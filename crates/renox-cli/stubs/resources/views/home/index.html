@@ -1,0 +1,12 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<h1>{{ app.name }}</h1>
+<p>Your Renox app is running.</p>
+
+<div x-data="{ count: 0 }">
+  <button @click="count++">Alpine.js clicks: <span x-text="count">0</span></button>
+</div>
+
+<p>Edit <code>resources/views/home/index.html</code> and refresh: templates reload without a rebuild.</p>
+{% endblock %}

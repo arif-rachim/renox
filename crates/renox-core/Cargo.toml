@@ -12,13 +12,23 @@ categories.workspace = true
 [dependencies]
 anyhow = "1.0.104"
 axum = "0.8.9"
+base64 = "0.23.1"
+cookie = { version = "0.18.2", features = ["private", "key-expansion", "percent-encode"] }
 dotenvy = "0.15.7"
+form_urlencoded = "1.2.2"
+minijinja = { version = "2.24.0", features = ["loader"] }
+minijinja-autoreload = "2.24.0"
+rand = "0.10.3"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
 thiserror = "2.0.21"
 tokio = { version = "1.53.1", features = ["full"] }
-tower-http = { version = "0.7.1", features = ["trace"] }
+tower = "0.5.3"
+tower-http = { version = "0.7.1", features = ["fs", "trace"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 [dev-dependencies]
 http-body-util = "0.1.5"
+tempfile = "3.27.0"
 tower = { version = "0.5.3", features = ["util"] }

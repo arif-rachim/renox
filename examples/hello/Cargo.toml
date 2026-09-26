@@ -6,3 +6,4 @@ publish = false
 
 [dependencies]
 renox.workspace = true
+serde = { version = "1.0.229", features = ["derive"] }

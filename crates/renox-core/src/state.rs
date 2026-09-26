@@ -1,17 +1,22 @@
+use std::fmt::Display;
 use std::sync::Arc;
 
-use crate::Config;
+use cookie::Key;
+
+use crate::{Config, Result, RouteTable, Views};
 
 /// Shared state available to every handler through `State<AppState>`.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AppState {
     pub config: Arc<Config>,
+    pub routes: Arc<RouteTable>,
+    pub views: Views,
+    pub(crate) key: Key,
 }
 
 impl AppState {
-    pub fn new(config: Config) -> Self {
-        Self {
-            config: Arc::new(config),
-        }
+    /// The URL path of a named route, e.g. `state.url("produk.show", &[&id])`.
+    pub fn url(&self, name: &str, params: &[&dyn Display]) -> Result<String> {
+        Ok(self.routes.url(name, params)?)
     }
 }

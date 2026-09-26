@@ -50,15 +50,20 @@ my-app/
 - [x] `examples/hello`
 
 ### M1 · v0.2: Web layer
-- [ ] Named routes and URL generation (`url_for("products.show", id)`)
-- [ ] Middleware stack: sessions (SQLite store), encrypted cookies, CSRF, flash messages, old input
-- [ ] MiniJinja views: layouts, components, app templates override built-in ones, reload in dev
-- [ ] HTMX helpers: `HxRequest`, `view()` that renders fragments for HTMX requests, `HxRedirect`, `HxTrigger`
-- [ ] htmx and Alpine.js embedded with versioned URLs
-- [ ] CLI: `renox new`, `renox serve`
+- [x] `Routes` builder with named routes; URL generation with `state.url()` and `route()` in templates
+- [x] Sessions in an encrypted cookie (`APP_KEY`), flash messages, old input, flashed errors
+- [x] CSRF protection: `X-CSRF-Token` header (sent automatically for HTMX) or `_token` field; 419 Page Expired
+- [x] MiniJinja views: layouts, request globals (`app`, `request`, `flash`, `errors`, `old()`, `csrf_field()`, `renox_head()`), reload in dev
+- [x] Built-in error page, overridable per status with `errors/{status}.html`
+- [x] HTMX helpers: `Htmx` extractor, `view().fragment()`, `HxRedirect`, `HxRefresh`, `HxTrigger`, `Back`
+- [x] htmx 2.0.11 and Alpine.js 3.17.4 embedded with cache-forever URLs; `public/` served at the root
+- [x] CLI: `renox new`, `renox serve` (rebuild and restart on change), `renox key:generate`
+- [ ] Route groups with a shared prefix and name prefix
+- [ ] CSRF token in multipart forms (moves to M6 with uploads; the header works today)
 
 ### M2 · v0.3: Database
 - [ ] sqlx SQLite pool with tuned pragmas (WAL, foreign keys, busy timeout)
+- [ ] Optional SQLite session driver for sessions larger than a cookie
 - [ ] Per-module migrations ordered by timestamp; `migrate`, `migrate:rollback`, `migrate:fresh`
 - [ ] `#[derive(Model)]`: `find`, `find_or_404`, `all`, `create`, `update`, `delete`, timestamps, soft deletes
 - [ ] Pagination (HTMX-ready links), transactions, seeders, factories
@@ -88,18 +93,24 @@ my-app/
 
 ### M7 · v0.8: CLI and developer experience
 - [ ] `make:module`, `make:model`, `make:migration`, `make:job`, `make:mail`, `make:policy`
-- [ ] `route:list`, `db:seed`, `key:generate`, `db:shell`
-- [ ] `serve` with hot reload (templates instantly, Rust code via rebuild)
+- [ ] `route:list`, `db:seed`, `db:shell`
+- [ ] Browser live reload after `renox serve` restarts
 
 ### M8 · v0.9: Testing and deployment
 - [ ] `renox-testing`: `TestApp`, HTTP client, `acting_as(user)`, `assert_see()`, in-memory DB per test, mail/queue fakes
-- [ ] `renox build`, Dockerfile and systemd templates, SQLite backups with Litestream
+- [ ] `renox build` with views embedded in the binary, Dockerfile and systemd templates, SQLite backups with Litestream
 
 ### v1.0
 - [ ] Documentation site built with Renox, starter kit, semver stability guarantee
 
 ## Decisions
 
+- **Crates:** runtime code lives in one crate, `renox-core`, organised in modules and gated by cargo
+  features where dependencies are heavy. Separate `renox-http`/`-db`/`-view` crates would all need
+  `AppState` and `App` would need all of them, so splitting now only adds indirection. Revisit if
+  compile times demand it.
+- **Sessions:** stored in an encrypted, signed cookie (AES-256-GCM via `APP_KEY`), so M1 needs no
+  database. Keep sessions small; a SQLite driver comes with M2.
 - **Templates:** MiniJinja (runtime, overridable, reloadable). Askama may be offered later.
 - **Named routes:** implemented in Renox; axum does not provide them.
 - **Queue:** apalis with the SQLite backend, so no Redis is required.

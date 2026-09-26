@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ app.name }}{% endblock %}</title>
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
+  {{ renox_head() }}
+</head>
+<body>
+  <main>
+    {% if flash.status %}<p class="flash">{{ flash.status }}</p>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

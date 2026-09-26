@@ -1,11 +1,9 @@
 // Separate test binary: the debug flag is process-wide.
-use axum::Router;
-use axum::body::Body;
-use axum::http::{Request, StatusCode};
-use axum::routing::get;
-use http_body_util::BodyExt;
-use renox_core::{App, AppState, Config, Module, Result};
-use tower::ServiceExt;
+mod support;
+
+use axum::http::StatusCode;
+use renox_core::{Module, Result, Routes};
+use support::TestApp;
 
 struct Demo;
 
@@ -14,8 +12,8 @@ impl Module for Demo {
         "demo"
     }
 
-    fn routes(&self) -> Router<AppState> {
-        Router::new().route("/fail", get(fail))
+    fn routes(&self) -> Routes {
+        Routes::new().get("/fail", fail)
     }
 }
 
@@ -26,18 +24,9 @@ async fn fail() -> Result<String> {
 
 #[tokio::test]
 async fn internal_error_hides_detail_without_debug() {
-    let config = Config {
-        debug: false,
-        ..Config::default()
-    };
-    let router = App::with_config(config).module(Demo).into_router().unwrap();
-    let res = router
-        .oneshot(Request::get("/fail").body(Body::empty()).unwrap())
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
-    let body = res.into_body().collect().await.unwrap().to_bytes();
-    let body = String::from_utf8(body.to_vec()).unwrap();
-    assert!(body.contains("500 · Internal Server Error"));
-    assert!(!body.contains("invalid digit"));
+    let mut app = TestApp::new(false, &[], |app| app.module(Demo));
+    let res = app.get("/fail").await;
+    assert_eq!(res.status, StatusCode::INTERNAL_SERVER_ERROR);
+    assert!(res.body.contains("500 · Internal Server Error"));
+    assert!(!res.body.contains("invalid digit"));
 }
