@@ -4,6 +4,8 @@ description = "Core of the Renox web framework: application builder, modules, co
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
