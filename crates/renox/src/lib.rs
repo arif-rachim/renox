@@ -1,0 +1,37 @@
+//! # Renox
+//!
+//! A batteries-included web framework for Rust, inspired by Laravel.
+//! Axum + HTMX + Alpine.js + SQLite.
+//!
+//! ```no_run
+//! use renox::prelude::*;
+//!
+//! struct Hello;
+//!
+//! impl Module for Hello {
+//!     fn name(&self) -> &'static str { "hello" }
+//!
+//!     fn routes(&self) -> Router<AppState> {
+//!         Router::new().route("/", get(|| async { "Hello from Renox" }))
+//!     }
+//! }
+//!
+//! fn main() -> renox::Result {
+//!     App::new().module(Hello).run()
+//! }
+//! ```
+
+pub use renox_core::*;
+
+pub use axum;
+pub use tokio;
+
+pub mod prelude {
+    pub use renox_core::{App, AppState, Config, Environment, Error, Module, Result};
+
+    pub use axum::Router;
+    pub use axum::extract::{Form, Json, Path, Query, State};
+    pub use axum::http::StatusCode;
+    pub use axum::response::{Html, IntoResponse, Redirect, Response};
+    pub use axum::routing::{delete, get, patch, post, put};
+}

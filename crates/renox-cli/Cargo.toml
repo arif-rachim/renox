@@ -1,0 +1,15 @@
+[package]
+name = "renox-cli"
+description = "Command-line tool for the Renox web framework (like Laravel's artisan). (Early placeholder, work in progress.)"
+readme = "../../README.md"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories = ["command-line-utilities", "web-programming::http-server"]
+
+[[bin]]
+name = "renox"
+path = "src/main.rs"
+
+[dependencies]
