@@ -20,6 +20,8 @@ pub enum Error {
     Unauthorized,
     Forbidden,
     NotFound,
+    /// The CSRF token was missing or wrong, usually because the session expired.
+    PageExpired,
     Internal(anyhow::Error),
 }
 
@@ -30,6 +32,7 @@ impl Error {
             Self::Unauthorized => StatusCode::UNAUTHORIZED,
             Self::Forbidden => StatusCode::FORBIDDEN,
             Self::NotFound => StatusCode::NOT_FOUND,
+            Self::PageExpired => StatusCode::from_u16(419).expect("valid status code"),
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -38,6 +41,21 @@ impl Error {
 impl<E: Into<anyhow::Error>> From<E> for Error {
     fn from(err: E) -> Self {
         Self::Internal(err.into())
+    }
+}
+
+/// Marks an error response so the view middleware can render it with
+/// `errors/{status}.html` or the built-in `renox/error.html`.
+#[derive(Debug, Clone)]
+pub(crate) struct ErrorPage {
+    pub status: StatusCode,
+    pub detail: Option<String>,
+}
+
+pub(crate) fn reason(status: StatusCode) -> &'static str {
+    match status.as_u16() {
+        419 => "Page Expired",
+        _ => status.canonical_reason().unwrap_or("Error"),
     }
 }
 
@@ -52,23 +70,24 @@ impl IntoResponse for Error {
             Self::BadRequest(msg) => Some(msg.clone()),
             _ => None,
         };
-        (status, Html(error_page(status, detail.as_deref()))).into_response()
+        let mut res = (status, Html(error_page(status, detail.as_deref()))).into_response();
+        res.extensions_mut().insert(ErrorPage { status, detail });
+        res
     }
 }
 
+/// Plain fallback used when the error page template can't be rendered.
 fn error_page(status: StatusCode, detail: Option<&str>) -> String {
     let code = status.as_u16();
-    let reason = status.canonical_reason().unwrap_or("Error");
+    let reason = reason(status);
     let detail = detail
         .map(|d| format!("<pre>{}</pre>", escape(d)))
         .unwrap_or_default();
     format!(
         "<!doctype html><html><head><meta charset=\"utf-8\">\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\
-         <title>{code} {reason}</title>\
-         <style>body{{font-family:system-ui,sans-serif;max-width:48rem;margin:4rem auto;padding:0 1rem;color:#222}}\
-         h1{{font-weight:600}}pre{{background:#f4f4f4;padding:1rem;overflow:auto;white-space:pre-wrap}}</style>\
-         </head><body><h1>{code} · {reason}</h1>{detail}</body></html>"
+         <title>{code} {reason}</title></head>\
+         <body><h1>{code} · {reason}</h1>{detail}</body></html>"
     )
 }
 

@@ -1,0 +1,26 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<h1>Buku Tamu</h1>
+
+<form method="post" action="{{ route('guestbook.store') }}"
+      hx-post="{{ route('guestbook.store') }}" hx-target="#entries" hx-swap="outerHTML"
+      x-data="{ sending: false }" @htmx:before-request="sending = true"
+      @htmx:after-request="sending = false; if ($event.detail.successful) $el.reset()">
+  {{ csrf_field() }}
+  {% for e in errors.form %}<p class="error">{{ e }}</p>{% endfor %}
+  <input name="name" placeholder="Nama" value="{{ old('name') }}">
+  <textarea name="message" placeholder="Pesan">{{ old('message') }}</textarea>
+  <button :disabled="sending" x-text="sending ? 'Mengirim…' : 'Kirim'">Kirim</button>
+</form>
+
+{% block entries %}
+<ul id="entries">
+  {% for entry in entries %}
+  <li><strong>{{ entry.name }}</strong>: {{ entry.message }}</li>
+  {% else %}
+  <li class="empty">Belum ada pesan.</li>
+  {% endfor %}
+</ul>
+{% endblock %}
+{% endblock %}

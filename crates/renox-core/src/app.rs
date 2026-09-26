@@ -1,9 +1,18 @@
+use std::sync::Arc;
+
 use axum::Router;
+use axum::handler::HandlerWithoutStateExt;
+use axum::middleware::{from_fn, from_fn_with_state};
 use tokio::net::TcpListener;
+use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
-use crate::{AppState, Config, Error, Module, Result};
+use crate::crypto::parse_key;
+use crate::{
+    AppState, Config, Environment, Error, Module, Result, RouteTable, Views, assets, csrf, session,
+    view,
+};
 
 /// The application builder.
 ///
@@ -45,7 +54,7 @@ impl App {
             Some(config) => config,
             None => Config::load()?,
         };
-        Ok(build_router(config, &self.modules))
+        build_router(config, &self.modules)
     }
 
     /// Starts the server on a new Tokio runtime and blocks until shutdown.
@@ -66,7 +75,7 @@ impl App {
 
         let addr = config.addr();
         let name = config.name.clone();
-        let router = build_router(config, &self.modules);
+        let router = build_router(config, &self.modules)?;
 
         let listener = TcpListener::bind(addr).await?;
         tracing::info!("{name} listening on http://{}", listener.local_addr()?);
@@ -84,19 +93,57 @@ impl Default for App {
     }
 }
 
-fn build_router(config: Config, modules: &[Box<dyn Module>]) -> Router {
+fn build_router(config: Config, modules: &[Box<dyn Module>]) -> Result<Router> {
     crate::error::set_debug(config.debug);
 
+    let key = match &config.key {
+        Some(key) => parse_key(key)?,
+        None => {
+            if config.env != Environment::Testing {
+                tracing::warn!(
+                    "APP_KEY is not set; using a temporary key, so sessions end on restart. \
+                     Run `renox key:generate`."
+                );
+            }
+            parse_key(&crate::generate_key())?
+        }
+    };
+
     let mut router = Router::new();
+    let mut routes = RouteTable::default();
     for module in modules {
         tracing::debug!(module = module.name(), "registering module");
-        router = router.merge(module.routes());
+        let (module_router, names) = module.routes().into_parts();
+        router = router.merge(module_router);
+        for (name, path) in names {
+            routes.insert(name, path)?;
+        }
     }
+    let routes = Arc::new(routes);
 
-    router
-        .fallback(|| async { Error::NotFound })
+    let public = config.public_path.clone();
+    let views = Views::new(&config, routes.clone());
+    let state = AppState {
+        config: Arc::new(config),
+        routes,
+        views,
+        key,
+    };
+
+    let not_found = || async { Error::NotFound };
+    let router = if public.is_dir() {
+        router.fallback_service(ServeDir::new(public).not_found_service(not_found.into_service()))
+    } else {
+        router.fallback(not_found)
+    };
+
+    Ok(router
+        .layer(from_fn_with_state(state.clone(), view::middleware))
+        .layer(from_fn(csrf::middleware))
+        .layer(from_fn_with_state(state.clone(), session::middleware))
+        .merge(assets::router())
         .layer(TraceLayer::new_for_http())
-        .with_state(AppState::new(config))
+        .with_state(state))
 }
 
 fn init_tracing(config: &Config) {

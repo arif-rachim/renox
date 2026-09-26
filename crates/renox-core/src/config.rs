@@ -1,5 +1,6 @@
 use std::env;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::path::PathBuf;
 
 use anyhow::{Context, bail};
 
@@ -34,6 +35,14 @@ pub struct Config {
     pub key: Option<String>,
     pub host: IpAddr,
     pub port: u16,
+    /// Where templates live, from `VIEWS_PATH`.
+    pub views_path: PathBuf,
+    /// Files served as-is at the site root, from `PUBLIC_PATH`.
+    pub public_path: PathBuf,
+    /// Minutes of inactivity before a session expires, from `SESSION_LIFETIME`.
+    pub session_lifetime: u64,
+    /// Name of the session cookie, from `SESSION_COOKIE`.
+    pub session_cookie: String,
 }
 
 impl Config {
@@ -67,6 +76,12 @@ impl Config {
             key,
             host,
             port,
+            views_path: var_or("VIEWS_PATH", "resources/views").into(),
+            public_path: var_or("PUBLIC_PATH", "public").into(),
+            session_lifetime: var_or("SESSION_LIFETIME", "120")
+                .parse()
+                .context("SESSION_LIFETIME must be a number of minutes")?,
+            session_cookie: var_or("SESSION_COOKIE", "renox_session"),
         })
     }
 
@@ -85,6 +100,10 @@ impl Default for Config {
             key: None,
             host: IpAddr::V4(Ipv4Addr::LOCALHOST),
             port: 3000,
+            views_path: "resources/views".into(),
+            public_path: "public".into(),
+            session_lifetime: 120,
+            session_cookie: "renox_session".into(),
         }
     }
 }
