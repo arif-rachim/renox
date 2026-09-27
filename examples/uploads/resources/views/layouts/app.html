@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="{{ app.locale }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {#- Title, description, canonical URL and social cards; a page overrides it with
+      {% block seo %}{{ seo(title="…", description="…", image="…") }}{% endblock %} -#}
+  {% block seo %}{{ seo() }}{% endblock %}
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
+  {{ renox_head() }}
+</head>
+<body>
+  <nav>
+    <a href="{{ route("home") }}"><strong>{{ app.name }}</strong></a>
+  </nav>
+  <main>
+    {% if flash.status %}<p class="flash">{{ flash.status }}</p>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

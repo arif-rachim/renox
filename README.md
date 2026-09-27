@@ -213,6 +213,13 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 
 - [`examples/crud`](examples/crud): one resource end to end, with pagination, validation,
   owner-only edit and delete through a policy, soft deletes with a trash, and tests.
+- [`examples/api`](examples/api): a JSON API for a mobile app, with tokens, Bearer auth, JSON
+  validation errors, CORS and a rate limit.
+- [`examples/jobs`](examples/jobs): an event, a queued receipt mail, admin notifications and a
+  scheduled daily report.
+- [`examples/uploads`](examples/uploads): public photos checked by content, and private invoices
+  behind expiring links.
+- [`examples/postgres`](examples/postgres): one app, tested on PostgreSQL and SQLite.
 - [`examples/webhooks`](examples/webhooks): Midtrans, Xendit and Stripe webhooks marking orders
   paid, each tested with good, forged and repeated calls.
 - [`examples/hello`](examples/hello): the guestbook from the GIF, with an HTMX form, a photo upload,
@@ -223,7 +230,7 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 Renox is **pre-1.0**: the API may still change between versions, and the crates on crates.io are
 placeholders until the first real release, so install from Git as shown above. Everything listed
 here is implemented and tested on Linux, macOS and Windows, against SQLite and PostgreSQL. What's
-next (more examples and doctests, then 1.0) is in
+next (doctests on the public API, then 1.0) is in
 [ROADMAP.md](ROADMAP.md). Issues and feedback are welcome.
 
 ## License

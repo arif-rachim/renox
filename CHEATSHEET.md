@@ -487,7 +487,8 @@ async fn members_only() {
 }
 ```
 
-Also available: `assert_redirect`, `assert_forbidden`, `assert_not_found`, `assert_dont_see`,
+Also available: `post_multipart(uri, &[("title", "x")], &[("photo", "a.png", &bytes)])`,
+`post_body` (exact bytes, e.g. signed webhooks), `assert_redirect`, `assert_forbidden`, `assert_not_found`, `assert_dont_see`,
 `assert_database_missing` / `assert_database_count`, `post_json`, `queued_jobs()`, `run_jobs()`,
 `sent_mail()` / `assert_mail_sent`.
 

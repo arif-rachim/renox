@@ -255,18 +255,56 @@ fn parse_json<T: DeserializeOwned>(
         Ok(_) => return Err(Error::BadRequest("The JSON body must be an object.".into())),
         Err(err) => return Err(Error::BadRequest(format!("Invalid JSON: {err}"))),
     };
-    let mut deserializer = serde_json::Deserializer::from_slice(bytes);
-    let parsed = match serde_path_to_error::deserialize(&mut deserializer) {
-        Ok(data) => Parsed::Ok(data, Errors::new()),
-        Err(err) => Parsed::Invalid(field_error(
-            &err.path().to_string(),
-            &err.inner().to_string(),
-            false,
-            locale,
-        )),
+    // As with forms: a missing field is put back as "" so its rules (and
+    // `required`) run, and a field of the wrong type gets its error and a
+    // placeholder, so every field's errors show at once.
+    let mut body = input.clone();
+    let mut errors = Errors::new();
+    let mut tries: HashMap<String, usize> = HashMap::new();
+    let parsed = loop {
+        match serde_path_to_error::deserialize(Value::Object(body.clone())) {
+            Ok(data) => break Parsed::Ok(data, errors),
+            Err(err) => {
+                let message = err.inner().to_string();
+                if let Some(field) = missing_field(&message)
+                    && !body.contains_key(field)
+                {
+                    body.insert(field.to_owned(), Value::String(String::new()));
+                    continue;
+                }
+                let path = err.path().to_string();
+                let blank = body.get(&path).is_some_and(|v| {
+                    v.is_null() || v.as_str().is_some_and(|s| s.trim().is_empty())
+                });
+                let tried = tries.entry(path.clone()).or_default();
+                if *tried == 0 {
+                    for (field, messages) in field_error(&path, &message, blank, locale).iter() {
+                        for message in messages {
+                            errors.add(field, message.clone());
+                        }
+                    }
+                }
+                let placeholder = JSON_PLACEHOLDERS.get(*tried);
+                *tried += 1;
+                match placeholder {
+                    Some(value) if body.contains_key(&path) => {
+                        body.insert(path, value());
+                    }
+                    _ => break Parsed::Invalid(errors),
+                }
+            }
+        }
     };
     Ok((parsed, input))
 }
+
+/// JSON stand-ins for a field of the wrong type, tried in turn.
+const JSON_PLACEHOLDERS: &[fn() -> Value] = &[
+    || Value::from(0),
+    || Value::Bool(false),
+    || Value::String(String::new()),
+    || Value::Null,
+];
 
 fn missing_field(message: &str) -> Option<&str> {
     message

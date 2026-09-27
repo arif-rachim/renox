@@ -24,6 +24,24 @@
   - Views: [index.html](examples/crud/resources/views/products/index.html),
     [form.html](examples/crud/resources/views/products/form.html)
   - Tests: [examples/crud/tests/products.rs](examples/crud/tests/products.rs)
+- [examples/api](examples/api): a JSON API: tokens for a mobile app (`User::attempt`,
+  `create_token`), Bearer auth, JSON bodies validated with 422 errors, JSON 401/404, CORS and a
+  rate limit. [src/app/products/mod.rs](examples/api/src/app/products/mod.rs),
+  [tests/api.rs](examples/api/tests/api.rs)
+- [examples/jobs](examples/jobs): an event whose listener queues a receipt mail (a mail template
+  with a text version), a notification to admins by mail and in the database, and a scheduled
+  daily report. [src/app/orders/mod.rs](examples/jobs/src/app/orders/mod.rs),
+  [receipt.rs](examples/jobs/src/app/orders/receipt.rs),
+  [new_order.rs](examples/jobs/src/app/orders/new_order.rs),
+  [tests/orders.rs](examples/jobs/tests/orders.rs)
+- [examples/uploads](examples/uploads): public photos checked by content, private invoices behind
+  expiring signed links, `post_multipart` in tests.
+  [src/app/documents/mod.rs](examples/uploads/src/app/documents/mod.rs),
+  [tests/documents.rs](examples/uploads/tests/documents.rs)
+- [examples/postgres](examples/postgres): one app on PostgreSQL and SQLite (BOOLEAN and DATE
+  columns, per-database migrations, case-insensitive search), tested on both.
+  [src/app/tasks/mod.rs](examples/postgres/src/app/tasks/mod.rs),
+  [migrations/](examples/postgres/migrations)
 - [examples/webhooks](examples/webhooks): payment gateway webhooks marking orders paid:
   Midtrans, Xendit and Stripe signatures, stored once per event, processed in the queue.
   - One file per provider: [midtrans.rs](examples/webhooks/src/app/payments/midtrans.rs),

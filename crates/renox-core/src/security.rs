@@ -171,7 +171,12 @@ pub(crate) async fn middleware(
     let security = &state.security;
     let nonce = crate::crypto::random_token();
     req.extensions_mut().insert(CspNonce(nonce.clone()));
+    let wants_json = crate::error::wants_json(req.headers());
     let mut res = next.run(req).await;
+    // Errors from outside the view layer (e.g. CSRF's 419) for API clients.
+    if wants_json && let Some(page) = res.extensions_mut().remove::<crate::error::ErrorPage>() {
+        res = page.json(state.config.debug);
+    }
 
     let headers = res.headers_mut();
     let mut set = |name: HeaderName, value: &str| {

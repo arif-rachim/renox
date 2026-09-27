@@ -106,6 +106,18 @@ impl User {
         self.save(db).await
     }
 
+    /// The user with this email and password, e.g. to issue an API token.
+    /// Takes as long for an unknown email as for a wrong password, so the
+    /// answer doesn't reveal which emails have accounts.
+    pub async fn attempt(db: &Db, email: &str, password: &str) -> Result<Option<Self>> {
+        let user = Self::find_by_email(db, email).await?;
+        let hash = user
+            .as_ref()
+            .map_or_else(dummy_hash, |u| u.password.clone());
+        let valid = verify_password(password, &hash).await;
+        Ok(user.filter(|_| valid))
+    }
+
     pub async fn check_password(&self, password: &str) -> bool {
         verify_password(password, &self.password).await
     }

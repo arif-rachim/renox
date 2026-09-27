@@ -118,6 +118,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
+name = "api"
+version = "0.0.0"
+dependencies = [
+ "renox",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "argon2"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1405,6 +1414,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "jobs"
+version = "0.0.0"
+dependencies = [
+ "renox",
+ "serde",
+]
+
+[[package]]
 name = "jobserver"
 version = "0.1.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1852,6 +1869,14 @@ dependencies = [
  "cpufeatures 0.2.17",
  "opaque-debug",
  "universal-hash",
+]
+
+[[package]]
+name = "postgres-app"
+version = "0.0.0"
+dependencies = [
+ "renox",
+ "serde",
 ]
 
 [[package]]
@@ -3130,6 +3155,14 @@ name = "untrusted"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
+
+[[package]]
+name = "uploads"
+version = "0.0.0"
+dependencies = [
+ "renox",
+ "serde",
+]
 
 [[package]]
 name = "url"

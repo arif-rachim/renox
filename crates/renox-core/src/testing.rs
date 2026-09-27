@@ -179,6 +179,16 @@ impl TestApp {
         self.request().post_json(uri, body).await
     }
 
+    /// A multipart form with files; see `TestRequest::post_multipart`.
+    pub async fn post_multipart(
+        &self,
+        uri: &str,
+        fields: &[(&str, &str)],
+        files: &[(&str, &str, &[u8])],
+    ) -> TestResponse {
+        self.request().post_multipart(uri, fields, files).await
+    }
+
     /// A POST with exactly these bytes (e.g. a signed webhook); no CSRF token.
     pub async fn post_body(
         &self,
@@ -311,6 +321,39 @@ impl TestRequest<'_> {
 
     pub async fn delete(self, uri: &str) -> TestResponse {
         self.send(Method::DELETE, uri, None, Body::empty()).await
+    }
+
+    /// A multipart form, as a browser sends one with a file input:
+    /// `post_multipart("/photos", &[("title", "Kopi")], &[("photo", "kopi.png", &bytes)])`.
+    pub async fn post_multipart(
+        self,
+        uri: &str,
+        fields: &[(&str, &str)],
+        files: &[(&str, &str, &[u8])],
+    ) -> TestResponse {
+        const BOUNDARY: &str = "renox-test-boundary-7d1f";
+        let mut body = Vec::new();
+        for (name, value) in fields {
+            body.extend_from_slice(
+                format!("--{BOUNDARY}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n")
+                    .as_bytes(),
+            );
+        }
+        for (name, file_name, bytes) in files {
+            body.extend_from_slice(
+                format!(
+                    "--{BOUNDARY}\r\nContent-Disposition: form-data; name=\"{name}\"; filename=\"{file_name}\"\r\n\
+                     Content-Type: application/octet-stream\r\n\r\n"
+                )
+                .as_bytes(),
+            );
+            body.extend_from_slice(bytes);
+            body.extend_from_slice(b"\r\n");
+        }
+        body.extend_from_slice(format!("--{BOUNDARY}--\r\n").as_bytes());
+        let content_type = format!("multipart/form-data; boundary={BOUNDARY}");
+        self.send(Method::POST, uri, Some(&content_type), Body::from(body))
+            .await
     }
 
     /// A POST with exactly these bytes, e.g. a webhook whose signature

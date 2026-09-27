@@ -397,6 +397,9 @@ pub(crate) async fn middleware(
 
     if let Some(page) = res.extensions_mut().remove::<ErrorPage>() {
         let debug = state.config.debug;
+        if wants_json && !htmx.request {
+            return page.json(debug);
+        }
         let html = state
             .views
             .render_error(&page, debug)
