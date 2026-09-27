@@ -79,6 +79,14 @@ enum Command {
         #[arg(long)]
         module: String,
     },
+    /// Create an app command in a module (`my-app <name>`).
+    #[command(name = "make:command")]
+    MakeCmd {
+        /// e.g. `admin:create`.
+        name: String,
+        #[arg(long)]
+        module: String,
+    },
     /// Create a policy for a module's model.
     #[command(name = "make:policy")]
     MakePolicy {
@@ -152,6 +160,7 @@ fn main() -> Result<()> {
             migration,
         } => generate::model(&app_root()?, &name, module.as_deref(), migration),
         Command::MakeJob { name, module } => generate::job(&app_root()?, &name, &module),
+        Command::MakeCmd { name, module } => generate::command(&app_root()?, &name, &module),
         Command::MakePolicy { model, module } => generate::policy(&app_root()?, &model, &module),
         Command::MakeMail { name } => generate::mail(&app_root()?, &name),
         Command::Migrate { args } => app_command("migrate", &args),

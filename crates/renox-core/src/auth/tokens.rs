@@ -7,6 +7,7 @@ use crate::db::{DateTime, Db, Model, now};
 
 /// An API token. Only a SHA-256 hash of the secret is stored.
 #[derive(Debug, Clone, Serialize)]
+#[non_exhaustive]
 pub struct AccessToken {
     pub id: i64,
     pub user_id: i64,
@@ -19,6 +20,7 @@ pub struct AccessToken {
 /// A freshly created token. `plain` is shown once; send it as
 /// `Authorization: Bearer <plain>`.
 #[derive(Debug, Clone, Serialize)]
+#[non_exhaustive]
 pub struct NewToken {
     pub token: AccessToken,
     pub plain: String,
@@ -32,7 +34,7 @@ pub(crate) fn sha256_hex(value: &str) -> String {
         .collect()
 }
 
-fn from_row(row: &crate::db::Row) -> std::result::Result<AccessToken, sqlx::Error> {
+fn from_row(row: &crate::db::Row) -> std::result::Result<AccessToken, crate::db::DbError> {
     Ok(AccessToken {
         id: row.try_get("id")?,
         user_id: row.try_get("user_id")?,

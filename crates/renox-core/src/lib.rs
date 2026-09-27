@@ -9,6 +9,7 @@ mod assets;
 pub mod auth;
 pub mod cache;
 mod client_ip;
+pub mod command;
 mod config;
 mod crypto;
 mod csrf;
@@ -50,7 +51,7 @@ pub use config::{AnalyticsConfig, Config, CspMode, Environment};
 pub use crypto::generate_key;
 pub use csrf::{CSRF_FIELD, CSRF_HEADER};
 pub use embedded::Embedded;
-pub use error::{Error, Result};
+pub use error::{Error, Result, abort, abort_if, abort_unless};
 pub use htmx::{Back, Htmx, HxRedirect, HxRefresh, HxTrigger};
 pub use i18n::Lang;
 pub use method::METHOD_FIELD;
@@ -69,6 +70,7 @@ pub use chrono;
 pub use fake;
 pub use serde;
 pub use serde_json;
-pub use sqlx;
+#[doc(hidden)]
+pub use sqlx as __sqlx;
 /// CORS configuration for `Routes::cors_layer`.
 pub use tower_http::cors;

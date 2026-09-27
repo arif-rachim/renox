@@ -292,6 +292,48 @@ impl Job for {pascal} {{
     Ok(())
 }
 
+/// `rnx make:command admin:create --module users`: an app command in the
+/// module, run as `my-app admin:create …`.
+pub fn command(root: &Path, name: &str, module: &str) -> Result<()> {
+    let valid = name.split(':').all(|part| {
+        part.starts_with(|c: char| c.is_ascii_lowercase())
+            && part
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
+    });
+    if !valid {
+        bail!(
+            "`{name}` is not a valid command name: use lowercase words separated by `:`, e.g. admin:create"
+        );
+    }
+    let snake = name.replace([':', '-'], "_");
+    if is_reserved(&snake) {
+        bail!("`{name}` can't be used: `{snake}` is a Rust keyword or a crate the app uses");
+    }
+    let module = module.to_snake_case();
+    let dir = module_dir(root, &module)?;
+    write_new(
+        &dir.join(format!("{snake}.rs")),
+        &format!(
+            r#"use renox::command::Args;
+use renox::prelude::*;
+
+/// `my-app {name} …`
+pub async fn run(state: AppState, args: Args) -> Result {{
+    let _ = (state, args);
+    println!("{name}: done");
+    Ok(())
+}}
+"#
+        ),
+    )?;
+    add_mod(&dir.join("mod.rs"), &snake)?;
+    println!(
+        "Register it in the module's `register`: app.command(\"{name}\", \"What it does\", {snake}::run);"
+    );
+    Ok(())
+}
+
 /// `rnx make:policy Produk --module produk`: `impl Policy` for a model.
 pub fn policy(root: &Path, model: &str, module: &str) -> Result<()> {
     check_name(model)?;
@@ -420,6 +462,10 @@ mod tests {
             read(&dir, "src/app/produk/kirim_struk.rs")
                 .contains(r#"const NAME: &'static str = "kirim-struk";"#)
         );
+        command(dir.path(), "stok:import", "produk").unwrap();
+        assert!(read(&dir, "src/app/produk/stok_import.rs").contains("pub async fn run("));
+        assert!(command(dir.path(), "Bad Name", "produk").is_err());
+        assert!(command(dir.path(), "self", "produk").is_err());
         policy(dir.path(), "Produk", "produk").unwrap();
         assert!(read(&dir, "src/app/produk/policy.rs").contains("impl Policy for Produk"));
 
@@ -428,6 +474,7 @@ mod tests {
             "pub mod model;",
             "pub mod kategori;",
             "pub mod kirim_struk;",
+            "pub mod stok_import;",
             "pub mod policy;",
         ] {
             assert!(mods.contains(m), "{mods}");

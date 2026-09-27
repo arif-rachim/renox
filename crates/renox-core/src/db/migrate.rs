@@ -105,6 +105,7 @@ impl Migration {
 
 /// Whether a migration has run, and in which batch.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct MigrationStatus {
     pub name: String,
     pub batch: Option<i64>,
@@ -138,7 +139,7 @@ fn runs_outside_transaction(sql: &str) -> bool {
 /// Runs `sql` outside the migration transaction. PostgreSQL runs a
 /// multi-statement script as one implicit transaction, which `CONCURRENTLY`
 /// refuses, so there such a script runs one statement at a time.
-async fn run_each(db: &Db, sql: &str) -> Result<(), sqlx::Error> {
+async fn run_each(db: &Db, sql: &str) -> Result<(), super::DbError> {
     if db.dialect() == Dialect::Postgres && sql.to_ascii_uppercase().contains(" CONCURRENTLY ") {
         for statement in statements(sql) {
             script(db, statement).await?;

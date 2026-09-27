@@ -39,13 +39,14 @@ async fn kernel(dir: &std::path::Path, env: Environment) -> Kernel {
         "<head>{{ renox_head() }}</head>v1",
     )
     .unwrap();
-    let config = Config {
-        env,
-        key: Some(renox::generate_key()),
-        views_path: dir.join("views"),
-        public_path: dir.join("public"),
-        lang_path: dir.join("lang"),
-        ..Config::default()
+    let config = {
+        let mut c = Config::default();
+        c.env = env;
+        c.key = Some(renox::generate_key());
+        c.views_path = dir.join("views");
+        c.public_path = dir.join("public");
+        c.lang_path = dir.join("lang");
+        c
     };
     let kernel = App::with_config(config)
         .module(Auth::new())

@@ -140,10 +140,11 @@ impl Module for Shop {
 }
 
 fn config() -> Config {
-    Config {
-        env: Environment::Testing,
-        key: Some(renox::generate_key()),
-        ..Config::default()
+    {
+        let mut c = Config::default();
+        c.env = Environment::Testing;
+        c.key = Some(renox::generate_key());
+        c
     }
 }
 
@@ -381,9 +382,10 @@ async fn misconfiguration_fails_at_boot() {
         .await;
     assert!(format!("{:?}", bad_time.err().unwrap()).contains("task `nope`"));
 
-    let bad_zone = App::with_config(Config {
-        timezone: "Asia/Jakarta".into(),
-        ..config()
+    let bad_zone = App::with_config({
+        let mut c = config();
+        c.timezone = "Asia/Jakarta".into();
+        c
     })
     .boot()
     .await;

@@ -39,6 +39,7 @@ const OUTBOX: usize = 50;
 
 /// One email message. `html` is optional; `text` is always sent.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct Mail {
     pub to: String,
     pub subject: String,
@@ -65,6 +66,7 @@ impl Mail {
 
 /// Mail settings, from `MAIL_*`.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct MailConfig {
     /// `smtp`, `log` or `memory`.
     pub mailer: String,

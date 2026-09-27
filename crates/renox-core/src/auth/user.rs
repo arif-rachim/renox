@@ -15,6 +15,7 @@ use crate::{Error, Result};
 /// Add your own columns with a migration and read them through your own
 /// model on the same table, e.g. `#[model(table = "users")] struct Pelanggan`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct User {
     pub id: i64,
     pub name: String,
@@ -47,7 +48,7 @@ impl Model for User {
         self.id = id;
     }
 
-    fn from_row(row: &Row) -> std::result::Result<Self, sqlx::Error> {
+    fn from_row(row: &Row) -> std::result::Result<Self, crate::db::DbError> {
         Ok(Self {
             id: row.try_get("id")?,
             name: row.try_get("name")?,

@@ -473,14 +473,18 @@ M13c · keep it that way:
 What would be a breaking change after 1.0, settled now (IDs from the audit), in three PRs.
 
 M14a · API foundations:
-- [ ] A1 `#[non_exhaustive]` or builders on public types that will grow
-- [ ] A2 Public dependency policy: which of axum / sqlx / tower-http stay exposed, and a
-      documented rule for Renox's major version when they change
-- [ ] A3 `Error::Status(code, message)` and an `abort` helper
-- [ ] A10 Route groups with a path prefix and a name prefix
-- [ ] A9 App commands (`App::command`), plus a `make:command` generator
-- [ ] `rnx new` pins the Renox version it depends on (a git tag or rev until the crates are
-      published), so `cargo update` doesn't pull an unreleased API
+- [x] A1 `#[non_exhaustive]` on the public structs and enums that will grow (list in
+      [docs/stability.md](docs/stability.md)); `Dialect` stays exhaustive on purpose
+- [x] A2 [docs/stability.md](docs/stability.md): semver scope and public dependencies. axum,
+      tower(-http), minijinja, tokio, serde, chrono and fake are public (Renox's major follows
+      theirs); sqlx is not: queries fail with `db::DbError`, and sqlx is reachable only through
+      escape hatches (`Db::sqlite()`, `renox::db::sqlx`, …)
+- [x] A3 `Error::Status(code, message)` and `abort`, `abort_if`, `abort_unless` (in the prelude)
+- [x] A10 `Routes::group(path_prefix, name_prefix, routes)`
+- [x] A9 `App::command` / `Registry::command` with `command::Args`, listed in `help`,
+      `Kernel::call` for tests; `rnx make:command`; `examples/hello` has `entries:prune`
+- [x] `rnx new` pins Renox to the commit `rnx` was built from (`rev = …`, also through
+      `cargo install --git`), falling back to `branch = "main"` without git
 
 M14b · extension points:
 - [ ] A8 Template functions and filters (money, dates), shared view data, typed app state,

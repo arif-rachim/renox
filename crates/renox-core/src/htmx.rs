@@ -16,6 +16,7 @@ use axum::response::{IntoResponse, IntoResponseParts, Redirect, Response, Respon
 /// }
 /// ```
 #[derive(Debug, Clone, Default)]
+#[non_exhaustive]
 pub struct Htmx {
     /// The request was made by HTMX (`HX-Request`).
     pub request: bool,

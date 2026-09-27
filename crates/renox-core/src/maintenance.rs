@@ -21,6 +21,7 @@ use crate::{AppState, Error, Result};
 const BYPASS_COOKIE: &str = "renox_maintenance";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Down {
     pub since: i64,
     /// Seconds to suggest in `Retry-After`.

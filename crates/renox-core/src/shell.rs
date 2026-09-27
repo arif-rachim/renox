@@ -102,7 +102,7 @@ pub async fn run_with(
 }
 
 /// Runs one statement and returns what to print.
-async fn execute(db: &Db, sql: &str) -> std::result::Result<String, sqlx::Error> {
+async fn execute(db: &Db, sql: &str) -> std::result::Result<String, crate::db::DbError> {
     let first = sql
         .split_whitespace()
         .next()

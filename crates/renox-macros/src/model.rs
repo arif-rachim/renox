@@ -149,7 +149,7 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
 
             fn from_row(
                 row: &::renox::db::Row,
-            ) -> ::core::result::Result<Self, ::renox::sqlx::Error> {
+            ) -> ::core::result::Result<Self, ::renox::db::DbError> {
                 ::core::result::Result::Ok(Self { #(#from_row),* })
             }
 

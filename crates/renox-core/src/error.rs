@@ -5,6 +5,19 @@ pub type Result<T = (), E = Error> = std::result::Result<T, E>;
 
 /// The error type handlers return. Any `anyhow`-compatible error converts into
 /// `Error::Internal` with `?`.
+///
+/// For a status without its own variant (402, 409, 410, …) use
+/// `Error::Status`, or [`abort`] / [`abort_if`]:
+///
+/// ```
+/// # use renox::prelude::*;
+/// # struct Order { paid: bool }
+/// fn download(order: &Order) -> Result<&'static str> {
+///     renox::abort_if(!order.paid, StatusCode::PAYMENT_REQUIRED, "Pay for the order first.")?;
+///     Ok("the file")
+/// }
+/// ```
+#[non_exhaustive]
 pub enum Error {
     BadRequest(String),
     Unauthorized,
@@ -18,7 +31,30 @@ pub enum Error {
     ServiceUnavailable,
     /// Invalid input; see `ValidationError`.
     Validation(crate::validation::ValidationError),
+    /// Any status, with a message that is safe to show visitors (on the
+    /// error page, or as `message` in JSON).
+    Status(StatusCode, String),
     Internal(anyhow::Error),
+}
+
+/// An error with `status` and a message shown to the visitor, for
+/// `return Err(abort(…))`. See [`abort_if`] for a condition.
+pub fn abort(status: StatusCode, message: impl Into<String>) -> Error {
+    Error::Status(status, message.into())
+}
+
+/// `Err(abort(status, message))` when `condition` holds, for `?`.
+pub fn abort_if(condition: bool, status: StatusCode, message: impl Into<String>) -> Result {
+    if condition {
+        Err(abort(status, message))
+    } else {
+        Ok(())
+    }
+}
+
+/// `Err(abort(status, message))` unless `condition` holds, for `?`.
+pub fn abort_unless(condition: bool, status: StatusCode, message: impl Into<String>) -> Result {
+    abort_if(!condition, status, message)
 }
 
 /// An error that retrying can't fix; see [`Error::permanent`]. It shows as
@@ -57,10 +93,14 @@ impl Error {
     /// second sign-up with the same email racing past the `unique` rule.
     pub fn is_unique_violation(&self) -> bool {
         match self {
-            Self::Internal(err) => err
-                .chain()
-                .filter_map(|e| e.downcast_ref::<sqlx::Error>())
-                .any(|e| matches!(e, sqlx::Error::Database(db) if db.is_unique_violation())),
+            Self::Internal(err) => err.chain().any(|e| {
+                e.downcast_ref::<crate::db::DbError>()
+                    .is_some_and(crate::db::DbError::is_unique_violation)
+                    || matches!(
+                        e.downcast_ref::<sqlx::Error>(),
+                        Some(sqlx::Error::Database(db)) if db.is_unique_violation()
+                    )
+            }),
             _ => false,
         }
     }
@@ -75,6 +115,7 @@ impl Error {
             Self::TooManyRequests => StatusCode::TOO_MANY_REQUESTS,
             Self::ServiceUnavailable => StatusCode::SERVICE_UNAVAILABLE,
             Self::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            Self::Status(status, _) => *status,
             // A duplicate that got past validation (e.g. two requests at once).
             Self::Internal(_) if self.is_unique_violation() => StatusCode::CONFLICT,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -88,6 +129,7 @@ impl std::fmt::Debug for Error {
         match self {
             Self::Internal(err) => write!(f, "{err:?}"),
             Self::BadRequest(msg) => write!(f, "bad request: {msg}"),
+            Self::Status(status, msg) => write!(f, "{}: {msg}", status.as_u16()),
             Self::Validation(err) => write!(f, "validation failed: {:?}", err.errors),
             other => write!(f, "{}", reason(other.status())),
         }
@@ -184,6 +226,7 @@ impl IntoResponse for Error {
                 (None, Some(format!("{err:?}")))
             }
             Self::BadRequest(msg) => (Some(msg.clone()), None),
+            Self::Status(_, msg) if !msg.is_empty() => (Some(msg.clone()), None),
             _ => (None, None),
         };
         // The view middleware renders the page, adding the internal detail

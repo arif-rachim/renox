@@ -70,6 +70,7 @@ pub trait Job: Serialize + DeserializeOwned + Send + Sync + 'static {
 }
 
 /// What a job gets when it runs.
+#[non_exhaustive]
 pub struct JobContext {
     pub state: AppState,
     /// 1 on the first try.
@@ -254,6 +255,7 @@ impl Queue {
 
 /// A job that used up its attempts.
 #[derive(Debug, Clone, Serialize)]
+#[non_exhaustive]
 pub struct FailedJob {
     pub id: i64,
     pub queue: String,

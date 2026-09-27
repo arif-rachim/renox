@@ -78,13 +78,14 @@ async fn kernel(dir: &std::path::Path, debug: bool) -> Kernel {
         "{{ t('welcome', name='arif') }}|{{ t('items', count=1) }}|{{ t('items', count=3) }}|{{ t('only_en') }}|{{ t('missing.key') }}|{{ app.locale }}",
     )
     .unwrap();
-    let config = Config {
-        env: Environment::Testing,
-        debug,
-        key: Some(renox::generate_key()),
-        views_path: dir.join("views"),
-        lang_path: dir.join("lang"),
-        ..Config::default()
+    let config = {
+        let mut c = Config::default();
+        c.env = Environment::Testing;
+        c.debug = debug;
+        c.key = Some(renox::generate_key());
+        c.views_path = dir.join("views");
+        c.lang_path = dir.join("lang");
+        c
     };
     let kernel = App::with_config(config)
         .module(Auth::new())
@@ -210,9 +211,10 @@ async fn broken_lang_files_fail_at_boot() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("lang")).unwrap();
     std::fs::write(dir.path().join("lang/id.json"), "{ not json").unwrap();
-    let config = Config {
-        lang_path: dir.path().join("lang"),
-        ..Config::default()
+    let config = {
+        let mut c = Config::default();
+        c.lang_path = dir.path().join("lang");
+        c
     };
     let err = App::with_config(config).boot().await.err().unwrap();
     assert!(
@@ -220,9 +222,10 @@ async fn broken_lang_files_fail_at_boot() {
         "{err:?}"
     );
 
-    let missing = Config {
-        lang_path: dir.path().join("nowhere"),
-        ..Config::default()
+    let missing = {
+        let mut c = Config::default();
+        c.lang_path = dir.path().join("nowhere");
+        c
     };
     assert!(
         App::with_config(missing).boot().await.is_ok(),

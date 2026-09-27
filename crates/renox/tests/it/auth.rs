@@ -76,11 +76,12 @@ async fn kernel(auth: Auth) -> (Kernel, tempfile::TempDir) {
         "{% for p in posts %}{{ p.owner_id }}:{{ 'edit' if can('update', p) else 'view' }};{% endfor %}",
     )
     .unwrap();
-    let config = Config {
-        env: Environment::Testing,
-        key: Some(renox::generate_key()),
-        views_path: dir.path().to_path_buf(),
-        ..Config::default()
+    let config = {
+        let mut c = Config::default();
+        c.env = Environment::Testing;
+        c.key = Some(renox::generate_key());
+        c.views_path = dir.path().to_path_buf();
+        c
     };
     let kernel = App::with_config(config)
         .module(auth)

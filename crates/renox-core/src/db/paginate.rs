@@ -42,6 +42,7 @@ impl<S: Send + Sync> FromRequestParts<S> for Page {
 /// {{ pagination(produk) }}
 /// ```
 #[derive(Debug, Clone, Serialize)]
+#[non_exhaustive]
 pub struct Paginated<T> {
     pub items: Vec<T>,
     pub page: u32,
