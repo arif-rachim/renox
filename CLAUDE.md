@@ -32,7 +32,7 @@ crates/renox/              facade crate apps depend on: re-exports renox-core, m
 crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/app.rs               App builder, boot(), Kernel, app-binary commands (migrate, queue:work…)
   src/config.rs            Config from env/.env (see §5)
-  src/state.rs             AppState (Clone): config, routes, views, db, mailer, queue, cache, storage, listeners,
+  src/state.rs             AppState (Clone): config, routes, views, db, mailer, queue, cache, storage, translator, listeners,
                            key (cookie::Key), gates, throttle
   src/module.rs            Module trait: name, routes, migrations, register
   src/registry.rs          Registry: jobs, listeners, schedule (App-level and Module::register)
@@ -62,6 +62,7 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/health.rs            GET /health
   src/upload.rs            Upload (multipart file field), sniffing, store/store_public, token registry
   src/storage.rs           Storage (local disk; S3 with the `s3` feature), temporary URLs, /_renox/files
+  src/i18n.rs              Translator (lang JSON files), format(), RequestLocale middleware, Lang, set_locale
   assets/                  vendored htmx.min.js (2.0.11), alpine.min.js (3.17.4)
   views/                   built-in templates (error, pagination, auth/*, mail/*) — see §4.4
   migrations/              framework-owned migrations (auth/*, queue/*) — see §4.6
@@ -76,7 +77,8 @@ examples/hello/            guestbook app exercising every feature; used for live
 ## 3. Architecture and the decisions behind it
 
 ### Request pipeline (outermost first)
-`TraceLayer` → `session::middleware` (loads/saves encrypted cookie) → `auth::middleware` (loads the
+`TraceLayer` → `session::middleware` (loads/saves encrypted cookie) → `i18n::middleware` (puts the
+visitor's `RequestLocale` in extensions: session `_locale` if known, else `APP_LOCALE`) → `auth::middleware` (loads the
 current user once per request from session or `Authorization: Bearer`, inserts `CurrentUser` and
 `AppState` into request extensions) → `csrf::middleware` → `view::middleware` (renders `View`
 responses, error pages, turns `ValidationError` into redirect-back for plain forms) →
@@ -155,10 +157,14 @@ value in `Default`, and document it in `crates/renox-cli/stubs/env.stub` and
 `examples/hello/.env.example`.
 
 ### 4.4 Built-in views and texts
-Auth pages/mails take a `text` object from `auth/module.rs::text(locale)` (English and Indonesian);
-add keys to **both** locales. Validation messages live in `validation/messages.rs` (keys like
-`required`, `min.string`, `auth.failed`). Labels for auth fields are localised via
-`module.rs::label()` using `Validator::locale()`.
+Auth pages/mails take a `text` object from `auth/module.rs::texts(&lang)`: the built-in en/id
+dictionary (`text(locale)`) with the app's `renox.auth.*` translations on top. Add new keys to
+**both** built-in locales. Auth handlers take a `Lang` extractor for the visitor's language
+(background code uses `Lang::of(state, &state.config.locale)`). Validation messages live in
+`validation/messages.rs` (keys like `required`, `min.string`, `max.file`, `auth.failed`); apps
+override them with `renox.validation.<key>` and name fields with `renox.validation.attributes.<field>`
+(`messages::template_for`). Built-in labels for Renox's own forms use `Field::fallback_label`, so an
+app's attribute translation wins.
 
 ### 4.5 Migrations owned by the framework
 Names start with `0001…` so they sort before app migrations (`2026…`):
@@ -199,7 +205,8 @@ migration changes migration counts asserted in `crates/renox/tests/database.rs`.
 
 ## 5. Configuration (env vars)
 `APP_NAME`, `APP_ENV` (local|testing|production), `APP_DEBUG`, `APP_URL`, `APP_KEY` (required in
-production; `base64:…`, `rnx key:generate`), `APP_HOST`, `APP_PORT`, `APP_LOCALE` (en|id),
+production; `base64:…`, `rnx key:generate`), `APP_HOST`, `APP_PORT`, `APP_LOCALE` (default language;
+built-ins for en|id), `APP_FALLBACK_LOCALE` (en), `LANG_PATH` (resources/lang),
 `APP_TIMEZONE` (`UTC` or offset like `+07:00`; IANA names are rejected), `VIEWS_PATH`
 (resources/views), `PUBLIC_PATH` (public), `SESSION_LIFETIME` (minutes, 120), `SESSION_COOKIE`,
 `REMEMBER_LIFETIME` (minutes, 43200), `DATABASE_URL` (sqlite://storage/app.db),
@@ -299,6 +306,8 @@ Lesson: after scripted edits, `grep` for the added line; keep browser checks for
   `err.into_response()`, don't wrap it in `Error::BadRequest`.
 - **Test HTTP clients must update the session cookie from every response** — flashed errors and
   old input live in the cookie set by the redirect.
+- **Scripted edits after rustfmt missed again in M6c** (guestbook `.label()` calls); grep caught it
+  this time. Prefer the Edit tool on freshly read content for anything rustfmt may have wrapped.
 - **Listener order:** `App::listen` listeners run before modules' (modules register at boot).
 - **`Error`'s `Debug`** is hand-written so `fn main() -> renox::Result` prints readable errors, not
   `Internal(…)`.
@@ -317,9 +326,10 @@ Lesson: after scripted edits, `grep` for the added line; keep browser checks for
 |---|---|
 | M0 foundation, M1 web layer, M2 database, M3 validation, M4 auth (a+b), M5 queue/scheduler/events/mail/notifications (a+b) | merged to `main` |
 | M6a cache, `Routes::throttle`, maintenance mode (`down`/`up`), `/health` | merged to `main` |
-| M6b uploads, file rules, storage (local + `s3` feature), multipart CSRF, body limit | PR from branch `m6b-uploads` |
-| M6c i18n (`resources/lang`, `t()`, per-request locale) | next |
-| M7 CLI/DX (`make:*`, `route:list`, `db:shell`, browser live reload), M8 testing helpers + deploy (`renox build` embedding views, Docker/systemd, Litestream), v1.0 docs | later |
+| M6b uploads, file rules, storage (local + `s3` feature), multipart CSRF, body limit | merged to `main` |
+| M6c i18n (`resources/lang`, `t()`, `Lang`, per-visitor locale, translatable built-ins) | PR from branch `m6c-i18n` |
+| M7 CLI/DX | next |
+| M8 testing helpers + deploy (`renox build` embedding views, Docker/systemd, Litestream), v1.0 docs | later |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on
 an up-to-date `main`. Open the next milestone's PR only after the previous one is merged (§6.3).
@@ -327,5 +337,5 @@ an up-to-date `main`. Open the next milestone's PR only after the previous one i
 Open items noted in ROADMAP: `#[derive(Validate)]`, more rules (regex, dates, files), route groups
 with prefixes, SQLite session driver, pagination links that keep other query params.
 
-Stats at the time of writing: ~9.4k lines of Rust in `crates/`, 116 tests, 34 direct dependencies
+Stats at the time of writing: ~9.8k lines of Rust in `crates/`, 122 tests, 34 direct dependencies
 (stars and roles were reviewed with the owner; keep deps lean and remove unused ones).

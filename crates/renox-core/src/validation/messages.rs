@@ -82,6 +82,19 @@ pub(crate) fn template(locale: Locale, key: &str) -> &'static str {
     }
 }
 
+/// The app's translation of a built-in message (`renox.validation.{key}` in
+/// its lang file), or the built-in template.
+pub(crate) fn template_for(
+    locale: Locale,
+    texts: Option<&crate::i18n::Texts>,
+    key: &str,
+) -> std::borrow::Cow<'static, str> {
+    match texts.and_then(|t| t.get(&format!("renox.validation.{key}"))) {
+        Some(text) => std::borrow::Cow::Owned(text.clone()),
+        None => std::borrow::Cow::Borrowed(template(locale, key)),
+    }
+}
+
 /// Fills a template's placeholders.
 pub(crate) fn render(template: &str, label: &str, params: &[(&str, String)]) -> String {
     let mut capitalized = label.to_owned();

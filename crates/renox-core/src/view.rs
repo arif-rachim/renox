@@ -228,8 +228,9 @@ fn safe_join(dir: &Path, name: &str) -> Option<PathBuf> {
 }
 
 /// A template response, rendered by Renox with the request's globals:
-/// `app`, `request`, `auth` (`auth.check`, `auth.user`), `can()`, `flash`,
-/// `errors`, `error()`, `old()`, `csrf_token`, `csrf_field()` and `renox_head()`.
+/// `app` (with the request's `app.locale`), `request`, `auth` (`auth.check`,
+/// `auth.user`), `t()`, `can()`, `flash`, `errors`, `error()`, `old()`,
+/// `csrf_token`, `csrf_field()` and `renox_head()`.
 ///
 /// ```ignore
 /// async fn index() -> View {
@@ -285,6 +286,7 @@ pub(crate) async fn middleware(
 ) -> Response {
     let session = req.extensions().get::<Session>().cloned();
     let current_user = req.extensions().get::<CurrentUser>().cloned();
+    let locale = crate::i18n::request_locale(req.extensions(), &state);
     let htmx = Htmx::from_headers(req.headers());
     let path = req.uri().path().to_owned();
     let (wants_json, referer) = {
@@ -312,7 +314,14 @@ pub(crate) async fn middleware(
     }
 
     if let Some(view) = res.extensions_mut().remove::<View>() {
-        let globals = globals(&state, session.as_ref(), current_user, &htmx, &path);
+        let globals = globals(
+            &state,
+            session.as_ref(),
+            current_user,
+            &htmx,
+            &path,
+            &locale,
+        );
         return match state.views.render_view(&view, globals, &htmx) {
             Ok(html) => with_html(res, html),
             Err(err) => {
@@ -347,8 +356,31 @@ fn globals(
     current_user: Option<CurrentUser>,
     htmx: &Htmx,
     path: &str,
+    locale: &str,
 ) -> Value {
     let config = &state.config;
+    let translator = state.translator.clone();
+    let (request_locale, fallback) = (locale.to_owned(), config.fallback_locale.clone());
+    let translate =
+        move |key: String, kwargs: minijinja::value::Kwargs| -> Result<Value, minijinja::Error> {
+            let mut params = Vec::new();
+            let mut count = None;
+            for name in kwargs.args() {
+                let value: Value = kwargs.get(name)?;
+                if name == "count" {
+                    count = i64::try_from(value).ok();
+                } else {
+                    params.push((name.to_owned(), value.to_string()));
+                }
+            }
+            kwargs.assert_all_used()?;
+            let params: Vec<(&str, String)> = params
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.clone()))
+                .collect();
+            let text = translator.get(&request_locale, &fallback, &key);
+            Ok(Value::from(crate::i18n::format(&text, &params, count)))
+        };
     let token = session.map(Session::token).unwrap_or_default();
 
     let head = Value::from_safe_string(assets::head_tags(&token));
@@ -376,12 +408,13 @@ fn globals(
             env => format!("{:?}", config.env).to_lowercase(),
             debug => config.debug,
             url => config.url,
-            locale => config.locale,
+            locale => locale,
         },
         auth => context! {
             check => user.is_some(),
             user => user.as_deref(),
         },
+        t => Value::from_function(translate),
         can => Value::from_function(move |gate: String| {
             gate_user.as_ref().is_some_and(|(user, gates)| {
                 gates.get(&gate).is_some_and(|check| check(user))

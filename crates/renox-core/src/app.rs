@@ -220,6 +220,10 @@ impl App {
             queue: Queue::new(db.clone()),
             cache: crate::cache::Cache::new(&config.cache_store, db.clone())?,
             storage,
+            translator: Arc::new(crate::i18n::Translator::load(
+                &config.lang_path,
+                config.debug,
+            )?),
             listeners: Arc::new(listeners),
             config: Arc::new(config),
             routes,
@@ -574,6 +578,7 @@ fn build_router(router: Router<AppState>, state: AppState) -> Router {
         .layer(from_fn_with_state(state.clone(), view::middleware))
         .layer(from_fn(csrf::middleware))
         .layer(from_fn_with_state(state.clone(), auth::middleware))
+        .layer(from_fn_with_state(state.clone(), crate::i18n::middleware))
         .layer(from_fn_with_state(state.clone(), session::middleware))
         .merge(assets::router())
         .merge(crate::health::router())

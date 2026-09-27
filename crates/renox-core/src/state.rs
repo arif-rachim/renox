@@ -7,6 +7,7 @@ use crate::auth::{Gates, Throttle};
 use crate::cache::Cache;
 use crate::db::Db;
 use crate::events::Listeners;
+use crate::i18n::Translator;
 use crate::mail::Mailer;
 use crate::queue::Queue;
 use crate::storage::Storage;
@@ -23,6 +24,7 @@ pub struct AppState {
     pub queue: Queue,
     pub cache: Cache,
     pub storage: Storage,
+    pub translator: Arc<Translator>,
     pub(crate) listeners: Listeners,
     pub(crate) key: Key,
     pub(crate) gates: Gates,

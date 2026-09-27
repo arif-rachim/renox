@@ -34,17 +34,13 @@ use sqlx::{AssertSqlSafe, Row};
 
 pub use extract::Valid;
 pub use messages::Locale;
+pub(crate) use messages::template_for;
 pub use value::{FieldValue, Inspected};
 
 use crate::Result;
 use crate::db::value_bind;
 use crate::db::{Db, DbValue, quote};
-use messages::{render, template};
-
-/// A built-in message by key (e.g. `required`, `auth.failed`) in `locale`.
-pub(crate) fn message(locale: Locale, key: &str, label: &str, params: &[(&str, String)]) -> String {
-    render(template(locale, key), label, params)
-}
+use messages::render;
 
 /// Validation errors: messages keyed by field name.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -101,6 +97,8 @@ struct Pending {
 /// failure; rules other than `required` and `accepted` skip empty values.
 pub struct Validator {
     locale: Locale,
+    /// The request language's lang file, for overridden messages and labels.
+    texts: Option<crate::i18n::Texts>,
     errors: Errors,
     pending: Vec<Pending>,
 }
@@ -109,16 +107,33 @@ impl Validator {
     pub fn new(locale: Locale) -> Self {
         Self {
             locale,
+            texts: None,
             errors: Errors::new(),
             pending: Vec::new(),
         }
     }
 
+    /// Uses the app's translations of messages (`renox.validation.*`) and
+    /// field names (`renox.validation.attributes.*`).
+    pub(crate) fn with_texts(mut self, texts: crate::i18n::Texts) -> Self {
+        self.texts = Some(texts);
+        self
+    }
+
+    fn template(&self, key: &str) -> std::borrow::Cow<'static, str> {
+        messages::template_for(self.locale, self.texts.as_ref(), key)
+    }
+
     /// Starts the rules for one field. The label in messages defaults to the
     /// name with `_` replaced by spaces.
     pub fn field<'v>(&'v mut self, name: &str, value: &impl FieldValue) -> Field<'v> {
+        let translated = self.texts.as_ref().and_then(|t| {
+            t.get(&format!("renox.validation.attributes.{name}"))
+                .cloned()
+        });
         Field {
-            label: name.replace('_', " "),
+            translated: translated.is_some(),
+            label: translated.unwrap_or_else(|| name.replace('_', " ")),
             name: name.to_owned(),
             value: value.inspect(),
             db_value: value.db_value(),
@@ -161,13 +176,28 @@ impl Validator {
             let found: bool = query.fetch_one(db).await?.try_get(0)?;
             if found == check.unique {
                 let key = if check.unique { "unique" } else { "exists" };
-                let message = check
-                    .message
-                    .unwrap_or_else(|| render(template(self.locale, key), &check.label, &[]));
+                let message = check.message.unwrap_or_else(|| {
+                    render(
+                        &messages::template_for(self.locale, self.texts.as_ref(), key),
+                        &check.label,
+                        &[],
+                    )
+                });
                 errors.add(check.field, message);
             }
         }
         Ok(errors)
+    }
+
+    /// Like `rules_of`, with the app's translations of messages and labels.
+    pub(crate) fn rules_with_texts(
+        data: &impl Validate,
+        locale: Locale,
+        texts: crate::i18n::Texts,
+    ) -> Self {
+        let mut validator = Self::new(locale).with_texts(texts);
+        data.rules(&mut validator);
+        validator
     }
 
     /// Applies `data`'s rules; call `finish` to run the database checks.
@@ -187,6 +217,8 @@ pub struct Field<'v> {
     v: &'v mut Validator,
     name: String,
     label: String,
+    /// The label came from the app's lang file.
+    translated: bool,
     value: Inspected,
     db_value: DbValue,
     failed: bool,
@@ -208,9 +240,17 @@ impl Field<'_> {
         self
     }
 
+    /// Uses `label` unless the app's lang file names this field.
+    pub(crate) fn fallback_label(mut self, label: &str) -> Self {
+        if !self.translated {
+            self.label = label.to_owned();
+        }
+        self
+    }
+
     fn fail(&mut self, key: &str, params: &[(&str, String)]) {
         if !self.failed {
-            let message = render(template(self.v.locale, key), &self.label, params);
+            let message = render(&self.v.template(key), &self.label, params);
             self.v.errors.add(&self.name, message);
             self.failed = true;
             self.last_pending = None;

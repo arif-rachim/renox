@@ -1,0 +1,18 @@
+{
+  "guestbook": {
+    "title": "Buku Tamu",
+    "name": "Nama",
+    "message": "Pesan",
+    "photo": "Foto (opsional)",
+    "send": "Kirim",
+    "sending": "Mengirim…",
+    "empty": "Belum ada pesan.",
+    "thanks": "Terima kasih, :name! Pesanmu tersimpan."
+  },
+  "nav": { "login": "Masuk", "register": "Daftar", "logout": "Keluar" },
+  "renox": {
+    "validation": {
+      "attributes": { "name": "nama", "message": "pesan", "photo": "foto" }
+    }
+  }
+}

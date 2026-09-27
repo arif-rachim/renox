@@ -8,10 +8,11 @@ use serde_json::json;
 use sqlx::Row;
 
 use super::User;
-use super::module::{go, locale, text};
+use super::module::{go, texts};
 use super::tokens::sha256_hex;
 use crate::crypto::{constant_time_eq, random_token};
 use crate::db::{DateTime, now};
+use crate::i18n::Lang;
 use crate::validation::{Errors, Valid, Validate, ValidationError, Validator};
 use crate::{AppState, Htmx, Result, Session, View, context, view};
 
@@ -20,10 +21,10 @@ const EXPIRES: Duration = Duration::from_secs(60 * 60);
 /// Minimum time between two reset emails to the same address.
 const RESEND_AFTER: Duration = Duration::from_secs(60);
 
-pub(super) async fn show_forgot(State(state): State<AppState>) -> View {
+pub(super) async fn show_forgot(lang: Lang) -> View {
     view(
         "renox/auth/forgot-password.html",
-        context! { text => text(locale(&state)) },
+        context! { text => texts(&lang) },
     )
 }
 
@@ -44,9 +45,10 @@ pub(super) async fn send_link(
     State(state): State<AppState>,
     session: Session,
     htmx: Htmx,
+    lang: Lang,
     Valid(form): Valid<ForgotForm>,
 ) -> Result<Response> {
-    let text = text(locale(&state));
+    let text = texts(&lang);
     if let Some(user) = User::find_by_email(&state.db, &form.email).await? {
         let last: Option<DateTime> =
             sqlx::query_scalar("SELECT created_at FROM password_reset_tokens WHERE email = ?")
@@ -92,13 +94,13 @@ pub(super) struct EmailQuery {
 }
 
 pub(super) async fn show_reset(
-    State(state): State<AppState>,
+    lang: Lang,
     Path(token): Path<String>,
     Query(query): Query<EmailQuery>,
 ) -> View {
     view(
         "renox/auth/reset-password.html",
-        context! { token, email => query.email.unwrap_or_default(), text => text(locale(&state)) },
+        context! { token, email => query.email.unwrap_or_default(), text => texts(&lang) },
     )
 }
 
@@ -127,9 +129,10 @@ pub(super) async fn reset(
     State(state): State<AppState>,
     session: Session,
     htmx: Htmx,
+    lang: Lang,
     Valid(form): Valid<ResetForm>,
 ) -> Result<Response> {
-    let text = text(locale(&state));
+    let text = texts(&lang);
     let row = sqlx::query("SELECT token, created_at FROM password_reset_tokens WHERE email = ?")
         .bind(form.email.trim())
         .fetch_optional(&state.db)
