@@ -104,6 +104,12 @@ impl App {
         }
     }
 
+    /// Replaces the configuration, e.g. in tests.
+    pub fn config(mut self, config: Config) -> Self {
+        self.config = Some(config);
+        self
+    }
+
     pub fn module(mut self, module: impl Module) -> Self {
         self.modules.push(Box::new(module));
         self

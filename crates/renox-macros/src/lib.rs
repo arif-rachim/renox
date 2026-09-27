@@ -48,3 +48,29 @@ pub fn migrations(input: TokenStream) -> TokenStream {
         .unwrap_or_else(|err| err.to_compile_error())
         .into()
 }
+
+/// Marks an async test, like `#[tokio::test]`, using the Tokio that Renox
+/// re-exports, so apps don't need `tokio` as a dependency.
+///
+/// ```ignore
+/// #[renox::test]
+/// async fn home_page() {
+///     let app = TestApp::new(toko::app()).await;
+///     app.get("/").await.assert_ok();
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn test(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let attr = proc_macro2::TokenStream::from(attr);
+    let item = proc_macro2::TokenStream::from(item);
+    let extra = if attr.is_empty() {
+        quote::quote! {}
+    } else {
+        quote::quote! { #attr, }
+    };
+    quote::quote! {
+        #[::renox::tokio::test(#extra crate = "::renox::tokio")]
+        #item
+    }
+    .into()
+}

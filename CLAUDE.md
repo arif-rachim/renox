@@ -66,6 +66,7 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/i18n.rs              Translator (lang JSON files), format(), RequestLocale middleware, Lang, set_locale
   src/live.rs              live reload: file-time polling, /_renox/live SSE, stop() on shutdown
   src/shell.rs             db:shell (run_with takes any input/output, for tests)
+  src/testing.rs           TestApp / TestRequest / TestResponse for apps' tests (M8a)
   assets/                  vendored htmx.min.js (2.0.11), alpine.min.js (3.17.4)
   views/                   built-in templates (error, pagination, auth/*, mail/*) — see §4.4
   migrations/              framework-owned migrations (auth/*, queue/*) — see §4.6
@@ -190,8 +191,14 @@ migration changes migration counts asserted in `crates/renox/tests/database.rs`.
 - HTTP tests drive `kernel.router()` with `tower::ServiceExt::oneshot`, keeping the session cookie
   by hand. For CSRF, add a route returning `session.token()` (e.g. `/token`) — `/login` redirects
   logged-in users, so it can't be used to read the token after login.
+- Prefer `renox::testing::TestApp` in new tests (it keeps cookies, sends CSRF, has assertions);
+  older tests use hand-written clients. `#[renox::test]` replaces `#[tokio::test]`.
+- `TestApp` does **not** read `.env`: it starts from `Config::default()` (en locale, memory mail,
+  in-memory DB) plus a temp storage dir; set anything else with `TestApp::with_config`.
 - `Kernel` helpers: `migrate()`, `run_jobs()` (drains the queue), `mailer().sent()` (memory driver),
   `state()`, `db()`, `worker(queues)`.
+- Apps are lib + bin: `src/lib.rs` has `pub fn app() -> App`, `main.rs` runs it, `tests/` boot it.
+  `rnx make:module` registers modules in `src/lib.rs` (falls back to `main.rs` for older apps).
 - Whether a 500 page shows the error chain is decided per app in the view middleware
   (`ErrorPage::shown_detail(config.debug)`); there is no process-wide debug flag any more, so apps
   with and without debug can run side by side in one test binary.
@@ -355,7 +362,8 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M6c i18n (`resources/lang`, `t()`, `Lang`, per-visitor locale, translatable built-ins) | merged to `main` |
 | M7 generators (`make:*`), `route:list`, `db:shell`, browser live reload | merged to `main` |
 | Faster tests (argon2 opt-level, one integration-test binary, per-app error detail) | merged to `main` (#15) |
-| M8 testing helpers + deploy (`renox build` embedding views, Docker/systemd, Litestream) | next |
+| M8a testing helpers (`TestApp`, `#[renox::test]`, lib + bin apps) | PR from branch `m8-testing` |
+| M8b deploy (`renox build` embedding views, Docker/systemd, Litestream) | next |
 | M9 PostgreSQL (owner's request, **must land before 1.0**; plan in ROADMAP M9) | after M8 |
 | v1.0 docs site, starter kit, semver guarantee | last |
 
@@ -365,5 +373,5 @@ an up-to-date `main`. Open the next milestone's PR only after the previous one i
 Open items noted in ROADMAP: `#[derive(Validate)]`, more rules (regex, dates, files), route groups
 with prefixes, SQLite session driver, pagination links that keep other query params.
 
-Stats at the time of writing: ~10.8k lines of Rust in `crates/`, 128 tests, 34 direct dependencies
+Stats at the time of writing: ~11.4k lines of Rust in `crates/`, 136 tests, 34 direct dependencies
 (stars and roles were reviewed with the owner; keep deps lean and remove unused ones).
