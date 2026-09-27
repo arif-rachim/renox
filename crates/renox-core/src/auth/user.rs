@@ -84,14 +84,16 @@ impl User {
         db: E,
         email: &str,
     ) -> impl Future<Output = Result<Option<Self>>> + Send {
-        Self::query().where_eq("email", email.trim()).first(db)
+        Self::query()
+            .where_eq("email", normalize_email(email))
+            .first(db)
     }
 
     /// Creates a user with a hashed password.
     pub async fn register(db: &Db, name: &str, email: &str, password: &str) -> Result<Self> {
         let user = Self {
             name: name.trim().to_owned(),
-            email: email.trim().to_owned(),
+            email: normalize_email(email),
             password: hash_password(password).await?,
             ..Self::default()
         };
@@ -119,6 +121,13 @@ impl User {
             Err(Error::Forbidden)
         }
     }
+}
+
+/// Emails are stored and looked up trimmed and lowercased, so they match
+/// regardless of case on every database (SQLite's `COLLATE NOCASE` alone
+/// wouldn't help on PostgreSQL).
+pub(crate) fn normalize_email(email: &str) -> String {
+    email.trim().to_lowercase()
 }
 
 /// A real hash of a throwaway password, verified against when an email is

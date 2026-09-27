@@ -5,6 +5,7 @@ use tokio::task::JoinSet;
 
 use super::{Handlers, JobContext, unix_now};
 use crate::AppState;
+use crate::db::Dialect;
 
 /// A reserved job older than this is assumed abandoned (e.g. the process
 /// crashed) and becomes available again.
@@ -45,11 +46,17 @@ impl Worker {
             let marks = vec!["?"; self.queues.len()].join(", ");
             format!(" AND queue IN ({marks})")
         };
+        // SQLite runs one write at a time, so the UPDATE is enough. On
+        // PostgreSQL, workers on several servers must not pick the same row.
+        let lock = match self.state.db.dialect() {
+            Dialect::Sqlite => "",
+            Dialect::Postgres => " FOR UPDATE SKIP LOCKED",
+        };
         let sql = format!(
             "UPDATE jobs SET reserved_at = ?, attempts = attempts + 1 WHERE id = (\
                 SELECT id FROM jobs WHERE available_at <= ? \
                 AND (reserved_at IS NULL OR reserved_at <= ?){queues} \
-                ORDER BY available_at, id LIMIT 1) \
+                ORDER BY available_at, id LIMIT 1{lock}) \
              RETURNING id, queue, job, payload, attempts, max_attempts"
         );
         let mut query = crate::db::sql(sql)
@@ -156,17 +163,24 @@ impl Worker {
             let worker = self.clone();
             let mut stop = shutdown.clone();
             loops.spawn(async move {
+                let wake = worker.state.queue.wake();
                 loop {
                     if *stop.borrow() {
                         break;
                     }
+                    // Listen before looking for work: a job dispatched while
+                    // the query runs still wakes this loop instead of waiting
+                    // for the next poll.
+                    let notified = wake.notified();
+                    tokio::pin!(notified);
+                    notified.as_mut().enable();
                     match worker.run_next().await {
                         Ok(true) => continue,
                         Ok(false) => {}
                         Err(err) => tracing::error!(error = ?err, "queue worker error"),
                     }
                     tokio::select! {
-                        _ = worker.state.queue.wake().notified() => {}
+                        _ = notified => {}
                         _ = tokio::time::sleep(POLL) => {}
                         _ = stop.changed() => {}
                     }

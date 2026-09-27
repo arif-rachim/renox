@@ -25,13 +25,8 @@ use crate::Result;
 use crate::db::{Db, Migration};
 use crate::queue::unix_now;
 
-pub(crate) const MIGRATION: Migration = Migration {
-    name: "00010101000200_create_cache_table",
-    up: include_str!("../migrations/cache/00010101000200_create_cache_table.up.sql"),
-    down: Some(include_str!(
-        "../migrations/cache/00010101000200_create_cache_table.down.sql"
-    )),
-};
+pub(crate) const MIGRATION: Migration =
+    crate::db::framework_migration!("cache", "00010101000200_create_cache_table");
 
 /// Entries the memory store keeps before dropping expired ones on write.
 const SWEEP_AT: usize = 10_000;

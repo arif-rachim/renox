@@ -39,13 +39,8 @@ pub use worker::Worker;
 use crate::db::{Db, Migration};
 use crate::{AppState, Result};
 
-pub(crate) const MIGRATION: Migration = Migration {
-    name: "00010101000100_create_jobs_table",
-    up: include_str!("../../migrations/queue/00010101000100_create_jobs_table.up.sql"),
-    down: Some(include_str!(
-        "../../migrations/queue/00010101000100_create_jobs_table.down.sql"
-    )),
-};
+pub(crate) const MIGRATION: Migration =
+    crate::db::framework_migration!("queue", "00010101000100_create_jobs_table");
 
 /// A unit of background work. It is stored as JSON, so keep it to ids and
 /// small values rather than whole models.

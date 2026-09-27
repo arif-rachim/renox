@@ -1,19 +1,106 @@
 use std::collections::{HashMap, HashSet};
 
-use super::{Db, now, quote, script, sql};
+use super::{Db, Dialect, now, quote, script, sql};
 use anyhow::{Context, anyhow, bail};
 
 const TABLE: &str = "renox_migrations";
+
+/// One of the framework's migrations from `crates/renox-core/migrations/DIR/`:
+/// `NAME.up.sql` (SQLite), `NAME.postgres.up.sql` and a shared `NAME.down.sql`.
+macro_rules! framework_migration {
+    ($dir:literal, $name:literal) => {
+        $crate::db::Migration {
+            name: $name,
+            up: include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/migrations/",
+                $dir,
+                "/",
+                $name,
+                ".up.sql"
+            )),
+            down: Some(include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/migrations/",
+                $dir,
+                "/",
+                $name,
+                ".down.sql"
+            ))),
+            sqlite: None,
+            postgres: Some($crate::db::Scripts {
+                up: include_str!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/migrations/",
+                    $dir,
+                    "/",
+                    $name,
+                    ".postgres.up.sql"
+                )),
+                down: None,
+            }),
+        }
+    };
+}
+pub(crate) use framework_migration;
 
 /// One migration: SQL to apply it and, optionally, SQL to undo it.
 ///
 /// Usually generated from `migrations/*.up.sql` and `*.down.sql` by
 /// `renox::migrations!()`. Names start with a timestamp and run in name order.
+///
+/// When SQL differs between databases, `NAME.postgres.up.sql` (and
+/// `.postgres.down.sql`) or `NAME.sqlite.up.sql` replace the plain files on
+/// that database; the plain file may then be left out if both are given.
 #[derive(Debug, Clone, Copy)]
 pub struct Migration {
     pub name: &'static str,
+    /// SQL for every database without its own version (may be empty when
+    /// each database has one).
     pub up: &'static str,
     pub down: Option<&'static str>,
+    /// Used instead of `up`/`down` on SQLite.
+    pub sqlite: Option<Scripts>,
+    /// Used instead of `up`/`down` on PostgreSQL.
+    pub postgres: Option<Scripts>,
+}
+
+/// One database's own version of a migration.
+#[derive(Debug, Clone, Copy)]
+pub struct Scripts {
+    pub up: &'static str,
+    /// Falls back to the migration's plain `down` when `None`.
+    pub down: Option<&'static str>,
+}
+
+impl Migration {
+    /// A migration with the same SQL on every database.
+    pub const fn new(name: &'static str, up: &'static str, down: Option<&'static str>) -> Self {
+        Self {
+            name,
+            up,
+            down,
+            sqlite: None,
+            postgres: None,
+        }
+    }
+
+    fn own(&self, dialect: Dialect) -> Option<&Scripts> {
+        match dialect {
+            Dialect::Sqlite => self.sqlite.as_ref(),
+            Dialect::Postgres => self.postgres.as_ref(),
+        }
+    }
+
+    /// The SQL that applies this migration on `dialect`.
+    pub fn up_for(&self, dialect: Dialect) -> &'static str {
+        self.own(dialect).map_or(self.up, |own| own.up)
+    }
+
+    /// The SQL that undoes this migration on `dialect`, if any.
+    pub fn down_for(&self, dialect: Dialect) -> Option<&'static str> {
+        self.own(dialect).and_then(|own| own.down).or(self.down)
+    }
 }
 
 /// Whether a migration has run, and in which batch.
@@ -44,7 +131,7 @@ impl Migrator {
         sql(format!(
             "CREATE TABLE IF NOT EXISTS {TABLE} (
                 name TEXT PRIMARY KEY NOT NULL,
-                batch INTEGER NOT NULL,
+                batch BIGINT NOT NULL,
                 applied_at TEXT NOT NULL
             )"
         ))
@@ -75,7 +162,7 @@ impl Migrator {
             .filter(|m| !applied.contains_key(m.name))
         {
             let mut tx = db.begin().await?;
-            script(&mut tx, migration.up)
+            script(&mut tx, migration.up_for(db.dialect()))
                 .await
                 .with_context(|| format!("migration `{}` failed", migration.name))?;
             sql(format!(
@@ -120,7 +207,7 @@ impl Migrator {
                 .ok_or_else(|| {
                     anyhow!("migration `{name}` was applied but is no longer registered")
                 })?;
-            let down = migration.down.ok_or_else(|| {
+            let down = migration.down_for(db.dialect()).ok_or_else(|| {
                 anyhow!("migration `{name}` has no .down.sql, so it can't be rolled back")
             })?;
             let mut tx = db.begin().await?;

@@ -194,6 +194,22 @@ impl<'c> Executor<'c> for &'c mut Transaction {
     }
 }
 
+impl<'c> Executor<'c> for Conn<'c> {
+    fn into_conn(self) -> Conn<'c> {
+        self
+    }
+}
+
+impl Conn<'_> {
+    /// Which engine the query will run on, for SQL that differs.
+    pub(crate) fn dialect(&self) -> Dialect {
+        match self {
+            Conn::Pool(db) => db.dialect(),
+            Conn::Tx(tx) => tx.dialect(),
+        }
+    }
+}
+
 /// Runs `$body` against whichever backend `$conn` is: `$build` makes the
 /// backend's query from `(sql, args)` and `$exec` is its sqlx executor.
 macro_rules! dispatch {
@@ -239,12 +255,12 @@ fn sqlite_query(
 ) -> sqlx::query::Query<'static, Sqlite, SqliteArguments> {
     args.into_iter().fold(
         sqlx::query(AssertSqlSafe(sql)),
-        |query, value| match value {
-            DbValue::Null => query.bind(None::<i64>),
+        |query, value| match value.for_sqlite() {
             DbValue::Integer(v) => query.bind(v),
             DbValue::Real(v) => query.bind(v),
             DbValue::Text(v) => query.bind(v),
             DbValue::Blob(v) => query.bind(v),
+            _ => query.bind(None::<i64>),
         },
     )
 }
@@ -258,13 +274,41 @@ fn postgres_query(
     args.into_iter().fold(
         sqlx::query(AssertSqlSafe(sql)),
         |query, value| match value {
-            DbValue::Null => query.bind(None::<i64>),
+            DbValue::Null => query.bind(UntypedNull),
             DbValue::Integer(v) => query.bind(v),
             DbValue::Real(v) => query.bind(v),
             DbValue::Text(v) => query.bind(v),
             DbValue::Blob(v) => query.bind(v),
+            DbValue::Bool(v) => query.bind(v),
+            DbValue::DateTime(v) => query.bind(v),
+            DbValue::NaiveDateTime(v) => query.bind(v),
+            DbValue::Date(v) => query.bind(v),
+            DbValue::Time(v) => query.bind(v),
         },
     )
+}
+
+/// A `NULL` parameter without a type, so PostgreSQL takes the type from
+/// where it's used (a `NULL` sent as `BIGINT` can't go into a `TIMESTAMPTZ`).
+#[cfg(feature = "postgres")]
+struct UntypedNull;
+
+#[cfg(feature = "postgres")]
+impl sqlx::Type<Postgres> for UntypedNull {
+    fn type_info() -> sqlx::postgres::PgTypeInfo {
+        // OID 0 means "unspecified" in the protocol.
+        sqlx::postgres::PgTypeInfo::with_oid(sqlx::postgres::types::Oid(0))
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl sqlx::Encode<'_, Postgres> for UntypedNull {
+    fn encode_by_ref(
+        &self,
+        _buf: &mut sqlx::postgres::PgArgumentBuffer,
+    ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
+        Ok(sqlx::encode::IsNull::Yes)
+    }
 }
 
 /// Rewrites `?` placeholders as PostgreSQL's `$1`, `$2`, …, skipping quoted

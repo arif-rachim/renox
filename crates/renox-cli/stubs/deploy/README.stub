@@ -28,6 +28,9 @@ compiled in) plus a `.env` file and a `storage/` directory.
 
 ## Backups with Litestream
 
+For SQLite apps. On PostgreSQL, set `DATABASE_URL` to the server instead and use
+its own backups (`pg_dump` or your provider's); see Renox's docs/postgresql.md.
+
 1. Install Litestream (https://litestream.io/install/).
 2. `sudo cp deploy/litestream.yml /etc/litestream.yml`, fill in the bucket and
    put the keys in `/etc/default/litestream`:

@@ -132,8 +132,10 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
 - **Queue is Renox's own on SQLite** (`jobs`, `failed_jobs`, unix-second integers). apalis was the
   plan but its stable SQL backend needs sqlx 0.8 (can't link next to our 0.9: both link
   `libsqlite3-sys`) and its 0.9 backend is only an RC.
-- **Workers and scheduler run inside `serve`** by default (single-process deploys). Multiple
-  instances would duplicate scheduled tasks → `SCHEDULER=false` on all but one.
+- **Workers and scheduler run inside `serve`** by default (single-process deploys). Several
+  instances may share one database: workers reserve with `SKIP LOCKED` on PostgreSQL, and every
+  scheduled run is claimed first (`schedule::claim`: insert `schedule:<task>:<slot>` into `cache`
+  with `ON CONFLICT DO NOTHING`; stale claims deleted on the next claim).
 - **SQLite now, PostgreSQL before 1.0.** The owner wants PostgreSQL for apps that outgrow one
   server. Since M9a, `Db` is Renox's own type (`db/conn.rs`): a private enum over `SqlitePool` and,
   with the `postgres` feature, `PgPool`, chosen by `DATABASE_URL`'s scheme in `db::connect`.
@@ -148,9 +150,28 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
     (quotes/comments skipped). Engine-specific code matches on `db.dialect()`, or on
     `db.sqlite()` / `db.postgres()` for raw sqlx (see `migrate.rs` `drop_all_*`, `shell.rs` cells).
   - `cfg(feature = "postgres")` arms: check both `cargo clippy --all-targets` and
-    `--all-features`. The PostgreSQL test module (`tests/it/postgres.rs`) runs only with
-    `--features postgres` and `RENOX_TEST_POSTGRES_URL` set (e.g. a `postgres:17-alpine` container
-    on port 55432).
+    `--all-features`.
+  - M9b: framework migrations are `NAME.up.sql` (SQLite) + `NAME.postgres.up.sql` + a shared
+    `NAME.down.sql`, included with `db::framework_migration!(dir, name)`. A new framework table
+    needs both versions (BIGINT identity ids, BIGINT integers, TIMESTAMPTZ dates). Apps get the same
+    through `migrations!()` (`*.postgres.up.sql` / `*.sqlite.up.sql` overrides → `Migration::
+    up_for(dialect)`).
+  - `DbValue` has typed variants (Bool, DateTime, NaiveDateTime, Date, Time). SQLite binds them as
+    before via `DbValue::for_sqlite()` (0/1, the old text formats); PostgreSQL binds them typed, and
+    `Null` as an OID-0 `UntypedNull`.
+  - Query builder: `where_sql(dialect)` / `select_sql(dialect)`; `like` → `ILIKE` on PostgreSQL;
+    `OFFSET` without `LIMIT -1` there. Get the dialect from `db.into_conn().dialect()` (Conn is an
+    Executor too).
+  - Emails: `auth::user::normalize_email` (trim + lowercase) on register, lookup, reset and the
+    registration `unique` check; PostgreSQL has a unique index on `lower(email)`.
+  - Testing on PostgreSQL: `TEST_DATABASE_URL` (env or `.env`) makes `db::connect` swap any
+    in-memory SQLite URL for a fresh `renox_test_…` schema (pool capped at 3). Run the suite with
+    `TEST_DATABASE_URL=postgres://postgres:postgres@localhost:55432/renox_test cargo test -p renox
+    -p renox-core -p renox-cli --features renox/postgres` against
+    `docker run -d --rm --name renox-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=renox_test -p
+    55432:5432 postgres:17-alpine`. Not `examples/hello` (SQLite migrations). CI job
+    `test (PostgreSQL)` does this with a service container.
+  - User-facing guide: `docs/postgresql.md`.
 - **Single-file deploys:** `App::embed(renox::embedded!())` bakes views, lang files and `public/`
   into the binary; they're used only when `APP_DEBUG` is off (debug keeps disk + live reload).
   Embedded public files are served by the router's fallback (`embedded.rs`). New built-in behaviour
@@ -246,8 +267,9 @@ production; `base64:…`, `rnx key:generate`), `APP_HOST`, `APP_PORT`, `APP_LOCA
 built-ins for en|id), `APP_FALLBACK_LOCALE` (en), `LANG_PATH` (resources/lang),
 `APP_TIMEZONE` (`UTC` or offset like `+07:00`; IANA names are rejected), `VIEWS_PATH`
 (resources/views), `PUBLIC_PATH` (public), `SESSION_LIFETIME` (minutes, 120), `SESSION_COOKIE`,
-`REMEMBER_LIFETIME` (minutes, 43200), `DATABASE_URL` (sqlite://storage/app.db),
-`DATABASE_POOL_SIZE`, `MAIL_MAILER` (smtp|log|memory), `MAIL_HOST`, `MAIL_PORT`,
+`REMEMBER_LIFETIME` (minutes, 43200), `DATABASE_URL` (sqlite://storage/app.db, or
+`postgres://…` with the `postgres` feature), `DATABASE_POOL_SIZE` (8), `TEST_DATABASE_URL`
+(PostgreSQL URL for tests; env or `.env`), `MAIL_MAILER` (smtp|log|memory), `MAIL_HOST`, `MAIL_PORT`,
 `MAIL_ENCRYPTION` (tls|starttls|none), `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS`,
 `MAIL_FROM_NAME`, `QUEUE_WORKERS` (2; 0 = none in serve), `SCHEDULER` (true), `CACHE_STORE`
 (memory|database), `STORAGE_PATH` (storage; holds `framework/down` for maintenance mode and `app/`
@@ -367,6 +389,22 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 - **`Error`'s `Debug`** is hand-written so `fn main() -> renox::Result` prints readable errors, not
   `Internal(…)`.
 
+### 6.5b PostgreSQL traps (M9b)
+- sqlx decodes strictly: `i64` needs `BIGINT` (a plain `INTEGER` column is INT4 and fails), and
+  `SELECT 1` is INT4 (`/health` returned 503 until it stopped decoding the ping). `SUM(bigint)` is
+  `NUMERIC`: write `CAST(SUM(x) AS BIGINT)`.
+- sqlx sends parameters in binary with a declared type: a text-typed `NULL` or date string can't
+  go into a `TIMESTAMPTZ`, hence the typed `DbValue` variants and the OID-0 untyped `NULL`.
+  (Sending text with OID 0 does *not* work for non-text columns: the bytes are binary-format.)
+- PostgreSQL keeps microseconds: `db::now()` truncates to them, or a saved model won't equal the
+  row read back.
+- `citext` doesn't help: `citext_col = $1` with a text parameter compares as text (case-sensitive).
+- Under a parallel test suite a PostgreSQL round trip is ~0.2 s; timing-based tests need slack on
+  PostgreSQL (see `background_workers_pick_up_jobs_and_stop_cleanly`). The worker also now arms
+  `Notify::notified()` *before* querying, so a dispatch during the query isn't lost.
+- `pgrep -f`/`pkill -f` with a pattern that appears in your own command line kills your shell
+  (exit 144) — happened again in M9b. Use the PID files.
+
 ### 6.6 Security incidents and rules
 - The owner once pasted a crates.io API token into chat; it was used (with his explicit authority)
   to publish the placeholders, and he was told to revoke it. Never store tokens; prefer the user
@@ -387,8 +425,8 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | Faster tests (argon2 opt-level, one integration-test binary, per-app error detail) | merged to `main` (#15) |
 | M8a testing helpers | merged to `main` |
 | M8b single-binary deploys (`embedded!()`), `rnx build`, `rnx make:deploy` (Docker/systemd/Litestream) | merged to `main` (#18) |
-| M9a Renox's own database layer (`Db`, `Transaction`, `Row`, `db::sql`, `postgres` feature) | PR from branch `m9a-db-layer` |
-| M9b PostgreSQL backend proper (dual-dialect framework migrations, typed binds, SKIP LOCKED, CI) | next (**must land before 1.0**; plan in ROADMAP M9) |
+| M9a Renox's own database layer (`Db`, `Transaction`, `Row`, `db::sql`, `postgres` feature) | merged to `main` (#19) |
+| M9b PostgreSQL backend proper (dual-dialect migrations, typed binds, SKIP LOCKED, schedule claims, `rnx new --database postgres`, CI, guide) | PR from branch `m9b-postgres` |
 | M10 examples + cheat-sheet + `llms.txt` for coding agents (owner's request, before 1.0; ROADMAP M10) | after M9b |
 | v1.0 docs site, starter kit, semver guarantee | last |
 

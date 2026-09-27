@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
 #[command(
@@ -34,6 +34,9 @@ enum Command {
         /// Use a local checkout of Renox instead of the Git repository.
         #[arg(long, value_name = "DIR")]
         renox_path: Option<PathBuf>,
+        /// The database the app starts with.
+        #[arg(long, value_enum, default_value_t = Database::Sqlite)]
+        database: Database,
     },
     /// Run the app, rebuilding and restarting it when source files change.
     Serve {
@@ -132,7 +135,11 @@ enum Command {
 
 fn main() -> Result<()> {
     match Cli::parse().command {
-        Command::New { name, renox_path } => new::run(&name, renox_path.as_deref()),
+        Command::New {
+            name,
+            renox_path,
+            database,
+        } => new::run(&name, renox_path.as_deref(), database),
         Command::Serve { cargo_args } => serve::run(&cargo_args),
         Command::KeyGenerate { show } => key_generate(show),
         Command::Build => deploy::build(&app_root()?),
@@ -177,6 +184,36 @@ fn app_command(command: &str, args: &[String]) -> Result<()> {
 }
 
 /// The current directory, if it looks like a Renox app.
+/// The database engine an app uses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub(crate) enum Database {
+    Sqlite,
+    Postgres,
+}
+
+impl Database {
+    /// The app's engine, from `DATABASE_URL` in the environment or in `.env`
+    /// in the current directory; SQLite when neither says otherwise.
+    pub(crate) fn of_current_app() -> Self {
+        let url = std::env::var("DATABASE_URL").ok().or_else(|| {
+            std::fs::read_to_string(".env").ok().and_then(|env| {
+                env.lines()
+                    .find_map(|line| line.trim().strip_prefix("DATABASE_URL="))
+                    .map(|url| url.trim().trim_matches('"').to_owned())
+            })
+        });
+        Self::of_url(url.as_deref().unwrap_or_default())
+    }
+
+    pub(crate) fn of_url(url: &str) -> Self {
+        if url.starts_with("postgres://") || url.starts_with("postgresql://") {
+            Database::Postgres
+        } else {
+            Database::Sqlite
+        }
+    }
+}
+
 fn app_root() -> Result<PathBuf> {
     let root = std::env::current_dir()?;
     if !root.join("Cargo.toml").is_file() || !root.join("src").is_dir() {

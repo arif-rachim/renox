@@ -18,7 +18,8 @@ pub(crate) fn router() -> Router<AppState> {
 }
 
 async fn health(State(state): State<AppState>) -> (StatusCode, Json<Value>) {
-    let ping = crate::db::sql("SELECT 1").scalar::<i64>(&state.db);
+    // Not decoded: `1` is an INT4 on PostgreSQL but an INTEGER (i64) on SQLite.
+    let ping = crate::db::sql("SELECT 1").fetch_one(&state.db);
     let database = match tokio::time::timeout(Duration::from_secs(2), ping).await {
         Ok(Ok(_)) => Ok(()),
         Ok(Err(err)) => Err(err.to_string()),

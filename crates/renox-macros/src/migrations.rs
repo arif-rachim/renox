@@ -11,6 +11,44 @@ struct Files {
     down: Option<PathBuf>,
 }
 
+/// A migration's plain files and each database's own versions.
+#[derive(Default)]
+struct Set {
+    plain: Files,
+    sqlite: Files,
+    postgres: Files,
+}
+
+impl Set {
+    fn files(&mut self, dialect: Option<&str>) -> &mut Files {
+        match dialect {
+            Some("sqlite") => &mut self.sqlite,
+            Some("postgres") => &mut self.postgres,
+            _ => &mut self.plain,
+        }
+    }
+}
+
+fn include(path: &Option<PathBuf>) -> TokenStream {
+    match path {
+        Some(path) => {
+            let path = path.to_string_lossy().into_owned();
+            quote! { ::core::option::Option::Some(::core::include_str!(#path)) }
+        }
+        None => quote! { ::core::option::Option::None },
+    }
+}
+
+/// `name.postgres` -> (`name`, Some("postgres")); other names are plain.
+fn split_dialect(stem: &str) -> (&str, Option<&str>) {
+    for dialect in ["sqlite", "postgres"] {
+        if let Some(name) = stem.strip_suffix(&format!(".{dialect}")) {
+            return (name, Some(dialect));
+        }
+    }
+    (stem, None)
+}
+
 pub fn expand(input: TokenStream) -> Result<TokenStream> {
     let dir = if input.is_empty() {
         "migrations".to_owned()
@@ -21,7 +59,7 @@ pub fn expand(input: TokenStream) -> Result<TokenStream> {
         .map_err(|_| Error::new(Span::call_site(), "CARGO_MANIFEST_DIR is not set"))?;
     let path = PathBuf::from(root).join(&dir);
 
-    let mut migrations: BTreeMap<String, Files> = BTreeMap::new();
+    let mut migrations: BTreeMap<String, Set> = BTreeMap::new();
     if path.is_dir() {
         let entries = std::fs::read_dir(&path).map_err(|e| {
             Error::new(
@@ -35,34 +73,89 @@ pub fn expand(input: TokenStream) -> Result<TokenStream> {
             else {
                 continue;
             };
-            if let Some(name) = file_name.strip_suffix(".down.sql") {
-                migrations.entry(name.to_owned()).or_default().down = Some(file);
-            } else if let Some(name) = file_name.strip_suffix(".up.sql") {
-                migrations.entry(name.to_owned()).or_default().up = Some(file);
-            } else if let Some(name) = file_name.strip_suffix(".sql") {
-                migrations.entry(name.to_owned()).or_default().up = Some(file);
+            let (stem, down) = if let Some(stem) = file_name.strip_suffix(".down.sql") {
+                (stem, true)
+            } else if let Some(stem) = file_name.strip_suffix(".up.sql") {
+                (stem, false)
+            } else if let Some(stem) = file_name.strip_suffix(".sql") {
+                (stem, false)
+            } else {
+                continue;
+            };
+            let (name, dialect) = split_dialect(stem);
+            let files = migrations
+                .entry(name.to_owned())
+                .or_default()
+                .files(dialect);
+            if down {
+                files.down = Some(file);
+            } else {
+                files.up = Some(file);
             }
         }
     }
 
     let mut items = Vec::new();
-    for (name, files) in &migrations {
-        let Some(up) = &files.up else {
+    for (name, set) in &migrations {
+        for (dialect, files) in [
+            ("sqlite", &set.sqlite),
+            ("postgres", &set.postgres),
+            ("", &set.plain),
+        ] {
+            if files.down.is_some()
+                && files.up.is_none()
+                && (dialect.is_empty() || set.plain.up.is_none())
+            {
+                let dot = if dialect.is_empty() {
+                    String::new()
+                } else {
+                    format!(".{dialect}")
+                };
+                return Err(Error::new(
+                    Span::call_site(),
+                    format!("migration `{name}` has a {dot}.down.sql but no {dot}.up.sql in {dir}"),
+                ));
+            }
+        }
+        if set.plain.up.is_none() && (set.sqlite.up.is_none() || set.postgres.up.is_none()) {
             return Err(Error::new(
                 Span::call_site(),
-                format!("migration `{name}` has a .down.sql but no .up.sql in {dir}"),
+                format!(
+                    "migration `{name}` needs a {name}.up.sql, or both {name}.sqlite.up.sql \
+                     and {name}.postgres.up.sql, in {dir}"
+                ),
             ));
+        }
+        let up = match &set.plain.up {
+            Some(up) => {
+                let up = up.to_string_lossy().into_owned();
+                quote! { ::core::include_str!(#up) }
+            }
+            None => quote! { "" },
         };
-        let up = up.to_string_lossy().into_owned();
-        let down = match &files.down {
-            Some(down) => {
-                let down = down.to_string_lossy().into_owned();
-                quote! { ::core::option::Option::Some(::core::include_str!(#down)) }
+        let down = include(&set.plain.down);
+        let own = |files: &Files| match &files.up {
+            Some(up) => {
+                let up = up.to_string_lossy().into_owned();
+                let down = include(&files.down);
+                quote! {
+                    ::core::option::Option::Some(::renox::db::Scripts {
+                        up: ::core::include_str!(#up),
+                        down: #down,
+                    })
+                }
             }
             None => quote! { ::core::option::Option::None },
         };
+        let (sqlite, postgres) = (own(&set.sqlite), own(&set.postgres));
         items.push(quote! {
-            ::renox::db::Migration { name: #name, up: ::core::include_str!(#up), down: #down }
+            ::renox::db::Migration {
+                name: #name,
+                up: #up,
+                down: #down,
+                sqlite: #sqlite,
+                postgres: #postgres,
+            }
         });
     }
 

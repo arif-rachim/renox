@@ -1,13 +1,41 @@
-use chrono::{NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
+use chrono::{FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
 
 /// A value bound to a query parameter.
+///
+/// SQLite stores booleans as `0`/`1` and dates as text; PostgreSQL gets them
+/// with their own types (`BOOLEAN`, `TIMESTAMPTZ`, `TIMESTAMP`, `DATE`,
+/// `TIME`), so the same model works on both.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum DbValue {
     Null,
     Integer(i64),
     Real(f64),
     Text(String),
     Blob(Vec<u8>),
+    Bool(bool),
+    /// A point in time with its offset (`TIMESTAMPTZ` on PostgreSQL).
+    DateTime(chrono::DateTime<FixedOffset>),
+    /// A date and time without a zone (`TIMESTAMP` on PostgreSQL).
+    NaiveDateTime(NaiveDateTime),
+    Date(NaiveDate),
+    Time(NaiveTime),
+}
+
+impl DbValue {
+    /// The value as SQLite stores it: booleans as integers, dates in the text
+    /// formats sqlx uses, so values written through models and through raw
+    /// sqlx queries compare equal.
+    pub(crate) fn for_sqlite(self) -> DbValue {
+        match self {
+            DbValue::Bool(v) => DbValue::Integer(i64::from(v)),
+            DbValue::DateTime(v) => DbValue::Text(v.format("%F %T%.f%:z").to_string()),
+            DbValue::NaiveDateTime(v) => DbValue::Text(v.format("%F %T%.f").to_string()),
+            DbValue::Date(v) => DbValue::Text(v.format("%F").to_string()),
+            DbValue::Time(v) => DbValue::Text(v.format("%T%.f").to_string()),
+            other => other,
+        }
+    }
 }
 
 /// Converts a Rust value into a query parameter. Implemented for the usual
@@ -27,7 +55,13 @@ macro_rules! integer {
     )*};
 }
 
-integer!(i8, i16, i32, i64, u8, u16, u32, bool);
+integer!(i8, i16, i32, i64, u8, u16, u32);
+
+impl ToDbValue for bool {
+    fn to_db_value(&self) -> DbValue {
+        DbValue::Bool(*self)
+    }
+}
 
 impl ToDbValue for f32 {
     fn to_db_value(&self) -> DbValue {
@@ -65,32 +99,27 @@ impl ToDbValue for serde_json::Value {
     }
 }
 
-// Same text formats sqlx uses when binding chrono types, so values written
-// through models and through raw queries compare equal.
-impl<Tz: TimeZone> ToDbValue for chrono::DateTime<Tz>
-where
-    Tz::Offset: std::fmt::Display,
-{
+impl<Tz: TimeZone> ToDbValue for chrono::DateTime<Tz> {
     fn to_db_value(&self) -> DbValue {
-        DbValue::Text(self.format("%F %T%.f%:z").to_string())
+        DbValue::DateTime(self.fixed_offset())
     }
 }
 
 impl ToDbValue for NaiveDateTime {
     fn to_db_value(&self) -> DbValue {
-        DbValue::Text(self.format("%F %T%.f").to_string())
+        DbValue::NaiveDateTime(*self)
     }
 }
 
 impl ToDbValue for NaiveDate {
     fn to_db_value(&self) -> DbValue {
-        DbValue::Text(self.format("%F").to_string())
+        DbValue::Date(*self)
     }
 }
 
 impl ToDbValue for NaiveTime {
     fn to_db_value(&self) -> DbValue {
-        DbValue::Text(self.format("%T%.f").to_string())
+        DbValue::Time(*self)
     }
 }
 
