@@ -151,6 +151,9 @@ pub(crate) struct ErrorPage {
     pub detail: Option<String>,
     /// The internal error's chain, shown only when the app's `APP_DEBUG` is on.
     pub debug_detail: Option<String>,
+    /// For a template error, where it happened with the lines around it;
+    /// shown only with `APP_DEBUG`.
+    pub template: Option<String>,
 }
 
 impl ErrorPage {
@@ -220,9 +223,15 @@ impl IntoResponse for Error {
             return err.into_response();
         }
         let status = self.status();
+        let mut template = None;
         let (detail, debug_detail) = match &self {
             Self::Internal(err) => {
                 tracing::error!(error = ?err, "internal server error");
+                template = err
+                    .chain()
+                    .find_map(|e| e.downcast_ref::<minijinja::Error>())
+                    .map(|e| e.display_debug_info().to_string())
+                    .filter(|info| !info.trim().is_empty());
                 (None, Some(format!("{err:?}")))
             }
             Self::BadRequest(msg) => (Some(msg.clone()), None),
@@ -236,6 +245,7 @@ impl IntoResponse for Error {
             status,
             detail,
             debug_detail,
+            template,
         });
         res
     }

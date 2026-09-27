@@ -60,88 +60,106 @@ where
     type Rejection = Response;
 
     async fn from_request(req: Request, state: &AppState) -> Result<Self, Response> {
-        let locale_name = crate::i18n::request_locale(req.extensions(), state);
-        let locale = &Messages {
-            locale: Locale::parse(&locale_name),
-            texts: state.translator.texts(&locale_name),
-        };
-        let content_type = req
-            .headers()
-            .get(CONTENT_TYPE)
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or_default()
-            .to_ascii_lowercase();
-        let is_json = req
-            .headers()
-            .get(CONTENT_TYPE)
-            .and_then(|v| v.to_str().ok())
-            .is_some_and(|v| v.starts_with("application/json"));
+        validate_request(req, state, |_: &T, _, _| {})
+            .await
+            .map(|(data, _)| Valid(data))
+    }
+}
 
-        let is_multipart = req
-            .headers()
-            .get(CONTENT_TYPE)
-            .and_then(|v| v.to_str().ok())
-            .is_some_and(|v| v.starts_with("multipart/form-data"));
+/// What `Valid` does, with `extra` rules added to `T`'s own; returns the
+/// data and the submitted fields (without files).
+#[allow(clippy::result_large_err)] // the rejection is a response, like axum's
+pub(crate) async fn validate_request<T>(
+    req: Request,
+    state: &AppState,
+    extra: impl FnOnce(&T, &Map<String, Value>, &mut Validator) + Send,
+) -> Result<(T, Map<String, Value>), Response>
+where
+    T: DeserializeOwned + Validate + Send,
+{
+    let locale_name = crate::i18n::request_locale(req.extensions(), state);
+    let locale = &Messages {
+        locale: Locale::parse(&locale_name),
+        texts: state.translator.texts(&locale_name),
+    };
+    let content_type = req
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let is_json = req
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.starts_with("application/json"));
 
-        let (parsed, input) = if matches!(*req.method(), Method::GET | Method::HEAD) {
-            let query = req.uri().query().unwrap_or_default().as_bytes();
-            let pairs = form_urlencoded::parse(query).into_owned().collect();
-            parse_pairs(pairs, &HashMap::new(), locale)
-        } else if is_multipart {
-            let multipart = Multipart::from_request(req, state)
-                .await
-                .map_err(IntoResponse::into_response)?;
-            // MultipartError keeps axum's status, e.g. 413 over UPLOAD_MAX_SIZE.
-            let (pairs, uploads) = read_multipart(multipart)
-                .await
-                .map_err(IntoResponse::into_response)?;
-            parse_pairs(pairs, &uploads, locale)
-        } else {
-            let bytes = Bytes::from_request(req, state)
-                .await
-                .map_err(IntoResponse::into_response)?;
-            if is_json {
-                parse_json(&bytes, locale).map_err(IntoResponse::into_response)?
-            } else if !content_type.is_empty()
-                && !content_type.starts_with("application/x-www-form-urlencoded")
-            {
-                return Err(
-                    (StatusCode::UNSUPPORTED_MEDIA_TYPE, "Send a form or JSON.").into_response()
-                );
-            } else {
-                let pairs = form_urlencoded::parse(&bytes).into_owned().collect();
-                parse_pairs(pairs, &HashMap::new(), locale)
-            }
-        };
+    let is_multipart = req
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.starts_with("multipart/form-data"));
 
-        let (data, mut errors) = match parsed {
-            Parsed::Ok(data, errors) => (data, errors),
-            Parsed::Invalid(errors) => {
-                return Err(ValidationError::new(errors)
-                    .with_input_map(input)
-                    .into_response());
-            }
-        };
-        let rule_errors = Validator::rules_with_texts(&data, locale.locale, locale.texts.clone())
-            .finish(&state.db)
+    let (parsed, input) = if matches!(*req.method(), Method::GET | Method::HEAD) {
+        let query = req.uri().query().unwrap_or_default().as_bytes();
+        let pairs = form_urlencoded::parse(query).into_owned().collect();
+        parse_pairs(pairs, &HashMap::new(), locale)
+    } else if is_multipart {
+        let multipart = Multipart::from_request(req, state)
             .await
             .map_err(IntoResponse::into_response)?;
-        // A field that didn't parse was checked with a placeholder; its own
-        // error is the one to show.
-        for (field, messages) in rule_errors.iter() {
-            if !errors.has(field) {
-                for message in messages {
-                    errors.add(field, message.clone());
-                }
+        // MultipartError keeps axum's status, e.g. 413 over UPLOAD_MAX_SIZE.
+        let (pairs, uploads) = read_multipart(multipart)
+            .await
+            .map_err(IntoResponse::into_response)?;
+        parse_pairs(pairs, &uploads, locale)
+    } else {
+        let bytes = Bytes::from_request(req, state)
+            .await
+            .map_err(IntoResponse::into_response)?;
+        if is_json {
+            parse_json(&bytes, locale).map_err(IntoResponse::into_response)?
+        } else if !content_type.is_empty()
+            && !content_type.starts_with("application/x-www-form-urlencoded")
+        {
+            return Err(
+                (StatusCode::UNSUPPORTED_MEDIA_TYPE, "Send a form or JSON.").into_response()
+            );
+        } else {
+            let pairs = form_urlencoded::parse(&bytes).into_owned().collect();
+            parse_pairs(pairs, &HashMap::new(), locale)
+        }
+    };
+
+    let (data, mut errors) = match parsed {
+        Parsed::Ok(data, errors) => (data, errors),
+        Parsed::Invalid(errors) => {
+            return Err(ValidationError::new(errors)
+                .with_input_map(input)
+                .into_response());
+        }
+    };
+    let mut validator = Validator::rules_with_texts(&data, locale.locale, locale.texts.clone());
+    extra(&data, &input, &mut validator);
+    let rule_errors = validator
+        .finish(&state.db)
+        .await
+        .map_err(IntoResponse::into_response)?;
+    // A field that didn't parse was checked with a placeholder; its own
+    // error is the one to show.
+    for (field, messages) in rule_errors.iter() {
+        if !errors.has(field) {
+            for message in messages {
+                errors.add(field, message.clone());
             }
         }
-        if errors.is_empty() {
-            Ok(Valid(data))
-        } else {
-            Err(ValidationError::new(errors)
-                .with_input_map(input)
-                .into_response())
-        }
+    }
+    if errors.is_empty() {
+        Ok((data, input))
+    } else {
+        Err(ValidationError::new(errors)
+            .with_input_map(input)
+            .into_response())
     }
 }
 

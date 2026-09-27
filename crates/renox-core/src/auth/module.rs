@@ -26,6 +26,56 @@ struct Settings {
     registration: bool,
     redirect_to: Option<String>,
     verify_email: bool,
+    rules: Option<RulesFn>,
+    on_registered: Option<RegisteredFn>,
+}
+
+type RulesFn = Arc<dyn Fn(&Registration, &mut Validator) + Send + Sync>;
+type RegisteredFn = Arc<
+    dyn Fn(
+            AppState,
+            User,
+            Registration,
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result> + Send>>
+        + Send
+        + Sync,
+>;
+
+/// What was submitted to `/register`, for [`Auth::registration_rules`] and
+/// [`Auth::on_registered`]. Add the fields to your own
+/// `renox/auth/register.html` (copy the built-in one).
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct Registration {
+    fields: serde_json::Map<String, Value>,
+}
+
+impl Registration {
+    /// A submitted field, trimmed; `""` when it's missing.
+    pub fn get(&self, field: &str) -> String {
+        match self.fields.get(field) {
+            Some(Value::String(value)) => value.trim().to_owned(),
+            Some(Value::Array(values)) => values
+                .first()
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .trim()
+                .to_owned(),
+            _ => String::new(),
+        }
+    }
+
+    /// Every value of a field sent several times (a group of checkboxes).
+    pub fn all(&self, field: &str) -> Vec<String> {
+        match self.fields.get(field) {
+            Some(Value::String(value)) => vec![value.clone()],
+            Some(Value::Array(values)) => values
+                .iter()
+                .filter_map(|v| v.as_str().map(str::to_owned))
+                .collect(),
+            _ => Vec::new(),
+        }
+    }
 }
 
 /// Login, registration, password reset and email verification pages, and
@@ -46,6 +96,8 @@ pub struct Auth {
     registration: bool,
     redirect_to: Option<String>,
     verify_email: bool,
+    rules: Option<RulesFn>,
+    on_registered: Option<RegisteredFn>,
 }
 
 impl Auth {
@@ -54,7 +106,49 @@ impl Auth {
             registration: true,
             redirect_to: None,
             verify_email: false,
+            rules: None,
+            on_registered: None,
         }
+    }
+
+    /// Validates fields the app adds to the registration form, with the
+    /// built-in ones. Their errors show next to the inputs like any other.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # let _ =
+    /// Auth::new()
+    ///     .registration_rules(|form, v| {
+    ///         v.field("phone", &form.get("phone")).required().max(20);
+    ///     })
+    ///     .on_registered(|state, mut user, form| async move {
+    ///         // `phone` and `role` are columns the app added to `users`.
+    ///         user.set(&state.db, "phone", form.get("phone")).await?;
+    ///         let first = User::query().count(&state.db).await? == 1;
+    ///         user.set(&state.db, "role", if first { "admin" } else { "member" }).await
+    ///     })
+    /// # ;
+    /// ```
+    pub fn registration_rules(
+        mut self,
+        rules: impl Fn(&Registration, &mut Validator) + Send + Sync + 'static,
+    ) -> Self {
+        self.rules = Some(Arc::new(rules));
+        self
+    }
+
+    /// Runs after a new user is saved and before they're logged in, e.g. to
+    /// save the app's own fields or give a role. If it fails, the user is
+    /// deleted again and the visitor gets the error, so they can try again.
+    pub fn on_registered<F, Fut>(mut self, hook: F) -> Self
+    where
+        F: Fn(AppState, User, Registration) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = Result> + Send + 'static,
+    {
+        self.on_registered = Some(Arc::new(move |state, user, form| {
+            Box::pin(hook(state, user, form))
+        }));
+        self
     }
 
     /// Emails new users a verification link. Guard routes that need a
@@ -98,6 +192,8 @@ impl Module for Auth {
             registration: self.registration,
             redirect_to: self.redirect_to.clone(),
             verify_email: self.verify_email,
+            rules: self.rules.clone(),
+            on_registered: self.on_registered.clone(),
         });
 
         let mut guest = Routes::new()
@@ -291,8 +387,28 @@ async fn store_register(
     session: Session,
     htmx: Htmx,
     lang: Lang,
-    Valid(form): Valid<RegisterForm>,
+    req: axum::extract::Request,
 ) -> Result<Response> {
+    let rules = settings.rules.clone();
+    let validated = crate::validation::extract::validate_request(
+        req,
+        &state,
+        move |_: &RegisterForm, fields, v| {
+            if let Some(rules) = &rules {
+                rules(
+                    &Registration {
+                        fields: fields.clone(),
+                    },
+                    v,
+                );
+            }
+        },
+    )
+    .await;
+    let (form, fields) = match validated {
+        Ok(validated) => validated,
+        Err(rejection) => return Ok(rejection),
+    };
     let user = match User::register(&state.db, &form.name, &form.email, &form.password).await {
         Ok(user) => user,
         // Two sign-ups with one email at the same moment: the database's
@@ -310,6 +426,22 @@ async fn store_register(
                 .into());
         }
         Err(err) => return Err(err),
+    };
+    let user = match &settings.on_registered {
+        None => user,
+        Some(hook) => {
+            let id = user.id;
+            if let Err(err) = hook(state.clone(), user, Registration { fields }).await {
+                // Undo the sign-up, so the visitor can try again.
+                crate::db::sql("DELETE FROM users WHERE id = ?")
+                    .bind(id)
+                    .execute(&state.db)
+                    .await?;
+                return Err(err);
+            }
+            // Read it back with what the hook changed.
+            <User as crate::db::Model>::find_or_404(&state.db, id).await?
+        }
     };
     if settings.verify_email {
         verification::send_verification(&state, &user).await?;

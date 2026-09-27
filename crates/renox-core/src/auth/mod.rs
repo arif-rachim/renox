@@ -52,7 +52,7 @@ use axum::http::{Method, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Redirect, Response};
 
-pub use module::Auth;
+pub use module::{Auth, Registration};
 pub use notifications::{Channel, DatabaseNotification, Notification};
 pub(crate) use throttle::LoginThrottle;
 pub use tokens::{AccessToken, NewToken};
@@ -128,6 +128,14 @@ impl<T: Policy> Can<T> {
 
 pub(crate) type Gate = Arc<dyn Fn(&User) -> bool + Send + Sync>;
 pub(crate) type Gates = Arc<HashMap<String, Gate>>;
+pub(crate) type AsyncGate = Arc<
+    dyn Fn(
+            User,
+            AppState,
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<bool>> + Send>>
+        + Send
+        + Sync,
+>;
 
 /// The logged-in user of the current request, if any; set by Renox's auth
 /// middleware for every request.
@@ -146,6 +154,7 @@ pub(crate) struct CurrentUser {
 pub struct AuthUser {
     user: Arc<User>,
     gates: Gates,
+    state: Option<AppState>,
 }
 
 impl Deref for AuthUser {
@@ -185,6 +194,31 @@ impl AuthUser {
         }
     }
 
+    /// Whether the gate named `gate` lets this user through, for gates made
+    /// with `App::gate_async` (which may query the database) as well as
+    /// plain ones. Unknown gates deny.
+    pub async fn allows_async(&self, gate: &str) -> Result<bool> {
+        if self.gates.contains_key(gate) {
+            return Ok(self.allows(gate));
+        }
+        let Some(state) = &self.state else {
+            return Ok(false);
+        };
+        match state.async_gates.get(gate) {
+            Some(check) => check(self.user.as_ref().clone(), state.clone()).await,
+            None => Ok(false),
+        }
+    }
+
+    /// Like `allows_async`, but a refusal becomes a 403 response.
+    pub async fn gate_async(&self, gate: &str) -> Result {
+        if self.allows_async(gate).await? {
+            Ok(())
+        } else {
+            Err(Error::Forbidden)
+        }
+    }
+
     pub fn user(&self) -> &User {
         &self.user
     }
@@ -217,6 +251,7 @@ fn current(extensions: &axum::http::Extensions) -> Option<AuthUser> {
     Some(AuthUser {
         user: current.user.clone()?,
         gates: current.gates.clone(),
+        state: extensions.get::<AppState>().cloned(),
     })
 }
 

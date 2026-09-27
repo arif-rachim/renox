@@ -117,7 +117,11 @@ impl<M: Model> Query<M> {
     }
 
     fn column(&mut self, column: &str) -> Option<String> {
-        if M::COLUMNS.contains(&column) {
+        let plain = !column.is_empty()
+            && column
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_');
+        if M::COLUMNS.contains(&column) || (M::SELECT_ALL && plain) {
             Some(quote(column))
         } else {
             self.error
@@ -271,7 +275,11 @@ impl<M: Model> Query<M> {
     }
 
     fn select_sql(&self, dialect: Dialect) -> String {
-        let columns: Vec<String> = M::COLUMNS.iter().map(|c| quote(c)).collect();
+        let columns: Vec<String> = if M::SELECT_ALL {
+            vec!["*".to_owned()]
+        } else {
+            M::COLUMNS.iter().map(|c| quote(c)).collect()
+        };
         let mut sql = format!(
             "SELECT {} FROM {}{}",
             columns.join(", "),

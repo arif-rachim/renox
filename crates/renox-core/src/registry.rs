@@ -17,6 +17,8 @@ pub struct Registry {
     pub(crate) duplicate_job: Option<&'static str>,
     pub(crate) webhooks: HashMap<&'static str, crate::webhook::HandleFn>,
     pub(crate) commands: Vec<crate::command::Command>,
+    pub(crate) templates: Vec<crate::view::TemplateHook>,
+    pub(crate) shares: Vec<(String, crate::view::ShareFn)>,
 }
 
 impl Registry {
@@ -62,6 +64,59 @@ impl Registry {
     {
         self.commands
             .push(crate::command::command(name, about, run));
+        self
+    }
+
+    /// Adds template functions, filters or globals, e.g. a `rupiah` filter:
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # let _ =
+    /// App::new().templates(|env| {
+    ///     env.add_filter("rupiah", |n: i64| format!("Rp {}", renox::format_number(n as f64, 0, "id")));
+    /// })
+    /// # ;
+    /// ```
+    ///
+    /// Built in: `number` (`{{ price | number }}` → `75.000` in Indonesian,
+    /// `number(2)` for decimals) and `date` (`{{ created_at | date("%d/%m/%Y") }}`,
+    /// in `APP_TIMEZONE`).
+    pub fn templates(
+        &mut self,
+        hook: impl Fn(&mut minijinja::Environment<'static>) + Send + Sync + 'static,
+    ) -> &mut Self {
+        self.templates.push(std::sync::Arc::new(hook));
+        self
+    }
+
+    /// Gives every view `key`, computed per request, e.g. the categories in
+    /// a menu or the number of items in a cart. It runs for every rendered
+    /// view, so keep it quick (cache what doesn't change per request).
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # use std::time::Duration;
+    /// # let _ =
+    /// App::new().share("cart_count", |ctx: renox::view::ViewContext| async move {
+    ///     let Some(user) = ctx.user else { return Ok(0) };
+    ///     let n: i64 = renox::db::sql("SELECT COUNT(*) FROM cart_items WHERE user_id = ?")
+    ///         .bind(user.id)
+    ///         .scalar(&ctx.state.db)
+    ///         .await?;
+    ///     Ok(n)
+    /// })
+    /// # ;
+    /// ```
+    ///
+    /// Values a handler passes in `context!` win over shared ones.
+    pub fn share<F, Fut, T>(&mut self, key: &str, compute: F) -> &mut Self
+    where
+        F: Fn(crate::view::ViewContext) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<T>> + Send + 'static,
+        T: serde::Serialize,
+    {
+        self.shares
+            .push((key.to_owned(), crate::view::share_fn(compute)));
         self
     }
 

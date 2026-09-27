@@ -84,6 +84,45 @@ pub struct Views {
     reloader: Arc<AutoReloader>,
 }
 
+/// What an `App::share` function knows about the request being rendered.
+#[non_exhaustive]
+#[derive(Clone)]
+pub struct ViewContext {
+    pub state: AppState,
+    /// The logged-in user, if any.
+    pub user: Option<Arc<crate::auth::User>>,
+    /// The request's language, e.g. `id`.
+    pub locale: String,
+    /// The request's path, e.g. `/products`.
+    pub path: String,
+}
+
+pub(crate) type ShareFn = Arc<
+    dyn Fn(
+            ViewContext,
+        )
+            -> std::pin::Pin<Box<dyn std::future::Future<Output = crate::Result<Value>> + Send>>
+        + Send
+        + Sync,
+>;
+
+pub(crate) fn share_fn<F, Fut, T>(compute: F) -> ShareFn
+where
+    F: Fn(ViewContext) -> Fut + Send + Sync + 'static,
+    Fut: std::future::Future<Output = crate::Result<T>> + Send + 'static,
+    T: Serialize,
+{
+    let compute = Arc::new(compute);
+    Arc::new(move |ctx| {
+        let compute = compute.clone();
+        Box::pin(async move { Ok(Value::from_serialize(compute(ctx).await?)) })
+    })
+}
+
+/// Adds functions, filters or globals to the template environment; see
+/// `App::templates`.
+pub(crate) type TemplateHook = Arc<dyn Fn(&mut Environment<'static>) + Send + Sync>;
+
 impl Views {
     /// `embedded`: templates compiled into the binary, used instead of
     /// `VIEWS_PATH` when given.
@@ -92,12 +131,20 @@ impl Views {
         routes: Arc<RouteTable>,
         storage: Storage,
         embedded: Option<&'static [(&'static str, &'static str)]>,
+        hooks: Arc<Vec<TemplateHook>>,
+        offset: i64,
     ) -> Self {
         let dir = config.views_path.clone();
         let watch = config.debug && embedded.is_none() && dir.is_dir();
+        let debug = config.debug;
         let reloader = AutoReloader::new(move |notifier| {
             let mut env = Environment::new();
             env.set_formatter(format_value);
+            // While developing, printing a misspelled variable is an error
+            // instead of an empty string (`{% if x %}` on a missing one is fine).
+            if debug {
+                env.set_undefined_behavior(minijinja::UndefinedBehavior::SemiStrict);
+            }
             let loader_dir = dir.clone();
             env.set_loader(move |name| load(&loader_dir, embedded, name));
 
@@ -150,6 +197,12 @@ impl Views {
             env.add_function("storage_url", move |key: String| {
                 Value::from_safe_string(storage.url(&key))
             });
+            env.add_filter("number", crate::view_filters::number);
+            env.add_filter("date", crate::view_filters::date(offset));
+            // The app's own functions and filters (`App::templates`).
+            for hook in hooks.iter() {
+                hook(&mut env);
+            }
 
             if watch {
                 notifier.watch_path(&dir, true);
@@ -167,10 +220,17 @@ impl Views {
         Ok(env.get_template(name)?.render(ctx)?)
     }
 
-    fn render_view(&self, view: &View, globals: Value, htmx: &Htmx) -> anyhow::Result<String> {
+    fn render_view(
+        &self,
+        view: &View,
+        shared: Value,
+        globals: Value,
+        htmx: &Htmx,
+    ) -> anyhow::Result<String> {
         let env = self.reloader.acquire_env()?;
         let template = env.get_template(&view.name)?;
-        let ctx = merge_maps([view.ctx.clone(), globals]);
+        // The last map wins: shared values, then the handler's, then Renox's.
+        let ctx = merge_maps([shared, view.ctx.clone(), globals]);
         match &view.fragment {
             Some(block) if htmx.wants_fragment() => {
                 let mut captured = template.render_captured_to(ctx, std::io::sink())?;
@@ -180,7 +240,7 @@ impl Views {
         }
     }
 
-    fn render_error(&self, page: &ErrorPage, debug: bool) -> anyhow::Result<String> {
+    fn render_error(&self, page: &ErrorPage, debug: bool, request: &str) -> anyhow::Result<String> {
         let env = self.reloader.acquire_env()?;
         let specific = format!("errors/{}.html", page.status.as_u16());
         let template = match env.get_template(&specific) {
@@ -194,6 +254,10 @@ impl Views {
             status => page.status.as_u16(),
             reason => reason(page.status),
             detail => page.shown_detail(debug),
+            // Only while developing: what was asked, and where a template failed.
+            debug => debug,
+            request => debug.then_some(request),
+            template => page.template.as_deref().filter(|_| debug),
         })?)
     }
 }
@@ -333,6 +397,7 @@ pub(crate) async fn middleware(
     let current_user = req.extensions().get::<CurrentUser>().cloned();
     let locale = crate::i18n::request_locale(req.extensions(), &state);
     let htmx = Htmx::from_headers(req.headers());
+    let method = req.method().clone();
     let path = req.uri().path().to_owned();
     let query = req.uri().query().unwrap_or_default().to_owned();
     let nonce = req
@@ -348,6 +413,11 @@ pub(crate) async fn middleware(
         (wants_json, crate::htmx::same_site_referer(req.headers()))
     };
 
+    let request_line = if query.is_empty() {
+        format!("{method} {path}")
+    } else {
+        format!("{method} {path}?{query}")
+    };
     let mut res = next.run(req).await;
 
     if let Some(failed) = res.extensions_mut().remove::<ValidationError>() {
@@ -376,6 +446,28 @@ pub(crate) async fn middleware(
     }
 
     if let Some(view) = res.extensions_mut().remove::<View>() {
+        let mut shared = std::collections::BTreeMap::new();
+        for (key, compute) in state.shares.iter() {
+            let ctx = ViewContext {
+                state: state.clone(),
+                user: current_user.as_ref().and_then(|c| c.user.clone()),
+                locale: locale.clone(),
+                path: path.clone(),
+            };
+            match compute(ctx).await {
+                Ok(value) => {
+                    shared.insert(key.clone(), value);
+                }
+                Err(err) => {
+                    let err = match err {
+                        Error::Internal(err) => err,
+                        other => anyhow::anyhow!("{other:?}"),
+                    };
+                    return Error::Internal(err.context(format!("sharing `{key}` with views")))
+                        .into_response();
+                }
+            }
+        }
         let events = match &session {
             Some(session) if !htmx.request => crate::analytics::take(session),
             _ => Vec::new(),
@@ -393,29 +485,51 @@ pub(crate) async fn middleware(
             },
             &locale,
         );
-        return match state.views.render_view(&view, globals, &htmx) {
+        return match state
+            .views
+            .render_view(&view, Value::from_serialize(&shared), globals, &htmx)
+        {
             Ok(html) => with_html(res, html),
             Err(err) => {
-                Error::Internal(err.context(format!("rendering {}", view.name))).into_response()
+                let mut failed = Error::Internal(err.context(format!("rendering {}", view.name)))
+                    .into_response();
+                match failed.extensions_mut().remove::<ErrorPage>() {
+                    Some(page) => {
+                        error_response(&state, page, failed, wants_json, &htmx, &request_line)
+                    }
+                    None => failed,
+                }
             }
         };
     }
 
     if let Some(page) = res.extensions_mut().remove::<ErrorPage>() {
-        let debug = state.config.debug;
-        if wants_json && !htmx.request {
-            return page.json(debug);
-        }
-        let html = state
-            .views
-            .render_error(&page, debug)
-            .unwrap_or_else(|err| {
-                tracing::error!(error = ?err, "could not render the error page");
-                crate::error::error_page(page.status, page.shown_detail(debug))
-            });
-        return with_html(res, html);
+        return error_response(&state, page, res, wants_json, &htmx, &request_line);
     }
     res
+}
+
+/// The error page (or JSON for API clients) for `page`.
+fn error_response(
+    state: &AppState,
+    page: ErrorPage,
+    res: Response,
+    wants_json: bool,
+    htmx: &Htmx,
+    request_line: &str,
+) -> Response {
+    let debug = state.config.debug;
+    if wants_json && !htmx.request {
+        return page.json(debug);
+    }
+    let html = state
+        .views
+        .render_error(&page, debug, request_line)
+        .unwrap_or_else(|err| {
+            tracing::error!(error = ?err, "could not render the error page");
+            crate::error::error_page(page.status, page.shown_detail(debug))
+        });
+    with_html(res, html)
 }
 
 fn with_html(mut res: Response, html: String) -> Response {
@@ -427,6 +541,33 @@ fn with_html(mut res: Response, html: String) -> Response {
     headers.remove(CONTENT_LENGTH);
     *res.body_mut() = Body::from(html);
     res
+}
+
+/// Flashed values; a key that wasn't flashed reads as `""`, so
+/// `{{ flash.status }}` needs no `if`, even with strict templates.
+#[derive(Debug)]
+struct Flashed(serde_json::Map<String, serde_json::Value>);
+
+impl minijinja::value::Object for Flashed {
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        let key = key.as_str()?;
+        Some(
+            self.0
+                .get(key)
+                .map(Value::from_serialize)
+                .unwrap_or_else(|| Value::from("")),
+        )
+    }
+
+    fn enumerate(self: &Arc<Self>) -> minijinja::value::Enumerator {
+        minijinja::value::Enumerator::Values(
+            self.0.keys().map(|k| Value::from(k.as_str())).collect(),
+        )
+    }
+
+    fn repr(self: &Arc<Self>) -> minijinja::value::ObjectRepr {
+        minijinja::value::ObjectRepr::Map
+    }
 }
 
 /// What templates see of the request, besides the session and user.
@@ -541,7 +682,7 @@ fn globals(
             boosted => htmx.boosted,
         },
         csrf_token => token,
-        flash => session.map(Session::flashed).unwrap_or_default(),
+        flash => Value::from_object(Flashed(session.map(Session::flashed).unwrap_or_default())),
         errors => errors,
         error => Value::from_function(move |field: String| {
             first_errors.get(&field).cloned().unwrap_or_default()

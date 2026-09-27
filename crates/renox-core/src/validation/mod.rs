@@ -27,7 +27,7 @@
 //! }
 //! ```
 
-mod extract;
+pub(crate) mod extract;
 mod messages;
 mod value;
 

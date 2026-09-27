@@ -385,7 +385,14 @@ async fn scheduler_task_that_panics_keeps_running() {
         });
     });
     let server = tokio::spawn(app.serve());
-    tokio::time::sleep(Duration::from_millis(5600)).await;
+    // Wait for enough runs (slow machines take longer), up to 30 s.
+    let started = Instant::now();
+    while started.elapsed() < Duration::from_secs(30)
+        && (SCHED_PANIC.load(Ordering::SeqCst) < 4 || SCHED_ERR.load(Ordering::SeqCst) < 4)
+    {
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+    let elapsed = started.elapsed().as_secs_f64();
     server.abort();
     let k = App::with_config({
         let mut c = config();
@@ -397,7 +404,7 @@ async fn scheduler_task_that_panics_keeps_running() {
     .unwrap();
     let claims = scalar(
         k.db(),
-        "SELECT COUNT(*) FROM cache WHERE key LIKE 'schedule:%'",
+        "SELECT COUNT(*) FROM cache WHERE key LIKE 'renox:schedule:%'",
     )
     .await;
     let (p, e, s) = (
@@ -406,10 +413,14 @@ async fn scheduler_task_that_panics_keeps_running() {
         SCHED_SLOW.load(Ordering::SeqCst),
     );
     eprintln!(
-        "scheduler over ~5.6s: panic-task runs={p}, err-task runs={e}, slow(2.5s)-task runs={s}, claim rows={claims}"
+        "scheduler: panic-task runs={p}, err-task runs={e}, slow(2.5s)-task runs={s}, claim rows={claims}"
     );
     assert!(e >= 4, "an erroring task keeps its schedule");
-    assert!(s <= 3, "overlapping runs are skipped");
+    // A 2.5 s task started every second runs at most once per 2.5 s.
+    assert!(
+        (s as f64) <= elapsed / 2.5 + 1.0,
+        "overlapping runs are skipped ({s} runs in {elapsed:.1}s)"
+    );
     assert!(
         p >= 4,
         "a task that panicked once never runs again (its `running` flag stays set)"
