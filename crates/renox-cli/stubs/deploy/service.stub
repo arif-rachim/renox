@@ -1,0 +1,18 @@
+# /etc/systemd/system/{{name}}.service
+[Unit]
+Description={{title}}
+After=network.target
+
+[Service]
+User={{name}}
+WorkingDirectory=/opt/{{name}}
+EnvironmentFile=/opt/{{name}}/.env
+ExecStartPre=/opt/{{name}}/{{name}} migrate
+ExecStart=/opt/{{name}}/{{name}}
+Restart=on-failure
+# Renox finishes running jobs on SIGTERM (up to 30 s).
+KillSignal=SIGTERM
+TimeoutStopSec=40
+
+[Install]
+WantedBy=multi-user.target

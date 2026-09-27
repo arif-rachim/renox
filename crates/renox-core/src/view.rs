@@ -85,14 +85,21 @@ pub struct Views {
 }
 
 impl Views {
-    pub(crate) fn new(config: &Config, routes: Arc<RouteTable>, storage: Storage) -> Self {
+    /// `embedded`: templates compiled into the binary, used instead of
+    /// `VIEWS_PATH` when given.
+    pub(crate) fn new(
+        config: &Config,
+        routes: Arc<RouteTable>,
+        storage: Storage,
+        embedded: Option<&'static [(&'static str, &'static str)]>,
+    ) -> Self {
         let dir = config.views_path.clone();
-        let watch = config.debug && dir.is_dir();
+        let watch = config.debug && embedded.is_none() && dir.is_dir();
         let reloader = AutoReloader::new(move |notifier| {
             let mut env = Environment::new();
             env.set_formatter(format_value);
             let loader_dir = dir.clone();
-            env.set_loader(move |name| load(&loader_dir, name));
+            env.set_loader(move |name| load(&loader_dir, embedded, name));
 
             let routes = routes.clone();
             env.add_function(
@@ -196,8 +203,16 @@ fn format_value(
     minijinja::escape_formatter(out, state, value)
 }
 
-fn load(dir: &Path, name: &str) -> Result<Option<String>, minijinja::Error> {
-    if let Some(path) = safe_join(dir, name) {
+fn load(
+    dir: &Path,
+    embedded: Option<&'static [(&'static str, &'static str)]>,
+    name: &str,
+) -> Result<Option<String>, minijinja::Error> {
+    if let Some(files) = embedded {
+        if let Some((_, source)) = files.iter().find(|(file, _)| *file == name) {
+            return Ok(Some((*source).to_owned()));
+        }
+    } else if let Some(path) = safe_join(dir, name) {
         match std::fs::read_to_string(&path) {
             Ok(source) => return Ok(Some(source)),
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}

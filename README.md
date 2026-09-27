@@ -166,6 +166,13 @@ async fn creating_a_product() {
 }
 ```
 
+Deploy one file: views, translations and public files are compiled into the release binary.
+
+```bash
+rnx build          # dist/my-app (plus a .env on the server)
+rnx make:deploy    # Dockerfile, systemd unit, Litestream backups, deploy/README.md
+```
+
 The `Auth` module also handles password reset and email verification by email (`MAIL_MAILER=log`
 prints the links while developing), and API tokens for mobile apps and integrations:
 

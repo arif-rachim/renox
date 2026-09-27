@@ -4,6 +4,7 @@ mod app;
 /// and tests boot it with `renox::testing::TestApp`.
 pub fn app() -> renox::App {
     renox::App::new()
+        .embed(renox::embedded!())
         .migrations(renox::migrations!())
         .module(renox::auth::Auth::new())
         .module(app::home::Home)

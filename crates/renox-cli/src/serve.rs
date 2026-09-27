@@ -51,7 +51,7 @@ pub fn run(cargo_args: &[String]) -> Result<()> {
 }
 
 /// Runs `cargo build` and returns the path of the app's binary.
-fn build(cargo_args: &[String]) -> Result<Option<PathBuf>> {
+pub(crate) fn build(cargo_args: &[String]) -> Result<Option<PathBuf>> {
     let output = Command::new("cargo")
         .args(["build", "--message-format=json-render-diagnostics"])
         .args(cargo_args)

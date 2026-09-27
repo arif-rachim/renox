@@ -26,7 +26,7 @@
 //! ```
 
 pub use renox_core::*;
-pub use renox_macros::{Model, migrations, test};
+pub use renox_macros::{Model, embedded, migrations, test};
 
 pub use axum;
 pub use tokio;

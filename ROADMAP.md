@@ -200,8 +200,15 @@ M8a (done):
 - [x] Apps are a library plus a tiny `main.rs` (`rnx new` writes `src/lib.rs` with `pub fn app()`
       and `tests/home.rs`), because tests can't import from `main.rs`; the guestbook has tests too
 
-M8b (next):
-- [ ] `renox build` with views embedded in the binary, Dockerfile and systemd templates, SQLite backups with Litestream
+M8b (done):
+- [x] `renox::embedded!()` + `App::embed(..)`: `resources/views`, `resources/lang` and `public/` are
+      compiled into the binary and used when `APP_DEBUG` is off; debug builds keep reading the disk
+      (live reload). A release build runs from one file plus `.env`
+- [x] `rnx build`: release build copied to `dist/<name>`
+- [x] `rnx make:deploy`: a multi-stage `Dockerfile` (+ `.dockerignore`), a systemd unit that migrates
+      before starting and stops gracefully, a Litestream config for continuous SQLite backups to
+      S3/R2, and `deploy/README.md` with the steps
+- [x] `rnx new` apps embed their files and ignore `dist/`
 
 ### M9 · v0.10: PostgreSQL (before 1.0)
 SQLite stays the default and is right for an app on one server. PostgreSQL is for apps that

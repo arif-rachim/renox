@@ -97,6 +97,16 @@ fn flatten(prefix: &str, value: &Value, out: &mut HashMap<String, String>) {
     }
 }
 
+fn parse(locales: &mut HashMap<String, Texts>, file: &str, text: &str) -> anyhow::Result<()> {
+    let locale = file.strip_suffix(".json").unwrap_or(file).to_owned();
+    let json: Value =
+        serde_json::from_str(text).with_context(|| format!("{file} is not valid JSON"))?;
+    let mut flat = HashMap::new();
+    flatten("", &json, &mut flat);
+    locales.insert(locale, Arc::new(flat));
+    Ok(())
+}
+
 fn read(dir: &Path) -> anyhow::Result<HashMap<String, Texts>> {
     let mut locales = HashMap::new();
     for (path, _) in fingerprint(dir) {
@@ -117,6 +127,26 @@ fn read(dir: &Path) -> anyhow::Result<HashMap<String, Texts>> {
 }
 
 impl Translator {
+    /// Uses translation files compiled into the binary.
+    pub(crate) fn embedded(files: &[(&str, &str)]) -> anyhow::Result<Self> {
+        let mut locales = HashMap::new();
+        for (file, text) in files
+            .iter()
+            .filter(|(f, _)| f.ends_with(".json") && !f.contains('/'))
+        {
+            parse(&mut locales, file, text)?;
+        }
+        Ok(Self {
+            dir: PathBuf::new(),
+            reload: false,
+            loaded: RwLock::new(Loaded {
+                locales,
+                fingerprint: Vec::new(),
+                checked: Instant::now(),
+            }),
+        })
+    }
+
     /// Loads `dir`; a file that isn't valid JSON is an error.
     pub(crate) fn load(dir: &Path, reload: bool) -> anyhow::Result<Self> {
         Ok(Self {

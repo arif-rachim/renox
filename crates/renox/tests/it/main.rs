@@ -6,6 +6,7 @@ mod auth;
 mod auth_email;
 mod database;
 mod dx;
+mod embed;
 mod i18n;
 mod infra;
 mod mail;
