@@ -1,5 +1,8 @@
 use axum::body::Bytes;
-use axum::extract::{FromRequest, Request};
+use std::collections::HashMap;
+
+use axum::extract::multipart::MultipartError;
+use axum::extract::{FromRequest, Multipart, Request};
 use axum::http::Method;
 use axum::http::header::CONTENT_TYPE;
 use axum::response::{IntoResponse, Response};
@@ -8,10 +11,12 @@ use serde_json::{Map, Value};
 
 use super::messages::{render, template};
 use super::{Errors, Locale, Validate, ValidationError, Validator};
+use crate::upload::{self, Upload};
 use crate::{AppState, Error};
 
-/// Deserializes and validates a form (or JSON body, or query string for GET)
-/// with the type's `Validate` rules.
+/// Deserializes and validates a form (urlencoded or multipart with `Upload`
+/// fields), a JSON body, or the query string for GET, with the type's
+/// `Validate` rules.
 ///
 /// On failure, HTMX and JSON requests get `422` with the errors as JSON (the
 /// bundled script shows them next to the form's inputs); other requests are
@@ -41,9 +46,25 @@ where
             .and_then(|v| v.to_str().ok())
             .is_some_and(|v| v.starts_with("application/json"));
 
+        let is_multipart = req
+            .headers()
+            .get(CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|v| v.starts_with("multipart/form-data"));
+
         let (parsed, input) = if matches!(*req.method(), Method::GET | Method::HEAD) {
-            let query = req.uri().query().unwrap_or_default().as_bytes().to_vec();
-            parse_form(&query, locale)
+            let query = req.uri().query().unwrap_or_default().as_bytes();
+            let pairs = form_urlencoded::parse(query).into_owned().collect();
+            parse_pairs(pairs, &HashMap::new(), locale)
+        } else if is_multipart {
+            let multipart = Multipart::from_request(req, state)
+                .await
+                .map_err(IntoResponse::into_response)?;
+            // MultipartError keeps axum's status, e.g. 413 over UPLOAD_MAX_SIZE.
+            let (pairs, uploads) = read_multipart(multipart)
+                .await
+                .map_err(IntoResponse::into_response)?;
+            parse_pairs(pairs, &uploads, locale)
         } else {
             let bytes = Bytes::from_request(req, state)
                 .await
@@ -51,7 +72,8 @@ where
             if is_json {
                 parse_json(&bytes, locale).map_err(IntoResponse::into_response)?
             } else {
-                parse_form(&bytes, locale)
+                let pairs = form_urlencoded::parse(&bytes).into_owned().collect();
+                parse_pairs(pairs, &HashMap::new(), locale)
             }
         };
 
@@ -77,14 +99,48 @@ where
     }
 }
 
-fn parse_form<T: DeserializeOwned>(
-    bytes: &[u8],
+/// Text fields as pairs, and files replaced by tokens that `Upload`'s
+/// `Deserialize` resolves. An empty file input counts as missing.
+async fn read_multipart(
+    mut multipart: Multipart,
+) -> Result<(Vec<(String, String)>, HashMap<String, Upload>), MultipartError> {
+    let mut pairs = Vec::new();
+    let mut uploads = HashMap::new();
+    while let Some(field) = multipart.next_field().await? {
+        let Some(name) = field.name().map(str::to_owned) else {
+            continue;
+        };
+        match field.file_name().map(str::to_owned) {
+            Some(file_name) => {
+                let content_type = field.content_type().unwrap_or_default().to_owned();
+                let bytes = field.bytes().await?;
+                if file_name.is_empty() && bytes.is_empty() {
+                    continue;
+                }
+                let token = upload::token(uploads.len());
+                uploads.insert(
+                    token.clone(),
+                    Upload {
+                        file_name,
+                        content_type,
+                        bytes,
+                    },
+                );
+                pairs.push((name, token));
+            }
+            None => pairs.push((name, field.text().await?)),
+        }
+    }
+    Ok((pairs, uploads))
+}
+
+fn parse_pairs<T: DeserializeOwned>(
+    pairs: Vec<(String, String)>,
+    uploads: &HashMap<String, Upload>,
     locale: Locale,
 ) -> (Parsed<T>, Map<String, Value>) {
-    let pairs: Vec<(String, String)> = form_urlencoded::parse(bytes).into_owned().collect();
-
     let mut input = Map::new();
-    for (key, value) in &pairs {
+    for (key, value) in pairs.iter().filter(|(_, v)| !uploads.contains_key(v)) {
         match input.get_mut(key) {
             Some(Value::Array(values)) => values.push(Value::String(value.clone())),
             Some(existing) => {
@@ -111,7 +167,7 @@ fn parse_form<T: DeserializeOwned>(
             .finish();
         let deserializer =
             serde_urlencoded::Deserializer::new(form_urlencoded::parse(encoded.as_bytes()));
-        match serde_path_to_error::deserialize(deserializer) {
+        match upload::with_uploads(uploads, || serde_path_to_error::deserialize(deserializer)) {
             Ok(data) => break Parsed::Ok(data),
             Err(err) => {
                 let message = err.inner().to_string();
@@ -189,6 +245,7 @@ fn field_error(path: &str, message: &str, blank: bool, locale: Locale) -> Errors
     .any(|needle| message.contains(needle));
     let key = match (blank, numeric) {
         (true, _) => "required",
+        _ if message.contains(upload::NOT_A_FILE) => "file",
         (false, true) => "numeric",
         (false, false) => "invalid",
     };
@@ -213,7 +270,10 @@ mod tests {
     }
 
     fn parse(body: &str) -> Result<Form, Errors> {
-        match parse_form::<Form>(body.as_bytes(), Locale::Id).0 {
+        let pairs = form_urlencoded::parse(body.as_bytes())
+            .into_owned()
+            .collect();
+        match parse_pairs::<Form>(pairs, &HashMap::new(), Locale::Id).0 {
             Parsed::Ok(form) => Ok(form),
             Parsed::Invalid(errors) => Err(errors),
         }
@@ -238,7 +298,10 @@ mod tests {
 
     #[test]
     fn keeps_every_input_for_old_values() {
-        let (_, input) = parse_form::<Form>(b"nama=Kopi&tag=a&tag=b&harga=", Locale::En);
+        let pairs = form_urlencoded::parse(b"nama=Kopi&tag=a&tag=b&harga=")
+            .into_owned()
+            .collect();
+        let (_, input) = parse_pairs::<Form>(pairs, &HashMap::new(), Locale::En);
         assert_eq!(input["nama"], "Kopi");
         assert_eq!(input["tag"], serde_json::json!(["a", "b"]));
         assert_eq!(input["harga"], "");

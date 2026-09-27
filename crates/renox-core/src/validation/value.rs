@@ -9,6 +9,13 @@ pub enum Inspected {
     Number(f64),
     Bool(bool),
     Items(usize),
+    /// An uploaded file: size in kilobytes, the extension its content (or
+    /// else its name) indicates, and whether it really is an image.
+    File {
+        kilobytes: f64,
+        extension: String,
+        image: bool,
+    },
 }
 
 /// A value that can be validated. Implemented for strings, numbers, `bool`,
@@ -101,5 +108,53 @@ impl<T: FieldValue + ?Sized> FieldValue for &T {
 
     fn db_value(&self) -> DbValue {
         (**self).db_value()
+    }
+}
+
+impl FieldValue for crate::upload::Upload {
+    fn inspect(&self) -> Inspected {
+        if self.bytes.is_empty() {
+            return Inspected::Missing;
+        }
+        let extension = match self.sniffed_type() {
+            Some("image/png") => "png".to_owned(),
+            Some("image/jpeg") => "jpg".to_owned(),
+            Some("image/gif") => "gif".to_owned(),
+            Some("image/webp") => "webp".to_owned(),
+            Some("application/pdf") => "pdf".to_owned(),
+            _ => self.extension().unwrap_or_default(),
+        };
+        Inspected::File {
+            kilobytes: self.size() as f64 / 1024.0,
+            extension,
+            image: self.is_image(),
+        }
+    }
+
+    fn db_value(&self) -> DbValue {
+        DbValue::Null
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::upload::Upload;
+    use crate::validation::{Locale, Validator};
+
+    #[test]
+    fn a_text_file_named_png_is_not_an_image() {
+        let fake = Some(Upload {
+            file_name: "palsu.png".into(),
+            content_type: "image/png".into(),
+            bytes: axum::body::Bytes::from_static(b"ini bukan gambar\n"),
+        });
+        assert!(matches!(
+            FieldValue::inspect(&fake),
+            Inspected::File { image: false, .. }
+        ));
+        let mut v = Validator::new(Locale::Id);
+        v.field("photo", &fake).label("foto").image().max(2048);
+        assert_eq!(v.errors.first("photo"), Some("Foto harus berupa gambar."));
     }
 }

@@ -32,7 +32,7 @@ crates/renox/              facade crate apps depend on: re-exports renox-core, m
 crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/app.rs               App builder, boot(), Kernel, app-binary commands (migrate, queue:work…)
   src/config.rs            Config from env/.env (see §5)
-  src/state.rs             AppState (Clone): config, routes, views, db, mailer, queue, cache, listeners,
+  src/state.rs             AppState (Clone): config, routes, views, db, mailer, queue, cache, storage, listeners,
                            key (cookie::Key), gates, throttle
   src/module.rs            Module trait: name, routes, migrations, register
   src/registry.rs          Registry: jobs, listeners, schedule (App-level and Module::register)
@@ -60,6 +60,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/rate_limit.rs        Limiter + middleware behind Routes::throttle
   src/maintenance.rs       down/up/status + middleware (bypass cookie)
   src/health.rs            GET /health
+  src/upload.rs            Upload (multipart file field), sniffing, store/store_public, token registry
+  src/storage.rs           Storage (local disk; S3 with the `s3` feature), temporary URLs, /_renox/files
   assets/                  vendored htmx.min.js (2.0.11), alpine.min.js (3.17.4)
   views/                   built-in templates (error, pagination, auth/*, mail/*) — see §4.4
   migrations/              framework-owned migrations (auth/*, queue/*) — see §4.6
@@ -80,7 +82,8 @@ current user once per request from session or `Authorization: Bearer`, inserts `
 responses, error pages, turns `ValidationError` into redirect-back for plain forms) →
 `maintenance::middleware` (503 while `storage/framework/down` exists; inside the view layer so the
 503 uses the error template) → routes. `assets::router()` (`/_renox/*.js`) and `health::router()`
-(`/health`) are merged after the layers, so they skip sessions and maintenance mode.
+(`/health`) and the local public files (`/storage/...`) are merged after the layers, so they skip
+sessions and maintenance mode. `DefaultBodyLimit` (`UPLOAD_MAX_SIZE`) wraps everything.
 `/_renox/mail` (mail preview) is merged only when `APP_DEBUG` is on. `public/` is the fallback
 service (`ServeDir`) with a 404 handler.
 
@@ -123,6 +126,12 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
 - **Workers and scheduler run inside `serve`** by default (single-process deploys). Multiple
   instances would duplicate scheduled tasks → `SCHEDULER=false` on all but one.
 - **Mail:** lettre with rustls (no OpenSSL). Drivers `smtp`, `log` (default), `memory` (tests).
+- **Uploads are form fields:** `Valid<T>` turns multipart files into tokens that `Upload`'s
+  `Deserialize` resolves from a thread-local during the synchronous serde pass (`upload.rs`), so
+  `struct Form { photo: Option<Upload> }` works with the normal validation path. `image()`/`mimes()`
+  sniff the content; stored names are random with an extension from the content.
+- **S3 is the opt-in `s3` feature** (object_store pulls reqwest + aws-lc-rs). CI runs clippy with
+  `--all-features` so the S3 code keeps compiling; there is no S3 integration test (no server in CI).
 
 ## 4. Conventions you must follow
 
@@ -197,7 +206,9 @@ production; `base64:…`, `rnx key:generate`), `APP_HOST`, `APP_PORT`, `APP_LOCA
 `DATABASE_POOL_SIZE`, `MAIL_MAILER` (smtp|log|memory), `MAIL_HOST`, `MAIL_PORT`,
 `MAIL_ENCRYPTION` (tls|starttls|none), `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS`,
 `MAIL_FROM_NAME`, `QUEUE_WORKERS` (2; 0 = none in serve), `SCHEDULER` (true), `CACHE_STORE`
-(memory|database), `STORAGE_PATH` (storage; holds `framework/down` for maintenance mode).
+(memory|database), `STORAGE_PATH` (storage; holds `framework/down` for maintenance mode and `app/`
+for the local disk), `STORAGE_DISK` (local|s3), `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`,
+`S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `STORAGE_URL`, `UPLOAD_MAX_SIZE` (MB, 10).
 Paths are relative to the working directory: run apps from their own directory.
 
 ## 6. Problems hit so far, and their fixes (read this)
@@ -249,6 +260,12 @@ opening #5 with the same commit to `main`. Lesson: don't stack; or if you must, 
   labels in auth forms.
 - Reset-password mail button reused the page's "Simpan kata sandi" label → uses the subject.
 
+### 6.4b Caught by the browser in M6b
+A scripted edit meant to add `v.field("photo", ..).image()` to the guestbook silently didn't apply
+(rustfmt had split the preceding line), so a text file named `.png` was accepted and stored. Unit
+and integration tests of the framework passed; only the headless-Chrome upload check showed it.
+Lesson: after scripted edits, `grep` for the added line; keep browser checks for UI features.
+
 ### 6.5 Library/API traps
 - **sqlx 0.9:** dynamic SQL needs `sqlx::AssertSqlSafe(string)`; `SqliteArguments` has no lifetime;
   multi-statement SQL uses `sqlx::raw_sql`. `sqlite::memory:` gives each pooled connection its own
@@ -276,6 +293,12 @@ opening #5 with the same commit to `main`. Lesson: don't stack; or if you must, 
 - **Futures and `Send`:** `Validator::rules_of` applies rules synchronously before the async DB
   checks so `Valid<T>` doesn't require `T: Sync`. Trait methods returning futures are declared
   `-> impl Future<Output = …> + Send`.
+- **`Option<T>` has a std `inspect` method,** so call `FieldValue::inspect(&opt)` explicitly in
+  tests; generic code in the validator is unaffected.
+- **`MultipartError` already carries the right status** (e.g. 413 over the body limit): return
+  `err.into_response()`, don't wrap it in `Error::BadRequest`.
+- **Test HTTP clients must update the session cookie from every response** — flashed errors and
+  old input live in the cookie set by the redirect.
 - **Listener order:** `App::listen` listeners run before modules' (modules register at boot).
 - **`Error`'s `Debug`** is hand-written so `fn main() -> renox::Result` prints readable errors, not
   `Internal(…)`.
@@ -293,8 +316,9 @@ opening #5 with the same commit to `main`. Lesson: don't stack; or if you must, 
 | Milestone | Status |
 |---|---|
 | M0 foundation, M1 web layer, M2 database, M3 validation, M4 auth (a+b), M5 queue/scheduler/events/mail/notifications (a+b) | merged to `main` |
-| M6a cache, `Routes::throttle`, maintenance mode (`down`/`up`), `/health` | PR from branch `m6-infra` |
-| M6b storage/uploads (+ multipart CSRF, file rules), i18n | next |
+| M6a cache, `Routes::throttle`, maintenance mode (`down`/`up`), `/health` | merged to `main` |
+| M6b uploads, file rules, storage (local + `s3` feature), multipart CSRF, body limit | PR from branch `m6b-uploads` |
+| M6c i18n (`resources/lang`, `t()`, per-request locale) | next |
 | M7 CLI/DX (`make:*`, `route:list`, `db:shell`, browser live reload), M8 testing helpers + deploy (`renox build` embedding views, Docker/systemd, Litestream), v1.0 docs | later |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on
@@ -303,5 +327,5 @@ an up-to-date `main`. Open the next milestone's PR only after the previous one i
 Open items noted in ROADMAP: `#[derive(Validate)]`, more rules (regex, dates, files), route groups
 with prefixes, SQLite session driver, pagination links that keep other query params.
 
-Stats at the time of writing: ~8.6k lines of Rust in `crates/`, 106 tests, 34 direct dependencies
+Stats at the time of writing: ~9.4k lines of Rust in `crates/`, 116 tests, 34 direct dependencies
 (stars and roles were reviewed with the owner; keep deps lean and remove unused ones).

@@ -213,11 +213,13 @@ impl App {
         let routes = Arc::new(routes);
 
         crate::error::set_debug(config.debug);
-        let views = Views::new(&config, routes.clone());
+        let storage = crate::storage::Storage::from_config(&config)?;
+        let views = Views::new(&config, routes.clone(), storage.clone());
         let state = AppState {
             mailer: Mailer::from_config(&config)?,
             queue: Queue::new(db.clone()),
             cache: crate::cache::Cache::new(&config.cache_store, db.clone())?,
+            storage,
             listeners: Arc::new(listeners),
             config: Arc::new(config),
             routes,
@@ -551,6 +553,7 @@ fn flag_value(args: &[String], flag: &str) -> Result<Option<u32>> {
 
 fn build_router(router: Router<AppState>, state: AppState) -> Router {
     let not_found = || async { Error::NotFound };
+    let router = router.merge(crate::storage::router());
     let router = if state.config.debug {
         router.merge(crate::mail::preview_router())
     } else {
@@ -574,8 +577,20 @@ fn build_router(router: Router<AppState>, state: AppState) -> Router {
         .layer(from_fn_with_state(state.clone(), session::middleware))
         .merge(assets::router())
         .merge(crate::health::router())
+        .merge(public_files(&state))
+        .layer(axum::extract::DefaultBodyLimit::max(
+            state.config.upload_max_size,
+        ))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
+}
+
+/// Public files of the local disk at `/storage/...`, outside sessions.
+fn public_files(state: &AppState) -> Router<AppState> {
+    match state.storage.public_root() {
+        Some(root) => Router::new().nest_service("/storage", ServeDir::new(root)),
+        None => Router::new(),
+    }
 }
 
 /// Long-running commands log at info; others only log warnings and errors.

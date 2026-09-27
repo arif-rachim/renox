@@ -9,6 +9,7 @@ use crate::db::Db;
 use crate::events::Listeners;
 use crate::mail::Mailer;
 use crate::queue::Queue;
+use crate::storage::Storage;
 use crate::{Config, Result, RouteTable, Views};
 
 /// Shared state available to every handler through `State<AppState>`.
@@ -21,6 +22,7 @@ pub struct AppState {
     pub mailer: Mailer,
     pub queue: Queue,
     pub cache: Cache,
+    pub storage: Storage,
     pub(crate) listeners: Listeners,
     pub(crate) key: Key,
     pub(crate) gates: Gates,

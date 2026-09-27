@@ -259,6 +259,7 @@ impl Field<'_> {
             Inspected::Text(text) => (text.chars().count() as f64, "string"),
             Inspected::Number(n) => (*n, "numeric"),
             Inspected::Items(n) => (*n as f64, "array"),
+            Inspected::File { kilobytes, .. } => (*kilobytes, "file"),
             _ => return self,
         };
         if !ok(size) {
@@ -267,13 +268,13 @@ impl Field<'_> {
         self
     }
 
-    /// At least `min` characters, items, or as a number.
+    /// At least `min` characters, items, kilobytes (files), or as a number.
     pub fn min(self, min: impl Into<f64>) -> Self {
         let min = min.into();
         self.size_rule("min", |s| s >= min, &[("min", number(min))])
     }
 
-    /// At most `max` characters, items, or as a number.
+    /// At most `max` characters, items, kilobytes (files), or as a number.
     pub fn max(self, max: impl Into<f64>) -> Self {
         let max = max.into();
         self.size_rule("max", |s| s <= max, &[("max", number(max))])
@@ -302,6 +303,36 @@ impl Field<'_> {
             && !is_url(text)
         {
             self.fail("url", &[]);
+        }
+        self
+    }
+
+    /// An uploaded image: PNG, JPEG, GIF or WebP, checked from the file's
+    /// content rather than its name.
+    pub fn image(mut self) -> Self {
+        if let (true, Inspected::File { image, .. }) = (self.present(), &self.value)
+            && !*image
+        {
+            self.fail("image", &[]);
+        }
+        self
+    }
+
+    /// An uploaded file of one of these types, e.g. `&["jpg", "png", "pdf"]`
+    /// (`jpeg` counts as `jpg`). The content decides for the formats Renox can
+    /// recognise, the file name for the rest.
+    pub fn mimes(mut self, extensions: &[&str]) -> Self {
+        if let (true, Inspected::File { extension, .. }) = (self.present(), &self.value) {
+            let normalise = |e: &str| match e.to_ascii_lowercase().as_str() {
+                "jpeg" => "jpg".to_owned(),
+                other => other.to_owned(),
+            };
+            let ok = extensions
+                .iter()
+                .any(|e| normalise(e) == normalise(extension));
+            if !ok {
+                self.fail("mimes", &[("values", extensions.join(", "))]);
+            }
         }
         self
     }

@@ -133,6 +133,16 @@ my-app up
 curl localhost:3000/health     # {"status":"ok","database":"ok","queue":{...},"maintenance":false}
 ```
 
+File uploads are ordinary form fields, checked by content and stored locally or on S3/R2:
+
+```rust
+#[derive(Deserialize)]
+struct ProductForm { name: String, photo: Option<Upload> }
+
+// in `rules`: v.field("photo", &self.photo).image().max(2048);   // KB
+let key = photo.store_public(&state.storage, "products").await?;  // <img src="{{ storage_url(key) }}">
+```
+
 The `Auth` module also handles password reset and email verification by email (`MAIL_MAILER=log`
 prints the links while developing), and API tokens for mobile apps and integrations:
 

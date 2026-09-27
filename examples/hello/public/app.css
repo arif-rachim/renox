@@ -15,3 +15,4 @@ nav { display: flex; gap: 1rem; align-items: center; margin-bottom: 2rem; }
 nav > :first-child { margin-right: auto; }
 nav form { margin: 0; }
 nav button { padding: .25rem .75rem; }
+li img { object-fit: cover; border-radius: .25rem; vertical-align: middle; margin-right: .5rem; }

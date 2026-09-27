@@ -14,6 +14,7 @@ use serde::Serialize;
 
 use crate::auth::CurrentUser;
 use crate::error::{ErrorPage, reason};
+use crate::storage::Storage;
 use crate::validation::ValidationError;
 use crate::{AppState, Config, Error, Htmx, RouteTable, Session, assets};
 
@@ -84,7 +85,7 @@ pub struct Views {
 }
 
 impl Views {
-    pub(crate) fn new(config: &Config, routes: Arc<RouteTable>) -> Self {
+    pub(crate) fn new(config: &Config, routes: Arc<RouteTable>, storage: Storage) -> Self {
         let dir = config.views_path.clone();
         let watch = config.debug && dir.is_dir();
         let reloader = AutoReloader::new(move |notifier| {
@@ -112,6 +113,10 @@ impl Views {
                 let mut url = String::from("/");
                 crate::routing::encode(&mut url, path.trim_start_matches('/'), true);
                 Value::from_safe_string(url)
+            });
+            let storage = storage.clone();
+            env.add_function("storage_url", move |key: String| {
+                Value::from_safe_string(storage.url(&key))
             });
 
             if watch {

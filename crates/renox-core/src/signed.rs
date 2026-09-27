@@ -35,6 +35,11 @@ impl AppState {
     /// An absolute URL to a named route, valid for `ttl` and signed with `APP_KEY`.
     pub fn signed_url(&self, name: &str, params: &[&dyn Display], ttl: Duration) -> Result<String> {
         let path = self.url(name, params)?;
+        self.sign_path(&path, ttl)
+    }
+
+    /// Like `signed_url`, for an already-encoded path such as `/_renox/files/a.pdf`.
+    pub fn sign_path(&self, path: &str, ttl: Duration) -> Result<String> {
         let unsigned = format!("{path}?expires={}", now() + ttl.as_secs());
         let signature = signature(self, &unsigned);
         Ok(format!(
