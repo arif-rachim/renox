@@ -32,7 +32,7 @@ crates/renox/              facade crate apps depend on: re-exports renox-core, m
 crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/app.rs               App builder, boot(), Kernel, app-binary commands (migrate, queue:work…)
   src/config.rs            Config from env/.env (see §5)
-  src/state.rs             AppState (Clone): config, routes, views, db, mailer, queue, listeners,
+  src/state.rs             AppState (Clone): config, routes, views, db, mailer, queue, cache, listeners,
                            key (cookie::Key), gates, throttle
   src/module.rs            Module trait: name, routes, migrations, register
   src/registry.rs          Registry: jobs, listeners, schedule (App-level and Module::register)
@@ -56,6 +56,10 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/schedule.rs          Schedule + runner; APP_TIMEZONE offsets
   src/events.rs            Event, listeners, AppState::emit
   src/mail.rs              Mail, Mailer (smtp/log/memory), mail_view, queue_mail, /_renox/mail preview
+  src/cache.rs             Cache (memory / database store), remember()
+  src/rate_limit.rs        Limiter + middleware behind Routes::throttle
+  src/maintenance.rs       down/up/status + middleware (bypass cookie)
+  src/health.rs            GET /health
   assets/                  vendored htmx.min.js (2.0.11), alpine.min.js (3.17.4)
   views/                   built-in templates (error, pagination, auth/*, mail/*) — see §4.4
   migrations/              framework-owned migrations (auth/*, queue/*) — see §4.6
@@ -73,8 +77,10 @@ examples/hello/            guestbook app exercising every feature; used for live
 `TraceLayer` → `session::middleware` (loads/saves encrypted cookie) → `auth::middleware` (loads the
 current user once per request from session or `Authorization: Bearer`, inserts `CurrentUser` and
 `AppState` into request extensions) → `csrf::middleware` → `view::middleware` (renders `View`
-responses, error pages, turns `ValidationError` into redirect-back for plain forms) → routes.
-`assets::router()` (`/_renox/*.js`) is merged after the layers, so it skips sessions.
+responses, error pages, turns `ValidationError` into redirect-back for plain forms) →
+`maintenance::middleware` (503 while `storage/framework/down` exists; inside the view layer so the
+503 uses the error template) → routes. `assets::router()` (`/_renox/*.js`) and `health::router()`
+(`/health`) are merged after the layers, so they skip sessions and maintenance mode.
 `/_renox/mail` (mail preview) is merged only when `APP_DEBUG` is on. `public/` is the fallback
 service (`ServeDir`) with a 404 handler.
 
@@ -93,7 +99,7 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
   `/` (MiniJinja's default escapes `/` as `&#x2f;`, which uglified URLs in pages and mail).
 - **The app binary is its own CLI** (like artisan): `my-app migrate|migrate:rollback|migrate:fresh|
   migrate:status|db:seed|queue:work|queue:failed|queue:retry|queue:flush|schedule:list|
-  schedule:work|help`, default `serve`. Migrations/jobs are compiled into the app, so only the app
+  schedule:work|down|up|help`, default `serve`. Migrations/jobs are compiled into the app, so only the app
   can run them. `rnx <anything unknown>` forwards to `cargo run --quiet -- <args>`.
 - **Own migrator** (table `renox_migrations`, Laravel-style batches) instead of sqlx's, to support
   batches and module-owned migrations. `migrations!()` embeds `*.up.sql`/`*.down.sql` (or plain
@@ -149,7 +155,8 @@ add keys to **both** locales. Validation messages live in `validation/messages.r
 Names start with `0001…` so they sort before app migrations (`2026…`):
 `00010101000000_create_users_table`, `…000001_create_password_reset_tokens_table`,
 `…000002_create_personal_access_tokens_table`, `…000003_create_notifications_table` (Auth module)
-and `00010101000100_create_jobs_table` (every app, registered in `App::boot`). Adding a framework
+and `00010101000100_create_jobs_table` + `00010101000200_create_cache_table` (every app, registered
+in `App::boot`). Adding a framework
 migration changes migration counts asserted in `crates/renox/tests/database.rs`.
 
 ### 4.6 Tests
@@ -189,7 +196,8 @@ production; `base64:…`, `rnx key:generate`), `APP_HOST`, `APP_PORT`, `APP_LOCA
 `REMEMBER_LIFETIME` (minutes, 43200), `DATABASE_URL` (sqlite://storage/app.db),
 `DATABASE_POOL_SIZE`, `MAIL_MAILER` (smtp|log|memory), `MAIL_HOST`, `MAIL_PORT`,
 `MAIL_ENCRYPTION` (tls|starttls|none), `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS`,
-`MAIL_FROM_NAME`, `QUEUE_WORKERS` (2; 0 = none in serve), `SCHEDULER` (true).
+`MAIL_FROM_NAME`, `QUEUE_WORKERS` (2; 0 = none in serve), `SCHEDULER` (true), `CACHE_STORE`
+(memory|database), `STORAGE_PATH` (storage; holds `framework/down` for maintenance mode).
 Paths are relative to the working directory: run apps from their own directory.
 
 ## 6. Problems hit so far, and their fixes (read this)
@@ -284,14 +292,16 @@ opening #5 with the same commit to `main`. Lesson: don't stack; or if you must, 
 
 | Milestone | Status |
 |---|---|
-| M0 foundation, M1 web layer, M2 database, M3 validation, M4 auth (a+b) | merged to `main` |
-| M5a queue/scheduler/events + removal of unused `thiserror`/`futures-util` | PR #9 open (branch `m5-queue`) |
-| M5b SMTP mail, templates, `/_renox/mail`, notifications, this guide | branch `m5b-mail` pushed, **no PR yet** — open it (base `main`, rebased) after #9 is merged |
-| M6 infrastructure: cache, storage/uploads (+ multipart CSRF), i18n, rate limiting, maintenance mode, `/health` | next |
+| M0 foundation, M1 web layer, M2 database, M3 validation, M4 auth (a+b), M5 queue/scheduler/events/mail/notifications (a+b) | merged to `main` |
+| M6a cache, `Routes::throttle`, maintenance mode (`down`/`up`), `/health` | PR from branch `m6-infra` |
+| M6b storage/uploads (+ multipart CSRF, file rules), i18n | next |
 | M7 CLI/DX (`make:*`, `route:list`, `db:shell`, browser live reload), M8 testing helpers + deploy (`renox build` embedding views, Docker/systemd, Litestream), v1.0 docs | later |
+
+Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on
+an up-to-date `main`. Open the next milestone's PR only after the previous one is merged (§6.3).
 
 Open items noted in ROADMAP: `#[derive(Validate)]`, more rules (regex, dates, files), route groups
 with prefixes, SQLite session driver, pagination links that keep other query params.
 
-Stats at the time of writing: ~8.2k lines of Rust in `crates/`, 100 tests, 34 direct dependencies
+Stats at the time of writing: ~8.6k lines of Rust in `crates/`, 106 tests, 34 direct dependencies
 (stars and roles were reviewed with the owner; keep deps lean and remove unused ones).

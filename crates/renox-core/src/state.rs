@@ -4,6 +4,7 @@ use std::sync::Arc;
 use cookie::Key;
 
 use crate::auth::{Gates, Throttle};
+use crate::cache::Cache;
 use crate::db::Db;
 use crate::events::Listeners;
 use crate::mail::Mailer;
@@ -19,6 +20,7 @@ pub struct AppState {
     pub db: Db,
     pub mailer: Mailer,
     pub queue: Queue,
+    pub cache: Cache,
     pub(crate) listeners: Listeners,
     pub(crate) key: Key,
     pub(crate) gates: Gates,

@@ -61,6 +61,10 @@ pub struct Config {
     pub scheduler: bool,
     /// UTC offset for scheduled times, from `APP_TIMEZONE` (e.g. `+07:00`).
     pub timezone: String,
+    /// `memory` or `database`, from `CACHE_STORE`.
+    pub cache_store: String,
+    /// Where the app keeps runtime files (maintenance flag, uploads), from `STORAGE_PATH`.
+    pub storage_path: PathBuf,
 }
 
 impl Config {
@@ -128,6 +132,8 @@ impl Config {
                 .context("QUEUE_WORKERS must be a number")?,
             scheduler: parse_bool("SCHEDULER", true)?,
             timezone: var_or("APP_TIMEZONE", "UTC"),
+            cache_store: var_or("CACHE_STORE", "memory"),
+            storage_path: var_or("STORAGE_PATH", "storage").into(),
         })
     }
 
@@ -161,6 +167,8 @@ impl Default for Config {
             queue_workers: 0,
             scheduler: false,
             timezone: "UTC".into(),
+            cache_store: "memory".into(),
+            storage_path: "storage".into(),
         }
     }
 }

@@ -137,9 +137,19 @@ M5b (done):
 - [x] HTML escaping leaves `/` alone (like Jinja2), so URLs in pages and mail stay readable
 
 ### M6 · v0.7: Infrastructure
-- [ ] Cache (memory / SQLite, `remember()`)
-- [ ] Storage (local / S3 / R2) and upload helpers
-- [ ] i18n, rate limiting, maintenance mode, `/health`
+M6a (done):
+- [x] Cache: `state.cache` with `get`, `put` (TTL), `has`, `remember`, `forget`, `flush`; `memory`
+      or `database` store (`CACHE_STORE`, table `cache`); values stored as JSON
+- [x] Rate limiting: `Routes::throttle(max, per)` per user or IP; 429 with `Retry-After`,
+      `X-RateLimit-Limit` / `X-RateLimit-Remaining` on allowed responses
+- [x] Maintenance mode: `down [--secret S] [--retry N]` / `up`; 503 through the error page
+      (`errors/503.html` overrides it); `/S` sets a bypass cookie; state in `STORAGE_PATH`
+- [x] `GET /health`: database ping, queue counts, maintenance flag; 503 when the database is down;
+      unaffected by maintenance mode and sessions
+
+M6b (next):
+- [ ] Storage (local / S3 / R2) and upload helpers, multipart forms (with CSRF) and file rules
+- [ ] i18n for app texts (`resources/lang/{en,id}`), `t()` in templates
 
 ### M7 · v0.8: CLI and developer experience
 - [ ] `make:module`, `make:model`, `make:migration`, `make:job`, `make:mail`, `make:policy`

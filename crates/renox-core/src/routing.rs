@@ -87,6 +87,18 @@ impl Routes {
         self.route_layer(from_fn(crate::auth::guest_only))
     }
 
+    /// Limits the routes added so far to `max` requests per `per`, counted per
+    /// logged-in user or per IP address. Over the limit: 429 with `Retry-After`.
+    pub fn throttle(self, max: u32, per: std::time::Duration) -> Self {
+        let limiter = std::sync::Arc::new(crate::rate_limit::Limiter::new(max, per));
+        self.route_layer(from_fn(
+            move |req: Request, next: axum::middleware::Next| {
+                let limiter = limiter.clone();
+                async move { crate::rate_limit::check(&limiter, req, next).await }
+            },
+        ))
+    }
+
     /// Wraps the routes added so far in a tower layer (axum's `route_layer`).
     pub fn route_layer<L>(mut self, layer: L) -> Self
     where
