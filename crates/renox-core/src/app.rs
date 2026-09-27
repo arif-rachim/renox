@@ -213,6 +213,7 @@ impl App {
 
         self.registry.job::<crate::mail::SendMail>();
         self.registry.job::<crate::webhook::ProcessWebhook>();
+        self.registry.job::<crate::analytics::ServerEvent>();
         let mut migrations = vec![
             crate::queue::MIGRATION,
             crate::cache::MIGRATION,
@@ -670,6 +671,7 @@ fn framework_routes(config: &Config) -> Vec<RouteInfo> {
     };
     let mut routes = vec![
         route("GET", "/health"),
+        route("GET", "/robots.txt"),
         route("GET", "/_renox/{asset}"),
         route("GET", "/_renox/files/{*key}"),
         route("GET", "/storage/{*path}"),
@@ -775,6 +777,7 @@ fn build_router(
         .layer(from_fn_with_state(state.clone(), session::middleware))
         .merge(assets::router())
         .merge(crate::health::router())
+        .merge(robots(&state, embedded_public))
         .merge(crate::live::router())
         .merge(public_files(&state))
         .layer(axum::extract::DefaultBodyLimit::max(
@@ -794,6 +797,22 @@ fn build_router(
         },
     );
     Router::new().fallback_service(tower::Layer::layer(&spoofing, router))
+}
+
+/// The generated `/robots.txt`, unless the app ships its own in `public/`.
+fn robots(
+    state: &AppState,
+    embedded_public: Option<&'static [(&'static str, &'static [u8])]>,
+) -> Router<AppState> {
+    let own = match embedded_public {
+        Some(files) => files.iter().any(|(path, _)| *path == "robots.txt"),
+        None => state.config.public_path.join("robots.txt").is_file(),
+    };
+    if own {
+        Router::new()
+    } else {
+        crate::seo::robots_router(state)
+    }
 }
 
 /// Public files of the local disk at `/storage/...`, outside sessions.

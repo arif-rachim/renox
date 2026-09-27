@@ -68,6 +68,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/live.rs              live reload: file-time polling, /_renox/live SSE, stop() on shutdown
   src/shell.rs             db:shell (run_with takes any input/output, for tests)
   src/testing.rs           TestApp / TestRequest / TestResponse for apps' tests (M8a)
+  src/seo.rs               seo() tags, head tags (noindex / verification / GA4 / GTM), robots.txt, Sitemap
+  src/analytics.rs         analytics::event (session → HX-Trigger / head meta), GaClientId, ServerEvent job
   src/webhook.rs           Webhook trait, receive route, webhook_calls store/retry, ProcessWebhook job
                            (`renox:webhook`), signature helpers
   src/security.rs          security headers + CSP (+ nonce), csrf-exempt and webhook route sets
@@ -260,6 +262,12 @@ migration changes migration counts asserted in `crates/renox/tests/database.rs`.
 - Whether a 500 page shows the error chain is decided per app in the view middleware
   (`ErrorPage::shown_detail(config.debug)`); there is no process-wide debug flag any more, so apps
   with and without debug can run side by side in one test binary.
+- Template-level helpers that need the page's `app`/`request` (e.g. `seo()`, `page_url()`) are
+  Rust functions registered per render, not MiniJinja macros: an imported macro can't see the
+  caller's context. Analytics events live in the session (`_renox_analytics`) until the view
+  middleware delivers them: htmx 2xx swap → `HX-Trigger` `{"renox:analytics":{"events":[…]}}`
+  (merged with the handler's own), full page → `<meta name="renox-analytics">` in `renox_head()`,
+  anything else (redirects) → kept for the next page.
 - `Valid<T>` for forms: a field that fails to parse gets its error plus a placeholder value
   (`validation/extract.rs` `PLACEHOLDERS`), so the other rules still run; rule errors on
   placeholder fields are dropped. `Parsed::Ok(T, Errors)` carries those parse errors.
@@ -483,8 +491,8 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M10b method spoofing, all validation errors at once, `can()` for policies, pagination keeps query | merged to `main` (#22) |
 | M11a security headers, CSP (relaxed default / strict with nonce + Alpine CSP build / off), CORS per route, `without_csrf()` | merged to `main` (#23) |
 | README rewrite (tagline, why, demo GIF, compiled examples, comparison) | merged to `main` (#24) |
-| M11b webhooks (`impl Webhook`, `webhook_calls`, signature helpers, `examples/webhooks`) | PR from branch `m11b-webhooks` |
-| M11c SEO & analytics (plan in ROADMAP M11) | next |
+| M11b webhooks (`impl Webhook`, `webhook_calls`, signature helpers, `examples/webhooks`) | merged to `main` (#25) |
+| M11c SEO & analytics (`seo()`, robots/sitemap, Search Console, GA4/GTM, events, Measurement Protocol) | PR from branch `m11c-seo-analytics` |
 | M10c examples api/jobs/uploads/postgres, doctests on public APIs | after M11 |
 | v1.0 docs site, starter kit, semver guarantee | last |
 

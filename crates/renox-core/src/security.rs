@@ -101,7 +101,14 @@ impl Security {
         .into_iter()
         .map(|(name, value)| (name.to_owned(), value))
         .collect();
-        for (name, sources) in &csp.extra {
+        let mut extra = csp.extra.clone();
+        for (directive, source) in crate::seo::csp_sources(config) {
+            extra
+                .entry(directive.to_owned())
+                .or_default()
+                .push(source.to_owned());
+        }
+        for (name, sources) in &extra {
             let sources = sources.join(" ");
             match directives.iter_mut().find(|(n, _)| n == name) {
                 Some((_, value)) => {

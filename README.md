@@ -149,6 +149,20 @@ async fn store(State(db): State<Db>, Valid(form): Valid<EntryForm>) -> Result<Vi
 </details>
 
 <details>
+<summary><b>SEO & analytics</b>: meta tags, sitemaps, Search Console, GA4, Tag Manager</summary>
+
+- `{{ seo(title=…, description=…, image=…) }}` writes the title, description, canonical URL,
+  OpenGraph and Twitter card tags.
+- `robots.txt` is generated for you, and `Sitemap` builds `sitemap.xml` from routes and models.
+  Staging servers say `noindex`.
+- Search Console verification, GA4 and Tag Manager come from `.env`, CSP-ready with nonces, and
+  only in production.
+- `analytics::event(&session, "sign_up", …)` reaches `gtag` with the htmx swap, the page or the
+  next page. `ServerEvent` sends from the server through the Measurement Protocol, where ad
+  blockers can't drop it.
+</details>
+
+<details>
 <summary><b>Testing & tooling</b></summary>
 
 ```rust
@@ -209,7 +223,7 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 Renox is **pre-1.0**: the API may still change between versions, and the crates on crates.io are
 placeholders until the first real release, so install from Git as shown above. Everything listed
 here is implemented and tested on Linux, macOS and Windows, against SQLite and PostgreSQL. What's
-next (SEO and analytics helpers, more examples, then 1.0) is in
+next (more examples and doctests, then 1.0) is in
 [ROADMAP.md](ROADMAP.md). Issues and feedback are welcome.
 
 ## License

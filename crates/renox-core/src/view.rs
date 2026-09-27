@@ -359,7 +359,21 @@ pub(crate) async fn middleware(
         return Redirect::to(referer.as_deref().unwrap_or("/")).into_response();
     }
 
+    // Analytics events: with an htmx swap, in its HX-Trigger; with a page,
+    // in its head (below); otherwise they wait for the next page.
+    if let Some(session) = &session
+        && crate::analytics::has_pending(session)
+        && htmx.request
+        && crate::analytics::deliverable_by_htmx(&res)
+    {
+        crate::analytics::add_trigger(&mut res, crate::analytics::take(session));
+    }
+
     if let Some(view) = res.extensions_mut().remove::<View>() {
+        let events = match &session {
+            Some(session) if !htmx.request => crate::analytics::take(session),
+            _ => Vec::new(),
+        };
         let globals = globals(
             &state,
             session.as_ref(),
@@ -369,6 +383,7 @@ pub(crate) async fn middleware(
                 path: &path,
                 query: &query,
                 nonce: &nonce,
+                events: &events,
             },
             &locale,
         );
@@ -410,6 +425,8 @@ struct Requested<'a> {
     path: &'a str,
     query: &'a str,
     nonce: &'a str,
+    /// Analytics events for this page's head.
+    events: &'a [crate::analytics::Event],
 }
 
 fn globals(
@@ -446,7 +463,23 @@ fn globals(
     let token = session.map(Session::token).unwrap_or_default();
 
     let strict = state.security.mode == crate::CspMode::Strict;
-    let head = Value::from_safe_string(assets::head_tags(&token, state.live.is_some(), strict));
+    let head = Value::from_safe_string(format!(
+        "{}\n{}",
+        assets::head_tags(&token, state.live.is_some(), strict),
+        crate::seo::head_tags(&state.config, requested.nonce, requested.events)
+    ));
+    let seo = {
+        let (config, path, locale) = (
+            state.config.clone(),
+            requested.path.to_owned(),
+            locale.to_owned(),
+        );
+        Value::from_function(
+            move |kwargs: minijinja::value::Kwargs| -> Result<Value, minijinja::Error> {
+                crate::seo::tags(&config, &path, &locale, &kwargs).map(Value::from_safe_string)
+            },
+        )
+    };
     let nonce = requested.nonce.to_owned();
     let field = Value::from_safe_string(format!(
         "<input type=\"hidden\" name=\"{}\" value=\"{token}\">",
@@ -505,6 +538,7 @@ fn globals(
             first_errors.get(&field).cloned().unwrap_or_default()
         }),
         renox_head => Value::from_function(move || head.clone()),
+        seo => seo,
         csp_nonce => Value::from_function(move || nonce.clone()),
         csrf_field => Value::from_function(move || field.clone()),
         old => Value::from_function(move |field: String, default: Option<Value>| {

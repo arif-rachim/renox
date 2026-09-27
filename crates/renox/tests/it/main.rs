@@ -15,6 +15,7 @@ mod method;
 mod postgres;
 mod queue;
 mod security;
+mod seo;
 mod testing;
 mod uploads;
 mod validation;
