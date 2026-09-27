@@ -245,6 +245,32 @@ still SQLite underneath) and M9b (the PostgreSQL backend proper).
 - [ ] CI runs the whole test suite against SQLite and against PostgreSQL (a service container)
 - [ ] A guide for moving an app from SQLite to PostgreSQL (schema via migrations, data copy)
 
+### M10 · v0.11: Examples and docs for people and coding agents (before 1.0)
+An agent (or a person) building on Renox should be able to find the idiomatic way to do something by
+opening one short file, not by reading the framework. That saves tokens and stops agents copying
+outdated APIs.
+
+- [ ] Small, focused examples, one pattern each, every one compiled and tested in CI (an untested
+      example goes stale, and a stale example is worse than none):
+  - [x] `examples/hello`: routes, views, forms, validation, uploads (exists)
+  - [ ] `examples/crud`: model, migration, pagination, soft deletes, policy
+  - [ ] `examples/api`: auth plus API tokens (Bearer)
+  - [ ] `examples/jobs`: queue, jobs, scheduler, mail, notifications
+  - [ ] `examples/uploads`: file rules, storage (local and S3)
+  - [ ] `examples/postgres`: the same app on PostgreSQL (after M9b)
+- [ ] Short files, no decorative code, comments only where something isn't obvious; the official way
+      only (when there are two ways, show the main one)
+- [ ] Each example names the generator commands that made its files (`rnx make:model Produk`, …),
+      so agents know not to type the boilerplate
+- [ ] `CHEATSHEET.md`: one page of the most common patterns, 5–10 lines each (route, view, form +
+      validation, model + query, migration, auth guard, job, mail, test), tested by a doctest or an
+      example so it can't drift
+- [ ] `llms.txt` at the repo root (and a section in CLAUDE.md for app authors): where each topic
+      lives, e.g. "CRUD → examples/crud/src/produk.rs", "cheat-sheet → CHEATSHEET.md"
+- [ ] Doc comments on public APIs get small runnable doctests instead of `ignore` where possible
+- [ ] Apps from `rnx new` ship an `AGENTS.md`/`CLAUDE.md` pointing to the cheat-sheet and the
+      examples
+
 ### v1.0
 - [ ] Documentation site built with Renox, starter kit, semver stability guarantee
 

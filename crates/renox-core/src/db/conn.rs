@@ -39,7 +39,7 @@ impl fmt::Display for Dialect {
 ///
 /// Models, queries and [`sql()`] take `&db` (or `&mut tx` inside a
 /// [`Transaction`]). For something only sqlx can do, reach the underlying
-/// pool with [`Db::sqlite`] or [`Db::postgres`].
+/// pool with [`Db::sqlite`] or `Db::postgres` (with the `postgres` feature).
 #[derive(Clone)]
 pub struct Db {
     pool: Pool,

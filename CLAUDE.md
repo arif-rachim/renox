@@ -389,6 +389,7 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M8b single-binary deploys (`embedded!()`), `rnx build`, `rnx make:deploy` (Docker/systemd/Litestream) | merged to `main` (#18) |
 | M9a Renox's own database layer (`Db`, `Transaction`, `Row`, `db::sql`, `postgres` feature) | PR from branch `m9a-db-layer` |
 | M9b PostgreSQL backend proper (dual-dialect framework migrations, typed binds, SKIP LOCKED, CI) | next (**must land before 1.0**; plan in ROADMAP M9) |
+| M10 examples + cheat-sheet + `llms.txt` for coding agents (owner's request, before 1.0; ROADMAP M10) | after M9b |
 | v1.0 docs site, starter kit, semver guarantee | last |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on
