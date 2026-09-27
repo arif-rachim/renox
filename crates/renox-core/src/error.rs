@@ -21,6 +21,8 @@ pub enum Error {
     NotFound,
     /// The CSRF token was missing or wrong, usually because the session expired.
     PageExpired,
+    /// Invalid input; see `ValidationError`.
+    Validation(crate::validation::ValidationError),
     Internal(anyhow::Error),
 }
 
@@ -32,6 +34,7 @@ impl Error {
             Self::Forbidden => StatusCode::FORBIDDEN,
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::PageExpired => StatusCode::from_u16(419).expect("valid status code"),
+            Self::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -43,6 +46,7 @@ impl std::fmt::Debug for Error {
         match self {
             Self::Internal(err) => write!(f, "{err:?}"),
             Self::BadRequest(msg) => write!(f, "bad request: {msg}"),
+            Self::Validation(err) => write!(f, "validation failed: {:?}", err.errors),
             other => write!(f, "{}", reason(other.status())),
         }
     }
@@ -69,8 +73,23 @@ pub(crate) fn reason(status: StatusCode) -> &'static str {
     }
 }
 
+impl From<crate::validation::ValidationError> for Error {
+    fn from(err: crate::validation::ValidationError) -> Self {
+        Self::Validation(err)
+    }
+}
+
+impl From<crate::validation::Errors> for Error {
+    fn from(errors: crate::validation::Errors) -> Self {
+        Self::Validation(errors.into())
+    }
+}
+
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
+        if let Self::Validation(err) = self {
+            return err.into_response();
+        }
         let status = self.status();
         let detail = match &self {
             Self::Internal(err) => {

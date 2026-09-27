@@ -2,7 +2,9 @@ body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 3rem auto; 
 form { display: grid; gap: .5rem; margin-bottom: 2rem; }
 input, textarea, button { font: inherit; padding: .5rem; }
 .flash { background: #e8f5e9; padding: .75rem; border-radius: .25rem; }
-.error { color: #b00020; margin: 0; }
+.error { color: #b00020; margin: 0; font-size: .9rem; }
+.error:empty { display: none; }
+[aria-invalid="true"] { border-color: #b00020; outline-color: #b00020; }
 .empty { color: #777; }
 ul { padding-left: 1.2rem; }
 .pagination { display: flex; gap: .25rem; margin-top: 1rem; }

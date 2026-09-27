@@ -20,7 +20,7 @@ and restart the app.
 
 ```rust
 use renox::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Model, Serialize, Default)]
 #[model(table = "products", soft_deletes)]
@@ -50,8 +50,23 @@ async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
     Ok(view("products/index.html", context! { products }).fragment("list"))
 }
 
-async fn store(State(db): State<Db>, session: Session, back: Back) -> Result<Back> {
-    Product::create(&db, Product { name: "Kopi".into(), price: 18_000, ..Default::default() }).await?;
+#[derive(Deserialize)]
+struct ProductForm {
+    name: String,
+    price: i64,
+}
+
+impl Validate for ProductForm {
+    fn rules(&self, v: &mut Validator) {
+        v.field("name", &self.name).required().max(100).unique("products", "name");
+        v.field("price", &self.price).min(1_000);
+    }
+}
+
+// Invalid input never reaches the handler: regular posts go back with errors and old input,
+// HTMX posts get a 422 that the bundled script shows next to the fields.
+async fn store(State(db): State<Db>, session: Session, back: Back, Valid(form): Valid<ProductForm>) -> Result<Back> {
+    Product::create(&db, Product { name: form.name, price: form.price, ..Default::default() }).await?;
     session.flash("status", "Saved!")?;
     Ok(back)
 }
@@ -73,8 +88,8 @@ rnx migrate:rollback
 rnx migrate:fresh --seed
 ```
 
-See [`examples/hello`](examples/hello) for a guestbook using SQLite, sessions, CSRF, flash messages,
-pagination and HTMX fragments.
+See [`examples/hello`](examples/hello) for a guestbook using SQLite, validation, sessions, CSRF,
+flash messages, pagination and HTMX fragments.
 
 ## Planned
 

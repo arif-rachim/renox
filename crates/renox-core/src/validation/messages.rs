@@ -1,0 +1,102 @@
+/// Languages with built-in validation messages, from `APP_LOCALE`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Locale {
+    #[default]
+    En,
+    Id,
+}
+
+impl Locale {
+    /// `en` or `id`; anything else falls back to English.
+    pub fn parse(value: &str) -> Self {
+        match value.to_ascii_lowercase().as_str() {
+            "id" | "id-id" | "id_id" => Self::Id,
+            _ => Self::En,
+        }
+    }
+}
+
+/// The message template for a rule. `:attribute` is the field's label,
+/// `:Attribute` the same with a capital first letter, and `:min`, `:max`,
+/// `:other` fill in rule arguments.
+pub(crate) fn template(locale: Locale, key: &str) -> &'static str {
+    match locale {
+        Locale::En => match key {
+            "required" => "The :attribute field is required.",
+            "min.string" => "The :attribute must be at least :min characters.",
+            "min.numeric" => "The :attribute must be at least :min.",
+            "min.array" => "The :attribute must have at least :min items.",
+            "max.string" => "The :attribute may not be longer than :max characters.",
+            "max.numeric" => "The :attribute may not be greater than :max.",
+            "max.array" => "The :attribute may not have more than :max items.",
+            "between.string" => "The :attribute must be between :min and :max characters.",
+            "between.numeric" => "The :attribute must be between :min and :max.",
+            "between.array" => "The :attribute must have between :min and :max items.",
+            "email" => "The :attribute must be a valid email address.",
+            "url" => "The :attribute must be a valid URL.",
+            "in" => "The selected :attribute is invalid.",
+            "confirmed" => "The :attribute confirmation does not match.",
+            "accepted" => "The :attribute must be accepted.",
+            "unique" => "The :attribute has already been taken.",
+            "exists" => "The selected :attribute is invalid.",
+            "numeric" => "The :attribute must be a number.",
+            _ => "The :attribute is invalid.",
+        },
+        Locale::Id => match key {
+            "required" => ":Attribute wajib diisi.",
+            "min.string" => ":Attribute minimal :min karakter.",
+            "min.numeric" => ":Attribute minimal :min.",
+            "min.array" => ":Attribute minimal berisi :min item.",
+            "max.string" => ":Attribute maksimal :max karakter.",
+            "max.numeric" => ":Attribute maksimal :max.",
+            "max.array" => ":Attribute maksimal berisi :max item.",
+            "between.string" => ":Attribute harus antara :min sampai :max karakter.",
+            "between.numeric" => ":Attribute harus antara :min sampai :max.",
+            "between.array" => ":Attribute harus berisi :min sampai :max item.",
+            "email" => ":Attribute harus berupa alamat email yang valid.",
+            "url" => ":Attribute harus berupa URL yang valid.",
+            "in" => ":Attribute yang dipilih tidak valid.",
+            "confirmed" => "Konfirmasi :attribute tidak cocok.",
+            "accepted" => ":Attribute harus disetujui.",
+            "unique" => ":Attribute sudah digunakan.",
+            "exists" => ":Attribute yang dipilih tidak valid.",
+            "numeric" => ":Attribute harus berupa angka.",
+            _ => ":Attribute tidak valid.",
+        },
+    }
+}
+
+/// Fills a template's placeholders.
+pub(crate) fn render(template: &str, label: &str, params: &[(&str, String)]) -> String {
+    let mut capitalized = label.to_owned();
+    if let Some(first) = capitalized.get_mut(0..1) {
+        first.make_ascii_uppercase();
+    }
+    let mut out = template
+        .replace(":Attribute", &capitalized)
+        .replace(":attribute", label);
+    for (name, value) in params {
+        out = out.replace(&format!(":{name}"), value);
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn renders_both_languages() {
+        let params = [("min", "3".to_owned())];
+        assert_eq!(
+            render(template(Locale::En, "min.string"), "nama", &params),
+            "The nama must be at least 3 characters."
+        );
+        assert_eq!(
+            render(template(Locale::Id, "min.string"), "nama", &params),
+            "Nama minimal 3 karakter."
+        );
+        assert_eq!(Locale::parse("ID"), Locale::Id);
+        assert_eq!(Locale::parse("fr"), Locale::En);
+    }
+}

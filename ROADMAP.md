@@ -75,9 +75,18 @@ my-app/
 - [ ] Pagination links that keep other query parameters
 
 ### M3 · v0.4: Forms and validation
-- [ ] `Valid<Form<T>>` extractor: redirect back with errors + old input, or re-render the form fragment (422) for HTMX
-- [ ] Rules including database-backed `unique` and `exists`
-- [ ] Messages in Indonesian and English
+- [x] `Valid<T>` extractor for forms, JSON bodies and GET query strings
+- [x] Regular posts are redirected back with errors and old input flashed (passwords never are)
+- [x] HTMX and JSON requests get `422 {"message", "errors"}`; the bundled script shows the errors next
+      to the inputs (`data-error-for` slots or inserted `<p class="error">`), sets `aria-invalid`,
+      focuses the first invalid input and leaves what the user typed in place
+- [x] Rules: `required`, `min`, `max`, `between`, `email`, `url`, `one_of`, `confirmed`, `accepted`,
+      custom `rule(bool, msg)`, and database-backed `unique` (with `ignore(id)`) and `exists`
+- [x] `label()` and `message()` per field; empty inputs count as missing; wrong types become field errors
+- [x] Messages in English and Indonesian (`APP_LOCALE=en|id`); `error('field')` in templates
+- [x] Handlers can return their own `ValidationError` / `Errors`
+- [ ] `#[derive(Validate)]` with attribute rules, for forms that only need the basics
+- [ ] More rules: `regex`, dates, `digits`, file uploads (with M6)
 
 ### M4 · v0.5: Authentication and authorization
 - [ ] Register, login, logout, remember me, password reset, email verification, login throttling
@@ -118,6 +127,9 @@ my-app/
 - **Sessions:** stored in an encrypted, signed cookie (AES-256-GCM via `APP_KEY`), so M1 needs no
   database. Keep sessions small; a SQLite driver comes with M2.
 - **Templates:** MiniJinja (runtime, overridable, reloadable). Askama may be offered later.
+- **HTMX validation errors:** returned as 422 JSON and placed by the bundled script, rather than
+  re-rendering a form fragment. It works for any form without a per-form partial, and the form
+  keeps the user's input, focus and Alpine state.
 - **Migrations:** Renox runs its own migrator (table `renox_migrations`) instead of sqlx's, to get
   Laravel-style batches and module-owned migrations. Migrations are compiled into the app, so the
   app binary runs them; `rnx` forwards to it.

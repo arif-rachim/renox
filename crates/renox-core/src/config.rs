@@ -47,6 +47,8 @@ pub struct Config {
     pub database_url: String,
     /// Maximum open connections, from `DATABASE_POOL_SIZE`.
     pub database_pool_size: u32,
+    /// Language of built-in messages, `en` or `id`, from `APP_LOCALE`.
+    pub locale: String,
 }
 
 impl Config {
@@ -90,6 +92,7 @@ impl Config {
             database_pool_size: var_or("DATABASE_POOL_SIZE", "8")
                 .parse()
                 .context("DATABASE_POOL_SIZE must be a number")?,
+            locale: var_or("APP_LOCALE", "en"),
         })
     }
 
@@ -114,6 +117,7 @@ impl Default for Config {
             session_cookie: "renox_session".into(),
             database_url: "sqlite::memory:".into(),
             database_pool_size: 8,
+            locale: "en".into(),
         }
     }
 }
