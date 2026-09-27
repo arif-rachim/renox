@@ -26,7 +26,8 @@ repo, and every trap hit so far, so you don't have to rediscover them.
 ```
 Cargo.toml                 workspace; shared package metadata; workspace.dependencies for renox*
 crates/renox/              facade crate apps depend on: re-exports renox-core, macros, prelude
-  src/lib.rs               `pub use renox_core::*`, `pub use renox_macros::{Model, migrations}`, prelude
+  src/lib.rs               `pub use renox_core::*`, `pub use renox_macros::{Model, migrations}`, prelude,
+                           and `CheatSheet` (cfg(doctest)): compiles every ```rust block of CHEATSHEET.md
   tests/it/                ONE integration-test binary (main.rs + a module per area) that needs
                            the derive/migrations! macros; add new areas as `mod x;` in main.rs
     migrations/, migrations_plain/   SQL fixtures for tests
@@ -47,7 +48,7 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/error.rs             Error enum, IntoResponse, error pages, Debug for main()
   src/crypto.rs            APP_KEY parsing/generation, random tokens, constant_time_eq
   src/signed.rs            signed URLs (HMAC-SHA256) + ValidSignature extractor
-  src/db/                  pool (mod.rs), Model trait (model.rs), Query builder (query.rs), DbValue
+  src/db/                  Db/Transaction/Row/sql() (conn.rs), connect + TEST_DATABASE_URL (mod.rs), Model trait (model.rs), Query builder (query.rs), DbValue
                            (value.rs), Paginated/Page (paginate.rs), migrator (migrate.rs), Factory
   src/validation/          Validator/rules (mod.rs), Valid<T> extractor (extract.rs), en/id messages
   src/auth/                User, hashing, login/logout, CurrentUser middleware, AuthUser, guards,
@@ -75,9 +76,14 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
 crates/renox-macros/       proc macros: #[derive(Model)], migrations!()
 crates/renox-cli/          `rnx`: new, serve, build, key:generate, make:* (generate.rs, make.rs, deploy.rs),
                            forwards the rest; stubs/deploy/ holds the Dockerfile/systemd/Litestream templates
-  stubs/                   files `rnx new` writes (Cargo.toml.stub, env.stub, build.rs, views…)
-examples/hello/            guestbook app exercising every feature; used for live/browser testing
-.github/workflows/ci.yml   fmt+clippy+doc (Ubuntu) and tests on Ubuntu/macOS/Windows
+  stubs/                   files `rnx new` writes (Cargo.toml.stub, env.stub, build.rs, views…,
+                           AGENTS.md.stub + CLAUDE.md.stub (named .stub so agents in this repo don't load them) working on the app)
+examples/hello/            guestbook app exercising many features in one file; used for live/browser testing
+examples/crud/             the reference CRUD module (policy, soft deletes, pagination) — M10a
+CHEATSHEET.md              one-page patterns for app authors/agents; its Rust is compiled as doctests
+llms.txt                   map for agents: which example/guide file shows what
+docs/postgresql.md         PostgreSQL guide for app authors
+.github/workflows/ci.yml   fmt+clippy+doc (Ubuntu), tests on Ubuntu/macOS/Windows, tests on PostgreSQL
 ```
 
 ## 3. Architecture and the decisions behind it
@@ -233,8 +239,9 @@ migration changes migration counts asserted in `crates/renox/tests/database.rs`.
   logged-in users, so it can't be used to read the token after login.
 - Prefer `renox::testing::TestApp` in new tests (it keeps cookies, sends CSRF, has assertions);
   older tests use hand-written clients. `#[renox::test]` replaces `#[tokio::test]`.
-- `TestApp` does **not** read `.env`: it starts from `Config::default()` (en locale, memory mail,
-  in-memory DB) plus a temp storage dir; set anything else with `TestApp::with_config`.
+- `TestApp` does **not** read `.env` (except `TEST_DATABASE_URL`, see §3): it starts from
+  `Config::default()` (en locale, memory mail, in-memory DB) plus a temp storage dir; set anything
+  else with `TestApp::with_config`.
 - `Kernel` helpers: `migrate()`, `run_jobs()` (drains the queue), `mailer().sent()` (memory driver),
   `state()`, `db()`, `worker(queues)`.
 - Apps are lib + bin: `src/lib.rs` has `pub fn app() -> App`, `main.rs` runs it, `tests/` boot it.
@@ -242,6 +249,20 @@ migration changes migration counts asserted in `crates/renox/tests/database.rs`.
 - Whether a 500 page shows the error chain is decided per app in the view middleware
   (`ErrorPage::shown_detail(config.debug)`); there is no process-wide debug flag any more, so apps
   with and without debug can run side by side in one test binary.
+
+### 4.6b Docs for app authors and agents (M10)
+- `CHEATSHEET.md` is compiled: every ```rust block must build on its own (visible `use` lines, no
+  `# ` hidden lines since GitHub shows them; define items only, no top-level statements, so the
+  doctest's `main` does nothing). Check with `cargo test --doc -p renox`. When a public API
+  changes, fix the cheat-sheet in the same PR.
+- Examples are workspace members with their own tests, so CI runs them; each is one pattern,
+  written the official way, and its module doc names the `rnx make:*` commands that made it.
+  Keep `llms.txt` in step when adding or renaming example files.
+- Browser-check example UIs. Things found that way in `examples/crud`: `hx-boost` on a whole
+  section also boosts its edit links and delete forms (scope it to the page links), and boosted
+  requests get full pages (by design, `Htmx::wants_fragment`), so pair them with `hx-select`.
+- Examples without a `.env` run with `APP_DEBUG` off, i.e. with the views embedded at build time:
+  restart after editing templates.
 
 ### 4.7 Git, PRs, CI (how the owner works)
 - One branch and one PR per milestone (`m1-web-layer`, `m2-database`, `m3-validation`, `m4-auth`,
@@ -426,15 +447,17 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M8a testing helpers | merged to `main` |
 | M8b single-binary deploys (`embedded!()`), `rnx build`, `rnx make:deploy` (Docker/systemd/Litestream) | merged to `main` (#18) |
 | M9a Renox's own database layer (`Db`, `Transaction`, `Row`, `db::sql`, `postgres` feature) | merged to `main` (#19) |
-| M9b PostgreSQL backend proper (dual-dialect migrations, typed binds, SKIP LOCKED, schedule claims, `rnx new --database postgres`, CI, guide) | PR from branch `m9b-postgres` |
-| M10 examples + cheat-sheet + `llms.txt` for coding agents (owner's request, before 1.0; ROADMAP M10) | after M9b |
+| M9b PostgreSQL backend proper (dual-dialect migrations, typed binds, SKIP LOCKED, schedule claims, `rnx new --database postgres`, CI, guide) | merged to `main` (#20) |
+| M10a CHEATSHEET.md (doctested), llms.txt, AGENTS.md/CLAUDE.md in new apps, `examples/crud` | PR from branch `m10a-agent-docs` |
+| M10b examples api/jobs/uploads/postgres, doctests on public APIs, the M10 gaps (ROADMAP M10) | next |
 | v1.0 docs site, starter kit, semver guarantee | last |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on
 an up-to-date `main`. Open the next milestone's PR only after the previous one is merged (§6.3).
 
 Open items noted in ROADMAP: `#[derive(Validate)]`, more rules (regex, dates, files), route groups
-with prefixes, SQLite session driver, pagination links that keep other query params.
+with prefixes, SQLite session driver, and the M10 gaps (method spoofing, all errors at once when a
+field fails to parse, `can()` for policies in templates, pagination links that keep query params).
 
 Stats at the time of writing: ~11.8k lines of Rust in `crates/`, 140 tests, 34 direct dependencies
 (stars and roles were reviewed with the owner; keep deps lean and remove unused ones).

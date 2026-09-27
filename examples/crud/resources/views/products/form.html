@@ -1,0 +1,15 @@
+{% extends "layouts/app.html" %}
+
+{# One form for both: `product` is only set when editing. #}
+{% block content %}
+<h1>{{ "Edit product" if product else "New product" }}</h1>
+<form method="post"
+      action="{{ route('products.update', product.id) if product else route('products.store') }}">
+  {{ csrf_field() }}
+  <label>Name <input name="name" value="{{ old('name', product.name if product else '') }}"></label>
+  <p class="error" data-error-for="name">{{ error('name') }}</p>
+  <label>Price <input name="price" inputmode="numeric" value="{{ old('price', product.price if product else '') }}"></label>
+  <p class="error" data-error-for="price">{{ error('price') }}</p>
+  <button>Save</button>
+</form>
+{% endblock %}

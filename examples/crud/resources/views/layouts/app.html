@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ app.name }}{% endblock %}</title>
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
+  {{ renox_head() }}
+</head>
+<body>
+  <nav>
+    <a href="{{ route('products.index') }}"><strong>{{ app.name }}</strong></a>
+    {% if auth.check %}
+    <a href="{{ route('products.trash') }}">Trash</a>
+    <span>{{ auth.user.name }}</span>
+    <form method="post" action="{{ route('logout') }}">{{ csrf_field() }}<button>Log out</button></form>
+    {% else %}
+    <a href="{{ route('login') }}">Log in</a>
+    <a href="{{ route('register') }}">Register</a>
+    {% endif %}
+  </nav>
+  <main>
+    {% if flash.status %}<p class="flash">{{ flash.status }}</p>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -8,6 +8,9 @@ use crate::Database;
 /// Files of a new app: (path, contents). `.stub` files are templated.
 const STUBS: &[(&str, &str)] = &[
     ("Cargo.toml", include_str!("../stubs/Cargo.toml.stub")),
+    ("AGENTS.md", include_str!("../stubs/AGENTS.md.stub")),
+    // Claude Code reads CLAUDE.md; it imports AGENTS.md so there's one text.
+    ("CLAUDE.md", include_str!("../stubs/CLAUDE.md.stub")),
     (".env", include_str!("../stubs/env.stub")),
     (".env.example", include_str!("../stubs/env.stub")),
     (".gitignore", include_str!("../stubs/gitignore.stub")),

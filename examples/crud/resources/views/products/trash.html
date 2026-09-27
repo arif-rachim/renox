@@ -1,0 +1,17 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<h1>Trash</h1>
+<ul>
+  {% for product in products %}
+  <li>
+    {{ product.name }}
+    <form method="post" action="{{ route('products.restore', product.id) }}">
+      {{ csrf_field() }}<button>Restore</button>
+    </form>
+  </li>
+  {% else %}
+  <li>The trash is empty.</li>
+  {% endfor %}
+</ul>
+{% endblock %}

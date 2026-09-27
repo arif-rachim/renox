@@ -1,0 +1,46 @@
+# Renox
+
+> Renox is a batteries-included Rust web framework inspired by Laravel: Axum + HTMX + Alpine.js,
+> with SQLite by default or PostgreSQL (the `postgres` feature). Apps depend on the `renox` crate
+> and are managed with the `rnx` CLI. To do something the idiomatic way, open the one file listed
+> for it below rather than reading the framework's source.
+
+## Start here
+
+- [CHEATSHEET.md](CHEATSHEET.md): the common patterns, 5–20 lines each and compiled as doctests
+  (routes, views, forms and validation, models and queries, pagination, auth and policies, HTMX, raw
+  SQL and transactions, jobs, events, schedule, mail, cache, session, uploads, translations, tests,
+  `.env`).
+- [README.md](README.md): install `rnx`, create and run an app, the generator commands.
+
+## Examples (complete apps, tested in CI)
+
+- [examples/crud](examples/crud): one resource end to end: model and migration, list with
+  pagination, create and edit forms with validation, owner-only edit and delete through a policy,
+  soft delete with a trash and restore, flash messages, and tests for each.
+  - Routes and handlers: [examples/crud/src/app/products/mod.rs](examples/crud/src/app/products/mod.rs)
+  - Model, factory, policy: [model.rs](examples/crud/src/app/products/model.rs),
+    [policy.rs](examples/crud/src/app/products/policy.rs)
+  - Views: [index.html](examples/crud/resources/views/products/index.html),
+    [form.html](examples/crud/resources/views/products/form.html)
+  - Tests: [examples/crud/tests/products.rs](examples/crud/tests/products.rs)
+- [examples/hello](examples/hello): a guestbook in one file: HTMX form posts that return
+  fragments, a photo upload, an event whose listener queues a mail job, a scheduled task,
+  i18n (en/id) with a language switch, and a seeder.
+  - [examples/hello/src/lib.rs](examples/hello/src/lib.rs),
+    [tests](examples/hello/tests/guestbook.rs)
+
+## Guides
+
+- [docs/postgresql.md](docs/postgresql.md): PostgreSQL apps, migrations per database, SQL that runs
+  on both, tests with `TEST_DATABASE_URL`, moving data from SQLite.
+- `rnx make:deploy` writes `deploy/README.md` (Docker, systemd, Litestream backups).
+
+## Where things are (for changing Renox itself)
+
+- [CLAUDE.md](CLAUDE.md) (same as AGENTS.md): the contributor and agent guide, including the
+  architecture, conventions, and problems already solved.
+- [ROADMAP.md](ROADMAP.md): milestones and design decisions.
+- `crates/renox-core/src`: the runtime. `db/` (Db, models, queries, migrations), `validation/`,
+  `auth/`, `queue/`, `schedule.rs`, `view.rs`, `testing.rs`.
+- `crates/renox-cli`: `rnx`; `stubs/` holds the files `rnx new` writes.
