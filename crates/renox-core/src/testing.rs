@@ -32,7 +32,6 @@ use axum::http::{HeaderMap, HeaderName, HeaderValue, Method, Request, StatusCode
 use http_body_util::BodyExt;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use sqlx::{AssertSqlSafe, Row};
 use tower::ServiceExt;
 
 use crate::auth::{User, login};
@@ -100,8 +99,8 @@ impl TestApp {
 
     /// Names of the jobs waiting in the queue, oldest first.
     pub async fn queued_jobs(&self) -> Vec<String> {
-        sqlx::query_scalar("SELECT job FROM jobs ORDER BY id")
-            .fetch_all(self.db())
+        crate::db::sql("SELECT job FROM jobs ORDER BY id")
+            .scalars(self.db())
             .await
             .expect("the jobs table can be read")
     }
@@ -193,15 +192,15 @@ impl TestApp {
             sql.push_str(" WHERE ");
             sql.push_str(&clauses.join(" AND "));
         }
-        let query = values
-            .iter()
-            .map(|(_, v)| v.to_db_value())
-            .filter(|v| *v != DbValue::Null)
-            .fold(sqlx::query(AssertSqlSafe(sql)), crate::db::value_bind);
-        query
-            .fetch_one(self.db())
+        crate::db::sql(sql)
+            .bind_all(
+                values
+                    .iter()
+                    .map(|(_, v)| v.to_db_value())
+                    .filter(|v| *v != DbValue::Null),
+            )
+            .scalar(self.db())
             .await
-            .and_then(|row| row.try_get(0))
             .unwrap_or_else(|err| panic!("could not query `{table}`: {err}"))
     }
 

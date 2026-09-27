@@ -135,9 +135,22 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
 - **Workers and scheduler run inside `serve`** by default (single-process deploys). Multiple
   instances would duplicate scheduled tasks → `SCHEDULER=false` on all but one.
 - **SQLite now, PostgreSQL before 1.0.** The owner wants PostgreSQL for apps that outgrow one
-  server. Until M9, keep new database code easy to port: build SQL in one place, avoid new
-  SQLite-only statements where a portable one exists, and remember `Db` is still `SqlitePool`
-  (M9 turns it into a Renox type chosen from `DATABASE_URL`).
+  server. Since M9a, `Db` is Renox's own type (`db/conn.rs`): a private enum over `SqlitePool` and,
+  with the `postgres` feature, `PgPool`, chosen by `DATABASE_URL`'s scheme in `db::connect`.
+  - All framework SQL goes through `crate::db::sql("… ? …").bind(v)` and `.fetch_all/
+    fetch_optional/fetch_one/execute/scalar/scalar_optional/scalars(executor)`; migration files go
+    through `db::script` (multi-statement, no params). Never call `sqlx::query` on `&Db` directly.
+  - Executors are `&Db` or `&mut Transaction` (trait `db::Executor`; `db.begin()` returns
+    `Transaction`, pass `&mut tx`, **not** `&mut *tx`). Models take `E: Executor<'c>`.
+  - Rows are `db::Row` (`try_get::<T>(name_or_index)`, `columns()`); `T: FromDb` means "decodes on
+    every enabled backend". `derive(Model)` generates `from_row(row: &Row)`.
+  - Always write `?` placeholders; `numbered_placeholders` turns them into `$n` on PostgreSQL
+    (quotes/comments skipped). Engine-specific code matches on `db.dialect()`, or on
+    `db.sqlite()` / `db.postgres()` for raw sqlx (see `migrate.rs` `drop_all_*`, `shell.rs` cells).
+  - `cfg(feature = "postgres")` arms: check both `cargo clippy --all-targets` and
+    `--all-features`. The PostgreSQL test module (`tests/it/postgres.rs`) runs only with
+    `--features postgres` and `RENOX_TEST_POSTGRES_URL` set (e.g. a `postgres:17-alpine` container
+    on port 55432).
 - **Single-file deploys:** `App::embed(renox::embedded!())` bakes views, lang files and `public/`
   into the binary; they're used only when `APP_DEBUG` is off (debug keeps disk + live reload).
   Embedded public files are served by the router's fallback (`embedded.rs`). New built-in behaviour
@@ -303,6 +316,10 @@ Two more scripted edits went wrong: a Python heredoc with nested `\"` quoting fa
 write the Python to a file, `assert old in s` before each replace (fail loudly), and use the Edit
 tool for anything quote-heavy or already formatted. Rewriting a small file whole (as with
 `shell.rs`) beats a pile of partial replacements.
+M9a added one more: a multi-line `perl -0pi` regex with a repeated group (`(\s*\.bind(..))*?`)
+kept only the *last* capture and silently dropped `.bind(key)` from the cache lookup; a test
+caught it. After any regex rewrite of call chains, audit with
+`git diff -U0 | grep -E '^[-+].*\.bind\('` (removed binds must match added ones).
 
 ### 6.4d Slow tests (measured, fixed)
 Unoptimised Argon2 made every login/registration slow (auth tests 3.9 s) and ten integration-test
@@ -369,8 +386,9 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M7 generators (`make:*`), `route:list`, `db:shell`, browser live reload | merged to `main` |
 | Faster tests (argon2 opt-level, one integration-test binary, per-app error detail) | merged to `main` (#15) |
 | M8a testing helpers | merged to `main` |
-| M8b single-binary deploys (`embedded!()`), `rnx build`, `rnx make:deploy` (Docker/systemd/Litestream) | PR from branch `m8b-deploy` |
-| M9 PostgreSQL (owner's request, **must land before 1.0**; plan in ROADMAP M9) | next |
+| M8b single-binary deploys (`embedded!()`), `rnx build`, `rnx make:deploy` (Docker/systemd/Litestream) | merged to `main` (#18) |
+| M9a Renox's own database layer (`Db`, `Transaction`, `Row`, `db::sql`, `postgres` feature) | PR from branch `m9a-db-layer` |
+| M9b PostgreSQL backend proper (dual-dialect framework migrations, typed binds, SKIP LOCKED, CI) | next (**must land before 1.0**; plan in ROADMAP M9) |
 | v1.0 docs site, starter kit, semver guarantee | last |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on

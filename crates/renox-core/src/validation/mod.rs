@@ -30,7 +30,6 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
-use sqlx::{AssertSqlSafe, Row};
 
 pub use extract::Valid;
 pub use messages::Locale;
@@ -38,7 +37,6 @@ pub(crate) use messages::template_for;
 pub use value::{FieldValue, Inspected};
 
 use crate::Result;
-use crate::db::value_bind;
 use crate::db::{Db, DbValue, quote};
 use messages::render;
 
@@ -169,11 +167,11 @@ impl Validator {
                 sql.push_str(" AND \"id\" != ?");
             }
             sql.push(')');
-            let mut query = value_bind(sqlx::query(AssertSqlSafe(sql)), check.value);
+            let mut query = crate::db::sql(sql).bind(check.value);
             if let Some(id) = check.ignore_id {
                 query = query.bind(id);
             }
-            let found: bool = query.fetch_one(db).await?.try_get(0)?;
+            let found: bool = query.scalar(db).await?;
             if found == check.unique {
                 let key = if check.unique { "unique" } else { "exists" };
                 let message = check.message.unwrap_or_else(|| {

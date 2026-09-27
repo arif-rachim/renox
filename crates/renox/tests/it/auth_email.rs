@@ -257,7 +257,7 @@ async fn reset_links_expire() {
         .to_owned();
 
     let two_hours_ago = renox::db::now() - renox::chrono::TimeDelta::hours(2);
-    renox::sqlx::query("UPDATE password_reset_tokens SET created_at = ?")
+    renox::db::sql("UPDATE password_reset_tokens SET created_at = ?")
         .bind(two_hours_ago)
         .execute(kernel.db())
         .await

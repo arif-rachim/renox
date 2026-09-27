@@ -213,22 +213,29 @@ M8b (done):
 ### M9 · v0.10: PostgreSQL (before 1.0)
 SQLite stays the default and is right for an app on one server. PostgreSQL is for apps that
 outgrow that: several app servers, heavy concurrent writes, or a managed database. It has to land
-before 1.0 because `Db` is a plain `SqlitePool` alias today; turning it into a type that can hold
-either pool after 1.0 would break every app.
+before 1.0 because `Db` was a plain `SqlitePool` alias; turning it into a type that can hold
+either pool after 1.0 would break every app. Split in two PRs: M9a (Renox's own database layer,
+still SQLite underneath) and M9b (the PostgreSQL backend proper).
 
-- [ ] `Db` becomes Renox's own type (holding a SQLite or a PostgreSQL pool), chosen at boot from
+- [x] `Db` becomes Renox's own type (holding a SQLite or a PostgreSQL pool), chosen at boot from
       the `DATABASE_URL` scheme (`sqlite://…` or `postgres://…`); `State(db): State<Db>` stays the
-      same, with `db.sqlite()` / `db.postgres()` for raw sqlx queries
-- [ ] PostgreSQL behind a `postgres` cargo feature, like `s3`, so SQLite-only apps don't compile it
-- [ ] A small dialect layer: `?` vs `$1` placeholders in the query builder, the models, the migrator,
-      the queue, the cache and the auth code; `DbValue` binding and row decoding for both
+      same, with `db.sqlite()` / `db.postgres()` for raw sqlx queries (M9a)
+- [x] `Transaction` (`db.begin()`, pass `&mut tx` where `&db` goes), `Row` (`try_get` by name or
+      position) and raw SQL with `renox::db::sql("… ?").bind(v).fetch_all(&db)` / `scalar` /
+      `execute`; models, queries and all framework code go through them (M9a)
+- [x] PostgreSQL behind a `postgres` cargo feature, like `s3`, so SQLite-only apps don't compile it
+      (M9a: the feature, the pool and the connection; M9b makes the framework's own SQL work on it)
+- [x] `?` placeholders rewritten to `$1`, `$2`, … on PostgreSQL, skipping quotes and comments (M9a)
+- [ ] `DbValue` binding for PostgreSQL's stricter types: untyped `NULL`, `BOOLEAN`, `TIMESTAMPTZ`,
+      `LIMIT`/`OFFSET` differences in the query builder
 - [ ] Framework migrations in both dialects: `AUTOINCREMENT` → `GENERATED ALWAYS AS IDENTITY`,
       `COLLATE NOCASE` emails → a unique index on `lower(email)` (or `citext`), `TEXT` timestamps →
       `TIMESTAMPTZ`, SQLite `INTEGER` booleans → `BOOLEAN`
 - [ ] App migrations per dialect when SQL differs: `migrations/*.up.sql` for both, with optional
       `*.sqlite.up.sql` / `*.postgres.up.sql` overrides picked by `migrations!()` at run time
-- [ ] Replace SQLite-only statements: `PRAGMA` (WAL, foreign keys), `sqlite_master` in
-      `migrate:fresh` and `db:shell .tables`, the `:memory:` pool handling
+- [x] `migrate:fresh` and `db:shell` (`.tables`, cell display, banner) handle both (M9a)
+- [ ] Replace the remaining SQLite-only statements (`INSERT OR IGNORE`, date functions, …) in the
+      framework's own SQL
 - [ ] Queue workers on PostgreSQL reserve jobs with `FOR UPDATE SKIP LOCKED`, so workers on
       several servers never take the same job
 - [ ] Scheduler on PostgreSQL takes an advisory lock per task, so several app servers can run
@@ -284,6 +291,7 @@ either pool after 1.0 would break every app.
   several instances of the app would run scheduled tasks on each; set `SCHEDULER=false` on all but
   one (queue workers are safe to run anywhere).
 - **Relations:** Rust has no runtime reflection, so there is no full Eloquent. `derive(Model)` covers
-  CRUD; relations are explicit methods; complex queries use `sqlx::query!`.
+  CRUD; relations are explicit methods; complex queries use `renox::db::sql()` (portable) or sqlx
+  directly through `db.sqlite()` / `db.postgres()` (e.g. for `query!`).
 - **Service container:** replaced by typed `AppState` and extractors.
 - **No REPL:** `rnx db:shell` and custom CLI commands instead of Tinker.

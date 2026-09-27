@@ -164,8 +164,8 @@ async fn file_databases_use_wal_and_create_their_directory() {
         ..config(dir.path())
     };
     let kernel = App::with_config(config).boot().await.unwrap();
-    let mode: String = renox::sqlx::query_scalar("PRAGMA journal_mode")
-        .fetch_one(kernel.db())
+    let mode: String = renox::db::sql("PRAGMA journal_mode")
+        .scalar(kernel.db())
         .await
         .unwrap();
     assert_eq!(mode, "wal");
@@ -368,8 +368,8 @@ async fn transactions_roll_back_on_drop() {
     let db = kernel.db();
     {
         let mut tx = db.begin().await.unwrap();
-        produk("Kopi", 1, None).save(&mut *tx).await.unwrap();
-        assert_eq!(Produk::query().count(&mut *tx).await.unwrap(), 1);
+        produk("Kopi", 1, None).save(&mut tx).await.unwrap();
+        assert_eq!(Produk::query().count(&mut tx).await.unwrap(), 1);
     }
     assert_eq!(Produk::query().count(db).await.unwrap(), 0);
 }
@@ -538,4 +538,50 @@ async fn handlers_use_the_pool_and_render_pagination() {
     assert!(body.contains(r#"href="?page=1" rel="prev""#), "{body}");
     assert!(body.contains(r#"href="?page=3" rel="next""#), "{body}");
     assert!(get("/produk?page=abc").await.1.starts_with("[A][B]"));
+}
+
+#[tokio::test]
+async fn raw_sql_binds_reads_and_commits() {
+    let (kernel, _dir) = kernel().await;
+    let db = kernel.db();
+    assert_eq!(db.dialect(), renox::db::Dialect::Sqlite);
+
+    let mut tx = db.begin().await.unwrap();
+    let inserted = renox::db::sql("INSERT INTO produk (nama, harga) VALUES (?, ?), (?, ?)")
+        .bind("Kopi")
+        .bind(18_000)
+        .bind("Teh")
+        .bind(9_000)
+        .execute(&mut tx)
+        .await
+        .unwrap();
+    assert_eq!(inserted, 2);
+    tx.commit().await.unwrap();
+
+    let rows = renox::db::sql("SELECT nama, harga FROM produk WHERE harga < ? ORDER BY nama")
+        .bind(20_000)
+        .fetch_all(db)
+        .await
+        .unwrap();
+    assert_eq!(rows[0].columns(), ["nama", "harga"]);
+    assert_eq!(rows[0].try_get::<String>("nama").unwrap(), "Kopi");
+    assert_eq!(rows[1].try_get::<i64>(1).unwrap(), 9_000);
+
+    let total: i64 = renox::db::sql("SELECT SUM(harga) FROM produk")
+        .scalar(db)
+        .await
+        .unwrap();
+    assert_eq!(total, 27_000);
+    let missing: Option<String> = renox::db::sql("SELECT nama FROM produk WHERE harga > ?")
+        .bind(1_000_000)
+        .scalar_optional(db)
+        .await
+        .unwrap();
+    assert_eq!(missing, None);
+    let names: Vec<String> = renox::db::sql("SELECT nama FROM produk ORDER BY nama")
+        .scalars(db)
+        .await
+        .unwrap();
+    assert_eq!(names, ["Kopi", "Teh"]);
+    assert!(db.sqlite().is_some());
 }

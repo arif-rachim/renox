@@ -40,7 +40,7 @@ pub trait Factory: Model {
             let mut models = Vec::with_capacity(count);
             for _ in 0..count {
                 let mut model = Self::definition();
-                model.save(&mut *tx).await?;
+                model.save(&mut tx).await?;
                 models.push(model);
             }
             tx.commit().await?;

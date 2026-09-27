@@ -1,5 +1,4 @@
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
-use sqlx::sqlite::{Sqlite, SqliteArguments};
 
 /// A value bound to a query parameter.
 #[derive(Debug, Clone, PartialEq)]
@@ -110,17 +109,5 @@ impl<T: ToDbValue + ?Sized> ToDbValue for &T {
 impl ToDbValue for DbValue {
     fn to_db_value(&self) -> DbValue {
         self.clone()
-    }
-}
-
-pub(crate) type SqlxQuery<'q> = sqlx::query::Query<'q, Sqlite, SqliteArguments>;
-
-pub(crate) fn bind(query: SqlxQuery<'_>, value: DbValue) -> SqlxQuery<'_> {
-    match value {
-        DbValue::Null => query.bind(None::<i64>),
-        DbValue::Integer(v) => query.bind(v),
-        DbValue::Real(v) => query.bind(v),
-        DbValue::Text(v) => query.bind(v),
-        DbValue::Blob(v) => query.bind(v),
     }
 }

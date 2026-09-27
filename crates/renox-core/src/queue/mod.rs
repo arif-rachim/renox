@@ -32,7 +32,6 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use sqlx::Row;
 use tokio::sync::Notify;
 
 pub use worker::Worker;
@@ -135,7 +134,7 @@ impl Queue {
     /// Queues a job to run after `delay`; returns its id.
     pub async fn dispatch_after<J: Job>(&self, job: J, delay: Duration) -> Result<i64> {
         let now = unix_now();
-        let id: i64 = sqlx::query(
+        let id: i64 = crate::db::sql(
             "INSERT INTO jobs (queue, job, payload, max_attempts, available_at, created_at) \
              VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
         )
@@ -145,22 +144,21 @@ impl Queue {
         .bind(i64::from(J::MAX_ATTEMPTS.max(1)))
         .bind(now + delay.as_secs() as i64)
         .bind(now)
-        .fetch_one(&self.db)
-        .await?
-        .try_get(0)?;
+        .scalar(&self.db)
+        .await?;
         self.wake.notify_waiters();
         Ok(id)
     }
 
     /// Jobs waiting or running.
     pub async fn pending(&self) -> Result<i64> {
-        Ok(sqlx::query_scalar("SELECT COUNT(*) FROM jobs")
-            .fetch_one(&self.db)
+        Ok(crate::db::sql("SELECT COUNT(*) FROM jobs")
+            .scalar(&self.db)
             .await?)
     }
 
     pub async fn failed(&self) -> Result<Vec<FailedJob>> {
-        let rows = sqlx::query(
+        let rows = crate::db::sql(
             "SELECT id, queue, job, payload, error, failed_at FROM failed_jobs ORDER BY id",
         )
         .fetch_all(&self.db)
@@ -187,20 +185,16 @@ impl Queue {
             "INSERT INTO jobs (queue, job, payload, max_attempts, available_at, created_at) \
              SELECT queue, job, payload, max_attempts, ?, ? FROM failed_jobs{filter}"
         );
-        let mut query = sqlx::query(sqlx::AssertSqlSafe(insert))
-            .bind(unix_now())
-            .bind(unix_now());
+        let mut query = crate::db::sql(insert).bind(unix_now()).bind(unix_now());
         if let Some(id) = id {
             query = query.bind(id);
         }
-        let moved = query.execute(&mut *tx).await?.rows_affected();
-        let mut delete = sqlx::query(sqlx::AssertSqlSafe(format!(
-            "DELETE FROM failed_jobs{filter}"
-        )));
+        let moved = query.execute(&mut tx).await?;
+        let mut delete = crate::db::sql(format!("DELETE FROM failed_jobs{filter}"));
         if let Some(id) = id {
             delete = delete.bind(id);
         }
-        delete.execute(&mut *tx).await?;
+        delete.execute(&mut tx).await?;
         tx.commit().await?;
         self.wake.notify_waiters();
         Ok(moved)
@@ -208,10 +202,9 @@ impl Queue {
 
     /// Deletes failed jobs.
     pub async fn flush_failed(&self) -> Result<u64> {
-        Ok(sqlx::query("DELETE FROM failed_jobs")
+        Ok(crate::db::sql("DELETE FROM failed_jobs")
             .execute(&self.db)
-            .await?
-            .rows_affected())
+            .await?)
     }
 }
 

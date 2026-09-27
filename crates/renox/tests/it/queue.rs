@@ -7,7 +7,7 @@ use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 
 async fn log(state: &AppState, message: &str) -> Result {
-    renox::sqlx::query("INSERT INTO log (message) VALUES (?)")
+    renox::db::sql("INSERT INTO log (message) VALUES (?)")
         .bind(message.to_owned())
         .execute(&state.db)
         .await?;
@@ -15,8 +15,8 @@ async fn log(state: &AppState, message: &str) -> Result {
 }
 
 async fn logged(kernel: &Kernel) -> Vec<String> {
-    renox::sqlx::query_scalar("SELECT message FROM log ORDER BY rowid")
-        .fetch_all(kernel.db())
+    renox::db::sql("SELECT message FROM log ORDER BY rowid")
+        .scalars(kernel.db())
         .await
         .unwrap()
 }
@@ -157,7 +157,7 @@ async fn kernel_with(app: impl FnOnce(App) -> App) -> Kernel {
     .await
     .unwrap();
     kernel.migrate().await.unwrap();
-    renox::sqlx::query("CREATE TABLE log (message TEXT NOT NULL)")
+    renox::db::sql("CREATE TABLE log (message TEXT NOT NULL)")
         .execute(kernel.db())
         .await
         .unwrap();
@@ -223,8 +223,8 @@ async fn jobs_that_keep_failing_can_be_retried_later() {
 
     assert_eq!(queue.retry(Some(failed[0].id)).await.unwrap(), 1);
     assert_eq!(queue.pending().await.unwrap(), 1);
-    let attempts: i64 = renox::sqlx::query_scalar("SELECT max_attempts FROM jobs")
-        .fetch_one(kernel.db())
+    let attempts: i64 = renox::db::sql("SELECT max_attempts FROM jobs")
+        .scalar(kernel.db())
         .await
         .unwrap();
     assert_eq!(attempts, 2, "a retried job gets its own attempts back");

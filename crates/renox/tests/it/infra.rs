@@ -144,7 +144,7 @@ async fn database_cache() {
         .put("short", &1, Some(Duration::from_secs(60)))
         .await
         .unwrap();
-    renox::sqlx::query("UPDATE cache SET expires_at = 1")
+    renox::db::sql("UPDATE cache SET expires_at = 1")
         .execute(kernel.db())
         .await
         .unwrap();
