@@ -1,0 +1,228 @@
+//! Webhooks: verified, stored once per event, processed in the queue, and
+//! still received in maintenance mode.
+
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use renox::prelude::*;
+use renox::testing::TestApp;
+use renox::webhook;
+use serde::Deserialize;
+
+const SECRET: &str = "whsec_test";
+
+/// A provider that signs the body with HMAC-SHA256 in `X-Signature`.
+struct Pay;
+
+#[derive(Deserialize)]
+struct Event {
+    id: String,
+    order: String,
+}
+
+/// Lets a test make processing fail, then succeed.
+static BROKEN: AtomicBool = AtomicBool::new(false);
+
+impl Webhook for Pay {
+    const PROVIDER: &'static str = "pay";
+
+    fn verify(request: &WebhookRequest, _: &AppState) -> Result {
+        let signature = request.header("x-signature").unwrap_or_default();
+        webhook::ensure(webhook::verify_hmac_sha256(
+            SECRET,
+            &request.body,
+            signature,
+        ))
+    }
+
+    fn event_id(request: &WebhookRequest) -> Result<String> {
+        Ok(request.json::<Event>()?.id)
+    }
+
+    async fn handle(call: WebhookCall, ctx: JobContext) -> Result {
+        let event: Event = call.json()?;
+        if event.order == "broken" && BROKEN.load(Ordering::SeqCst) {
+            return Err(Error::BadRequest("the shop is closed".into()));
+        }
+        ctx.state
+            .cache
+            .put(&format!("paid:{}", event.order), &true, None)
+            .await
+    }
+}
+
+struct Shop;
+
+impl Module for Shop {
+    fn name(&self) -> &'static str {
+        "shop"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new()
+            .get("/", || async { "home" })
+            .name("home")
+            .webhook::<Pay>("/webhooks/pay")
+    }
+
+    fn register(&self, app: &mut Registry) {
+        app.webhook::<Pay>();
+    }
+}
+
+async fn app() -> TestApp {
+    TestApp::new(App::new().module(Shop)).await
+}
+
+fn body(id: &str, order: &str) -> String {
+    format!(r#"{{"id":"{id}","order":"{order}"}}"#)
+}
+
+async fn send(app: &TestApp, body: &str, signature: &str) -> renox::testing::TestResponse {
+    app.request()
+        .without_csrf()
+        .header("x-signature", signature)
+        .post_body("/webhooks/pay", "application/json", body)
+        .await
+}
+
+async fn paid(app: &TestApp, order: &str) -> bool {
+    app.state()
+        .cache
+        .get::<bool>(&format!("paid:{order}"))
+        .await
+        .unwrap()
+        .unwrap_or(false)
+}
+
+#[renox::test]
+async fn verified_calls_are_stored_once_and_processed_in_the_queue() {
+    let app = app().await;
+    let call = body("evt_1", "A-1");
+    let signature = webhook::hmac_sha256_hex(SECRET, &call);
+
+    send(&app, &call, &signature)
+        .await
+        .assert_ok()
+        .assert_see("ok");
+    app.assert_database_has(
+        "webhook_calls",
+        &[
+            ("provider", &"pay"),
+            ("event_id", &"evt_1"),
+            ("status", &"received"),
+        ],
+    )
+    .await;
+    assert!(!paid(&app, "A-1").await, "processed later, by a worker");
+    assert_eq!(app.queued_jobs().await, ["renox:webhook"]);
+
+    // The provider retries: answered 200, not stored or queued again.
+    send(&app, &call, &signature)
+        .await
+        .assert_ok()
+        .assert_see("already received");
+    app.assert_database_count("webhook_calls", 1).await;
+    assert_eq!(app.queued_jobs().await.len(), 1);
+
+    app.run_jobs().await;
+    assert!(paid(&app, "A-1").await);
+    app.assert_database_has(
+        "webhook_calls",
+        &[("event_id", &"evt_1"), ("status", &"processed")],
+    )
+    .await;
+}
+
+#[renox::test]
+async fn forged_or_incomplete_calls_are_refused() {
+    let app = app().await;
+    let call = body("evt_2", "A-2");
+    send(&app, &call, &webhook::hmac_sha256_hex("guess", &call))
+        .await
+        .assert_status(401);
+    send(&app, &call, "").await.assert_status(401);
+    let no_id = r#"{"order":"A-2"}"#;
+    send(&app, no_id, &webhook::hmac_sha256_hex(SECRET, no_id))
+        .await
+        .assert_status(400);
+    app.assert_database_count("webhook_calls", 0).await;
+}
+
+#[renox::test]
+async fn failed_calls_can_be_retried() {
+    let app = app().await;
+    let call = body("evt_3", "broken");
+    BROKEN.store(true, Ordering::SeqCst);
+    send(&app, &call, &webhook::hmac_sha256_hex(SECRET, &call))
+        .await
+        .assert_ok();
+    app.run_jobs().await;
+    let failed = webhook::WebhookCall::failed(app.db()).await.unwrap();
+    assert_eq!(failed.len(), 1);
+    assert!(
+        failed[0]
+            .error
+            .as_deref()
+            .unwrap()
+            .contains("the shop is closed")
+    );
+
+    BROKEN.store(false, Ordering::SeqCst);
+    assert!(webhook::retry(app.state(), failed[0].id).await.unwrap());
+    // The first job is still waiting for its retry backoff; the new one runs now.
+    app.run_jobs().await;
+    assert!(paid(&app, "broken").await);
+    assert!(
+        webhook::WebhookCall::failed(app.db())
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert!(!webhook::retry(app.state(), 999).await.unwrap());
+}
+
+#[renox::test]
+async fn webhooks_work_in_maintenance_mode_and_show_in_route_list() {
+    let app = app().await;
+    renox::maintenance::down(&app.state().config.storage_path, None, None).unwrap();
+    app.get("/").await.assert_status(503);
+    let call = body("evt_4", "A-4");
+    send(&app, &call, &webhook::hmac_sha256_hex(SECRET, &call))
+        .await
+        .assert_ok();
+
+    let route = app
+        .kernel()
+        .routes()
+        .iter()
+        .find(|r| r.path == "/webhooks/pay")
+        .unwrap();
+    assert_eq!(route.name.as_deref(), Some("webhooks.pay"));
+    assert_eq!(route.middleware, ["no-csrf", "webhook:pay"]);
+}
+
+#[renox::test]
+async fn a_webhook_route_needs_its_registration() {
+    struct Forgetful;
+
+    impl Module for Forgetful {
+        fn name(&self) -> &'static str {
+            "forgetful"
+        }
+
+        fn routes(&self) -> Routes {
+            Routes::new().webhook::<Pay>("/webhooks/pay")
+        }
+    }
+
+    let err = App::with_config(Config::default())
+        .module(Forgetful)
+        .boot()
+        .await
+        .err()
+        .unwrap();
+    assert!(
+        format!("{err:?}").contains("add `app.webhook::<…>()`"),
+        "{err:?}"
+    );
+}

@@ -318,14 +318,22 @@ M11a · security (done):
       else; `route:list` shows `cors`
 - [x] `Routes::without_csrf()` for callers without a session (webhooks); `route:list` shows `no-csrf`
 
-M11b · webhooks:
-- [ ] `renox::webhook`: HMAC-SHA256/SHA512 hex signatures, constant-time checks, Stripe-style
-      `t=…,v1=…` with a time tolerance; raw body available to the handler
-- [ ] A `webhook_calls` table, unique per (provider, event id): duplicates are answered 200 and not
-      processed twice; store, dispatch a job, answer fast
-- [ ] `webhook:retry <id>`; optionally accept webhooks during maintenance mode
-- [ ] `examples/webhooks` with Midtrans, Xendit and Stripe style signatures, tested with good and
-      forged requests
+M11b · webhooks (done):
+- [x] `impl Webhook` (`PROVIDER`, `verify`, `event_id`, `handle`) + `Routes::webhook::<W>(path)` +
+      `app.webhook::<W>()` (boot fails if a webhook route's provider isn't registered)
+- [x] `renox::webhook` helpers: `sha256_hex`, `sha512_hex`, `hmac_sha256_hex`, `hmac_sha512_hex`,
+      `verify_hmac_sha256` (`sha256=` prefix, any hex case), `verify_timestamped` (Stripe-style
+      `t=…,v1=…` with a tolerance against replays), `same` (constant time), `ensure`, `secret`
+- [x] A `webhook_calls` table (both databases), unique per (provider, event id): a call is stored
+      and its processing queued in one transaction, answered 200 at once; duplicates are answered
+      200 and not processed again; forged calls 401, calls without an event id 400
+- [x] Processing in the queue (`renox:webhook`, 5 attempts, backoff): status `processed` or
+      `failed` with the error; `webhook:failed`, `webhook:retry <id>`, `webhook::retry(state, id)`
+- [x] Webhook routes skip CSRF, keep working in maintenance mode, and show in `route:list`
+- [x] `Config::var(name)` / `config.vars` for secrets (tests set them without touching the
+      process environment); `TestApp::post_body` / `TestRequest::post_body` for exact bytes
+- [x] `examples/webhooks`: Midtrans (`signature_key` SHA-512), Xendit (`x-callback-token`), Stripe
+      (`Stripe-Signature`), each tested with good, forged and repeated calls
 
 M11c · SEO and analytics:
 - [ ] A `seo()` macro: title, description, canonical, OpenGraph and Twitter cards; `<html lang>` from

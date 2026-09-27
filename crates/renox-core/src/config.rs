@@ -105,6 +105,9 @@ pub struct Config {
     pub upload_max_size: usize,
     /// The Content-Security-Policy, from `CSP` (`relaxed`, `strict` or `off`).
     pub csp: CspMode,
+    /// Values `var()` returns before looking at the environment, e.g. a
+    /// webhook secret set in a test with `TestApp::with_config`.
+    pub vars: std::collections::HashMap<String, String>,
 }
 
 impl Config {
@@ -191,7 +194,18 @@ impl Config {
                 * 1024
                 * 1024,
             csp: CspMode::parse(&var_or("CSP", "relaxed"))?,
+            vars: Default::default(),
         })
+    }
+
+    /// Any other setting, e.g. an API key: `config.vars`, else the
+    /// environment (which includes `.env`). Empty values count as missing.
+    pub fn var(&self, name: &str) -> Option<String> {
+        self.vars
+            .get(name)
+            .cloned()
+            .or_else(|| env::var(name).ok())
+            .filter(|v| !v.is_empty())
     }
 
     pub fn addr(&self) -> SocketAddr {
@@ -231,6 +245,7 @@ impl Default for Config {
             storage: StorageConfig::default(),
             upload_max_size: 10 * 1024 * 1024,
             csp: CspMode::Relaxed,
+            vars: Default::default(),
         }
     }
 }

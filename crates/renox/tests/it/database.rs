@@ -120,23 +120,25 @@ async fn migrations_run_in_batches_and_roll_back() {
     assert!(status.iter().all(|m| m.batch == Some(1)));
 
     let rolled = kernel.rollback(1).await.unwrap();
-    // Newest first; every app also gets the framework's jobs and cache tables.
+    // Newest first; every app also gets the framework's jobs, cache and
+    // webhook_calls tables.
     assert_eq!(
         rolled,
         [
             "20260102000000_create_catatan",
             "20260101000000_create_produk",
+            "00010101000300_create_webhook_calls_table",
             "00010101000200_create_cache_table",
             "00010101000100_create_jobs_table"
         ]
     );
     assert!(Produk::all(kernel.db()).await.is_err(), "table is gone");
 
-    assert_eq!(kernel.migrate().await.unwrap().len(), 4);
+    assert_eq!(kernel.migrate().await.unwrap().len(), 5);
     Produk::create(kernel.db(), produk("Kopi", 1, None))
         .await
         .unwrap();
-    assert_eq!(kernel.fresh().await.unwrap().len(), 4);
+    assert_eq!(kernel.fresh().await.unwrap().len(), 5);
     assert!(
         Produk::all(kernel.db()).await.unwrap().is_empty(),
         "fresh drops data"

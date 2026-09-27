@@ -1,0 +1,13 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<h1>Orders</h1>
+<table>
+  <tr><th>Order</th><th>Amount</th><th>Status</th><th>Paid via</th></tr>
+  {% for order in orders %}
+  <tr><td>{{ order.code }}</td><td>{{ order.amount }}</td><td>{{ order.status }}</td><td>{{ order.paid_via or "" }}</td></tr>
+  {% else %}
+  <tr><td colspan="4">No orders yet (cargo run -- db:seed).</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}
