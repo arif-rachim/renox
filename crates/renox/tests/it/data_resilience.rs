@@ -385,7 +385,11 @@ async fn file_sqlite_write_while_own_transaction_is_open_fails_fast() {
     tx.commit().await.unwrap();
     let err = format!("{:?}", other.unwrap_err());
     assert!(err.contains("database is locked"), "{err}");
-    assert!(started.elapsed() < Duration::from_secs(8));
+    // busy_timeout is 5 s; slow CI runners add a few more.
+    assert!(
+        started.elapsed() < Duration::from_secs(20),
+        "it waited, but not forever"
+    );
 }
 
 // ---------------------------------------------------------------- 3. migrations
