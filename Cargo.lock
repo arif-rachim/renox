@@ -1621,6 +1621,7 @@ dependencies = [
  "fake",
  "form_urlencoded",
  "futures-util",
+ "hmac 0.13.0",
  "http-body-util",
  "minijinja",
  "minijinja-autoreload",

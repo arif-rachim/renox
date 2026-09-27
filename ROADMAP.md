@@ -102,10 +102,15 @@ M4a (done):
 - [x] Built-in pages in English and Indonesian, overridable per file (`renox/auth/*.html`)
 - [x] `rnx new` apps come with `Auth` and a login/logout nav
 
-M4b (next):
-- [ ] Password reset by email and email verification, with signed URLs
-- [ ] A `log` mail driver so both work before SMTP arrives in M5
-- [ ] API tokens with `Authorization: Bearer` (skipping CSRF)
+M4b (done):
+- [x] Password reset by email: one-time links valid for 60 minutes, one email per address per
+      minute, the same reply for unknown addresses; resetting ends other sessions
+- [x] Email verification with signed links (`Auth::new().verify_email()`,
+      `Routes::require_verified()`), resend, and `verification.notice`
+- [x] Signed URLs for any route (`state.signed_url(..)`, `ValidSignature` extractor)
+- [x] `log` and `memory` mail drivers (`MAIL_MAILER`), so both flows work before SMTP arrives in M5
+- [x] API tokens: `user.create_token()`, `tokens()`, `revoke_token()`; `Authorization: Bearer id|secret`
+      skips CSRF, answers 401 JSON when invalid, can expire, and records `last_used_at`
 
 ### M5 · v0.6: Background work
 - [ ] Queue: `Job` trait, `dispatch()`, delays, retries, failed jobs, `renox queue:work` or in-process worker

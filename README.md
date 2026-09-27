@@ -94,6 +94,13 @@ async fn edit(auth: AuthUser, State(db): State<Db>, Path(id): Path<i64>) -> Resu
 }
 ```
 
+The `Auth` module also handles password reset and email verification by email (`MAIL_MAILER=log`
+prints the links while developing), and API tokens for mobile apps and integrations:
+
+```rust
+let token = user.create_token(&db, "mobile", None).await?;  // send token.plain as `Authorization: Bearer ...`
+```
+
 Migrations live in `migrations/` and run with `rnx migrate`:
 
 ```bash

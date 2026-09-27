@@ -17,6 +17,7 @@ use tracing_subscriber::EnvFilter;
 use crate::auth::{Gate, Gates, Throttle, User};
 use crate::crypto::parse_key;
 use crate::db::{Db, Migration, MigrationStatus, Migrator};
+use crate::mail::Mailer;
 use crate::{
     AppState, Config, Environment, Error, Module, Result, RouteTable, Views, assets, auth, csrf,
     session, view,
@@ -134,8 +135,16 @@ impl App {
         }
         let migrator = Migrator::new(migrations)?;
         let db = crate::db::connect(&config).await?;
-        let router = build_router(config, &self.modules, db.clone(), Arc::new(self.gates))?;
+        let mailer = Mailer::from_name(&config.mailer)?;
+        let router = build_router(
+            config,
+            &self.modules,
+            db.clone(),
+            mailer.clone(),
+            Arc::new(self.gates),
+        )?;
         Ok(Kernel {
+            mailer,
             router,
             db,
             migrator,
@@ -242,6 +251,7 @@ impl Default for App {
 /// A booted application: its router, database and maintenance commands.
 pub struct Kernel {
     router: Router,
+    mailer: Mailer,
     db: Db,
     migrator: Migrator,
     seeders: Vec<Seeder>,
@@ -254,6 +264,11 @@ impl Kernel {
 
     pub fn db(&self) -> &Db {
         &self.db
+    }
+
+    /// The mailer; with `MAIL_MAILER=memory`, `mailer().sent()` lists what was sent.
+    pub fn mailer(&self) -> &Mailer {
+        &self.mailer
     }
 
     /// Runs pending migrations; returns their names.
@@ -309,6 +324,7 @@ fn build_router(
     config: Config,
     modules: &[Box<dyn Module>],
     db: Db,
+    mailer: Mailer,
     gates: Gates,
 ) -> Result<Router> {
     crate::error::set_debug(config.debug);
@@ -337,6 +353,7 @@ fn build_router(
         routes,
         views,
         db,
+        mailer,
         key,
         gates,
         // Five failed logins per email and IP per minute.

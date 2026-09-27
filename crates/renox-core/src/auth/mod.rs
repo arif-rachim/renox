@@ -23,8 +23,11 @@
 //! ```
 
 mod module;
+mod passwords;
 mod throttle;
+mod tokens;
 mod user;
+mod verification;
 
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -32,7 +35,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use axum::extract::{FromRequestParts, OptionalFromRequestParts, Request};
-use axum::http::header::ACCEPT;
+use axum::http::header::{ACCEPT, AUTHORIZATION};
 use axum::http::request::Parts;
 use axum::http::{Method, StatusCode};
 use axum::middleware::Next;
@@ -40,7 +43,9 @@ use axum::response::{IntoResponse, Redirect, Response};
 
 pub use module::Auth;
 pub(crate) use throttle::Throttle;
+pub use tokens::{AccessToken, NewToken};
 pub use user::{User, hash_password, verify_password};
+pub use verification::send_verification;
 
 use crate::crypto::constant_time_eq;
 use crate::db::Model;
@@ -75,6 +80,8 @@ pub(crate) type Gates = Arc<HashMap<String, Gate>>;
 pub(crate) struct CurrentUser {
     pub user: Option<Arc<User>>,
     pub gates: Gates,
+    /// Authenticated with `Authorization: Bearer`, so CSRF doesn't apply.
+    pub via_token: bool,
 }
 
 /// The logged-in user. Requests without one are sent to the `login` route
@@ -189,14 +196,28 @@ pub(crate) async fn middleware(
     mut req: Request,
     next: Next,
 ) -> Response {
+    let bearer = req
+        .headers()
+        .get(AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .map(str::to_owned);
     let session = req.extensions().get::<Session>().cloned();
-    let user = match &session {
-        Some(session) => resolve(&state, session).await,
-        None => None,
+    let (user, via_token) = match (&bearer, &session) {
+        (Some(bearer), _) => match tokens::authenticate(&state.db, bearer.trim()).await {
+            Ok(user) => (user, true),
+            Err(err) => {
+                tracing::error!(error = ?err, "could not check the API token");
+                (None, true)
+            }
+        },
+        (None, Some(session)) => (resolve(&state, session).await, false),
+        (None, None) => (None, false),
     };
     req.extensions_mut().insert(CurrentUser {
         user: user.map(Arc::new),
         gates: state.gates.clone(),
+        via_token,
     });
     req.extensions_mut().insert(state);
     next.run(req).await
@@ -235,7 +256,7 @@ fn path_or(state: Option<&AppState>, route: &str, fallback: &str) -> String {
 
 /// Sends a guest to the login page, remembering where they were going.
 fn unauthenticated(parts: &Parts) -> Response {
-    if wants_json(&parts.headers) {
+    if wants_json(&parts.headers) || parts.headers.contains_key(AUTHORIZATION) {
         let body = serde_json::json!({ "message": "Unauthenticated." });
         return (StatusCode::UNAUTHORIZED, axum::Json(body)).into_response();
     }
@@ -261,6 +282,34 @@ pub(crate) async fn require_auth(req: Request, next: Next) -> Response {
     }
     let (parts, _) = req.into_parts();
     unauthenticated(&parts)
+}
+
+/// Route guard: only users who verified their email. See `Routes::require_verified`.
+pub(crate) async fn require_verified(req: Request, next: Next) -> Response {
+    let Some(user) = current(req.extensions()) else {
+        let (parts, _) = req.into_parts();
+        return unauthenticated(&parts);
+    };
+    if user.email_verified_at.is_some() {
+        return next.run(req).await;
+    }
+    if wants_json(req.headers()) || user_via_token(req.extensions()) {
+        let body = serde_json::json!({ "message": "Your email address is not verified." });
+        return (StatusCode::FORBIDDEN, axum::Json(body)).into_response();
+    }
+    let notice = path_or(
+        req.extensions().get::<AppState>(),
+        "verification.notice",
+        "/verify-email",
+    );
+    if Htmx::from_headers(req.headers()).request {
+        return HxRedirect(notice).into_response();
+    }
+    Redirect::to(&notice).into_response()
+}
+
+pub(crate) fn user_via_token(extensions: &axum::http::Extensions) -> bool {
+    extensions.get::<CurrentUser>().is_some_and(|c| c.via_token)
 }
 
 /// Route guard: only guests; logged-in users go to the `home` route.

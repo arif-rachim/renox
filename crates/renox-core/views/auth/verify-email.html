@@ -1,0 +1,17 @@
+{% extends "renox/auth/layout.html" %}
+{% block title %}{{ text.verify_title }} · {{ app.name }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>{{ text.verify_title }}</h2>
+  <p>{{ text.verify_intro }}</p>
+  {% if flash.status %}<p class="status">{{ flash.status }}</p>{% endif %}
+  <form method="post" action="{{ route('verification.send') }}">
+    {{ csrf_field() }}
+    <button type="submit">{{ text.resend_button }}</button>
+  </form>
+  <form method="post" action="{{ route('logout') }}" class="alt">
+    {{ csrf_field() }}
+    <button type="submit" class="link">{{ text.logout }}</button>
+  </form>
+</div>
+{% endblock %}
