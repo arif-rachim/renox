@@ -13,6 +13,9 @@ categories = ["command-line-utilities", "web-programming::http-server"]
 [[bin]]
 name = "renox"
 path = "src/main.rs"
+# The binary shares its name with the `renox` library; documenting both
+# writes to the same target/doc/renox directory.
+doc = false
 
 [dependencies]
 anyhow = "1.0.104"
