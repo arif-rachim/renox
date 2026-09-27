@@ -71,3 +71,18 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # The other examples are SQLite apps; examples/postgres runs on both.
       - run: cargo test -p renox -p renox-core -p renox-cli -p postgres-app -p fields --features renox/postgres
+
+  chaos:
+    name: chaos (${{ matrix.database }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, postgres]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # Stops, pauses and restarts PostgreSQL (or locks SQLite) under a running
+      # app and checks it answers fast and recovers; see docs/operations.md.
+      - run: tests/chaos/run.sh ${{ matrix.database }}

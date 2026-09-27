@@ -354,6 +354,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "chaos"
+version = "0.0.0"
+dependencies = [
+ "renox",
+ "serde",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"

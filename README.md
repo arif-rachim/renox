@@ -186,6 +186,11 @@ rnx route:list                                    # every route with its name, m
 rnx db:shell                                      # SQL prompt, no sqlite3/psql needed
 rnx build && rnx make:deploy                      # dist/shop + Dockerfile, systemd, Litestream
 ```
+
+In production, timeouts keep a slow database or mail server from holding requests, `/health`
+feeds your load balancer, and panics in handlers, jobs and tasks are contained. CI checks this by
+stopping, pausing and locking the database under a running app
+([running in production](docs/operations.md)).
 </details>
 
 <details>

@@ -458,12 +458,16 @@ M13b · data and background resilience:
       `tests/it/background_resilience.rs`
 
 M13c · keep it that way:
-- [ ] Every probe passes on main (web, data, background), on SQLite and PostgreSQL
-- [ ] A chaos job in CI: PostgreSQL stopped, paused and restarted under a running app (health
-      reports, requests fail fast, the app and workers recover without a restart); SQLite held
-      locked; panics in jobs, tasks, handlers and listeners
-- [ ] docs/operations.md: timeouts, proxies, backups, what `/health` means, how to recover
-      failed jobs and webhook calls
+- [x] Every probe passes on main (web, data, background), on SQLite and PostgreSQL: they run in
+      the `test` and `test (PostgreSQL)` CI jobs as `tests/it/web_security.rs`,
+      `data_resilience.rs` and `background_resilience.rs`
+- [x] A chaos job in CI (`chaos (sqlite)`, `chaos (postgres)`): `tests/chaos/run.sh` runs the
+      `tests/chaos` app and checks, with time limits, that PostgreSQL stopped, paused (also during
+      a request) and restarted gives fast 500s and a 503 `/health`, and that the app and workers
+      recover without a restart; that SQLite held locked keeps reads up and strands no job; and
+      that panics in handlers, listeners, jobs and scheduled tasks are contained
+- [x] [docs/operations.md](docs/operations.md): timeouts, proxies, `/health`, failure behaviour,
+      failed jobs and webhook calls, backups, deploys and migrations, maintenance mode, logs
 
 ### M14 · v0.15: API freeze
 What would be a breaking change after 1.0, settled now (IDs from the audit):

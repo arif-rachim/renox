@@ -95,11 +95,15 @@ docs/types.md              the type mapping table (compiled as a doctest: `Types
 examples/api/              JSON API with tokens (M10c)
 examples/jobs/             events, queued mail, notifications, schedule (M10c)
 examples/uploads/          public / private files (M10c)
+tests/chaos/               app + run.sh (postgres|sqlite) the `chaos` CI job injects faults into
+                           (docker pause/stop/restart, python3 holding SQLite's lock); workspace member
 examples/postgres/         one app on PostgreSQL + SQLite; package `postgres-app`; run in the PostgreSQL CI job (M10c)
 examples/crud/             the reference CRUD module (policy, soft deletes, pagination) — M10a
 CHEATSHEET.md              one-page patterns for app authors/agents; its Rust is compiled as doctests
 llms.txt                   map for agents: which example/guide file shows what
 docs/postgresql.md         PostgreSQL guide for app authors
+docs/operations.md         production guide: timeouts, proxies, /health, failure table (kept in
+                           sync with tests/chaos/run.sh), failed jobs/webhooks, backups
 .github/workflows/ci.yml   fmt+clippy+doc (Ubuntu), tests on Ubuntu/macOS/Windows, tests on PostgreSQL
 ```
 
@@ -538,10 +542,10 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M10c examples api / jobs / uploads / postgres; JSON errors for API clients; JSON bodies report all errors; `User::attempt`; `post_multipart` | merged to `main` (#27) |
 | M10d doctests on public APIs (all 35 renox-core examples compile) | merged to `main` (#28) |
 | M12 types end to end (checkbox, datetime-local, multi-select, `DbEnum`, `Json<T>`, `uuid` feature, `examples/fields`, docs/types.md) | merged to `main` (#29) |
-| Pre-1.0 audit (Laravel gaps, negative flows, chaos) → docs/audit/2026-09-pre-1.0.md; plan M13 + M14 in ROADMAP | PR from branch `pre-1.0-plan` |
-| M13a web security (W1–W18): sandboxed user files, `ClientIp` + `TRUSTED_PROXIES`, logout revokes sessions, 3-way login lock, same-site redirects | PR from branch `m13a-web-security` |
-| M13b resilience (D1–D30): contained panics, timeouts, queue/migration/cache hardening | PR from branch `m13b-resilience` |
-| M13c regression + chaos suite + docs/operations.md (ROADMAP M13) | next |
+| Pre-1.0 audit (Laravel gaps, negative flows, chaos) → docs/audit/2026-09-pre-1.0.md; plan M13 + M14 in ROADMAP | merged to `main` |
+| M13a web security (W1–W18): sandboxed user files, `ClientIp` + `TRUSTED_PROXIES`, logout revokes sessions, 3-way login lock, same-site redirects | merged to `main` |
+| M13b resilience (D1–D30): contained panics, timeouts, queue/migration/cache hardening | merged to `main` |
+| M13c chaos CI job (`tests/chaos`), docs/operations.md | PR from branch `m13c-keep-it-that-way` |
 | M14 API freeze (ROADMAP M14, IDs A*) | after M13 |
 | v1.0 docs site, starter kit, semver guarantee | last |
 
