@@ -171,6 +171,7 @@ impl App {
             None => Config::load()?,
         };
 
+        self.registry.job::<crate::mail::SendMail>();
         let mut migrations = vec![crate::queue::MIGRATION];
         migrations.extend(self.migrations);
         for module in &self.modules {
@@ -211,7 +212,7 @@ impl App {
         crate::error::set_debug(config.debug);
         let views = Views::new(&config, routes.clone());
         let state = AppState {
-            mailer: Mailer::from_name(&config.mailer)?,
+            mailer: Mailer::from_config(&config)?,
             queue: Queue::new(db.clone()),
             listeners: Arc::new(listeners),
             config: Arc::new(config),
@@ -533,6 +534,11 @@ fn flag_value(args: &[String], flag: &str) -> Result<Option<u32>> {
 
 fn build_router(router: Router<AppState>, state: AppState) -> Router {
     let not_found = || async { Error::NotFound };
+    let router = if state.config.debug {
+        router.merge(crate::mail::preview_router())
+    } else {
+        router
+    };
     let public = state.config.public_path.clone();
     let router = if public.is_dir() {
         router.fallback_service(ServeDir::new(public).not_found_service(not_found.into_service()))

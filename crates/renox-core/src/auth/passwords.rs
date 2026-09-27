@@ -12,7 +12,6 @@ use super::module::{go, locale, text};
 use super::tokens::sha256_hex;
 use crate::crypto::{constant_time_eq, random_token};
 use crate::db::{DateTime, now};
-use crate::mail::Mail;
 use crate::validation::{Errors, Valid, Validate, ValidationError, Validator};
 use crate::{AppState, Htmx, Result, Session, View, context, view};
 
@@ -73,15 +72,14 @@ pub(super) async fn send_link(
                 "{}?email={email}",
                 state.absolute_url("password.reset", &[&token])?
             );
-            let body = text["mail_reset_body"]
-                .as_str()
-                .unwrap_or_default()
-                .replace("{link}", &link);
             let subject = text["mail_reset_subject"].as_str().unwrap_or_default();
-            state
-                .mailer
-                .send(Mail::new(&user.email, subject, body))
-                .await?;
+            let mail = state.mail_view(
+                &user.email,
+                subject,
+                "renox/mail/auth/reset-password",
+                context! { link, text },
+            )?;
+            state.mailer.send(mail).await?;
         }
     }
     session.flash("status", &text["reset_link_sent"])?;

@@ -8,7 +8,6 @@ use super::tokens::sha256_hex;
 use super::{AuthUser, User};
 use crate::crypto::constant_time_eq;
 use crate::db::{Model, now};
-use crate::mail::Mail;
 use crate::signed::ValidSignature;
 use crate::{AppState, Error, Htmx, Result, Session, context, view};
 
@@ -23,15 +22,14 @@ pub async fn send_verification(state: &AppState, user: &User) -> Result {
         &[&user.id, &sha256_hex(&user.email)],
         EXPIRES,
     )?;
-    let body = text["mail_verify_body"]
-        .as_str()
-        .unwrap_or_default()
-        .replace("{link}", &link);
     let subject = text["mail_verify_subject"].as_str().unwrap_or_default();
-    state
-        .mailer
-        .send(Mail::new(&user.email, subject, body))
-        .await
+    let mail = state.mail_view(
+        &user.email,
+        subject,
+        "renox/mail/auth/verify-email",
+        context! { link, text },
+    )?;
+    state.mailer.send(mail).await
 }
 
 fn home(state: &AppState) -> String {

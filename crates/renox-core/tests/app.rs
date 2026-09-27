@@ -230,8 +230,7 @@ async fn views_render_with_globals() {
     assert!(res.body.contains("<h1>Daftar - Test App</h1>"));
     assert!(res.body.contains(r#"href="/notes/3""#));
     assert!(res.body.contains("<li>a</li><li>b</li>"));
-    // MiniJinja escapes `/` in HTML; browsers display it as `/page`.
-    assert!(res.body.contains("<p>&#x2f;page </p>"));
+    assert!(res.body.contains("<p>/page </p>"), "`/` is not escaped");
     assert!(res.body.contains(r#"<meta name="csrf-token" content=""#));
     assert!(res.body.contains("/_renox/htmx-2.0.11.min.js"));
 }

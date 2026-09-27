@@ -4,6 +4,8 @@ use std::path::PathBuf;
 
 use anyhow::{Context, bail};
 
+use crate::mail::MailConfig;
+
 /// The environment the application runs in, from `APP_ENV`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Environment {
@@ -51,8 +53,8 @@ pub struct Config {
     pub database_pool_size: u32,
     /// Language of built-in messages, `en` or `id`, from `APP_LOCALE`.
     pub locale: String,
-    /// Mail driver, `log` or `memory`, from `MAIL_MAILER`.
-    pub mailer: String,
+    /// Mail settings, from `MAIL_*`.
+    pub mail: MailConfig,
     /// Queue workers `serve` runs in-process, from `QUEUE_WORKERS` (0 turns them off).
     pub queue_workers: usize,
     /// Whether `serve` runs scheduled tasks, from `SCHEDULER`.
@@ -106,7 +108,21 @@ impl Config {
                 .parse()
                 .context("DATABASE_POOL_SIZE must be a number")?,
             locale: var_or("APP_LOCALE", "en"),
-            mailer: var_or("MAIL_MAILER", "log"),
+            mail: MailConfig {
+                mailer: var_or("MAIL_MAILER", "log"),
+                host: var_or("MAIL_HOST", "localhost"),
+                port: env::var("MAIL_PORT")
+                    .ok()
+                    .filter(|p| !p.is_empty())
+                    .map(|p| p.parse())
+                    .transpose()
+                    .context("MAIL_PORT must be a port number")?,
+                username: env::var("MAIL_USERNAME").ok().filter(|v| !v.is_empty()),
+                password: env::var("MAIL_PASSWORD").ok().filter(|v| !v.is_empty()),
+                encryption: var_or("MAIL_ENCRYPTION", "starttls"),
+                from_address: var_or("MAIL_FROM_ADDRESS", "hello@example.com"),
+                from_name: env::var("MAIL_FROM_NAME").ok().filter(|v| !v.is_empty()),
+            },
             queue_workers: var_or("QUEUE_WORKERS", "2")
                 .parse()
                 .context("QUEUE_WORKERS must be a number")?,
@@ -138,7 +154,10 @@ impl Default for Config {
             database_url: "sqlite::memory:".into(),
             database_pool_size: 8,
             locale: "en".into(),
-            mailer: "memory".into(),
+            mail: MailConfig {
+                mailer: "memory".into(),
+                ..MailConfig::default()
+            },
             queue_workers: 0,
             scheduler: false,
             timezone: "UTC".into(),

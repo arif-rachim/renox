@@ -111,6 +111,15 @@ App::new()
     .schedule(|s| { s.daily_at("02:00", "close-day", close_day); })
 ```
 
+Mail uses MiniJinja templates with a text version, SMTP in production and a preview page at
+`/_renox/mail` while developing; notifications go by mail and/or to the database:
+
+```rust
+let mail = state.mail_view(&user.email, "Your receipt", "mail/receipt", context! { order })?;
+state.queue_mail(mail).await?;
+state.notify(&user, &OrderShipped { order_id }).await?;
+```
+
 The `Auth` module also handles password reset and email verification by email (`MAIL_MAILER=log`
 prints the links while developing), and API tokens for mobile apps and integrations:
 
