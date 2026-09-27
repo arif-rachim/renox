@@ -13,7 +13,7 @@ const WATCH: &[&str] = &["src", "migrations", "build.rs", "Cargo.toml", ".env"];
 
 pub fn run(cargo_args: &[String]) -> Result<()> {
     if !Path::new("Cargo.toml").is_file() {
-        bail!("no Cargo.toml here; run `renox serve` from your app's directory");
+        bail!("no Cargo.toml here; run `rnx serve` from your app's directory");
     }
 
     let (tx, rx) = mpsc::channel::<DebounceEventResult>();
@@ -36,17 +36,17 @@ pub fn run(cargo_args: &[String]) -> Result<()> {
                 app = Some(start(&exe)?);
             }
             Some(_) if app.is_some() => {
-                eprintln!("\nrenox: migrations failed; the previous version keeps running.")
+                eprintln!("\nrnx: migrations failed; the previous version keeps running.")
             }
-            Some(_) => eprintln!("\nrenox: migrations failed; waiting for changes…"),
+            Some(_) => eprintln!("\nrnx: migrations failed; waiting for changes…"),
             None if app.is_some() => {
-                eprintln!("\nrenox: build failed; the previous version keeps running.")
+                eprintln!("\nrnx: build failed; the previous version keeps running.")
             }
-            None => eprintln!("\nrenox: build failed; waiting for changes…"),
+            None => eprintln!("\nrnx: build failed; waiting for changes…"),
         }
 
         snapshot = wait_for_change(&rx, snapshot);
-        eprintln!("\nrenox: change detected, rebuilding…");
+        eprintln!("\nrnx: change detected, rebuilding…");
     }
 }
 
@@ -110,7 +110,7 @@ fn wait_for_change(
 ) -> Vec<(PathBuf, SystemTime, u64)> {
     for result in rx {
         if let Err(err) = result {
-            eprintln!("renox: watch error: {err}");
+            eprintln!("rnx: watch error: {err}");
             continue;
         }
         let current = fingerprint();

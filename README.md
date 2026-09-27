@@ -9,10 +9,10 @@ A batteries-included web framework for Rust, inspired by Laravel.
 ## Quick start
 
 ```bash
-cargo install --git https://github.com/arif-rachim/renox renox-cli
-renox new my-app
+cargo install --git https://github.com/arif-rachim/renox renox-cli   # installs `rnx`
+rnx new my-app
 cd my-app
-renox serve
+rnx serve
 ```
 
 Open http://127.0.0.1:3000. Templates in `resources/views` reload on refresh; Rust changes rebuild
@@ -64,13 +64,13 @@ fn main() -> renox::Result {
 }
 ```
 
-Migrations live in `migrations/` and run with `renox migrate`:
+Migrations live in `migrations/` and run with `rnx migrate`:
 
 ```bash
-renox make:migration create_products_table
-renox migrate
-renox migrate:rollback
-renox migrate:fresh --seed
+rnx make:migration create_products_table
+rnx migrate
+rnx migrate:rollback
+rnx migrate:fresh --seed
 ```
 
 See [`examples/hello`](examples/hello) for a guestbook using SQLite, sessions, CSRF, flash messages,
@@ -84,7 +84,7 @@ pagination and HTMX fragments.
 - Validation, authentication and authorization
 - Queues, scheduler, mail, notifications, events
 - Cache, file storage, i18n, testing helpers
-- `renox` CLI: `new`, `serve`, `make:*`, `migrate`, `queue:work`, ...
+- `rnx` CLI: `new`, `serve`, `make:*`, `migrate`, `queue:work`, ...
 
 ## License
 

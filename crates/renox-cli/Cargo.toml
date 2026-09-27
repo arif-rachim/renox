@@ -1,6 +1,6 @@
 [package]
 name = "renox-cli"
-description = "Command-line tool for the Renox web framework (like Laravel's artisan). (Early placeholder, work in progress.)"
+description = "rnx, the command-line tool for the Renox web framework (like Laravel's artisan)."
 readme = "../../README.md"
 version.workspace = true
 edition.workspace = true
@@ -11,11 +11,8 @@ keywords.workspace = true
 categories = ["command-line-utilities", "web-programming::http-server"]
 
 [[bin]]
-name = "renox"
+name = "rnx"
 path = "src/main.rs"
-# The binary shares its name with the `renox` library; documenting both
-# writes to the same target/doc/renox directory.
-doc = false
 
 [dependencies]
 anyhow = "1.0.104"

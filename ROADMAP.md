@@ -57,7 +57,7 @@ my-app/
 - [x] Built-in error page, overridable per status with `errors/{status}.html`
 - [x] HTMX helpers: `Htmx` extractor, `view().fragment()`, `HxRedirect`, `HxRefresh`, `HxTrigger`, `Back`
 - [x] htmx 2.0.11 and Alpine.js 3.17.4 embedded with cache-forever URLs; `public/` served at the root
-- [x] CLI: `renox new`, `renox serve` (rebuild and restart on change), `renox key:generate`
+- [x] CLI: `rnx new`, `rnx serve` (rebuild and restart on change), `rnx key:generate`
 - [ ] Route groups with a shared prefix and name prefix
 - [ ] CSRF token in multipart forms (moves to M6 with uploads; the header works today)
 
@@ -65,8 +65,8 @@ my-app/
 - [x] SQLite pool from `DATABASE_URL` with WAL, foreign keys, a busy timeout; `State(db): State<Db>` in handlers
 - [x] Migrations in `migrations/*.up.sql` / `.down.sql`, embedded with `renox::migrations!()`, per app or per module
 - [x] Batches like Laravel: `migrate`, `migrate:rollback [--step N]`, `migrate:fresh [--seed]`, `migrate:status`
-- [x] The app binary is its own command line (`my-app migrate`); `renox migrate` forwards to it
-- [x] `renox make:migration`; `renox serve` migrates before each restart and rebuilds when migrations change
+- [x] The app binary is its own command line (`my-app migrate`); `rnx migrate` forwards to it
+- [x] `rnx make:migration`; `rnx serve` migrates before each restart and rebuilds when migrations change
 - [x] `#[derive(Model)]`: `find`, `find_or_404`, `all`, `create`, `save`, `delete`, `force_delete`, `restore`, timestamps, soft deletes, skipped fields
 - [x] Query builder: `where_eq/op/like/in/null/not_null`, `order_by`, `latest`, `limit`, `offset`, `get`, `first`, `count`, `exists`, bulk `delete`; unknown columns and operators are errors
 - [x] Pagination: `Page` extractor, `paginate()`, built-in `renox/pagination.html` macro
@@ -100,7 +100,7 @@ my-app/
 ### M7 · v0.8: CLI and developer experience
 - [ ] `make:module`, `make:model`, `make:migration`, `make:job`, `make:mail`, `make:policy`
 - [ ] `route:list`, `db:seed`, `db:shell`
-- [ ] Browser live reload after `renox serve` restarts
+- [ ] Browser live reload after `rnx serve` restarts
 
 ### M8 · v0.9: Testing and deployment
 - [ ] `renox-testing`: `TestApp`, HTTP client, `acting_as(user)`, `assert_see()`, in-memory DB per test, mail/queue fakes
@@ -120,7 +120,7 @@ my-app/
 - **Templates:** MiniJinja (runtime, overridable, reloadable). Askama may be offered later.
 - **Migrations:** Renox runs its own migrator (table `renox_migrations`) instead of sqlx's, to get
   Laravel-style batches and module-owned migrations. Migrations are compiled into the app, so the
-  app binary runs them; `renox` forwards to it.
+  app binary runs them; `rnx` forwards to it.
 - **Models:** values are bound through `DbValue`/`ToDbValue` and rows decoded with sqlx, so the
   derive only needs `renox` as a dependency.
 - **Named routes:** implemented in Renox; axum does not provide them.
@@ -128,4 +128,4 @@ my-app/
 - **Relations:** Rust has no runtime reflection, so there is no full Eloquent. `derive(Model)` covers
   CRUD; relations are explicit methods; complex queries use `sqlx::query!`.
 - **Service container:** replaced by typed `AppState` and extractors.
-- **No REPL:** `renox db:shell` and custom CLI commands instead of Tinker.
+- **No REPL:** `rnx db:shell` and custom CLI commands instead of Tinker.

@@ -20,7 +20,7 @@ pub(crate) fn parse_key(value: &str) -> anyhow::Result<Key> {
     };
     ensure!(
         bytes.len() >= 32,
-        "APP_KEY must be at least 32 bytes; generate one with `renox key:generate`"
+        "APP_KEY must be at least 32 bytes; generate one with `rnx key:generate`"
     );
     Ok(Key::derive_from(&bytes))
 }

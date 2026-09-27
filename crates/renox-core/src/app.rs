@@ -157,7 +157,7 @@ impl App {
         if command == "serve" && config.key.is_none() && config.env != Environment::Testing {
             tracing::warn!(
                 "APP_KEY is not set; using a temporary key, so sessions end on restart. \
-                 Run `renox key:generate`."
+                 Run `rnx key:generate`."
             );
         }
         let name = config.name.clone();
