@@ -264,6 +264,15 @@ migration changes migration counts asserted in `crates/renox/tests/database.rs`.
   `method_field('PUT')`.
 
 ### 4.6b Docs for app authors and agents (M10)
+- `README.md` is compiled the same way (`ReadMe` in crates/renox/src/lib.rs): keep its Rust blocks
+  complete. It's the front page, so it sells: tagline, why, GIF, 3-line quick start, a short
+  taste, fold-out feature tour, comparison with Loco/Axum, then status. Keep claims true (checked
+  against the code) and keep the crates.io/docs.rs badges out until real crates are published
+  (crates.io still has the 0.0.1 placeholders, so install stays `--git`).
+- `docs/assets/demo.gif` was made by driving examples/hello (`APP_LOCALE=en`) in headless Chrome
+  over CDP (`Page.captureScreenshot` per typed character, `Input.insertText`), then composing the
+  frames with Pillow (browser bar, captions, 64-colour palette, ~210 KB). There's no ffmpeg here.
+  Re-record it when the guestbook's look changes.
 - `CHEATSHEET.md` is compiled: every ```rust block must build on its own (visible `use` lines, no
   `# ` hidden lines since GitHub shows them; define items only, no top-level statements, so the
   doctest's `main` does nothing). Check with `cargo test --doc -p renox`. When a public API
