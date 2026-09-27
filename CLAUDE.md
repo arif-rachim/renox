@@ -27,7 +27,8 @@ repo, and every trap hit so far, so you don't have to rediscover them.
 Cargo.toml                 workspace; shared package metadata; workspace.dependencies for renox*
 crates/renox/              facade crate apps depend on: re-exports renox-core, macros, prelude
   src/lib.rs               `pub use renox_core::*`, `pub use renox_macros::{Model, migrations}`, prelude
-  tests/                   integration tests that need the derive/migrations! macros (see §7)
+  tests/it/                ONE integration-test binary (main.rs + a module per area) that needs
+                           the derive/migrations! macros; add new areas as `mod x;` in main.rs
     migrations/, migrations_plain/   SQL fixtures for tests
 crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/app.rs               App builder, boot(), Kernel, app-binary commands (migrate, queue:work…)
@@ -178,15 +179,18 @@ in `App::boot`). Adding a framework
 migration changes migration counts asserted in `crates/renox/tests/database.rs`.
 
 ### 4.6 Tests
-- Tests using `#[derive(Model)]` / `migrations!()` must live in `crates/renox/tests/` (the macros
-  emit `::renox::` paths). Core-only tests go in `crates/renox-core/tests/` or unit tests.
+- Tests using `#[derive(Model)]` / `migrations!()` must live in `crates/renox/tests/it/` (the
+  macros emit `::renox::` paths) as a module of `it/main.rs`. **Don't add new top-level
+  `tests/*.rs` files**: each becomes its own binary linked against sqlx/axum, which made builds
+  4x slower before they were merged. Core-only tests go in `crates/renox-core/tests/` or unit tests.
 - HTTP tests drive `kernel.router()` with `tower::ServiceExt::oneshot`, keeping the session cookie
   by hand. For CSRF, add a route returning `session.token()` (e.g. `/token`) — `/login` redirects
   logged-in users, so it can't be used to read the token after login.
 - `Kernel` helpers: `migrate()`, `run_jobs()` (drains the queue), `mailer().sent()` (memory driver),
   `state()`, `db()`, `worker(queues)`.
-- The process-wide debug flag in `error.rs` means debug-on and debug-off error tests need separate
-  test binaries (`production_errors.rs`).
+- Whether a 500 page shows the error chain is decided per app in the view middleware
+  (`ErrorPage::shown_detail(config.debug)`); there is no process-wide debug flag any more, so apps
+  with and without debug can run side by side in one test binary.
 
 ### 4.7 Git, PRs, CI (how the owner works)
 - One branch and one PR per milestone (`m1-web-layer`, `m2-database`, `m3-validation`, `m4-auth`,
@@ -283,6 +287,13 @@ write the Python to a file, `assert old in s` before each replace (fail loudly),
 tool for anything quote-heavy or already formatted. Rewriting a small file whole (as with
 `shell.rs`) beats a pile of partial replacements.
 
+### 6.4d Slow tests (measured, fixed)
+Unoptimised Argon2 made every login/registration slow (auth tests 3.9 s) and ten integration-test
+binaries each paid a full link. The workspace now builds `argon2`/`blake2` with `opt-level = 3` in
+the dev profile (and `rnx new` apps get the same, since profiles only apply at a workspace root),
+and the integration tests are one binary. Result: rebuild after a core change 29 s → 7 s, full run
+19 s → 6 s. Don't run tests with `--release` (slow compile, no debug assertions).
+
 ### 6.5 Library/API traps
 - **sqlx 0.9:** dynamic SQL needs `sqlx::AssertSqlSafe(string)`; `SqliteArguments` has no lifetime;
   multi-statement SQL uses `sqlx::raw_sql`. `sqlite::memory:` gives each pooled connection its own
@@ -338,7 +349,7 @@ tool for anything quote-heavy or already formatted. Rewriting a small file whole
 | M6a cache, `Routes::throttle`, maintenance mode (`down`/`up`), `/health` | merged to `main` |
 | M6b uploads, file rules, storage (local + `s3` feature), multipart CSRF, body limit | merged to `main` |
 | M6c i18n (`resources/lang`, `t()`, `Lang`, per-visitor locale, translatable built-ins) | merged to `main` |
-| M7 generators (`make:*`), `route:list`, `db:shell`, browser live reload | PR from branch `m7-dx` |
+| M7 generators (`make:*`), `route:list`, `db:shell`, browser live reload | merged to `main` |
 | M8 testing helpers + deploy (`renox build` embedding views, Docker/systemd, Litestream) | next |
 | v1.0 docs site, starter kit, semver guarantee | later |
 
