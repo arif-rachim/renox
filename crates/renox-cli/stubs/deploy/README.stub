@@ -21,8 +21,8 @@ compiled in) plus a `.env` file and a `storage/` directory.
 
 3. In `/opt/{{name}}/.env` set at least:
    `APP_ENV=production`, `APP_DEBUG=false`, `APP_KEY=` (from `rnx key:generate --show`),
-   `APP_URL=https://your-domain`, `APP_HOST=127.0.0.1` behind a reverse proxy
-   (Caddy or nginx), and your `MAIL_*` settings.
+   `APP_URL=https://your-domain`, `APP_HOST=127.0.0.1` and `TRUSTED_PROXIES=127.0.0.1`
+   behind a reverse proxy (Caddy or nginx), and your `MAIL_*` settings.
 4. Updates: copy the new binary and `sudo systemctl restart {{name}}`
    (migrations run before it starts).
 
@@ -50,3 +50,6 @@ docker run -d --name {{name}} -p 3000:3000 \
 
 The `renox` dependency must be reachable from the build (crates.io or git), not a local path.
 Health checks: `GET /health` answers 200 while the database is reachable.
+
+Timeouts, health checks, backups and recovering failed jobs and webhooks:
+https://github.com/arif-rachim/renox/blob/main/docs/operations.md
