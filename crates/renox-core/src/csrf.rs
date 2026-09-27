@@ -47,6 +47,20 @@ pub(crate) async fn middleware(req: Request, next: Next) -> Response {
         return next.run(req).await;
     }
 
+    // Routes marked `without_csrf()`, e.g. webhooks, which verify signatures instead.
+    let exempt = req
+        .extensions()
+        .get::<crate::AppState>()
+        .is_some_and(|state| {
+            state.security.skips_csrf(
+                req.method(),
+                req.extensions().get::<axum::extract::MatchedPath>(),
+            )
+        });
+    if exempt {
+        return next.run(req).await;
+    }
+
     let Some(session) = req.extensions().get::<Session>().cloned() else {
         return Error::from(anyhow::anyhow!(
             "CSRF protection requires the session middleware"

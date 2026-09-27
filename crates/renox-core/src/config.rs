@@ -26,6 +26,34 @@ impl Environment {
     }
 }
 
+/// How strict the Content-Security-Policy header is, from `CSP`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CspMode {
+    /// Scripts from this site, inline scripts and `eval` (which Alpine.js's
+    /// standard build needs) are allowed; other sites' scripts, framing by
+    /// other sites and plugins are not.
+    #[default]
+    Relaxed,
+    /// Scripts only from this site or with `nonce="{{ csp_nonce() }}"`, no
+    /// `eval`: Renox switches to Alpine's CSP build (expressions are limited
+    /// to properties and methods; put logic in `Alpine.data(...)`) and turns
+    /// off htmx's `eval`.
+    Strict,
+    /// No Content-Security-Policy header.
+    Off,
+}
+
+impl CspMode {
+    fn parse(value: &str) -> anyhow::Result<Self> {
+        match value.to_ascii_lowercase().as_str() {
+            "relaxed" | "" => Ok(Self::Relaxed),
+            "strict" => Ok(Self::Strict),
+            "off" | "false" | "none" => Ok(Self::Off),
+            other => bail!("CSP must be relaxed, strict or off, got `{other}`"),
+        }
+    }
+}
+
 /// Application configuration, read from the process environment and `.env`.
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -75,6 +103,8 @@ pub struct Config {
     pub storage: StorageConfig,
     /// Largest request body in bytes, from `UPLOAD_MAX_SIZE` in megabytes (default 10).
     pub upload_max_size: usize,
+    /// The Content-Security-Policy, from `CSP` (`relaxed`, `strict` or `off`).
+    pub csp: CspMode,
 }
 
 impl Config {
@@ -160,6 +190,7 @@ impl Config {
                 .context("UPLOAD_MAX_SIZE must be a number of megabytes")?
                 * 1024
                 * 1024,
+            csp: CspMode::parse(&var_or("CSP", "relaxed"))?,
         })
     }
 
@@ -199,6 +230,7 @@ impl Default for Config {
             storage_path: "storage".into(),
             storage: StorageConfig::default(),
             upload_max_size: 10 * 1024 * 1024,
+            csp: CspMode::Relaxed,
         }
     }
 }

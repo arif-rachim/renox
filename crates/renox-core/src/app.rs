@@ -82,6 +82,7 @@ pub struct App {
     gates: HashMap<String, Gate>,
     registry: Registry,
     embedded: Option<crate::Embedded>,
+    csp: crate::security::Csp,
 }
 
 impl App {
@@ -95,7 +96,15 @@ impl App {
             gates: HashMap::new(),
             registry: Registry::default(),
             embedded: None,
+            csp: crate::security::Csp::default(),
         }
+    }
+
+    /// Allows other sites in the Content-Security-Policy, e.g.
+    /// `.csp(|csp| { csp.allow("script-src", "https://www.googletagmanager.com"); })`.
+    pub fn csp(mut self, allow: impl FnOnce(&mut crate::security::Csp)) -> Self {
+        allow(&mut self.csp);
+        self
     }
 
     /// Views, translations and public files compiled into the binary:
@@ -247,7 +256,9 @@ impl App {
             storage.clone(),
             embedded.map(|e| e.views),
         );
+        let security = Arc::new(crate::security::Security::new(&config, &self.csp, &listing));
         let state = AppState {
+            security,
             mailer: Mailer::from_config(&config)?,
             queue: Queue::new(db.clone()),
             cache: crate::cache::Cache::new(&config.cache_store, db.clone())?,
@@ -706,6 +717,10 @@ fn build_router(
         .merge(public_files(&state))
         .layer(axum::extract::DefaultBodyLimit::max(
             state.config.upload_max_size,
+        ))
+        .layer(from_fn_with_state(
+            state.clone(),
+            crate::security::middleware,
         ))
         .layer(TraceLayer::new_for_http())
         .with_state(state.clone());

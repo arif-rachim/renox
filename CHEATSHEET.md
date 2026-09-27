@@ -367,6 +367,34 @@ async fn upload(State(state): State<AppState>, Valid(form): Valid<PhotoForm>) ->
 }
 ```
 
+## Security: CSP, CORS, webhooks
+
+```rust
+use renox::prelude::*;
+
+fn secured(app: App) -> App {
+    // Every response gets nosniff, Referrer-Policy, X-Frame-Options, HSTS
+    // (production + https) and a Content-Security-Policy (`CSP=relaxed|strict|off`).
+    app.csp(|csp| {
+        csp.allow("script-src", "https://www.googletagmanager.com")
+            .allow("frame-src", "https://www.youtube.com");
+    })
+}
+
+fn routes() -> Routes {
+    let api = Routes::new()
+        .get("/api/stock", || async { "12" })
+        .cors(&["https://app.example.com"]); // or &["*"]
+    let webhooks = Routes::new()
+        .post("/webhooks/payment", || async { StatusCode::OK })
+        .without_csrf(); // no session: check the gateway's signature instead
+    api.merge(webhooks)
+}
+```
+
+With `CSP=strict`, an inline script needs `<script nonce="{{ csp_nonce() }}">`, and Alpine
+expressions must stay simple (move statements into `Alpine.data(...)`).
+
 ## Tests
 
 ```rust
@@ -399,4 +427,5 @@ Also available: `assert_redirect`, `assert_forbidden`, `assert_not_found`, `asse
 `APP_KEY` (`rnx key:generate`), `APP_DEBUG`, `APP_URL`, `APP_LOCALE`, `APP_TIMEZONE` (`+07:00`),
 `DATABASE_URL` (`sqlite://storage/app.db` or `postgres://…` with the `postgres` feature),
 `TEST_DATABASE_URL`, `MAIL_MAILER` (`log` | `smtp`), `QUEUE_WORKERS`, `SCHEDULER`,
-`CACHE_STORE` (`memory` | `database`), `STORAGE_DISK` (`local` | `s3`), `UPLOAD_MAX_SIZE` (MB).
+`CACHE_STORE` (`memory` | `database`), `STORAGE_DISK` (`local` | `s3`), `UPLOAD_MAX_SIZE` (MB),
+`CSP` (`relaxed` | `strict` | `off`).

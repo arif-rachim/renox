@@ -31,6 +31,7 @@ pub struct AppState {
     pub(crate) key: Key,
     pub(crate) gates: Gates,
     pub(crate) throttle: Arc<Throttle>,
+    pub(crate) security: Arc<crate::security::Security>,
 }
 
 impl AppState {

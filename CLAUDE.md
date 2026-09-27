@@ -89,7 +89,10 @@ docs/postgresql.md         PostgreSQL guide for app authors
 ## 3. Architecture and the decisions behind it
 
 ### Request pipeline (outermost first)
-`method::middleware` (method spoofing: a POST with `_method=PUT|PATCH|DELETE` or
+`security::middleware` (outermost with `DefaultBodyLimit`/Trace: puts a `CspNonce` in extensions,
+adds nosniff / Referrer-Policy / X-Frame-Options / HSTS / CSP to every response unless the handler
+set them; the policy is built once at boot in `security::Security`) wraps everything, and in front of
+the router sits `method::middleware` (method spoofing: a POST with `_method=PUT|PATCH|DELETE` or
 `X-HTTP-Method-Override` becomes that method; it wraps the whole router via
 `Router::new().fallback_service(layer(router))` because route layers run after axum matched the
 method) → `TraceLayer` → `session::middleware` (loads/saves encrypted cookie) → `i18n::middleware` (puts the
@@ -271,6 +274,10 @@ migration changes migration counts asserted in `crates/renox/tests/database.rs`.
 - Browser-check example UIs. Things found that way in `examples/crud`: `hx-boost` on a whole
   section also boosts its edit links and delete forms (scope it to the page links), and boosted
   requests get full pages (by design, `Htmx::wants_fragment`), so pair them with `hx-select`.
+- Under `CSP=strict`, Alpine's CSP build rejects statements in attributes (e.g. examples/hello's
+  `@htmx:after-request="sending = false; if (…) $el.reset()"` → "CSP Parser Error: Unexpected
+  token: if"). That's why relaxed is the default; strict apps move logic into `Alpine.data`.
+  Browser-check CSP work by collecting `Log.entryAdded` / `Runtime.exceptionThrown` over CDP.
 - Examples without a `.env` run with `APP_DEBUG` off, i.e. with the views embedded at build time:
   restart after editing templates.
 
@@ -302,7 +309,7 @@ built-ins for en|id), `APP_FALLBACK_LOCALE` (en), `LANG_PATH` (resources/lang),
 `postgres://…` with the `postgres` feature), `DATABASE_POOL_SIZE` (8), `TEST_DATABASE_URL`
 (PostgreSQL URL for tests; env or `.env`), `MAIL_MAILER` (smtp|log|memory), `MAIL_HOST`, `MAIL_PORT`,
 `MAIL_ENCRYPTION` (tls|starttls|none), `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS`,
-`MAIL_FROM_NAME`, `QUEUE_WORKERS` (2; 0 = none in serve), `SCHEDULER` (true), `CACHE_STORE`
+`MAIL_FROM_NAME`, `CSP` (relaxed|strict|off; relaxed is the owner's chosen default), `QUEUE_WORKERS` (2; 0 = none in serve), `SCHEDULER` (true), `CACHE_STORE`
 (memory|database), `STORAGE_PATH` (storage; holds `framework/down` for maintenance mode and `app/`
 for the local disk), `STORAGE_DISK` (local|s3), `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`,
 `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `STORAGE_URL`, `UPLOAD_MAX_SIZE` (MB, 10).
@@ -459,8 +466,10 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M9a Renox's own database layer (`Db`, `Transaction`, `Row`, `db::sql`, `postgres` feature) | merged to `main` (#19) |
 | M9b PostgreSQL backend proper (dual-dialect migrations, typed binds, SKIP LOCKED, schedule claims, `rnx new --database postgres`, CI, guide) | merged to `main` (#20) |
 | M10a CHEATSHEET.md (doctested), llms.txt, AGENTS.md/CLAUDE.md in new apps, `examples/crud` | merged to `main` (#21) |
-| M10b method spoofing, all validation errors at once, `can()` for policies, pagination keeps query | PR from branch `m10b-framework-gaps` |
-| M10c examples api/jobs/uploads/postgres, doctests on public APIs | next |
+| M10b method spoofing, all validation errors at once, `can()` for policies, pagination keeps query | merged to `main` (#22) |
+| M11a security headers, CSP (relaxed default / strict with nonce + Alpine CSP build / off), CORS per route, `without_csrf()` | PR from branch `m11a-security` |
+| M11b webhooks, M11c SEO & analytics (plan in ROADMAP M11) | next, in that order |
+| M10c examples api/jobs/uploads/postgres, doctests on public APIs | after M11 |
 | v1.0 docs site, starter kit, semver guarantee | last |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on
