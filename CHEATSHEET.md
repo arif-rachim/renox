@@ -169,6 +169,14 @@ struct ProductForm {
     name: String,
     price: i64,
     email: Option<String>,
+    sku: String,
+    kind: String,
+    brand: Option<String>,
+    launch: renox::chrono::NaiveDate,
+    #[serde(default)]
+    tags: Vec<String>,
+    #[serde(default)]
+    photos: Vec<Upload>, // <input type="file" name="photos" multiple>
 }
 
 impl Validate for ProductForm {
@@ -176,6 +184,14 @@ impl Validate for ProductForm {
         v.field("name", &self.name).required().max(100).unique("products", "name");
         v.field("price", &self.price).min(0);
         v.field("email", &self.email).email();
+        v.field("sku", &self.sku).matches(r"^[A-Z]{2}-\d{4}$").none_of(&["XX-0000"]);
+        v.field("brand", &self.brand).required_if(self.kind == "branded"); // also required_with, required_unless
+        v.field("launch", &self.launch).after(renox::chrono::NaiveDate::from_ymd_opt(2026, 1, 1).unwrap());
+        v.field("tags", &self.tags).max(5);
+        v.each("tags", &self.tags, |tag| tag.required().max(20)); // errors on tags.0, tags.1, …
+        v.each("photos", &self.photos, |photo| photo.image().max(2048));
+        // Also: digits(n), digits_between(a, b), date(), before…, one_of, same, different,
+        // v.nested("lines", &self.lines) for a Vec of structs, .apply(&MyRule) with `validation::Rule`.
     }
 }
 
@@ -402,10 +418,15 @@ async fn add(htmx: Htmx) -> Result<Response> {
 async fn after_delete() -> HxRedirect {
     HxRedirect("/todos".into()) // the browser navigates there
 }
+
+async fn after_save(htmx: Htmx) -> Response {
+    htmx.redirect("/todos") // HX-Redirect for htmx posts, 303 for plain forms
+}
 ```
 
 `Back` redirects to the previous page (the Referer). HTMX requests send the CSRF token by
-themselves. Boosted requests (`hx-boost`) get whole pages, so pair them with `hx-select`.
+themselves. Errors of list items (`photos.1`, `tags.0`) show at the list's input and its
+`data-error-for="photos"` slot, and `{{ error('photos') }}` includes them. Boosted requests (`hx-boost`) get whole pages, so pair them with `hx-select`.
 
 ## Raw SQL and transactions (SQLite and PostgreSQL)
 
@@ -563,6 +584,30 @@ async fn ship(state: &AppState, user: &User) -> Result {
     state.notify_later(user, &OrderShipped { order_id: 7 }).await?; // one queued job per channel
     let guest = Recipient::to("mail", "guest@example.com").and("whatsapp", "+628123");
     state.notify_to(&guest, &OrderShipped { order_id: 7 }).await   // no account: no database row
+}
+```
+
+## Cookies and downloads
+
+```rust
+use renox::prelude::*;
+use renox::{Cookies, Download, SetCookie};
+use std::time::Duration;
+
+async fn remember_theme(State(state): State<AppState>) -> (SetCookie, Redirect) {
+    let cookie = SetCookie::new(&state, "theme", "dark").max_age(Duration::from_secs(365 * 86_400));
+    (cookie, Redirect::to("/")) // HttpOnly, SameSite=Lax, Secure on https; SetCookie::encrypted / remove
+}
+
+async fn theme(cookies: Cookies) -> String {
+    cookies.get("theme").unwrap_or_default() // get_encrypted for SetCookie::encrypted
+}
+
+async fn invoice(State(state): State<AppState>) -> Result<Download> {
+    let pdf = state.storage.get("invoices/1.pdf").await?.unwrap_or_default();
+    Ok(Download::bytes("INV-001.pdf", "application/pdf", pdf).inline()) // or attachment (default)
+    // Download::file(path, name).await (streamed), Download::from_storage(&storage, key, name),
+    // Download::stream(name, type, stream) for a CSV written row by row
 }
 ```
 

@@ -2,12 +2,14 @@
 
 {% block content %}
 <h1>Documents</h1>
-<form method="post" action="{{ route('photos.store') }}" enctype="multipart/form-data">
+<form method="post" action="{{ route('photos.store') }}" enctype="multipart/form-data"
+      hx-post="{{ route('photos.store') }}" hx-encoding="multipart/form-data">
   {{ csrf_field() }}
   <input name="title" placeholder="Photo title" value="{{ old('title') }}">
-  <input type="file" name="photo" accept="image/*">
-  <p class="error">{{ error('photo') }}</p>
-  <button>Upload photo</button>
+  <input type="file" name="photos" accept="image/*" multiple>
+  {# errors for each file (photos.0, photos.1, …) show here too #}
+  <p class="error" data-error-for="photos">{{ error('photos') }}</p>
+  <button>Upload photos</button>
 </form>
 <form method="post" action="{{ route('invoices.store') }}" enctype="multipart/form-data">
   {{ csrf_field() }}
@@ -20,7 +22,8 @@
   {% for doc in documents %}
   <li>
     {% if doc.kind == "photo" %}<img src="{{ storage_url(doc.file_key) }}" alt="" width="64"> {{ doc.title }}
-    {% else %}<a href="{{ route('invoices.download', doc.id) }}">{{ doc.title }}</a> (private){% endif %}
+    {% else %}<a href="{{ route('invoices.download', doc.id) }}">{{ doc.title }}</a> (private,
+      <a href="{{ route('invoices.show', doc.id) }}">view</a>){% endif %}
   </li>
   {% endfor %}
 </ul>

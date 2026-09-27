@@ -532,11 +532,19 @@ M15a · queries and relations:
       [docs/relations.md](docs/relations.md) (compiled as a doctest)
 
 M15b · validation and requests:
-- [ ] Validation: `regex`, dates (`before`/`after`), `digits`, `in`/`not_in`, `required_if` /
-      `required_with`, `same`/`different`, rules for each item of a `Vec`, a `Rule` trait for
-      reusable rules
-- [ ] Requests and responses: `Vec<Upload>` for several files in one field, a cookie API,
-      download and streaming helpers
+- [x] Validation: `matches` (regex, cached), `digits`, `digits_between`, `date`, `before` /
+      `after` / `before_or_equal` / `after_or_equal` (text, `NaiveDate`, `NaiveDateTime`,
+      `DateTime`), `none_of` (Laravel's `not_in`; `in` is `one_of`), `required_if` /
+      `required_unless` / `required_with`, `same` / `different`, `Validator::each` for every
+      item of a list (errors on `name.0`, …), `Validator::nested` for a list of structs (errors on
+      `name.0.field`), the `Rule` trait with `.apply(&rule)`; English and Indonesian messages
+- [x] Requests and responses: `Vec<Upload>` for `<input type="file" multiple>` (checked per file
+      with `each`), `Cookies` / `SetCookie` (plain or encrypted with `APP_KEY`, safe defaults),
+      `Download` (bytes, a streamed file, a `Storage` key, any stream; `inline()`, but never for
+      HTML/XML/JS; UTF-8 file names)
+- [x] Around them: `Htmx::redirect(to)` (HX-Redirect or 303); list-item errors (`photos.1`) show at
+      the list's input and slot (renox.js) and in `error('photos')`; `examples/uploads` takes several
+      photos at once through htmx and shows invoices with `Download`
 
 ### M16 · v0.17: Developer experience and trust
 - [ ] Lighter builds: analytics (reqwest) behind a feature, rustls on `ring` so `aws-lc-sys`

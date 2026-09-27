@@ -125,7 +125,9 @@ async fn store(State(db): State<Db>, Valid(form): Valid<EntryForm>) -> Result<Vi
 <summary><b>Validation, auth & authorization</b></summary>
 
 - `Valid<T>` validates forms, JSON bodies and query strings with rules such as `required`,
-  `email`, `between`, `unique`, `exists`, `confirmed`, `image` and `mimes`. Messages come in English
+  `required_if`, `email`, `between`, `matches` (regex), `digits`, dates (`before`, `after`),
+  `unique`, `exists`, `same`, `image` and `mimes`, per item of a list (`each`, `nested`), and your
+  own reusable `Rule`s. Messages come in English
   and Indonesian, or from your own translations.
 - `Auth::new()` adds login, registration, logout, remember me, password reset and email
   verification, with Argon2id hashing and login throttling.

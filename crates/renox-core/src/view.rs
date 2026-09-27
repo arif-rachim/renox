@@ -684,8 +684,19 @@ fn globals(
         csrf_token => token,
         flash => Value::from_object(Flashed(session.map(Session::flashed).unwrap_or_default())),
         errors => errors,
+        // `error('photos')` also shows the first error of an item (`photos.1`).
         error => Value::from_function(move |field: String| {
-            first_errors.get(&field).cloned().unwrap_or_default()
+            first_errors
+                .get(&field)
+                .or_else(|| {
+                    let prefix = format!("{field}.");
+                    first_errors
+                        .iter()
+                        .find(|(key, _)| key.starts_with(&prefix))
+                        .map(|(_, message)| message)
+                })
+                .cloned()
+                .unwrap_or_default()
         }),
         renox_head => Value::from_function(move || head.clone()),
         seo => seo,

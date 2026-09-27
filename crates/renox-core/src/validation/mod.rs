@@ -45,6 +45,7 @@ pub use value::{FieldValue, Inspected};
 
 use crate::Result;
 use crate::db::{Db, DbValue, quote};
+use chrono::NaiveDateTime;
 
 /// Validation errors: messages keyed by field name.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -147,11 +148,75 @@ impl Validator {
 
     /// Starts the rules for one field. The label in messages defaults to the
     /// name with `_` replaced by spaces.
-    pub fn field<'v>(&'v mut self, name: &str, value: &impl FieldValue) -> Field<'v> {
-        let translated = self.texts.as_ref().and_then(|t| {
+    /// A field's name for messages: the app's translation
+    /// (`renox.validation.attributes.{name}`) or the name with spaces.
+    fn translated_label(&self, name: &str) -> Option<String> {
+        self.texts.as_ref().and_then(|t| {
             t.get(&format!("renox.validation.attributes.{name}"))
                 .cloned()
-        });
+        })
+    }
+
+    fn label_for(&self, name: &str) -> String {
+        self.translated_label(name)
+            .unwrap_or_else(|| name.replace('_', " "))
+    }
+
+    /// Rules for each item of a list, e.g. every tag or every uploaded
+    /// photo; errors are keyed `name.0`, `name.1`, … and labelled
+    /// "`name` #1", "#2", …
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # struct Form { tags: Vec<String>, photos: Vec<Upload> }
+    /// # impl Validate for Form {
+    /// fn rules(&self, v: &mut Validator) {
+    ///     v.field("tags", &self.tags).max(5);
+    ///     v.each("tags", &self.tags, |tag| tag.required().max(20));
+    ///     v.each("photos", &self.photos, |photo| photo.image().max(2048));
+    /// }
+    /// # }
+    /// ```
+    pub fn each<T: FieldValue>(
+        &mut self,
+        name: &str,
+        items: &[T],
+        rules: impl for<'a> Fn(Field<'a>) -> Field<'a>,
+    ) {
+        let base = self.label_for(name);
+        for (i, item) in items.iter().enumerate() {
+            let key = format!("{name}.{i}");
+            let label = format!("{base} #{}", i + 1);
+            rules(self.field(&key, item).label(&label));
+        }
+    }
+
+    /// Each item's own `Validate` rules, for a list of structs (e.g. the
+    /// lines of an order sent as JSON); errors are keyed `name.0.field`.
+    pub fn nested<T: Validate>(&mut self, name: &str, items: &[T]) {
+        for (i, item) in items.iter().enumerate() {
+            let mut inner = Validator {
+                locale: self.locale,
+                texts: self.texts.clone(),
+                errors: Errors::new(),
+                pending: Vec::new(),
+            };
+            item.rules(&mut inner);
+            for (field, messages) in inner.errors.iter() {
+                for message in messages {
+                    self.errors
+                        .add(format!("{name}.{i}.{field}"), message.clone());
+                }
+            }
+            for mut pending in inner.pending {
+                pending.field = format!("{name}.{i}.{}", pending.field);
+                self.pending.push(pending);
+            }
+        }
+    }
+
+    pub fn field<'v>(&'v mut self, name: &str, value: &impl FieldValue) -> Field<'v> {
+        let translated = self.translated_label(name);
         let mut field = Field {
             translated: translated.is_some(),
             label: translated.unwrap_or_else(|| name.replace('_', " ")),
@@ -456,6 +521,172 @@ impl Field<'_> {
         self
     }
 
+    /// The whole text matches `pattern` (a regular expression; anchor it
+    /// with `^…$` to match all of it), e.g. `.matches(r"^[A-Z]{2}\d{4}$")`.
+    pub fn matches(mut self, pattern: &str) -> Self {
+        if let (true, Inspected::Text(text)) = (self.present(), &self.value) {
+            let ok = match cached_regex(pattern) {
+                Ok(regex) => regex.is_match(text),
+                Err(err) => {
+                    tracing::error!(pattern, error = %err, "invalid pattern in a `matches` rule");
+                    false
+                }
+            };
+            if !ok {
+                self.fail("regex", &[]);
+            }
+        }
+        self
+    }
+
+    /// Exactly `n` digits (and nothing else), e.g. a PIN.
+    pub fn digits(mut self, n: usize) -> Self {
+        if self.present() && digit_count(&self.value) != Some(n) {
+            self.fail("digits", &[("digits", n.to_string())]);
+        }
+        self
+    }
+
+    /// Between `min` and `max` digits (and nothing else), e.g. a phone number.
+    pub fn digits_between(mut self, min: usize, max: usize) -> Self {
+        if self.present() && !digit_count(&self.value).is_some_and(|n| n >= min && n <= max) {
+            self.fail(
+                "digits_between",
+                &[("min", min.to_string()), ("max", max.to_string())],
+            );
+        }
+        self
+    }
+
+    /// A date (`2026-10-01`) or a date and time (`2026-10-01T10:30`).
+    pub fn date(mut self) -> Self {
+        if self.present() && self.as_date().is_none() {
+            self.fail("date", &[]);
+        }
+        self
+    }
+
+    fn date_rule(
+        mut self,
+        key: &str,
+        limit: NaiveDateTime,
+        ok: impl Fn(NaiveDateTime, NaiveDateTime) -> bool,
+    ) -> Self {
+        if !self.present() {
+            return self;
+        }
+        match self.as_date() {
+            None => self.fail("date", &[]),
+            Some(date) if !ok(date, limit) => {
+                let shown = if limit.time() == chrono::NaiveTime::MIN {
+                    limit.date().to_string()
+                } else {
+                    limit.format("%Y-%m-%d %H:%M").to_string()
+                };
+                self.fail(key, &[("date", shown)]);
+            }
+            Some(_) => {}
+        }
+        self
+    }
+
+    /// A date before `limit` (a `NaiveDate`, `NaiveDateTime` or `DateTime`),
+    /// e.g. `.before(today)` for a birth date.
+    pub fn before(self, limit: impl FieldValue) -> Self {
+        match limit.inspect() {
+            Inspected::Date(limit) => self.date_rule("before", limit, |d, l| d < l),
+            _ => self,
+        }
+    }
+
+    pub fn before_or_equal(self, limit: impl FieldValue) -> Self {
+        match limit.inspect() {
+            Inspected::Date(limit) => self.date_rule("before_or_equal", limit, |d, l| d <= l),
+            _ => self,
+        }
+    }
+
+    /// A date after `limit`, e.g. `.after(self.start)` for an end date.
+    pub fn after(self, limit: impl FieldValue) -> Self {
+        match limit.inspect() {
+            Inspected::Date(limit) => self.date_rule("after", limit, |d, l| d > l),
+            _ => self,
+        }
+    }
+
+    pub fn after_or_equal(self, limit: impl FieldValue) -> Self {
+        match limit.inspect() {
+            Inspected::Date(limit) => self.date_rule("after_or_equal", limit, |d, l| d >= l),
+            _ => self,
+        }
+    }
+
+    fn as_date(&self) -> Option<NaiveDateTime> {
+        match &self.value {
+            Inspected::Date(date) => Some(*date),
+            Inspected::Text(text) => parse_date(text.trim()),
+            _ => None,
+        }
+    }
+
+    /// None of the given values (Laravel's `not_in`).
+    pub fn none_of<V: FieldValue>(mut self, refused: &[V]) -> Self {
+        if self.present() && refused.iter().any(|r| r.inspect() == self.value) {
+            self.fail("not_in", &[]);
+        }
+        self
+    }
+
+    /// Required when `condition` holds, e.g.
+    /// `.required_if(self.kind == "company")` for a company name.
+    pub fn required_if(self, condition: bool) -> Self {
+        if condition { self.required() } else { self }
+    }
+
+    /// Required unless `condition` holds.
+    pub fn required_unless(self, condition: bool) -> Self {
+        self.required_if(!condition)
+    }
+
+    /// Required when `other` has a value, e.g. a phone number's country
+    /// code when a phone number is given.
+    pub fn required_with(self, other: &impl FieldValue) -> Self {
+        let given = other.inspect() != Inspected::Missing;
+        self.required_if(given)
+    }
+
+    /// Equal to another field, named `other` in the message.
+    pub fn same(mut self, other: &str, value: &impl FieldValue) -> Self {
+        if self.present() && value.inspect() != self.value {
+            let other = self.v.label_for(other);
+            self.fail("same", &[("other", other)]);
+        }
+        self
+    }
+
+    /// Different from another field, named `other` in the message.
+    pub fn different(mut self, other: &str, value: &impl FieldValue) -> Self {
+        if self.present() && value.inspect() == self.value {
+            let other = self.v.label_for(other);
+            self.fail("different", &[("other", other)]);
+        }
+        self
+    }
+
+    /// A reusable rule; see [`Rule`].
+    pub fn apply(mut self, rule: &impl Rule) -> Self {
+        if !self.present() {
+            return self;
+        }
+        if let Err(message) = rule.check(&self.value) {
+            let message = render(&message, &self.label, &[]);
+            self.v.errors.add(&self.name, message);
+            self.failed = true;
+            self.last_pending = None;
+        }
+        self
+    }
+
     fn database(mut self, table: &str, column: &str, unique: bool) -> Self {
         if self.present() {
             self.v.pending.push(Pending {
@@ -490,6 +721,86 @@ impl Field<'_> {
     pub fn exists(self, table: &str, column: &str) -> Self {
         self.database(table, column, false)
     }
+}
+
+/// A rule to reuse across forms, e.g. an Indonesian tax number:
+///
+/// ```
+/// # use renox::prelude::*;
+/// use renox::validation::{Inspected, Rule};
+///
+/// struct Npwp;
+///
+/// impl Rule for Npwp {
+///     fn check(&self, value: &Inspected) -> std::result::Result<(), String> {
+///         let Inspected::Text(text) = value else { return Ok(()) };
+///         let digits = text.chars().filter(char::is_ascii_digit).count();
+///         if digits == 15 || digits == 16 {
+///             Ok(())
+///         } else {
+///             Err("The :attribute must be a valid NPWP.".into()) // :attribute is the field's label
+///         }
+///     }
+/// }
+///
+/// # struct Form { npwp: String }
+/// # impl Validate for Form {
+/// fn rules(&self, v: &mut Validator) {
+///     v.field("npwp", &self.npwp).required().apply(&Npwp);
+/// }
+/// # }
+/// ```
+///
+/// Missing values skip the rule (combine it with `required`).
+pub trait Rule {
+    /// `Err(message)` when `value` breaks the rule.
+    fn check(&self, value: &Inspected) -> std::result::Result<(), String>;
+}
+
+/// Compiled patterns, so a rule in a hot form doesn't recompile each time.
+fn cached_regex(pattern: &str) -> std::result::Result<regex::Regex, regex::Error> {
+    static CACHE: std::sync::LazyLock<
+        std::sync::Mutex<std::collections::HashMap<String, regex::Regex>>,
+    > = std::sync::LazyLock::new(Default::default);
+    let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(regex) = cache.get(pattern) {
+        return Ok(regex.clone());
+    }
+    let regex = regex::Regex::new(pattern)?;
+    if cache.len() < 1000 {
+        cache.insert(pattern.to_owned(), regex.clone());
+    }
+    Ok(regex)
+}
+
+/// How many digits the value is made of, if it's only digits.
+fn digit_count(value: &Inspected) -> Option<usize> {
+    let text = match value {
+        Inspected::Text(text) => text.trim().to_owned(),
+        Inspected::Number(n) if n.fract() == 0.0 && *n >= 0.0 => format!("{}", *n as u64),
+        _ => return None,
+    };
+    (!text.is_empty() && text.chars().all(|c| c.is_ascii_digit())).then_some(text.len())
+}
+
+/// `2026-10-01`, `2026-10-01T10:30`, `2026-10-01 10:30:00` or RFC 3339.
+fn parse_date(text: &str) -> Option<NaiveDateTime> {
+    if let Ok(date) = chrono::NaiveDate::parse_from_str(text, "%Y-%m-%d") {
+        return Some(date.and_time(chrono::NaiveTime::MIN));
+    }
+    for format in [
+        "%Y-%m-%dT%H:%M",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%d %H:%M:%S",
+    ] {
+        if let Ok(date) = NaiveDateTime::parse_from_str(text, format) {
+            return Some(date);
+        }
+    }
+    chrono::DateTime::parse_from_rfc3339(text)
+        .ok()
+        .map(|d| d.naive_utc())
 }
 
 fn is_email(text: &str) -> bool {

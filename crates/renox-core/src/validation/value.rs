@@ -17,6 +17,8 @@ pub enum Inspected {
         extension: String,
         image: bool,
     },
+    /// A date or a date and time (a date alone is its midnight).
+    Date(chrono::NaiveDateTime),
 }
 
 /// A value that can be validated. Implemented for strings, numbers, `bool`,
@@ -70,6 +72,36 @@ number!(i8, i16, i32, i64, u8, u16, u32, f32, f64);
 impl FieldValue for bool {
     fn inspect(&self) -> Inspected {
         Inspected::Bool(*self)
+    }
+
+    fn db_value(&self) -> DbValue {
+        self.to_db_value()
+    }
+}
+
+impl FieldValue for chrono::NaiveDate {
+    fn inspect(&self) -> Inspected {
+        Inspected::Date(self.and_time(chrono::NaiveTime::MIN))
+    }
+
+    fn db_value(&self) -> DbValue {
+        self.to_db_value()
+    }
+}
+
+impl FieldValue for chrono::NaiveDateTime {
+    fn inspect(&self) -> Inspected {
+        Inspected::Date(*self)
+    }
+
+    fn db_value(&self) -> DbValue {
+        self.to_db_value()
+    }
+}
+
+impl FieldValue for chrono::DateTime<chrono::Utc> {
+    fn inspect(&self) -> Inspected {
+        Inspected::Date(self.naive_utc())
     }
 
     fn db_value(&self) -> DbValue {

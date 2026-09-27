@@ -19,6 +19,7 @@ mod method;
 #[cfg(feature = "postgres")]
 mod postgres;
 mod queue;
+mod requests;
 mod security;
 mod seo;
 mod testing;

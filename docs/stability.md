@@ -17,7 +17,8 @@ commit that `rnx` was built from.
   - `WebhookRequest`, `WebhookCall`, `JobContext`, `Htmx`, `Down`, `analytics::Event`
   - `view::ViewContext`, `auth::Registration`, `auth::Recipient`, `mail::Attachment`
 - **New variants on these enums.** A `match` on them needs a `_` arm:
-  - `Error`, `Environment`, `CspMode`, `Channel`, `Locale`, `DbValue`, `Inspected`
+  - `Error`, `Environment`, `CspMode`, `Channel`, `Locale`, `DbValue`, `Inspected` (a `Rule`
+    matching on `Inspected` needs a `_` arm)
 - New methods, functions, modules, template functions, validation rules, CLI commands and `.env`
   settings (always with defaults).
 - New provided methods on traits you implement (`Model`, `Notification`, …); `FromRow` stays one
