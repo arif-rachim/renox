@@ -3,16 +3,17 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::extract::{Request, State};
-use axum::http::header::{CONTENT_LENGTH, CONTENT_TYPE};
+use axum::http::header::{ACCEPT, CONTENT_LENGTH, CONTENT_TYPE, REFERER};
 use axum::http::{HeaderValue, StatusCode};
 use axum::middleware::Next;
-use axum::response::{IntoResponse, Response};
+use axum::response::{IntoResponse, Redirect, Response};
 use minijinja::value::{Rest, merge_maps};
 use minijinja::{Environment, ErrorKind, Value, context};
 use minijinja_autoreload::AutoReloader;
 use serde::Serialize;
 
 use crate::error::{ErrorPage, reason};
+use crate::validation::ValidationError;
 use crate::{AppState, Config, Error, Htmx, RouteTable, Session, assets};
 
 /// Templates that ship with Renox. An app overrides one by creating a file
@@ -142,8 +143,8 @@ fn safe_join(dir: &Path, name: &str) -> Option<PathBuf> {
 }
 
 /// A template response, rendered by Renox with the request's globals:
-/// `app`, `request`, `flash`, `errors`, `old()`, `csrf_token`, `csrf_field()`
-/// and `renox_head()`.
+/// `app`, `request`, `flash`, `errors`, `error()`, `old()`, `csrf_token`,
+/// `csrf_field()` and `renox_head()`.
 ///
 /// ```ignore
 /// async fn index() -> View {
@@ -190,7 +191,8 @@ impl IntoResponse for View {
     }
 }
 
-/// Renders `View` and error responses once the handler has returned.
+/// Renders `View` and error responses once the handler has returned, and
+/// turns validation errors into a redirect back for regular form posts.
 pub(crate) async fn middleware(
     State(state): State<AppState>,
     req: Request,
@@ -199,8 +201,29 @@ pub(crate) async fn middleware(
     let session = req.extensions().get::<Session>().cloned();
     let htmx = Htmx::from_headers(req.headers());
     let path = req.uri().path().to_owned();
+    let (wants_json, referer) = {
+        let header = |name| req.headers().get(name).and_then(|v| v.to_str().ok());
+        let wants_json = header(ACCEPT).is_some_and(|v| v.contains("application/json"))
+            || header(CONTENT_TYPE).is_some_and(|v| v.starts_with("application/json"));
+        (wants_json, header(REFERER).map(str::to_owned))
+    };
 
     let mut res = next.run(req).await;
+
+    if let Some(failed) = res.extensions_mut().remove::<ValidationError>() {
+        if htmx.request || wants_json {
+            return res;
+        }
+        if let Some(session) = &session {
+            let flashed = session
+                .flash_errors(&failed.errors)
+                .and_then(|()| session.flash_input(&failed.input));
+            if let Err(err) = flashed {
+                return err.into_response();
+            }
+        }
+        return Redirect::to(referer.as_deref().unwrap_or("/")).into_response();
+    }
 
     if let Some(view) = res.extensions_mut().remove::<View>() {
         let globals = globals(&state, session.as_ref(), &htmx, &path);
@@ -242,6 +265,16 @@ fn globals(state: &AppState, session: Option<&Session>, htmx: &Htmx, path: &str)
         crate::csrf::CSRF_FIELD
     ));
     let old_input = session.cloned();
+    let errors = session.map(Session::errors).unwrap_or_default();
+    let first_errors: std::collections::BTreeMap<String, String> = errors
+        .iter()
+        .filter_map(|(field, messages)| {
+            messages
+                .get(0)
+                .and_then(|m| m.as_str())
+                .map(|m| (field.clone(), m.to_owned()))
+        })
+        .collect();
 
     context! {
         app => context! {
@@ -257,7 +290,10 @@ fn globals(state: &AppState, session: Option<&Session>, htmx: &Htmx, path: &str)
         },
         csrf_token => token,
         flash => session.map(Session::flashed).unwrap_or_default(),
-        errors => session.map(Session::errors).unwrap_or_default(),
+        errors => errors,
+        error => Value::from_function(move |field: String| {
+            first_errors.get(&field).cloned().unwrap_or_default()
+        }),
         renox_head => Value::from_function(move || head.clone()),
         csrf_field => Value::from_function(move || field.clone()),
         old => Value::from_function(move |field: String, default: Option<Value>| {

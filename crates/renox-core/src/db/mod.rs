@@ -22,6 +22,7 @@ pub use model::Model;
 pub use paginate::{Page, Paginated};
 pub use query::Query;
 pub use sqlx::sqlite::SqliteRow;
+pub(crate) use value::bind as value_bind;
 pub use value::{DbValue, ToDbValue};
 
 use crate::{AppState, Config};

@@ -15,6 +15,7 @@ mod module;
 mod routing;
 mod session;
 mod state;
+pub mod validation;
 mod view;
 
 pub use app::{App, Kernel};
@@ -28,6 +29,7 @@ pub use module::Module;
 pub use routing::{RouteTable, Routes};
 pub use session::Session;
 pub use state::AppState;
+pub use validation::{Errors, Valid, Validate, ValidationError, Validator};
 pub use view::{View, Views, view};
 
 pub use minijinja::context;

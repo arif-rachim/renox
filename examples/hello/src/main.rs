@@ -1,6 +1,6 @@
 //! A guestbook showing Renox's features so far: named routes, views with a
-//! layout, sessions and flash messages, CSRF, old input, HTMX fragments, and
-//! SQLite with a model, migrations, a seeder and pagination.
+//! layout, sessions and flash messages, CSRF, HTMX fragments, validation with
+//! old input, and SQLite with a model, migrations, a seeder and pagination.
 //!
 //! Run it from this directory:
 //!
@@ -36,10 +36,20 @@ impl Factory for Entry {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 struct EntryForm {
     name: String,
     message: String,
+}
+
+impl Validate for EntryForm {
+    fn rules(&self, v: &mut Validator) {
+        v.field("name", &self.name).label("nama").required().max(50);
+        v.field("message", &self.message)
+            .label("pesan")
+            .required()
+            .between(3, 280);
+    }
 }
 
 struct Guestbook;
@@ -65,23 +75,16 @@ async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
     Ok(view("guestbook/index.html", context! { entries }).fragment("entries"))
 }
 
+/// Invalid input never gets here: `Valid` sends regular posts back with the
+/// errors and old input, and HTMX posts get a 422 the bundled script shows
+/// next to the fields.
 async fn store(
     State(state): State<AppState>,
     session: Session,
     htmx: Htmx,
     back: Back,
-    Form(form): Form<EntryForm>,
+    Valid(form): Valid<EntryForm>,
 ) -> Result<Response> {
-    if form.name.trim().is_empty() || form.message.trim().is_empty() {
-        session.flash_input(&form)?;
-        session.flash_errors(&context! { form => ["Nama dan pesan wajib diisi."] })?;
-        // Validation responses for HTMX forms arrive in M3; until then reload the page.
-        if htmx.request {
-            return Ok(HxRedirect(state.url("guestbook.index", &[])?).into_response());
-        }
-        return Ok(back.into_response());
-    }
-
     Entry::create(
         &state.db,
         Entry {

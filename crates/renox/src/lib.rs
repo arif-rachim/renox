@@ -34,8 +34,9 @@ pub use tokio;
 pub mod prelude {
     pub use renox_core::db::{DateTime, Db, Factory, Model, Page, Paginated};
     pub use renox_core::{
-        App, AppState, Back, Config, Environment, Error, Htmx, HxRedirect, HxRefresh, HxTrigger,
-        Module, Result, Routes, Session, View, context, view,
+        App, AppState, Back, Config, Environment, Error, Errors, Htmx, HxRedirect, HxRefresh,
+        HxTrigger, Module, Result, Routes, Session, Valid, Validate, ValidationError, Validator,
+        View, context, view,
     };
     pub use renox_macros::Model;
 

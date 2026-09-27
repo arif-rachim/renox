@@ -12,10 +12,69 @@ pub const ALPINE_VERSION: &str = "3.17.4";
 
 const HTMX: &str = include_str!("../assets/htmx.min.js");
 const ALPINE: &str = include_str!("../assets/alpine.min.js");
-const RENOX: &str = r#"document.addEventListener("htmx:configRequest", function (event) {
-  var meta = document.querySelector('meta[name="csrf-token"]');
-  if (meta) event.detail.headers["X-CSRF-Token"] = meta.content;
-});
+const RENOX: &str = r#"(function () {
+  // Send the CSRF token with every HTMX request.
+  document.addEventListener("htmx:configRequest", function (event) {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta) event.detail.headers["X-CSRF-Token"] = meta.content;
+  });
+
+  function formOf(elt) {
+    return (elt && elt.closest && elt.closest("form")) || elt;
+  }
+
+  function clearErrors(form) {
+    if (!form || !form.querySelectorAll) return;
+    form.querySelectorAll("[data-renox-error]").forEach(function (el) { el.remove(); });
+    form.querySelectorAll("[data-error-for]").forEach(function (el) { el.textContent = ""; });
+    form.querySelectorAll("[aria-invalid]").forEach(function (el) { el.removeAttribute("aria-invalid"); });
+  }
+
+  // Show 422 validation errors next to the inputs that caused them: in an
+  // element with data-error-for="field" if the form has one, otherwise in a
+  // <p class="error"> inserted after the input.
+  function showErrors(form, errors) {
+    clearErrors(form);
+    Object.keys(errors).forEach(function (field) {
+      var message = (errors[field] || [])[0];
+      if (!message) return;
+      var name = CSS.escape(field);
+      var input = form.querySelector('[name="' + name + '"]');
+      if (input) input.setAttribute("aria-invalid", "true");
+      var slot = form.querySelector('[data-error-for="' + name + '"]');
+      if (slot) {
+        slot.textContent = message;
+        return;
+      }
+      var p = document.createElement("p");
+      p.className = "error";
+      p.setAttribute("data-renox-error", field);
+      p.textContent = message;
+      if (input) input.insertAdjacentElement("afterend", p);
+      else form.prepend(p);
+    });
+    // First invalid input in page order, not in the (alphabetical) error order.
+    var first = form.querySelector('[aria-invalid="true"]');
+    if (first && first.focus) first.focus();
+  }
+
+  document.addEventListener("htmx:beforeRequest", function (event) {
+    clearErrors(formOf(event.detail.elt));
+  });
+
+  document.addEventListener("htmx:beforeSwap", function (event) {
+    var xhr = event.detail.xhr;
+    var type = xhr.getResponseHeader("Content-Type") || "";
+    if (xhr.status !== 422 || type.indexOf("application/json") !== 0) return;
+    // Not swapped, and still an error: forms that reset themselves after a
+    // successful request keep what the user typed.
+    event.detail.shouldSwap = false;
+    try {
+      var body = JSON.parse(xhr.responseText);
+      showErrors(formOf(event.detail.requestConfig.elt), body.errors || {});
+    } catch (_) {}
+  });
+})();
 "#;
 
 /// Content-hashed URLs, so browsers can cache the files forever.
