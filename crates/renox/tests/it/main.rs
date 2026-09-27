@@ -17,6 +17,7 @@ mod queue;
 mod security;
 mod seo;
 mod testing;
+mod types;
 mod uploads;
 mod validation;
 mod webhook;

@@ -4,6 +4,7 @@
 
 mod conn;
 mod factory;
+mod json;
 mod migrate;
 mod model;
 mod paginate;
@@ -22,6 +23,7 @@ pub use conn::{Conn, bounds};
 pub use conn::{Db, Dialect, Executor, FromDb, Row, RowIndex, Sql, Transaction, sql};
 pub(crate) use conn::{RowInner, script};
 pub use factory::Factory;
+pub use json::Json;
 pub use migrate::{Migration, MigrationStatus, Scripts};
 pub(crate) use migrate::{Migrator, framework_migration};
 pub use model::Model;
@@ -199,4 +201,52 @@ async fn connect_sqlite(config: &Config) -> anyhow::Result<sqlx::SqlitePool> {
 /// Quotes an identifier (the same on SQLite and PostgreSQL), e.g. `order` -> `"order"`.
 pub(crate) fn quote(ident: &str) -> String {
     format!("\"{}\"", ident.replace('"', "\"\""))
+}
+
+/// Implements sqlx's traits for a type stored as text through `Display` and
+/// `FromStr` (what `#[derive(DbEnum)]` generates), for every database this
+/// build of Renox supports. Chosen when renox-core is compiled, so apps don't
+/// need to know which features it has.
+#[doc(hidden)]
+#[cfg(not(feature = "postgres"))]
+#[macro_export]
+macro_rules! __db_text_type {
+    ($t:ty) => {
+        $crate::__db_text_type_for!($t, $crate::sqlx::sqlite::Sqlite);
+    };
+}
+
+#[doc(hidden)]
+#[cfg(feature = "postgres")]
+#[macro_export]
+macro_rules! __db_text_type {
+    ($t:ty) => {
+        $crate::__db_text_type_for!($t, $crate::sqlx::sqlite::Sqlite);
+        $crate::__db_text_type_for!($t, $crate::sqlx::postgres::Postgres);
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __db_text_type_for {
+    ($t:ty, $db:ty) => {
+        impl $crate::sqlx::Type<$db> for $t {
+            fn type_info() -> <$db as $crate::sqlx::Database>::TypeInfo {
+                <::std::string::String as $crate::sqlx::Type<$db>>::type_info()
+            }
+
+            fn compatible(ty: &<$db as $crate::sqlx::Database>::TypeInfo) -> bool {
+                <::std::string::String as $crate::sqlx::Type<$db>>::compatible(ty)
+            }
+        }
+
+        impl<'r> $crate::sqlx::Decode<'r, $db> for $t {
+            fn decode(
+                value: <$db as $crate::sqlx::Database>::ValueRef<'r>,
+            ) -> ::std::result::Result<Self, $crate::sqlx::error::BoxDynError> {
+                let text = <::std::string::String as $crate::sqlx::Decode<$db>>::decode(value)?;
+                text.parse::<$t>().map_err(::std::convert::Into::into)
+            }
+        }
+    };
 }

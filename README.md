@@ -104,6 +104,9 @@ async fn store(State(db): State<Db>, Valid(form): Valid<EntryForm>) -> Result<Vi
 <details>
 <summary><b>Database</b>: SQLite or PostgreSQL, migrations, models</summary>
 
+- Every form field type maps to a Rust type and a column on both databases: checkboxes, selects
+  (`#[derive(DbEnum)]`), multi-selects (`Json<Vec<_>>`), dates, times, JSON, UUIDs
+  ([docs/types.md](docs/types.md)).
 - Plain SQL migrations run in batches (`migrate`, `migrate:rollback`, `migrate:fresh --seed`),
   with per-database files when SQL differs.
 - `#[derive(Model)]` gives you `create`, `save`, `delete` (with optional soft deletes), `find_or_404`,

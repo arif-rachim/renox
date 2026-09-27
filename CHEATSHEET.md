@@ -164,6 +164,41 @@ async fn queries(db: &Db) -> Result {
 }
 ```
 
+## Every field type (details in docs/types.md)
+
+```rust
+use renox::chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+use renox::db::Json;
+use renox::prelude::*;
+use serde::{Deserialize, Serialize};
+
+#[derive(DbEnum, Debug, Clone, Copy, PartialEq, Default)]
+enum Size { Small, #[default] Medium, Large } // <select>; TEXT "small" | "medium" | "large"
+
+#[derive(Model, Serialize, Default)]
+#[model(table = "products")]
+struct Product {
+    id: i64,
+    name: String,                 // <input>            TEXT
+    price: i64,                   // money in rupiah    INTEGER / BIGINT
+    weight_kg: f64,               // step="0.01"        REAL / DOUBLE PRECISION
+    available: bool,              // checkbox           INTEGER 0/1 / BOOLEAN
+    size: Size,                   // <select>           TEXT
+    colors: Json<Vec<String>>,    // <select multiple>  TEXT / JSONB
+    opens_at: Option<NaiveTime>,          // type=time            TEXT / TIME
+    launch_at: Option<NaiveDateTime>,     // type=datetime-local  TEXT / TIMESTAMP
+    released_on: Option<NaiveDate>,       // type=date            TEXT / DATE
+}
+
+#[derive(Deserialize)]
+struct ProductForm {
+    available: bool,     // "on" → true; unchecked (not sent) → false
+    #[serde(default)]
+    colors: Vec<String>, // colors=black&colors=red; nothing chosen → []
+    size: Size,          // "huge" → a validation error, reported with the others
+}
+```
+
 ## Pagination
 
 ```rust

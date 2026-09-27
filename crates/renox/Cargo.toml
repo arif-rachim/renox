@@ -15,6 +15,8 @@ categories.workspace = true
 s3 = ["renox-core/s3"]
 # PostgreSQL databases (`DATABASE_URL=postgres://...`).
 postgres = ["renox-core/postgres"]
+# `uuid::Uuid` model fields (BLOB on SQLite, UUID on PostgreSQL).
+uuid = ["renox-core/uuid"]
 
 [dependencies]
 renox-core.workspace = true

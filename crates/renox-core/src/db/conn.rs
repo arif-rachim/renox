@@ -284,6 +284,9 @@ fn postgres_query(
             DbValue::NaiveDateTime(v) => query.bind(v),
             DbValue::Date(v) => query.bind(v),
             DbValue::Time(v) => query.bind(v),
+            DbValue::Json(v) => query.bind(sqlx::types::Json(v)),
+            #[cfg(feature = "uuid")]
+            DbValue::Uuid(v) => query.bind(v),
         },
     )
 }
