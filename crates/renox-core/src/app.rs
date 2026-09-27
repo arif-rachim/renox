@@ -222,7 +222,6 @@ impl App {
         listing.sort_by(|a, b| (&a.path, &a.method).cmp(&(&b.path, &b.method)));
         let routes = Arc::new(routes);
 
-        crate::error::set_debug(config.debug);
         let storage = crate::storage::Storage::from_config(&config)?;
         let views = Views::new(&config, routes.clone(), storage.clone());
         let state = AppState {

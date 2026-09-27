@@ -148,7 +148,7 @@ impl Views {
         }
     }
 
-    fn render_error(&self, page: &ErrorPage) -> anyhow::Result<String> {
+    fn render_error(&self, page: &ErrorPage, debug: bool) -> anyhow::Result<String> {
         let env = self.reloader.acquire_env()?;
         let specific = format!("errors/{}.html", page.status.as_u16());
         let template = match env.get_template(&specific) {
@@ -161,7 +161,7 @@ impl Views {
         Ok(template.render(context! {
             status => page.status.as_u16(),
             reason => reason(page.status),
-            detail => page.detail,
+            detail => page.shown_detail(debug),
         })?)
     }
 }
@@ -331,10 +331,15 @@ pub(crate) async fn middleware(
     }
 
     if let Some(page) = res.extensions_mut().remove::<ErrorPage>() {
-        match state.views.render_error(&page) {
-            Ok(html) => return with_html(res, html),
-            Err(err) => tracing::error!(error = ?err, "could not render the error page"),
-        }
+        let debug = state.config.debug;
+        let html = state
+            .views
+            .render_error(&page, debug)
+            .unwrap_or_else(|err| {
+                tracing::error!(error = ?err, "could not render the error page");
+                crate::error::error_page(page.status, page.shown_detail(debug))
+            });
+        return with_html(res, html);
     }
     res
 }
