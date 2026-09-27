@@ -470,23 +470,76 @@ M13c · keep it that way:
       failed jobs and webhook calls, backups, deploys and migrations, maintenance mode, logs
 
 ### M14 · v0.15: API freeze
-What would be a breaking change after 1.0, settled now (IDs from the audit):
+What would be a breaking change after 1.0, settled now (IDs from the audit), in three PRs.
+
+M14a · API foundations:
 - [ ] A1 `#[non_exhaustive]` or builders on public types that will grow
 - [ ] A2 Public dependency policy: which of axum / sqlx / tower-http stay exposed, and a
       documented rule for Renox's major version when they change
 - [ ] A3 `Error::Status(code, message)` and an `abort` helper
+- [ ] A10 Route groups with a path prefix and a name prefix
+- [ ] A9 App commands (`App::command`), plus a `make:command` generator
+- [ ] `rnx new` pins the Renox version it depends on (a git tag or rev until the crates are
+      published), so `cargo update` doesn't pull an unreleased API
+
+M14b · extension points:
+- [ ] A8 Template functions and filters (money, dates), shared view data, typed app state,
+      `App::layer` for global middleware
 - [ ] A4 Gates that can use the database; a `User` apps extend (roles, extra fields at
       registration)
+- [ ] Strict undefined variables in templates while `APP_DEBUG` is on, and a debug error page
+      with the request, the error chain and the template location
+
+M14c · mail and notifications:
 - [ ] A6 Mail with from, cc, bcc, reply-to, several recipients and attachments
-- [ ] A7 Custom notification channels (e.g. WhatsApp, SMS) and notifying non-users
-- [ ] A8 App extension points: template functions and filters, shared view data, typed app
-      state, `App::layer`
-- [ ] A9 App commands (`App::command`), plus a `make:command` generator
-- [ ] A10 Route groups with a path prefix and a name prefix
+- [ ] A7 Custom notification channels (e.g. WhatsApp, SMS), notifying non-users, queued
+      notifications
 - [ ] Update the cheat-sheet, docs, examples and generators to the frozen API
 
+### M15 · v0.16: The data layer
+The biggest day-to-day gap for developers coming from Laravel (see "Readiness vs Laravel" in the
+audit). Explicit, typed, no magic; settled before the 1.0 freeze.
+- [ ] Query builder: `select(&[..])`, `or_where` / grouped conditions, `where_between`,
+      `where_not_in`, `sum`/`avg`/`min`/`max`, `pluck`, bulk `update`, `increment`,
+      `upsert` / `insert_many`, `first_or_create`, `chunk`, `when()`, and a simple `join` with
+      checked column names
+- [ ] `sql(..).fetch_as::<T>()` for models and `FromRow` structs
+- [ ] Relations as explicit helpers: `belongs_to` / `has_many`, eager loading of a page's
+      relations in one query (`load_many` via `where_in`, no N+1), many-to-many through a
+      pivot table; a `docs/relations.md` guide
+- [ ] Validation: `regex`, dates (`before`/`after`), `digits`, `in`/`not_in`, `required_if` /
+      `required_with`, `same`/`different`, rules for each item of a `Vec`, a `Rule` trait for
+      reusable rules
+- [ ] Requests and responses: `Vec<Upload>` for several files in one field, a cookie API,
+      download and streaming helpers
+
+### M16 · v0.17: Developer experience and trust
+- [ ] Lighter builds: analytics (reqwest) behind a feature, rustls on `ring` so `aws-lc-sys`
+      isn't built by default, `fake` only where factories are used; documented dev-profile tips
+- [ ] Cache-busting `asset()` (content hash in the URL, long cache for hashed files)
+- [ ] `make:deploy` Dockerfile with dependency caching (cargo-chef)
+- [ ] Rate limits and the login lock optionally stored in the database for several servers;
+      multi-server caveats in docs/operations.md
+- [ ] CI: `rnx new` → every `make:*` → `cargo build` and `cargo test` on the result; trybuild
+      tests for the macros; a feature matrix (cargo-hack) including a SQLite-only build; S3
+      against MinIO; MSRV; cargo-deny; coverage; semver checks
+- [ ] Direct tests for APIs covered only indirectly (session `pull`/`reflash`/`set_lifetime`,
+      `HxRedirect`/`HxRefresh`, `Validator::rule`, `fetch_optional`/`bind_all`, schedule
+      constructors and offsets, signed URL tampering and expiry, plural 0, `Config::load`)
+- [ ] SECURITY.md, CONTRIBUTING.md, CHANGELOG.md
+
+### M17 · v0.18: Examples of real apps
+- [ ] `examples/shop`: auth with gates and policies, an admin with search, sort and pagination,
+      uploads, checkout in a transaction, cache, mail and notifications, queue, i18n with
+      plurals, SEO, and its `make:deploy` output
+- [ ] `examples/htmx-recipes`: inline edit (`hx-patch`), infinite scroll, modal forms, delete
+      with `HxRefresh`/`HxRedirect`, Alpine dropdown/tabs/modal
+- [ ] `examples/relations`: one-to-many and many-to-many with joins and eager loading
+- [ ] A README for every example
+
 ### v1.0
-- [ ] Documentation site built with Renox, starter kit, semver stability guarantee
+- [ ] Documentation site built with Renox: a tutorial, a "Laravel → Renox" guide, the API
+      reference; a starter kit; the semver stability guarantee
 - [ ] Real crates published to crates.io (`renox`, `renox-core`, `renox-macros`, `renox-cli`;
       only 0.0.1 placeholders exist), then crates.io/docs.rs badges and `cargo install renox-cli`
       in the README
