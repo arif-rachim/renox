@@ -40,12 +40,11 @@ use serde_json::{Map, Value, json};
 
 pub use extract::Valid;
 pub use messages::Locale;
-pub(crate) use messages::template_for;
+pub(crate) use messages::{render, template_for};
 pub use value::{FieldValue, Inspected};
 
 use crate::Result;
 use crate::db::{Db, DbValue, quote};
-use messages::render;
 
 /// Validation errors: messages keyed by field name.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -136,7 +135,7 @@ impl Validator {
             t.get(&format!("renox.validation.attributes.{name}"))
                 .cloned()
         });
-        Field {
+        let mut field = Field {
             translated: translated.is_some(),
             label: translated.unwrap_or_else(|| name.replace('_', " ")),
             name: name.to_owned(),
@@ -145,7 +144,14 @@ impl Validator {
             failed: false,
             last_pending: None,
             v: self,
+        };
+        // `NaN`, `inf` and `1e999` parse as floats, but aren't numbers anyone entered.
+        if let Inspected::Number(n) = field.value
+            && !n.is_finite()
+        {
+            field.fail("numeric", &[]);
         }
+        field
     }
 
     /// The language messages are written in, e.g. to pick labels.

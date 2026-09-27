@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use cookie::Key;
 
-use crate::auth::{Gates, Throttle};
+use crate::auth::{Gates, LoginThrottle};
 use crate::cache::Cache;
 use crate::db::Db;
 use crate::events::Listeners;
@@ -30,7 +30,7 @@ pub struct AppState {
     pub(crate) listeners: Listeners,
     pub(crate) key: Key,
     pub(crate) gates: Gates,
-    pub(crate) throttle: Arc<Throttle>,
+    pub(crate) throttle: Arc<LoginThrottle>,
     pub(crate) security: Arc<crate::security::Security>,
     pub(crate) webhooks: crate::webhook::Handlers,
 }

@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::extract::{Request, State};
-use axum::http::header::{ACCEPT, CONTENT_LENGTH, CONTENT_TYPE, REFERER};
+use axum::http::header::{ACCEPT, CONTENT_LENGTH, CONTENT_TYPE};
 use axum::http::{HeaderValue, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Redirect, Response};
@@ -344,7 +344,8 @@ pub(crate) async fn middleware(
         let header = |name| req.headers().get(name).and_then(|v| v.to_str().ok());
         let wants_json = header(ACCEPT).is_some_and(|v| v.contains("application/json"))
             || header(CONTENT_TYPE).is_some_and(|v| v.starts_with("application/json"));
-        (wants_json, header(REFERER).map(str::to_owned))
+        // Back to the form's page, but never to another site.
+        (wants_json, crate::htmx::same_site_referer(req.headers()))
     };
 
     let mut res = next.run(req).await;

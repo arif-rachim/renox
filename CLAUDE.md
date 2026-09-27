@@ -53,13 +53,16 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/validation/          Validator/rules (mod.rs), Valid<T> extractor (extract.rs), en/id messages
   src/auth/                User, hashing, login/logout, CurrentUser middleware, AuthUser, guards,
                            Policy/gates (mod.rs), Auth module + pages (module.rs), password reset,
-                           verification, API tokens, throttle, notifications
+                           verification, API tokens, LoginThrottle (pair/account/IP), notifications;
+                           logout bumps users.sessions_revoked_at (checked in resolve)
   src/queue/               Job trait, Queue (dispatch), Worker
   src/schedule.rs          Schedule + runner; APP_TIMEZONE offsets
   src/events.rs            Event, listeners, AppState::emit
   src/mail.rs              Mail, Mailer (smtp/log/memory), mail_view, queue_mail, /_renox/mail preview
   src/cache.rs             Cache (memory / database store), remember()
   src/rate_limit.rs        Limiter + middleware behind Routes::throttle
+  src/client_ip.rs         ClientIp extractor + TrustedProxies (TRUSTED_PROXIES); resolved once in
+                           security::middleware (outermost), read by throttle, login lock, trace span
   src/maintenance.rs       down/up/status + middleware (bypass cookie)
   src/health.rs            GET /health
   src/upload.rs            Upload (multipart file field), sniffing, store/store_public, token registry
@@ -488,6 +491,10 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 - The probes are committed on **local** branches `probe-web` (probe_web.rs) and `probe-data`
   (probe_data.rs, probe_bg.rs, examples/probe-chaos): `git worktree add ../x probe-web`. They are not
   pushed and not on main; when an item is fixed, move its probe to main as a passing test.
+- M13a moved all web probes to main as `tests/it/web_security.rs` (names without `probe_`).
+  `probe-data` remains the source for M13b/M13c.
+- `target/` grows to ~100 GB over a few milestones and fills the disk (link errors, "No space left
+  on device"); `cargo clean` it before the full two-database run.
 - This session's working directory (~/workspace/renoxium) isn't a git repo, so the Agent tool's
   `isolation: "worktree"` fails there; create worktrees by hand with `git -C ~/workspace/renox
   worktree add …` and point agents at them.
@@ -524,7 +531,8 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M10d doctests on public APIs (all 35 renox-core examples compile) | merged to `main` (#28) |
 | M12 types end to end (checkbox, datetime-local, multi-select, `DbEnum`, `Json<T>`, `uuid` feature, `examples/fields`, docs/types.md) | merged to `main` (#29) |
 | Pre-1.0 audit (Laravel gaps, negative flows, chaos) → docs/audit/2026-09-pre-1.0.md; plan M13 + M14 in ROADMAP | PR from branch `pre-1.0-plan` |
-| M13a web security, M13b resilience, M13c regression + chaos suite (ROADMAP M13, IDs W*/D* in the audit) | next |
+| M13a web security (W1–W18): sandboxed user files, `ClientIp` + `TRUSTED_PROXIES`, logout revokes sessions, 3-way login lock, same-site redirects | PR from branch `m13a-web-security` |
+| M13b resilience, M13c regression + chaos suite (ROADMAP M13, IDs D* in the audit) | next |
 | M14 API freeze (ROADMAP M14, IDs A*) | after M13 |
 | v1.0 docs site, starter kit, semver guarantee | last |
 

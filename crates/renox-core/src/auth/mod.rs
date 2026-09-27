@@ -54,17 +54,19 @@ use axum::response::{IntoResponse, Redirect, Response};
 
 pub use module::Auth;
 pub use notifications::{Channel, DatabaseNotification, Notification};
-pub(crate) use throttle::Throttle;
+pub(crate) use throttle::LoginThrottle;
 pub use tokens::{AccessToken, NewToken};
 pub use user::{User, hash_password, verify_password};
 pub use verification::send_verification;
 
 use crate::crypto::constant_time_eq;
-use crate::db::Model;
+use crate::db::Db;
 use crate::{AppState, Error, Htmx, HxRedirect, Result, Session};
 
 const AUTH_ID: &str = "_auth_user_id";
 const AUTH_HASH: &str = "_auth_password_hash";
+/// Unix milliseconds of the login, compared with `users.sessions_revoked_at`.
+const AUTH_AT: &str = "_auth_at";
 const INTENDED: &str = "_intended";
 
 /// Decides whether a user may perform an ability on a model.
@@ -224,15 +226,27 @@ pub fn login(session: &Session, user: &User, remember: Option<u64>) -> Result {
     session.regenerate_token();
     session.put(AUTH_ID, user.id)?;
     session.put(AUTH_HASH, fingerprint(&user.password))?;
+    session.put(AUTH_AT, unix_millis())?;
     if let Some(minutes) = remember {
         session.set_lifetime(minutes);
     }
     Ok(())
 }
 
-/// Ends the session entirely: user, data and CSRF token.
-pub fn logout(session: &Session) {
+/// Ends the session entirely (user, data and CSRF token), and every other
+/// session of the same user, so a copied cookie stops working too.
+pub async fn logout(db: &Db, session: &Session) -> Result {
+    if let Some(id) = session.get::<i64>(AUTH_ID) {
+        user::revoke_sessions(db, id).await?;
+    }
     session.flush();
+    Ok(())
+}
+
+pub(crate) fn unix_millis() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as i64)
 }
 
 /// Ties a session to the password it was logged in with, so changing the
@@ -257,11 +271,16 @@ pub(crate) async fn middleware(
         .map(str::to_owned);
     let session = req.extensions().get::<Session>().cloned();
     let (user, via_token) = match (&bearer, &session) {
+        // Only a token that authenticates turns CSRF off: a wrong or unknown
+        // one leaves the request a guest's, with CSRF checked as usual.
         (Some(bearer), _) => match tokens::authenticate(&state.db, bearer.trim()).await {
-            Ok(user) => (user, true),
+            Ok(user) => {
+                let valid = user.is_some();
+                (user, valid)
+            }
             Err(err) => {
                 tracing::error!(error = ?err, "could not check the API token");
-                (None, true)
+                (None, false)
             }
         },
         (None, Some(session)) => (resolve(&state, session).await, false),
@@ -279,12 +298,20 @@ pub(crate) async fn middleware(
 async fn resolve(state: &AppState, session: &Session) -> Option<User> {
     let id: i64 = session.get(AUTH_ID)?;
     let hash: String = session.get(AUTH_HASH).unwrap_or_default();
-    match User::find(&state.db, id).await {
-        Ok(Some(user)) if constant_time_eq(&fingerprint(&user.password), &hash) => Some(user),
+    let logged_in_at: i64 = session.get(AUTH_AT).unwrap_or(0);
+    match User::find_with_revocation(&state.db, id).await {
+        Ok(Some((user, revoked_at)))
+            if constant_time_eq(&fingerprint(&user.password), &hash)
+                && (revoked_at == 0 || logged_in_at > revoked_at) =>
+        {
+            Some(user)
+        }
         Ok(_) => {
-            // Deleted user or changed password: this session is no longer theirs.
+            // Deleted user, changed password or logged out elsewhere: this
+            // session is no longer theirs.
             session.remove(AUTH_ID);
             session.remove(AUTH_HASH);
+            session.remove(AUTH_AT);
             None
         }
         Err(err) => {
@@ -377,7 +404,7 @@ pub(crate) async fn guest_only(req: Request, next: Next) -> Response {
 pub(crate) fn intended(session: &Session, fallback: String) -> String {
     session
         .pull::<String>(INTENDED)
-        .filter(|path| path.starts_with('/') && !path.starts_with("//"))
+        .filter(|path| crate::htmx::is_local_path(path))
         .unwrap_or(fallback)
 }
 

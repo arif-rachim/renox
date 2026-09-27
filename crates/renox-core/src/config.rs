@@ -110,6 +110,8 @@ pub struct Config {
     pub vars: std::collections::HashMap<String, String>,
     /// Search engines and analytics; used only in production.
     pub analytics: AnalyticsConfig,
+    /// Reverse proxies whose `X-Forwarded-For` is believed, from `TRUSTED_PROXIES`.
+    pub trusted_proxies: crate::TrustedProxies,
 }
 
 /// Google Search Console, Google Analytics 4 and Google Tag Manager, from
@@ -211,6 +213,7 @@ impl Config {
                 * 1024
                 * 1024,
             csp: CspMode::parse(&var_or("CSP", "relaxed"))?,
+            trusted_proxies: crate::TrustedProxies::parse(&var_or("TRUSTED_PROXIES", ""))?,
             vars: Default::default(),
             analytics: AnalyticsConfig {
                 google_site_verification: optional("GOOGLE_SITE_VERIFICATION"),
@@ -270,6 +273,7 @@ impl Default for Config {
             csp: CspMode::Relaxed,
             vars: Default::default(),
             analytics: AnalyticsConfig::default(),
+            trusted_proxies: Default::default(),
         }
     }
 }

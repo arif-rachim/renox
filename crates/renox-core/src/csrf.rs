@@ -10,16 +10,21 @@ use crate::{Error, Session};
 pub const CSRF_HEADER: &str = "x-csrf-token";
 pub const CSRF_FIELD: &str = "_token";
 
-/// Finds the text field `name` in a buffered multipart body.
+/// Finds the text field `name` in a buffered multipart body. The body was
+/// already read within the app's `UPLOAD_MAX_SIZE`, so no other limit
+/// applies here (axum's `Multipart` would add its own 2 MB one).
 pub(crate) async fn multipart_field(
     headers: &axum::http::HeaderMap,
     bytes: axum::body::Bytes,
     name: &str,
 ) -> Option<String> {
-    use axum::extract::{FromRequest, Multipart};
-    let mut probe = Request::new(Body::from(bytes));
-    *probe.headers_mut() = headers.clone();
-    let mut multipart = Multipart::from_request(probe, &()).await.ok()?;
+    let content_type = headers
+        .get(axum::http::header::CONTENT_TYPE)?
+        .to_str()
+        .ok()?;
+    let boundary = multer::parse_boundary(content_type).ok()?;
+    let body = futures_util::stream::once(async move { Ok::<_, std::io::Error>(bytes) });
+    let mut multipart = multer::Multipart::new(body, boundary);
     while let Ok(Some(field)) = multipart.next_field().await {
         if field.name() == Some(name) {
             return field.text().await.ok();
@@ -45,6 +50,17 @@ pub(crate) async fn middleware(req: Request, next: Next) -> Response {
     // API tokens are sent explicitly, not by the browser, so they can't be forged cross-site.
     if crate::auth::user_via_token(req.extensions()) {
         return next.run(req).await;
+    }
+    // A Bearer token that didn't authenticate: the caller is an API client
+    // with bad credentials, so say that (401) instead of asking for a CSRF
+    // token. Either way the request goes no further.
+    if req
+        .headers()
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.starts_with("Bearer "))
+    {
+        return Error::Unauthorized.into_response();
     }
 
     // Routes marked `without_csrf()`, e.g. webhooks, which verify signatures instead.

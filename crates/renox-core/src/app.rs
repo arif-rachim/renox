@@ -15,7 +15,7 @@ use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
-use crate::auth::{Gate, Throttle, User};
+use crate::auth::{Gate, LoginThrottle, User};
 use crate::crypto::parse_key;
 use crate::db::{Db, Migration, MigrationStatus, Migrator};
 use crate::events::Event;
@@ -330,8 +330,7 @@ impl App {
             db,
             key,
             gates: Arc::new(self.gates),
-            // Five failed logins per email and IP per minute.
-            throttle: Arc::new(Throttle::new(5, Duration::from_secs(60))),
+            throttle: Arc::new(LoginThrottle::new()),
         };
 
         Ok(Kernel {
@@ -776,7 +775,26 @@ fn build_router(
             async move { crate::embedded::serve(&files, &uri) }
         })
     } else if public.is_dir() {
-        router.fallback_service(ServeDir::new(public).not_found_service(not_found.into_service()))
+        let files = ServeDir::new(public).not_found_service(not_found.into_service());
+        router.fallback(move |req: axum::extract::Request| {
+            let files = files.clone();
+            async move {
+                // A name no file system accepts (over 255 bytes) can't be a
+                // file here; asking the OS would be a "name too long" 500.
+                if req
+                    .uri()
+                    .path()
+                    .split('/')
+                    .any(|segment| segment.len() > 255)
+                {
+                    return axum::response::IntoResponse::into_response(Error::NotFound);
+                }
+                match tower::ServiceExt::oneshot(files, req).await {
+                    Ok(res) => axum::response::IntoResponse::into_response(res),
+                    Err(never) => match never {},
+                }
+            }
+        })
     } else {
         router.fallback(not_found)
     };
@@ -799,11 +817,17 @@ fn build_router(
         .layer(axum::extract::DefaultBodyLimit::max(
             state.config.upload_max_size,
         ))
-        .layer(from_fn_with_state(
-            state.clone(),
-            crate::security::middleware,
-        ))
-        .layer(TraceLayer::new_for_http())
+        .layer(
+            TraceLayer::new_for_http().make_span_with(|req: &axum::extract::Request| {
+                let ip = crate::ClientIp::of(req).map(|ip| ip.to_string());
+                tracing::debug_span!(
+                    "request",
+                    method = %req.method(),
+                    uri = %req.uri(),
+                    ip = ip.as_deref().unwrap_or("unknown"),
+                )
+            }),
+        )
         .with_state(state.clone());
     // Method spoofing must change the method before the router matches it.
     let limit = state.config.upload_max_size;
@@ -812,7 +836,11 @@ fn build_router(
             crate::method::middleware(req, next, limit)
         },
     );
-    Router::new().fallback_service(tower::Layer::layer(&spoofing, router))
+    // Security headers outermost, so every response gets them, including
+    // the method-spoofing layer's own 413.
+    Router::new()
+        .fallback_service(tower::Layer::layer(&spoofing, router))
+        .layer(from_fn_with_state(state, crate::security::middleware))
 }
 
 /// The generated `/robots.txt`, unless the app ships its own in `public/`.
@@ -834,9 +862,47 @@ fn robots(
 /// Public files of the local disk at `/storage/...`, outside sessions.
 fn public_files(state: &AppState) -> Router<AppState> {
     match state.storage.public_root() {
-        Some(root) => Router::new().nest_service("/storage", ServeDir::new(root)),
+        Some(root) => Router::new()
+            .nest_service("/storage", ServeDir::new(root))
+            .layer(axum::middleware::map_response(user_file_headers)),
         None => Router::new(),
     }
+}
+
+/// Uploaded files are other people's content served from the app's origin:
+/// a sandbox CSP keeps any HTML or SVG among them from running scripts,
+/// `nosniff` stops browsers guessing a type, and documents are downloaded
+/// instead of displayed.
+pub(crate) async fn user_file_headers(
+    mut res: axum::response::Response,
+) -> axum::response::Response {
+    use axum::http::HeaderValue;
+    use axum::http::header::{
+        CONTENT_DISPOSITION, CONTENT_SECURITY_POLICY, CONTENT_TYPE, X_CONTENT_TYPE_OPTIONS,
+    };
+
+    let content_type = res
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let headers = res.headers_mut();
+    headers.insert(
+        CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static(
+            "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox",
+        ),
+    );
+    headers.insert(X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+    let document = ["html", "xml", "javascript", "ecmascript"]
+        .iter()
+        .any(|kind| content_type.contains(kind))
+        && !content_type.contains("svg");
+    if document {
+        headers.insert(CONTENT_DISPOSITION, HeaderValue::from_static("attachment"));
+    }
+    res
 }
 
 /// Long-running commands log at info; others only log warnings and errors.

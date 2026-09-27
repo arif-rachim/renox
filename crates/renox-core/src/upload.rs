@@ -59,6 +59,12 @@ impl fmt::Debug for Upload {
     }
 }
 
+/// Extensions browsers treat as documents or scripts.
+const ACTIVE_EXTENSIONS: &[&str] = &[
+    "html", "htm", "xhtml", "xht", "shtml", "mht", "mhtml", "xml", "xsl", "xslt", "js", "mjs",
+    "cjs", "php", "phtml", "asp", "aspx", "jsp", "cgi", "pl", "py", "sh", "swf", "hta", "htc",
+];
+
 impl Upload {
     pub fn size(&self) -> usize {
         self.bytes.len()
@@ -96,7 +102,10 @@ impl Upload {
     }
 
     /// An extension to store the file under: from the content when it can be
-    /// sniffed, otherwise from the original name, otherwise `bin`.
+    /// sniffed, otherwise from the original name, otherwise `bin`. Names a
+    /// browser would run as a page or script (`.html`, `.js`, …) are stored
+    /// as `.txt`, so a public upload can't become active content on the
+    /// app's origin.
     fn safe_extension(&self) -> String {
         match self.sniffed_type() {
             Some("image/png") => "png".into(),
@@ -104,7 +113,11 @@ impl Upload {
             Some("image/gif") => "gif".into(),
             Some("image/webp") => "webp".into(),
             Some("application/pdf") => "pdf".into(),
-            _ => self.extension().unwrap_or_else(|| "bin".into()),
+            _ => match self.extension() {
+                Some(ext) if ACTIVE_EXTENSIONS.contains(&ext.as_str()) => "txt".into(),
+                Some(ext) => ext,
+                None => "bin".into(),
+            },
         }
     }
 

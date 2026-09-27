@@ -50,6 +50,29 @@ struct Payload {
     lifetime: Option<u64>,
 }
 
+/// Most bytes of old input kept, leaving room in the cookie for the rest
+/// of the session.
+const OLD_INPUT_LIMIT: usize = 2048;
+
+fn old_input(input: Value) -> Value {
+    let Value::Object(mut map) = input else {
+        return Value::Object(Map::new());
+    };
+    map.retain(|key, _| !key.starts_with('_') && !key.to_ascii_lowercase().contains("password"));
+    let size = |map: &Map<String, Value>| serde_json::to_string(map).map_or(0, |s| s.len());
+    while size(&map) > OLD_INPUT_LIMIT {
+        let Some(largest) = map
+            .iter()
+            .max_by_key(|(_, v)| v.to_string().len())
+            .map(|(k, _)| k.clone())
+        else {
+            break;
+        };
+        map.remove(&largest);
+    }
+    Value::Object(map)
+}
+
 impl Session {
     fn new(payload: Option<Payload>) -> Self {
         let inner = match payload {
@@ -131,8 +154,11 @@ impl Session {
     }
 
     /// Flashes the submitted form so the next page can refill it with `old()`.
+    /// Passwords and Renox's own fields (`_token`, `_method`) are never kept,
+    /// and the largest values are dropped when the rest wouldn't fit in the
+    /// cookie (browsers drop cookies over 4 KB).
     pub fn flash_input(&self, input: &impl Serialize) -> Result {
-        self.flash(OLD_INPUT, input)
+        self.flash(OLD_INPUT, old_input(serde_json::to_value(input)?))
     }
 
     /// A field from the input flashed by the previous request.

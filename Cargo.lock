@@ -2141,6 +2141,7 @@ dependencies = [
  "lettre",
  "minijinja",
  "minijinja-autoreload",
+ "multer",
  "object_store",
  "rand 0.10.3",
  "renox",

@@ -396,19 +396,23 @@ flows and injected faults into running apps. IDs below refer to it. Each fix lan
 (on the local `probe-web` / `probe-data` branches) moved to main as a passing regression test.
 
 M13a · web security:
-- [ ] W1 Uploads can't become active content: no html/svg/xml/js extensions kept; `/storage`
-      served with `CSP: sandbox`, `nosniff`, and `attachment` for non-image/PDF/text files
-- [ ] W18 / A5 `TRUSTED_PROXIES` and one `ClientIp` (X-Forwarded-For / Forwarded) used by
-      throttles, the login lock and logs
-- [ ] W2 Sessions end on logout everywhere (a per-user session version checked on each request)
-- [ ] W3 Only a valid Bearer token skips CSRF
-- [ ] W4 Multipart CSRF / `_method` fields read up to `UPLOAD_MAX_SIZE`
-- [ ] W5 Old input kept under the cookie limit; password fields never flashed
-- [ ] W6, W7 Redirects (`Back`, after validation, intended URL) stay on the app's origin
-- [ ] W8, W9 Login lock per account and per IP; password reset revokes API tokens
-- [ ] W10–W17 Maintenance cookie as an HMAC with `Secure`; security headers on 413; empty files
+- [x] W1 Uploads can't become active content: html/xml/js/php/… extensions are stored as
+      `.txt`; `/storage` and `public/` answer with `CSP: sandbox`, `nosniff`, and `attachment`
+      for HTML/XML/JavaScript (an SVG stays an image, sandboxed)
+- [x] W18 / A5 `TRUSTED_PROXIES` (addresses, CIDR ranges or `*`) and one `ClientIp` extractor
+      (X-Forwarded-For / Forwarded, walked from the right) used by throttles, the login lock
+      and request logs
+- [x] W2 Logging out ends every session of the user (`users.sessions_revoked_at`, checked on
+      each request; `auth::logout` is now async and takes the `Db`)
+- [x] W3 Only a valid Bearer token skips CSRF; a wrong one answers 401
+- [x] W4 Multipart CSRF / `_method` fields read up to `UPLOAD_MAX_SIZE` (with `multer`)
+- [x] W5 Old input kept under 2 KB; password and `_` fields never flashed
+- [x] W6, W7 Redirects (`Back`, after validation, intended URL) stay on the app's origin
+- [x] W8, W9 Login lock per email+IP, per account and per IP; password reset revokes API tokens
+- [x] W10–W17 Maintenance cookie as an HMAC with `Secure`; security headers on 413; empty files
       fail type rules; long paths 404; unique races 422; finite floats only; 415 for unknown
       bodies; normalized emails on login and reset
+- [x] The web probes are in main as `crates/renox/tests/it/web_security.rs`
 
 M13b · data and background resilience:
 - [ ] D1, D3, D9 Panics are contained: a job panic is a failed attempt and the worker keeps

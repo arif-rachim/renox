@@ -43,7 +43,7 @@ pub mod prelude {
         HxTrigger, Module, Result, Routes, Session, Valid, Validate, ValidationError, Validator,
         View, context, view,
     };
-    pub use renox_core::{AuthUser, Lang, Policy, Registry, Upload};
+    pub use renox_core::{AuthUser, ClientIp, Lang, Policy, Registry, Upload};
     pub use renox_macros::{DbEnum, Model};
 
     pub use axum::extract::{Form, Json, Path, Query, State};

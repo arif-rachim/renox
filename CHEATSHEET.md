@@ -533,4 +533,5 @@ Also available: `post_multipart(uri, &[("title", "x")], &[("photo", "a.png", &by
 `DATABASE_URL` (`sqlite://storage/app.db` or `postgres://…` with the `postgres` feature),
 `TEST_DATABASE_URL`, `MAIL_MAILER` (`log` | `smtp`), `QUEUE_WORKERS`, `SCHEDULER`,
 `CACHE_STORE` (`memory` | `database`), `STORAGE_DISK` (`local` | `s3`), `UPLOAD_MAX_SIZE` (MB),
-`CSP` (`relaxed` | `strict` | `off`).
+`CSP` (`relaxed` | `strict` | `off`), `TRUSTED_PROXIES` (`127.0.0.1,10.0.0.0/8` or `*`: behind a
+proxy, rate limits, the login lock, logs and the `ClientIp` extractor use `X-Forwarded-For`).

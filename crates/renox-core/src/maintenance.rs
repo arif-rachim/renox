@@ -61,14 +61,20 @@ pub fn status(storage: &Path) -> Option<Down> {
     serde_json::from_str(&text).ok()
 }
 
-fn has_bypass(req: &Request, secret: &str) -> bool {
+/// The bypass cookie's value: an HMAC of the secret, so the cookie can't be
+/// read back into the secret (which also opens `/{secret}`).
+fn bypass_token(state: &AppState, secret: &str) -> String {
+    crate::signed::signature(state, &format!("maintenance-bypass:{secret}"))
+}
+
+fn has_bypass(req: &Request, token: &str) -> bool {
     req.headers()
         .get_all(COOKIE)
         .iter()
         .filter_map(|v| v.to_str().ok())
         .flat_map(|v| v.split(';'))
         .filter_map(|pair| pair.trim().split_once('='))
-        .any(|(name, value)| name == BYPASS_COOKIE && constant_time_eq(value, secret))
+        .any(|(name, value)| name == BYPASS_COOKIE && constant_time_eq(value, token))
 }
 
 pub(crate) async fn middleware(
@@ -87,12 +93,18 @@ pub(crate) async fn middleware(
         return next.run(req).await;
     }
     if let Some(secret) = &down.secret {
-        if has_bypass(&req, secret) {
+        if has_bypass(&req, &bypass_token(&state, secret)) {
             return next.run(req).await;
         }
         if req.uri().path().trim_start_matches('/') == secret {
             let mut res = Redirect::to("/").into_response();
-            let cookie = format!("{BYPASS_COOKIE}={secret}; Path=/; HttpOnly; SameSite=Lax");
+            let secure = if state.config.url.starts_with("https://") {
+                "; Secure"
+            } else {
+                ""
+            };
+            let token = bypass_token(&state, secret);
+            let cookie = format!("{BYPASS_COOKIE}={token}; Path=/; HttpOnly; SameSite=Lax{secure}");
             if let Ok(value) = HeaderValue::from_str(&cookie) {
                 res.headers_mut().append(SET_COOKIE, value);
             }
