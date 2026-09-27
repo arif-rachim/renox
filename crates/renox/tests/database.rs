@@ -84,7 +84,8 @@ fn migrations_macro_embeds_files_in_order() {
         ]
     );
     assert!(migrations[0].up.contains("CREATE TABLE produk"));
-    assert_eq!(migrations[0].down, Some("DROP TABLE produk;\n"));
+    // Trimmed: Git may check files out with CRLF line endings on Windows.
+    assert_eq!(migrations[0].down.map(str::trim), Some("DROP TABLE produk;"));
     assert!(
         renox::migrations!("tests/migrations_plain")[0]
             .down
