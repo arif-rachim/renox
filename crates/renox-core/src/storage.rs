@@ -14,7 +14,7 @@
 use std::path::{Component, Path, PathBuf};
 use std::time::Duration;
 
-use anyhow::{anyhow, bail};
+use anyhow::{Context, bail};
 use axum::Router;
 use axum::body::Bytes;
 use axum::extract::{Path as UrlPath, State};
@@ -51,10 +51,13 @@ fn check_key(key: &str) -> Result<&str> {
             .components()
             .all(|c| matches!(c, Component::Normal(_)))
         && !key.contains('\\');
-    if clean {
+    if clean && !key.contains('\0') {
         Ok(key)
     } else {
-        Err(anyhow!("invalid storage key `{key}`").into())
+        Err(Error::BadRequest(format!(
+            "invalid storage key `{}`",
+            key.escape_debug()
+        )))
     }
 }
 
@@ -81,9 +84,13 @@ impl Storage {
             Disk::Local { root } => {
                 let path = root.join(key);
                 if let Some(dir) = path.parent() {
-                    tokio::fs::create_dir_all(dir).await?;
+                    tokio::fs::create_dir_all(dir)
+                        .await
+                        .with_context(|| format!("could not create {}", dir.display()))?;
                 }
-                tokio::fs::write(path, &bytes).await?;
+                tokio::fs::write(&path, &bytes)
+                    .await
+                    .with_context(|| format!("could not write {}", path.display()))?;
             }
             #[cfg(feature = "s3")]
             Disk::S3 { store, .. } => {
@@ -91,7 +98,8 @@ impl Storage {
                 store
                     .put(&object_store::path::Path::from(key), bytes.into())
                     .await
-                    .map_err(anyhow::Error::from)?;
+                    .map_err(anyhow::Error::from)
+                    .with_context(|| format!("could not store `{key}`"))?;
             }
         }
         Ok(())
@@ -104,7 +112,9 @@ impl Storage {
             Disk::Local { root } => match tokio::fs::read(root.join(key)).await {
                 Ok(bytes) => Ok(Some(bytes.into())),
                 Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
-                Err(err) => Err(err.into()),
+                Err(err) => Err(anyhow::Error::from(err)
+                    .context(format!("could not read {}", root.join(key).display()))
+                    .into()),
             },
             #[cfg(feature = "s3")]
             Disk::S3 { store, .. } => {
@@ -112,7 +122,9 @@ impl Storage {
                 match store.get(&object_store::path::Path::from(key)).await {
                     Ok(result) => Ok(Some(result.bytes().await.map_err(anyhow::Error::from)?)),
                     Err(object_store::Error::NotFound { .. }) => Ok(None),
-                    Err(err) => Err(anyhow::Error::from(err).into()),
+                    Err(err) => Err(anyhow::Error::from(err)
+                        .context(format!("could not read `{key}`"))
+                        .into()),
                 }
             }
         }
@@ -141,7 +153,9 @@ impl Storage {
             Disk::Local { root } => match tokio::fs::remove_file(root.join(key)).await {
                 Ok(()) => Ok(()),
                 Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
-                Err(err) => Err(err.into()),
+                Err(err) => Err(anyhow::Error::from(err)
+                    .context(format!("could not delete {}", root.join(key).display()))
+                    .into()),
             },
             #[cfg(feature = "s3")]
             Disk::S3 { store, .. } => {
@@ -169,7 +183,7 @@ impl Storage {
     }
 
     /// A link to any file that works for `ttl`: signed by Renox for the local
-    /// disk, presigned by S3 otherwise.
+    /// disk, presigned by S3 otherwise (for at most 7 days).
     pub async fn temporary_url(
         &self,
         state: &AppState,
@@ -184,6 +198,8 @@ impl Storage {
             #[cfg(feature = "s3")]
             Disk::S3 { store, .. } => {
                 use object_store::signer::Signer;
+                // S3 presigns for at most 7 days.
+                let ttl = ttl.min(Duration::from_secs(7 * 24 * 60 * 60));
                 let url = store
                     .signed_url(
                         axum::http::Method::GET,

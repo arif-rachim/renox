@@ -97,6 +97,23 @@ struct Pending {
     message: Option<String>,
 }
 
+/// SQLite reads an unknown double-quoted column as a string literal, which
+/// would make `unique("t", "typo")` always pass; refuse unknown columns.
+async fn ensure_sqlite_column(db: &Db, table: &str, column: &str) -> Result {
+    let found: i64 = crate::db::sql("SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?")
+        .bind(table)
+        .bind(column)
+        .scalar(db)
+        .await?;
+    if found == 0 {
+        return Err(anyhow::anyhow!(
+            "unique/exists rule: table `{table}` has no column `{column}`"
+        )
+        .into());
+    }
+    Ok(())
+}
+
 /// Collects rule failures. Rules run in order and stop at a field's first
 /// failure; rules other than `required` and `accepted` skip empty values.
 pub struct Validator {
@@ -171,10 +188,21 @@ impl Validator {
             if errors.has(&check.field) {
                 continue;
             }
+            let dialect = db.dialect();
+            if dialect == crate::db::Dialect::Sqlite {
+                ensure_sqlite_column(db, &check.table, &check.column).await?;
+            }
+            // Form input is text; PostgreSQL won't compare text with a number
+            // column, so compare as text (a no-op for text columns).
+            let column = match (&check.value, dialect) {
+                (DbValue::Text(_), crate::db::Dialect::Postgres) => {
+                    format!("CAST({} AS TEXT)", quote(&check.column))
+                }
+                _ => quote(&check.column),
+            };
             let mut sql = format!(
-                "SELECT EXISTS(SELECT 1 FROM {} WHERE {} = ?",
+                "SELECT EXISTS(SELECT 1 FROM {} WHERE {column} = ?",
                 quote(&check.table),
-                quote(&check.column)
             );
             if check.ignore_id.is_some() {
                 sql.push_str(" AND \"id\" != ?");

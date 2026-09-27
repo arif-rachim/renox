@@ -395,8 +395,8 @@ async fn each_scheduled_run_is_claimed_once() {
     let kernel = kernel().await;
     let state = kernel.state();
     // Two processes sharing the database reach the same slot: one runs it.
-    assert!(renox::schedule::claim(state, "report", 1_800_000_000).await);
-    assert!(!renox::schedule::claim(state, "report", 1_800_000_000).await);
-    assert!(renox::schedule::claim(state, "report", 1_800_000_060).await);
-    assert!(renox::schedule::claim(state, "backup", 1_800_000_000).await);
+    assert!(renox::schedule::claim(state, "report", 1_800_000_000, 120).await);
+    assert!(!renox::schedule::claim(state, "report", 1_800_000_000, 120).await);
+    assert!(renox::schedule::claim(state, "report", 1_800_000_060, 120).await);
+    assert!(renox::schedule::claim(state, "backup", 1_800_000_000, 120).await);
 }

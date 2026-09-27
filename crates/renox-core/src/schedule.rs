@@ -28,7 +28,7 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::time::Duration;
 
 use anyhow::{Context, bail};
@@ -45,6 +45,26 @@ enum When {
     Every(i64),
     /// Once a day at this many seconds after midnight in the timezone.
     Daily(i64),
+}
+
+impl When {
+    /// How long a run's claim is kept: past the slot, so a process whose
+    /// clock is a little behind doesn't run it again, and no longer.
+    fn claim_for(self) -> i64 {
+        match self {
+            When::Every(seconds) => seconds.max(60) + 60,
+            When::Daily(_) => 24 * 60 * 60,
+        }
+    }
+}
+
+/// Clears a task's `running` flag when dropped.
+struct Running(Arc<AtomicBool>);
+
+impl Drop for Running {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
 }
 
 #[derive(Clone)]
@@ -180,16 +200,21 @@ impl Schedule {
                 }
                 let (task, state) = (task.clone(), state.clone());
                 tokio::spawn(async move {
-                    if !claim(&state, &task.name, slot).await {
+                    // Clears `running` however the run ends, panics included.
+                    let _running = Running(task.running.clone());
+                    if !claim(&state, &task.name, slot, task.when.claim_for()).await {
                         tracing::debug!(task = %task.name, "skipped: another process runs it");
-                        task.running.store(false, Ordering::SeqCst);
                         return;
                     }
                     tracing::info!(task = %task.name, "scheduled task started");
-                    if let Err(err) = (task.run)(state).await {
-                        tracing::error!(task = %task.name, error = ?err, "scheduled task failed");
+                    let run = std::panic::AssertUnwindSafe((task.run)(state));
+                    match futures_util::FutureExt::catch_unwind(run).await {
+                        Ok(Ok(())) => {}
+                        Ok(Err(err)) => {
+                            tracing::error!(task = %task.name, error = ?err, "scheduled task failed");
+                        }
+                        Err(_) => tracing::error!(task = %task.name, "scheduled task panicked"),
                     }
-                    task.running.store(false, Ordering::SeqCst);
                 });
             }
         }
@@ -197,24 +222,19 @@ impl Schedule {
 }
 
 /// Claims the run of `task` due at `slot`, so that processes sharing the
-/// database run it once: the first to insert the claim wins. If the database
-/// can't be reached the task runs anyway, as a single process would.
+/// database run it once: the first to insert the claim wins. The claim is
+/// kept `keep` seconds. If the database can't be reached the task runs
+/// anyway, as a single process would.
 #[doc(hidden)]
-pub async fn claim(state: &AppState, task: &str, slot: i64) -> bool {
+pub async fn claim(state: &AppState, task: &str, slot: i64, keep: i64) -> bool {
     let now = unix_now();
-    let stale = crate::db::sql("DELETE FROM cache WHERE key LIKE 'schedule:%' AND expires_at < ?")
-        .bind(now)
-        .execute(&state.db)
-        .await;
-    if let Err(err) = stale {
-        tracing::warn!(error = %err, "could not clear old schedule claims");
-    }
+    prune_claims(state, now).await;
     let claimed = crate::db::sql(
         "INSERT INTO cache (key, value, expires_at) VALUES (?, 'null', ?) \
          ON CONFLICT (key) DO NOTHING",
     )
-    .bind(format!("schedule:{task}:{slot}"))
-    .bind(now + 24 * 60 * 60)
+    .bind(format!("{CLAIM_PREFIX}{task}:{slot}"))
+    .bind(now + keep)
     .execute(&state.db)
     .await;
     match claimed {
@@ -223,6 +243,30 @@ pub async fn claim(state: &AppState, task: &str, slot: i64) -> bool {
             tracing::warn!(task, error = %err, "could not claim the run; running it anyway");
             true
         }
+    }
+}
+
+/// Framework rows in the `cache` table start with `renox:`; `Cache::flush` keeps them.
+const CLAIM_PREFIX: &str = "renox:schedule:";
+
+/// Deletes expired claims, at most once a minute per process.
+async fn prune_claims(state: &AppState, now: i64) {
+    static LAST: AtomicI64 = AtomicI64::new(0);
+    let last = LAST.load(Ordering::Relaxed);
+    if now - last < 60
+        || LAST
+            .compare_exchange(last, now, Ordering::Relaxed, Ordering::Relaxed)
+            .is_err()
+    {
+        return;
+    }
+    let pruned = crate::db::sql("DELETE FROM cache WHERE key LIKE ? AND expires_at < ?")
+        .bind(format!("{CLAIM_PREFIX}%"))
+        .bind(now)
+        .execute(&state.db)
+        .await;
+    if let Err(err) = pruned {
+        tracing::warn!(error = %err, "could not clear old schedule claims");
     }
 }
 

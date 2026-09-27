@@ -309,6 +309,14 @@ async fn report(db: &Db) -> Result {
 }
 ```
 
+SQLite has one writer: while a transaction is open, write through `&mut tx`, not `db` (that
+waits for the transaction and fails with "database is locked"). A duplicate that slips past a
+`unique` rule is a 409 (`err.is_unique_violation()`).
+
+Migrations run in a transaction each. A migration with `CREATE INDEX CONCURRENTLY` or its own
+`BEGIN … COMMIT` runs without one, as does one with a `-- renox:no-transaction` line. Two
+`migrate` runs at once wait for each other; `migrate:status` flags edited and missing files.
+
 ## Jobs, events, schedule, mail
 
 ```rust
@@ -362,9 +370,24 @@ async fn place_order(State(state): State<AppState>) -> Result<Redirect> {
     state.emit(OrderPlaced { order_id: 1 }).await?; // listeners run, the job is queued
     Ok(Redirect::to("/orders"))
 }
+
+async fn checkout(State(state): State<AppState>) -> Result {
+    let mut tx = state.db.begin().await?;
+    // … insert the order with `&mut tx`
+    state.queue.dispatch_in(&mut tx, SendReceipt { order_id: 1 }).await?; // only if committed
+    tx.commit().await?;
+    Ok(())
+}
+
+fn card_number(raw: &str) -> Result<u64> {
+    // Retrying can't fix a bad number: the job goes straight to failed_jobs.
+    raw.parse::<u64>().map_err(Error::permanent)
+}
 ```
 
 Jobs and scheduled tasks run inside `rnx serve` / `my-app serve` (`QUEUE_WORKERS`, `SCHEDULER`).
+A job that errors, panics or passes its `TIMEOUT` is retried up to `MAX_ATTEMPTS`, then moved to
+`failed_jobs` (`queue:failed`, `queue:retry`); a panicking task or listener doesn't stop the others.
 
 ## Cache, session, uploads, translations
 
@@ -535,3 +558,5 @@ Also available: `post_multipart(uri, &[("title", "x")], &[("photo", "a.png", &by
 `CACHE_STORE` (`memory` | `database`), `STORAGE_DISK` (`local` | `s3`), `UPLOAD_MAX_SIZE` (MB),
 `CSP` (`relaxed` | `strict` | `off`), `TRUSTED_PROXIES` (`127.0.0.1,10.0.0.0/8` or `*`: behind a
 proxy, rate limits, the login lock, logs and the `ClientIp` extractor use `X-Forwarded-For`).
+Timeouts in seconds: `DATABASE_ACQUIRE_TIMEOUT` (5), `DATABASE_STATEMENT_TIMEOUT` (30,
+PostgreSQL; 0 = none), `REQUEST_TIMEOUT` (60; 0 = none), `MAIL_TIMEOUT` (10).

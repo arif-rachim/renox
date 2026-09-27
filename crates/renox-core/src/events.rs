@@ -64,7 +64,12 @@ impl AppState {
         };
         let mut first_error: Option<Error> = None;
         for listener in listeners {
-            if let Err(err) = listener(Box::new(event.clone()), self.clone()).await {
+            // A panicking listener is a failed one; the others still run.
+            let run = std::panic::AssertUnwindSafe(listener(Box::new(event.clone()), self.clone()));
+            let outcome = futures_util::FutureExt::catch_unwind(run)
+                .await
+                .unwrap_or_else(|_| Err(anyhow::anyhow!("the listener panicked").into()));
+            if let Err(err) = outcome {
                 tracing::error!(event = std::any::type_name::<E>(), error = ?err, "listener failed");
                 first_error.get_or_insert(err);
             }

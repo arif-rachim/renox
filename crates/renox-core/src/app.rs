@@ -230,11 +230,8 @@ impl App {
         self.registry.job::<crate::mail::SendMail>();
         self.registry.job::<crate::webhook::ProcessWebhook>();
         self.registry.job::<crate::analytics::ServerEvent>();
-        let mut migrations = vec![
-            crate::queue::MIGRATION,
-            crate::cache::MIGRATION,
-            crate::webhook::MIGRATION,
-        ];
+        let mut migrations = vec![crate::queue::MIGRATION, crate::cache::MIGRATION];
+        migrations.extend(crate::webhook::MIGRATIONS);
         migrations.extend(self.migrations);
         for module in &self.modules {
             migrations.extend_from_slice(module.migrations());
@@ -262,11 +259,39 @@ impl App {
 
         let mut router = Router::new();
         let mut routes = RouteTable::default();
-        let mut listing = Vec::new();
+        let mut listing: Vec<RouteInfo> = Vec::new();
         for module in &self.modules {
             tracing::debug!(module = module.name(), "registering module");
             let (module_router, names, infos) = module.routes().into_parts();
-            router = router.merge(module_router);
+            for info in &infos {
+                let clash = listing.iter().find(|other| {
+                    other.path == info.path
+                        && (other.method == info.method
+                            || other.method == "*"
+                            || info.method == "*")
+                });
+                if let Some(other) = clash {
+                    return Err(anyhow!(
+                        "{} {} is defined by both the `{}` and the `{}` module",
+                        info.method,
+                        info.path,
+                        other.module,
+                        module.name()
+                    )
+                    .into());
+                }
+            }
+            // Anything else axum refuses to merge is a boot error, not a panic.
+            router = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                router.merge(module_router)
+            }))
+            .map_err(|panic| {
+                let message = crate::error::panic_message(&*panic);
+                anyhow!(
+                    "the routes of the `{}` module clash: {message}",
+                    module.name()
+                )
+            })?;
             for (name, path) in names {
                 routes.insert(name, path)?;
             }
@@ -408,8 +433,15 @@ impl App {
             }
             "migrate:status" => {
                 for m in kernel.migration_status().await? {
+                    let note = if m.missing {
+                        "  (applied, but its file is gone)"
+                    } else if m.changed {
+                        "  (edited after it ran; the edit won't run)"
+                    } else {
+                        ""
+                    };
                     match m.batch {
-                        Some(batch) => println!("  ran (batch {batch})  {}", m.name),
+                        Some(batch) => println!("  ran (batch {batch})  {}{note}", m.name),
                         None => println!("  pending          {}", m.name),
                     }
                 }
@@ -755,6 +787,34 @@ fn flag_value(args: &[String], flag: &str) -> Result<Option<u32>> {
     }
 }
 
+/// Turns a handler that panics or runs past `REQUEST_TIMEOUT` into a 500
+/// with the error page, instead of a dropped connection or a hung client.
+async fn guard(
+    limit: Option<Duration>,
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use axum::response::IntoResponse;
+    let run = futures_util::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(next.run(req)));
+    let outcome = match limit {
+        Some(limit) => match tokio::time::timeout(limit, run).await {
+            Ok(outcome) => outcome,
+            Err(_) => {
+                return Error::Internal(anyhow!(
+                    "the request took longer than REQUEST_TIMEOUT ({}s)",
+                    limit.as_secs()
+                ))
+                .into_response();
+            }
+        },
+        None => run.await,
+    };
+    outcome.unwrap_or_else(|panic| {
+        let message = crate::error::panic_message(&*panic);
+        Error::Internal(anyhow!("the handler panicked: {message}")).into_response()
+    })
+}
+
 fn build_router(
     router: Router<AppState>,
     state: AppState,
@@ -799,7 +859,13 @@ fn build_router(
         router.fallback(not_found)
     };
 
+    let request_timeout = state.config.request_timeout;
     let router: Router = router
+        .layer(from_fn(
+            move |req: axum::extract::Request, next: axum::middleware::Next| {
+                guard(request_timeout, req, next)
+            },
+        ))
         .layer(from_fn_with_state(
             state.clone(),
             crate::maintenance::middleware,

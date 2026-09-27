@@ -415,27 +415,47 @@ M13a · web security:
 - [x] The web probes are in main as `crates/renox/tests/it/web_security.rs`
 
 M13b · data and background resilience:
-- [ ] D1, D3, D9 Panics are contained: a job panic is a failed attempt and the worker keeps
-      going; a task panic doesn't stop its schedule; a handler panic answers 500
-      (`CatchPanicLayer`); one listener's panic doesn't skip the others
-- [ ] D2 Stale reservations respect `MAX_ATTEMPTS` (exhausted jobs go to `failed_jobs`)
-- [ ] D4, D22 Timeouts: database acquire (default about 5 s), PostgreSQL `statement_timeout`,
-      a request timeout layer, SMTP; all configurable in `.env`
-- [ ] D5 `DATABASE_URL` accepts only sqlite / postgres schemes
-- [ ] D6, D7 Worker bookkeeping retried; `TIMEOUT` must be shorter than the reservation
-- [ ] D8 Public transaction-aware dispatch (`tx.dispatch`, or after commit)
-- [ ] D10, D15, D16, D17 SQLite without double-quoted-string fallback; `exists`/`unique` safe on
-      PostgreSQL across types; large `where_in`; clamped limit/offset
-- [ ] D11, D12, D13, D26, D27 Migrations: `fresh` drops the whole PostgreSQL schema; a lock
-      against concurrent runs; all-or-nothing rollback; a no-transaction marker; checksums and
-      unknown applied migrations in `migrate:status`
-- [ ] D14 Webhook payloads as bytes; long event ids hashed or refused
-- [ ] D18, D21, D23 Unique violations recognisable (409 / validation error); permanent job
-      failures skip retries; notifications don't resend mail on retry
-- [ ] D19, D20, D24, D25, D28, D29, D30 Overflow-safe signed URLs and config; boot errors
-      instead of panics; cache TTL 0, `remember` lock, type mismatch errors, namespaced
-      framework rows; scheduler claims expire with their interval; CLI refuses Rust keywords
-      and quotes table names; `Send` test helpers; storage errors name the path
+- [x] D1, D3, D9 Panics are contained: a job runs in its own task, so a panic is a failed attempt
+      and the worker keeps going (a webhook handler's panic marks its call failed); a task panic
+      doesn't stop its schedule (a guard clears `running`); a handler panic answers 500 with the
+      error page; one listener's panic doesn't skip the others
+- [x] D2 Only jobs with attempts left are reserved; a job whose last attempt never finished
+      (crash, kill, OOM) goes to `failed_jobs` (checked at most once a minute)
+- [x] D4, D22 Timeouts in `.env`: `DATABASE_ACQUIRE_TIMEOUT` (5 s), `DATABASE_STATEMENT_TIMEOUT`
+      (30 s, PostgreSQL), `REQUEST_TIMEOUT` (60 s, a 500), `MAIL_TIMEOUT` (10 s, the whole send)
+- [x] D5 `DATABASE_URL` accepts only `sqlite:`, `postgres://` and `postgresql://` (the error
+      hides the password)
+- [x] D6, D7 A job's outcome is written with retries (about 10 s) so a database blip doesn't
+      strand it; a job whose `TIMEOUT` is longer than the 15-minute reservation keeps its
+      reservation for `TIMEOUT` + 1 min (instead of refusing such jobs)
+- [x] D8 `state.queue.dispatch_in(&mut tx, job)`: the job exists only if the transaction
+      commits; workers see it within a second. Plain `dispatch` while SQLite's one write
+      transaction is open fails with "database is locked" (documented)
+- [x] D10, D15, D16, D17 `unique`/`exists` refuse an unknown column on SQLite (checked with
+      `pragma_table_info`, instead of turning SQLite's double-quoted-string fallback off, which
+      could break apps' own SQL); text input is compared as text on PostgreSQL; `where_in`
+      with over 1,000 ints or strings sends one JSON array; `limit`/`offset` clamp to `i64::MAX`
+- [x] D11, D12, D13, D26, D27 Migrations: `fresh` on PostgreSQL drops types, sequences,
+      functions and materialized views too; runs take turns (an in-process lock, an advisory
+      lock on PostgreSQL, `BEGIN IMMEDIATE` plus a re-check per migration on SQLite); rollback
+      checks every `down` before undoing anything and forgets unregistered migrations with a
+      warning; `-- renox:no-transaction`, `CONCURRENTLY` or an own `BEGIN` run without the
+      wrapper; checksums flag edited migrations, and `migrate:status` lists missing ones
+- [x] D14 Webhook payloads are stored as bytes (BLOB/BYTEA; `WebhookCall::payload: Vec<u8>`,
+      `text()`); event ids over 200 bytes are stored as `sha256:<hash>`
+- [x] D18, D21, D23 A unique violation answers 409; `Error::permanent` (payloads that no longer
+      decode, invalid mail addresses) skips the retries; notifications write the database row
+      before sending mail
+- [x] D19, D20, D24, D25, D28, D29, D30 Saturating signed-URL expiry (S3 presigns for at most
+      7 days); `DATABASE_POOL_SIZE=0`, a huge `UPLOAD_MAX_SIZE` and a path defined by two
+      modules are boot errors; cache: TTL 0 stores nothing, `remember` computes once per key in
+      a process, a wrong type is an error (`remember` recomputes), `flush` keeps `renox:` rows;
+      scheduler claims last the interval + 1 min and are pruned once a minute; the CLI refuses
+      Rust keywords and `renox`, quotes table names, rejects `create__table`, keeps `export
+      APP_KEY=`; `assert_database_has` is `Send`; storage errors name the path, and an invalid
+      key is a 400
+- [x] The data probes are in main as `tests/it/data_resilience.rs` and
+      `tests/it/background_resilience.rs`
 
 M13c · keep it that way:
 - [ ] Every probe passes on main (web, data, background), on SQLite and PostgreSQL

@@ -40,7 +40,7 @@ impl AppState {
 
     /// Like `signed_url`, for an already-encoded path such as `/_renox/files/a.pdf`.
     pub fn sign_path(&self, path: &str, ttl: Duration) -> Result<String> {
-        let unsigned = format!("{path}?expires={}", now() + ttl.as_secs());
+        let unsigned = format!("{path}?expires={}", now().saturating_add(ttl.as_secs()));
         let signature = signature(self, &unsigned);
         Ok(format!(
             "{}{unsigned}&signature={signature}",

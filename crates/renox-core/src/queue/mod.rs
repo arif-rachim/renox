@@ -92,7 +92,8 @@ pub fn handler<J: Job>() -> JobHandler {
     JobHandler {
         run: Arc::new(|payload, ctx| {
             Box::pin(async move {
-                let job: J = serde_json::from_str(&payload)?;
+                // A payload that doesn't decode now never will.
+                let job: J = serde_json::from_str(&payload).map_err(crate::Error::permanent)?;
                 job.handle(ctx).await
             })
         }),
@@ -142,12 +143,30 @@ impl Queue {
     }
 
     /// Queues a job inside `tx`, so it only exists if the transaction
-    /// commits. Call `wake()` after committing.
-    pub(crate) async fn dispatch_in<J: Job>(
+    /// commits; workers pick it up within a second of the commit. Use it
+    /// instead of `dispatch` while a transaction is open: on SQLite, which
+    /// writes one transaction at a time, `dispatch` would wait for `tx`.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # #[derive(serde::Serialize, serde::Deserialize)] struct SendReceipt { order_id: i64 }
+    /// # impl Job for SendReceipt { const NAME: &'static str = "r"; async fn handle(self, _: JobContext) -> Result { Ok(()) } }
+    /// # async fn demo(state: AppState) -> Result {
+    /// let mut tx = state.db.begin().await?;
+    /// let order_id: i64 = renox::db::sql("INSERT INTO orders (total) VALUES (?) RETURNING id")
+    ///     .bind(75_000)
+    ///     .scalar(&mut tx)
+    ///     .await?;
+    /// state.queue.dispatch_in(&mut tx, SendReceipt { order_id }).await?;
+    /// tx.commit().await?; // no order, no receipt
+    /// # Ok(()) }
+    /// ```
+    pub async fn dispatch_in<J: Job>(
+        &self,
         tx: &mut crate::db::Transaction,
-        job: &J,
+        job: J,
     ) -> Result<i64> {
-        Self::insert(tx, job, Duration::ZERO).await
+        Self::insert(tx, &job, Duration::ZERO).await
     }
 
     pub(crate) fn wake_workers(&self) {

@@ -4,6 +4,8 @@
 
 mod auth;
 mod auth_email;
+mod background_resilience;
+mod data_resilience;
 mod database;
 mod dx;
 mod embed;
