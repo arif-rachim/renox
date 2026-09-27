@@ -1,4 +1,4 @@
-//! `renox`: the command-line tool for the Renox web framework.
+//! `rnx`: the command-line tool for the Renox web framework.
 
 mod make;
 mod new;
@@ -12,7 +12,7 @@ use base64::engine::general_purpose::STANDARD;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "renox", version, about = "The Renox web framework CLI")]
+#[command(name = "rnx", version, about = "rnx: the Renox web framework CLI")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -93,7 +93,7 @@ fn main() -> Result<()> {
 /// migrations and seeders are compiled into the app.
 fn app_command(command: &str, args: &[String]) -> Result<()> {
     if !std::path::Path::new("Cargo.toml").is_file() {
-        anyhow::bail!("no Cargo.toml here; run `renox {command}` from your app's directory");
+        anyhow::bail!("no Cargo.toml here; run `rnx {command}` from your app's directory");
     }
     let status = std::process::Command::new("cargo")
         .args(["run", "--quiet", "--", command])

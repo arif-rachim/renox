@@ -41,7 +41,7 @@ pub fn derive_model(input: TokenStream) -> TokenStream {
 /// Files are `<timestamp>_<name>.up.sql` with an optional matching
 /// `.down.sql`, or a plain `<timestamp>_<name>.sql` that can't be rolled back.
 /// Add a `build.rs` with `println!("cargo:rerun-if-changed=migrations");` so
-/// new files are picked up (`renox new` creates it).
+/// new files are picked up (`rnx new` creates it).
 #[proc_macro]
 pub fn migrations(input: TokenStream) -> TokenStream {
     migrations::expand(input.into())

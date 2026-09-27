@@ -65,7 +65,7 @@ pub fn run(name: &str, renox_path: Option<&Path>) -> Result<()> {
             .with_context(|| format!("could not write {}", path.display()))?;
     }
 
-    println!("Created {name}. Next:\n\n    cd {name}\n    renox serve\n");
+    println!("Created {name}. Next:\n\n    cd {name}\n    rnx serve\n");
     Ok(())
 }
 
