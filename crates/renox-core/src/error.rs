@@ -77,6 +77,28 @@ impl ErrorPage {
     }
 }
 
+impl ErrorPage {
+    /// The error as `{"message": …}` for API clients, with the same status.
+    pub fn json(&self, debug: bool) -> Response {
+        let message = self
+            .shown_detail(debug)
+            .unwrap_or_else(|| reason(self.status));
+        (
+            self.status,
+            axum::Json(serde_json::json!({ "message": message })),
+        )
+            .into_response()
+    }
+}
+
+/// Whether the client asked for JSON: `Accept: application/json`, or a JSON body.
+pub(crate) fn wants_json(headers: &axum::http::HeaderMap) -> bool {
+    let header = |name| headers.get(name).and_then(|v| v.to_str().ok());
+    header(axum::http::header::ACCEPT).is_some_and(|v| v.contains("application/json"))
+        || header(axum::http::header::CONTENT_TYPE)
+            .is_some_and(|v| v.starts_with("application/json"))
+}
+
 pub(crate) fn reason(status: StatusCode) -> &'static str {
     match status.as_u16() {
         419 => "Page Expired",

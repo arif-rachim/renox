@@ -1,0 +1,27 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<h1>Documents</h1>
+<form method="post" action="{{ route('photos.store') }}" enctype="multipart/form-data">
+  {{ csrf_field() }}
+  <input name="title" placeholder="Photo title" value="{{ old('title') }}">
+  <input type="file" name="photo" accept="image/*">
+  <p class="error">{{ error('photo') }}</p>
+  <button>Upload photo</button>
+</form>
+<form method="post" action="{{ route('invoices.store') }}" enctype="multipart/form-data">
+  {{ csrf_field() }}
+  <input name="title" placeholder="Invoice title">
+  <input type="file" name="invoice" accept="application/pdf">
+  <p class="error">{{ error('invoice') }}</p>
+  <button>Upload invoice</button>
+</form>
+<ul>
+  {% for doc in documents %}
+  <li>
+    {% if doc.kind == "photo" %}<img src="{{ storage_url(doc.file_key) }}" alt="" width="64"> {{ doc.title }}
+    {% else %}<a href="{{ route('invoices.download', doc.id) }}">{{ doc.title }}</a> (private){% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}

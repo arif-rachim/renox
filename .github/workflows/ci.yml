@@ -69,5 +69,5 @@ jobs:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      # examples/hello is a SQLite app (its migrations are SQLite SQL).
-      - run: cargo test -p renox -p renox-core -p renox-cli --features renox/postgres
+      # The other examples are SQLite apps; examples/postgres runs on both.
+      - run: cargo test -p renox -p renox-core -p renox-cli -p postgres-app --features renox/postgres

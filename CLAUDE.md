@@ -86,6 +86,10 @@ crates/renox-cli/          `rnx`: new, serve, build, key:generate, make:* (gener
                            AGENTS.md.stub + CLAUDE.md.stub (named .stub so agents in this repo don't load them) working on the app)
 examples/hello/            guestbook app exercising many features in one file; used for live/browser testing
 examples/webhooks/         Midtrans / Xendit / Stripe webhooks (M11b)
+examples/api/              JSON API with tokens (M10c)
+examples/jobs/             events, queued mail, notifications, schedule (M10c)
+examples/uploads/          public / private files (M10c)
+examples/postgres/         one app on PostgreSQL + SQLite; package `postgres-app`; run in the PostgreSQL CI job (M10c)
 examples/crud/             the reference CRUD module (policy, soft deletes, pagination) — M10a
 CHEATSHEET.md              one-page patterns for app authors/agents; its Rust is compiled as doctests
 llms.txt                   map for agents: which example/guide file shows what
@@ -492,8 +496,9 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M11a security headers, CSP (relaxed default / strict with nonce + Alpine CSP build / off), CORS per route, `without_csrf()` | merged to `main` (#23) |
 | README rewrite (tagline, why, demo GIF, compiled examples, comparison) | merged to `main` (#24) |
 | M11b webhooks (`impl Webhook`, `webhook_calls`, signature helpers, `examples/webhooks`) | merged to `main` (#25) |
-| M11c SEO & analytics (`seo()`, robots/sitemap, Search Console, GA4/GTM, events, Measurement Protocol) | PR from branch `m11c-seo-analytics` |
-| M10c examples api/jobs/uploads/postgres, doctests on public APIs | after M11 |
+| M11c SEO & analytics (`seo()`, robots/sitemap, Search Console, GA4/GTM, events, Measurement Protocol) | merged to `main` (#26) |
+| M10c examples api / jobs / uploads / postgres; JSON errors for API clients; JSON bodies report all errors; `User::attempt`; `post_multipart` | PR from branch `m10c-examples` |
+| M10d doctests on public APIs (35 `ignore` examples in renox-core) | next |
 | v1.0 docs site, starter kit, semver guarantee | last |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on

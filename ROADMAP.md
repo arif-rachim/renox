@@ -258,17 +258,18 @@ still SQLite underneath) and M9b (the PostgreSQL backend proper).
 An agent (or a person) building on Renox should be able to find the idiomatic way to do something by
 opening one short file, not by reading the framework. That saves tokens and stops agents copying
 outdated APIs. Split in PRs: M10a (cheat-sheet, llms.txt, agent files in new apps,
-`examples/crud`), M10b (the framework gaps the examples exposed, below) and M10c (the other
-examples, doctests on public APIs).
+`examples/crud`), M10b (the framework gaps the examples exposed, below), M10c (the other
+examples, and the gaps they exposed) and M10d (doctests on public APIs).
 
 - [ ] Small, focused examples, one pattern each, every one compiled and tested in CI (an untested
       example goes stale, and a stale example is worse than none):
   - [x] `examples/hello`: routes, views, forms, validation, uploads (exists)
   - [x] `examples/crud`: model, migration, pagination, soft deletes and a trash, policy, flash (M10a)
-  - [ ] `examples/api`: auth plus API tokens (Bearer)
-  - [ ] `examples/jobs`: queue, jobs, scheduler, mail, notifications
-  - [ ] `examples/uploads`: file rules, storage (local and S3)
-  - [ ] `examples/postgres`: the same app on PostgreSQL (after M9b)
+  - [x] `examples/api`: API tokens (Bearer), JSON validation errors, CORS, rate limit (M10c)
+  - [x] `examples/jobs`: events, queued mail, notifications, a scheduled task (M10c)
+  - [x] `examples/uploads`: file rules, public files, private files behind expiring links (M10c)
+  - [x] `examples/postgres`: one app on PostgreSQL and SQLite, tested on both in CI (M10c)
+  - [x] `examples/webhooks`: payment gateway webhooks (M11b)
 - [x] Short files, no decorative code, comments only where something isn't obvious; the official way
       only (when there are two ways, show the main one)
 - [x] Each example names the generator commands that made its files (`rnx make:model Produk`, …),
@@ -282,7 +283,16 @@ examples, doctests on public APIs).
 - [x] Apps from `rnx new` ship an `AGENTS.md` (and a `CLAUDE.md` importing it) with the layout,
       the generators, where the cheat-sheet and examples are, and the checks to run (M10a)
 
-Gaps found while writing the examples, to close before 1.0:
+Gaps found while writing examples/api, jobs, uploads and postgres (M10c, closed):
+- [x] Errors for API clients (`Accept: application/json` or a JSON body) are `{"message": …}` with
+      the status, also for errors raised outside the view layer (CSRF's 419)
+- [x] JSON bodies report every field's errors at once, like forms (missing fields, wrong types
+      with placeholders, rules)
+- [x] `User::attempt(db, email, password)` for token endpoints, as slow for unknown emails as for
+      wrong passwords
+- [x] `TestApp::post_multipart(uri, fields, files)` for testing uploads
+
+Gaps found while writing the first example, to close before 1.0:
 - [x] Method spoofing (`_method=PUT|PATCH|DELETE` in plain HTML forms, urlencoded or multipart, or
       the `X-HTTP-Method-Override` header), with `{{ method_field('PUT') }}`; a layer in front of
       the whole router, since route layers run after the method is matched (M10b)

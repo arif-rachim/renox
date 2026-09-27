@@ -410,6 +410,49 @@ async fn htmx_and_json_requests_get_422_json() {
     let body: serde_json::Value = serde_json::from_str(&reply.body).unwrap();
     assert_eq!(body["errors"]["harga"][0], "The harga must be a number.");
 
+    // JSON bodies report every field too: a missing one, a wrong type, a rule.
+    let token = client.token.clone();
+    let reply = client
+        .send(
+            Request::post("/produk")
+                .header(CONTENT_TYPE, "application/json")
+                .header("x-csrf-token", token)
+                .body(Body::from(r#"{"harga": true, "email": "x"}"#))
+                .unwrap(),
+        )
+        .await;
+    let body: serde_json::Value = serde_json::from_str(&reply.body).unwrap();
+    assert_eq!(body["errors"]["nama"][0], "The nama field is required.");
+    assert_eq!(body["errors"]["harga"][0], "The harga must be a number.");
+    assert!(
+        body["errors"]["email"][0]
+            .as_str()
+            .unwrap()
+            .contains("email")
+    );
+
+    // Errors for API clients are JSON too, from the handler or from CSRF.
+    let reply = client
+        .send(
+            Request::post("/produk")
+                .header(CONTENT_TYPE, "application/json")
+                .body(Body::from(r#"{"nama": "Kopi"}"#))
+                .unwrap(),
+        )
+        .await;
+    assert_eq!(reply.status.as_u16(), 419);
+    assert_eq!(reply.body, r#"{"message":"Page Expired"}"#);
+    let reply = client
+        .send(
+            Request::get("/nowhere")
+                .header("accept", "application/json")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::NOT_FOUND);
+    assert_eq!(reply.body, r#"{"message":"Not Found"}"#);
+
     // A field that doesn't parse doesn't hide the other fields' errors, and
     // its placeholder value (0, below the minimum) adds no error of its own.
     let reply = client

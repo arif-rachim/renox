@@ -1,0 +1,18 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<h1>Place an order</h1>
+<form method="post" action="{{ route('orders.store') }}">
+  {{ csrf_field() }}
+  <input name="customer_email" placeholder="Your email" value="{{ old('customer_email') }}">
+  <p class="error" data-error-for="customer_email">{{ error('customer_email') }}</p>
+  <input name="item" placeholder="Item" value="{{ old('item') }}">
+  <p class="error" data-error-for="item">{{ error('item') }}</p>
+  <input name="total" placeholder="Total (Rp)" inputmode="numeric" value="{{ old('total') }}">
+  <p class="error" data-error-for="total">{{ error('total') }}</p>
+  <button>Order</button>
+</form>
+<ul>
+  {% for order in orders %}<li>#{{ order.id }} {{ order.item }}: Rp {{ order.total }}</li>{% endfor %}
+</ul>
+{% endblock %}
