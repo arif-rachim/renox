@@ -24,7 +24,6 @@
 use anyhow::anyhow;
 use serde::Serialize;
 use serde_json::Value;
-use sqlx::Row;
 
 use super::User;
 use crate::db::{DateTime, Db, now};
@@ -77,7 +76,7 @@ impl AppState {
                     self.mailer.send(mail).await?;
                 }
                 Channel::Database => {
-                    sqlx::query(
+                    crate::db::sql(
                         "INSERT INTO notifications (user_id, kind, data, created_at) VALUES (?, ?, ?, ?)",
                     )
                     .bind(user.id)
@@ -93,7 +92,7 @@ impl AppState {
     }
 }
 
-fn from_row(row: &sqlx::sqlite::SqliteRow) -> Result<DatabaseNotification> {
+fn from_row(row: &crate::db::Row) -> Result<DatabaseNotification> {
     let data: String = row.try_get("data")?;
     Ok(DatabaseNotification {
         id: row.try_get("id")?,
@@ -107,7 +106,7 @@ fn from_row(row: &sqlx::sqlite::SqliteRow) -> Result<DatabaseNotification> {
 impl User {
     /// The user's notifications, newest first.
     pub async fn notifications(&self, db: &Db, limit: u32) -> Result<Vec<DatabaseNotification>> {
-        let rows = sqlx::query(
+        let rows = crate::db::sql(
             "SELECT id, kind, data, read_at, created_at FROM notifications \
              WHERE user_id = ? ORDER BY id DESC LIMIT ?",
         )
@@ -119,7 +118,7 @@ impl User {
     }
 
     pub async fn unread_notifications(&self, db: &Db) -> Result<Vec<DatabaseNotification>> {
-        let rows = sqlx::query(
+        let rows = crate::db::sql(
             "SELECT id, kind, data, read_at, created_at FROM notifications \
              WHERE user_id = ? AND read_at IS NULL ORDER BY id DESC",
         )
@@ -130,17 +129,17 @@ impl User {
     }
 
     pub async fn unread_notification_count(&self, db: &Db) -> Result<i64> {
-        Ok(sqlx::query_scalar(
+        Ok(crate::db::sql(
             "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read_at IS NULL",
         )
         .bind(self.id)
-        .fetch_one(db)
+        .scalar(db)
         .await?)
     }
 
     /// Marks one of the user's notifications read; returns whether it was theirs.
     pub async fn mark_notification_read(&self, db: &Db, id: i64) -> Result<bool> {
-        let done = sqlx::query(
+        let done = crate::db::sql(
             "UPDATE notifications SET read_at = COALESCE(read_at, ?) WHERE id = ? AND user_id = ?",
         )
         .bind(now())
@@ -148,17 +147,17 @@ impl User {
         .bind(self.id)
         .execute(db)
         .await?;
-        Ok(done.rows_affected() > 0)
+        Ok(done > 0)
     }
 
     pub async fn mark_all_notifications_read(&self, db: &Db) -> Result<u64> {
-        let done = sqlx::query(
+        let done = crate::db::sql(
             "UPDATE notifications SET read_at = ? WHERE user_id = ? AND read_at IS NULL",
         )
         .bind(now())
         .bind(self.id)
         .execute(db)
         .await?;
-        Ok(done.rows_affected())
+        Ok(done)
     }
 }

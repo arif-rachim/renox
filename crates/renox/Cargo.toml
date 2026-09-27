@@ -13,6 +13,8 @@ categories.workspace = true
 [features]
 # S3-compatible storage (AWS S3, Cloudflare R2, MinIO) for `STORAGE_DISK=s3`.
 s3 = ["renox-core/s3"]
+# PostgreSQL databases (`DATABASE_URL=postgres://...`).
+postgres = ["renox-core/postgres"]
 
 [dependencies]
 renox-core.workspace = true

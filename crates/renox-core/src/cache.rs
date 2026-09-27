@@ -75,12 +75,12 @@ impl Cache {
                     .map(|(value, _)| value.clone()))
             }
             Store::Database(db) => {
-                let text: Option<String> = sqlx::query_scalar(
+                let text: Option<String> = crate::db::sql(
                     "SELECT value FROM cache WHERE key = ? AND (expires_at IS NULL OR expires_at > ?)",
                 )
                 .bind(key)
                 .bind(now)
-                .fetch_optional(db)
+                .scalar_optional(db)
                 .await?;
                 Ok(text.and_then(|t| serde_json::from_str(&t).ok()))
             }
@@ -113,7 +113,7 @@ impl Cache {
                 map.insert(key.to_owned(), (value, expires));
             }
             Store::Database(db) => {
-                sqlx::query(
+                crate::db::sql(
                     "INSERT INTO cache (key, value, expires_at) VALUES (?, ?, ?) \
                      ON CONFLICT (key) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at",
                 )
@@ -149,7 +149,7 @@ impl Cache {
                 map.lock().unwrap_or_else(|e| e.into_inner()).remove(key);
             }
             Store::Database(db) => {
-                sqlx::query("DELETE FROM cache WHERE key = ?")
+                crate::db::sql("DELETE FROM cache WHERE key = ?")
                     .bind(key)
                     .execute(db)
                     .await?;
@@ -163,7 +163,7 @@ impl Cache {
         match &self.store {
             Store::Memory(map) => map.lock().unwrap_or_else(|e| e.into_inner()).clear(),
             Store::Database(db) => {
-                sqlx::query("DELETE FROM cache").execute(db).await?;
+                crate::db::sql("DELETE FROM cache").execute(db).await?;
             }
         }
         Ok(())

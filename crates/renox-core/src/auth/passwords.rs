@@ -5,7 +5,6 @@ use axum::response::Response;
 use chrono::TimeDelta;
 use serde::Deserialize;
 use serde_json::json;
-use sqlx::Row;
 
 use super::User;
 use super::module::{go, texts};
@@ -51,15 +50,15 @@ pub(super) async fn send_link(
     let text = texts(&lang);
     if let Some(user) = User::find_by_email(&state.db, &form.email).await? {
         let last: Option<DateTime> =
-            sqlx::query_scalar("SELECT created_at FROM password_reset_tokens WHERE email = ?")
+            crate::db::sql("SELECT created_at FROM password_reset_tokens WHERE email = ?")
                 .bind(&user.email)
-                .fetch_optional(&state.db)
+                .scalar_optional(&state.db)
                 .await?;
         let recently = last
             .is_some_and(|at| now() - at < TimeDelta::from_std(RESEND_AFTER).unwrap_or_default());
         if !recently {
             let token = random_token();
-            sqlx::query(
+            crate::db::sql(
                 "INSERT INTO password_reset_tokens (email, token, created_at) VALUES (?, ?, ?) \
                  ON CONFLICT (email) DO UPDATE SET token = excluded.token, created_at = excluded.created_at",
             )
@@ -133,7 +132,7 @@ pub(super) async fn reset(
     Valid(form): Valid<ResetForm>,
 ) -> Result<Response> {
     let text = texts(&lang);
-    let row = sqlx::query("SELECT token, created_at FROM password_reset_tokens WHERE email = ?")
+    let row = crate::db::sql("SELECT token, created_at FROM password_reset_tokens WHERE email = ?")
         .bind(form.email.trim())
         .fetch_optional(&state.db)
         .await?;
@@ -159,7 +158,7 @@ pub(super) async fn reset(
     };
 
     user.set_password(&state.db, &form.password).await?;
-    sqlx::query("DELETE FROM password_reset_tokens WHERE email = ?")
+    crate::db::sql("DELETE FROM password_reset_tokens WHERE email = ?")
         .bind(&user.email)
         .execute(&state.db)
         .await?;

@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use sqlx::Row;
 use tokio::sync::watch;
 use tokio::task::JoinSet;
 
@@ -53,7 +52,7 @@ impl Worker {
                 ORDER BY available_at, id LIMIT 1) \
              RETURNING id, queue, job, payload, attempts, max_attempts"
         );
-        let mut query = sqlx::query(sqlx::AssertSqlSafe(sql))
+        let mut query = crate::db::sql(sql)
             .bind(now)
             .bind(now)
             .bind(now - RESERVATION);
@@ -68,8 +67,8 @@ impl Worker {
             queue: row.try_get("queue")?,
             job: row.try_get("job")?,
             payload: row.try_get("payload")?,
-            attempts: row.try_get::<i64, _>("attempts")? as u32,
-            max_attempts: row.try_get::<i64, _>("max_attempts")? as u32,
+            attempts: row.try_get::<i64>("attempts")? as u32,
+            max_attempts: row.try_get::<i64>("max_attempts")? as u32,
         }))
     }
 
@@ -98,7 +97,7 @@ impl Worker {
         let db = &self.state.db;
         match outcome {
             Ok(()) => {
-                sqlx::query("DELETE FROM jobs WHERE id = ?")
+                crate::db::sql("DELETE FROM jobs WHERE id = ?")
                     .bind(job.id)
                     .execute(db)
                     .await?;
@@ -108,7 +107,7 @@ impl Worker {
                 let backoff = handler
                     .map(|h| (h.backoff)(job.attempts))
                     .unwrap_or_default();
-                sqlx::query("UPDATE jobs SET reserved_at = NULL, available_at = ? WHERE id = ?")
+                crate::db::sql("UPDATE jobs SET reserved_at = NULL, available_at = ? WHERE id = ?")
                     .bind(unix_now() + backoff.as_secs() as i64)
                     .bind(job.id)
                     .execute(db)
@@ -117,7 +116,7 @@ impl Worker {
             }
             Err(error) => {
                 let mut tx = db.begin().await?;
-                sqlx::query(
+                crate::db::sql(
                     "INSERT INTO failed_jobs (queue, job, payload, max_attempts, error, failed_at) \
                      VALUES (?, ?, ?, ?, ?, ?)",
                 )
@@ -127,11 +126,11 @@ impl Worker {
                 .bind(i64::from(job.max_attempts))
                 .bind(&error)
                 .bind(unix_now())
-                .execute(&mut *tx)
+                .execute(&mut tx)
                 .await?;
-                sqlx::query("DELETE FROM jobs WHERE id = ?")
+                crate::db::sql("DELETE FROM jobs WHERE id = ?")
                     .bind(job.id)
-                    .execute(&mut *tx)
+                    .execute(&mut tx)
                     .await?;
                 tx.commit().await?;
                 tracing::error!(job = %job.job, id = job.id, %error, "job failed for good");

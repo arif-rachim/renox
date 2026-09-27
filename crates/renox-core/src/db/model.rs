@@ -1,12 +1,8 @@
 use std::future::Future;
 
-use anyhow::anyhow;
-use sqlx::sqlite::SqliteExecutor;
-use sqlx::{AssertSqlSafe, Row};
-
-use super::value::bind;
-use super::{DateTime, DbValue, Query, SqliteRow, ToDbValue, now, quote};
+use super::{DateTime, DbValue, Executor, Query, Row, ToDbValue, now, quote, sql};
 use crate::{Error, Result};
+use anyhow::anyhow;
 
 /// A struct stored as a row in a table. Derive it with `#[derive(Model)]`.
 ///
@@ -38,7 +34,7 @@ pub trait Model: Sized + Send + Sync + Unpin + 'static {
 
     fn id(&self) -> i64;
     fn set_id(&mut self, id: i64);
-    fn from_row(row: &SqliteRow) -> std::result::Result<Self, sqlx::Error>;
+    fn from_row(row: &Row) -> std::result::Result<Self, sqlx::Error>;
     /// Values of every column except `id`, in `COLUMNS` order.
     fn values(&self) -> Vec<DbValue>;
     /// Updates `created_at` / `updated_at` if the model has them.
@@ -55,11 +51,11 @@ pub trait Model: Sized + Send + Sync + Unpin + 'static {
         Self::query().where_eq(column, value)
     }
 
-    fn all<'c, E: SqliteExecutor<'c>>(db: E) -> impl Future<Output = Result<Vec<Self>>> + Send {
+    fn all<'c, E: Executor<'c>>(db: E) -> impl Future<Output = Result<Vec<Self>>> + Send {
         Self::query().order_by("id").get(db)
     }
 
-    fn find<'c, E: SqliteExecutor<'c>>(
+    fn find<'c, E: Executor<'c>>(
         db: E,
         id: i64,
     ) -> impl Future<Output = Result<Option<Self>>> + Send {
@@ -67,7 +63,7 @@ pub trait Model: Sized + Send + Sync + Unpin + 'static {
     }
 
     /// Like `find`, but a missing row becomes a 404 response.
-    fn find_or_404<'c, E: SqliteExecutor<'c>>(
+    fn find_or_404<'c, E: Executor<'c>>(
         db: E,
         id: i64,
     ) -> impl Future<Output = Result<Self>> + Send {
@@ -75,7 +71,7 @@ pub trait Model: Sized + Send + Sync + Unpin + 'static {
     }
 
     /// Saves a new model and returns it with its id and timestamps.
-    fn create<'c, E: SqliteExecutor<'c>>(
+    fn create<'c, E: Executor<'c>>(
         db: E,
         mut model: Self,
     ) -> impl Future<Output = Result<Self>> + Send {
@@ -86,7 +82,7 @@ pub trait Model: Sized + Send + Sync + Unpin + 'static {
     }
 
     /// Inserts the model if its id is `0`, otherwise updates its row.
-    fn save<'c, E: SqliteExecutor<'c>>(&mut self, db: E) -> impl Future<Output = Result> + Send {
+    fn save<'c, E: Executor<'c>>(&mut self, db: E) -> impl Future<Output = Result> + Send {
         async move {
             let creating = self.id() == 0;
             self.touch(now(), creating);
@@ -99,7 +95,7 @@ pub trait Model: Sized + Send + Sync + Unpin + 'static {
             let table = quote(Self::TABLE);
 
             if creating {
-                let sql = if columns.is_empty() {
+                let sql_text = if columns.is_empty() {
                     format!("INSERT INTO {table} DEFAULT VALUES RETURNING id")
                 } else {
                     let marks = vec!["?"; columns.len()].join(", ");
@@ -108,22 +104,22 @@ pub trait Model: Sized + Send + Sync + Unpin + 'static {
                         columns.join(", ")
                     )
                 };
-                let query = values
-                    .into_iter()
-                    .fold(sqlx::query(AssertSqlSafe(sql)), bind);
-                let id: i64 = query.fetch_one(db).await?.try_get(0)?;
+                let id: i64 = sql(sql_text).bind_all(values).scalar(db).await?;
                 self.set_id(id);
             } else {
                 if columns.is_empty() {
                     return Ok(());
                 }
                 let sets: Vec<String> = columns.iter().map(|c| format!("{c} = ?")).collect();
-                let sql = format!("UPDATE {table} SET {} WHERE id = ?", sets.join(", "));
-                let query = values
-                    .into_iter()
-                    .chain([DbValue::Integer(self.id())])
-                    .fold(sqlx::query(AssertSqlSafe(sql)), bind);
-                if query.execute(db).await?.rows_affected() == 0 {
+                let changed = sql(format!(
+                    "UPDATE {table} SET {} WHERE id = ?",
+                    sets.join(", ")
+                ))
+                .bind_all(values)
+                .bind(self.id())
+                .execute(db)
+                .await?;
+                if changed == 0 {
                     return Err(Error::NotFound);
                 }
             }
@@ -132,34 +128,29 @@ pub trait Model: Sized + Send + Sync + Unpin + 'static {
     }
 
     /// Deletes the row, or marks it deleted for models with soft deletes.
-    fn delete<'c, E: SqliteExecutor<'c>>(&mut self, db: E) -> impl Future<Output = Result> + Send {
+    fn delete<'c, E: Executor<'c>>(&mut self, db: E) -> impl Future<Output = Result> + Send {
         async move {
             if !Self::SOFT_DELETES {
                 return self.force_delete(db).await;
             }
             let at = now();
-            let sql = format!(
+            sql(format!(
                 "UPDATE {} SET deleted_at = ? WHERE id = ?",
                 quote(Self::TABLE)
-            );
-            [at.to_db_value(), DbValue::Integer(self.id())]
-                .into_iter()
-                .fold(sqlx::query(AssertSqlSafe(sql)), bind)
-                .execute(db)
-                .await?;
+            ))
+            .bind(at)
+            .bind(self.id())
+            .execute(db)
+            .await?;
             self.set_deleted_at(Some(at));
             Ok(())
         }
     }
 
     /// Removes the row, even for models with soft deletes.
-    fn force_delete<'c, E: SqliteExecutor<'c>>(
-        &self,
-        db: E,
-    ) -> impl Future<Output = Result> + Send {
+    fn force_delete<'c, E: Executor<'c>>(&self, db: E) -> impl Future<Output = Result> + Send {
         async move {
-            let sql = format!("DELETE FROM {} WHERE id = ?", quote(Self::TABLE));
-            sqlx::query(AssertSqlSafe(sql))
+            sql(format!("DELETE FROM {} WHERE id = ?", quote(Self::TABLE)))
                 .bind(self.id())
                 .execute(db)
                 .await?;
@@ -168,19 +159,18 @@ pub trait Model: Sized + Send + Sync + Unpin + 'static {
     }
 
     /// Brings back a soft-deleted row.
-    fn restore<'c, E: SqliteExecutor<'c>>(&mut self, db: E) -> impl Future<Output = Result> + Send {
+    fn restore<'c, E: Executor<'c>>(&mut self, db: E) -> impl Future<Output = Result> + Send {
         async move {
             if !Self::SOFT_DELETES {
                 return Err(anyhow!("{} does not use soft deletes", Self::TABLE).into());
             }
-            let sql = format!(
+            sql(format!(
                 "UPDATE {} SET deleted_at = NULL WHERE id = ?",
                 quote(Self::TABLE)
-            );
-            sqlx::query(AssertSqlSafe(sql))
-                .bind(self.id())
-                .execute(db)
-                .await?;
+            ))
+            .bind(self.id())
+            .execute(db)
+            .await?;
             self.set_deleted_at(None);
             Ok(())
         }

@@ -12,6 +12,8 @@ categories.workspace = true
 [features]
 # S3-compatible storage (AWS S3, Cloudflare R2, MinIO) for `STORAGE_DISK=s3`.
 s3 = ["dep:object_store"]
+# PostgreSQL databases (`DATABASE_URL=postgres://...`).
+postgres = ["sqlx/postgres"]
 
 [dependencies]
 anyhow = "1.0.104"

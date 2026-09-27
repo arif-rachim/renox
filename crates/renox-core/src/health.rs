@@ -18,7 +18,7 @@ pub(crate) fn router() -> Router<AppState> {
 }
 
 async fn health(State(state): State<AppState>) -> (StatusCode, Json<Value>) {
-    let ping = sqlx::query_scalar::<_, i64>("SELECT 1").fetch_one(&state.db);
+    let ping = crate::db::sql("SELECT 1").scalar::<i64>(&state.db);
     let database = match tokio::time::timeout(Duration::from_secs(2), ping).await {
         Ok(Ok(_)) => Ok(()),
         Ok(Err(err)) => Err(err.to_string()),
@@ -27,8 +27,8 @@ async fn health(State(state): State<AppState>) -> (StatusCode, Json<Value>) {
     let queue = match &database {
         Ok(()) => {
             let pending = state.queue.pending().await.ok();
-            let failed: Option<i64> = sqlx::query_scalar("SELECT COUNT(*) FROM failed_jobs")
-                .fetch_one(&state.db)
+            let failed: Option<i64> = crate::db::sql("SELECT COUNT(*) FROM failed_jobs")
+                .scalar(&state.db)
                 .await
                 .ok();
             json!({ "pending": pending, "failed": failed })

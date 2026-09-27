@@ -96,7 +96,7 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
         if f.skip {
             quote! { #ident: ::core::default::Default::default() }
         } else {
-            quote! { #ident: ::renox::sqlx::Row::try_get(row, #name)? }
+            quote! { #ident: row.try_get(#name)? }
         }
     });
 
@@ -148,7 +148,7 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
             }
 
             fn from_row(
-                row: &::renox::db::SqliteRow,
+                row: &::renox::db::Row,
             ) -> ::core::result::Result<Self, ::renox::sqlx::Error> {
                 ::core::result::Result::Ok(Self { #(#from_row),* })
             }

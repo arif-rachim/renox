@@ -1,5 +1,4 @@
 use serde::Serialize;
-use sqlx::{AssertSqlSafe, Row};
 
 use super::User;
 use crate::Result;
@@ -33,7 +32,7 @@ pub(crate) fn sha256_hex(value: &str) -> String {
         .collect()
 }
 
-fn from_row(row: &sqlx::sqlite::SqliteRow) -> std::result::Result<AccessToken, sqlx::Error> {
+fn from_row(row: &crate::db::Row) -> std::result::Result<AccessToken, sqlx::Error> {
     Ok(AccessToken {
         id: row.try_get("id")?,
         user_id: row.try_get("user_id")?,
@@ -56,10 +55,10 @@ impl User {
     ) -> Result<NewToken> {
         let secret = random_token();
         let created = now();
-        let row = sqlx::query(AssertSqlSafe(format!(
+        let row = crate::db::sql(format!(
             "INSERT INTO personal_access_tokens (user_id, name, token, expires_at, created_at, updated_at) \
              VALUES (?, ?, ?, ?, ?, ?) RETURNING {COLUMNS}"
-        )))
+        ))
         .bind(self.id)
         .bind(name)
         .bind(sha256_hex(&secret))
@@ -77,9 +76,9 @@ impl User {
 
     /// The user's API tokens, newest first.
     pub async fn tokens(&self, db: &Db) -> Result<Vec<AccessToken>> {
-        let rows = sqlx::query(AssertSqlSafe(format!(
+        let rows = crate::db::sql(format!(
             "SELECT {COLUMNS} FROM personal_access_tokens WHERE user_id = ? ORDER BY id DESC"
-        )))
+        ))
         .bind(self.id)
         .fetch_all(db)
         .await?;
@@ -91,21 +90,22 @@ impl User {
 
     /// Revokes one of the user's tokens; returns whether it existed.
     pub async fn revoke_token(&self, db: &Db, token_id: i64) -> Result<bool> {
-        let done = sqlx::query("DELETE FROM personal_access_tokens WHERE id = ? AND user_id = ?")
-            .bind(token_id)
-            .bind(self.id)
-            .execute(db)
-            .await?;
-        Ok(done.rows_affected() > 0)
+        let done =
+            crate::db::sql("DELETE FROM personal_access_tokens WHERE id = ? AND user_id = ?")
+                .bind(token_id)
+                .bind(self.id)
+                .execute(db)
+                .await?;
+        Ok(done > 0)
     }
 
     /// Revokes all of the user's tokens.
     pub async fn revoke_tokens(&self, db: &Db) -> Result<u64> {
-        let done = sqlx::query("DELETE FROM personal_access_tokens WHERE user_id = ?")
+        let done = crate::db::sql("DELETE FROM personal_access_tokens WHERE user_id = ?")
             .bind(self.id)
             .execute(db)
             .await?;
-        Ok(done.rows_affected())
+        Ok(done)
     }
 }
 
@@ -117,11 +117,12 @@ pub(crate) async fn authenticate(db: &Db, bearer: &str) -> Result<Option<User>> 
     let Ok(id) = id.parse::<i64>() else {
         return Ok(None);
     };
-    let Some(row) =
-        sqlx::query("SELECT user_id, token, expires_at FROM personal_access_tokens WHERE id = ?")
-            .bind(id)
-            .fetch_optional(db)
-            .await?
+    let Some(row) = crate::db::sql(
+        "SELECT user_id, token, expires_at FROM personal_access_tokens WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(db)
+    .await?
     else {
         return Ok(None);
     };
@@ -130,7 +131,7 @@ pub(crate) async fn authenticate(db: &Db, bearer: &str) -> Result<Option<User>> 
     if !constant_time_eq(&hash, &sha256_hex(secret)) || expires_at.is_some_and(|at| at <= now()) {
         return Ok(None);
     }
-    sqlx::query("UPDATE personal_access_tokens SET last_used_at = ? WHERE id = ?")
+    crate::db::sql("UPDATE personal_access_tokens SET last_used_at = ? WHERE id = ?")
         .bind(now())
         .bind(id)
         .execute(db)

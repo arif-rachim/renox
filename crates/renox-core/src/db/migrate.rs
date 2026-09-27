@@ -1,9 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
+use super::{Db, now, quote, script, sql};
 use anyhow::{Context, anyhow, bail};
-use sqlx::{AssertSqlSafe, Row};
-
-use super::{Db, now, quote};
 
 const TABLE: &str = "renox_migrations";
 
@@ -43,13 +41,13 @@ impl Migrator {
     }
 
     async fn ensure_table(db: &Db) -> anyhow::Result<()> {
-        sqlx::query(AssertSqlSafe(format!(
+        sql(format!(
             "CREATE TABLE IF NOT EXISTS {TABLE} (
                 name TEXT PRIMARY KEY NOT NULL,
                 batch INTEGER NOT NULL,
                 applied_at TEXT NOT NULL
             )"
-        )))
+        ))
         .execute(db)
         .await?;
         Ok(())
@@ -57,7 +55,7 @@ impl Migrator {
 
     async fn applied(db: &Db) -> anyhow::Result<HashMap<String, i64>> {
         Self::ensure_table(db).await?;
-        let rows = sqlx::query(AssertSqlSafe(format!("SELECT name, batch FROM {TABLE}")))
+        let rows = sql(format!("SELECT name, batch FROM {TABLE}"))
             .fetch_all(db)
             .await?;
         rows.iter()
@@ -77,17 +75,16 @@ impl Migrator {
             .filter(|m| !applied.contains_key(m.name))
         {
             let mut tx = db.begin().await?;
-            sqlx::raw_sql(AssertSqlSafe(migration.up))
-                .execute(&mut *tx)
+            script(&mut tx, migration.up)
                 .await
                 .with_context(|| format!("migration `{}` failed", migration.name))?;
-            sqlx::query(AssertSqlSafe(format!(
+            sql(format!(
                 "INSERT INTO {TABLE} (name, batch, applied_at) VALUES (?, ?, ?)"
-            )))
+            ))
             .bind(migration.name)
             .bind(batch)
             .bind(now().to_rfc3339())
-            .execute(&mut *tx)
+            .execute(&mut tx)
             .await?;
             tx.commit().await?;
             done.push(migration.name);
@@ -127,13 +124,12 @@ impl Migrator {
                 anyhow!("migration `{name}` has no .down.sql, so it can't be rolled back")
             })?;
             let mut tx = db.begin().await?;
-            sqlx::raw_sql(AssertSqlSafe(down))
-                .execute(&mut *tx)
+            script(&mut tx, down)
                 .await
                 .with_context(|| format!("rolling back `{name}` failed"))?;
-            sqlx::query(AssertSqlSafe(format!("DELETE FROM {TABLE} WHERE name = ?")))
+            sql(format!("DELETE FROM {TABLE} WHERE name = ?"))
                 .bind(name)
-                .execute(&mut *tx)
+                .execute(&mut tx)
                 .await?;
             tx.commit().await?;
             done.push(name.clone());
@@ -143,26 +139,13 @@ impl Migrator {
 
     /// Drops every table and view, then runs all migrations.
     pub async fn fresh(&self, db: &Db) -> anyhow::Result<Vec<&'static str>> {
-        let mut conn = db.acquire().await?;
-        let objects = sqlx::query(
-            "SELECT type, name FROM sqlite_master \
-             WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%'",
-        )
-        .fetch_all(&mut *conn)
-        .await?;
-        sqlx::query("PRAGMA foreign_keys = OFF")
-            .execute(&mut *conn)
-            .await?;
-        for object in &objects {
-            let kind: String = object.try_get("type")?;
-            let name: String = object.try_get("name")?;
-            let sql = format!("DROP {} IF EXISTS {}", kind.to_uppercase(), quote(&name));
-            sqlx::query(AssertSqlSafe(sql)).execute(&mut *conn).await?;
+        if let Some(pool) = db.sqlite() {
+            drop_all_sqlite(pool).await?;
         }
-        sqlx::query("PRAGMA foreign_keys = ON")
-            .execute(&mut *conn)
-            .await?;
-        drop(conn);
+        #[cfg(feature = "postgres")]
+        if let Some(pool) = db.postgres() {
+            drop_all_postgres(pool).await?;
+        }
         self.run(db).await
     }
 
@@ -178,4 +161,54 @@ impl Migrator {
             })
             .collect())
     }
+}
+
+/// Drops every table and view on one connection, with foreign keys off so
+/// the order doesn't matter.
+async fn drop_all_sqlite(pool: &sqlx::SqlitePool) -> anyhow::Result<()> {
+    use sqlx::{AssertSqlSafe, Row};
+
+    let mut conn = pool.acquire().await?;
+    let objects = sqlx::query(
+        "SELECT type, name FROM sqlite_master \
+         WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%'",
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    sqlx::query("PRAGMA foreign_keys = OFF")
+        .execute(&mut *conn)
+        .await?;
+    for object in &objects {
+        let kind: String = object.try_get("type")?;
+        let name: String = object.try_get("name")?;
+        let sql = format!("DROP {} IF EXISTS {}", kind.to_uppercase(), quote(&name));
+        sqlx::query(AssertSqlSafe(sql)).execute(&mut *conn).await?;
+    }
+    sqlx::query("PRAGMA foreign_keys = ON")
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
+/// Drops every table and view in the current schema; `CASCADE` takes care
+/// of foreign keys between them.
+#[cfg(feature = "postgres")]
+async fn drop_all_postgres(pool: &sqlx::PgPool) -> anyhow::Result<()> {
+    use sqlx::{AssertSqlSafe, Row};
+
+    let objects = sqlx::query(
+        "SELECT 'VIEW' AS kind, table_name::text AS name FROM information_schema.views \
+         WHERE table_schema = current_schema() \
+         UNION ALL \
+         SELECT 'TABLE', tablename::text FROM pg_tables WHERE schemaname = current_schema()",
+    )
+    .fetch_all(pool)
+    .await?;
+    for object in &objects {
+        let kind: String = object.try_get("kind")?;
+        let name: String = object.try_get("name")?;
+        let sql = format!("DROP {kind} IF EXISTS {} CASCADE", quote(&name));
+        sqlx::query(AssertSqlSafe(sql)).execute(pool).await?;
+    }
+    Ok(())
 }

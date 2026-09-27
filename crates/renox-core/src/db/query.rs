@@ -1,12 +1,8 @@
 use std::marker::PhantomData;
 
-use anyhow::anyhow;
-use sqlx::sqlite::SqliteExecutor;
-use sqlx::{AssertSqlSafe, Row};
-
-use super::value::bind;
-use super::{Db, DbValue, Model, Paginated, ToDbValue, now, quote};
+use super::{Db, DbValue, Executor, Model, Paginated, ToDbValue, now, quote, sql};
 use crate::Result;
+use anyhow::anyhow;
 
 const OPERATORS: &[&str] = &["=", "!=", "<>", "<", "<=", ">", ">=", "like", "not like"];
 
@@ -225,41 +221,36 @@ impl<M: Model> Query<M> {
         sql
     }
 
-    pub async fn get<'c, E: SqliteExecutor<'c>>(self, db: E) -> Result<Vec<M>> {
+    pub async fn get<'c, E: Executor<'c>>(self, db: E) -> Result<Vec<M>> {
         self.check()?;
-        let query = self
-            .binds
-            .iter()
-            .cloned()
-            .fold(sqlx::query(AssertSqlSafe(self.select_sql())), bind);
-        let rows = query.fetch_all(db).await?;
+        let rows = sql(self.select_sql())
+            .bind_all(self.binds)
+            .fetch_all(db)
+            .await?;
         Ok(rows
             .iter()
             .map(M::from_row)
             .collect::<std::result::Result<_, _>>()?)
     }
 
-    pub async fn first<'c, E: SqliteExecutor<'c>>(self, db: E) -> Result<Option<M>> {
+    pub async fn first<'c, E: Executor<'c>>(self, db: E) -> Result<Option<M>> {
         Ok(self.limit(1).get(db).await?.into_iter().next())
     }
 
-    pub async fn count<'c, E: SqliteExecutor<'c>>(self, db: E) -> Result<u64> {
+    pub async fn count<'c, E: Executor<'c>>(self, db: E) -> Result<u64> {
         self.check()?;
-        let sql = format!(
+        let count: i64 = sql(format!(
             "SELECT COUNT(*) FROM {}{}",
             quote(M::TABLE),
             self.where_sql()
-        );
-        let query = self
-            .binds
-            .iter()
-            .cloned()
-            .fold(sqlx::query(AssertSqlSafe(sql)), bind);
-        let count: i64 = query.fetch_one(db).await?.try_get(0)?;
+        ))
+        .bind_all(self.binds)
+        .scalar(db)
+        .await?;
         Ok(count as u64)
     }
 
-    pub async fn exists<'c, E: SqliteExecutor<'c>>(self, db: E) -> Result<bool> {
+    pub async fn exists<'c, E: Executor<'c>>(self, db: E) -> Result<bool> {
         Ok(self.count(db).await? > 0)
     }
 
@@ -278,31 +269,32 @@ impl<M: Model> Query<M> {
     }
 
     /// Deletes every matching row (soft-deletes them for models with soft deletes).
-    pub async fn delete<'c, E: SqliteExecutor<'c>>(self, db: E) -> Result<u64> {
+    pub async fn delete<'c, E: Executor<'c>>(self, db: E) -> Result<u64> {
         if M::SOFT_DELETES {
             self.check()?;
-            let sql = format!(
+            return Ok(sql(format!(
                 "UPDATE {} SET \"deleted_at\" = ?{}",
                 quote(M::TABLE),
                 self.where_sql()
-            );
-            let query = std::iter::once(now().to_db_value())
-                .chain(self.binds.iter().cloned())
-                .fold(sqlx::query(AssertSqlSafe(sql)), bind);
-            return Ok(query.execute(db).await?.rows_affected());
+            ))
+            .bind(now())
+            .bind_all(self.binds)
+            .execute(db)
+            .await?);
         }
         self.force_delete(db).await
     }
 
     /// Removes every matching row, even for models with soft deletes.
-    pub async fn force_delete<'c, E: SqliteExecutor<'c>>(self, db: E) -> Result<u64> {
+    pub async fn force_delete<'c, E: Executor<'c>>(self, db: E) -> Result<u64> {
         self.check()?;
-        let sql = format!("DELETE FROM {}{}", quote(M::TABLE), self.where_sql());
-        let query = self
-            .binds
-            .iter()
-            .cloned()
-            .fold(sqlx::query(AssertSqlSafe(sql)), bind);
-        Ok(query.execute(db).await?.rows_affected())
+        Ok(sql(format!(
+            "DELETE FROM {}{}",
+            quote(M::TABLE),
+            self.where_sql()
+        ))
+        .bind_all(self.binds)
+        .execute(db)
+        .await?)
     }
 }

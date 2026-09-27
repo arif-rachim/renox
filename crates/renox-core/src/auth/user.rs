@@ -5,11 +5,9 @@ use argon2::Argon2;
 use argon2::password_hash::phc::PasswordHash;
 use argon2::password_hash::{PasswordHasher, PasswordVerifier};
 use serde::{Deserialize, Serialize};
-use sqlx::Row;
-use sqlx::sqlite::SqliteExecutor;
 
 use super::Policy;
-use crate::db::{DateTime, Db, DbValue, Model, SqliteRow, ToDbValue};
+use crate::db::{DateTime, Db, DbValue, Executor, Model, Row, ToDbValue};
 use crate::{Error, Result};
 
 /// A row of the `users` table created by the `Auth` module.
@@ -49,7 +47,7 @@ impl Model for User {
         self.id = id;
     }
 
-    fn from_row(row: &SqliteRow) -> std::result::Result<Self, sqlx::Error> {
+    fn from_row(row: &Row) -> std::result::Result<Self, sqlx::Error> {
         Ok(Self {
             id: row.try_get("id")?,
             name: row.try_get("name")?,
@@ -82,7 +80,7 @@ impl Model for User {
 
 impl User {
     /// Emails are matched case-insensitively.
-    pub fn find_by_email<'c, E: SqliteExecutor<'c>>(
+    pub fn find_by_email<'c, E: Executor<'c>>(
         db: E,
         email: &str,
     ) -> impl Future<Output = Result<Option<Self>>> + Send {
