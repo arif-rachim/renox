@@ -20,6 +20,8 @@ commit that `rnx` was built from.
   - `Error`, `Environment`, `CspMode`, `Channel`, `Locale`, `DbValue`, `Inspected`
 - New methods, functions, modules, template functions, validation rules, CLI commands and `.env`
   settings (always with defaults).
+- New provided methods on traits you implement (`Model`, `Notification`, …); `FromRow` stays one
+  method. `db::Number` is sealed: only `i64` and `f64`.
 
 `Dialect` is deliberately not in that list. Supporting a third database would change the SQL every
 app writes, so it would come with a major release.

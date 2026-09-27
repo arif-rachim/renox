@@ -110,7 +110,11 @@ async fn store(State(db): State<Db>, Valid(form): Valid<EntryForm>) -> Result<Vi
 - Plain SQL migrations run in batches (`migrate`, `migrate:rollback`, `migrate:fresh --seed`),
   with per-database files when SQL differs.
 - `#[derive(Model)]` gives you `create`, `save`, `delete` (with optional soft deletes), `find_or_404`,
-  a query builder, pagination and factories with fake data.
+  a query builder (OR groups, sub-queries, aggregates, bulk updates, upserts, chunks), pagination and
+  factories with fake data.
+- Relations are explicit and N+1-free: `belongs_to`, `has_many` and many-to-many pivots load a page's
+  related rows in one query each ([guide](docs/relations.md)); joins read into
+  `#[derive(FromRow)]` structs with `fetch_as`.
 - For anything else there's raw SQL with `?` placeholders and transactions:
   `renox::db::sql("…").bind(x).fetch_all(&db)`.
 - SQLite is the default. PostgreSQL is one feature flag away, with the same code
