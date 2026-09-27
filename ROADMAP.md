@@ -501,10 +501,16 @@ M14b · extension points:
       template with its line, also when a view fails to render (it used to fall back to a bare page)
 
 M14c · mail and notifications:
-- [ ] A6 Mail with from, cc, bcc, reply-to, several recipients and attachments
-- [ ] A7 Custom notification channels (e.g. WhatsApp, SMS), notifying non-users, queued
-      notifications
-- [ ] Update the cheat-sheet, docs, examples and generators to the frozen API
+- [x] A6 `Mail` with several recipients (`to: Vec<String>`, `.also_to`), `.cc`, `.bcc`,
+      `.reply_to`, `.from` (instead of `MAIL_FROM_*`) and `.attach(name, type, bytes)`
+      (base64 in the queue); invalid addresses fail permanently; the preview page lists them all;
+      `Mail::is_for(address)`
+- [x] A7 `Channel::Custom(name)` with `App::channel(name, handler)` and
+      `Notification::to_channel`; `Recipient` for users or plain addresses
+      (`Recipient::to("mail", …).and("whatsapp", …)`) with `state.notify_to`; `state.notify_later`
+      (database row now, each other channel as its own queued job with retries)
+- [x] The cheat-sheet, README, docs and examples follow the frozen API (`Notification` methods
+      take a `&Recipient`)
 
 ### M15 · v0.16: The data layer
 The biggest day-to-day gap for developers coming from Laravel (see "Readiness vs Laravel" in the

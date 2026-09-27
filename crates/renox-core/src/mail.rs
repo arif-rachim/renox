@@ -38,29 +38,137 @@ use crate::{AppState, Config, Error, Result, context};
 const OUTBOX: usize = 50;
 
 /// One email message. `html` is optional; `text` is always sent.
+///
+/// ```
+/// # use renox::mail::Mail;
+/// let pdf: Vec<u8> = b"%PDF-1.7 ...".to_vec();
+/// let mail = Mail::new("budi@example.com", "Invoice INV-001", "Your invoice is attached.")
+///     .also_to("finance@example.com")
+///     .cc("sales@example.com")
+///     .bcc("archive@example.com")
+///     .reply_to("Toko Kopi <halo@toko.id>")
+///     .from("Toko Kopi Billing <billing@toko.id>") // instead of MAIL_FROM_*
+///     .attach("INV-001.pdf", "application/pdf", pdf);
+/// ```
+///
+/// Addresses are `a@b.c` or `Name <a@b.c>`; an invalid one fails the send
+/// (and a queued mail isn't retried for it).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[non_exhaustive]
 pub struct Mail {
-    pub to: String,
+    pub to: Vec<String>,
     pub subject: String,
     pub text: String,
     #[serde(default)]
     pub html: Option<String>,
+    #[serde(default)]
+    pub cc: Vec<String>,
+    #[serde(default)]
+    pub bcc: Vec<String>,
+    #[serde(default)]
+    pub reply_to: Option<String>,
+    /// Sender instead of `MAIL_FROM_ADDRESS` / `MAIL_FROM_NAME`.
+    #[serde(default)]
+    pub from: Option<String>,
+    #[serde(default)]
+    pub attachments: Vec<Attachment>,
+}
+
+/// A file sent with a mail.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
+pub struct Attachment {
+    pub filename: String,
+    /// e.g. `application/pdf`.
+    pub content_type: String,
+    /// Stored as base64 when the mail is queued.
+    #[serde(with = "base64_bytes")]
+    pub data: Vec<u8>,
+}
+
+mod base64_bytes {
+    use base64::Engine;
+    use base64::engine::general_purpose::STANDARD;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(data: &[u8], s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(&STANDARD.encode(data))
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D::Error> {
+        let text = String::deserialize(d)?;
+        STANDARD.decode(text).map_err(serde::de::Error::custom)
+    }
 }
 
 impl Mail {
     pub fn new(to: impl Into<String>, subject: impl Into<String>, text: impl Into<String>) -> Self {
         Self {
-            to: to.into(),
+            to: vec![to.into()],
             subject: subject.into(),
             text: text.into(),
             html: None,
+            cc: Vec::new(),
+            bcc: Vec::new(),
+            reply_to: None,
+            from: None,
+            attachments: Vec::new(),
         }
     }
 
     pub fn html(mut self, html: impl Into<String>) -> Self {
         self.html = Some(html.into());
         self
+    }
+
+    /// Another recipient.
+    pub fn also_to(mut self, address: impl Into<String>) -> Self {
+        self.to.push(address.into());
+        self
+    }
+
+    pub fn cc(mut self, address: impl Into<String>) -> Self {
+        self.cc.push(address.into());
+        self
+    }
+
+    pub fn bcc(mut self, address: impl Into<String>) -> Self {
+        self.bcc.push(address.into());
+        self
+    }
+
+    pub fn reply_to(mut self, address: impl Into<String>) -> Self {
+        self.reply_to = Some(address.into());
+        self
+    }
+
+    /// Sends as `address` instead of `MAIL_FROM_ADDRESS` / `MAIL_FROM_NAME`.
+    pub fn from(mut self, address: impl Into<String>) -> Self {
+        self.from = Some(address.into());
+        self
+    }
+
+    pub fn attach(
+        mut self,
+        filename: impl Into<String>,
+        content_type: impl Into<String>,
+        data: impl Into<Vec<u8>>,
+    ) -> Self {
+        self.attachments.push(Attachment {
+            filename: filename.into(),
+            content_type: content_type.into(),
+            data: data.into(),
+        });
+        self
+    }
+
+    /// Whether `address` is among `to`, `cc` or `bcc`.
+    pub fn is_for(&self, address: &str) -> bool {
+        self.to
+            .iter()
+            .chain(&self.cc)
+            .chain(&self.bcc)
+            .any(|a| a == address || a.ends_with(&format!("<{address}>")))
     }
 }
 
@@ -147,7 +255,7 @@ impl Mailer {
         match &self.driver {
             Driver::Log => tracing::info!(
                 "mail (log driver)\nTo: {}\nSubject: {}\n\n{}\n",
-                mail.to,
+                mail.to.join(", "),
                 mail.subject,
                 mail.text
             ),
@@ -164,7 +272,7 @@ impl Mailer {
                     .await
                     .map_err(|_| anyhow::anyhow!("no answer from the SMTP server in {timeout:?}"))
                     .and_then(|sent| sent.map_err(anyhow::Error::from))
-                    .with_context(|| format!("sending mail to {}", mail.to))?;
+                    .with_context(|| format!("sending mail to {}", mail.to.join(", ")))?;
             }
         }
         self.remember(mail);
@@ -236,24 +344,68 @@ fn smtp(config: &Config) -> anyhow::Result<Driver> {
     })
 }
 
-fn message(from: &Mailbox, mail: &Mail) -> Result<Message> {
-    let to: Mailbox = mail.to.parse().map_err(|err| {
+fn mailbox(address: &str) -> Result<Mailbox> {
+    address.trim().parse().map_err(|err| {
         Error::permanent(
-            anyhow::Error::new(err).context(format!("`{}` is not an email address", mail.to)),
+            anyhow::Error::new(err).context(format!("`{address}` is not an email address")),
         )
-    })?;
-    let builder = Message::builder()
-        .from(from.clone())
-        .to(to)
-        .subject(mail.subject.clone());
-    let message = match &mail.html {
-        Some(html) => builder.multipart(MultiPart::alternative_plain_html(
-            mail.text.clone(),
-            html.clone(),
-        )),
-        None => builder
-            .header(ContentType::TEXT_PLAIN)
-            .body(mail.text.clone()),
+    })
+}
+
+fn message(from: &Mailbox, mail: &Mail) -> Result<Message> {
+    use lettre::message::{Attachment as Part, SinglePart};
+
+    if mail.to.is_empty() {
+        return Err(Error::permanent(anyhow::anyhow!(
+            "the mail has no recipient"
+        )));
+    }
+    let from = match &mail.from {
+        Some(address) => mailbox(address)?,
+        None => from.clone(),
+    };
+    let mut builder = Message::builder().from(from).subject(mail.subject.clone());
+    for address in &mail.to {
+        builder = builder.to(mailbox(address)?);
+    }
+    for address in &mail.cc {
+        builder = builder.cc(mailbox(address)?);
+    }
+    for address in &mail.bcc {
+        builder = builder.bcc(mailbox(address)?);
+    }
+    if let Some(address) = &mail.reply_to {
+        builder = builder.reply_to(mailbox(address)?);
+    }
+    let body = match &mail.html {
+        Some(html) => MultiPart::alternative_plain_html(mail.text.clone(), html.clone()),
+        None => MultiPart::mixed().singlepart(
+            SinglePart::builder()
+                .header(ContentType::TEXT_PLAIN)
+                .body(mail.text.clone()),
+        ),
+    };
+    let message = if mail.attachments.is_empty() {
+        match &mail.html {
+            Some(_) => builder.multipart(body),
+            None => builder
+                .header(ContentType::TEXT_PLAIN)
+                .body(mail.text.clone()),
+        }
+    } else {
+        let mut mixed = MultiPart::mixed().multipart(body);
+        for file in &mail.attachments {
+            let content_type = ContentType::parse(&file.content_type).map_err(|err| {
+                Error::permanent(anyhow::anyhow!(
+                    "attachment `{}`: `{}` is not a content type ({err})",
+                    file.filename,
+                    file.content_type
+                ))
+            })?;
+            mixed = mixed
+                .singlepart(Part::new(file.filename.clone()).body(file.data.clone(), content_type));
+        }
+        builder.multipart(mixed)
     };
     Ok(message.map_err(anyhow::Error::from)?)
 }
@@ -414,7 +566,7 @@ async fn list(State(state): State<AppState>) -> Html<String> {
                 s.at.format("%H:%M:%S"),
                 s.id,
                 escape(&s.mail.subject),
-                escape(&s.mail.to)
+                escape(&s.mail.to.join(", "))
             )
         })
         .collect();
@@ -441,12 +593,38 @@ async fn show(State(state): State<AppState>, Path(id): Path<u64>) -> Result<Html
             escape(html)
         )
     });
+    let mut details = format!("<p>To: {}</p>", escape(&sent.mail.to.join(", ")));
+    for (label, list) in [("Cc", &sent.mail.cc), ("Bcc", &sent.mail.bcc)] {
+        if !list.is_empty() {
+            details.push_str(&format!("<p>{label}: {}</p>", escape(&list.join(", "))));
+        }
+    }
+    for (label, value) in [("Reply-To", &sent.mail.reply_to), ("From", &sent.mail.from)] {
+        if let Some(value) = value {
+            details.push_str(&format!("<p>{label}: {}</p>", escape(value)));
+        }
+    }
+    if !sent.mail.attachments.is_empty() {
+        let files: Vec<String> = sent
+            .mail
+            .attachments
+            .iter()
+            .map(|a| {
+                format!(
+                    "{} ({}, {} bytes)",
+                    escape(&a.filename),
+                    escape(&a.content_type),
+                    a.data.len()
+                )
+            })
+            .collect();
+        details.push_str(&format!("<p>Attachments: {}</p>", files.join(", ")));
+    }
     Ok(Html(format!(
         "<!doctype html><meta charset=utf-8><title>{subject} · Renox</title>{STYLE}\
-         <p><a href=\"/_renox/mail\">&larr; All mail</a></p><h1>{subject}</h1><p>To: {to}</p>{html}\
+         <p><a href=\"/_renox/mail\">&larr; All mail</a></p><h1>{subject}</h1>{details}{html}\
          <h2>Text</h2><pre>{text}</pre>",
         subject = escape(&sent.mail.subject),
-        to = escape(&sent.mail.to),
         text = escape(&sent.mail.text),
     )))
 }

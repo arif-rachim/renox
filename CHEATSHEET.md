@@ -493,6 +493,61 @@ Jobs and scheduled tasks run inside `rnx serve` / `my-app serve` (`QUEUE_WORKERS
 A job that errors, panics or passes its `TIMEOUT` is retried up to `MAX_ATTEMPTS`, then moved to
 `failed_jobs` (`queue:failed`, `queue:retry`); a panicking task or listener doesn't stop the others.
 
+## Mail and notifications
+
+```rust
+use renox::prelude::*;
+use renox::auth::{Channel, Notification, Recipient};
+use renox::mail::Mail;
+
+async fn send_invoice(state: &AppState, pdf: Vec<u8>) -> Result {
+    let mail = state
+        .mail_view("budi@example.com", "Invoice INV-001", "mail/invoice", context! {})? // .html + .txt
+        .also_to("siti@example.com")
+        .cc("sales@example.com")
+        .bcc("archive@example.com")
+        .reply_to("Toko Kopi <halo@toko.id>")
+        .from("Billing <billing@toko.id>") // instead of MAIL_FROM_*
+        .attach("INV-001.pdf", "application/pdf", pdf);
+    state.queue_mail(mail).await?; // or state.mailer.send(mail).await? for now
+    Ok(())
+}
+
+struct OrderShipped { order_id: i64 }
+
+impl Notification for OrderShipped {
+    fn kind(&self) -> &'static str { "order-shipped" }
+    fn channels(&self) -> Vec<Channel> {
+        vec![Channel::Mail, Channel::Database, Channel::Custom("whatsapp")]
+    }
+    fn to_mail(&self, to: &Recipient, _: &AppState) -> Result<Mail> {
+        Ok(Mail::new(to.email().unwrap_or_default(), "Order shipped", "On its way."))
+    }
+    fn to_database(&self, _: &Recipient) -> renox::serde_json::Value {
+        json!({ "order_id": self.order_id }) // user.unread_notifications(&db)
+    }
+    fn to_channel(&self, _: &str, _: &Recipient) -> Result<renox::serde_json::Value> {
+        Ok(json!({ "text": format!("Order #{} shipped", self.order_id) }))
+    }
+}
+
+fn channels(app: App) -> App {
+    // Your own channel: call WhatsApp, SMS or Slack with what `to_channel` built.
+    app.channel("whatsapp", |_state, to: Recipient, message| async move {
+        let phone = to.address("whatsapp").or_else(|| to.user.as_ref()?.get("phone"));
+        let _ = (phone, message);
+        Ok(())
+    })
+}
+
+async fn ship(state: &AppState, user: &User) -> Result {
+    state.notify(user, &OrderShipped { order_id: 7 }).await?;       // now
+    state.notify_later(user, &OrderShipped { order_id: 7 }).await?; // one queued job per channel
+    let guest = Recipient::to("mail", "guest@example.com").and("whatsapp", "+628123");
+    state.notify_to(&guest, &OrderShipped { order_id: 7 }).await   // no account: no database row
+}
+```
+
 ## Cache, session, uploads, translations
 
 ```rust

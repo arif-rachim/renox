@@ -36,6 +36,9 @@ pub struct AppState {
     pub(crate) webhooks: crate::webhook::Handlers,
     /// Values every view gets (`App::share`).
     pub(crate) shares: Arc<Vec<(String, crate::view::ShareFn)>>,
+    /// The app's notification channels (`App::channel`).
+    pub(crate) channels:
+        Arc<std::collections::HashMap<String, crate::auth::notifications::ChannelFn>>,
     /// The app's own values (`App::provide`).
     pub(crate) provided: crate::provided::ProvidedMap,
 }
