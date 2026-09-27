@@ -326,8 +326,8 @@ Lesson: after scripted edits, `grep` for the added line; keep browser checks for
 |---|---|
 | M0 foundation, M1 web layer, M2 database, M3 validation, M4 auth (a+b), M5 queue/scheduler/events/mail/notifications (a+b) | merged to `main` |
 | M6a cache, `Routes::throttle`, maintenance mode (`down`/`up`), `/health` | merged to `main` |
-| M6b uploads, file rules, storage (local + `s3` feature), multipart CSRF, body limit | PR #12 (branch `m6b-uploads`) |
-| M6c i18n (`resources/lang`, `t()`, `Lang`, per-visitor locale, translatable built-ins) | branch `m6c-i18n` on top of `m6b-uploads`; open its PR after #12 merges |
+| M6b uploads, file rules, storage (local + `s3` feature), multipart CSRF, body limit | merged to `main` |
+| M6c i18n (`resources/lang`, `t()`, `Lang`, per-visitor locale, translatable built-ins) | PR from branch `m6c-i18n` |
 | M7 CLI/DX | next |
 | M8 testing helpers + deploy (`renox build` embedding views, Docker/systemd, Litestream), v1.0 docs | later |
 
