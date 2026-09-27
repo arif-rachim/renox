@@ -1,8 +1,6 @@
-use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 
-use axum::extract::{ConnectInfo, Extension, FromRequestParts, State};
-use axum::http::request::Parts;
+use axum::extract::{Extension, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -12,13 +10,16 @@ use super::{User, intended, login, logout, passwords, verification, verify_passw
 use crate::db::Migration;
 use crate::i18n::Lang;
 use crate::validation::{Errors, Locale, Valid, Validate, ValidationError, Validator};
-use crate::{AppState, Htmx, HxRedirect, Module, Result, Routes, Session, View, context, view};
+use crate::{
+    AppState, ClientIp, Htmx, HxRedirect, Module, Result, Routes, Session, View, context, view,
+};
 
 const MIGRATIONS: &[Migration] = &[
     crate::db::framework_migration!("auth", "00010101000000_create_users_table"),
     crate::db::framework_migration!("auth", "00010101000001_create_password_reset_tokens_table"),
     crate::db::framework_migration!("auth", "00010101000002_create_personal_access_tokens_table"),
     crate::db::framework_migration!("auth", "00010101000003_create_notifications_table"),
+    crate::db::framework_migration!("auth", "00010101000004_add_sessions_revoked_at_to_users"),
 ];
 
 struct Settings {
@@ -35,6 +36,11 @@ struct Settings {
 /// `verification.notice`, `verification.verify` and `verification.send`.
 /// The pages live in `renox/auth/*.html`, inside `renox/auth/layout.html`;
 /// create a file with the same name under your views to replace one.
+///
+/// Failed logins lock out 5 tries per email and IP a minute, 20 per email in
+/// 15 minutes from any IP, and 50 per IP in 15 minutes for any email (set
+/// `TRUSTED_PROXIES` behind a proxy). Logging out ends every session of the
+/// user, and a new password or a password reset ends the other sessions.
 #[derive(Clone)]
 pub struct Auth {
     registration: bool,
@@ -129,25 +135,6 @@ impl Module for Auth {
     }
 }
 
-/// The client's IP address, when the server knows it.
-struct ClientIp(Option<IpAddr>);
-
-impl<S: Send + Sync> FromRequestParts<S> for ClientIp {
-    type Rejection = std::convert::Infallible;
-
-    async fn from_request_parts(
-        parts: &mut Parts,
-        _: &S,
-    ) -> std::result::Result<Self, Self::Rejection> {
-        Ok(Self(
-            parts
-                .extensions
-                .get::<ConnectInfo<SocketAddr>>()
-                .map(|info| info.0.ip()),
-        ))
-    }
-}
-
 /// The built-in texts for the request's language, with the app's
 /// `renox.auth.*` translations on top.
 pub(super) fn texts(lang: &Lang) -> Value {
@@ -211,7 +198,9 @@ pub(super) fn label(v: &Validator, field: &'static str) -> &'static str {
 
 impl Validate for LoginForm {
     fn rules(&self, v: &mut Validator) {
-        v.field("email", &self.email).required().email();
+        v.field("email", &super::user::normalize_email(&self.email))
+            .required()
+            .email();
         let password = label(v, "password");
         v.field("password", &self.password)
             .fallback_label(password)
@@ -228,11 +217,6 @@ async fn store_login(
     lang: Lang,
     Valid(form): Valid<LoginForm>,
 ) -> Result<Response> {
-    let key = format!(
-        "{}|{}",
-        form.email.trim().to_lowercase(),
-        ip.map(|ip| ip.to_string()).unwrap_or_default()
-    );
     let failed = |key: &str, seconds: Option<u64>| {
         let mut errors = Errors::new();
         let seconds = seconds.map(|s| s.to_string()).unwrap_or_default();
@@ -241,7 +225,7 @@ async fn store_login(
             .with_input(&json!({ "email": form.email, "remember": form.remember }))
     };
 
-    if let Some(seconds) = state.throttle.blocked_for(&key) {
+    if let Some(seconds) = state.throttle.blocked_for(&form.email, ip) {
         return Err(failed("auth.throttle", Some(seconds)).into());
     }
 
@@ -252,11 +236,11 @@ async fn store_login(
         .map_or_else(dummy_hash, |u| u.password.clone());
     let valid = verify_password(&form.password, &hash).await;
     let Some(user) = user.filter(|_| valid) else {
-        state.throttle.fail(&key);
+        state.throttle.fail(&form.email, ip);
         return Err(failed("auth.failed", None).into());
     };
 
-    state.throttle.clear(&key);
+    state.throttle.clear(&form.email, ip);
     let remember = form
         .remember
         .is_some()
@@ -306,9 +290,27 @@ async fn store_register(
     State(state): State<AppState>,
     session: Session,
     htmx: Htmx,
+    lang: Lang,
     Valid(form): Valid<RegisterForm>,
 ) -> Result<Response> {
-    let user = User::register(&state.db, &form.name, &form.email, &form.password).await?;
+    let user = match User::register(&state.db, &form.name, &form.email, &form.password).await {
+        Ok(user) => user,
+        // Two sign-ups with one email at the same moment: the database's
+        // unique index stops the second, which gets the `unique` rule's answer.
+        Err(err) if err.is_unique_violation() => {
+            let template = crate::validation::template_for(
+                Locale::parse(&lang.locale),
+                Some(&lang.texts()),
+                "unique",
+            );
+            let mut errors = Errors::new();
+            errors.add("email", crate::validation::render(&template, "email", &[]));
+            return Err(ValidationError::new(errors)
+                .with_input(&json!({ "name": form.name, "email": form.email }))
+                .into());
+        }
+        Err(err) => return Err(err),
+    };
     if settings.verify_email {
         verification::send_verification(&state, &user).await?;
     }
@@ -316,9 +318,12 @@ async fn store_register(
     Ok(go(&htmx, after_login(&state, &settings, &session)))
 }
 
-async fn destroy(State(state): State<AppState>, session: Session, htmx: Htmx) -> Response {
-    logout(&session);
-    go(&htmx, state.url("home", &[]).unwrap_or_else(|_| "/".into()))
+async fn destroy(State(state): State<AppState>, session: Session, htmx: Htmx) -> Result<Response> {
+    logout(&state.db, &session).await?;
+    Ok(go(
+        &htmx,
+        state.url("home", &[]).unwrap_or_else(|_| "/".into()),
+    ))
 }
 
 /// Words on the built-in pages.

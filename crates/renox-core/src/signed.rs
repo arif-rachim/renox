@@ -20,7 +20,7 @@ fn now() -> u64 {
         .unwrap_or_default()
 }
 
-fn signature(state: &AppState, payload: &str) -> String {
+pub(crate) fn signature(state: &AppState, payload: &str) -> String {
     let mut mac = <Hmac<Sha256> as KeyInit>::new_from_slice(state.key.signing())
         .expect("HMAC accepts keys of any length");
     mac.update(payload.as_bytes());

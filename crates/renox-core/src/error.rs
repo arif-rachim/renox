@@ -22,6 +22,18 @@ pub enum Error {
 }
 
 impl Error {
+    /// Whether the error is a database unique-constraint violation, e.g. a
+    /// second sign-up with the same email racing past the `unique` rule.
+    pub fn is_unique_violation(&self) -> bool {
+        match self {
+            Self::Internal(err) => err
+                .chain()
+                .filter_map(|e| e.downcast_ref::<sqlx::Error>())
+                .any(|e| matches!(e, sqlx::Error::Database(db) if db.is_unique_violation())),
+            _ => false,
+        }
+    }
+
     pub fn status(&self) -> StatusCode {
         match self {
             Self::BadRequest(_) => StatusCode::BAD_REQUEST,

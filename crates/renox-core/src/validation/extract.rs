@@ -3,8 +3,8 @@ use std::collections::HashMap;
 
 use axum::extract::multipart::MultipartError;
 use axum::extract::{FromRequest, Multipart, Request};
-use axum::http::Method;
 use axum::http::header::CONTENT_TYPE;
+use axum::http::{Method, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
@@ -65,6 +65,12 @@ where
             locale: Locale::parse(&locale_name),
             texts: state.translator.texts(&locale_name),
         };
+        let content_type = req
+            .headers()
+            .get(CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_ascii_lowercase();
         let is_json = req
             .headers()
             .get(CONTENT_TYPE)
@@ -96,6 +102,12 @@ where
                 .map_err(IntoResponse::into_response)?;
             if is_json {
                 parse_json(&bytes, locale).map_err(IntoResponse::into_response)?
+            } else if !content_type.is_empty()
+                && !content_type.starts_with("application/x-www-form-urlencoded")
+            {
+                return Err(
+                    (StatusCode::UNSUPPORTED_MEDIA_TYPE, "Send a form or JSON.").into_response()
+                );
             } else {
                 let pairs = form_urlencoded::parse(&bytes).into_owned().collect();
                 parse_pairs(pairs, &HashMap::new(), locale)

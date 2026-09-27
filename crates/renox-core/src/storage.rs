@@ -270,7 +270,11 @@ fn s3(config: &StorageConfig) -> anyhow::Result<Disk> {
 
 /// `/_renox/files/{key}?expires=…&signature=…` for local temporary URLs.
 pub(crate) fn router() -> Router<AppState> {
-    Router::new().route("/_renox/files/{*key}", get(private_file))
+    Router::new()
+        .route("/_renox/files/{*key}", get(private_file))
+        .layer(axum::middleware::map_response(
+            crate::app::user_file_headers,
+        ))
 }
 
 async fn private_file(

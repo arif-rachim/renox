@@ -119,7 +119,9 @@ impl IntoResponseParts for HxTrigger {
     }
 }
 
-/// Redirects to the previous page (the `Referer`), or `/` when unknown.
+/// Redirects to the previous page (the `Referer`), or `/` when it's unknown
+/// or on another site (so a link from elsewhere can't use it as an open
+/// redirect).
 ///
 /// ```
 /// # use renox::prelude::*;
@@ -134,14 +136,36 @@ impl<S: Send + Sync> FromRequestParts<S> for Back {
     type Rejection = Infallible;
 
     async fn from_request_parts(parts: &mut Parts, _: &S) -> Result<Self, Infallible> {
-        Ok(Self(
-            parts
-                .headers
-                .get(REFERER)
-                .and_then(|v| v.to_str().ok())
-                .map(str::to_owned),
-        ))
+        Ok(Self(same_site_referer(&parts.headers)))
     }
+}
+
+/// The `Referer` as a path on this site (`/produk?page=2`), or `None` when
+/// it's missing or points anywhere else. The request's `Host` decides what
+/// "this site" is.
+pub(crate) fn same_site_referer(headers: &axum::http::HeaderMap) -> Option<String> {
+    let referer = headers.get(REFERER)?.to_str().ok()?;
+    if referer.starts_with('/') {
+        return is_local_path(referer).then(|| referer.to_owned());
+    }
+    let host = headers.get(axum::http::header::HOST)?.to_str().ok()?;
+    let rest = referer
+        .strip_prefix("https://")
+        .or_else(|| referer.strip_prefix("http://"))?;
+    let (authority, path) = match rest.find('/') {
+        Some(i) => (&rest[..i], &rest[i..]),
+        None => (rest, "/"),
+    };
+    (authority.eq_ignore_ascii_case(host) && is_local_path(path)).then(|| path.to_owned())
+}
+
+/// A path that stays on this site: starts with one `/`, and no `//` or `/\`
+/// that browsers would read as another host.
+pub(crate) fn is_local_path(path: &str) -> bool {
+    path.starts_with('/')
+        && !path.starts_with("//")
+        && !path.starts_with("/\\")
+        && !path.contains(['\\', '\r', '\n'])
 }
 
 impl IntoResponse for Back {

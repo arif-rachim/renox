@@ -171,6 +171,8 @@ pub(crate) async fn middleware(
     mut req: Request,
     next: Next,
 ) -> Response {
+    let client = crate::client_ip::resolve(&req, &state.config.trusted_proxies);
+    req.extensions_mut().insert(client);
     let security = &state.security;
     let nonce = crate::crypto::random_token();
     req.extensions_mut().insert(CspNonce(nonce.clone()));

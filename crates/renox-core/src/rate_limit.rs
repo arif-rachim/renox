@@ -1,16 +1,16 @@
 //! Per-route rate limits: `Routes::throttle(60, Duration::from_secs(60))`.
 //!
-//! Requests are counted per logged-in user, or per IP address for guests, in
+//! Requests are counted per logged-in user, or per IP address for guests
+//! (see [`ClientIp`](crate::ClientIp) behind a proxy), in
 //! fixed windows kept in memory. Over the limit, the response is 429 with
 //! `Retry-After`; every allowed response carries `X-RateLimit-Limit` and
 //! `X-RateLimit-Remaining`.
 
 use std::collections::HashMap;
-use std::net::SocketAddr;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use axum::extract::{ConnectInfo, Request};
+use axum::extract::Request;
 use axum::http::HeaderValue;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
@@ -74,8 +74,8 @@ fn key(req: &Request) -> String {
         .and_then(|c| c.user.as_ref().map(|u| u.id));
     match user {
         Some(id) => format!("user:{id}"),
-        None => match req.extensions().get::<ConnectInfo<SocketAddr>>() {
-            Some(info) => format!("ip:{}", info.0.ip()),
+        None => match crate::ClientIp::of(req) {
+            Some(ip) => format!("ip:{ip}"),
             None => "ip:unknown".to_owned(),
         },
     }

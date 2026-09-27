@@ -7,7 +7,7 @@ use argon2::password_hash::{PasswordHasher, PasswordVerifier};
 use serde::{Deserialize, Serialize};
 
 use super::Policy;
-use crate::db::{DateTime, Db, DbValue, Executor, Model, Row, ToDbValue};
+use crate::db::{DateTime, Db, DbValue, Executor, Model, Row, ToDbValue, sql};
 use crate::{Error, Result};
 
 /// A row of the `users` table created by the `Auth` module.
@@ -106,6 +106,27 @@ impl User {
         self.save(db).await
     }
 
+    /// Ends every session of the user, e.g. on logout or when an account
+    /// may be compromised. API tokens stay; see [`User::revoke_tokens`].
+    pub async fn revoke_sessions(&self, db: &Db) -> Result {
+        revoke_sessions(db, self.id).await
+    }
+
+    /// The user and when their sessions were last revoked, in one query.
+    pub(crate) async fn find_with_revocation(db: &Db, id: i64) -> Result<Option<(Self, i64)>> {
+        let row = sql(format!(
+            "SELECT {}, sessions_revoked_at FROM users WHERE id = ?",
+            Self::COLUMNS.join(", ")
+        ))
+        .bind(id)
+        .fetch_optional(db)
+        .await?;
+        Ok(match row {
+            Some(row) => Some((Self::from_row(&row)?, row.try_get("sessions_revoked_at")?)),
+            None => None,
+        })
+    }
+
     /// The user with this email and password, e.g. to issue an API token.
     /// Takes as long for an unknown email as for a wrong password, so the
     /// answer doesn't reveal which emails have accounts.
@@ -133,6 +154,15 @@ impl User {
             Err(Error::Forbidden)
         }
     }
+}
+
+pub(crate) async fn revoke_sessions(db: &Db, id: i64) -> Result {
+    sql("UPDATE users SET sessions_revoked_at = ? WHERE id = ?")
+        .bind(super::unix_millis())
+        .bind(id)
+        .execute(db)
+        .await?;
+    Ok(())
 }
 
 /// Emails are stored and looked up trimmed and lowercased, so they match

@@ -34,7 +34,9 @@ pub(super) struct ForgotForm {
 
 impl Validate for ForgotForm {
     fn rules(&self, v: &mut Validator) {
-        v.field("email", &self.email).required().email();
+        v.field("email", &super::user::normalize_email(&self.email))
+            .required()
+            .email();
     }
 }
 
@@ -115,7 +117,9 @@ impl Validate for ResetForm {
     fn rules(&self, v: &mut Validator) {
         let password = super::module::label(v, "password");
         v.field("token", &self.token).required();
-        v.field("email", &self.email).required().email();
+        v.field("email", &super::user::normalize_email(&self.email))
+            .required()
+            .email();
         v.field("password", &self.password)
             .label(password)
             .required()
@@ -158,6 +162,9 @@ pub(super) async fn reset(
     };
 
     user.set_password(&state.db, &form.password).await?;
+    // Whoever reset the password may be recovering a stolen account: API
+    // tokens made before it stop working too, like other sessions do.
+    user.revoke_tokens(&state.db).await?;
     crate::db::sql("DELETE FROM password_reset_tokens WHERE email = ?")
         .bind(&user.email)
         .execute(&state.db)
