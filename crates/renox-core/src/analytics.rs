@@ -3,8 +3,11 @@
 //!
 //! From a handler, whatever the response is:
 //!
-//! ```ignore
+//! ```
+//! # use renox::prelude::*;
+//! # fn demo(session: &Session) -> Result {
 //! renox::analytics::event(&session, "sign_up", json!({ "method": "email" }))?;
+//! # Ok(()) }
 //! ```
 //!
 //! The event reaches the browser with this response when it's an htmx swap
@@ -16,7 +19,10 @@
 //! Events that must not be lost to ad blockers (a purchase) can go from the
 //! server instead, through the Measurement Protocol:
 //!
-//! ```ignore
+//! ```
+//! # use renox::prelude::*;
+//! use renox::analytics::{GaClientId, ServerEvent};
+//!
 //! async fn paid(State(state): State<AppState>, GaClientId(client): GaClientId) -> Result<Redirect> {
 //!     state.dispatch(ServerEvent::new(client, "purchase").param("value", 18_000).param("currency", "IDR")).await?;
 //!     Ok(Redirect::to("/thanks"))

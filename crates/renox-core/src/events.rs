@@ -1,17 +1,25 @@
 //! Events and listeners, for decoupling modules: the order module emits
 //! `OrderPlaced`, and the stock and mail modules react to it.
 //!
-//! ```ignore
+//! ```
+//! # use renox::prelude::*;
+//! # use serde::{Deserialize, Serialize};
+//! # #[derive(Serialize, Deserialize)] struct SendReceipt { order_id: i64 }
+//! # impl Job for SendReceipt { const NAME: &'static str = "send-receipt"; async fn handle(self, _: JobContext) -> Result { Ok(()) } }
 //! #[derive(Clone)]
 //! struct OrderPlaced { order_id: i64 }
 //! impl Event for OrderPlaced {}
 //!
+//! # let _ =
 //! App::new().listen(|event: OrderPlaced, state| async move {
 //!     state.dispatch(SendReceipt { order_id: event.order_id }).await?; // slow work: queue it
 //!     Ok(())
 //! })
+//! # ;
 //!
+//! # async fn demo(state: AppState, order_id: i64) -> Result {
 //! state.emit(OrderPlaced { order_id }).await?;
+//! # Ok(()) }
 //! ```
 
 use std::any::{Any, TypeId};

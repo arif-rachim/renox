@@ -46,3 +46,7 @@ tower = { version = "0.5.3", features = ["util"] }
 tower-http = { version = "0.7.1", features = ["cors", "fs", "trace"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+
+[dev-dependencies]
+# Doc examples are written the way apps use Renox: through the `renox` crate.
+renox = { path = "../renox" }

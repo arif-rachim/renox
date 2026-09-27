@@ -1,7 +1,11 @@
 //! Notifications: one message to a user, delivered by email, stored for an
 //! in-app list, or both.
 //!
-//! ```ignore
+//! ```
+//! # use renox::prelude::*;
+//! use renox::auth::{Channel, Notification};
+//! use renox::mail::Mail;
+//!
 //! struct OrderShipped { order_id: i64 }
 //!
 //! impl Notification for OrderShipped {
@@ -12,13 +16,15 @@
 //!         state.mail_view(&user.email, "Pesanan dikirim", "mail/shipped", context! { id => self.order_id })
 //!     }
 //!
-//!     fn to_database(&self, _: &User) -> serde_json::Value {
+//!     fn to_database(&self, _: &User) -> renox::serde_json::Value {
 //!         json!({ "order_id": self.order_id })
 //!     }
 //! }
 //!
+//! # async fn demo(state: AppState, user: User, db: Db, order_id: i64) -> Result {
 //! state.notify(&user, &OrderShipped { order_id }).await?;
 //! let unread = user.unread_notifications(&db).await?;
+//! # let _ = unread; Ok(()) }
 //! ```
 
 use anyhow::anyhow;

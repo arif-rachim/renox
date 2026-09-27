@@ -16,11 +16,17 @@ use crate::AppState;
 
 /// A module's routes, with optional names for URL generation.
 ///
-/// ```ignore
+/// ```
+/// # use renox::prelude::*;
+/// # async fn index() {}
+/// # async fn show() {}
+/// # async fn store() {}
+/// # let _ =
 /// Routes::new()
 ///     .get("/produk", index).name("produk.index")
 ///     .get("/produk/{id}", show).name("produk.show")
 ///     .post("/produk", store).name("produk.store")
+/// # ;
 /// ```
 #[derive(Default)]
 pub struct Routes {

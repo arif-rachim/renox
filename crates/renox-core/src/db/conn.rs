@@ -365,7 +365,9 @@ pub(crate) fn numbered_placeholders(sql: &str) -> Cow<'_, str> {
 
 /// A raw SQL statement with `?` placeholders.
 ///
-/// ```ignore
+/// ```
+/// # use renox::prelude::*;
+/// # async fn demo(db: Db) -> Result {
 /// let rows = renox::db::sql("SELECT nama FROM produk WHERE harga < ?")
 ///     .bind(20_000)
 ///     .fetch_all(&db)
@@ -373,6 +375,7 @@ pub(crate) fn numbered_placeholders(sql: &str) -> Cow<'_, str> {
 /// let nama: String = rows[0].try_get("nama")?;
 ///
 /// let total: i64 = renox::db::sql("SELECT COUNT(*) FROM produk").scalar(&db).await?;
+/// # let _ = (nama, total); Ok(()) }
 /// ```
 pub fn sql(sql: impl Into<String>) -> Sql {
     Sql {

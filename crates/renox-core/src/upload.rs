@@ -1,22 +1,26 @@
 //! Uploaded files. A form field of type `Upload` (or `Option<Upload>`)
 //! receives the file from a `multipart/form-data` post through `Valid<T>`:
 //!
-//! ```ignore
+//! ```
+//! # use renox::prelude::*;
+//! # use serde::Deserialize;
 //! #[derive(Deserialize)]
 //! struct ProdukForm { nama: String, foto: Option<Upload> }
 //!
 //! impl Validate for ProdukForm {
 //!     fn rules(&self, v: &mut Validator) {
+//!         v.field("nama", &self.nama).required();
 //!         v.field("foto", &self.foto).image().max(2048);     // KB
 //!     }
 //! }
 //!
-//! async fn store(State(state): State<AppState>, Valid(form): Valid<ProdukForm>) -> Result<Back> {
+//! async fn store(State(state): State<AppState>, back: Back, Valid(form): Valid<ProdukForm>) -> Result<Back> {
 //!     if let Some(foto) = &form.foto {
 //!         let key = foto.store_public(&state.storage, "produk").await?;   // public/produk/…jpg
 //!         let url = state.storage.url(&key);
+//! #       let _ = url;
 //!     }
-//!     ...
+//!     Ok(back)
 //! }
 //! ```
 //!

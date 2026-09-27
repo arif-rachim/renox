@@ -10,7 +10,12 @@
 //!    retrying on errors; `webhook:failed` lists what failed and
 //!    `webhook:retry <id>` runs a call again.
 //!
-//! ```ignore
+//! ```
+//! # use renox::prelude::*;
+//! # #[derive(serde::Deserialize)] struct Invoice { id: String, status: String, external_id: String }
+//! # async fn mark_paid(_: &Db, _: &str) -> Result { Ok(()) }
+//! use renox::webhook;
+//!
 //! struct Xendit;
 //!
 //! impl Webhook for Xendit {

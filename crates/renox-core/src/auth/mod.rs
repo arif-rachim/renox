@@ -1,13 +1,23 @@
 //! Authentication and authorization: the `users` table, password hashing,
 //! session login with "remember me", route guards, policies and gates.
 //!
-//! ```ignore
+//! ```
+//! # #[derive(Model, serde::Serialize, Default)]
+//! # #[model(table = "produk")]
+//! # struct Produk { id: i64, nama: String, harga: i64, kategori: Option<String>, user_id: i64 }
+//! # use renox::prelude::*;
+//! # impl Policy for Produk { fn allows(&self, user: &User, _: &str) -> bool { self.user_id == user.id } }
+//! # let _ =
 //! App::new()
 //!     .module(Auth::new())                       // /login, /register, /logout
 //!     .gate("admin", |user| user.email.ends_with("@toko.id"))
-//!     .module(Produk)
+//!     .module(Toko)
+//! # ;
 //!
-//! impl Module for Produk {
+//! struct Toko;
+//!
+//! impl Module for Toko {
+//! #   fn name(&self) -> &'static str { "toko" }
 //!     fn routes(&self) -> Routes {
 //!         Routes::new()
 //!             .get("/produk/{id}/edit", edit)
@@ -18,7 +28,7 @@
 //! async fn edit(auth: AuthUser, State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
 //!     let produk = Produk::find_or_404(&db, id).await?;
 //!     auth.authorize("update", &produk)?;        // 403 unless the policy allows it
-//!     ...
+//!     Ok(view("produk/edit.html", context! { produk }))
 //! }
 //! ```
 
@@ -59,7 +69,11 @@ const INTENDED: &str = "_intended";
 
 /// Decides whether a user may perform an ability on a model.
 ///
-/// ```ignore
+/// ```
+/// # #[derive(Model, serde::Serialize, Default)]
+/// # #[model(table = "produk")]
+/// # struct Produk { id: i64, nama: String, harga: i64, kategori: Option<String>, user_id: i64 }
+/// # use renox::prelude::*;
 /// impl Policy for Produk {
 ///     fn allows(&self, user: &User, ability: &str) -> bool {
 ///         match ability {
@@ -76,7 +90,10 @@ pub trait Policy {
 /// A model together with what the current user may do with it, so templates
 /// can ask the policy: `{% if can('update', product) %}`.
 ///
-/// ```ignore
+/// ```
+/// # use renox::prelude::*;
+/// # #[derive(Model, serde::Serialize, Default)] struct Product { id: i64, user_id: i64 }
+/// # impl Policy for Product { fn allows(&self, user: &User, _: &str) -> bool { self.user_id == user.id } }
 /// async fn index(State(db): State<Db>, user: Option<AuthUser>, Page(page): Page) -> Result<View> {
 ///     let products = Product::query().paginate(&db, page, 20).await?
 ///         .map(|p| Can::new(p, user.as_deref(), &["update", "delete"]));

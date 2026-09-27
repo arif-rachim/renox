@@ -210,8 +210,13 @@ pub(crate) fn robots_router(state: &AppState) -> Router<AppState> {
 /// A `sitemap.xml` response. Name its route `sitemap` and `robots.txt`
 /// will point search engines at it.
 ///
-/// ```ignore
+/// ```
+/// # use renox::prelude::*;
+/// # use renox::seo::Sitemap;
+/// # #[derive(Model, serde::Serialize, Default)] struct Product { id: i64, updated_at: Option<DateTime> }
+/// # let _: Routes =
 /// Routes::new().get("/sitemap.xml", sitemap).name("sitemap")
+/// # ;
 ///
 /// async fn sitemap(State(state): State<AppState>) -> Result<Sitemap> {
 ///     let mut map = Sitemap::new(&state).route("home", &[], None)?;

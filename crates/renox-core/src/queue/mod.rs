@@ -1,6 +1,10 @@
 //! Background jobs stored in SQLite, with retries and a failed-jobs table.
 //!
-//! ```ignore
+//! ```
+//! # use renox::prelude::*;
+//! # #[derive(Model, serde::Serialize, Default)] struct Order { id: i64 }
+//! use serde::{Deserialize, Serialize};
+//!
 //! #[derive(Serialize, Deserialize)]
 //! struct SendReceipt { order_id: i64 }
 //!
@@ -10,13 +14,17 @@
 //!
 //!     async fn handle(self, ctx: JobContext) -> Result {
 //!         let order = Order::find_or_404(&ctx.state.db, self.order_id).await?;
-//!         // ...
+//!         // … send it
+//! #       let _ = order;
 //!         Ok(())
 //!     }
 //! }
 //!
-//! App::new().job::<SendReceipt>()             // register the handler
+//! # let _ =
+//! App::new().job::<SendReceipt>();            // register the handler
+//! # async fn demo(state: AppState, order_id: i64) -> Result {
 //! state.dispatch(SendReceipt { order_id }).await?;   // in a handler
+//! # Ok(()) }
 //! ```
 //!
 //! `serve` runs workers in the same process (`QUEUE_WORKERS`, default 2; 0 to

@@ -1,10 +1,13 @@
 //! Sending email: SMTP in production, the log or memory in development and
 //! tests, HTML templates with a text version, and a preview page.
 //!
-//! ```ignore
+//! ```
+//! # use renox::prelude::*;
+//! # async fn demo(state: AppState, order: renox::serde_json::Value) -> Result {
 //! let mail = state.mail_view("budi@example.com", "Struk pesanan", "mail/receipt", context! { order })?;
-//! state.mailer.send(mail).await?;      // now
-//! state.queue_mail(mail).await?;       // through the queue, with retries
+//! state.mailer.send(mail.clone()).await?;   // now
+//! state.queue_mail(mail).await?;            // through the queue, with retries
+//! # Ok(()) }
 //! ```
 //!
 //! `MAIL_MAILER` picks the driver: `smtp` (`MAIL_HOST`, `MAIL_PORT`,

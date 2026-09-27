@@ -15,13 +15,19 @@ enum Trashed {
 
 /// A query on a model's table, built with chained filters.
 ///
-/// ```ignore
+/// ```
+/// # #[derive(Model, serde::Serialize, Default)]
+/// # #[model(table = "produk")]
+/// # struct Produk { id: i64, nama: String, harga: i64, kategori: Option<String>, user_id: i64 }
+/// # use renox::prelude::*;
+/// # async fn demo(db: Db, page: u32) -> Result {
 /// let produk = Produk::query()
 ///     .where_eq("kategori", "kopi")
 ///     .where_op("harga", "<", 25_000)
 ///     .order_by("nama")
 ///     .paginate(&db, page, 20)
 ///     .await?;
+/// # let _ = produk; Ok(()) }
 /// ```
 ///
 /// Column names are checked against the model; an unknown column or operator

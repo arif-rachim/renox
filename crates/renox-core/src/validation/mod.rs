@@ -1,7 +1,10 @@
 //! Form validation with Laravel-style rules, database-backed `unique` and
 //! `exists`, and messages in English and Indonesian.
 //!
-//! ```ignore
+//! ```
+//! # use renox::prelude::*;
+//! use serde::{Deserialize, Serialize};
+//!
 //! #[derive(Deserialize, Serialize)]
 //! struct ProdukForm {
 //!     nama: String,
@@ -17,7 +20,11 @@
 //!     }
 //! }
 //!
-//! async fn store(State(db): State<Db>, Valid(form): Valid<ProdukForm>) -> Result<Back> { ... }
+//! async fn store(State(db): State<Db>, back: Back, Valid(form): Valid<ProdukForm>) -> Result<Back> {
+//!     // `form` passed every rule; invalid input never gets here.
+//! #   let _ = (db, form);
+//!     Ok(back)
+//! }
 //! ```
 
 mod extract;
@@ -200,8 +207,14 @@ impl Validator {
 
     /// Applies `data`'s rules; call `finish` to run the database checks.
     ///
-    /// ```ignore
+    /// ```
+    /// # use renox::prelude::*;
+    /// # use renox::validation::Locale;
+    /// # #[derive(serde::Deserialize)] struct ProdukForm { nama: String }
+    /// # impl Validate for ProdukForm { fn rules(&self, v: &mut Validator) { v.field("nama", &self.nama).required(); } }
+    /// # async fn demo(form: ProdukForm, db: Db) -> Result {
     /// let errors = Validator::rules_of(&form, Locale::Id).finish(&db).await?;
+    /// # let _ = errors; Ok(()) }
     /// ```
     pub fn rules_of(data: &impl Validate, locale: Locale) -> Self {
         let mut validator = Self::new(locale);
@@ -480,10 +493,14 @@ const DONT_FLASH: &[&str] = &[
 ///
 /// Return it from a handler for errors found after validation:
 ///
-/// ```ignore
+/// ```
+/// # use renox::prelude::*;
+/// # #[derive(serde::Serialize)] struct StokForm { jumlah: i64 }
+/// # fn demo(form: StokForm) -> Result {
 /// let mut errors = Errors::new();
 /// errors.add("stok", "Stok tidak cukup.");
 /// return Err(ValidationError::new(errors).with_input(&form).into());
+/// # }
 /// ```
 #[derive(Debug, Clone)]
 pub struct ValidationError {
