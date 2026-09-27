@@ -292,16 +292,13 @@ opening #5 with the same commit to `main`. Lesson: don't stack; or if you must, 
 
 | Milestone | Status |
 |---|---|
-| M0 foundation, M1 web layer, M2 database, M3 validation, M4 auth (a+b) | merged to `main` |
-| M5a queue/scheduler/events + removal of unused `thiserror`/`futures-util` | PR #9 open (branch `m5-queue`) |
-| M5b SMTP mail, templates, `/_renox/mail`, notifications, this guide | branch `m5b-mail` pushed, **no PR yet** |
-| M6a cache, `Routes::throttle`, maintenance mode (`down`/`up`), `/health` | branch `m6-infra` (on top of `m5b-mail`), **no PR yet** |
+| M0 foundation, M1 web layer, M2 database, M3 validation, M4 auth (a+b), M5 queue/scheduler/events/mail/notifications (a+b) | merged to `main` |
+| M6a cache, `Routes::throttle`, maintenance mode (`down`/`up`), `/health` | PR from branch `m6-infra` |
 | M6b storage/uploads (+ multipart CSRF, file rules), i18n | next |
 | M7 CLI/DX (`make:*`, `route:list`, `db:shell`, browser live reload), M8 testing helpers + deploy (`renox build` embedding views, Docker/systemd, Litestream), v1.0 docs | later |
 
-PR order once #9 is merged: open `m5b-mail` → `main`; after it merges, rebase `m6-infra` on `main`
-(`git rebase --onto main m5b-mail m6-infra` if `m5b-mail` was squashed; plain rebase otherwise) and
-open its PR. Don't open stacked PRs (§6.3).
+Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on
+an up-to-date `main`. Open the next milestone's PR only after the previous one is merged (§6.3).
 
 Open items noted in ROADMAP: `#[derive(Validate)]`, more rules (regex, dates, files), route groups
 with prefixes, SQLite session driver, pagination links that keep other query params.
