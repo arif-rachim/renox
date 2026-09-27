@@ -61,6 +61,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/events.rs            Event, listeners, AppState::emit
   src/mail.rs              Mail, Mailer (smtp/log/memory), mail_view, queue_mail, /_renox/mail preview
   src/cache.rs             Cache (memory / database store), remember()
+  src/provided.rs          App::provide values: Provided<T> extractor, AppState::provided
+  src/view_filters.rs      built-in template filters `number` and `date`; pub format_number
   src/command.rs           app commands: Args, Command; App::command / Registry::command, Kernel::call
   src/rate_limit.rs        Limiter + middleware behind Routes::throttle
   src/client_ip.rs         ClientIp extractor + TrustedProxies (TRUSTED_PROXIES); resolved once in
@@ -514,6 +516,13 @@ and the integration tests are one binary. Result: rebuild after a core change 29
   reach sqlx through the hidden `renox::__sqlx`. `rnx new` pins `rev` from `renox-cli/build.rs`
   (`git rev-parse HEAD`, else the cargo checkout directory's short rev); testing that needs the
   build script committed (`git add -A`), since `cargo install --git` builds the committed tree.
+- M14b conventions: template context precedence is `merge_maps([shared, view ctx, globals])` and
+  the LAST map wins (MiniJinja looks up in reverse). Templates are SemiStrict in debug, and the
+  whole test suite runs with `debug = true`, so built-in templates must only print defined values
+  (`flash` is an object returning "" for missing keys). `User` selects `*` (`Model::SELECT_ALL`)
+  and keeps unknown columns in `extra` (never password/sessions_revoked_at); `User::register`
+  reads the row back. `Valid`'s logic is `validation::extract::validate_request` (with an
+  extra-rules hook, used by `/register`).
 - `target/` grows to ~100 GB over a few milestones and fills the disk (link errors, "No space left
   on device"); `cargo clean` it before the full two-database run.
 - This session's working directory (~/workspace/renoxium) isn't a git repo, so the Agent tool's
@@ -556,8 +565,9 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M13b resilience (D1–D30): contained panics, timeouts, queue/migration/cache hardening | merged to `main` |
 | M13c chaos CI job (`tests/chaos`), docs/operations.md | merged to `main` |
 | Readiness vs Laravel review → ROADMAP M14a/b/c, M15 data layer, M16 DX & trust, M17 examples | merged to `main` |
-| M14a API foundations: non_exhaustive, stability doc + `DbError`, `abort`, route groups, app commands, pinned `rnx new` | PR from branch `m14a-api-foundations` |
-| M14b extension points (ROADMAP M14) | next; then M14c, M15, M16, M17, v1.0 |
+| M14a API foundations: non_exhaustive, stability doc + `DbError`, `abort`, route groups, app commands, pinned `rnx new` | merged to `main` |
+| M14b extension points: template hooks + number/date filters, `share`, `provide`/`Provided`, `App::layer`, `User` extra columns, registration hooks, async gates, semi-strict debug templates, debug error page | PR from branch `m14b-extension-points` |
+| M14c mail and notifications (ROADMAP M14) | next; then M15, M16, M17, v1.0 |
 | v1.0 docs site, starter kit, semver guarantee | last |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on

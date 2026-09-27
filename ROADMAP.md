@@ -487,12 +487,18 @@ M14a · API foundations:
       `cargo install --git`), falling back to `branch = "main"` without git
 
 M14b · extension points:
-- [ ] A8 Template functions and filters (money, dates), shared view data, typed app state,
-      `App::layer` for global middleware
-- [ ] A4 Gates that can use the database; a `User` apps extend (roles, extra fields at
-      registration)
-- [ ] Strict undefined variables in templates while `APP_DEBUG` is on, and a debug error page
-      with the request, the error chain and the template location
+- [x] A8 `App::templates(|env| …)` for filters, functions and globals, plus built-in `number`
+      (locale separators) and `date` (chrono format, `APP_TIMEZONE`) filters; `App::share(key,
+      async fn(ViewContext))` for data every view gets (the handler's context wins); typed values
+      with `App::provide(value)`, the `Provided<T>` extractor and `state.provided::<T>()`;
+      `App::layer(..)` around the app's own routes (after the session and user are loaded)
+- [x] A4 The app's own `users` columns are kept on `User` (`user.get::<T>("role")`,
+      `user.set(&db, "role", "admin")`, `User::where_eq("role", …)`, `{{ auth.user.role }}`);
+      `Auth::registration_rules` and `Auth::on_registered` for extra registration fields (a
+      failing hook undoes the sign-up); `App::gate_async` with `auth.gate_async(..).await?`
+- [x] Templates are semi-strict while `APP_DEBUG` is on (printing a missing variable fails;
+      `if` and `flash.x` don't); the debug error page shows the request, the error chain and the
+      template with its line, also when a view fails to render (it used to fall back to a bare page)
 
 M14c · mail and notifications:
 - [ ] A6 Mail with from, cc, bcc, reply-to, several recipients and attachments

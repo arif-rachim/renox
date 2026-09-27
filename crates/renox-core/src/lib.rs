@@ -25,6 +25,7 @@ pub mod mail;
 pub mod maintenance;
 mod method;
 mod module;
+mod provided;
 pub mod queue;
 mod rate_limit;
 mod registry;
@@ -40,7 +41,8 @@ pub mod storage;
 pub mod testing;
 pub mod upload;
 pub mod validation;
-mod view;
+pub mod view;
+mod view_filters;
 pub mod webhook;
 
 pub use app::{App, Kernel};
@@ -56,6 +58,7 @@ pub use htmx::{Back, Htmx, HxRedirect, HxRefresh, HxTrigger};
 pub use i18n::Lang;
 pub use method::METHOD_FIELD;
 pub use module::Module;
+pub use provided::Provided;
 pub use registry::Registry;
 pub use routing::{RouteInfo, RouteTable, Routes};
 pub use session::Session;
@@ -63,6 +66,7 @@ pub use state::AppState;
 pub use upload::Upload;
 pub use validation::{Errors, Valid, Validate, ValidationError, Validator};
 pub use view::{View, Views, view};
+pub use view_filters::format_number;
 
 pub use minijinja::context;
 

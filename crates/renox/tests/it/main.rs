@@ -10,6 +10,7 @@ mod data_resilience;
 mod database;
 mod dx;
 mod embed;
+mod extension_points;
 mod i18n;
 mod infra;
 mod mail;

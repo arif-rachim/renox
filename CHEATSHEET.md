@@ -99,7 +99,63 @@ library, so tests can boot it.
 <p>{{ t('shop.welcome', name=auth.user.name) if auth.check }}</p>
 {% if flash.status %}<p class="flash">{{ flash.status }}</p>{% endif %}
 {% if can('admin') %}<a href="/admin">Admin</a>{% endif %}    {# gate #}
+<p>{{ product.price | number }}</p>                            {# 75.000 (id) / 75,000 (en); number(2) #}
+<p>{{ order.created_at | date('%d/%m/%Y %H:%M') }}</p>        {# in APP_TIMEZONE; default %Y-%m-%d #}
+<span>{{ cart_count }}</span>                                  {# from App::share #}
 {% endblock %}
+```
+
+With `APP_DEBUG` on, printing a variable that doesn't exist (`{{ prodcut.name }}`) is an error
+page showing the request, the error and the template line; `{% if x %}` on a missing one is fine,
+and so is `{{ flash.anything }}`.
+
+```rust
+use renox::prelude::*;
+use renox::view::ViewContext;
+
+fn view_extras(app: App) -> App {
+    app.templates(|env| {
+        // Your own filters and functions (MiniJinja's API).
+        env.add_filter("rupiah", |n: i64| format!("Rp {}", renox::format_number(n as f64, 0, "id")));
+    })
+    // In every view, computed per request (cache what doesn't change per request).
+    .share("cart_count", |ctx: ViewContext| async move {
+        let Some(user) = ctx.user else { return Ok(0) };
+        let n: i64 = renox::db::sql("SELECT COUNT(*) FROM cart_items WHERE user_id = ?")
+            .bind(user.id)
+            .scalar(&ctx.state.db)
+            .await?;
+        Ok(n)
+    })
+}
+```
+
+## Your own shared values and middleware
+
+```rust
+use renox::prelude::*;
+use renox::Provided;
+use renox::axum::extract::Request;
+use renox::axum::middleware::{Next, from_fn};
+
+#[derive(Clone)]
+struct Payments { api_key: String }
+
+async fn pay(payments: Provided<Payments>) -> String {
+    // In jobs, listeners, commands and tasks: state.provided::<Payments>()
+    format!("key starts with {}", &payments.api_key[..3])
+}
+
+async fn stamp(user: Option<AuthUser>, req: Request, next: Next) -> Response {
+    let mut res = next.run(req).await; // runs after the session and user are loaded
+    res.headers_mut().insert("x-member", user.is_some().to_string().parse().unwrap());
+    res
+}
+
+fn wiring(app: App) -> App {
+    app.provide(Payments { api_key: "sk_test_123".into() })
+        .layer(from_fn(stamp)) // every route of the app's modules
+}
 ```
 
 ## Form + validation
@@ -275,7 +331,27 @@ async fn edit(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Resu
 }
 
 fn gates(app: App) -> App {
-    app.gate("admin", |user| user.email.ends_with("@shop.example")) // user.gate("admin")?
+    // `role` is a column the app added to `users` (read with user.get, change with user.set).
+    app.gate("admin", |user| user.get::<String>("role").as_deref() == Some("admin")) // user.gate("admin")?
+        // May query the database; check with `user.gate_async("billing").await?` in handlers.
+        .gate_async("billing", |user, state| async move {
+            let n: i64 = renox::db::sql("SELECT COUNT(*) FROM team_admins WHERE user_id = ?")
+                .bind(user.id)
+                .scalar(&state.db)
+                .await?;
+            Ok(n > 0)
+        })
+}
+
+// Extra registration fields (add the inputs to your own renox/auth/register.html).
+fn auth() -> Auth {
+    Auth::new()
+        .registration_rules(|form, v| {
+            v.field("phone", &form.get("phone")).required().max(20);
+        })
+        .on_registered(|state, mut user, form| async move {
+            user.set(&state.db, "phone", form.get("phone")).await // a failure undoes the sign-up
+        })
 }
 
 // For `{% if can('update', product) %}` in the view, attach the abilities.

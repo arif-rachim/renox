@@ -28,6 +28,26 @@ pub enum DbValue {
 }
 
 impl DbValue {
+    /// The value as JSON, as templates and APIs would see it.
+    pub(crate) fn to_json(&self) -> serde_json::Value {
+        use serde_json::Value;
+        match self {
+            DbValue::Null => Value::Null,
+            DbValue::Integer(v) => Value::from(*v),
+            DbValue::Real(v) => Value::from(*v),
+            DbValue::Text(v) => Value::from(v.clone()),
+            DbValue::Blob(v) => Value::from(v.clone()),
+            DbValue::Bool(v) => Value::from(*v),
+            DbValue::DateTime(v) => Value::from(v.to_rfc3339()),
+            DbValue::NaiveDateTime(v) => Value::from(v.format("%Y-%m-%dT%H:%M:%S").to_string()),
+            DbValue::Date(v) => Value::from(v.to_string()),
+            DbValue::Time(v) => Value::from(v.to_string()),
+            DbValue::Json(v) => v.clone(),
+            #[cfg(feature = "uuid")]
+            DbValue::Uuid(v) => Value::from(v.to_string()),
+        }
+    }
+
     /// The value as SQLite stores it: booleans as integers, dates in the text
     /// formats sqlx uses, so values written through models and through raw
     /// sqlx queries compare equal.

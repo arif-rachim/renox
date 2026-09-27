@@ -521,6 +521,42 @@ impl Row {
         }
     }
 
+    /// A column's value as JSON, whatever its type; `null` when it can't be
+    /// read as a number, boolean, text, timestamp or JSON.
+    pub(crate) fn json(&self, column: &str) -> serde_json::Value {
+        use serde_json::Value;
+        if let Ok(v) = self.try_get::<Option<i64>>(column) {
+            return v.map_or(Value::Null, Value::from);
+        }
+        if let Ok(v) = self.try_get::<Option<i32>>(column) {
+            return v.map_or(Value::Null, Value::from);
+        }
+        if let Ok(v) = self.try_get::<Option<f64>>(column) {
+            return v.map_or(Value::Null, Value::from);
+        }
+        if let Ok(v) = self.try_get::<Option<bool>>(column) {
+            return v.map_or(Value::Null, Value::from);
+        }
+        if let Ok(v) = self.try_get::<Option<chrono::DateTime<chrono::Utc>>>(column) {
+            return v.map_or(Value::Null, |d| Value::from(d.to_rfc3339()));
+        }
+        if let Ok(v) = self.try_get::<Option<chrono::NaiveDateTime>>(column) {
+            return v.map_or(Value::Null, |d| {
+                Value::from(d.format("%Y-%m-%dT%H:%M:%S").to_string())
+            });
+        }
+        if let Ok(v) = self.try_get::<Option<chrono::NaiveDate>>(column) {
+            return v.map_or(Value::Null, |d| Value::from(d.to_string()));
+        }
+        if let Ok(v) = self.try_get::<Option<String>>(column) {
+            return v.map_or(Value::Null, Value::from);
+        }
+        if let Ok(v) = self.try_get::<Option<serde_json::Value>>(column) {
+            return v.unwrap_or(Value::Null);
+        }
+        Value::Null
+    }
+
     /// The column names, in order.
     pub fn columns(&self) -> Vec<&str> {
         match &self.0 {

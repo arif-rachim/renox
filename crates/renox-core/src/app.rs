@@ -90,10 +90,16 @@ pub struct App {
     migrations: Vec<Migration>,
     seeders: Vec<Seeder>,
     gates: HashMap<String, Gate>,
+    async_gates: HashMap<String, crate::auth::AsyncGate>,
     registry: Registry,
     embedded: Option<crate::Embedded>,
     csp: crate::security::Csp,
+    provided: HashMap<std::any::TypeId, Arc<dyn std::any::Any + Send + Sync>>,
+    layers: Vec<AppLayer>,
 }
+
+/// A layer from `App::layer`, applied to the app's routes at boot.
+type AppLayer = Box<dyn FnOnce(Router<AppState>) -> Router<AppState> + Send>;
 
 impl App {
     /// Creates an application that loads its configuration from `.env` on start.
@@ -104,10 +110,51 @@ impl App {
             migrations: Vec::new(),
             seeders: Vec::new(),
             gates: HashMap::new(),
+            async_gates: HashMap::new(),
             registry: Registry::default(),
             embedded: None,
             csp: crate::security::Csp::default(),
+            provided: HashMap::new(),
+            layers: Vec::new(),
         }
+    }
+
+    /// Wraps every route of the app's modules in a tower layer, e.g. a
+    /// middleware function (framework routes such as `/health` and
+    /// `public/` files aren't wrapped). It runs after Renox has loaded the
+    /// session and the user, so it can use `AuthUser` or `Session`:
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// use renox::axum::extract::Request;
+    /// use renox::axum::middleware::{Next, from_fn};
+    ///
+    /// async fn stamp(user: Option<AuthUser>, req: Request, next: Next) -> Response {
+    ///     let mut res = next.run(req).await;
+    ///     let who = if user.is_some() { "member" } else { "guest" };
+    ///     res.headers_mut().insert("x-visitor", who.parse().unwrap());
+    ///     res
+    /// }
+    ///
+    /// # let _ =
+    /// App::new().layer(from_fn(stamp))
+    /// # ;
+    /// ```
+    ///
+    /// Layers run in the order added: the first one sees the request first.
+    pub fn layer<L>(mut self, layer: L) -> Self
+    where
+        L: tower::Layer<axum::routing::Route> + Clone + Send + Sync + 'static,
+        L::Service: tower::Service<axum::extract::Request> + Clone + Send + Sync + 'static,
+        <L::Service as tower::Service<axum::extract::Request>>::Response:
+            axum::response::IntoResponse + 'static,
+        <L::Service as tower::Service<axum::extract::Request>>::Error:
+            Into<std::convert::Infallible> + 'static,
+        <L::Service as tower::Service<axum::extract::Request>>::Future: Send + 'static,
+    {
+        self.layers
+            .push(Box::new(move |router| router.layer(layer)));
+        self
     }
 
     /// Allows other sites in the Content-Security-Policy, e.g.
@@ -190,6 +237,36 @@ impl App {
         self
     }
 
+    /// A gate that may query the database, e.g. whether the user belongs to
+    /// a team. Check it in handlers with `auth.gate_async(name).await?`;
+    /// templates can't wait for it (`can()` denies it), so pass its answer in
+    /// the view's context.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # let _ =
+    /// App::new().gate_async("billing", |user, state| async move {
+    ///     let n: i64 = renox::db::sql("SELECT COUNT(*) FROM team_admins WHERE user_id = ?")
+    ///         .bind(user.id)
+    ///         .scalar(&state.db)
+    ///         .await?;
+    ///     Ok(n > 0)
+    /// })
+    /// // in a handler: auth.gate_async("billing").await?;
+    /// # ;
+    /// ```
+    pub fn gate_async<F, Fut>(mut self, name: &str, check: F) -> Self
+    where
+        F: Fn(User, AppState) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<bool>> + Send + 'static,
+    {
+        self.async_gates.insert(
+            name.to_owned(),
+            Arc::new(move |user, state| Box::pin(check(user, state))),
+        );
+        self
+    }
+
     /// Receives `W`'s webhooks: see `renox::webhook`. Also add the route
     /// with `Routes::webhook::<W>(path)`.
     pub fn webhook<W: crate::webhook::Webhook>(mut self) -> Self {
@@ -225,6 +302,36 @@ impl App {
         self
     }
 
+    /// Makes `value` available everywhere the app runs: `Provided<T>` in
+    /// handlers, `state.provided::<T>()` in jobs, listeners, commands and
+    /// scheduled tasks. One value per type; a second one replaces the first.
+    /// See [`crate::Provided`].
+    pub fn provide<T: Send + Sync + 'static>(mut self, value: T) -> Self {
+        self.provided
+            .insert(std::any::TypeId::of::<T>(), Arc::new(value));
+        self
+    }
+
+    /// Gives every view a value computed per request; see [`Registry::share`].
+    pub fn share<F, Fut, T>(mut self, key: &str, compute: F) -> Self
+    where
+        F: Fn(crate::view::ViewContext) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<T>> + Send + 'static,
+        T: serde::Serialize,
+    {
+        self.registry.share(key, compute);
+        self
+    }
+
+    /// Adds template functions, filters or globals; see [`Registry::templates`].
+    pub fn templates(
+        mut self,
+        hook: impl Fn(&mut minijinja::Environment<'static>) + Send + Sync + 'static,
+    ) -> Self {
+        self.registry.templates(hook);
+        self
+    }
+
     /// Defines scheduled tasks.
     pub fn schedule(mut self, define: impl FnOnce(&mut Schedule)) -> Self {
         define(self.registry.schedule());
@@ -255,6 +362,8 @@ impl App {
             duplicate_job,
             webhooks,
             commands,
+            templates,
+            shares,
         } = self.registry;
         if let Some(name) = duplicate_job {
             return Err(anyhow!("job `{name}` is registered twice").into());
@@ -313,6 +422,10 @@ impl App {
                 ..info
             }));
         }
+        // The app's own layers; the first one added ends up outermost.
+        for layer in self.layers.into_iter().rev() {
+            router = layer(router);
+        }
         listing.extend(framework_routes(&config));
         listing.sort_by(|a, b| (&a.path, &a.method).cmp(&(&b.path, &b.method)));
         for route in &listing {
@@ -341,6 +454,8 @@ impl App {
             routes.clone(),
             storage.clone(),
             embedded.map(|e| e.views),
+            Arc::new(templates),
+            offset,
         );
         let security = Arc::new(crate::security::Security::new(&config, &self.csp, &listing));
         let state = AppState {
@@ -368,6 +483,9 @@ impl App {
             db,
             key,
             gates: Arc::new(self.gates),
+            async_gates: Arc::new(self.async_gates),
+            shares: Arc::new(shares),
+            provided: Arc::new(self.provided),
             throttle: Arc::new(LoginThrottle::new()),
         };
 

@@ -35,6 +35,10 @@ pub trait Model: Sized + Send + Sync + Unpin + 'static {
     /// `delete()` sets `deleted_at` instead of removing the row, and queries
     /// skip deleted rows unless asked with `with_trashed()` / `only_trashed()`.
     const SOFT_DELETES: bool = false;
+    /// Select every column (`*`) instead of `COLUMNS`, so `from_row` also
+    /// sees columns the struct doesn't list, and queries may filter on them.
+    /// The built-in `User` does this to keep the app's own columns.
+    const SELECT_ALL: bool = false;
 
     fn id(&self) -> i64;
     fn set_id(&mut self, id: i64);

@@ -12,8 +12,12 @@ use crate::{Error, Result};
 
 /// A row of the `users` table created by the `Auth` module.
 ///
-/// Add your own columns with a migration and read them through your own
-/// model on the same table, e.g. `#[model(table = "users")] struct Pelanggan`.
+/// Columns the app adds with its own migration (a `role`, a `phone`) are
+/// kept in `extra`: read them with `user.get::<String>("role")`, change them
+/// with `user.set(&db, "role", "admin")`, filter with
+/// `User::where_eq("role", "admin")`. Templates and JSON see them as the
+/// user's own fields (`{{ auth.user.role }}`). A typed model on the same
+/// table (`#[model(table = "users")] struct Member`) works too.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct User {
@@ -26,10 +30,27 @@ pub struct User {
     pub email_verified_at: Option<DateTime>,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
+    /// The app's own columns, by name.
+    #[serde(flatten, default)]
+    pub extra: std::collections::BTreeMap<String, serde_json::Value>,
 }
+
+/// Columns `extra` never holds: the struct's own, and secrets.
+const NOT_EXTRA: &[&str] = &[
+    "id",
+    "name",
+    "email",
+    "password",
+    "email_verified_at",
+    "created_at",
+    "updated_at",
+    "sessions_revoked_at",
+    "remember_token",
+];
 
 impl Model for User {
     const TABLE: &'static str = "users";
+    const SELECT_ALL: bool = true;
     const COLUMNS: &'static [&'static str] = &[
         "id",
         "name",
@@ -49,6 +70,12 @@ impl Model for User {
     }
 
     fn from_row(row: &Row) -> std::result::Result<Self, crate::db::DbError> {
+        let extra = row
+            .columns()
+            .into_iter()
+            .filter(|column| !NOT_EXTRA.contains(column))
+            .map(|column| (column.to_owned(), row.json(column)))
+            .collect();
         Ok(Self {
             id: row.try_get("id")?,
             name: row.try_get("name")?,
@@ -57,6 +84,7 @@ impl Model for User {
             email_verified_at: row.try_get("email_verified_at")?,
             created_at: row.try_get("created_at")?,
             updated_at: row.try_get("updated_at")?,
+            extra,
         })
     }
 
@@ -98,13 +126,46 @@ impl User {
             password: hash_password(password).await?,
             ..Self::default()
         };
-        Self::create(db, user).await
+        let id = Self::create(db, user).await?.id;
+        // Read back, with the defaults of the app's own columns (`extra`).
+        Self::find_or_404(db, id).await
     }
 
     /// Changes the password, which also logs out the user's other sessions.
     pub async fn set_password(&mut self, db: &Db, password: &str) -> Result {
         self.password = hash_password(password).await?;
         self.save(db).await
+    }
+
+    /// One of the app's own columns (see `extra`), e.g.
+    /// `user.get::<String>("role")`; `None` if missing, null or of another type.
+    pub fn get<T: serde::de::DeserializeOwned>(&self, column: &str) -> Option<T> {
+        self.extra
+            .get(column)
+            .and_then(|value| serde_json::from_value(value.clone()).ok())
+    }
+
+    /// Sets one of the app's own columns in the database and in `extra`, e.g.
+    /// `user.set(&db, "role", "admin")`.
+    pub async fn set(&mut self, db: &Db, column: &str, value: impl ToDbValue) -> Result {
+        let plain = !column.is_empty()
+            && column
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_');
+        if !plain || NOT_EXTRA.contains(&column) {
+            return Err(anyhow::anyhow!("User::set can't change `{column}`").into());
+        }
+        let value = value.to_db_value();
+        sql(format!(
+            "UPDATE users SET {} = ? WHERE id = ?",
+            crate::db::quote(column)
+        ))
+        .bind(value.clone())
+        .bind(self.id)
+        .execute(db)
+        .await?;
+        self.extra.insert(column.to_owned(), value.to_json());
+        Ok(())
     }
 
     /// Ends every session of the user, e.g. on logout or when an account
@@ -115,13 +176,10 @@ impl User {
 
     /// The user and when their sessions were last revoked, in one query.
     pub(crate) async fn find_with_revocation(db: &Db, id: i64) -> Result<Option<(Self, i64)>> {
-        let row = sql(format!(
-            "SELECT {}, sessions_revoked_at FROM users WHERE id = ?",
-            Self::COLUMNS.join(", ")
-        ))
-        .bind(id)
-        .fetch_optional(db)
-        .await?;
+        let row = sql("SELECT * FROM users WHERE id = ?")
+            .bind(id)
+            .fetch_optional(db)
+            .await?;
         Ok(match row {
             Some(row) => Some((Self::from_row(&row)?, row.try_get("sessions_revoked_at")?)),
             None => None,
