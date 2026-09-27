@@ -1,7 +1,8 @@
 //! A guestbook showing Renox's features so far: named routes, views with a
 //! layout, sessions and flash messages, CSRF, HTMX fragments, validation with
-//! old input, SQLite with a model, migrations, a seeder and pagination, and
-//! login/registration from the `Auth` module.
+//! old input, SQLite with a model, migrations, a seeder and pagination,
+//! login/registration from the `Auth` module, and an event whose listener
+//! queues a job, plus a scheduled task.
 //!
 //! Run it from this directory:
 //!
@@ -53,6 +54,34 @@ impl Validate for EntryForm {
     }
 }
 
+/// Emitted when someone signs the guestbook.
+#[derive(Clone)]
+struct EntryPosted {
+    entry_id: i64,
+}
+
+impl Event for EntryPosted {}
+
+/// Thanks the guest in the background (to the log, with `MAIL_MAILER=log`).
+#[derive(Serialize, Deserialize)]
+struct ThankGuest {
+    entry_id: i64,
+}
+
+impl Job for ThankGuest {
+    const NAME: &'static str = "thank-guest";
+
+    async fn handle(self, ctx: JobContext) -> Result {
+        let entry = Entry::find_or_404(&ctx.state.db, self.entry_id).await?;
+        let mail = renox::mail::Mail::new(
+            "owner@example.com",
+            format!("{} menulis di buku tamu", entry.name),
+            entry.message,
+        );
+        ctx.state.mailer.send(mail).await
+    }
+}
+
 struct Guestbook;
 
 impl Module for Guestbook {
@@ -68,6 +97,24 @@ impl Module for Guestbook {
             .name("guestbook.store")
             .get("/halo/{nama}", greet)
             .name("greet")
+    }
+
+    fn register(&self, app: &mut Registry) {
+        app.job::<ThankGuest>()
+            .listen(|event: EntryPosted, state| async move {
+                state
+                    .dispatch(ThankGuest {
+                        entry_id: event.entry_id,
+                    })
+                    .await?;
+                Ok(())
+            });
+        app.schedule()
+            .every_minute("count-entries", |state| async move {
+                let total = Entry::query().count(&state.db).await?;
+                tracing::info!(total, "guestbook entries");
+                Ok(())
+            });
     }
 }
 
@@ -86,7 +133,7 @@ async fn store(
     back: Back,
     Valid(form): Valid<EntryForm>,
 ) -> Result<Response> {
-    Entry::create(
+    let entry = Entry::create(
         &state.db,
         Entry {
             name: form.name,
@@ -95,6 +142,7 @@ async fn store(
         },
     )
     .await?;
+    state.emit(EntryPosted { entry_id: entry.id }).await?;
 
     if htmx.request {
         let entries = Entry::query().latest().paginate(&state.db, 1, 10).await?;

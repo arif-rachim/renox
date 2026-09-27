@@ -53,6 +53,12 @@ pub struct Config {
     pub locale: String,
     /// Mail driver, `log` or `memory`, from `MAIL_MAILER`.
     pub mailer: String,
+    /// Queue workers `serve` runs in-process, from `QUEUE_WORKERS` (0 turns them off).
+    pub queue_workers: usize,
+    /// Whether `serve` runs scheduled tasks, from `SCHEDULER`.
+    pub scheduler: bool,
+    /// UTC offset for scheduled times, from `APP_TIMEZONE` (e.g. `+07:00`).
+    pub timezone: String,
 }
 
 impl Config {
@@ -101,6 +107,11 @@ impl Config {
                 .context("DATABASE_POOL_SIZE must be a number")?,
             locale: var_or("APP_LOCALE", "en"),
             mailer: var_or("MAIL_MAILER", "log"),
+            queue_workers: var_or("QUEUE_WORKERS", "2")
+                .parse()
+                .context("QUEUE_WORKERS must be a number")?,
+            scheduler: parse_bool("SCHEDULER", true)?,
+            timezone: var_or("APP_TIMEZONE", "UTC"),
         })
     }
 
@@ -128,6 +139,9 @@ impl Default for Config {
             database_pool_size: 8,
             locale: "en".into(),
             mailer: "memory".into(),
+            queue_workers: 0,
+            scheduler: false,
+            timezone: "UTC".into(),
         }
     }
 }

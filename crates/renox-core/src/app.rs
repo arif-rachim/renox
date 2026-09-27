@@ -10,32 +10,46 @@ use axum::Router;
 use axum::handler::HandlerWithoutStateExt;
 use axum::middleware::{from_fn, from_fn_with_state};
 use tokio::net::TcpListener;
+use tokio::sync::watch;
 use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
-use crate::auth::{Gate, Gates, Throttle, User};
+use crate::auth::{Gate, Throttle, User};
 use crate::crypto::parse_key;
 use crate::db::{Db, Migration, MigrationStatus, Migrator};
+use crate::events::Event;
 use crate::mail::Mailer;
+use crate::queue::{Handlers, Job, Queue, Worker};
+use crate::schedule::{Schedule, parse_offset};
 use crate::{
-    AppState, Config, Environment, Error, Module, Result, RouteTable, Views, assets, auth, csrf,
-    session, view,
+    AppState, Config, Environment, Error, Module, Registry, Result, RouteTable, Views, assets,
+    auth, csrf, session, view,
 };
 
 type Seeder = Box<dyn Fn(Db) -> Pin<Box<dyn Future<Output = Result> + Send>> + Send + Sync>;
+
+/// How long `serve` waits for running jobs after a shutdown signal.
+const SHUTDOWN_GRACE: Duration = Duration::from_secs(30);
 
 const USAGE: &str = "\
 Usage: <app> [command]
 
 Commands:
-  serve                     Start the web server (default)
+  serve                     Start the web server, queue workers and scheduler (default)
   migrate                   Run pending migrations
   migrate:rollback [--step N]
                             Undo the last N batches of migrations (default 1)
   migrate:fresh [--seed]    Drop all tables, run every migration, optionally seed
   migrate:status            List migrations and whether they have run
   db:seed                   Run the seeders
+  queue:work [--queue a,b] [--workers N] [--once]
+                            Run queued jobs (until stopped, or --once for what's there)
+  queue:failed              List failed jobs
+  queue:retry <id|all>      Put failed jobs back on the queue
+  queue:flush               Delete failed jobs
+  schedule:list             List scheduled tasks and when they run next
+  schedule:work             Run scheduled tasks (when SCHEDULER=false for serve)
   help                      Show this message";
 
 /// The application builder.
@@ -45,19 +59,22 @@ Commands:
 ///     App::new()
 ///         .migrations(renox::migrations!())
 ///         .module(Produk)
+///         .job::<SendReceipt>()
+///         .schedule(|s| { s.daily_at("02:00", "cleanup", cleanup); })
 ///         .seeder(seed)
 ///         .run()
 /// }
 /// ```
 ///
 /// The built binary is also the app's command line, like Laravel's artisan:
-/// `my-app migrate`, `my-app db:seed`, `my-app help`.
+/// `my-app migrate`, `my-app queue:work`, `my-app help`.
 pub struct App {
     config: Option<Config>,
     modules: Vec<Box<dyn Module>>,
     migrations: Vec<Migration>,
     seeders: Vec<Seeder>,
     gates: HashMap<String, Gate>,
+    registry: Registry,
 }
 
 impl App {
@@ -69,6 +86,7 @@ impl App {
             migrations: Vec::new(),
             seeders: Vec::new(),
             gates: HashMap::new(),
+            registry: Registry::default(),
         }
     }
 
@@ -123,32 +141,97 @@ impl App {
         self
     }
 
+    /// Lets queue workers run jobs of type `J`.
+    pub fn job<J: Job>(mut self) -> Self {
+        self.registry.job::<J>();
+        self
+    }
+
+    /// Runs `listener` whenever an `E` is emitted with `state.emit(..)`.
+    pub fn listen<E, F, Fut>(mut self, listener: F) -> Self
+    where
+        E: Event,
+        F: Fn(E, AppState) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result> + Send + 'static,
+    {
+        self.registry.listen(listener);
+        self
+    }
+
+    /// Defines scheduled tasks.
+    pub fn schedule(mut self, define: impl FnOnce(&mut Schedule)) -> Self {
+        define(self.registry.schedule());
+        self
+    }
+
     /// Connects to the database and builds the router, without serving.
-    pub async fn boot(self) -> Result<Kernel> {
+    pub async fn boot(mut self) -> Result<Kernel> {
         let config = match self.config {
             Some(config) => config,
             None => Config::load()?,
         };
-        let mut migrations = self.migrations;
+
+        let mut migrations = vec![crate::queue::MIGRATION];
+        migrations.extend(self.migrations);
         for module in &self.modules {
             migrations.extend_from_slice(module.migrations());
+            module.register(&mut self.registry);
         }
+        let Registry {
+            jobs,
+            listeners,
+            schedule,
+            duplicate_job,
+        } = self.registry;
+        if let Some(name) = duplicate_job {
+            return Err(anyhow!("job `{name}` is registered twice").into());
+        }
+        schedule.check()?;
+        let offset = parse_offset(&config.timezone)?;
+
         let migrator = Migrator::new(migrations)?;
         let db = crate::db::connect(&config).await?;
-        let mailer = Mailer::from_name(&config.mailer)?;
-        let router = build_router(
-            config,
-            &self.modules,
-            db.clone(),
-            mailer.clone(),
-            Arc::new(self.gates),
-        )?;
-        Ok(Kernel {
-            mailer,
-            router,
+        let key = match &config.key {
+            Some(key) => parse_key(key)?,
+            None => parse_key(&crate::generate_key())?,
+        };
+
+        let mut router = Router::new();
+        let mut routes = RouteTable::default();
+        for module in &self.modules {
+            tracing::debug!(module = module.name(), "registering module");
+            let (module_router, names) = module.routes().into_parts();
+            router = router.merge(module_router);
+            for (name, path) in names {
+                routes.insert(name, path)?;
+            }
+        }
+        let routes = Arc::new(routes);
+
+        crate::error::set_debug(config.debug);
+        let views = Views::new(&config, routes.clone());
+        let state = AppState {
+            mailer: Mailer::from_name(&config.mailer)?,
+            queue: Queue::new(db.clone()),
+            listeners: Arc::new(listeners),
+            config: Arc::new(config),
+            routes,
+            views,
             db,
+            key,
+            gates: Arc::new(self.gates),
+            // Five failed logins per email and IP per minute.
+            throttle: Arc::new(Throttle::new(5, Duration::from_secs(60))),
+        };
+
+        Ok(Kernel {
+            router: build_router(router, state.clone()),
+            state,
             migrator,
             seeders: self.seeders,
+            handlers: Arc::new(jobs),
+            schedule,
+            offset,
         })
     }
 
@@ -183,15 +266,14 @@ impl App {
             Some(config) => config,
             None => Config::load()?,
         };
-        init_tracing(&config, command == "serve");
+        let long_running = matches!(command, "serve" | "queue:work" | "schedule:work");
+        init_tracing(&config, long_running);
         if command == "serve" && config.key.is_none() && config.env != Environment::Testing {
             tracing::warn!(
                 "APP_KEY is not set; using a temporary key, so sessions end on restart. \
                  Run `rnx key:generate`."
             );
         }
-        let name = config.name.clone();
-        let addr = config.addr();
         let kernel = App {
             config: Some(config),
             ..self
@@ -200,17 +282,7 @@ impl App {
         .await?;
 
         match command {
-            "serve" => {
-                let listener = TcpListener::bind(addr).await?;
-                tracing::info!("{name} listening on http://{}", listener.local_addr()?);
-                let service = kernel
-                    .router
-                    .into_make_service_with_connect_info::<SocketAddr>();
-                axum::serve(listener, service)
-                    .with_graceful_shutdown(shutdown_signal())
-                    .await?;
-                tracing::info!("{name} stopped");
-            }
+            "serve" => kernel.serve().await?,
             "migrate" => print_done("Migrated", &kernel.migrate().await?),
             "migrate:rollback" => {
                 let steps = flag_value(args, "--step")?.unwrap_or(1);
@@ -236,6 +308,71 @@ impl App {
                 kernel.seed().await?;
                 println!("Seeded.");
             }
+            "queue:work" => {
+                let queues: Vec<String> = flag_text(args, "--queue")
+                    .map(|q| q.split(',').map(|s| s.trim().to_owned()).collect())
+                    .unwrap_or_default();
+                let worker = kernel.worker(queues);
+                if args.iter().any(|a| a == "--once") {
+                    println!("Ran {} job(s).", worker.drain().await?);
+                } else {
+                    let workers = flag_value(args, "--workers")?.unwrap_or(1) as usize;
+                    let (stop, stopped) = watch::channel(false);
+                    let running = tokio::spawn(worker.run(workers, stopped));
+                    shutdown_signal().await;
+                    let _ = stop.send(true);
+                    let _ = running.await;
+                }
+            }
+            "queue:failed" => {
+                let failed = kernel.state.queue.failed().await?;
+                if failed.is_empty() {
+                    println!("No failed jobs.");
+                }
+                for job in failed {
+                    println!("  #{} {} ({}): {}", job.id, job.job, job.queue, job.error);
+                }
+            }
+            "queue:retry" => {
+                let id = match args.get(1).map(String::as_str) {
+                    Some("all") => None,
+                    Some(id) => Some(
+                        id.parse()
+                            .map_err(|_| anyhow!("expected a job id or `all`"))?,
+                    ),
+                    None => return Err(anyhow!("usage: queue:retry <id|all>").into()),
+                };
+                println!(
+                    "Queued {} job(s) again.",
+                    kernel.state.queue.retry(id).await?
+                );
+            }
+            "queue:flush" => println!(
+                "Deleted {} failed job(s).",
+                kernel.state.queue.flush_failed().await?
+            ),
+            "schedule:list" => {
+                if kernel.schedule.is_empty() {
+                    println!("No scheduled tasks.");
+                }
+                for (name, at) in kernel.schedule.upcoming(kernel.offset) {
+                    let at = chrono::DateTime::from_timestamp(at + kernel.offset, 0)
+                        .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
+                        .unwrap_or_default();
+                    println!("  {at}  {name}");
+                }
+            }
+            "schedule:work" => {
+                let (stop, stopped) = watch::channel(false);
+                let running = tokio::spawn(kernel.schedule.clone().run(
+                    kernel.state.clone(),
+                    kernel.offset,
+                    stopped,
+                ));
+                shutdown_signal().await;
+                let _ = stop.send(true);
+                let _ = running.await;
+            }
             other => return Err(anyhow!("unknown command `{other}`\n\n{USAGE}").into()),
         }
         Ok(())
@@ -248,13 +385,15 @@ impl Default for App {
     }
 }
 
-/// A booted application: its router, database and maintenance commands.
+/// A booted application: its router, database, queue and maintenance commands.
 pub struct Kernel {
     router: Router,
-    mailer: Mailer,
-    db: Db,
+    state: AppState,
     migrator: Migrator,
     seeders: Vec<Seeder>,
+    handlers: Handlers,
+    schedule: Schedule,
+    offset: i64,
 }
 
 impl Kernel {
@@ -262,40 +401,107 @@ impl Kernel {
         self.router.clone()
     }
 
+    /// What handlers get as `State<AppState>`.
+    pub fn state(&self) -> &AppState {
+        &self.state
+    }
+
     pub fn db(&self) -> &Db {
-        &self.db
+        &self.state.db
     }
 
     /// The mailer; with `MAIL_MAILER=memory`, `mailer().sent()` lists what was sent.
     pub fn mailer(&self) -> &Mailer {
-        &self.mailer
+        &self.state.mailer
+    }
+
+    /// A worker for the given queues (all queues when empty).
+    pub fn worker(&self, queues: Vec<String>) -> Worker {
+        Worker::new(self.state.clone(), self.handlers.clone(), queues)
+    }
+
+    /// Runs every job that is available now, e.g. in tests; returns how many ran.
+    pub async fn run_jobs(&self) -> Result<usize> {
+        self.worker(Vec::new()).drain().await
+    }
+
+    /// Serves HTTP with queue workers and the scheduler in the same process,
+    /// until Ctrl-C or SIGTERM; then lets running jobs finish.
+    pub async fn serve(self) -> Result {
+        let config = self.state.config.clone();
+        let listener = TcpListener::bind(config.addr()).await?;
+        tracing::info!(
+            "{} listening on http://{}",
+            config.name,
+            listener.local_addr()?
+        );
+
+        let (stop, stopped) = watch::channel(false);
+        let mut background = Vec::new();
+        if config.queue_workers > 0 {
+            tracing::info!(workers = config.queue_workers, "queue workers started");
+            let worker = self.worker(Vec::new());
+            background.push(tokio::spawn(
+                worker.run(config.queue_workers, stopped.clone()),
+            ));
+        }
+        if config.scheduler && !self.schedule.is_empty() {
+            tracing::info!("scheduler started");
+            background.push(tokio::spawn(self.schedule.clone().run(
+                self.state.clone(),
+                self.offset,
+                stopped,
+            )));
+        }
+
+        let service = self
+            .router
+            .into_make_service_with_connect_info::<SocketAddr>();
+        axum::serve(listener, service)
+            .with_graceful_shutdown(shutdown_signal())
+            .await?;
+
+        let _ = stop.send(true);
+        let finished = async {
+            for task in background {
+                let _ = task.await;
+            }
+        };
+        if tokio::time::timeout(SHUTDOWN_GRACE, finished)
+            .await
+            .is_err()
+        {
+            tracing::warn!("background work was still running after {SHUTDOWN_GRACE:?}");
+        }
+        tracing::info!("{} stopped", config.name);
+        Ok(())
     }
 
     /// Runs pending migrations; returns their names.
     pub async fn migrate(&self) -> Result<Vec<String>> {
-        let done = self.migrator.run(&self.db).await?;
+        let done = self.migrator.run(self.db()).await?;
         Ok(done.into_iter().map(str::to_owned).collect())
     }
 
     /// Undoes the last `batches` batches of migrations; returns their names.
     pub async fn rollback(&self, batches: u32) -> Result<Vec<String>> {
-        Ok(self.migrator.rollback(&self.db, batches).await?)
+        Ok(self.migrator.rollback(self.db(), batches).await?)
     }
 
     /// Drops every table and runs all migrations.
     pub async fn fresh(&self) -> Result<Vec<String>> {
-        let done = self.migrator.fresh(&self.db).await?;
+        let done = self.migrator.fresh(self.db()).await?;
         Ok(done.into_iter().map(str::to_owned).collect())
     }
 
     pub async fn migration_status(&self) -> Result<Vec<MigrationStatus>> {
-        Ok(self.migrator.status(&self.db).await?)
+        Ok(self.migrator.status(self.db()).await?)
     }
 
     /// Runs every seeder in registration order.
     pub async fn seed(&self) -> Result {
         for seeder in &self.seeders {
-            seeder(self.db.clone()).await?;
+            seeder(self.db().clone()).await?;
         }
         Ok(())
     }
@@ -310,76 +516,43 @@ fn print_done(verb: &str, names: &[String]) {
     }
 }
 
+fn flag_text<'a>(args: &'a [String], flag: &str) -> Option<&'a str> {
+    let i = args.iter().position(|a| a == flag)?;
+    args.get(i + 1).map(String::as_str)
+}
+
 fn flag_value(args: &[String], flag: &str) -> Result<Option<u32>> {
-    let Some(i) = args.iter().position(|a| a == flag) else {
+    if !args.iter().any(|a| a == flag) {
         return Ok(None);
-    };
-    match args.get(i + 1).and_then(|v| v.parse().ok()) {
+    }
+    match flag_text(args, flag).and_then(|v| v.parse().ok()) {
         Some(value) => Ok(Some(value)),
         None => Err(anyhow!("{flag} needs a number").into()),
     }
 }
 
-fn build_router(
-    config: Config,
-    modules: &[Box<dyn Module>],
-    db: Db,
-    mailer: Mailer,
-    gates: Gates,
-) -> Result<Router> {
-    crate::error::set_debug(config.debug);
-
-    let key = match &config.key {
-        Some(key) => parse_key(key)?,
-        None => parse_key(&crate::generate_key())?,
-    };
-
-    let mut router = Router::new();
-    let mut routes = RouteTable::default();
-    for module in modules {
-        tracing::debug!(module = module.name(), "registering module");
-        let (module_router, names) = module.routes().into_parts();
-        router = router.merge(module_router);
-        for (name, path) in names {
-            routes.insert(name, path)?;
-        }
-    }
-    let routes = Arc::new(routes);
-
-    let public = config.public_path.clone();
-    let views = Views::new(&config, routes.clone());
-    let state = AppState {
-        config: Arc::new(config),
-        routes,
-        views,
-        db,
-        mailer,
-        key,
-        gates,
-        // Five failed logins per email and IP per minute.
-        throttle: Arc::new(Throttle::new(5, Duration::from_secs(60))),
-    };
-
+fn build_router(router: Router<AppState>, state: AppState) -> Router {
     let not_found = || async { Error::NotFound };
+    let public = state.config.public_path.clone();
     let router = if public.is_dir() {
         router.fallback_service(ServeDir::new(public).not_found_service(not_found.into_service()))
     } else {
         router.fallback(not_found)
     };
 
-    Ok(router
+    router
         .layer(from_fn_with_state(state.clone(), view::middleware))
         .layer(from_fn(csrf::middleware))
         .layer(from_fn_with_state(state.clone(), auth::middleware))
         .layer(from_fn_with_state(state.clone(), session::middleware))
         .merge(assets::router())
         .layer(TraceLayer::new_for_http())
-        .with_state(state))
+        .with_state(state)
 }
 
-/// Serving logs requests; other commands only log warnings and errors.
-fn init_tracing(config: &Config, serving: bool) {
-    let default = match (serving, config.debug) {
+/// Long-running commands log at info; others only log warnings and errors.
+fn init_tracing(config: &Config, long_running: bool) {
+    let default = match (long_running, config.debug) {
         (true, true) => "info,renox=debug",
         (true, false) => "info",
         (false, _) => "warn",
