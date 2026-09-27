@@ -1,5 +1,6 @@
 //! `rnx`: the command-line tool for the Renox web framework.
 
+mod deploy;
 mod generate;
 mod make;
 mod new;
@@ -112,6 +113,11 @@ enum Command {
     /// Run the app's seeders.
     #[command(name = "db:seed")]
     DbSeed,
+    /// Build a release binary into dist/.
+    Build,
+    /// Create a Dockerfile, a systemd unit, a Litestream config and a deploy guide.
+    #[command(name = "make:deploy")]
+    MakeDeploy,
     /// Generate an APP_KEY and write it to `.env`.
     #[command(name = "key:generate")]
     KeyGenerate {
@@ -129,6 +135,8 @@ fn main() -> Result<()> {
         Command::New { name, renox_path } => new::run(&name, renox_path.as_deref()),
         Command::Serve { cargo_args } => serve::run(&cargo_args),
         Command::KeyGenerate { show } => key_generate(show),
+        Command::Build => deploy::build(&app_root()?),
+        Command::MakeDeploy => deploy::make_deploy(&app_root()?),
         Command::MakeMigration { name, path } => make::migration(&name, &path),
         Command::MakeModule { name } => generate::module(&app_root()?, &name),
         Command::MakeModel {

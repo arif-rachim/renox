@@ -1,0 +1,49 @@
+# Deploying {{title}}
+
+Renox apps deploy as one binary (views, translations and public files are
+compiled in) plus a `.env` file and a `storage/` directory.
+
+## On a Linux server with systemd
+
+1. Build: `rnx build` (or `cargo build --release`) → `dist/{{name}}`.
+   Build on the same OS/CPU as the server, or use the Docker image below.
+2. On the server:
+
+   ```bash
+   sudo useradd --system --home /opt/{{name}} {{name}}
+   sudo mkdir -p /opt/{{name}}/storage
+   sudo cp dist/{{name}} /opt/{{name}}/
+   sudo cp .env.example /opt/{{name}}/.env    # then edit it, see below
+   sudo chown -R {{name}} /opt/{{name}}
+   sudo cp deploy/{{name}}.service /etc/systemd/system/
+   sudo systemctl enable --now {{name}}
+   ```
+
+3. In `/opt/{{name}}/.env` set at least:
+   `APP_ENV=production`, `APP_DEBUG=false`, `APP_KEY=` (from `rnx key:generate --show`),
+   `APP_URL=https://your-domain`, `APP_HOST=127.0.0.1` behind a reverse proxy
+   (Caddy or nginx), and your `MAIL_*` settings.
+4. Updates: copy the new binary and `sudo systemctl restart {{name}}`
+   (migrations run before it starts).
+
+## Backups with Litestream
+
+1. Install Litestream (https://litestream.io/install/).
+2. `sudo cp deploy/litestream.yml /etc/litestream.yml`, fill in the bucket and
+   put the keys in `/etc/default/litestream`:
+   `LITESTREAM_ACCESS_KEY_ID=...` and `LITESTREAM_SECRET_ACCESS_KEY=...`.
+3. `sudo systemctl enable --now litestream`.
+4. Restore on a new server before starting the app:
+   `litestream restore -o /opt/{{name}}/storage/app.db /opt/{{name}}/storage/app.db`.
+
+## With Docker
+
+```bash
+docker build -t {{name}} .
+docker run -d --name {{name}} -p 3000:3000 \
+  -e APP_KEY=base64:... -e APP_URL=https://your-domain \
+  -v {{name}}-storage:/app/storage {{name}}
+```
+
+The `renox` dependency must be reachable from the build (crates.io or git), not a local path.
+Health checks: `GET /health` answers 200 while the database is reachable.

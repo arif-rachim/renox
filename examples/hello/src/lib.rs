@@ -184,6 +184,7 @@ async fn greet(Path(nama): Path<String>) -> String {
 /// The guestbook app; `main.rs` runs it and the tests boot it.
 pub fn app() -> App {
     App::new()
+        .embed(renox::embedded!())
         .migrations(renox::migrations!())
         .module(Auth::new().redirect_to("/"))
         .module(Guestbook)

@@ -81,6 +81,7 @@ pub struct App {
     seeders: Vec<Seeder>,
     gates: HashMap<String, Gate>,
     registry: Registry,
+    embedded: Option<crate::Embedded>,
 }
 
 impl App {
@@ -93,7 +94,16 @@ impl App {
             seeders: Vec::new(),
             gates: HashMap::new(),
             registry: Registry::default(),
+            embedded: None,
         }
+    }
+
+    /// Views, translations and public files compiled into the binary:
+    /// `.embed(renox::embedded!())`. They're used when `APP_DEBUG` is off;
+    /// while debugging, files are read from disk so edits show up at once.
+    pub fn embed(mut self, embedded: crate::Embedded) -> Self {
+        self.embedded = Some(embedded);
+        self
     }
 
     /// Uses the given configuration instead of loading it from the environment.
@@ -229,16 +239,23 @@ impl App {
         let routes = Arc::new(routes);
 
         let storage = crate::storage::Storage::from_config(&config)?;
-        let views = Views::new(&config, routes.clone(), storage.clone());
+        // Release builds serve what was compiled in; debug builds read the disk.
+        let embedded = self.embedded.filter(|_| !config.debug);
+        let views = Views::new(
+            &config,
+            routes.clone(),
+            storage.clone(),
+            embedded.map(|e| e.views),
+        );
         let state = AppState {
             mailer: Mailer::from_config(&config)?,
             queue: Queue::new(db.clone()),
             cache: crate::cache::Cache::new(&config.cache_store, db.clone())?,
             storage,
-            translator: Arc::new(crate::i18n::Translator::load(
-                &config.lang_path,
-                config.debug,
-            )?),
+            translator: Arc::new(match embedded {
+                Some(files) => crate::i18n::Translator::embedded(files.lang)?,
+                None => crate::i18n::Translator::load(&config.lang_path, config.debug)?,
+            }),
             live: (config.debug && config.env == Environment::Local).then(|| {
                 crate::live::Live::start(vec![
                     config.views_path.clone(),
@@ -259,7 +276,7 @@ impl App {
 
         Ok(Kernel {
             listing,
-            router: build_router(router, state.clone()),
+            router: build_router(router, state.clone(), embedded.map(|e| e.public)),
             state,
             migrator,
             seeders: self.seeders,
@@ -648,7 +665,11 @@ fn flag_value(args: &[String], flag: &str) -> Result<Option<u32>> {
     }
 }
 
-fn build_router(router: Router<AppState>, state: AppState) -> Router {
+fn build_router(
+    router: Router<AppState>,
+    state: AppState,
+    embedded_public: Option<&'static [(&'static str, &'static [u8])]>,
+) -> Router {
     let not_found = || async { Error::NotFound };
     let router = router.merge(crate::storage::router());
     let router = if state.config.debug {
@@ -657,7 +678,13 @@ fn build_router(router: Router<AppState>, state: AppState) -> Router {
         router
     };
     let public = state.config.public_path.clone();
-    let router = if public.is_dir() {
+    let router = if let Some(files) = embedded_public {
+        let files = crate::embedded::public_map(files);
+        router.fallback(move |uri: axum::http::Uri| {
+            let files = files.clone();
+            async move { crate::embedded::serve(&files, &uri) }
+        })
+    } else if public.is_dir() {
         router.fallback_service(ServeDir::new(public).not_found_service(not_found.into_service()))
     } else {
         router.fallback(not_found)

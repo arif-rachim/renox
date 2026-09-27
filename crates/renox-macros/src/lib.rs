@@ -1,6 +1,7 @@
 //! Procedural macros for Renox. Use them through the `renox` crate:
 //! `renox::Model` and `renox::migrations!`.
 
+mod embedded;
 mod migrations;
 mod model;
 
@@ -73,4 +74,21 @@ pub fn test(attr: TokenStream, item: TokenStream) -> TokenStream {
         #item
     }
     .into()
+}
+
+/// Embeds `resources/views`, `resources/lang` and `public` in the binary, so
+/// a release build runs from a single file:
+///
+/// ```ignore
+/// App::new().embed(renox::embedded!())
+/// ```
+///
+/// Files are read from disk while `APP_DEBUG` is on (templates reload), and
+/// from the binary otherwise. Add `cargo:rerun-if-changed=resources` and
+/// `=public` to `build.rs` so new files are picked up (`rnx new` does).
+#[proc_macro]
+pub fn embedded(input: TokenStream) -> TokenStream {
+    embedded::expand(input.into())
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
 }

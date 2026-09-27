@@ -67,12 +67,14 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/live.rs              live reload: file-time polling, /_renox/live SSE, stop() on shutdown
   src/shell.rs             db:shell (run_with takes any input/output, for tests)
   src/testing.rs           TestApp / TestRequest / TestResponse for apps' tests (M8a)
+  src/embedded.rs          Embedded (views/lang/public compiled in), public-file serving + content types
   assets/                  vendored htmx.min.js (2.0.11), alpine.min.js (3.17.4)
   views/                   built-in templates (error, pagination, auth/*, mail/*) — see §4.4
   migrations/              framework-owned migrations (auth/*, queue/*) — see §4.6
   tests/                   core integration tests (support/mod.rs has TestApp)
 crates/renox-macros/       proc macros: #[derive(Model)], migrations!()
-crates/renox-cli/          `rnx`: new, serve, key:generate, make:* (generate.rs, make.rs), forwards the rest
+crates/renox-cli/          `rnx`: new, serve, build, key:generate, make:* (generate.rs, make.rs, deploy.rs),
+                           forwards the rest; stubs/deploy/ holds the Dockerfile/systemd/Litestream templates
   stubs/                   files `rnx new` writes (Cargo.toml.stub, env.stub, build.rs, views…)
 examples/hello/            guestbook app exercising every feature; used for live/browser testing
 .github/workflows/ci.yml   fmt+clippy+doc (Ubuntu) and tests on Ubuntu/macOS/Windows
@@ -136,6 +138,10 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
   server. Until M9, keep new database code easy to port: build SQL in one place, avoid new
   SQLite-only statements where a portable one exists, and remember `Db` is still `SqlitePool`
   (M9 turns it into a Renox type chosen from `DATABASE_URL`).
+- **Single-file deploys:** `App::embed(renox::embedded!())` bakes views, lang files and `public/`
+  into the binary; they're used only when `APP_DEBUG` is off (debug keeps disk + live reload).
+  Embedded public files are served by the router's fallback (`embedded.rs`). New built-in behaviour
+  that reads from `VIEWS_PATH`/`LANG_PATH`/`PUBLIC_PATH` must also handle the embedded source.
 - **Mail:** lettre with rustls (no OpenSSL). Drivers `smtp`, `log` (default), `memory` (tests).
 - **Uploads are form fields:** `Valid<T>` turns multipart files into tokens that `Upload`'s
   `Deserialize` resolves from a thread-local during the synchronous serde pass (`upload.rs`), so
@@ -362,9 +368,9 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M6c i18n (`resources/lang`, `t()`, `Lang`, per-visitor locale, translatable built-ins) | merged to `main` |
 | M7 generators (`make:*`), `route:list`, `db:shell`, browser live reload | merged to `main` |
 | Faster tests (argon2 opt-level, one integration-test binary, per-app error detail) | merged to `main` (#15) |
-| M8a testing helpers (`TestApp`, `#[renox::test]`, lib + bin apps) | PR from branch `m8-testing` |
-| M8b deploy (`renox build` embedding views, Docker/systemd, Litestream) | next |
-| M9 PostgreSQL (owner's request, **must land before 1.0**; plan in ROADMAP M9) | after M8 |
+| M8a testing helpers | merged to `main` |
+| M8b single-binary deploys (`embedded!()`), `rnx build`, `rnx make:deploy` (Docker/systemd/Litestream) | PR from branch `m8b-deploy` |
+| M9 PostgreSQL (owner's request, **must land before 1.0**; plan in ROADMAP M9) | next |
 | v1.0 docs site, starter kit, semver guarantee | last |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on
@@ -373,5 +379,5 @@ an up-to-date `main`. Open the next milestone's PR only after the previous one i
 Open items noted in ROADMAP: `#[derive(Validate)]`, more rules (regex, dates, files), route groups
 with prefixes, SQLite session driver, pagination links that keep other query params.
 
-Stats at the time of writing: ~11.4k lines of Rust in `crates/`, 136 tests, 34 direct dependencies
+Stats at the time of writing: ~11.8k lines of Rust in `crates/`, 140 tests, 34 direct dependencies
 (stars and roles were reviewed with the owner; keep deps lean and remove unused ones).
