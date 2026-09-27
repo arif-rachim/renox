@@ -150,6 +150,22 @@ validation messages and auth pages:
 <h1>{{ t('products.title') }}</h1>  <p>{{ t('products.count', count=total) }}</p>
 ```
 
+Apps are tested like Laravel apps, in memory:
+
+```rust
+use renox::testing::TestApp;
+
+#[renox::test]
+async fn creating_a_product() {
+    let app = TestApp::new(my_app::app()).await;       // in-memory DB, migrated; fake mail and queue
+    app.acting_as(&user)
+        .post("/products", &[("name", "Kopi"), ("price", "18000")])   // CSRF handled for you
+        .await
+        .assert_redirect("/products");
+    app.assert_database_has("products", &[("name", &"Kopi")]).await;
+}
+```
+
 The `Auth` module also handles password reset and email verification by email (`MAIL_MAILER=log`
 prints the links while developing), and API tokens for mobile apps and integrations:
 

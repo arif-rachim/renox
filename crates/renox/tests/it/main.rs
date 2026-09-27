@@ -10,5 +10,6 @@ mod i18n;
 mod infra;
 mod mail;
 mod queue;
+mod testing;
 mod uploads;
 mod validation;

@@ -187,7 +187,20 @@ M6c (done):
       end on shutdown so it stays graceful
 
 ### M8 · v0.9: Testing and deployment
-- [ ] `renox-testing`: `TestApp`, HTTP client, `acting_as(user)`, `assert_see()`, in-memory DB per test, mail/queue fakes
+M8a (done):
+- [x] `renox::testing::TestApp` (a module, not a separate crate: it needs the kernel's internals):
+      boots the app with an in-memory, migrated database, the memory mailer, no workers, a temporary
+      storage directory; keeps the session cookie and sends CSRF tokens itself
+- [x] Requests: `get`, `post`, `put`, `patch`, `delete`, `post_json`, `htmx()`, `json()`,
+      `header()`, `without_csrf()`; `acting_as(&user)`, `logout()`
+- [x] Assertions: `assert_ok/status/redirect/hx_redirect/not_found/forbidden/unauthorized`,
+      `assert_see/dont_see`, `assert_header`, `assert_invalid(field)`, `json()`;
+      `assert_database_has/missing/count`, `queued_jobs()`, `run_jobs()`, `assert_mail_sent()`
+- [x] `#[renox::test]` (Tokio test through Renox's re-export, so apps don't depend on tokio)
+- [x] Apps are a library plus a tiny `main.rs` (`rnx new` writes `src/lib.rs` with `pub fn app()`
+      and `tests/home.rs`), because tests can't import from `main.rs`; the guestbook has tests too
+
+M8b (next):
 - [ ] `renox build` with views embedded in the binary, Dockerfile and systemd templates, SQLite backups with Litestream
 
 ### M9 · v0.10: PostgreSQL (before 1.0)

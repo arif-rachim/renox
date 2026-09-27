@@ -281,3 +281,32 @@ fn unix_now() -> u64 {
         .map(|d| d.as_secs())
         .unwrap_or_default()
 }
+
+/// The session carried by a `Cookie` header value (a new one if absent or
+/// invalid). Used by `renox::testing`.
+pub(crate) fn from_cookie(state: &AppState, cookie_header: Option<&str>) -> Session {
+    let mut headers = HeaderMap::new();
+    if let Some(value) = cookie_header.and_then(|v| HeaderValue::from_str(v).ok()) {
+        headers.insert(COOKIE, value);
+    }
+    let payload = read_cookie(&headers, &state.config.session_cookie, &state.key)
+        .filter(|payload| payload.expires > unix_now());
+    Session::new(payload)
+}
+
+/// `session` encrypted as a `name=value` cookie pair. Used by `renox::testing`.
+pub(crate) fn cookie_pair(state: &AppState, session: &Session) -> String {
+    let lifetime = session.lifetime().unwrap_or(state.config.session_lifetime) * 60;
+    let value = serde_json::to_string(&session.to_payload(unix_now() + lifetime))
+        .expect("session payloads serialize");
+    let mut jar = CookieJar::new();
+    jar.private_mut(&state.key)
+        .add(Cookie::new(state.config.session_cookie.clone(), value));
+    let cookie = jar
+        .delta()
+        .next()
+        .expect("the cookie was just added")
+        .encoded()
+        .to_string();
+    cookie.split(';').next().unwrap_or_default().to_owned()
+}

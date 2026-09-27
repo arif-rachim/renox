@@ -11,7 +11,9 @@ const STUBS: &[(&str, &str)] = &[
     (".gitignore", include_str!("../stubs/gitignore.stub")),
     ("build.rs", include_str!("../stubs/build.rs")),
     ("migrations/.gitkeep", ""),
+    ("src/lib.rs", include_str!("../stubs/src/lib.rs")),
     ("src/main.rs", include_str!("../stubs/src/main.rs")),
+    ("tests/home.rs", include_str!("../stubs/tests/home.rs")),
     ("src/app/mod.rs", include_str!("../stubs/src/app/mod.rs")),
     (
         "src/app/home/mod.rs",
@@ -61,7 +63,8 @@ pub fn run(name: &str, renox_path: Option<&Path>) -> Result<()> {
         let contents = contents
             .replace("{{name}}", name)
             .replace("{{title}}", &title(name))
-            .replace("{{renox_dependency}}", &dependency);
+            .replace("{{renox_dependency}}", &dependency)
+            .replace("{{crate_name}}", &name.replace('-', "_"));
         // Only the real .env gets a key; .env.example stays shareable.
         let contents = match *file {
             ".env" => contents.replace("{{app_key}}", &key),

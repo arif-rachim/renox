@@ -113,15 +113,19 @@ async fn index() -> View {{
         ),
     )?;
     add_mod(&root.join("src/app/mod.rs"), &snake)?;
-    register_in_main(
-        &root.join("src/main.rs"),
-        &format!("app::{snake}::{pascal}"),
-    )
+    // Apps from `rnx new` build the App in src/lib.rs; older ones in main.rs.
+    let lib = root.join("src/lib.rs");
+    let target = if lib.is_file() {
+        lib
+    } else {
+        root.join("src/main.rs")
+    };
+    register_in_main(&target, &format!("app::{snake}::{pascal}"))
 }
 
-/// Adds `.module(path)` to `main.rs` after the last `.module(` call.
+/// Adds `.module(path)` after the last `.module(` call in `lib.rs`/`main.rs`.
 fn register_in_main(main_rs: &Path, path: &str) -> Result<()> {
-    let hint = || println!("Register it in src/main.rs: .module({path})");
+    let hint = || println!("Register it where the App is built: .module({path})");
     let Ok(source) = fs::read_to_string(main_rs) else {
         hint();
         return Ok(());

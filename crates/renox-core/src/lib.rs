@@ -30,6 +30,7 @@ pub mod shell;
 pub mod signed;
 mod state;
 pub mod storage;
+pub mod testing;
 pub mod upload;
 pub mod validation;
 mod view;

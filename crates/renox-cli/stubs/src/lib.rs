@@ -1,0 +1,10 @@
+mod app;
+
+/// The application: its modules, migrations and seeders. `main.rs` runs it,
+/// and tests boot it with `renox::testing::TestApp`.
+pub fn app() -> renox::App {
+    renox::App::new()
+        .migrations(renox::migrations!())
+        .module(renox::auth::Auth::new())
+        .module(app::home::Home)
+}
