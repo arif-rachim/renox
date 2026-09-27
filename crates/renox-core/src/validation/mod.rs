@@ -41,6 +41,11 @@ use crate::db::value_bind;
 use crate::db::{Db, DbValue, quote};
 use messages::{render, template};
 
+/// A built-in message by key (e.g. `required`, `auth.failed`) in `locale`.
+pub(crate) fn message(locale: Locale, key: &str, label: &str, params: &[(&str, String)]) -> String {
+    render(template(locale, key), label, params)
+}
+
 /// Validation errors: messages keyed by field name.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -121,6 +126,11 @@ impl Validator {
             last_pending: None,
             v: self,
         }
+    }
+
+    /// The language messages are written in, e.g. to pick labels.
+    pub fn locale(&self) -> Locale {
+        self.locale
     }
 
     /// Adds an error that no rule covers.

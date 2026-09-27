@@ -5,6 +5,7 @@
 
 mod app;
 mod assets;
+pub mod auth;
 mod config;
 mod crypto;
 mod csrf;
@@ -20,6 +21,7 @@ mod view;
 
 pub use app::{App, Kernel};
 pub use assets::{ALPINE_VERSION, HTMX_VERSION};
+pub use auth::{AuthUser, Policy};
 pub use config::{Config, Environment};
 pub use crypto::generate_key;
 pub use csrf::{CSRF_FIELD, CSRF_HEADER};

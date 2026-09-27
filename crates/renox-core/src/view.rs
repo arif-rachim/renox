@@ -12,6 +12,7 @@ use minijinja::{Environment, ErrorKind, Value, context};
 use minijinja_autoreload::AutoReloader;
 use serde::Serialize;
 
+use crate::auth::CurrentUser;
 use crate::error::{ErrorPage, reason};
 use crate::validation::ValidationError;
 use crate::{AppState, Config, Error, Htmx, RouteTable, Session, assets};
@@ -23,6 +24,18 @@ const BUILTIN: &[(&str, &str)] = &[
     (
         "renox/pagination.html",
         include_str!("../views/pagination.html"),
+    ),
+    (
+        "renox/auth/layout.html",
+        include_str!("../views/auth/layout.html"),
+    ),
+    (
+        "renox/auth/login.html",
+        include_str!("../views/auth/login.html"),
+    ),
+    (
+        "renox/auth/register.html",
+        include_str!("../views/auth/register.html"),
     ),
 ];
 
@@ -143,8 +156,8 @@ fn safe_join(dir: &Path, name: &str) -> Option<PathBuf> {
 }
 
 /// A template response, rendered by Renox with the request's globals:
-/// `app`, `request`, `flash`, `errors`, `error()`, `old()`, `csrf_token`,
-/// `csrf_field()` and `renox_head()`.
+/// `app`, `request`, `auth` (`auth.check`, `auth.user`), `can()`, `flash`,
+/// `errors`, `error()`, `old()`, `csrf_token`, `csrf_field()` and `renox_head()`.
 ///
 /// ```ignore
 /// async fn index() -> View {
@@ -199,6 +212,7 @@ pub(crate) async fn middleware(
     next: Next,
 ) -> Response {
     let session = req.extensions().get::<Session>().cloned();
+    let current_user = req.extensions().get::<CurrentUser>().cloned();
     let htmx = Htmx::from_headers(req.headers());
     let path = req.uri().path().to_owned();
     let (wants_json, referer) = {
@@ -226,7 +240,7 @@ pub(crate) async fn middleware(
     }
 
     if let Some(view) = res.extensions_mut().remove::<View>() {
-        let globals = globals(&state, session.as_ref(), &htmx, &path);
+        let globals = globals(&state, session.as_ref(), current_user, &htmx, &path);
         return match state.views.render_view(&view, globals, &htmx) {
             Ok(html) => with_html(res, html),
             Err(err) => {
@@ -255,7 +269,13 @@ fn with_html(mut res: Response, html: String) -> Response {
     res
 }
 
-fn globals(state: &AppState, session: Option<&Session>, htmx: &Htmx, path: &str) -> Value {
+fn globals(
+    state: &AppState,
+    session: Option<&Session>,
+    current_user: Option<CurrentUser>,
+    htmx: &Htmx,
+    path: &str,
+) -> Value {
     let config = &state.config;
     let token = session.map(Session::token).unwrap_or_default();
 
@@ -265,6 +285,8 @@ fn globals(state: &AppState, session: Option<&Session>, htmx: &Htmx, path: &str)
         crate::csrf::CSRF_FIELD
     ));
     let old_input = session.cloned();
+    let user = current_user.as_ref().and_then(|c| c.user.clone());
+    let gate_user = current_user.and_then(|c| Some((c.user?, c.gates)));
     let errors = session.map(Session::errors).unwrap_or_default();
     let first_errors: std::collections::BTreeMap<String, String> = errors
         .iter()
@@ -282,7 +304,17 @@ fn globals(state: &AppState, session: Option<&Session>, htmx: &Htmx, path: &str)
             env => format!("{:?}", config.env).to_lowercase(),
             debug => config.debug,
             url => config.url,
+            locale => config.locale,
         },
+        auth => context! {
+            check => user.is_some(),
+            user => user.as_deref(),
+        },
+        can => Value::from_function(move |gate: String| {
+            gate_user.as_ref().is_some_and(|(user, gates)| {
+                gates.get(&gate).is_some_and(|check| check(user))
+            })
+        }),
         request => context! {
             path => path,
             htmx => htmx.request,

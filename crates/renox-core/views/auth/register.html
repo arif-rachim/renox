@@ -1,0 +1,25 @@
+{% extends "renox/auth/layout.html" %}
+{% block title %}{{ text.register_title }} · {{ app.name }}{% endblock %}
+{% block content %}
+<form class="card" method="post" action="{{ route('register') }}" hx-post="{{ route('register') }}">
+  {{ csrf_field() }}
+  <h2>{{ text.register_title }}</h2>
+  <label>{{ text.name }}
+    <input name="name" value="{{ old('name') }}" autocomplete="name" required autofocus>
+  </label>
+  <p class="error" data-error-for="name">{{ error('name') }}</p>
+  <label>{{ text.email }}
+    <input type="email" name="email" value="{{ old('email') }}" autocomplete="username" required>
+  </label>
+  <p class="error" data-error-for="email">{{ error('email') }}</p>
+  <label>{{ text.password }}
+    <input type="password" name="password" autocomplete="new-password" required>
+  </label>
+  <p class="error" data-error-for="password">{{ error('password') }}</p>
+  <label>{{ text.password_confirmation }}
+    <input type="password" name="password_confirmation" autocomplete="new-password" required>
+  </label>
+  <button type="submit">{{ text.register_button }}</button>
+  <p class="alt">{{ text.have_account }} <a href="{{ route('login') }}">{{ text.login_button }}</a></p>
+</form>
+{% endblock %}

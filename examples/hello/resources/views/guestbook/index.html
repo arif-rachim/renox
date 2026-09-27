@@ -8,7 +8,7 @@
       x-data="{ sending: false }" @htmx:before-request="sending = true"
       @htmx:after-request="sending = false; if ($event.detail.successful) $el.reset()">
   {{ csrf_field() }}
-  <input name="name" placeholder="Nama" value="{{ old('name') }}">
+  <input name="name" placeholder="Nama" value="{{ old('name', auth.user.name if auth.check else '') }}">
   <p class="error" data-error-for="name">{{ error('name') }}</p>
   <textarea name="message" placeholder="Pesan">{{ old('message') }}</textarea>
   <p class="error" data-error-for="message">{{ error('message') }}</p>

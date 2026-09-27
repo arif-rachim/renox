@@ -89,10 +89,23 @@ my-app/
 - [ ] More rules: `regex`, dates, `digits`, file uploads (with M6)
 
 ### M4 · v0.5: Authentication and authorization
-- [ ] Register, login, logout, remember me, password reset, email verification, login throttling
-- [ ] `AuthUser` extractor, `auth` / `guest` middleware, API tokens
-- [ ] Gates and policies (`authorize!(user, "update", &product)`)
-- [ ] Overridable auth views
+M4a (done):
+- [x] `Auth` module: `users` table, `/login`, `/register`, `/logout`, Argon2id password hashing
+- [x] Remember me (session lasts `REMEMBER_LIFETIME`), new CSRF token on login
+- [x] Changing a password logs out the user's other sessions; deleted users are logged out
+- [x] Login throttling: 5 failures per email and IP per minute; unknown emails take as long as known ones
+- [x] `AuthUser` / `Option<AuthUser>` extractors; `Routes::require_auth()` and `guest_only()`;
+      guests are sent to `login` and back to the page they wanted (HTMX via `HX-Redirect`, JSON gets 401)
+- [x] Policies (`impl Policy for Model`, `auth.authorize("update", &model)?`) and gates
+      (`App::gate("admin", |user| ...)`, `auth.gate("admin")?`, `can('admin')` in templates)
+- [x] `auth.check` / `auth.user` in templates (the password hash is never serialized)
+- [x] Built-in pages in English and Indonesian, overridable per file (`renox/auth/*.html`)
+- [x] `rnx new` apps come with `Auth` and a login/logout nav
+
+M4b (next):
+- [ ] Password reset by email and email verification, with signed URLs
+- [ ] A `log` mail driver so both work before SMTP arrives in M5
+- [ ] API tokens with `Authorization: Bearer` (skipping CSRF)
 
 ### M5 · v0.6: Background work
 - [ ] Queue: `Job` trait, `dispatch()`, delays, retries, failed jobs, `renox queue:work` or in-process worker
@@ -127,6 +140,9 @@ my-app/
 - **Sessions:** stored in an encrypted, signed cookie (AES-256-GCM via `APP_KEY`), so M1 needs no
   database. Keep sessions small; a SQLite driver comes with M2.
 - **Templates:** MiniJinja (runtime, overridable, reloadable). Askama may be offered later.
+- **Auth sessions:** the session stores the user id and a fingerprint of the password hash, so a
+  password change ends other sessions without a separate token column. "Remember me" makes the
+  (encrypted cookie) session itself longer-lived.
 - **HTMX validation errors:** returned as 422 JSON and placed by the bundled script, rather than
   re-rendering a form fragment. It works for any form without a per-form partial, and the form
   keeps the user's input, focus and Alpine state.

@@ -1,6 +1,9 @@
+use std::collections::HashMap;
 use std::future::Future;
+use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::anyhow;
 use axum::Router;
@@ -11,11 +14,12 @@ use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
+use crate::auth::{Gate, Gates, Throttle, User};
 use crate::crypto::parse_key;
 use crate::db::{Db, Migration, MigrationStatus, Migrator};
 use crate::{
-    AppState, Config, Environment, Error, Module, Result, RouteTable, Views, assets, csrf, session,
-    view,
+    AppState, Config, Environment, Error, Module, Result, RouteTable, Views, assets, auth, csrf,
+    session, view,
 };
 
 type Seeder = Box<dyn Fn(Db) -> Pin<Box<dyn Future<Output = Result> + Send>> + Send + Sync>;
@@ -52,6 +56,7 @@ pub struct App {
     modules: Vec<Box<dyn Module>>,
     migrations: Vec<Migration>,
     seeders: Vec<Seeder>,
+    gates: HashMap<String, Gate>,
 }
 
 impl App {
@@ -62,6 +67,7 @@ impl App {
             modules: Vec::new(),
             migrations: Vec::new(),
             seeders: Vec::new(),
+            gates: HashMap::new(),
         }
     }
 
@@ -101,6 +107,21 @@ impl App {
         self
     }
 
+    /// Defines a gate: an ability that depends only on the user.
+    ///
+    /// ```ignore
+    /// App::new().gate("admin", |user| user.email.ends_with("@toko.id"))
+    /// // in a handler: auth.gate("admin")?;   in a template: {% if can('admin') %}
+    /// ```
+    pub fn gate(
+        mut self,
+        name: &str,
+        check: impl Fn(&User) -> bool + Send + Sync + 'static,
+    ) -> Self {
+        self.gates.insert(name.to_owned(), Arc::new(check));
+        self
+    }
+
     /// Connects to the database and builds the router, without serving.
     pub async fn boot(self) -> Result<Kernel> {
         let config = match self.config {
@@ -113,7 +134,7 @@ impl App {
         }
         let migrator = Migrator::new(migrations)?;
         let db = crate::db::connect(&config).await?;
-        let router = build_router(config, &self.modules, db.clone())?;
+        let router = build_router(config, &self.modules, db.clone(), Arc::new(self.gates))?;
         Ok(Kernel {
             router,
             db,
@@ -173,7 +194,10 @@ impl App {
             "serve" => {
                 let listener = TcpListener::bind(addr).await?;
                 tracing::info!("{name} listening on http://{}", listener.local_addr()?);
-                axum::serve(listener, kernel.router)
+                let service = kernel
+                    .router
+                    .into_make_service_with_connect_info::<SocketAddr>();
+                axum::serve(listener, service)
                     .with_graceful_shutdown(shutdown_signal())
                     .await?;
                 tracing::info!("{name} stopped");
@@ -281,7 +305,12 @@ fn flag_value(args: &[String], flag: &str) -> Result<Option<u32>> {
     }
 }
 
-fn build_router(config: Config, modules: &[Box<dyn Module>], db: Db) -> Result<Router> {
+fn build_router(
+    config: Config,
+    modules: &[Box<dyn Module>],
+    db: Db,
+    gates: Gates,
+) -> Result<Router> {
     crate::error::set_debug(config.debug);
 
     let key = match &config.key {
@@ -309,6 +338,9 @@ fn build_router(config: Config, modules: &[Box<dyn Module>], db: Db) -> Result<R
         views,
         db,
         key,
+        gates,
+        // Five failed logins per email and IP per minute.
+        throttle: Arc::new(Throttle::new(5, Duration::from_secs(60))),
     };
 
     let not_found = || async { Error::NotFound };
@@ -321,6 +353,7 @@ fn build_router(config: Config, modules: &[Box<dyn Module>], db: Db) -> Result<R
     Ok(router
         .layer(from_fn_with_state(state.clone(), view::middleware))
         .layer(from_fn(csrf::middleware))
+        .layer(from_fn_with_state(state.clone(), auth::middleware))
         .layer(from_fn_with_state(state.clone(), session::middleware))
         .merge(assets::router())
         .layer(TraceLayer::new_for_http())

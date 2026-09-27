@@ -40,6 +40,8 @@ pub(crate) fn template(locale: Locale, key: &str) -> &'static str {
             "unique" => "The :attribute has already been taken.",
             "exists" => "The selected :attribute is invalid.",
             "numeric" => "The :attribute must be a number.",
+            "auth.failed" => "These credentials do not match our records.",
+            "auth.throttle" => "Too many login attempts. Please try again in :seconds seconds.",
             _ => "The :attribute is invalid.",
         },
         Locale::Id => match key {
@@ -61,6 +63,8 @@ pub(crate) fn template(locale: Locale, key: &str) -> &'static str {
             "unique" => ":Attribute sudah digunakan.",
             "exists" => ":Attribute yang dipilih tidak valid.",
             "numeric" => ":Attribute harus berupa angka.",
+            "auth.failed" => "Email atau kata sandi salah.",
+            "auth.throttle" => "Terlalu banyak percobaan masuk. Coba lagi dalam :seconds detik.",
             _ => ":Attribute tidak valid.",
         },
     }

@@ -1,0 +1,24 @@
+{% extends "renox/auth/layout.html" %}
+{% block title %}{{ text.login_title }} · {{ app.name }}{% endblock %}
+{% block content %}
+<form class="card" method="post" action="{{ route('login') }}" hx-post="{{ route('login') }}">
+  {{ csrf_field() }}
+  <h2>{{ text.login_title }}</h2>
+  {% if flash.status %}<p class="status">{{ flash.status }}</p>{% endif %}
+  <label>{{ text.email }}
+    <input type="email" name="email" value="{{ old('email') }}" autocomplete="username" required autofocus>
+  </label>
+  <p class="error" data-error-for="email">{{ error('email') }}</p>
+  <label>{{ text.password }}
+    <input type="password" name="password" autocomplete="current-password" required>
+  </label>
+  <p class="error" data-error-for="password">{{ error('password') }}</p>
+  <label class="check">
+    <input type="checkbox" name="remember" value="1" {% if old('remember') %}checked{% endif %}> {{ text.remember }}
+  </label>
+  <button type="submit">{{ text.login_button }}</button>
+  {% if registration %}
+  <p class="alt">{{ text.no_account }} <a href="{{ route('register') }}">{{ text.register_button }}</a></p>
+  {% endif %}
+</form>
+{% endblock %}

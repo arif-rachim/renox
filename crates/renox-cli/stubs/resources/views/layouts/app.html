@@ -8,6 +8,16 @@
   {{ renox_head() }}
 </head>
 <body>
+  <nav>
+    <a href="{{ route('home') }}"><strong>{{ app.name }}</strong></a>
+    {% if auth.check %}
+    <span>{{ auth.user.name }}</span>
+    <form method="post" action="{{ route('logout') }}">{{ csrf_field() }}<button>Log out</button></form>
+    {% else %}
+    <a href="{{ route('login') }}">Log in</a>
+    <a href="{{ route('register') }}">Register</a>
+    {% endif %}
+  </nav>
   <main>
     {% if flash.status %}<p class="flash">{{ flash.status }}</p>{% endif %}
     {% block content %}{% endblock %}
