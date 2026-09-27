@@ -190,6 +190,34 @@ M6c (done):
 - [ ] `renox-testing`: `TestApp`, HTTP client, `acting_as(user)`, `assert_see()`, in-memory DB per test, mail/queue fakes
 - [ ] `renox build` with views embedded in the binary, Dockerfile and systemd templates, SQLite backups with Litestream
 
+### M9 · v0.10: PostgreSQL (before 1.0)
+SQLite stays the default and is right for an app on one server. PostgreSQL is for apps that
+outgrow that: several app servers, heavy concurrent writes, or a managed database. It has to land
+before 1.0 because `Db` is a plain `SqlitePool` alias today; turning it into a type that can hold
+either pool after 1.0 would break every app.
+
+- [ ] `Db` becomes Renox's own type (holding a SQLite or a PostgreSQL pool), chosen at boot from
+      the `DATABASE_URL` scheme (`sqlite://…` or `postgres://…`); `State(db): State<Db>` stays the
+      same, with `db.sqlite()` / `db.postgres()` for raw sqlx queries
+- [ ] PostgreSQL behind a `postgres` cargo feature, like `s3`, so SQLite-only apps don't compile it
+- [ ] A small dialect layer: `?` vs `$1` placeholders in the query builder, the models, the migrator,
+      the queue, the cache and the auth code; `DbValue` binding and row decoding for both
+- [ ] Framework migrations in both dialects: `AUTOINCREMENT` → `GENERATED ALWAYS AS IDENTITY`,
+      `COLLATE NOCASE` emails → a unique index on `lower(email)` (or `citext`), `TEXT` timestamps →
+      `TIMESTAMPTZ`, SQLite `INTEGER` booleans → `BOOLEAN`
+- [ ] App migrations per dialect when SQL differs: `migrations/*.up.sql` for both, with optional
+      `*.sqlite.up.sql` / `*.postgres.up.sql` overrides picked by `migrations!()` at run time
+- [ ] Replace SQLite-only statements: `PRAGMA` (WAL, foreign keys), `sqlite_master` in
+      `migrate:fresh` and `db:shell .tables`, the `:memory:` pool handling
+- [ ] Queue workers on PostgreSQL reserve jobs with `FOR UPDATE SKIP LOCKED`, so workers on
+      several servers never take the same job
+- [ ] Scheduler on PostgreSQL takes an advisory lock per task, so several app servers can run
+      `serve` without running a task twice (lifts the `SCHEDULER=false` workaround)
+- [ ] `/health`, `db:shell`, `route:list` and the `rnx` generators work with both
+- [ ] `rnx new --database postgres`; `.env` templates document `DATABASE_URL` for both
+- [ ] CI runs the whole test suite against SQLite and against PostgreSQL (a service container)
+- [ ] A guide for moving an app from SQLite to PostgreSQL (schema via migrations, data copy)
+
 ### v1.0
 - [ ] Documentation site built with Renox, starter kit, semver stability guarantee
 
@@ -223,6 +251,10 @@ M6c (done):
   app binary runs them; `rnx` forwards to it.
 - **Models:** values are bound through `DbValue`/`ToDbValue` and rows decoded with sqlx, so the
   derive only needs `renox` as a dependency.
+- **Databases:** SQLite first (one file, no server, WAL; enough for one server). PostgreSQL is
+  planned for M9, before 1.0, as an opt-in `postgres` feature with the same `Db` API; one app uses
+  one database, picked from `DATABASE_URL`. sqlx's `Any` driver was not chosen as the plan because
+  it supports fewer types (e.g. chrono timestamps) than the typed pools.
 - **Named routes:** implemented in Renox; axum does not provide them.
 - **Queue:** Renox's own SQLite queue (tables `jobs` and `failed_jobs`), so no Redis is required.
   apalis was the plan, but its stable SQL backend needs sqlx 0.8 (which can't link next to our 0.9)
