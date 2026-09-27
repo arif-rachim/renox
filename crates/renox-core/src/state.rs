@@ -25,6 +25,8 @@ pub struct AppState {
     pub cache: Cache,
     pub storage: Storage,
     pub translator: Arc<Translator>,
+    /// Live reload, only while developing locally.
+    pub(crate) live: Option<Arc<crate::live::Live>>,
     pub(crate) listeners: Listeners,
     pub(crate) key: Key,
     pub(crate) gates: Gates,

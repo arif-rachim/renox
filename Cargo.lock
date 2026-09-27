@@ -2073,9 +2073,11 @@ dependencies = [
  "base64 0.23.1",
  "chrono",
  "clap",
+ "heck",
  "notify-debouncer-mini",
  "rand 0.10.3",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -2091,6 +2093,7 @@ dependencies = [
  "dotenvy",
  "fake",
  "form_urlencoded",
+ "futures-util",
  "hmac 0.13.0",
  "http-body-util",
  "lettre",

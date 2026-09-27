@@ -157,14 +157,19 @@ prints the links while developing), and API tokens for mobile apps and integrati
 let token = user.create_token(&db, "mobile", None).await?;  // send token.plain as `Authorization: Bearer ...`
 ```
 
-Migrations live in `migrations/` and run with `rnx migrate`:
+Generators and tools, like artisan:
 
 ```bash
-rnx make:migration create_products_table
-rnx migrate
-rnx migrate:rollback
-rnx migrate:fresh --seed
+rnx make:module products          # routes, a view, registered in main.rs
+rnx make:model Product -m         # model + create_product_table migration
+rnx make:job SendReceipt --module products
+rnx migrate                       # also migrate:rollback, migrate:fresh --seed, db:seed
+rnx route:list                    # every route with its name, module and guards
+rnx db:shell                      # SQL prompt on the app's database
 ```
+
+While `rnx serve` runs, the browser reloads by itself when a view, lang or public file changes and
+after each rebuild.
 
 See [`examples/hello`](examples/hello) for a guestbook using SQLite, validation, login and
 registration, sessions, CSRF, flash messages, pagination and HTMX fragments.

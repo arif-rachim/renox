@@ -175,9 +175,16 @@ M6c (done):
 - [ ] Choosing the language from `Accept-Language` (opt-in)
 
 ### M7 · v0.8: CLI and developer experience
-- [ ] `make:module`, `make:model`, `make:migration`, `make:job`, `make:mail`, `make:policy`
-- [ ] `route:list`, `db:seed`, `db:shell`
-- [ ] Browser live reload after `rnx serve` restarts
+- [x] Generators: `rnx make:module` (routes, view, `pub mod` and `.module(..)` in main.rs),
+      `make:model [-m]`, `make:migration`, `make:job`, `make:policy`, `make:mail`; they never
+      overwrite files
+- [x] `route:list`: method, path, name, module and guards (`auth`, `guest`, `throttle:…`) of every
+      route, the framework's included
+- [x] `db:shell`: a built-in SQL prompt (`.tables`, `.quit`, piped input), no `sqlite3` needed
+- [x] `db:seed`, `key:generate` (earlier milestones)
+- [x] Browser live reload while developing locally: views, public and lang files trigger a reload
+      over `/_renox/live` (SSE); a restart by `rnx serve` reloads after reconnecting; open streams
+      end on shutdown so it stays graceful
 
 ### M8 · v0.9: Testing and deployment
 - [ ] `renox-testing`: `TestApp`, HTTP client, `acting_as(user)`, `assert_see()`, in-memory DB per test, mail/queue fakes
@@ -206,6 +213,8 @@ M6c (done):
 - **i18n:** plain JSON files, loaded into memory at boot and reloaded in debug. Renox's own texts
   stay in code for en/id (so apps work without lang files) but every one of them can be overridden
   by key, which is also how other languages are added.
+- **Live reload polls file times** (500 ms) instead of using a watcher, avoiding the watcher-event
+  pitfalls `rnx serve` hit, and is only compiled into responses when `APP_ENV=local` with debug on.
 - **HTMX validation errors:** returned as 422 JSON and placed by the bundled script, rather than
   re-rendering a form fragment. It works for any form without a per-form partial, and the form
   keeps the user's input, focus and Alpine state.
