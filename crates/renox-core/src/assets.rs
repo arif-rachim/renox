@@ -12,6 +12,8 @@ pub const ALPINE_VERSION: &str = "3.17.4";
 
 const HTMX: &str = include_str!("../assets/htmx.min.js");
 const ALPINE: &str = include_str!("../assets/alpine.min.js");
+/// Alpine's build for `CSP=strict`: no `eval`, simpler expressions.
+const ALPINE_CSP: &str = include_str!("../assets/alpine-csp.min.js");
 const RENOX: &str = r#"(function () {
   // Send the CSRF token with every HTMX request.
   document.addEventListener("htmx:configRequest", function (event) {
@@ -91,20 +93,22 @@ const RENOX: &str = r#"(function () {
 "#;
 
 /// Content-hashed URLs, so browsers can cache the files forever.
-static URLS: LazyLock<[String; 3]> = LazyLock::new(|| {
+static URLS: LazyLock<[String; 4]> = LazyLock::new(|| {
     [
         format!("/_renox/htmx-{HTMX_VERSION}.min.js"),
         format!("/_renox/alpine-{ALPINE_VERSION}.min.js"),
         format!("/_renox/renox-{:016x}.js", fnv1a(RENOX)),
+        format!("/_renox/alpine-csp-{ALPINE_VERSION}.min.js"),
     ]
 });
 
 pub(crate) fn router() -> Router<AppState> {
-    let [htmx, alpine, renox] = &*URLS;
+    let [htmx, alpine, renox, alpine_csp] = &*URLS;
     Router::new()
         .route(htmx, get(|| async { js(HTMX) }))
         .route(alpine, get(|| async { js(ALPINE) }))
         .route(renox, get(|| async { js(RENOX) }))
+        .route(alpine_csp, get(|| async { js(ALPINE_CSP) }))
 }
 
 fn js(body: &'static str) -> impl IntoResponse {
@@ -119,15 +123,24 @@ fn js(body: &'static str) -> impl IntoResponse {
 
 /// The `<head>` tags every Renox page needs: the CSRF token, htmx, Alpine.js
 /// and the script that sends the token with HTMX requests.
-pub(crate) fn head_tags(csrf_token: &str, live: bool) -> String {
-    let [htmx, alpine, renox] = &*URLS;
+pub(crate) fn head_tags(csrf_token: &str, live: bool, strict_csp: bool) -> String {
+    let [htmx, alpine, renox, alpine_csp] = &*URLS;
+    // Under a strict CSP: Alpine's CSP build, and htmx without `eval`.
+    let (alpine, htmx_config) = if strict_csp {
+        (
+            alpine_csp,
+            "<meta name=\"htmx-config\" content='{\"allowEval\":false}'>\n",
+        )
+    } else {
+        (alpine, "")
+    };
     let live = if live {
         "<meta name=\"renox-live\" content=\"1\">\n"
     } else {
         ""
     };
     format!(
-        "{live}<meta name=\"csrf-token\" content=\"{csrf_token}\">\n\
+        "{live}{htmx_config}<meta name=\"csrf-token\" content=\"{csrf_token}\">\n\
          <script src=\"{htmx}\" defer></script>\n\
          <script src=\"{renox}\" defer></script>\n\
          <script src=\"{alpine}\" defer></script>"

@@ -330,6 +330,11 @@ pub(crate) async fn middleware(
     let htmx = Htmx::from_headers(req.headers());
     let path = req.uri().path().to_owned();
     let query = req.uri().query().unwrap_or_default().to_owned();
+    let nonce = req
+        .extensions()
+        .get::<crate::security::CspNonce>()
+        .map(|n| n.0.clone())
+        .unwrap_or_default();
     let (wants_json, referer) = {
         let header = |name| req.headers().get(name).and_then(|v| v.to_str().ok());
         let wants_json = header(ACCEPT).is_some_and(|v| v.contains("application/json"))
@@ -360,8 +365,11 @@ pub(crate) async fn middleware(
             session.as_ref(),
             current_user,
             &htmx,
-            &path,
-            &query,
+            &Requested {
+                path: &path,
+                query: &query,
+                nonce: &nonce,
+            },
             &locale,
         );
         return match state.views.render_view(&view, globals, &htmx) {
@@ -397,13 +405,19 @@ fn with_html(mut res: Response, html: String) -> Response {
     res
 }
 
+/// What templates see of the request, besides the session and user.
+struct Requested<'a> {
+    path: &'a str,
+    query: &'a str,
+    nonce: &'a str,
+}
+
 fn globals(
     state: &AppState,
     session: Option<&Session>,
     current_user: Option<CurrentUser>,
     htmx: &Htmx,
-    path: &str,
-    query: &str,
+    requested: &Requested,
     locale: &str,
 ) -> Value {
     let config = &state.config;
@@ -431,7 +445,9 @@ fn globals(
         };
     let token = session.map(Session::token).unwrap_or_default();
 
-    let head = Value::from_safe_string(assets::head_tags(&token, state.live.is_some()));
+    let strict = state.security.mode == crate::CspMode::Strict;
+    let head = Value::from_safe_string(assets::head_tags(&token, state.live.is_some(), strict));
+    let nonce = requested.nonce.to_owned();
     let field = Value::from_safe_string(format!(
         "<input type=\"hidden\" name=\"{}\" value=\"{token}\">",
         crate::csrf::CSRF_FIELD
@@ -477,8 +493,8 @@ fn globals(
             }
         }),
         request => context! {
-            path => path,
-            query => query,
+            path => requested.path,
+            query => requested.query,
             htmx => htmx.request,
             boosted => htmx.boosted,
         },
@@ -489,6 +505,7 @@ fn globals(
             first_errors.get(&field).cloned().unwrap_or_default()
         }),
         renox_head => Value::from_function(move || head.clone()),
+        csp_nonce => Value::from_function(move || nonce.clone()),
         csrf_field => Value::from_function(move || field.clone()),
         old => Value::from_function(move |field: String, default: Option<Value>| {
             old_input

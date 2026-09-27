@@ -296,6 +296,47 @@ Gaps found while writing the examples, to close before 1.0:
 - [x] Pagination links keep the other query parameters: `page_url(n)` in templates reads
       `request.query` (M10b)
 
+### M11 · v0.12: Web essentials (before 1.0)
+What most real apps need on day one besides pages and a database: safe defaults in the browser,
+payment gateway callbacks, and being found and measured. Owner's request, done before M10c so the
+remaining examples use the final APIs. Order: M11a → M11b → M11c → M10c → v1.0.
+
+M11a · security (done):
+- [x] Security headers on every response: `X-Content-Type-Options: nosniff`,
+      `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: SAMEORIGIN`, and HSTS in
+      production over https; a header the handler set is kept
+- [x] Content-Security-Policy, `CSP=relaxed|strict|off`. **relaxed is the default** (owner's
+      choice): this site's scripts, inline scripts and `eval` (Alpine's standard build) are allowed;
+      other sites' scripts, framing by other sites and plugins are not. `strict` allows scripts only
+      from this site or with the request's nonce (`csp_nonce()` in templates), switches to Alpine's
+      CSP build (vendored) and turns off htmx's `eval`; Alpine expressions must then be simple
+      (move statements into `Alpine.data(...)`)
+- [x] `App::csp(|csp| { csp.allow("script-src", "https://…"); })` adds sources; a new directive keeps
+      `'self'`
+- [x] `Routes::cors(&["https://app.example.com"])` (or `"*"`) answers preflights and adds the
+      CORS headers for the routes added so far; `cors_layer(renox::cors::CorsLayer)` for anything
+      else; `route:list` shows `cors`
+- [x] `Routes::without_csrf()` for callers without a session (webhooks); `route:list` shows `no-csrf`
+
+M11b · webhooks:
+- [ ] `renox::webhook`: HMAC-SHA256/SHA512 hex signatures, constant-time checks, Stripe-style
+      `t=…,v1=…` with a time tolerance; raw body available to the handler
+- [ ] A `webhook_calls` table, unique per (provider, event id): duplicates are answered 200 and not
+      processed twice; store, dispatch a job, answer fast
+- [ ] `webhook:retry <id>`; optionally accept webhooks during maintenance mode
+- [ ] `examples/webhooks` with Midtrans, Xendit and Stripe style signatures, tested with good and
+      forged requests
+
+M11c · SEO and analytics:
+- [ ] A `seo()` macro: title, description, canonical, OpenGraph and Twitter cards; `<html lang>` from
+      the locale; `noindex` outside production
+- [ ] `robots.txt` and `sitemap.xml` helpers (routes and models)
+- [ ] Google Search Console verification meta (`GOOGLE_SITE_VERIFICATION`)
+- [ ] GA4 / Google Tag Manager from `.env` in `renox_head()`, with the CSP nonce and CSP sources,
+      off in local and testing
+- [ ] Analytics events: `HxTrigger` → `gtag('event', …)` in renox.js, page views on `hx-boost`
+      navigation, and a job that sends server-side events (GA4 Measurement Protocol)
+
 ### v1.0
 - [ ] Documentation site built with Renox, starter kit, semver stability guarantee
 

@@ -148,6 +148,60 @@ impl Routes {
         .mark(&format!("throttle:{max}/{}s", per.as_secs()))
     }
 
+    /// Lets the routes added so far be posted to without a CSRF token, for
+    /// callers that have no session, such as a payment gateway's webhook.
+    /// Such a handler must check the request itself (e.g. its signature).
+    pub fn without_csrf(self) -> Self {
+        self.mark("no-csrf")
+    }
+
+    /// Lets browsers on `origins` (e.g. `https://app.example.com`, or `*`
+    /// for any) call the routes added so far with `fetch`: answers CORS
+    /// preflights and adds the `Access-Control-Allow-*` headers. Allows the
+    /// usual methods and the `Content-Type`, `Authorization`, `Accept` and
+    /// `X-CSRF-Token` headers. Use `cors_layer` for anything else.
+    pub fn cors(self, origins: &[&str]) -> Self {
+        use axum::http::{HeaderName, HeaderValue, Method, header};
+        use tower_http::cors::{AllowOrigin, CorsLayer};
+
+        let origin = if origins.contains(&"*") {
+            AllowOrigin::any()
+        } else {
+            AllowOrigin::list(
+                origins
+                    .iter()
+                    .filter_map(|o| HeaderValue::from_str(o.trim_end_matches('/')).ok()),
+            )
+        };
+        let layer = CorsLayer::new()
+            .allow_origin(origin)
+            .allow_methods([
+                Method::GET,
+                Method::POST,
+                Method::PUT,
+                Method::PATCH,
+                Method::DELETE,
+                Method::OPTIONS,
+            ])
+            .allow_headers([
+                header::CONTENT_TYPE,
+                header::AUTHORIZATION,
+                header::ACCEPT,
+                HeaderName::from_static(crate::CSRF_HEADER),
+            ])
+            .max_age(std::time::Duration::from_secs(3600));
+        self.cors_layer(layer)
+    }
+
+    /// Like `cors`, with a `tower_http::cors::CorsLayer` built by hand
+    /// (`renox::cors::CorsLayer`), e.g. to allow credentials.
+    pub fn cors_layer(mut self, layer: tower_http::cors::CorsLayer) -> Self {
+        // `layer`, not `route_layer`: preflights use OPTIONS, which the
+        // routes themselves don't handle.
+        self.router = self.router.layer(layer);
+        self.mark("cors")
+    }
+
     /// Wraps the routes added so far in a tower layer (axum's `route_layer`).
     pub fn route_layer<L>(mut self, layer: L) -> Self
     where
