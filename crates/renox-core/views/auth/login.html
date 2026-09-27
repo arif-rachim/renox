@@ -17,6 +17,7 @@
     <input type="checkbox" name="remember" value="1" {% if old('remember') %}checked{% endif %}> {{ text.remember }}
   </label>
   <button type="submit">{{ text.login_button }}</button>
+  <p class="alt"><a href="{{ route('password.request') }}">{{ text.forgot_link }}</a></p>
   {% if registration %}
   <p class="alt">{{ text.no_account }} <a href="{{ route('register') }}">{{ text.register_button }}</a></p>
   {% endif %}

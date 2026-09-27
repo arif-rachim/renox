@@ -24,6 +24,11 @@ pub(crate) async fn middleware(req: Request, next: Next) -> Response {
         return next.run(req).await;
     }
 
+    // API tokens are sent explicitly, not by the browser, so they can't be forged cross-site.
+    if crate::auth::user_via_token(req.extensions()) {
+        return next.run(req).await;
+    }
+
     let Some(session) = req.extensions().get::<Session>().cloned() else {
         return Error::from(anyhow::anyhow!(
             "CSRF protection requires the session middleware"

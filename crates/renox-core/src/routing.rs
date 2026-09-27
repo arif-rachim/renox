@@ -75,6 +75,12 @@ impl Routes {
         self.route_layer(from_fn(crate::auth::require_auth))
     }
 
+    /// Like `require_auth`, and the user must have verified their email;
+    /// others are sent to the `verification.notice` route.
+    pub fn require_verified(self) -> Self {
+        self.route_layer(from_fn(crate::auth::require_verified))
+    }
+
     /// Only guests may use the routes added so far; logged-in users are sent
     /// to the `home` route (e.g. for login and registration pages).
     pub fn guest_only(self) -> Self {

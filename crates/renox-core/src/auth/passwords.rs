@@ -1,0 +1,167 @@
+use std::time::Duration;
+
+use axum::extract::{Path, Query, State};
+use axum::response::Response;
+use chrono::TimeDelta;
+use serde::Deserialize;
+use serde_json::json;
+use sqlx::Row;
+
+use super::User;
+use super::module::{go, locale, text};
+use super::tokens::sha256_hex;
+use crate::crypto::{constant_time_eq, random_token};
+use crate::db::{DateTime, now};
+use crate::mail::Mail;
+use crate::validation::{Errors, Valid, Validate, ValidationError, Validator};
+use crate::{AppState, Htmx, Result, Session, View, context, view};
+
+/// How long a reset link works.
+const EXPIRES: Duration = Duration::from_secs(60 * 60);
+/// Minimum time between two reset emails to the same address.
+const RESEND_AFTER: Duration = Duration::from_secs(60);
+
+pub(super) async fn show_forgot(State(state): State<AppState>) -> View {
+    view(
+        "renox/auth/forgot-password.html",
+        context! { text => text(locale(&state)) },
+    )
+}
+
+#[derive(Deserialize)]
+pub(super) struct ForgotForm {
+    email: String,
+}
+
+impl Validate for ForgotForm {
+    fn rules(&self, v: &mut Validator) {
+        v.field("email", &self.email).required().email();
+    }
+}
+
+/// Emails a reset link if the address has an account. The reply is the same
+/// either way, so the form can't be used to find out who is registered.
+pub(super) async fn send_link(
+    State(state): State<AppState>,
+    session: Session,
+    htmx: Htmx,
+    Valid(form): Valid<ForgotForm>,
+) -> Result<Response> {
+    let text = text(locale(&state));
+    if let Some(user) = User::find_by_email(&state.db, &form.email).await? {
+        let last: Option<DateTime> =
+            sqlx::query_scalar("SELECT created_at FROM password_reset_tokens WHERE email = ?")
+                .bind(&user.email)
+                .fetch_optional(&state.db)
+                .await?;
+        let recently = last
+            .is_some_and(|at| now() - at < TimeDelta::from_std(RESEND_AFTER).unwrap_or_default());
+        if !recently {
+            let token = random_token();
+            sqlx::query(
+                "INSERT INTO password_reset_tokens (email, token, created_at) VALUES (?, ?, ?) \
+                 ON CONFLICT (email) DO UPDATE SET token = excluded.token, created_at = excluded.created_at",
+            )
+            .bind(&user.email)
+            .bind(sha256_hex(&token))
+            .bind(now())
+            .execute(&state.db)
+            .await?;
+
+            let email: String = form_urlencoded::byte_serialize(user.email.as_bytes()).collect();
+            let link = format!(
+                "{}?email={email}",
+                state.absolute_url("password.reset", &[&token])?
+            );
+            let body = text["mail_reset_body"]
+                .as_str()
+                .unwrap_or_default()
+                .replace("{link}", &link);
+            let subject = text["mail_reset_subject"].as_str().unwrap_or_default();
+            state
+                .mailer
+                .send(Mail::new(&user.email, subject, body))
+                .await?;
+        }
+    }
+    session.flash("status", &text["reset_link_sent"])?;
+    Ok(go(&htmx, state.url("password.request", &[])?))
+}
+
+#[derive(Deserialize)]
+pub(super) struct EmailQuery {
+    email: Option<String>,
+}
+
+pub(super) async fn show_reset(
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+    Query(query): Query<EmailQuery>,
+) -> View {
+    view(
+        "renox/auth/reset-password.html",
+        context! { token, email => query.email.unwrap_or_default(), text => text(locale(&state)) },
+    )
+}
+
+#[derive(Deserialize)]
+pub(super) struct ResetForm {
+    token: String,
+    email: String,
+    password: String,
+    password_confirmation: Option<String>,
+}
+
+impl Validate for ResetForm {
+    fn rules(&self, v: &mut Validator) {
+        let password = super::module::label(v, "password");
+        v.field("token", &self.token).required();
+        v.field("email", &self.email).required().email();
+        v.field("password", &self.password)
+            .label(password)
+            .required()
+            .min(8)
+            .confirmed(&self.password_confirmation);
+    }
+}
+
+pub(super) async fn reset(
+    State(state): State<AppState>,
+    session: Session,
+    htmx: Htmx,
+    Valid(form): Valid<ResetForm>,
+) -> Result<Response> {
+    let text = text(locale(&state));
+    let row = sqlx::query("SELECT token, created_at FROM password_reset_tokens WHERE email = ?")
+        .bind(form.email.trim())
+        .fetch_optional(&state.db)
+        .await?;
+    let fresh =
+        |created: DateTime| now() - created < TimeDelta::from_std(EXPIRES).unwrap_or_default();
+    let valid = match &row {
+        Some(row) => {
+            let hash: String = row.try_get("token")?;
+            constant_time_eq(&hash, &sha256_hex(&form.token)) && fresh(row.try_get("created_at")?)
+        }
+        None => false,
+    };
+    let user = match valid {
+        true => User::find_by_email(&state.db, &form.email).await?,
+        false => None,
+    };
+    let Some(mut user) = user else {
+        let mut errors = Errors::new();
+        errors.add("email", text["reset_invalid"].as_str().unwrap_or_default());
+        return Err(ValidationError::new(errors)
+            .with_input(&json!({ "email": form.email }))
+            .into());
+    };
+
+    user.set_password(&state.db, &form.password).await?;
+    sqlx::query("DELETE FROM password_reset_tokens WHERE email = ?")
+        .bind(&user.email)
+        .execute(&state.db)
+        .await?;
+    session.flash("status", &text["password_reset_done"])?;
+    Ok(go(&htmx, state.url("login", &[])?))
+}

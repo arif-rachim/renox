@@ -8,34 +8,50 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use super::user::dummy_hash;
-use super::{User, intended, login, logout, verify_password};
+use super::{User, intended, login, logout, passwords, verification, verify_password};
 use crate::db::Migration;
 use crate::validation::{Errors, Locale, Valid, Validate, ValidationError, Validator};
 use crate::{AppState, Htmx, HxRedirect, Module, Result, Routes, Session, View, context, view};
 
-const MIGRATIONS: &[Migration] = &[Migration {
-    name: "00010101000000_create_users_table",
-    up: include_str!("../../migrations/auth/00010101000000_create_users_table.up.sql"),
-    down: Some(include_str!(
-        "../../migrations/auth/00010101000000_create_users_table.down.sql"
-    )),
-}];
+macro_rules! migration {
+    ($name:literal) => {
+        Migration {
+            name: $name,
+            up: include_str!(concat!("../../migrations/auth/", $name, ".up.sql")),
+            down: Some(include_str!(concat!(
+                "../../migrations/auth/",
+                $name,
+                ".down.sql"
+            ))),
+        }
+    };
+}
+
+const MIGRATIONS: &[Migration] = &[
+    migration!("00010101000000_create_users_table"),
+    migration!("00010101000001_create_password_reset_tokens_table"),
+    migration!("00010101000002_create_personal_access_tokens_table"),
+];
 
 struct Settings {
     registration: bool,
     redirect_to: Option<String>,
+    verify_email: bool,
 }
 
-/// Login, registration and logout pages, and the `users` table.
+/// Login, registration, password reset and email verification pages, and
+/// the `users`, `password_reset_tokens` and `personal_access_tokens` tables.
 ///
-/// Routes: `login` (GET/POST `/login`), `register` (GET/POST `/register`) and
-/// `logout` (POST `/logout`). The pages are `renox/auth/login.html` and
-/// `renox/auth/register.html`, inside `renox/auth/layout.html`; create a file
-/// with the same name under your views to replace one.
+/// Routes: `login`, `register`, `logout`, `password.request`,
+/// `password.email`, `password.reset`, `password.update`,
+/// `verification.notice`, `verification.verify` and `verification.send`.
+/// The pages live in `renox/auth/*.html`, inside `renox/auth/layout.html`;
+/// create a file with the same name under your views to replace one.
 #[derive(Clone)]
 pub struct Auth {
     registration: bool,
     redirect_to: Option<String>,
+    verify_email: bool,
 }
 
 impl Auth {
@@ -43,7 +59,15 @@ impl Auth {
         Self {
             registration: true,
             redirect_to: None,
+            verify_email: false,
         }
+    }
+
+    /// Emails new users a verification link. Guard routes that need a
+    /// verified address with `Routes::require_verified()`.
+    pub fn verify_email(mut self) -> Self {
+        self.verify_email = true;
+        self
     }
 
     /// Hides `/register`, e.g. for back-office apps where an admin adds users.
@@ -79,6 +103,7 @@ impl Module for Auth {
         let settings = Arc::new(Settings {
             registration: self.registration,
             redirect_to: self.redirect_to.clone(),
+            verify_email: self.verify_email,
         });
 
         let mut guest = Routes::new()
@@ -91,8 +116,26 @@ impl Module for Auth {
                 .post("/register", store_register)
                 .name("register");
         }
+        let guest = guest
+            .get("/forgot-password", passwords::show_forgot)
+            .name("password.request")
+            .post("/forgot-password", passwords::send_link)
+            .name("password.email")
+            .get("/reset-password/{token}", passwords::show_reset)
+            .name("password.reset")
+            .post("/reset-password", passwords::reset)
+            .name("password.update")
+            .guest_only();
+        let verification = Routes::new()
+            .get("/verify-email", verification::notice)
+            .name("verification.notice")
+            .get("/verify-email/{id}/{hash}", verification::verify)
+            .name("verification.verify")
+            .post("/email/verification-notification", verification::resend)
+            .name("verification.send")
+            .require_auth();
         guest
-            .guest_only()
+            .merge(verification)
             .merge(Routes::new().post("/logout", destroy).name("logout"))
             .route_layer(Extension(settings))
     }
@@ -117,7 +160,7 @@ impl<S: Send + Sync> FromRequestParts<S> for ClientIp {
     }
 }
 
-fn locale(state: &AppState) -> Locale {
+pub(super) fn locale(state: &AppState) -> Locale {
     Locale::parse(&state.config.locale)
 }
 
@@ -130,7 +173,7 @@ fn after_login(state: &AppState, settings: &Settings, session: &Session) -> Stri
 }
 
 /// A full page load after logging in or out, since the layout changes.
-fn go(htmx: &Htmx, to: String) -> Response {
+pub(super) fn go(htmx: &Htmx, to: String) -> Response {
     if htmx.request {
         HxRedirect(to).into_response()
     } else {
@@ -156,7 +199,7 @@ struct LoginForm {
 }
 
 /// Field labels in messages, matching the words on the built-in pages.
-fn label(v: &Validator, field: &'static str) -> &'static str {
+pub(super) fn label(v: &Validator, field: &'static str) -> &'static str {
     match (v.locale(), field) {
         (Locale::Id, "name") => "nama",
         (Locale::Id, "password") => "kata sandi",
@@ -263,6 +306,9 @@ async fn store_register(
     Valid(form): Valid<RegisterForm>,
 ) -> Result<Response> {
     let user = User::register(&state.db, &form.name, &form.email, &form.password).await?;
+    if settings.verify_email {
+        verification::send_verification(&state, &user).await?;
+    }
     login(&session, &user, None)?;
     Ok(go(&htmx, after_login(&state, &settings, &session)))
 }
@@ -273,7 +319,7 @@ async fn destroy(State(state): State<AppState>, session: Session, htmx: Htmx) ->
 }
 
 /// Words on the built-in pages.
-fn text(locale: Locale) -> Value {
+pub(super) fn text(locale: Locale) -> Value {
     match locale {
         Locale::En => json!({
             "login_title": "Log in",
@@ -287,6 +333,26 @@ fn text(locale: Locale) -> Value {
             "register_button": "Register",
             "no_account": "No account yet?",
             "have_account": "Already registered?",
+            "forgot_link": "Forgot your password?",
+            "forgot_title": "Forgot your password?",
+            "forgot_intro": "Enter your email and we'll send you a link to choose a new password.",
+            "send_link": "Email me a reset link",
+            "back_to_login": "Back to log in",
+            "reset_title": "Choose a new password",
+            "reset_button": "Reset password",
+            "reset_link_sent": "If that email has an account, a reset link is on its way.",
+            "reset_invalid": "This password reset link is invalid or has expired.",
+            "password_reset_done": "Your password has been reset. You can log in now.",
+            "verify_title": "Verify your email",
+            "verify_intro": "We've emailed you a link to verify your address. Didn't get it?",
+            "resend_button": "Send another link",
+            "logout": "Log out",
+            "verification_sent": "A new verification link has been sent.",
+            "verified": "Your email address is verified.",
+            "mail_reset_subject": "Reset your password",
+            "mail_reset_body": "You asked to reset your password.\n\nChoose a new one here:\n{link}\n\nThe link works for 60 minutes. If you didn't ask for this, ignore this email.",
+            "mail_verify_subject": "Verify your email address",
+            "mail_verify_body": "Please verify your email address:\n{link}\n\nThe link works for 60 minutes.",
         }),
         Locale::Id => json!({
             "login_title": "Masuk",
@@ -300,6 +366,26 @@ fn text(locale: Locale) -> Value {
             "register_button": "Daftar",
             "no_account": "Belum punya akun?",
             "have_account": "Sudah punya akun?",
+            "forgot_link": "Lupa kata sandi?",
+            "forgot_title": "Lupa kata sandi?",
+            "forgot_intro": "Masukkan email kamu, kami kirimkan link untuk membuat kata sandi baru.",
+            "send_link": "Kirim link atur ulang",
+            "back_to_login": "Kembali ke halaman masuk",
+            "reset_title": "Buat kata sandi baru",
+            "reset_button": "Simpan kata sandi",
+            "reset_link_sent": "Kalau email itu terdaftar, link atur ulang sedang dikirim.",
+            "reset_invalid": "Link atur ulang kata sandi tidak valid atau sudah kedaluwarsa.",
+            "password_reset_done": "Kata sandi sudah diganti. Silakan masuk.",
+            "verify_title": "Verifikasi email",
+            "verify_intro": "Kami sudah mengirim link verifikasi ke email kamu. Belum menerima?",
+            "resend_button": "Kirim ulang link",
+            "logout": "Keluar",
+            "verification_sent": "Link verifikasi baru sudah dikirim.",
+            "verified": "Alamat email kamu sudah terverifikasi.",
+            "mail_reset_subject": "Atur ulang kata sandi",
+            "mail_reset_body": "Kamu meminta atur ulang kata sandi.\n\nBuat kata sandi baru di sini:\n{link}\n\nLink berlaku 60 menit. Kalau kamu tidak memintanya, abaikan email ini.",
+            "mail_verify_subject": "Verifikasi alamat email",
+            "mail_verify_body": "Silakan verifikasi alamat email kamu:\n{link}\n\nLink berlaku 60 menit.",
         }),
     }
 }

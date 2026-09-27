@@ -51,6 +51,8 @@ pub struct Config {
     pub database_pool_size: u32,
     /// Language of built-in messages, `en` or `id`, from `APP_LOCALE`.
     pub locale: String,
+    /// Mail driver, `log` or `memory`, from `MAIL_MAILER`.
+    pub mailer: String,
 }
 
 impl Config {
@@ -98,6 +100,7 @@ impl Config {
                 .parse()
                 .context("DATABASE_POOL_SIZE must be a number")?,
             locale: var_or("APP_LOCALE", "en"),
+            mailer: var_or("MAIL_MAILER", "log"),
         })
     }
 
@@ -124,6 +127,7 @@ impl Default for Config {
             database_url: "sqlite::memory:".into(),
             database_pool_size: 8,
             locale: "en".into(),
+            mailer: "memory".into(),
         }
     }
 }

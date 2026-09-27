@@ -37,6 +37,18 @@ const BUILTIN: &[(&str, &str)] = &[
         "renox/auth/register.html",
         include_str!("../views/auth/register.html"),
     ),
+    (
+        "renox/auth/forgot-password.html",
+        include_str!("../views/auth/forgot-password.html"),
+    ),
+    (
+        "renox/auth/reset-password.html",
+        include_str!("../views/auth/reset-password.html"),
+    ),
+    (
+        "renox/auth/verify-email.html",
+        include_str!("../views/auth/verify-email.html"),
+    ),
 ];
 
 /// The template engine (MiniJinja), reading from `VIEWS_PATH`.
