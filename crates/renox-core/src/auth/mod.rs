@@ -23,6 +23,7 @@
 //! ```
 
 mod module;
+pub mod notifications;
 mod passwords;
 mod throttle;
 mod tokens;
@@ -42,6 +43,7 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Redirect, Response};
 
 pub use module::Auth;
+pub use notifications::{Channel, DatabaseNotification, Notification};
 pub(crate) use throttle::Throttle;
 pub use tokens::{AccessToken, NewToken};
 pub use user::{User, hash_password, verify_password};

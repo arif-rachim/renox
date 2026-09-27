@@ -125,9 +125,16 @@ M5a (done):
 - [x] `Module::register` for a module's jobs, listeners and scheduled tasks
 - [x] `rnx` forwards any other command to the app (`rnx queue:work`, `rnx schedule:list`, ...)
 
-M5b (next):
-- [ ] SMTP mail driver, mail templates (MiniJinja, HTML + text), preview route in development
-- [ ] Notifications: mail and database channels
+M5b (done):
+- [x] SMTP driver (lettre with rustls: `tls`, `starttls` or `none`), plus `log` and `memory`
+- [x] Mail templates: `state.mail_view(to, subject, "mail/x", ctx)` renders `x.html` and `x.txt`
+      (or text made from the HTML), a built-in `renox/mail/layout.html` and `button` macro
+- [x] `state.queue_mail(mail)` sends through the queue with retries
+- [x] `/_renox/mail` lists recent mail with HTML and text previews while `APP_DEBUG` is on
+- [x] Notifications: `Notification` with mail and database channels, `state.notify(&user, &n)`,
+      and `user.notifications()`, `unread_notifications()`, `mark_notification_read()`
+- [x] Password reset and verification emails use the templates (HTML + text, English and Indonesian)
+- [x] HTML escaping leaves `/` alone (like Jinja2), so URLs in pages and mail stay readable
 
 ### M6 · v0.7: Infrastructure
 - [ ] Cache (memory / SQLite, `remember()`)

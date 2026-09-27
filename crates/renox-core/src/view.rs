@@ -49,6 +49,30 @@ const BUILTIN: &[(&str, &str)] = &[
         "renox/auth/verify-email.html",
         include_str!("../views/auth/verify-email.html"),
     ),
+    (
+        "renox/mail/layout.html",
+        include_str!("../views/mail/layout.html"),
+    ),
+    (
+        "renox/mail/button.html",
+        include_str!("../views/mail/button.html"),
+    ),
+    (
+        "renox/mail/auth/reset-password.html",
+        include_str!("../views/mail/auth/reset-password.html"),
+    ),
+    (
+        "renox/mail/auth/reset-password.txt",
+        include_str!("../views/mail/auth/reset-password.txt"),
+    ),
+    (
+        "renox/mail/auth/verify-email.html",
+        include_str!("../views/mail/auth/verify-email.html"),
+    ),
+    (
+        "renox/mail/auth/verify-email.txt",
+        include_str!("../views/mail/auth/verify-email.txt"),
+    ),
 ];
 
 /// The template engine (MiniJinja), reading from `VIEWS_PATH`.
@@ -65,6 +89,7 @@ impl Views {
         let watch = config.debug && dir.is_dir();
         let reloader = AutoReloader::new(move |notifier| {
             let mut env = Environment::new();
+            env.set_formatter(format_value);
             let loader_dir = dir.clone();
             env.set_loader(move |name| load(&loader_dir, name));
 
@@ -134,6 +159,36 @@ impl Views {
             detail => page.detail,
         })?)
     }
+}
+
+/// Like MiniJinja's default formatter, but HTML escaping leaves `/` alone:
+/// escaping `& < > " '` is enough for text and quoted attributes, and URLs
+/// (links in pages and mail) stay readable.
+fn format_value(
+    out: &mut minijinja::Output,
+    state: &minijinja::State,
+    value: &Value,
+) -> Result<(), minijinja::Error> {
+    use std::fmt::Write;
+    if let (minijinja::AutoEscape::Html, false, Some(text)) =
+        (state.auto_escape(), value.is_safe(), value.as_str())
+    {
+        for c in text.chars() {
+            let written = match c {
+                '&' => out.write_str("&amp;"),
+                '<' => out.write_str("&lt;"),
+                '>' => out.write_str("&gt;"),
+                '"' => out.write_str("&quot;"),
+                '\'' => out.write_str("&#39;"),
+                c => out.write_char(c),
+            };
+            written.map_err(|_| {
+                minijinja::Error::new(ErrorKind::WriteFailure, "could not write output")
+            })?;
+        }
+        return Ok(());
+    }
+    minijinja::escape_formatter(out, state, value)
 }
 
 fn load(dir: &Path, name: &str) -> Result<Option<String>, minijinja::Error> {

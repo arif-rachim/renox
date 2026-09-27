@@ -31,6 +31,7 @@ const MIGRATIONS: &[Migration] = &[
     migration!("00010101000000_create_users_table"),
     migration!("00010101000001_create_password_reset_tokens_table"),
     migration!("00010101000002_create_personal_access_tokens_table"),
+    migration!("00010101000003_create_notifications_table"),
 ];
 
 struct Settings {
@@ -350,9 +351,11 @@ pub(super) fn text(locale: Locale) -> Value {
             "verification_sent": "A new verification link has been sent.",
             "verified": "Your email address is verified.",
             "mail_reset_subject": "Reset your password",
-            "mail_reset_body": "You asked to reset your password.\n\nChoose a new one here:\n{link}\n\nThe link works for 60 minutes. If you didn't ask for this, ignore this email.",
+            "mail_reset_intro": "You asked to reset your password. Choose a new one with the button below.",
+            "mail_reset_outro": "The link works for 60 minutes. If you didn't ask for this, ignore this email.",
             "mail_verify_subject": "Verify your email address",
-            "mail_verify_body": "Please verify your email address:\n{link}\n\nThe link works for 60 minutes.",
+            "mail_verify_intro": "Please confirm that this is your email address.",
+            "mail_verify_outro": "The link works for 60 minutes.",
         }),
         Locale::Id => json!({
             "login_title": "Masuk",
@@ -383,9 +386,11 @@ pub(super) fn text(locale: Locale) -> Value {
             "verification_sent": "Link verifikasi baru sudah dikirim.",
             "verified": "Alamat email kamu sudah terverifikasi.",
             "mail_reset_subject": "Atur ulang kata sandi",
-            "mail_reset_body": "Kamu meminta atur ulang kata sandi.\n\nBuat kata sandi baru di sini:\n{link}\n\nLink berlaku 60 menit. Kalau kamu tidak memintanya, abaikan email ini.",
+            "mail_reset_intro": "Kamu meminta atur ulang kata sandi. Buat kata sandi baru lewat tombol di bawah.",
+            "mail_reset_outro": "Link berlaku 60 menit. Kalau kamu tidak memintanya, abaikan email ini.",
             "mail_verify_subject": "Verifikasi alamat email",
-            "mail_verify_body": "Silakan verifikasi alamat email kamu:\n{link}\n\nLink berlaku 60 menit.",
+            "mail_verify_intro": "Silakan konfirmasi bahwa ini alamat email kamu.",
+            "mail_verify_outro": "Link berlaku 60 menit.",
         }),
     }
 }
