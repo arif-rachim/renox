@@ -7,7 +7,7 @@ use argon2::password_hash::{PasswordHasher, PasswordVerifier};
 use serde::{Deserialize, Serialize};
 
 use super::Policy;
-use crate::db::{DateTime, Db, DbValue, Executor, Model, Row, ToDbValue, sql};
+use crate::db::{DateTime, Db, DbValue, Executor, FromRow, Model, Row, ToDbValue, sql};
 use crate::{Error, Result};
 
 /// A row of the `users` table created by the `Auth` module.
@@ -48,6 +48,27 @@ const NOT_EXTRA: &[&str] = &[
     "remember_token",
 ];
 
+impl FromRow for User {
+    fn from_row(row: &Row) -> std::result::Result<Self, crate::db::DbError> {
+        let extra = row
+            .columns()
+            .into_iter()
+            .filter(|column| !NOT_EXTRA.contains(column))
+            .map(|column| (column.to_owned(), row.json(column)))
+            .collect();
+        Ok(Self {
+            id: row.try_get("id")?,
+            name: row.try_get("name")?,
+            email: row.try_get("email")?,
+            password: row.try_get("password")?,
+            email_verified_at: row.try_get("email_verified_at")?,
+            created_at: row.try_get("created_at")?,
+            updated_at: row.try_get("updated_at")?,
+            extra,
+        })
+    }
+}
+
 impl Model for User {
     const TABLE: &'static str = "users";
     const SELECT_ALL: bool = true;
@@ -67,25 +88,6 @@ impl Model for User {
 
     fn set_id(&mut self, id: i64) {
         self.id = id;
-    }
-
-    fn from_row(row: &Row) -> std::result::Result<Self, crate::db::DbError> {
-        let extra = row
-            .columns()
-            .into_iter()
-            .filter(|column| !NOT_EXTRA.contains(column))
-            .map(|column| (column.to_owned(), row.json(column)))
-            .collect();
-        Ok(Self {
-            id: row.try_get("id")?,
-            name: row.try_get("name")?,
-            email: row.try_get("email")?,
-            password: row.try_get("password")?,
-            email_verified_at: row.try_get("email_verified_at")?,
-            created_at: row.try_get("created_at")?,
-            updated_at: row.try_get("updated_at")?,
-            extra,
-        })
     }
 
     fn values(&self) -> Vec<DbValue> {

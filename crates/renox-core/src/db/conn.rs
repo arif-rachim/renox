@@ -212,6 +212,14 @@ impl<'c> Executor<'c> for Conn<'c> {
 }
 
 impl Conn<'_> {
+    /// The same connection for one more statement.
+    pub(crate) fn reborrow(&mut self) -> Conn<'_> {
+        match self {
+            Conn::Pool(db) => Conn::Pool(db),
+            Conn::Tx(tx) => Conn::Tx(tx),
+        }
+    }
+
     /// Which engine the query will run on, for SQL that differs.
     pub(crate) fn dialect(&self) -> Dialect {
         match self {
@@ -449,6 +457,35 @@ impl Sql {
             .execute(exec)
             .await
             .map(|done| done.rows_affected()))
+    }
+
+    /// Every row, read into `T`: a model, a `#[derive(FromRow)]` struct or a
+    /// tuple; see [`super::FromRow`].
+    pub async fn fetch_as<'c, T: super::FromRow>(
+        self,
+        db: impl Executor<'c>,
+    ) -> Result<Vec<T>, DbError> {
+        self.fetch_all(db).await?.iter().map(T::from_row).collect()
+    }
+
+    /// The first row read into `T`, or `None` if there is no row.
+    pub async fn fetch_optional_as<'c, T: super::FromRow>(
+        self,
+        db: impl Executor<'c>,
+    ) -> Result<Option<T>, DbError> {
+        self.fetch_optional(db)
+            .await?
+            .as_ref()
+            .map(T::from_row)
+            .transpose()
+    }
+
+    /// The first row read into `T`; an error if there is none.
+    pub async fn fetch_one_as<'c, T: super::FromRow>(
+        self,
+        db: impl Executor<'c>,
+    ) -> Result<T, DbError> {
+        T::from_row(&self.fetch_one(db).await?)
     }
 
     /// The first column of the first row; an error if there is no row.

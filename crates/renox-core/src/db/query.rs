@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use super::{Db, DbValue, Dialect, Executor, Model, Paginated, ToDbValue, now, quote, sql};
+use super::{Db, DbValue, Dialect, Executor, FromDb, Model, Paginated, ToDbValue, now, quote, sql};
 use crate::Result;
 use anyhow::anyhow;
 
@@ -16,8 +16,92 @@ enum Trashed {
 /// `where_in` lists longer than this are sent as one JSON array.
 const LARGE_IN: usize = 1000;
 
-/// Marks a filter rendered by `json_in`: `{JSON_IN}{int|text}:{column}`.
-const JSON_IN: &str = "\u{0}json_in:";
+/// A number type `Query::sum` can return.
+pub trait Number: FromDb + sealed::Sealed {
+    #[doc(hidden)]
+    const SQL_TYPE: &'static str;
+}
+
+impl Number for i64 {
+    const SQL_TYPE: &'static str = "BIGINT";
+}
+
+impl Number for f64 {
+    const SQL_TYPE: &'static str = "DOUBLE PRECISION";
+}
+
+mod sealed {
+    pub trait Sealed {}
+    impl Sealed for i64 {}
+    impl Sealed for f64 {}
+}
+
+/// One condition of a query, rendered per database.
+#[derive(Clone)]
+enum Filter {
+    /// SQL with `?` placeholders.
+    Sql(String),
+    /// `column LIKE ?` (ILIKE on PostgreSQL); `not` for NOT LIKE.
+    Like { column: String, not: bool },
+    /// `column IN (…)` for a long list sent as one JSON array.
+    JsonIn { kind: &'static str, column: String },
+    /// Conditions joined with OR (`any`) or AND, in parentheses.
+    Group { any: bool, filters: Vec<Filter> },
+    /// `NOT (…)`.
+    Not(Box<Filter>),
+    /// `column IN (SELECT sub_column FROM table WHERE …)`.
+    InQuery {
+        column: String,
+        table: &'static str,
+        sub_column: String,
+        filters: Vec<Filter>,
+    },
+}
+
+impl Filter {
+    fn render(&self, dialect: Dialect) -> String {
+        match self {
+            Filter::Sql(sql) => sql.clone(),
+            Filter::Like { column, not } => {
+                let op = match (dialect, not) {
+                    (Dialect::Postgres, false) => "ILIKE",
+                    (Dialect::Postgres, true) => "NOT ILIKE",
+                    (_, false) => "LIKE",
+                    (_, true) => "NOT LIKE",
+                };
+                format!("{column} {op} ?")
+            }
+            Filter::JsonIn { kind, column } => json_in(kind, column, dialect),
+            Filter::Group { any, filters } => {
+                if filters.is_empty() {
+                    // Nothing to match for `any`, nothing to restrict for AND.
+                    return if *any { "0 = 1".into() } else { "1 = 1".into() };
+                }
+                let joiner = if *any { " OR " } else { " AND " };
+                let parts: Vec<String> = filters.iter().map(|f| f.render(dialect)).collect();
+                format!("({})", parts.join(joiner))
+            }
+            Filter::Not(filter) => format!("NOT ({})", filter.render(dialect)),
+            Filter::InQuery {
+                column,
+                table,
+                sub_column,
+                filters,
+            } => {
+                let condition = if filters.is_empty() {
+                    String::new()
+                } else {
+                    let parts: Vec<String> = filters.iter().map(|f| f.render(dialect)).collect();
+                    format!(" WHERE {}", parts.join(" AND "))
+                };
+                format!(
+                    "{column} IN (SELECT {sub_column} FROM {}{condition})",
+                    quote(table)
+                )
+            }
+        }
+    }
+}
 
 /// A long list of integers or of strings, as a JSON array.
 fn large_list(values: &[DbValue]) -> Option<(&'static str, serde_json::Value)> {
@@ -44,8 +128,7 @@ fn large_list(values: &[DbValue]) -> Option<(&'static str, serde_json::Value)> {
         .map(|texts| ("text", texts.into()))
 }
 
-fn json_in(rest: &str, dialect: Dialect) -> String {
-    let (kind, column) = rest.split_once(':').unwrap_or(("text", rest));
+fn json_in(kind: &str, column: &str, dialect: Dialect) -> String {
     match (dialect, kind) {
         (Dialect::Sqlite, _) => format!("{column} IN (SELECT value FROM json_each(?))"),
         (Dialect::Postgres, "int") => format!(
@@ -77,7 +160,7 @@ fn json_in(rest: &str, dialect: Dialect) -> String {
 /// Column names are checked against the model; an unknown column or operator
 /// makes the query return an error instead of running.
 pub struct Query<M> {
-    filters: Vec<String>,
+    filters: Vec<Filter>,
     binds: Vec<DbValue>,
     order: Vec<String>,
     limit: Option<u64>,
@@ -145,8 +228,11 @@ impl<M: Model> Query<M> {
             return self;
         }
         if let Some(column) = self.column(column) {
-            self.filters
-                .push(format!("{column} {} ?", op.to_uppercase()));
+            self.filters.push(match op.as_str() {
+                "like" => Filter::Like { column, not: false },
+                "not like" => Filter::Like { column, not: true },
+                _ => Filter::Sql(format!("{column} {} ?", op.to_uppercase())),
+            });
             self.binds.push(value.to_db_value());
         }
         self
@@ -158,38 +244,145 @@ impl<M: Model> Query<M> {
 
     pub fn where_null(mut self, column: &str) -> Self {
         if let Some(column) = self.column(column) {
-            self.filters.push(format!("{column} IS NULL"));
+            self.filters.push(Filter::Sql(format!("{column} IS NULL")));
         }
         self
     }
 
     pub fn where_not_null(mut self, column: &str) -> Self {
         if let Some(column) = self.column(column) {
-            self.filters.push(format!("{column} IS NOT NULL"));
+            self.filters
+                .push(Filter::Sql(format!("{column} IS NOT NULL")));
         }
         self
     }
 
-    pub fn where_in<V: ToDbValue>(
-        mut self,
+    pub fn where_in<V: ToDbValue>(self, column: &str, values: impl IntoIterator<Item = V>) -> Self {
+        self.in_list(column, values, false)
+    }
+
+    pub fn where_not_in<V: ToDbValue>(
+        self,
         column: &str,
         values: impl IntoIterator<Item = V>,
     ) -> Self {
+        self.in_list(column, values, true)
+    }
+
+    fn in_list<V: ToDbValue>(
+        mut self,
+        column: &str,
+        values: impl IntoIterator<Item = V>,
+        not: bool,
+    ) -> Self {
         let values: Vec<DbValue> = values.into_iter().map(|v| v.to_db_value()).collect();
         if let Some(column) = self.column(column) {
-            if values.is_empty() {
-                self.filters.push("0 = 1".into());
+            let filter = if values.is_empty() {
+                // Nothing is in an empty list.
+                Filter::Sql("0 = 1".into())
             } else if let Some((kind, list)) = large_list(&values) {
                 // Over the databases' bind limits: one JSON array instead.
-                self.filters.push(format!("{JSON_IN}{kind}:{column}"));
                 self.binds.push(DbValue::Json(list));
+                Filter::JsonIn { kind, column }
             } else {
                 let marks = vec!["?"; values.len()].join(", ");
-                self.filters.push(format!("{column} IN ({marks})"));
                 self.binds.extend(values);
-            }
+                Filter::Sql(format!("{column} IN ({marks})"))
+            };
+            self.filters.push(if not {
+                Filter::Not(Box::new(filter))
+            } else {
+                filter
+            });
         }
         self
+    }
+
+    /// `low <= column <= high`.
+    pub fn where_between(
+        mut self,
+        column: &str,
+        low: impl ToDbValue,
+        high: impl ToDbValue,
+    ) -> Self {
+        if let Some(column) = self.column(column) {
+            self.filters
+                .push(Filter::Sql(format!("{column} BETWEEN ? AND ?")));
+            self.binds.push(low.to_db_value());
+            self.binds.push(high.to_db_value());
+        }
+        self
+    }
+
+    /// Rows whose `column` is among `sub_column`'s values in another model's
+    /// query, e.g. products in active categories:
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # #[derive(Model, serde::Serialize, Default)] struct Product { id: i64, category_id: i64 }
+    /// # #[derive(Model, serde::Serialize, Default)] struct Category { id: i64, active: bool }
+    /// # async fn demo(db: Db) -> Result {
+    /// let products = Product::query()
+    ///     .where_in_query("category_id", Category::where_eq("active", true), "id")
+    ///     .get(&db)
+    ///     .await?;
+    /// # let _ = products; Ok(()) }
+    /// ```
+    pub fn where_in_query<N: Model>(
+        mut self,
+        column: &str,
+        mut sub: Query<N>,
+        sub_column: &str,
+    ) -> Self {
+        let sub_column = sub.column(sub_column);
+        let column = self.column(column);
+        if let Some(error) = sub.error.take() {
+            self.error.get_or_insert(error);
+        }
+        if let (Some(column), Some(sub_column)) = (column, sub_column) {
+            let trashed = sub.trashed_filter();
+            let mut filters = sub.filters;
+            filters.extend(trashed);
+            self.filters.push(Filter::InQuery {
+                column,
+                table: N::TABLE,
+                sub_column,
+                filters,
+            });
+            self.binds.extend(sub.binds);
+        }
+        self
+    }
+
+    /// Any of the conditions `group` adds must hold (`OR`), in parentheses:
+    /// `.where_any(|q| q.where_eq("status", "new").where_op("total", ">", 100))`.
+    pub fn where_any(self, group: impl FnOnce(Self) -> Self) -> Self {
+        self.group(true, group)
+    }
+
+    /// All of the conditions `group` adds must hold, in parentheses; useful
+    /// inside `where_any`: `.where_any(|q| q.where_eq("a", 1).where_all(|q| …))`.
+    pub fn where_all(self, group: impl FnOnce(Self) -> Self) -> Self {
+        self.group(false, group)
+    }
+
+    fn group(mut self, any: bool, group: impl FnOnce(Self) -> Self) -> Self {
+        let mut inner = group(Self::new());
+        if let Some(error) = inner.error.take() {
+            self.error.get_or_insert(error);
+        }
+        self.filters.push(Filter::Group {
+            any,
+            filters: inner.filters,
+        });
+        self.binds.extend(inner.binds);
+        self
+    }
+
+    /// Applies `add` only when `condition` holds, e.g. an optional search:
+    /// `.when(!q.is_empty(), |query| query.where_like("name", format!("%{q}%")))`.
+    pub fn when(self, condition: bool, add: impl FnOnce(Self) -> Self) -> Self {
+        if condition { add(self) } else { self }
     }
 
     pub fn order_by(mut self, column: &str) -> Self {
@@ -246,27 +439,21 @@ impl<M: Model> Query<M> {
         }
     }
 
-    fn where_sql(&self, dialect: Dialect) -> String {
-        let mut filters: Vec<String> = self
-            .filters
-            .iter()
-            .map(|filter| {
-                if let Some(rest) = filter.strip_prefix(JSON_IN) {
-                    return json_in(rest, dialect);
-                }
-                match filter.strip_suffix(" LIKE ?") {
-                    Some(head) if dialect == Dialect::Postgres => format!("{head} ILIKE ?"),
-                    _ => filter.clone(),
-                }
-            })
-            .collect();
-        if M::SOFT_DELETES {
-            match self.trashed {
-                Trashed::Without => filters.push("\"deleted_at\" IS NULL".into()),
-                Trashed::Only => filters.push("\"deleted_at\" IS NOT NULL".into()),
-                Trashed::With => {}
-            }
+    /// The soft-delete condition, if the model has soft deletes.
+    fn trashed_filter(&self) -> Option<Filter> {
+        if !M::SOFT_DELETES {
+            return None;
         }
+        match self.trashed {
+            Trashed::Without => Some(Filter::Sql("\"deleted_at\" IS NULL".into())),
+            Trashed::Only => Some(Filter::Sql("\"deleted_at\" IS NOT NULL".into())),
+            Trashed::With => None,
+        }
+    }
+
+    fn where_sql(&self, dialect: Dialect) -> String {
+        let mut filters: Vec<String> = self.filters.iter().map(|f| f.render(dialect)).collect();
+        filters.extend(self.trashed_filter().map(|f| f.render(dialect)));
         if filters.is_empty() {
             String::new()
         } else {
@@ -280,9 +467,12 @@ impl<M: Model> Query<M> {
         } else {
             M::COLUMNS.iter().map(|c| quote(c)).collect()
         };
+        self.select_columns_sql(dialect, &columns.join(", "))
+    }
+
+    fn select_columns_sql(&self, dialect: Dialect, columns: &str) -> String {
         let mut sql = format!(
-            "SELECT {} FROM {}{}",
-            columns.join(", "),
+            "SELECT {columns} FROM {}{}",
             quote(M::TABLE),
             self.where_sql(dialect)
         );
@@ -300,6 +490,220 @@ impl<M: Model> Query<M> {
             (None, None) => {}
         }
         sql
+    }
+
+    /// One aggregate over the matching rows (order and limit don't apply).
+    async fn aggregate<'c, T: FromDb, E: Executor<'c>>(
+        self,
+        db: E,
+        expression: String,
+    ) -> Result<T> {
+        self.check()?;
+        let db = db.into_conn();
+        let statement = format!(
+            "SELECT {expression} FROM {}{}",
+            quote(M::TABLE),
+            self.where_sql(db.dialect())
+        );
+        Ok(sql(statement).bind_all(self.binds).scalar(db).await?)
+    }
+
+    /// The sum of `column`, 0 without rows: `sum::<i64>(…)` for whole
+    /// numbers (money in its smallest unit), `sum::<f64>(…)` for measures.
+    pub async fn sum<'c, T: Number, E: Executor<'c>>(mut self, db: E, column: &str) -> Result<T> {
+        let Some(column) = self.column(column) else {
+            return Err(self.check().unwrap_err());
+        };
+        let expression = format!("CAST(COALESCE(SUM({column}), 0) AS {})", T::SQL_TYPE);
+        self.aggregate(db, expression).await
+    }
+
+    /// The average of `column`, or `None` without rows.
+    pub async fn avg<'c, E: Executor<'c>>(mut self, db: E, column: &str) -> Result<Option<f64>> {
+        let Some(column) = self.column(column) else {
+            return Err(self.check().unwrap_err());
+        };
+        self.aggregate(db, format!("CAST(AVG({column}) AS DOUBLE PRECISION)"))
+            .await
+    }
+
+    /// The smallest value of `column`, or `None` without rows.
+    pub async fn min<'c, T: FromDb, E: Executor<'c>>(
+        mut self,
+        db: E,
+        column: &str,
+    ) -> Result<Option<T>>
+    where
+        Option<T>: FromDb,
+    {
+        let Some(column) = self.column(column) else {
+            return Err(self.check().unwrap_err());
+        };
+        self.aggregate(db, format!("MIN({column})")).await
+    }
+
+    /// The largest value of `column`, or `None` without rows.
+    pub async fn max<'c, T: FromDb, E: Executor<'c>>(
+        mut self,
+        db: E,
+        column: &str,
+    ) -> Result<Option<T>>
+    where
+        Option<T>: FromDb,
+    {
+        let Some(column) = self.column(column) else {
+            return Err(self.check().unwrap_err());
+        };
+        self.aggregate(db, format!("MAX({column})")).await
+    }
+
+    /// One column of the matching rows, in the query's order:
+    /// `Product::query().order_by("name").pluck::<String, _>(&db, "name")`.
+    pub async fn pluck<'c, T: FromDb, E: Executor<'c>>(
+        mut self,
+        db: E,
+        column: &str,
+    ) -> Result<Vec<T>> {
+        let Some(column) = self.column(column) else {
+            return Err(self.check().unwrap_err());
+        };
+        self.check()?;
+        let db = db.into_conn();
+        let statement = self.select_columns_sql(db.dialect(), &column);
+        Ok(sql(statement).bind_all(self.binds).scalars(db).await?)
+    }
+
+    /// Sets columns on every matching row (and `updated_at` when the model
+    /// has it); returns how many changed.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # #[derive(Model, serde::Serialize, Default)] struct Order { id: i64, status: String, paid_at: Option<DateTime> }
+    /// # async fn demo(db: Db) -> Result {
+    /// Order::where_eq("status", "pending")
+    ///     .update(&db, &[("status", &"paid"), ("paid_at", &renox::db::now())])
+    ///     .await?;
+    /// # Ok(()) }
+    /// ```
+    pub async fn update<'c, E: Executor<'c>>(
+        mut self,
+        db: E,
+        values: &[(&str, &(dyn ToDbValue + Sync))],
+    ) -> Result<u64> {
+        let mut sets = Vec::new();
+        let mut binds = Vec::new();
+        for (column, value) in values {
+            if *column == "id" {
+                self.error
+                    .get_or_insert_with(|| "update can't change `id`".into());
+            }
+            if let Some(quoted) = self.column(column) {
+                sets.push(format!("{quoted} = ?"));
+                binds.push(value.to_db_value());
+            }
+        }
+        if M::COLUMNS.contains(&"updated_at") && !values.iter().any(|(c, _)| *c == "updated_at") {
+            sets.push(format!("{} = ?", quote("updated_at")));
+            binds.push(now().to_db_value());
+        }
+        if sets.is_empty() {
+            self.check()?;
+            return Ok(0);
+        }
+        self.set_rows(db, sets.join(", "), binds).await
+    }
+
+    /// Adds `by` to `column` on every matching row (negative to subtract),
+    /// in the database, so concurrent changes aren't lost:
+    /// `Product::where_eq("id", id).increment(&db, "stock", -1)`.
+    pub async fn increment<'c, E: Executor<'c>>(
+        mut self,
+        db: E,
+        column: &str,
+        by: i64,
+    ) -> Result<u64> {
+        let Some(quoted) = self.column(column) else {
+            return Err(self.check().unwrap_err());
+        };
+        let mut sets = format!("{quoted} = {quoted} + ?");
+        let mut binds = vec![DbValue::Integer(by)];
+        if M::COLUMNS.contains(&"updated_at") {
+            sets.push_str(&format!(", {} = ?", quote("updated_at")));
+            binds.push(now().to_db_value());
+        }
+        self.set_rows(db, sets, binds).await
+    }
+
+    async fn set_rows<'c, E: Executor<'c>>(
+        self,
+        db: E,
+        sets: String,
+        binds: Vec<DbValue>,
+    ) -> Result<u64> {
+        self.check()?;
+        let db = db.into_conn();
+        let statement = format!(
+            "UPDATE {} SET {sets}{}",
+            quote(M::TABLE),
+            self.where_sql(db.dialect())
+        );
+        Ok(sql(statement)
+            .bind_all(binds)
+            .bind_all(self.binds)
+            .execute(db)
+            .await?)
+    }
+
+    /// Like `first`, but no row becomes a 404 response.
+    pub async fn first_or_404<'c, E: Executor<'c>>(self, db: E) -> Result<M> {
+        self.first(db).await?.ok_or(crate::Error::NotFound)
+    }
+
+    /// The first matching row, or `make()` saved as a new one. If another
+    /// request creates it at the same moment (a unique index stops the
+    /// second insert), the row it created is returned.
+    pub async fn first_or_create(self, db: &Db, make: impl FnOnce() -> M) -> Result<M> {
+        if let Some(found) = self.clone().first(db).await? {
+            return Ok(found);
+        }
+        match M::create(db, make()).await {
+            Ok(created) => Ok(created),
+            Err(err) if err.is_unique_violation() => self.first(db).await?.ok_or(err),
+            Err(err) => Err(err),
+        }
+    }
+
+    /// Runs `each` on the matching rows `size` at a time, in id order, so a
+    /// large table never sits in memory at once. (The query's own order and
+    /// limit don't apply.)
+    pub async fn chunk<F, Fut>(self, db: &Db, size: u64, mut each: F) -> Result<u64>
+    where
+        F: FnMut(Vec<M>) -> Fut,
+        Fut: std::future::Future<Output = Result>,
+    {
+        let mut last = 0_i64;
+        let mut seen = 0_u64;
+        loop {
+            let mut page = self.clone();
+            page.order.clear();
+            page.limit = None;
+            page.offset = None;
+            let rows = page
+                .where_op("id", ">", last)
+                .order_by("id")
+                .limit(size.max(1))
+                .get(db)
+                .await?;
+            let Some(tail) = rows.last() else { break };
+            last = tail.id();
+            let full = rows.len() as u64 == size.max(1);
+            seen += rows.len() as u64;
+            each(rows).await?;
+            if !full {
+                break;
+            }
+        }
+        Ok(seen)
     }
 
     pub async fn get<'c, E: Executor<'c>>(self, db: E) -> Result<Vec<M>> {

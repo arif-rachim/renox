@@ -48,7 +48,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/error.rs             Error enum, IntoResponse, error pages, Debug for main()
   src/crypto.rs            APP_KEY parsing/generation, random tokens, constant_time_eq
   src/signed.rs            signed URLs (HMAC-SHA256) + ValidSignature extractor
-  src/db/                  Db/Transaction/Row/sql() (conn.rs), connect + TEST_DATABASE_URL (mod.rs), Model trait (model.rs), Query builder (query.rs), DbValue
+  src/db/                  relations.rs (belongs_to/has_many/Pivot), from_row.rs (FromRow + tuples),
+                           Db/Transaction/Row/sql() (conn.rs), connect + TEST_DATABASE_URL (mod.rs), Model trait (model.rs), Query builder (query.rs), DbValue
                            (value.rs), Paginated/Page (paginate.rs), migrator (migrate.rs), Factory
   src/validation/          Validator/rules (mod.rs), Valid<T> extractor (extract.rs), en/id messages
   src/auth/                User, hashing, login/logout, CurrentUser middleware, AuthUser, guards,
@@ -108,6 +109,7 @@ examples/crud/             the reference CRUD module (policy, soft deletes, pagi
 CHEATSHEET.md              one-page patterns for app authors/agents; its Rust is compiled as doctests
 llms.txt                   map for agents: which example/guide file shows what
 docs/postgresql.md         PostgreSQL guide for app authors
+docs/relations.md          relations without N+1, fetch_as/FromRow, query builder vs Laravel (doctested)
 docs/stability.md          semver scope, #[non_exhaustive] types, public-dependency policy (keep in sync
                            when adding public types or re-exports)
 docs/operations.md         production guide: timeouts, proxies, /health, failure table (kept in
@@ -526,6 +528,11 @@ and the integration tests are one binary. Result: rebuild after a core change 29
   and keeps unknown columns in `extra` (never password/sessions_revoked_at); `User::register`
   reads the row back. `Valid`'s logic is `validation::extract::validate_request` (with an
   extra-rules hook, used by `/register`).
+- M15a conventions: query conditions are `query::Filter` values (Sql, Like, JsonIn, Group, Not,
+  InQuery) rendered per dialect at execution, with binds kept in render order. `from_row` lives in
+  `db::FromRow` (supertrait of `Model`; derive(Model) emits both impls). Statements that run
+  several times on one executor use `Conn::reborrow()`. Aggregate sums are cast (`db::Number`,
+  sealed) so PostgreSQL's NUMERIC doesn't leak.
 - `target/` grows to ~100 GB over a few milestones and fills the disk (link errors, "No space left
   on device"); `cargo clean` it before the full two-database run.
 - This session's working directory (~/workspace/renoxium) isn't a git repo, so the Agent tool's
@@ -570,8 +577,9 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | Readiness vs Laravel review → ROADMAP M14a/b/c, M15 data layer, M16 DX & trust, M17 examples | merged to `main` |
 | M14a API foundations: non_exhaustive, stability doc + `DbError`, `abort`, route groups, app commands, pinned `rnx new` | merged to `main` |
 | M14b extension points: template hooks + number/date filters, `share`, `provide`/`Provided`, `App::layer`, `User` extra columns, registration hooks, async gates, semi-strict debug templates, debug error page | merged to `main` |
-| M14c mail (recipients, cc/bcc, reply-to, from, attachments) and notifications (custom channels, `Recipient`, `notify_later`) | PR from branch `m14c-mail-notifications` |
-| M15 data layer (ROADMAP M15) | next; then M16, M17, v1.0 |
+| M14c mail (recipients, cc/bcc, reply-to, from, attachments) and notifications (custom channels, `Recipient`, `notify_later`) | merged to `main` |
+| M15a query builder (groups, sub-queries, aggregates, bulk update/upsert, chunk), `FromRow` + `fetch_as`, `db::relations` (belongs_to, has_many, Pivot), docs/relations.md | PR from branch `m15a-query-builder-relations` |
+| M15b validation rules, `Vec<Upload>`, cookies, downloads (ROADMAP M15) | next; then M16, M17, v1.0 |
 | v1.0 docs site, starter kit, semver guarantee | last |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on

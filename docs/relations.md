@@ -1,0 +1,189 @@
+# Relations and queries beyond one table
+
+Renox has no Eloquent-style lazy relations: `product.category` doesn't quietly run a query. Rust
+has no reflection to build them from, and hidden queries are where N+1 problems come from.
+Instead, Renox gives you:
+- a foreign key column in the struct;
+- a method when you need one related row;
+- loaders that fetch the related rows of a whole page in one query;
+- plain SQL, read into structs, when a join is the clearest way.
+
+The examples below use this schema:
+
+```sql
+CREATE TABLE categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);
+CREATE TABLE products (id INTEGER PRIMARY KEY AUTOINCREMENT, category_id INTEGER REFERENCES categories (id),
+                       name TEXT NOT NULL, price INTEGER NOT NULL);
+CREATE TABLE reviews (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL REFERENCES products (id),
+                      stars INTEGER NOT NULL);
+CREATE TABLE tags (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);
+CREATE TABLE product_tags (product_id INTEGER NOT NULL, tag_id INTEGER NOT NULL, UNIQUE (product_id, tag_id));
+```
+
+## One related row, or the rows of one model
+
+Write a method. It is one line, it is typed, and the query it runs is visible where it's called:
+
+```rust
+use renox::prelude::*;
+
+#[derive(Model, serde::Serialize, Default, Clone)]
+#[model(table = "categories")]
+pub struct Category { pub id: i64, pub name: String }
+
+#[derive(Model, serde::Serialize, Default, Clone)]
+#[model(table = "products")]
+pub struct Product { pub id: i64, pub category_id: Option<i64>, pub name: String, pub price: i64 }
+
+#[derive(Model, serde::Serialize, Default, Clone)]
+#[model(table = "reviews")]
+pub struct Review { pub id: i64, pub product_id: i64, pub stars: i64 }
+
+impl Product {
+    /// belongs to
+    pub async fn category(&self, db: &Db) -> Result<Option<Category>> {
+        match self.category_id {
+            Some(id) => Category::find(db, id).await,
+            None => Ok(None),
+        }
+    }
+
+    /// has many
+    pub async fn reviews(&self, db: &Db) -> Result<Vec<Review>> {
+        Review::where_eq("product_id", self.id).order_by_desc("stars").get(db).await
+    }
+}
+```
+
+## A page of rows with their relations (no N+1)
+
+Calling `product.category(&db)` in a loop over 20 products runs 21 queries. The loaders in
+`renox::db::relations` fetch the related rows of the whole page in one query each, then you
+look them up by id:
+
+```rust
+use renox::prelude::*;
+use renox::db::relations::{Pivot, belongs_to, has_many};
+# #[derive(Model, serde::Serialize, Default, Clone)] #[model(table = "categories")] pub struct Category { pub id: i64, pub name: String }
+# #[derive(Model, serde::Serialize, Default, Clone)] #[model(table = "products")] pub struct Product { pub id: i64, pub category_id: Option<i64>, pub name: String, pub price: i64 }
+# #[derive(Model, serde::Serialize, Default, Clone)] #[model(table = "reviews")] pub struct Review { pub id: i64, pub product_id: i64, pub stars: i64 }
+# #[derive(Model, serde::Serialize, Default, Clone)] #[model(table = "tags")] pub struct Tag { pub id: i64, pub name: String }
+
+/// many to many, through a pivot table
+pub const PRODUCT_TAGS: Pivot = Pivot::new("product_tags", "product_id", "tag_id");
+
+/// What the template gets for each product.
+#[derive(serde::Serialize)]
+struct ProductCard {
+    #[serde(flatten)]
+    product: Product,
+    category: Option<Category>,
+    reviews: Vec<Review>,
+    tags: Vec<Tag>,
+}
+
+async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
+    let products = Product::query().order_by("name").paginate(&db, page, 20).await?; // 2 queries
+    let mut categories = belongs_to::<Category, _, _>(&db, &products.items, |p| p.category_id).await?; // 1
+    let mut reviews = has_many(&db, &products.items, Review::query().order_by_desc("stars"),
+                               "product_id", |r| r.product_id).await?; // 1
+    let mut tags = PRODUCT_TAGS.load_for::<Tag, _>(&db, &products.items).await?; // 2
+    let cards = products.map(|product| ProductCard {
+        category: product.category_id.and_then(|id| categories.remove(&id)),
+        reviews: reviews.remove(&product.id).unwrap_or_default(),
+        tags: tags.remove(&product.id).unwrap_or_default(),
+        product,
+    });
+    Ok(view("products/index.html", context! { products => cards }))
+}
+```
+
+In the template, `{{ card.category.name }}` and `{% for tag in card.tags %}` read plain data.
+Each loader takes the page's rows, so it works the same for `get()`, `paginate()` and `chunk()`.
+
+- `belongs_to::<Parent, _, _>(db, &children, |child| child.parent_id)` returns a
+  `HashMap<parent id, Parent>`. The key may be `i64` or `Option<i64>`.
+- `has_many(db, &parents, Child::query()…, "parent_id", |child| child.parent_id)` returns a
+  `HashMap<parent id, Vec<Child>>`. The query sets the children's order and filters.
+- `Pivot::load_for::<Target, _>(db, &parents)` / `load(db, ids)` returns a
+  `HashMap<parent id, Vec<Target>>`. `Pivot::inverse()` gives the other direction.
+- `Model::find_many(db, ids)` returns the rows with these ids.
+
+## Changing a many-to-many
+
+```rust
+# use renox::prelude::*;
+# use renox::db::relations::Pivot;
+# const PRODUCT_TAGS: Pivot = Pivot::new("product_tags", "product_id", "tag_id");
+# async fn demo(db: Db, product_id: i64, checked: Vec<i64>) -> Result {
+PRODUCT_TAGS.attach(&db, product_id, [1, 2]).await?; // adds links that aren't there yet
+PRODUCT_TAGS.detach(&db, product_id, [2]).await?;
+PRODUCT_TAGS.sync(&db, product_id, checked).await?;  // exactly these (a form's checkboxes), in a transaction
+let tag_ids = PRODUCT_TAGS.ids(&db, product_id).await?;
+# let _ = tag_ids; Ok(()) }
+```
+
+## Joins and reports: SQL read into structs
+
+A join or an aggregate is clearest as SQL. `fetch_as` reads the rows into:
+- a `#[derive(FromRow)]` struct (columns by name; `#[row(rename = "…")]`, `#[row(skip)]`);
+- a model;
+- a tuple (columns by position).
+
+```rust
+use renox::prelude::*;
+
+#[derive(FromRow, serde::Serialize)]
+struct CategorySales {
+    category: String,
+    products: i64,
+    revenue: i64,
+}
+
+# async fn demo(db: Db) -> Result {
+let sales: Vec<CategorySales> = renox::db::sql(
+    "SELECT c.name AS category, COUNT(p.id) AS products, CAST(SUM(p.price) AS BIGINT) AS revenue \
+     FROM categories c JOIN products p ON p.category_id = c.id \
+     GROUP BY c.name ORDER BY revenue DESC",
+)
+.fetch_as(&db)
+.await?;
+let names: Vec<(i64, String)> = renox::db::sql("SELECT id, name FROM products").fetch_as(&db).await?;
+# let _ = (sales, names); Ok(()) }
+```
+
+On PostgreSQL, `SUM` and `COUNT` of `BIGINT` come back as `NUMERIC` and `BIGINT`. Cast sums with
+`CAST(… AS BIGINT)`, as above, so the same struct reads on both databases.
+
+## Filtering by a related table without a join
+
+```rust
+# use renox::prelude::*;
+# #[derive(Model, serde::Serialize, Default)] #[model(table = "categories")] struct Category { id: i64, name: String, active: bool }
+# #[derive(Model, serde::Serialize, Default)] #[model(table = "products")] struct Product { id: i64, category_id: Option<i64>, name: String, price: i64 }
+# async fn demo(db: Db, q: String) -> Result {
+let products = Product::query()
+    .where_in_query("category_id", Category::where_eq("active", true), "id") // IN (SELECT id FROM categories …)
+    .when(!q.is_empty(), |query| {
+        query.where_any(|any| any.where_like("name", format!("%{q}%")).where_op("price", "<", 10_000))
+    })
+    .get(&db)
+    .await?;
+# let _ = products; Ok(()) }
+```
+
+## More of the query builder
+
+| Laravel | Renox |
+|---|---|
+| `where(fn …)` / `orWhere` | `.where_any(\|q\| …)` (OR), `.where_all(\|q\| …)` (AND), nestable |
+| `whereBetween`, `whereNotIn` | `.where_between(col, low, high)`, `.where_not_in(col, list)` |
+| `when($cond, fn …)` | `.when(cond, \|q\| …)` |
+| `sum`, `avg`, `min`, `max` | `.sum::<i64, _>(&db, col)`, `.avg(&db, col)`, `.min::<T, _>(…)`, `.max::<T, _>(…)` |
+| `pluck` | `.pluck::<T, _>(&db, col)` |
+| `update([...])` | `.update(&db, &[("status", &"paid")])`, which sets `updated_at` too |
+| `increment` / `decrement` | `.increment(&db, "stock", -1)` |
+| `firstOrFail`, `firstOrCreate` | `.first_or_404(&db)`, `.first_or_create(&db, \|\| new)` |
+| `chunk` | `.chunk(&db, 1000, \|rows\| async { … })` (by id) |
+| `insert([...])`, `upsert` | `Model::insert_many(&db, rows)`, `Model::upsert(&db, rows, &["sku"], &["qty"])` |
+| `with('category')` | `relations::belongs_to` / `has_many` / `Pivot::load_for` (above) |

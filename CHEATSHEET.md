@@ -241,11 +241,29 @@ async fn queries(db: &Db) -> Result {
         .await?;
     let one = Product::find_or_404(db, tea.id).await?; // missing row -> 404 page
     let total = Product::query().count(db).await?;
+    let q = "kopi";
+    let found = Product::query()
+        .where_any(|any| any.where_like("name", format!("%{q}%")).where_op("price", "<", 5_000)) // (… OR …)
+        .when(!q.is_empty(), |query| query.where_not_null("user_id"))
+        .where_between("price", 1_000, 50_000)
+        .get(db)
+        .await?;
+    let revenue = Product::query().sum::<i64, _>(db, "price").await?; // avg, min, max
+    let names: Vec<String> = Product::query().order_by("name").pluck(db, "name").await?;
+    Product::where_eq("user_id", 1).update(db, &[("price", &12_000)]).await?; // sets updated_at
+    Product::where_eq("id", tea.id).increment(db, "price", 500).await?;
+    let first = Product::where_eq("name", "Tea").first_or_404(db).await?;
+    Product::insert_many(db, vec![Product { name: "Kopi".into(), ..Default::default() }]).await?;
     tea.delete(db).await?; // soft delete; .with_trashed() / .only_trashed() / restore()
-    let _ = (cheap, one, total);
+    let _ = (cheap, one, total, found, revenue, names, first);
     Ok(())
 }
 ```
+
+Relations are explicit: a method for one related row, and loaders for a page of rows
+(`relations::belongs_to`, `has_many`, `Pivot` for many-to-many, one query each, no N+1).
+For joins and reports, use `sql("…").fetch_as::<T>(&db)` with `#[derive(FromRow)]` or a tuple.
+See [docs/relations.md](docs/relations.md).
 
 ## Every field type (details in docs/types.md)
 

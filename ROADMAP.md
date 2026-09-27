@@ -514,15 +514,24 @@ M14c · mail and notifications:
 
 ### M15 · v0.16: The data layer
 The biggest day-to-day gap for developers coming from Laravel (see "Readiness vs Laravel" in the
-audit). Explicit, typed, no magic; settled before the 1.0 freeze.
-- [ ] Query builder: `select(&[..])`, `or_where` / grouped conditions, `where_between`,
-      `where_not_in`, `sum`/`avg`/`min`/`max`, `pluck`, bulk `update`, `increment`,
-      `upsert` / `insert_many`, `first_or_create`, `chunk`, `when()`, and a simple `join` with
-      checked column names
-- [ ] `sql(..).fetch_as::<T>()` for models and `FromRow` structs
-- [ ] Relations as explicit helpers: `belongs_to` / `has_many`, eager loading of a page's
-      relations in one query (`load_many` via `where_in`, no N+1), many-to-many through a
-      pivot table; a `docs/relations.md` guide
+audit). Explicit, typed, no magic; settled before the 1.0 freeze. Two PRs.
+
+M15a · queries and relations:
+- [x] Query builder: `where_any` / `where_all` (nested OR / AND groups), `where_between`,
+      `where_not_in`, `when()`, `where_in_query` (a sub-query instead of a join),
+      `sum::<i64|f64>` / `avg` / `min` / `max`, `pluck`, bulk `update` (sets `updated_at`),
+      `increment`, `first_or_404`, `first_or_create` (race-safe with a unique index), `chunk` (by
+      id); `Model::find_many`, `insert_many` and `upsert` (chunked under the bind limit). A
+      column-picking `select` isn't offered on model queries (a model needs its columns); joins
+      and projections use `fetch_as`
+- [x] `sql(..).fetch_as::<T>()` / `fetch_one_as` / `fetch_optional_as` with the new `FromRow`
+      trait: `#[derive(FromRow)]` (`rename`, `skip`), models (`Model: FromRow`) and tuples
+- [x] Relations as explicit helpers (`db::relations`): `belongs_to`, `has_many` (with the
+      children's query for order and filters), `Pivot` with `attach` / `detach` / `sync` / `ids` /
+      `load` / `load_for` / `inverse`; each loads a page's related rows in one query;
+      [docs/relations.md](docs/relations.md) (compiled as a doctest)
+
+M15b · validation and requests:
 - [ ] Validation: `regex`, dates (`before`/`after`), `digits`, `in`/`not_in`, `required_if` /
       `required_with`, `same`/`different`, rules for each item of a `Vec`, a `Rule` trait for
       reusable rules

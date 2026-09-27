@@ -3,6 +3,7 @@
 
 mod db_enum;
 mod embedded;
+mod from_row;
 mod migrations;
 mod model;
 
@@ -33,6 +34,30 @@ use syn::{DeriveInput, parse_macro_input};
 pub fn derive_model(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     model::expand(input)
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
+}
+
+/// Implements `renox::db::FromRow`, so `sql(…).fetch_as::<T>()` can read
+/// rows of any query (joins, aggregates, a few columns) into the struct.
+///
+/// ```ignore
+/// #[derive(FromRow, Serialize)]
+/// struct ProductRow {
+///     id: i64,
+///     name: String,
+///     #[row(rename = "category_name")]
+///     category: Option<String>,
+///     #[row(skip)]
+///     note: String, // Default
+/// }
+/// ```
+///
+/// `derive(Model)` implements `FromRow` too.
+#[proc_macro_derive(FromRow, attributes(row))]
+pub fn derive_from_row(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    from_row::expand(input)
         .unwrap_or_else(|err| err.to_compile_error())
         .into()
 }

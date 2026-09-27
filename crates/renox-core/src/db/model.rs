@@ -1,6 +1,6 @@
 use std::future::Future;
 
-use super::{DateTime, DbValue, Executor, Query, Row, ToDbValue, now, quote, sql};
+use super::{DateTime, DbValue, Executor, Query, ToDbValue, now, quote, sql};
 use crate::{Error, Result};
 use anyhow::anyhow;
 
@@ -28,7 +28,7 @@ use anyhow::anyhow;
 /// ```
 ///
 /// The primary key is an `id: i64` column; `0` means "not saved yet".
-pub trait Model: Sized + Send + Sync + Unpin + 'static {
+pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
     const TABLE: &'static str;
     /// Every column, including `id`.
     const COLUMNS: &'static [&'static str];
@@ -42,7 +42,6 @@ pub trait Model: Sized + Send + Sync + Unpin + 'static {
 
     fn id(&self) -> i64;
     fn set_id(&mut self, id: i64);
-    fn from_row(row: &Row) -> std::result::Result<Self, super::DbError>;
     /// Values of every column except `id`, in `COLUMNS` order.
     fn values(&self) -> Vec<DbValue>;
     /// Updates `created_at` / `updated_at` if the model has them.
@@ -68,6 +67,61 @@ pub trait Model: Sized + Send + Sync + Unpin + 'static {
         id: i64,
     ) -> impl Future<Output = Result<Option<Self>>> + Send {
         Self::query().where_eq("id", id).first(db)
+    }
+
+    /// The rows with these ids, in id order (missing ids are skipped).
+    fn find_many<'c, E: Executor<'c>>(
+        db: E,
+        ids: impl IntoIterator<Item = i64>,
+    ) -> impl Future<Output = Result<Vec<Self>>> + Send {
+        let ids: Vec<i64> = ids.into_iter().collect();
+        Self::query().where_in("id", ids).order_by("id").get(db)
+    }
+
+    /// Inserts many new models with a few statements (ids aren't returned;
+    /// use `create` when you need them). Timestamps are set. Returns the
+    /// number of rows inserted.
+    fn insert_many<'c, E: Executor<'c>>(
+        db: E,
+        models: Vec<Self>,
+    ) -> impl Future<Output = Result<u64>> + Send {
+        async move { write_many::<Self>(db.into_conn(), models, None).await }
+    }
+
+    /// Inserts `models`, or updates the rows they clash with on the
+    /// `unique_by` columns (which need a unique index), setting `update`
+    /// columns (and `updated_at` when the model has it). Returns the rows
+    /// written.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # #[derive(Model, serde::Serialize, Default)] struct Stock { id: i64, sku: String, qty: i64 }
+    /// # async fn demo(db: Db) -> Result {
+    /// let feed = vec![Stock { sku: "KOPI-1".into(), qty: 12, ..Default::default() }];
+    /// Stock::upsert(&db, feed, &["sku"], &["qty"]).await?;
+    /// # Ok(()) }
+    /// ```
+    fn upsert<'c, E: Executor<'c>>(
+        db: E,
+        models: Vec<Self>,
+        unique_by: &[&str],
+        update: &[&str],
+    ) -> impl Future<Output = Result<u64>> + Send {
+        let unique_by: Vec<String> = unique_by.iter().map(|c| (*c).to_owned()).collect();
+        let update: Vec<String> = update.iter().map(|c| (*c).to_owned()).collect();
+        async move {
+            for column in unique_by.iter().chain(&update) {
+                if !Self::COLUMNS.contains(&column.as_str()) || column == "id" {
+                    return Err(
+                        anyhow!("`{}` has no column `{column}` to upsert", Self::TABLE).into(),
+                    );
+                }
+            }
+            if unique_by.is_empty() {
+                return Err(anyhow!("upsert needs at least one `unique_by` column").into());
+            }
+            write_many::<Self>(db.into_conn(), models, Some((unique_by, update))).await
+        }
     }
 
     /// Like `find`, but a missing row becomes a 404 response.
@@ -183,4 +237,61 @@ pub trait Model: Sized + Send + Sync + Unpin + 'static {
             Ok(())
         }
     }
+}
+
+/// Most parameters one statement binds; both databases allow more
+/// (SQLite 32,766, PostgreSQL 65,535).
+const MAX_BINDS: usize = 30_000;
+
+/// `insert_many` / `upsert`: multi-row INSERTs in chunks under the bind limit.
+async fn write_many<M: Model>(
+    mut conn: super::Conn<'_>,
+    mut models: Vec<M>,
+    upsert: Option<(Vec<String>, Vec<String>)>,
+) -> Result<u64> {
+    let at = now();
+    for model in &mut models {
+        model.touch(at, true);
+    }
+    let columns: Vec<&str> = M::COLUMNS.iter().copied().filter(|c| *c != "id").collect();
+    if columns.is_empty() || models.is_empty() {
+        return Ok(0);
+    }
+    let quoted: Vec<String> = columns.iter().map(|c| quote(c)).collect();
+    let row_marks = format!("({})", vec!["?"; columns.len()].join(", "));
+    let conflict = upsert.map(|(unique_by, update)| {
+        let targets: Vec<String> = unique_by.iter().map(|c| quote(c)).collect();
+        let mut sets: Vec<String> = update
+            .iter()
+            .map(|c| format!("{0} = excluded.{0}", quote(c)))
+            .collect();
+        if columns.contains(&"updated_at") && !update.iter().any(|c| c == "updated_at") {
+            sets.push(format!("{0} = excluded.{0}", quote("updated_at")));
+        }
+        if sets.is_empty() {
+            format!(" ON CONFLICT ({}) DO NOTHING", targets.join(", "))
+        } else {
+            format!(
+                " ON CONFLICT ({}) DO UPDATE SET {}",
+                targets.join(", "),
+                sets.join(", ")
+            )
+        }
+    });
+    let per_statement = (MAX_BINDS / columns.len()).max(1);
+    let mut written = 0;
+    for chunk in models.chunks(per_statement) {
+        let marks = vec![row_marks.as_str(); chunk.len()].join(", ");
+        let statement = format!(
+            "INSERT INTO {} ({}) VALUES {marks}{}",
+            quote(M::TABLE),
+            quoted.join(", "),
+            conflict.as_deref().unwrap_or_default()
+        );
+        written += sql(statement)
+            .bind_all(chunk.iter().flat_map(Model::values))
+            .execute(conn.reborrow())
+            .await?;
+    }
+    Ok(written)
 }

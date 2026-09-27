@@ -133,7 +133,10 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
         }
     });
 
+    let from_row_impl = crate::from_row::from_row_impl(ident, quote! { #(#from_row),* });
     Ok(quote! {
+        #from_row_impl
+
         impl ::renox::db::Model for #ident {
             const TABLE: &'static str = #table;
             const COLUMNS: &'static [&'static str] = &[#(#columns),*];
@@ -145,12 +148,6 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
 
             fn set_id(&mut self, id: i64) {
                 self.id = id;
-            }
-
-            fn from_row(
-                row: &::renox::db::Row,
-            ) -> ::core::result::Result<Self, ::renox::db::DbError> {
-                ::core::result::Result::Ok(Self { #(#from_row),* })
             }
 
             fn values(&self) -> ::std::vec::Vec<::renox::db::DbValue> {

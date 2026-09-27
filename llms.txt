@@ -67,6 +67,8 @@
 - [docs/operations.md](docs/operations.md): running in production: timeouts, `TRUSTED_PROXIES`,
   `/health`, what happens when the database or SMTP fails, recovering failed jobs and webhook
   calls, backups, migrations at deploy, maintenance mode.
+- [docs/relations.md](docs/relations.md): relations without N+1 (`belongs_to`, `has_many`, `Pivot`),
+  joins with `fetch_as` and `#[derive(FromRow)]`, the query builder mapped to Laravel's.
 - [docs/stability.md](docs/stability.md): what semver covers, which types may grow
   (`#[non_exhaustive]`), public dependencies (axum yes, sqlx only through escape hatches).
 - `rnx make:deploy` writes `deploy/README.md` (Docker, systemd, Litestream backups).

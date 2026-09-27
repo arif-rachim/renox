@@ -5,11 +5,13 @@
 mod conn;
 mod error;
 mod factory;
+mod from_row;
 mod json;
 mod migrate;
 mod model;
 mod paginate;
 mod query;
+pub mod relations;
 mod value;
 
 use std::str::FromStr;
@@ -25,12 +27,13 @@ pub use conn::{Db, Dialect, Executor, FromDb, Row, RowIndex, Sql, Transaction, s
 pub(crate) use conn::{RowInner, script};
 pub use error::DbError;
 pub use factory::Factory;
+pub use from_row::FromRow;
 pub use json::Json;
 pub use migrate::{Migration, MigrationStatus, Scripts};
 pub(crate) use migrate::{Migrator, framework_migration};
 pub use model::Model;
 pub use paginate::{Page, Paginated};
-pub use query::Query;
+pub use query::{Number, Query};
 /// sqlx, for what Renox's own API doesn't cover: `Db::sqlite()`, `Db::postgres()`,
 /// `Row::sqlite()`, `Row::postgres()` and `DbError::sqlx()` hand out its types.
 /// sqlx may move to a new version in a minor Renox release; see docs/stability.md.
