@@ -181,7 +181,7 @@ async fn guests_are_sent_to_login() {
 ```
 
 ```bash
-rnx make:module products                          # also make:model -m, make:policy, make:job, make:mail
+rnx make:module products                          # also make:model -m, make:policy, make:job, make:command, make:mail
 rnx route:list                                    # every route with its name, module and guards
 rnx db:shell                                      # SQL prompt, no sqlite3/psql needed
 rnx build && rnx make:deploy                      # dist/shop + Dockerfile, systemd, Litestream

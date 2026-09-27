@@ -214,6 +214,17 @@ impl App {
         self
     }
 
+    /// Adds a command the app binary runs: `my-app <name> [args]`, e.g. to
+    /// create the first admin or run an import. See [`crate::command`].
+    pub fn command<F, Fut>(mut self, name: &str, about: &str, run: F) -> Self
+    where
+        F: Fn(AppState, crate::command::Args) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result> + Send + 'static,
+    {
+        self.registry.command(name, about, run);
+        self
+    }
+
     /// Defines scheduled tasks.
     pub fn schedule(mut self, define: impl FnOnce(&mut Schedule)) -> Self {
         define(self.registry.schedule());
@@ -243,10 +254,12 @@ impl App {
             schedule,
             duplicate_job,
             webhooks,
+            commands,
         } = self.registry;
         if let Some(name) = duplicate_job {
             return Err(anyhow!("job `{name}` is registered twice").into());
         }
+        check_commands(&commands)?;
         schedule.check()?;
         let offset = parse_offset(&config.timezone)?;
 
@@ -367,6 +380,7 @@ impl App {
             handlers: Arc::new(jobs),
             schedule,
             offset,
+            commands,
         })
     }
 
@@ -382,18 +396,25 @@ impl App {
         tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()?
-            .block_on(self.command(&args))
+            .block_on(self.run_command(&args))
     }
 
     /// Starts the server on the current Tokio runtime.
     pub async fn serve(self) -> Result {
-        self.command(&[]).await
+        self.run_command(&[]).await
     }
 
-    async fn command(self, args: &[String]) -> Result {
+    async fn run_command(self, args: &[String]) -> Result {
         let command = args.first().map(String::as_str).unwrap_or("serve");
         if matches!(command, "help" | "--help" | "-h") {
-            println!("{USAGE}");
+            // Modules add their commands in `register`, which boot runs.
+            let mut modules = Registry::default();
+            for module in &self.modules {
+                module.register(&mut modules);
+            }
+            let mut commands = self.registry.commands.clone();
+            commands.extend(modules.commands);
+            println!("{USAGE}{}", app_commands_help(&commands));
             return Ok(());
         }
 
@@ -560,10 +581,70 @@ impl App {
                 true => println!("The app is up."),
                 false => println!("The app was not down."),
             },
-            other => return Err(anyhow!("unknown command `{other}`\n\n{USAGE}").into()),
+            other if kernel.commands.iter().any(|c| c.name == other) => {
+                kernel.call(other, args[1..].iter().cloned()).await?;
+            }
+            other => {
+                return Err(anyhow!(
+                    "unknown command `{other}`\n\n{USAGE}{}",
+                    app_commands_help(&kernel.commands)
+                )
+                .into());
+            }
         }
         Ok(())
     }
+}
+
+/// Built-in commands; an app command can't take one of these names.
+const BUILT_IN_COMMANDS: &[&str] = &[
+    "serve",
+    "migrate",
+    "migrate:rollback",
+    "migrate:fresh",
+    "migrate:status",
+    "db:seed",
+    "queue:work",
+    "queue:failed",
+    "queue:retry",
+    "queue:flush",
+    "webhook:failed",
+    "webhook:retry",
+    "schedule:list",
+    "schedule:work",
+    "route:list",
+    "db:shell",
+    "down",
+    "up",
+    "help",
+];
+
+fn check_commands(commands: &[crate::command::Command]) -> Result {
+    let mut seen = std::collections::HashSet::new();
+    for command in commands {
+        let name = command.name.as_str();
+        if name.is_empty() || name.starts_with('-') || name.contains(char::is_whitespace) {
+            return Err(anyhow!("`{name}` is not a valid command name").into());
+        }
+        if BUILT_IN_COMMANDS.contains(&name) {
+            return Err(anyhow!("the command `{name}` is built in; choose another name").into());
+        }
+        if !seen.insert(name) {
+            return Err(anyhow!("the command `{name}` is registered twice").into());
+        }
+    }
+    Ok(())
+}
+
+fn app_commands_help(commands: &[crate::command::Command]) -> String {
+    if commands.is_empty() {
+        return String::new();
+    }
+    let mut out = String::from("\n\nApp commands:\n");
+    for command in commands {
+        out.push_str(&format!("  {:<26}{}\n", command.name, command.about));
+    }
+    out.trim_end().to_owned()
 }
 
 impl Default for App {
@@ -582,9 +663,24 @@ pub struct Kernel {
     handlers: Handlers,
     schedule: Schedule,
     offset: i64,
+    commands: Vec<crate::command::Command>,
 }
 
 impl Kernel {
+    /// Runs the app command `name` (see [`App::command`]), e.g. from a test.
+    pub async fn call(
+        &self,
+        name: &str,
+        args: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Result {
+        let command = self
+            .commands
+            .iter()
+            .find(|c| c.name == name)
+            .ok_or_else(|| anyhow!("unknown command `{name}`"))?;
+        (command.run)(self.state.clone(), crate::command::Args::new(args)).await
+    }
+
     pub fn router(&self) -> Router {
         self.router.clone()
     }

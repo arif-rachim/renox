@@ -41,11 +41,12 @@ impl Module for Area {
 }
 
 async fn kernel(auth: Auth) -> Kernel {
-    let config = Config {
-        env: Environment::Testing,
-        key: Some(renox::generate_key()),
-        views_path: std::env::temp_dir().join("renox-no-views"),
-        ..Config::default()
+    let config = {
+        let mut c = Config::default();
+        c.env = Environment::Testing;
+        c.key = Some(renox::generate_key());
+        c.views_path = std::env::temp_dir().join("renox-no-views");
+        c
     };
     let kernel = App::with_config(config)
         .module(auth)

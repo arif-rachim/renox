@@ -10,6 +10,7 @@ use crate::storage::StorageConfig;
 
 /// The environment the application runs in, from `APP_ENV`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Environment {
     Local,
     Testing,
@@ -29,6 +30,7 @@ impl Environment {
 
 /// How strict the Content-Security-Policy header is, from `CSP`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub enum CspMode {
     /// Scripts from this site, inline scripts and `eval` (which Alpine.js's
     /// standard build needs) are allowed; other sites' scripts, framing by
@@ -57,6 +59,7 @@ impl CspMode {
 
 /// Application configuration, read from the process environment and `.env`.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Config {
     pub name: String,
     pub env: Environment,
@@ -128,6 +131,7 @@ pub struct Config {
 /// `GOOGLE_SITE_VERIFICATION`, `GA4_MEASUREMENT_ID`, `GA4_API_SECRET` and
 /// `GTM_CONTAINER_ID`. Tags are added to pages only in production.
 #[derive(Debug, Clone, Default)]
+#[non_exhaustive]
 pub struct AnalyticsConfig {
     /// The `content` of Search Console's `google-site-verification` meta tag.
     pub google_site_verification: Option<String>,

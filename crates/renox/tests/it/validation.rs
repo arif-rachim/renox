@@ -78,12 +78,13 @@ async fn kernel(locale: &str) -> (Kernel, tempfile::TempDir) {
         r#"<input name="nama" value="{{ old('nama') }}"><input name="password" value="{{ old('password') }}"><p data-error-for="nama">{{ error('nama') }}</p><p>{{ error('harga') }}</p>{{ csrf_token }}"#,
     )
     .unwrap();
-    let config = Config {
-        env: Environment::Testing,
-        key: Some(renox::generate_key()),
-        views_path: dir.path().to_path_buf(),
-        locale: locale.into(),
-        ..Config::default()
+    let config = {
+        let mut c = Config::default();
+        c.env = Environment::Testing;
+        c.key = Some(renox::generate_key());
+        c.views_path = dir.path().to_path_buf();
+        c.locale = locale.into();
+        c
     };
     let kernel = App::with_config(config)
         .migrations(renox::migrations!("tests/migrations"))

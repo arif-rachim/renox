@@ -38,6 +38,7 @@ pub struct Routes {
 
 /// One route as `route:list` shows it.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct RouteInfo {
     /// `GET`, `POST`, … or `*` for a `route()` whose methods Renox can't see.
     pub method: String,
@@ -241,6 +242,60 @@ impl Routes {
         self.router = self.router.merge(other.router);
         self.names.extend(other.names);
         self.listing.extend(other.listing);
+        self.last_path = None;
+        self
+    }
+
+    /// Adds `routes` under a path prefix and a name prefix, like Laravel's
+    /// `Route::prefix('admin')->name('admin.')->group(…)`. Guards added to
+    /// `routes` cover only them; guards added after the group cover
+    /// everything added so far, as usual.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # async fn dashboard() {}
+    /// # async fn users() {}
+    /// # let _ =
+    /// Routes::new().group(
+    ///     "/admin",
+    ///     "admin.",
+    ///     Routes::new()
+    ///         .get("/", dashboard).name("dashboard") // GET /admin, `admin.dashboard`
+    ///         .get("/users", users).name("users")    // GET /admin/users, `admin.users`
+    ///         .require_auth(),
+    /// )
+    /// # ;
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// If `path` doesn't start with `/` or ends with `/`.
+    pub fn group(mut self, path: &str, name: &str, routes: impl Into<Routes>) -> Self {
+        assert!(
+            path.starts_with('/') && !path.ends_with('/'),
+            "Routes::group(\"{path}\", …): the prefix must start with `/` and not end with one"
+        );
+        let routes = routes.into();
+        let join = |inner: &str| {
+            if inner == "/" {
+                path.to_owned()
+            } else {
+                format!("{path}{inner}")
+            }
+        };
+        self.router = self.router.nest(path, routes.router);
+        self.names.extend(
+            routes
+                .names
+                .into_iter()
+                .map(|(route_name, route_path)| (format!("{name}{route_name}"), join(&route_path))),
+        );
+        self.listing
+            .extend(routes.listing.into_iter().map(|info| RouteInfo {
+                path: join(&info.path),
+                name: info.name.map(|route_name| format!("{name}{route_name}")),
+                ..info
+            }));
         self.last_path = None;
         self
     }

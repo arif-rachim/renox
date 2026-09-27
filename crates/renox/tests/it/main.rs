@@ -2,6 +2,7 @@
 //! executable against sqlx, axum and friends is much faster than linking ten.
 //! Fixtures (`tests/migrations*`) are read relative to the crate root.
 
+mod api_foundations;
 mod auth;
 mod auth_email;
 mod background_resilience;

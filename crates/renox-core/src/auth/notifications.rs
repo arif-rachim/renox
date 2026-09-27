@@ -38,6 +38,7 @@ use crate::{AppState, Result};
 
 /// Where a notification goes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Channel {
     /// Sent now with `state.mailer` (dispatch a job to send it later).
     Mail,
@@ -64,6 +65,7 @@ pub trait Notification: Send + Sync {
 
 /// A stored notification.
 #[derive(Debug, Clone, Serialize)]
+#[non_exhaustive]
 pub struct DatabaseNotification {
     pub id: i64,
     pub kind: String,

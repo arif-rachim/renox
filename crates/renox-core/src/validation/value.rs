@@ -2,6 +2,7 @@ use crate::db::{DbValue, ToDbValue};
 
 /// What a rule sees of a field's value.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum Inspected {
     /// `None`, or text that is empty after trimming.
     Missing,

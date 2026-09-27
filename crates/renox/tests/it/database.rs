@@ -48,11 +48,12 @@ fn produk(nama: &str, harga: i64, kategori: Option<&str>) -> Produk {
 }
 
 fn config(views: &std::path::Path) -> Config {
-    Config {
-        env: Environment::Testing,
-        key: Some(renox::generate_key()),
-        views_path: views.to_path_buf(),
-        ..Config::default()
+    {
+        let mut c = Config::default();
+        c.env = Environment::Testing;
+        c.key = Some(renox::generate_key());
+        c.views_path = views.to_path_buf();
+        c
     }
 }
 
@@ -174,9 +175,10 @@ async fn duplicate_migrations_fail_at_boot() {
 async fn file_databases_use_wal_and_create_their_directory() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("storage/app.db");
-    let config = Config {
-        database_url: format!("sqlite://{}", path.display()),
-        ..config(dir.path())
+    let config = {
+        let mut c = config(dir.path());
+        c.database_url = format!("sqlite://{}", path.display());
+        c
     };
     let kernel = App::with_config(config).boot().await.unwrap();
     let mode: String = renox::db::sql("PRAGMA journal_mode")

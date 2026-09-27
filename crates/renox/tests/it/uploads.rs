@@ -74,13 +74,14 @@ async fn kernel(dir: &std::path::Path, upload_max_size: usize) -> Kernel {
         r#"<input name="name" value="{{ old('name') }}">{{ error('photo') }}"#,
     )
     .unwrap();
-    let config = Config {
-        env: Environment::Testing,
-        key: Some(renox::generate_key()),
-        views_path: dir.join("views"),
-        storage_path: dir.join("storage"),
-        upload_max_size,
-        ..Config::default()
+    let config = {
+        let mut c = Config::default();
+        c.env = Environment::Testing;
+        c.key = Some(renox::generate_key());
+        c.views_path = dir.join("views");
+        c.storage_path = dir.join("storage");
+        c.upload_max_size = upload_max_size;
+        c
     };
     let kernel = App::with_config(config).module(Shop).boot().await.unwrap();
     kernel.migrate().await.unwrap();
@@ -444,12 +445,10 @@ async fn private_files_need_a_temporary_url() {
 #[tokio::test]
 async fn s3_needs_the_feature() {
     let dir = tempfile::tempdir().unwrap();
-    let config = Config {
-        storage: renox::storage::StorageConfig {
-            disk: "s3".into(),
-            ..Default::default()
-        },
-        ..Config::default()
+    let config = {
+        let mut c = Config::default();
+        c.storage.disk = "s3".into();
+        c
     };
     let _ = dir;
     let err = App::with_config(config).boot().await.err().unwrap();

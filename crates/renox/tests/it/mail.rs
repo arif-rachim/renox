@@ -11,12 +11,13 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tower::ServiceExt;
 
 fn config(dir: &std::path::Path) -> Config {
-    Config {
-        env: Environment::Testing,
-        key: Some(renox::generate_key()),
-        views_path: dir.to_path_buf(),
-        name: "Toko Kopi".into(),
-        ..Config::default()
+    {
+        let mut c = Config::default();
+        c.env = Environment::Testing;
+        c.key = Some(renox::generate_key());
+        c.views_path = dir.to_path_buf();
+        c.name = "Toko Kopi".into();
+        c
     }
 }
 
@@ -118,9 +119,10 @@ async fn get(kernel: &Kernel, uri: &str) -> (StatusCode, String) {
 #[tokio::test]
 async fn sent_mail_can_be_previewed_in_debug_only() {
     let dir = views();
-    let kernel = kernel_with(Config {
-        debug: true,
-        ..config(dir.path())
+    let kernel = kernel_with({
+        let mut c = config(dir.path());
+        c.debug = true;
+        c
     })
     .await;
     let mail = Mail::new("budi@example.com", "Halo <Budi>", "teks").html("<p>\"html\" & more</p>");
@@ -145,9 +147,10 @@ async fn sent_mail_can_be_previewed_in_debug_only() {
         StatusCode::NOT_FOUND
     );
 
-    let production = kernel_with(Config {
-        debug: false,
-        ..config(dir.path())
+    let production = kernel_with({
+        let mut c = config(dir.path());
+        c.debug = false;
+        c
     })
     .await;
     assert_eq!(
@@ -198,17 +201,19 @@ async fn fake_smtp() -> (u16, Arc<Mutex<String>>) {
 async fn smtp_sends_multipart_mail() {
     let dir = views();
     let (port, received) = fake_smtp().await;
-    let smtp = MailConfig {
-        mailer: "smtp".into(),
-        host: "127.0.0.1".into(),
-        port: Some(port),
-        encryption: "none".into(),
-        from_address: "toko@example.com".into(),
-        ..MailConfig::default()
+    let smtp = {
+        let mut mail = MailConfig::default();
+        mail.mailer = "smtp".into();
+        mail.host = "127.0.0.1".into();
+        mail.port = Some(port);
+        mail.encryption = "none".into();
+        mail.from_address = "toko@example.com".into();
+        mail
     };
-    let kernel = kernel_with(Config {
-        mail: smtp,
-        ..config(dir.path())
+    let kernel = kernel_with({
+        let mut c = config(dir.path());
+        c.mail = smtp;
+        c
     })
     .await;
     let mail = kernel
@@ -240,32 +245,36 @@ async fn bad_mail_settings_fail_at_boot() {
     let dir = views();
     for (mail, expected) in [
         (
-            MailConfig {
-                mailer: "sendgrid".into(),
-                ..MailConfig::default()
+            {
+                let mut mail = MailConfig::default();
+                mail.mailer = "sendgrid".into();
+                mail
             },
             "MAIL_MAILER",
         ),
         (
-            MailConfig {
-                mailer: "smtp".into(),
-                encryption: "ssl3".into(),
-                ..MailConfig::default()
+            {
+                let mut mail = MailConfig::default();
+                mail.mailer = "smtp".into();
+                mail.encryption = "ssl3".into();
+                mail
             },
             "MAIL_ENCRYPTION",
         ),
         (
-            MailConfig {
-                mailer: "smtp".into(),
-                from_address: "not an address".into(),
-                ..MailConfig::default()
+            {
+                let mut mail = MailConfig::default();
+                mail.mailer = "smtp".into();
+                mail.from_address = "not an address".into();
+                mail
             },
             "MAIL_FROM_ADDRESS",
         ),
     ] {
-        let err = App::with_config(Config {
-            mail,
-            ..config(dir.path())
+        let err = App::with_config({
+            let mut c = config(dir.path());
+            c.mail = mail;
+            c
         })
         .boot()
         .await

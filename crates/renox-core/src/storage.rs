@@ -231,6 +231,7 @@ fn encode_path(key: &str) -> String {
 
 /// Settings for `state.storage`, from `STORAGE_DISK` and `S3_*`.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct StorageConfig {
     /// `local` or `s3`.
     pub disk: String,

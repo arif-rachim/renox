@@ -13,8 +13,8 @@ use std::fmt;
 use sqlx::sqlite::{Sqlite, SqliteArguments, SqlitePool, SqliteRow};
 use sqlx::{AssertSqlSafe, Column, Row as _};
 
-use super::ToDbValue;
 use super::value::DbValue;
+use super::{DbError, ToDbValue};
 
 #[cfg(feature = "postgres")]
 use sqlx::postgres::{PgArguments, PgPool, PgRow, Postgres};
@@ -106,7 +106,7 @@ impl Db {
 
     /// Starts a transaction. Pass `&mut tx` wherever a `&db` goes, then
     /// `tx.commit()`; dropping it without committing rolls it back.
-    pub async fn begin(&self) -> Result<Transaction, sqlx::Error> {
+    pub async fn begin(&self) -> Result<Transaction, DbError> {
         let inner = match &self.pool {
             Pool::Sqlite(pool) => TxInner::Sqlite(pool.begin().await?),
             #[cfg(feature = "postgres")]
@@ -117,7 +117,7 @@ impl Db {
 
     /// A transaction that takes SQLite's write lock at once (`BEGIN
     /// IMMEDIATE`), so a check made inside it holds until commit.
-    pub(crate) async fn begin_immediate(&self) -> Result<Transaction, sqlx::Error> {
+    pub(crate) async fn begin_immediate(&self) -> Result<Transaction, DbError> {
         let inner = match &self.pool {
             Pool::Sqlite(pool) => TxInner::Sqlite(pool.begin_with("BEGIN IMMEDIATE").await?),
             #[cfg(feature = "postgres")]
@@ -156,19 +156,19 @@ impl Transaction {
         }
     }
 
-    pub async fn commit(self) -> Result<(), sqlx::Error> {
+    pub async fn commit(self) -> Result<(), DbError> {
         match self.inner {
-            TxInner::Sqlite(tx) => tx.commit().await,
+            TxInner::Sqlite(tx) => Ok(tx.commit().await?),
             #[cfg(feature = "postgres")]
-            TxInner::Postgres(tx) => tx.commit().await,
+            TxInner::Postgres(tx) => Ok(tx.commit().await?),
         }
     }
 
-    pub async fn rollback(self) -> Result<(), sqlx::Error> {
+    pub async fn rollback(self) -> Result<(), DbError> {
         match self.inner {
-            TxInner::Sqlite(tx) => tx.rollback().await,
+            TxInner::Sqlite(tx) => Ok(tx.rollback().await?),
             #[cfg(feature = "postgres")]
-            TxInner::Postgres(tx) => tx.rollback().await,
+            TxInner::Postgres(tx) => Ok(tx.rollback().await?),
         }
     }
 }
@@ -231,14 +231,14 @@ macro_rules! dispatch {
                     #[allow(unused_variables)]
                     let $build = sqlite_query;
                     let $exec = pool;
-                    $body
+                    ($body).map_err(DbError::from)
                 }
                 #[cfg(feature = "postgres")]
                 Pool::Postgres(pool) => {
                     #[allow(unused_variables)]
                     let $build = postgres_query;
                     let $exec = pool;
-                    $body
+                    ($body).map_err(DbError::from)
                 }
             },
             Conn::Tx(tx) => match &mut tx.inner {
@@ -246,14 +246,14 @@ macro_rules! dispatch {
                     #[allow(unused_variables)]
                     let $build = sqlite_query;
                     let $exec = &mut **tx;
-                    $body
+                    ($body).map_err(DbError::from)
                 }
                 #[cfg(feature = "postgres")]
                 TxInner::Postgres(tx) => {
                     #[allow(unused_variables)]
                     let $build = postgres_query;
                     let $exec = &mut **tx;
-                    $body
+                    ($body).map_err(DbError::from)
                 }
             },
         }
@@ -419,7 +419,7 @@ impl Sql {
         self
     }
 
-    pub async fn fetch_all<'c>(self, db: impl Executor<'c>) -> Result<Vec<Row>, sqlx::Error> {
+    pub async fn fetch_all<'c>(self, db: impl Executor<'c>) -> Result<Vec<Row>, DbError> {
         let Self { sql, args } = self;
         dispatch!(db.into_conn(), |build, exec| build(sql, args)
             .fetch_all(exec)
@@ -427,10 +427,7 @@ impl Sql {
             .map(|rows| rows.into_iter().map(Row::from).collect()))
     }
 
-    pub async fn fetch_optional<'c>(
-        self,
-        db: impl Executor<'c>,
-    ) -> Result<Option<Row>, sqlx::Error> {
+    pub async fn fetch_optional<'c>(self, db: impl Executor<'c>) -> Result<Option<Row>, DbError> {
         let Self { sql, args } = self;
         dispatch!(db.into_conn(), |build, exec| build(sql, args)
             .fetch_optional(exec)
@@ -439,14 +436,14 @@ impl Sql {
     }
 
     /// The first row; an error if there is none.
-    pub async fn fetch_one<'c>(self, db: impl Executor<'c>) -> Result<Row, sqlx::Error> {
+    pub async fn fetch_one<'c>(self, db: impl Executor<'c>) -> Result<Row, DbError> {
         self.fetch_optional(db)
             .await?
-            .ok_or(sqlx::Error::RowNotFound)
+            .ok_or_else(|| DbError::from(sqlx::Error::RowNotFound))
     }
 
     /// Runs the statement and returns the number of rows it changed.
-    pub async fn execute<'c>(self, db: impl Executor<'c>) -> Result<u64, sqlx::Error> {
+    pub async fn execute<'c>(self, db: impl Executor<'c>) -> Result<u64, DbError> {
         let Self { sql, args } = self;
         dispatch!(db.into_conn(), |build, exec| build(sql, args)
             .execute(exec)
@@ -455,7 +452,7 @@ impl Sql {
     }
 
     /// The first column of the first row; an error if there is no row.
-    pub async fn scalar<'c, T: FromDb>(self, db: impl Executor<'c>) -> Result<T, sqlx::Error> {
+    pub async fn scalar<'c, T: FromDb>(self, db: impl Executor<'c>) -> Result<T, DbError> {
         self.fetch_one(db).await?.try_get(0)
     }
 
@@ -463,7 +460,7 @@ impl Sql {
     pub async fn scalar_optional<'c, T: FromDb>(
         self,
         db: impl Executor<'c>,
-    ) -> Result<Option<T>, sqlx::Error> {
+    ) -> Result<Option<T>, DbError> {
         self.fetch_optional(db)
             .await?
             .map(|row| row.try_get(0))
@@ -471,10 +468,7 @@ impl Sql {
     }
 
     /// The first column of every row.
-    pub async fn scalars<'c, T: FromDb>(
-        self,
-        db: impl Executor<'c>,
-    ) -> Result<Vec<T>, sqlx::Error> {
+    pub async fn scalars<'c, T: FromDb>(self, db: impl Executor<'c>) -> Result<Vec<T>, DbError> {
         self.fetch_all(db)
             .await?
             .iter()
@@ -485,7 +479,7 @@ impl Sql {
 
 /// Runs SQL that may hold several statements and no parameters, e.g. a
 /// migration file. Returns the number of rows changed.
-pub(crate) async fn script<'c>(db: impl Executor<'c>, sql: &str) -> Result<u64, sqlx::Error> {
+pub(crate) async fn script<'c>(db: impl Executor<'c>, sql: &str) -> Result<u64, DbError> {
     let sql = sql.to_owned();
     dispatch!(db.into_conn(), |build, exec| sqlx::raw_sql(AssertSqlSafe(
         sql
@@ -519,11 +513,11 @@ impl From<PgRow> for Row {
 
 impl Row {
     /// A column's value, by name (`"nama"`) or position (`0`).
-    pub fn try_get<T: FromDb>(&self, index: impl RowIndex) -> Result<T, sqlx::Error> {
+    pub fn try_get<T: FromDb>(&self, index: impl RowIndex) -> Result<T, DbError> {
         match &self.0 {
-            RowInner::Sqlite(row) => row.try_get(index),
+            RowInner::Sqlite(row) => Ok(row.try_get(index)?),
             #[cfg(feature = "postgres")]
-            RowInner::Postgres(row) => row.try_get(index),
+            RowInner::Postgres(row) => Ok(row.try_get(index)?),
         }
     }
 

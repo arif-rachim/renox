@@ -3,6 +3,7 @@
 //! factories.
 
 mod conn;
+mod error;
 mod factory;
 mod json;
 mod migrate;
@@ -22,6 +23,7 @@ use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, S
 pub use conn::{Conn, bounds};
 pub use conn::{Db, Dialect, Executor, FromDb, Row, RowIndex, Sql, Transaction, sql};
 pub(crate) use conn::{RowInner, script};
+pub use error::DbError;
 pub use factory::Factory;
 pub use json::Json;
 pub use migrate::{Migration, MigrationStatus, Scripts};
@@ -29,6 +31,10 @@ pub(crate) use migrate::{Migrator, framework_migration};
 pub use model::Model;
 pub use paginate::{Page, Paginated};
 pub use query::Query;
+/// sqlx, for what Renox's own API doesn't cover: `Db::sqlite()`, `Db::postgres()`,
+/// `Row::sqlite()`, `Row::postgres()` and `DbError::sqlx()` hand out its types.
+/// sqlx may move to a new version in a minor Renox release; see docs/stability.md.
+pub use sqlx;
 pub use value::{DbValue, ToDbValue};
 
 use crate::{AppState, Config};
@@ -234,7 +240,7 @@ pub(crate) fn quote(ident: &str) -> String {
 #[macro_export]
 macro_rules! __db_text_type {
     ($t:ty) => {
-        $crate::__db_text_type_for!($t, $crate::sqlx::sqlite::Sqlite);
+        $crate::__db_text_type_for!($t, $crate::__sqlx::sqlite::Sqlite);
     };
 }
 
@@ -243,8 +249,8 @@ macro_rules! __db_text_type {
 #[macro_export]
 macro_rules! __db_text_type {
     ($t:ty) => {
-        $crate::__db_text_type_for!($t, $crate::sqlx::sqlite::Sqlite);
-        $crate::__db_text_type_for!($t, $crate::sqlx::postgres::Postgres);
+        $crate::__db_text_type_for!($t, $crate::__sqlx::sqlite::Sqlite);
+        $crate::__db_text_type_for!($t, $crate::__sqlx::postgres::Postgres);
     };
 }
 
@@ -252,21 +258,21 @@ macro_rules! __db_text_type {
 #[macro_export]
 macro_rules! __db_text_type_for {
     ($t:ty, $db:ty) => {
-        impl $crate::sqlx::Type<$db> for $t {
-            fn type_info() -> <$db as $crate::sqlx::Database>::TypeInfo {
-                <::std::string::String as $crate::sqlx::Type<$db>>::type_info()
+        impl $crate::__sqlx::Type<$db> for $t {
+            fn type_info() -> <$db as $crate::__sqlx::Database>::TypeInfo {
+                <::std::string::String as $crate::__sqlx::Type<$db>>::type_info()
             }
 
-            fn compatible(ty: &<$db as $crate::sqlx::Database>::TypeInfo) -> bool {
-                <::std::string::String as $crate::sqlx::Type<$db>>::compatible(ty)
+            fn compatible(ty: &<$db as $crate::__sqlx::Database>::TypeInfo) -> bool {
+                <::std::string::String as $crate::__sqlx::Type<$db>>::compatible(ty)
             }
         }
 
-        impl<'r> $crate::sqlx::Decode<'r, $db> for $t {
+        impl<'r> $crate::__sqlx::Decode<'r, $db> for $t {
             fn decode(
-                value: <$db as $crate::sqlx::Database>::ValueRef<'r>,
-            ) -> ::std::result::Result<Self, $crate::sqlx::error::BoxDynError> {
-                let text = <::std::string::String as $crate::sqlx::Decode<$db>>::decode(value)?;
+                value: <$db as $crate::__sqlx::Database>::ValueRef<'r>,
+            ) -> ::std::result::Result<Self, $crate::__sqlx::error::BoxDynError> {
+                let text = <::std::string::String as $crate::__sqlx::Decode<$db>>::decode(value)?;
                 text.parse::<$t>().map_err(::std::convert::Into::into)
             }
         }

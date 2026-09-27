@@ -31,12 +31,13 @@ impl Module for Api {
 }
 
 fn config(dir: &std::path::Path) -> Config {
-    Config {
-        env: Environment::Testing,
-        key: Some(renox::generate_key()),
-        views_path: dir.join("views"),
-        storage_path: dir.join("storage"),
-        ..Config::default()
+    {
+        let mut c = Config::default();
+        c.env = Environment::Testing;
+        c.key = Some(renox::generate_key());
+        c.views_path = dir.join("views");
+        c.storage_path = dir.join("storage");
+        c
     }
 }
 
@@ -131,9 +132,10 @@ async fn memory_cache() {
 #[tokio::test]
 async fn database_cache() {
     let dir = tempfile::tempdir().unwrap();
-    let kernel = kernel(Config {
-        cache_store: "database".into(),
-        ..config(dir.path())
+    let kernel = kernel({
+        let mut c = config(dir.path());
+        c.cache_store = "database".into();
+        c
     })
     .await;
     cache_basics(&kernel).await;
@@ -152,9 +154,10 @@ async fn database_cache() {
         "expired rows are ignored"
     );
 
-    let bad = App::with_config(Config {
-        cache_store: "redis".into(),
-        ..config(dir.path())
+    let bad = App::with_config({
+        let mut c = config(dir.path());
+        c.cache_store = "redis".into();
+        c
     })
     .boot()
     .await;

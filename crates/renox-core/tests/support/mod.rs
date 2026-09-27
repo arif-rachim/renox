@@ -33,14 +33,15 @@ impl TestApp {
         std::fs::create_dir_all(dir.path().join("public")).unwrap();
         std::fs::write(dir.path().join("public/robots.txt"), "User-agent: *").unwrap();
 
-        let config = Config {
-            name: "Test App".into(),
-            env: Environment::Testing,
-            debug,
-            views_path: dir.path().join("views"),
-            public_path: dir.path().join("public"),
-            key: Some(renox_core::generate_key()),
-            ..Config::default()
+        let config = {
+            let mut c = Config::default();
+            c.name = "Test App".into();
+            c.env = Environment::Testing;
+            c.debug = debug;
+            c.views_path = dir.path().join("views");
+            c.public_path = dir.path().join("public");
+            c.key = Some(renox_core::generate_key());
+            c
         };
         let router = build(App::with_config(config)).into_router().await.unwrap();
         Self {

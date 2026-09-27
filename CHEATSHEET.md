@@ -13,6 +13,7 @@ rnx make:module products             # routes + view, registered in src/lib.rs
 rnx make:model Product --module products --migration
 rnx make:policy Product --module products
 rnx make:job SendReceipt --module products
+rnx make:command products:import --module products  # then `rnx products:import file.csv`
 rnx make:mail order_shipped
 rnx migrate                          # migrate:rollback, migrate:fresh --seed, db:seed
 rnx route:list                       # db:shell, queue:work, schedule:list, down, up
@@ -45,7 +46,18 @@ impl Module for Products {
             .post("/products", store)
             .name("products.store")
             .require_auth(); // covers the routes added before it
-        public.merge(members)
+        public.merge(members).group(
+            "/admin",   // path prefix
+            "admin.",   // name prefix
+            Routes::new()
+                .get("/products", index).name("products") // GET /admin/products, `admin.products`
+                .require_auth(),                          // only the group's routes
+        )
+    }
+
+    fn register(&self, app: &mut Registry) {
+        // `my-app products:import file.csv` (or `rnx products:import …`)
+        app.command("products:import", "Import products from a CSV file", import);
     }
 }
 
@@ -55,6 +67,21 @@ async fn index() -> View {
 
 async fn store() -> Redirect {
     Redirect::to("/products")
+}
+
+async fn import(state: AppState, args: renox::command::Args) -> Result {
+    let Some(file) = args.positional().first().copied() else {
+        return Err(Error::BadRequest("usage: products:import FILE [--dry-run]".into()));
+    };
+    let _ = (state, file, args.has("--dry-run"));
+    Ok(())
+}
+
+async fn download(order_paid: bool) -> Result<&'static str> {
+    // Any status with a message visitors see (page or JSON `message`).
+    abort_unless(order_paid, StatusCode::PAYMENT_REQUIRED, "Pay for the order first.")?;
+    // or: return Err(abort(StatusCode::GONE, "This offer ended."));
+    Ok("the file")
 }
 ```
 
@@ -310,8 +337,9 @@ async fn report(db: &Db) -> Result {
 ```
 
 SQLite has one writer: while a transaction is open, write through `&mut tx`, not `db` (that
-waits for the transaction and fails with "database is locked"). A duplicate that slips past a
-`unique` rule is a 409 (`err.is_unique_violation()`).
+waits for the transaction and fails with "database is locked"). Queries fail with a
+`renox::db::DbError` (`is_unique_violation()`, `is_foreign_key_violation()`, `is_row_not_found()`,
+`is_timeout()`); a duplicate that slips past a `unique` rule answers 409.
 
 Migrations run in a transaction each. A migration with `CREATE INDEX CONCURRENTLY` or its own
 `BEGIN … COMMIT` runs without one, as does one with a `-- renox:no-transaction` line. Two

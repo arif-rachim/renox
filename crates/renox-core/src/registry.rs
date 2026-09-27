@@ -7,8 +7,8 @@ use crate::queue::{Job, JobHandler, handler};
 use crate::schedule::Schedule;
 use crate::{AppState, Result};
 
-/// Where the app and its modules register jobs, listeners and scheduled
-/// tasks. Modules get it in `Module::register`.
+/// Where the app and its modules register jobs, listeners, scheduled tasks
+/// and commands. Modules get it in `Module::register`.
 #[derive(Default)]
 pub struct Registry {
     pub(crate) jobs: HashMap<&'static str, JobHandler>,
@@ -16,6 +16,7 @@ pub struct Registry {
     pub(crate) schedule: Schedule,
     pub(crate) duplicate_job: Option<&'static str>,
     pub(crate) webhooks: HashMap<&'static str, crate::webhook::HandleFn>,
+    pub(crate) commands: Vec<crate::command::Command>,
 }
 
 impl Registry {
@@ -49,6 +50,18 @@ impl Registry {
     {
         let (type_id, run) = listener(listener_fn);
         self.listeners.entry(type_id).or_default().push(run);
+        self
+    }
+
+    /// Adds a command the app binary runs: `my-app <name> [args]`. See
+    /// [`crate::command`].
+    pub fn command<F, Fut>(&mut self, name: &str, about: &str, run: F) -> &mut Self
+    where
+        F: Fn(AppState, crate::command::Args) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result> + Send + 'static,
+    {
+        self.commands
+            .push(crate::command::command(name, about, run));
         self
     }
 

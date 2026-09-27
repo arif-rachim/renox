@@ -45,6 +45,16 @@ const STUBS: &[(&str, &str)] = &[
 
 const RENOX_GIT: &str = "https://github.com/arif-rachim/renox";
 
+/// Renox from GitHub, pinned to the commit this `rnx` was built from, so
+/// `cargo update` doesn't move the app to an API it wasn't written for.
+fn git_dependency(rev: Option<&str>) -> String {
+    match rev {
+        Some(rev) => format!("renox = {{ git = \"{RENOX_GIT}\", rev = \"{rev}\""),
+        // Built without git: follow main (move to a `rev` when you can).
+        None => format!("renox = {{ git = \"{RENOX_GIT}\", branch = \"main\""),
+    }
+}
+
 pub fn run(name: &str, renox_path: Option<&Path>, database: Database) -> Result<()> {
     validate_name(name)?;
     let root = Path::new(name);
@@ -60,7 +70,7 @@ pub fn run(name: &str, renox_path: Option<&Path>, database: Database) -> Result<
                 .with_context(|| format!("{} is not a Renox checkout", path.display()))?;
             format!("renox = {{ path = {:?}", crate_dir.display().to_string())
         }
-        None => format!("renox = {{ git = \"{RENOX_GIT}\""),
+        None => git_dependency(option_env!("RENOX_GIT_REV")),
     };
     let dependency = match database {
         Database::Sqlite => format!("{dependency} }}"),
@@ -157,6 +167,13 @@ mod tests {
         for reserved in ["renox", "fn", "self", "type"] {
             assert!(validate_name(reserved).is_err(), "{reserved}");
         }
+    }
+
+    #[test]
+    fn pins_the_git_dependency() {
+        let rev = "0123456789abcdef0123456789abcdef01234567";
+        assert!(git_dependency(Some(rev)).ends_with(&format!("rev = \"{rev}\"")));
+        assert!(git_dependency(None).ends_with("branch = \"main\""));
     }
 
     #[test]

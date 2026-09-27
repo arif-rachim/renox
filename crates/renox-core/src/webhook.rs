@@ -108,6 +108,7 @@ pub trait Webhook: Send + Sync + 'static {
 
 /// The incoming call: headers and the raw body, exactly as signed.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct WebhookRequest {
     pub headers: HeaderMap,
     pub body: Bytes,
@@ -131,6 +132,7 @@ impl WebhookRequest {
 
 /// A stored call, as `handle` gets it.
 #[derive(Debug, Clone, Serialize)]
+#[non_exhaustive]
 pub struct WebhookCall {
     pub id: i64,
     pub provider: String,
@@ -187,7 +189,7 @@ impl WebhookCall {
 
 const COLUMNS: &str = "id, provider, event_id, payload, status, error, received_at, processed_at";
 
-fn from_row(row: &crate::db::Row) -> std::result::Result<WebhookCall, sqlx::Error> {
+fn from_row(row: &crate::db::Row) -> std::result::Result<WebhookCall, crate::db::DbError> {
     Ok(WebhookCall {
         id: row.try_get("id")?,
         provider: row.try_get("provider")?,

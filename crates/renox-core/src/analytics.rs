@@ -49,6 +49,7 @@ const TRIGGER: &str = "renox:analytics";
 
 /// One analytics event: a name such as `sign_up` and its parameters.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Event {
     pub name: String,
     #[serde(default)]

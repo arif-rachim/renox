@@ -61,6 +61,7 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/events.rs            Event, listeners, AppState::emit
   src/mail.rs              Mail, Mailer (smtp/log/memory), mail_view, queue_mail, /_renox/mail preview
   src/cache.rs             Cache (memory / database store), remember()
+  src/command.rs           app commands: Args, Command; App::command / Registry::command, Kernel::call
   src/rate_limit.rs        Limiter + middleware behind Routes::throttle
   src/client_ip.rs         ClientIp extractor + TrustedProxies (TRUSTED_PROXIES); resolved once in
                            security::middleware (outermost), read by throttle, login lock, trace span
@@ -102,6 +103,8 @@ examples/crud/             the reference CRUD module (policy, soft deletes, pagi
 CHEATSHEET.md              one-page patterns for app authors/agents; its Rust is compiled as doctests
 llms.txt                   map for agents: which example/guide file shows what
 docs/postgresql.md         PostgreSQL guide for app authors
+docs/stability.md          semver scope, #[non_exhaustive] types, public-dependency policy (keep in sync
+                           when adding public types or re-exports)
 docs/operations.md         production guide: timeouts, proxies, /health, failure table (kept in
                            sync with tests/chaos/run.sh), failed jobs/webhooks, backups
 .github/workflows/ci.yml   fmt+clippy+doc (Ubuntu), tests on Ubuntu/macOS/Windows, tests on PostgreSQL
@@ -151,7 +154,7 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
   `*.sql`, not reversible). Apps need `build.rs` with `cargo:rerun-if-changed=migrations` so new
   files are picked up (`rnx new` writes it).
 - **Models:** `#[derive(Model)]` generates `impl ::renox::db::Model` using `::renox::…` paths, values
-  go through `DbValue`/`ToDbValue`, rows decode via `renox::sqlx::Row::try_get` — apps don't need
+  go through `DbValue`/`ToDbValue`, rows decode via `renox::db::Row::try_get` — apps don't need
   sqlx directly. Primary key is always `id: i64`, `0` = unsaved. Table name = snake_case struct name
   (no pluralisation; Indonesian names don't pluralise with "s"). Query builder validates column
   names against `COLUMNS` and operators against a whitelist → SQL injection via names is an error.
@@ -505,6 +508,12 @@ and the integration tests are one binary. Result: rebuild after a core change 29
   files; `.env` default is 5 s), while in-memory SQLite caps it at 2 s so a task waiting on its
   own transaction fails fast; framework migrations needing a PostgreSQL `down` are written as a
   `Migration` literal (see `webhook::MIGRATIONS`), since `framework_migration!` has none.
+- M14a conventions: new public structs/enums that may grow get `#[non_exhaustive]` and a line in
+  docs/stability.md; tests build `Config` by mutation (`let mut c = config(); c.x = …;`), never
+  with struct literals. Public database APIs return `db::DbError`, never `sqlx::Error`; macros
+  reach sqlx through the hidden `renox::__sqlx`. `rnx new` pins `rev` from `renox-cli/build.rs`
+  (`git rev-parse HEAD`, else the cargo checkout directory's short rev); testing that needs the
+  build script committed (`git add -A`), since `cargo install --git` builds the committed tree.
 - `target/` grows to ~100 GB over a few milestones and fills the disk (link errors, "No space left
   on device"); `cargo clean` it before the full two-database run.
 - This session's working directory (~/workspace/renoxium) isn't a git repo, so the Agent tool's
@@ -546,8 +555,9 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M13a web security (W1–W18): sandboxed user files, `ClientIp` + `TRUSTED_PROXIES`, logout revokes sessions, 3-way login lock, same-site redirects | merged to `main` |
 | M13b resilience (D1–D30): contained panics, timeouts, queue/migration/cache hardening | merged to `main` |
 | M13c chaos CI job (`tests/chaos`), docs/operations.md | merged to `main` |
-| Readiness vs Laravel review → ROADMAP M14a/b/c, M15 data layer, M16 DX & trust, M17 examples | PR from branch `roadmap-m15-m17` |
-| M14a API foundations (ROADMAP M14, IDs A*) | next; then M14b, M14c, M15, M16, M17, v1.0 |
+| Readiness vs Laravel review → ROADMAP M14a/b/c, M15 data layer, M16 DX & trust, M17 examples | merged to `main` |
+| M14a API foundations: non_exhaustive, stability doc + `DbError`, `abort`, route groups, app commands, pinned `rnx new` | PR from branch `m14a-api-foundations` |
+| M14b extension points (ROADMAP M14) | next; then M14c, M15, M16, M17, v1.0 |
 | v1.0 docs site, starter kit, semver guarantee | last |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on

@@ -43,3 +43,28 @@ async fn empty_entries_are_rejected() {
         .assert_invalid("message");
     app.assert_database_count("entries", 0).await;
 }
+
+#[renox::test]
+async fn the_prune_command_deletes_old_entries() {
+    let app = app().await;
+    app.post("/entries", &[("name", "Arif"), ("message", "Kopinya enak")])
+        .await;
+    renox::db::sql("UPDATE entries SET created_at = ?")
+        .bind(renox::db::now() - renox::chrono::TimeDelta::days(40))
+        .execute(app.db())
+        .await
+        .unwrap();
+    app.post("/entries", &[("name", "Budi"), ("message", "Tehnya juga")])
+        .await;
+    app.kernel()
+        .call("entries:prune", ["--days", "30"])
+        .await
+        .unwrap();
+    app.assert_database_count("entries", 1).await;
+    assert!(
+        app.kernel()
+            .call("entries:prune", ["--days", "x"])
+            .await
+            .is_err()
+    );
+}

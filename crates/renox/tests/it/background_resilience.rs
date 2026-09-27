@@ -273,9 +273,10 @@ async fn two_workers(k: &Kernel, jobs: usize) {
 #[renox::test(flavor = "multi_thread", worker_threads = 8)]
 async fn two_workers_file_sqlite() {
     let dir = tempfile::tempdir().unwrap();
-    let k = kernel_cfg(Config {
-        database_url: format!("sqlite://{}/q.db", dir.path().display()),
-        ..config()
+    let k = kernel_cfg({
+        let mut c = config();
+        c.database_url = format!("sqlite://{}/q.db", dir.path().display());
+        c
     })
     .await;
     two_workers(&k, 300).await;
@@ -294,13 +295,11 @@ async fn dispatch_in_a_rolled_back_transaction_is_dropped() {
     let mut results = Vec::new();
     for (label, cfg) in [
         ("default", config()),
-        (
-            "file-sqlite",
-            Config {
-                database_url: format!("sqlite://{}/t.db", dir.path().display()),
-                ..config()
-            },
-        ),
+        ("file-sqlite", {
+            let mut c = config();
+            c.database_url = format!("sqlite://{}/t.db", dir.path().display());
+            c
+        }),
     ] {
         let k = kernel_cfg(cfg).await;
         let mut tx = k.db().begin().await.unwrap();
@@ -359,12 +358,13 @@ async fn scheduler_task_that_panics_keeps_running() {
         .local_addr()
         .unwrap()
         .port();
-    let cfg = Config {
-        database_url: format!("sqlite://{}/s.db", dir.path().display()),
-        port,
-        scheduler: true,
-        storage_path: dir.path().join("storage"),
-        ..config()
+    let cfg = {
+        let mut c = config();
+        c.database_url = format!("sqlite://{}/s.db", dir.path().display());
+        c.port = port;
+        c.scheduler = true;
+        c.storage_path = dir.path().join("storage");
+        c
     };
     let k = App::with_config(cfg.clone()).boot().await.unwrap();
     k.migrate().await.unwrap();
@@ -387,9 +387,10 @@ async fn scheduler_task_that_panics_keeps_running() {
     let server = tokio::spawn(app.serve());
     tokio::time::sleep(Duration::from_millis(5600)).await;
     server.abort();
-    let k = App::with_config(Config {
-        database_url: format!("sqlite://{}/s.db", dir.path().display()),
-        ..config()
+    let k = App::with_config({
+        let mut c = config();
+        c.database_url = format!("sqlite://{}/s.db", dir.path().display());
+        c
     })
     .boot()
     .await

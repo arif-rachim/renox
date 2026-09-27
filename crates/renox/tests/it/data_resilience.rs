@@ -42,10 +42,11 @@ fn p(nama: &str) -> Produk {
 }
 
 pub(crate) fn config() -> Config {
-    Config {
-        env: Environment::Testing,
-        key: Some(renox::generate_key()),
-        ..Config::default()
+    {
+        let mut c = Config::default();
+        c.env = Environment::Testing;
+        c.key = Some(renox::generate_key());
+        c
     }
 }
 
@@ -277,10 +278,8 @@ async fn unique_violation_is_a_conflict() {
         .execute(db)
         .await
         .unwrap_err();
-    let is_unique = err
-        .as_database_error()
-        .is_some_and(|e| e.is_unique_violation());
-    assert!(is_unique, "sqlx reports it: {err}");
+    assert!(err.is_unique_violation(), "DbError reports it: {err}");
+    assert!(!err.is_foreign_key_violation());
     let err: Error = err.into();
     eprintln!("unique violation -> {} {:?}", err.status(), err);
     // Robust: a duplicate is a 409/422 the app can show, not a generic 500.
@@ -370,9 +369,10 @@ async fn file_sqlite_write_while_own_transaction_is_open_fails_fast() {
     let dir = tempfile::tempdir().unwrap();
     let url = format!("sqlite://{}/app.db", dir.path().display());
     let k = kernel_cfg(
-        Config {
-            database_url: url,
-            ..config()
+        {
+            let mut c = config();
+            c.database_url = url;
+            c
         },
         &[],
     )
@@ -493,9 +493,10 @@ async fn rollback_with_a_missing_down_is_all_or_nothing() {
 async fn edited_and_removed_migrations_on_a_file_database() {
     let dir = tempfile::tempdir().unwrap();
     let url = format!("sqlite://{}/app.db", dir.path().display());
-    let cfg = || Config {
-        database_url: url.clone(),
-        ..config()
+    let cfg = || {
+        let mut c = config();
+        c.database_url = url.clone();
+        c
     };
     let k = boot(cfg(), &[M_A, M_C]).await;
     k.migrate().await.unwrap();
@@ -798,16 +799,18 @@ async fn storage_read_only_directory() {
 
 #[renox::test]
 async fn invalid_app_key_fails_boot() {
-    let r = App::with_config(Config {
-        key: Some("short".into()),
-        ..config()
+    let r = App::with_config({
+        let mut c = config();
+        c.key = Some("short".into());
+        c
     })
     .boot()
     .await;
     assert!(r.is_err());
-    let r = App::with_config(Config {
-        key: Some("base64:!!!".into()),
-        ..config()
+    let r = App::with_config({
+        let mut c = config();
+        c.key = Some("base64:!!!".into());
+        c
     })
     .boot()
     .await;
@@ -881,10 +884,11 @@ async fn zero_pool_size_is_a_boot_error() {
     let r = tokio::time::timeout(
         Duration::from_secs(10),
         tokio::spawn(
-            App::with_config(Config {
-                database_url: format!("sqlite://{}/x.db", dir.path().display()),
-                database_pool_size: 0,
-                ..config()
+            App::with_config({
+                let mut c = config();
+                c.database_url = format!("sqlite://{}/x.db", dir.path().display());
+                c.database_pool_size = 0;
+                c
             })
             .boot(),
         ),
@@ -971,9 +975,10 @@ async fn missing_views_directory() {
 #[renox::test]
 async fn database_url_with_an_unknown_scheme_is_refused() {
     for url in ["postgress://app:s3cret@db/app", "mysql://app:s3cret@db/app"] {
-        let err = App::with_config(Config {
-            database_url: url.into(),
-            ..config()
+        let err = App::with_config({
+            let mut c = config();
+            c.database_url = url.into();
+            c
         })
         .boot()
         .await

@@ -38,7 +38,7 @@ pub trait Model: Sized + Send + Sync + Unpin + 'static {
 
     fn id(&self) -> i64;
     fn set_id(&mut self, id: i64);
-    fn from_row(row: &Row) -> std::result::Result<Self, sqlx::Error>;
+    fn from_row(row: &Row) -> std::result::Result<Self, super::DbError>;
     /// Values of every column except `id`, in `COLUMNS` order.
     fn values(&self) -> Vec<DbValue>;
     /// Updates `created_at` / `updated_at` if the model has them.

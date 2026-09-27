@@ -1,5 +1,6 @@
 /// Languages with built-in validation messages, from `APP_LOCALE`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub enum Locale {
     #[default]
     En,

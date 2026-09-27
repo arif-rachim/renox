@@ -2,7 +2,8 @@
 //! layout, sessions and flash messages, CSRF, HTMX fragments, validation with
 //! old input, SQLite with a model, migrations, a seeder and pagination,
 //! login/registration from the `Auth` module, and an event whose listener
-//! queues a job, plus a scheduled task.
+//! queues a job, plus a scheduled task and an app command
+//! (`cargo run -- entries:prune --days 7`).
 //!
 //! The app lives in this library (`app()`), so `tests/` can boot it;
 //! `main.rs` only runs it. Run it from this directory:
@@ -115,6 +116,12 @@ impl Module for Guestbook {
                     .await?;
                 Ok(())
             });
+        // `cargo run -- entries:prune --days 7`
+        app.command(
+            "entries:prune",
+            "Delete entries older than --days (default 30)",
+            prune,
+        );
         app.schedule()
             .every_minute("count-entries", |state| async move {
                 let total = Entry::query().count(&state.db).await?;
@@ -122,6 +129,22 @@ impl Module for Guestbook {
                 Ok(())
             });
     }
+}
+
+/// The `entries:prune` command.
+async fn prune(state: AppState, args: renox::command::Args) -> Result {
+    let days: i64 = args
+        .value("--days")
+        .unwrap_or("30")
+        .parse()
+        .map_err(|_| Error::BadRequest("--days must be a number".into()))?;
+    let cutoff = renox::db::now() - renox::chrono::TimeDelta::days(days);
+    let deleted = Entry::query()
+        .where_op("created_at", "<", cutoff)
+        .delete(&state.db)
+        .await?;
+    println!("Deleted {deleted} entries older than {days} days.");
+    Ok(())
 }
 
 async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {

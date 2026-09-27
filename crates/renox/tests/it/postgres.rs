@@ -7,7 +7,7 @@ use renox::db::{Db, Dialect, sql};
 
 async fn db() -> Option<Db> {
     let url = std::env::var("TEST_DATABASE_URL").ok()?;
-    let pool = renox::sqlx::PgPool::connect(&url)
+    let pool = renox::db::sqlx::PgPool::connect(&url)
         .await
         .expect("TEST_DATABASE_URL is reachable");
     Some(Db::from(pool))
