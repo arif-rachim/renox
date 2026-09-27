@@ -545,8 +545,9 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | Pre-1.0 audit (Laravel gaps, negative flows, chaos) → docs/audit/2026-09-pre-1.0.md; plan M13 + M14 in ROADMAP | merged to `main` |
 | M13a web security (W1–W18): sandboxed user files, `ClientIp` + `TRUSTED_PROXIES`, logout revokes sessions, 3-way login lock, same-site redirects | merged to `main` |
 | M13b resilience (D1–D30): contained panics, timeouts, queue/migration/cache hardening | merged to `main` |
-| M13c chaos CI job (`tests/chaos`), docs/operations.md | PR from branch `m13c-keep-it-that-way` |
-| M14 API freeze (ROADMAP M14, IDs A*) | after M13 |
+| M13c chaos CI job (`tests/chaos`), docs/operations.md | merged to `main` |
+| Readiness vs Laravel review → ROADMAP M14a/b/c, M15 data layer, M16 DX & trust, M17 examples | PR from branch `roadmap-m15-m17` |
+| M14a API foundations (ROADMAP M14, IDs A*) | next; then M14b, M14c, M15, M16, M17, v1.0 |
 | v1.0 docs site, starter kit, semver guarantee | last |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on
