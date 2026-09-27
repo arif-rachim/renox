@@ -1,0 +1,272 @@
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
+
+use axum::body::Body;
+use axum::extract::ConnectInfo;
+use axum::http::{Request, StatusCode};
+use http_body_util::BodyExt;
+use renox::Kernel;
+use renox::prelude::*;
+use tower::ServiceExt;
+
+struct Api;
+
+impl Module for Api {
+    fn name(&self) -> &'static str {
+        "api"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new()
+            .get("/", || async { "home" })
+            .name("home")
+            .merge(
+                Routes::new()
+                    .get("/search", || async { "results" })
+                    .throttle(2, Duration::from_secs(60)),
+            )
+    }
+}
+
+fn config(dir: &std::path::Path) -> Config {
+    Config {
+        env: Environment::Testing,
+        key: Some(renox::generate_key()),
+        views_path: dir.join("views"),
+        storage_path: dir.join("storage"),
+        ..Config::default()
+    }
+}
+
+async fn kernel(config: Config) -> Kernel {
+    let kernel = App::with_config(config).module(Api).boot().await.unwrap();
+    kernel.migrate().await.unwrap();
+    kernel
+}
+
+struct Reply {
+    status: StatusCode,
+    headers: axum::http::HeaderMap,
+    body: String,
+}
+
+async fn send(kernel: &Kernel, req: Request<Body>) -> Reply {
+    let res = kernel.router().oneshot(req).await.unwrap();
+    let (status, headers) = (res.status(), res.headers().clone());
+    let body = res.into_body().collect().await.unwrap().to_bytes();
+    Reply {
+        status,
+        headers,
+        body: String::from_utf8(body.to_vec()).unwrap(),
+    }
+}
+
+fn from(ip: &str, uri: &str) -> Request<Body> {
+    let mut req = Request::get(uri).body(Body::empty()).unwrap();
+    let addr: SocketAddr = format!("{ip}:5000").parse().unwrap();
+    req.extensions_mut().insert(ConnectInfo(addr));
+    req
+}
+
+async fn cache_basics(kernel: &Kernel) {
+    let cache = &kernel.state().cache;
+    assert_eq!(cache.get::<String>("menu").await.unwrap(), None);
+    cache.put("menu", &vec!["kopi", "teh"], None).await.unwrap();
+    assert_eq!(
+        cache.get::<Vec<String>>("menu").await.unwrap().unwrap(),
+        ["kopi", "teh"]
+    );
+    assert!(cache.has("menu").await.unwrap());
+    assert_eq!(
+        cache.get::<i64>("menu").await.unwrap(),
+        None,
+        "wrong type reads as missing"
+    );
+
+    let calls = Arc::new(AtomicUsize::new(0));
+    for _ in 0..3 {
+        let calls = calls.clone();
+        let total: i64 = cache
+            .remember("total", Duration::from_secs(60), || async move {
+                calls.fetch_add(1, Ordering::SeqCst);
+                Ok(42)
+            })
+            .await
+            .unwrap();
+        assert_eq!(total, 42);
+    }
+    assert_eq!(calls.load(Ordering::SeqCst), 1, "computed once");
+
+    let failed: Result<i64> = cache
+        .remember("broken", Duration::from_secs(60), || async {
+            Err(Error::NotFound)
+        })
+        .await;
+    assert!(failed.is_err());
+    assert!(!cache.has("broken").await.unwrap(), "errors are not cached");
+
+    cache.forget("menu").await.unwrap();
+    assert!(!cache.has("menu").await.unwrap());
+    cache.flush().await.unwrap();
+    assert!(!cache.has("total").await.unwrap());
+}
+
+#[tokio::test]
+async fn memory_cache() {
+    let dir = tempfile::tempdir().unwrap();
+    let kernel = kernel(config(dir.path())).await;
+    cache_basics(&kernel).await;
+
+    let cache = &kernel.state().cache;
+    cache
+        .put("short", &1, Some(Duration::from_secs(1)))
+        .await
+        .unwrap();
+    assert!(cache.has("short").await.unwrap());
+    tokio::time::sleep(Duration::from_millis(2100)).await;
+    assert!(!cache.has("short").await.unwrap(), "expired");
+}
+
+#[tokio::test]
+async fn database_cache() {
+    let dir = tempfile::tempdir().unwrap();
+    let kernel = kernel(Config {
+        cache_store: "database".into(),
+        ..config(dir.path())
+    })
+    .await;
+    cache_basics(&kernel).await;
+
+    let cache = &kernel.state().cache;
+    cache
+        .put("short", &1, Some(Duration::from_secs(60)))
+        .await
+        .unwrap();
+    renox::sqlx::query("UPDATE cache SET expires_at = 1")
+        .execute(kernel.db())
+        .await
+        .unwrap();
+    assert!(
+        !cache.has("short").await.unwrap(),
+        "expired rows are ignored"
+    );
+
+    let bad = App::with_config(Config {
+        cache_store: "redis".into(),
+        ..config(dir.path())
+    })
+    .boot()
+    .await;
+    assert!(format!("{:?}", bad.err().unwrap()).contains("CACHE_STORE"));
+}
+
+#[tokio::test]
+async fn throttled_routes_answer_429() {
+    let dir = tempfile::tempdir().unwrap();
+    let kernel = kernel(config(dir.path())).await;
+
+    let first = send(&kernel, from("10.0.0.1", "/search")).await;
+    assert_eq!(first.status, StatusCode::OK);
+    assert_eq!(first.headers["x-ratelimit-limit"], "2");
+    assert_eq!(first.headers["x-ratelimit-remaining"], "1");
+    assert_eq!(
+        send(&kernel, from("10.0.0.1", "/search")).await.status,
+        StatusCode::OK
+    );
+
+    let limited = send(&kernel, from("10.0.0.1", "/search")).await;
+    assert_eq!(limited.status, StatusCode::TOO_MANY_REQUESTS);
+    assert!(
+        limited.headers["retry-after"]
+            .to_str()
+            .unwrap()
+            .parse::<u64>()
+            .unwrap()
+            <= 60
+    );
+    assert!(limited.body.contains("429"), "{}", limited.body);
+
+    assert_eq!(
+        send(&kernel, from("10.0.0.2", "/search")).await.status,
+        StatusCode::OK,
+        "per IP"
+    );
+    assert_eq!(
+        send(&kernel, from("10.0.0.1", "/")).await.status,
+        StatusCode::OK,
+        "only throttled routes"
+    );
+}
+
+#[tokio::test]
+async fn maintenance_mode_with_a_bypass_secret() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("views/errors")).unwrap();
+    std::fs::write(
+        dir.path().join("views/errors/503.html"),
+        "Sedang perbaikan, kembali sebentar lagi",
+    )
+    .unwrap();
+    let config = config(dir.path());
+    let kernel = kernel(config.clone()).await;
+
+    renox::maintenance::down(&config.storage_path, Some("izinkan".into()), Some(120)).unwrap();
+    let down = send(&kernel, from("10.0.0.1", "/")).await;
+    assert_eq!(down.status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(down.headers["retry-after"], "120");
+    assert_eq!(down.body, "Sedang perbaikan, kembali sebentar lagi");
+
+    let health = send(&kernel, from("10.0.0.1", "/health")).await;
+    assert_eq!(health.status, StatusCode::OK, "health checks keep working");
+    assert!(health.body.contains(r#""maintenance":true"#));
+
+    let bypass = send(&kernel, from("10.0.0.1", "/izinkan")).await;
+    assert_eq!(bypass.status, StatusCode::SEE_OTHER);
+    let cookie = bypass.headers["set-cookie"]
+        .to_str()
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap()
+        .to_owned();
+    let mut req = from("10.0.0.1", "/");
+    req.headers_mut().insert("cookie", cookie.parse().unwrap());
+    assert_eq!(
+        send(&kernel, req).await.body,
+        "home",
+        "the cookie lets the owner in"
+    );
+
+    let mut wrong = from("10.0.0.1", "/");
+    wrong
+        .headers_mut()
+        .insert("cookie", "renox_maintenance=tebak".parse().unwrap());
+    assert_eq!(
+        send(&kernel, wrong).await.status,
+        StatusCode::SERVICE_UNAVAILABLE
+    );
+
+    assert!(renox::maintenance::up(&config.storage_path).unwrap());
+    assert!(!renox::maintenance::up(&config.storage_path).unwrap());
+    assert_eq!(send(&kernel, from("10.0.0.1", "/")).await.body, "home");
+}
+
+#[tokio::test]
+async fn health_reports_the_database() {
+    let dir = tempfile::tempdir().unwrap();
+    let kernel = kernel(config(dir.path())).await;
+    let ok = send(&kernel, from("10.0.0.1", "/health")).await;
+    assert_eq!(ok.status, StatusCode::OK);
+    let body: serde_json::Value = serde_json::from_str(&ok.body).unwrap();
+    assert_eq!(body["status"], "ok");
+    assert_eq!(body["database"], "ok");
+    assert_eq!(body["queue"]["pending"], 0);
+    assert_eq!(body["queue"]["failed"], 0);
+
+    kernel.db().close().await;
+    let down = send(&kernel, from("10.0.0.1", "/health")).await;
+    assert_eq!(down.status, StatusCode::SERVICE_UNAVAILABLE);
+    assert!(down.body.contains(r#""status":"error""#), "{}", down.body);
+}

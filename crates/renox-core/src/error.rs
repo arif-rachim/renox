@@ -21,6 +21,10 @@ pub enum Error {
     NotFound,
     /// The CSRF token was missing or wrong, usually because the session expired.
     PageExpired,
+    /// A rate limit was hit; see `Routes::throttle`.
+    TooManyRequests,
+    /// The app is in maintenance mode.
+    ServiceUnavailable,
     /// Invalid input; see `ValidationError`.
     Validation(crate::validation::ValidationError),
     Internal(anyhow::Error),
@@ -34,6 +38,8 @@ impl Error {
             Self::Forbidden => StatusCode::FORBIDDEN,
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::PageExpired => StatusCode::from_u16(419).expect("valid status code"),
+            Self::TooManyRequests => StatusCode::TOO_MANY_REQUESTS,
+            Self::ServiceUnavailable => StatusCode::SERVICE_UNAVAILABLE,
             Self::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }

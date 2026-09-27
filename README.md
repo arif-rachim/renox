@@ -120,6 +120,19 @@ state.queue_mail(mail).await?;
 state.notify(&user, &OrderShipped { order_id }).await?;
 ```
 
+Caching, rate limits, maintenance mode and a health check are built in too:
+
+```rust
+let menu = state.cache.remember("menu", Duration::from_secs(600), || load_menu(&state.db)).await?;
+Routes::new().get("/search", search).throttle(60, Duration::from_secs(60));
+```
+
+```bash
+my-app down --secret letmein   # 503 for everyone else; visit /letmein to get in
+my-app up
+curl localhost:3000/health     # {"status":"ok","database":"ok","queue":{...},"maintenance":false}
+```
+
 The `Auth` module also handles password reset and email verification by email (`MAIL_MAILER=log`
 prints the links while developing), and API tokens for mobile apps and integrations:
 

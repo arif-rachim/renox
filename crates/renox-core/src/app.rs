@@ -50,6 +50,9 @@ Commands:
   queue:flush               Delete failed jobs
   schedule:list             List scheduled tasks and when they run next
   schedule:work             Run scheduled tasks (when SCHEDULER=false for serve)
+  down [--secret S] [--retry N]
+                            Maintenance mode: answer 503 (visit /S to bypass it)
+  up                        Leave maintenance mode
   help                      Show this message";
 
 /// The application builder.
@@ -172,7 +175,7 @@ impl App {
         };
 
         self.registry.job::<crate::mail::SendMail>();
-        let mut migrations = vec![crate::queue::MIGRATION];
+        let mut migrations = vec![crate::queue::MIGRATION, crate::cache::MIGRATION];
         migrations.extend(self.migrations);
         for module in &self.modules {
             migrations.extend_from_slice(module.migrations());
@@ -214,6 +217,7 @@ impl App {
         let state = AppState {
             mailer: Mailer::from_config(&config)?,
             queue: Queue::new(db.clone()),
+            cache: crate::cache::Cache::new(&config.cache_store, db.clone())?,
             listeners: Arc::new(listeners),
             config: Arc::new(config),
             routes,
@@ -374,6 +378,19 @@ impl App {
                 let _ = stop.send(true);
                 let _ = running.await;
             }
+            "down" => {
+                let secret = flag_text(args, "--secret").map(str::to_owned);
+                let retry = flag_value(args, "--retry")?.map(u64::from);
+                crate::maintenance::down(&kernel.state.config.storage_path, secret.clone(), retry)?;
+                match secret {
+                    Some(secret) => println!("The app is down. Visit /{secret} to bypass it."),
+                    None => println!("The app is down."),
+                }
+            }
+            "up" => match crate::maintenance::up(&kernel.state.config.storage_path)? {
+                true => println!("The app is up."),
+                false => println!("The app was not down."),
+            },
             other => return Err(anyhow!("unknown command `{other}`\n\n{USAGE}").into()),
         }
         Ok(())
@@ -547,11 +564,16 @@ fn build_router(router: Router<AppState>, state: AppState) -> Router {
     };
 
     router
+        .layer(from_fn_with_state(
+            state.clone(),
+            crate::maintenance::middleware,
+        ))
         .layer(from_fn_with_state(state.clone(), view::middleware))
         .layer(from_fn(csrf::middleware))
         .layer(from_fn_with_state(state.clone(), auth::middleware))
         .layer(from_fn_with_state(state.clone(), session::middleware))
         .merge(assets::router())
+        .merge(crate::health::router())
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
