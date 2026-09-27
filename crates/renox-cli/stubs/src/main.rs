@@ -1,5 +1,8 @@
 mod app;
 
 fn main() -> renox::Result {
-    renox::App::new().module(app::home::Home).run()
+    renox::App::new()
+        .migrations(renox::migrations!())
+        .module(app::home::Home)
+        .run()
 }

@@ -93,7 +93,7 @@ const CREATE: &str = r#"<form method="post">{{ csrf_field() }}
 {% for e in errors.title %}<span class="error">{{ e }}</span>{% endfor %}
 </form>"#;
 
-fn app() -> TestApp {
+async fn app() -> TestApp {
     TestApp::new(
         true,
         &[
@@ -103,6 +103,7 @@ fn app() -> TestApp {
         ],
         |app| app.module(Demo),
     )
+    .await
 }
 
 async fn token(app: &mut TestApp) -> String {
@@ -111,19 +112,19 @@ async fn token(app: &mut TestApp) -> String {
 
 #[tokio::test]
 async fn module_routes_receive_app_state() {
-    let res = app().get("/").await;
+    let res = app().await.get("/").await;
     assert_eq!(res.status, StatusCode::OK);
     assert_eq!(res.body, "Test App");
 }
 
 #[tokio::test]
 async fn named_routes_build_urls() {
-    assert_eq!(app().get("/notes/1").await.body, "/notes/7");
+    assert_eq!(app().await.get("/notes/1").await.body, "/notes/7");
 }
 
 #[tokio::test]
 async fn unknown_route_renders_the_builtin_error_template() {
-    let res = app().get("/nope").await;
+    let res = app().await.get("/nope").await;
     assert_eq!(res.status, StatusCode::NOT_FOUND);
     assert!(res.body.contains("404 · Not Found"));
     assert!(
@@ -145,7 +146,8 @@ async fn app_templates_override_error_pages() {
     }
     let mut app = TestApp::new(true, &[("errors/403.html", "custom forbidden")], |a| {
         a.module(Forbidden)
-    });
+    })
+    .await;
     let res = app.get("/").await;
     assert_eq!(res.status, StatusCode::FORBIDDEN);
     assert_eq!(res.body, "custom forbidden");
@@ -153,14 +155,14 @@ async fn app_templates_override_error_pages() {
 
 #[tokio::test]
 async fn internal_error_shows_detail_in_debug() {
-    let res = app().get("/fail").await;
+    let res = app().await.get("/fail").await;
     assert_eq!(res.status, StatusCode::INTERNAL_SERVER_ERROR);
     assert!(res.body.contains("invalid digit"));
 }
 
 #[tokio::test]
 async fn session_persists_between_requests() {
-    let mut app = app();
+    let mut app = app().await;
     assert_eq!(app.get("/counter").await.body, "1");
     assert_eq!(app.get("/counter").await.body, "2");
     app.clear_cookies();
@@ -169,7 +171,7 @@ async fn session_persists_between_requests() {
 
 #[tokio::test]
 async fn tampered_session_cookie_is_ignored() {
-    let mut app = app();
+    let mut app = app().await;
     app.get("/counter").await;
     app.clear_cookies();
     let res = app
@@ -185,7 +187,7 @@ async fn tampered_session_cookie_is_ignored() {
 
 #[tokio::test]
 async fn flash_lasts_for_one_request() {
-    let mut app = app();
+    let mut app = app().await;
     let token = token(&mut app).await;
     let res = app.post_form("/flash", &format!("_token={token}")).await;
     assert_eq!(res.status, StatusCode::SEE_OTHER);
@@ -195,7 +197,7 @@ async fn flash_lasts_for_one_request() {
 
 #[tokio::test]
 async fn csrf_rejects_requests_without_a_valid_token() {
-    let mut app = app();
+    let mut app = app().await;
     token(&mut app).await;
     assert_eq!(app.post_form("/flash", "").await.status.as_u16(), 419);
     assert_eq!(
@@ -212,7 +214,7 @@ async fn csrf_rejects_requests_without_a_valid_token() {
 
 #[tokio::test]
 async fn csrf_accepts_the_header_used_by_htmx() {
-    let mut app = app();
+    let mut app = app().await;
     let token = token(&mut app).await;
     let res = app.htmx_post("/hx", &token).await;
     assert_eq!(res.status, StatusCode::OK);
@@ -221,7 +223,7 @@ async fn csrf_accepts_the_header_used_by_htmx() {
 
 #[tokio::test]
 async fn views_render_with_globals() {
-    let mut app = app();
+    let mut app = app().await;
     let res = app.get("/page").await;
     assert_eq!(res.status, StatusCode::OK);
     assert_eq!(res.headers["content-type"], "text/html; charset=utf-8");
@@ -236,14 +238,14 @@ async fn views_render_with_globals() {
 
 #[tokio::test]
 async fn htmx_requests_get_only_the_fragment() {
-    let res = app().htmx_get("/page").await;
+    let res = app().await.htmx_get("/page").await;
     assert_eq!(res.body, "<ul><li>a</li><li>b</li></ul>");
-    assert_eq!(app().htmx_get("/hx").await.body, "true true");
+    assert_eq!(app().await.htmx_get("/hx").await.body, "true true");
 }
 
 #[tokio::test]
 async fn old_input_and_errors_survive_the_redirect() {
-    let mut app = app();
+    let mut app = app().await;
     let token = token(&mut app).await;
     app.get("/notes/create").await;
     app.post_form("/notes", &format!("_token={token}&title=Halo+%3Cb%3E"))
@@ -266,7 +268,7 @@ async fn old_input_and_errors_survive_the_redirect() {
 
 #[tokio::test]
 async fn embedded_assets_are_served_with_long_caching() {
-    let mut app = app();
+    let mut app = app().await;
     let page = app.get("/page").await.body;
     let src = page
         .split("src=\"")
@@ -287,7 +289,7 @@ async fn embedded_assets_are_served_with_long_caching() {
 
 #[tokio::test]
 async fn public_files_are_served() {
-    let res = app().get("/robots.txt").await;
+    let res = app().await.get("/robots.txt").await;
     assert_eq!(res.status, StatusCode::OK);
     assert_eq!(res.body, "User-agent: *");
 }

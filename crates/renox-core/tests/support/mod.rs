@@ -23,7 +23,7 @@ pub struct TestResponse {
 }
 
 impl TestApp {
-    pub fn new(debug: bool, views: &[(&str, &str)], build: impl FnOnce(App) -> App) -> Self {
+    pub async fn new(debug: bool, views: &[(&str, &str)], build: impl FnOnce(App) -> App) -> Self {
         let dir = tempfile::tempdir().unwrap();
         for (name, source) in views {
             let path = dir.path().join("views").join(name);
@@ -42,7 +42,7 @@ impl TestApp {
             key: Some(renox_core::generate_key()),
             ..Config::default()
         };
-        let router = build(App::with_config(config)).into_router().unwrap();
+        let router = build(App::with_config(config)).into_router().await.unwrap();
         Self {
             router,
             cookie: None,

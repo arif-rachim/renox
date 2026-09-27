@@ -17,7 +17,13 @@ use crate::{AppState, Config, Error, Htmx, RouteTable, Session, assets};
 
 /// Templates that ship with Renox. An app overrides one by creating a file
 /// with the same name in its views directory.
-const BUILTIN: &[(&str, &str)] = &[("renox/error.html", include_str!("../views/error.html"))];
+const BUILTIN: &[(&str, &str)] = &[
+    ("renox/error.html", include_str!("../views/error.html")),
+    (
+        "renox/pagination.html",
+        include_str!("../views/pagination.html"),
+    ),
+];
 
 /// The template engine (MiniJinja), reading from `VIEWS_PATH`.
 ///

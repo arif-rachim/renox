@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use cookie::Key;
 
+use crate::db::Db;
 use crate::{Config, Result, RouteTable, Views};
 
 /// Shared state available to every handler through `State<AppState>`.
@@ -11,6 +12,7 @@ pub struct AppState {
     pub config: Arc<Config>,
     pub routes: Arc<RouteTable>,
     pub views: Views,
+    pub db: Db,
     pub(crate) key: Key,
 }
 

@@ -1,18 +1,43 @@
-//! A tiny guestbook showing Renox's M1 features: named routes, views with a
-//! layout, sessions and flash messages, CSRF, old input and HTMX fragments.
+//! A guestbook showing Renox's features so far: named routes, views with a
+//! layout, sessions and flash messages, CSRF, old input, HTMX fragments, and
+//! SQLite with a model, migrations, a seeder and pagination.
 //!
-//! Run it from this directory: `cargo run`.
+//! Run it from this directory:
+//!
+//! ```text
+//! cargo run -- migrate
+//! cargo run -- db:seed     # optional: 30 fake entries
+//! cargo run
+//! ```
 
-use std::sync::Mutex;
-
+use renox::fake::Fake;
+use renox::fake::faker::lorem::en::Sentence;
+use renox::fake::faker::name::en::FirstName;
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 
-/// Kept in memory until the database arrives in M2.
-static ENTRIES: Mutex<Vec<Entry>> = Mutex::new(Vec::new());
-
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Model, Serialize, Default)]
+#[model(table = "entries")]
 struct Entry {
+    id: i64,
+    name: String,
+    message: String,
+    created_at: Option<DateTime>,
+    updated_at: Option<DateTime>,
+}
+
+impl Factory for Entry {
+    fn definition() -> Self {
+        Entry {
+            name: FirstName().fake(),
+            message: Sentence(3..8).fake(),
+            ..Default::default()
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct EntryForm {
     name: String,
     message: String,
 }
@@ -35,9 +60,9 @@ impl Module for Guestbook {
     }
 }
 
-async fn index() -> View {
-    let entries = ENTRIES.lock().unwrap().clone();
-    view("guestbook/index.html", context! { entries }).fragment("entries")
+async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
+    let entries = Entry::query().latest().paginate(&db, page, 10).await?;
+    Ok(view("guestbook/index.html", context! { entries }).fragment("entries"))
 }
 
 async fn store(
@@ -45,10 +70,10 @@ async fn store(
     session: Session,
     htmx: Htmx,
     back: Back,
-    Form(entry): Form<Entry>,
+    Form(form): Form<EntryForm>,
 ) -> Result<Response> {
-    if entry.name.trim().is_empty() || entry.message.trim().is_empty() {
-        session.flash_input(&entry)?;
+    if form.name.trim().is_empty() || form.message.trim().is_empty() {
+        session.flash_input(&form)?;
         session.flash_errors(&context! { form => ["Nama dan pesan wajib diisi."] })?;
         // Validation responses for HTMX forms arrive in M3; until then reload the page.
         if htmx.request {
@@ -57,10 +82,18 @@ async fn store(
         return Ok(back.into_response());
     }
 
-    ENTRIES.lock().unwrap().insert(0, entry);
+    Entry::create(
+        &state.db,
+        Entry {
+            name: form.name,
+            message: form.message,
+            ..Default::default()
+        },
+    )
+    .await?;
 
     if htmx.request {
-        let entries = ENTRIES.lock().unwrap().clone();
+        let entries = Entry::query().latest().paginate(&state.db, 1, 10).await?;
         return Ok((
             HxTrigger("entry-added".into()),
             view("guestbook/index.html", context! { entries }).fragment("entries"),
@@ -76,5 +109,12 @@ async fn greet(Path(nama): Path<String>) -> String {
 }
 
 fn main() -> renox::Result {
-    App::new().module(Guestbook).run()
+    App::new()
+        .migrations(renox::migrations!())
+        .module(Guestbook)
+        .seeder(|db| async move {
+            Entry::create_many(&db, 30).await?;
+            Ok(())
+        })
+        .run()
 }

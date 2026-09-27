@@ -1,5 +1,8 @@
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 
+use anyhow::anyhow;
 use axum::Router;
 use axum::handler::HandlerWithoutStateExt;
 use axum::middleware::{from_fn, from_fn_with_state};
@@ -9,21 +12,46 @@ use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
 use crate::crypto::parse_key;
+use crate::db::{Db, Migration, MigrationStatus, Migrator};
 use crate::{
     AppState, Config, Environment, Error, Module, Result, RouteTable, Views, assets, csrf, session,
     view,
 };
 
+type Seeder = Box<dyn Fn(Db) -> Pin<Box<dyn Future<Output = Result> + Send>> + Send + Sync>;
+
+const USAGE: &str = "\
+Usage: <app> [command]
+
+Commands:
+  serve                     Start the web server (default)
+  migrate                   Run pending migrations
+  migrate:rollback [--step N]
+                            Undo the last N batches of migrations (default 1)
+  migrate:fresh [--seed]    Drop all tables, run every migration, optionally seed
+  migrate:status            List migrations and whether they have run
+  db:seed                   Run the seeders
+  help                      Show this message";
+
 /// The application builder.
 ///
 /// ```ignore
 /// fn main() -> renox::Result {
-///     App::new().module(Produk).run()
+///     App::new()
+///         .migrations(renox::migrations!())
+///         .module(Produk)
+///         .seeder(seed)
+///         .run()
 /// }
 /// ```
+///
+/// The built binary is also the app's command line, like Laravel's artisan:
+/// `my-app migrate`, `my-app db:seed`, `my-app help`.
 pub struct App {
     config: Option<Config>,
     modules: Vec<Box<dyn Module>>,
+    migrations: Vec<Migration>,
+    seeders: Vec<Seeder>,
 }
 
 impl App {
@@ -32,6 +60,8 @@ impl App {
         Self {
             config: None,
             modules: Vec::new(),
+            migrations: Vec::new(),
+            seeders: Vec::new(),
         }
     }
 
@@ -39,7 +69,7 @@ impl App {
     pub fn with_config(config: Config) -> Self {
         Self {
             config: Some(config),
-            modules: Vec::new(),
+            ..Self::new()
         }
     }
 
@@ -48,41 +78,133 @@ impl App {
         self
     }
 
-    /// Builds the router without starting a server, e.g. for tests.
-    pub fn into_router(self) -> Result<Router> {
+    /// Registers app-level migrations, usually `renox::migrations!()`.
+    pub fn migrations(mut self, migrations: &[Migration]) -> Self {
+        self.migrations.extend_from_slice(migrations);
+        self
+    }
+
+    /// Registers a seeder for `db:seed`. Seeders run in registration order.
+    ///
+    /// ```ignore
+    /// App::new().seeder(|db| async move {
+    ///     Produk::create_many(&db, 50).await?;
+    ///     Ok(())
+    /// })
+    /// ```
+    pub fn seeder<F, Fut>(mut self, seeder: F) -> Self
+    where
+        F: Fn(Db) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result> + Send + 'static,
+    {
+        self.seeders.push(Box::new(move |db| Box::pin(seeder(db))));
+        self
+    }
+
+    /// Connects to the database and builds the router, without serving.
+    pub async fn boot(self) -> Result<Kernel> {
         let config = match self.config {
             Some(config) => config,
             None => Config::load()?,
         };
-        build_router(config, &self.modules)
+        let mut migrations = self.migrations;
+        for module in &self.modules {
+            migrations.extend_from_slice(module.migrations());
+        }
+        let migrator = Migrator::new(migrations)?;
+        let db = crate::db::connect(&config).await?;
+        let router = build_router(config, &self.modules, db.clone())?;
+        Ok(Kernel {
+            router,
+            db,
+            migrator,
+            seeders: self.seeders,
+        })
     }
 
-    /// Starts the server on a new Tokio runtime and blocks until shutdown.
+    /// Builds the router without starting a server, e.g. for tests.
+    pub async fn into_router(self) -> Result<Router> {
+        Ok(self.boot().await?.router)
+    }
+
+    /// Runs the command given on the command line (`serve` by default) on a
+    /// new Tokio runtime.
     pub fn run(self) -> Result {
+        let args: Vec<String> = std::env::args().skip(1).collect();
         tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()?
-            .block_on(self.serve())
+            .block_on(self.command(&args))
     }
 
     /// Starts the server on the current Tokio runtime.
     pub async fn serve(self) -> Result {
-        let config = match self.config {
+        self.command(&[]).await
+    }
+
+    async fn command(self, args: &[String]) -> Result {
+        let command = args.first().map(String::as_str).unwrap_or("serve");
+        if matches!(command, "help" | "--help" | "-h") {
+            println!("{USAGE}");
+            return Ok(());
+        }
+
+        let config = match self.config.clone() {
             Some(config) => config,
             None => Config::load()?,
         };
-        init_tracing(&config);
-
-        let addr = config.addr();
+        init_tracing(&config, command == "serve");
+        if command == "serve" && config.key.is_none() && config.env != Environment::Testing {
+            tracing::warn!(
+                "APP_KEY is not set; using a temporary key, so sessions end on restart. \
+                 Run `renox key:generate`."
+            );
+        }
         let name = config.name.clone();
-        let router = build_router(config, &self.modules)?;
+        let addr = config.addr();
+        let kernel = App {
+            config: Some(config),
+            ..self
+        }
+        .boot()
+        .await?;
 
-        let listener = TcpListener::bind(addr).await?;
-        tracing::info!("{name} listening on http://{}", listener.local_addr()?);
-        axum::serve(listener, router)
-            .with_graceful_shutdown(shutdown_signal())
-            .await?;
-        tracing::info!("{name} stopped");
+        match command {
+            "serve" => {
+                let listener = TcpListener::bind(addr).await?;
+                tracing::info!("{name} listening on http://{}", listener.local_addr()?);
+                axum::serve(listener, kernel.router)
+                    .with_graceful_shutdown(shutdown_signal())
+                    .await?;
+                tracing::info!("{name} stopped");
+            }
+            "migrate" => print_done("Migrated", &kernel.migrate().await?),
+            "migrate:rollback" => {
+                let steps = flag_value(args, "--step")?.unwrap_or(1);
+                print_done("Rolled back", &kernel.rollback(steps).await?);
+            }
+            "migrate:fresh" => {
+                println!("Dropped all tables.");
+                print_done("Migrated", &kernel.fresh().await?);
+                if args.iter().any(|a| a == "--seed") {
+                    kernel.seed().await?;
+                    println!("Seeded.");
+                }
+            }
+            "migrate:status" => {
+                for m in kernel.migration_status().await? {
+                    match m.batch {
+                        Some(batch) => println!("  ran (batch {batch})  {}", m.name),
+                        None => println!("  pending          {}", m.name),
+                    }
+                }
+            }
+            "db:seed" => {
+                kernel.seed().await?;
+                println!("Seeded.");
+            }
+            other => return Err(anyhow!("unknown command `{other}`\n\n{USAGE}").into()),
+        }
         Ok(())
     }
 }
@@ -93,20 +215,78 @@ impl Default for App {
     }
 }
 
-fn build_router(config: Config, modules: &[Box<dyn Module>]) -> Result<Router> {
+/// A booted application: its router, database and maintenance commands.
+pub struct Kernel {
+    router: Router,
+    db: Db,
+    migrator: Migrator,
+    seeders: Vec<Seeder>,
+}
+
+impl Kernel {
+    pub fn router(&self) -> Router {
+        self.router.clone()
+    }
+
+    pub fn db(&self) -> &Db {
+        &self.db
+    }
+
+    /// Runs pending migrations; returns their names.
+    pub async fn migrate(&self) -> Result<Vec<String>> {
+        let done = self.migrator.run(&self.db).await?;
+        Ok(done.into_iter().map(str::to_owned).collect())
+    }
+
+    /// Undoes the last `batches` batches of migrations; returns their names.
+    pub async fn rollback(&self, batches: u32) -> Result<Vec<String>> {
+        Ok(self.migrator.rollback(&self.db, batches).await?)
+    }
+
+    /// Drops every table and runs all migrations.
+    pub async fn fresh(&self) -> Result<Vec<String>> {
+        let done = self.migrator.fresh(&self.db).await?;
+        Ok(done.into_iter().map(str::to_owned).collect())
+    }
+
+    pub async fn migration_status(&self) -> Result<Vec<MigrationStatus>> {
+        Ok(self.migrator.status(&self.db).await?)
+    }
+
+    /// Runs every seeder in registration order.
+    pub async fn seed(&self) -> Result {
+        for seeder in &self.seeders {
+            seeder(self.db.clone()).await?;
+        }
+        Ok(())
+    }
+}
+
+fn print_done(verb: &str, names: &[String]) {
+    if names.is_empty() {
+        println!("Nothing to do.");
+    }
+    for name in names {
+        println!("{verb}: {name}");
+    }
+}
+
+fn flag_value(args: &[String], flag: &str) -> Result<Option<u32>> {
+    let Some(i) = args.iter().position(|a| a == flag) else {
+        return Ok(None);
+    };
+    match args.get(i + 1).and_then(|v| v.parse().ok()) {
+        Some(value) => Ok(Some(value)),
+        None => Err(anyhow!("{flag} needs a number").into()),
+    }
+}
+
+fn build_router(config: Config, modules: &[Box<dyn Module>], db: Db) -> Result<Router> {
     crate::error::set_debug(config.debug);
 
     let key = match &config.key {
         Some(key) => parse_key(key)?,
-        None => {
-            if config.env != Environment::Testing {
-                tracing::warn!(
-                    "APP_KEY is not set; using a temporary key, so sessions end on restart. \
-                     Run `renox key:generate`."
-                );
-            }
-            parse_key(&crate::generate_key())?
-        }
+        None => parse_key(&crate::generate_key())?,
     };
 
     let mut router = Router::new();
@@ -127,6 +307,7 @@ fn build_router(config: Config, modules: &[Box<dyn Module>]) -> Result<Router> {
         config: Arc::new(config),
         routes,
         views,
+        db,
         key,
     };
 
@@ -146,11 +327,12 @@ fn build_router(config: Config, modules: &[Box<dyn Module>]) -> Result<Router> {
         .with_state(state))
 }
 
-fn init_tracing(config: &Config) {
-    let default = if config.debug {
-        "info,renox=debug"
-    } else {
-        "info"
+/// Serving logs requests; other commands only log warnings and errors.
+fn init_tracing(config: &Config, serving: bool) {
+    let default = match (serving, config.debug) {
+        (true, true) => "info,renox=debug",
+        (true, false) => "info",
+        (false, _) => "warn",
     };
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(default));
     let _ = tracing_subscriber::fmt().with_env_filter(filter).try_init();

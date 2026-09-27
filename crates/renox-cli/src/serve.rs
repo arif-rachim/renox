@@ -9,7 +9,7 @@ use notify_debouncer_mini::{DebounceEventResult, new_debouncer};
 use serde_json::Value;
 
 /// Paths whose changes need a rebuild. Views reload inside the running app.
-const WATCH: &[&str] = &["src", "Cargo.toml", ".env"];
+const WATCH: &[&str] = &["src", "migrations", "build.rs", "Cargo.toml", ".env"];
 
 pub fn run(cargo_args: &[String]) -> Result<()> {
     if !Path::new("Cargo.toml").is_file() {
@@ -29,12 +29,16 @@ pub fn run(cargo_args: &[String]) -> Result<()> {
     let mut app: Option<Child> = None;
     loop {
         match build(cargo_args)? {
-            Some(exe) => {
+            Some(exe) if migrate(&exe)? => {
                 if let Some(mut old) = app.take() {
                     stop(&mut old);
                 }
                 app = Some(start(&exe)?);
             }
+            Some(_) if app.is_some() => {
+                eprintln!("\nrenox: migrations failed; the previous version keeps running.")
+            }
+            Some(_) => eprintln!("\nrenox: migrations failed; waiting for changes…"),
             None if app.is_some() => {
                 eprintln!("\nrenox: build failed; the previous version keeps running.")
             }
@@ -68,6 +72,21 @@ fn build(cargo_args: &[String]) -> Result<Option<PathBuf>> {
         Some(exe) => Ok(Some(exe)),
         None => bail!("the build produced no binary; is this a Renox app?"),
     }
+}
+
+/// Runs pending migrations with the new binary. Prints its output unless
+/// there was nothing to do.
+fn migrate(exe: &Path) -> Result<bool> {
+    let output = Command::new(exe)
+        .arg("migrate")
+        .output()
+        .with_context(|| format!("could not run {} migrate", exe.display()))?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    if stdout.trim() != "Nothing to do." {
+        print!("{stdout}");
+    }
+    eprint!("{}", String::from_utf8_lossy(&output.stderr));
+    Ok(output.status.success())
 }
 
 fn start(exe: &Path) -> Result<Child> {

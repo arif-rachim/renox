@@ -43,6 +43,10 @@ pub struct Config {
     pub session_lifetime: u64,
     /// Name of the session cookie, from `SESSION_COOKIE`.
     pub session_cookie: String,
+    /// SQLite database, from `DATABASE_URL`, e.g. `sqlite://storage/app.db`.
+    pub database_url: String,
+    /// Maximum open connections, from `DATABASE_POOL_SIZE`.
+    pub database_pool_size: u32,
 }
 
 impl Config {
@@ -82,6 +86,10 @@ impl Config {
                 .parse()
                 .context("SESSION_LIFETIME must be a number of minutes")?,
             session_cookie: var_or("SESSION_COOKIE", "renox_session"),
+            database_url: var_or("DATABASE_URL", "sqlite://storage/app.db"),
+            database_pool_size: var_or("DATABASE_POOL_SIZE", "8")
+                .parse()
+                .context("DATABASE_POOL_SIZE must be a number")?,
         })
     }
 
@@ -104,6 +112,8 @@ impl Default for Config {
             public_path: "public".into(),
             session_lifetime: 120,
             session_cookie: "renox_session".into(),
+            database_url: "sqlite::memory:".into(),
+            database_pool_size: 8,
         }
     }
 }
