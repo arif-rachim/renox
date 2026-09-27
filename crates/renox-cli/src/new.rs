@@ -119,6 +119,12 @@ fn validate_name(name: &str) -> Result<()> {
             "`{name}` is not a valid name: use lowercase letters, digits, `-` and `_`, starting with a letter"
         );
     }
+    let crate_name = name.replace('-', "_");
+    if crate::generate::is_reserved(&crate_name) {
+        bail!(
+            "`{name}` can't be an app's name: `{crate_name}` is a Rust keyword or a crate the app uses"
+        );
+    }
     Ok(())
 }
 
@@ -148,6 +154,9 @@ mod tests {
         assert!(validate_name("Toko").is_err());
         assert!(validate_name("2toko").is_err());
         assert!(validate_name("../toko").is_err());
+        for reserved in ["renox", "fn", "self", "type"] {
+            assert!(validate_name(reserved).is_err(), "{reserved}");
+        }
     }
 
     #[test]

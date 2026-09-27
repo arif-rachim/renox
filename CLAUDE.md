@@ -55,7 +55,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            Policy/gates (mod.rs), Auth module + pages (module.rs), password reset,
                            verification, API tokens, LoginThrottle (pair/account/IP), notifications;
                            logout bumps users.sessions_revoked_at (checked in resolve)
-  src/queue/               Job trait, Queue (dispatch), Worker
+  src/queue/               Job trait, Queue (dispatch, dispatch_in), Worker (job per task, sweep of
+                           exhausted jobs, extended reservations, retried bookkeeping)
   src/schedule.rs          Schedule + runner; APP_TIMEZONE offsets
   src/events.rs            Event, listeners, AppState::emit
   src/mail.rs              Mail, Mailer (smtp/log/memory), mail_view, queue_mail, /_renox/mail preview
@@ -491,8 +492,15 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 - The probes are committed on **local** branches `probe-web` (probe_web.rs) and `probe-data`
   (probe_data.rs, probe_bg.rs, examples/probe-chaos): `git worktree add ../x probe-web`. They are not
   pushed and not on main; when an item is fixed, move its probe to main as a passing test.
-- M13a moved all web probes to main as `tests/it/web_security.rs` (names without `probe_`).
-  `probe-data` remains the source for M13b/M13c.
+- M13a moved all web probes to main as `tests/it/web_security.rs`, M13b the data/background
+  ones as `tests/it/data_resilience.rs` and `background_resilience.rs` (names without
+  `probe_`). `probe-data` still holds `examples/probe-chaos/` for M13c.
+- M13b conventions: framework rows in the `cache` table start with `renox:` (flush keeps them);
+  `Error::permanent` marks errors the queue won't retry; `error::panic_message` for caught
+  panics; `Config::default()` keeps a 30 s acquire timeout (parallel tests open many SQLite
+  files; `.env` default is 5 s), while in-memory SQLite caps it at 2 s so a task waiting on its
+  own transaction fails fast; framework migrations needing a PostgreSQL `down` are written as a
+  `Migration` literal (see `webhook::MIGRATIONS`), since `framework_migration!` has none.
 - `target/` grows to ~100 GB over a few milestones and fills the disk (link errors, "No space left
   on device"); `cargo clean` it before the full two-database run.
 - This session's working directory (~/workspace/renoxium) isn't a git repo, so the Agent tool's
@@ -532,7 +540,8 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M12 types end to end (checkbox, datetime-local, multi-select, `DbEnum`, `Json<T>`, `uuid` feature, `examples/fields`, docs/types.md) | merged to `main` (#29) |
 | Pre-1.0 audit (Laravel gaps, negative flows, chaos) → docs/audit/2026-09-pre-1.0.md; plan M13 + M14 in ROADMAP | PR from branch `pre-1.0-plan` |
 | M13a web security (W1–W18): sandboxed user files, `ClientIp` + `TRUSTED_PROXIES`, logout revokes sessions, 3-way login lock, same-site redirects | PR from branch `m13a-web-security` |
-| M13b resilience, M13c regression + chaos suite (ROADMAP M13, IDs D* in the audit) | next |
+| M13b resilience (D1–D30): contained panics, timeouts, queue/migration/cache hardening | PR from branch `m13b-resilience` |
+| M13c regression + chaos suite + docs/operations.md (ROADMAP M13) | next |
 | M14 API freeze (ROADMAP M14, IDs A*) | after M13 |
 | v1.0 docs site, starter kit, semver guarantee | last |
 

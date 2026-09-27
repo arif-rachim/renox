@@ -76,6 +76,9 @@ pub struct MailConfig {
     pub encryption: String,
     pub from_address: String,
     pub from_name: Option<String>,
+    /// How long sending one mail over SMTP may take, from `MAIL_TIMEOUT` in
+    /// seconds (default 10).
+    pub timeout: std::time::Duration,
 }
 
 impl Default for MailConfig {
@@ -88,6 +91,7 @@ impl Default for MailConfig {
             password: None,
             encryption: "starttls".into(),
             from_address: "hello@example.com".into(),
+            timeout: std::time::Duration::from_secs(10),
             from_name: None,
         }
     }
@@ -100,6 +104,7 @@ enum Driver {
     Smtp {
         transport: AsyncSmtpTransport<Tokio1Executor>,
         from: Mailbox,
+        timeout: std::time::Duration,
     },
 }
 
@@ -145,11 +150,18 @@ impl Mailer {
                 mail.text
             ),
             Driver::Memory => {}
-            Driver::Smtp { transport, from } => {
+            Driver::Smtp {
+                transport,
+                from,
+                timeout,
+            } => {
                 let message = message(from, &mail)?;
-                transport
-                    .send(message)
+                // lettre's own timeout doesn't cover a server that accepts the
+                // connection and then says nothing.
+                tokio::time::timeout(*timeout, transport.send(message))
                     .await
+                    .map_err(|_| anyhow::anyhow!("no answer from the SMTP server in {timeout:?}"))
+                    .and_then(|sent| sent.map_err(anyhow::Error::from))
                     .with_context(|| format!("sending mail to {}", mail.to))?;
             }
         }
@@ -201,6 +213,7 @@ fn smtp(config: &Config) -> anyhow::Result<Driver> {
     if let Some(port) = mail.port {
         builder = builder.port(port);
     }
+    builder = builder.timeout(Some(mail.timeout));
     if let (Some(user), Some(password)) = (&mail.username, &mail.password) {
         builder = builder.credentials(Credentials::new(user.clone(), password.clone()));
     }
@@ -217,14 +230,16 @@ fn smtp(config: &Config) -> anyhow::Result<Driver> {
     Ok(Driver::Smtp {
         transport: builder.build(),
         from: Mailbox::new(Some(name), address),
+        timeout: mail.timeout,
     })
 }
 
 fn message(from: &Mailbox, mail: &Mail) -> Result<Message> {
-    let to: Mailbox = mail
-        .to
-        .parse()
-        .with_context(|| format!("`{}` is not an email address", mail.to))?;
+    let to: Mailbox = mail.to.parse().map_err(|err| {
+        Error::permanent(
+            anyhow::Error::new(err).context(format!("`{}` is not an email address", mail.to)),
+        )
+    })?;
     let builder = Message::builder()
         .from(from.clone())
         .to(to)

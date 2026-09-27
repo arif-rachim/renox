@@ -13,6 +13,50 @@ enum Trashed {
     Only,
 }
 
+/// `where_in` lists longer than this are sent as one JSON array.
+const LARGE_IN: usize = 1000;
+
+/// Marks a filter rendered by `json_in`: `{JSON_IN}{int|text}:{column}`.
+const JSON_IN: &str = "\u{0}json_in:";
+
+/// A long list of integers or of strings, as a JSON array.
+fn large_list(values: &[DbValue]) -> Option<(&'static str, serde_json::Value)> {
+    if values.len() <= LARGE_IN {
+        return None;
+    }
+    if let Some(ints) = values
+        .iter()
+        .map(|v| match v {
+            DbValue::Integer(n) => Some(serde_json::Value::from(*n)),
+            _ => None,
+        })
+        .collect::<Option<Vec<_>>>()
+    {
+        return Some(("int", ints.into()));
+    }
+    values
+        .iter()
+        .map(|v| match v {
+            DbValue::Text(s) => Some(serde_json::Value::from(s.clone())),
+            _ => None,
+        })
+        .collect::<Option<Vec<_>>>()
+        .map(|texts| ("text", texts.into()))
+}
+
+fn json_in(rest: &str, dialect: Dialect) -> String {
+    let (kind, column) = rest.split_once(':').unwrap_or(("text", rest));
+    match (dialect, kind) {
+        (Dialect::Sqlite, _) => format!("{column} IN (SELECT value FROM json_each(?))"),
+        (Dialect::Postgres, "int") => format!(
+            "{column} IN (SELECT CAST(x AS BIGINT) FROM jsonb_array_elements_text(CAST(? AS JSONB)) AS t(x))"
+        ),
+        (Dialect::Postgres, _) => format!(
+            "{column} IN (SELECT x FROM jsonb_array_elements_text(CAST(? AS JSONB)) AS t(x))"
+        ),
+    }
+}
+
 /// A query on a model's table, built with chained filters.
 ///
 /// ```
@@ -131,6 +175,10 @@ impl<M: Model> Query<M> {
         if let Some(column) = self.column(column) {
             if values.is_empty() {
                 self.filters.push("0 = 1".into());
+            } else if let Some((kind, list)) = large_list(&values) {
+                // Over the databases' bind limits: one JSON array instead.
+                self.filters.push(format!("{JSON_IN}{kind}:{column}"));
+                self.binds.push(DbValue::Json(list));
             } else {
                 let marks = vec!["?"; values.len()].join(", ");
                 self.filters.push(format!("{column} IN ({marks})"));
@@ -164,13 +212,14 @@ impl<M: Model> Query<M> {
         self.order_by_desc(column).order_by_desc("id")
     }
 
+    /// At most `limit` rows (a limit past `i64::MAX` means no limit).
     pub fn limit(mut self, limit: u64) -> Self {
-        self.limit = Some(limit);
+        self.limit = Some(limit.min(i64::MAX as u64));
         self
     }
 
     pub fn offset(mut self, offset: u64) -> Self {
-        self.offset = Some(offset);
+        self.offset = Some(offset.min(i64::MAX as u64));
         self
     }
 
@@ -197,9 +246,14 @@ impl<M: Model> Query<M> {
         let mut filters: Vec<String> = self
             .filters
             .iter()
-            .map(|filter| match filter.strip_suffix(" LIKE ?") {
-                Some(head) if dialect == Dialect::Postgres => format!("{head} ILIKE ?"),
-                _ => filter.clone(),
+            .map(|filter| {
+                if let Some(rest) = filter.strip_prefix(JSON_IN) {
+                    return json_in(rest, dialect);
+                }
+                match filter.strip_suffix(" LIKE ?") {
+                    Some(head) if dialect == Dialect::Postgres => format!("{head} ILIKE ?"),
+                    _ => filter.clone(),
+                }
             })
             .collect();
         if M::SOFT_DELETES {

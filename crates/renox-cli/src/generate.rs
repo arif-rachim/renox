@@ -38,7 +38,79 @@ fn check_name(name: &str) -> Result<()> {
             "`{name}` is not a valid name: use letters, digits, `_` or `-`, starting with a letter"
         );
     }
+    let snake = name.to_snake_case();
+    if is_reserved(&snake) {
+        bail!("`{name}` can't be used: `{snake}` is a Rust keyword or a crate the app uses");
+    }
     Ok(())
+}
+
+/// Rust keywords (current and reserved) and crate names an app's modules
+/// and crate must not take.
+pub(crate) fn is_reserved(word: &str) -> bool {
+    const RESERVED: &[&str] = &[
+        "as",
+        "async",
+        "await",
+        "break",
+        "const",
+        "continue",
+        "crate",
+        "dyn",
+        "else",
+        "enum",
+        "extern",
+        "false",
+        "fn",
+        "for",
+        "gen",
+        "if",
+        "impl",
+        "in",
+        "let",
+        "loop",
+        "match",
+        "mod",
+        "move",
+        "mut",
+        "pub",
+        "ref",
+        "return",
+        "self",
+        "static",
+        "struct",
+        "super",
+        "trait",
+        "true",
+        "type",
+        "unsafe",
+        "use",
+        "where",
+        "while",
+        "abstract",
+        "become",
+        "box",
+        "do",
+        "final",
+        "macro",
+        "override",
+        "priv",
+        "try",
+        "typeof",
+        "unsized",
+        "virtual",
+        "yield",
+        "std",
+        "core",
+        "alloc",
+        "renox",
+        "renox_core",
+        "renox_macros",
+        "serde",
+        "tokio",
+        "test",
+    ];
+    RESERVED.contains(&word)
 }
 
 /// Adds `pub mod {name};` to a `mod.rs`, after its other module lines.

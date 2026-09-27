@@ -58,13 +58,23 @@ impl FromRef<AppState> for Db {
 /// unchanged.
 pub(crate) async fn connect(config: &Config) -> anyhow::Result<Db> {
     let url = &config.database_url;
+    if config.database_pool_size == 0 {
+        anyhow::bail!("DATABASE_POOL_SIZE must be at least 1");
+    }
     if is_postgres(url) {
-        return connect_postgres(url, config.database_pool_size, false).await;
+        return connect_postgres(url, config, false).await;
+    }
+    if !url.starts_with("sqlite:") {
+        // A typo such as `postgress://` must not become a SQLite file.
+        anyhow::bail!(
+            "DATABASE_URL `{}` must start with sqlite:, postgres:// or postgresql://",
+            redact(url)
+        );
     }
     if is_memory(url)
         && let Some(test_url) = test_database_url().filter(|u| is_postgres(u))
     {
-        return connect_postgres(&test_url, config.database_pool_size, true).await;
+        return connect_postgres(&test_url, config, true).await;
     }
     connect_sqlite(config).await.map(Db::from)
 }
@@ -92,7 +102,7 @@ fn is_memory(url: &str) -> bool {
 /// Connects to PostgreSQL; with `fresh_schema`, in a new, empty schema of its
 /// own (named `renox_test_…`, left behind for inspection).
 #[cfg(feature = "postgres")]
-async fn connect_postgres(url: &str, pool_size: u32, fresh_schema: bool) -> anyhow::Result<Db> {
+async fn connect_postgres(url: &str, config: &Config, fresh_schema: bool) -> anyhow::Result<Db> {
     use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
     use sqlx::{ConnectOptions, Connection};
 
@@ -120,6 +130,10 @@ async fn connect_postgres(url: &str, pool_size: u32, fresh_schema: bool) -> anyh
         conn.close().await.ok();
         options = options.options([("search_path", schema)]);
     }
+    if let Some(limit) = config.database_statement_timeout {
+        options = options.options([("statement_timeout", format!("{}ms", limit.as_millis()))]);
+    }
+    let pool_size = config.database_pool_size;
     // Test suites boot many apps at once; a few connections each keeps them
     // under the server's limit (100 by default).
     let pool_size = if fresh_schema {
@@ -129,6 +143,7 @@ async fn connect_postgres(url: &str, pool_size: u32, fresh_schema: bool) -> anyh
     };
     let pool = PgPoolOptions::new()
         .max_connections(pool_size)
+        .acquire_timeout(config.database_acquire_timeout)
         .connect_with(options)
         .await
         .with_context(failed)?;
@@ -136,7 +151,7 @@ async fn connect_postgres(url: &str, pool_size: u32, fresh_schema: bool) -> anyh
 }
 
 #[cfg(not(feature = "postgres"))]
-async fn connect_postgres(_url: &str, _pool_size: u32, _fresh_schema: bool) -> anyhow::Result<Db> {
+async fn connect_postgres(_url: &str, _config: &Config, _fresh_schema: bool) -> anyhow::Result<Db> {
     anyhow::bail!(
         "the database URL points to PostgreSQL, but this build has no PostgreSQL support; \
          enable the `postgres` feature of `renox`"
@@ -144,7 +159,6 @@ async fn connect_postgres(_url: &str, _pool_size: u32, _fresh_schema: bool) -> a
 }
 
 /// The URL with its password hidden, for error messages.
-#[cfg_attr(not(feature = "postgres"), allow(dead_code))]
 fn redact(url: &str) -> String {
     let Some((scheme, rest)) = url.split_once("://") else {
         return url.to_owned();
@@ -192,7 +206,15 @@ async fn connect_sqlite(config: &Config) -> anyhow::Result<sqlx::SqlitePool> {
             .max_lifetime(None)
     } else {
         SqlitePoolOptions::new().max_connections(config.database_pool_size)
-    };
+    }
+    .acquire_timeout(if in_memory {
+        // The one connection is busy for a moment at most, unless a task
+        // waits for itself (a query through `&db` while its own transaction
+        // is open): fail such a test fast instead of letting it hang.
+        config.database_acquire_timeout.min(Duration::from_secs(2))
+    } else {
+        config.database_acquire_timeout
+    });
     pool.connect_with(options)
         .await
         .with_context(|| format!("could not open the database at `{url}`"))

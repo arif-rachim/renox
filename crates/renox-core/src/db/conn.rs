@@ -115,6 +115,17 @@ impl Db {
         Ok(Transaction { inner })
     }
 
+    /// A transaction that takes SQLite's write lock at once (`BEGIN
+    /// IMMEDIATE`), so a check made inside it holds until commit.
+    pub(crate) async fn begin_immediate(&self) -> Result<Transaction, sqlx::Error> {
+        let inner = match &self.pool {
+            Pool::Sqlite(pool) => TxInner::Sqlite(pool.begin_with("BEGIN IMMEDIATE").await?),
+            #[cfg(feature = "postgres")]
+            Pool::Postgres(pool) => TxInner::Postgres(pool.begin().await?),
+        };
+        Ok(Transaction { inner })
+    }
+
     /// Closes every connection; later queries fail.
     pub async fn close(&self) {
         match &self.pool {

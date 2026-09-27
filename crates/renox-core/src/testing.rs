@@ -204,7 +204,7 @@ impl TestApp {
             .await
     }
 
-    async fn where_count(&self, table: &str, values: &[(&str, &dyn ToDbValue)]) -> i64 {
+    async fn where_count(&self, table: &str, values: &[(&str, &(dyn ToDbValue + Sync))]) -> i64 {
         let mut sql = format!("SELECT COUNT(*) FROM {}", quote(table));
         let clauses: Vec<String> = values
             .iter()
@@ -230,14 +230,22 @@ impl TestApp {
     }
 
     /// Fails unless a row of `table` has all these column values.
-    pub async fn assert_database_has(&self, table: &str, values: &[(&str, &dyn ToDbValue)]) {
+    pub async fn assert_database_has(
+        &self,
+        table: &str,
+        values: &[(&str, &(dyn ToDbValue + Sync))],
+    ) {
         if self.where_count(table, values).await == 0 {
             panic!("expected `{table}` to have a row with {}", describe(values));
         }
     }
 
     /// Fails if a row of `table` has all these column values.
-    pub async fn assert_database_missing(&self, table: &str, values: &[(&str, &dyn ToDbValue)]) {
+    pub async fn assert_database_missing(
+        &self,
+        table: &str,
+        values: &[(&str, &(dyn ToDbValue + Sync))],
+    ) {
         let count = self.where_count(table, values).await;
         if count > 0 {
             panic!(
@@ -268,7 +276,7 @@ impl TestApp {
     }
 }
 
-fn describe(values: &[(&str, &dyn ToDbValue)]) -> String {
+fn describe(values: &[(&str, &(dyn ToDbValue + Sync))]) -> String {
     values
         .iter()
         .map(|(c, v)| format!("{c} = {:?}", v.to_db_value()))

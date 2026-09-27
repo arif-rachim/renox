@@ -61,11 +61,30 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256, Sha512};
 
 use crate::db::{Db, Migration};
-use crate::queue::{Job, JobContext, Queue, unix_now};
+use crate::queue::{Job, JobContext, unix_now};
 use crate::{AppState, Error, Result};
 
-pub(crate) const MIGRATION: Migration =
-    crate::db::framework_migration!("webhook", "00010101000300_create_webhook_calls_table");
+pub(crate) const MIGRATIONS: [Migration; 2] = [
+    crate::db::framework_migration!("webhook", "00010101000300_create_webhook_calls_table"),
+    Migration {
+        name: "00010101000301_store_webhook_payloads_as_bytes",
+        up: include_str!(
+            "../migrations/webhook/00010101000301_store_webhook_payloads_as_bytes.up.sql"
+        ),
+        down: Some(include_str!(
+            "../migrations/webhook/00010101000301_store_webhook_payloads_as_bytes.down.sql"
+        )),
+        sqlite: None,
+        postgres: Some(crate::db::Scripts {
+            up: include_str!(
+                "../migrations/webhook/00010101000301_store_webhook_payloads_as_bytes.postgres.up.sql"
+            ),
+            down: Some(include_str!(
+                "../migrations/webhook/00010101000301_store_webhook_payloads_as_bytes.postgres.down.sql"
+            )),
+        }),
+    },
+];
 
 /// Tells Renox how to receive one provider's webhooks.
 pub trait Webhook: Send + Sync + 'static {
@@ -115,8 +134,10 @@ impl WebhookRequest {
 pub struct WebhookCall {
     pub id: i64,
     pub provider: String,
+    /// The provider's id, or `sha256:` and its hash when longer than 200 bytes.
     pub event_id: String,
-    pub payload: String,
+    /// The body exactly as received.
+    pub payload: Vec<u8>,
     /// `received`, `processed` or `failed`.
     pub status: String,
     pub error: Option<String>,
@@ -128,12 +149,17 @@ pub struct WebhookCall {
 impl WebhookCall {
     /// The payload as JSON.
     pub fn json<T: DeserializeOwned>(&self) -> Result<T> {
-        Ok(serde_json::from_str(&self.payload)?)
+        Ok(serde_json::from_slice(&self.payload)?)
     }
 
     /// The payload as a urlencoded form.
     pub fn form<T: DeserializeOwned>(&self) -> Result<T> {
-        Ok(serde_urlencoded::from_str(&self.payload)?)
+        Ok(serde_urlencoded::from_bytes(&self.payload)?)
+    }
+
+    /// The payload as text; an error if it isn't UTF-8.
+    pub fn text(&self) -> Result<&str> {
+        Ok(std::str::from_utf8(&self.payload)?)
     }
 
     pub async fn find(db: &Db, id: i64) -> Result<Option<Self>> {
@@ -197,7 +223,7 @@ pub(crate) async fn receive<W: Webhook>(
         return (StatusCode::UNAUTHORIZED, "invalid webhook").into_response();
     }
     let event_id = match W::event_id(&request) {
-        Ok(id) if !id.trim().is_empty() => id,
+        Ok(id) if !id.trim().is_empty() => stored_event_id(id),
         Ok(_) => return Error::BadRequest("the webhook has no event id".into()).into_response(),
         Err(err) => return err.into_response(),
     };
@@ -215,6 +241,17 @@ pub(crate) async fn receive<W: Webhook>(
     }
 }
 
+/// Event ids longer than this are stored as their hash, so the unique index
+/// stays small (PostgreSQL refuses index rows over about 2.7 KB).
+const EVENT_ID_MAX: usize = 200;
+
+fn stored_event_id(id: String) -> String {
+    if id.len() <= EVENT_ID_MAX {
+        return id;
+    }
+    format!("sha256:{}", sha256_hex(&id))
+}
+
 /// Stores the call and queues its processing in one transaction; `None`
 /// when this event was stored before.
 async fn store(
@@ -230,12 +267,15 @@ async fn store(
     )
     .bind(provider)
     .bind(event_id)
-    .bind(String::from_utf8_lossy(body).into_owned())
+    .bind(body.to_vec())
     .bind(unix_now())
     .scalar_optional(&mut tx)
     .await?;
     if let Some(id) = id {
-        Queue::dispatch_in(&mut tx, &ProcessWebhook { call_id: id }).await?;
+        state
+            .queue
+            .dispatch_in(&mut tx, ProcessWebhook { call_id: id })
+            .await?;
     }
     tx.commit().await?;
     if id.is_some() {
@@ -256,7 +296,10 @@ pub async fn retry(state: &AppState, id: i64) -> Result<bool> {
     if changed == 0 {
         return Ok(false);
     }
-    Queue::dispatch_in(&mut tx, &ProcessWebhook { call_id: id }).await?;
+    state
+        .queue
+        .dispatch_in(&mut tx, ProcessWebhook { call_id: id })
+        .await?;
     tx.commit().await?;
     state.queue.wake_workers();
     Ok(true)
@@ -290,7 +333,18 @@ impl Job for ProcessWebhook {
             return Err(anyhow!(error).into());
         };
         let id = call.id;
-        match handle(call, ctx).await {
+        // Its own task, so a panicking handler marks the call failed too.
+        let outcome = match tokio::spawn(handle(call, ctx)).await {
+            Ok(outcome) => outcome,
+            Err(join) => Err(anyhow!(
+                "the webhook handler panicked: {}",
+                join.try_into_panic()
+                    .map(|panic| crate::error::panic_message(&*panic))
+                    .unwrap_or_else(|join| join.to_string())
+            )
+            .into()),
+        };
+        match outcome {
             Ok(()) => mark(&db, id, "processed", None).await,
             Err(err) => {
                 mark(&db, id, "failed", Some(&format!("{err:?}"))).await?;

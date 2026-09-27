@@ -241,9 +241,15 @@ fn key_generate(show: bool) -> Result<()> {
     let mut lines: Vec<String> = env
         .lines()
         .map(|line| {
-            if line.starts_with("APP_KEY=") {
+            // `export APP_KEY=…` (a .env also sourced by a shell) keeps its `export`.
+            let export = line.starts_with("export ");
+            let rest = line.strip_prefix("export ").unwrap_or(line).trim_start();
+            if rest.starts_with("APP_KEY=") && !replaced {
                 replaced = true;
-                format!("APP_KEY={key}")
+                format!("{}APP_KEY={key}", if export { "export " } else { "" })
+            } else if rest.starts_with("APP_KEY=") {
+                // A second definition would override the new key.
+                format!("# {line}")
             } else {
                 line.to_owned()
             }

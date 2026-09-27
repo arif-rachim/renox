@@ -73,9 +73,13 @@ pub struct DatabaseNotification {
 }
 
 impl AppState {
-    /// Delivers `notification` to `user` on each of its channels.
+    /// Delivers `notification` to `user` on each of its channels. The
+    /// database row is written before mail is sent, so a failure there
+    /// doesn't leave a sent mail behind that a retry would send again.
     pub async fn notify(&self, user: &User, notification: &impl Notification) -> Result {
-        for channel in notification.channels() {
+        let mut channels = notification.channels();
+        channels.sort_by_key(|channel| matches!(channel, Channel::Mail));
+        for channel in channels {
             match channel {
                 Channel::Mail => {
                     let mail = notification.to_mail(user, self)?;

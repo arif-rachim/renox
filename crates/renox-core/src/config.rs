@@ -1,6 +1,7 @@
 use std::env;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
+use std::time::Duration;
 
 use anyhow::{Context, bail};
 
@@ -80,6 +81,15 @@ pub struct Config {
     pub database_url: String,
     /// Maximum open connections, from `DATABASE_POOL_SIZE`.
     pub database_pool_size: u32,
+    /// How long a query waits for a free connection before failing, from
+    /// `DATABASE_ACQUIRE_TIMEOUT` in seconds (default 5).
+    pub database_acquire_timeout: Duration,
+    /// Longest a PostgreSQL statement may run, from `DATABASE_STATEMENT_TIMEOUT`
+    /// in seconds (default 30; 0 for none).
+    pub database_statement_timeout: Option<Duration>,
+    /// Longest a request may take to answer, from `REQUEST_TIMEOUT` in
+    /// seconds (default 60; 0 for none). Streaming a response isn't counted.
+    pub request_timeout: Option<Duration>,
     /// Default language of the app, from `APP_LOCALE`. Built-in messages exist
     /// for `en` and `id`; other locales need a lang file.
     pub locale: String,
@@ -172,7 +182,13 @@ impl Config {
             database_url: var_or("DATABASE_URL", "sqlite://storage/app.db"),
             database_pool_size: var_or("DATABASE_POOL_SIZE", "8")
                 .parse()
-                .context("DATABASE_POOL_SIZE must be a number")?,
+                .ok()
+                .filter(|n| *n > 0)
+                .context("DATABASE_POOL_SIZE must be a number above 0")?,
+            database_acquire_timeout: seconds("DATABASE_ACQUIRE_TIMEOUT", 5)?
+                .unwrap_or(Duration::from_secs(5)),
+            database_statement_timeout: seconds("DATABASE_STATEMENT_TIMEOUT", 30)?,
+            request_timeout: seconds("REQUEST_TIMEOUT", 60)?,
             locale: var_or("APP_LOCALE", "en"),
             fallback_locale: var_or("APP_FALLBACK_LOCALE", "en"),
             lang_path: var_or("LANG_PATH", "resources/lang").into(),
@@ -190,6 +206,7 @@ impl Config {
                 encryption: var_or("MAIL_ENCRYPTION", "starttls"),
                 from_address: var_or("MAIL_FROM_ADDRESS", "hello@example.com"),
                 from_name: env::var("MAIL_FROM_NAME").ok().filter(|v| !v.is_empty()),
+                timeout: seconds("MAIL_TIMEOUT", 10)?.unwrap_or(Duration::from_secs(10)),
             },
             queue_workers: var_or("QUEUE_WORKERS", "2")
                 .parse()
@@ -209,9 +226,9 @@ impl Config {
             },
             upload_max_size: var_or("UPLOAD_MAX_SIZE", "10")
                 .parse::<usize>()
-                .context("UPLOAD_MAX_SIZE must be a number of megabytes")?
-                * 1024
-                * 1024,
+                .ok()
+                .and_then(|mb| mb.checked_mul(1024 * 1024))
+                .context("UPLOAD_MAX_SIZE must be a number of megabytes")?,
             csp: CspMode::parse(&var_or("CSP", "relaxed"))?,
             trusted_proxies: crate::TrustedProxies::parse(&var_or("TRUSTED_PROXIES", ""))?,
             vars: Default::default(),
@@ -256,6 +273,11 @@ impl Default for Config {
             remember_lifetime: 43_200,
             database_url: "sqlite::memory:".into(),
             database_pool_size: 8,
+            // Generous: parallel test suites open many SQLite files at once.
+            // (An in-memory database still fails fast; see `db::connect`.)
+            database_acquire_timeout: Duration::from_secs(30),
+            database_statement_timeout: Some(Duration::from_secs(30)),
+            request_timeout: Some(Duration::from_secs(60)),
             locale: "en".into(),
             fallback_locale: "en".into(),
             lang_path: "resources/lang".into(),
@@ -280,6 +302,14 @@ impl Default for Config {
 
 fn optional(name: &str) -> Option<String> {
     env::var(name).ok().filter(|v| !v.is_empty())
+}
+
+/// A number of seconds from `name`; `None` when it is 0 (no limit).
+fn seconds(name: &str, default: u64) -> anyhow::Result<Option<Duration>> {
+    let value: u64 = var_or(name, &default.to_string())
+        .parse()
+        .with_context(|| format!("{name} must be a number of seconds"))?;
+    Ok((value > 0).then(|| Duration::from_secs(value)))
 }
 
 fn var_or(name: &str, default: &str) -> String {

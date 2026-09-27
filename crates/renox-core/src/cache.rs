@@ -14,11 +14,12 @@
 //!
 //! `CACHE_STORE=memory` (default) keeps values in this process; `database`
 //! keeps them in the `cache` table, so they survive restarts and are shared
-//! with `queue:work` processes. Values are stored as JSON.
+//! with `queue:work` processes. Values are stored as JSON. Keys starting with
+//! `renox:` belong to the framework (e.g. scheduler claims).
 
 use std::collections::HashMap;
 use std::future::Future;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 
 use anyhow::bail;
@@ -48,11 +49,17 @@ enum Store {
 #[derive(Clone)]
 pub struct Cache {
     store: Store,
+    /// One lock per key being computed by `remember` in this process.
+    computing: Arc<Mutex<HashMap<String, Weak<tokio::sync::Mutex<()>>>>>,
 }
 
+/// Unix seconds when a value stored now for `ttl` expires, rounded up.
 fn expiry(ttl: Option<Duration>) -> Option<i64> {
-    ttl.map(|ttl| unix_now() + ttl.as_secs().max(1) as i64)
+    ttl.map(|ttl| unix_now() + ttl.as_secs() as i64 + i64::from(ttl.subsec_nanos() > 0))
 }
+
+/// Keys of framework rows, which `flush` keeps.
+const FRAMEWORK_PREFIX: &str = "renox:";
 
 impl Cache {
     pub(crate) fn new(store: &str, db: Db) -> anyhow::Result<Self> {
@@ -61,7 +68,10 @@ impl Cache {
             "database" => Store::Database(db),
             other => bail!("CACHE_STORE must be memory or database, got `{other}`"),
         };
-        Ok(Self { store })
+        Ok(Self {
+            store,
+            computing: Arc::default(),
+        })
     }
 
     async fn raw(&self, key: &str) -> Result<Option<Value>> {
@@ -87,20 +97,32 @@ impl Cache {
         }
     }
 
-    /// The cached value, if present, not expired and of type `T`.
+    /// The cached value, if present and not expired. A value of another
+    /// type than `T` is an error.
     pub async fn get<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>> {
-        Ok(self
-            .raw(key)
-            .await?
-            .and_then(|v| serde_json::from_value(v).ok()))
+        match self.raw(key).await? {
+            None => Ok(None),
+            Some(value) => serde_json::from_value(value).map(Some).map_err(|err| {
+                anyhow::Error::new(err)
+                    .context(format!(
+                        "the cached `{key}` is not a {}",
+                        std::any::type_name::<T>()
+                    ))
+                    .into()
+            }),
+        }
     }
 
     pub async fn has(&self, key: &str) -> Result<bool> {
         Ok(self.raw(key).await?.is_some())
     }
 
-    /// Stores `value` for `ttl`, or until forgotten when `ttl` is `None`.
+    /// Stores `value` for `ttl`, or until forgotten when `ttl` is `None`. A
+    /// zero `ttl` stores nothing (and forgets the key).
     pub async fn put(&self, key: &str, value: &impl Serialize, ttl: Option<Duration>) -> Result {
+        if ttl == Some(Duration::ZERO) {
+            return self.forget(key).await;
+        }
         let value = serde_json::to_value(value)?;
         let expires = expiry(ttl);
         match &self.store {
@@ -128,19 +150,45 @@ impl Cache {
     }
 
     /// Returns the cached value, or runs `compute`, caches its result for
-    /// `ttl` and returns it. Errors are not cached.
+    /// `ttl` and returns it. Errors are not cached. Concurrent calls for the
+    /// same key in this process compute once; the others wait for it. A
+    /// cached value of another type (e.g. after a deploy) is computed again.
     pub async fn remember<T, F, Fut>(&self, key: &str, ttl: Duration, compute: F) -> Result<T>
     where
         T: Serialize + DeserializeOwned,
         F: FnOnce() -> Fut,
         Fut: Future<Output = Result<T>>,
     {
-        if let Some(value) = self.get(key).await? {
+        if let Some(value) = self.cached(key).await? {
+            return Ok(value);
+        }
+        let lock = self.computing_lock(key);
+        let _computing = lock.lock().await;
+        if let Some(value) = self.cached(key).await? {
             return Ok(value);
         }
         let value = compute().await?;
         self.put(key, &value, Some(ttl)).await?;
         Ok(value)
+    }
+
+    /// Like `get`, but a value of another type is a miss.
+    async fn cached<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>> {
+        Ok(self
+            .raw(key)
+            .await?
+            .and_then(|v| serde_json::from_value(v).ok()))
+    }
+
+    fn computing_lock(&self, key: &str) -> Arc<tokio::sync::Mutex<()>> {
+        let mut locks = self.computing.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(lock) = locks.get(key).and_then(Weak::upgrade) {
+            return lock;
+        }
+        locks.retain(|_, lock| lock.strong_count() > 0);
+        let lock = Arc::new(tokio::sync::Mutex::new(()));
+        locks.insert(key.to_owned(), Arc::downgrade(&lock));
+        lock
     }
 
     pub async fn forget(&self, key: &str) -> Result {
@@ -158,12 +206,18 @@ impl Cache {
         Ok(())
     }
 
-    /// Removes everything.
+    /// Removes everything the app cached (not the framework's `renox:` rows).
     pub async fn flush(&self) -> Result {
         match &self.store {
-            Store::Memory(map) => map.lock().unwrap_or_else(|e| e.into_inner()).clear(),
+            Store::Memory(map) => map
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .retain(|key, _| key.starts_with(FRAMEWORK_PREFIX)),
             Store::Database(db) => {
-                crate::db::sql("DELETE FROM cache").execute(db).await?;
+                crate::db::sql("DELETE FROM cache WHERE key NOT LIKE ?")
+                    .bind(format!("{FRAMEWORK_PREFIX}%"))
+                    .execute(db)
+                    .await?;
             }
         }
         Ok(())

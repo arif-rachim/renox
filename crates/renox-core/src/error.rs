@@ -21,7 +21,38 @@ pub enum Error {
     Internal(anyhow::Error),
 }
 
+/// An error that retrying can't fix; see [`Error::permanent`]. It shows as
+/// the error it wraps, and stays findable in the chain under more context.
+#[derive(Debug)]
+struct Permanent(anyhow::Error);
+
+impl std::fmt::Display for Permanent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.0, f)
+    }
+}
+
+impl std::error::Error for Permanent {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.0.chain().nth(1)
+    }
+}
+
 impl Error {
+    /// An error that retrying can't fix, e.g. an invalid email address. A job
+    /// that returns one goes to `failed_jobs` at once instead of being retried.
+    pub fn permanent(err: impl Into<anyhow::Error>) -> Self {
+        Self::Internal(anyhow::Error::new(Permanent(err.into())))
+    }
+
+    /// Whether the error was made with [`Error::permanent`].
+    pub fn is_permanent(&self) -> bool {
+        match self {
+            Self::Internal(err) => err.chain().any(|e| e.is::<Permanent>()),
+            _ => false,
+        }
+    }
+
     /// Whether the error is a database unique-constraint violation, e.g. a
     /// second sign-up with the same email racing past the `unique` rule.
     pub fn is_unique_violation(&self) -> bool {
@@ -44,6 +75,8 @@ impl Error {
             Self::TooManyRequests => StatusCode::TOO_MANY_REQUESTS,
             Self::ServiceUnavailable => StatusCode::SERVICE_UNAVAILABLE,
             Self::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            // A duplicate that got past validation (e.g. two requests at once).
+            Self::Internal(_) if self.is_unique_violation() => StatusCode::CONFLICT,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -109,6 +142,15 @@ pub(crate) fn wants_json(headers: &axum::http::HeaderMap) -> bool {
     header(axum::http::header::ACCEPT).is_some_and(|v| v.contains("application/json"))
         || header(axum::http::header::CONTENT_TYPE)
             .is_some_and(|v| v.starts_with("application/json"))
+}
+
+/// The text of a caught panic.
+pub(crate) fn panic_message(panic: &(dyn std::any::Any + Send)) -> String {
+    panic
+        .downcast_ref::<String>()
+        .cloned()
+        .or_else(|| panic.downcast_ref::<&str>().map(|s| (*s).to_owned()))
+        .unwrap_or_else(|| "(no message)".into())
 }
 
 pub(crate) fn reason(status: StatusCode) -> &'static str {

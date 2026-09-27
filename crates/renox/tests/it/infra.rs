@@ -79,10 +79,9 @@ async fn cache_basics(kernel: &Kernel) {
         ["kopi", "teh"]
     );
     assert!(cache.has("menu").await.unwrap());
-    assert_eq!(
-        cache.get::<i64>("menu").await.unwrap(),
-        None,
-        "wrong type reads as missing"
+    assert!(
+        cache.get::<i64>("menu").await.is_err(),
+        "a wrong type is an error, not a silent miss"
     );
 
     let calls = Arc::new(AtomicUsize::new(0));

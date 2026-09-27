@@ -74,6 +74,14 @@ SQL that differs between the two:
 Plain `TEXT`, `NOT NULL`, `UNIQUE`, `REFERENCES … ON DELETE CASCADE`, `CREATE INDEX` and
 `DROP TABLE` are the same on both.
 
+Each migration runs in a transaction. `CREATE INDEX CONCURRENTLY` can't, so a migration that
+uses it runs without one, statement by statement (so does one with a `-- renox:no-transaction`
+line). Keep such a migration to that one change: if it fails halfway, what ran stays.
+
+Several servers can run `migrate` at the same deploy: an advisory lock makes them take turns, and
+the later ones find nothing left to do. `migrate:fresh` drops everything in the schema, including
+enum types, sequences and functions (not what extensions created).
+
 ## Writing SQL that runs on both
 
 - Always write `?` placeholders. On PostgreSQL they become `$1`, `$2`, … before the query is sent.
@@ -156,6 +164,11 @@ maintenance mode:
 5. Point `DATABASE_URL` at PostgreSQL, deploy, then `my-app up`.
 
 ## Deploying
+
+Timeouts keep a slow or unreachable database from holding requests: a query waits at most
+`DATABASE_ACQUIRE_TIMEOUT` (5 s) for a connection, a statement runs at most
+`DATABASE_STATEMENT_TIMEOUT` (30 s; `0` for no limit, e.g. for a long report job, or `SET
+statement_timeout` in its transaction), and a request answers within `REQUEST_TIMEOUT` (60 s).
 
 `rnx make:deploy` writes the same Dockerfile and systemd unit. Set `DATABASE_URL` to the
 PostgreSQL server in the environment; the Dockerfile's SQLite default is only a fallback. Skip
