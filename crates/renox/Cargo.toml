@@ -10,6 +10,10 @@ homepage.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
+[features]
+# S3-compatible storage (AWS S3, Cloudflare R2, MinIO) for `STORAGE_DISK=s3`.
+s3 = ["renox-core/s3"]
+
 [dependencies]
 renox-core.workspace = true
 renox-macros.workspace = true

@@ -26,6 +26,8 @@ pub mod schedule;
 mod session;
 pub mod signed;
 mod state;
+pub mod storage;
+pub mod upload;
 pub mod validation;
 mod view;
 
@@ -42,6 +44,7 @@ pub use registry::Registry;
 pub use routing::{RouteTable, Routes};
 pub use session::Session;
 pub use state::AppState;
+pub use upload::Upload;
 pub use validation::{Errors, Valid, Validate, ValidationError, Validator};
 pub use view::{View, Views, view};
 

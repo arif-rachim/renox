@@ -147,9 +147,22 @@ M6a (done):
 - [x] `GET /health`: database ping, queue counts, maintenance flag; 503 when the database is down;
       unaffected by maintenance mode and sessions
 
-M6b (next):
-- [ ] Storage (local / S3 / R2) and upload helpers, multipart forms (with CSRF) and file rules
-- [ ] i18n for app texts (`resources/lang/{en,id}`), `t()` in templates
+M6b (done):
+- [x] `Upload` form fields (`Option<Upload>`) through `Valid<T>` for `multipart/form-data`
+- [x] File rules: `image()` (checked from the content, not the name), `mimes(&[..])`, `min`/`max`/
+      `between` in kilobytes; "must be a file" for text sent to a file field; empty file inputs are
+      missing
+- [x] `state.storage`: `put`, `get`, `exists`, `delete`, `url` (public keys under `public/`),
+      `temporary_url` (signed for the local disk, presigned for S3); keys can't escape the root
+- [x] `upload.store(..)` / `store_public(..)` with random names and extensions from the content
+- [x] Local disk (`STORAGE_PATH/app`, public files at `/storage/...` without sessions) and
+      S3/R2/MinIO behind the `s3` cargo feature (object_store)
+- [x] CSRF `_token` read from multipart forms; `UPLOAD_MAX_SIZE` body limit (413 above it)
+- [x] `storage_url(key)` in templates; the guestbook takes an optional photo
+- [ ] Several files in one field (`Vec<Upload>`): serde_urlencoded has no sequences
+
+M6c (next):
+- [ ] i18n for app texts (`resources/lang/{en,id}`), `t()` in templates, per-request locale
 
 ### M7 · v0.8: CLI and developer experience
 - [ ] `make:module`, `make:model`, `make:migration`, `make:job`, `make:mail`, `make:policy`
@@ -175,6 +188,11 @@ M6b (next):
 - **Auth sessions:** the session stores the user id and a fingerprint of the password hash, so a
   password change ends other sessions without a separate token column. "Remember me" makes the
   (encrypted cookie) session itself longer-lived.
+- **Uploads as form fields:** multipart files are swapped for tokens that `Upload`'s `Deserialize`
+  resolves from a thread-local during the (synchronous) deserialization, so a plain
+  `#[derive(Deserialize)]` struct can hold files and share the validation path with text forms.
+- **Storage:** the local disk is Renox's own code; S3 is an opt-in `s3` feature because object_store's
+  AWS support pulls in reqwest and aws-lc-rs, which most apps on one server don't need.
 - **HTMX validation errors:** returned as 422 JSON and placed by the bundled script, rather than
   re-rendering a form fragment. It works for any form without a per-form partial, and the form
   keeps the user's input, focus and Alpine state.

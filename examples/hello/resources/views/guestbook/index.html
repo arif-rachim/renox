@@ -3,7 +3,7 @@
 {% block content %}
 <h1>Buku Tamu</h1>
 
-<form method="post" action="{{ route('guestbook.store') }}"
+<form method="post" action="{{ route('guestbook.store') }}" enctype="multipart/form-data"
       hx-post="{{ route('guestbook.store') }}" hx-target="#entries" hx-swap="outerHTML"
       x-data="{ sending: false }" @htmx:before-request="sending = true"
       @htmx:after-request="sending = false; if ($event.detail.successful) $el.reset()">
@@ -12,6 +12,8 @@
   <p class="error" data-error-for="name">{{ error('name') }}</p>
   <textarea name="message" placeholder="Pesan">{{ old('message') }}</textarea>
   <p class="error" data-error-for="message">{{ error('message') }}</p>
+  <label>Foto (opsional) <input type="file" name="photo" accept="image/*"></label>
+  <p class="error" data-error-for="photo">{{ error('photo') }}</p>
   <button :disabled="sending" x-text="sending ? 'Mengirim…' : 'Kirim'">Kirim</button>
 </form>
 
@@ -19,7 +21,10 @@
 <section id="entries" hx-boost="true" hx-target="#entries" hx-select="#entries" hx-swap="outerHTML">
   <ul>
     {% for entry in entries.items %}
-    <li><strong>{{ entry.name }}</strong>: {{ entry.message }}</li>
+    <li>
+      {% if entry.photo %}<img src="{{ storage_url(entry.photo) }}" alt="" width="48" height="48">{% endif %}
+      <strong>{{ entry.name }}</strong>: {{ entry.message }}
+    </li>
     {% else %}
     <li class="empty">Belum ada pesan.</li>
     {% endfor %}

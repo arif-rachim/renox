@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use anyhow::{Context, bail};
 
 use crate::mail::MailConfig;
+use crate::storage::StorageConfig;
 
 /// The environment the application runs in, from `APP_ENV`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,6 +66,10 @@ pub struct Config {
     pub cache_store: String,
     /// Where the app keeps runtime files (maintenance flag, uploads), from `STORAGE_PATH`.
     pub storage_path: PathBuf,
+    /// File storage, from `STORAGE_DISK`, `S3_*` and `STORAGE_URL`.
+    pub storage: StorageConfig,
+    /// Largest request body in bytes, from `UPLOAD_MAX_SIZE` in megabytes (default 10).
+    pub upload_max_size: usize,
 }
 
 impl Config {
@@ -134,6 +139,20 @@ impl Config {
             timezone: var_or("APP_TIMEZONE", "UTC"),
             cache_store: var_or("CACHE_STORE", "memory"),
             storage_path: var_or("STORAGE_PATH", "storage").into(),
+            storage: StorageConfig {
+                disk: var_or("STORAGE_DISK", "local"),
+                bucket: optional("S3_BUCKET"),
+                region: optional("S3_REGION"),
+                endpoint: optional("S3_ENDPOINT"),
+                access_key_id: optional("S3_ACCESS_KEY_ID"),
+                secret_access_key: optional("S3_SECRET_ACCESS_KEY"),
+                url: optional("STORAGE_URL"),
+            },
+            upload_max_size: var_or("UPLOAD_MAX_SIZE", "10")
+                .parse::<usize>()
+                .context("UPLOAD_MAX_SIZE must be a number of megabytes")?
+                * 1024
+                * 1024,
         })
     }
 
@@ -169,8 +188,14 @@ impl Default for Config {
             timezone: "UTC".into(),
             cache_store: "memory".into(),
             storage_path: "storage".into(),
+            storage: StorageConfig::default(),
+            upload_max_size: 10 * 1024 * 1024,
         }
     }
+}
+
+fn optional(name: &str) -> Option<String> {
+    env::var(name).ok().filter(|v| !v.is_empty())
 }
 
 fn var_or(name: &str, default: &str) -> String {

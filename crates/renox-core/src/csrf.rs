@@ -10,12 +10,29 @@ use crate::{Error, Session};
 pub const CSRF_HEADER: &str = "x-csrf-token";
 pub const CSRF_FIELD: &str = "_token";
 
+/// Finds the `_token` field in a buffered multipart body.
+async fn multipart_token(
+    headers: &axum::http::HeaderMap,
+    bytes: axum::body::Bytes,
+) -> Option<String> {
+    use axum::extract::{FromRequest, Multipart};
+    let mut probe = Request::new(Body::from(bytes));
+    *probe.headers_mut() = headers.clone();
+    let mut multipart = Multipart::from_request(probe, &()).await.ok()?;
+    while let Ok(Some(field)) = multipart.next_field().await {
+        if field.name() == Some(CSRF_FIELD) {
+            return field.text().await.ok();
+        }
+    }
+    None
+}
+
 /// Largest urlencoded body the CSRF check buffers to look for `_token`.
 const FORM_LIMIT: usize = 2 * 1024 * 1024;
 
 /// Rejects state-changing requests that don't carry the session's CSRF token,
 /// either in the `X-CSRF-Token` header (sent automatically for HTMX requests)
-/// or in a `_token` form field (`{{ csrf_field() }}`).
+/// or in a `_token` field of a urlencoded or multipart form (`{{ csrf_field() }}`).
 pub(crate) async fn middleware(req: Request, next: Next) -> Response {
     if matches!(
         *req.method(),
@@ -44,23 +61,37 @@ pub(crate) async fn middleware(req: Request, next: Next) -> Response {
         };
     }
 
-    let is_form = req
+    let content_type = req
         .headers()
         .get(CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
-        .is_some_and(|v| v.starts_with("application/x-www-form-urlencoded"));
-    if !is_form {
+        .unwrap_or_default()
+        .to_owned();
+    let multipart = content_type.starts_with("multipart/form-data");
+    if !multipart && !content_type.starts_with("application/x-www-form-urlencoded") {
         return Error::PageExpired.into_response();
     }
+    let limit = if multipart {
+        req.extensions()
+            .get::<crate::AppState>()
+            .map_or(FORM_LIMIT, |state| state.config.upload_max_size)
+    } else {
+        FORM_LIMIT
+    };
 
     let (parts, body) = req.into_parts();
-    let bytes = match to_bytes(body, FORM_LIMIT).await {
+    let bytes = match to_bytes(body, limit).await {
         Ok(bytes) => bytes,
         Err(_) => return Error::BadRequest("The form is too large.".into()).into_response(),
     };
-    let valid = form_urlencoded::parse(&bytes)
-        .find(|(name, _)| name == CSRF_FIELD)
-        .is_some_and(|(_, token)| constant_time_eq(&token, &expected));
+    let token = if multipart {
+        multipart_token(&parts.headers, bytes.clone()).await
+    } else {
+        form_urlencoded::parse(&bytes)
+            .find(|(name, _)| name == CSRF_FIELD)
+            .map(|(_, token)| token.into_owned())
+    };
+    let valid = token.is_some_and(|token| constant_time_eq(&token, &expected));
     if !valid {
         return Error::PageExpired.into_response();
     }

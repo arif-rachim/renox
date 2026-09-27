@@ -24,6 +24,8 @@ struct Entry {
     id: i64,
     name: String,
     message: String,
+    /// Storage key of an optional photo, e.g. `public/entries/abc.jpg`.
+    photo: Option<String>,
     created_at: Option<DateTime>,
     updated_at: Option<DateTime>,
 }
@@ -42,6 +44,7 @@ impl Factory for Entry {
 struct EntryForm {
     name: String,
     message: String,
+    photo: Option<Upload>,
 }
 
 impl Validate for EntryForm {
@@ -51,6 +54,10 @@ impl Validate for EntryForm {
             .label("pesan")
             .required()
             .between(3, 280);
+        v.field("photo", &self.photo)
+            .label("foto")
+            .image()
+            .max(2048);
     }
 }
 
@@ -133,11 +140,16 @@ async fn store(
     back: Back,
     Valid(form): Valid<EntryForm>,
 ) -> Result<Response> {
+    let photo = match &form.photo {
+        Some(photo) => Some(photo.store_public(&state.storage, "entries").await?),
+        None => None,
+    };
     let entry = Entry::create(
         &state.db,
         Entry {
             name: form.name,
             message: form.message,
+            photo,
             ..Default::default()
         },
     )
