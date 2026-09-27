@@ -67,6 +67,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/cache.rs             Cache (memory / database store), remember()
   src/provided.rs          App::provide values: Provided<T> extractor, AppState::provided
   src/view_filters.rs      built-in template filters `number` and `date`; pub format_number
+  src/cookies.rs           Cookies extractor (plain / encrypted with APP_KEY), SetCookie response part
+  src/download.rs          Download: bytes, streamed file, Storage key, stream; safe Content-Disposition
   src/command.rs           app commands: Args, Command; App::command / Registry::command, Kernel::call
   src/rate_limit.rs        Limiter + middleware behind Routes::throttle
   src/client_ip.rs         ClientIp extractor + TrustedProxies (TRUSTED_PROXIES); resolved once in
@@ -578,8 +580,9 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M14a API foundations: non_exhaustive, stability doc + `DbError`, `abort`, route groups, app commands, pinned `rnx new` | merged to `main` |
 | M14b extension points: template hooks + number/date filters, `share`, `provide`/`Provided`, `App::layer`, `User` extra columns, registration hooks, async gates, semi-strict debug templates, debug error page | merged to `main` |
 | M14c mail (recipients, cc/bcc, reply-to, from, attachments) and notifications (custom channels, `Recipient`, `notify_later`) | merged to `main` |
-| M15a query builder (groups, sub-queries, aggregates, bulk update/upsert, chunk), `FromRow` + `fetch_as`, `db::relations` (belongs_to, has_many, Pivot), docs/relations.md | PR from branch `m15a-query-builder-relations` |
-| M15b validation rules, `Vec<Upload>`, cookies, downloads (ROADMAP M15) | next; then M16, M17, v1.0 |
+| M15a query builder (groups, sub-queries, aggregates, bulk update/upsert, chunk), `FromRow` + `fetch_as`, `db::relations` (belongs_to, has_many, Pivot), docs/relations.md | merged to `main` |
+| M15b validation rules (regex, digits, dates, required_if…, each/nested, `Rule`), `Vec<Upload>`, `Cookies`/`SetCookie`, `Download` | PR from branch `m15b-validation-requests` |
+| M16 DX & trust (ROADMAP M16) | next; then M17, v1.0 |
 | v1.0 docs site, starter kit, semver guarantee | last |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on

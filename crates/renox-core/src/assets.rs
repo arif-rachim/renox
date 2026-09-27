@@ -42,10 +42,20 @@ const RENOX: &str = r#"(function () {
       if (!message) return;
       var name = CSS.escape(field);
       var input = form.querySelector('[name="' + name + '"]');
-      if (input) input.setAttribute("aria-invalid", "true");
       var slot = form.querySelector('[data-error-for="' + name + '"]');
+      // `tags.1` / `photos.0`: an item of a list. Use the list's own input
+      // (the item's one when there is one per item) and slot.
+      var parts = field.split(".");
+      if (!input && parts.length > 1) {
+        var inputs = form.querySelectorAll('[name="' + CSS.escape(parts[0]) + '"]');
+        input = inputs[parseInt(parts[1], 10)] || inputs[0] || null;
+      }
+      if (!slot && parts.length > 1) {
+        slot = form.querySelector('[data-error-for="' + CSS.escape(parts[0]) + '"]');
+      }
+      if (input) input.setAttribute("aria-invalid", "true");
       if (slot) {
-        slot.textContent = message;
+        slot.textContent = slot.textContent ? slot.textContent + " " + message : message;
         return;
       }
       var p = document.createElement("p");

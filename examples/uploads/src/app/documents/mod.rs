@@ -2,6 +2,7 @@
 
 use std::time::Duration;
 
+use renox::Download;
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -37,6 +38,8 @@ impl Module for Documents {
             .name("invoices.store")
             .get("/invoices/{id}/download", download)
             .name("invoices.download")
+            .get("/invoices/{id}", view_invoice)
+            .name("invoices.show")
     }
 }
 
@@ -48,24 +51,36 @@ async fn index(State(db): State<Db>) -> Result<View> {
 #[derive(Deserialize)]
 struct PhotoForm {
     title: String,
-    photo: Upload,
+    /// `<input type="file" name="photos" multiple>`: one or more files.
+    #[serde(default)]
+    photos: Vec<Upload>,
 }
 
 impl Validate for PhotoForm {
     fn rules(&self, v: &mut Validator) {
         v.field("title", &self.title).required().max(100);
-        // Checked by content, not by name: a text file called x.png is refused.
-        v.field("photo", &self.photo).required().image().max(2048); // KB
+        v.field("photos", &self.photos).required().max(10); // at most 10 files
+        // Each file checked by content, not by name: a text file called x.png is refused.
+        v.each("photos", &self.photos, |photo| photo.image().max(2048)); // KB
     }
 }
 
 async fn store_photo(
     State(state): State<AppState>,
+    htmx: Htmx,
     Valid(form): Valid<PhotoForm>,
-) -> Result<Redirect> {
-    let key = form.photo.store_public(&state.storage, "photos").await?;
-    save(&state.db, form.title, "photo", key, &form.photo).await?;
-    Ok(Redirect::to("/"))
+) -> Result<Response> {
+    let count = form.photos.len();
+    for (i, photo) in form.photos.iter().enumerate() {
+        let key = photo.store_public(&state.storage, "photos").await?;
+        let title = if count > 1 {
+            format!("{} ({}/{count})", form.title, i + 1)
+        } else {
+            form.title.clone()
+        };
+        save(&state.db, title, "photo", key, photo).await?;
+    }
+    Ok(htmx.redirect("/"))
 }
 
 #[derive(Deserialize)]
@@ -117,4 +132,18 @@ async fn download(State(state): State<AppState>, Path(id): Path<i64>) -> Result<
         .temporary_url(&state, &document.file_key, Duration::from_secs(300))
         .await?;
     Ok(Redirect::to(&url))
+}
+
+/// The same private file, sent by the app itself with its original name
+/// (the check above applies here too).
+async fn view_invoice(State(state): State<AppState>, Path(id): Path<i64>) -> Result<Download> {
+    let document = Document::find_or_404(&state.db, id).await?;
+    if document.kind != "invoice" {
+        return Err(Error::NotFound);
+    }
+    Ok(
+        Download::from_storage(&state.storage, &document.file_key, document.file_name)
+            .await?
+            .inline(),
+    )
 }

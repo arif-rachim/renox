@@ -12,18 +12,38 @@ async fn photos_are_checked_by_content_and_served_publicly() {
         .post_multipart(
             "/photos",
             &[("title", "Fake")],
-            &[("photo", "fake.png", b"just text")],
+            &[
+                ("photos", "kopi.png", PNG),
+                ("photos", "fake.png", b"just text"),
+            ],
         )
         .await
-        .assert_invalid("photo");
+        .assert_invalid("photos.1");
 
     app.post_multipart(
         "/photos",
         &[("title", "Kopi")],
-        &[("photo", "kopi.png", PNG)],
+        &[("photos", "kopi.png", PNG)],
     )
     .await
     .assert_redirect("/");
+    // Several at once, from htmx: each becomes a document.
+    app.htmx()
+        .post_multipart(
+            "/photos",
+            &[("title", "Menu")],
+            &[("photos", "a.png", PNG), ("photos", "b.png", PNG)],
+        )
+        .await
+        .assert_hx_redirect("/");
+    assert_eq!(
+        Document::query()
+            .where_like("title", "Menu (%")
+            .count(app.db())
+            .await
+            .unwrap(),
+        2
+    );
     let photo = Document::where_eq("title", "Kopi")
         .first(app.db())
         .await
@@ -75,4 +95,13 @@ async fn invoices_are_private_behind_expiring_links() {
     app.get(&link.replace("signature=", "signature=x"))
         .await
         .assert_forbidden();
+    // Or sent by the app, shown in the browser under its original name.
+    let res = app.get(&format!("/invoices/{}", invoice.id)).await;
+    res.assert_ok()
+        .assert_header("content-type", "application/pdf");
+    assert!(
+        res.header("content-disposition")
+            .unwrap()
+            .starts_with("inline; filename=\"sept.pdf\"")
+    );
 }

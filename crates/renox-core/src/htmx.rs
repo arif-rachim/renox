@@ -47,6 +47,17 @@ impl Htmx {
         }
     }
 
+    /// Goes to `to` after a form post: `HX-Redirect` for htmx requests (a
+    /// full page load in the browser), a `303 See Other` otherwise.
+    pub fn redirect(&self, to: &str) -> axum::response::Response {
+        use axum::response::IntoResponse;
+        if self.request {
+            HxRedirect(to.to_owned()).into_response()
+        } else {
+            axum::response::Redirect::to(to).into_response()
+        }
+    }
+
     /// An HTMX request that wants a fragment rather than a full page.
     pub fn wants_fragment(&self) -> bool {
         self.request && !self.boosted

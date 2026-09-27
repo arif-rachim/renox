@@ -47,6 +47,17 @@ pub(crate) fn template(locale: Locale, key: &str) -> &'static str {
             "unique" => "The :attribute has already been taken.",
             "exists" => "The selected :attribute is invalid.",
             "numeric" => "The :attribute must be a number.",
+            "regex" => "The :attribute format is invalid.",
+            "digits" => "The :attribute must be :digits digits.",
+            "digits_between" => "The :attribute must be between :min and :max digits.",
+            "date" => "The :attribute is not a valid date.",
+            "before" => "The :attribute must be a date before :date.",
+            "before_or_equal" => "The :attribute must be a date before or equal to :date.",
+            "after" => "The :attribute must be a date after :date.",
+            "after_or_equal" => "The :attribute must be a date after or equal to :date.",
+            "not_in" => "The selected :attribute is invalid.",
+            "same" => "The :attribute and :other must match.",
+            "different" => "The :attribute and :other must be different.",
             "auth.failed" => "These credentials do not match our records.",
             "auth.throttle" => "Too many login attempts. Please try again in :seconds seconds.",
             _ => "The :attribute is invalid.",
@@ -76,6 +87,17 @@ pub(crate) fn template(locale: Locale, key: &str) -> &'static str {
             "unique" => ":Attribute sudah digunakan.",
             "exists" => ":Attribute yang dipilih tidak valid.",
             "numeric" => ":Attribute harus berupa angka.",
+            "regex" => "Format :attribute tidak valid.",
+            "digits" => ":Attribute harus :digits digit.",
+            "digits_between" => ":Attribute harus antara :min sampai :max digit.",
+            "date" => ":Attribute bukan tanggal yang valid.",
+            "before" => ":Attribute harus tanggal sebelum :date.",
+            "before_or_equal" => ":Attribute harus tanggal sebelum atau sama dengan :date.",
+            "after" => ":Attribute harus tanggal setelah :date.",
+            "after_or_equal" => ":Attribute harus tanggal setelah atau sama dengan :date.",
+            "not_in" => ":Attribute yang dipilih tidak valid.",
+            "same" => ":Attribute dan :other harus sama.",
+            "different" => ":Attribute dan :other harus berbeda.",
             "auth.failed" => "Email atau kata sandi salah.",
             "auth.throttle" => "Terlalu banyak percobaan masuk. Coba lagi dalam :seconds detik.",
             _ => ":Attribute tidak valid.",
@@ -128,5 +150,33 @@ mod tests {
         );
         assert_eq!(Locale::parse("ID"), Locale::Id);
         assert_eq!(Locale::parse("fr"), Locale::En);
+    }
+
+    #[test]
+    fn every_rule_has_its_own_message_in_both_languages() {
+        for key in [
+            "regex",
+            "digits",
+            "digits_between",
+            "date",
+            "before",
+            "before_or_equal",
+            "after",
+            "after_or_equal",
+            "not_in",
+            "same",
+            "different",
+        ] {
+            assert_ne!(
+                template(Locale::En, key),
+                "The :attribute is invalid.",
+                "{key}"
+            );
+            assert_ne!(
+                template(Locale::Id, key),
+                ":Attribute tidak valid.",
+                "{key}"
+            );
+        }
     }
 }
