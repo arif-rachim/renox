@@ -27,6 +27,20 @@ pub struct Routes {
     router: Router<AppState>,
     names: Vec<(String, String)>,
     last_path: Option<String>,
+    listing: Vec<RouteInfo>,
+}
+
+/// One route as `route:list` shows it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RouteInfo {
+    /// `GET`, `POST`, … or `*` for a `route()` whose methods Renox can't see.
+    pub method: String,
+    pub path: String,
+    pub name: Option<String>,
+    /// The module that defined it, or `renox` for the framework's own.
+    pub module: String,
+    /// Guards and limits, e.g. `auth`, `throttle:60/60s`.
+    pub middleware: Vec<String>,
 }
 
 macro_rules! method {
@@ -36,7 +50,7 @@ macro_rules! method {
             H: Handler<T, AppState>,
             T: 'static,
         {
-            self.route(path, routing::$method(handler))
+            self.add(path, routing::$method(handler), &stringify!($method).to_uppercase())
         }
     )*};
 }
@@ -49,9 +63,28 @@ impl Routes {
     method!(get, post, put, patch, delete);
 
     /// Adds a route with any axum method router, e.g. `get(show).post(update)`.
-    pub fn route(mut self, path: &str, method_router: MethodRouter<AppState>) -> Self {
+    pub fn route(self, path: &str, method_router: MethodRouter<AppState>) -> Self {
+        self.add(path, method_router, "*")
+    }
+
+    fn add(mut self, path: &str, method_router: MethodRouter<AppState>, method: &str) -> Self {
         self.router = self.router.route(path, method_router);
         self.last_path = Some(path.to_owned());
+        self.listing.push(RouteInfo {
+            method: method.to_owned(),
+            path: path.to_owned(),
+            name: None,
+            module: String::new(),
+            middleware: Vec::new(),
+        });
+        self
+    }
+
+    /// Notes a layer on every route added so far, for `route:list`.
+    fn mark(mut self, middleware: &str) -> Self {
+        for route in &mut self.listing {
+            route.middleware.push(middleware.to_owned());
+        }
         self
     }
 
@@ -66,6 +99,18 @@ impl Routes {
             .clone()
             .expect("Routes::name() must follow a route");
         self.names.push((name.to_owned(), path));
+        // A name belongs to a path, so it also covers the methods added just
+        // before for the same path (`.get(p, a).post(p, b).name(n)`) that
+        // don't have a name of their own.
+        let path = self.last_path.clone();
+        for route in self.listing.iter_mut().rev() {
+            if Some(&route.path) != path.as_ref() {
+                break;
+            }
+            if route.name.is_none() {
+                route.name = Some(name.to_owned());
+            }
+        }
         self
     }
 
@@ -73,18 +118,21 @@ impl Routes {
     /// to the `login` route. Call it after adding the routes it should cover.
     pub fn require_auth(self) -> Self {
         self.route_layer(from_fn(crate::auth::require_auth))
+            .mark("auth")
     }
 
     /// Like `require_auth`, and the user must have verified their email;
     /// others are sent to the `verification.notice` route.
     pub fn require_verified(self) -> Self {
         self.route_layer(from_fn(crate::auth::require_verified))
+            .mark("verified")
     }
 
     /// Only guests may use the routes added so far; logged-in users are sent
     /// to the `home` route (e.g. for login and registration pages).
     pub fn guest_only(self) -> Self {
         self.route_layer(from_fn(crate::auth::guest_only))
+            .mark("guest")
     }
 
     /// Limits the routes added so far to `max` requests per `per`, counted per
@@ -97,6 +145,7 @@ impl Routes {
                 async move { crate::rate_limit::check(&limiter, req, next).await }
             },
         ))
+        .mark(&format!("throttle:{max}/{}s", per.as_secs()))
     }
 
     /// Wraps the routes added so far in a tower layer (axum's `route_layer`).
@@ -116,12 +165,13 @@ impl Routes {
         let other = other.into();
         self.router = self.router.merge(other.router);
         self.names.extend(other.names);
+        self.listing.extend(other.listing);
         self.last_path = None;
         self
     }
 
-    pub(crate) fn into_parts(self) -> (Router<AppState>, Vec<(String, String)>) {
-        (self.router, self.names)
+    pub(crate) fn into_parts(self) -> (Router<AppState>, Vec<(String, String)>, Vec<RouteInfo>) {
+        (self.router, self.names, self.listing)
     }
 }
 

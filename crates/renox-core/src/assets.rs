@@ -74,6 +74,19 @@ const RENOX: &str = r#"(function () {
       showErrors(formOf(event.detail.requestConfig.elt), body.errors || {});
     } catch (_) {}
   });
+
+  // Live reload while developing: reload when a view, public or lang file
+  // changes, or when the app restarts (a new boot id after reconnecting).
+  var live = document.querySelector('meta[name="renox-live"]');
+  if (live && window.EventSource) {
+    var boot = null;
+    var source = new EventSource("/_renox/live");
+    source.addEventListener("boot", function (event) {
+      if (boot !== null && boot !== event.data) location.reload();
+      boot = event.data;
+    });
+    source.addEventListener("reload", function () { location.reload(); });
+  }
 })();
 "#;
 
@@ -106,10 +119,15 @@ fn js(body: &'static str) -> impl IntoResponse {
 
 /// The `<head>` tags every Renox page needs: the CSRF token, htmx, Alpine.js
 /// and the script that sends the token with HTMX requests.
-pub(crate) fn head_tags(csrf_token: &str) -> String {
+pub(crate) fn head_tags(csrf_token: &str, live: bool) -> String {
     let [htmx, alpine, renox] = &*URLS;
+    let live = if live {
+        "<meta name=\"renox-live\" content=\"1\">\n"
+    } else {
+        ""
+    };
     format!(
-        "<meta name=\"csrf-token\" content=\"{csrf_token}\">\n\
+        "{live}<meta name=\"csrf-token\" content=\"{csrf_token}\">\n\
          <script src=\"{htmx}\" defer></script>\n\
          <script src=\"{renox}\" defer></script>\n\
          <script src=\"{alpine}\" defer></script>"

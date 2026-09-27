@@ -63,12 +63,14 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/upload.rs            Upload (multipart file field), sniffing, store/store_public, token registry
   src/storage.rs           Storage (local disk; S3 with the `s3` feature), temporary URLs, /_renox/files
   src/i18n.rs              Translator (lang JSON files), format(), RequestLocale middleware, Lang, set_locale
+  src/live.rs              live reload: file-time polling, /_renox/live SSE, stop() on shutdown
+  src/shell.rs             db:shell (run_with takes any input/output, for tests)
   assets/                  vendored htmx.min.js (2.0.11), alpine.min.js (3.17.4)
   views/                   built-in templates (error, pagination, auth/*, mail/*) — see §4.4
   migrations/              framework-owned migrations (auth/*, queue/*) — see §4.6
   tests/                   core integration tests (support/mod.rs has TestApp)
 crates/renox-macros/       proc macros: #[derive(Model)], migrations!()
-crates/renox-cli/          `rnx`: new, serve, key:generate, make:migration, forwards everything else
+crates/renox-cli/          `rnx`: new, serve, key:generate, make:* (generate.rs, make.rs), forwards the rest
   stubs/                   files `rnx new` writes (Cargo.toml.stub, env.stub, build.rs, views…)
 examples/hello/            guestbook app exercising every feature; used for live/browser testing
 .github/workflows/ci.yml   fmt+clippy+doc (Ubuntu) and tests on Ubuntu/macOS/Windows
@@ -84,7 +86,8 @@ current user once per request from session or `Authorization: Bearer`, inserts `
 responses, error pages, turns `ValidationError` into redirect-back for plain forms) →
 `maintenance::middleware` (503 while `storage/framework/down` exists; inside the view layer so the
 503 uses the error template) → routes. `assets::router()` (`/_renox/*.js`) and `health::router()`
-(`/health`) and the local public files (`/storage/...`) are merged after the layers, so they skip
+(`/health`), `/_renox/live` (debug + local only) and the local public files (`/storage/...`) are
+merged after the layers, so they skip
 sessions and maintenance mode. `DefaultBodyLimit` (`UPLOAD_MAX_SIZE`) wraps everything.
 `/_renox/mail` (mail preview) is merged only when `APP_DEBUG` is on. `public/` is the fallback
 service (`ServeDir`) with a 404 handler.
@@ -104,7 +107,7 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
   `/` (MiniJinja's default escapes `/` as `&#x2f;`, which uglified URLs in pages and mail).
 - **The app binary is its own CLI** (like artisan): `my-app migrate|migrate:rollback|migrate:fresh|
   migrate:status|db:seed|queue:work|queue:failed|queue:retry|queue:flush|schedule:list|
-  schedule:work|down|up|help`, default `serve`. Migrations/jobs are compiled into the app, so only the app
+  schedule:work|down|up|route:list|db:shell|help`, default `serve`. Migrations/jobs are compiled into the app, so only the app
   can run them. `rnx <anything unknown>` forwards to `cargo run --quiet -- <args>`.
 - **Own migrator** (table `renox_migrations`, Laravel-style batches) instead of sqlx's, to support
   batches and module-owned migrations. `migrations!()` embeds `*.up.sql`/`*.down.sql` (or plain
@@ -273,6 +276,13 @@ A scripted edit meant to add `v.field("photo", ..).image()` to the guestbook sil
 and integration tests of the framework passed; only the headless-Chrome upload check showed it.
 Lesson: after scripted edits, `grep` for the added line; keep browser checks for UI features.
 
+### 6.4c Editing files from scripts (M7)
+Two more scripted edits went wrong: a Python heredoc with nested `\"` quoting failed to parse (so
+*nothing* was applied), and replacements silently missed text rustfmt had re-wrapped. What works:
+write the Python to a file, `assert old in s` before each replace (fail loudly), and use the Edit
+tool for anything quote-heavy or already formatted. Rewriting a small file whole (as with
+`shell.rs`) beats a pile of partial replacements.
+
 ### 6.5 Library/API traps
 - **sqlx 0.9:** dynamic SQL needs `sqlx::AssertSqlSafe(string)`; `SqliteArguments` has no lifetime;
   multi-statement SQL uses `sqlx::raw_sql`. `sqlite::memory:` gives each pooled connection its own
@@ -327,9 +337,10 @@ Lesson: after scripted edits, `grep` for the added line; keep browser checks for
 | M0 foundation, M1 web layer, M2 database, M3 validation, M4 auth (a+b), M5 queue/scheduler/events/mail/notifications (a+b) | merged to `main` |
 | M6a cache, `Routes::throttle`, maintenance mode (`down`/`up`), `/health` | merged to `main` |
 | M6b uploads, file rules, storage (local + `s3` feature), multipart CSRF, body limit | merged to `main` |
-| M6c i18n (`resources/lang`, `t()`, `Lang`, per-visitor locale, translatable built-ins) | PR from branch `m6c-i18n` |
-| M7 CLI/DX | next |
-| M8 testing helpers + deploy (`renox build` embedding views, Docker/systemd, Litestream), v1.0 docs | later |
+| M6c i18n (`resources/lang`, `t()`, `Lang`, per-visitor locale, translatable built-ins) | merged to `main` |
+| M7 generators (`make:*`), `route:list`, `db:shell`, browser live reload | PR from branch `m7-dx` |
+| M8 testing helpers + deploy (`renox build` embedding views, Docker/systemd, Litestream) | next |
+| v1.0 docs site, starter kit, semver guarantee | later |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on
 an up-to-date `main`. Open the next milestone's PR only after the previous one is merged (§6.3).
@@ -337,5 +348,5 @@ an up-to-date `main`. Open the next milestone's PR only after the previous one i
 Open items noted in ROADMAP: `#[derive(Validate)]`, more rules (regex, dates, files), route groups
 with prefixes, SQLite session driver, pagination links that keep other query params.
 
-Stats at the time of writing: ~9.8k lines of Rust in `crates/`, 122 tests, 34 direct dependencies
+Stats at the time of writing: ~10.8k lines of Rust in `crates/`, 128 tests, 34 direct dependencies
 (stars and roles were reviewed with the owner; keep deps lean and remove unused ones).

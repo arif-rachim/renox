@@ -383,7 +383,7 @@ fn globals(
         };
     let token = session.map(Session::token).unwrap_or_default();
 
-    let head = Value::from_safe_string(assets::head_tags(&token));
+    let head = Value::from_safe_string(assets::head_tags(&token, state.live.is_some()));
     let field = Value::from_safe_string(format!(
         "<input type=\"hidden\" name=\"{}\" value=\"{token}\">",
         crate::csrf::CSRF_FIELD

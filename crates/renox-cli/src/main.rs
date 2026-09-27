@@ -1,5 +1,6 @@
 //! `rnx`: the command-line tool for the Renox web framework.
 
+mod generate;
 mod make;
 mod new;
 mod serve;
@@ -48,6 +49,46 @@ enum Command {
         #[arg(long, default_value = "migrations")]
         path: PathBuf,
     },
+    /// Create a module: routes, an index view, and its registration.
+    #[command(name = "make:module")]
+    MakeModule {
+        /// e.g. `produk` or `stok_barang`.
+        name: String,
+    },
+    /// Create a model (and with --migration, its table's migration).
+    #[command(name = "make:model")]
+    MakeModel {
+        /// e.g. `Produk`.
+        name: String,
+        /// Module to put it in; defaults to the model's name in snake_case.
+        #[arg(long)]
+        module: Option<String>,
+        /// Also create a `create_<table>_table` migration.
+        #[arg(short, long)]
+        migration: bool,
+    },
+    /// Create a queued job in a module.
+    #[command(name = "make:job")]
+    MakeJob {
+        /// e.g. `KirimStruk`.
+        name: String,
+        #[arg(long)]
+        module: String,
+    },
+    /// Create a policy for a module's model.
+    #[command(name = "make:policy")]
+    MakePolicy {
+        /// The model, e.g. `Produk`.
+        model: String,
+        #[arg(long)]
+        module: String,
+    },
+    /// Create an HTML and a text mail template.
+    #[command(name = "make:mail")]
+    MakeMail {
+        /// e.g. `pesanan_dikirim`.
+        name: String,
+    },
     /// Run pending migrations.
     Migrate {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true, hide = true)]
@@ -89,6 +130,15 @@ fn main() -> Result<()> {
         Command::Serve { cargo_args } => serve::run(&cargo_args),
         Command::KeyGenerate { show } => key_generate(show),
         Command::MakeMigration { name, path } => make::migration(&name, &path),
+        Command::MakeModule { name } => generate::module(&app_root()?, &name),
+        Command::MakeModel {
+            name,
+            module,
+            migration,
+        } => generate::model(&app_root()?, &name, module.as_deref(), migration),
+        Command::MakeJob { name, module } => generate::job(&app_root()?, &name, &module),
+        Command::MakePolicy { model, module } => generate::policy(&app_root()?, &model, &module),
+        Command::MakeMail { name } => generate::mail(&app_root()?, &name),
         Command::Migrate { args } => app_command("migrate", &args),
         Command::MigrateRollback { args } => app_command("migrate:rollback", &args),
         Command::MigrateFresh { args } => app_command("migrate:fresh", &args),
@@ -116,6 +166,15 @@ fn app_command(command: &str, args: &[String]) -> Result<()> {
         std::process::exit(status.code().unwrap_or(1));
     }
     Ok(())
+}
+
+/// The current directory, if it looks like a Renox app.
+fn app_root() -> Result<PathBuf> {
+    let root = std::env::current_dir()?;
+    if !root.join("Cargo.toml").is_file() || !root.join("src").is_dir() {
+        anyhow::bail!("run this from your app's directory (the one with Cargo.toml and src/)");
+    }
+    Ok(root)
 }
 
 pub(crate) fn generate_key() -> String {

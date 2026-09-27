@@ -21,6 +21,7 @@ use crate::db::{Db, Migration, MigrationStatus, Migrator};
 use crate::events::Event;
 use crate::mail::Mailer;
 use crate::queue::{Handlers, Job, Queue, Worker};
+use crate::routing::RouteInfo;
 use crate::schedule::{Schedule, parse_offset};
 use crate::{
     AppState, Config, Environment, Error, Module, Registry, Result, RouteTable, Views, assets,
@@ -50,6 +51,8 @@ Commands:
   queue:flush               Delete failed jobs
   schedule:list             List scheduled tasks and when they run next
   schedule:work             Run scheduled tasks (when SCHEDULER=false for serve)
+  route:list                List every route with its name, module and guards
+  db:shell                  Run SQL against the database (`.tables`, `.quit`)
   down [--secret S] [--retry N]
                             Maintenance mode: answer 503 (visit /S to bypass it)
   up                        Leave maintenance mode
@@ -202,14 +205,21 @@ impl App {
 
         let mut router = Router::new();
         let mut routes = RouteTable::default();
+        let mut listing = Vec::new();
         for module in &self.modules {
             tracing::debug!(module = module.name(), "registering module");
-            let (module_router, names) = module.routes().into_parts();
+            let (module_router, names, infos) = module.routes().into_parts();
             router = router.merge(module_router);
             for (name, path) in names {
                 routes.insert(name, path)?;
             }
+            listing.extend(infos.into_iter().map(|info| RouteInfo {
+                module: module.name().to_owned(),
+                ..info
+            }));
         }
+        listing.extend(framework_routes(&config));
+        listing.sort_by(|a, b| (&a.path, &a.method).cmp(&(&b.path, &b.method)));
         let routes = Arc::new(routes);
 
         crate::error::set_debug(config.debug);
@@ -224,6 +234,13 @@ impl App {
                 &config.lang_path,
                 config.debug,
             )?),
+            live: (config.debug && config.env == Environment::Local).then(|| {
+                crate::live::Live::start(vec![
+                    config.views_path.clone(),
+                    config.public_path.clone(),
+                    config.lang_path.clone(),
+                ])
+            }),
             listeners: Arc::new(listeners),
             config: Arc::new(config),
             routes,
@@ -236,6 +253,7 @@ impl App {
         };
 
         Ok(Kernel {
+            listing,
             router: build_router(router, state.clone()),
             state,
             migrator,
@@ -384,6 +402,8 @@ impl App {
                 let _ = stop.send(true);
                 let _ = running.await;
             }
+            "route:list" => print_routes(kernel.routes()),
+            "db:shell" => crate::shell::run(kernel.db()).await?,
             "down" => {
                 let secret = flag_text(args, "--secret").map(str::to_owned);
                 let retry = flag_value(args, "--retry")?.map(u64::from);
@@ -412,6 +432,7 @@ impl Default for App {
 /// A booted application: its router, database, queue and maintenance commands.
 pub struct Kernel {
     router: Router,
+    listing: Vec<RouteInfo>,
     state: AppState,
     migrator: Migrator,
     seeders: Vec<Seeder>,
@@ -423,6 +444,11 @@ pub struct Kernel {
 impl Kernel {
     pub fn router(&self) -> Router {
         self.router.clone()
+    }
+
+    /// Every route, sorted by path, as `route:list` prints them.
+    pub fn routes(&self) -> &[RouteInfo] {
+        &self.listing
     }
 
     /// What handlers get as `State<AppState>`.
@@ -481,8 +507,15 @@ impl Kernel {
         let service = self
             .router
             .into_make_service_with_connect_info::<SocketAddr>();
+        let live = self.state.live.clone();
         axum::serve(listener, service)
-            .with_graceful_shutdown(shutdown_signal())
+            .with_graceful_shutdown(async move {
+                shutdown_signal().await;
+                // Open live-reload streams would otherwise hold the shutdown.
+                if let Some(live) = live {
+                    live.stop();
+                }
+            })
             .await?;
 
         let _ = stop.send(true);
@@ -528,6 +561,61 @@ impl Kernel {
             seeder(self.db().clone()).await?;
         }
         Ok(())
+    }
+}
+
+/// Routes Renox adds itself.
+fn framework_routes(config: &Config) -> Vec<RouteInfo> {
+    let route = |method: &str, path: &str| RouteInfo {
+        method: method.to_owned(),
+        path: path.to_owned(),
+        name: None,
+        module: "renox".to_owned(),
+        middleware: Vec::new(),
+    };
+    let mut routes = vec![
+        route("GET", "/health"),
+        route("GET", "/_renox/{asset}"),
+        route("GET", "/_renox/files/{*key}"),
+        route("GET", "/storage/{*path}"),
+    ];
+    if config.debug {
+        routes.push(route("GET", "/_renox/mail"));
+        routes.push(route("GET", "/_renox/mail/{id}"));
+    }
+    if config.debug && config.env == Environment::Local {
+        routes.push(route("GET", "/_renox/live"));
+    }
+    routes
+}
+
+fn print_routes(routes: &[RouteInfo]) {
+    let rows: Vec<[String; 5]> = routes
+        .iter()
+        .map(|r| {
+            [
+                r.method.clone(),
+                r.path.clone(),
+                r.name.clone().unwrap_or_default(),
+                r.module.clone(),
+                r.middleware.join(", "),
+            ]
+        })
+        .collect();
+    let header = ["METHOD", "PATH", "NAME", "MODULE", "MIDDLEWARE"].map(str::to_owned);
+    let mut widths = header.clone().map(|h| h.len());
+    for row in &rows {
+        for (width, cell) in widths.iter_mut().zip(row) {
+            *width = (*width).max(cell.chars().count());
+        }
+    }
+    for row in std::iter::once(&header).chain(&rows) {
+        let line: Vec<String> = row
+            .iter()
+            .zip(widths)
+            .map(|(cell, width)| format!("{cell:<width$}"))
+            .collect();
+        println!("{}", line.join("  ").trim_end());
     }
 }
 
@@ -582,6 +670,7 @@ fn build_router(router: Router<AppState>, state: AppState) -> Router {
         .layer(from_fn_with_state(state.clone(), session::middleware))
         .merge(assets::router())
         .merge(crate::health::router())
+        .merge(crate::live::router())
         .merge(public_files(&state))
         .layer(axum::extract::DefaultBodyLimit::max(
             state.config.upload_max_size,
