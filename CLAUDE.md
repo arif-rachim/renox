@@ -89,7 +89,10 @@ docs/postgresql.md         PostgreSQL guide for app authors
 ## 3. Architecture and the decisions behind it
 
 ### Request pipeline (outermost first)
-`TraceLayer` → `session::middleware` (loads/saves encrypted cookie) → `i18n::middleware` (puts the
+`method::middleware` (method spoofing: a POST with `_method=PUT|PATCH|DELETE` or
+`X-HTTP-Method-Override` becomes that method; it wraps the whole router via
+`Router::new().fallback_service(layer(router))` because route layers run after axum matched the
+method) → `TraceLayer` → `session::middleware` (loads/saves encrypted cookie) → `i18n::middleware` (puts the
 visitor's `RequestLocale` in extensions: session `_locale` if known, else `APP_LOCALE`) → `auth::middleware` (loads the
 current user once per request from session or `Authorization: Bearer`, inserts `CurrentUser` and
 `AppState` into request extensions) → `csrf::middleware` → `view::middleware` (renders `View`
@@ -249,6 +252,13 @@ migration changes migration counts asserted in `crates/renox/tests/database.rs`.
 - Whether a 500 page shows the error chain is decided per app in the view middleware
   (`ErrorPage::shown_detail(config.debug)`); there is no process-wide debug flag any more, so apps
   with and without debug can run side by side in one test binary.
+- `Valid<T>` for forms: a field that fails to parse gets its error plus a placeholder value
+  (`validation/extract.rs` `PLACEHOLDERS`), so the other rules still run; rule errors on
+  placeholder fields are dropped. `Parsed::Ok(T, Errors)` carries those parse errors.
+- Templates: `request.query` holds the raw query string; `page_url(n)` (reads it through
+  `minijinja::State::lookup`, which works inside imported macros) keeps filters in page links;
+  `can(ability, target)` reads `target._can` (from `auth::Can`), `can(gate)` asks a gate;
+  `method_field('PUT')`.
 
 ### 4.6b Docs for app authors and agents (M10)
 - `CHEATSHEET.md` is compiled: every ```rust block must build on its own (visible `use` lines, no
@@ -448,16 +458,16 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M8b single-binary deploys (`embedded!()`), `rnx build`, `rnx make:deploy` (Docker/systemd/Litestream) | merged to `main` (#18) |
 | M9a Renox's own database layer (`Db`, `Transaction`, `Row`, `db::sql`, `postgres` feature) | merged to `main` (#19) |
 | M9b PostgreSQL backend proper (dual-dialect migrations, typed binds, SKIP LOCKED, schedule claims, `rnx new --database postgres`, CI, guide) | merged to `main` (#20) |
-| M10a CHEATSHEET.md (doctested), llms.txt, AGENTS.md/CLAUDE.md in new apps, `examples/crud` | PR from branch `m10a-agent-docs` |
-| M10b examples api/jobs/uploads/postgres, doctests on public APIs, the M10 gaps (ROADMAP M10) | next |
+| M10a CHEATSHEET.md (doctested), llms.txt, AGENTS.md/CLAUDE.md in new apps, `examples/crud` | merged to `main` (#21) |
+| M10b method spoofing, all validation errors at once, `can()` for policies, pagination keeps query | PR from branch `m10b-framework-gaps` |
+| M10c examples api/jobs/uploads/postgres, doctests on public APIs | next |
 | v1.0 docs site, starter kit, semver guarantee | last |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on
 an up-to-date `main`. Open the next milestone's PR only after the previous one is merged (§6.3).
 
 Open items noted in ROADMAP: `#[derive(Validate)]`, more rules (regex, dates, files), route groups
-with prefixes, SQLite session driver, and the M10 gaps (method spoofing, all errors at once when a
-field fails to parse, `can()` for policies in templates, pagination links that keep query params).
+with prefixes, SQLite session driver.
 
 Stats at the time of writing: ~11.8k lines of Rust in `crates/`, 140 tests, 34 direct dependencies
 (stars and roles were reviewed with the owner; keep deps lean and remove unused ones).

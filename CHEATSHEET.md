@@ -98,7 +98,7 @@ impl Validate for ProductForm {
 
 // Invalid input never reaches the handler. A plain form post goes back with
 // errors and old input; an HTMX post gets a 422 and the errors appear next to
-// the fields.
+// the fields. Every field's errors show at once, even when one doesn't parse.
 async fn store(session: Session, Valid(form): Valid<ProductForm>) -> Result<Redirect> {
     let _ = form.name;
     session.flash("status", "Saved.")?;
@@ -107,9 +107,9 @@ async fn store(session: Session, Valid(form): Valid<ProductForm>) -> Result<Redi
 ```
 
 ```html
-<form method="post" action="{{ route('products.store') }}">
-  {{ csrf_field() }}
-  <input name="name" value="{{ old('name') }}">
+<form method="post" action="{{ route('products.update', product.id) }}">
+  {{ csrf_field() }}{{ method_field('PUT') }}   {# routed as PUT; also PATCH, DELETE #}
+  <input name="name" value="{{ old('name', product.name) }}">
   <p class="error" data-error-for="name">{{ error('name') }}</p>
   <button>Save</button>
 </form>
@@ -181,7 +181,7 @@ async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
 ```html
 <section id="products">
   {% for p in products.items %}<p>{{ p.name }}</p>{% endfor %}
-  {# page links swap just this section #}
+  {# page links swap just this section and keep other query parameters (?q=…) #}
   <div hx-boost="true" hx-target="#products" hx-select="#products" hx-swap="outerHTML">
     {% from "renox/pagination.html" import pagination %}{{ pagination(products) }}
   </div>
@@ -214,6 +214,17 @@ async fn edit(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Resu
 
 fn gates(app: App) -> App {
     app.gate("admin", |user| user.email.ends_with("@shop.example")) // user.gate("admin")?
+}
+
+// For `{% if can('update', product) %}` in the view, attach the abilities.
+async fn index(State(db): State<Db>, user: Option<AuthUser>) -> Result<View> {
+    let products: Vec<_> = Product::query()
+        .get(&db)
+        .await?
+        .into_iter()
+        .map(|p| Can::new(p, user.as_deref(), &["update", "delete"]))
+        .collect(); // on a page: .paginate(…).await?.map(|p| Can::new(…))
+    Ok(view("products/index.html", context! { products }))
 }
 ```
 

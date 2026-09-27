@@ -73,6 +73,40 @@ pub trait Policy {
     fn allows(&self, user: &User, ability: &str) -> bool;
 }
 
+/// A model together with what the current user may do with it, so templates
+/// can ask the policy: `{% if can('update', product) %}`.
+///
+/// ```ignore
+/// async fn index(State(db): State<Db>, user: Option<AuthUser>, Page(page): Page) -> Result<View> {
+///     let products = Product::query().paginate(&db, page, 20).await?
+///         .map(|p| Can::new(p, user.as_deref(), &["update", "delete"]));
+///     Ok(view("products/index.html", context! { products }))
+/// }
+/// ```
+///
+/// It serializes as the model's own fields plus `_can` (`{"update": true, …}`);
+/// guests get `false` for every ability.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct Can<T> {
+    #[serde(flatten)]
+    pub item: T,
+    #[serde(rename = "_can")]
+    pub abilities: std::collections::BTreeMap<String, bool>,
+}
+
+impl<T: Policy> Can<T> {
+    pub fn new(item: T, user: Option<&User>, abilities: &[&str]) -> Self {
+        let abilities = abilities
+            .iter()
+            .map(|ability| {
+                let allowed = user.is_some_and(|user| item.allows(user, ability));
+                ((*ability).to_owned(), allowed)
+            })
+            .collect();
+        Self { item, abilities }
+    }
+}
+
 pub(crate) type Gate = Arc<dyn Fn(&User) -> bool + Send + Sync>;
 pub(crate) type Gates = Arc<HashMap<String, Gate>>;
 

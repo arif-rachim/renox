@@ -68,13 +68,13 @@ async fn only_the_owner_edits_a_product() {
 
     app.acting_as(&user(&app, "other@example.com").await);
     app.get(&edit).await.assert_forbidden();
-    app.post(&update, &[("name", "Stolen"), ("price", "1")])
+    app.put(&update, &[("name", "Stolen"), ("price", "1")])
         .await
         .assert_forbidden();
 
     app.acting_as(&owner);
     app.get(&edit).await.assert_ok().assert_see(&product.name);
-    app.post(&update, &[("name", "Renamed"), ("price", "1")])
+    app.put(&update, &[("name", "Renamed"), ("price", "1")])
         .await
         .assert_redirect("/products");
     app.assert_database_has("products", &[("id", &product.id), ("name", &"Renamed")])
@@ -92,7 +92,7 @@ async fn deleted_products_go_to_the_trash_and_come_back() {
     let product = Product::create(app.db(), espresso).await.unwrap();
     app.acting_as(&owner);
 
-    app.post(&format!("/products/{}/delete", product.id), &[])
+    app.delete(&format!("/products/{}", product.id))
         .await
         .assert_redirect("/products");
     app.get("/products").await.assert_dont_see(&product.name);
@@ -102,4 +102,36 @@ async fn deleted_products_go_to_the_trash_and_come_back() {
         .await
         .assert_redirect("/products");
     app.get("/products").await.assert_see(&product.name);
+}
+
+#[renox::test]
+async fn the_list_offers_edit_and_delete_to_the_owner_only() {
+    let app = TestApp::new(crud::app()).await;
+    let owner = user(&app, "owner@example.com").await;
+    let product = Product::create(app.db(), Product::for_owner(&owner))
+        .await
+        .unwrap();
+    let edit_link = format!("/products/{}/edit", product.id);
+
+    app.get("/products").await.assert_dont_see(&edit_link);
+    app.acting_as(&user(&app, "other@example.com").await);
+    app.get("/products").await.assert_dont_see(&edit_link);
+    app.acting_as(&owner);
+    app.get("/products")
+        .await
+        .assert_see(&edit_link)
+        .assert_see(r#"name="_method" value="DELETE""#);
+
+    // What the Delete button sends: a POST with `_method=DELETE`.
+    app.post(
+        &format!("/products/{}", product.id),
+        &[("_method", "DELETE")],
+    )
+    .await
+    .assert_redirect("/products");
+    app.assert_database_missing(
+        "products",
+        &[("id", &product.id), ("deleted_at", &None::<DateTime>)],
+    )
+    .await;
 }

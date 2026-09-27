@@ -12,11 +12,10 @@
       <td>{{ product.name }}</td>
       <td>{{ product.price }}</td>
       <td>
-        {# Mirrors the policy (only owners edit and delete); the handlers enforce it. #}
-        {% if auth.check and auth.user.id == product.user_id %}
-        <a href="{{ route('products.edit', product.id) }}">Edit</a>
+        {% if can('update', product) %}<a href="{{ route('products.edit', product.id) }}">Edit</a>{% endif %}
+        {% if can('delete', product) %}
         <form method="post" action="{{ route('products.destroy', product.id) }}">
-          {{ csrf_field() }}<button>Delete</button>
+          {{ csrf_field() }}{{ method_field('DELETE') }}<button>Delete</button>
         </form>
         {% endif %}
       </td>

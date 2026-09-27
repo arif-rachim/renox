@@ -409,6 +409,23 @@ async fn htmx_and_json_requests_get_422_json() {
     assert_eq!(reply.status, StatusCode::UNPROCESSABLE_ENTITY);
     let body: serde_json::Value = serde_json::from_str(&reply.body).unwrap();
     assert_eq!(body["errors"]["harga"][0], "The harga must be a number.");
+
+    // A field that doesn't parse doesn't hide the other fields' errors, and
+    // its placeholder value (0, below the minimum) adds no error of its own.
+    let reply = client
+        .post("/produk", "nama=&harga=murah&setuju=maybe&email=x", true)
+        .await;
+    let body: serde_json::Value = serde_json::from_str(&reply.body).unwrap();
+    assert_eq!(body["errors"]["nama"][0], "The nama field is required.");
+    assert_eq!(body["errors"]["harga"].as_array().unwrap().len(), 1);
+    assert_eq!(body["errors"]["harga"][0], "The harga must be a number.");
+    assert_eq!(body["errors"]["setuju"].as_array().unwrap().len(), 1);
+    assert!(
+        body["errors"]["email"][0]
+            .as_str()
+            .unwrap()
+            .contains("email")
+    );
 }
 
 #[tokio::test]

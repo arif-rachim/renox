@@ -8,6 +8,7 @@ use renox::Kernel;
 use renox::prelude::*;
 use tower::ServiceExt;
 
+#[derive(serde::Serialize)]
 struct Post {
     owner_id: i64,
 }
@@ -33,6 +34,12 @@ impl Module for Dashboard {
             .get("/", || async { view("home.html", ()) })
             .name("home")
             .get("/token", |session: Session| async move { session.token() })
+            .get("/posts", |auth: Option<AuthUser>| async move {
+                let posts: Vec<_> = [1, 2]
+                    .map(|owner_id| Can::new(Post { owner_id }, auth.as_deref(), &["update"]))
+                    .into();
+                view("posts.html", context! { posts })
+            })
             .get("/whoami", |auth: Option<AuthUser>| async move {
                 auth.map_or("guest".to_owned(), |a| a.name.clone())
             })
@@ -62,6 +69,11 @@ async fn kernel(auth: Auth) -> (Kernel, tempfile::TempDir) {
     std::fs::write(
         dir.path().join("home.html"),
         "{% if auth.check %}Halo {{ auth.user.name }}{% else %}Tamu{% endif %}|admin={% if can('admin') %}yes{% else %}no{% endif %}|{{ auth.user | tojson }}",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("posts.html"),
+        "{% for p in posts %}{{ p.owner_id }}:{{ 'edit' if can('update', p) else 'view' }};{% endfor %}",
     )
     .unwrap();
     let config = Config {
@@ -422,7 +434,17 @@ async fn policies_and_gates() {
         .await
         .unwrap();
     let mut client = Client::new(&kernel);
+    assert_eq!(client.get("/posts").await.body, "1:view;2:view;", "guests");
     client.login("arif@example.com", "rahasia123").await;
+    assert_eq!(
+        client.get("/posts").await.body,
+        format!(
+            "1:{};2:{};",
+            if owner.id == 1 { "edit" } else { "view" },
+            if owner.id == 2 { "edit" } else { "view" }
+        ),
+        "can('update', post) in templates asks the policy"
+    );
 
     assert_eq!(
         client.get(&format!("/posts/{}/edit", owner.id)).await.body,

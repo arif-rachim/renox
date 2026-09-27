@@ -257,8 +257,9 @@ still SQLite underneath) and M9b (the PostgreSQL backend proper).
 ### M10 · v0.11: Examples and docs for people and coding agents (before 1.0)
 An agent (or a person) building on Renox should be able to find the idiomatic way to do something by
 opening one short file, not by reading the framework. That saves tokens and stops agents copying
-outdated APIs. Split in two PRs: M10a (cheat-sheet, llms.txt, agent files in new apps,
-`examples/crud`) and M10b (the other examples, doctests on public APIs).
+outdated APIs. Split in PRs: M10a (cheat-sheet, llms.txt, agent files in new apps,
+`examples/crud`), M10b (the framework gaps the examples exposed, below) and M10c (the other
+examples, doctests on public APIs).
 
 - [ ] Small, focused examples, one pattern each, every one compiled and tested in CI (an untested
       example goes stale, and a stale example is worse than none):
@@ -282,14 +283,18 @@ outdated APIs. Split in two PRs: M10a (cheat-sheet, llms.txt, agent files in new
       the generators, where the cheat-sheet and examples are, and the checks to run (M10a)
 
 Gaps found while writing the examples, to close before 1.0:
-- [ ] Method spoofing (`_method=PUT|PATCH|DELETE` in plain HTML forms, as in Laravel). It needs a
-      layer in front of axum's routing, since route layers run after the method is matched; until
-      then updates and deletes are `POST /products/{id}` and `POST /products/{id}/delete`
-- [ ] When a field fails to parse (e.g. `price=abc` for an `i64`), only that error is reported; the
-      other fields' rules should still run so every error shows at once
-- [ ] `can('update', product)` in templates for policies (today `can()` checks gates only, so views
-      repeat the owner check)
-- [ ] Pagination links that keep the other query parameters (e.g. a search box)
+- [x] Method spoofing (`_method=PUT|PATCH|DELETE` in plain HTML forms, urlencoded or multipart, or
+      the `X-HTTP-Method-Override` header), with `{{ method_field('PUT') }}`; a layer in front of
+      the whole router, since route layers run after the method is matched (M10b)
+- [x] When a field fails to parse (e.g. `price=abc` for an `i64`), it gets its error and a
+      placeholder (`0`, then `false`) so the rest parses and every other field's rules still run;
+      a placeholder's own rule errors are dropped (M10b; urlencoded and multipart forms — JSON
+      bodies still report the first parse error)
+- [x] `can('update', product)` in templates for policies: the handler wraps models in
+      `auth::Can::new(model, user, &["update", …])` (`Paginated::map` for pages), which adds `_can`
+      (M10b)
+- [x] Pagination links keep the other query parameters: `page_url(n)` in templates reads
+      `request.query` (M10b)
 
 ### v1.0
 - [ ] Documentation site built with Renox, starter kit, semver stability guarantee

@@ -116,6 +116,31 @@ impl Views {
                         })
                 },
             );
+            // The current URL's query string with `page` set to `page`, for
+            // pagination links that keep filters such as `?q=kopi`.
+            env.add_function("page_url", |state: &minijinja::State, page: u32| -> Value {
+                let query = state
+                    .lookup("request")
+                    .and_then(|request| request.get_attr("query").ok())
+                    .and_then(|query| query.as_str().map(str::to_owned))
+                    .unwrap_or_default();
+                let mut url = form_urlencoded::Serializer::new(String::new());
+                for (key, value) in form_urlencoded::parse(query.as_bytes()) {
+                    if key != "page" {
+                        url.append_pair(&key, &value);
+                    }
+                }
+                url.append_pair("page", &page.to_string());
+                Value::from(format!("?{}", url.finish()))
+            });
+            env.add_function("method_field", |method: String| {
+                let method: String = method.chars().filter(char::is_ascii_alphabetic).collect();
+                Value::from_safe_string(format!(
+                    "<input type=\"hidden\" name=\"{}\" value=\"{}\">",
+                    crate::method::METHOD_FIELD,
+                    method.to_ascii_uppercase()
+                ))
+            });
             env.add_function("asset", |path: String| {
                 let mut url = String::from("/");
                 crate::routing::encode(&mut url, path.trim_start_matches('/'), true);
@@ -304,6 +329,7 @@ pub(crate) async fn middleware(
     let locale = crate::i18n::request_locale(req.extensions(), &state);
     let htmx = Htmx::from_headers(req.headers());
     let path = req.uri().path().to_owned();
+    let query = req.uri().query().unwrap_or_default().to_owned();
     let (wants_json, referer) = {
         let header = |name| req.headers().get(name).and_then(|v| v.to_str().ok());
         let wants_json = header(ACCEPT).is_some_and(|v| v.contains("application/json"))
@@ -335,6 +361,7 @@ pub(crate) async fn middleware(
             current_user,
             &htmx,
             &path,
+            &query,
             &locale,
         );
         return match state.views.render_view(&view, globals, &htmx) {
@@ -376,6 +403,7 @@ fn globals(
     current_user: Option<CurrentUser>,
     htmx: &Htmx,
     path: &str,
+    query: &str,
     locale: &str,
 ) -> Value {
     let config = &state.config;
@@ -435,13 +463,22 @@ fn globals(
             user => user.as_deref(),
         },
         t => Value::from_function(translate),
-        can => Value::from_function(move |gate: String| {
-            gate_user.as_ref().is_some_and(|(user, gates)| {
-                gates.get(&gate).is_some_and(|check| check(user))
-            })
+        // `can('admin')` asks a gate; `can('update', product)` reads the
+        // abilities `auth::Can` attached to the model in the handler.
+        can => Value::from_function(move |ability: String, target: Option<Value>| {
+            match target {
+                Some(target) => target
+                    .get_attr("_can")
+                    .and_then(|can| can.get_attr(&ability))
+                    .is_ok_and(|allowed| allowed.is_true()),
+                None => gate_user.as_ref().is_some_and(|(user, gates)| {
+                    gates.get(&ability).is_some_and(|check| check(user))
+                }),
+            }
         }),
         request => context! {
             path => path,
+            query => query,
             htmx => htmx.request,
             boosted => htmx.boosted,
         },

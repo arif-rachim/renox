@@ -573,6 +573,13 @@ async fn handlers_use_the_pool_and_render_pagination() {
     assert!(body.contains(r#"href="?page=1" rel="prev""#), "{body}");
     assert!(body.contains(r#"href="?page=3" rel="next""#), "{body}");
     assert!(get("/produk?page=abc").await.1.starts_with("[A][B]"));
+
+    // Page links keep the other query parameters.
+    let (_, body) = get("/produk?q=kopi+susu&page=2&sort=nama").await;
+    assert!(
+        body.contains(r#"href="?q=kopi+susu&amp;sort=nama&amp;page=3" rel="next""#),
+        "{body}"
+    );
 }
 
 #[tokio::test]
