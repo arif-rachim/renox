@@ -48,3 +48,9 @@ pub mod prelude {
     pub use axum::http::StatusCode;
     pub use axum::response::{Html, IntoResponse, Redirect, Response};
 }
+
+/// Compiles every Rust example in `CHEATSHEET.md` as a doctest, so the
+/// cheat-sheet can't drift from the API.
+#[cfg(doctest)]
+#[doc = include_str!("../../../CHEATSHEET.md")]
+pub struct CheatSheet;

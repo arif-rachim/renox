@@ -1,0 +1,45 @@
+# {{title}}: notes for coding agents
+
+A [Renox](https://github.com/arif-rachim/renox) app: Rust + Axum + HTMX + Alpine.js, like Laravel.
+The framework is the `renox` dependency; don't copy its code into this app.
+
+## How to do things
+
+Check the Renox cheat-sheet first. It has one short, compiled example per task: routes, views,
+forms and validation, models, queries, pagination, auth and policies, HTMX, jobs, mail, cache,
+uploads, tests.
+- https://github.com/arif-rachim/renox/blob/main/CHEATSHEET.md
+- Local copy: in the `renox` checkout Cargo downloaded (`~/.cargo/git/checkouts/renox-*/*/`),
+  next to `llms.txt`, which lists complete example apps such as `examples/crud`.
+
+Prefer the generators over writing boilerplate by hand:
+
+```bash
+rnx make:module products                               # src/app/products + view + registration
+rnx make:model Product --module products --migration   # model + migrations/*.sql
+rnx make:policy Product --module products
+rnx make:job SendReceipt --module products
+rnx make:mail order_shipped
+rnx make:migration add_stock_to_products
+```
+
+## Layout
+
+- `src/lib.rs`: `app()` builds the App (modules, migrations, seeders); `src/main.rs` only runs it.
+- `src/app/<module>/mod.rs`: one module per feature (routes + handlers), with `model.rs`,
+  `policy.rs` and jobs next to it.
+- `resources/views/`: MiniJinja templates (`layouts/app.html` is the layout).
+  `resources/lang/*.json`: translations. `public/`: static files.
+- `migrations/`: `TIMESTAMP_name.up.sql` / `.down.sql`, written for the database in
+  `DATABASE_URL` (`.env`).
+- `tests/`: integration tests with `renox::testing::TestApp`.
+
+## Checks before you finish
+
+```bash
+cargo test            # boots the app on a fresh test database
+cargo clippy --all-targets
+rnx route:list        # confirm routes and their names
+```
+
+Run the app with `rnx serve` (it rebuilds on changes) and try pages at http://127.0.0.1:3000.

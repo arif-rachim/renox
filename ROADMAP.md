@@ -257,28 +257,39 @@ still SQLite underneath) and M9b (the PostgreSQL backend proper).
 ### M10 · v0.11: Examples and docs for people and coding agents (before 1.0)
 An agent (or a person) building on Renox should be able to find the idiomatic way to do something by
 opening one short file, not by reading the framework. That saves tokens and stops agents copying
-outdated APIs.
+outdated APIs. Split in two PRs: M10a (cheat-sheet, llms.txt, agent files in new apps,
+`examples/crud`) and M10b (the other examples, doctests on public APIs).
 
 - [ ] Small, focused examples, one pattern each, every one compiled and tested in CI (an untested
       example goes stale, and a stale example is worse than none):
   - [x] `examples/hello`: routes, views, forms, validation, uploads (exists)
-  - [ ] `examples/crud`: model, migration, pagination, soft deletes, policy
+  - [x] `examples/crud`: model, migration, pagination, soft deletes and a trash, policy, flash (M10a)
   - [ ] `examples/api`: auth plus API tokens (Bearer)
   - [ ] `examples/jobs`: queue, jobs, scheduler, mail, notifications
   - [ ] `examples/uploads`: file rules, storage (local and S3)
   - [ ] `examples/postgres`: the same app on PostgreSQL (after M9b)
-- [ ] Short files, no decorative code, comments only where something isn't obvious; the official way
+- [x] Short files, no decorative code, comments only where something isn't obvious; the official way
       only (when there are two ways, show the main one)
-- [ ] Each example names the generator commands that made its files (`rnx make:model Produk`, …),
+- [x] Each example names the generator commands that made its files (`rnx make:model Produk`, …),
       so agents know not to type the boilerplate
-- [ ] `CHEATSHEET.md`: one page of the most common patterns, 5–10 lines each (route, view, form +
-      validation, model + query, migration, auth guard, job, mail, test), tested by a doctest or an
-      example so it can't drift
-- [ ] `llms.txt` at the repo root (and a section in CLAUDE.md for app authors): where each topic
-      lives, e.g. "CRUD → examples/crud/src/produk.rs", "cheat-sheet → CHEATSHEET.md"
+- [x] `CHEATSHEET.md`: one page of the most common patterns (commands, app/module/routes, views,
+      forms + validation, model + migration + queries, pagination, auth/policies/gates, HTMX, raw
+      SQL + transactions, jobs/events/schedule/mail, cache/session/uploads/i18n, tests, `.env`);
+      every Rust block is compiled by `cargo test --doc -p renox` (M10a)
+- [x] `llms.txt` at the repo root: what each example and guide covers, file by file (M10a)
 - [ ] Doc comments on public APIs get small runnable doctests instead of `ignore` where possible
-- [ ] Apps from `rnx new` ship an `AGENTS.md`/`CLAUDE.md` pointing to the cheat-sheet and the
-      examples
+- [x] Apps from `rnx new` ship an `AGENTS.md` (and a `CLAUDE.md` importing it) with the layout,
+      the generators, where the cheat-sheet and examples are, and the checks to run (M10a)
+
+Gaps found while writing the examples, to close before 1.0:
+- [ ] Method spoofing (`_method=PUT|PATCH|DELETE` in plain HTML forms, as in Laravel). It needs a
+      layer in front of axum's routing, since route layers run after the method is matched; until
+      then updates and deletes are `POST /products/{id}` and `POST /products/{id}/delete`
+- [ ] When a field fails to parse (e.g. `price=abc` for an `i64`), only that error is reported; the
+      other fields' rules should still run so every error shows at once
+- [ ] `can('update', product)` in templates for policies (today `can()` checks gates only, so views
+      repeat the owner check)
+- [ ] Pagination links that keep the other query parameters (e.g. a search box)
 
 ### v1.0
 - [ ] Documentation site built with Renox, starter kit, semver stability guarantee

@@ -1,0 +1,34 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<h1>Products</h1>
+{% if auth.check %}<p><a href="{{ route('products.create') }}">New product</a></p>{% endif %}
+
+<section id="products">
+  <table>
+    <tr><th>Name</th><th>Price</th><th></th></tr>
+    {% for product in products.items %}
+    <tr>
+      <td>{{ product.name }}</td>
+      <td>{{ product.price }}</td>
+      <td>
+        {# Mirrors the policy (only owners edit and delete); the handlers enforce it. #}
+        {% if auth.check and auth.user.id == product.user_id %}
+        <a href="{{ route('products.edit', product.id) }}">Edit</a>
+        <form method="post" action="{{ route('products.destroy', product.id) }}">
+          {{ csrf_field() }}<button>Delete</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="3">No products yet.</td></tr>
+    {% endfor %}
+  </table>
+  {# Page links load the next page with HTMX and swap in just this section. #}
+  <div hx-boost="true" hx-target="#products" hx-select="#products" hx-swap="outerHTML">
+    {% from "renox/pagination.html" import pagination %}
+    {{ pagination(products) }}
+  </div>
+</section>
+{% endblock %}

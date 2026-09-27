@@ -198,7 +198,11 @@ SQLite is the default and suits an app on one server. PostgreSQL (the `postgres`
 for apps that outgrow it, with the same models, queries and commands: see
 [docs/postgresql.md](docs/postgresql.md).
 
-See [`examples/hello`](examples/hello) for a guestbook using SQLite, validation, login and
+**Patterns at a glance:** [CHEATSHEET.md](CHEATSHEET.md) (every Rust snippet is compiled in CI).
+Coding agents: start from [llms.txt](llms.txt); apps made by `rnx new` include an `AGENTS.md`.
+
+See [`examples/crud`](examples/crud) for a complete CRUD module (policy, soft deletes, pagination)
+and [`examples/hello`](examples/hello) for a guestbook using SQLite, validation, login and
 registration, sessions, CSRF, flash messages, pagination and HTMX fragments.
 
 ## Planned
