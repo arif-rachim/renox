@@ -20,6 +20,11 @@ pub enum DbValue {
     NaiveDateTime(NaiveDateTime),
     Date(NaiveDate),
     Time(NaiveTime),
+    /// Text on SQLite; JSON on PostgreSQL (fits `JSONB` and `TEXT` columns).
+    Json(serde_json::Value),
+    /// A 16-byte BLOB on SQLite; `UUID` on PostgreSQL.
+    #[cfg(feature = "uuid")]
+    Uuid(uuid::Uuid),
 }
 
 impl DbValue {
@@ -33,6 +38,9 @@ impl DbValue {
             DbValue::NaiveDateTime(v) => DbValue::Text(v.format("%F %T%.f").to_string()),
             DbValue::Date(v) => DbValue::Text(v.format("%F").to_string()),
             DbValue::Time(v) => DbValue::Text(v.format("%T%.f").to_string()),
+            DbValue::Json(v) => DbValue::Text(v.to_string()),
+            #[cfg(feature = "uuid")]
+            DbValue::Uuid(v) => DbValue::Blob(v.as_bytes().to_vec()),
             other => other,
         }
     }
@@ -95,7 +103,14 @@ impl ToDbValue for Vec<u8> {
 
 impl ToDbValue for serde_json::Value {
     fn to_db_value(&self) -> DbValue {
-        DbValue::Text(self.to_string())
+        DbValue::Json(self.clone())
+    }
+}
+
+#[cfg(feature = "uuid")]
+impl ToDbValue for uuid::Uuid {
+    fn to_db_value(&self) -> DbValue {
+        DbValue::Uuid(*self)
     }
 }
 

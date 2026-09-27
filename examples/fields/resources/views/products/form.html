@@ -1,0 +1,50 @@
+{% extends "layouts/app.html" %}
+
+{#- Each input shows the old input after a failed save, else the stored value.
+    The value formats match what the inputs expect: dates as 2026-10-01,
+    times as 08:00:00, date-times as 2026-10-01T10:30:00. -#}
+{% macro value(name) %}{{ old(name, product[name] if product and product[name] is not none else '') }}{% endmacro %}
+
+{% block content %}
+<h1>{{ "Edit " ~ product.name if product else "New product" }}</h1>
+<form method="post" action="{{ route('products.update', product.public_id) if product else route('products.store') }}">
+  {{ csrf_field() }}{% if product %}{{ method_field('PUT') }}{% endif %}
+
+  <label>Name <input name="name" value="{{ value('name') }}"></label>
+  <p class="error" data-error-for="name">{{ error('name') }}</p>
+
+  <label>Description <textarea name="description">{{ value('description') }}</textarea></label>
+
+  <label>Stock <input type="number" name="stock" min="0" value="{{ value('stock') }}"></label>
+  <p class="error" data-error-for="stock">{{ error('stock') }}</p>
+
+  <label>Weight (kg) <input type="number" name="weight_kg" step="0.01" min="0" value="{{ value('weight_kg') }}"></label>
+  <p class="error" data-error-for="weight_kg">{{ error('weight_kg') }}</p>
+
+  <label>Price (Rp) <input type="number" name="price" step="1" min="0" value="{{ value('price') }}"></label>
+  <p class="error" data-error-for="price">{{ error('price') }}</p>
+
+  {% set available = old('available', product.available if product else false) %}
+  <label><input type="checkbox" name="available" {% if available %}checked{% endif %}> Available</label>
+
+  {% set size = old('size', product.size if product else 'medium') %}
+  <label>Size
+    <select name="size">
+      {% for s in sizes %}<option value="{{ s }}" {% if s == size %}selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
+  </label>
+  <p class="error" data-error-for="size">{{ error('size') }}</p>
+
+  {% set chosen = old('colors', product.colors if product else []) %}
+  <fieldset><legend>Colors</legend>
+    {% for c in colors %}<label><input type="checkbox" name="colors" value="{{ c }}" {% if c in chosen %}checked{% endif %}> {{ c }}</label>{% endfor %}
+  </fieldset>
+  <p class="error" data-error-for="colors">{{ error('colors') }}</p>
+
+  <label>Opens at <input type="time" name="opens_at" value="{{ value('opens_at') }}"></label>
+  <label>Launch <input type="datetime-local" name="launch_at" value="{{ value('launch_at') }}"></label>
+  <label>Released on <input type="date" name="released_on" value="{{ value('released_on') }}"></label>
+
+  <button>Save</button>
+</form>
+{% endblock %}

@@ -1,0 +1,69 @@
+# Types: from the form to the database and back
+
+One table for choosing a field type. Every row is exercised by
+[`examples/fields`](../examples/fields) (a form with every input) and by Renox's own tests, on
+SQLite and PostgreSQL.
+
+| HTML input | Rust type (form and model) | SQLite column | PostgreSQL column |
+|---|---|---|---|
+| `<input>`, `type=email/url/tel/search/password` | `String` | `TEXT` | `TEXT` |
+| `<textarea>` | `String`, or `Option<String>` (empty → `None`) | `TEXT` | `TEXT` |
+| `type=number` | `i64` (use `i64` for whole numbers; PostgreSQL has no unsigned types) | `INTEGER` | `BIGINT` |
+| `type=number step=0.01` (measures) | `f64` | `REAL` | `DOUBLE PRECISION` |
+| money | `i64` in the smallest unit (rupiah, cents), never `f64` | `INTEGER` | `BIGINT` |
+| `type=checkbox` (one) | `bool`: `on` → `true`, unchecked (nothing sent) → `false` | `INTEGER` 0/1 | `BOOLEAN` |
+| `<select>` | an enum with `#[derive(DbEnum)]` | `TEXT` | `TEXT` |
+| `<select multiple>`, checkboxes sharing a name | `Vec<String>` with `#[serde(default)]`; stored as `Json<Vec<String>>` | `TEXT` | `JSONB` |
+| `type=date` | `NaiveDate` | `TEXT` | `DATE` |
+| `type=time` | `NaiveTime` | `TEXT` | `TIME` |
+| `type=datetime-local` (no seconds needed) | `NaiveDateTime` | `TEXT` | `TIMESTAMP` |
+| (set by Renox) `created_at`, `updated_at` | `Option<DateTime>` (UTC) | `TEXT` | `TIMESTAMPTZ` |
+| `type=file` | `Upload`; store it and keep its key as `String` | `TEXT` | `TEXT` |
+| (structured data) | `Json<T>` for any serde type, or `serde_json::Value` | `TEXT` | `JSONB` (or `JSON`, `TEXT`) |
+| (public ids) | `uuid::Uuid`, with renox's `uuid` feature | `BLOB` | `UUID` |
+| (bytes) | `Vec<u8>` | `BLOB` | `BYTEA` |
+| any optional field | `Option<T>` | nullable | nullable |
+
+## Enums
+
+```rust
+use renox::prelude::*;
+
+#[derive(DbEnum, Debug, Clone, Copy, PartialEq, Default)]
+enum Status {
+    #[default]
+    Draft,          // stored as "draft"
+    InStock,        // "in_stock"
+    #[db(rename = "gone")]
+    SoldOut,
+}
+```
+
+The same enum is a model field, a form field (`<option value="{{ s }}">` for `s in Status::ALL`),
+a JSON value and a template value, always as its text. A value that isn't a variant is a
+validation error.
+
+## Forms
+
+- Browsers send only checked checkboxes, and send them as `on`. Renox reads that as `true`, and
+  a missing one as `false`.
+- A multi-select or checkbox group repeats its name (`colors=black&colors=red`). Declare the
+  field as `Vec<T>` with `#[serde(default)]`, so that nothing chosen becomes an empty list.
+- `datetime-local` sends `2026-10-01T10:30`, without seconds. Renox accepts it as a
+  `NaiveDateTime`.
+- To show values back in an edit form, write them as they come. Dates, times and date-times
+  serialize in the formats their inputs expect (`2026-10-01`, `07:30:00`,
+  `2026-10-01T10:30:00`).
+- A field that doesn't parse (`weight=heavy`, `size=huge`) is reported together with every other
+  field's errors.
+
+## Choosing
+
+- **Money:** use `i64` in the smallest unit, `price: i64 // rupiah`, and format it for display.
+  Floats round (`0.1 + 0.2 != 0.3`). sqlx deliberately has no decimal type on SQLite, so a
+  `Decimal` would behave differently on the two databases.
+- **Time zones:** `DateTime` (UTC) is for moments something happened (`created_at`, `paid_at`).
+  `NaiveDateTime` is for what a user typed in their local time (`launch_at`); convert it with
+  `APP_TIMEZONE` when you need a moment.
+- **PostgreSQL:** use `BIGINT` for `i64` columns. A plain `INTEGER` is 32-bit and won't read into
+  an `i64`.

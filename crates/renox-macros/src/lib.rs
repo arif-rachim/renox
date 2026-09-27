@@ -1,6 +1,7 @@
 //! Procedural macros for Renox. Use them through the `renox` crate:
 //! `renox::Model` and `renox::migrations!`.
 
+mod db_enum;
 mod embedded;
 mod migrations;
 mod model;
@@ -32,6 +33,32 @@ use syn::{DeriveInput, parse_macro_input};
 pub fn derive_model(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     model::expand(input)
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
+}
+
+/// A fieldless enum stored as text: in the database (a `TEXT` column), in
+/// forms (`<select>`), in JSON and in templates. Variants are stored in
+/// snake_case (`OnHold` → `on_hold`) unless renamed with `#[db(rename = "…")]`.
+///
+/// Generates `as_str()`, `ALL` (every variant, e.g. for a `<select>`),
+/// `Display`, `FromStr`, `Serialize`, `Deserialize`, `ToDbValue`, and
+/// decoding on every database, so the enum can be a model field.
+///
+/// ```ignore
+/// #[derive(DbEnum, Debug, Clone, Copy, PartialEq, Default)]
+/// enum Status {
+///     #[default]
+///     Draft,
+///     Published,
+///     #[db(rename = "hidden")]
+///     Archived,
+/// }
+/// ```
+#[proc_macro_derive(DbEnum, attributes(db))]
+pub fn derive_db_enum(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    db_enum::expand(input)
         .unwrap_or_else(|err| err.to_compile_error())
         .into()
 }

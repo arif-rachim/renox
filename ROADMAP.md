@@ -366,6 +366,28 @@ M11c · SEO and analytics (done):
 - [x] `renox::serde_json` re-export and `json!` in the prelude (apps from `rnx new` had no
       `serde_json` for event parameters)
 
+### M12 · v0.13: Types from the form to the database (before 1.0)
+Asked by the owner after M10: do the examples cover every type in the database, in Renox and in
+the UI? They didn't, and a probe of what browsers send showed three inputs that didn't work.
+
+- [x] Checkboxes: `on` (and `1`, `yes`) read as `true`, an unchecked box (nothing sent) as `false`
+- [x] `<input type="datetime-local">` without seconds reads as `NaiveDateTime`
+- [x] Multi-selects and checkbox groups (repeated names) read into `Vec<T>`: forms are
+      deserialized with `serde_html_form` instead of `serde_urlencoded`
+- [x] `#[derive(DbEnum)]`: text-backed enums for models, forms, JSON and templates (`ALL`,
+      `as_str`, `Display`, `FromStr`, serde, `ToDbValue`, sqlx decoding on every enabled database
+      through `__db_text_type!`, chosen when renox-core compiles)
+- [x] `renox::db::Json<T>` fields (TEXT on SQLite, JSONB/JSON/TEXT on PostgreSQL) and
+      `serde_json::Value` read back (sqlx `json` feature); `DbValue::Json`
+- [x] UUID fields with renox's `uuid` feature (BLOB on SQLite, UUID on PostgreSQL); `DbValue::Uuid`
+- [x] A field that doesn't parse as an enum gets the enum's first variant as its placeholder, so
+      every other field's errors still show
+- [x] `examples/fields`: one form with every input type, saved and shown back in the edit form,
+      tested on SQLite and PostgreSQL (in the PostgreSQL CI job); [docs/types.md](docs/types.md)
+      maps HTML input ↔ Rust type ↔ SQLite ↔ PostgreSQL and is compiled as a doctest
+- Decimals: not added. sqlx deliberately has no decimal type on SQLite, so money stays `i64` in
+  the smallest unit, as the guide explains
+
 ### v1.0
 - [ ] Documentation site built with Renox, starter kit, semver stability guarantee
 

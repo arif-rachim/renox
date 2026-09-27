@@ -1,0 +1,11 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<h1>Products</h1>
+<p><a href="{{ route('products.create') }}">New product</a></p>
+<ul>
+  {% for p in products %}
+  <li><a href="{{ route('products.edit', p.public_id) }}">{{ p.name }}</a> ({{ p.size }}, {{ p.colors | join(", ") }})</li>
+  {% endfor %}
+</ul>
+{% endblock %}

@@ -26,7 +26,7 @@
 //! ```
 
 pub use renox_core::*;
-pub use renox_macros::{Model, embedded, migrations, test};
+pub use renox_macros::{DbEnum, Model, embedded, migrations, test};
 
 pub use axum;
 pub use tokio;
@@ -44,12 +44,17 @@ pub mod prelude {
         View, context, view,
     };
     pub use renox_core::{AuthUser, Lang, Policy, Registry, Upload};
-    pub use renox_macros::Model;
+    pub use renox_macros::{DbEnum, Model};
 
     pub use axum::extract::{Form, Json, Path, Query, State};
     pub use axum::http::StatusCode;
     pub use axum::response::{Html, IntoResponse, Redirect, Response};
 }
+
+/// Compiles the Rust in docs/types.md as a doctest.
+#[cfg(doctest)]
+#[doc = include_str!("../../../docs/types.md")]
+pub struct TypesGuide;
 
 /// Compiles every Rust example in the README as a doctest, so the front page
 /// can't drift from the API.

@@ -70,4 +70,4 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       # The other examples are SQLite apps; examples/postgres runs on both.
-      - run: cargo test -p renox -p renox-core -p renox-cli -p postgres-app --features renox/postgres
+      - run: cargo test -p renox -p renox-core -p renox-cli -p postgres-app -p fields --features renox/postgres

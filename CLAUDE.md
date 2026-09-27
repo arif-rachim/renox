@@ -86,6 +86,8 @@ crates/renox-cli/          `rnx`: new, serve, build, key:generate, make:* (gener
                            AGENTS.md.stub + CLAUDE.md.stub (named .stub so agents in this repo don't load them) working on the app)
 examples/hello/            guestbook app exercising many features in one file; used for live/browser testing
 examples/webhooks/         Midtrans / Xendit / Stripe webhooks (M11b)
+examples/fields/           every form field type ↔ Rust ↔ SQLite / PostgreSQL (M12); run in the PostgreSQL CI job
+docs/types.md              the type mapping table (compiled as a doctest: `TypesGuide`)
 examples/api/              JSON API with tokens (M10c)
 examples/jobs/             events, queued mail, notifications, schedule (M10c)
 examples/uploads/          public / private files (M10c)
@@ -272,6 +274,13 @@ migration changes migration counts asserted in `crates/renox/tests/database.rs`.
   middleware delivers them: htmx 2xx swap → `HX-Trigger` `{"renox:analytics":{"events":[…]}}`
   (merged with the handler's own), full page → `<meta name="renox-analytics">` in `renox_head()`,
   anything else (redirects) → kept for the next page.
+- Forms are deserialized with `serde_html_form` (repeated names → `Vec`). The retry loop in
+  `validation/extract.rs` first rewrites browser values (`coerce_browser_value`: checkbox
+  `on`/missing → bool, datetime-local + `:00`), then uses placeholders (an enum's first variant
+  from the error's "expected one of", then `0`, `false`).
+- `#[derive(DbEnum)]` emits `::renox::__db_text_type!(T)`; that macro_rules is defined twice in
+  renox-core (with/without `postgres`) so the sqlx impls match renox-core's features, not the
+  app's. Don't use `#[cfg(feature)]` inside exported macros: it would test the caller's features.
 - `Valid<T>` for forms: a field that fails to parse gets its error plus a placeholder value
   (`validation/extract.rs` `PLACEHOLDERS`), so the other rules still run; rule errors on
   placeholder fields are dropped. `Parsed::Ok(T, Errors)` carries those parse errors.
@@ -502,7 +511,8 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M11b webhooks (`impl Webhook`, `webhook_calls`, signature helpers, `examples/webhooks`) | merged to `main` (#25) |
 | M11c SEO & analytics (`seo()`, robots/sitemap, Search Console, GA4/GTM, events, Measurement Protocol) | merged to `main` (#26) |
 | M10c examples api / jobs / uploads / postgres; JSON errors for API clients; JSON bodies report all errors; `User::attempt`; `post_multipart` | merged to `main` (#27) |
-| M10d doctests on public APIs (all 35 renox-core examples compile) | PR from branch `m10d-doctests` |
+| M10d doctests on public APIs (all 35 renox-core examples compile) | merged to `main` (#28) |
+| M12 types end to end (checkbox, datetime-local, multi-select, `DbEnum`, `Json<T>`, `uuid` feature, `examples/fields`, docs/types.md) | PR from branch `m12-types` |
 | v1.0 docs site, starter kit, semver guarantee | last |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on

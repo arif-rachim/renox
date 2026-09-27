@@ -14,6 +14,8 @@ categories.workspace = true
 s3 = ["dep:object_store"]
 # PostgreSQL databases (`DATABASE_URL=postgres://...`).
 postgres = ["sqlx/postgres"]
+# `uuid::Uuid` model fields (BLOB on SQLite, UUID on PostgreSQL).
+uuid = ["dep:uuid", "sqlx/uuid"]
 
 [dependencies]
 anyhow = "1.0.104"
@@ -37,9 +39,11 @@ rand = "0.10.3"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 serde_path_to_error = "0.1.20"
+serde_html_form = "0.2.8"
 serde_urlencoded = "0.7.1"
 sha2 = "0.11.0"
-sqlx = { version = "0.9.0", default-features = false, features = ["sqlite", "runtime-tokio", "chrono"] }
+sqlx = { version = "0.9.0", default-features = false, features = ["sqlite", "runtime-tokio", "chrono", "json"] }
+uuid = { version = "1", optional = true, features = ["v4", "serde"] }
 tempfile = "3.27.0"
 tokio = { version = "1.53.1", features = ["full"] }
 tower = { version = "0.5.3", features = ["util"] }

@@ -65,6 +65,7 @@ pub use minijinja::context;
 
 pub use chrono;
 pub use fake;
+pub use serde;
 pub use serde_json;
 pub use sqlx;
 /// CORS configuration for `Routes::cors_layer`.

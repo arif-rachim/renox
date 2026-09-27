@@ -201,12 +201,14 @@ fn parse_pairs<T: DeserializeOwned>(
         .collect();
     let mut errors = Errors::new();
     let mut tries: HashMap<String, usize> = HashMap::new();
+    let mut coerced: std::collections::HashSet<String> = std::collections::HashSet::new();
     let parsed = loop {
         let encoded = form_urlencoded::Serializer::new(String::new())
             .extend_pairs(&filled)
             .finish();
-        let deserializer =
-            serde_urlencoded::Deserializer::new(form_urlencoded::parse(encoded.as_bytes()));
+        // serde_html_form, unlike serde_urlencoded, reads repeated names (a
+        // multi-select, a group of checkboxes) into a `Vec`.
+        let deserializer = serde_html_form::Deserializer::from_bytes(encoded.as_bytes());
         match upload::with_uploads(uploads, || serde_path_to_error::deserialize(deserializer)) {
             Ok(data) => break Parsed::Ok(data, errors),
             Err(err) => {
@@ -218,6 +220,9 @@ fn parse_pairs<T: DeserializeOwned>(
                     continue;
                 }
                 let path = err.path().to_string();
+                if coerce_browser_value(&mut filled, &path, &message, &mut coerced) {
+                    continue;
+                }
                 let blank = filled.iter().any(|(k, v)| *k == path && v.is_empty());
                 let tried = tries.entry(path.clone()).or_default();
                 if *tried == 0 {
@@ -227,14 +232,18 @@ fn parse_pairs<T: DeserializeOwned>(
                         }
                     }
                 }
-                // Stand-ins that parse as most field types: numbers and text,
-                // then booleans.
-                let placeholder = PLACEHOLDERS.get(*tried);
+                // Stand-ins that parse as most field types: an enum's first
+                // variant (named in the error), numbers and text, booleans.
+                let placeholder = match *tried {
+                    0 => expected_variant(&message)
+                        .or_else(|| PLACEHOLDERS.first().map(|p| (*p).to_owned())),
+                    n => PLACEHOLDERS.get(n).map(|p| (*p).to_owned()),
+                };
                 *tried += 1;
                 match placeholder {
                     Some(value) if filled.iter().any(|(k, _)| *k == path) => {
                         filled.retain(|(k, _)| *k != path);
-                        filled.push((path, (*value).to_owned()));
+                        filled.push((path, value));
                     }
                     _ => break Parsed::Invalid(errors),
                 }
@@ -245,6 +254,65 @@ fn parse_pairs<T: DeserializeOwned>(
 }
 
 const PLACEHOLDERS: &[&str] = &["0", "false"];
+
+/// The first valid value an enum's error names: serde's "unknown variant
+/// `x`, expected one of `a`, `b`" or DbEnum's "expected one of: a, b".
+fn expected_variant(message: &str) -> Option<String> {
+    let rest = message.split("expected one of").nth(1)?;
+    let rest = rest.trim_start_matches([':', ' ']);
+    let first = rest.split(',').next()?.trim().trim_matches('`');
+    (!first.is_empty()).then(|| first.to_owned())
+}
+
+/// Rewrites what browsers send into what Rust types parse, once per field:
+/// a checkbox's `on` (or `1`, `yes`) is `true`, an unchecked one (missing)
+/// is `false`; `<input type="datetime-local">` leaves out the seconds.
+/// Returns whether `path` was rewritten, so deserializing can try again.
+fn coerce_browser_value(
+    filled: &mut [(String, String)],
+    path: &str,
+    message: &str,
+    coerced: &mut std::collections::HashSet<String>,
+) -> bool {
+    if coerced.contains(path) {
+        return false;
+    }
+    let mut changed = false;
+    for (_, value) in filled.iter_mut().filter(|(k, _)| k == path) {
+        let new = if message.contains("`true` or `false`") {
+            match value.trim().to_ascii_lowercase().as_str() {
+                "on" | "1" | "yes" | "checked" => Some("true".to_owned()),
+                "" | "off" | "0" | "no" => Some("false".to_owned()),
+                _ => None,
+            }
+        } else if is_minute_datetime(value) {
+            Some(format!("{value}:00"))
+        } else {
+            None
+        };
+        if let Some(new) = new {
+            *value = new;
+            changed = true;
+        }
+    }
+    if changed {
+        coerced.insert(path.to_owned());
+    }
+    changed
+}
+
+/// `2026-10-01T10:30`, as `<input type="datetime-local">` sends it.
+fn is_minute_datetime(value: &str) -> bool {
+    let b = value.as_bytes();
+    b.len() == 16
+        && b[4] == b'-'
+        && b[7] == b'-'
+        && b[10] == b'T'
+        && b[13] == b':'
+        && b.iter()
+            .enumerate()
+            .all(|(i, c)| matches!(i, 4 | 7 | 10 | 13) || c.is_ascii_digit())
+}
 
 fn parse_json<T: DeserializeOwned>(
     bytes: &[u8],
@@ -284,11 +352,14 @@ fn parse_json<T: DeserializeOwned>(
                         }
                     }
                 }
-                let placeholder = JSON_PLACEHOLDERS.get(*tried);
+                let placeholder = match (*tried, expected_variant(&message)) {
+                    (0, Some(variant)) => Some(Value::String(variant)),
+                    (n, _) => JSON_PLACEHOLDERS.get(n).map(|p| p()),
+                };
                 *tried += 1;
                 match placeholder {
                     Some(value) if body.contains_key(&path) => {
-                        body.insert(path, value());
+                        body.insert(path, value);
                     }
                     _ => break Parsed::Invalid(errors),
                 }
@@ -382,6 +453,46 @@ mod tests {
             Parsed::Ok(form, errors) if errors.is_empty() => Ok(form),
             Parsed::Ok(_, errors) | Parsed::Invalid(errors) => Err(errors),
         }
+    }
+
+    #[derive(Deserialize, Debug)]
+    struct Browser {
+        agree: bool,
+        news: bool,
+        starts_at: chrono::NaiveDateTime,
+        #[serde(default)]
+        tags: Vec<String>,
+        #[serde(default)]
+        sizes: Vec<i64>,
+    }
+
+    fn parse_browser(body: &str) -> Result<Browser, Errors> {
+        let pairs = form_urlencoded::parse(body.as_bytes())
+            .into_owned()
+            .collect();
+        match parse_pairs::<Browser>(pairs, &HashMap::new(), &plain(Locale::En)).0 {
+            Parsed::Ok(form, errors) if errors.is_empty() => Ok(form),
+            Parsed::Ok(_, errors) | Parsed::Invalid(errors) => Err(errors),
+        }
+    }
+
+    #[test]
+    fn reads_what_browsers_send() {
+        // A checked checkbox sends "on", an unchecked one nothing;
+        // datetime-local has no seconds; multi-selects repeat the name.
+        let form =
+            parse_browser("agree=on&starts_at=2026-10-01T10%3A30&tags=a&tags=b&sizes=1&sizes=2")
+                .unwrap();
+        assert!(form.agree);
+        assert!(!form.news);
+        assert_eq!(form.starts_at.to_string(), "2026-10-01 10:30:00");
+        assert_eq!(form.tags, ["a", "b"]);
+        assert_eq!(form.sizes, [1, 2]);
+        let form = parse_browser("agree=1&news=true&starts_at=2026-10-01T10%3A30%3A15").unwrap();
+        assert!(form.agree && form.news);
+        assert!(form.tags.is_empty());
+        let errors = parse_browser("agree=maybe&starts_at=soon").unwrap_err();
+        assert!(errors.has("agree") && errors.has("starts_at"));
     }
 
     #[test]
