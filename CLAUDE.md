@@ -482,6 +482,16 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 - `pgrep -f`/`pkill -f` with a pattern that appears in your own command line kills your shell
   (exit 144) — happened again in M9b. Use the PID files.
 
+### 6.5c Pre-1.0 audit (read before M13/M14)
+- Findings with IDs (W* web, D* data/background, A* Laravel gaps) and the chaos baseline are in
+  `docs/audit/2026-09-pre-1.0.md`. ROADMAP M13/M14 checklists use the same IDs.
+- The probes are committed on **local** branches `probe-web` (probe_web.rs) and `probe-data`
+  (probe_data.rs, probe_bg.rs, examples/probe-chaos): `git worktree add ../x probe-web`. They are not
+  pushed and not on main; when an item is fixed, move its probe to main as a passing test.
+- This session's working directory (~/workspace/renoxium) isn't a git repo, so the Agent tool's
+  `isolation: "worktree"` fails there; create worktrees by hand with `git -C ~/workspace/renox
+  worktree add …` and point agents at them.
+
 ### 6.6 Security incidents and rules
 - The owner once pasted a crates.io API token into chat; it was used (with his explicit authority)
   to publish the placeholders, and he was told to revoke it. Never store tokens; prefer the user
@@ -512,14 +522,17 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M11c SEO & analytics (`seo()`, robots/sitemap, Search Console, GA4/GTM, events, Measurement Protocol) | merged to `main` (#26) |
 | M10c examples api / jobs / uploads / postgres; JSON errors for API clients; JSON bodies report all errors; `User::attempt`; `post_multipart` | merged to `main` (#27) |
 | M10d doctests on public APIs (all 35 renox-core examples compile) | merged to `main` (#28) |
-| M12 types end to end (checkbox, datetime-local, multi-select, `DbEnum`, `Json<T>`, `uuid` feature, `examples/fields`, docs/types.md) | PR from branch `m12-types` |
+| M12 types end to end (checkbox, datetime-local, multi-select, `DbEnum`, `Json<T>`, `uuid` feature, `examples/fields`, docs/types.md) | merged to `main` (#29) |
+| Pre-1.0 audit (Laravel gaps, negative flows, chaos) → docs/audit/2026-09-pre-1.0.md; plan M13 + M14 in ROADMAP | PR from branch `pre-1.0-plan` |
+| M13a web security, M13b resilience, M13c regression + chaos suite (ROADMAP M13, IDs W*/D* in the audit) | next |
+| M14 API freeze (ROADMAP M14, IDs A*) | after M13 |
 | v1.0 docs site, starter kit, semver guarantee | last |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on
 an up-to-date `main`. Open the next milestone's PR only after the previous one is merged (§6.3).
 
 Open items noted in ROADMAP: `#[derive(Validate)]`, more rules (regex, dates, files), route groups
-with prefixes, SQLite session driver.
+with prefixes (M14), server-side sessions.
 
 Stats at the time of writing: ~11.8k lines of Rust in `crates/`, 140 tests, 34 direct dependencies
 (stars and roles were reviewed with the owner; keep deps lean and remove unused ones).

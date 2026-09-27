@@ -71,7 +71,8 @@ my-app/
 - [x] Query builder: `where_eq/op/like/in/null/not_null`, `order_by`, `latest`, `limit`, `offset`, `get`, `first`, `count`, `exists`, bulk `delete`; unknown columns and operators are errors
 - [x] Pagination: `Page` extractor, `paginate()`, built-in `renox/pagination.html` macro
 - [x] Transactions via `db.begin()`, seeders (`App::seeder`, `db:seed`), factories (`Factory`, `fake`)
-- [ ] SQLite session driver (deferred: cookie sessions cover M3 and M4; revisit if sessions outgrow 4 KB)
+- [ ] Server-side sessions (deferred: cookie sessions cover M3 and M4). Revocation on logout
+      comes first, as a session version (M13a, W2); a server-side store only if sessions outgrow 4 KB
 - [ ] Pagination links that keep other query parameters
 
 ### M3 · v0.4: Forms and validation
@@ -159,7 +160,8 @@ M6b (done):
       S3/R2/MinIO behind the `s3` cargo feature (object_store)
 - [x] CSRF `_token` read from multipart forms; `UPLOAD_MAX_SIZE` body limit (413 above it)
 - [x] `storage_url(key)` in templates; the guestbook takes an optional photo
-- [ ] Several files in one field (`Vec<Upload>`): serde_urlencoded has no sequences
+- [ ] Several files in one field (`Vec<Upload>`): forms now use serde_html_form (M12), which reads
+      sequences; needs a test and per-file rules
 
 M6c (done):
 - [x] `resources/lang/{locale}.json` (`LANG_PATH`), nested or flat; reloaded on change in debug;
@@ -388,8 +390,78 @@ the UI? They didn't, and a probe of what browsers send showed three inputs that 
 - Decimals: not added. sqlx deliberately has no decimal type on SQLite, so money stays `i64` in
   the smallest unit, as the guide explains
 
+### M13 · v0.14: Hardening from the pre-1.0 audit
+The audit in [docs/audit/2026-09-pre-1.0.md](docs/audit/2026-09-pre-1.0.md) probed negative
+flows and injected faults into running apps. IDs below refer to it. Each fix lands with its probe
+(on the local `probe-web` / `probe-data` branches) moved to main as a passing regression test.
+
+M13a · web security:
+- [ ] W1 Uploads can't become active content: no html/svg/xml/js extensions kept; `/storage`
+      served with `CSP: sandbox`, `nosniff`, and `attachment` for non-image/PDF/text files
+- [ ] W18 / A5 `TRUSTED_PROXIES` and one `ClientIp` (X-Forwarded-For / Forwarded) used by
+      throttles, the login lock and logs
+- [ ] W2 Sessions end on logout everywhere (a per-user session version checked on each request)
+- [ ] W3 Only a valid Bearer token skips CSRF
+- [ ] W4 Multipart CSRF / `_method` fields read up to `UPLOAD_MAX_SIZE`
+- [ ] W5 Old input kept under the cookie limit; password fields never flashed
+- [ ] W6, W7 Redirects (`Back`, after validation, intended URL) stay on the app's origin
+- [ ] W8, W9 Login lock per account and per IP; password reset revokes API tokens
+- [ ] W10–W17 Maintenance cookie as an HMAC with `Secure`; security headers on 413; empty files
+      fail type rules; long paths 404; unique races 422; finite floats only; 415 for unknown
+      bodies; normalized emails on login and reset
+
+M13b · data and background resilience:
+- [ ] D1, D3, D9 Panics are contained: a job panic is a failed attempt and the worker keeps
+      going; a task panic doesn't stop its schedule; a handler panic answers 500
+      (`CatchPanicLayer`); one listener's panic doesn't skip the others
+- [ ] D2 Stale reservations respect `MAX_ATTEMPTS` (exhausted jobs go to `failed_jobs`)
+- [ ] D4, D22 Timeouts: database acquire (default about 5 s), PostgreSQL `statement_timeout`,
+      a request timeout layer, SMTP; all configurable in `.env`
+- [ ] D5 `DATABASE_URL` accepts only sqlite / postgres schemes
+- [ ] D6, D7 Worker bookkeeping retried; `TIMEOUT` must be shorter than the reservation
+- [ ] D8 Public transaction-aware dispatch (`tx.dispatch`, or after commit)
+- [ ] D10, D15, D16, D17 SQLite without double-quoted-string fallback; `exists`/`unique` safe on
+      PostgreSQL across types; large `where_in`; clamped limit/offset
+- [ ] D11, D12, D13, D26, D27 Migrations: `fresh` drops the whole PostgreSQL schema; a lock
+      against concurrent runs; all-or-nothing rollback; a no-transaction marker; checksums and
+      unknown applied migrations in `migrate:status`
+- [ ] D14 Webhook payloads as bytes; long event ids hashed or refused
+- [ ] D18, D21, D23 Unique violations recognisable (409 / validation error); permanent job
+      failures skip retries; notifications don't resend mail on retry
+- [ ] D19, D20, D24, D25, D28, D29, D30 Overflow-safe signed URLs and config; boot errors
+      instead of panics; cache TTL 0, `remember` lock, type mismatch errors, namespaced
+      framework rows; scheduler claims expire with their interval; CLI refuses Rust keywords
+      and quotes table names; `Send` test helpers; storage errors name the path
+
+M13c · keep it that way:
+- [ ] Every probe passes on main (web, data, background), on SQLite and PostgreSQL
+- [ ] A chaos job in CI: PostgreSQL stopped, paused and restarted under a running app (health
+      reports, requests fail fast, the app and workers recover without a restart); SQLite held
+      locked; panics in jobs, tasks, handlers and listeners
+- [ ] docs/operations.md: timeouts, proxies, backups, what `/health` means, how to recover
+      failed jobs and webhook calls
+
+### M14 · v0.15: API freeze
+What would be a breaking change after 1.0, settled now (IDs from the audit):
+- [ ] A1 `#[non_exhaustive]` or builders on public types that will grow
+- [ ] A2 Public dependency policy: which of axum / sqlx / tower-http stay exposed, and a
+      documented rule for Renox's major version when they change
+- [ ] A3 `Error::Status(code, message)` and an `abort` helper
+- [ ] A4 Gates that can use the database; a `User` apps extend (roles, extra fields at
+      registration)
+- [ ] A6 Mail with from, cc, bcc, reply-to, several recipients and attachments
+- [ ] A7 Custom notification channels (e.g. WhatsApp, SMS) and notifying non-users
+- [ ] A8 App extension points: template functions and filters, shared view data, typed app
+      state, `App::layer`
+- [ ] A9 App commands (`App::command`), plus a `make:command` generator
+- [ ] A10 Route groups with a path prefix and a name prefix
+- [ ] Update the cheat-sheet, docs, examples and generators to the frozen API
+
 ### v1.0
 - [ ] Documentation site built with Renox, starter kit, semver stability guarantee
+- [ ] Real crates published to crates.io (`renox`, `renox-core`, `renox-macros`, `renox-cli`;
+      only 0.0.1 placeholders exist), then crates.io/docs.rs badges and `cargo install renox-cli`
+      in the README
 
 ## Decisions
 
@@ -398,7 +470,7 @@ the UI? They didn't, and a probe of what browsers send showed three inputs that 
   `AppState` and `App` would need all of them, so splitting now only adds indirection. Revisit if
   compile times demand it.
 - **Sessions:** stored in an encrypted, signed cookie (AES-256-GCM via `APP_KEY`), so M1 needs no
-  database. Keep sessions small; a SQLite driver comes with M2.
+  database. Keep sessions small (old input is capped in M13a, W5); a server-side store is deferred.
 - **Templates:** MiniJinja (runtime, overridable, reloadable). Askama may be offered later.
 - **Auth sessions:** the session stores the user id and a fingerprint of the password hash, so a
   password change ends other sessions without a separate token column. "Remember me" makes the
@@ -437,4 +509,4 @@ the UI? They didn't, and a probe of what browsers send showed three inputs that 
   CRUD; relations are explicit methods; complex queries use `renox::db::sql()` (portable) or sqlx
   directly through `db.sqlite()` / `db.postgres()` (e.g. for `query!`).
 - **Service container:** replaced by typed `AppState` and extractors.
-- **No REPL:** `rnx db:shell` and custom CLI commands instead of Tinker.
+- **No REPL:** `rnx db:shell`, and app commands (planned in M14, A9) instead of Tinker.

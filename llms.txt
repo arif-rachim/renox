@@ -71,6 +71,8 @@
 - [CLAUDE.md](CLAUDE.md) (same as AGENTS.md): the contributor and agent guide, including the
   architecture, conventions, and problems already solved.
 - [ROADMAP.md](ROADMAP.md): milestones and design decisions.
+- [docs/audit/2026-09-pre-1.0.md](docs/audit/2026-09-pre-1.0.md): known issues (IDs W*, D*, A*) from
+  the pre-1.0 audit, with repro tests and fix directions; ROADMAP M13/M14 track them.
 - `crates/renox-core/src`: the runtime. `db/` (Db, models, queries, migrations), `validation/`,
   `auth/`, `queue/`, `schedule.rs`, `view.rs`, `testing.rs`.
 - `crates/renox-cli`: `rnx`; `stubs/` holds the files `rnx new` writes.
