@@ -5,7 +5,9 @@ use crate::Result;
 
 /// Builds models with fake data for seeders and tests.
 ///
-/// ```ignore
+/// ```
+/// # use renox::prelude::*;
+/// # #[derive(Model, serde::Serialize, Default)] struct Produk { id: i64, nama: String, harga: i64 }
 /// use renox::fake::{Fake, faker::lorem::en::Word};
 ///
 /// impl Factory for Produk {
@@ -14,7 +16,9 @@ use crate::Result;
 ///     }
 /// }
 ///
+/// # async fn demo(db: Db) -> Result {
 /// Produk::create_many(&db, 50).await?;
+/// # Ok(()) }
 /// ```
 pub trait Factory: Model {
     fn definition() -> Self;

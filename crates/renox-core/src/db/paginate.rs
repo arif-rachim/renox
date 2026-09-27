@@ -6,7 +6,9 @@ use serde::Serialize;
 
 /// The `?page=` query parameter, defaulting to 1.
 ///
-/// ```ignore
+/// ```
+/// # use renox::prelude::*;
+/// # #[derive(Model, serde::Serialize, Default)] struct Produk { id: i64 }
 /// async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
 ///     let produk = Produk::query().latest().paginate(&db, page, 20).await?;
 ///     Ok(view("produk/index.html", context! { produk }))

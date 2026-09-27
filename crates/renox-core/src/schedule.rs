@@ -1,13 +1,21 @@
 //! Tasks that run on a schedule, defined in code and run by `serve` (or
 //! `my-app schedule:work`).
 //!
-//! ```ignore
+//! ```
+//! # use renox::prelude::*;
+//! # async fn sync(_: &AppState) -> Result { Ok(()) }
+//! # let _ =
 //! App::new().schedule(|s| {
 //!     s.every_minutes(5, "sync-stock", |state| async move { sync(&state).await });
 //!     s.daily_at("02:00", "cleanup", |state| async move {
-//!         Session::prune(&state.db).await
+//!         renox::db::sql("DELETE FROM carts WHERE updated_at < ?")
+//!             .bind(renox::db::now() - renox::chrono::TimeDelta::days(30))
+//!             .execute(&state.db)
+//!             .await?;
+//!         Ok(())
 //!     });
 //! })
+//! # ;
 //! ```
 //!
 //! Times are in `APP_TIMEZONE`, a UTC offset such as `+07:00` (WIB). A task

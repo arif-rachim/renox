@@ -272,10 +272,15 @@ fn safe_join(dir: &Path, name: &str) -> Option<PathBuf> {
 /// `auth.user`), `t()`, `can()`, `flash`, `errors`, `error()`, `old()`,
 /// `csrf_token`, `csrf_field()` and `renox_head()`.
 ///
-/// ```ignore
+/// ```
+/// # use renox::prelude::*;
+/// # let list: Vec<String> = Vec::new();
+/// # let _ = move || {
 /// async fn index() -> View {
+/// #   let list: Vec<String> = Vec::new();
 ///     view("produk/index.html", context! { produk => list }).fragment("list")
 /// }
+/// # };
 /// ```
 #[derive(Clone)]
 pub struct View {

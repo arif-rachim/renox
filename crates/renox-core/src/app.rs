@@ -62,7 +62,15 @@ Commands:
 
 /// The application builder.
 ///
-/// ```ignore
+/// ```no_run
+/// # use renox::prelude::*;
+/// # use serde::{Deserialize, Serialize};
+/// # struct Produk;
+/// # impl Module for Produk { fn name(&self) -> &'static str { "produk" } }
+/// # #[derive(Serialize, Deserialize)] struct SendReceipt;
+/// # impl Job for SendReceipt { const NAME: &'static str = "send-receipt"; async fn handle(self, _: JobContext) -> Result { Ok(()) } }
+/// # async fn cleanup(_: AppState) -> Result { Ok(()) }
+/// # async fn seed(_: Db) -> Result { Ok(()) }
 /// fn main() -> renox::Result {
 ///     App::new()
 ///         .migrations(renox::migrations!())
@@ -144,11 +152,16 @@ impl App {
 
     /// Registers a seeder for `db:seed`. Seeders run in registration order.
     ///
-    /// ```ignore
+    /// ```
+    /// # use renox::prelude::*;
+    /// # #[derive(Model, serde::Serialize, Default)] struct Produk { id: i64 }
+    /// # impl Factory for Produk { fn definition() -> Self { Produk::default() } }
+    /// # let _ =
     /// App::new().seeder(|db| async move {
     ///     Produk::create_many(&db, 50).await?;
     ///     Ok(())
     /// })
+    /// # ;
     /// ```
     pub fn seeder<F, Fut>(mut self, seeder: F) -> Self
     where
@@ -161,9 +174,12 @@ impl App {
 
     /// Defines a gate: an ability that depends only on the user.
     ///
-    /// ```ignore
+    /// ```
+    /// # use renox::prelude::*;
+    /// # let _ =
     /// App::new().gate("admin", |user| user.email.ends_with("@toko.id"))
     /// // in a handler: auth.gate("admin")?;   in a template: {% if can('admin') %}
+    /// # ;
     /// ```
     pub fn gate(
         mut self,

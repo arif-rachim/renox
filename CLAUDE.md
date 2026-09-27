@@ -290,6 +290,10 @@ migration changes migration counts asserted in `crates/renox/tests/database.rs`.
   over CDP (`Page.captureScreenshot` per typed character, `Input.insertText`), then composing the
   frames with Pillow (browser bar, captions, 64-colour palette, ~210 KB). There's no ffmpeg here.
   Re-record it when the guestbook's look changes.
+- renox-core's doc examples are doctests too (renox is its dev-dependency, so `use
+  renox::prelude::*` and `derive(Model)` work there): never write ```ignore; hide setup with `# `
+  lines and wrap statements in `# async fn demo(..) -> Result { … # Ok(()) }`; examples that
+  define `fn main` and would start a server are `no_run`.
 - `CHEATSHEET.md` is compiled: every ```rust block must build on its own (visible `use` lines, no
   `# ` hidden lines since GitHub shows them; define items only, no top-level statements, so the
   doctest's `main` does nothing). Check with `cargo test --doc -p renox`. When a public API
@@ -497,8 +501,8 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | README rewrite (tagline, why, demo GIF, compiled examples, comparison) | merged to `main` (#24) |
 | M11b webhooks (`impl Webhook`, `webhook_calls`, signature helpers, `examples/webhooks`) | merged to `main` (#25) |
 | M11c SEO & analytics (`seo()`, robots/sitemap, Search Console, GA4/GTM, events, Measurement Protocol) | merged to `main` (#26) |
-| M10c examples api / jobs / uploads / postgres; JSON errors for API clients; JSON bodies report all errors; `User::attempt`; `post_multipart` | PR from branch `m10c-examples` |
-| M10d doctests on public APIs (35 `ignore` examples in renox-core) | next |
+| M10c examples api / jobs / uploads / postgres; JSON errors for API clients; JSON bodies report all errors; `User::attempt`; `post_multipart` | merged to `main` (#27) |
+| M10d doctests on public APIs (all 35 renox-core examples compile) | PR from branch `m10d-doctests` |
 | v1.0 docs site, starter kit, semver guarantee | last |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on

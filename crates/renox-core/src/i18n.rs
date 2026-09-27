@@ -6,13 +6,16 @@
 //! { "produk": { "disimpan": ":nama tersimpan", "jumlah": "Satu produk|:count produk" } }
 //! ```
 //!
-//! ```ignore
+//! ```
+//! # use renox::prelude::*;
 //! // templates: {{ t('produk.disimpan', nama='Kopi') }}  {{ t('produk.jumlah', count=3) }}
-//! async fn store(lang: Lang, session: Session) -> Result<Back> {
+//! async fn store(lang: Lang, session: Session, back: Back) -> Result<Back> {
 //!     session.flash("status", lang.t("produk.disimpan", &[("nama", &"Kopi")]))?;
-//!     ...
+//!     Ok(back)
 //! }
+//! # fn demo(session: &Session) -> Result {
 //! renox::i18n::set_locale(&session, "en")?;   // this visitor's language from now on
+//! # Ok(()) }
 //! ```
 //!
 //! A request's language is the one stored with `set_locale`, else `APP_LOCALE`.
@@ -282,7 +285,8 @@ pub(crate) fn request_locale(extensions: &axum::http::Extensions, state: &AppSta
 
 /// The current request's language and its texts.
 ///
-/// ```ignore
+/// ```
+/// # use renox::prelude::*;
 /// async fn index(lang: Lang) -> String { lang.t("welcome", &[("name", &"Arif")]) }
 /// ```
 #[derive(Clone)]

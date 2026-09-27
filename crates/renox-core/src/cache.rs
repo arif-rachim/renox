@@ -1,10 +1,15 @@
 //! A key-value cache for expensive results.
 //!
-//! ```ignore
-//! let menu = state.cache.remember("menu", Duration::from_secs(600), || async {
+//! ```
+//! # use renox::prelude::*;
+//! # use std::time::Duration;
+//! # #[derive(Model, serde::Serialize, serde::Deserialize, Default)] struct Produk { id: i64, nama: String }
+//! # async fn demo(state: AppState) -> Result {
+//! let menu: Vec<Produk> = state.cache.remember("menu", Duration::from_secs(600), || async {
 //!     Produk::query().order_by("nama").get(&state.db).await
 //! }).await?;
 //! state.cache.forget("menu").await?;   // after the menu changes
+//! # let _ = menu; Ok(()) }
 //! ```
 //!
 //! `CACHE_STORE=memory` (default) keeps values in this process; `database`

@@ -2134,6 +2134,7 @@ dependencies = [
  "minijinja-autoreload",
  "object_store",
  "rand 0.10.3",
+ "renox",
  "reqwest",
  "serde",
  "serde_json",

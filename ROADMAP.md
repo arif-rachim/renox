@@ -279,7 +279,9 @@ examples, and the gaps they exposed) and M10d (doctests on public APIs).
       SQL + transactions, jobs/events/schedule/mail, cache/session/uploads/i18n, tests, `.env`);
       every Rust block is compiled by `cargo test --doc -p renox` (M10a)
 - [x] `llms.txt` at the repo root: what each example and guide covers, file by file (M10a)
-- [ ] Doc comments on public APIs get small runnable doctests instead of `ignore` where possible
+- [x] Doc comments on public APIs get doctests instead of `ignore`: all 35 examples in renox-core
+      compile (renox is a dev-dependency so they're written the way apps write them; setup lines
+      hidden with `# `); writing them found a stale one (`Session::prune`) (M10d)
 - [x] Apps from `rnx new` ship an `AGENTS.md` (and a `CLAUDE.md` importing it) with the layout,
       the generators, where the cheat-sheet and examples are, and the checks to run (M10a)
 

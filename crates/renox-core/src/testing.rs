@@ -1,6 +1,8 @@
 //! Testing helpers, in the spirit of Laravel's HTTP tests.
 //!
-//! ```ignore
+//! ```
+//! # use renox::prelude::*;
+//! # mod toko { pub fn app() -> renox::App { renox::App::new() } }
 //! use renox::testing::TestApp;
 //!
 //! #[renox::test]

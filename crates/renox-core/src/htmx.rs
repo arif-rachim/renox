@@ -8,9 +8,11 @@ use axum::response::{IntoResponse, IntoResponseParts, Redirect, Response, Respon
 
 /// What HTMX told us about the current request.
 ///
-/// ```ignore
+/// ```
+/// # use renox::prelude::*;
 /// async fn index(htmx: Htmx) -> View {
-///     if htmx.request { /* render a fragment */ }
+///     let page = view("produk/index.html", context! {});
+///     if htmx.request { page.fragment("list") } else { page }
 /// }
 /// ```
 #[derive(Debug, Clone, Default)]
@@ -119,7 +121,8 @@ impl IntoResponseParts for HxTrigger {
 
 /// Redirects to the previous page (the `Referer`), or `/` when unknown.
 ///
-/// ```ignore
+/// ```
+/// # use renox::prelude::*;
 /// async fn store(back: Back, session: Session) -> Result<Back> {
 ///     session.flash("status", "Tersimpan")?;
 ///     Ok(back)

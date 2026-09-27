@@ -6,7 +6,9 @@ use anyhow::anyhow;
 
 /// A struct stored as a row in a table. Derive it with `#[derive(Model)]`.
 ///
-/// ```ignore
+/// ```
+/// # use renox::prelude::*;
+/// # use serde::Serialize;
 /// #[derive(Model, Serialize, Default)]
 /// #[model(table = "produk", soft_deletes)]
 /// struct Produk {
@@ -18,9 +20,11 @@ use anyhow::anyhow;
 ///     deleted_at: Option<DateTime>,
 /// }
 ///
+/// # async fn demo(db: Db) -> Result {
 /// let mut kopi = Produk { nama: "Kopi".into(), harga: 18_000, ..Default::default() };
 /// kopi.save(&db).await?;                      // INSERT, sets id and timestamps
 /// let murah = Produk::query().where_op("harga", "<", 20_000).get(&db).await?;
+/// # let _ = murah; Ok(()) }
 /// ```
 ///
 /// The primary key is an `id: i64` column; `0` means "not saved yet".

@@ -5,11 +5,14 @@
 //!
 //! Allow another site's scripts, images or frames with [`App::csp`](crate::App::csp):
 //!
-//! ```ignore
+//! ```
+//! # use renox::prelude::*;
+//! # let _ =
 //! App::new().csp(|csp| {
 //!     csp.allow("script-src", "https://www.googletagmanager.com")
 //!        .allow("frame-src", "https://www.youtube.com");
 //! })
+//! # ;
 //! ```
 //!
 //! With `CSP=strict`, inline scripts need the request's nonce:
