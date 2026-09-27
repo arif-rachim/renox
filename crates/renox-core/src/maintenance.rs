@@ -79,6 +79,13 @@ pub(crate) async fn middleware(
     let Some(down) = status(&state.config.storage_path) else {
         return next.run(req).await;
     };
+    // Providers would retry, but may give up; store the calls instead.
+    if state
+        .security
+        .is_webhook(req.extensions().get::<axum::extract::MatchedPath>())
+    {
+        return next.run(req).await;
+    }
     if let Some(secret) = &down.secret {
         if has_bypass(&req, secret) {
             return next.run(req).await;

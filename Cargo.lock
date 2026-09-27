@@ -3284,6 +3284,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "webhooks"
+version = "0.0.0"
+dependencies = [
+ "renox",
+ "serde",
+ "tracing",
+]
+
+[[package]]
 name = "webpki-root-certs"
 version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"

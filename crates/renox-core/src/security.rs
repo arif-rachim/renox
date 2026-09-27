@@ -77,6 +77,8 @@ pub(crate) struct Security {
     hsts: bool,
     /// (method, path pattern) of routes marked `without_csrf()`; method `*` is any.
     csrf_exempt: HashSet<(String, String)>,
+    /// Path patterns of webhook routes, which work in maintenance mode.
+    webhook_paths: HashSet<String>,
 }
 
 impl Security {
@@ -123,12 +125,23 @@ impl Security {
             .filter(|route| route.middleware.iter().any(|m| m == "no-csrf"))
             .map(|route| (route.method.clone(), route.path.clone()))
             .collect();
+        let webhook_paths = routes
+            .iter()
+            .filter(|route| route.middleware.iter().any(|m| m.starts_with("webhook:")))
+            .map(|route| route.path.clone())
+            .collect();
         Self {
+            webhook_paths,
             mode: config.csp,
             policy,
             hsts: config.env == Environment::Production && config.url.starts_with("https://"),
             csrf_exempt,
         }
+    }
+
+    /// Whether the matched route receives webhooks.
+    pub fn is_webhook(&self, path: Option<&MatchedPath>) -> bool {
+        path.is_some_and(|path| self.webhook_paths.contains(path.as_str()))
     }
 
     /// Whether the route `req` matched was marked `without_csrf()`.

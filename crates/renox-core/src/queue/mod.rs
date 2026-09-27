@@ -128,6 +128,29 @@ impl Queue {
 
     /// Queues a job to run after `delay`; returns its id.
     pub async fn dispatch_after<J: Job>(&self, job: J, delay: Duration) -> Result<i64> {
+        let id = Self::insert(&self.db, &job, delay).await?;
+        self.wake.notify_waiters();
+        Ok(id)
+    }
+
+    /// Queues a job inside `tx`, so it only exists if the transaction
+    /// commits. Call `wake()` after committing.
+    pub(crate) async fn dispatch_in<J: Job>(
+        tx: &mut crate::db::Transaction,
+        job: &J,
+    ) -> Result<i64> {
+        Self::insert(tx, job, Duration::ZERO).await
+    }
+
+    pub(crate) fn wake_workers(&self) {
+        self.wake.notify_waiters();
+    }
+
+    async fn insert<'c, J: Job>(
+        db: impl crate::db::Executor<'c>,
+        job: &J,
+        delay: Duration,
+    ) -> Result<i64> {
         let now = unix_now();
         let id: i64 = crate::db::sql(
             "INSERT INTO jobs (queue, job, payload, max_attempts, available_at, created_at) \
@@ -135,13 +158,12 @@ impl Queue {
         )
         .bind(J::QUEUE)
         .bind(J::NAME)
-        .bind(serde_json::to_string(&job)?)
+        .bind(serde_json::to_string(job)?)
         .bind(i64::from(J::MAX_ATTEMPTS.max(1)))
         .bind(now + delay.as_secs() as i64)
         .bind(now)
-        .scalar(&self.db)
+        .scalar(db)
         .await?;
-        self.wake.notify_waiters();
         Ok(id)
     }
 

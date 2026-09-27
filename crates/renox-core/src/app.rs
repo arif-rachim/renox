@@ -49,6 +49,8 @@ Commands:
   queue:failed              List failed jobs
   queue:retry <id|all>      Put failed jobs back on the queue
   queue:flush               Delete failed jobs
+  webhook:failed            List webhook calls whose processing failed
+  webhook:retry <id>        Process a stored webhook call again
   schedule:list             List scheduled tasks and when they run next
   schedule:work             Run scheduled tasks (when SCHEDULER=false for serve)
   route:list                List every route with its name, module and guards
@@ -172,6 +174,13 @@ impl App {
         self
     }
 
+    /// Receives `W`'s webhooks: see `renox::webhook`. Also add the route
+    /// with `Routes::webhook::<W>(path)`.
+    pub fn webhook<W: crate::webhook::Webhook>(mut self) -> Self {
+        self.registry.webhook::<W>();
+        self
+    }
+
     /// Lets queue workers run jobs of type `J`.
     pub fn job<J: Job>(mut self) -> Self {
         self.registry.job::<J>();
@@ -203,7 +212,12 @@ impl App {
         };
 
         self.registry.job::<crate::mail::SendMail>();
-        let mut migrations = vec![crate::queue::MIGRATION, crate::cache::MIGRATION];
+        self.registry.job::<crate::webhook::ProcessWebhook>();
+        let mut migrations = vec![
+            crate::queue::MIGRATION,
+            crate::cache::MIGRATION,
+            crate::webhook::MIGRATION,
+        ];
         migrations.extend(self.migrations);
         for module in &self.modules {
             migrations.extend_from_slice(module.migrations());
@@ -214,6 +228,7 @@ impl App {
             listeners,
             schedule,
             duplicate_job,
+            webhooks,
         } = self.registry;
         if let Some(name) = duplicate_job {
             return Err(anyhow!("job `{name}` is registered twice").into());
@@ -245,6 +260,22 @@ impl App {
         }
         listing.extend(framework_routes(&config));
         listing.sort_by(|a, b| (&a.path, &a.method).cmp(&(&b.path, &b.method)));
+        for route in &listing {
+            for provider in route
+                .middleware
+                .iter()
+                .filter_map(|m| m.strip_prefix("webhook:"))
+            {
+                if !webhooks.contains_key(provider) {
+                    return Err(anyhow!(
+                        "the route {} receives `{provider}` webhooks, but they're not registered: \
+                         add `app.webhook::<…>()` in the module's `register`",
+                        route.path
+                    )
+                    .into());
+                }
+            }
+        }
         let routes = Arc::new(routes);
 
         let storage = crate::storage::Storage::from_config(&config)?;
@@ -259,6 +290,7 @@ impl App {
         let security = Arc::new(crate::security::Security::new(&config, &self.csp, &listing));
         let state = AppState {
             security,
+            webhooks: Arc::new(webhooks),
             mailer: Mailer::from_config(&config)?,
             queue: Queue::new(db.clone()),
             cache: crate::cache::Cache::new(&config.cache_store, db.clone())?,
@@ -384,6 +416,36 @@ impl App {
                     shutdown_signal().await;
                     let _ = stop.send(true);
                     let _ = running.await;
+                }
+            }
+            "webhook:failed" => {
+                let failed = crate::webhook::WebhookCall::failed(&kernel.state.db).await?;
+                if failed.is_empty() {
+                    println!("No failed webhook calls.");
+                }
+                for call in failed {
+                    println!(
+                        "  #{} {} {}: {}",
+                        call.id,
+                        call.provider,
+                        call.event_id,
+                        call.error
+                            .unwrap_or_default()
+                            .lines()
+                            .next()
+                            .unwrap_or_default()
+                    );
+                }
+            }
+            "webhook:retry" => {
+                let id: i64 = args
+                    .get(1)
+                    .and_then(|id| id.parse().ok())
+                    .ok_or_else(|| anyhow!("usage: webhook:retry <id>"))?;
+                if crate::webhook::retry(&kernel.state, id).await? {
+                    println!("Webhook call #{id} queued again.");
+                } else {
+                    return Err(anyhow!("there is no webhook call #{id}").into());
                 }
             }
             "queue:failed" => {

@@ -15,6 +15,7 @@ pub struct Registry {
     pub(crate) listeners: HashMap<TypeId, Vec<crate::events::ListenerFn>>,
     pub(crate) schedule: Schedule,
     pub(crate) duplicate_job: Option<&'static str>,
+    pub(crate) webhooks: HashMap<&'static str, crate::webhook::HandleFn>,
 }
 
 impl Registry {
@@ -22,6 +23,19 @@ impl Registry {
     pub fn job<J: Job>(&mut self) -> &mut Self {
         if self.jobs.insert(J::NAME, handler::<J>()).is_some() {
             self.duplicate_job.get_or_insert(J::NAME);
+        }
+        self
+    }
+
+    /// Lets queue workers process `W`'s webhooks; pair it with
+    /// `Routes::webhook::<W>(path)`.
+    pub fn webhook<W: crate::webhook::Webhook>(&mut self) -> &mut Self {
+        if self
+            .webhooks
+            .insert(W::PROVIDER, crate::webhook::handler::<W>())
+            .is_some()
+        {
+            self.duplicate_job.get_or_insert(W::PROVIDER);
         }
         self
     }

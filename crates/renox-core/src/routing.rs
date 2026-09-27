@@ -148,6 +148,21 @@ impl Routes {
         .mark(&format!("throttle:{max}/{}s", per.as_secs()))
     }
 
+    /// Receives `W`'s webhooks at `path` (POST): verifies, stores once per
+    /// event and processes them in the queue. See `renox::webhook`. The
+    /// route is named `webhooks.<provider>`, skips CSRF and keeps working in
+    /// maintenance mode.
+    pub fn webhook<W: crate::webhook::Webhook>(self, path: &str) -> Self {
+        let mut routes = self
+            .post(path, crate::webhook::receive::<W>)
+            .name(&format!("webhooks.{}", W::PROVIDER));
+        if let Some(route) = routes.listing.last_mut() {
+            route.middleware.push("no-csrf".into());
+            route.middleware.push(format!("webhook:{}", W::PROVIDER));
+        }
+        routes
+    }
+
     /// Lets the routes added so far be posted to without a CSRF token, for
     /// callers that have no session, such as a payment gateway's webhook.
     /// Such a handler must check the request itself (e.g. its signature).

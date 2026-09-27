@@ -37,6 +37,7 @@ pub mod testing;
 pub mod upload;
 pub mod validation;
 mod view;
+pub mod webhook;
 
 pub use app::{App, Kernel};
 pub use assets::{ALPINE_VERSION, HTMX_VERSION};

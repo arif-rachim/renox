@@ -32,6 +32,7 @@ pub struct AppState {
     pub(crate) gates: Gates,
     pub(crate) throttle: Arc<Throttle>,
     pub(crate) security: Arc<crate::security::Security>,
+    pub(crate) webhooks: crate::webhook::Handlers,
 }
 
 impl AppState {

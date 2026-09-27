@@ -83,8 +83,11 @@ async fn store(State(db): State<Db>, Valid(form): Valid<EntryForm>) -> Result<Vi
 - Encrypted cookie sessions, flash messages and old input come built in. CSRF protection is
   automatic for forms and htmx.
 - `_method` spoofing lets plain forms send PUT and DELETE.
-- Security headers and a Content-Security-Policy are on by default, CORS can be enabled per route,
-  and `.without_csrf()` covers webhooks.
+- Security headers and a Content-Security-Policy are on by default, and CORS can be enabled per
+  route.
+- Webhooks from payment gateways and other services (`impl Webhook`, `.webhook::<W>(path)`):
+  signature checks (HMAC, Stripe-style), each event stored and processed once in the queue,
+  with `webhook:retry` when something failed.
 - Maintenance mode (`my-app down --secret …`) and `/health` are included.
 </details>
 
@@ -196,6 +199,8 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 
 - [`examples/crud`](examples/crud): one resource end to end, with pagination, validation,
   owner-only edit and delete through a policy, soft deletes with a trash, and tests.
+- [`examples/webhooks`](examples/webhooks): Midtrans, Xendit and Stripe webhooks marking orders
+  paid, each tested with good, forged and repeated calls.
 - [`examples/hello`](examples/hello): the guestbook from the GIF, with an HTMX form, a photo upload,
   an event that queues mail, a scheduled task, English and Indonesian, and login.
 
@@ -204,7 +209,7 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 Renox is **pre-1.0**: the API may still change between versions, and the crates on crates.io are
 placeholders until the first real release, so install from Git as shown above. Everything listed
 here is implemented and tested on Linux, macOS and Windows, against SQLite and PostgreSQL. What's
-next (webhooks, SEO and analytics helpers, more examples, then 1.0) is in
+next (SEO and analytics helpers, more examples, then 1.0) is in
 [ROADMAP.md](ROADMAP.md). Issues and feedback are welcome.
 
 ## License

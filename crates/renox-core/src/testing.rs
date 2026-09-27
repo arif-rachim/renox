@@ -179,6 +179,19 @@ impl TestApp {
         self.request().post_json(uri, body).await
     }
 
+    /// A POST with exactly these bytes (e.g. a signed webhook); no CSRF token.
+    pub async fn post_body(
+        &self,
+        uri: &str,
+        content_type: &str,
+        body: impl Into<Vec<u8>>,
+    ) -> TestResponse {
+        self.request()
+            .without_csrf()
+            .post_body(uri, content_type, body)
+            .await
+    }
+
     async fn where_count(&self, table: &str, values: &[(&str, &dyn ToDbValue)]) -> i64 {
         let mut sql = format!("SELECT COUNT(*) FROM {}", quote(table));
         let clauses: Vec<String> = values
@@ -298,6 +311,23 @@ impl TestRequest<'_> {
 
     pub async fn delete(self, uri: &str) -> TestResponse {
         self.send(Method::DELETE, uri, None, Body::empty()).await
+    }
+
+    /// A POST with exactly these bytes, e.g. a webhook whose signature
+    /// covers the raw body.
+    pub async fn post_body(
+        self,
+        uri: &str,
+        content_type: &str,
+        body: impl Into<Vec<u8>>,
+    ) -> TestResponse {
+        self.send(
+            Method::POST,
+            uri,
+            Some(content_type),
+            Body::from(body.into()),
+        )
+        .await
     }
 
     pub async fn post_json(self, uri: &str, body: &impl Serialize) -> TestResponse {

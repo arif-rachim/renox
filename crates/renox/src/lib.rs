@@ -36,6 +36,7 @@ pub mod prelude {
     pub use renox_core::db::{DateTime, Db, Factory, Model, Page, Paginated};
     pub use renox_core::events::Event;
     pub use renox_core::queue::{Job, JobContext};
+    pub use renox_core::webhook::{Webhook, WebhookCall, WebhookRequest};
     pub use renox_core::{
         App, AppState, Back, Config, Environment, Error, Errors, Htmx, HxRedirect, HxRefresh,
         HxTrigger, Module, Result, Routes, Session, Valid, Validate, ValidationError, Validator,

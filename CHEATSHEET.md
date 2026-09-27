@@ -392,6 +392,40 @@ fn routes() -> Routes {
 }
 ```
 
+A payment gateway's webhook: verified, stored once per event, processed in the queue
+(`webhook:failed`, `webhook:retry <id>`):
+
+```rust
+use renox::prelude::*;
+use renox::webhook;
+
+struct Xendit;
+
+impl Webhook for Xendit {
+    const PROVIDER: &'static str = "xendit";
+
+    fn verify(request: &WebhookRequest, state: &AppState) -> Result {
+        let token = webhook::secret(state, "XENDIT_CALLBACK_TOKEN")?; // from .env
+        let sent = request.header("x-callback-token").unwrap_or_default();
+        webhook::ensure(webhook::same(sent, &token)) // or verify_hmac_sha256, verify_timestamped
+    }
+
+    fn event_id(request: &WebhookRequest) -> Result<String> {
+        let invoice: serde_json::Value = request.json()?;
+        Ok(format!("{}:{}", invoice["id"], invoice["status"]))
+    }
+
+    async fn handle(call: WebhookCall, ctx: JobContext) -> Result {
+        let invoice: serde_json::Value = call.json()?;
+        let _ = (invoice, ctx.state); // mark the order paid; errors are retried
+        Ok(())
+    }
+}
+
+// Module::routes:   Routes::new().webhook::<Xendit>("/webhooks/xendit")
+// Module::register: app.webhook::<Xendit>();
+```
+
 With `CSP=strict`, an inline script needs `<script nonce="{{ csp_nonce() }}">`, and Alpine
 expressions must stay simple (move statements into `Alpine.data(...)`).
 

@@ -24,6 +24,12 @@
   - Views: [index.html](examples/crud/resources/views/products/index.html),
     [form.html](examples/crud/resources/views/products/form.html)
   - Tests: [examples/crud/tests/products.rs](examples/crud/tests/products.rs)
+- [examples/webhooks](examples/webhooks): payment gateway webhooks marking orders paid:
+  Midtrans, Xendit and Stripe signatures, stored once per event, processed in the queue.
+  - One file per provider: [midtrans.rs](examples/webhooks/src/app/payments/midtrans.rs),
+    [xendit.rs](examples/webhooks/src/app/payments/xendit.rs),
+    [stripe.rs](examples/webhooks/src/app/payments/stripe.rs); tests:
+    [tests/payments.rs](examples/webhooks/tests/payments.rs)
 - [examples/hello](examples/hello): a guestbook in one file: HTMX form posts that return
   fragments, a photo upload, an event whose listener queues a mail job, a scheduled task,
   i18n (en/id) with a language switch, and a seeder.
