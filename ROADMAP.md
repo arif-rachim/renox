@@ -161,8 +161,18 @@ M6b (done):
 - [x] `storage_url(key)` in templates; the guestbook takes an optional photo
 - [ ] Several files in one field (`Vec<Upload>`): serde_urlencoded has no sequences
 
-M6c (next):
-- [ ] i18n for app texts (`resources/lang/{en,id}`), `t()` in templates, per-request locale
+M6c (done):
+- [x] `resources/lang/{locale}.json` (`LANG_PATH`), nested or flat; reloaded on change in debug;
+      invalid JSON fails at boot
+- [x] `t('key', name='…', count=n)` in templates and `Lang` (`lang.t`, `lang.choice`) in handlers;
+      `:name`/`:Name` placeholders, `one|many` plurals, fallback to `APP_FALLBACK_LOCALE`, then the key
+- [x] Per-visitor language: `i18n::set_locale(&session, "en")`, else `APP_LOCALE`; `app.locale` follows it
+- [x] Built-in texts are translatable from the same files: `renox.validation.*` messages,
+      `renox.validation.attributes.*` field names, `renox.auth.*` page texts — so languages
+      beyond en/id work without changing Renox
+- [x] Validation messages and auth pages follow the visitor's language
+- [x] The guestbook and `rnx new` apps ship `en.json` and `id.json`; the guestbook has an ID | EN switch
+- [ ] Choosing the language from `Accept-Language` (opt-in)
 
 ### M7 · v0.8: CLI and developer experience
 - [ ] `make:module`, `make:model`, `make:migration`, `make:job`, `make:mail`, `make:policy`
@@ -193,6 +203,9 @@ M6c (next):
   `#[derive(Deserialize)]` struct can hold files and share the validation path with text forms.
 - **Storage:** the local disk is Renox's own code; S3 is an opt-in `s3` feature because object_store's
   AWS support pulls in reqwest and aws-lc-rs, which most apps on one server don't need.
+- **i18n:** plain JSON files, loaded into memory at boot and reloaded in debug. Renox's own texts
+  stay in code for en/id (so apps work without lang files) but every one of them can be overridden
+  by key, which is also how other languages are added.
 - **HTMX validation errors:** returned as 422 JSON and placed by the bundled script, rather than
   re-rendering a form fragment. It works for any form without a per-form partial, and the form
   keeps the user's input, focus and Alpine state.

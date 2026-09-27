@@ -10,6 +10,7 @@ use serde_json::{Value, json};
 use super::user::dummy_hash;
 use super::{User, intended, login, logout, passwords, verification, verify_password};
 use crate::db::Migration;
+use crate::i18n::Lang;
 use crate::validation::{Errors, Locale, Valid, Validate, ValidationError, Validator};
 use crate::{AppState, Htmx, HxRedirect, Module, Result, Routes, Session, View, context, view};
 
@@ -161,8 +162,25 @@ impl<S: Send + Sync> FromRequestParts<S> for ClientIp {
     }
 }
 
-pub(super) fn locale(state: &AppState) -> Locale {
-    Locale::parse(&state.config.locale)
+/// The built-in texts for the request's language, with the app's
+/// `renox.auth.*` translations on top.
+pub(super) fn texts(lang: &Lang) -> Value {
+    let mut base = text(Locale::parse(&lang.locale));
+    if let Value::Object(map) = &mut base {
+        for (key, value) in lang.texts().iter() {
+            if let Some(key) = key.strip_prefix("renox.auth.") {
+                map.insert(key.to_owned(), Value::String(value.clone()));
+            }
+        }
+    }
+    base
+}
+
+/// A built-in message (e.g. `auth.failed`), translated if the app's lang file has it.
+fn message(lang: &Lang, key: &str, params: &[(&str, String)]) -> String {
+    let template =
+        crate::validation::template_for(Locale::parse(&lang.locale), Some(&lang.texts()), key);
+    crate::i18n::format(&template, params, None)
 }
 
 fn after_login(state: &AppState, settings: &Settings, session: &Session) -> String {
@@ -182,13 +200,10 @@ pub(super) fn go(htmx: &Htmx, to: String) -> Response {
     }
 }
 
-async fn show_login(
-    Extension(settings): Extension<Arc<Settings>>,
-    State(state): State<AppState>,
-) -> View {
+async fn show_login(Extension(settings): Extension<Arc<Settings>>, lang: Lang) -> View {
     view(
         "renox/auth/login.html",
-        context! { registration => settings.registration, text => text(locale(&state)) },
+        context! { registration => settings.registration, text => texts(&lang) },
     )
 }
 
@@ -199,7 +214,7 @@ struct LoginForm {
     remember: Option<String>,
 }
 
-/// Field labels in messages, matching the words on the built-in pages.
+/// Built-in labels for Renox's own forms; an app's lang file wins.
 pub(super) fn label(v: &Validator, field: &'static str) -> &'static str {
     match (v.locale(), field) {
         (Locale::Id, "name") => "nama",
@@ -213,7 +228,7 @@ impl Validate for LoginForm {
         v.field("email", &self.email).required().email();
         let password = label(v, "password");
         v.field("password", &self.password)
-            .label(password)
+            .fallback_label(password)
             .required();
     }
 }
@@ -224,6 +239,7 @@ async fn store_login(
     session: Session,
     htmx: Htmx,
     ClientIp(ip): ClientIp,
+    lang: Lang,
     Valid(form): Valid<LoginForm>,
 ) -> Result<Response> {
     let key = format!(
@@ -231,14 +247,10 @@ async fn store_login(
         form.email.trim().to_lowercase(),
         ip.map(|ip| ip.to_string()).unwrap_or_default()
     );
-    let locale = locale(&state);
     let failed = |key: &str, seconds: Option<u64>| {
         let mut errors = Errors::new();
         let seconds = seconds.map(|s| s.to_string()).unwrap_or_default();
-        errors.add(
-            "email",
-            crate::validation::message(locale, key, "", &[("seconds", seconds)]),
-        );
+        errors.add("email", message(&lang, key, &[("seconds", seconds)]));
         ValidationError::new(errors)
             .with_input(&json!({ "email": form.email, "remember": form.remember }))
     };
@@ -267,10 +279,10 @@ async fn store_login(
     Ok(go(&htmx, after_login(&state, &settings, &session)))
 }
 
-async fn show_register(State(state): State<AppState>) -> View {
+async fn show_register(lang: Lang) -> View {
     view(
         "renox/auth/register.html",
-        context! { text => text(locale(&state)) },
+        context! { text => texts(&lang) },
     )
 }
 
@@ -285,14 +297,17 @@ struct RegisterForm {
 impl Validate for RegisterForm {
     fn rules(&self, v: &mut Validator) {
         let (name, password) = (label(v, "name"), label(v, "password"));
-        v.field("name", &self.name).label(name).required().max(255);
+        v.field("name", &self.name)
+            .fallback_label(name)
+            .required()
+            .max(255);
         v.field("email", &self.email)
             .required()
             .email()
             .max(255)
             .unique("users", "email");
         v.field("password", &self.password)
-            .label(password)
+            .fallback_label(password)
             .required()
             .min(8)
             .confirmed(&self.password_confirmation);

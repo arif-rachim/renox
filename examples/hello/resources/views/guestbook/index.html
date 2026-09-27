@@ -1,20 +1,20 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-<h1>Buku Tamu</h1>
+<h1>{{ t('guestbook.title') }}</h1>
 
 <form method="post" action="{{ route('guestbook.store') }}" enctype="multipart/form-data"
       hx-post="{{ route('guestbook.store') }}" hx-target="#entries" hx-swap="outerHTML"
       x-data="{ sending: false }" @htmx:before-request="sending = true"
       @htmx:after-request="sending = false; if ($event.detail.successful) $el.reset()">
   {{ csrf_field() }}
-  <input name="name" placeholder="Nama" value="{{ old('name', auth.user.name if auth.check else '') }}">
+  <input name="name" placeholder="{{ t('guestbook.name') }}" value="{{ old('name', auth.user.name if auth.check else '') }}">
   <p class="error" data-error-for="name">{{ error('name') }}</p>
-  <textarea name="message" placeholder="Pesan">{{ old('message') }}</textarea>
+  <textarea name="message" placeholder="{{ t('guestbook.message') }}">{{ old('message') }}</textarea>
   <p class="error" data-error-for="message">{{ error('message') }}</p>
-  <label>Foto (opsional) <input type="file" name="photo" accept="image/*"></label>
+  <label>{{ t('guestbook.photo') }} <input type="file" name="photo" accept="image/*"></label>
   <p class="error" data-error-for="photo">{{ error('photo') }}</p>
-  <button :disabled="sending" x-text="sending ? 'Mengirim…' : 'Kirim'">Kirim</button>
+  <button :disabled="sending" x-text="sending ? '{{ t('guestbook.sending') }}' : '{{ t('guestbook.send') }}'">{{ t('guestbook.send') }}</button>
 </form>
 
 {% block entries %}
@@ -26,7 +26,7 @@
       <strong>{{ entry.name }}</strong>: {{ entry.message }}
     </li>
     {% else %}
-    <li class="empty">Belum ada pesan.</li>
+    <li class="empty">{{ t('guestbook.empty') }}</li>
     {% endfor %}
   </ul>
   {% from "renox/pagination.html" import pagination %}

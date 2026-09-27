@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="id">
+<html lang="{{ app.locale }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -12,11 +12,12 @@
     <a href="{{ route('guestbook.index') }}"><strong>{{ app.name }}</strong></a>
     {% if auth.check %}
     <span>{{ auth.user.name }}</span>
-    <form method="post" action="{{ route('logout') }}">{{ csrf_field() }}<button>Keluar</button></form>
+    <form method="post" action="{{ route('logout') }}">{{ csrf_field() }}<button>{{ t('nav.logout') }}</button></form>
     {% else %}
-    <a href="{{ route('login') }}">Masuk</a>
-    <a href="{{ route('register') }}">Daftar</a>
+    <a href="{{ route('login') }}">{{ t('nav.login') }}</a>
+    <a href="{{ route('register') }}">{{ t('nav.register') }}</a>
     {% endif %}
+    <span class="lang"><a href="{{ route('language', 'id') }}">ID</a> | <a href="{{ route('language', 'en') }}">EN</a></span>
   </nav>
   <main>
     {% if flash.status %}<p class="flash">{{ flash.status }}</p>{% endif %}

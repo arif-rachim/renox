@@ -9,7 +9,7 @@ use axum::response::{IntoResponse, Response};
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
-use super::messages::{render, template};
+use super::messages::render;
 use super::{Errors, Locale, Validate, ValidationError, Validator};
 use crate::upload::{self, Upload};
 use crate::{AppState, Error};
@@ -27,6 +27,25 @@ use crate::{AppState, Error};
 /// becomes a validation error rather than a 400.
 pub struct Valid<T>(pub T);
 
+/// Built-in messages in the request's language, with the app's overrides.
+struct Messages {
+    locale: Locale,
+    texts: crate::i18n::Texts,
+}
+
+impl Messages {
+    fn template(&self, key: &str) -> std::borrow::Cow<'static, str> {
+        super::messages::template_for(self.locale, Some(&self.texts), key)
+    }
+
+    fn label(&self, field: &str) -> String {
+        self.texts
+            .get(&format!("renox.validation.attributes.{field}"))
+            .cloned()
+            .unwrap_or_else(|| field.replace('_', " "))
+    }
+}
+
 enum Parsed<T> {
     Ok(T),
     Invalid(Errors),
@@ -39,7 +58,11 @@ where
     type Rejection = Response;
 
     async fn from_request(req: Request, state: &AppState) -> Result<Self, Response> {
-        let locale = Locale::parse(&state.config.locale);
+        let locale_name = crate::i18n::request_locale(req.extensions(), state);
+        let locale = &Messages {
+            locale: Locale::parse(&locale_name),
+            texts: state.translator.texts(&locale_name),
+        };
         let is_json = req
             .headers()
             .get(CONTENT_TYPE)
@@ -85,7 +108,7 @@ where
                     .into_response());
             }
         };
-        let errors = Validator::rules_of(&data, locale)
+        let errors = Validator::rules_with_texts(&data, locale.locale, locale.texts.clone())
             .finish(&state.db)
             .await
             .map_err(IntoResponse::into_response)?;
@@ -137,7 +160,7 @@ async fn read_multipart(
 fn parse_pairs<T: DeserializeOwned>(
     pairs: Vec<(String, String)>,
     uploads: &HashMap<String, Upload>,
-    locale: Locale,
+    locale: &Messages,
 ) -> (Parsed<T>, Map<String, Value>) {
     let mut input = Map::new();
     for (key, value) in pairs.iter().filter(|(_, v)| !uploads.contains_key(v)) {
@@ -188,7 +211,7 @@ fn parse_pairs<T: DeserializeOwned>(
 
 fn parse_json<T: DeserializeOwned>(
     bytes: &[u8],
-    locale: Locale,
+    locale: &Messages,
 ) -> Result<(Parsed<T>, Map<String, Value>), Error> {
     let input = match serde_json::from_slice(bytes) {
         Ok(Value::Object(map)) => map,
@@ -216,7 +239,7 @@ fn missing_field(message: &str) -> Option<&str> {
 
 /// Turns a deserialization error into a message for the field it concerns.
 /// `blank` means the field was submitted empty.
-fn field_error(path: &str, message: &str, blank: bool, locale: Locale) -> Errors {
+fn field_error(path: &str, message: &str, blank: bool, locale: &Messages) -> Errors {
     let mut errors = Errors::new();
     if let Some(field) = missing_field(message) {
         let field = if path == "." {
@@ -226,7 +249,7 @@ fn field_error(path: &str, message: &str, blank: bool, locale: Locale) -> Errors
         };
         errors.add(
             &field,
-            render(template(locale, "required"), &field.replace('_', " "), &[]),
+            render(&locale.template("required"), &locale.label(&field), &[]),
         );
         return errors;
     }
@@ -251,7 +274,7 @@ fn field_error(path: &str, message: &str, blank: bool, locale: Locale) -> Errors
     };
     errors.add(
         field,
-        render(template(locale, key), &field.replace('_', " "), &[]),
+        render(&locale.template(key), &locale.label(field), &[]),
     );
     errors
 }
@@ -260,6 +283,13 @@ fn field_error(path: &str, message: &str, blank: bool, locale: Locale) -> Errors
 mod tests {
     use super::*;
     use serde::Deserialize;
+
+    fn plain(locale: Locale) -> Messages {
+        Messages {
+            locale,
+            texts: Default::default(),
+        }
+    }
 
     #[derive(Deserialize, Debug)]
     #[allow(dead_code)]
@@ -273,7 +303,7 @@ mod tests {
         let pairs = form_urlencoded::parse(body.as_bytes())
             .into_owned()
             .collect();
-        match parse_pairs::<Form>(pairs, &HashMap::new(), Locale::Id).0 {
+        match parse_pairs::<Form>(pairs, &HashMap::new(), &plain(Locale::Id)).0 {
             Parsed::Ok(form) => Ok(form),
             Parsed::Invalid(errors) => Err(errors),
         }
@@ -301,7 +331,7 @@ mod tests {
         let pairs = form_urlencoded::parse(b"nama=Kopi&tag=a&tag=b&harga=")
             .into_owned()
             .collect();
-        let (_, input) = parse_pairs::<Form>(pairs, &HashMap::new(), Locale::En);
+        let (_, input) = parse_pairs::<Form>(pairs, &HashMap::new(), &plain(Locale::En));
         assert_eq!(input["nama"], "Kopi");
         assert_eq!(input["tag"], serde_json::json!(["a", "b"]));
         assert_eq!(input["harga"], "");

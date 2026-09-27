@@ -26,6 +26,14 @@ const STUBS: &[(&str, &str)] = &[
         include_str!("../stubs/resources/views/home/index.html"),
     ),
     ("public/app.css", include_str!("../stubs/public/app.css")),
+    (
+        "resources/lang/en.json",
+        include_str!("../stubs/resources/lang/en.json"),
+    ),
+    (
+        "resources/lang/id.json",
+        include_str!("../stubs/resources/lang/id.json"),
+    ),
 ];
 
 const RENOX_GIT: &str = "https://github.com/arif-rachim/renox";

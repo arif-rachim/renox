@@ -52,8 +52,13 @@ pub struct Config {
     pub database_url: String,
     /// Maximum open connections, from `DATABASE_POOL_SIZE`.
     pub database_pool_size: u32,
-    /// Language of built-in messages, `en` or `id`, from `APP_LOCALE`.
+    /// Default language of the app, from `APP_LOCALE`. Built-in messages exist
+    /// for `en` and `id`; other locales need a lang file.
     pub locale: String,
+    /// Language used for keys missing in the request's locale, from `APP_FALLBACK_LOCALE`.
+    pub fallback_locale: String,
+    /// Where translation files live, from `LANG_PATH`.
+    pub lang_path: PathBuf,
     /// Mail settings, from `MAIL_*`.
     pub mail: MailConfig,
     /// Queue workers `serve` runs in-process, from `QUEUE_WORKERS` (0 turns them off).
@@ -117,6 +122,8 @@ impl Config {
                 .parse()
                 .context("DATABASE_POOL_SIZE must be a number")?,
             locale: var_or("APP_LOCALE", "en"),
+            fallback_locale: var_or("APP_FALLBACK_LOCALE", "en"),
+            lang_path: var_or("LANG_PATH", "resources/lang").into(),
             mail: MailConfig {
                 mailer: var_or("MAIL_MAILER", "log"),
                 host: var_or("MAIL_HOST", "localhost"),
@@ -179,6 +186,8 @@ impl Default for Config {
             database_url: "sqlite::memory:".into(),
             database_pool_size: 8,
             locale: "en".into(),
+            fallback_locale: "en".into(),
+            lang_path: "resources/lang".into(),
             mail: MailConfig {
                 mailer: "memory".into(),
                 ..MailConfig::default()

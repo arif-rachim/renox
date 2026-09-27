@@ -49,15 +49,11 @@ struct EntryForm {
 
 impl Validate for EntryForm {
     fn rules(&self, v: &mut Validator) {
-        v.field("name", &self.name).label("nama").required().max(50);
-        v.field("message", &self.message)
-            .label("pesan")
-            .required()
-            .between(3, 280);
-        v.field("photo", &self.photo)
-            .label("foto")
-            .image()
-            .max(2048);
+        // Field names in messages come from resources/lang/*.json
+        // (`renox.validation.attributes.*`), in the visitor's language.
+        v.field("name", &self.name).required().max(50);
+        v.field("message", &self.message).required().between(3, 280);
+        v.field("photo", &self.photo).image().max(2048);
     }
 }
 
@@ -104,6 +100,8 @@ impl Module for Guestbook {
             .name("guestbook.store")
             .get("/halo/{nama}", greet)
             .name("greet")
+            .get("/bahasa/{locale}", switch_language)
+            .name("language")
     }
 
     fn register(&self, app: &mut Registry) {
@@ -138,6 +136,7 @@ async fn store(
     session: Session,
     htmx: Htmx,
     back: Back,
+    lang: Lang,
     Valid(form): Valid<EntryForm>,
 ) -> Result<Response> {
     let photo = match &form.photo {
@@ -164,8 +163,17 @@ async fn store(
         )
             .into_response());
     }
-    session.flash("status", "Terima kasih, pesanmu tersimpan!")?;
+    session.flash(
+        "status",
+        lang.t("guestbook.thanks", &[("name", &entry.name)]),
+    )?;
     Ok(back.into_response())
+}
+
+/// Remembers the visitor's language and goes back to where they were.
+async fn switch_language(session: Session, back: Back, Path(locale): Path<String>) -> Result<Back> {
+    renox::i18n::set_locale(&session, &locale)?;
+    Ok(back)
 }
 
 async fn greet(Path(nama): Path<String>) -> String {

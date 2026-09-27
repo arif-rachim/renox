@@ -143,6 +143,13 @@ struct ProductForm { name: String, photo: Option<Upload> }
 let key = photo.store_public(&state.storage, "products").await?;  // <img src="{{ storage_url(key) }}">
 ```
 
+Texts can be translated per visitor from `resources/lang/{en,id,…}.json`, including Renox's own
+validation messages and auth pages:
+
+```html
+<h1>{{ t('products.title') }}</h1>  <p>{{ t('products.count', count=total) }}</p>
+```
+
 The `Auth` module also handles password reset and email verification by email (`MAIL_MAILER=log`
 prints the links while developing), and API tokens for mobile apps and integrations:
 
