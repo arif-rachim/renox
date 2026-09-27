@@ -705,10 +705,14 @@ impl renox::auth::Notification for Shipped {
     fn channels(&self) -> Vec<renox::auth::Channel> {
         vec![renox::auth::Channel::Mail, renox::auth::Channel::Database]
     }
-    fn to_mail(&self, user: &User, _: &AppState) -> Result<Mail> {
-        Ok(Mail::new(&user.email, "Shipped", "on its way"))
+    fn to_mail(&self, to: &renox::auth::Recipient, _: &AppState) -> Result<Mail> {
+        Ok(Mail::new(
+            to.email().unwrap_or_default(),
+            "Shipped",
+            "on its way",
+        ))
     }
-    fn to_database(&self, _: &User) -> renox::serde_json::Value {
+    fn to_database(&self, _: &renox::auth::Recipient) -> renox::serde_json::Value {
         json!({"order": 1})
     }
 }

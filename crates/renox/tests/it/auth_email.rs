@@ -169,7 +169,11 @@ async fn forgotten_passwords_are_reset_by_email() {
     assert!(page.contains("If that email has an account, a reset link is on its way."));
     let mails = kernel.mailer().sent();
     assert_eq!(
-        (mails.len(), mails[0].to.as_str(), mails[0].subject.as_str()),
+        (
+            mails.len(),
+            mails[0].to[0].as_str(),
+            mails[0].subject.as_str()
+        ),
         (1, "arif@example.com", "Reset your password")
     );
 
@@ -335,7 +339,7 @@ async fn new_users_verify_their_email_with_a_signed_link() {
     other.post("/email/verification-notification", "").await;
     assert_eq!(
         kernel.mailer().sent().last().unwrap().to,
-        "budi@example.com"
+        ["budi@example.com"]
     );
     assert!(
         other

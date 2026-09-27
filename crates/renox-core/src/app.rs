@@ -302,6 +302,17 @@ impl App {
         self
     }
 
+    /// Adds a notification channel (WhatsApp, SMS, Slack…); see
+    /// [`Registry::channel`].
+    pub fn channel<F, Fut>(mut self, name: &str, send: F) -> Self
+    where
+        F: Fn(AppState, crate::auth::Recipient, serde_json::Value) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result> + Send + 'static,
+    {
+        self.registry.channel(name, send);
+        self
+    }
+
     /// Makes `value` available everywhere the app runs: `Provided<T>` in
     /// handlers, `state.provided::<T>()` in jobs, listeners, commands and
     /// scheduled tasks. One value per type; a second one replaces the first.
@@ -346,6 +357,8 @@ impl App {
         };
 
         self.registry.job::<crate::mail::SendMail>();
+        self.registry
+            .job::<crate::auth::notifications::SendToChannel>();
         self.registry.job::<crate::webhook::ProcessWebhook>();
         self.registry.job::<crate::analytics::ServerEvent>();
         let mut migrations = vec![crate::queue::MIGRATION, crate::cache::MIGRATION];
@@ -364,6 +377,7 @@ impl App {
             commands,
             templates,
             shares,
+            channels,
         } = self.registry;
         if let Some(name) = duplicate_job {
             return Err(anyhow!("job `{name}` is registered twice").into());
@@ -485,6 +499,7 @@ impl App {
             gates: Arc::new(self.gates),
             async_gates: Arc::new(self.async_gates),
             shares: Arc::new(shares),
+            channels: Arc::new(channels),
             provided: Arc::new(self.provided),
             throttle: Arc::new(LoginThrottle::new()),
         };

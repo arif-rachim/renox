@@ -53,7 +53,7 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Redirect, Response};
 
 pub use module::{Auth, Registration};
-pub use notifications::{Channel, DatabaseNotification, Notification};
+pub use notifications::{Channel, DatabaseNotification, Notification, Recipient};
 pub(crate) use throttle::LoginThrottle;
 pub use tokens::{AccessToken, NewToken};
 pub use user::{User, hash_password, verify_password};

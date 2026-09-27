@@ -19,6 +19,7 @@ pub struct Registry {
     pub(crate) commands: Vec<crate::command::Command>,
     pub(crate) templates: Vec<crate::view::TemplateHook>,
     pub(crate) shares: Vec<(String, crate::view::ShareFn)>,
+    pub(crate) channels: HashMap<String, crate::auth::notifications::ChannelFn>,
 }
 
 impl Registry {
@@ -117,6 +118,21 @@ impl Registry {
     {
         self.shares
             .push((key.to_owned(), crate::view::share_fn(compute)));
+        self
+    }
+
+    /// Adds a notification channel, used by notifications that list
+    /// `Channel::Custom(name)`: `send` gets the recipient and the message
+    /// `Notification::to_channel` built. See [`crate::auth::notifications`].
+    pub fn channel<F, Fut>(&mut self, name: &str, send: F) -> &mut Self
+    where
+        F: Fn(AppState, crate::auth::Recipient, serde_json::Value) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result> + Send + 'static,
+    {
+        self.channels.insert(
+            name.to_owned(),
+            crate::auth::notifications::channel_fn(send),
+        );
         self
     }
 

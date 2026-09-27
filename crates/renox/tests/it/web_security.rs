@@ -942,7 +942,7 @@ fn reset_token(app: &TestApp, to: &str) -> String {
         .sent_mail()
         .into_iter()
         .rev()
-        .find(|m| m.to == to)
+        .find(|m| m.is_for(to))
         .unwrap();
     let url = mail
         .text

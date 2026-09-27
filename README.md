@@ -137,9 +137,10 @@ async fn store(State(db): State<Db>, Valid(form): Valid<EntryForm>) -> Result<Vi
 - The scheduler (`every_minutes(5, …)`, `daily_at("02:00", …)`) runs inside `serve`, and each run
   is claimed once when several servers share the database.
 - Events and listeners are included.
-- Mail comes from templates, with a text version, SMTP in production and a preview page at
-  `/_renox/mail` while developing.
-- Notifications go by mail and/or to the database.
+- Mail comes from templates, with a text version, several recipients, cc/bcc, reply-to and
+  attachments, SMTP in production and a preview page at `/_renox/mail` while developing.
+- Notifications go by mail, to the database and through your own channels (WhatsApp, SMS…), now
+  or through the queue, to users or to plain addresses.
 </details>
 
 <details>

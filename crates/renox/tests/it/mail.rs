@@ -4,7 +4,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use renox::Kernel;
-use renox::auth::{Channel, Notification};
+use renox::auth::{Channel, Notification, Recipient};
 use renox::mail::{Mail, MailConfig};
 use renox::prelude::*;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -142,6 +142,19 @@ async fn sent_mail_can_be_previewed_in_debug_only() {
         "{page}"
     );
     assert!(page.contains("<pre>teks</pre>"));
+
+    let full = Mail::new("budi@example.com", "Invoice", "see file")
+        .cc("tim@example.com")
+        .reply_to("halo@example.com")
+        .attach("<inv>.pdf", "application/pdf", vec![1, 2, 3]);
+    kernel.mailer().send(full).await.unwrap();
+    let (_, page) = get(&kernel, "/_renox/mail/2").await;
+    assert!(page.contains("<p>Cc: tim@example.com</p>"), "{page}");
+    assert!(page.contains("<p>Reply-To: halo@example.com</p>"), "{page}");
+    assert!(
+        page.contains("Attachments: &lt;inv&gt;.pdf (application/pdf, 3 bytes)"),
+        "{page}"
+    );
     assert_eq!(
         get(&kernel, "/_renox/mail/9").await.0,
         StatusCode::NOT_FOUND
@@ -297,15 +310,15 @@ impl Notification for OrderShipped {
         vec![Channel::Mail, Channel::Database]
     }
 
-    fn to_mail(&self, user: &User, _: &AppState) -> Result<Mail> {
+    fn to_mail(&self, to: &Recipient, _: &AppState) -> Result<Mail> {
         Ok(Mail::new(
-            &user.email,
+            to.email().unwrap_or_default(),
             format!("Pesanan #{} dikirim", self.order_id),
             "Sedang di jalan.",
         ))
     }
 
-    fn to_database(&self, _: &User) -> serde_json::Value {
+    fn to_database(&self, _: &Recipient) -> serde_json::Value {
         serde_json::json!({ "order_id": self.order_id })
     }
 }
@@ -426,4 +439,249 @@ async fn auth_mails_are_html_with_a_text_version() {
             .lines()
             .any(|l| l.starts_with("http://127.0.0.1:3000/reset-password/"))
     );
+}
+
+#[tokio::test]
+async fn smtp_sends_cc_bcc_reply_to_from_and_attachments() {
+    let dir = views();
+    let (port, received) = fake_smtp().await;
+    let kernel = kernel_with({
+        let mut c = config(dir.path());
+        c.mail.mailer = "smtp".into();
+        c.mail.host = "127.0.0.1".into();
+        c.mail.port = Some(port);
+        c.mail.encryption = "none".into();
+        c.mail.from_address = "toko@example.com".into();
+        c
+    })
+    .await;
+    let pdf = b"%PDF-1.7 invoice".to_vec();
+    let mail = Mail::new("budi@example.com", "Invoice INV-001", "Terlampir.")
+        .also_to("siti@example.com")
+        .cc("sales@example.com")
+        .bcc("arsip@example.com")
+        .reply_to("Halo Toko <halo@example.com>")
+        .from("Toko Billing <billing@example.com>")
+        .attach("INV-001.pdf", "application/pdf", pdf.clone());
+    kernel.mailer().send(mail.clone()).await.unwrap();
+
+    let data = received.lock().unwrap().clone();
+    for rcpt in [
+        "budi@example.com",
+        "siti@example.com",
+        "sales@example.com",
+        "arsip@example.com",
+    ] {
+        assert!(
+            data.contains(&format!("RCPT TO:<{rcpt}>")),
+            "{rcpt}: {data}"
+        );
+    }
+    assert!(data.contains("MAIL FROM:<billing@example.com>"), "{data}");
+    assert!(data.contains("Cc: sales@example.com"), "{data}");
+    assert!(!data.contains("Bcc:"), "bcc isn't a header: {data}");
+    assert!(data.contains("Reply-To:") && data.contains("halo@example.com"));
+    assert!(data.contains("multipart/mixed") && data.contains("application/pdf"));
+    assert!(data.contains("INV-001.pdf"));
+    let _ = pdf;
+
+    // An invalid address anywhere fails the send, permanently (no retries).
+    let err = kernel
+        .mailer()
+        .send(Mail::new("budi@example.com", "x", "y").cc("not an email"))
+        .await
+        .unwrap_err();
+    assert!(err.is_permanent(), "{err:?}");
+}
+
+#[tokio::test]
+async fn queued_mail_keeps_its_attachments() {
+    let dir = views();
+    let kernel = kernel_with({
+        let mut c = config(dir.path());
+        c.mail.mailer = "memory".into();
+        c
+    })
+    .await;
+    let bytes: Vec<u8> = (0..=255).collect();
+    let mail = Mail::new("budi@example.com", "Data", "see attachment")
+        .cc("tim@example.com")
+        .attach("data.bin", "application/octet-stream", bytes.clone());
+    kernel.state().queue_mail(mail).await.unwrap();
+    kernel.run_jobs().await.unwrap();
+    let sent = kernel.mailer().sent();
+    assert_eq!(sent.len(), 1);
+    assert_eq!(sent[0].attachments[0].data, bytes);
+    assert!(sent[0].is_for("tim@example.com"));
+}
+
+struct Shipped {
+    order_id: i64,
+}
+
+impl Notification for Shipped {
+    fn kind(&self) -> &'static str {
+        "shipped"
+    }
+
+    fn channels(&self) -> Vec<Channel> {
+        vec![
+            Channel::Mail,
+            Channel::Database,
+            Channel::Custom("whatsapp"),
+        ]
+    }
+
+    fn to_mail(&self, to: &Recipient, _: &AppState) -> Result<Mail> {
+        Ok(Mail::new(
+            to.email().unwrap_or_default(),
+            format!("Pesanan #{} dikirim", self.order_id),
+            "Sedang di jalan.",
+        ))
+    }
+
+    fn to_database(&self, _: &Recipient) -> serde_json::Value {
+        serde_json::json!({ "order_id": self.order_id })
+    }
+
+    fn to_channel(&self, channel: &str, _: &Recipient) -> Result<serde_json::Value> {
+        Ok(serde_json::json!({ "channel": channel, "text": format!("#{} dikirim", self.order_id) }))
+    }
+}
+
+type Outbox = Arc<Mutex<Vec<(Option<String>, serde_json::Value)>>>;
+
+async fn channel_kernel(dir: &std::path::Path) -> (Kernel, Outbox) {
+    let outbox: Outbox = Arc::default();
+    let sent = outbox.clone();
+    let kernel = App::with_config(config(dir))
+        .module(Auth::new())
+        .migrations(&[renox::db::Migration::new(
+            "20300101000000_add_phone_to_users",
+            "ALTER TABLE users ADD COLUMN phone TEXT",
+            None,
+        )])
+        .channel("whatsapp", move |_, to: Recipient, message| {
+            let sent = sent.clone();
+            async move {
+                let phone = to
+                    .address("whatsapp")
+                    .or_else(|| to.user.as_ref()?.get("phone"));
+                sent.lock().unwrap().push((phone, message));
+                Ok(())
+            }
+        })
+        .boot()
+        .await
+        .unwrap();
+    kernel.migrate().await.unwrap();
+    (kernel, outbox)
+}
+
+#[tokio::test]
+async fn notifications_reach_custom_channels_and_people_without_accounts() {
+    let dir = views();
+    let (kernel, outbox) = channel_kernel(dir.path()).await;
+    let (state, db) = (kernel.state(), kernel.db());
+    let mut budi = User::register(db, "Budi", "budi@example.com", "rahasia123")
+        .await
+        .unwrap();
+    budi.set(db, "phone", "+628111").await.unwrap();
+
+    state.notify(&budi, &Shipped { order_id: 7 }).await.unwrap();
+    assert_eq!(budi.unread_notification_count(db).await.unwrap(), 1);
+    assert!(
+        kernel
+            .mailer()
+            .sent()
+            .iter()
+            .any(|m| m.is_for("budi@example.com"))
+    );
+    let (phone, message) = outbox.lock().unwrap()[0].clone();
+    assert_eq!(phone.as_deref(), Some("+628111"));
+    assert_eq!(message["text"], "#7 dikirim");
+
+    // Someone without an account: mail and WhatsApp, no database row.
+    let guest = Recipient::to("mail", "tamu@example.com").and("whatsapp", "+628222");
+    state
+        .notify_to(&guest, &Shipped { order_id: 8 })
+        .await
+        .unwrap();
+    assert!(
+        kernel
+            .mailer()
+            .sent()
+            .iter()
+            .any(|m| m.is_for("tamu@example.com"))
+    );
+    assert_eq!(outbox.lock().unwrap()[1].0.as_deref(), Some("+628222"));
+    let rows: i64 = renox::db::sql("SELECT COUNT(*) FROM notifications")
+        .scalar(db)
+        .await
+        .unwrap();
+    assert_eq!(rows, 1);
+}
+
+#[tokio::test]
+async fn queued_notifications_send_each_channel_as_its_own_job() {
+    let dir = views();
+    let (kernel, outbox) = channel_kernel(dir.path()).await;
+    let (state, db) = (kernel.state(), kernel.db());
+    let budi = User::register(db, "Budi", "budi@example.com", "rahasia123")
+        .await
+        .unwrap();
+    let mails_before = kernel.mailer().sent().len();
+
+    state
+        .notify_later(&budi, &Shipped { order_id: 9 })
+        .await
+        .unwrap();
+    // The database row is written at once; mail and WhatsApp wait for a worker.
+    assert_eq!(budi.unread_notification_count(db).await.unwrap(), 1);
+    assert_eq!(kernel.mailer().sent().len(), mails_before);
+    assert!(outbox.lock().unwrap().is_empty());
+    assert_eq!(state.queue.pending().await.unwrap(), 2);
+
+    kernel.run_jobs().await.unwrap();
+    assert!(
+        kernel
+            .mailer()
+            .sent()
+            .iter()
+            .any(|m| m.subject == "Pesanan #9 dikirim")
+    );
+    assert_eq!(outbox.lock().unwrap().len(), 1);
+    assert_eq!(state.queue.pending().await.unwrap(), 0);
+}
+
+struct Unknown;
+
+impl Notification for Unknown {
+    fn kind(&self) -> &'static str {
+        "unknown"
+    }
+
+    fn channels(&self) -> Vec<Channel> {
+        vec![Channel::Custom("pigeon")]
+    }
+
+    fn to_channel(&self, _: &str, _: &Recipient) -> Result<serde_json::Value> {
+        Ok(serde_json::Value::Null)
+    }
+}
+
+#[tokio::test]
+async fn an_unregistered_channel_is_an_error() {
+    let dir = views();
+    let (kernel, _) = channel_kernel(dir.path()).await;
+    let budi = User::register(kernel.db(), "Budi", "budi@example.com", "rahasia123")
+        .await
+        .unwrap();
+    for result in [
+        kernel.state().notify(&budi, &Unknown).await,
+        kernel.state().notify_later(&budi, &Unknown).await,
+    ] {
+        let err = format!("{:?}", result.unwrap_err());
+        assert!(err.contains("no `pigeon` notification channel"), "{err}");
+    }
 }

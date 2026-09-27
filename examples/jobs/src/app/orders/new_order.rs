@@ -1,4 +1,4 @@
-use renox::auth::{Channel, Notification};
+use renox::auth::{Channel, Notification, Recipient};
 use renox::mail::Mail;
 use renox::prelude::*;
 
@@ -17,10 +17,10 @@ impl Notification for NewOrder {
         vec![Channel::Mail, Channel::Database]
     }
 
-    fn to_mail(&self, user: &User, _: &AppState) -> Result<Mail> {
+    fn to_mail(&self, to: &Recipient, _: &AppState) -> Result<Mail> {
         let order = &self.0;
         Ok(Mail::new(
-            &user.email,
+            to.email().unwrap_or_default(),
             format!("New order #{}", order.id),
             format!(
                 "{} ordered {} (Rp {}).",
@@ -29,7 +29,7 @@ impl Notification for NewOrder {
         ))
     }
 
-    fn to_database(&self, _: &User) -> renox::serde_json::Value {
+    fn to_database(&self, _: &Recipient) -> renox::serde_json::Value {
         json!({ "order_id": self.0.id, "total": self.0.total })
     }
 }

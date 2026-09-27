@@ -265,11 +265,11 @@ impl TestApp {
         let sent = self.sent_mail();
         if !sent
             .iter()
-            .any(|m| m.to == to && m.subject.contains(subject))
+            .any(|m| m.is_for(to) && m.subject.contains(subject))
         {
             let list: Vec<String> = sent
                 .iter()
-                .map(|m| format!("{} ({})", m.subject, m.to))
+                .map(|m| format!("{} ({})", m.subject, m.to.join(", ")))
                 .collect();
             panic!("no mail to {to} about \"{subject}\"; sent: {list:?}");
         }

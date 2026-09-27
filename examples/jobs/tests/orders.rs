@@ -40,7 +40,7 @@ async fn an_order_queues_the_receipt_and_notifies_admins() {
     let receipt = app
         .sent_mail()
         .into_iter()
-        .find(|m| m.to == "buyer@example.com")
+        .find(|m| m.is_for("buyer@example.com"))
         .unwrap();
     assert!(receipt.text.contains("Kopi: Rp 18000"), "{}", receipt.text);
 }
