@@ -1,0 +1,237 @@
+//! seo(), robots.txt, sitemaps, Search Console / GA4 / GTM head tags, and
+//! analytics events reaching the browser.
+
+use renox::analytics::{self, ServerEvent};
+use renox::prelude::*;
+use renox::seo::Sitemap;
+use renox::testing::TestApp;
+use serde_json::json;
+
+struct Shop;
+
+impl Module for Shop {
+    fn name(&self) -> &'static str {
+        "shop"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new()
+            .get("/", || async { view("page.html", ()) })
+            .name("home")
+            .get("/products/{id}", |Path(id): Path<i64>| async move {
+                view("product.html", context! { id })
+            })
+            .name("products.show")
+            .get("/sitemap.xml", sitemap)
+            .name("sitemap")
+            .get("/welcome", |session: Session| async move {
+                analytics::event(&session, "tutorial_begin", json!({}))?;
+                Ok::<_, Error>(view("page.html", ()))
+            })
+            .post("/signup", |session: Session| async move {
+                analytics::event(&session, "sign_up", json!({ "method": "email" }))?;
+                Ok::<_, Error>(Redirect::to("/"))
+            })
+            .post("/cart", |session: Session| async move {
+                analytics::event(&session, "add_to_cart", json!({ "value": 18000 }))?;
+                Ok::<_, Error>((
+                    HxTrigger("cart-updated".into()),
+                    view("page.html", ()).fragment("body"),
+                ))
+            })
+            .post("/track", |State(state): State<AppState>| async move {
+                state
+                    .dispatch(ServerEvent::new(None, "purchase").param("value", 18000))
+                    .await?;
+                Ok::<_, Error>("queued")
+            })
+    }
+}
+
+async fn sitemap(State(state): State<AppState>) -> Result<Sitemap> {
+    let at = "2026-09-01T10:00:00Z".parse::<DateTime>().unwrap();
+    Sitemap::new(&state)
+        .route("home", &[], None)?
+        .route("products.show", &[&7], Some(at))
+        .map(|map| map.add("/search?q=kopi&page=2", None))
+}
+
+const PAGE: &str = r#"<head>{{ renox_head() }}</head>{% block body %}<p>body</p>{% endblock %}"#;
+const PRODUCT: &str = r#"<head>{{ seo(title='Kopi "Susu" · Toko', description='Enak & murah', image='/img/kopi.jpg', type='product') }}</head>"#;
+
+async fn app(configure: impl FnOnce(&mut Config) + Send) -> (TestApp, tempfile::TempDir) {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("page.html"), PAGE).unwrap();
+    std::fs::write(dir.path().join("product.html"), PRODUCT).unwrap();
+    let views = dir.path().to_path_buf();
+    let public = dir.path().join("public");
+    let app = TestApp::with_config(App::new().module(Shop), |c| {
+        c.name = "Toko".into();
+        c.url = "https://toko.example".into();
+        c.views_path = views;
+        c.public_path = public;
+        configure(c);
+    })
+    .await;
+    (app, dir)
+}
+
+fn production(c: &mut Config) {
+    c.env = Environment::Production;
+    c.analytics.google_site_verification = Some("abc123".into());
+    c.analytics.ga4_measurement_id = Some("G-TEST123".into());
+    c.analytics.gtm_container_id = Some("GTM-TEST".into());
+}
+
+#[renox::test]
+async fn seo_writes_title_description_canonical_and_social_cards() {
+    let (app, _dir) = app(|_| {}).await;
+    let page = app.get("/products/7?utm_source=x").await.text();
+    for expected in [
+        "<title>Kopi &quot;Susu&quot; · Toko</title>",
+        r#"<meta name="description" content="Enak &amp; murah">"#,
+        r#"<link rel="canonical" href="https://toko.example/products/7">"#,
+        r#"<meta property="og:title" content="Kopi &quot;Susu&quot; · Toko">"#,
+        r#"<meta property="og:type" content="product">"#,
+        r#"<meta property="og:url" content="https://toko.example/products/7">"#,
+        r#"<meta property="og:image" content="https://toko.example/img/kopi.jpg">"#,
+        r#"<meta property="og:site_name" content="Toko">"#,
+        r#"<meta property="og:locale" content="en">"#,
+        r#"<meta name="twitter:card" content="summary_large_image">"#,
+    ] {
+        assert!(page.contains(expected), "{expected}\n{page}");
+    }
+}
+
+#[renox::test]
+async fn staging_is_kept_out_of_search_engines_and_analytics() {
+    let (app, _dir) = app(|c| {
+        c.analytics.ga4_measurement_id = Some("G-TEST123".into());
+    })
+    .await;
+    let page = app.get("/").await.text();
+    assert!(page.contains(r#"<meta name="robots" content="noindex, nofollow">"#));
+    assert!(
+        !page.contains("googletagmanager"),
+        "no analytics outside production"
+    );
+    let robots = app.get("/robots.txt").await;
+    assert_eq!(robots.text(), "User-agent: *\nDisallow: /\n");
+}
+
+#[renox::test]
+async fn production_pages_get_verification_ga4_and_gtm_with_the_csp_nonce() {
+    let (app, _dir) = app(production).await;
+    let res = app.get("/").await;
+    let csp = res.header("content-security-policy").unwrap().to_owned();
+    let page = res.text();
+    assert!(!page.contains("noindex"));
+    assert!(page.contains(r#"<meta name="google-site-verification" content="abc123">"#));
+    assert!(page.contains(r#"src="https://www.googletagmanager.com/gtag/js?id=G-TEST123""#));
+    assert!(page.contains("gtag('config','G-TEST123')"));
+    assert!(page.contains("'GTM-TEST'"));
+    // Inline tags carry the nonce, and the CSP allows Google's hosts.
+    let nonce = page
+        .split("nonce=\"")
+        .nth(1)
+        .unwrap()
+        .split('"')
+        .next()
+        .unwrap();
+    assert!(!nonce.is_empty());
+    assert!(csp.contains("https://www.googletagmanager.com"), "{csp}");
+    assert!(
+        csp.contains("connect-src 'self' https://*.google-analytics.com"),
+        "{csp}"
+    );
+}
+
+#[renox::test]
+async fn robots_txt_and_the_sitemap_in_production() {
+    let (app, _dir) = app(production).await;
+    assert_eq!(
+        app.get("/robots.txt").await.text(),
+        "User-agent: *\nAllow: /\n\nSitemap: https://toko.example/sitemap.xml\n"
+    );
+    let res = app.get("/sitemap.xml").await;
+    res.assert_header("content-type", "application/xml; charset=utf-8");
+    let xml = res.text();
+    assert!(xml.contains("<loc>https://toko.example/</loc>"), "{xml}");
+    assert!(
+        xml.contains(
+            "<loc>https://toko.example/products/7</loc><lastmod>2026-09-01T10:00:00Z</lastmod>"
+        ),
+        "{xml}"
+    );
+    assert!(
+        xml.contains("<loc>https://toko.example/search?q=kopi&amp;page=2</loc>"),
+        "{xml}"
+    );
+}
+
+#[renox::test]
+async fn an_apps_own_robots_txt_wins() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("public")).unwrap();
+    std::fs::write(
+        dir.path().join("public/robots.txt"),
+        "User-agent: *\nDisallow: /admin\n",
+    )
+    .unwrap();
+    std::fs::write(dir.path().join("page.html"), PAGE).unwrap();
+    let (views, public) = (dir.path().to_path_buf(), dir.path().join("public"));
+    let app = TestApp::with_config(App::new().module(Shop), |c| {
+        c.views_path = views;
+        c.public_path = public;
+    })
+    .await;
+    assert_eq!(
+        app.get("/robots.txt").await.text(),
+        "User-agent: *\nDisallow: /admin\n"
+    );
+}
+
+#[renox::test]
+async fn events_reach_the_browser_with_the_page_the_swap_or_the_next_page() {
+    let (app, _dir) = app(|_| {}).await;
+
+    // A page: in its head.
+    let page = app.get("/welcome").await.text();
+    assert!(
+        page.contains(
+            r#"<meta name="renox-analytics" content="[{&quot;name&quot;:&quot;tutorial_begin&quot;"#
+        ),
+        "{page}"
+    );
+    assert!(
+        !app.get("/").await.text().contains("renox-analytics"),
+        "delivered once"
+    );
+
+    // An htmx swap: in its HX-Trigger, next to the handler's own trigger.
+    let res = app.htmx().post("/cart", &[]).await;
+    let trigger: serde_json::Value =
+        serde_json::from_str(res.header("hx-trigger").unwrap()).unwrap();
+    assert_eq!(trigger["cart-updated"], serde_json::Value::Null);
+    assert_eq!(
+        trigger["renox:analytics"]["events"][0]["name"],
+        "add_to_cart"
+    );
+    assert_eq!(
+        trigger["renox:analytics"]["events"][0]["params"]["value"],
+        18000
+    );
+
+    // A redirect: with the next page.
+    app.post("/signup", &[]).await.assert_redirect("/");
+    let next = app.get("/").await.text();
+    assert!(next.contains("sign_up") && next.contains("email"), "{next}");
+}
+
+#[renox::test]
+async fn server_events_are_queued_and_skipped_without_ga4() {
+    let (app, _dir) = app(|_| {}).await;
+    app.post("/track", &[]).await.assert_ok();
+    assert_eq!(app.queued_jobs().await, ["renox:analytics"]);
+    assert_eq!(app.run_jobs().await, 1);
+}

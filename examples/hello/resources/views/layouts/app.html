@@ -3,7 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}{{ app.name }}{% endblock %}</title>
+  {#- Title, description, canonical URL and social cards; a page overrides it with
+      {% block seo %}{{ seo(title="…", description="…", image="…") }}{% endblock %} -#}
+  {% block seo %}{{ seo() }}{% endblock %}
   <link rel="stylesheet" href="{{ asset('app.css') }}">
   {{ renox_head() }}
 </head>

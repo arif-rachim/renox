@@ -79,6 +79,28 @@ const RENOX: &str = r#"(function () {
 
   // Live reload while developing: reload when a view, public or lang file
   // changes, or when the app restarts (a new boot id after reconnecting).
+  // Analytics events from the server (renox::analytics::event): with an htmx
+  // swap in its HX-Trigger, with a page in a <meta>.
+  function track(events) {
+    (events || []).forEach(function (e) {
+      var params = e.params || {};
+      if (typeof window.gtag === "function") window.gtag("event", e.name, params);
+      if (window.dataLayer && document.querySelector('script[src*="googletagmanager.com/gtm.js"]')) {
+        var entry = { event: e.name };
+        Object.keys(params).forEach(function (key) { entry[key] = params[key]; });
+        window.dataLayer.push(entry);
+      }
+      document.dispatchEvent(new CustomEvent("renox:tracked", { detail: e }));
+    });
+  }
+  document.addEventListener("renox:analytics", function (event) {
+    track(event.detail && event.detail.events);
+  });
+  var pending = document.querySelector('meta[name="renox-analytics"]');
+  if (pending) {
+    try { track(JSON.parse(pending.content)); } catch (_) {}
+  }
+
   var live = document.querySelector('meta[name="renox-live"]');
   if (live && window.EventSource) {
     var boot = null;

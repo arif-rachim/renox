@@ -335,15 +335,24 @@ M11b · webhooks (done):
 - [x] `examples/webhooks`: Midtrans (`signature_key` SHA-512), Xendit (`x-callback-token`), Stripe
       (`Stripe-Signature`), each tested with good, forged and repeated calls
 
-M11c · SEO and analytics:
-- [ ] A `seo()` macro: title, description, canonical, OpenGraph and Twitter cards; `<html lang>` from
-      the locale; `noindex` outside production
-- [ ] `robots.txt` and `sitemap.xml` helpers (routes and models)
-- [ ] Google Search Console verification meta (`GOOGLE_SITE_VERIFICATION`)
-- [ ] GA4 / Google Tag Manager from `.env` in `renox_head()`, with the CSP nonce and CSP sources,
-      off in local and testing
-- [ ] Analytics events: `HxTrigger` → `gtag('event', …)` in renox.js, page views on `hx-boost`
-      navigation, and a job that sends server-side events (GA4 Measurement Protocol)
+M11c · SEO and analytics (done):
+- [x] `seo(title=…, description=…, image=…, type=…, canonical=…)` in templates (a Rust function,
+      since imported macros can't see the page's `app`/`request`): title, description, canonical
+      (APP_URL + path, no query), OpenGraph, Twitter cards; `<html lang="{{ app.locale }}">` and a
+      `{% block seo %}` in the generated layout; `noindex, nofollow` outside production
+- [x] `/robots.txt` generated unless `public/robots.txt` exists (production: allow + the sitemap
+      when a route is named `sitemap`; elsewhere disallow); `renox::seo::Sitemap` builder
+- [x] Search Console verification meta (`GOOGLE_SITE_VERIFICATION`)
+- [x] GA4 (`GA4_MEASUREMENT_ID`) and Tag Manager (`GTM_CONTAINER_ID`) tags in `renox_head()` with
+      the CSP nonce, and their hosts added to the CSP; production only
+- [x] `renox::analytics::event(&session, name, params)`: delivered in the htmx swap's `HX-Trigger`,
+      the page's head, or the next page after a redirect; renox.js calls `gtag('event', …)` and
+      pushes to the GTM `dataLayer`. Page views on `hx-boost` need nothing (GA4 enhanced
+      measurement counts history changes; GTM has a History Change trigger)
+- [x] `ServerEvent` job for GA4's Measurement Protocol (`GA4_API_SECRET`), `GaClientId` from the
+      `_ga` cookie; only sent in production
+- [x] `renox::serde_json` re-export and `json!` in the prelude (apps from `rnx new` had no
+      `serde_json` for event parameters)
 
 ### v1.0
 - [ ] Documentation site built with Renox, starter kit, semver stability guarantee

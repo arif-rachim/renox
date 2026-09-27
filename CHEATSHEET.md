@@ -429,6 +429,41 @@ impl Webhook for Xendit {
 With `CSP=strict`, an inline script needs `<script nonce="{{ csp_nonce() }}">`, and Alpine
 expressions must stay simple (move statements into `Alpine.data(...)`).
 
+## SEO and analytics
+
+```html
+{% block seo %}{{ seo(title=product.name ~ " · " ~ app.name, description=product.summary,
+                      image=storage_url(product.photo), type="product") }}{% endblock %}
+{# → <title>, description, canonical URL, OpenGraph and Twitter card tags #}
+```
+
+```rust
+use renox::analytics::{self, GaClientId, ServerEvent};
+use renox::prelude::*;
+use renox::seo::Sitemap;
+
+// Routes::new().get("/sitemap.xml", sitemap).name("sitemap")  → robots.txt links it
+async fn sitemap(State(state): State<AppState>) -> Result<Sitemap> {
+    Sitemap::new(&state).route("home", &[], None)?.route("products.show", &[&7], None)
+}
+
+async fn signed_up(session: Session) -> Result<Redirect> {
+    // Reaches gtag / the dataLayer with this htmx swap, this page, or the next one.
+    analytics::event(&session, "sign_up", json!({ "method": "email" }))?;
+    Ok(Redirect::to("/welcome"))
+}
+
+async fn paid(State(state): State<AppState>, GaClientId(client): GaClientId) -> Result<StatusCode> {
+    // From the server (GA4 Measurement Protocol), so ad blockers can't drop it.
+    state.dispatch(ServerEvent::new(client, "purchase").param("value", 18_000).param("currency", "IDR")).await?;
+    Ok(StatusCode::OK)
+}
+```
+
+`.env`: `GOOGLE_SITE_VERIFICATION`, `GA4_MEASUREMENT_ID`, `GA4_API_SECRET`, `GTM_CONTAINER_ID`. Tags
+are added (with the CSP nonce and sources) only in production; elsewhere pages say `noindex` and
+`robots.txt` disallows everything.
+
 ## Tests
 
 ```rust

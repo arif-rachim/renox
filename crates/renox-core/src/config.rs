@@ -108,6 +108,23 @@ pub struct Config {
     /// Values `var()` returns before looking at the environment, e.g. a
     /// webhook secret set in a test with `TestApp::with_config`.
     pub vars: std::collections::HashMap<String, String>,
+    /// Search engines and analytics; used only in production.
+    pub analytics: AnalyticsConfig,
+}
+
+/// Google Search Console, Google Analytics 4 and Google Tag Manager, from
+/// `GOOGLE_SITE_VERIFICATION`, `GA4_MEASUREMENT_ID`, `GA4_API_SECRET` and
+/// `GTM_CONTAINER_ID`. Tags are added to pages only in production.
+#[derive(Debug, Clone, Default)]
+pub struct AnalyticsConfig {
+    /// The `content` of Search Console's `google-site-verification` meta tag.
+    pub google_site_verification: Option<String>,
+    /// e.g. `G-XXXXXXXXXX`: adds the GA4 tag to every page.
+    pub ga4_measurement_id: Option<String>,
+    /// For events sent from the server (Measurement Protocol).
+    pub ga4_api_secret: Option<String>,
+    /// e.g. `GTM-XXXXXXX`: adds the Tag Manager container to every page.
+    pub gtm_container_id: Option<String>,
 }
 
 impl Config {
@@ -195,6 +212,12 @@ impl Config {
                 * 1024,
             csp: CspMode::parse(&var_or("CSP", "relaxed"))?,
             vars: Default::default(),
+            analytics: AnalyticsConfig {
+                google_site_verification: optional("GOOGLE_SITE_VERIFICATION"),
+                ga4_measurement_id: optional("GA4_MEASUREMENT_ID"),
+                ga4_api_secret: optional("GA4_API_SECRET"),
+                gtm_container_id: optional("GTM_CONTAINER_ID"),
+            },
         })
     }
 
@@ -246,6 +269,7 @@ impl Default for Config {
             upload_max_size: 10 * 1024 * 1024,
             csp: CspMode::Relaxed,
             vars: Default::default(),
+            analytics: AnalyticsConfig::default(),
         }
     }
 }

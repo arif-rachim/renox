@@ -3,6 +3,7 @@
 //! Most applications should depend on the `renox` crate instead, which
 //! re-exports everything here through `renox::prelude`.
 
+pub mod analytics;
 mod app;
 mod assets;
 pub mod auth;
@@ -28,6 +29,7 @@ mod registry;
 mod routing;
 pub mod schedule;
 pub mod security;
+pub mod seo;
 mod session;
 pub mod shell;
 pub mod signed;
@@ -42,7 +44,7 @@ pub mod webhook;
 pub use app::{App, Kernel};
 pub use assets::{ALPINE_VERSION, HTMX_VERSION};
 pub use auth::{AuthUser, Policy};
-pub use config::{Config, CspMode, Environment};
+pub use config::{AnalyticsConfig, Config, CspMode, Environment};
 pub use crypto::generate_key;
 pub use csrf::{CSRF_FIELD, CSRF_HEADER};
 pub use embedded::Embedded;
@@ -63,6 +65,7 @@ pub use minijinja::context;
 
 pub use chrono;
 pub use fake;
+pub use serde_json;
 pub use sqlx;
 /// CORS configuration for `Routes::cors_layer`.
 pub use tower_http::cors;
