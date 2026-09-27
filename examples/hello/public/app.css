@@ -11,3 +11,7 @@ ul { padding-left: 1.2rem; }
 .pagination a, .pagination span { padding: .25rem .6rem; border: 1px solid #ddd; border-radius: .25rem; text-decoration: none; }
 .pagination [aria-current] { background: #222; color: #fff; border-color: #222; }
 .pagination [aria-disabled], .pagination .gap { color: #aaa; }
+nav { display: flex; gap: 1rem; align-items: center; margin-bottom: 2rem; }
+nav > :first-child { margin-right: auto; }
+nav form { margin: 0; }
+nav button { padding: .25rem .75rem; }

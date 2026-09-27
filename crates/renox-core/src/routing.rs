@@ -1,10 +1,16 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Write};
 
+use std::convert::Infallible;
+
 use anyhow::{anyhow, bail};
 use axum::Router;
+use axum::extract::Request;
 use axum::handler::Handler;
-use axum::routing::{self, MethodRouter};
+use axum::middleware::from_fn;
+use axum::response::IntoResponse;
+use axum::routing::{self, MethodRouter, Route};
+use tower::{Layer, Service};
 
 use crate::AppState;
 
@@ -60,6 +66,31 @@ impl Routes {
             .clone()
             .expect("Routes::name() must follow a route");
         self.names.push((name.to_owned(), path));
+        self
+    }
+
+    /// Only logged-in users may use the routes added so far; guests are sent
+    /// to the `login` route. Call it after adding the routes it should cover.
+    pub fn require_auth(self) -> Self {
+        self.route_layer(from_fn(crate::auth::require_auth))
+    }
+
+    /// Only guests may use the routes added so far; logged-in users are sent
+    /// to the `home` route (e.g. for login and registration pages).
+    pub fn guest_only(self) -> Self {
+        self.route_layer(from_fn(crate::auth::guest_only))
+    }
+
+    /// Wraps the routes added so far in a tower layer (axum's `route_layer`).
+    pub fn route_layer<L>(mut self, layer: L) -> Self
+    where
+        L: Layer<Route> + Clone + Send + Sync + 'static,
+        L::Service: Service<Request> + Clone + Send + Sync + 'static,
+        <L::Service as Service<Request>>::Response: IntoResponse + 'static,
+        <L::Service as Service<Request>>::Error: Into<Infallible> + 'static,
+        <L::Service as Service<Request>>::Future: Send + 'static,
+    {
+        self.router = self.router.route_layer(layer);
         self
     }
 

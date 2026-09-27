@@ -1,6 +1,7 @@
 //! A guestbook showing Renox's features so far: named routes, views with a
 //! layout, sessions and flash messages, CSRF, HTMX fragments, validation with
-//! old input, and SQLite with a model, migrations, a seeder and pagination.
+//! old input, SQLite with a model, migrations, a seeder and pagination, and
+//! login/registration from the `Auth` module.
 //!
 //! Run it from this directory:
 //!
@@ -114,6 +115,7 @@ async fn greet(Path(nama): Path<String>) -> String {
 fn main() -> renox::Result {
     App::new()
         .migrations(renox::migrations!())
+        .module(Auth::new().redirect_to("/"))
         .module(Guestbook)
         .seeder(|db| async move {
             Entry::create_many(&db, 30).await?;

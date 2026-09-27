@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use cookie::Key;
 
+use crate::auth::{Gates, Throttle};
 use crate::db::Db;
 use crate::{Config, Result, RouteTable, Views};
 
@@ -14,6 +15,8 @@ pub struct AppState {
     pub views: Views,
     pub db: Db,
     pub(crate) key: Key,
+    pub(crate) gates: Gates,
+    pub(crate) throttle: Arc<Throttle>,
 }
 
 impl AppState {

@@ -34,6 +34,8 @@ struct Inner {
     /// Flashed by this request, readable during the next one.
     flash_next: Map<String, Value>,
     token: String,
+    /// Minutes this session lasts instead of `SESSION_LIFETIME` ("remember me").
+    lifetime: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -44,6 +46,8 @@ struct Payload {
     flash: Map<String, Value>,
     token: String,
     expires: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    lifetime: Option<u64>,
 }
 
 impl Session {
@@ -54,6 +58,7 @@ impl Session {
                 flashed: p.flash,
                 flash_next: Map::new(),
                 token: p.token,
+                lifetime: p.lifetime,
             },
             None => Inner {
                 token: random_token(),
@@ -95,6 +100,18 @@ impl Session {
 
     pub fn remove(&self, key: &str) -> Option<Value> {
         self.lock().data.remove(key)
+    }
+
+    /// Reads a value and removes it.
+    pub fn pull<T: DeserializeOwned>(&self, key: &str) -> Option<T> {
+        let value = self.lock().data.remove(key)?;
+        serde_json::from_value(value).ok()
+    }
+
+    /// Keeps this session for `minutes` of inactivity instead of
+    /// `SESSION_LIFETIME`, e.g. for "remember me".
+    pub fn set_lifetime(&self, minutes: u64) {
+        self.lock().lifetime = Some(minutes);
     }
 
     /// Stores a value for the next request only.
@@ -167,6 +184,10 @@ impl Session {
         };
     }
 
+    fn lifetime(&self) -> Option<u64> {
+        self.lock().lifetime
+    }
+
     fn to_payload(&self, expires: u64) -> Payload {
         let inner = self.lock();
         Payload {
@@ -174,6 +195,7 @@ impl Session {
             flash: inner.flash_next.clone(),
             token: inner.token.clone(),
             expires,
+            lifetime: inner.lifetime,
         }
     }
 }
@@ -204,7 +226,7 @@ pub(crate) async fn middleware(
 
     let mut res = next.run(req).await;
 
-    let lifetime = config.session_lifetime * 60;
+    let lifetime = session.lifetime().unwrap_or(config.session_lifetime) * 60;
     let payload = session.to_payload(now + lifetime);
     let value = match serde_json::to_string(&payload) {
         Ok(value) => value,

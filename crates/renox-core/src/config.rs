@@ -43,6 +43,8 @@ pub struct Config {
     pub session_lifetime: u64,
     /// Name of the session cookie, from `SESSION_COOKIE`.
     pub session_cookie: String,
+    /// Minutes a "remember me" login lasts, from `REMEMBER_LIFETIME` (30 days).
+    pub remember_lifetime: u64,
     /// SQLite database, from `DATABASE_URL`, e.g. `sqlite://storage/app.db`.
     pub database_url: String,
     /// Maximum open connections, from `DATABASE_POOL_SIZE`.
@@ -88,6 +90,9 @@ impl Config {
                 .parse()
                 .context("SESSION_LIFETIME must be a number of minutes")?,
             session_cookie: var_or("SESSION_COOKIE", "renox_session"),
+            remember_lifetime: var_or("REMEMBER_LIFETIME", "43200")
+                .parse()
+                .context("REMEMBER_LIFETIME must be a number of minutes")?,
             database_url: var_or("DATABASE_URL", "sqlite://storage/app.db"),
             database_pool_size: var_or("DATABASE_POOL_SIZE", "8")
                 .parse()
@@ -115,6 +120,7 @@ impl Default for Config {
             public_path: "public".into(),
             session_lifetime: 120,
             session_cookie: "renox_session".into(),
+            remember_lifetime: 43_200,
             database_url: "sqlite::memory:".into(),
             database_pool_size: 8,
             locale: "en".into(),

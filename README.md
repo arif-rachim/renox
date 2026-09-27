@@ -74,8 +74,23 @@ async fn store(State(db): State<Db>, session: Session, back: Back, Valid(form): 
 fn main() -> renox::Result {
     App::new()
         .migrations(renox::migrations!())
+        .module(Auth::new())            // /login, /register, /logout and the users table
         .module(Products)
         .run()
+}
+```
+
+Protect routes and check permissions:
+
+```rust
+Routes::new()
+    .get("/products/{id}/edit", edit)
+    .require_auth();                    // guests go to /login and come back afterwards
+
+async fn edit(auth: AuthUser, State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
+    let product = Product::find_or_404(&db, id).await?;
+    auth.authorize("update", &product)?; // 403 unless `impl Policy for Product` allows it
+    Ok(view("products/edit.html", context! { product }))
 }
 ```
 
@@ -88,8 +103,8 @@ rnx migrate:rollback
 rnx migrate:fresh --seed
 ```
 
-See [`examples/hello`](examples/hello) for a guestbook using SQLite, validation, sessions, CSRF,
-flash messages, pagination and HTMX fragments.
+See [`examples/hello`](examples/hello) for a guestbook using SQLite, validation, login and
+registration, sessions, CSRF, flash messages, pagination and HTMX fragments.
 
 ## Planned
 
