@@ -131,6 +131,10 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
   `libsqlite3-sys`) and its 0.9 backend is only an RC.
 - **Workers and scheduler run inside `serve`** by default (single-process deploys). Multiple
   instances would duplicate scheduled tasks → `SCHEDULER=false` on all but one.
+- **SQLite now, PostgreSQL before 1.0.** The owner wants PostgreSQL for apps that outgrow one
+  server. Until M9, keep new database code easy to port: build SQL in one place, avoid new
+  SQLite-only statements where a portable one exists, and remember `Db` is still `SqlitePool`
+  (M9 turns it into a Renox type chosen from `DATABASE_URL`).
 - **Mail:** lettre with rustls (no OpenSSL). Drivers `smtp`, `log` (default), `memory` (tests).
 - **Uploads are form fields:** `Valid<T>` turns multipart files into tokens that `Upload`'s
   `Deserialize` resolves from a thread-local during the synchronous serde pass (`upload.rs`), so
@@ -350,8 +354,10 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M6b uploads, file rules, storage (local + `s3` feature), multipart CSRF, body limit | merged to `main` |
 | M6c i18n (`resources/lang`, `t()`, `Lang`, per-visitor locale, translatable built-ins) | merged to `main` |
 | M7 generators (`make:*`), `route:list`, `db:shell`, browser live reload | merged to `main` |
+| Faster tests (argon2 opt-level, one integration-test binary, per-app error detail) | merged to `main` (#15) |
 | M8 testing helpers + deploy (`renox build` embedding views, Docker/systemd, Litestream) | next |
-| v1.0 docs site, starter kit, semver guarantee | later |
+| M9 PostgreSQL (owner's request, **must land before 1.0**; plan in ROADMAP M9) | after M8 |
+| v1.0 docs site, starter kit, semver guarantee | last |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on
 an up-to-date `main`. Open the next milestone's PR only after the previous one is merged (§6.3).
