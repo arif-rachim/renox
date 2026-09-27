@@ -1,7 +1,7 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
-use renox::db::{DbValue, Migration};
+use renox::db::{DbValue, Dialect, Migration};
 use renox::prelude::*;
 use renox::{Kernel, fake::Fake};
 use serde::Serialize;
@@ -84,6 +84,18 @@ fn migrations_macro_embeds_files_in_order() {
         ]
     );
     assert!(migrations[0].up.contains("CREATE TABLE produk"));
+    // `NAME.postgres.up.sql` replaces the plain file on PostgreSQL only; the
+    // plain `.down.sql` still serves both.
+    assert!(
+        migrations[0]
+            .up_for(Dialect::Sqlite)
+            .contains("AUTOINCREMENT")
+    );
+    assert!(migrations[0].up_for(Dialect::Postgres).contains("IDENTITY"));
+    assert_eq!(
+        migrations[0].down_for(Dialect::Postgres),
+        migrations[0].down
+    );
     // Trimmed: Git may check files out with CRLF line endings on Windows.
     assert_eq!(
         migrations[0].down.map(str::trim),
@@ -312,6 +324,29 @@ async fn queries_filter_order_and_limit() {
                 .unwrap()
         ),
         ["Kopi", "Roti"]
+    );
+    assert_eq!(
+        names(
+            Produk::query()
+                .where_like("nama", "KOP%")
+                .get(db)
+                .await
+                .unwrap()
+        ),
+        ["Kopi"],
+        "like ignores case on every database"
+    );
+    let total = Produk::query().count(db).await.unwrap() as usize;
+    assert_eq!(
+        Produk::query()
+            .order_by("harga")
+            .offset(1)
+            .get(db)
+            .await
+            .unwrap()
+            .len(),
+        total - 1,
+        "an offset works without a limit"
     );
 
     let halaman = Produk::query()
@@ -544,7 +579,6 @@ async fn handlers_use_the_pool_and_render_pagination() {
 async fn raw_sql_binds_reads_and_commits() {
     let (kernel, _dir) = kernel().await;
     let db = kernel.db();
-    assert_eq!(db.dialect(), renox::db::Dialect::Sqlite);
 
     let mut tx = db.begin().await.unwrap();
     let inserted = renox::db::sql("INSERT INTO produk (nama, harga) VALUES (?, ?), (?, ?)")
@@ -567,7 +601,8 @@ async fn raw_sql_binds_reads_and_commits() {
     assert_eq!(rows[0].try_get::<String>("nama").unwrap(), "Kopi");
     assert_eq!(rows[1].try_get::<i64>(1).unwrap(), 9_000);
 
-    let total: i64 = renox::db::sql("SELECT SUM(harga) FROM produk")
+    // SUM of a BIGINT is NUMERIC on PostgreSQL; the cast keeps it an i64 on both.
+    let total: i64 = renox::db::sql("SELECT CAST(SUM(harga) AS BIGINT) FROM produk")
         .scalar(db)
         .await
         .unwrap();
@@ -583,5 +618,4 @@ async fn raw_sql_binds_reads_and_commits() {
         .await
         .unwrap();
     assert_eq!(names, ["Kopi", "Teh"]);
-    assert!(db.sqlite().is_some());
 }

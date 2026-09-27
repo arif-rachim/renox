@@ -2,7 +2,7 @@
 
 A batteries-included web framework for Rust, inspired by Laravel.
 
-**Stack:** Axum + HTMX + Alpine.js + SQLite
+**Stack:** Axum + HTMX + Alpine.js + SQLite (or PostgreSQL)
 
 > ⚠️ Early development. Renox is not ready for real applications yet. See [ROADMAP.md](ROADMAP.md).
 
@@ -10,7 +10,7 @@ A batteries-included web framework for Rust, inspired by Laravel.
 
 ```bash
 cargo install --git https://github.com/arif-rachim/renox renox-cli   # installs `rnx`
-rnx new my-app
+rnx new my-app                    # or: rnx new my-app --database postgres
 cd my-app
 rnx serve
 ```
@@ -194,13 +194,17 @@ rnx db:shell                      # SQL prompt on the app's database
 While `rnx serve` runs, the browser reloads by itself when a view, lang or public file changes and
 after each rebuild.
 
+SQLite is the default and suits an app on one server. PostgreSQL (the `postgres` feature) is there
+for apps that outgrow it, with the same models, queries and commands: see
+[docs/postgresql.md](docs/postgresql.md).
+
 See [`examples/hello`](examples/hello) for a guestbook using SQLite, validation, login and
 registration, sessions, CSRF, flash messages, pagination and HTMX fragments.
 
 ## Planned
 
 - Routing, middleware, sessions, CSRF, flash messages
-- SQLite with migrations, seeders, factories and a lightweight model layer
+- SQLite or PostgreSQL with migrations, seeders, factories and a lightweight model layer
 - Templates with layouts and components, first-class HTMX and Alpine.js helpers
 - Validation, authentication and authorization
 - Queues, scheduler, mail, notifications, events

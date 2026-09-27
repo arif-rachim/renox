@@ -22,8 +22,8 @@ pub use conn::{Conn, bounds};
 pub use conn::{Db, Dialect, Executor, FromDb, Row, RowIndex, Sql, Transaction, sql};
 pub(crate) use conn::{RowInner, script};
 pub use factory::Factory;
-pub(crate) use migrate::Migrator;
-pub use migrate::{Migration, MigrationStatus};
+pub use migrate::{Migration, MigrationStatus, Scripts};
+pub(crate) use migrate::{Migrator, framework_migration};
 pub use model::Model;
 pub use paginate::{Page, Paginated};
 pub use query::Query;
@@ -34,9 +34,11 @@ use crate::{AppState, Config};
 /// The timestamp type for `created_at`, `updated_at` and `deleted_at`.
 pub type DateTime = chrono::DateTime<chrono::Utc>;
 
-/// The current time, as stored in timestamps.
+/// The current time, as stored in timestamps: to the microsecond, which is
+/// what PostgreSQL keeps, so a saved model equals the same row read back.
 pub fn now() -> DateTime {
-    chrono::Utc::now()
+    use chrono::SubsecRound;
+    chrono::Utc::now().trunc_subsecs(6)
 }
 
 impl FromRef<AppState> for Db {
@@ -47,29 +49,94 @@ impl FromRef<AppState> for Db {
 
 /// Opens the pool for `DATABASE_URL`. `postgres://` URLs need the `postgres`
 /// feature; anything else is SQLite.
+///
+/// An in-memory SQLite database (what tests use) is swapped for a fresh
+/// schema in `TEST_DATABASE_URL` when that is set to a PostgreSQL URL (in the
+/// environment or in `.env`), so a test suite can run against PostgreSQL
+/// unchanged.
 pub(crate) async fn connect(config: &Config) -> anyhow::Result<Db> {
     let url = &config.database_url;
-    if url.starts_with("postgres://") || url.starts_with("postgresql://") {
-        return connect_postgres(config).await;
+    if is_postgres(url) {
+        return connect_postgres(url, config.database_pool_size, false).await;
+    }
+    if is_memory(url)
+        && let Some(test_url) = test_database_url().filter(|u| is_postgres(u))
+    {
+        return connect_postgres(&test_url, config.database_pool_size, true).await;
     }
     connect_sqlite(config).await.map(Db::from)
 }
 
+/// `TEST_DATABASE_URL` from the environment, else from `.env` in the current
+/// directory (without loading the rest of `.env` into the environment).
+fn test_database_url() -> Option<String> {
+    std::env::var("TEST_DATABASE_URL").ok().or_else(|| {
+        dotenvy::from_path_iter(".env")
+            .ok()?
+            .flatten()
+            .find(|(key, _)| key == "TEST_DATABASE_URL")
+            .map(|(_, url)| url)
+    })
+}
+
+fn is_postgres(url: &str) -> bool {
+    url.starts_with("postgres://") || url.starts_with("postgresql://")
+}
+
+fn is_memory(url: &str) -> bool {
+    url.contains(":memory:") || url.contains("mode=memory")
+}
+
+/// Connects to PostgreSQL; with `fresh_schema`, in a new, empty schema of its
+/// own (named `renox_test_…`, left behind for inspection).
 #[cfg(feature = "postgres")]
-async fn connect_postgres(config: &Config) -> anyhow::Result<Db> {
-    let url = &config.database_url;
-    let pool = sqlx::postgres::PgPoolOptions::new()
-        .max_connections(config.database_pool_size)
-        .connect(url)
+async fn connect_postgres(url: &str, pool_size: u32, fresh_schema: bool) -> anyhow::Result<Db> {
+    use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
+    use sqlx::{ConnectOptions, Connection};
+
+    let failed = || format!("could not connect to the database at `{}`", redact(url));
+    let mut options = PgConnectOptions::from_str(url).with_context(failed)?;
+    if fresh_schema {
+        static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let schema = format!(
+            "renox_test_{}_{}_{nanos}",
+            std::process::id(),
+            COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        );
+        let mut conn = options.connect().await.with_context(failed)?;
+        sqlx::raw_sql(sqlx::AssertSqlSafe(format!(
+            "CREATE SCHEMA {}",
+            quote(&schema)
+        )))
+        .execute(&mut conn)
         .await
-        .with_context(|| format!("could not connect to the database at `{}`", redact(url)))?;
+        .context("could not create a schema for the test")?;
+        conn.close().await.ok();
+        options = options.options([("search_path", schema)]);
+    }
+    // Test suites boot many apps at once; a few connections each keeps them
+    // under the server's limit (100 by default).
+    let pool_size = if fresh_schema {
+        pool_size.min(3)
+    } else {
+        pool_size
+    };
+    let pool = PgPoolOptions::new()
+        .max_connections(pool_size)
+        .connect_with(options)
+        .await
+        .with_context(failed)?;
     Ok(Db::from(pool))
 }
 
 #[cfg(not(feature = "postgres"))]
-async fn connect_postgres(_config: &Config) -> anyhow::Result<Db> {
+async fn connect_postgres(_url: &str, _pool_size: u32, _fresh_schema: bool) -> anyhow::Result<Db> {
     anyhow::bail!(
-        "DATABASE_URL points to PostgreSQL, but this build has no PostgreSQL support; \
+        "the database URL points to PostgreSQL, but this build has no PostgreSQL support; \
          enable the `postgres` feature of `renox`"
     )
 }
@@ -93,7 +160,7 @@ fn redact(url: &str) -> String {
 /// databases use WAL mode; every connection enforces foreign keys.
 async fn connect_sqlite(config: &Config) -> anyhow::Result<sqlx::SqlitePool> {
     let url = &config.database_url;
-    let in_memory = url.contains(":memory:") || url.contains("mode=memory");
+    let in_memory = is_memory(url);
 
     let mut options = SqliteConnectOptions::from_str(url)
         .with_context(|| format!("DATABASE_URL `{url}` is not a valid SQLite URL"))?

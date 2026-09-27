@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use super::{Db, DbValue, Executor, Model, Paginated, ToDbValue, now, quote, sql};
+use super::{Db, DbValue, Dialect, Executor, Model, Paginated, ToDbValue, now, quote, sql};
 use crate::Result;
 use anyhow::anyhow;
 
@@ -81,6 +81,8 @@ impl<M: Model> Query<M> {
     }
 
     /// Filters with a comparison: `=`, `!=`, `<>`, `<`, `<=`, `>`, `>=`, `like`, `not like`.
+    /// `like` ignores ASCII case on both databases (`ILIKE` on PostgreSQL, as
+    /// SQLite's `LIKE` already does).
     pub fn where_op(mut self, column: &str, op: &str, value: impl ToDbValue) -> Self {
         let op = op.to_ascii_lowercase();
         if !OPERATORS.contains(&op.as_str()) {
@@ -185,8 +187,15 @@ impl<M: Model> Query<M> {
         }
     }
 
-    fn where_sql(&self) -> String {
-        let mut filters = self.filters.clone();
+    fn where_sql(&self, dialect: Dialect) -> String {
+        let mut filters: Vec<String> = self
+            .filters
+            .iter()
+            .map(|filter| match filter.strip_suffix(" LIKE ?") {
+                Some(head) if dialect == Dialect::Postgres => format!("{head} ILIKE ?"),
+                _ => filter.clone(),
+            })
+            .collect();
         if M::SOFT_DELETES {
             match self.trashed {
                 Trashed::Without => filters.push("\"deleted_at\" IS NULL".into()),
@@ -201,13 +210,13 @@ impl<M: Model> Query<M> {
         }
     }
 
-    fn select_sql(&self) -> String {
+    fn select_sql(&self, dialect: Dialect) -> String {
         let columns: Vec<String> = M::COLUMNS.iter().map(|c| quote(c)).collect();
         let mut sql = format!(
             "SELECT {} FROM {}{}",
             columns.join(", "),
             quote(M::TABLE),
-            self.where_sql()
+            self.where_sql(dialect)
         );
         if !self.order.is_empty() {
             sql.push_str(&format!(" ORDER BY {}", self.order.join(", ")));
@@ -215,7 +224,11 @@ impl<M: Model> Query<M> {
         match (self.limit, self.offset) {
             (Some(limit), Some(offset)) => sql.push_str(&format!(" LIMIT {limit} OFFSET {offset}")),
             (Some(limit), None) => sql.push_str(&format!(" LIMIT {limit}")),
-            (None, Some(offset)) => sql.push_str(&format!(" LIMIT -1 OFFSET {offset}")),
+            // SQLite needs a LIMIT before OFFSET; -1 means none.
+            (None, Some(offset)) if dialect == Dialect::Sqlite => {
+                sql.push_str(&format!(" LIMIT -1 OFFSET {offset}"))
+            }
+            (None, Some(offset)) => sql.push_str(&format!(" OFFSET {offset}")),
             (None, None) => {}
         }
         sql
@@ -223,7 +236,8 @@ impl<M: Model> Query<M> {
 
     pub async fn get<'c, E: Executor<'c>>(self, db: E) -> Result<Vec<M>> {
         self.check()?;
-        let rows = sql(self.select_sql())
+        let db = db.into_conn();
+        let rows = sql(self.select_sql(db.dialect()))
             .bind_all(self.binds)
             .fetch_all(db)
             .await?;
@@ -239,10 +253,11 @@ impl<M: Model> Query<M> {
 
     pub async fn count<'c, E: Executor<'c>>(self, db: E) -> Result<u64> {
         self.check()?;
+        let db = db.into_conn();
         let count: i64 = sql(format!(
             "SELECT COUNT(*) FROM {}{}",
             quote(M::TABLE),
-            self.where_sql()
+            self.where_sql(db.dialect())
         ))
         .bind_all(self.binds)
         .scalar(db)
@@ -272,10 +287,11 @@ impl<M: Model> Query<M> {
     pub async fn delete<'c, E: Executor<'c>>(self, db: E) -> Result<u64> {
         if M::SOFT_DELETES {
             self.check()?;
+            let db = db.into_conn();
             return Ok(sql(format!(
                 "UPDATE {} SET \"deleted_at\" = ?{}",
                 quote(M::TABLE),
-                self.where_sql()
+                self.where_sql(db.dialect())
             ))
             .bind(now())
             .bind_all(self.binds)
@@ -288,10 +304,11 @@ impl<M: Model> Query<M> {
     /// Removes every matching row, even for models with soft deletes.
     pub async fn force_delete<'c, E: Executor<'c>>(self, db: E) -> Result<u64> {
         self.check()?;
+        let db = db.into_conn();
         Ok(sql(format!(
             "DELETE FROM {}{}",
             quote(M::TABLE),
-            self.where_sql()
+            self.where_sql(db.dialect())
         ))
         .bind_all(self.binds)
         .execute(db)

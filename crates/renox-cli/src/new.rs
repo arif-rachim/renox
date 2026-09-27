@@ -3,6 +3,8 @@ use std::path::Path;
 
 use anyhow::{Context, Result, bail};
 
+use crate::Database;
+
 /// Files of a new app: (path, contents). `.stub` files are templated.
 const STUBS: &[(&str, &str)] = &[
     ("Cargo.toml", include_str!("../stubs/Cargo.toml.stub")),
@@ -40,7 +42,7 @@ const STUBS: &[(&str, &str)] = &[
 
 const RENOX_GIT: &str = "https://github.com/arif-rachim/renox";
 
-pub fn run(name: &str, renox_path: Option<&Path>) -> Result<()> {
+pub fn run(name: &str, renox_path: Option<&Path>, database: Database) -> Result<()> {
     validate_name(name)?;
     let root = Path::new(name);
     if root.exists() {
@@ -53,9 +55,25 @@ pub fn run(name: &str, renox_path: Option<&Path>) -> Result<()> {
             let crate_dir = crate_dir
                 .canonicalize()
                 .with_context(|| format!("{} is not a Renox checkout", path.display()))?;
-            format!("renox = {{ path = {:?} }}", crate_dir.display().to_string())
+            format!("renox = {{ path = {:?}", crate_dir.display().to_string())
         }
-        None => format!("renox = {{ git = \"{RENOX_GIT}\" }}"),
+        None => format!("renox = {{ git = \"{RENOX_GIT}\""),
+    };
+    let dependency = match database {
+        Database::Sqlite => format!("{dependency} }}"),
+        Database::Postgres => format!("{dependency}, features = [\"postgres\"] }}"),
+    };
+    let crate_name = name.replace('-', "_");
+    let postgres = format!("postgres://postgres:postgres@localhost:5432/{crate_name}");
+    let (database_url, test_database_url) = match database {
+        Database::Sqlite => (
+            "sqlite://storage/app.db".to_owned(),
+            format!("# TEST_DATABASE_URL={postgres}_test"),
+        ),
+        Database::Postgres => (
+            postgres.clone(),
+            format!("TEST_DATABASE_URL={postgres}_test"),
+        ),
     };
     let key = crate::generate_key();
 
@@ -64,7 +82,9 @@ pub fn run(name: &str, renox_path: Option<&Path>) -> Result<()> {
             .replace("{{name}}", name)
             .replace("{{title}}", &title(name))
             .replace("{{renox_dependency}}", &dependency)
-            .replace("{{crate_name}}", &name.replace('-', "_"));
+            .replace("{{crate_name}}", &crate_name)
+            .replace("{{database_url}}", &database_url)
+            .replace("{{test_database_url}}", &test_database_url);
         // Only the real .env gets a key; .env.example stays shareable.
         let contents = match *file {
             ".env" => contents.replace("{{app_key}}", &key),
@@ -76,7 +96,13 @@ pub fn run(name: &str, renox_path: Option<&Path>) -> Result<()> {
             .with_context(|| format!("could not write {}", path.display()))?;
     }
 
-    println!("Created {name}. Next:\n\n    cd {name}\n    rnx serve\n");
+    match database {
+        Database::Sqlite => println!("Created {name}. Next:\n\n    cd {name}\n    rnx serve\n"),
+        Database::Postgres => println!(
+            "Created {name}. Next: create the `{crate_name}` and `{crate_name}_test` databases \
+             (or edit DATABASE_URL and TEST_DATABASE_URL in .env), then\n\n    cd {name}\n    rnx serve\n"
+        ),
+    }
     Ok(())
 }
 

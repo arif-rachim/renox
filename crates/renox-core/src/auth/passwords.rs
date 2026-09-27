@@ -133,7 +133,7 @@ pub(super) async fn reset(
 ) -> Result<Response> {
     let text = texts(&lang);
     let row = crate::db::sql("SELECT token, created_at FROM password_reset_tokens WHERE email = ?")
-        .bind(form.email.trim())
+        .bind(super::user::normalize_email(&form.email))
         .fetch_optional(&state.db)
         .await?;
     let fresh =

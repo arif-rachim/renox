@@ -12,6 +12,10 @@
 //!
 //! Times are in `APP_TIMEZONE`, a UTC offset such as `+07:00` (WIB). A task
 //! whose previous run hasn't finished is skipped rather than run twice.
+//!
+//! Several processes may run the same schedule (e.g. `serve` on two servers
+//! sharing a PostgreSQL database): each run is claimed in the `cache` table
+//! first, so only one of them runs it.
 
 use std::future::Future;
 use std::pin::Pin;
@@ -160,6 +164,7 @@ impl Schedule {
                 if *at > now {
                     continue;
                 }
+                let slot = *at;
                 *at = next_run(task.when, now, offset);
                 if task.running.swap(true, Ordering::SeqCst) {
                     tracing::warn!(task = %task.name, "skipped: the previous run is still going");
@@ -167,6 +172,11 @@ impl Schedule {
                 }
                 let (task, state) = (task.clone(), state.clone());
                 tokio::spawn(async move {
+                    if !claim(&state, &task.name, slot).await {
+                        tracing::debug!(task = %task.name, "skipped: another process runs it");
+                        task.running.store(false, Ordering::SeqCst);
+                        return;
+                    }
                     tracing::info!(task = %task.name, "scheduled task started");
                     if let Err(err) = (task.run)(state).await {
                         tracing::error!(task = %task.name, error = ?err, "scheduled task failed");
@@ -174,6 +184,36 @@ impl Schedule {
                     task.running.store(false, Ordering::SeqCst);
                 });
             }
+        }
+    }
+}
+
+/// Claims the run of `task` due at `slot`, so that processes sharing the
+/// database run it once: the first to insert the claim wins. If the database
+/// can't be reached the task runs anyway, as a single process would.
+#[doc(hidden)]
+pub async fn claim(state: &AppState, task: &str, slot: i64) -> bool {
+    let now = unix_now();
+    let stale = crate::db::sql("DELETE FROM cache WHERE key LIKE 'schedule:%' AND expires_at < ?")
+        .bind(now)
+        .execute(&state.db)
+        .await;
+    if let Err(err) = stale {
+        tracing::warn!(error = %err, "could not clear old schedule claims");
+    }
+    let claimed = crate::db::sql(
+        "INSERT INTO cache (key, value, expires_at) VALUES (?, 'null', ?) \
+         ON CONFLICT (key) DO NOTHING",
+    )
+    .bind(format!("schedule:{task}:{slot}"))
+    .bind(now + 24 * 60 * 60)
+    .execute(&state.db)
+    .await;
+    match claimed {
+        Ok(rows) => rows == 1,
+        Err(err) => {
+            tracing::warn!(task, error = %err, "could not claim the run; running it anyway");
+            true
         }
     }
 }

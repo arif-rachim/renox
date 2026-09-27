@@ -14,25 +14,11 @@ use crate::i18n::Lang;
 use crate::validation::{Errors, Locale, Valid, Validate, ValidationError, Validator};
 use crate::{AppState, Htmx, HxRedirect, Module, Result, Routes, Session, View, context, view};
 
-macro_rules! migration {
-    ($name:literal) => {
-        Migration {
-            name: $name,
-            up: include_str!(concat!("../../migrations/auth/", $name, ".up.sql")),
-            down: Some(include_str!(concat!(
-                "../../migrations/auth/",
-                $name,
-                ".down.sql"
-            ))),
-        }
-    };
-}
-
 const MIGRATIONS: &[Migration] = &[
-    migration!("00010101000000_create_users_table"),
-    migration!("00010101000001_create_password_reset_tokens_table"),
-    migration!("00010101000002_create_personal_access_tokens_table"),
-    migration!("00010101000003_create_notifications_table"),
+    crate::db::framework_migration!("auth", "00010101000000_create_users_table"),
+    crate::db::framework_migration!("auth", "00010101000001_create_password_reset_tokens_table"),
+    crate::db::framework_migration!("auth", "00010101000002_create_personal_access_tokens_table"),
+    crate::db::framework_migration!("auth", "00010101000003_create_notifications_table"),
 ];
 
 struct Settings {
@@ -301,7 +287,8 @@ impl Validate for RegisterForm {
             .fallback_label(name)
             .required()
             .max(255);
-        v.field("email", &self.email)
+        // Checked as it will be stored, so `unique` ignores case on every database.
+        v.field("email", &super::user::normalize_email(&self.email))
             .required()
             .email()
             .max(255)
