@@ -19,7 +19,6 @@ cookie = { version = "0.18.2", features = ["private", "key-expansion", "percent-
 dotenvy = "0.15.7"
 fake = "5.1.0"
 form_urlencoded = "1.2.2"
-futures-util = "0.3.34"
 hmac = "0.13.0"
 minijinja = { version = "2.24.0", features = ["loader", "json", "urlencode"] }
 minijinja-autoreload = "2.24.0"
@@ -30,7 +29,6 @@ serde_path_to_error = "0.1.20"
 serde_urlencoded = "0.7.1"
 sha2 = "0.11.0"
 sqlx = { version = "0.9.0", default-features = false, features = ["sqlite", "runtime-tokio", "chrono"] }
-thiserror = "2.0.21"
 tokio = { version = "1.53.1", features = ["full"] }
 tower = "0.5.3"
 tower-http = { version = "0.7.1", features = ["fs", "trace"] }
