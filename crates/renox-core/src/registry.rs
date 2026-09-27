@@ -1,0 +1,44 @@
+use std::any::TypeId;
+use std::collections::HashMap;
+use std::future::Future;
+
+use crate::events::{Event, listener};
+use crate::queue::{Job, JobHandler, handler};
+use crate::schedule::Schedule;
+use crate::{AppState, Result};
+
+/// Where the app and its modules register jobs, listeners and scheduled
+/// tasks. Modules get it in `Module::register`.
+#[derive(Default)]
+pub struct Registry {
+    pub(crate) jobs: HashMap<&'static str, JobHandler>,
+    pub(crate) listeners: HashMap<TypeId, Vec<crate::events::ListenerFn>>,
+    pub(crate) schedule: Schedule,
+    pub(crate) duplicate_job: Option<&'static str>,
+}
+
+impl Registry {
+    /// Lets workers run jobs of type `J`.
+    pub fn job<J: Job>(&mut self) -> &mut Self {
+        if self.jobs.insert(J::NAME, handler::<J>()).is_some() {
+            self.duplicate_job.get_or_insert(J::NAME);
+        }
+        self
+    }
+
+    /// Runs `listener` whenever an `E` is emitted.
+    pub fn listen<E, F, Fut>(&mut self, listener_fn: F) -> &mut Self
+    where
+        E: Event,
+        F: Fn(E, AppState) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result> + Send + 'static,
+    {
+        let (type_id, run) = listener(listener_fn);
+        self.listeners.entry(type_id).or_default().push(run);
+        self
+    }
+
+    pub fn schedule(&mut self) -> &mut Schedule {
+        &mut self.schedule
+    }
+}

@@ -1,0 +1,66 @@
+//! Events and listeners, for decoupling modules: the order module emits
+//! `OrderPlaced`, and the stock and mail modules react to it.
+//!
+//! ```ignore
+//! #[derive(Clone)]
+//! struct OrderPlaced { order_id: i64 }
+//! impl Event for OrderPlaced {}
+//!
+//! App::new().listen(|event: OrderPlaced, state| async move {
+//!     state.dispatch(SendReceipt { order_id: event.order_id }).await?; // slow work: queue it
+//!     Ok(())
+//! })
+//!
+//! state.emit(OrderPlaced { order_id }).await?;
+//! ```
+
+use std::any::{Any, TypeId};
+use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+
+use crate::{AppState, Error, Result};
+
+/// Something that happened. Listeners get a clone each.
+pub trait Event: Clone + Send + Sync + 'static {}
+
+pub(crate) type ListenerFn = Arc<
+    dyn Fn(Box<dyn Any + Send>, AppState) -> Pin<Box<dyn Future<Output = Result> + Send>>
+        + Send
+        + Sync,
+>;
+
+pub(crate) type Listeners = Arc<HashMap<TypeId, Vec<ListenerFn>>>;
+
+pub(crate) fn listener<E, F, Fut>(listener: F) -> (TypeId, ListenerFn)
+where
+    E: Event,
+    F: Fn(E, AppState) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = Result> + Send + 'static,
+{
+    let run: ListenerFn = Arc::new(move |event, state| match event.downcast::<E>() {
+        Ok(event) => Box::pin(listener(*event, state)),
+        Err(_) => Box::pin(async { Ok(()) }),
+    });
+    (TypeId::of::<E>(), run)
+}
+
+impl AppState {
+    /// Runs every listener of `E` in registration order: those added with
+    /// `App::listen` first, then modules' (registered at boot). All of them
+    /// run even if one fails; the first error is returned.
+    pub async fn emit<E: Event>(&self, event: E) -> Result {
+        let Some(listeners) = self.listeners.get(&TypeId::of::<E>()) else {
+            return Ok(());
+        };
+        let mut first_error: Option<Error> = None;
+        for listener in listeners {
+            if let Err(err) = listener(Box::new(event.clone()), self.clone()).await {
+                tracing::error!(event = std::any::type_name::<E>(), error = ?err, "listener failed");
+                first_error.get_or_insert(err);
+            }
+        }
+        first_error.map_or(Ok(()), Err)
+    }
+}

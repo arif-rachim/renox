@@ -5,7 +5,9 @@ use cookie::Key;
 
 use crate::auth::{Gates, Throttle};
 use crate::db::Db;
+use crate::events::Listeners;
 use crate::mail::Mailer;
+use crate::queue::Queue;
 use crate::{Config, Result, RouteTable, Views};
 
 /// Shared state available to every handler through `State<AppState>`.
@@ -16,6 +18,8 @@ pub struct AppState {
     pub views: Views,
     pub db: Db,
     pub mailer: Mailer,
+    pub queue: Queue,
+    pub(crate) listeners: Listeners,
     pub(crate) key: Key,
     pub(crate) gates: Gates,
     pub(crate) throttle: Arc<Throttle>,

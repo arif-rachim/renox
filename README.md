@@ -94,6 +94,23 @@ async fn edit(auth: AuthUser, State(db): State<Db>, Path(id): Path<i64>) -> Resu
 }
 ```
 
+Background jobs, events and scheduled tasks run inside the same binary:
+
+```rust
+#[derive(Serialize, Deserialize)]
+struct SendReceipt { order_id: i64 }
+
+impl Job for SendReceipt {
+    const NAME: &'static str = "send-receipt";
+    async fn handle(self, ctx: JobContext) -> Result { /* ... */ Ok(()) }
+}
+
+App::new()
+    .job::<SendReceipt>()
+    .listen(|e: OrderPlaced, state| async move { state.dispatch(SendReceipt { order_id: e.id }).await.map(|_| ()) })
+    .schedule(|s| { s.daily_at("02:00", "close-day", close_day); })
+```
+
 The `Auth` module also handles password reset and email verification by email (`MAIL_MAILER=log`
 prints the links while developing), and API tokens for mobile apps and integrations:
 

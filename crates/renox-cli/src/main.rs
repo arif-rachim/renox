@@ -12,7 +12,12 @@ use base64::engine::general_purpose::STANDARD;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "rnx", version, about = "rnx: the Renox web framework CLI")]
+#[command(
+    name = "rnx",
+    version,
+    about = "rnx: the Renox web framework CLI",
+    after_help = "Any other command runs in your app (cargo run -- <command>), e.g.\n  rnx queue:work, rnx queue:failed, rnx schedule:list"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -73,6 +78,9 @@ enum Command {
         #[arg(long)]
         show: bool,
     },
+    /// Any other command is run by the app itself.
+    #[command(external_subcommand)]
+    App(Vec<String>),
 }
 
 fn main() -> Result<()> {
@@ -86,6 +94,10 @@ fn main() -> Result<()> {
         Command::MigrateFresh { args } => app_command("migrate:fresh", &args),
         Command::MigrateStatus => app_command("migrate:status", &[]),
         Command::DbSeed => app_command("db:seed", &[]),
+        Command::App(args) => match args.split_first() {
+            Some((command, rest)) => app_command(command, rest),
+            None => Ok(()),
+        },
     }
 }
 

@@ -113,10 +113,20 @@ M4b (done):
       skips CSRF, answers 401 JSON when invalid, can expire, and records `last_used_at`
 
 ### M5 · v0.6: Background work
-- [ ] Queue: `Job` trait, `dispatch()`, delays, retries, failed jobs, `renox queue:work` or in-process worker
-- [ ] Scheduler defined in code, `renox schedule:run`
-- [ ] Events and listeners (sync or queued)
-- [ ] Mail: templates, `log` driver in dev, preview route
+M5a (done):
+- [x] Queue in SQLite: `Job` trait (name, queue, attempts, timeout, backoff), `state.dispatch()`,
+      `dispatch_after()`, retries, a `failed_jobs` table, abandoned reservations released after 15 minutes
+- [x] Workers inside `serve` (`QUEUE_WORKERS`, woken immediately on dispatch) or on their own with
+      `queue:work [--queue a,b] [--workers N] [--once]`; running jobs finish on shutdown
+- [x] `queue:failed`, `queue:retry <id|all>`, `queue:flush`
+- [x] Scheduler defined in code: `every`, `every_minute(s)`, `hourly`, `daily_at("HH:MM")` in
+      `APP_TIMEZONE`; overlapping runs are skipped; `schedule:list`, `schedule:work`
+- [x] Events and listeners (`Event`, `App::listen`, `state.emit`); queue slow work from a listener
+- [x] `Module::register` for a module's jobs, listeners and scheduled tasks
+- [x] `rnx` forwards any other command to the app (`rnx queue:work`, `rnx schedule:list`, ...)
+
+M5b (next):
+- [ ] SMTP mail driver, mail templates (MiniJinja, HTML + text), preview route in development
 - [ ] Notifications: mail and database channels
 
 ### M6 · v0.7: Infrastructure
@@ -157,7 +167,13 @@ M4b (done):
 - **Models:** values are bound through `DbValue`/`ToDbValue` and rows decoded with sqlx, so the
   derive only needs `renox` as a dependency.
 - **Named routes:** implemented in Renox; axum does not provide them.
-- **Queue:** apalis with the SQLite backend, so no Redis is required.
+- **Queue:** Renox's own SQLite queue (tables `jobs` and `failed_jobs`), so no Redis is required.
+  apalis was the plan, but its stable SQL backend needs sqlx 0.8 (which can't link next to our 0.9)
+  and the 0.9 backend is still a release candidate; a small queue on our own pool also keeps
+  dispatch, retries and the `queue:*` commands Laravel-like.
+- **Scheduler and workers run inside `serve`** by default, keeping deploys to one process. Running
+  several instances of the app would run scheduled tasks on each; set `SCHEDULER=false` on all but
+  one (queue workers are safe to run anywhere).
 - **Relations:** Rust has no runtime reflection, so there is no full Eloquent. `derive(Model)` covers
   CRUD; relations are explicit methods; complex queries use `sqlx::query!`.
 - **Service container:** replaced by typed `AppState` and extractors.

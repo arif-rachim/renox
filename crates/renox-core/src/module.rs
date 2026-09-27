@@ -1,5 +1,5 @@
-use crate::Routes;
 use crate::db::Migration;
+use crate::{Registry, Routes};
 
 /// A self-contained piece of an application: its routes and migrations, and
 /// later its jobs, policies and views.
@@ -28,4 +28,15 @@ pub trait Module: Send + Sync + 'static {
     fn migrations(&self) -> &'static [Migration] {
         &[]
     }
+
+    /// Registers the module's jobs, event listeners and scheduled tasks.
+    ///
+    /// ```ignore
+    /// fn register(&self, app: &mut Registry) {
+    ///     app.job::<SendReceipt>()
+    ///         .listen(|e: OrderPlaced, state| async move { ... });
+    ///     app.schedule().daily_at("02:00", "close-day", close_day);
+    /// }
+    /// ```
+    fn register(&self, _app: &mut Registry) {}
 }

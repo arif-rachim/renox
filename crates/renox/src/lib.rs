@@ -34,12 +34,14 @@ pub use tokio;
 pub mod prelude {
     pub use renox_core::auth::{Auth, User};
     pub use renox_core::db::{DateTime, Db, Factory, Model, Page, Paginated};
+    pub use renox_core::events::Event;
+    pub use renox_core::queue::{Job, JobContext};
     pub use renox_core::{
         App, AppState, Back, Config, Environment, Error, Errors, Htmx, HxRedirect, HxRefresh,
         HxTrigger, Module, Result, Routes, Session, Valid, Validate, ValidationError, Validator,
         View, context, view,
     };
-    pub use renox_core::{AuthUser, Policy};
+    pub use renox_core::{AuthUser, Policy, Registry};
     pub use renox_macros::Model;
 
     pub use axum::extract::{Form, Json, Path, Query, State};
