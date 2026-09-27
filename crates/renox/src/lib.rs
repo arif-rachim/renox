@@ -26,15 +26,18 @@
 //! ```
 
 pub use renox_core::*;
+pub use renox_macros::{Model, migrations};
 
 pub use axum;
 pub use tokio;
 
 pub mod prelude {
+    pub use renox_core::db::{DateTime, Db, Factory, Model, Page, Paginated};
     pub use renox_core::{
         App, AppState, Back, Config, Environment, Error, Htmx, HxRedirect, HxRefresh, HxTrigger,
         Module, Result, Routes, Session, View, context, view,
     };
+    pub use renox_macros::Model;
 
     pub use axum::extract::{Form, Json, Path, Query, State};
     pub use axum::http::StatusCode;

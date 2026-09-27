@@ -15,12 +15,16 @@
 </form>
 
 {% block entries %}
-<ul id="entries">
-  {% for entry in entries %}
-  <li><strong>{{ entry.name }}</strong>: {{ entry.message }}</li>
-  {% else %}
-  <li class="empty">Belum ada pesan.</li>
-  {% endfor %}
-</ul>
+<section id="entries" hx-boost="true" hx-target="#entries" hx-select="#entries" hx-swap="outerHTML">
+  <ul>
+    {% for entry in entries.items %}
+    <li><strong>{{ entry.name }}</strong>: {{ entry.message }}</li>
+    {% else %}
+    <li class="empty">Belum ada pesan.</li>
+    {% endfor %}
+  </ul>
+  {% from "renox/pagination.html" import pagination %}
+  {{ pagination(entries) }}
+</section>
 {% endblock %}
 {% endblock %}

@@ -14,7 +14,6 @@ pub type Result<T = (), E = Error> = std::result::Result<T, E>;
 
 /// The error type handlers return. Any `anyhow`-compatible error converts into
 /// `Error::Internal` with `?`.
-#[derive(Debug)]
 pub enum Error {
     BadRequest(String),
     Unauthorized,
@@ -34,6 +33,17 @@ impl Error {
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::PageExpired => StatusCode::from_u16(419).expect("valid status code"),
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
+/// Readable when `main` returns an error: the message and its causes.
+impl std::fmt::Debug for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Internal(err) => write!(f, "{err:?}"),
+            Self::BadRequest(msg) => write!(f, "bad request: {msg}"),
+            other => write!(f, "{}", reason(other.status())),
         }
     }
 }

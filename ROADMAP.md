@@ -62,11 +62,17 @@ my-app/
 - [ ] CSRF token in multipart forms (moves to M6 with uploads; the header works today)
 
 ### M2 · v0.3: Database
-- [ ] sqlx SQLite pool with tuned pragmas (WAL, foreign keys, busy timeout)
-- [ ] Optional SQLite session driver for sessions larger than a cookie
-- [ ] Per-module migrations ordered by timestamp; `migrate`, `migrate:rollback`, `migrate:fresh`
-- [ ] `#[derive(Model)]`: `find`, `find_or_404`, `all`, `create`, `update`, `delete`, timestamps, soft deletes
-- [ ] Pagination (HTMX-ready links), transactions, seeders, factories
+- [x] SQLite pool from `DATABASE_URL` with WAL, foreign keys, a busy timeout; `State(db): State<Db>` in handlers
+- [x] Migrations in `migrations/*.up.sql` / `.down.sql`, embedded with `renox::migrations!()`, per app or per module
+- [x] Batches like Laravel: `migrate`, `migrate:rollback [--step N]`, `migrate:fresh [--seed]`, `migrate:status`
+- [x] The app binary is its own command line (`my-app migrate`); `renox migrate` forwards to it
+- [x] `renox make:migration`; `renox serve` migrates before each restart and rebuilds when migrations change
+- [x] `#[derive(Model)]`: `find`, `find_or_404`, `all`, `create`, `save`, `delete`, `force_delete`, `restore`, timestamps, soft deletes, skipped fields
+- [x] Query builder: `where_eq/op/like/in/null/not_null`, `order_by`, `latest`, `limit`, `offset`, `get`, `first`, `count`, `exists`, bulk `delete`; unknown columns and operators are errors
+- [x] Pagination: `Page` extractor, `paginate()`, built-in `renox/pagination.html` macro
+- [x] Transactions via `db.begin()`, seeders (`App::seeder`, `db:seed`), factories (`Factory`, `fake`)
+- [ ] SQLite session driver (deferred: cookie sessions cover M3 and M4; revisit if sessions outgrow 4 KB)
+- [ ] Pagination links that keep other query parameters
 
 ### M3 · v0.4: Forms and validation
 - [ ] `Valid<Form<T>>` extractor: redirect back with errors + old input, or re-render the form fragment (422) for HTMX
@@ -112,9 +118,14 @@ my-app/
 - **Sessions:** stored in an encrypted, signed cookie (AES-256-GCM via `APP_KEY`), so M1 needs no
   database. Keep sessions small; a SQLite driver comes with M2.
 - **Templates:** MiniJinja (runtime, overridable, reloadable). Askama may be offered later.
+- **Migrations:** Renox runs its own migrator (table `renox_migrations`) instead of sqlx's, to get
+  Laravel-style batches and module-owned migrations. Migrations are compiled into the app, so the
+  app binary runs them; `renox` forwards to it.
+- **Models:** values are bound through `DbValue`/`ToDbValue` and rows decoded with sqlx, so the
+  derive only needs `renox` as a dependency.
 - **Named routes:** implemented in Renox; axum does not provide them.
 - **Queue:** apalis with the SQLite backend, so no Redis is required.
-- **Models:** Rust has no runtime reflection, so there is no full Eloquent. `derive(Model)` covers
+- **Relations:** Rust has no runtime reflection, so there is no full Eloquent. `derive(Model)` covers
   CRUD; relations are explicit methods; complex queries use `sqlx::query!`.
 - **Service container:** replaced by typed `AppState` and extractors.
 - **No REPL:** `renox db:shell` and custom CLI commands instead of Tinker.

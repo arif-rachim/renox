@@ -8,6 +8,7 @@ mod assets;
 mod config;
 mod crypto;
 mod csrf;
+pub mod db;
 mod error;
 mod htmx;
 mod module;
@@ -16,7 +17,7 @@ mod session;
 mod state;
 mod view;
 
-pub use app::App;
+pub use app::{App, Kernel};
 pub use assets::{ALPINE_VERSION, HTMX_VERSION};
 pub use config::{Config, Environment};
 pub use crypto::generate_key;
@@ -30,3 +31,7 @@ pub use state::AppState;
 pub use view::{View, Views, view};
 
 pub use minijinja::context;
+
+pub use chrono;
+pub use fake;
+pub use sqlx;

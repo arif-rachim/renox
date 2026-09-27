@@ -9,6 +9,8 @@ const STUBS: &[(&str, &str)] = &[
     (".env", include_str!("../stubs/env.stub")),
     (".env.example", include_str!("../stubs/env.stub")),
     (".gitignore", include_str!("../stubs/gitignore.stub")),
+    ("build.rs", include_str!("../stubs/build.rs")),
+    ("migrations/.gitkeep", ""),
     ("src/main.rs", include_str!("../stubs/src/main.rs")),
     ("src/app/mod.rs", include_str!("../stubs/src/app/mod.rs")),
     (

@@ -13,10 +13,14 @@ categories = ["command-line-utilities", "web-programming::http-server"]
 [[bin]]
 name = "renox"
 path = "src/main.rs"
+# The binary shares its name with the `renox` library; documenting both
+# writes to the same target/doc/renox directory.
+doc = false
 
 [dependencies]
 anyhow = "1.0.104"
 base64 = "0.23.1"
+chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 clap = { version = "4.6.7", features = ["derive"] }
 notify-debouncer-mini = "0.7.0"
 rand = "0.10.3"
