@@ -6,6 +6,7 @@
 <form method="post"
       action="{{ route('products.update', product.id) if product else route('products.store') }}">
   {{ csrf_field() }}
+  {% if product %}{{ method_field('PUT') }}{% endif %}
   <label>Name <input name="name" value="{{ old('name', product.name if product else '') }}"></label>
   <p class="error" data-error-for="name">{{ error('name') }}</p>
   <label>Price <input name="price" inputmode="numeric" value="{{ old('price', product.price if product else '') }}"></label>

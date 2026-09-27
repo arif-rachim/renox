@@ -690,7 +690,7 @@ fn build_router(
         router.fallback(not_found)
     };
 
-    router
+    let router: Router = router
         .layer(from_fn_with_state(
             state.clone(),
             crate::maintenance::middleware,
@@ -708,7 +708,15 @@ fn build_router(
             state.config.upload_max_size,
         ))
         .layer(TraceLayer::new_for_http())
-        .with_state(state)
+        .with_state(state.clone());
+    // Method spoofing must change the method before the router matches it.
+    let limit = state.config.upload_max_size;
+    let spoofing = from_fn(
+        move |req: axum::extract::Request, next: axum::middleware::Next| {
+            crate::method::middleware(req, next, limit)
+        },
+    );
+    Router::new().fallback_service(tower::Layer::layer(&spoofing, router))
 }
 
 /// Public files of the local disk at `/storage/...`, outside sessions.

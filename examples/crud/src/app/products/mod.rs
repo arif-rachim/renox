@@ -23,7 +23,6 @@ impl Module for Products {
             .name("home")
             .get("/products", index)
             .name("products.index");
-        // HTML forms only send GET and POST, so updates and deletes are POSTs.
         let members = Routes::new()
             .get("/products/new", create)
             .name("products.create")
@@ -33,9 +32,10 @@ impl Module for Products {
             .name("products.trash")
             .get("/products/{id}/edit", edit)
             .name("products.edit")
-            .post("/products/{id}", update)
+            // Forms send these as POST with `{{ method_field('PUT') }}` etc.
+            .put("/products/{id}", update)
             .name("products.update")
-            .post("/products/{id}/delete", destroy)
+            .delete("/products/{id}", destroy)
             .name("products.destroy")
             .post("/products/{id}/restore", restore)
             .name("products.restore")
@@ -62,8 +62,13 @@ async fn home() -> Redirect {
     Redirect::to("/products")
 }
 
-async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
-    let products = Product::query().latest().paginate(&db, page, 10).await?;
+async fn index(State(db): State<Db>, user: Option<AuthUser>, Page(page): Page) -> Result<View> {
+    let products = Product::query()
+        .latest()
+        .paginate(&db, page, 10)
+        .await?
+        // Lets the view ask the policy: `can('update', product)`.
+        .map(|product| Can::new(product, user.as_deref(), &["update", "delete"]));
     Ok(view("products/index.html", context! { products }))
 }
 

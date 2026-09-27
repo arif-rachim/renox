@@ -32,7 +32,7 @@ pub use axum;
 pub use tokio;
 
 pub mod prelude {
-    pub use renox_core::auth::{Auth, User};
+    pub use renox_core::auth::{Auth, Can, User};
     pub use renox_core::db::{DateTime, Db, Factory, Model, Page, Paginated};
     pub use renox_core::events::Event;
     pub use renox_core::queue::{Job, JobContext};

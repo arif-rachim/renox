@@ -10,6 +10,7 @@ mod embed;
 mod i18n;
 mod infra;
 mod mail;
+mod method;
 #[cfg(feature = "postgres")]
 mod postgres;
 mod queue;

@@ -10,17 +10,18 @@ use crate::{Error, Session};
 pub const CSRF_HEADER: &str = "x-csrf-token";
 pub const CSRF_FIELD: &str = "_token";
 
-/// Finds the `_token` field in a buffered multipart body.
-async fn multipart_token(
+/// Finds the text field `name` in a buffered multipart body.
+pub(crate) async fn multipart_field(
     headers: &axum::http::HeaderMap,
     bytes: axum::body::Bytes,
+    name: &str,
 ) -> Option<String> {
     use axum::extract::{FromRequest, Multipart};
     let mut probe = Request::new(Body::from(bytes));
     *probe.headers_mut() = headers.clone();
     let mut multipart = Multipart::from_request(probe, &()).await.ok()?;
     while let Ok(Some(field)) = multipart.next_field().await {
-        if field.name() == Some(CSRF_FIELD) {
+        if field.name() == Some(name) {
             return field.text().await.ok();
         }
     }
@@ -28,7 +29,7 @@ async fn multipart_token(
 }
 
 /// Largest urlencoded body the CSRF check buffers to look for `_token`.
-const FORM_LIMIT: usize = 2 * 1024 * 1024;
+pub(crate) const FORM_LIMIT: usize = 2 * 1024 * 1024;
 
 /// Rejects state-changing requests that don't carry the session's CSRF token,
 /// either in the `X-CSRF-Token` header (sent automatically for HTMX requests)
@@ -85,7 +86,7 @@ pub(crate) async fn middleware(req: Request, next: Next) -> Response {
         Err(_) => return Error::BadRequest("The form is too large.".into()).into_response(),
     };
     let token = if multipart {
-        multipart_token(&parts.headers, bytes.clone()).await
+        multipart_field(&parts.headers, bytes.clone(), CSRF_FIELD).await
     } else {
         form_urlencoded::parse(&bytes)
             .find(|(name, _)| name == CSRF_FIELD)

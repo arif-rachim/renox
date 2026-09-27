@@ -47,7 +47,9 @@ impl Messages {
 }
 
 enum Parsed<T> {
-    Ok(T),
+    /// Parsed, possibly with placeholders standing in for fields that
+    /// didn't parse; `Errors` holds those fields' errors.
+    Ok(T, Errors),
     Invalid(Errors),
 }
 
@@ -100,18 +102,27 @@ where
             }
         };
 
-        let data = match parsed {
-            Parsed::Ok(data) => data,
+        let (data, mut errors) = match parsed {
+            Parsed::Ok(data, errors) => (data, errors),
             Parsed::Invalid(errors) => {
                 return Err(ValidationError::new(errors)
                     .with_input_map(input)
                     .into_response());
             }
         };
-        let errors = Validator::rules_with_texts(&data, locale.locale, locale.texts.clone())
+        let rule_errors = Validator::rules_with_texts(&data, locale.locale, locale.texts.clone())
             .finish(&state.db)
             .await
             .map_err(IntoResponse::into_response)?;
+        // A field that didn't parse was checked with a placeholder; its own
+        // error is the one to show.
+        for (field, messages) in rule_errors.iter() {
+            if !errors.has(field) {
+                for message in messages {
+                    errors.add(field, message.clone());
+                }
+            }
+        }
         if errors.is_empty() {
             Ok(Valid(data))
         } else {
@@ -179,11 +190,17 @@ fn parse_pairs<T: DeserializeOwned>(
     // Empty inputs are dropped so `Option<T>` fields become `None`. A field
     // serde then reports missing is put back as "", so text fields still reach
     // the rules (and their labels); a number left blank becomes "required".
+    //
+    // A field that doesn't parse (`price=abc` for an i64) gets its error, then
+    // a placeholder so the rest of the form still parses and every other
+    // field's rules run too: all errors show at once.
     let mut filled: Vec<(String, String)> = pairs
         .iter()
         .filter(|(_, v)| !v.trim().is_empty())
         .cloned()
         .collect();
+    let mut errors = Errors::new();
+    let mut tries: HashMap<String, usize> = HashMap::new();
     let parsed = loop {
         let encoded = form_urlencoded::Serializer::new(String::new())
             .extend_pairs(&filled)
@@ -191,7 +208,7 @@ fn parse_pairs<T: DeserializeOwned>(
         let deserializer =
             serde_urlencoded::Deserializer::new(form_urlencoded::parse(encoded.as_bytes()));
         match upload::with_uploads(uploads, || serde_path_to_error::deserialize(deserializer)) {
-            Ok(data) => break Parsed::Ok(data),
+            Ok(data) => break Parsed::Ok(data, errors),
             Err(err) => {
                 let message = err.inner().to_string();
                 if let Some(field) = missing_field(&message)
@@ -202,12 +219,32 @@ fn parse_pairs<T: DeserializeOwned>(
                 }
                 let path = err.path().to_string();
                 let blank = filled.iter().any(|(k, v)| *k == path && v.is_empty());
-                break Parsed::Invalid(field_error(&path, &message, blank, locale));
+                let tried = tries.entry(path.clone()).or_default();
+                if *tried == 0 {
+                    for (field, messages) in field_error(&path, &message, blank, locale).iter() {
+                        for message in messages {
+                            errors.add(field, message.clone());
+                        }
+                    }
+                }
+                // Stand-ins that parse as most field types: numbers and text,
+                // then booleans.
+                let placeholder = PLACEHOLDERS.get(*tried);
+                *tried += 1;
+                match placeholder {
+                    Some(value) if filled.iter().any(|(k, _)| *k == path) => {
+                        filled.retain(|(k, _)| *k != path);
+                        filled.push((path, (*value).to_owned()));
+                    }
+                    _ => break Parsed::Invalid(errors),
+                }
             }
         }
     };
     (parsed, input)
 }
+
+const PLACEHOLDERS: &[&str] = &["0", "false"];
 
 fn parse_json<T: DeserializeOwned>(
     bytes: &[u8],
@@ -220,7 +257,7 @@ fn parse_json<T: DeserializeOwned>(
     };
     let mut deserializer = serde_json::Deserializer::from_slice(bytes);
     let parsed = match serde_path_to_error::deserialize(&mut deserializer) {
-        Ok(data) => Parsed::Ok(data),
+        Ok(data) => Parsed::Ok(data, Errors::new()),
         Err(err) => Parsed::Invalid(field_error(
             &err.path().to_string(),
             &err.inner().to_string(),
@@ -304,8 +341,8 @@ mod tests {
             .into_owned()
             .collect();
         match parse_pairs::<Form>(pairs, &HashMap::new(), &plain(Locale::Id)).0 {
-            Parsed::Ok(form) => Ok(form),
-            Parsed::Invalid(errors) => Err(errors),
+            Parsed::Ok(form, errors) if errors.is_empty() => Ok(form),
+            Parsed::Ok(_, errors) | Parsed::Invalid(errors) => Err(errors),
         }
     }
 
