@@ -169,6 +169,186 @@ impl Storage {
     }
 
     /// The URL of a public file (a key under `public/`).
+    /// The files under `prefix` (a folder like `invoices/2026`, or `""`
+    /// for all), at any depth, sorted by key.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # async fn demo(state: AppState) -> Result {
+    /// for file in state.storage.list("invoices/2026").await? {
+    ///     println!("{} ({} bytes)", file.key, file.size);
+    /// }
+    /// state.storage.copy("public/logo.png", "public/logo-old.png").await?;
+    /// state.storage.rename("uploads/tmp/a.pdf", "invoices/2026/a.pdf").await?;
+    /// let removed = state.storage.delete_all("uploads/tmp").await?;
+    /// # let _ = removed; Ok(()) }
+    /// ```
+    pub async fn list(&self, prefix: &str) -> Result<Vec<FileInfo>> {
+        let prefix = check_prefix(prefix)?;
+        let mut files = match &self.disk {
+            Disk::Local { root } => {
+                let mut files = Vec::new();
+                let start = if prefix.is_empty() {
+                    root.clone()
+                } else {
+                    root.join(prefix)
+                };
+                let mut dirs = vec![start];
+                while let Some(dir) = dirs.pop() {
+                    let mut entries = match tokio::fs::read_dir(&dir).await {
+                        Ok(entries) => entries,
+                        Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+                        Err(err) if err.kind() == std::io::ErrorKind::NotADirectory => continue,
+                        Err(err) => {
+                            return Err(anyhow::Error::from(err)
+                                .context(format!("could not list {}", dir.display()))
+                                .into());
+                        }
+                    };
+                    while let Some(entry) = entries.next_entry().await? {
+                        let meta = entry.metadata().await?;
+                        if meta.is_dir() {
+                            dirs.push(entry.path());
+                        } else if meta.is_file() {
+                            let relative = entry.path();
+                            let relative = relative.strip_prefix(root).unwrap_or(&relative);
+                            let key = relative
+                                .components()
+                                .map(|c| c.as_os_str().to_string_lossy())
+                                .collect::<Vec<_>>()
+                                .join("/");
+                            files.push(FileInfo {
+                                key,
+                                size: meta.len(),
+                                modified: meta.modified().ok().map(Into::into),
+                            });
+                        }
+                    }
+                }
+                files
+            }
+            #[cfg(feature = "s3")]
+            Disk::S3 { store, .. } => {
+                use futures_util::TryStreamExt;
+                use object_store::ObjectStore;
+                let path = (!prefix.is_empty()).then(|| object_store::path::Path::from(prefix));
+                store
+                    .list(path.as_ref())
+                    .map_ok(|meta| FileInfo {
+                        key: meta.location.to_string(),
+                        size: meta.size,
+                        modified: Some(meta.last_modified),
+                    })
+                    .try_collect()
+                    .await
+                    .map_err(anyhow::Error::from)?
+            }
+        };
+        files.sort_by(|a, b| a.key.cmp(&b.key));
+        Ok(files)
+    }
+
+    /// The size of a file in bytes, if it exists.
+    pub async fn size(&self, key: &str) -> Result<Option<u64>> {
+        let key = check_key(key)?;
+        match &self.disk {
+            Disk::Local { root } => match tokio::fs::metadata(root.join(key)).await {
+                Ok(meta) if meta.is_file() => Ok(Some(meta.len())),
+                Ok(_) => Ok(None),
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
+                Err(err) => Err(anyhow::Error::from(err).into()),
+            },
+            #[cfg(feature = "s3")]
+            Disk::S3 { store, .. } => {
+                use object_store::ObjectStoreExt;
+                match store.head(&object_store::path::Path::from(key)).await {
+                    Ok(meta) => Ok(Some(meta.size)),
+                    Err(object_store::Error::NotFound { .. }) => Ok(None),
+                    Err(err) => Err(anyhow::Error::from(err).into()),
+                }
+            }
+        }
+    }
+
+    /// Copies a file, replacing `to` if it exists. A missing `from` is a
+    /// 404.
+    pub async fn copy(&self, from: &str, to: &str) -> Result {
+        let (from, to) = (check_key(from)?, check_key(to)?);
+        match &self.disk {
+            Disk::Local { root } => {
+                let target = root.join(to);
+                create_parent(&target).await?;
+                match tokio::fs::copy(root.join(from), &target).await {
+                    Ok(_) => Ok(()),
+                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => Err(Error::NotFound),
+                    Err(err) => Err(anyhow::Error::from(err)
+                        .context(format!("could not copy `{from}` to `{to}`"))
+                        .into()),
+                }
+            }
+            #[cfg(feature = "s3")]
+            Disk::S3 { store, .. } => {
+                use object_store::ObjectStoreExt;
+                let (from, to) = (
+                    object_store::path::Path::from(from),
+                    object_store::path::Path::from(to),
+                );
+                match store.copy(&from, &to).await {
+                    Ok(()) => Ok(()),
+                    Err(object_store::Error::NotFound { .. }) => Err(Error::NotFound),
+                    Err(err) => Err(anyhow::Error::from(err).into()),
+                }
+            }
+        }
+    }
+
+    /// Moves a file (Laravel's `move`), replacing `to` if it exists. A
+    /// missing `from` is a 404.
+    pub async fn rename(&self, from: &str, to: &str) -> Result {
+        let (from, to) = (check_key(from)?, check_key(to)?);
+        match &self.disk {
+            Disk::Local { root } => {
+                let target = root.join(to);
+                create_parent(&target).await?;
+                match tokio::fs::rename(root.join(from), &target).await {
+                    Ok(()) => Ok(()),
+                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => Err(Error::NotFound),
+                    Err(err) => Err(anyhow::Error::from(err)
+                        .context(format!("could not move `{from}` to `{to}`"))
+                        .into()),
+                }
+            }
+            #[cfg(feature = "s3")]
+            Disk::S3 { store, .. } => {
+                use object_store::ObjectStoreExt;
+                let (from, to) = (
+                    object_store::path::Path::from(from),
+                    object_store::path::Path::from(to),
+                );
+                match store.rename(&from, &to).await {
+                    Ok(()) => Ok(()),
+                    Err(object_store::Error::NotFound { .. }) => Err(Error::NotFound),
+                    Err(err) => Err(anyhow::Error::from(err).into()),
+                }
+            }
+        }
+    }
+
+    /// Deletes every file under `prefix` (not `""`: that would be all of
+    /// them); returns how many.
+    pub async fn delete_all(&self, prefix: &str) -> Result<usize> {
+        if check_prefix(prefix)?.is_empty() {
+            return Err(Error::BadRequest(
+                "delete_all needs a folder, not the whole disk".into(),
+            ));
+        }
+        let files = self.list(prefix).await?;
+        for file in &files {
+            self.delete(&file.key).await?;
+        }
+        Ok(files.len())
+    }
+
     pub fn url(&self, key: &str) -> String {
         let key = key.trim_start_matches('/');
         let rest = key.strip_prefix("public/").unwrap_or(key);
@@ -221,6 +401,34 @@ impl Storage {
             Disk::S3 { .. } => None,
         }
     }
+}
+
+/// A folder prefix: `""` or a clean relative path.
+fn check_prefix(prefix: &str) -> Result<&str> {
+    let prefix = prefix.trim_matches('/');
+    if prefix.is_empty() {
+        return Ok(prefix);
+    }
+    check_key(prefix)
+}
+
+async fn create_parent(path: &Path) -> Result {
+    if let Some(dir) = path.parent() {
+        tokio::fs::create_dir_all(dir)
+            .await
+            .with_context(|| format!("could not create {}", dir.display()))?;
+    }
+    Ok(())
+}
+
+/// A stored file; from [`Storage::list`].
+#[derive(Debug, Clone, serde::Serialize)]
+#[non_exhaustive]
+pub struct FileInfo {
+    /// Its key, e.g. `invoices/2026/a.pdf`.
+    pub key: String,
+    pub size: u64,
+    pub modified: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 fn encode_path(key: &str) -> String {

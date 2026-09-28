@@ -64,6 +64,13 @@ rnx make:migration add_stock_to_products
   "`Send` is not general enough"): don't keep a closure or iterator that borrows a local across
   an `.await`; collect into a `Vec` first.
 - Money is `i64` in the smallest unit (rupiah, cents), never `f64`.
+- Call other services with `state.http` (timeouts, retries), not a client of your own: tests
+  then fake it with `app.fake_http().on("https://api.example.com/*", FakeResponse::json(…))`.
+  While faking, a request without a matching fake is an error, never a real call.
+- Messages to a user go in their language inside a notification (`Recipient::locale()`: a
+  `locale` column on `users`); elsewhere use `state.lang("id")` or `state.mail_view_in(…)`.
+- The queue dashboard (`renox::queue::Dashboard`) is invisible until the app defines the
+  `view-queue-dashboard` gate.
 - Tests: `#[renox::test] async fn …() { let app = TestApp::new({{crate_name}}::app()).await; … }`,
   with `app.acting_as(&user)`, `app.htmx()`, `assert_see`, `assert_invalid("field")`.
 

@@ -522,6 +522,7 @@ impl App {
             queue: Queue::new(db.clone(), key.clone()),
             cache: crate::cache::Cache::new(&config.cache_store, db.clone())?,
             storage,
+            http: crate::http::Http::default(),
             translator: Arc::new(match embedded {
                 Some(files) => crate::i18n::Translator::embedded(files.lang)?,
                 None => crate::i18n::Translator::load(&config.lang_path, config.debug)?,

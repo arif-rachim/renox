@@ -24,6 +24,8 @@ pub struct AppState {
     pub queue: Queue,
     pub cache: Cache,
     pub storage: Storage,
+    /// Calls other services; faked in tests (`TestApp::fake_http`).
+    pub http: crate::http::Http,
     pub translator: Arc<Translator>,
     /// Live reload, only while developing locally.
     pub(crate) live: Option<Arc<crate::live::Live>>,

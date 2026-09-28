@@ -926,7 +926,10 @@ fn card_number(raw: &str) -> Result<u64> {
 
 Jobs and scheduled tasks run inside `rnx serve` / `my-app serve` (`QUEUE_WORKERS`, `SCHEDULER`).
 `schedule:list` shows each task's next run and zone, `schedule:run NAME` runs one now (also
-`kernel.run_scheduled(name)` in tests).
+`kernel.run_scheduled(name)` in tests). `.module(renox::queue::Dashboard)` adds `/_renox/queue`
+(waiting jobs, throughput, failed jobs to retry or forget, batches) for users who pass the
+`view-queue-dashboard` gate (`renox::queue::DASHBOARD_GATE`); `state.queue.stats()` has the same
+numbers for monitoring.
 A job that errors, panics or passes its `TIMEOUT` is retried up to `MAX_ATTEMPTS`, then moved to
 `failed_jobs` (`queue:failed`, `queue:retry`, `queue:forget`, `queue:prune-failed`); a panicking
 task or listener doesn't stop the others.
@@ -958,8 +961,19 @@ impl Notification for OrderShipped {
     fn channels(&self) -> Vec<Channel> {
         vec![Channel::Mail, Channel::Database, Channel::Custom("whatsapp")]
     }
-    fn to_mail(&self, to: &Recipient, _: &AppState) -> Result<Mail> {
-        Ok(Mail::new(to.email().unwrap_or_default(), "Order shipped", "On its way."))
+    fn channels_for(&self, to: &Recipient) -> Vec<Channel> {
+        // Per recipient; defaults to channels().
+        let mut channels = self.channels();
+        if to.address("whatsapp").is_none() {
+            channels.retain(|c| *c != Channel::Custom("whatsapp"));
+        }
+        channels
+    }
+    fn to_mail(&self, to: &Recipient, state: &AppState) -> Result<Mail> {
+        // Built in the recipient's language (Recipient::locale: in_locale(..) or users.locale):
+        // t() in the mail view and state.current_lang() here use it.
+        let subject = state.current_lang().t("mail.shipped", &[("id", &self.order_id)]);
+        Ok(Mail::new(to.email().unwrap_or_default(), subject, "On its way."))
     }
     fn to_database(&self, _: &Recipient) -> renox::serde_json::Value {
         json!({ "order_id": self.order_id }) // user.unread_notifications(&db)
@@ -981,10 +995,46 @@ fn channels(app: App) -> App {
 async fn ship(state: &AppState, user: &User) -> Result {
     state.notify(user, &OrderShipped { order_id: 7 }).await?;       // now
     state.notify_later(user, &OrderShipped { order_id: 7 }).await?; // one queued job per channel
-    let guest = Recipient::to("mail", "guest@example.com").and("whatsapp", "+628123");
+    let guest = Recipient::to("mail", "guest@example.com").and("whatsapp", "+628123").in_locale("id");
     state.notify_to(&guest, &OrderShipped { order_id: 7 }).await   // no account: no database row
 }
 ```
+
+Mail views can `{% from "renox/mail/components.html" import button, panel, table, divider %}`:
+`{{ button(url, t('mail.track')) }}`, `{% call panel() %}…{% endcall %}`,
+`{{ table(rows, head=[…], total=[…]) }}`. `state.mail_view_in("id", …)` renders in a given
+language; `state.lang("id").t(…)` and `renox::i18n::set_current_locale("id")` (for the rest of
+a job) help code outside a request.
+
+## Calling other services (HTTP)
+
+```rust
+use renox::prelude::*;
+use std::time::Duration;
+
+#[derive(serde::Deserialize)]
+struct Rate { idr: f64 }
+
+async fn rate(state: &AppState) -> Result<f64> {
+    let rate: Rate = state
+        .http // also post/put/patch/delete; .json(&body), .form(&body), .header(..), .basic_auth(..)
+        .get("https://api.example.com/rates")
+        .query(&[("base", "USD")])
+        .bearer("token")
+        .timeout(Duration::from_secs(5)) // 30 s by default
+        .retry(3, Duration::from_millis(200)) // connection errors, 429, 5xx
+        .send()
+        .await?
+        .error_for_status()? // 4xx/5xx → Err
+        .json()?;
+    Ok(rate.idr)
+}
+```
+
+In tests: `let http = app.fake_http(); http.on("https://api.example.com/*",
+FakeResponse::json(200, json!({ "idr": 16000.0 })));` then `http.assert_sent(|r| …)`. Requests
+without a fake fail, so tests never reach the network. Scheduled tasks can ping health checks:
+`.ping_before(url)`, `.then_ping(url)`, `.ping_on_success(url)`, `.ping_on_failure(url)`.
 
 ## Cookies and downloads
 
@@ -1031,7 +1081,9 @@ async fn misc(State(state): State<AppState>, session: Session, lang: Lang) -> Re
         // … one worker at a time; lock.block(Duration::from_secs(5)) waits instead (423 after)
         guard.release().await?; // or drop it
     }
-    let _ = (visits, first, otp);
+    let files = state.storage.list("invoices/2026").await?; // key, size, modified; any depth
+    state.storage.copy("public/a.png", "public/b.png").await?; // also rename (move), size, delete_all(prefix)
+    let _ = (visits, first, otp, files);
     session.put("cart", vec![1, 2, 3])?;
     let cart: Option<Vec<i64>> = session.get("cart");
     // Also: pull (read and remove), remove, regenerate_token(), set_lifetime(minutes).

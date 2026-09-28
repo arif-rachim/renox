@@ -12,11 +12,13 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["fake", "server-events"]
+default = ["fake", "http", "server-events"]
 # `renox::fake`, for factories with fake data.
 fake = ["renox-core/fake"]
-# `analytics::ServerEvent` (GA4 events sent from the server; brings an HTTP client).
-server-events = ["renox-core/server-events"]
+# `renox::http` sends real requests (brings reqwest; the test fake works without it).
+http = ["renox-core/http"]
+# `analytics::ServerEvent` (GA4 events sent from the server, over `renox::http`).
+server-events = ["http", "renox-core/server-events"]
 # S3-compatible storage (AWS S3, Cloudflare R2, MinIO) for `STORAGE_DISK=s3`.
 s3 = ["renox-core/s3"]
 # PostgreSQL databases (`DATABASE_URL=postgres://...`).

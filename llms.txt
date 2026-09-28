@@ -81,7 +81,9 @@ Every example has a README.md that walks through it.
   a cache lock against overlapping runs, and counts and sums done in SQL. The M20b queue:
   payment as a chain (charge → receipt → warehouse) with an encrypted, rate-limited charge job
   and its `failed` hook, receipts on a `high` queue, unique reminders, and monthly statements
-  as a batch with an htmx progress bar. [src/app/orders/mod.rs](examples/jobs/src/app/orders/mod.rs),
+  as a batch with an htmx progress bar. The charge calls the payment gateway with `state.http`
+  (a sandbox route stands in for it; the tests use `app.fake_http()`), and the admin sees the
+  queue dashboard. [src/app/orders/mod.rs](examples/jobs/src/app/orders/mod.rs),
   [payment.rs](examples/jobs/src/app/orders/payment.rs),
   [remind.rs](examples/jobs/src/app/orders/remind.rs),
   [statements.rs](examples/jobs/src/app/orders/statements.rs),
@@ -140,7 +142,7 @@ Every example has a README.md that walks through it.
   scopes and `renox::context`, password confirmation, the audit log), mapped to Laravel's.
 - [docs/queue.md](docs/queue.md): jobs, retries and `failed`, `dispatch_in`, priority, unique
   jobs, middleware (overlap, rate limits), encrypted payloads, chains and batches with
-  progress, testing jobs; mapped to Laravel's.
+  progress, the dashboard, testing jobs; mapped to Laravel's.
 - [docs/relations.md](docs/relations.md): relations without N+1 (`belongs_to`, `has_many`, `Pivot`
   with pivot columns, polymorphic `Morph`), joins with `fetch_as` and `#[derive(FromRow)]`, the query builder mapped to Laravel's.
 - [docs/stability.md](docs/stability.md): what semver covers, which types may grow

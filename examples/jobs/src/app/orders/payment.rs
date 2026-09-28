@@ -86,7 +86,7 @@ impl Job for ChargePayment {
         if order.status == OrderStatus::Paid {
             return Ok(()); // charged by an earlier attempt that failed afterwards
         }
-        gateway::charge(&order, &self.card_token).await?;
+        gateway::charge(&ctx.state, &order, &self.card_token).await?;
         order.status = OrderStatus::Paid;
         order.save_only(db, &["status"]).await
     }
@@ -140,39 +140,80 @@ impl Job for NotifyWarehouse {
     }
 }
 
-/// Stands in for the payment provider's HTTP API. Like a provider's test
-/// mode, two test tokens fail: `tok_declined` (retrying won't help) and
-/// `tok_unreachable` (it might).
+/// The payment provider's HTTP API, called with `state.http`: a timeout,
+/// an idempotency key, and the answer turned into "retry" or "give up".
+/// `PAYMENT_GATEWAY_URL` points at the provider; unset, it's this app's own
+/// sandbox (below), so `cargo run` works without an account.
 mod gateway {
     use super::Order;
     use renox::prelude::*;
+    use std::time::Duration;
 
     #[derive(Debug)]
     pub enum GatewayError {
         Declined,
-        Unreachable,
+        Unavailable(StatusCode),
     }
 
     impl std::fmt::Display for GatewayError {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            f.write_str(match self {
-                Self::Declined => "the card was declined",
-                Self::Unreachable => "the payment gateway timed out",
-            })
+            match self {
+                Self::Declined => f.write_str("the card was declined"),
+                Self::Unavailable(status) => write!(f, "the payment gateway answered {status}"),
+            }
         }
     }
 
     impl std::error::Error for GatewayError {}
 
-    /// Charges `order.total`; a real call sends `order-{id}` as the
-    /// idempotency key, so a retry after a lost response can't charge twice.
-    pub async fn charge(_order: &Order, card_token: &str) -> Result {
-        match card_token {
+    pub fn base_url(state: &AppState) -> String {
+        state.config.var("PAYMENT_GATEWAY_URL").unwrap_or_else(|| {
+            format!("{}/sandbox/gateway", state.config.url.trim_end_matches('/'))
+        })
+    }
+
+    /// Charges `order.total`. `order-{id}` is the idempotency key, so a
+    /// retry after a lost response can't charge twice.
+    pub async fn charge(state: &AppState, order: &Order, card_token: &str) -> Result {
+        let secret = state
+            .config
+            .var("PAYMENT_GATEWAY_KEY")
+            .unwrap_or_else(|| "sk_test_sandbox".into());
+        let response = state
+            .http
+            .post(format!("{}/charges", base_url(state)))
+            .basic_auth(&secret, "") // as Stripe does
+            .header("idempotency-key", format!("order-{}", order.id))
+            .json(&json!({ "amount": order.total, "currency": "idr", "source": card_token }))
+            .timeout(Duration::from_secs(15))
+            .send()
+            .await?; // no answer at all: a plain error, retried (MAX_ATTEMPTS)
+        match response.status() {
+            status if status.is_success() => Ok(()),
             // `Error::permanent`: straight to `failed_jobs`, no retries.
-            "tok_declined" => Err(Error::permanent(GatewayError::Declined)),
-            // A plain error: retried (MAX_ATTEMPTS) with a growing wait.
-            "tok_unreachable" => Err(GatewayError::Unreachable.into()),
-            _ => Ok(()),
+            StatusCode::PAYMENT_REQUIRED => Err(Error::permanent(GatewayError::Declined)),
+            // A 5xx or 429 might pass later: retried with a growing wait.
+            status => Err(GatewayError::Unavailable(status).into()),
         }
+    }
+}
+
+/// A pretend payment gateway for trying the example: `tok_declined` is
+/// declined (402), `tok_unreachable` finds it down (503), any other token
+/// is charged. Called by `ChargePayment` over HTTP like a real provider,
+/// so it has no CSRF token.
+pub(super) async fn sandbox_charge(Json(charge): Json<renox::serde_json::Value>) -> Response {
+    match charge["source"].as_str().unwrap_or_default() {
+        "tok_declined" => (
+            StatusCode::PAYMENT_REQUIRED,
+            Json(json!({ "error": "card_declined" })),
+        )
+            .into_response(),
+        "tok_unreachable" => StatusCode::SERVICE_UNAVAILABLE.into_response(),
+        _ => (
+            StatusCode::CREATED,
+            Json(json!({ "id": "ch_sandbox", "amount": charge["amount"] })),
+        )
+            .into_response(),
     }
 }

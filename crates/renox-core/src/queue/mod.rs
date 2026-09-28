@@ -59,6 +59,7 @@
 //! # let _ = status; Ok(()) }
 //! ```
 
+mod dashboard;
 mod worker;
 
 use std::collections::HashMap;
@@ -71,6 +72,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Notify;
 
+pub use dashboard::{Dashboard, GATE as DASHBOARD_GATE, QueueCounts, QueueStats};
 pub use worker::Worker;
 
 use crate::db::{Db, Migration, Transaction};

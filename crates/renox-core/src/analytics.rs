@@ -151,7 +151,6 @@ pub use server_event::ServerEvent;
 /// `server-events` feature (on by default).
 #[cfg(feature = "server-events")]
 mod server_event {
-    use std::sync::LazyLock;
 
     use anyhow::anyhow;
 
@@ -213,13 +212,6 @@ mod server_event {
         }
     }
 
-    static HTTP: LazyLock<reqwest::Client> = LazyLock::new(|| {
-        // reqwest is built without a crypto provider (so aws-lc isn't
-        // compiled); use ring, like the mailer. Fails only if one is installed.
-        let _ = rustls::crypto::ring::default_provider().install_default();
-        reqwest::Client::new()
-    });
-
     impl Job for ServerEvent {
         const NAME: &'static str = "renox:analytics";
 
@@ -236,25 +228,19 @@ mod server_event {
                 tracing::info!(event = %self.name, payload = %self.payload(), "analytics event (not sent outside production)");
                 return Ok(());
             }
-            let res = HTTP
+            let res = ctx
+                .state
+                .http
                 .post("https://www.google-analytics.com/mp/collect")
                 .query(&[("measurement_id", id), ("api_secret", secret)])
                 .json(&self.payload())
+                .timeout(std::time::Duration::from_secs(10))
                 .send()
                 .await?;
-            if !res.status().is_success() {
+            if !res.ok() {
                 return Err(anyhow!("GA4 answered {}", res.status()).into());
             }
             Ok(())
-        }
-    }
-
-    #[cfg(test)]
-    mod tests {
-        #[test]
-        fn the_http_client_builds_with_the_ring_provider() {
-            // Would panic if no rustls crypto provider were available.
-            std::sync::LazyLock::force(&super::HTTP);
         }
     }
 }

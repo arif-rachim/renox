@@ -260,6 +260,27 @@ deletes finished batches.
 chain and a batch's callbacks too; a retry still waiting for its backoff is not due), and `state.dispatch_sync(job)` runs one job now, in the caller. Assert what the
 job did: rows written, `app.sent_mail()`.
 
+## The dashboard
+
+`.module(renox::queue::Dashboard)` adds `/_renox/queue`: jobs ready, delayed and running per
+queue, how long the oldest has waited, jobs done and failed in the last hour, the failed jobs
+(retry one, retry all, forget), and recent batches with their progress. It refreshes itself
+every 5 seconds. Only users who pass the `view-queue-dashboard` gate see it, in development
+too, so define the gate:
+
+```rust
+# use renox::prelude::*;
+# let _ =
+App::new()
+    .module(renox::queue::Dashboard)
+    .gate(renox::queue::DASHBOARD_GATE, |user| user.email == "ops@example.com")
+# ;
+```
+
+`state.queue.stats()` returns the same numbers (`QueueStats`) for your own monitoring, e.g. an
+alert when `oldest_wait` grows. The throughput counts are per-minute rows in the `cache` table
+(`renox:queue:done:*`, `renox:queue:failed:*`) that expire after two hours.
+
 ## Coming from Laravel
 
 | Laravel | Renox |
@@ -273,4 +294,4 @@ job did: rows written, `app.sent_mail()`.
 | `Bus::chain`, `Bus::batch`, `then/catch/finally` | `queue.chain()`, `queue.batch(name)`, jobs as callbacks |
 | `afterCommit` | `dispatch_in(&mut tx, job)` |
 | `dispatchSync` | `state.dispatch_sync(job)` |
-| Horizon | not yet (planned in M20c: a queue dashboard) |
+| Horizon | `.module(renox::queue::Dashboard)` (see "The dashboard") |

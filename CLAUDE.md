@@ -90,7 +90,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            audit:prune
   src/context.rs           renox::context: task-local values per request/job/task/command
                            (default scopes, context::app())
-  src/queue/               Job trait, Queue (dispatch, dispatch_in), Worker
+  src/queue/               Job trait, Queue (dispatch, chain, batch), Middleware, Worker,
+                           dashboard.rs (Dashboard module, stats)
   src/schedule.rs          Schedule + runner, ScheduledTask builder, own cron parser, run claims
   src/timezone.rs          Zone (UTC / fixed offset / IANA via chrono-tz) for APP_TIMEZONE
   src/events.rs            Event, listeners, AppState::emit
@@ -109,13 +110,16 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/maintenance.rs       down/up/status + middleware (bypass cookie)
   src/health.rs            GET /health
   src/upload.rs            Upload (multipart file field), sniffing, store/store_public, token registry
-  src/storage.rs           Storage (local disk; S3 with the `s3` feature), temporary URLs, /_renox/files
+  src/storage.rs           Storage (local disk; S3 with the `s3` feature), temporary URLs, /_renox/files,
+                           list/copy/rename/size/delete_all
+  src/http.rs              renox::http client (reqwest behind the `http` feature) + FakeHttp
   src/i18n.rs              Translator (lang JSON files), format(), RequestLocale middleware, Lang
   src/live.rs              live reload: file-time polling, /_renox/live SSE, stop() on shutdown
   src/shell.rs             db:shell (run_with takes any input/output, for tests)
   src/testing.rs           TestApp / TestRequest / TestResponse for apps' tests
   src/seo.rs               seo() tags, head tags (noindex / verification / GA4 / GTM), robots.txt, Sitemap
-  src/analytics.rs         analytics::event, GaClientId, ServerEvent job (`server-events` feature)
+  src/analytics.rs         analytics::event, GaClientId, ServerEvent job (`server-events` feature,
+                           sent through `state.http`)
   src/webhook.rs           Webhook trait, receive route, webhook_calls store/retry, ProcessWebhook job
   src/security.rs          security headers + CSP (+ nonce), csrf-exempt and webhook route sets
   src/method.rs            method spoofing layer (in front of the router)
@@ -718,7 +722,10 @@ change 29 s → 7 s, full run 19 s → 6 s.
 - **M20b** (queue: priority, unique, encrypted, middleware, failed hook, chains, batches,
   dispatch_sync, forget/prune): merged (#52). Adds framework migration
   `00010101000110`; tests that count framework migrations must follow it.
-- **Next: M20c (dashboard, mail, HTTP client, storage), then M21 (views and DX)**, from the Laravel parity review
+- **M20c** (`renox::http` + fake + schedule pings, queue dashboard module, localized mail and
+  notifications, mail components, storage list/copy/rename): branch `m20c-background`. The
+  dashboard page was browser-checked (desktop, 390 px, dark). M20 is done.
+- **Next: M21 (views and DX)**, from the Laravel parity review
   (`docs/audit/2026-09-laravel-parity.md`); the ROADMAP lists each milestone's items. **v1.0 is
   on hold** until the owner says to start it (docs site, starter kit, semver checks, real
   crates.io releases; the owner runs `cargo login`).

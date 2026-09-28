@@ -109,6 +109,52 @@ async fn files_round_trip_through_s3() {
     storage.delete(&key).await.unwrap(); // deleting twice is fine
     assert!(!storage.exists(&key).await.unwrap());
     assert!(storage.put("../escape.txt", "x".into()).await.is_err());
+
+    // Listing, copying and moving, under a folder of this run only.
+    let dir = format!("{}-tree", key.trim_end_matches(".txt"));
+    storage
+        .put(&format!("{dir}/a.txt"), "a".into())
+        .await
+        .unwrap();
+    storage
+        .put(&format!("{dir}/sub/b.txt"), "bb".into())
+        .await
+        .unwrap();
+    storage
+        .copy(&format!("{dir}/a.txt"), &format!("{dir}/c.txt"))
+        .await
+        .unwrap();
+    storage
+        .rename(&format!("{dir}/sub/b.txt"), &format!("{dir}/d.txt"))
+        .await
+        .unwrap();
+    let listed: Vec<(String, u64)> = storage
+        .list(&dir)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|f| (f.key, f.size))
+        .collect();
+    assert_eq!(
+        listed,
+        [
+            (format!("{dir}/a.txt"), 1),
+            (format!("{dir}/c.txt"), 1),
+            (format!("{dir}/d.txt"), 2)
+        ]
+    );
+    assert_eq!(
+        storage.size(&format!("{dir}/d.txt")).await.unwrap(),
+        Some(2)
+    );
+    assert!(
+        storage
+            .copy(&format!("{dir}/nope"), &format!("{dir}/x"))
+            .await
+            .is_err()
+    );
+    assert_eq!(storage.delete_all(&dir).await.unwrap(), 3);
+    assert!(storage.list(&dir).await.unwrap().is_empty());
 }
 
 #[derive(serde::Deserialize)]

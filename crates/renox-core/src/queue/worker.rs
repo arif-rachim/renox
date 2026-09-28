@@ -384,6 +384,9 @@ impl Worker {
             if let Some(key) = unique {
                 super::release_unique(&mut tx, key).await?;
             }
+            if !matches!(outcome, Outcome::Skipped) {
+                super::dashboard::count_finished(&mut tx, failure.is_some()).await?;
+            }
         }
         tx.commit().await?;
         if deleted > 0 {

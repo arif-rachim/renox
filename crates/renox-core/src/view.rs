@@ -59,6 +59,14 @@ const BUILTIN: &[(&str, &str)] = &[
         include_str!("../views/mail/button.html"),
     ),
     (
+        "renox/queue/dashboard.html",
+        include_str!("../views/queue/dashboard.html"),
+    ),
+    (
+        "renox/mail/components.html",
+        include_str!("../views/mail/components.html"),
+    ),
+    (
         "renox/auth/account.html",
         include_str!("../views/auth/account.html"),
     ),
@@ -594,18 +602,11 @@ struct Requested<'a> {
     events: &'a [crate::analytics::Event],
 }
 
-fn globals(
-    state: &AppState,
-    session: Option<&Session>,
-    current_user: Option<CurrentUser>,
-    htmx: &Htmx,
-    requested: &Requested,
-    locale: &str,
-) -> Value {
-    let config = &state.config;
+/// The templates' `t(key, name=…, count=…)` in `locale`.
+pub(crate) fn translate_function(state: &AppState, locale: &str) -> Value {
     let translator = state.translator.clone();
-    let (request_locale, fallback) = (locale.to_owned(), config.fallback_locale.clone());
-    let translate =
+    let (locale, fallback) = (locale.to_owned(), state.config.fallback_locale.clone());
+    Value::from_function(
         move |key: String, kwargs: minijinja::value::Kwargs| -> Result<Value, minijinja::Error> {
             let mut params = Vec::new();
             let mut count = None;
@@ -622,9 +623,21 @@ fn globals(
                 .iter()
                 .map(|(k, v)| (k.as_str(), v.clone()))
                 .collect();
-            let text = translator.get(&request_locale, &fallback, &key);
+            let text = translator.get(&locale, &fallback, &key);
             Ok(Value::from(crate::i18n::format(&text, &params, count)))
-        };
+        },
+    )
+}
+
+fn globals(
+    state: &AppState,
+    session: Option<&Session>,
+    current_user: Option<CurrentUser>,
+    htmx: &Htmx,
+    requested: &Requested,
+    locale: &str,
+) -> Value {
+    let config = &state.config;
     let token = session.map(Session::token).unwrap_or_default();
 
     let strict = state.security.mode == crate::CspMode::Strict;
@@ -681,7 +694,7 @@ fn globals(
             user => user.as_deref(),
             roles => roles,
         },
-        t => Value::from_function(translate),
+        t => translate_function(state, locale),
         // `can('admin')` asks a gate; `can('update', product)` reads the
         // abilities `auth::Can` attached to the model in the handler.
         can => Value::from_function(move |ability: String, target: Option<Value>| {
