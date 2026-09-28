@@ -111,6 +111,10 @@ mod tests {
         make_deploy(dir.path()).unwrap();
         let docker = fs::read_to_string(dir.path().join("Dockerfile")).unwrap();
         assert!(docker.contains("cp target/release/toko-kopi /toko-kopi"));
+        assert!(
+            docker.contains("cargo chef cook --release"),
+            "dependencies in their own layer"
+        );
         let unit = fs::read_to_string(dir.path().join("deploy/toko-kopi.service")).unwrap();
         assert!(
             unit.contains("Description=Toko Kopi")

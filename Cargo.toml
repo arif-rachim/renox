@@ -13,7 +13,7 @@ categories = ["web-programming::http-server"]
 
 [workspace.dependencies]
 renox = { path = "crates/renox", version = "0.0.1" }
-renox-core = { path = "crates/renox-core", version = "0.0.1" }
+renox-core = { path = "crates/renox-core", version = "0.0.1", default-features = false }
 renox-macros = { path = "crates/renox-macros", version = "0.0.1" }
 
 # Password hashing (Argon2) is deliberately slow, and far slower unoptimised:

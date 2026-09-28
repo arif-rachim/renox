@@ -95,7 +95,7 @@ library, so tests can boot it.
 {% block content %}
 <h1>{{ title }}</h1>
 <a href="{{ route('products.edit', product.id) }}">Edit</a>   {# named route with parameters #}
-<img src="{{ asset('logo.png') }}">                           {# file in public/ #}
+<img src="{{ asset('logo.png') }}">                           {# /logo.png?v=hash: cached a year, new URL on change #}
 <p>{{ t('shop.welcome', name=auth.user.name) if auth.check }}</p>
 {% if flash.status %}<p class="flash">{{ flash.status }}</p>{% endif %}
 {% if can('admin') %}<a href="/admin">Admin</a>{% endif %}    {# gate #}
@@ -777,7 +777,7 @@ Also available: `post_multipart(uri, &[("title", "x")], &[("photo", "a.png", &by
 `APP_KEY` (`rnx key:generate`), `APP_DEBUG`, `APP_URL`, `APP_LOCALE`, `APP_TIMEZONE` (`+07:00`),
 `DATABASE_URL` (`sqlite://storage/app.db` or `postgres://…` with the `postgres` feature),
 `TEST_DATABASE_URL`, `MAIL_MAILER` (`log` | `smtp`), `QUEUE_WORKERS`, `SCHEDULER`,
-`CACHE_STORE` (`memory` | `database`), `STORAGE_DISK` (`local` | `s3`), `UPLOAD_MAX_SIZE` (MB),
+`CACHE_STORE` (`memory` | `database`: with several servers, also shares rate limits and the login lock), `STORAGE_DISK` (`local` | `s3`), `UPLOAD_MAX_SIZE` (MB),
 `CSP` (`relaxed` | `strict` | `off`), `TRUSTED_PROXIES` (`127.0.0.1,10.0.0.0/8` or `*`: behind a
 proxy, rate limits, the login lock, logs and the `ClientIp` extractor use `X-Forwarded-For`).
 Timeouts in seconds: `DATABASE_ACQUIRE_TIMEOUT` (5), `DATABASE_STATEMENT_TIMEOUT` (30,

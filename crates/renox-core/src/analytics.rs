@@ -30,9 +30,7 @@
 //! ```
 
 use std::convert::Infallible;
-use std::sync::LazyLock;
 
-use anyhow::anyhow;
 use axum::extract::FromRequestParts;
 use axum::http::header::{COOKIE, LOCATION};
 use axum::http::request::Parts;
@@ -40,8 +38,6 @@ use axum::http::{HeaderValue, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
-use crate::config::Environment;
-use crate::queue::{Job, JobContext};
 use crate::{Result, Session};
 
 const SESSION_KEY: &str = "_renox_analytics";
@@ -148,87 +144,118 @@ fn client_id_from_cookie(value: &str) -> Option<String> {
         .then(|| format!("{}.{}", parts[parts.len() - 2], parts[parts.len() - 1]))
 }
 
-/// An event sent from the server to GA4 (Measurement Protocol), as a queue
-/// job so a slow or failing request never holds up the page. Needs
-/// `GA4_MEASUREMENT_ID` and `GA4_API_SECRET`; outside production it's only logged.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ServerEvent {
-    client_id: String,
-    user_id: Option<String>,
-    name: String,
-    params: Map<String, Value>,
-}
+#[cfg(feature = "server-events")]
+pub use server_event::ServerEvent;
 
-impl ServerEvent {
-    /// `client_id` from [`GaClientId`]; without one a random id is used, so
-    /// the event still counts but isn't linked to the visitor's session.
-    pub fn new(client_id: Option<String>, name: &str) -> Self {
-        let client_id = client_id.unwrap_or_else(|| {
-            let [a, b] = [rand::random::<u32>(), rand::random::<u32>()];
-            format!("{a}.{b}")
-        });
-        Self {
-            client_id,
-            user_id: None,
-            name: name.to_owned(),
-            params: Map::new(),
+/// `ServerEvent` needs an HTTP client, so it comes with the
+/// `server-events` feature (on by default).
+#[cfg(feature = "server-events")]
+mod server_event {
+    use std::sync::LazyLock;
+
+    use anyhow::anyhow;
+
+    use super::*;
+    use crate::config::Environment;
+    use crate::queue::{Job, JobContext};
+
+    /// An event sent from the server to GA4 (Measurement Protocol), as a queue
+    /// job so a slow or failing request never holds up the page. Needs
+    /// `GA4_MEASUREMENT_ID` and `GA4_API_SECRET`; outside production it's only logged.
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct ServerEvent {
+        client_id: String,
+        user_id: Option<String>,
+        name: String,
+        params: Map<String, Value>,
+    }
+
+    impl ServerEvent {
+        /// `client_id` from [`GaClientId`]; without one a random id is used, so
+        /// the event still counts but isn't linked to the visitor's session.
+        pub fn new(client_id: Option<String>, name: &str) -> Self {
+            let client_id = client_id.unwrap_or_else(|| {
+                let [a, b] = [rand::random::<u32>(), rand::random::<u32>()];
+                format!("{a}.{b}")
+            });
+            Self {
+                client_id,
+                user_id: None,
+                name: name.to_owned(),
+                params: Map::new(),
+            }
+        }
+
+        pub fn param(mut self, key: &str, value: impl Serialize) -> Self {
+            self.params.insert(
+                key.to_owned(),
+                serde_json::to_value(value).unwrap_or(Value::Null),
+            );
+            self
+        }
+
+        /// Links the event to your own user id (GA4 User-ID).
+        pub fn user_id(mut self, id: impl ToString) -> Self {
+            self.user_id = Some(id.to_string());
+            self
+        }
+
+        /// The JSON body sent to `/mp/collect`.
+        pub fn payload(&self) -> Value {
+            let mut body = json!({
+                "client_id": self.client_id,
+                "events": [{ "name": self.name, "params": self.params }],
+            });
+            if let Some(user_id) = &self.user_id {
+                body["user_id"] = json!(user_id);
+            }
+            body
         }
     }
 
-    pub fn param(mut self, key: &str, value: impl Serialize) -> Self {
-        self.params.insert(
-            key.to_owned(),
-            serde_json::to_value(value).unwrap_or(Value::Null),
-        );
-        self
+    static HTTP: LazyLock<reqwest::Client> = LazyLock::new(|| {
+        // reqwest is built without a crypto provider (so aws-lc isn't
+        // compiled); use ring, like the mailer. Fails only if one is installed.
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        reqwest::Client::new()
+    });
+
+    impl Job for ServerEvent {
+        const NAME: &'static str = "renox:analytics";
+
+        async fn handle(self, ctx: JobContext) -> Result {
+            let config = &ctx.state.config;
+            let analytics = &config.analytics;
+            let (Some(id), Some(secret)) =
+                (&analytics.ga4_measurement_id, &analytics.ga4_api_secret)
+            else {
+                tracing::debug!(event = %self.name, "analytics event not sent: GA4_MEASUREMENT_ID or GA4_API_SECRET is not set");
+                return Ok(());
+            };
+            if config.env != Environment::Production {
+                tracing::info!(event = %self.name, payload = %self.payload(), "analytics event (not sent outside production)");
+                return Ok(());
+            }
+            let res = HTTP
+                .post("https://www.google-analytics.com/mp/collect")
+                .query(&[("measurement_id", id), ("api_secret", secret)])
+                .json(&self.payload())
+                .send()
+                .await?;
+            if !res.status().is_success() {
+                return Err(anyhow!("GA4 answered {}", res.status()).into());
+            }
+            Ok(())
+        }
     }
 
-    /// Links the event to your own user id (GA4 User-ID).
-    pub fn user_id(mut self, id: impl ToString) -> Self {
-        self.user_id = Some(id.to_string());
-        self
-    }
-
-    /// The JSON body sent to `/mp/collect`.
-    pub fn payload(&self) -> Value {
-        let mut body = json!({
-            "client_id": self.client_id,
-            "events": [{ "name": self.name, "params": self.params }],
-        });
-        if let Some(user_id) = &self.user_id {
-            body["user_id"] = json!(user_id);
+    #[cfg(test)]
+    mod tests {
+        #[test]
+        fn the_http_client_builds_with_the_ring_provider() {
+            // Would panic if no rustls crypto provider were available.
+            std::sync::LazyLock::force(&super::HTTP);
         }
-        body
-    }
-}
-
-static HTTP: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
-
-impl Job for ServerEvent {
-    const NAME: &'static str = "renox:analytics";
-
-    async fn handle(self, ctx: JobContext) -> Result {
-        let config = &ctx.state.config;
-        let analytics = &config.analytics;
-        let (Some(id), Some(secret)) = (&analytics.ga4_measurement_id, &analytics.ga4_api_secret)
-        else {
-            tracing::debug!(event = %self.name, "analytics event not sent: GA4_MEASUREMENT_ID or GA4_API_SECRET is not set");
-            return Ok(());
-        };
-        if config.env != Environment::Production {
-            tracing::info!(event = %self.name, payload = %self.payload(), "analytics event (not sent outside production)");
-            return Ok(());
-        }
-        let res = HTTP
-            .post("https://www.google-analytics.com/mp/collect")
-            .query(&[("measurement_id", id), ("api_secret", secret)])
-            .json(&self.payload())
-            .send()
-            .await?;
-        if !res.status().is_success() {
-            return Err(anyhow!("GA4 answered {}", res.status()).into());
-        }
-        Ok(())
     }
 }
 
@@ -246,6 +273,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "server-events")]
     fn builds_measurement_protocol_payloads() {
         let event = ServerEvent::new(Some("1.2".into()), "purchase")
             .param("value", 18_000)

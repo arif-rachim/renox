@@ -1,7 +1,18 @@
 # Build the app, then run it from a small image. Views, translations and
 # public files are compiled into the binary (renox::embedded!()).
-FROM rust:1-bookworm AS build
+#
+# cargo-chef builds the dependencies in their own layer, which Docker reuses
+# until Cargo.toml or Cargo.lock change: a code change rebuilds only the app.
+FROM lukemathwalker/cargo-chef:latest-rust-1-bookworm AS chef
 WORKDIR /src
+
+FROM chef AS plan
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS build
+COPY --from=plan /src/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
 RUN cargo build --release && cp target/release/{{name}} /{{name}}
 

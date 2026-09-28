@@ -76,3 +76,73 @@ fn the_macro_embeds_nothing_when_there_is_nothing() {
     let embedded = renox::embedded!();
     assert!(embedded.views.is_empty() && embedded.lang.is_empty() && embedded.public.is_empty());
 }
+
+struct Assets;
+
+impl Module for Assets {
+    fn name(&self) -> &'static str {
+        "assets"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new().get("/css-url", || async { view("url.html", ()) })
+    }
+}
+
+#[renox::test]
+async fn asset_urls_carry_a_content_version() {
+    // Compiled in: hashed at boot, cached for a year when versioned.
+    let dir = tempfile::tempdir().unwrap();
+    const WITH_URL: Embedded = Embedded {
+        views: &[("url.html", "{{ asset('app.css') }}|{{ asset('none.css') }}")],
+        lang: &[],
+        public: &[("app.css", b"body { color: teal; }")],
+    };
+    let app = TestApp::with_config(App::new().embed(WITH_URL).module(Assets), |c| {
+        c.debug = false;
+        c.views_path = dir.path().join("views");
+        c.public_path = dir.path().join("public");
+    })
+    .await;
+    let urls = app.get("/css-url").await.text();
+    let (css, missing) = urls.split_once('|').unwrap();
+    assert!(
+        css.starts_with("/app.css?v=") && css.len() == "/app.css?v=".len() + 8,
+        "{css}"
+    );
+    assert_eq!(missing, "/none.css", "no file, no version");
+    app.get(css)
+        .await
+        .assert_ok()
+        .assert_header("cache-control", "public, max-age=31536000, immutable");
+
+    // From disk while developing: a changed file gets a new version.
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("views")).unwrap();
+    std::fs::create_dir_all(dir.path().join("public")).unwrap();
+    std::fs::write(dir.path().join("views/url.html"), "{{ asset('app.css') }}").unwrap();
+    std::fs::write(dir.path().join("public/app.css"), "a {}").unwrap();
+    let root = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new().module(Assets), move |c| {
+        c.debug = true;
+        c.views_path = root.join("views");
+        c.public_path = root.join("public");
+    })
+    .await;
+    let first = app.get("/css-url").await.text();
+    assert!(first.starts_with("/app.css?v="), "{first}");
+    app.get(&first)
+        .await
+        .assert_ok()
+        .assert_header("cache-control", "public, max-age=31536000, immutable");
+    std::thread::sleep(std::time::Duration::from_millis(1100)); // a new modified time
+    std::fs::write(dir.path().join("public/app.css"), "b { color: red }").unwrap();
+    let second = app.get("/css-url").await.text();
+    assert_ne!(first, second, "the new content has a new URL");
+    assert!(
+        app.get("/app.css")
+            .await
+            .header("cache-control")
+            .is_none_or(|c| !c.contains("immutable"))
+    );
+}

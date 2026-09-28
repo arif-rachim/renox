@@ -360,6 +360,7 @@ impl App {
         self.registry
             .job::<crate::auth::notifications::SendToChannel>();
         self.registry.job::<crate::webhook::ProcessWebhook>();
+        #[cfg(feature = "server-events")]
         self.registry.job::<crate::analytics::ServerEvent>();
         let mut migrations = vec![crate::queue::MIGRATION, crate::cache::MIGRATION];
         migrations.extend(crate::webhook::MIGRATIONS);
@@ -463,6 +464,12 @@ impl App {
         let storage = crate::storage::Storage::from_config(&config)?;
         // Release builds serve what was compiled in; debug builds read the disk.
         let embedded = self.embedded.filter(|_| !config.debug);
+        // Rate limits and login locks shared by every server (CACHE_STORE=database).
+        let shared_counters = (config.cache_store == "database").then(|| db.clone());
+        let versions = Arc::new(crate::embedded::AssetVersions::new(
+            &config.public_path,
+            embedded.map(|e| e.public),
+        ));
         let views = Views::new(
             &config,
             routes.clone(),
@@ -470,6 +477,7 @@ impl App {
             embedded.map(|e| e.views),
             Arc::new(templates),
             offset,
+            versions,
         );
         let security = Arc::new(crate::security::Security::new(&config, &self.csp, &listing));
         let state = AppState {
@@ -501,7 +509,7 @@ impl App {
             shares: Arc::new(shares),
             channels: Arc::new(channels),
             provided: Arc::new(self.provided),
-            throttle: Arc::new(LoginThrottle::new()),
+            throttle: Arc::new(LoginThrottle::new(shared_counters.clone())),
         };
 
         Ok(Kernel {
@@ -1078,8 +1086,20 @@ fn build_router(
                 {
                     return axum::response::IntoResponse::into_response(Error::NotFound);
                 }
+                let versioned = crate::embedded::is_versioned(req.uri());
                 match tower::ServiceExt::oneshot(files, req).await {
-                    Ok(res) => axum::response::IntoResponse::into_response(res),
+                    Ok(res) => {
+                        let mut res = axum::response::IntoResponse::into_response(res);
+                        if versioned && res.status().is_success() {
+                            res.headers_mut().insert(
+                                axum::http::header::CACHE_CONTROL,
+                                axum::http::HeaderValue::from_static(
+                                    "public, max-age=31536000, immutable",
+                                ),
+                            );
+                        }
+                        res
+                    }
                     Err(never) => match never {},
                 }
             }
