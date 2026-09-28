@@ -288,6 +288,7 @@ impl Migrator {
             sql(format!("ALTER TABLE {TABLE} ADD COLUMN checksum TEXT"))
                 .execute(db)
                 .await?;
+            db.schema_changed();
         }
         Ok(())
     }
@@ -334,6 +335,22 @@ impl Migrator {
         }
         let batch = applied.values().map(|a| a.batch).max().unwrap_or(0) + 1;
         let mut done = Vec::new();
+        let result = self.run_pending(db, &applied, batch, &mut done).await;
+        // Once per batch: every change reopens the pool's connections.
+        if !done.is_empty() {
+            db.schema_changed();
+        }
+        result.map(|()| done)
+    }
+
+    async fn run_pending(
+        &self,
+        db: &Db,
+        applied: &HashMap<String, Applied>,
+        batch: i64,
+        done: &mut Vec<&'static str>,
+    ) -> anyhow::Result<()> {
+        let dialect = db.dialect();
 
         for migration in self
             .migrations
@@ -369,7 +386,7 @@ impl Migrator {
             }
             done.push(migration.name);
         }
-        Ok(done)
+        Ok(())
     }
 
     /// Undoes the last `batches` batches, newest migration first. Nothing is
@@ -437,6 +454,8 @@ impl Migrator {
                 }
             }
             done.push(name.clone());
+            // Undone even if a later step fails: mark each.
+            db.schema_changed();
         }
         Ok(done)
     }
@@ -451,6 +470,7 @@ impl Migrator {
         if let Some(pool) = db.postgres() {
             drop_all_postgres(pool).await?;
         }
+        db.schema_changed();
         self.run_locked(db).await
     }
 
@@ -601,5 +621,49 @@ mod tests {
         assert!(!runs_outside_transaction(
             "CREATE TABLE begin_log (id INT);"
         ));
+    }
+
+    /// Connections that read the schema before a migration aren't reused
+    /// after it: with them, `SELECT *` on the altered table panicked inside
+    /// sqlx-sqlite (a flaky macOS CI failure in M16b).
+    #[tokio::test]
+    async fn pooled_connections_see_columns_added_by_a_migration() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = crate::Config {
+            database_url: format!("sqlite://{}/app.db", dir.path().display()),
+            database_pool_size: 4,
+            ..crate::Config::default()
+        };
+        let db = super::super::connect(&config).await.unwrap();
+        let create = Migration::new(
+            "1_notes",
+            "CREATE TABLE notes (id INTEGER PRIMARY KEY, a TEXT);",
+            None,
+        );
+        Migrator::new(vec![create]).unwrap().run(&db).await.unwrap();
+        sql("INSERT INTO notes (a) VALUES ('x')")
+            .execute(&db)
+            .await
+            .unwrap();
+
+        // Every connection in the pool reads the table (and caches the query).
+        let mut open = Vec::new();
+        for _ in 0..4 {
+            let mut tx = db.begin().await.unwrap();
+            sql("SELECT * FROM notes").fetch_all(&mut tx).await.unwrap();
+            open.push(tx);
+        }
+        drop(open);
+
+        let alter = Migration::new("2_notes_b", "ALTER TABLE notes ADD COLUMN b TEXT;", None);
+        Migrator::new(vec![create, alter])
+            .unwrap()
+            .run(&db)
+            .await
+            .unwrap();
+        for _ in 0..8 {
+            let rows = sql("SELECT * FROM notes").fetch_all(&db).await.unwrap();
+            assert_eq!(rows[0].try_get::<Option<String>>("b").unwrap(), None);
+        }
     }
 }

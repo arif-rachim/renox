@@ -43,6 +43,33 @@ impl fmt::Display for Dialect {
 #[derive(Clone)]
 pub struct Db {
     pool: Pool,
+    schema: SchemaEpoch,
+}
+
+/// When this process last changed the schema (migrations ran).
+///
+/// A pooled connection keeps the schema it read, and prepares statements
+/// against it until it next steps one. sqlx takes a statement's columns from
+/// that first prepare, so after `ALTER TABLE users ADD COLUMN …` a
+/// `SELECT *` on an older connection gets one column more than sqlx expects
+/// and panics (sqlx-sqlite `row.rs`), or PostgreSQL refuses a cached plan.
+/// The pools made by [`super::connect`] drop connections opened before the
+/// last change instead of reusing them.
+#[derive(Clone, Default)]
+pub(crate) struct SchemaEpoch(std::sync::Arc<std::sync::Mutex<Option<std::time::Instant>>>);
+
+impl SchemaEpoch {
+    pub(crate) fn changed(&self) {
+        *self.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(std::time::Instant::now());
+    }
+
+    /// Whether a connection of this age was opened before the last change.
+    pub(crate) fn is_stale(&self, age: std::time::Duration) -> bool {
+        self.0
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .is_some_and(|at| age >= at.elapsed())
+    }
 }
 
 #[derive(Clone)]
@@ -62,22 +89,37 @@ impl fmt::Debug for Db {
 
 impl From<SqlitePool> for Db {
     fn from(pool: SqlitePool) -> Self {
-        Self {
-            pool: Pool::Sqlite(pool),
-        }
+        Self::with_epoch(Pool::Sqlite(pool), SchemaEpoch::default())
     }
 }
 
 #[cfg(feature = "postgres")]
 impl From<PgPool> for Db {
     fn from(pool: PgPool) -> Self {
-        Self {
-            pool: Pool::Postgres(pool),
-        }
+        Self::with_epoch(Pool::Postgres(pool), SchemaEpoch::default())
     }
 }
 
 impl Db {
+    fn with_epoch(pool: Pool, schema: SchemaEpoch) -> Self {
+        Self { pool, schema }
+    }
+
+    pub(crate) fn from_sqlite(pool: SqlitePool, schema: SchemaEpoch) -> Self {
+        Self::with_epoch(Pool::Sqlite(pool), schema)
+    }
+
+    #[cfg(feature = "postgres")]
+    pub(crate) fn from_postgres(pool: PgPool, schema: SchemaEpoch) -> Self {
+        Self::with_epoch(Pool::Postgres(pool), schema)
+    }
+
+    /// Records that the schema changed, so older pooled connections aren't
+    /// reused (see `SchemaEpoch`).
+    pub(crate) fn schema_changed(&self) {
+        self.schema.changed();
+    }
+
     pub fn dialect(&self) -> Dialect {
         match self.pool {
             Pool::Sqlite(_) => Dialect::Sqlite,

@@ -562,6 +562,11 @@ and the integration tests are one binary. Result: rebuild after a core change 29
   - `rnx make:job` / `make:command` insert their `app.job::<…>()` / `app.command(…)` into the
     module's `fn register` (creating it before `fn routes`); `make:migration` bumps the
     timestamp past the newest migration.
+- Schema changes vs pooled connections: `Db` carries a `SchemaEpoch`; the migrator marks it once
+  per batch (each rollback step, `fresh`), and pools from `db::connect` drop connections opened
+  before it (`before_acquire`). Without it a pre-migration connection's `SELECT *` panicked in
+  sqlx-sqlite (`row.rs` index out of bounds) and returned no rows. Mark per batch, not per
+  migration: per migration made the PostgreSQL suite 2.5x slower (reconnects).
 - `target/` grows to ~100 GB over a few milestones and fills the disk (link errors, "No space left
   on device"); `cargo clean` it before the full two-database run.
 - This session's working directory (~/workspace/renoxium) isn't a git repo, so the Agent tool's
@@ -610,7 +615,8 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M15a query builder (groups, sub-queries, aggregates, bulk update/upsert, chunk), `FromRow` + `fetch_as`, `db::relations` (belongs_to, has_many, Pivot), docs/relations.md | merged to `main` |
 | M15b validation rules (regex, digits, dates, required_if…, each/nested, `Rule`), `Vec<Upload>`, `Cookies`/`SetCookie`, `Download` | merged to `main` |
 | M16a lighter builds (no aws-lc, default features `fake`/`server-events`), versioned `asset()`, cargo-chef Dockerfile, shared limits with `CACHE_STORE=database` | merged to `main` (#40) |
-| M16b CI & trust: MSRV, cargo-hack, `tests/cli/run.sh` (rnx new + make:* + Docker), S3 on SeaweedFS, cargo-deny, coverage, direct tests, macro doctests, SECURITY/CONTRIBUTING/CHANGELOG | PR from branch `m16b-ci-and-trust` |
+| M16b CI & trust: MSRV, cargo-hack, `tests/cli/run.sh` (rnx new + make:* + Docker), S3 on SeaweedFS, cargo-deny, coverage, direct tests, macro doctests, SECURITY/CONTRIBUTING/CHANGELOG | merged to `main` (#41) |
+| Fix: pooled connections with a stale schema after migrations (flaky macOS CI) | PR from branch `fix-stale-schema-connections` |
 | M17 examples (shop, htmx-recipes, relations, READMEs) | next; then v1.0 |
 | v1.0 docs site, starter kit, semver guarantee | last |
 

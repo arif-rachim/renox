@@ -10,6 +10,14 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### Fixes
+
+- **Stale schema in pooled connections.** After a migration added a column, a connection opened
+  before it could run `SELECT *` on that table with the old column list. sqlx-sqlite then
+  panicked, and the query returned no rows; PostgreSQL could refuse its cached plan. Pools now
+  drop connections opened before the last migration batch run in the process. Seen as a flaky
+  macOS failure of the multi-server test.
+
 ### M16b · CI and trust
 
 - CI builds and tests an app made by `rnx new` with every `make:*` generator, on SQLite and
