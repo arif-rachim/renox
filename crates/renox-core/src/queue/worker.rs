@@ -181,7 +181,8 @@ impl Worker {
                     attempt: job.attempts,
                 };
                 // Its own task, so a panic is a failed attempt, not a dead worker.
-                let mut task = tokio::spawn((handler.run)(job.payload.clone(), ctx));
+                let run = (handler.run)(job.payload.clone(), ctx);
+                let mut task = tokio::spawn(crate::context::scope(run));
                 match tokio::time::timeout(handler.timeout, &mut task).await {
                     Ok(Ok(Ok(()))) => Ok(()),
                     Ok(Ok(Err(err))) => Err(Failure {

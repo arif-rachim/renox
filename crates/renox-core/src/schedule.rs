@@ -207,7 +207,8 @@ impl Schedule {
                         return;
                     }
                     tracing::info!(task = %task.name, "scheduled task started");
-                    let run = std::panic::AssertUnwindSafe((task.run)(state));
+                    let run =
+                        std::panic::AssertUnwindSafe(crate::context::scope((task.run)(state)));
                     match futures_util::FutureExt::catch_unwind(run).await {
                         Ok(Ok(())) => {}
                         Ok(Err(err)) => {

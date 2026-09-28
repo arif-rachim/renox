@@ -12,6 +12,8 @@ pub struct AccessToken {
     pub id: i64,
     pub user_id: i64,
     pub name: String,
+    /// What the token may do (`AuthUser::token_can`); `None` for everything.
+    pub abilities: Option<Vec<String>>,
     pub last_used_at: Option<DateTime>,
     pub expires_at: Option<DateTime>,
     pub created_at: Option<DateTime>,
@@ -39,30 +41,63 @@ fn from_row(row: &crate::db::Row) -> std::result::Result<AccessToken, crate::db:
         id: row.try_get("id")?,
         user_id: row.try_get("user_id")?,
         name: row.try_get("name")?,
+        abilities: parse_abilities(row.try_get("abilities")?),
         last_used_at: row.try_get("last_used_at")?,
         expires_at: row.try_get("expires_at")?,
         created_at: row.try_get("created_at")?,
     })
 }
 
-const COLUMNS: &str = "id, user_id, name, last_used_at, expires_at, created_at";
+const COLUMNS: &str = "id, user_id, name, abilities, last_used_at, expires_at, created_at";
+
+fn parse_abilities(json: Option<String>) -> Option<Vec<String>> {
+    json.and_then(|json| serde_json::from_str(&json).ok())
+}
 
 impl User {
-    /// Creates an API token, optionally expiring at `expires_at`.
+    /// Creates an API token that may do everything the user may, optionally
+    /// expiring at `expires_at`.
     pub async fn create_token(
         &self,
         db: &Db,
         name: &str,
         expires_at: Option<DateTime>,
     ) -> Result<NewToken> {
+        self.insert_token(db, name, None, expires_at).await
+    }
+
+    /// Creates an API token limited to `abilities` (checked with
+    /// `AuthUser::token_can` or `Routes::require_ability`), e.g. a read-only
+    /// token: `create_token_with(&db, "reports", &["orders:read"], None)`.
+    /// `"*"` allows everything.
+    pub async fn create_token_with(
+        &self,
+        db: &Db,
+        name: &str,
+        abilities: &[&str],
+        expires_at: Option<DateTime>,
+    ) -> Result<NewToken> {
+        self.insert_token(db, name, Some(abilities), expires_at)
+            .await
+    }
+
+    async fn insert_token(
+        &self,
+        db: &Db,
+        name: &str,
+        abilities: Option<&[&str]>,
+        expires_at: Option<DateTime>,
+    ) -> Result<NewToken> {
         let secret = random_token();
         let created = now();
+        let abilities = abilities.map(|list| serde_json::json!(list).to_string());
         let row = crate::db::sql(format!(
-            "INSERT INTO personal_access_tokens (user_id, name, token, expires_at, created_at, updated_at) \
-             VALUES (?, ?, ?, ?, ?, ?) RETURNING {COLUMNS}"
+            "INSERT INTO personal_access_tokens (user_id, name, abilities, token, expires_at, created_at, updated_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING {COLUMNS}"
         ))
         .bind(self.id)
         .bind(name)
+        .bind(abilities)
         .bind(sha256_hex(&secret))
         .bind(expires_at)
         .bind(created)
@@ -111,9 +146,24 @@ impl User {
     }
 }
 
-/// The user behind `Authorization: Bearer <id|secret>` and the token's id,
-/// if the token is valid.
-pub(crate) async fn authenticate(db: &Db, bearer: &str) -> Result<Option<(User, i64)>> {
+/// Deletes tokens that expired more than `grace` ago; returns how many.
+/// `rnx tokens:prune` (from the `Auth` module) runs it with a day's grace.
+pub async fn prune_expired_tokens(db: &Db, grace: std::time::Duration) -> Result<u64> {
+    let before = now() - chrono::Duration::from_std(grace).unwrap_or_default();
+    Ok(
+        crate::db::sql("DELETE FROM personal_access_tokens WHERE expires_at < ?")
+            .bind(before)
+            .execute(db)
+            .await?,
+    )
+}
+
+/// The token's id and abilities (`None` for every ability).
+pub(crate) type TokenGrant = (i64, Option<Vec<String>>);
+
+/// The user behind `Authorization: Bearer <id|secret>` and the token, if
+/// the token is valid.
+pub(crate) async fn authenticate(db: &Db, bearer: &str) -> Result<Option<(User, TokenGrant)>> {
     let Some((id, secret)) = bearer.split_once('|') else {
         return Ok(None);
     };
@@ -121,7 +171,7 @@ pub(crate) async fn authenticate(db: &Db, bearer: &str) -> Result<Option<(User, 
         return Ok(None);
     };
     let Some(row) = crate::db::sql(
-        "SELECT user_id, token, expires_at FROM personal_access_tokens WHERE id = ?",
+        "SELECT user_id, token, abilities, expires_at FROM personal_access_tokens WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(db)
@@ -139,7 +189,8 @@ pub(crate) async fn authenticate(db: &Db, bearer: &str) -> Result<Option<(User, 
         .bind(id)
         .execute(db)
         .await?;
+    let abilities = parse_abilities(row.try_get("abilities")?);
     Ok(User::find(db, row.try_get("user_id")?)
         .await?
-        .map(|user| (user, id)))
+        .map(|user| (user, (id, abilities))))
 }

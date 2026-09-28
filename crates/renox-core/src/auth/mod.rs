@@ -35,6 +35,7 @@
 mod module;
 pub mod notifications;
 mod passwords;
+pub mod permissions;
 mod throttle;
 mod tokens;
 mod user;
@@ -54,8 +55,9 @@ use axum::response::{IntoResponse, Redirect, Response};
 
 pub use module::{Auth, Registration};
 pub use notifications::{Channel, DatabaseNotification, Notification, Recipient};
+pub use permissions::Permissions;
 pub(crate) use throttle::LoginThrottle;
-pub use tokens::{AccessToken, NewToken};
+pub use tokens::{AccessToken, NewToken, prune_expired_tokens};
 pub use user::{User, hash_password, verify_password};
 pub use verification::send_verification;
 
@@ -113,12 +115,42 @@ pub struct Can<T> {
     pub abilities: std::collections::BTreeMap<String, bool>,
 }
 
+/// Who asks a policy, for [`Can::new`]: a [`User`], or an [`AuthUser`],
+/// which also applies `App::gate_before` (pass `user.as_ref()` for that).
+pub trait Viewer {
+    fn as_user(&self) -> &User;
+
+    /// `App::gate_before`'s answer, if any.
+    fn before(&self, _ability: &str) -> Option<bool> {
+        None
+    }
+}
+
+impl Viewer for User {
+    fn as_user(&self) -> &User {
+        self
+    }
+}
+
+impl Viewer for AuthUser {
+    fn as_user(&self) -> &User {
+        &self.user
+    }
+
+    fn before(&self, ability: &str) -> Option<bool> {
+        AuthUser::before(self, ability)
+    }
+}
+
 impl<T: Policy> Can<T> {
-    pub fn new(item: T, user: Option<&User>, abilities: &[&str]) -> Self {
+    pub fn new<V: Viewer + ?Sized>(item: T, user: Option<&V>, abilities: &[&str]) -> Self {
         let abilities = abilities
             .iter()
             .map(|ability| {
-                let allowed = user.is_some_and(|user| item.allows(user, ability));
+                let allowed = user.is_some_and(|user| {
+                    user.before(ability)
+                        .unwrap_or_else(|| item.allows(user.as_user(), ability))
+                });
                 ((*ability).to_owned(), allowed)
             })
             .collect();
@@ -127,7 +159,39 @@ impl<T: Policy> Can<T> {
 }
 
 pub(crate) type Gate = Arc<dyn Fn(&User) -> bool + Send + Sync>;
-pub(crate) type Gates = Arc<HashMap<String, Gate>>;
+pub(crate) type GateBefore = Arc<dyn Fn(&User, &str) -> Option<bool> + Send + Sync>;
+pub(crate) type Gates = Arc<Access>;
+
+/// The app's gates (`App::gate`), its `App::gate_before` hook, and whether
+/// the `Permissions` module is on.
+#[derive(Default)]
+pub(crate) struct Access {
+    pub gates: HashMap<String, Gate>,
+    pub before: Option<GateBefore>,
+    pub permissions: bool,
+}
+
+impl Access {
+    /// A gate or permission named `name`: `gate_before` first, then the gate,
+    /// then the user's permissions. Unknown names deny.
+    pub(crate) fn check(&self, user: &User, grants: &Grants, name: &str) -> bool {
+        if let Some(allowed) = self.before.as_ref().and_then(|before| before(user, name)) {
+            return allowed;
+        }
+        match self.gates.get(name) {
+            Some(check) => check(user),
+            None => grants.permissions.contains(name),
+        }
+    }
+}
+
+/// The current user's roles and permissions (`Permissions` module), loaded
+/// once per request.
+#[derive(Default, Debug)]
+pub(crate) struct Grants {
+    pub roles: Vec<String>,
+    pub permissions: std::collections::HashSet<String>,
+}
 pub(crate) type AsyncGate = Arc<
     dyn Fn(
             User,
@@ -146,6 +210,10 @@ pub(crate) struct CurrentUser {
     /// The API token of `Authorization: Bearer`, when that authenticated
     /// the request (so CSRF doesn't apply).
     pub token_id: Option<i64>,
+    /// That token's abilities; `None` for every ability (sessions, and
+    /// tokens made without a list).
+    pub abilities: Option<Arc<Vec<String>>>,
+    pub grants: Arc<Grants>,
 }
 
 /// The logged-in user. Requests without one are sent to the `login` route
@@ -157,6 +225,8 @@ pub struct AuthUser {
     gates: Gates,
     state: Option<AppState>,
     token_id: Option<i64>,
+    abilities: Option<Arc<Vec<String>>>,
+    grants: Arc<Grants>,
 }
 
 impl Deref for AuthUser {
@@ -175,9 +245,44 @@ impl AuthUser {
         self.token_id
     }
 
-    /// Whether the policy of `target` allows `ability`.
+    /// Whether the API token this request logged in with may do `ability`
+    /// (`create_token_with(.., &["orders:read"], ..)`). Sessions, and tokens
+    /// made without a list, may do everything.
+    pub fn token_can(&self, ability: &str) -> bool {
+        self.abilities
+            .as_ref()
+            .is_none_or(|list| list.iter().any(|a| a == ability || a == "*"))
+    }
+
+    /// Whether the user has `role` (the `Permissions` module).
+    pub fn has_role(&self, role: &str) -> bool {
+        self.grants.roles.iter().any(|r| r == role)
+    }
+
+    /// Whether one of the user's roles grants `permission` (the
+    /// `Permissions` module). `allows(permission)` also asks
+    /// `App::gate_before`.
+    pub fn has_permission(&self, permission: &str) -> bool {
+        self.grants.permissions.contains(permission)
+    }
+
+    /// The user's roles (the `Permissions` module).
+    pub fn role_names(&self) -> &[String] {
+        &self.grants.roles
+    }
+
+    /// Whether the policy of `target` allows `ability` (after
+    /// `App::gate_before`).
     pub fn can(&self, ability: &str, target: &impl Policy) -> bool {
-        target.allows(&self.user, ability)
+        self.before(ability)
+            .unwrap_or_else(|| target.allows(&self.user, ability))
+    }
+
+    fn before(&self, ability: &str) -> Option<bool> {
+        self.gates
+            .before
+            .as_ref()
+            .and_then(|before| before(&self.user, ability))
     }
 
     /// Like `can`, but a refusal becomes a 403 response.
@@ -189,9 +294,11 @@ impl AuthUser {
         }
     }
 
-    /// Whether the gate named `gate` lets this user through. Unknown gates deny.
+    /// Whether the gate named `gate` lets this user through: `gate_before`,
+    /// then the gate, then the user's permissions of that name. Unknown
+    /// names deny.
     pub fn allows(&self, gate: &str) -> bool {
-        self.gates.get(gate).is_some_and(|check| check(&self.user))
+        self.gates.check(&self.user, &self.grants, gate)
     }
 
     /// Like `allows`, but a refusal becomes a 403 response.
@@ -207,7 +314,10 @@ impl AuthUser {
     /// with `App::gate_async` (which may query the database) as well as
     /// plain ones. Unknown gates deny.
     pub async fn allows_async(&self, gate: &str) -> Result<bool> {
-        if self.gates.contains_key(gate) {
+        if let Some(allowed) = self.before(gate) {
+            return Ok(allowed);
+        }
+        if self.gates.gates.contains_key(gate) || self.grants.permissions.contains(gate) {
             return Ok(self.allows(gate));
         }
         let Some(state) = &self.state else {
@@ -262,6 +372,8 @@ fn current(extensions: &axum::http::Extensions) -> Option<AuthUser> {
         gates: current.gates.clone(),
         state: extensions.get::<AppState>().cloned(),
         token_id: current.token_id,
+        abilities: current.abilities.clone(),
+        grants: current.grants.clone(),
     })
 }
 
@@ -315,11 +427,11 @@ pub(crate) async fn middleware(
         .and_then(|v| v.strip_prefix("Bearer "))
         .map(str::to_owned);
     let session = req.extensions().get::<Session>().cloned();
-    let (user, token_id) = match (&bearer, &session) {
+    let (user, token) = match (&bearer, &session) {
         // Only a token that authenticates turns CSRF off: a wrong or unknown
         // one leaves the request a guest's, with CSRF checked as usual.
         (Some(bearer), _) => match tokens::authenticate(&state.db, bearer.trim()).await {
-            Ok(Some((user, id))) => (Some(user), Some(id)),
+            Ok(Some((user, token))) => (Some(user), Some(token)),
             Ok(None) => (None, None),
             Err(err) => {
                 tracing::error!(error = ?err, "could not check the API token");
@@ -329,10 +441,24 @@ pub(crate) async fn middleware(
         (None, Some(session)) => (resolve(&state, session).await, None),
         (None, None) => (None, None),
     };
+    let grants = match &user {
+        Some(user) if state.gates.permissions => {
+            match permissions::grants(&state.db, user.id).await {
+                Ok(grants) => grants,
+                Err(err) => {
+                    tracing::error!(error = ?err, "could not load the user's roles");
+                    Grants::default()
+                }
+            }
+        }
+        _ => Grants::default(),
+    };
     req.extensions_mut().insert(CurrentUser {
         user: user.map(Arc::new),
         gates: state.gates.clone(),
-        token_id,
+        token_id: token.as_ref().map(|t| t.0),
+        abilities: token.and_then(|t| t.1).map(Arc::new),
+        grants: Arc::new(grants),
     });
     req.extensions_mut().insert(state);
     next.run(req).await
@@ -405,6 +531,39 @@ pub(crate) async fn require_auth(req: Request, next: Next) -> Response {
     }
     let (parts, _) = req.into_parts();
     unauthenticated(&parts)
+}
+
+/// What a route guard asks of the logged-in user (`Routes::require_gate`,
+/// `require_role`, `require_permission`, `require_ability`).
+#[derive(Clone)]
+pub(crate) enum Requirement {
+    Gate(String),
+    Role(String),
+    Permission(String),
+    Ability(String),
+}
+
+/// Route guard: a guest is sent to log in; a user who doesn't meet
+/// `requirement` gets 403.
+pub(crate) async fn require(requirement: Arc<Requirement>, req: Request, next: Next) -> Response {
+    let Some(user) = current(req.extensions()) else {
+        let (parts, _) = req.into_parts();
+        return unauthenticated(&parts);
+    };
+    let allowed = match requirement.as_ref() {
+        Requirement::Gate(gate) => match user.allows_async(gate).await {
+            Ok(allowed) => allowed,
+            Err(err) => return err.into_response(),
+        },
+        Requirement::Role(role) => user.has_role(role),
+        Requirement::Permission(permission) => user.allows(permission),
+        Requirement::Ability(ability) => user.token_can(ability),
+    };
+    if allowed {
+        next.run(req).await
+    } else {
+        Error::Forbidden.into_response()
+    }
 }
 
 /// Route guard: only users who verified their email. See `Routes::require_verified`.

@@ -11,6 +11,7 @@ pub mod cache;
 mod client_ip;
 pub mod command;
 mod config;
+pub mod context;
 mod cookies;
 mod counters;
 mod crypto;

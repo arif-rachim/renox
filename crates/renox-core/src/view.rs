@@ -644,7 +644,11 @@ fn globals(
     ));
     let old_input = session.cloned();
     let user = current_user.as_ref().and_then(|c| c.user.clone());
-    let gate_user = current_user.and_then(|c| Some((c.user?, c.gates)));
+    let roles = current_user
+        .as_ref()
+        .map(|c| c.grants.roles.clone())
+        .unwrap_or_default();
+    let gate_user = current_user.and_then(|c| Some((c.user?, c.gates, c.grants)));
     let errors = session.map(Session::errors).unwrap_or_default();
     let first_errors: std::collections::BTreeMap<String, String> = errors
         .iter()
@@ -667,6 +671,7 @@ fn globals(
         auth => context! {
             check => user.is_some(),
             user => user.as_deref(),
+            roles => roles,
         },
         t => Value::from_function(translate),
         // `can('admin')` asks a gate; `can('update', product)` reads the
@@ -677,9 +682,9 @@ fn globals(
                     .get_attr("_can")
                     .and_then(|can| can.get_attr(&ability))
                     .is_ok_and(|allowed| allowed.is_true()),
-                None => gate_user.as_ref().is_some_and(|(user, gates)| {
-                    gates.get(&ability).is_some_and(|check| check(user))
-                }),
+                None => gate_user
+                    .as_ref()
+                    .is_some_and(|(user, gates, grants)| gates.check(user, grants, &ability)),
             }
         }),
         request => context! {

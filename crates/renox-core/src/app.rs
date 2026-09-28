@@ -91,6 +91,7 @@ pub struct App {
     seeders: Vec<Seeder>,
     gates: HashMap<String, Gate>,
     async_gates: HashMap<String, crate::auth::AsyncGate>,
+    gate_before: Option<crate::auth::GateBefore>,
     registry: Registry,
     embedded: Option<crate::Embedded>,
     csp: crate::security::Csp,
@@ -111,6 +112,7 @@ impl App {
             seeders: Vec::new(),
             gates: HashMap::new(),
             async_gates: HashMap::new(),
+            gate_before: None,
             registry: Registry::default(),
             embedded: None,
             csp: crate::security::Csp::default(),
@@ -255,6 +257,26 @@ impl App {
     /// // in a handler: auth.gate_async("billing").await?;
     /// # ;
     /// ```
+    /// Asked before every gate, permission and policy check: `Some(true)`
+    /// allows, `Some(false)` denies, `None` goes on to the check itself.
+    /// Typically lets super-admins do everything.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # let _ =
+    /// App::new().gate_before(|user, _ability| {
+    ///     (user.get::<String>("role").as_deref() == Some("owner")).then_some(true)
+    /// })
+    /// # ;
+    /// ```
+    pub fn gate_before(
+        mut self,
+        check: impl Fn(&User, &str) -> Option<bool> + Send + Sync + 'static,
+    ) -> Self {
+        self.gate_before = Some(Arc::new(check));
+        self
+    }
+
     pub fn gate_async<F, Fut>(mut self, name: &str, check: F) -> Self
     where
         F: Fn(User, AppState) -> Fut + Send + Sync + 'static,
@@ -379,6 +401,7 @@ impl App {
             templates,
             shares,
             channels,
+            permissions,
         } = self.registry;
         if let Some(name) = duplicate_job {
             return Err(anyhow!("job `{name}` is registered twice").into());
@@ -504,7 +527,11 @@ impl App {
             views,
             db,
             key,
-            gates: Arc::new(self.gates),
+            gates: Arc::new(crate::auth::Access {
+                gates: self.gates,
+                before: self.gate_before,
+                permissions,
+            }),
             async_gates: Arc::new(self.async_gates),
             shares: Arc::new(shares),
             channels: Arc::new(channels),
@@ -819,7 +846,8 @@ impl Kernel {
             .iter()
             .find(|c| c.name == name)
             .ok_or_else(|| anyhow!("unknown command `{name}`"))?;
-        (command.run)(self.state.clone(), crate::command::Args::new(args)).await
+        let run = (command.run)(self.state.clone(), crate::command::Args::new(args));
+        crate::context::scope(run).await
     }
 
     pub fn router(&self) -> Router {
@@ -1124,6 +1152,8 @@ fn build_router(
         .layer(from_fn_with_state(state.clone(), auth::middleware))
         .layer(from_fn_with_state(state.clone(), crate::i18n::middleware))
         .layer(from_fn_with_state(state.clone(), session::middleware))
+        // Each request's own `renox::context`, around everything the app runs.
+        .layer(from_fn(crate::context::middleware))
         .merge(assets::router())
         .merge(crate::health::router())
         .merge(robots(&state, embedded_public))

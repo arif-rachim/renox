@@ -146,6 +146,25 @@ struct Ping;
 
 impl Event for Ping {}
 
+/// Roles, permissions, token abilities and scoped rules (routed so the
+/// futures are checked for `Send`; the tables aren't created here).
+async fn access(State(db): State<Db>, user: AuthUser) -> Result<String> {
+    use renox::auth::permissions;
+    permissions::define_role(&db, "editor", &["posts.publish"]).await?;
+    permissions::grant(&db, "editor", &["posts.edit"]).await?;
+    permissions::revoke(&db, "editor", &["posts.edit"]).await?;
+    user.assign_role(&db, "editor").await?;
+    user.sync_roles(&db, &["editor"]).await?;
+    user.remove_role(&db, "editor").await?;
+    let roles = user.roles(&db).await?;
+    let all = permissions::roles(&db).await?;
+    permissions::delete_role(&db, "editor").await?;
+    user.create_token_with(&db, "t", &["a"], None).await?;
+    renox::auth::prune_expired_tokens(&db, Duration::from_secs(60)).await?;
+    let scoped = Note::unscoped().none().count(&db).await?;
+    Ok(format!("{} {} {scoped}", roles.len(), all.len()))
+}
+
 struct Handlers;
 
 impl Module for Handlers {
@@ -158,6 +177,7 @@ impl Module for Handlers {
             .get("/relations", relations)
             .get("/queries", queries)
             .get("/more", more)
+            .get("/access", access)
     }
 }
 

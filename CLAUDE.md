@@ -165,9 +165,11 @@ docs/assets/demo.gif       the README's demo (see §4.10)
 5. Merged at this level, so they skip everything below (sessions, maintenance): `assets::router()`
    (`/_renox/*.js`), `/health`, `/robots.txt` (unless `public/robots.txt` exists), `/_renox/live`
    (debug + local only) and the local disk's public files (`/storage/...`, sandboxed headers).
-6. `session` (encrypted cookie) → `i18n` (`RequestLocale`: session `_locale`, else
-   `APP_LOCALE`) → `auth` (loads the user once from session or `Authorization: Bearer`; inserts
-   `CurrentUser` and `AppState` into extensions) → `csrf` → `view` (renders `View`s and error
+6. `context` (`renox::context`: a fresh task-local context per request; jobs, scheduled tasks
+   and app commands get one too) → `session` (encrypted cookie) → `i18n` (`RequestLocale`: session `_locale`, else
+   `APP_LOCALE`) → `auth` (loads the user once from session or `Authorization: Bearer`, with the
+   token's abilities, and the user's roles/permissions when the `Permissions` module is on;
+   inserts `CurrentUser` and `AppState` into extensions) → `csrf` → `view` (renders `View`s and error
    pages; `ValidationError` → redirect back for plain forms) → `maintenance` (503 while
    `storage/framework/down` exists; inside `view` so the 503 uses the error template) → `guard`
    (a handler panic or a run past `REQUEST_TIMEOUT` becomes a 500 with the error page).
@@ -326,10 +328,13 @@ to the config tests there, give it a test-friendly value in `Default`, and docum
 App-specific settings need no field: `config.var(name)` reads `config.vars`, then the environment.
 
 ### 4.5 Migrations owned by the framework
-Names start with `0001…` so they sort before app migrations (`2026…`). There are nine:
+Names start with `0001…` so they sort before app migrations (`2026…`). There are eleven:
 - Auth module (`auth/module.rs` `MIGRATIONS`): `00010101000000_create_users_table`,
   `…000001_create_password_reset_tokens_table`, `…000002_create_personal_access_tokens_table`,
-  `…000003_create_notifications_table`, `…000004_add_sessions_revoked_at_to_users`.
+  `…000003_create_notifications_table`, `…000004_add_sessions_revoked_at_to_users`,
+  `…000005_add_abilities_to_personal_access_tokens`.
+- Permissions module (`auth/permissions.rs`): `00010101000500_create_roles_and_permissions_tables`
+  (roles, permissions, permission_role, role_user).
 - Every app (registered in `App::boot`): `00010101000100_create_jobs_table` (queue),
   `00010101000200_create_cache_table` (cache), `00010101000300_create_webhook_calls_table` and
   `00010101000301_store_webhook_payloads_as_bytes` (webhook.rs `MIGRATIONS`).
@@ -652,9 +657,12 @@ change 29 s → 7 s, full run 19 s → 6 s.
 - **All milestones M0–M17 are merged to `main`**; the last was M17b (examples htmx-recipes and
   relations, a README per example, `AuthUser::token_id`, `key:generate` creates `.env`; #44).
   History: `CHANGELOG.md` (per milestone) and `ROADMAP.md` (per-milestone notes and decisions).
-- After M17, a docs refresh (branch `docs-refresh`): this file, CHEATSHEET, llms.txt, README, the
-  new-app AGENTS.md (linked to the pinned commit), ROADMAP "Not planned", crate descriptions.
-- **Next: M18 (SaaS foundations), then M19–M21**, from the Laravel parity review
+- After M17: a docs refresh (#45) and the Laravel parity review with M18–M21 planned (#46).
+- **M18a** (tenancy: `renox::context`, default scopes, scoped `unique`/`exists`; `require_gate`,
+  `gate_before`; the `Permissions` module; token abilities): PR from branch
+  `m18a-authorization`. Authorization is in one place: `auth::Access::check` (gate_before →
+  gate → permission); `gate_before` doesn't answer role membership.
+- **Next: M18b (accounts and security), then M19–M21**, from the Laravel parity review
   (`docs/audit/2026-09-laravel-parity.md`); the ROADMAP lists each milestone's items. **v1.0 is
   on hold** until the owner says to start it (docs site, starter kit, semver checks, real
   crates.io releases; the owner runs `cargo login`).

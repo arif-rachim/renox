@@ -1,7 +1,6 @@
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use super::Admin;
 use crate::app::catalog::FEATURED;
 use crate::app::catalog::model::{Category, Product, slug};
 
@@ -14,7 +13,6 @@ pub struct Filters {
 
 pub async fn index(
     State(db): State<Db>,
-    _: Admin,
     Query(filters): Query<Filters>,
     Page(page): Page,
 ) -> Result<View> {
@@ -59,14 +57,13 @@ impl Validate for ProductForm {
     }
 }
 
-pub async fn create(State(db): State<Db>, _: Admin) -> Result<View> {
+pub async fn create(State(db): State<Db>) -> Result<View> {
     let categories = Category::query().order_by("name").get(&db).await?;
     Ok(view("admin/products/form.html", context! { categories }))
 }
 
 pub async fn store(
     State(state): State<AppState>,
-    _: Admin,
     session: Session,
     Valid(form): Valid<ProductForm>,
 ) -> Result<Redirect> {
@@ -78,7 +75,7 @@ pub async fn store(
     Ok(Redirect::to("/admin/products"))
 }
 
-pub async fn edit(State(db): State<Db>, _: Admin, Path(id): Path<i64>) -> Result<View> {
+pub async fn edit(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
     let product = Product::find_or_404(&db, id).await?;
     let categories = Category::query().order_by("name").get(&db).await?;
     Ok(view(
@@ -89,7 +86,6 @@ pub async fn edit(State(db): State<Db>, _: Admin, Path(id): Path<i64>) -> Result
 
 pub async fn update(
     State(state): State<AppState>,
-    _: Admin,
     session: Session,
     Path(id): Path<i64>,
     Valid(form): Valid<ProductForm>,
@@ -104,7 +100,6 @@ pub async fn update(
 
 pub async fn destroy(
     State(state): State<AppState>,
-    _: Admin,
     session: Session,
     Path(id): Path<i64>,
 ) -> Result<Redirect> {

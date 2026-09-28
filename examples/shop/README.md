@@ -26,7 +26,7 @@ Register a customer at `/register`, or promote any registered user with
 | Checkout in one transaction that never oversells, and cancelling with the stock given back | [src/app/orders/checkout.rs](src/app/orders/checkout.rs) |
 | `OrderPlaced` event, its listener, the daily task that cancels unpaid orders, the order policy | [src/app/orders/mod.rs](src/app/orders/mod.rs), [model.rs](src/app/orders/model.rs) |
 | Notifications: a queued confirmation mail (HTML and text) and a database row for the customer, a database row for every admin, a "shipped" mail | [src/app/orders/notifications.rs](src/app/orders/notifications.rs), [resources/views/mail](resources/views/mail) |
-| `/admin`: an `Admin` extractor that checks the gate, products with photo uploads and search/sort, orders moved pending → paid → shipped, a dashboard with low stock and notifications | [src/app/admin](src/app/admin) |
+| `/admin`: a route group guarded by the `admin` gate (`require_gate`), products with photo uploads and search/sort, orders moved pending → paid → shipped, a dashboard with low stock and notifications | [src/app/admin](src/app/admin) |
 | English and Indonesian, with plurals (`0 products`, `One product`, `3 products`) and translated validation labels | [resources/lang](resources/lang) |
 | Deploy: Dockerfile (cargo-chef), systemd unit, Litestream, from `rnx make:deploy` | [Dockerfile](Dockerfile), [deploy/](deploy) |
 
@@ -44,8 +44,9 @@ Register a customer at `/register`, or promote any registered user with
   `order_by` call.
 - **One query per relation.** The product list and the cart load their categories and products
   with `relations::belongs_to`, not one query per row.
-- **Admin routes are checked in one place.** Every admin handler takes `Admin`, an extractor
-  that sends guests to the login page and answers 403 to customers.
+- **Admin routes are checked in one place.** The `/admin` group ends with
+  `.require_gate("admin")`, which sends guests to the login page and answers 403 to customers;
+  `rnx route:list` shows it as `gate:admin`.
 
 ## Deploying
 

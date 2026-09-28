@@ -1,7 +1,6 @@
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use super::Admin;
 use crate::app::orders::checkout;
 use crate::app::orders::model::{Order, OrderStatus};
 use crate::app::orders::notifications::OrderShipped;
@@ -13,7 +12,6 @@ pub struct Filters {
 
 pub async fn index(
     State(db): State<Db>,
-    _: Admin,
     Query(filters): Query<Filters>,
     Page(page): Page,
 ) -> Result<View> {
@@ -44,7 +42,6 @@ impl Validate for StatusForm {
 /// comes back). Shipping tells the customer.
 pub async fn update_status(
     State(state): State<AppState>,
-    _: Admin,
     session: Session,
     back: Back,
     Path(id): Path<i64>,
