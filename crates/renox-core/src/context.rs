@@ -81,12 +81,29 @@ pub async fn scope<F: Future>(fut: F) -> F::Output {
     CONTEXT.scope(RefCell::new(Values::new()), fut).await
 }
 
+/// The app of the current request, job, task or command, e.g. for a model
+/// hook that emits an event or forgets a cache key. `None` outside one
+/// (a bare `tokio::spawn`, or a test calling models directly).
+pub fn app() -> Option<crate::AppState> {
+    get::<crate::AppState>()
+}
+
+/// Runs `fut` in a fresh context that knows the app.
+pub(crate) async fn scope_app<F: Future>(state: crate::AppState, fut: F) -> F::Output {
+    scope(async move {
+        set(state);
+        fut.await
+    })
+    .await
+}
+
 /// Runs each request in its own context.
 pub(crate) async fn middleware(
+    axum::extract::State(state): axum::extract::State<crate::AppState>,
     req: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> axum::response::Response {
-    scope(next.run(req)).await
+    scope_app(state, next.run(req)).await
 }
 
 #[cfg(test)]

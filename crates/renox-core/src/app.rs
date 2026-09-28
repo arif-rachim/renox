@@ -847,7 +847,7 @@ impl Kernel {
             .find(|c| c.name == name)
             .ok_or_else(|| anyhow!("unknown command `{name}`"))?;
         let run = (command.run)(self.state.clone(), crate::command::Args::new(args));
-        crate::context::scope(run).await
+        crate::context::scope_app(self.state.clone(), run).await
     }
 
     pub fn router(&self) -> Router {
@@ -1153,7 +1153,10 @@ fn build_router(
         .layer(from_fn_with_state(state.clone(), crate::i18n::middleware))
         .layer(from_fn_with_state(state.clone(), session::middleware))
         // Each request's own `renox::context`, around everything the app runs.
-        .layer(from_fn(crate::context::middleware))
+        .layer(from_fn_with_state(
+            state.clone(),
+            crate::context::middleware,
+        ))
         .merge(assets::router())
         .merge(crate::health::router())
         .merge(robots(&state, embedded_public))

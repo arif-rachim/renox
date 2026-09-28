@@ -376,7 +376,57 @@ Relations are explicit: a method for one related row, and loaders for a page of 
 counts and totals per row; one query each, no N+1). Filter by related rows with
 `.where_has(Review::where_eq("stars", 5), "product_id")` / `.where_doesnt_have(…)`.
 For joins and reports, use `sql("…").fetch_as::<T>(&db)` with `#[derive(FromRow)]` or a tuple.
-See [docs/relations.md](docs/relations.md).
+See [docs/relations.md](docs/relations.md): pivot columns (`attach_with`, `load_with_pivot`,
+`toggle`) and polymorphic relations (`Morph`) are there too.
+
+## Model hooks, partial saves, encrypted values
+
+```rust
+use renox::db::ModelHooks;
+use renox::prelude::*;
+
+#[derive(Model, serde::Serialize, Default, Clone)]
+#[model(table = "posts", hooks)]
+struct Post {
+    id: i64,
+    title: String,
+    slug: String,
+    views: i64,
+    api_secret: String, // stored encrypted
+}
+
+impl ModelHooks for Post {
+    // Before INSERT/UPDATE; an Err stops the save. Also `deleting` before a delete.
+    fn saving(&mut self, _creating: bool) -> Result {
+        self.slug = self.title.to_lowercase().replace(' ', "-");
+        Ok(())
+    }
+
+    // After the write; also `deleted`. The current app, in a request, job, task or command:
+    async fn saved(&self, _created: bool) -> Result {
+        if let Some(state) = renox::context::app() {
+            state.cache.forget("posts.latest").await?;
+        }
+        Ok(())
+    }
+}
+
+async fn edit(state: &AppState, id: i64) -> Result {
+    let db = &state.db;
+    let original = Post::find_or_404(db, id).await?;
+    let mut post = original.clone();
+    post.title = "New title".into();
+    post.save_only(db, &["title"]).await?; // only these columns (+ updated_at); `views` untouched
+    post.save_changes(db, &original).await?; // the columns that differ; false if none
+    post.api_secret = state.encrypt("sk_live_123"); // AES-256-GCM under APP_KEY
+    let secret = state.decrypt(&post.api_secret)?; // Err if tampered or another key
+    let _ = secret;
+    Ok(())
+}
+```
+
+Hooks run for `save`, `create`, `save_only`, `save_changes`, `delete` and `force_delete`, not
+for bulk `Query::update`/`delete` or `insert_many`.
 
 ## Every field type (details in docs/types.md)
 

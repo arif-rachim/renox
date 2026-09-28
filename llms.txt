@@ -105,8 +105,8 @@ Every example has a README.md that walks through it.
   sccache, the cargo-chef Dockerfile).
 - [docs/types.md](docs/types.md): every Rust field type with its form input and its SQLite and
   PostgreSQL column (`DbEnum`, `Json<T>`, dates and times, money, UUID).
-- [docs/relations.md](docs/relations.md): relations without N+1 (`belongs_to`, `has_many`, `Pivot`),
-  joins with `fetch_as` and `#[derive(FromRow)]`, the query builder mapped to Laravel's.
+- [docs/relations.md](docs/relations.md): relations without N+1 (`belongs_to`, `has_many`, `Pivot`
+  with pivot columns, polymorphic `Morph`), joins with `fetch_as` and `#[derive(FromRow)]`, the query builder mapped to Laravel's.
 - [docs/stability.md](docs/stability.md): what semver covers, which types may grow
   (`#[non_exhaustive]`), public dependencies (axum yes, sqlx only through escape hatches).
 - `rnx make:deploy` writes `deploy/README.md` (Docker, systemd, Litestream backups).
