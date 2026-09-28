@@ -19,7 +19,7 @@ rnx make:command products:import --module products  # then `rnx products:import 
 rnx make:mail order_shipped
 rnx migrate                          # migrate:status, migrate:fresh --seed, db:seed
 rnx migrate:rollback --step 2        # the last 2 batches (default 1)
-rnx route:list                       # db:shell, schedule:list
+rnx route:list                       # db:shell, schedule:list, schedule:run NAME, cache:prune
 rnx queue:work --queue mail --workers 2  # --once: run what is queued, then stop
 rnx queue:failed                     # queue:retry <id|all>, queue:flush (deletes them)
 rnx schedule:work                    # tasks in their own process (SCHEDULER=false for serve)
@@ -866,7 +866,9 @@ fn background(app: App) -> App {
         })
         .schedule(|s| {
             // Also every_minute(name, task), hourly(name, task), every(Duration, name, task).
-            s.every_minutes(5, "sync-stock", |_state| async move { Ok(()) }); // :00, :05, … on the clock
+            s.every_minutes(5, "sync-stock", |_state| async move { Ok(()) }) // :00, :05, … on the clock
+                .weekdays() // also weekends(), days(&[Weekday::Sat])
+                .between("08:00", "18:00");
             s.daily_at("02:00", "cleanup", |state| async move { // in APP_TIMEZONE
                 renox::db::sql("DELETE FROM carts WHERE updated_at < ?")
                     .bind(renox::db::now() - renox::chrono::TimeDelta::days(30))
@@ -874,6 +876,12 @@ fn background(app: App) -> App {
                     .await?;
                 Ok(())
             });
+            s.cron("30 9 * * 1-5", "standup", |_state| async move { Ok(()) }) // min hour day month weekday
+                .timezone("Europe/Amsterdam") // instead of APP_TIMEZONE; DST handled
+                .on_failure(|_state, err| async move { eprintln!("standup failed: {err:?}") })
+                .on_success(|_state| async move {});
+            s.weekly_on(renox::chrono::Weekday::Mon, "07:00", "weekly", |_state| async move { Ok(()) });
+            s.monthly_on(1, "00:05", "invoices", |_state| async move { Ok(()) });
         })
 }
 
@@ -898,6 +906,8 @@ fn card_number(raw: &str) -> Result<u64> {
 ```
 
 Jobs and scheduled tasks run inside `rnx serve` / `my-app serve` (`QUEUE_WORKERS`, `SCHEDULER`).
+`schedule:list` shows each task's next run and zone, `schedule:run NAME` runs one now (also
+`kernel.run_scheduled(name)` in tests).
 A job that errors, panics or passes its `TIMEOUT` is retried up to `MAX_ATTEMPTS`, then moved to
 `failed_jobs` (`queue:failed`, `queue:retry`); a panicking task or listener doesn't stop the others.
 
@@ -993,6 +1003,15 @@ async fn misc(State(state): State<AppState>, session: Session, lang: Lang) -> Re
             renox::db::sql("SELECT COUNT(*) FROM products").scalar(&state.db).await.map_err(Into::into)
         })
         .await?;
+    let visits = state.cache.increment("visits", 1).await?; // atomic; also decrement
+    let first = state.cache.add("promo-sent:7", &true, None).await?; // false if already there
+    let otp: Option<String> = state.cache.pull("otp:7").await?; // read and remove
+    let lock = state.cache.lock("stock:42", Duration::from_secs(30)); // across servers with CACHE_STORE=database
+    if let Some(guard) = lock.try_acquire().await? {
+        // … one worker at a time; lock.block(Duration::from_secs(5)) waits instead (423 after)
+        guard.release().await?; // or drop it
+    }
+    let _ = (visits, first, otp);
     session.put("cart", vec![1, 2, 3])?;
     let cart: Option<Vec<i64>> = session.get("cart");
     // Also: pull (read and remove), remove, regenerate_token(), set_lifetime(minutes).
@@ -1212,7 +1231,7 @@ bytes, e.g. signed webhooks), `request().without_csrf()`, `logout()`, `csrf_toke
 value, such as `staging`, stops the app at boot), `APP_KEY` (`rnx key:generate`; required in
 production), `APP_DEBUG` (on by default in `local`), `APP_NAME`, `APP_URL`, `APP_HOST` (an IP
 address, `127.0.0.1`; `0.0.0.0` in a container) and `APP_PORT` (3000), `APP_LOCALE`,
-`APP_FALLBACK_LOCALE`, `APP_TIMEZONE` (`+07:00`),
+`APP_FALLBACK_LOCALE`, `APP_TIMEZONE` (`Asia/Jakarta`, `+07:00` or `UTC`),
 `SESSION_LIFETIME` (minutes, 120), `REMEMBER_LIFETIME` (minutes, 43200 = 30 days),
 `SESSION_COOKIE` (`renox_session`), `MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME` (defaults to `APP_NAME`),
 `VIEWS_PATH` (`resources/views`), `PUBLIC_PATH` (`public`), `LANG_PATH` (`resources/lang`),

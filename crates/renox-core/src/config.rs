@@ -106,7 +106,9 @@ pub struct Config {
     pub queue_workers: usize,
     /// Whether `serve` runs scheduled tasks, from `SCHEDULER`.
     pub scheduler: bool,
-    /// UTC offset for scheduled times, from `APP_TIMEZONE` (e.g. `+07:00`).
+    /// The zone of scheduled times and the `date` filter, from
+    /// `APP_TIMEZONE`: an IANA name (`Asia/Jakarta`), an offset (`+07:00`) or
+    /// `UTC`. See [`crate::timezone::Zone`].
     pub timezone: String,
     /// `memory` or `database`, from `CACHE_STORE`.
     pub cache_store: String,

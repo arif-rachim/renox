@@ -7,6 +7,7 @@ mod api_foundations;
 mod auth;
 mod auth_email;
 mod authorization;
+mod background;
 mod background_resilience;
 mod data_layer;
 mod data_resilience;

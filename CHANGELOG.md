@@ -10,6 +10,21 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M20a · Scheduler, locks and cache
+
+- `APP_TIMEZONE` takes IANA names (`Asia/Jakarta`, `Europe/Amsterdam`) with daylight saving
+  time, as well as offsets and `UTC`; `renox::timezone::Zone`. The `date` filter uses it too.
+- Schedules: `cron("30 9 * * 1-5")`, `weekly_on`, `monthly_on`; per task `.weekdays()`,
+  `.weekends()`, `.days(&[…])`, `.between("08:00", "17:00")`, `.timezone("…")`,
+  `.on_failure(|state, err| …)`, `.on_success(…)`. `schedule:run NAME` and
+  `Kernel::run_scheduled`. A duplicate task name is a boot error.
+- **Changed:** schedule methods return `ScheduledTask` (derefs to `Schedule`);
+  `Schedule::upcoming` takes a `Zone` and returns `(name, at, zone)`.
+- Cache: `add`, `pull`, `increment`/`decrement` (atomic), `prune` and `cache:prune`; the database
+  store prunes expired rows hourly on its own.
+- Locks: `state.cache.lock(name, ttl)` with `try_acquire`, `block(wait)` (423 on timeout),
+  `is_held`, `force_release`; `LockGuard::release` or drop.
+
 ### M19b · Model features
 
 - Model hooks: `#[model(hooks)]` and `impl renox::db::ModelHooks` with `saving` (may stop the

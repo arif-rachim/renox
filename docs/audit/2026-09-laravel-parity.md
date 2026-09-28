@@ -60,7 +60,7 @@ Renox is solid, and in several areas ahead of Laravel. Head to head, two kinds o
 |---|---|---|
 | `User::set_password` also logs out the current session (the fingerprint changes); the handler must `auth::login` again. CHEATSHEET said "other sessions end" (fixed with this review). | `auth/user.rs:137`, `auth/mod.rs:347` | M18: `auth::change_password` |
 | `auth::logout` ends every session of the user, on every device (deliberate since M13a); there's no "log out this device" | `auth/mod.rs:283` | M18 |
-| `APP_TIMEZONE` accepts only UTC or a fixed offset (`+07:00`); `Asia/Jakarta` is refused and DST is impossible | `schedule.rs:283` | M20 |
+| `APP_TIMEZONE` accepts only UTC or a fixed offset (`+07:00`); `Asia/Jakarta` is refused and DST is impossible | `schedule.rs:283` | M20 (fixed in M20a) |
 | A bad `Path<i64>` value gets axum's plain-text 400, not a 404 or Renox's error page (read, not run) | no rejection mapping found | M21 |
 | Expired rows of the database cache store (and counters) are never pruned | `cache.rs`, `counters.rs` | M20 |
 

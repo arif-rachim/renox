@@ -22,7 +22,8 @@ use crate::events::Event;
 use crate::mail::Mailer;
 use crate::queue::{Handlers, Job, Queue, Worker};
 use crate::routing::RouteInfo;
-use crate::schedule::{Schedule, parse_offset};
+use crate::schedule::Schedule;
+use crate::timezone::Zone;
 use crate::{
     AppState, Config, Environment, Error, Module, Registry, Result, RouteTable, Views, assets,
     auth, csrf, session, view,
@@ -51,7 +52,9 @@ Commands:
   queue:flush               Delete failed jobs
   webhook:failed            List webhook calls whose processing failed
   webhook:retry <id>        Process a stored webhook call again
+  cache:prune               Delete expired rows of the database cache store
   schedule:list             List scheduled tasks and when they run next
+  schedule:run <task>       Run one scheduled task now
   schedule:work             Run scheduled tasks (when SCHEDULER=false for serve)
   route:list                List every route with its name, module and guards
   db:shell                  Run SQL against the database (`.tables`, `.quit`)
@@ -408,7 +411,10 @@ impl App {
         }
         check_commands(&commands)?;
         schedule.check()?;
-        let offset = parse_offset(&config.timezone)?;
+        let zone: Zone = config
+            .timezone
+            .parse()
+            .map_err(|err| anyhow!("APP_TIMEZONE: {err}"))?;
 
         let migrator = Migrator::new(migrations)?;
         let db = crate::db::connect(&config).await?;
@@ -499,7 +505,7 @@ impl App {
             storage.clone(),
             embedded.map(|e| e.views),
             Arc::new(templates),
-            offset,
+            zone,
             versions,
         );
         let security = Arc::new(crate::security::Security::new(&config, &self.csp, &listing));
@@ -547,7 +553,7 @@ impl App {
             seeders: self.seeders,
             handlers: Arc::new(jobs),
             schedule,
-            offset,
+            zone,
             commands,
         })
     }
@@ -712,22 +718,35 @@ impl App {
                 "Deleted {} failed job(s).",
                 kernel.state.queue.flush_failed().await?
             ),
+            "cache:prune" => println!(
+                "Deleted {} expired cache row(s).",
+                kernel.state.cache.prune().await?
+            ),
             "schedule:list" => {
                 if kernel.schedule.is_empty() {
                     println!("No scheduled tasks.");
                 }
-                for (name, at) in kernel.schedule.upcoming(kernel.offset) {
-                    let at = chrono::DateTime::from_timestamp(at + kernel.offset, 0)
-                        .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
-                        .unwrap_or_default();
-                    println!("  {at}  {name}");
+                for (name, at, zone) in kernel.schedule.upcoming(kernel.zone) {
+                    let when = if at == i64::MAX {
+                        "never".to_owned()
+                    } else {
+                        zone.local(at).format("%Y-%m-%d %H:%M").to_string()
+                    };
+                    println!("  {when:<16}  {zone:<18}  {name}");
                 }
+            }
+            "schedule:run" => {
+                let Some(name) = args.get(1).filter(|a| !a.starts_with('-')) else {
+                    return Err(anyhow!("usage: schedule:run <task>").into());
+                };
+                kernel.run_scheduled(name).await?;
+                println!("Ran `{name}`.");
             }
             "schedule:work" => {
                 let (stop, stopped) = watch::channel(false);
                 let running = tokio::spawn(kernel.schedule.clone().run(
                     kernel.state.clone(),
-                    kernel.offset,
+                    kernel.zone,
                     stopped,
                 ));
                 shutdown_signal().await;
@@ -778,7 +797,9 @@ const BUILT_IN_COMMANDS: &[&str] = &[
     "queue:flush",
     "webhook:failed",
     "webhook:retry",
+    "cache:prune",
     "schedule:list",
+    "schedule:run",
     "schedule:work",
     "route:list",
     "db:shell",
@@ -830,7 +851,7 @@ pub struct Kernel {
     seeders: Vec<Seeder>,
     handlers: Handlers,
     schedule: Schedule,
-    offset: i64,
+    zone: Zone,
     commands: Vec<crate::command::Command>,
 }
 
@@ -848,6 +869,12 @@ impl Kernel {
             .ok_or_else(|| anyhow!("unknown command `{name}`"))?;
         let run = (command.run)(self.state.clone(), crate::command::Args::new(args));
         crate::context::scope_app(self.state.clone(), run).await
+    }
+
+    /// Runs the scheduled task `name` now, with its hooks (what
+    /// `schedule:run` does), e.g. from a test.
+    pub async fn run_scheduled(&self, name: &str) -> Result {
+        self.schedule.run_now(self.state.clone(), name).await
     }
 
     pub fn router(&self) -> Router {
@@ -907,7 +934,7 @@ impl Kernel {
             tracing::info!("scheduler started");
             background.push(tokio::spawn(self.schedule.clone().run(
                 self.state.clone(),
-                self.offset,
+                self.zone,
                 stopped,
             )));
         }
