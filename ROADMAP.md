@@ -606,7 +606,87 @@ Notes from M17b:
   missing, and examples/api's `DELETE /api/tokens/current` revoked every token; there is now
   `AuthUser::token_id()`, so it revokes only the one used, and `DELETE /api/tokens` all.
 
+### M18 · v0.19: SaaS foundations
+
+From the Laravel parity review (docs/audit/2026-09-laravel-parity.md). What a typical SaaS needs
+before it can start: tenants, roles, accounts.
+
+- [ ] Tenancy: a default scope on models (`fn default_scope(q) -> Query<Self>`, bypassed with
+      `.without_default_scope()`), e.g. filtering by a task-local current team
+- [ ] Scoped `unique`/`exists`: `.unique("products", "sku").ignore(id).where_eq("team_id", t)`,
+      `.where_null("deleted_at")`
+- [ ] Roles and permissions (opt-in module): tables, `user.has_role`, `user.has_permission`,
+      `Routes::require_role` / `require_permission`, permissions usable as gates
+- [ ] `Routes::require_gate("admin")` (async gates too, shown in `route:list`) and
+      `App::gate_before(|user| Option<bool>)` for super-admins
+- [ ] Account pages in `Auth`: profile (name, email with re-verification), password (checks the
+      current one and keeps this session logged in), delete account; `auth::change_password`
+- [ ] Password rules (`Password::min(12).mixed_case().numbers().symbols()`, optional
+      breached-password check) used by register/reset/change; `require_password_confirmed`
+- [ ] Auth events (`Registered`, `LoggedIn`, `LoginFailed`, `LockedOut`, `LoggedOut`,
+      `PasswordReset`, `Verified`) and an opt-in audit log (`state.audit(user, action, subject)`)
+- [ ] API token abilities (`create_token(.., &["orders:read"])`, `token_can`,
+      `Routes::require_ability`), expired-token pruning
+- [ ] Log out this device only; log out other devices (keeps this one)
+- [ ] Accept bcrypt hashes from imported Laravel users and rehash to Argon2id at login
+
+### M19 · v0.20: Data layer 2
+- [ ] Raw fragments in the builder: `where_raw`, `order_by_raw`, `select_raw` +
+      `group_by`/`having` read into `FromRow`; `to_sql()` for debugging
+- [ ] `lock_for_update()` / `shared_lock()` (PostgreSQL), a public `begin_immediate` (SQLite)
+- [ ] Aggregate loaders: `relations::count_many`, `sum_many`, `exists_many` (one GROUP BY)
+- [ ] `where_has` / `where_doesnt_have` (EXISTS), `where_not_in_query`
+- [ ] Non-integer keys: `#[model(key = "uuid")]` (UUID/ULID/string), loaders generic over the key
+- [ ] Model hooks: `saving`/`saved`/`deleting`/`deleted` trait methods called by `save`/`delete`
+- [ ] Partial saves: `save_only(&["price"])` and change tracking against the loaded row
+- [ ] Pivot data and timestamps (`attach_with`, `load_with::<T, PivotRow>`); polymorphic
+      relations (`Morph`)
+- [ ] `simple_paginate` and `cursor_paginate`; `update_or_create`, `first_or_new`, `refresh`
+- [ ] `db.transaction(|tx| …).retries(3)` (SQLite busy, PostgreSQL serialization), savepoints
+- [ ] `Encrypted<T>` field type (AES-GCM under `APP_KEY`), a public encrypt/decrypt API
+
+### M20 · v0.21: Background 2
+- [ ] Schedules: `cron("0 9 * * 1-5")`, `weekly_on`, `monthly_on`, `weekdays`, `between`;
+      IANA time zones with DST (`APP_TIMEZONE=Asia/Jakarta`, per-task `timezone`)
+- [ ] Schedule hooks: `on_failure`, `ping_before`/`then_ping` (health checks), `schedule:run NAME`
+- [ ] Atomic locks: `state.cache.lock(key, ttl)`, `.block(wait)`
+- [ ] Unique jobs (`UNIQUE_FOR`, `unique_id`), job middleware (rate limited, without
+      overlapping), chains and batches with progress
+- [ ] Queue priority (`--queue high,default` drains in order), `dispatch_sync`, a `failed` hook,
+      `queue:forget`, `queue:prune-failed`, encrypted payloads
+- [ ] A queue dashboard (`/_renox/queue`, gated) with pending, failed, throughput and wait time
+- [ ] Localized mail and notifications (`t()` in mail templates, a recipient's locale),
+      per-recipient channels, mail components (panel, table)
+- [ ] An HTTP client for apps (`renox::http`: timeouts, retries) with `TestApp::fake_http`
+- [ ] Cache `add`/`pull`/`increment`, pruning expired rows of the database store; storage
+      listing/copy/move
+
+### M21 · v0.22: Views and developer experience
+- [ ] Components that see the request (`old`, `error`, `t`, `csrf_field`, `can`, `auth` inside
+      imported macros), a `renox/ui/*` kit (input, select, button, modal, dropdown, table, card,
+      alert, tabs) and `make:component`
+- [ ] Flash as toasts over htmx; `push`/`stack`/`once`; error pages rendered in the app layout;
+      several fragments and out-of-band swaps; `HxRetarget`/`HxReswap`/`HxPushUrl`
+- [ ] Live validation over htmx (validate one field without running the handler)
+- [ ] Tailwind with its standalone CLI in `rnx serve` / `rnx build`, `rnx new --tailwind`
+- [ ] Resource scaffolding: `Routes::resource`, `rnx make:module --resource` (handlers, views,
+      tests); `make:factory`, `make:seeder`, `make:test`, `make:notification`, `make:event`,
+      `make:rule`, `make:middleware`
+- [ ] Tests: `assert_json_path`/`assert_json`, session/auth/view assertions, time travel,
+      event and notification fakes, a browser-test recipe
+- [ ] Errors and logs: `App::report(…)` (e.g. Sentry), `LOG_FORMAT=json`, log files, a request id;
+      a debug inspector (`/_renox/debug`: requests, queries, jobs, mail)
+- [ ] Named, dynamic rate limiters; `route()` with query parameters; `Path` rejections as 404;
+      more validation rules and form-request hooks (`authorize`, `prepare`, `after`, async rules)
+- [ ] Typed app commands (a clap parser), prompts; zero-downtime deploy recipes; an opt-in
+      server-side session store
+
+### Plugins (separate crates, after M18)
+- [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`
+      (resource tables and forms); billing later
+
 ### v1.0
+On hold until the owner starts it; M18–M21 come first.
 - [ ] Documentation site built with Renox: a tutorial, a "Laravel → Renox" guide, the API
       reference; a starter kit; the semver stability guarantee
 - [ ] cargo-semver-checks in CI against the last release (moved from M16b)

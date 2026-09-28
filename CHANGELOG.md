@@ -10,6 +10,12 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### Laravel parity review
+
+- docs/audit/2026-09-laravel-parity.md: every Laravel feature area compared with Renox, the
+  verdict, and the gaps; ROADMAP plans them as M18–M21 before v1.0.
+- CHEATSHEET: `set_password` ends every session, this one too (log it in again).
+
 ### Docs refresh
 
 - The `AGENTS.md` that `rnx new` writes links the cheat-sheet and llms.txt of the Renox commit the
