@@ -489,8 +489,15 @@ PostgreSQL suite 2.5x slower (reconnects).
   up-to-date `main`. **Don't stack PRs** on unmerged branches (§6.3): push the next branch, but open
   its PR only after the previous one is merged.
 - Each milestone PR also updates: `CHANGELOG.md` (under "Unreleased", a `### Mxx · title`
-  section; breaking changes marked), ROADMAP checkboxes and notes, §7 of this file, `llms.txt`,
-  and the example READMEs when examples change.
+  section; breaking changes marked), ROADMAP checkboxes and notes (tick only what is in the
+  code, with the API names the code uses), §7 of this file, `llms.txt`, and the example READMEs
+  when examples change. Also check, and update when the milestone touches them: `README.md`
+  (feature tour, Laravel table, status), `docs/operations.md` (commands, tables to prune, what
+  `APP_KEY` protects, failure table), the other guides in `docs/`, the counts in §4.5/§7,
+  `crates/renox-cli/stubs/AGENTS.md.stub` (traps for app agents) and `env.stub`, and the
+  examples: an example that works around something the milestone adds should use the new API,
+  and a major new feature should be shown by at least one example. M18–M20 skipped these and
+  needed a catch-up PR (#53).
 - **Commit messages and PR bodies are long and structured** (the owner asked for good
   descriptions and notes): summary paragraph, *What's included*, *Design notes*, *Deviations from
   the roadmap*, *Testing* (what was actually run, including browser checks). End commits and PR

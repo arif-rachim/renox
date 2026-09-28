@@ -791,6 +791,9 @@ Notes from M20b (queue):
       more validation rules and form-request hooks (`authorize`, `prepare`, `after`, async rules)
 - [ ] Typed app commands (a clap parser), prompts; zero-downtime deploy recipes; an opt-in
       server-side session store
+- [ ] Authorization gaps found while moving examples/shop to `Permissions` (#53): policies
+      see a plain `User` without its roles (`Policy::allows` can't say "admins see all"), and
+      there is no loader for the users with a role (`permissions::users_with_role`)
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`
