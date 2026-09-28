@@ -306,6 +306,10 @@ impl Views {
     }
 }
 
+/// The template a response was rendered from.
+#[derive(Debug, Clone)]
+pub(crate) struct RenderedView(pub String);
+
 /// The globals Renox gives each rendered page (see `globals`), which
 /// components reach through the environment.
 const REQUEST_GLOBALS: &[&str] = &[
@@ -693,7 +697,13 @@ pub(crate) async fn middleware(
             .views
             .render_view(&view, Value::from_serialize(&shared), globals, &htmx)
         {
-            Ok(html) => with_html(res, html),
+            Ok(html) => {
+                let mut page = with_html(res, html);
+                // For `TestResponse::assert_view`.
+                page.extensions_mut()
+                    .insert(RenderedView(view.name.clone()));
+                page
+            }
             Err(err) => {
                 let mut failed = Error::Internal(err.context(format!("rendering {}", view.name)))
                     .into_response();

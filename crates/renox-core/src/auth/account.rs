@@ -39,9 +39,7 @@ pub(super) fn routes() -> Routes {
 }
 
 fn unix_now() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs())
+    crate::clock::unix_secs().max(0) as u64
 }
 
 /// Records that the user just typed their password.

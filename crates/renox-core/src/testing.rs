@@ -45,6 +45,8 @@ use crate::{App, AppState, Config, Environment, Kernel};
 pub struct TestApp {
     kernel: Kernel,
     cookie: Mutex<Option<String>>,
+    /// Seconds the clock is moved by (`travel`).
+    offset: std::sync::atomic::AtomicI64,
     _storage: tempfile::TempDir,
 }
 
@@ -69,6 +71,7 @@ impl TestApp {
         Self {
             kernel,
             cookie: Mutex::new(None),
+            offset: std::sync::atomic::AtomicI64::new(0),
             _storage: storage,
         }
     }
@@ -102,7 +105,215 @@ impl TestApp {
 
     /// Runs the jobs queued so far; returns how many ran.
     pub async fn run_jobs(&self) -> usize {
-        self.kernel.run_jobs().await.expect("the queue runs")
+        self.at_travelled_time(self.kernel.run_jobs())
+            .await
+            .expect("the queue runs")
+    }
+
+    /// Moves the clock forward by `by` for what this `TestApp` does next:
+    /// requests, `run_jobs`, and code run in [`TestApp::at_travelled_time`]
+    /// (`renox::db::now()`, sessions, signed URLs, the queue, the cache).
+    /// Adds up; [`TestApp::travel_back`] returns to the present.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # use std::time::Duration;
+    /// # async fn demo(app: renox::testing::TestApp) {
+    /// app.travel(Duration::from_secs(3 * 60 * 60)); // past the password confirmation
+    /// app.get("/account/delete").await.assert_redirect("/confirm-password");
+    /// # }
+    /// ```
+    pub fn travel(&self, by: std::time::Duration) -> &Self {
+        let seconds = i64::try_from(by.as_secs()).unwrap_or(i64::MAX);
+        self.offset
+            .fetch_add(seconds, std::sync::atomic::Ordering::SeqCst);
+        self
+    }
+
+    /// Returns the clock to the present.
+    pub fn travel_back(&self) -> &Self {
+        self.offset.store(0, std::sync::atomic::Ordering::SeqCst);
+        self
+    }
+
+    /// Runs `fut` with the clock where [`TestApp::travel`] moved it, e.g.
+    /// to call a model or a job's code directly.
+    pub async fn at_travelled_time<F: std::future::Future>(&self, fut: F) -> F::Output {
+        let offset = self.offset.load(std::sync::atomic::Ordering::SeqCst);
+        crate::clock::with_offset(offset, fut).await
+    }
+
+    /// Records events instead of running their listeners, from now on; read
+    /// them with [`TestApp::emitted`] or [`TestApp::assert_emitted`].
+    pub fn fake_events(&self) -> &Self {
+        let mut events = self
+            .state()
+            .fakes
+            .events
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        events.get_or_insert_with(Vec::new);
+        self
+    }
+
+    /// The events of type `E` emitted since `fake_events`, oldest first.
+    pub fn emitted<E: crate::events::Event>(&self) -> Vec<E> {
+        let events = self
+            .state()
+            .fakes
+            .events
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        events
+            .iter()
+            .flatten()
+            .filter_map(|event| event.downcast_ref::<E>().cloned())
+            .collect()
+    }
+
+    /// Panics unless an `E` matching `check` was emitted.
+    #[track_caller]
+    pub fn assert_emitted<E: crate::events::Event>(&self, check: impl Fn(&E) -> bool) -> &Self {
+        let emitted = self.emitted::<E>();
+        assert!(
+            emitted.iter().any(check),
+            "no matching {} was emitted ({} of that type)",
+            std::any::type_name::<E>(),
+            emitted.len()
+        );
+        self
+    }
+
+    #[track_caller]
+    pub fn assert_not_emitted<E: crate::events::Event>(&self) -> &Self {
+        let emitted = self.emitted::<E>();
+        assert!(
+            emitted.is_empty(),
+            "{} {} emitted",
+            emitted.len(),
+            std::any::type_name::<E>()
+        );
+        self
+    }
+
+    /// Records notifications instead of sending them (mail, database,
+    /// channels), from now on.
+    pub fn fake_notifications(&self) -> &Self {
+        let mut sent = self
+            .state()
+            .fakes
+            .notifications
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        sent.get_or_insert_with(Vec::new);
+        self
+    }
+
+    /// The notifications recorded since `fake_notifications`, oldest first.
+    pub fn notifications(&self) -> Vec<crate::SentNotification> {
+        let sent = self
+            .state()
+            .fakes
+            .notifications
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        sent.iter().flatten().cloned().collect()
+    }
+
+    /// Panics unless `user` was sent a notification of `kind`.
+    #[track_caller]
+    pub fn assert_notified(&self, user: &User, kind: &str) -> &Self {
+        let sent = self.notifications();
+        assert!(
+            sent.iter()
+                .any(|n| n.kind == kind && n.to.user.as_ref().is_some_and(|u| u.id == user.id)),
+            "user {} got no `{kind}` notification; sent: {:?}",
+            user.id,
+            sent.iter().map(|n| n.kind).collect::<Vec<_>>()
+        );
+        self
+    }
+
+    /// Panics unless someone with `address` (on any channel, or a user's
+    /// email) was sent a notification of `kind`.
+    #[track_caller]
+    pub fn assert_notified_to(&self, address: &str, kind: &str) -> &Self {
+        let sent = self.notifications();
+        assert!(
+            sent.iter().any(|n| n.kind == kind
+                && (n.to.routes.values().any(|a| a == address)
+                    || n.to.email().as_deref() == Some(address))),
+            "`{address}` got no `{kind}` notification"
+        );
+        self
+    }
+
+    #[track_caller]
+    pub fn assert_nothing_notified(&self) -> &Self {
+        let sent = self.notifications();
+        assert!(sent.is_empty(), "{} notification(s) were sent", sent.len());
+        self
+    }
+
+    /// A value in the session as the next request will see it.
+    pub fn session_get<T: DeserializeOwned>(&self, key: &str) -> Option<T> {
+        self.session().get(key)
+    }
+
+    #[track_caller]
+    pub fn assert_session_has(&self, key: &str) -> &Self {
+        assert!(
+            self.session().get::<serde_json::Value>(key).is_some(),
+            "the session has no `{key}`"
+        );
+        self
+    }
+
+    #[track_caller]
+    pub fn assert_session_missing(&self, key: &str) -> &Self {
+        assert!(
+            self.session().get::<serde_json::Value>(key).is_none(),
+            "the session has `{key}`"
+        );
+        self
+    }
+
+    /// Panics unless the session is logged in (as `user`, when given).
+    #[track_caller]
+    pub fn assert_authenticated(&self, user: Option<&User>) -> &Self {
+        let id: Option<i64> = self.session().get(crate::auth::AUTH_ID);
+        match (id, user) {
+            (None, _) => panic!("expected a logged-in session, it's a guest"),
+            (Some(id), Some(user)) => assert_eq!(id, user.id, "logged in as another user"),
+            _ => {}
+        }
+        self
+    }
+
+    #[track_caller]
+    pub fn assert_guest(&self) -> &Self {
+        let id: Option<i64> = self.session().get(crate::auth::AUTH_ID);
+        assert!(id.is_none(), "expected a guest, logged in as user {id:?}");
+        self
+    }
+
+    /// Serves the app on a free local port and returns its base URL
+    /// (`http://127.0.0.1:…`), e.g. for a browser test (docs/testing.md).
+    /// The server runs until the test's runtime ends.
+    pub async fn serve(&self) -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("a free port");
+        let url = format!("http://{}", listener.local_addr().expect("an address"));
+        let router = self.kernel.router();
+        tokio::spawn(async move {
+            let _ = axum::serve(
+                listener,
+                router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+            )
+            .await;
+        });
+        url
     }
 
     /// Runs every queued job, including those waiting for a delay or a
@@ -479,12 +690,18 @@ impl TestRequest<'_> {
         for (name, value) in &self.headers {
             req = req.header(name.as_str(), value.as_str());
         }
-        let res = app
+        let request = app
             .kernel
             .router()
-            .oneshot(req.body(body).expect("a valid request"))
+            .oneshot(req.body(body).expect("a valid request"));
+        let res = app
+            .at_travelled_time(request)
             .await
             .expect("the router answers");
+        let view = res
+            .extensions()
+            .get::<crate::view::RenderedView>()
+            .map(|v| v.0.clone());
 
         let session_cookie = format!("{}=", app.state().config.session_cookie);
         for set in res.headers().get_all(SET_COOKIE) {
@@ -510,6 +727,7 @@ impl TestRequest<'_> {
             status,
             headers,
             body,
+            view,
         }
     }
 }
@@ -521,6 +739,8 @@ pub struct TestResponse {
     pub status: StatusCode,
     pub headers: HeaderMap,
     pub body: Bytes,
+    /// The template the page was rendered from, if it was a view.
+    pub view: Option<String>,
 }
 
 impl TestResponse {
@@ -631,6 +851,48 @@ impl TestResponse {
         self
     }
 
+    /// Panics unless the page was rendered from `name` (e.g.
+    /// `"products/index.html"`).
+    #[track_caller]
+    pub fn assert_view(&self, name: &str) -> &Self {
+        assert_eq!(self.view.as_deref(), Some(name), "the view rendered");
+        self
+    }
+
+    /// The value at `path` in the JSON body: keys and indexes separated by
+    /// dots (`data.0.name`); `null` when it isn't there.
+    pub fn json_path(&self, path: &str) -> serde_json::Value {
+        let body: serde_json::Value = serde_json::from_slice(&self.body).unwrap_or_default();
+        path.split('.')
+            .filter(|part| !part.is_empty())
+            .fold(body, |value, part| match part.parse::<usize>() {
+                Ok(i) if value.is_array() => value.get(i).cloned().unwrap_or_default(),
+                _ => value.get(part).cloned().unwrap_or_default(),
+            })
+    }
+
+    /// Panics unless the JSON body has `expected` at `path`
+    /// (`assert_json_path("data.0.name", "Kopi")`).
+    #[track_caller]
+    pub fn assert_json_path(&self, path: &str, expected: impl Serialize) -> &Self {
+        let expected = serde_json::to_value(expected).expect("a JSON value");
+        assert_eq!(self.json_path(path), expected, "JSON at `{path}`");
+        self
+    }
+
+    /// Panics unless the JSON body contains `expected`: every key of an
+    /// object in `expected` must be there with that value (other keys may be
+    /// too); arrays must match item by item.
+    #[track_caller]
+    pub fn assert_json(&self, expected: serde_json::Value) -> &Self {
+        let body: serde_json::Value = serde_json::from_slice(&self.body).unwrap_or_default();
+        assert!(
+            json_contains(&body, &expected),
+            "the JSON body doesn't contain {expected}; it's {body}"
+        );
+        self
+    }
+
     #[track_caller]
     pub fn assert_header(&self, name: &str, value: &str) -> &Self {
         let actual = self.header(name);
@@ -655,5 +917,19 @@ impl TestResponse {
             );
         }
         self
+    }
+}
+
+/// Whether `actual` has everything `expected` has.
+fn json_contains(actual: &serde_json::Value, expected: &serde_json::Value) -> bool {
+    use serde_json::Value;
+    match (actual, expected) {
+        (Value::Object(a), Value::Object(e)) => e
+            .iter()
+            .all(|(k, v)| a.get(k).is_some_and(|av| json_contains(av, v))),
+        (Value::Array(a), Value::Array(e)) => {
+            a.len() == e.len() && a.iter().zip(e).all(|(av, ev)| json_contains(av, ev))
+        }
+        _ => actual == expected,
     }
 }

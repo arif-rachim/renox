@@ -280,6 +280,9 @@ impl AppState {
     /// so a failure doesn't leave a message behind that a retry would send
     /// again.
     pub async fn notify_to(&self, to: &Recipient, notification: &impl Notification) -> Result {
+        if self.fakes.record_notification(notification.kind(), to) {
+            return Ok(());
+        }
         let locale = to.locale();
         let locale = locale.as_deref();
         for channel in ordered(notification, to) {
@@ -308,6 +311,9 @@ impl AppState {
         notification: &impl Notification,
     ) -> Result {
         let to = to.into();
+        if self.fakes.record_notification(notification.kind(), &to) {
+            return Ok(());
+        }
         let locale = to.locale();
         let locale = locale.as_deref();
         for channel in ordered(notification, &to) {

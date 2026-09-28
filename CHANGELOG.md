@@ -10,6 +10,24 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M21c · Scaffolding and test tools
+
+- `Routes::resource(path, name, Resource::new().index(..).create(..).store(..).show(..).edit(..)
+  .update(..).destroy(..))` with Laravel's route names.
+- `rnx make:module products --resource --fields "name:string price:money …"`: model, factory,
+  migration, validated form, handlers, UI-kit views and tests. New generators: `make:factory`,
+  `make:seeder`, `make:test`, `make:notification`, `make:event`, `make:rule`,
+  `make:middleware`.
+- `rnx new` apps use the UI kit (a navigation bar, an account menu, toasts).
+- `TestApp`: `travel`, `travel_back`, `at_travelled_time`; `fake_events` (`emitted`,
+  `assert_emitted`, `assert_not_emitted`); `fake_notifications` (`notifications`,
+  `assert_notified`, `assert_notified_to`, `assert_nothing_notified`); `assert_session_has`,
+  `assert_session_missing`, `session_get`, `assert_authenticated`, `assert_guest`; `serve()` for
+  browser tests.
+- `TestResponse`: `assert_view`, `json_path`, `assert_json_path`, `assert_json`, and a `view`
+  field. **Changed:** code building a `TestResponse` literal must add `view`.
+- docs/testing.md.
+
 ### M21b · Views, components and the UI kit
 
 - Components see the request: `old`, `error`, `errors`, `t`, `can`, `auth`, `request`, `flash`,

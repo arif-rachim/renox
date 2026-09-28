@@ -35,6 +35,7 @@ mod send_handlers;
 mod seo;
 mod services;
 mod testing;
+mod testing_tools;
 mod types;
 mod ui;
 mod uploads;

@@ -3,7 +3,7 @@ use renox::testing::TestApp;
 #[renox::test]
 async fn the_home_page_works() {
     let app = TestApp::new({{crate_name}}::app()).await;
-    app.get("/").await.assert_ok().assert_see("<h1>");
+    app.get("/").await.assert_ok().assert_see("<h1");
 }
 
 #[renox::test]

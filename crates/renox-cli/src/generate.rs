@@ -16,7 +16,7 @@ fn shown(path: &Path) -> String {
         .to_string()
 }
 
-fn write_new(path: &Path, contents: &str) -> Result<()> {
+pub(crate) fn write_new(path: &Path, contents: &str) -> Result<()> {
     if path.exists() {
         bail!("{} already exists", shown(path));
     }
@@ -28,7 +28,7 @@ fn write_new(path: &Path, contents: &str) -> Result<()> {
     Ok(())
 }
 
-fn check_name(name: &str) -> Result<()> {
+pub(crate) fn check_name(name: &str) -> Result<()> {
     let ok = name.starts_with(|c: char| c.is_ascii_alphabetic())
         && name
             .chars()
@@ -114,7 +114,7 @@ pub(crate) fn is_reserved(word: &str) -> bool {
 }
 
 /// Adds `pub mod {name};` to a `mod.rs`, after its other module lines.
-fn add_mod(mod_rs: &Path, name: &str) -> Result<()> {
+pub(crate) fn add_mod(mod_rs: &Path, name: &str) -> Result<()> {
     let source = fs::read_to_string(mod_rs).unwrap_or_default();
     let line = format!("pub mod {name};");
     if source
@@ -186,23 +186,23 @@ async fn index() -> View {{
     )?;
     add_mod(&root.join("src/app/mod.rs"), &snake)?;
     // Apps from `rnx new` build the App in src/lib.rs; older ones in main.rs.
-    let lib = root.join("src/lib.rs");
-    let target = if lib.is_file() {
-        lib
-    } else {
-        root.join("src/main.rs")
-    };
-    register_in_main(&target, &format!("app::{snake}::{pascal}"))
+    register_in_main(&app_file(root), &format!("app::{snake}::{pascal}"))
 }
 
 /// Adds `.module(path)` after the last `.module(` call in `lib.rs`/`main.rs`.
-fn register_in_main(main_rs: &Path, path: &str) -> Result<()> {
-    let hint = || println!("Register it where the App is built: .module({path})");
+pub(crate) fn register_in_main(main_rs: &Path, path: &str) -> Result<()> {
+    register_call(main_rs, &format!(".module({path})"))
+}
+
+/// Adds `call` (e.g. `.seeder(…)`) after the last `.module(` call in
+/// `lib.rs`/`main.rs`; prints it when the file doesn't look like that.
+fn register_call(main_rs: &Path, call: &str) -> Result<()> {
+    let hint = || println!("Register it where the App is built: {call}");
     let Ok(source) = fs::read_to_string(main_rs) else {
         hint();
         return Ok(());
     };
-    if source.contains(&format!(".module({path})")) {
+    if source.contains(call) {
         return Ok(());
     }
     let mut lines: Vec<String> = source.lines().map(str::to_owned).collect();
@@ -217,9 +217,41 @@ fn register_in_main(main_rs: &Path, path: &str) -> Result<()> {
         .chars()
         .take_while(|c| c.is_whitespace())
         .collect();
-    lines.insert(last + 1, format!("{indent}.module({path})"));
+    lines.insert(last + 1, format!("{indent}{call}"));
     fs::write(main_rs, lines.join("\n") + "\n")?;
-    println!("Updated {} (.module({path}))", shown(main_rs));
+    println!("Updated {} ({call})", shown(main_rs));
+    Ok(())
+}
+
+/// Where the App is built: `src/lib.rs` (apps from `rnx new`) or `main.rs`.
+fn app_file(root: &Path) -> PathBuf {
+    let lib = root.join("src/lib.rs");
+    if lib.is_file() {
+        lib
+    } else {
+        root.join("src/main.rs")
+    }
+}
+
+/// Adds `mod {name};` to the app file, after its other `mod` lines.
+fn add_top_mod(root: &Path, name: &str) -> Result<()> {
+    let file = app_file(root);
+    let source = fs::read_to_string(&file).unwrap_or_default();
+    if source
+        .lines()
+        .any(|l| l.trim() == format!("mod {name};") || l.trim() == format!("pub mod {name};"))
+    {
+        return Ok(());
+    }
+    let mut lines: Vec<&str> = source.lines().collect();
+    let at = lines
+        .iter()
+        .rposition(|l| l.starts_with("mod ") || l.starts_with("pub mod "))
+        .map_or(0, |i| i + 1);
+    let line = format!("mod {name};");
+    lines.insert(at, &line);
+    fs::write(&file, lines.join("\n") + "\n")?;
+    println!("Updated {} (mod {name};)", shown(&file));
     Ok(())
 }
 
@@ -432,6 +464,234 @@ pub fn mail(root: &Path, name: &str) -> Result<()> {
     )?;
     println!("Send it with: state.mail_view(to, subject, \"mail/{snake}\", context! {{}})");
     Ok(())
+}
+
+/// `rnx make:factory Produk --module produk`: fake records for seeders and tests.
+pub fn factory(root: &Path, model: &str, module: &str) -> Result<()> {
+    check_name(model)?;
+    let pascal = model.to_upper_camel_case();
+    let snake = model.to_snake_case();
+    let module = module.to_snake_case();
+    let dir = module_dir(root, &module)?;
+    let from = if dir.join(format!("{snake}.rs")).is_file() {
+        snake.clone()
+    } else {
+        "model".into()
+    };
+    write_new(
+        &dir.join(format!("{snake}_factory.rs")),
+        &format!(
+            r#"use renox::fake::Fake;
+use renox::fake::faker::lorem::en::Word;
+use renox::prelude::*;
+
+use super::{from}::{pascal};
+
+/// Fake records: `{pascal}::make()` (unsaved), `{pascal}::create_one(&db)`,
+/// `{pascal}::create_many(&db, 20)`.
+impl Factory for {pascal} {{
+    fn definition() -> Self {{
+        let _word: String = Word().fake(); // fill the fields with fake data
+        {pascal} {{
+            ..Default::default()
+        }}
+    }}
+}}
+"#
+        ),
+    )?;
+    add_mod(&dir.join("mod.rs"), &format!("{snake}_factory"))
+}
+
+/// `rnx make:seeder DemoData`: a seeder for `db:seed`, registered on the App.
+pub fn seeder(root: &Path, name: &str) -> Result<()> {
+    check_name(name)?;
+    let snake = name.to_snake_case();
+    write_new(
+        &root.join(format!("src/seeders/{snake}.rs")),
+        r#"use renox::prelude::*;
+
+/// Run by `rnx db:seed` (and `migrate:fresh --seed`), in the app's context:
+/// `renox::context::app()` gives the config, `encrypt`, the cache.
+pub async fn run(db: Db) -> Result {
+    let _ = db; // e.g. User::register(&db, "Admin", "admin@example.com", "password123").await?;
+    Ok(())
+}
+"#,
+    )?;
+    add_mod(&root.join("src/seeders/mod.rs"), &snake)?;
+    add_top_mod(root, "seeders")?;
+    register_call(&app_file(root), &format!(".seeder(seeders::{snake}::run)"))
+}
+
+/// `rnx make:test Checkout`: an integration test file.
+pub fn test(root: &Path, name: &str) -> Result<()> {
+    check_name(name)?;
+    let snake = name.to_snake_case();
+    let crate_name = crate::scaffold::crate_name(root)?;
+    write_new(
+        &root.join(format!("tests/{snake}.rs")),
+        &format!(
+            r#"use renox::prelude::*;
+use renox::testing::TestApp;
+
+#[renox::test]
+async fn {snake}_works() {{
+    let app = TestApp::new({crate_name}::app()).await;
+    let user = User::register(app.db(), "Test", "test@example.com", "password123")
+        .await
+        .unwrap();
+    app.acting_as(&user);
+    app.get("/").await.assert_ok();
+    // Also: app.post(..), assert_redirect, assert_see, assert_view,
+    // assert_database_has, app.fake_events(), app.fake_notifications(),
+    // app.fake_http(), app.travel(..), app.run_jobs().
+}}
+"#
+        ),
+    )?;
+    Ok(())
+}
+
+/// `rnx make:notification OrderShipped --module orders`.
+pub fn notification(root: &Path, name: &str, module: &str) -> Result<()> {
+    check_name(name)?;
+    let pascal = name.to_upper_camel_case();
+    let snake = name.to_snake_case();
+    let kebab = name.to_kebab_case();
+    let module = module.to_snake_case();
+    let dir = module_dir(root, &module)?;
+    write_new(
+        &dir.join(format!("{snake}.rs")),
+        &format!(
+            r#"use renox::auth::{{Channel, Notification, Recipient}};
+use renox::mail::Mail;
+use renox::prelude::*;
+
+/// Send it with `state.notify(&user, &{pascal} {{ .. }})` (now) or
+/// `state.notify_later(&user, &…)` (through the queue).
+pub struct {pascal} {{
+    pub id: i64,
+}}
+
+impl Notification for {pascal} {{
+    fn kind(&self) -> &'static str {{
+        "{kebab}"
+    }}
+
+    fn channels(&self) -> Vec<Channel> {{
+        vec![Channel::Mail, Channel::Database]
+    }}
+
+    fn to_mail(&self, to: &Recipient, state: &AppState) -> Result<Mail> {{
+        // Written in the recipient's language: t() in a mail view, or
+        // state.current_lang().t(..) here.
+        let _ = state;
+        Ok(Mail::new(to.email().unwrap_or_default(), "{title}", "…"))
+    }}
+
+    fn to_database(&self, _to: &Recipient) -> renox::serde_json::Value {{
+        json!({{ "id": self.id }})
+    }}
+}}
+"#,
+            title = name.to_title_case()
+        ),
+    )?;
+    add_mod(&dir.join("mod.rs"), &snake)
+}
+
+/// `rnx make:event OrderPlaced --module orders`: the event and a listener.
+pub fn event(root: &Path, name: &str, module: &str) -> Result<()> {
+    check_name(name)?;
+    let pascal = name.to_upper_camel_case();
+    let snake = name.to_snake_case();
+    let module = module.to_snake_case();
+    let dir = module_dir(root, &module)?;
+    write_new(
+        &dir.join(format!("{snake}.rs")),
+        &format!(
+            r#"use renox::prelude::*;
+
+/// Emit it with `state.emit({pascal} {{ .. }}).await?`; the listeners
+/// registered in the module's `register` run in turn.
+#[derive(Clone, Debug)]
+pub struct {pascal} {{
+    pub id: i64,
+}}
+
+impl Event for {pascal} {{}}
+"#
+        ),
+    )?;
+    add_mod(&dir.join("mod.rs"), &snake)?;
+    register_in_module(
+        &dir.join("mod.rs"),
+        &format!(
+            "app.listen(|event: {snake}::{pascal}, _state| async move {{ let _ = event.id; Ok(()) }});"
+        ),
+    )
+}
+
+/// `rnx make:rule Npwp --module invoices`: a validation rule to `apply`.
+pub fn rule(root: &Path, name: &str, module: &str) -> Result<()> {
+    check_name(name)?;
+    let pascal = name.to_upper_camel_case();
+    let snake = name.to_snake_case();
+    let module = module.to_snake_case();
+    let dir = module_dir(root, &module)?;
+    write_new(
+        &dir.join(format!("{snake}.rs")),
+        &format!(
+            r#"use renox::validation::{{Inspected, Rule}};
+
+/// `v.field("{snake}", &self.{snake}).required().apply(&{pascal})`.
+pub struct {pascal};
+
+impl Rule for {pascal} {{
+    fn check(&self, value: &Inspected) -> std::result::Result<(), String> {{
+        let Inspected::Text(text) = value else {{
+            return Ok(());
+        }};
+        if text.trim().is_empty() {{
+            return Err("The :attribute is not valid.".into()); // :attribute is the field's label
+        }}
+        Ok(())
+    }}
+}}
+"#
+        ),
+    )?;
+    add_mod(&dir.join("mod.rs"), &snake)
+}
+
+/// `rnx make:middleware StampRequests`: a middleware on every route.
+pub fn middleware(root: &Path, name: &str) -> Result<()> {
+    check_name(name)?;
+    let snake = name.to_snake_case();
+    write_new(
+        &root.join(format!("src/middleware/{snake}.rs")),
+        r#"use renox::axum::extract::Request;
+use renox::axum::middleware::Next;
+use renox::prelude::*;
+
+/// Runs around every route of the app's modules (`App::layer`), after the
+/// session and the user are loaded: take `Option<AuthUser>`, `Session`… as
+/// arguments before `req`.
+pub async fn handle(req: Request, next: Next) -> Response {
+    // Before the handler: e.g. renox::context::set(..), or return early.
+    let res = next.run(req).await;
+    // After: e.g. add a header.
+    res
+}
+"#,
+    )?;
+    add_mod(&root.join("src/middleware/mod.rs"), &snake)?;
+    add_top_mod(root, "middleware")?;
+    register_call(
+        &app_file(root),
+        &format!(".layer(renox::axum::middleware::from_fn(middleware::{snake}::handle))"),
+    )
 }
 
 pub fn component(root: &Path, name: &str) -> Result<()> {

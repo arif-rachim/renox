@@ -3,7 +3,7 @@
 //! extractor rejects tampered or expired ones with 403.
 
 use std::fmt::Display;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
@@ -14,10 +14,7 @@ use crate::crypto::constant_time_eq;
 use crate::{AppState, Error, Result};
 
 fn now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or_default()
+    crate::clock::unix_secs().max(0) as u64
 }
 
 pub(crate) fn signature(state: &AppState, payload: &str) -> String {

@@ -51,7 +51,7 @@ pub type DateTime = chrono::DateTime<chrono::Utc>;
 /// what PostgreSQL keeps, so a saved model equals the same row read back.
 pub fn now() -> DateTime {
     use chrono::SubsecRound;
-    chrono::Utc::now().trunc_subsecs(6)
+    chrono::DateTime::<chrono::Utc>::from(crate::clock::system_now()).trunc_subsecs(6)
 }
 
 impl FromRef<AppState> for Db {

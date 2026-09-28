@@ -69,6 +69,61 @@ impl Routes {
 
     method!(get, post, put, patch, delete);
 
+    /// The routes of a resource, like Laravel's `Route::resource`: only the
+    /// actions given, under `path`, named `{name}.{action}`.
+    ///
+    /// | Action | Method and path | Name |
+    /// |---|---|---|
+    /// | `index` | `GET /products` | `products.index` |
+    /// | `create` | `GET /products/new` | `products.create` |
+    /// | `store` | `POST /products` | `products.store` |
+    /// | `show` | `GET /products/{id}` | `products.show` |
+    /// | `edit` | `GET /products/{id}/edit` | `products.edit` |
+    /// | `update` | `PUT` and `PATCH /products/{id}` | `products.update` |
+    /// | `destroy` | `DELETE /products/{id}` | `products.destroy` |
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # use renox::Resource;
+    /// # async fn index() -> &'static str { "" }
+    /// # async fn show(Path(id): Path<i64>) -> String { id.to_string() }
+    /// # async fn destroy(Path(id): Path<i64>) -> String { id.to_string() }
+    /// # let _: Routes =
+    /// Routes::new()
+    ///     .resource("/products", "products", Resource::new().index(index).show(show).destroy(destroy))
+    ///     .require_auth()
+    /// # ;
+    /// ```
+    pub fn resource(mut self, path: &str, name: &str, resource: Resource) -> Self {
+        assert!(
+            path.starts_with('/') && !path.ends_with('/'),
+            "Routes::resource(\"{path}\", …): the path must start with `/` and not end with one"
+        );
+        let member = format!("{path}/{{id}}");
+        let actions = [
+            ("index", "GET", path.to_owned(), resource.index),
+            ("create", "GET", format!("{path}/new"), resource.create),
+            ("store", "POST", path.to_owned(), resource.store),
+            ("show", "GET", member.clone(), resource.show),
+            ("edit", "GET", format!("{member}/edit"), resource.edit),
+            ("update", "PUT", member.clone(), resource.update),
+            ("destroy", "DELETE", member, resource.destroy),
+        ];
+        for (action, method, at, router) in actions {
+            if let Some(router) = router {
+                let method = if action == "update" {
+                    "PUT|PATCH"
+                } else {
+                    method
+                };
+                self = self
+                    .add(&at, router, method)
+                    .name(&format!("{name}.{action}"));
+            }
+        }
+        self
+    }
+
     /// Adds a route with any axum method router, e.g. `get(show).post(update)`.
     pub fn route(self, path: &str, method_router: MethodRouter<AppState>) -> Self {
         self.add(path, method_router, "*")
@@ -507,4 +562,48 @@ mod tests {
         let mut t = table();
         assert!(t.insert("home".into(), "/home".into()).is_err());
     }
+}
+
+/// The handlers of a resource, for [`Routes::resource`]; leave out the
+/// actions it doesn't have.
+#[derive(Default)]
+#[must_use = "a resource does nothing until given to Routes::resource"]
+pub struct Resource {
+    index: Option<MethodRouter<AppState>>,
+    create: Option<MethodRouter<AppState>>,
+    store: Option<MethodRouter<AppState>>,
+    show: Option<MethodRouter<AppState>>,
+    edit: Option<MethodRouter<AppState>>,
+    update: Option<MethodRouter<AppState>>,
+    destroy: Option<MethodRouter<AppState>>,
+}
+
+macro_rules! resource_action {
+    ($($action:ident => $router:expr),* $(,)?) => {$(
+        pub fn $action<H, T>(mut self, handler: H) -> Self
+        where
+            H: Handler<T, AppState>,
+            T: 'static,
+        {
+            let make: fn(H) -> MethodRouter<AppState> = $router;
+            self.$action = Some(make(handler));
+            self
+        }
+    )*};
+}
+
+impl Resource {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    resource_action!(
+        index => routing::get,
+        create => routing::get,
+        store => routing::post,
+        show => routing::get,
+        edit => routing::get,
+        update => |h| routing::put(h.clone()).patch(h),
+        destroy => routing::delete,
+    );
 }

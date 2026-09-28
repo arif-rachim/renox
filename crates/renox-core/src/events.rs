@@ -59,6 +59,10 @@ impl AppState {
     /// `App::listen` first, then modules' (registered at boot). All of them
     /// run even if one fails; the first error is returned.
     pub async fn emit<E: Event>(&self, event: E) -> Result {
+        // `TestApp::fake_events`: record it, run nothing.
+        if self.fakes.record_event(event.clone()) {
+            return Ok(());
+        }
         let Some(listeners) = self.listeners.get(&TypeId::of::<E>()) else {
             return Ok(());
         };

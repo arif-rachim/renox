@@ -11,12 +11,18 @@ rnx new shop                         # or: rnx new shop --database postgres
 rnx key:generate                     # APP_KEY into .env (made from .env.example if missing)
 rnx serve                            # run, rebuild and reload on changes
 rnx make:module products             # routes + view, registered in src/lib.rs
+rnx make:module products --resource --fields "name:string price:money notes:text active:bool due_on:date"
+                                     # model, migration, factory, form, 7 handlers, UI-kit views, tests
 rnx make:model Product --module products --migration
 rnx make:migration add_sku_to_products
 rnx make:policy Product --module products
 rnx make:job SendReceipt --module products
 rnx make:command products:import --module products  # then `rnx products:import file.csv`
 rnx make:mail order_shipped
+rnx make:factory Product --module products  # also make:seeder DemoData, make:test checkout
+rnx make:notification OrderShipped --module orders  # also make:event, make:rule (--module)
+rnx make:middleware StampRequests    # on every route (App::layer)
+rnx make:component price_tag         # --ui copies the UI kit into the app
 rnx migrate                          # migrate:status, migrate:fresh --seed, db:seed
 rnx migrate:rollback --step 2        # the last 2 batches (default 1)
 rnx route:list                       # db:shell, schedule:list, schedule:run NAME, cache:prune
@@ -570,6 +576,8 @@ impl Policy for Product {
     }
 }
 
+// Routes::new().resource("/products", "products", Resource::new().index(index).show(show)…)
+// registers index/create/store/show/edit/update/destroy as Laravel does (products.index, …).
 // `AuthUser` sends guests to the login page; use `Option<AuthUser>` when optional.
 // `Path` is Renox's: `/products/abc` for a `Path<i64>` is a 404, like a missing product.
 async fn edit(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Result<View> {
@@ -1354,6 +1362,31 @@ async fn with_settings() {
     let res = app.request().header("x-api-version", "2").json().get("/health").await;
     let body: renox::serde_json::Value = res.json(); // also res.text(), res.header("…")
     let _ = body;
+}
+```
+
+```rust
+use renox::prelude::*;
+use renox::testing::TestApp;
+use std::time::Duration;
+
+#[derive(Clone)]
+struct OrderPlaced { id: i64 }
+impl Event for OrderPlaced {}
+
+#[renox::test]
+async fn test_tools() {
+    let app = TestApp::new(App::new().module(Auth::new())).await;
+    app.fake_events().fake_notifications(); // record instead of running / sending
+    let res = app.get("/login").await;
+    res.assert_view("renox/auth/login.html");
+    app.assert_guest().assert_session_missing("cart");
+    app.travel(Duration::from_secs(3600)); // requests and jobs see the clock an hour on
+    app.run_all_jobs().await; // retries waiting for their backoff too
+    app.assert_not_emitted::<OrderPlaced>().assert_nothing_notified();
+    // JSON: res.assert_json_path("data.0.name", "Kopi"), res.assert_json(json!({ "total": 2 }))
+    // Events/notifications: app.assert_emitted::<OrderPlaced>(|e| e.id == 7), app.assert_notified(&user, "kind")
+    // A real server for a browser test: let url = app.serve().await;
 }
 ```
 

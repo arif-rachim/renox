@@ -799,11 +799,11 @@ Notes from M20c (dashboard, mail, HTTP, storage):
       `HxRetarget`/`HxReswap`/`HxPushUrl`
 - [ ] `push`/`stack`; error pages rendered in the app layout (M21d)
 - [x] Live validation over htmx (validate one field without running the handler)
-- [ ] Tailwind with its standalone CLI in `rnx serve` / `rnx build`, `rnx new --tailwind`
-- [ ] Resource scaffolding: `Routes::resource`, `rnx make:module --resource` (handlers, views,
+- [ ] Tailwind with its standalone CLI in `rnx serve` / `rnx build`, `rnx new --tailwind` (M21d)
+- [x] Resource scaffolding: `Routes::resource`, `rnx make:module --resource` (handlers, views,
       tests); `make:factory`, `make:seeder`, `make:test`, `make:notification`, `make:event`,
       `make:rule`, `make:middleware`
-- [ ] Tests: `assert_json_path`/`assert_json`, session/auth/view assertions, time travel,
+- [x] Tests: `assert_json_path`/`assert_json`, session/auth/view assertions, time travel,
       event and notification fakes, a browser-test recipe
 - [ ] Errors and logs: `App::report(…)` (e.g. Sentry), `LOG_FORMAT=json`, log files, a request id;
       a debug inspector (`/_renox/debug`: requests, queries, jobs, mail)
@@ -884,6 +884,26 @@ Notes from M21b (views):
 - Browser-checked on examples/crud (desktop, 390 px, dark), which caught a sheet inheriting a
   table cell's alignment, red row buttons out-shouting the primary action, a menu too
   transparent over a button, and a table 8–21 px too wide on phones (actions now stack).
+
+Notes from M21c (scaffolding and tests):
+- `Routes::resource(path, name, Resource::new().index(..)…)` registers only the actions given,
+  with Laravel's names; create is at `/{path}/new` (as in examples/crud); update answers PUT
+  and PATCH.
+- `rnx make:module <plural> --resource --fields "…"` (types string, text, int, money, float,
+  bool, date; `--model` when the singular guess is wrong) writes the model with a factory, a
+  migration for the app's database, a validated form, the seven handlers behind `require_auth`
+  with toasts, UI-kit views (list with a confirmation sheet, a form with live validation, a
+  grouped details page) and HTTP tests. tests/cli/run.sh generates two resources and runs their
+  tests in CI. `rnx new`'s layout now uses the kit (navigation bar, account menu, toasts).
+- `make:seeder` and `make:middleware` add `mod seeders;` / `mod middleware;` and register
+  `.seeder(…)` / `.layer(from_fn(…))` next to the modules.
+- Time: `renox::db::now()`, sessions, signed URLs, the queue, the cache and password
+  confirmation read one clock (`clock.rs`) with a task-local offset; `TestApp::travel` sets it
+  around its requests and job runs. Code spawned elsewhere doesn't see it.
+- Fakes live in `AppState::fakes`; faked events skip their listeners and faked notifications
+  skip every channel (mail, database, custom).
+- `TestResponse` gained a public `view` field (the rendered template).
+- Tailwind moves to M21d with the rest of the tooling.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

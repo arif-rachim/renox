@@ -140,6 +140,9 @@ Every example has a README.md that walks through it.
 - [docs/authorization.md](docs/authorization.md): which tool answers which question (gates,
   policies, the `Permissions` module, `gate_before`, token abilities, tenants with default
   scopes and `renox::context`, password confirmation, the audit log), mapped to Laravel's.
+- [docs/testing.md](docs/testing.md): `TestApp` requests and assertions (JSON paths, views,
+  session, login), the database, jobs, event and notification fakes, HTTP fakes, time travel,
+  counting queries, a browser-test recipe.
 - [docs/ui.md](docs/ui.md): components that see the request, the UI kit (`renox/ui.html`: fields,
   buttons, cards, sheets, menus, tabs, tables) and its design rules, toasts, out-of-band
   fragments, htmx headers, live validation.
