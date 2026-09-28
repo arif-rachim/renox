@@ -5,6 +5,8 @@ members = ["crates/*", "examples/*", "tests/chaos"]
 [workspace.package]
 version = "0.0.1"
 edition = "2024"
+# The oldest Rust that builds Renox (sqlx 0.9 needs 1.94); checked in CI.
+rust-version = "1.94"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/arif-rachim/renox"
 homepage = "https://github.com/arif-rachim/renox"

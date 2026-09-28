@@ -56,5 +56,5 @@ because of a dependency.
 - The HTML of the built-in pages under `renox/…` (override them in your views to fix their
   markup).
 - The exact wording of built-in messages.
-- The minimum supported Rust version (MSRV): it may rise in a minor release, and the release
-  notes say so.
+- The minimum supported Rust version (MSRV), now Rust 1.94 (`rust-version` in `Cargo.toml`,
+  checked in CI): it may rise in a minor release, and CHANGELOG.md says so.

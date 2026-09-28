@@ -3,6 +3,7 @@ name = "renox-macros"
 description = "Procedural macros for the Renox web framework: #[derive(Model)] and migrations!()."
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
@@ -17,3 +18,8 @@ heck = "0.5.0"
 proc-macro2 = "1.0.107"
 quote = "1.0.47"
 syn = { version = "2", features = ["full"] }
+
+[dev-dependencies]
+# The examples in the docs use the macros through `renox`, as apps do.
+renox.workspace = true
+serde = { version = "1.0.229", features = ["derive"] }

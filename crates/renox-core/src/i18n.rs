@@ -358,6 +358,14 @@ mod tests {
             format("Satu produk|:count produk", &[], Some(4)),
             "4 produk"
         );
+        // Like Laravel: 0 and negative counts take the plural form.
+        assert_eq!(
+            format("Satu produk|:count produk", &[], Some(0)),
+            "0 produk"
+        );
+        assert_eq!(format("one|:count many", &[], Some(-1)), "-1 many");
+        // Without a plural form the text is used as it is.
+        assert_eq!(format(":count item", &[], Some(3)), "3 item");
         assert_eq!(
             format(
                 ":name :names",

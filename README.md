@@ -245,8 +245,9 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 Renox is **pre-1.0**: the API may still change between versions, and the crates on crates.io are
 placeholders until the first real release, so install from Git as shown above. Everything listed
 here is implemented and tested on Linux, macOS and Windows, against SQLite and PostgreSQL. What's
-next (hardening from a pre-1.0 audit, then an API freeze and 1.0) is in
-[ROADMAP.md](ROADMAP.md). Issues and feedback are welcome.
+next (examples of real apps, then 1.0) is in [ROADMAP.md](ROADMAP.md), and what changed is in
+[CHANGELOG.md](CHANGELOG.md). Issues and feedback are welcome: see
+[CONTRIBUTING.md](CONTRIBUTING.md), and [SECURITY.md](SECURITY.md) to report a vulnerability.
 
 ## License
 

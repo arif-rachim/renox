@@ -152,95 +152,112 @@ impl Config {
 
     /// Reads the configuration from the environment only, without loading `.env`.
     pub fn from_env() -> anyhow::Result<Self> {
-        let env = Environment::parse(&var_or("APP_ENV", "local"))?;
-        let debug = parse_bool("APP_DEBUG", env == Environment::Local)?;
-        let host = var_or("APP_HOST", "127.0.0.1")
+        Self::from_vars(|name| env::var(name).ok())
+    }
+
+    /// Reads the configuration from `get` (a variable's value by name), e.g.
+    /// a map in a test: `Config::from_vars(|name| vars.get(name).cloned())`.
+    pub fn from_vars(get: impl Fn(&str) -> Option<String>) -> anyhow::Result<Self> {
+        let v = Vars(get);
+        let env = Environment::parse(&v.or("APP_ENV", "local"))?;
+        let debug = v.bool("APP_DEBUG", env == Environment::Local)?;
+        let host = v
+            .or("APP_HOST", "127.0.0.1")
             .parse()
             .context("APP_HOST must be an IP address")?;
-        let port = var_or("APP_PORT", "3000")
+        let port = v
+            .or("APP_PORT", "3000")
             .parse()
             .context("APP_PORT must be a port number")?;
-        let key = env::var("APP_KEY").ok().filter(|k| !k.is_empty());
+        let key = v.get("APP_KEY").filter(|k| !k.is_empty());
 
         if env == Environment::Production && key.is_none() {
             bail!("APP_KEY must be set in production");
         }
 
         Ok(Self {
-            name: var_or("APP_NAME", "Renox"),
+            name: v.or("APP_NAME", "Renox"),
             env,
             debug,
-            url: var_or("APP_URL", &format!("http://{host}:{port}")),
+            url: v.or("APP_URL", &format!("http://{host}:{port}")),
             key,
             host,
             port,
-            views_path: var_or("VIEWS_PATH", "resources/views").into(),
-            public_path: var_or("PUBLIC_PATH", "public").into(),
-            session_lifetime: var_or("SESSION_LIFETIME", "120")
+            views_path: v.or("VIEWS_PATH", "resources/views").into(),
+            public_path: v.or("PUBLIC_PATH", "public").into(),
+            session_lifetime: v
+                .or("SESSION_LIFETIME", "120")
                 .parse()
                 .context("SESSION_LIFETIME must be a number of minutes")?,
-            session_cookie: var_or("SESSION_COOKIE", "renox_session"),
-            remember_lifetime: var_or("REMEMBER_LIFETIME", "43200")
+            session_cookie: v.or("SESSION_COOKIE", "renox_session"),
+            remember_lifetime: v
+                .or("REMEMBER_LIFETIME", "43200")
                 .parse()
                 .context("REMEMBER_LIFETIME must be a number of minutes")?,
-            database_url: var_or("DATABASE_URL", "sqlite://storage/app.db"),
-            database_pool_size: var_or("DATABASE_POOL_SIZE", "8")
+            database_url: v.or("DATABASE_URL", "sqlite://storage/app.db"),
+            database_pool_size: v
+                .or("DATABASE_POOL_SIZE", "8")
                 .parse()
                 .ok()
                 .filter(|n| *n > 0)
                 .context("DATABASE_POOL_SIZE must be a number above 0")?,
-            database_acquire_timeout: seconds("DATABASE_ACQUIRE_TIMEOUT", 5)?
+            database_acquire_timeout: v
+                .seconds("DATABASE_ACQUIRE_TIMEOUT", 5)?
                 .unwrap_or(Duration::from_secs(5)),
-            database_statement_timeout: seconds("DATABASE_STATEMENT_TIMEOUT", 30)?,
-            request_timeout: seconds("REQUEST_TIMEOUT", 60)?,
-            locale: var_or("APP_LOCALE", "en"),
-            fallback_locale: var_or("APP_FALLBACK_LOCALE", "en"),
-            lang_path: var_or("LANG_PATH", "resources/lang").into(),
+            database_statement_timeout: v.seconds("DATABASE_STATEMENT_TIMEOUT", 30)?,
+            request_timeout: v.seconds("REQUEST_TIMEOUT", 60)?,
+            locale: v.or("APP_LOCALE", "en"),
+            fallback_locale: v.or("APP_FALLBACK_LOCALE", "en"),
+            lang_path: v.or("LANG_PATH", "resources/lang").into(),
             mail: MailConfig {
-                mailer: var_or("MAIL_MAILER", "log"),
-                host: var_or("MAIL_HOST", "localhost"),
-                port: env::var("MAIL_PORT")
-                    .ok()
+                mailer: v.or("MAIL_MAILER", "log"),
+                host: v.or("MAIL_HOST", "localhost"),
+                port: v
+                    .get("MAIL_PORT")
                     .filter(|p| !p.is_empty())
                     .map(|p| p.parse())
                     .transpose()
                     .context("MAIL_PORT must be a port number")?,
-                username: env::var("MAIL_USERNAME").ok().filter(|v| !v.is_empty()),
-                password: env::var("MAIL_PASSWORD").ok().filter(|v| !v.is_empty()),
-                encryption: var_or("MAIL_ENCRYPTION", "starttls"),
-                from_address: var_or("MAIL_FROM_ADDRESS", "hello@example.com"),
-                from_name: env::var("MAIL_FROM_NAME").ok().filter(|v| !v.is_empty()),
-                timeout: seconds("MAIL_TIMEOUT", 10)?.unwrap_or(Duration::from_secs(10)),
+                username: v.get("MAIL_USERNAME").filter(|v| !v.is_empty()),
+                password: v.get("MAIL_PASSWORD").filter(|v| !v.is_empty()),
+                encryption: v.or("MAIL_ENCRYPTION", "starttls"),
+                from_address: v.or("MAIL_FROM_ADDRESS", "hello@example.com"),
+                from_name: v.get("MAIL_FROM_NAME").filter(|v| !v.is_empty()),
+                timeout: v
+                    .seconds("MAIL_TIMEOUT", 10)?
+                    .unwrap_or(Duration::from_secs(10)),
             },
-            queue_workers: var_or("QUEUE_WORKERS", "2")
+            queue_workers: v
+                .or("QUEUE_WORKERS", "2")
                 .parse()
                 .context("QUEUE_WORKERS must be a number")?,
-            scheduler: parse_bool("SCHEDULER", true)?,
-            timezone: var_or("APP_TIMEZONE", "UTC"),
-            cache_store: var_or("CACHE_STORE", "memory"),
-            storage_path: var_or("STORAGE_PATH", "storage").into(),
+            scheduler: v.bool("SCHEDULER", true)?,
+            timezone: v.or("APP_TIMEZONE", "UTC"),
+            cache_store: v.or("CACHE_STORE", "memory"),
+            storage_path: v.or("STORAGE_PATH", "storage").into(),
             storage: StorageConfig {
-                disk: var_or("STORAGE_DISK", "local"),
-                bucket: optional("S3_BUCKET"),
-                region: optional("S3_REGION"),
-                endpoint: optional("S3_ENDPOINT"),
-                access_key_id: optional("S3_ACCESS_KEY_ID"),
-                secret_access_key: optional("S3_SECRET_ACCESS_KEY"),
-                url: optional("STORAGE_URL"),
+                disk: v.or("STORAGE_DISK", "local"),
+                bucket: v.optional("S3_BUCKET"),
+                region: v.optional("S3_REGION"),
+                endpoint: v.optional("S3_ENDPOINT"),
+                access_key_id: v.optional("S3_ACCESS_KEY_ID"),
+                secret_access_key: v.optional("S3_SECRET_ACCESS_KEY"),
+                url: v.optional("STORAGE_URL"),
             },
-            upload_max_size: var_or("UPLOAD_MAX_SIZE", "10")
+            upload_max_size: v
+                .or("UPLOAD_MAX_SIZE", "10")
                 .parse::<usize>()
                 .ok()
                 .and_then(|mb| mb.checked_mul(1024 * 1024))
                 .context("UPLOAD_MAX_SIZE must be a number of megabytes")?,
-            csp: CspMode::parse(&var_or("CSP", "relaxed"))?,
-            trusted_proxies: crate::TrustedProxies::parse(&var_or("TRUSTED_PROXIES", ""))?,
+            csp: CspMode::parse(&v.or("CSP", "relaxed"))?,
+            trusted_proxies: crate::TrustedProxies::parse(&v.or("TRUSTED_PROXIES", ""))?,
             vars: Default::default(),
             analytics: AnalyticsConfig {
-                google_site_verification: optional("GOOGLE_SITE_VERIFICATION"),
-                ga4_measurement_id: optional("GA4_MEASUREMENT_ID"),
-                ga4_api_secret: optional("GA4_API_SECRET"),
-                gtm_container_id: optional("GTM_CONTAINER_ID"),
+                google_site_verification: v.optional("GOOGLE_SITE_VERIFICATION"),
+                ga4_measurement_id: v.optional("GA4_MEASUREMENT_ID"),
+                ga4_api_secret: v.optional("GA4_API_SECRET"),
+                gtm_container_id: v.optional("GTM_CONTAINER_ID"),
             },
         })
     }
@@ -304,30 +321,40 @@ impl Default for Config {
     }
 }
 
-fn optional(name: &str) -> Option<String> {
-    env::var(name).ok().filter(|v| !v.is_empty())
-}
+/// Variables by name, for `Config::from_vars`.
+struct Vars<F>(F);
 
-/// A number of seconds from `name`; `None` when it is 0 (no limit).
-fn seconds(name: &str, default: u64) -> anyhow::Result<Option<Duration>> {
-    let value: u64 = var_or(name, &default.to_string())
-        .parse()
-        .with_context(|| format!("{name} must be a number of seconds"))?;
-    Ok((value > 0).then(|| Duration::from_secs(value)))
-}
+impl<F: Fn(&str) -> Option<String>> Vars<F> {
+    fn get(&self, name: &str) -> Option<String> {
+        (self.0)(name)
+    }
 
-fn var_or(name: &str, default: &str) -> String {
-    env::var(name).unwrap_or_else(|_| default.to_owned())
-}
+    fn optional(&self, name: &str) -> Option<String> {
+        self.get(name).filter(|v| !v.is_empty())
+    }
 
-fn parse_bool(name: &str, default: bool) -> anyhow::Result<bool> {
-    match env::var(name) {
-        Err(_) => Ok(default),
-        Ok(v) => match v.to_ascii_lowercase().as_str() {
-            "1" | "true" | "yes" | "on" => Ok(true),
-            "0" | "false" | "no" | "off" | "" => Ok(false),
-            other => bail!("{name} must be true or false, got `{other}`"),
-        },
+    fn or(&self, name: &str, default: &str) -> String {
+        self.get(name).unwrap_or_else(|| default.to_owned())
+    }
+
+    /// A number of seconds from `name`; `None` when it is 0 (no limit).
+    fn seconds(&self, name: &str, default: u64) -> anyhow::Result<Option<Duration>> {
+        let value: u64 = self
+            .or(name, &default.to_string())
+            .parse()
+            .with_context(|| format!("{name} must be a number of seconds"))?;
+        Ok((value > 0).then(|| Duration::from_secs(value)))
+    }
+
+    fn bool(&self, name: &str, default: bool) -> anyhow::Result<bool> {
+        match self.get(name) {
+            None => Ok(default),
+            Some(v) => match v.to_ascii_lowercase().as_str() {
+                "1" | "true" | "yes" | "on" => Ok(true),
+                "0" | "false" | "no" | "off" | "" => Ok(false),
+                other => bail!("{name} must be true or false, got `{other}`"),
+            },
+        }
     }
 }
 
@@ -342,5 +369,90 @@ mod tests {
         assert_eq!(Environment::parse("test").unwrap(), Environment::Testing);
         assert_eq!(Environment::parse("prod").unwrap(), Environment::Production);
         assert!(Environment::parse("staging").is_err());
+    }
+
+    fn load(pairs: &[(&str, &str)]) -> anyhow::Result<Config> {
+        let vars: std::collections::HashMap<String, String> = pairs
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect();
+        Config::from_vars(|name| vars.get(name).cloned())
+    }
+
+    #[test]
+    fn defaults_without_any_variable() {
+        let c = load(&[]).unwrap();
+        assert_eq!(c.env, Environment::Local);
+        assert!(c.debug, "local defaults to debug");
+        assert_eq!(
+            (c.port, c.database_pool_size, c.upload_max_size),
+            (3000, 8, 10 * 1024 * 1024)
+        );
+        assert_eq!(c.database_acquire_timeout, Duration::from_secs(5));
+        assert_eq!(c.request_timeout, Some(Duration::from_secs(60)));
+        assert_eq!(c.cache_store, "memory");
+        assert_eq!(c.csp, CspMode::Relaxed);
+        assert!(c.key.is_none() && c.mail.port.is_none());
+    }
+
+    #[test]
+    fn reads_every_kind_of_value() {
+        let c = load(&[
+            ("APP_ENV", "production"),
+            ("APP_KEY", "base64:abc"),
+            ("APP_DEBUG", "off"),
+            ("APP_PORT", "8080"),
+            ("DATABASE_POOL_SIZE", "3"),
+            ("REQUEST_TIMEOUT", "0"),
+            ("DATABASE_STATEMENT_TIMEOUT", "5"),
+            ("UPLOAD_MAX_SIZE", "2"),
+            ("MAIL_PORT", "2525"),
+            ("MAIL_USERNAME", ""),
+            ("CSP", "strict"),
+            ("TRUSTED_PROXIES", "10.0.0.0/8"),
+            ("S3_BUCKET", "files"),
+        ])
+        .unwrap();
+        assert_eq!(c.env, Environment::Production);
+        assert!(!c.debug);
+        assert_eq!((c.port, c.database_pool_size), (8080, 3));
+        assert_eq!(c.request_timeout, None, "0 means no limit");
+        assert_eq!(c.database_statement_timeout, Some(Duration::from_secs(5)));
+        assert_eq!(c.upload_max_size, 2 * 1024 * 1024);
+        assert_eq!(c.mail.port, Some(2525));
+        assert_eq!(c.mail.username, None, "empty means unset");
+        assert_eq!(c.csp, CspMode::Strict);
+        assert!(c.trusted_proxies.contains("10.1.2.3".parse().unwrap()));
+        assert_eq!(c.storage.bucket.as_deref(), Some("files"));
+    }
+
+    #[test]
+    fn refuses_bad_values_with_the_variable_name() {
+        for (name, value) in [
+            ("APP_ENV", "staging"),
+            ("APP_DEBUG", "maybe"),
+            ("APP_PORT", "http"),
+            ("APP_HOST", "localhost"),
+            ("DATABASE_POOL_SIZE", "0"),
+            ("REQUEST_TIMEOUT", "-1"),
+            ("UPLOAD_MAX_SIZE", "99999999999999999"),
+            ("MAIL_PORT", "99999"),
+            ("CSP", "loose"),
+            ("TRUSTED_PROXIES", "proxy.local"),
+        ] {
+            let err = load(&[(name, value)])
+                .err()
+                .map(|e| format!("{e:#}"))
+                .unwrap_or_default();
+            assert!(
+                err.contains(name) || err.contains(value),
+                "{name}={value}: {err}"
+            );
+        }
+        let err = load(&[("APP_ENV", "production")]).unwrap_err();
+        assert!(
+            format!("{err}").contains("APP_KEY"),
+            "production needs a key"
+        );
     }
 }

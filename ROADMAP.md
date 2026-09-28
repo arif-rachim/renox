@@ -563,13 +563,24 @@ M16a · lighter builds and several servers:
       in docs/operations.md
 
 M16b · CI and trust:
-- [ ] CI: `rnx new` → every `make:*` → `cargo build` and `cargo test` on the result; trybuild
-      tests for the macros; a feature matrix (cargo-hack) including a SQLite-only build; S3
-      against MinIO; MSRV; cargo-deny; coverage; semver checks; a Docker build of `make:deploy`
-- [ ] Direct tests for APIs covered only indirectly (session `pull`/`reflash`/`set_lifetime`,
+- [x] CI: `rnx new` → every `make:*` → `cargo build` and `cargo test` on the result (SQLite and
+      PostgreSQL, `tests/cli/run.sh`); compile-fail tests for the macros; a feature matrix
+      (cargo-hack) including a SQLite-only build; S3 against a real S3 server; MSRV; cargo-deny;
+      coverage; a Docker build of `make:deploy`, started and checked on `/health`
+- [x] Direct tests for APIs covered only indirectly (session `pull`/`reflash`/`set_lifetime`,
       `HxRedirect`/`HxRefresh`, `Validator::rule`, `fetch_optional`/`bind_all`, schedule
       constructors and offsets, signed URL tampering and expiry, plural 0, `Config::load`)
-- [ ] SECURITY.md, CONTRIBUTING.md, CHANGELOG.md
+- [x] SECURITY.md, CONTRIBUTING.md, CHANGELOG.md
+
+Deviations in M16b:
+- The macros' compile errors are `compile_fail` doctests, not trybuild: the same check without
+  another dev-dependency or `.stderr` snapshots that change with every Rust release.
+- S3 runs against SeaweedFS: MinIO no longer publishes Docker images.
+- Semver checks (cargo-semver-checks) move to v1.0: before a first release there's no published
+  baseline to compare with, and 0.x allows breaking changes anyway.
+- The job found two generator gaps and one bug, fixed here: `make:job`/`make:command` now register
+  what they create, migrations made in the same second keep their order, and S3 over `http://`
+  (a local MinIO/SeaweedFS) failed on every request.
 
 ### M17 · v0.18: Examples of real apps
 - [ ] `examples/shop`: auth with gates and policies, an admin with search, sort and pagination,
@@ -583,6 +594,7 @@ M16b · CI and trust:
 ### v1.0
 - [ ] Documentation site built with Renox: a tutorial, a "Laravel → Renox" guide, the API
       reference; a starter kit; the semver stability guarantee
+- [ ] cargo-semver-checks in CI against the last release (moved from M16b)
 - [ ] Real crates published to crates.io (`renox`, `renox-core`, `renox-macros`, `renox-cli`;
       only 0.0.1 placeholders exist), then crates.io/docs.rs badges and `cargo install renox-cli`
       in the README

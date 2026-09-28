@@ -12,7 +12,9 @@ use syn::{DeriveInput, parse_macro_input};
 
 /// Implements `renox::db::Model` for a struct with named fields.
 ///
-/// ```ignore
+/// ```
+/// # use renox::prelude::*;
+/// # use serde::Serialize;
 /// #[derive(Model, Serialize, Default)]
 /// #[model(table = "produk", soft_deletes)]
 /// struct Produk {
@@ -41,7 +43,9 @@ pub fn derive_model(input: TokenStream) -> TokenStream {
 /// Implements `renox::db::FromRow`, so `sql(…).fetch_as::<T>()` can read
 /// rows of any query (joins, aggregates, a few columns) into the struct.
 ///
-/// ```ignore
+/// ```
+/// # use renox::prelude::*;
+/// # use serde::Serialize;
 /// #[derive(FromRow, Serialize)]
 /// struct ProductRow {
 ///     id: i64,
@@ -70,7 +74,8 @@ pub fn derive_from_row(input: TokenStream) -> TokenStream {
 /// `Display`, `FromStr`, `Serialize`, `Deserialize`, `ToDbValue`, and
 /// decoding on every database, so the enum can be a model field.
 ///
-/// ```ignore
+/// ```
+/// # use renox::prelude::*;
 /// #[derive(DbEnum, Debug, Clone, Copy, PartialEq, Default)]
 /// enum Status {
 ///     #[default]
@@ -79,6 +84,10 @@ pub fn derive_from_row(input: TokenStream) -> TokenStream {
 ///     #[db(rename = "hidden")]
 ///     Archived,
 /// }
+///
+/// assert_eq!(Status::Archived.as_str(), "hidden");
+/// assert_eq!("published".parse::<Status>().unwrap(), Status::Published);
+/// assert_eq!(Status::ALL.len(), 3);
 /// ```
 #[proc_macro_derive(DbEnum, attributes(db))]
 pub fn derive_db_enum(input: TokenStream) -> TokenStream {
@@ -105,11 +114,13 @@ pub fn migrations(input: TokenStream) -> TokenStream {
 /// Marks an async test, like `#[tokio::test]`, using the Tokio that Renox
 /// re-exports, so apps don't need `tokio` as a dependency.
 ///
-/// ```ignore
+/// ```
+/// # use renox::prelude::*;
+/// # use renox::testing::TestApp;
 /// #[renox::test]
 /// async fn home_page() {
-///     let app = TestApp::new(toko::app()).await;
-///     app.get("/").await.assert_ok();
+///     let app = TestApp::new(App::new()).await;
+///     app.get("/health").await.assert_ok();
 /// }
 /// ```
 #[proc_macro_attribute]
@@ -131,8 +142,11 @@ pub fn test(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Embeds `resources/views`, `resources/lang` and `public` in the binary, so
 /// a release build runs from a single file:
 ///
-/// ```ignore
+/// ```
+/// # use renox::prelude::*;
+/// # let _ =
 /// App::new().embed(renox::embedded!())
+/// # ;
 /// ```
 ///
 /// Files are read from disk while `APP_DEBUG` is on (templates reload), and

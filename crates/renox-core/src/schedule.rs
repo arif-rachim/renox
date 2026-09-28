@@ -333,6 +333,60 @@ mod tests {
     }
 
     #[test]
+    fn every_constructor_picks_its_interval() {
+        let mut schedule = Schedule::default();
+        schedule
+            .every_minute("a", |_| async { Ok(()) })
+            .every_minutes(15, "b", |_| async { Ok(()) })
+            .hourly("c", |_| async { Ok(()) })
+            .every(Duration::ZERO, "d", |_| async { Ok(()) });
+        let whens: Vec<When> = schedule.tasks.iter().map(|t| t.when).collect();
+        assert_eq!(
+            whens,
+            [
+                When::Every(60),
+                When::Every(900),
+                When::Every(3600),
+                When::Every(1)
+            ],
+            "a zero interval runs every second rather than never"
+        );
+        schedule.check().unwrap();
+        let upcoming = schedule.upcoming(0);
+        assert_eq!(upcoming.len(), 4);
+        assert_eq!(upcoming[1].1 % 900, 0, "aligned to the quarter hour");
+        assert_eq!(upcoming[2].1 % 3600, 0, "on the hour");
+    }
+
+    #[test]
+    fn a_bad_daily_time_is_a_boot_error() {
+        let mut schedule = Schedule::default();
+        schedule.daily_at("25:00", "report", |_| async { Ok(()) });
+        assert!(schedule.check().unwrap_err().to_string().contains("report"));
+    }
+
+    #[test]
+    fn negative_offsets_and_midnight() {
+        let ny = parse_offset("-05:00").unwrap();
+        // 10:07:30 UTC is 05:07:30 in UTC-5; 04:00 there is tomorrow, 23:30 is tonight.
+        let early = next_run(When::Daily(parse_time("04:00").unwrap()), NOW, ny);
+        assert_eq!((early + ny).rem_euclid(86_400), 4 * 3600);
+        assert_eq!(early - NOW, 22 * 3600 + 52 * 60 + 30);
+        let late = next_run(When::Daily(parse_time("23:30").unwrap()), NOW, ny);
+        assert_eq!(late - NOW, 18 * 3600 + 22 * 60 + 30);
+        // A run due exactly now is the next day's.
+        let midnight_utc = NOW - NOW.rem_euclid(86_400);
+        assert_eq!(
+            next_run(When::Daily(0), midnight_utc, 0),
+            midnight_utc + 86_400
+        );
+        // UTC+14 is already tomorrow: 00:30 there is 10:30 UTC today.
+        let kiribati = parse_offset("+14:00").unwrap();
+        let soon = next_run(When::Daily(parse_time("00:30").unwrap()), NOW, kiribati);
+        assert_eq!(soon - NOW, 22 * 60 + 30);
+    }
+
+    #[test]
     fn parses_times_and_offsets() {
         assert_eq!(parse_offset("UTC").unwrap(), 0);
         assert_eq!(parse_offset("-03:30").unwrap(), -(3 * 3600 + 30 * 60));

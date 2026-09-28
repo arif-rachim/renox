@@ -3,6 +3,7 @@ name = "renox-core"
 description = "Core of the Renox web framework: application builder, modules, config and errors."
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
