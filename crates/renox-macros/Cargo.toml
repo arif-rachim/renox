@@ -1,6 +1,6 @@
 [package]
 name = "renox-macros"
-description = "Procedural macros for the Renox web framework: #[derive(Model)] and migrations!()."
+description = "Procedural macros for the Renox web framework: derive Model, FromRow and DbEnum, migrations!(), embedded!() and #[renox::test]."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

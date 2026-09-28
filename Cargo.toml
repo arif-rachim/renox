@@ -10,7 +10,7 @@ rust-version = "1.94"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/arif-rachim/renox"
 homepage = "https://github.com/arif-rachim/renox"
-keywords = ["web", "framework", "htmx", "axum", "sqlite"]
+keywords = ["web", "framework", "htmx", "sqlite", "postgres"]
 categories = ["web-programming::http-server"]
 
 [workspace.dependencies]

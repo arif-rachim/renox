@@ -7,13 +7,20 @@
 
 ## Start here
 
-- [CHEATSHEET.md](CHEATSHEET.md): the common patterns, 5–20 lines each and compiled as doctests
-  (routes, views, forms and validation, models and queries, pagination, auth and policies, HTMX, raw
-  SQL and transactions, jobs, events, schedule, mail, cache, session, uploads, translations, tests,
-  `.env`).
+- [CHEATSHEET.md](CHEATSHEET.md): the common patterns, 5–20 lines each and compiled as doctests:
+  `rnx` commands; modules, routes, path parameters, route groups and guards (auth, verified,
+  guest, throttle); views, template globals and overriding built-in pages; `App::share` and
+  `App::templates`; `App::provide` and `App::layer`; forms and validation (`unique`/`exists`);
+  models, migrations and queries; every field type; pagination; seeders and factories; auth,
+  policies, gates, API tokens and your own login; HTMX; raw SQL and transactions; jobs, events and
+  the schedule; mail and notifications (with the in-app inbox); cookies and downloads; cache,
+  session, uploads and translations (plurals); signed URLs and private files; CSP, CORS and
+  webhooks; SEO and analytics; tests; configuration (`.env` and your own settings).
 - [README.md](README.md): install `rnx`, create and run an app, the generator commands.
 
 ## Examples (complete apps, tested in CI)
+
+Every example has a README.md that walks through it.
 
 - [examples/shop](examples/shop): a whole online shop, the example to read for how everything
   fits: catalog with htmx search, sort and pagination, a cached home page, SEO and a sitemap; a
@@ -26,20 +33,20 @@
     [admin/mod.rs](examples/shop/src/app/admin/mod.rs),
     [admin/products.rs](examples/shop/src/app/admin/products.rs); tests:
     [tests/shop.rs](examples/shop/tests/shop.rs)
-- [examples/htmx-recipes](examples/htmx-recipes): htmx + Alpine recipes, each a few attributes and
+- [examples/htmx-recipes](examples/htmx-recipes) ([README](examples/htmx-recipes/README.md)): htmx + Alpine recipes, each a few attributes and
   a handler that answers with a fragment: modal form (HX-Trigger closes it), inline edit
   (`hx-patch`, Escape cancels), toggle, dropdown with delete (empty 200), infinite scroll
   (`revealed`), client-side tabs, `HxRefresh`, `HxRedirect`.
   [src/app/tasks/mod.rs](examples/htmx-recipes/src/app/tasks/mod.rs),
   [views](examples/htmx-recipes/resources/views/tasks),
   [tests/recipes.rs](examples/htmx-recipes/tests/recipes.rs)
-- [examples/relations](examples/relations): a blog: belongs to, has many, many to many through a
+- [examples/relations](examples/relations) ([README](examples/relations/README.md)): a blog: belongs to, has many, many to many through a
   pivot (`Pivot::sync` from checkboxes, `inverse()`), a page loaded without N+1
   (`belongs_to`, `has_many`, `load_for`), reports as SQL joins with `fetch_as`.
   [src/app/blog/mod.rs](examples/relations/src/app/blog/mod.rs),
   [model.rs](examples/relations/src/app/blog/model.rs),
   [tests/blog.rs](examples/relations/tests/blog.rs)
-- [examples/crud](examples/crud): one resource end to end: model and migration, list with
+- [examples/crud](examples/crud) ([README](examples/crud/README.md)): one resource end to end: model and migration, list with
   pagination, create and edit forms with validation, owner-only edit and delete through a policy,
   soft delete with a trash and restore, flash messages, and tests for each.
   - Routes and handlers: [examples/crud/src/app/products/mod.rs](examples/crud/src/app/products/mod.rs)
@@ -48,37 +55,37 @@
   - Views: [index.html](examples/crud/resources/views/products/index.html),
     [form.html](examples/crud/resources/views/products/form.html)
   - Tests: [examples/crud/tests/products.rs](examples/crud/tests/products.rs)
-- [examples/api](examples/api): a JSON API: tokens for a mobile app (`User::attempt`,
+- [examples/api](examples/api) ([README](examples/api/README.md)): a JSON API: tokens for a mobile app (`User::attempt`,
   `create_token`), Bearer auth, JSON bodies validated with 422 errors, JSON 401/404, CORS and a
   rate limit. [src/app/products/mod.rs](examples/api/src/app/products/mod.rs),
   [tests/api.rs](examples/api/tests/api.rs)
-- [examples/jobs](examples/jobs): an event whose listener queues a receipt mail (a mail template
+- [examples/jobs](examples/jobs) ([README](examples/jobs/README.md)): an event whose listener queues a receipt mail (a mail template
   with a text version), a notification to admins by mail and in the database, and a scheduled
   daily report. [src/app/orders/mod.rs](examples/jobs/src/app/orders/mod.rs),
   [receipt.rs](examples/jobs/src/app/orders/receipt.rs),
   [new_order.rs](examples/jobs/src/app/orders/new_order.rs),
   [tests/orders.rs](examples/jobs/tests/orders.rs)
-- [examples/uploads](examples/uploads): public photos checked by content, private invoices behind
+- [examples/uploads](examples/uploads) ([README](examples/uploads/README.md)): public photos checked by content, private invoices behind
   expiring signed links, `post_multipart` in tests.
   [src/app/documents/mod.rs](examples/uploads/src/app/documents/mod.rs),
   [tests/documents.rs](examples/uploads/tests/documents.rs)
-- [examples/postgres](examples/postgres): one app on PostgreSQL and SQLite (BOOLEAN and DATE
+- [examples/postgres](examples/postgres) ([README](examples/postgres/README.md)): one app on PostgreSQL and SQLite (BOOLEAN and DATE
   columns, per-database migrations, case-insensitive search), tested on both.
   [src/app/tasks/mod.rs](examples/postgres/src/app/tasks/mod.rs),
   [migrations/](examples/postgres/migrations)
-- [examples/fields](examples/fields): every form field type (text, textarea, number, money,
+- [examples/fields](examples/fields) ([README](examples/fields/README.md)): every form field type (text, textarea, number, money,
   checkbox, select → `DbEnum`, multi-select → `Json<Vec<String>>`, time, datetime-local, date,
   UUID) saved and shown back in the edit form, on SQLite and PostgreSQL. The mapping table is
   [docs/types.md](docs/types.md). [src/app/products/mod.rs](examples/fields/src/app/products/mod.rs),
   [form.html](examples/fields/resources/views/products/form.html),
   [tests/products.rs](examples/fields/tests/products.rs)
-- [examples/webhooks](examples/webhooks): payment gateway webhooks marking orders paid:
+- [examples/webhooks](examples/webhooks) ([README](examples/webhooks/README.md)): payment gateway webhooks marking orders paid:
   Midtrans, Xendit and Stripe signatures, stored once per event, processed in the queue.
   - One file per provider: [midtrans.rs](examples/webhooks/src/app/payments/midtrans.rs),
     [xendit.rs](examples/webhooks/src/app/payments/xendit.rs),
     [stripe.rs](examples/webhooks/src/app/payments/stripe.rs); tests:
     [tests/payments.rs](examples/webhooks/tests/payments.rs)
-- [examples/hello](examples/hello): a guestbook in one file: HTMX form posts that return
+- [examples/hello](examples/hello) ([README](examples/hello/README.md)): a guestbook in one file: HTMX form posts that return
   fragments, a photo upload, an event whose listener queues a mail job, a scheduled task,
   i18n (en/id) with a language switch, and a seeder.
   - [examples/hello/src/lib.rs](examples/hello/src/lib.rs),
@@ -93,6 +100,8 @@
   calls, backups, migrations at deploy, maintenance mode.
 - [docs/development.md](docs/development.md): faster builds (profiles, linker, features to drop,
   sccache, the cargo-chef Dockerfile).
+- [docs/types.md](docs/types.md): every Rust field type with its form input and its SQLite and
+  PostgreSQL column (`DbEnum`, `Json<T>`, dates and times, money, UUID).
 - [docs/relations.md](docs/relations.md): relations without N+1 (`belongs_to`, `has_many`, `Pivot`),
   joins with `fetch_as` and `#[derive(FromRow)]`, the query builder mapped to Laravel's.
 - [docs/stability.md](docs/stability.md): what semver covers, which types may grow

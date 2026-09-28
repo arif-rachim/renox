@@ -10,6 +10,20 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### Docs refresh
+
+- The `AGENTS.md` that `rnx new` writes links the cheat-sheet and llms.txt of the Renox commit the
+  app is pinned to (not `main`), points to examples/shop, htmx-recipes, relations and the guides,
+  and lists the traps agents hit (`{id}` routes, `require_auth` order, handlers that aren't `Send`).
+- CHEATSHEET: path parameters, route guards, `unique(…).ignore(id)`, signed URLs, queues and
+  delays, plurals and language switching, auth options, seeders and factories, template globals
+  and overridable pages, more test helpers, every `.env` setting.
+- README: a "Coming from Laravel" table, a Documentation section, an updated status and upgrade
+  path, prerequisites, and a corrected comparison with Loco.
+- CLAUDE.md rewritten for accuracy (pipeline, CI jobs, env vars, conventions), without personal
+  or session details. ROADMAP: finished items ticked, a "Not planned" section.
+- Crate descriptions and keywords mention PostgreSQL.
+
 ### M17b · More examples, a README for each
 
 - `examples/htmx-recipes` (modal form, inline edit, toggle, dropdown with delete, infinite

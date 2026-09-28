@@ -1,6 +1,6 @@
 [package]
 name = "renox-core"
-description = "Core of the Renox web framework: application builder, modules, config and errors."
+description = "Runtime of the Renox web framework: routing, views, database and models, validation, auth, queue, scheduler, mail, storage. Use it through the `renox` crate."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

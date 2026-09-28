@@ -55,6 +55,11 @@ fn git_dependency(rev: Option<&str>) -> String {
     }
 }
 
+/// The Renox repository at `rev` (or `main`), for links in AGENTS.md.
+fn docs_url(rev: Option<&str>) -> String {
+    format!("{RENOX_GIT}/blob/{}", rev.unwrap_or("main"))
+}
+
 pub fn run(name: &str, renox_path: Option<&Path>, database: Database) -> Result<()> {
     validate_name(name)?;
     let root = Path::new(name);
@@ -62,15 +67,38 @@ pub fn run(name: &str, renox_path: Option<&Path>, database: Database) -> Result<
         bail!("`{name}` already exists");
     }
 
-    let dependency = match renox_path {
+    let rev = option_env!("RENOX_GIT_REV");
+    // Where AGENTS.md sends coding agents: the docs of the Renox this app
+    // compiles against, not `main`, which may have APIs it doesn't.
+    let (dependency, docs, source) = match renox_path {
         Some(path) => {
             let crate_dir = path.join("crates/renox");
             let crate_dir = crate_dir
                 .canonicalize()
                 .with_context(|| format!("{} is not a Renox checkout", path.display()))?;
-            format!("renox = {{ path = {:?}", crate_dir.display().to_string())
+            let checkout = crate_dir
+                .parent()
+                .and_then(Path::parent)
+                .unwrap_or(&crate_dir)
+                .display()
+                .to_string();
+            (
+                format!("renox = {{ path = {:?}", crate_dir.display().to_string()),
+                docs_url(None),
+                format!("the local Renox checkout this app uses: `{checkout}`"),
+            )
         }
-        None => git_dependency(option_env!("RENOX_GIT_REV")),
+        None => (
+            git_dependency(rev),
+            docs_url(rev),
+            match rev {
+                Some(rev) => format!(
+                    "the checkout Cargo downloaded: `~/.cargo/git/checkouts/renox-*/{}/`",
+                    &rev[..7.min(rev.len())]
+                ),
+                None => "the checkout Cargo downloaded: `~/.cargo/git/checkouts/renox-*/*/`".into(),
+            },
+        ),
     };
     let dependency = match database {
         Database::Sqlite => format!("{dependency} }}"),
@@ -95,6 +123,8 @@ pub fn run(name: &str, renox_path: Option<&Path>, database: Database) -> Result<
             .replace("{{name}}", name)
             .replace("{{title}}", &title(name))
             .replace("{{renox_dependency}}", &dependency)
+            .replace("{{renox_docs}}", &docs)
+            .replace("{{renox_source}}", &source)
             .replace("{{crate_name}}", &crate_name)
             .replace("{{database_url}}", &database_url)
             .replace("{{test_database_url}}", &test_database_url);
@@ -174,6 +204,12 @@ mod tests {
         let rev = "0123456789abcdef0123456789abcdef01234567";
         assert!(git_dependency(Some(rev)).ends_with(&format!("rev = \"{rev}\"")));
         assert!(git_dependency(None).ends_with("branch = \"main\""));
+        // AGENTS.md links the docs of that same commit.
+        assert_eq!(
+            docs_url(Some(rev)),
+            format!("https://github.com/arif-rachim/renox/blob/{rev}")
+        );
+        assert!(docs_url(None).ends_with("/blob/main"));
     }
 
     #[test]

@@ -10,7 +10,7 @@ commit that `rnx` was built from.
 ## What 1.x may add without a major release
 
 - **New fields on these structs.** Build them with their constructors, `Default` or
-  `TestApp::with_config(|c| …)`, not with struct literals:
+  `TestApp::with_config(app, |c| …)`, not with struct literals:
   - `Config`, `MailConfig`, `StorageConfig`, `AnalyticsConfig`
   - `Mail`, `User`, `Paginated`, `RouteInfo`, `MigrationStatus`, `FailedJob`
   - `DatabaseNotification`, `AccessToken`, `NewToken`

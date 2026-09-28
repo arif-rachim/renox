@@ -6,7 +6,8 @@ build. These settings make both steps quicker.
 
 ## What `rnx new` already does
 
-- **Argon2 is optimised in dev builds** (`[profile.dev.package.argon2] opt-level = 3`). Password
+- **Argon2 and BLAKE2 are optimised in dev builds** (`[profile.dev.package.argon2]` and
+  `[profile.dev.package.blake2]`, both `opt-level = 3`; Argon2 hashes with BLAKE2). Password
   hashing is slow on purpose, and very slow unoptimised; every login test would pay for it.
 - **Debug info is only line tables** (`[profile.dev] debug = "line-tables-only"`). Backtraces
   keep file and line numbers, while binaries are much smaller and linking, the part of each
