@@ -620,16 +620,16 @@ before it can start: tenants, roles, accounts.
       `Routes::require_role` / `require_permission`, permissions usable as gates
 - [x] `Routes::require_gate("admin")` (async gates too, shown in `route:list`) and
       `App::gate_before(|user| Option<bool>)` for super-admins
-- [ ] Account pages in `Auth`: profile (name, email with re-verification), password (checks the
+- [x] Account pages in `Auth`: profile (name, email with re-verification), password (checks the
       current one and keeps this session logged in), delete account; `auth::change_password`
-- [ ] Password rules (`Password::min(12).mixed_case().numbers().symbols()`, optional
+- [x] Password rules (`Password::min(12).mixed_case().numbers().symbols()`, optional
       breached-password check) used by register/reset/change; `require_password_confirmed`
-- [ ] Auth events (`Registered`, `LoggedIn`, `LoginFailed`, `LockedOut`, `LoggedOut`,
+- [x] Auth events (`Registered`, `LoggedIn`, `LoginFailed`, `LockedOut`, `LoggedOut`,
       `PasswordReset`, `Verified`) and an opt-in audit log (`state.audit(user, action, subject)`)
 - [x] API token abilities (`create_token(.., &["orders:read"])`, `token_can`,
       `Routes::require_ability`), expired-token pruning
-- [ ] Log out this device only; log out other devices (keeps this one)
-- [ ] Accept bcrypt hashes from imported Laravel users and rehash to Argon2id at login
+- [x] Log out this device only; log out other devices (keeps this one)
+- [x] Accept bcrypt hashes from imported Laravel users and rehash to Argon2id at login
 
 Notes from M18a (tenancy, roles, gates, token abilities):
 - `renox::context`: every request, job, scheduled task and app command runs in its own
@@ -643,6 +643,20 @@ Notes from M18a (tenancy, roles, gates, token abilities):
   module is registered. `require_role/permission/gate/ability` show in `route:list`.
 - Remaining M18 items move to M18b: account pages, password rules and confirmation, auth events
   and audit log, per-device logout, bcrypt import.
+
+Notes from M18b (accounts and security):
+- Per-device logout keeps sessions in cookies: each login gets a random id, and `logout` puts it
+  on a short denylist (`revoked_sessions`, kept until a copy of the cookie would expire). "Log
+  out other devices" reuses the `sessions_revoked_at` cut-off and logs this session in after it.
+  `logout` used to end every session of the user; now it ends this device only.
+- Password policy: `Password::min(n).letters().mixed_case().numbers().symbols()`, used by the
+  built-in register, reset and account forms through `Auth::password_rules`. The optional
+  breached-password check (HIBP) is left out: it needs an HTTP client, which M20 adds.
+- The account page is opt-in (`Auth::account()`) so existing apps' routes don't clash; new apps
+  from `rnx new` turn it on and link it from the layout.
+- Password confirmation lasts three hours, like Laravel; a login through the form counts.
+- Auth events are emitted by the built-in pages only; a listener's failure is logged and never
+  fails the login. The `Audit` module records them all and gives apps `audit::record`.
 
 ### M19 · v0.20: Data layer 2
 - [ ] Raw fragments in the builder: `where_raw`, `order_by_raw`, `select_raw` +

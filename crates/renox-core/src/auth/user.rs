@@ -46,6 +46,7 @@ const NOT_EXTRA: &[&str] = &[
     "updated_at",
     "sessions_revoked_at",
     "remember_token",
+    "session_revoked",
 ];
 
 impl FromRow for User {
@@ -173,17 +174,33 @@ impl User {
     /// Ends every session of the user, e.g. on logout or when an account
     /// may be compromised. API tokens stay; see [`User::revoke_tokens`].
     pub async fn revoke_sessions(&self, db: &Db) -> Result {
-        revoke_sessions(db, self.id).await
+        revoke_sessions(db, self.id).await.map(|_| ())
     }
 
-    /// The user and when their sessions were last revoked, in one query.
-    pub(crate) async fn find_with_revocation(db: &Db, id: i64) -> Result<Option<(Self, i64)>> {
-        let row = sql("SELECT * FROM users WHERE id = ?")
-            .bind(id)
-            .fetch_optional(db)
-            .await?;
+    /// The user, when their sessions were last revoked, and whether the
+    /// session `session_id` was logged out, in one query.
+    pub(crate) async fn find_with_revocation(
+        db: &Db,
+        id: i64,
+        session_id: &str,
+    ) -> Result<Option<(Self, i64, bool)>> {
+        let row = sql(
+            "SELECT users.*, (SELECT COUNT(*) FROM revoked_sessions WHERE id = ?) AS session_revoked \
+             FROM users WHERE id = ?",
+        )
+        .bind(session_id)
+        .bind(id)
+        .fetch_optional(db)
+        .await?;
         Ok(match row {
-            Some(row) => Some((Self::from_row(&row)?, row.try_get("sessions_revoked_at")?)),
+            Some(row) => {
+                let revoked: i64 = row.try_get("session_revoked")?;
+                Some((
+                    Self::from_row(&row)?,
+                    row.try_get("sessions_revoked_at")?,
+                    revoked > 0,
+                ))
+            }
             None => None,
         })
     }
@@ -197,7 +214,20 @@ impl User {
             .as_ref()
             .map_or_else(dummy_hash, |u| u.password.clone());
         let valid = verify_password(password, &hash).await;
-        Ok(user.filter(|_| valid))
+        let Some(mut user) = user.filter(|_| valid) else {
+            return Ok(None);
+        };
+        user.rehash_if_needed(db, password).await?;
+        Ok(Some(user))
+    }
+
+    /// After a successful login: replaces an older hash (bcrypt from an
+    /// imported Laravel app) with Argon2id.
+    pub(crate) async fn rehash_if_needed(&mut self, db: &Db, password: &str) -> Result {
+        if needs_rehash(&self.password) {
+            self.set_password(db, password).await?;
+        }
+        Ok(())
     }
 
     pub async fn check_password(&self, password: &str) -> bool {
@@ -217,13 +247,15 @@ impl User {
     }
 }
 
-pub(crate) async fn revoke_sessions(db: &Db, id: i64) -> Result {
+/// Ends every session of user `id` logged in until now; returns the cut-off.
+pub(crate) async fn revoke_sessions(db: &Db, id: i64) -> Result<i64> {
+    let now = super::unix_millis();
     sql("UPDATE users SET sessions_revoked_at = ? WHERE id = ?")
-        .bind(super::unix_millis())
+        .bind(now)
         .bind(id)
         .execute(db)
         .await?;
-    Ok(())
+    Ok(now)
 }
 
 /// Emails are stored and looked up trimmed and lowercased, so they match
@@ -259,10 +291,16 @@ pub async fn hash_password(password: &str) -> Result<String> {
     .map_err(Error::from)
 }
 
-/// Checks a password against an Argon2 hash on a blocking thread.
+/// Checks a password against its hash on a blocking thread: Argon2 (what
+/// Renox writes), or bcrypt (`$2y$…`, e.g. users imported from Laravel).
 pub async fn verify_password(password: &str, hash: &str) -> bool {
     let (password, hash) = (password.to_owned(), hash.to_owned());
     tokio::task::spawn_blocking(move || {
+        if is_bcrypt(&hash) {
+            // PHP writes `$2y$`, the same algorithm as `$2b$`.
+            let hash = hash.replacen("$2y$", "$2b$", 1);
+            return bcrypt::verify(password.as_bytes(), &hash).unwrap_or(false);
+        }
         PasswordHash::new(&hash).is_ok_and(|parsed| {
             Argon2::default()
                 .verify_password(password.as_bytes(), &parsed)
@@ -271,6 +309,16 @@ pub async fn verify_password(password: &str, hash: &str) -> bool {
     })
     .await
     .unwrap_or(false)
+}
+
+fn is_bcrypt(hash: &str) -> bool {
+    ["$2y$", "$2b$", "$2a$"].iter().any(|p| hash.starts_with(p))
+}
+
+/// Whether a hash should be replaced by a fresh Argon2id one (e.g. a bcrypt
+/// hash imported from Laravel). The login does it with the typed password.
+pub fn needs_rehash(hash: &str) -> bool {
+    !hash.starts_with("$argon2id$")
 }
 
 #[cfg(test)]
@@ -284,5 +332,18 @@ mod tests {
         assert!(verify_password("rahasia123", &hash).await);
         assert!(!verify_password("salah", &hash).await);
         assert!(!verify_password("rahasia123", "not a hash").await);
+        assert!(!needs_rehash(&hash));
+    }
+
+    #[tokio::test]
+    async fn laravel_bcrypt_hashes_verify() {
+        // `Hash::make('password')` in Laravel (cost 4 to keep the test fast).
+        let laravel = bcrypt::hash("password", 4)
+            .unwrap()
+            .replacen("$2b$", "$2y$", 1);
+        assert!(laravel.starts_with("$2y$04$"));
+        assert!(verify_password("password", &laravel).await);
+        assert!(!verify_password("wrong", &laravel).await);
+        assert!(needs_rehash(&laravel));
     }
 }

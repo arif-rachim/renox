@@ -59,6 +59,14 @@ const BUILTIN: &[(&str, &str)] = &[
         include_str!("../views/mail/button.html"),
     ),
     (
+        "renox/auth/account.html",
+        include_str!("../views/auth/account.html"),
+    ),
+    (
+        "renox/auth/confirm-password.html",
+        include_str!("../views/auth/confirm-password.html"),
+    ),
+    (
         "renox/mail/auth/reset-password.html",
         include_str!("../views/mail/auth/reset-password.html"),
     ),

@@ -6,6 +6,6 @@ pub fn app() -> renox::App {
     renox::App::new()
         .embed(renox::embedded!())
         .migrations(renox::migrations!())
-        .module(renox::auth::Auth::new())
+        .module(renox::auth::Auth::new().account()) // login, register, /account
         .module(app::home::Home)
 }

@@ -516,6 +516,8 @@ use renox::prelude::*;
 
 fn back_office() -> Auth {
     Auth::new()
+        .account()                 // /account: profile, password, other devices, delete
+        .password_rules(renox::validation::Password::min(12).mixed_case().numbers())
         .verify_email()            // mails a link; guard routes with .require_verified()
         .without_registration()    // no /register: an admin adds users
         .redirect_to("/dashboard") // after login, when no page asked for one
@@ -534,15 +536,15 @@ async fn sign_in(State(state): State<AppState>, session: Session, Form(f): Form<
 }
 
 async fn sign_out(State(db): State<Db>, session: Session) -> Result<Redirect> {
-    renox::auth::logout(&db, &session).await?; // ends every session of the user
+    renox::auth::logout(&db, &session).await?; // this device (a copied cookie dies too)
     Ok(Redirect::to("/"))
 }
 
 async fn security(State(db): State<Db>, session: Session, user: AuthUser) -> Result<View> {
     let mut me = user.user().clone();
-    me.set_password(&db, "a new password").await?; // every session ends, this one too:
-    renox::auth::login(&session, &me, None)?;       // log this one in again
-    me.revoke_sessions(&db).await?;                 // "log out everywhere" (this one too)
+    renox::auth::change_password(&db, &session, &mut me, "a new password").await?; // others end
+    renox::auth::logout_other_devices(&db, &session, &me).await?; // keeps this one
+    // me.revoke_sessions(&db) ends every session, this one too; me.delete_account(&db)
     let admin = user.allows("admin");               // a gate as a bool; allows_async for gate_async
     let billing = user.allows_async("billing").await?;
     Ok(view("account/security.html", context! { admin, billing }))
@@ -556,6 +558,45 @@ async fn inbox(State(db): State<Db>, user: AuthUser) -> Result<View> {
     Ok(view("inbox.html", context! { notifications, unread }))
 }
 ```
+
+Routes that should ask for the password again (after three hours): `.require_password_confirmed()`
+(the `Auth` module serves `/confirm-password`). Users imported from Laravel keep their bcrypt
+hashes and are moved to Argon2id when they next log in.
+
+## Auth events and the audit log
+
+```rust
+use renox::prelude::*;
+use renox::audit::{self, Audit, Entry};
+use renox::auth::events::{LoggedIn, LoginFailed, Registered};
+
+fn app() -> App {
+    App::new()
+        .module(Auth::new())
+        .module(Audit) // an audit_logs table; records every auth event below
+        // Registered, LoggedIn, LoginFailed, LockedOut, LoggedOut, PasswordReset,
+        // PasswordChanged, EmailVerified, ProfileUpdated, OtherDevicesLoggedOut, AccountDeleted
+        .listen(|e: Registered, state| async move {
+            let _ = (e.user_id, state); // e.g. queue a welcome mail
+            Ok(())
+        })
+        .listen(|e: LoginFailed, _state| async move {
+            let _ = (e.email, e.ip); // e.g. alert on many failures from one address
+            Ok(())
+        })
+}
+
+async fn refund(State(db): State<Db>, user: AuthUser, ClientIp(ip): ClientIp) -> Result<&'static str> {
+    audit::record(&db, Entry::new("order.refunded").user(user.id).subject("orders", 42)
+        .data(json!({ "amount": 75_000 })).ip(ip)).await?;
+    let history = audit::for_subject(&db, "orders", 42, 20).await?; // also for_user, latest
+    let _ = history;
+    Ok("refunded")
+}
+# let _ = (app, refund, |e: LoggedIn| e.user_id);
+```
+
+`rnx audit:prune --days 365` deletes older entries.
 
 ## Tenants, roles and permissions
 

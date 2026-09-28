@@ -210,7 +210,7 @@ impl Session {
         };
     }
 
-    fn lifetime(&self) -> Option<u64> {
+    pub(crate) fn lifetime(&self) -> Option<u64> {
         self.lock().lifetime
     }
 

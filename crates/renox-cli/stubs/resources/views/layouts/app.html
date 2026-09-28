@@ -13,7 +13,7 @@
   <nav>
     <a href="{{ route('home') }}"><strong>{{ app.name }}</strong></a>
     {% if auth.check %}
-    <span>{{ auth.user.name }}</span>
+    <a href="{{ route('account.show') }}">{{ auth.user.name }}</a>
     <form method="post" action="{{ route('logout') }}">{{ csrf_field() }}<button>Log out</button></form>
     {% else %}
     <a href="{{ route('login') }}">Log in</a>

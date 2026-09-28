@@ -2,10 +2,12 @@
 //!
 //! Most applications should depend on the `renox` crate instead, which
 //! re-exports everything here through `renox::prelude`.
+#![recursion_limit = "256"] // the built-in auth texts are one large `json!`
 
 pub mod analytics;
 mod app;
 mod assets;
+pub mod audit;
 pub mod auth;
 pub mod cache;
 mod client_ip;

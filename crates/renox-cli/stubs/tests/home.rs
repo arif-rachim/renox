@@ -21,4 +21,6 @@ async fn guests_can_register() {
     .await
     .assert_redirect("/");
     app.assert_database_has("users", &[("email", &"arif@example.com")]).await;
+    // Registered and logged in: the account page is theirs.
+    app.get("/account").await.assert_ok().assert_see("arif@example.com");
 }

@@ -328,13 +328,14 @@ to the config tests there, give it a test-friendly value in `Default`, and docum
 App-specific settings need no field: `config.var(name)` reads `config.vars`, then the environment.
 
 ### 4.5 Migrations owned by the framework
-Names start with `0001…` so they sort before app migrations (`2026…`). There are eleven:
+Names start with `0001…` so they sort before app migrations (`2026…`). There are thirteen:
 - Auth module (`auth/module.rs` `MIGRATIONS`): `00010101000000_create_users_table`,
   `…000001_create_password_reset_tokens_table`, `…000002_create_personal_access_tokens_table`,
   `…000003_create_notifications_table`, `…000004_add_sessions_revoked_at_to_users`,
-  `…000005_add_abilities_to_personal_access_tokens`.
+  `…000005_add_abilities_to_personal_access_tokens`, `…000006_create_revoked_sessions_table`.
 - Permissions module (`auth/permissions.rs`): `00010101000500_create_roles_and_permissions_tables`
   (roles, permissions, permission_role, role_user).
+- Audit module (`audit.rs`): `00010101000600_create_audit_logs_table`.
 - Every app (registered in `App::boot`): `00010101000100_create_jobs_table` (queue),
   `00010101000200_create_cache_table` (cache), `00010101000300_create_webhook_calls_table` and
   `00010101000301_store_webhook_payloads_as_bytes` (webhook.rs `MIGRATIONS`).
@@ -662,7 +663,11 @@ change 29 s → 7 s, full run 19 s → 6 s.
   `gate_before`; the `Permissions` module; token abilities): PR from branch
   `m18a-authorization`. Authorization is in one place: `auth::Access::check` (gate_before →
   gate → permission); `gate_before` doesn't answer role membership.
-- **Next: M18b (accounts and security), then M19–M21**, from the Laravel parity review
+- **M18b** (account pages, `Password` policy, password confirmation, per-device logout with a
+  `revoked_sessions` denylist, auth events + the `Audit` module, bcrypt import): PR from branch
+  `m18b-accounts`. Sessions: each login stores `_auth_session_id`; `resolve` checks the password
+  fingerprint, `sessions_revoked_at` and the denylist in one query.
+- **Next: M19–M21**, from the Laravel parity review
   (`docs/audit/2026-09-laravel-parity.md`); the ROADMAP lists each milestone's items. **v1.0 is
   on hold** until the owner says to start it (docs site, starter kit, semver checks, real
   crates.io releases; the owner runs `cargo login`).

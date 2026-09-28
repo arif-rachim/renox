@@ -43,6 +43,13 @@ pub(crate) fn template(locale: Locale, key: &str) -> &'static str {
             "url" => "The :attribute must be a valid URL.",
             "in" => "The selected :attribute is invalid.",
             "confirmed" => "The :attribute confirmation does not match.",
+            "password.letters" => "The :attribute must contain at least one letter.",
+            "password.mixed" => {
+                "The :attribute must contain at least one uppercase and one lowercase letter."
+            }
+            "password.numbers" => "The :attribute must contain at least one number.",
+            "password.symbols" => "The :attribute must contain at least one symbol.",
+            "current_password" => "The :attribute is incorrect.",
             "accepted" => "The :attribute must be accepted.",
             "unique" => "The :attribute has already been taken.",
             "exists" => "The selected :attribute is invalid.",
@@ -83,6 +90,13 @@ pub(crate) fn template(locale: Locale, key: &str) -> &'static str {
             "url" => ":Attribute harus berupa URL yang valid.",
             "in" => ":Attribute yang dipilih tidak valid.",
             "confirmed" => "Konfirmasi :attribute tidak cocok.",
+            "password.letters" => ":Attribute harus berisi setidaknya satu huruf.",
+            "password.mixed" => {
+                ":Attribute harus berisi setidaknya satu huruf besar dan satu huruf kecil."
+            }
+            "password.numbers" => ":Attribute harus berisi setidaknya satu angka.",
+            "password.symbols" => ":Attribute harus berisi setidaknya satu simbol.",
+            "current_password" => ":Attribute salah.",
             "accepted" => ":Attribute harus disetujui.",
             "unique" => ":Attribute sudah digunakan.",
             "exists" => ":Attribute yang dipilih tidak valid.",

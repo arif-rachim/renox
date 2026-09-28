@@ -148,7 +148,7 @@ impl Event for Ping {}
 
 /// Roles, permissions, token abilities and scoped rules (routed so the
 /// futures are checked for `Send`; the tables aren't created here).
-async fn access(State(db): State<Db>, user: AuthUser) -> Result<String> {
+async fn access(State(db): State<Db>, user: AuthUser, session: Session) -> Result<String> {
     use renox::auth::permissions;
     permissions::define_role(&db, "editor", &["posts.publish"]).await?;
     permissions::grant(&db, "editor", &["posts.edit"]).await?;
@@ -162,6 +162,15 @@ async fn access(State(db): State<Db>, user: AuthUser) -> Result<String> {
     user.create_token_with(&db, "t", &["a"], None).await?;
     renox::auth::prune_expired_tokens(&db, Duration::from_secs(60)).await?;
     let scoped = Note::unscoped().none().count(&db).await?;
+    let mut me = user.user().clone();
+    renox::auth::change_password(&db, &session, &mut me, "a new password").await?;
+    renox::auth::logout_other_devices(&db, &session, &me).await?;
+    renox::audit::record(&db, renox::audit::Entry::new("x").user(me.id)).await?;
+    renox::audit::latest(&db, 5).await?;
+    renox::audit::for_user(&db, me.id, 5).await?;
+    renox::audit::prune(&db, Duration::from_secs(60)).await?;
+    renox::auth::logout(&db, &session).await?;
+    me.delete_account(&db).await?;
     Ok(format!("{} {} {scoped}", roles.len(), all.len()))
 }
 

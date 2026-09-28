@@ -1,0 +1,62 @@
+{% extends "renox/auth/layout.html" %}
+{% block title %}{{ text.account_title }} · {{ app.name }}{% endblock %}
+{% block content %}
+<div class="stack">
+  {% if flash.status %}<p class="status">{{ flash.status }}</p>{% endif %}
+
+  <form class="card" method="post" action="{{ route('account.profile') }}" hx-post="{{ route('account.profile') }}">
+    {{ csrf_field() }}{{ method_field('PUT') }}
+    <h2>{{ text.profile_title }}</h2>
+    <label>{{ text.name }}
+      <input name="name" value="{{ old('name', user.name) }}" autocomplete="name" required>
+    </label>
+    <p class="error" data-error-for="name">{{ error('name') }}</p>
+    <label>{{ text.email }}
+      <input type="email" name="email" value="{{ old('email', user.email) }}" autocomplete="email" required>
+    </label>
+    <p class="error" data-error-for="email">{{ error('email') }}</p>
+    {% if verify_email and not user.email_verified_at %}<p>{{ text.email_unverified }}</p>{% endif %}
+    <button type="submit">{{ text.save }}</button>
+  </form>
+
+  <form class="card" method="post" action="{{ route('account.password') }}" hx-post="{{ route('account.password') }}">
+    {{ csrf_field() }}{{ method_field('PUT') }}
+    <h2>{{ text.password_title }}</h2>
+    <label>{{ text.current_password }}
+      <input type="password" name="current_password" autocomplete="current-password" required>
+    </label>
+    <p class="error" data-error-for="current_password">{{ error('current_password') }}</p>
+    <label>{{ text.new_password }}
+      <input type="password" name="password" autocomplete="new-password" required>
+    </label>
+    <p class="error" data-error-for="password">{{ error('password') }}</p>
+    <label>{{ text.password_confirmation }}
+      <input type="password" name="password_confirmation" autocomplete="new-password" required>
+    </label>
+    <button type="submit">{{ text.save }}</button>
+  </form>
+
+  <form class="card" method="post" action="{{ route('account.logout_others') }}" hx-post="{{ route('account.logout_others') }}">
+    {{ csrf_field() }}
+    <h2>{{ text.other_devices_title }}</h2>
+    <p>{{ text.other_devices_intro }}</p>
+    <label>{{ text.password }}
+      <input type="password" name="password" autocomplete="current-password" required>
+    </label>
+    <p class="error" data-error-for="password">{{ error('password') }}</p>
+    <button type="submit">{{ text.other_devices_button }}</button>
+  </form>
+
+  <form class="card danger" method="post" action="{{ route('account.destroy') }}" hx-post="{{ route('account.destroy') }}"
+        hx-confirm="{{ text.delete_confirm }}">
+    {{ csrf_field() }}{{ method_field('DELETE') }}
+    <h2>{{ text.delete_title }}</h2>
+    <p>{{ text.delete_intro }}</p>
+    <label>{{ text.password }}
+      <input type="password" name="password" autocomplete="current-password" required>
+    </label>
+    <p class="error" data-error-for="password">{{ error('password') }}</p>
+    <button type="submit">{{ text.delete_button }}</button>
+  </form>
+</div>
+{% endblock %}

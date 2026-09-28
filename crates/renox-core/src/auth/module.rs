@@ -5,13 +5,15 @@ use axum::response::{IntoResponse, Redirect, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+use super::events::{LockedOut, LoggedIn, LoggedOut, LoginFailed, Registered, announce};
 use super::user::dummy_hash;
 use super::{User, intended, login, logout, passwords, verification, verify_password};
 use crate::db::Migration;
 use crate::i18n::Lang;
 use crate::validation::{Errors, Locale, Valid, Validate, ValidationError, Validator};
 use crate::{
-    AppState, ClientIp, Htmx, HxRedirect, Module, Result, Routes, Session, View, context, view,
+    AppState, AuthUser, ClientIp, Htmx, HxRedirect, Module, Result, Routes, Session, View, context,
+    view,
 };
 
 const MIGRATIONS: &[Migration] = &[
@@ -24,12 +26,14 @@ const MIGRATIONS: &[Migration] = &[
         "auth",
         "00010101000005_add_abilities_to_personal_access_tokens"
     ),
+    crate::db::framework_migration!("auth", "00010101000006_create_revoked_sessions_table"),
 ];
 
-struct Settings {
+pub(super) struct Settings {
+    pub(super) password: crate::validation::Password,
     registration: bool,
     redirect_to: Option<String>,
-    verify_email: bool,
+    pub(super) verify_email: bool,
     rules: Option<RulesFn>,
     on_registered: Option<RegisteredFn>,
 }
@@ -97,6 +101,8 @@ impl Registration {
 /// user, and a new password or a password reset ends the other sessions.
 #[derive(Clone)]
 pub struct Auth {
+    password: crate::validation::Password,
+    account: bool,
     registration: bool,
     redirect_to: Option<String>,
     verify_email: bool,
@@ -107,6 +113,8 @@ pub struct Auth {
 impl Auth {
     pub fn new() -> Self {
         Self {
+            password: crate::validation::Password::default(),
+            account: false,
             registration: true,
             redirect_to: None,
             verify_email: false,
@@ -162,6 +170,31 @@ impl Auth {
         self
     }
 
+    /// What passwords must contain on the register, reset and account
+    /// forms; `Password::min(8)` by default.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// use renox::validation::Password;
+    /// # let _ =
+    /// Auth::new().password_rules(Password::min(12).mixed_case().numbers())
+    /// # ;
+    /// ```
+    pub fn password_rules(mut self, policy: crate::validation::Password) -> Self {
+        self.password = policy;
+        self
+    }
+
+    /// Adds the account page (`/account`, route `account.show`): change
+    /// name and email (a new email must be verified again with
+    /// `verify_email`), change the password, log out other devices, delete
+    /// the account. The last two ask for the password. Override the page at
+    /// `resources/views/renox/auth/account.html`.
+    pub fn account(mut self) -> Self {
+        self.account = true;
+        self
+    }
+
     /// Hides `/register`, e.g. for back-office apps where an admin adds users.
     pub fn without_registration(mut self) -> Self {
         self.registration = false;
@@ -207,6 +240,7 @@ impl Module for Auth {
 
     fn routes(&self) -> Routes {
         let settings = Arc::new(Settings {
+            password: self.password.clone(),
             registration: self.registration,
             redirect_to: self.redirect_to.clone(),
             verify_email: self.verify_email,
@@ -242,10 +276,19 @@ impl Module for Auth {
             .post("/email/verification-notification", verification::resend)
             .name("verification.send")
             .require_auth();
-        guest
+        let confirm = Routes::new()
+            .get("/confirm-password", super::account::show_confirm)
+            .post("/confirm-password", super::account::confirm)
+            .name("password.confirm")
+            .require_auth();
+        let mut routes = guest
             .merge(verification)
-            .merge(Routes::new().post("/logout", destroy).name("logout"))
-            .route_layer(Extension(settings))
+            .merge(confirm)
+            .merge(Routes::new().post("/logout", destroy).name("logout"));
+        if self.account {
+            routes = routes.merge(super::account::routes());
+        }
+        routes.route_layer(Extension(settings))
     }
 }
 
@@ -306,6 +349,8 @@ pub(super) fn label(v: &Validator, field: &'static str) -> &'static str {
     match (v.locale(), field) {
         (Locale::Id, "name") => "nama",
         (Locale::Id, "password") => "kata sandi",
+        (Locale::Id, "current_password") => "kata sandi saat ini",
+        (Locale::En, "current_password") => "current password",
         _ => field,
     }
 }
@@ -339,7 +384,14 @@ async fn store_login(
             .with_input(&json!({ "email": form.email, "remember": form.remember }))
     };
 
+    let address = ip.map(|ip| ip.to_string());
     if let Some(seconds) = state.throttle.blocked_for(&form.email, ip).await {
+        let event = LockedOut {
+            email: form.email.clone(),
+            ip: address,
+            seconds,
+        };
+        announce(&state, event).await;
         return Err(failed("auth.throttle", Some(seconds)).into());
     }
 
@@ -349,10 +401,16 @@ async fn store_login(
         .as_ref()
         .map_or_else(dummy_hash, |u| u.password.clone());
     let valid = verify_password(&form.password, &hash).await;
-    let Some(user) = user.filter(|_| valid) else {
+    let Some(mut user) = user.filter(|_| valid) else {
         state.throttle.fail(&form.email, ip).await;
+        let event = LoginFailed {
+            email: form.email.clone(),
+            ip: address,
+        };
+        announce(&state, event).await;
         return Err(failed("auth.failed", None).into());
     };
+    user.rehash_if_needed(&state.db, &form.password).await?;
 
     state.throttle.clear(&form.email, ip).await;
     let remember = form
@@ -360,6 +418,12 @@ async fn store_login(
         .is_some()
         .then_some(state.config.remember_lifetime);
     login(&session, &user, remember)?;
+    super::account::mark_confirmed(&session)?;
+    let event = LoggedIn {
+        user_id: user.id,
+        ip: address,
+    };
+    announce(&state, event).await;
     Ok(go(&htmx, after_login(&state, &settings, &session)))
 }
 
@@ -391,11 +455,8 @@ impl Validate for RegisterForm {
             .email()
             .max(255)
             .unique("users", "email");
-        v.field("password", &self.password)
-            .fallback_label(password)
-            .required()
-            .min(8)
-            .confirmed(&self.password_confirmation);
+        // Checked with the app's policy in `store_register`.
+        let _ = password;
     }
 }
 
@@ -408,10 +469,17 @@ async fn store_register(
     req: axum::extract::Request,
 ) -> Result<Response> {
     let rules = settings.rules.clone();
+    let policy = settings.password.clone();
     let validated = crate::validation::extract::validate_request(
         req,
         &state,
-        move |_: &RegisterForm, fields, v| {
+        move |form: &RegisterForm, fields, v| {
+            let password = label(v, "password");
+            v.field("password", &form.password)
+                .fallback_label(password)
+                .required()
+                .password(&policy)
+                .confirmed(&form.password_confirmation);
             if let Some(rules) = &rules {
                 rules(
                     &Registration {
@@ -465,11 +533,24 @@ async fn store_register(
         verification::send_verification(&state, &user).await?;
     }
     login(&session, &user, None)?;
+    let event = Registered {
+        user_id: user.id,
+        email: user.email.clone(),
+    };
+    announce(&state, event).await;
     Ok(go(&htmx, after_login(&state, &settings, &session)))
 }
 
-async fn destroy(State(state): State<AppState>, session: Session, htmx: Htmx) -> Result<Response> {
+async fn destroy(
+    State(state): State<AppState>,
+    session: Session,
+    user: Option<AuthUser>,
+    htmx: Htmx,
+) -> Result<Response> {
     logout(&state.db, &session).await?;
+    if let Some(user) = user {
+        announce(&state, LoggedOut { user_id: user.id }).await;
+    }
     Ok(go(
         &htmx,
         state.url("home", &[]).unwrap_or_else(|_| "/".into()),
@@ -513,6 +594,26 @@ pub(super) fn text(locale: Locale) -> Value {
             "mail_verify_subject": "Verify your email address",
             "mail_verify_intro": "Please confirm that this is your email address.",
             "mail_verify_outro": "The link works for 60 minutes.",
+            "account_title": "Your account",
+            "profile_title": "Profile",
+            "profile_saved": "Your profile is saved.",
+            "email_unverified": "Your new email address isn't verified yet: check your inbox.",
+            "save": "Save",
+            "password_title": "Change password",
+            "current_password": "Current password",
+            "new_password": "New password",
+            "password_changed": "Your password is changed. Your other devices are logged out.",
+            "other_devices_title": "Other devices",
+            "other_devices_intro": "Log out everywhere else, e.g. on a phone you lost.",
+            "other_devices_button": "Log out other devices",
+            "other_devices_logged_out": "Your other devices are logged out.",
+            "delete_title": "Delete account",
+            "delete_intro": "Your account and its data are deleted for good.",
+            "delete_button": "Delete my account",
+            "delete_confirm": "Delete your account for good?",
+            "confirm_title": "Confirm your password",
+            "confirm_intro": "This is a secure area. Please confirm your password to continue.",
+            "confirm_button": "Confirm",
         }),
         Locale::Id => json!({
             "login_title": "Masuk",
@@ -548,6 +649,26 @@ pub(super) fn text(locale: Locale) -> Value {
             "mail_verify_subject": "Verifikasi alamat email",
             "mail_verify_intro": "Silakan konfirmasi bahwa ini alamat email kamu.",
             "mail_verify_outro": "Link berlaku 60 menit.",
+            "account_title": "Akun kamu",
+            "profile_title": "Profil",
+            "profile_saved": "Profil kamu sudah disimpan.",
+            "email_unverified": "Alamat email baru kamu belum terverifikasi: cek kotak masuk.",
+            "save": "Simpan",
+            "password_title": "Ganti kata sandi",
+            "current_password": "Kata sandi saat ini",
+            "new_password": "Kata sandi baru",
+            "password_changed": "Kata sandi sudah diganti. Perangkat lain kamu sudah dikeluarkan.",
+            "other_devices_title": "Perangkat lain",
+            "other_devices_intro": "Keluar dari semua perangkat lain, misalnya ponsel yang hilang.",
+            "other_devices_button": "Keluarkan perangkat lain",
+            "other_devices_logged_out": "Perangkat lain kamu sudah dikeluarkan.",
+            "delete_title": "Hapus akun",
+            "delete_intro": "Akun dan datanya dihapus permanen.",
+            "delete_button": "Hapus akun saya",
+            "delete_confirm": "Hapus akun kamu secara permanen?",
+            "confirm_title": "Konfirmasi kata sandi",
+            "confirm_intro": "Ini area aman. Masukkan kata sandi kamu untuk melanjutkan.",
+            "confirm_button": "Konfirmasi",
         }),
     }
 }

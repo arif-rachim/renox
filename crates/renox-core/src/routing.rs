@@ -186,6 +186,15 @@ impl Routes {
         .mark(&format!("{kind}:{name}"))
     }
 
+    /// Users who haven't typed their password in the last three hours are
+    /// asked for it (`/confirm-password`, from the `Auth` module) before the
+    /// routes added so far, e.g. billing settings. Also marks `auth`.
+    pub fn require_password_confirmed(self) -> Self {
+        self.route_layer(from_fn(crate::auth::require_password_confirmed))
+            .route_layer(from_fn(crate::auth::require_auth))
+            .mark("password.confirm")
+    }
+
     /// Only guests may use the routes added so far; logged-in users are sent
     /// to the `home` route (e.g. for login and registration pages).
     pub fn guest_only(self) -> Self {
