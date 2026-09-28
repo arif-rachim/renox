@@ -181,7 +181,9 @@ impl Module for Guestbook {
 <summary><b>Background work</b>: queue, scheduler, events, mail, notifications</summary>
 
 - The job queue lives in your own database, with retries, backoff and `queue:failed` / `queue:retry`.
-  On PostgreSQL, workers on several servers never take the same job.
+  On PostgreSQL, workers on several servers never take the same job. Queues drain in priority
+  order (`--queue high,default`); jobs can be unique, encrypted, rate limited or kept from
+  overlapping, have a `failed` hook, and run in chains or in batches with progress.
 - The scheduler (`every_minutes(5, …)`, `daily_at("02:00", …)`, `cron("30 9 * * 1-5", …)`,
   `weekly_on`, `monthly_on`, with `weekdays()`, `between(…)`, `on_failure(…)`) runs inside
   `serve` in `APP_TIMEZONE` or a task's own IANA zone, daylight saving included, and each run is
@@ -332,8 +334,9 @@ Not planned: runtime-reflected Eloquent-style models, Redis, and a REPL.
 
 Renox is **pre-1.0**. After the Laravel parity review
 ([docs/audit/2026-09-laravel-parity.md](docs/audit/2026-09-laravel-parity.md)), milestones M18
-(tenancy, roles, accounts), M19 (query builder and models) and M20a (scheduler, locks) are done;
-the rest of M20 (queue, HTTP client, mail) and M21 (views and developer experience) come next,
+(tenancy, roles, accounts), M19 (query builder and models), M20a (scheduler, locks) and M20b
+(queue) are done; M20c (HTTP client, queue dashboard, localized mail) and M21 (views and
+developer experience) come next,
 then 1.0: a documentation site with a tutorial and a Laravel guide, semver checks, and the first
 real release on crates.io (today's crates there are placeholders, so install from Git as above).
 Until then the API may still change; breaking changes are listed in [CHANGELOG.md](CHANGELOG.md).

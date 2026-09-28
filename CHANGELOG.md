@@ -10,7 +10,7 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
-### Docs and examples catch-up after M20a
+### Docs and examples catch-up after M20b
 
 - Docs brought in line with M18–M20a: the README's feature tour, Laravel table and status;
   docs/operations.md (what `APP_KEY` now protects, which failure rows the chaos test really
@@ -36,6 +36,22 @@ changes by milestone (each one pull request; details in its description and in
   when run as root (root ignores directory permissions).
 - `docs/audit/2026-09-laravel-gap-report.pdf`: what Renox still lacks against Laravel after
   M20a (in Indonesian).
+
+### M20b · Queue
+
+- Priority: `queue:work --queue high,default` drains `high` first; `dispatch_on(queue, job)`.
+- Unique jobs: `const UNIQUE_FOR` and `fn unique_id`; a second dispatch returns the queued id.
+- Encrypted payloads: `const ENCRYPTED: bool = true`.
+- Middleware: `fn middleware(&self) -> Vec<Middleware>` with `Middleware::without_overlapping(key)`
+  and `Middleware::rate_limited(key, max, per)`; a held-back job keeps its attempts.
+- `async fn failed(self, state, error)` on `Job`, run once a job fails for good.
+- Chains (`state.queue.chain().then(a).then(b).dispatch()`) and batches
+  (`state.queue.batch(name).push(job)…then/catch/finally/allow_failures().dispatch()`,
+  `batch_status` with `progress()`, `cancel_batch`).
+- `state.dispatch_sync(job)`; `queue:forget`, `queue:prune-failed`, `queue:prune-batches`.
+- `JobContext` has `id` and `batch_id`.
+- **Migration:** a new framework migration adds `chain`/`batch_id` columns and `job_batches`;
+  run `migrate`.
 
 ### M20a · Scheduler, locks and cache
 

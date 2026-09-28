@@ -50,6 +50,11 @@ Commands:
   queue:failed              List failed jobs
   queue:retry <id|all>      Put failed jobs back on the queue
   queue:flush               Delete failed jobs
+  queue:forget <id>         Delete one failed job
+  queue:prune-failed [--hours N]
+                            Delete failed jobs older than N hours (default 168)
+  queue:prune-batches [--hours N]
+                            Delete batches finished more than N hours ago (default 24)
   webhook:failed            List webhook calls whose processing failed
   webhook:retry <id>        Process a stored webhook call again
   cache:prune               Delete expired rows of the database cache store
@@ -387,7 +392,8 @@ impl App {
         self.registry.job::<crate::webhook::ProcessWebhook>();
         #[cfg(feature = "server-events")]
         self.registry.job::<crate::analytics::ServerEvent>();
-        let mut migrations = vec![crate::queue::MIGRATION, crate::cache::MIGRATION];
+        let mut migrations = crate::queue::MIGRATIONS.to_vec();
+        migrations.push(crate::cache::MIGRATION);
         migrations.extend(crate::webhook::MIGRATIONS);
         migrations.extend(self.migrations);
         for module in &self.modules {
@@ -513,7 +519,7 @@ impl App {
             security,
             webhooks: Arc::new(webhooks),
             mailer: Mailer::from_config(&config)?,
-            queue: Queue::new(db.clone()),
+            queue: Queue::new(db.clone(), key.clone()),
             cache: crate::cache::Cache::new(&config.cache_store, db.clone())?,
             storage,
             translator: Arc::new(match embedded {
@@ -714,6 +720,33 @@ impl App {
                     kernel.state.queue.retry(id).await?
                 );
             }
+            "queue:forget" => {
+                let id: i64 = args
+                    .get(1)
+                    .and_then(|id| id.parse().ok())
+                    .ok_or_else(|| anyhow!("usage: queue:forget <id>"))?;
+                if kernel.state.queue.forget_failed(id).await? {
+                    println!("Deleted failed job {id}.");
+                } else {
+                    return Err(anyhow!("no failed job {id}").into());
+                }
+            }
+            "queue:prune-failed" => {
+                let hours = flag_value(args, "--hours")?.unwrap_or(168);
+                let age = Duration::from_secs(u64::from(hours) * 3600);
+                println!(
+                    "Deleted {} failed job(s) older than {hours} hour(s).",
+                    kernel.state.queue.prune_failed(age).await?
+                );
+            }
+            "queue:prune-batches" => {
+                let hours = flag_value(args, "--hours")?.unwrap_or(24);
+                let age = Duration::from_secs(u64::from(hours) * 3600);
+                println!(
+                    "Deleted {} batch(es) finished more than {hours} hour(s) ago.",
+                    kernel.state.queue.prune_batches(age).await?
+                );
+            }
             "queue:flush" => println!(
                 "Deleted {} failed job(s).",
                 kernel.state.queue.flush_failed().await?
@@ -795,6 +828,9 @@ const BUILT_IN_COMMANDS: &[&str] = &[
     "queue:failed",
     "queue:retry",
     "queue:flush",
+    "queue:forget",
+    "queue:prune-failed",
+    "queue:prune-batches",
     "webhook:failed",
     "webhook:retry",
     "cache:prune",

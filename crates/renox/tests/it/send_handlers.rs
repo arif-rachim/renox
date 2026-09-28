@@ -272,6 +272,59 @@ async fn cache(State(state): State<AppState>) -> Result<String> {
     ))
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
+struct Nudge(i64);
+
+impl Job for Nudge {
+    const NAME: &'static str = "nudge";
+
+    async fn handle(self, _: JobContext) -> Result {
+        Ok(())
+    }
+}
+
+/// M20's queue and cache APIs, routed (not called: a compile-time `Send` check).
+async fn background(State(state): State<AppState>) -> Result<String> {
+    let queue = &state.queue;
+    let chain = queue
+        .chain()
+        .then(Nudge(1))
+        .then(Nudge(2))
+        .dispatch()
+        .await?;
+    let batch = queue
+        .batch("b")
+        .push(Nudge(3))
+        .then(Nudge(4))
+        .catch(Nudge(5))
+        .finally(Nudge(6))
+        .allow_failures()
+        .dispatch()
+        .await?;
+    let status = queue.batch_status(batch).await?;
+    queue.cancel_batch(batch).await?;
+    queue.dispatch_on("high", Nudge(7)).await?;
+    state.dispatch_sync(Nudge(8)).await?;
+    queue.forget_failed(1).await?;
+    queue.prune_failed(Duration::from_secs(1)).await?;
+    queue.prune_batches(Duration::from_secs(1)).await?;
+    let cache = &state.cache;
+    let n = cache.increment("n", 1).await?;
+    cache.add("a", &1, None).await?;
+    let pulled: Option<i64> = cache.pull("a").await?;
+    let lock = cache.lock("l", Duration::from_secs(5));
+    if let Some(guard) = lock.try_acquire().await? {
+        guard.release().await?;
+    }
+    let guard = lock.block(Duration::from_secs(1)).await?;
+    drop(guard);
+    cache.prune().await?;
+    Ok(format!(
+        "{chain} {} {n} {pulled:?}",
+        status.map_or(0, |s| s.progress())
+    ))
+}
+
 struct Handlers;
 
 impl Module for Handlers {
@@ -288,6 +341,7 @@ impl Module for Handlers {
             .get("/builder", builder)
             .get("/models", models)
             .get("/cache", cache)
+            .get("/background", background)
     }
 }
 

@@ -116,9 +116,15 @@ my-app queue:failed          # list them, with their errors
 my-app queue:retry 12        # put one back on the queue with fresh attempts
 my-app queue:retry all
 my-app queue:flush           # delete them all
+my-app queue:forget 12       # delete one
+my-app queue:prune-failed --hours 168    # delete those older than a week (the default)
+my-app queue:prune-batches --hours 24    # delete finished batches
 ```
 
-Fix the cause first, then retry. `queue:retry` runs the same payload again.
+Fix the cause first, then retry. `queue:retry` runs the same payload again; a job of a chain
+resumes the chain, and a job of a batch counts in its batch again. A job's `failed` hook runs
+once it fails for good (not on `queue:retry`). Schedule the prune commands, e.g.
+`s.daily_at("03:00", "prune-failed", |state| async move { state.queue.prune_failed(week).await.map(drop) })`.
 
 ## Failed webhook calls
 
@@ -146,8 +152,9 @@ sent, so signatures can be checked again.
 **Files.** Uploads live in `STORAGE_PATH/app` (or the S3 bucket). Back that directory up too.
 
 **Keys.** Keep `.env`'s `APP_KEY` with the backups. Without it, sessions end and signed links
-stop working. Values the app sealed with `state.encrypt` can't be read any more: that data is
-lost unless you still have the old key. Rotating the key has the same effect, so decrypt and
+stop working. Values the app sealed with `state.encrypt`, and queued jobs with encrypted
+payloads (`const ENCRYPTED`), can't be read any more: that data is lost unless you still have
+the old key. Rotating the key has the same effect, so decrypt and
 re-encrypt such values with the new key before switching.
 
 ## Deploys and migrations
@@ -187,7 +194,8 @@ hand:
 | `personal_access_tokens` | expired API tokens | `tokens:prune` (Auth module): tokens expired more than a day ago |
 | `audit_logs` | every audited action (Audit module) | `audit:prune --days 365` |
 | `revoked_sessions` | logouts | itself, on each logout |
-| `failed_jobs` | jobs that failed for good | `queue:flush` (see Failed jobs) |
+| `failed_jobs` | jobs that failed for good | `queue:prune-failed --hours 168`, `queue:flush` (see Failed jobs) |
+| `job_batches` | every dispatched batch | `queue:prune-batches --hours 24` (finished batches) |
 | `webhook_calls` | every received webhook | nothing yet: delete old `processed` rows yourself if it matters |
 
 ## Maintenance mode

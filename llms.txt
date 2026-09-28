@@ -17,7 +17,8 @@
   roles and permissions, route guards for gates/roles/permissions/token abilities; the account
   page, password rules and confirmation, per-device logout; auth events and the audit log;
   model hooks, partial saves (`save_only`, `save_changes`) and encrypted values; HTMX; raw SQL
-  and transactions; jobs, events and the schedule (cron, weekly/monthly, weekdays, IANA time
+  and transactions; jobs (priority, unique, encrypted, middleware, chains, batches), events and
+  the schedule (cron, weekly/monthly, weekdays, IANA time
   zones, `on_failure`, `schedule:run`); mail and notifications (with the in-app inbox); cookies
   and downloads; cache (`add`, `pull`, `increment`) and atomic locks; session, uploads and
   translations (plurals); signed URLs and private files; CSP, CORS and

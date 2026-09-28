@@ -209,8 +209,8 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
 - **HTML escaping uses a custom formatter** (`view.rs::format_value`): escapes `& < > " '` but not
   `/` (MiniJinja's default escapes `/` as `&#x2f;`, which uglified URLs in pages and mail).
 - **The app binary is its own CLI** (like artisan): `my-app migrate|migrate:rollback|migrate:fresh|
-  migrate:status|db:seed|queue:work|queue:failed|queue:retry|queue:flush|webhook:failed|
-  webhook:retry|cache:prune|schedule:list|schedule:run|schedule:work|route:list|db:shell|down|
+  migrate:status|db:seed|queue:work|queue:failed|queue:retry|queue:flush|queue:forget|
+  queue:prune-failed|queue:prune-batches|webhook:failed|webhook:retry|cache:prune|schedule:list|schedule:run|schedule:work|route:list|db:shell|down|
   up|help`, default `serve` (modules add more: `tokens:prune` from Auth, `audit:prune` from Audit),
   plus the app's own commands (`App::command`; names can't clash with built-ins). Migrations and
   jobs are compiled into the app, so only the app can run them. `rnx <anything unknown>` forwards
@@ -236,7 +236,10 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
   errors next to inputs (`data-error-for` slots or inserted `<p class="error">`), sets
   `aria-invalid`, focuses the first invalid input in *page* order. Plain posts → 303 back with
   errors + old input flashed (never passwords).
-- **Queue is Renox's own** (`jobs`, `failed_jobs`, unix-second integers) on SQLite and PostgreSQL;
+- **Queue is Renox's own** (`jobs`, `failed_jobs`, `job_batches`, unix-second integers) on SQLite
+  and PostgreSQL; chains ride in `jobs.chain`, batches count in `job_batches` inside the same
+  transaction that finishes a job (`worker.rs::record`), unique claims are `renox:unique:*` cache
+  rows, encrypted payloads start with `enc:`;
   PostgreSQL workers reserve with `FOR UPDATE SKIP LOCKED`. apalis was the plan but its stable SQL
   backend needs sqlx 0.8 (can't link next to our 0.9: both link `libsqlite3-sys`).
 - **Workers and scheduler run inside `serve`** by default (single-process deploys). Several
@@ -348,7 +351,7 @@ to the config tests there, give it a test-friendly value in `Default`, and docum
 App-specific settings need no field: `config.var(name)` reads `config.vars`, then the environment.
 
 ### 4.5 Migrations owned by the framework
-Names start with `0001…` so they sort before app migrations (`2026…`). There are thirteen:
+Names start with `0001…` so they sort before app migrations (`2026…`). There are fourteen:
 - Auth module (`auth/module.rs` `MIGRATIONS`): `00010101000000_create_users_table`,
   `…000001_create_password_reset_tokens_table`, `…000002_create_personal_access_tokens_table`,
   `…000003_create_notifications_table`, `…000004_add_sessions_revoked_at_to_users`,
@@ -356,7 +359,8 @@ Names start with `0001…` so they sort before app migrations (`2026…`). There
 - Permissions module (`auth/permissions.rs`): `00010101000500_create_roles_and_permissions_tables`
   (roles, permissions, permission_role, role_user).
 - Audit module (`audit.rs`): `00010101000600_create_audit_logs_table`.
-- Every app (registered in `App::boot`): `00010101000100_create_jobs_table` (queue),
+- Every app (registered in `App::boot`): `00010101000100_create_jobs_table` and
+  `00010101000110_add_chains_and_batches_to_jobs` (queue),
   `00010101000200_create_cache_table` (cache), `00010101000300_create_webhook_calls_table` and
   `00010101000301_store_webhook_payloads_as_bytes` (webhook.rs `MIGRATIONS`).
 
@@ -675,7 +679,7 @@ change 29 s → 7 s, full run 19 s → 6 s.
 
 ## 7. Where things stand (update this section when it changes)
 
-- **All milestones M0–M20a are merged to `main`**; the last was M20a (#51). History:
+- **All milestones M0–M20b are merged to `main`**; the last was M20b (#52). History:
   `CHANGELOG.md` (per milestone) and `ROADMAP.md` (per-milestone notes and decisions).
 - After M17: a docs refresh (#45) and the Laravel parity review with M18–M21 planned (#46).
   After M20a: a docs and examples catch-up (branch `claude/laravel-project-feature-report-i6wgz0`:
@@ -698,7 +702,10 @@ change 29 s → 7 s, full run 19 s → 6 s.
   `schedule:run`; cache add/pull/increment, locks, prune): merged (#51). A cron
   time skipped by DST runs right after the jump; intervals follow the current offset. Schedule
   methods return `ScheduledTask` (DerefMut to `Schedule`) so add-chains still compile.
-- **Next: M20b (queue), M20c (dashboard, mail, HTTP client, storage), then M21 (views and DX)**, from the Laravel parity review
+- **M20b** (queue: priority, unique, encrypted, middleware, failed hook, chains, batches,
+  dispatch_sync, forget/prune): merged (#52). Adds framework migration
+  `00010101000110`; tests that count framework migrations must follow it.
+- **Next: M20c (dashboard, mail, HTTP client, storage), then M21 (views and DX)**, from the Laravel parity review
   (`docs/audit/2026-09-laravel-parity.md`); the ROADMAP lists each milestone's items. **v1.0 is
   on hold** until the owner says to start it (docs site, starter kit, semver checks, real
   crates.io releases; the owner runs `cargo login`).

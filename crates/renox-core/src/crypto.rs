@@ -25,6 +25,31 @@ pub(crate) fn parse_key(value: &str) -> anyhow::Result<Key> {
     Ok(Key::derive_from(&bytes))
 }
 
+/// Associated data for [`seal`], so its values can't pass as an encrypted
+/// cookie or the other way round.
+const SEALED: &str = "renox.encrypted";
+
+/// Encrypts `plain` with AES-256-GCM under `key` (via the cookie crate's
+/// private jar); base64 text.
+pub(crate) fn seal(key: &Key, plain: &str) -> String {
+    let mut jar = cookie::CookieJar::new();
+    jar.private_mut(key)
+        .add(cookie::Cookie::new(SEALED, plain.to_owned()));
+    jar.get(SEALED)
+        .map(|sealed| sealed.value().to_owned())
+        .unwrap_or_default()
+}
+
+/// Reads a value from [`seal`]; fails if it was changed or sealed with
+/// another key.
+pub(crate) fn open(key: &Key, sealed: &str) -> anyhow::Result<String> {
+    cookie::CookieJar::new()
+        .private(key)
+        .decrypt(cookie::Cookie::new(SEALED, sealed.to_owned()))
+        .map(|plain| plain.value().to_owned())
+        .context("the value can't be decrypted with this APP_KEY")
+}
+
 /// A random, URL-safe token with 256 bits of entropy.
 pub(crate) fn random_token() -> String {
     let mut bytes = [0u8; 32];

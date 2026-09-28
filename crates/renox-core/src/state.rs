@@ -62,25 +62,12 @@ impl AppState {
     /// # Ok(()) }
     /// ```
     pub fn encrypt(&self, plain: &str) -> String {
-        let mut jar = cookie::CookieJar::new();
-        jar.private_mut(&self.key)
-            .add(cookie::Cookie::new(ENCRYPTED, plain.to_owned()));
-        jar.get(ENCRYPTED)
-            .map(|sealed| sealed.value().to_owned())
-            .unwrap_or_default()
+        crate::crypto::seal(&self.key, plain)
     }
 
     /// Reads a value from [`AppState::encrypt`]. Fails if it was changed or
     /// sealed with another key.
     pub fn decrypt(&self, sealed: &str) -> Result<String> {
-        let jar = cookie::CookieJar::new();
-        jar.private(&self.key)
-            .decrypt(cookie::Cookie::new(ENCRYPTED, sealed.to_owned()))
-            .map(|plain| plain.value().to_owned())
-            .ok_or_else(|| anyhow::anyhow!("the value can't be decrypted with this APP_KEY").into())
+        Ok(crate::crypto::open(&self.key, sealed)?)
     }
 }
-
-/// Associated data for [`AppState::encrypt`], so its values can't pass as
-/// an encrypted cookie or the other way round.
-const ENCRYPTED: &str = "renox.encrypted";
