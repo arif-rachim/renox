@@ -538,10 +538,11 @@ async fn sign_out(State(db): State<Db>, session: Session) -> Result<Redirect> {
     Ok(Redirect::to("/"))
 }
 
-async fn security(State(db): State<Db>, user: AuthUser) -> Result<View> {
+async fn security(State(db): State<Db>, session: Session, user: AuthUser) -> Result<View> {
     let mut me = user.user().clone();
-    me.set_password(&db, "a new password").await?; // other sessions end
-    me.revoke_sessions(&db).await?;                 // "log out everywhere"
+    me.set_password(&db, "a new password").await?; // every session ends, this one too:
+    renox::auth::login(&session, &me, None)?;       // log this one in again
+    me.revoke_sessions(&db).await?;                 // "log out everywhere" (this one too)
     let admin = user.allows("admin");               // a gate as a bool; allows_async for gate_async
     let billing = user.allows_async("billing").await?;
     Ok(view("account/security.html", context! { admin, billing }))

@@ -654,13 +654,12 @@ change 29 s → 7 s, full run 19 s → 6 s.
   History: `CHANGELOG.md` (per milestone) and `ROADMAP.md` (per-milestone notes and decisions).
 - After M17, a docs refresh (branch `docs-refresh`): this file, CHEATSHEET, llms.txt, README, the
   new-app AGENTS.md (linked to the pinned commit), ROADMAP "Not planned", crate descriptions.
-- **Next: v1.0, on hold until the owner says to start.** From ROADMAP: a documentation site built
-  with Renox (tutorial, "Laravel → Renox" guide, API reference), a starter kit, the semver
-  guarantee, cargo-semver-checks in CI, and real crates published to crates.io (the owner runs
-  `cargo login`), then crates.io/docs.rs badges in the README.
-- **Open items** noted in ROADMAP: `#[derive(Validate)]`, server-side sessions, choosing the
-  locale from `Accept-Language` (opt-in), a route-level `require_gate("…")` (shown in
-  `route:list`).
+- **Next: M18 (SaaS foundations), then M19–M21**, from the Laravel parity review
+  (`docs/audit/2026-09-laravel-parity.md`); the ROADMAP lists each milestone's items. **v1.0 is
+  on hold** until the owner says to start it (docs site, starter kit, semver checks, real
+  crates.io releases; the owner runs `cargo login`).
+- **Other open items** noted in ROADMAP: `#[derive(Validate)]`, choosing the locale from
+  `Accept-Language` (opt-in).
 - As of M17: ~34k lines of Rust in `crates/` (stubs excluded), ~400 `#[test]`/`#[renox::test]`/
   `#[tokio::test]` functions in `crates/` and `examples/` (plus doctests), and 37 direct
   dependencies in renox-core (5 optional). Keep dependencies lean and remove unused ones.
