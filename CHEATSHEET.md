@@ -648,7 +648,7 @@ hashes and are moved to Argon2id when they next log in.
 ```rust
 use renox::prelude::*;
 use renox::audit::{self, Audit, Entry};
-use renox::auth::events::{LoggedIn, LoginFailed, Registered};
+use renox::auth::events::{LoginFailed, Registered};
 
 fn app() -> App {
     App::new()
@@ -673,7 +673,6 @@ async fn refund(State(db): State<Db>, user: AuthUser, ClientIp(ip): ClientIp) ->
     let _ = history;
     Ok("refunded")
 }
-# let _ = (app, refund, |e: LoggedIn| e.user_id);
 ```
 
 `rnx audit:prune --days 365` deletes older entries.
@@ -749,7 +748,6 @@ impl Validate for ProjectForm {
             .where_null("deleted_at");    // soft-deleted rows don't count
     }
 }
-# let _ = (app, routes, setup, check);
 ```
 
 In templates: `{% if can('posts.publish') %}` (a gate or a permission) and `auth.roles`.
@@ -1223,7 +1221,8 @@ bytes, e.g. signed webhooks), `request().without_csrf()`, `logout()`, `csrf_toke
 `app.kernel().call("products:import", ["file.csv"])` (an app command), `assert_redirect`,
 `assert_hx_redirect`, `assert_header(name, value)`, `assert_unauthorized`, `assert_forbidden`,
 `assert_not_found`, `assert_dont_see`, `assert_database_missing` / `assert_database_count`,
-`queued_jobs()`, `run_jobs()`, `sent_mail()` / `assert_mail_sent`.
+`queued_jobs()`, `run_jobs()`, `sent_mail()` / `assert_mail_sent`, `session_cookie()` /
+`use_session_cookie(…)` (play a second device), `app.kernel().run_scheduled("task")`.
 
 ## Configuration (`.env`)
 

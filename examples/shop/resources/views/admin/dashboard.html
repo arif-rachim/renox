@@ -26,4 +26,17 @@
   <li class="muted">Nothing new.</li>
   {% endfor %}
 </ul>
+
+<h2>Recent activity</h2>
+<ul>
+  {% for entry in activity %}
+  <li>
+    {% if entry.action == 'order.status_changed' %}User #{{ entry.user_id }} moved order <a href="{{ route('orders.show', entry.subject_id) }}">#{{ entry.subject_id }}</a> from {{ entry.data.from }} to {{ entry.data.to }}
+    {% else %}{{ entry.action }}{% if entry.user_id %} (user #{{ entry.user_id }}){% endif %}{% endif %}
+    <span class="muted">{{ entry.created_at | date('%d/%m %H:%M') }}</span>
+  </li>
+  {% else %}
+  <li class="muted">Nothing recorded yet.</li>
+  {% endfor %}
+</ul>
 {% endblock %}

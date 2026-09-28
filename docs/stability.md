@@ -41,6 +41,7 @@ because of a dependency.
 | `minijinja` (2) | `context!`, template values |
 | `tokio` (1), `serde` (1), `serde_json` (1), `chrono` (0.4) | Re-exported and used throughout |
 | `fake` (5) | `Factory` definitions, re-exported as `renox::fake` |
+| `chrono-tz` (0.10) | `renox::timezone::Zone::Named(chrono_tz::Tz)` (not re-exported; parse zones with `"Asia/Jakarta".parse::<Zone>()`) |
 
 **`sqlx` is not part of the stable API.**
 - Database errors are Renox's own `db::DbError`. Rows are `db::Row`, and values go through

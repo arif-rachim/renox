@@ -72,6 +72,15 @@ async fn the_daily_report_sums_todays_orders() {
         };
         Order::create(app.db(), order).await.unwrap();
     }
+    // An order from last week is left out of today's report.
+    let old = Order {
+        customer_email: "b@example.com".into(),
+        item: "Teh".into(),
+        total: 5_000,
+        created_at: Some(renox::db::now() - renox::chrono::TimeDelta::days(3)),
+        ..Default::default()
+    };
+    Order::create(app.db(), old).await.unwrap();
     jobs::daily_sales(app.state().clone()).await.unwrap(); // what the scheduler runs at 21:00
     app.run_jobs().await;
     let report = app
@@ -84,4 +93,64 @@ async fn the_daily_report_sums_todays_orders() {
         "{}",
         report.text
     );
+}
+
+#[renox::test]
+async fn the_weekly_report_covers_seven_days() {
+    let app = app().await;
+    for (total, days_ago) in [(18_000, 0), (5_000, 3), (1_000, 10)] {
+        let order = Order {
+            customer_email: "b@example.com".into(),
+            item: "Kopi".into(),
+            total,
+            created_at: Some(renox::db::now() - renox::chrono::TimeDelta::days(days_ago)),
+            ..Default::default()
+        };
+        Order::create(app.db(), order).await.unwrap();
+    }
+    // Runs it by name, as `my-app schedule:run weekly-sales` does: this also
+    // checks that the task is registered.
+    app.kernel().run_scheduled("weekly-sales").await.unwrap();
+    app.run_jobs().await;
+    let report = app
+        .sent_mail()
+        .into_iter()
+        .find(|m| m.subject == "This week's sales")
+        .unwrap();
+    assert!(
+        report
+            .text
+            .contains("2 order(s) in the last 7 days, Rp 23000"),
+        "{}",
+        report.text
+    );
+}
+
+#[renox::test]
+async fn a_report_already_running_is_not_sent_twice() {
+    let app = app().await;
+    let lock = app
+        .state()
+        .cache
+        .lock("sales-report:1", std::time::Duration::from_secs(60));
+    let held = lock.try_acquire().await.unwrap().unwrap(); // another run holds it
+    app.kernel().run_scheduled("daily-sales").await.unwrap();
+    assert!(app.queued_jobs().await.is_empty());
+
+    held.release().await.unwrap();
+    app.kernel().run_scheduled("daily-sales").await.unwrap();
+    assert_eq!(app.queued_jobs().await, ["renox.send-mail"]);
+    assert!(!lock.is_held().await.unwrap(), "released after the run");
+}
+
+#[renox::test]
+async fn a_failed_report_alerts_someone() {
+    let app = app().await;
+    renox::db::sql("DROP TABLE orders")
+        .execute(app.db())
+        .await
+        .unwrap();
+    assert!(app.kernel().run_scheduled("daily-sales").await.is_err());
+    app.run_jobs().await;
+    app.assert_mail_sent("admin@example.com", "A sales report failed");
 }

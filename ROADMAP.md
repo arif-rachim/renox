@@ -622,11 +622,13 @@ before it can start: tenants, roles, accounts.
       `App::gate_before(|user| Option<bool>)` for super-admins
 - [x] Account pages in `Auth`: profile (name, email with re-verification), password (checks the
       current one and keeps this session logged in), delete account; `auth::change_password`
-- [x] Password rules (`Password::min(12).mixed_case().numbers().symbols()`, optional
-      breached-password check) used by register/reset/change; `require_password_confirmed`
+- [x] Password rules (`Password::min(12).mixed_case().numbers().symbols()`) used by
+      register/reset/change; `require_password_confirmed`
+- [ ] Optional breached-password check (HIBP), once the HTTP client (M20c) exists
 - [x] Auth events (`Registered`, `LoggedIn`, `LoginFailed`, `LockedOut`, `LoggedOut`,
-      `PasswordReset`, `Verified`) and an opt-in audit log (`state.audit(user, action, subject)`)
-- [x] API token abilities (`create_token(.., &["orders:read"])`, `token_can`,
+      `PasswordReset`, `EmailVerified`) and an opt-in audit log (the `Audit` module,
+      `audit::record(&db, Entry::new(action).user(id).subject(table, id))`)
+- [x] API token abilities (`create_token_with(.., &["orders:read"], ..)`, `token_can`,
       `Routes::require_ability`), expired-token pruning
 - [x] Log out this device only; log out other devices (keeps this one)
 - [x] Accept bcrypt hashes from imported Laravel users and rehash to Argon2id at login
@@ -659,19 +661,22 @@ Notes from M18b (accounts and security):
   fails the login. The `Audit` module records them all and gives apps `audit::record`.
 
 ### M19 · v0.20: Data layer 2
-- [x] Raw fragments in the builder: `where_raw`, `order_by_raw`, `select_raw` +
-      `group_by`/`having` read into `FromRow`; `to_sql()` for debugging
+- [x] Raw fragments in the builder: `where_raw`, `order_by_raw`, `select_as` +
+      `group_by`/`having_raw` read into `FromRow`; `to_sql()` for debugging
 - [x] `lock_for_update()` / `shared_lock()` (PostgreSQL), a public `begin_immediate` (SQLite)
-- [x] Aggregate loaders: `relations::count_many`, `sum_many`, `exists_many` (one GROUP BY)
+- [x] Aggregate loaders: `relations::count_many`, `sum_many` (one GROUP BY; "has any" is a
+      count above zero, or `where_has` to filter)
 - [x] `where_has` / `where_doesnt_have` (EXISTS), `where_not_in_query`
 - [ ] Non-integer keys: `#[model(key = "uuid")]` (UUID/ULID/string), loaders generic over the key
       (deferred, see the notes from M19b)
 - [x] Model hooks: `saving`/`saved`/`deleting`/`deleted` trait methods called by `save`/`delete`
 - [x] Partial saves: `save_only(&["price"])` and change tracking against the loaded row
-- [x] Pivot data and timestamps (`attach_with`, `load_with::<T, PivotRow>`); polymorphic
+- [x] Pivot data and timestamps (`attach_with`, `load_with_pivot::<T, PivotRow>`); polymorphic
       relations (`Morph`)
 - [x] `simple_paginate` and `cursor_paginate`; `update_or_create`, `first_or_new`, `refresh`
-- [x] `db.transaction(|tx| …).retries(3)` (SQLite busy, PostgreSQL serialization), savepoints
+- [x] `db.transaction(|tx| …)` and `db.transaction_retrying(3, |tx| …)` (SQLite busy,
+      PostgreSQL serialization)
+- [ ] Savepoints (nested transactions)
 - [x] A public encrypt/decrypt API (`state.encrypt` / `state.decrypt`, AES-GCM under `APP_KEY`)
 - [ ] `Encrypted<T>` field type (deferred, see the notes from M19b)
 

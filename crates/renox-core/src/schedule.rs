@@ -350,6 +350,7 @@ impl Schedule {
         self.add(name, Ok(When::Every(seconds)), task)
     }
 
+    /// Every minute, on the minute.
     pub fn every_minute<F, Fut>(&mut self, name: &str, task: F) -> ScheduledTask<'_>
     where
         F: Fn(AppState) -> Fut + Send + Sync + 'static,
@@ -358,6 +359,7 @@ impl Schedule {
         self.every(Duration::from_secs(60), name, task)
     }
 
+    /// Every `minutes` minutes, aligned to the clock (every 15 runs at :00, :15, ...).
     pub fn every_minutes<F, Fut>(&mut self, minutes: u64, name: &str, task: F) -> ScheduledTask<'_>
     where
         F: Fn(AppState) -> Fut + Send + Sync + 'static,
@@ -366,6 +368,7 @@ impl Schedule {
         self.every(Duration::from_secs(minutes * 60), name, task)
     }
 
+    /// Every hour, on the hour.
     pub fn hourly<F, Fut>(&mut self, name: &str, task: F) -> ScheduledTask<'_>
     where
         F: Fn(AppState) -> Fut + Send + Sync + 'static,

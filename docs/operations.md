@@ -61,9 +61,10 @@ Several app servers can share one PostgreSQL database:
 - Each scheduled run is claimed once.
 - Migrations take turns.
 
-Set `CACHE_STORE=database` as well. Then the cache, `Routes::throttle` limits and the login lock
-are counted in the `cache` table, so they hold across servers. With the default `memory` store,
-each server counts on its own, and N servers allow N times the limit.
+Set `CACHE_STORE=database` as well. Then the cache, `Routes::throttle` limits, the login lock
+and cache locks (`state.cache.lock`) live in the `cache` table, so they hold across servers. With
+the default `memory` store, each server counts on its own (N servers allow N times the limit),
+and a lock only keeps out other tasks of the same process.
 
 Sessions live in their encrypted cookie, so any server can answer any request (no sticky
 sessions). Uploaded files must be on shared storage (`STORAGE_DISK=s3`) or on the one server that
@@ -85,8 +86,11 @@ and visitors see the maintenance page.
 
 ## When a dependency fails
 
-The table below is what the chaos test (`tests/chaos/run.sh`, run in CI on SQLite and
-PostgreSQL) checks on every change:
+The table below is what the app does when something it depends on fails. The database and
+panic rows are what the chaos test (`tests/chaos/run.sh`, run in CI on SQLite and PostgreSQL)
+checks on every change; the SMTP and killed-process rows are covered by the integration tests
+(`crates/renox/tests/it/background_resilience.rs`); the `SIGTERM` row is how `serve` shuts down
+and has no automated test yet.
 
 | Fault | What the app does |
 |---|---|
@@ -142,7 +146,9 @@ sent, so signatures can be checked again.
 **Files.** Uploads live in `STORAGE_PATH/app` (or the S3 bucket). Back that directory up too.
 
 **Keys.** Keep `.env`'s `APP_KEY` with the backups. Without it, sessions end and signed links
-stop working, but no data is lost. Rotating the key has the same effect.
+stop working. Values the app sealed with `state.encrypt` can't be read any more: that data is
+lost unless you still have the old key. Rotating the key has the same effect, so decrypt and
+re-encrypt such values with the new key before switching.
 
 ## Deploys and migrations
 
@@ -160,6 +166,29 @@ stop working, but no data is lost. Rotating the key has the same effect.
   may keep connections that read the old schema until it restarts.
 - `migrate:rollback` undoes the last batch only if every migration in it has a `.down.sql`;
   otherwise it undoes nothing.
+
+## Scheduled tasks and housekeeping
+
+The scheduler runs inside `serve` (or alone with `schedule:work`). Its times follow
+`APP_TIMEZONE`: `UTC`, a fixed offset like `+07:00`, or an IANA name like `Asia/Jakarta`, with
+daylight saving handled; a task can set its own `timezone`.
+
+```bash
+my-app schedule:list          # each task's next run, in its time zone
+my-app schedule:run backup    # run one task now, e.g. to check it after a deploy
+```
+
+Some tables grow until something prunes them. Schedule the commands (e.g. daily) or run them by
+hand:
+
+| Table | Grows with | Pruned by |
+|---|---|---|
+| `cache` (database store) | expired entries | itself, at most once an hour per process; `cache:prune` on demand |
+| `personal_access_tokens` | expired API tokens | `tokens:prune` (Auth module): tokens expired more than a day ago |
+| `audit_logs` | every audited action (Audit module) | `audit:prune --days 365` |
+| `revoked_sessions` | logouts | itself, on each logout |
+| `failed_jobs` | jobs that failed for good | `queue:flush` (see Failed jobs) |
+| `webhook_calls` | every received webhook | nothing yet: delete old `processed` rows yourself if it matters |
 
 ## Maintenance mode
 

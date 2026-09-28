@@ -13,7 +13,7 @@
   <nav>
     <a href="{{ route('guestbook.index') }}"><strong>{{ app.name }}</strong></a>
     {% if auth.check %}
-    <span>{{ auth.user.name }}</span>
+    <a href="{{ route('account.show') }}">{{ auth.user.name }}</a>
     <form method="post" action="{{ route('logout') }}">{{ csrf_field() }}<button>{{ t('nav.logout') }}</button></form>
     {% else %}
     <a href="{{ route('login') }}">{{ t('nav.login') }}</a>

@@ -10,6 +10,33 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### Docs and examples catch-up after M20a
+
+- Docs brought in line with M18–M20a: the README's feature tour, Laravel table and status;
+  docs/operations.md (what `APP_KEY` now protects, which failure rows the chaos test really
+  checks, the scheduler's time zone, tables to prune, cache locks across servers);
+  docs/postgresql.md (row locks); docs/stability.md (`chrono-tz`); SECURITY.md (raw SQL
+  fragments); the new-app `AGENTS.md` (traps from M18–M20a); llms.txt; CLAUDE.md.
+- ROADMAP: M18/M19 items ticked but not built are corrected (no `exists_many`, no savepoints,
+  no breached-password check yet) and API names fixed (`EmailVerified`, `load_with_pivot`,
+  `transaction_retrying`, `create_token_with`).
+- `User::set_password`'s doc says it ends this session too (use `auth::change_password`).
+- Examples use the new APIs:
+  - shop: roles from the `Permissions` module (`require_role`), the `Audit` module on order
+    status changes, `save_only`. **Changed:** the `users.role` migration is removed; recreate a
+    local shop database (`migrate:fresh --seed`).
+  - api: tokens with abilities and an expiry (`create_token_with`, `require_ability`), a nightly
+    token prune, `cursor_paginate`, `DELETE /api/products/{id}`.
+  - jobs: daily (weekdays) and weekly (`cron`) reports in `Asia/Jakarta` with `on_failure` and
+    a cache lock; counts and sums in SQL. The mail template is now `mail/sales.html`.
+  - relations: `count_many`, `where_has`, a `group_by` + `select_as` report, pivot columns
+    (pinned, timestamps) with `attach_with` / `update_pivot` / `load_with_pivot`.
+  - hello: the account page (`Auth::new().account()`).
+- Tests: M20a's cache APIs are routed in `send_handlers.rs`; the read-only storage test skips
+  when run as root (root ignores directory permissions).
+- `docs/audit/2026-09-laravel-gap-report.pdf`: what Renox still lacks against Laravel after
+  M20a (in Indonesian).
+
 ### M20a · Scheduler, locks and cache
 
 - `APP_TIMEZONE` takes IANA names (`Asia/Jakarta`, `Europe/Amsterdam`) with daylight saving

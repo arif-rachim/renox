@@ -116,6 +116,10 @@ enum types, sequences and functions (not what extensions created).
   take the same job, and they don't wait on each other.
 - **Scheduled tasks** claim each run in the `cache` table before starting it. `serve` on several
   servers runs a task once, not once per server. `SCHEDULER=false` is no longer needed for that.
+- **Row locks:** `Query::lock_for_update()` and `shared_lock()` add `FOR UPDATE` / `FOR SHARE`
+  on PostgreSQL and do nothing on SQLite, which locks the whole database for a write instead.
+  On SQLite, start the transaction with `db.begin_immediate()` so it takes the write lock before
+  it reads.
 
 ## Tests
 

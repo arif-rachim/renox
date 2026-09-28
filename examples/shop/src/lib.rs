@@ -1,7 +1,9 @@
 //! Example: a small online shop, the whole way. Customers browse and search
 //! products, fill a cart and check out; the order takes the stock in one
 //! transaction, a confirmation mail goes out through the queue, and admins
-//! manage products (with photos) and ship orders from `/admin`.
+//! manage products (with photos) and ship orders from `/admin`. Admins are
+//! the users with the `admin` role (the `Permissions` module), and what they
+//! do to orders goes into the audit log (the `Audit` module).
 //!
 //! Run it from this directory:
 //!
@@ -14,6 +16,8 @@
 
 pub mod app;
 
+use renox::audit::Audit;
+use renox::auth::{Permissions, permissions};
 use renox::prelude::*;
 
 use app::catalog::model::{Category, Product};
@@ -23,12 +27,16 @@ pub fn app() -> App {
         .embed(renox::embedded!())
         .migrations(renox::migrations!())
         .module(Auth::new())
+        // Roles for users: `require_role("admin")` on `/admin`,
+        // `user.has_role("admin")` in handlers, `auth.roles` in templates.
+        .module(Permissions)
+        // An `audit_logs` table: logins and account changes are recorded on
+        // their own; the admin records order changes (`admin/orders.rs`).
+        .module(Audit)
         .module(app::catalog::Catalog)
         .module(app::cart::Cart)
         .module(app::orders::Orders)
         .module(app::admin::AdminPanel)
-        // `role` is the column the first migration adds to `users`.
-        .gate("admin", is_admin)
         .templates(|env| {
             env.add_filter("rupiah", |n: i64| {
                 format!("Rp {}", renox::format_number(n as f64, 0, "id"))
@@ -53,34 +61,47 @@ pub fn app() -> App {
         .seeder(seed)
 }
 
-pub fn is_admin(user: &User) -> bool {
-    user.get::<String>("role").as_deref() == Some("admin")
+/// The role that opens `/admin`.
+pub const ADMIN: &str = "admin";
+
+/// Gives `user` the admin role, creating the role on a fresh install.
+pub async fn make_admin_of(db: &Db, user: &User) -> Result {
+    // `define_role` is idempotent: it creates the role if it's new and sets
+    // the permissions it grants (none: the shop checks the role itself).
+    permissions::define_role(db, ADMIN, &[]).await?;
+    user.assign_role(db, ADMIN).await
 }
 
-/// Everyone with the admin role.
+/// Everyone with the admin role. The `Permissions` module has no "users
+/// with role" loader, so this asks the `role_user` table in a sub-query.
 pub async fn admins(db: &Db) -> Result<Vec<User>> {
-    let ids: Vec<i64> = renox::db::sql("SELECT id FROM users WHERE role = 'admin' ORDER BY id")
-        .scalars(db)
-        .await?;
-    User::find_many(db, ids).await
+    User::query()
+        .where_raw(
+            "id IN (SELECT ru.user_id FROM role_user ru \
+             JOIN roles r ON r.id = ru.role_id WHERE r.name = ?)",
+            [ADMIN],
+        )
+        .order_by("id")
+        .get(db)
+        .await
 }
 
 async fn make_admin(state: AppState, args: renox::command::Args) -> Result {
     let Some(email) = args.positional().first().copied() else {
         return Err(Error::BadRequest("usage: shop:make-admin EMAIL".into()));
     };
-    let mut user = User::where_eq("email", email)
+    let user = User::where_eq("email", email)
         .first(&state.db)
         .await?
         .ok_or_else(|| Error::BadRequest(format!("no user has the email {email}")))?;
-    user.set(&state.db, "role", "admin").await?;
+    make_admin_of(&state.db, &user).await?;
     println!("{email} is an admin now.");
     Ok(())
 }
 
 async fn seed(db: Db) -> Result {
-    let mut admin = User::register(&db, "Admin", "admin@example.com", "password123").await?;
-    admin.set(&db, "role", "admin").await?;
+    let admin = User::register(&db, "Admin", "admin@example.com", "password123").await?;
+    make_admin_of(&db, &admin).await?;
     for name in ["Coffee", "Tea", "Snacks"] {
         let category = Category::create(
             &db,

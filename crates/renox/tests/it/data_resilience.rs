@@ -782,6 +782,14 @@ async fn storage_read_only_directory() {
     s.put("ok.txt", Bytes::from_static(b"x")).await.unwrap();
     let root = app.state().config.storage_path.join("app");
     std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o555)).unwrap();
+    // Root (e.g. in a container) ignores directory permissions: nothing to test.
+    let probe = root.join(".probe");
+    if std::fs::write(&probe, b"").is_ok() {
+        let _ = std::fs::remove_file(&probe);
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o755)).unwrap();
+        eprintln!("read-only storage: skipped, permissions aren't enforced for this user");
+        return;
+    }
     let r = s.put("new/file.txt", Bytes::from_static(b"x")).await;
     let r2 = s.put("ok.txt", Bytes::from_static(b"y")).await;
     let r3 = s.delete("ok.txt").await;

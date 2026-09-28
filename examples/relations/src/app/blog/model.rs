@@ -44,7 +44,19 @@ pub struct Tag {
 }
 
 /// Posts ⇄ tags. `POST_TAGS.inverse()` goes from a tag to its posts.
-pub const POST_TAGS: Pivot = Pivot::new("post_tags", "post_id", "tag_id");
+/// `with_timestamps()`: attaching (`attach`, `attach_with`, `sync`) fills the
+/// pivot's `created_at`/`updated_at`, and `update_pivot` its `updated_at`.
+pub const POST_TAGS: Pivot = Pivot::new("post_tags", "post_id", "tag_id").with_timestamps();
+
+/// The pivot's own columns, read next to each tag (or post) by
+/// `Pivot::load_with_pivot`.
+#[derive(FromRow, Serialize, Debug, Clone)]
+pub struct Tagging {
+    /// Pinned posts come first on the tag's page.
+    pub pinned: bool,
+    /// When the post was tagged.
+    pub created_at: Option<DateTime>,
+}
 
 /// For one post, a method per relation: one query each, visible where it's
 /// called. For a page of posts, use the loaders (see `blog::index`).
@@ -66,6 +78,16 @@ impl Post {
     pub async fn tags(&self, db: &Db) -> Result<Vec<Tag>> {
         let ids = POST_TAGS.ids(db, self.id).await?;
         Tag::find_many(db, ids).await
+    }
+
+    /// The tags with the pivot's columns (pinned, tagged when), by name.
+    pub async fn taggings(&self, db: &Db) -> Result<Vec<(Tag, Tagging)>> {
+        let mut by_post = POST_TAGS
+            .load_with_pivot::<Tag, Tagging>(db, [self.id])
+            .await?;
+        let mut taggings = by_post.remove(&self.id).unwrap_or_default();
+        taggings.sort_by(|(a, _), (b, _)| a.name.cmp(&b.name));
+        Ok(taggings)
     }
 }
 

@@ -1,6 +1,7 @@
 //! The shop end to end: what customers and admins do, and what must not
 //! happen (overselling, other people's orders, customers in the admin).
 
+use renox::audit;
 use renox::prelude::*;
 use renox::testing::TestApp;
 use shop::app::catalog::model::{Category, Product};
@@ -19,8 +20,8 @@ async fn customer(app: &TestApp, email: &str) -> User {
 }
 
 async fn admin(app: &TestApp) -> User {
-    let mut user = customer(app, "admin@example.com").await;
-    user.set(app.db(), "role", "admin").await.unwrap();
+    let user = customer(app, "admin@example.com").await;
+    shop::make_admin_of(app.db(), &user).await.unwrap();
     user
 }
 
@@ -354,6 +355,64 @@ async fn only_admins_get_into_the_admin() {
     );
     app.get("/").await.assert_see(">Admin</a>");
     app.get("/admin").await.assert_ok();
+    assert_eq!(budi.roles(app.db()).await.unwrap(), ["admin"]);
+    // Promoting twice is harmless, and the role list stays the same.
+    app.kernel()
+        .call("shop:make-admin", ["budi@example.com"])
+        .await
+        .unwrap();
+    assert_eq!(budi.roles(app.db()).await.unwrap(), ["admin"]);
+    let admins = shop::admins(app.db()).await.unwrap();
+    assert_eq!(admins.iter().map(|u| u.id).collect::<Vec<_>>(), [budi.id]);
+
+    // Taking the role away closes the admin again.
+    budi.remove_role(app.db(), "admin").await.unwrap();
+    app.get("/admin").await.assert_forbidden();
+    app.get("/").await.assert_dont_see(">Admin</a>");
+}
+
+#[renox::test]
+async fn order_status_changes_are_audited() {
+    let app = shop().await;
+    let boss = admin(&app).await;
+    let kopi = product(&app, "Kopi Susu", 25_000, 5).await;
+    let budi = customer(&app, "budi@example.com").await;
+    let order = placed_order(&app, &budi, &kopi, 1).await;
+    let status = format!("/admin/orders/{}/status", order.id);
+
+    // A customer can't move an order along, and nothing is recorded.
+    app.put(&status, &[("status", "paid")])
+        .await
+        .assert_forbidden();
+    assert!(
+        audit::for_subject(app.db(), "orders", order.id, 10)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+
+    app.acting_as(&boss);
+    app.put(&status, &[("status", "paid")])
+        .await
+        .assert_status(303);
+    // A refused move (paid → cancelled) records nothing either.
+    app.put(&status, &[("status", "cancelled")])
+        .await
+        .assert_status(409);
+    let entries = audit::for_subject(app.db(), "orders", order.id, 10)
+        .await
+        .unwrap();
+    assert_eq!(entries.len(), 1);
+    let entry = &entries[0];
+    assert_eq!(entry.action, "order.status_changed");
+    assert_eq!(entry.user_id, Some(boss.id));
+    assert_eq!(entry.data, json!({ "from": "pending", "to": "paid" }));
+
+    // The dashboard lists it.
+    app.get("/admin").await.assert_ok().assert_see(&format!(
+        "moved order <a href=\"/orders/{0}\">#{0}</a> from pending to paid",
+        order.id
+    ));
 }
 
 #[renox::test]

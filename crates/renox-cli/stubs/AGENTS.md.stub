@@ -7,7 +7,8 @@ one Renox version (the `renox` line in `Cargo.toml`); the links below are for th
 ## Where to look
 
 - **Cheat-sheet**, one short compiled example per task (routes, views, forms and validation,
-  models and queries, auth, HTMX, jobs, mail, notifications, uploads, config, tests):
+  models and queries, auth and account pages, roles and permissions, tenants, audit log, HTMX,
+  jobs, schedules, cache and locks, mail, notifications, uploads, config, tests):
   {{renox_docs}}/CHEATSHEET.md
 - **llms.txt**, a map from every topic to a guide or an example file: {{renox_docs}}/llms.txt
 - **Whole apps:** `examples/shop` shows how everything fits (catalog, cart, checkout in a
@@ -47,7 +48,18 @@ rnx make:migration add_stock_to_products
 ## Things that trip agents up
 
 - Route parameters are `{id}` (axum 0.8), not `:id`: `.get("/products/{id}", show)`.
-- `.require_auth()` guards only the routes added before it in that `Routes`.
+- `.require_auth()` guards only the routes added before it in that `Routes`; so do
+  `.require_gate`, `.require_role`, `.require_permission`, `.require_ability` and
+  `.require_password_confirmed`.
+- `auth::logout` ends this device only (`logout_other_devices` for the rest).
+  `User::set_password` ends every session, this one too: in a handler use
+  `auth::change_password`, which keeps the user logged in.
+- A model with `#[model(default_scope = "…")]` (e.g. the current team) filters every query,
+  including `find`; use `Model::unscoped()` in admin code and commands that must see all rows.
+- Model hooks (`#[model(hooks)]`) run on `save`, `save_only`, `save_changes` and `delete`, never
+  on bulk `Query::update` / `delete`, `insert_many` or `upsert`.
+- Scheduled task names must be unique (a duplicate is a boot error); `rnx schedule:list` shows
+  the next runs, `rnx schedule:run NAME` runs one now.
 - A handler that won't compile as a route ("the trait `Handler` is not implemented", or
   "`Send` is not general enough"): don't keep a closure or iterator that borrows a local across
   an `.await`; collect into a `Vec` first.

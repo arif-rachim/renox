@@ -13,20 +13,21 @@ cargo run                        # http://127.0.0.1:3000
 ```
 
 Register a customer at `/register`, or promote any registered user with
-`cargo run -- shop:make-admin you@example.com`.
+`cargo run -- shop:make-admin you@example.com` (it gives them the `admin` role, creating the role
+on a fresh install).
 
 ## What's where
 
 | Feature | Where |
 |---|---|
-| Wiring: modules, the `admin` gate, the `rupiah` filter, `cart_count` on every page, the `shop:make-admin` command, the seeder | [src/lib.rs](src/lib.rs) |
+| Wiring: modules (including `Permissions` and `Audit`), the `admin` role and who has it (`make_admin_of`, `admins`), the `rupiah` filter, `cart_count` on every page, the `shop:make-admin` command, the seeder | [src/lib.rs](src/lib.rs) |
 | Home page with a cached product list; list with search, category filter, sort and pagination (the search box swaps only the results with htmx); product page with SEO tags; `sitemap.xml`; language switch | [src/app/catalog/mod.rs](src/app/catalog/mod.rs) |
 | Models, a factory, slugs, a "belongs to" method | [src/app/catalog/model.rs](src/app/catalog/model.rs) |
 | The cart in the database, loaded with its products in one query (`relations::belongs_to`), an upsert in plain SQL | [src/app/cart/mod.rs](src/app/cart/mod.rs) |
 | Checkout in one transaction that never oversells, and cancelling with the stock given back | [src/app/orders/checkout.rs](src/app/orders/checkout.rs) |
-| `OrderPlaced` event, its listener, the daily task that cancels unpaid orders, the order policy | [src/app/orders/mod.rs](src/app/orders/mod.rs), [model.rs](src/app/orders/model.rs) |
+| `OrderPlaced` event, its listener, the daily task that cancels unpaid orders, the order policy (owners; admins pass by role) | [src/app/orders/mod.rs](src/app/orders/mod.rs), [model.rs](src/app/orders/model.rs) |
 | Notifications: a queued confirmation mail (HTML and text) and a database row for the customer, a database row for every admin, a "shipped" mail | [src/app/orders/notifications.rs](src/app/orders/notifications.rs), [resources/views/mail](resources/views/mail) |
-| `/admin`: a route group guarded by the `admin` gate (`require_gate`), products with photo uploads and search/sort, orders moved pending → paid → shipped, a dashboard with low stock and notifications | [src/app/admin](src/app/admin) |
+| `/admin`: a route group guarded by the `admin` role (`require_role`), products with photo uploads and search/sort, orders moved pending → paid → shipped (each move written to the audit log), a dashboard with pending orders, low stock, notifications and recent activity | [src/app/admin](src/app/admin) |
 | English and Indonesian, with plurals (`0 products`, `One product`, `3 products`) and translated validation labels | [resources/lang](resources/lang) |
 | Deploy: Dockerfile (cargo-chef), systemd unit, Litestream, from `rnx make:deploy` | [Dockerfile](Dockerfile), [deploy/](deploy) |
 
@@ -44,9 +45,19 @@ Register a customer at `/register`, or promote any registered user with
   `order_by` call.
 - **One query per relation.** The product list and the cart load their categories and products
   with `relations::belongs_to`, not one query per row.
-- **Admin routes are checked in one place.** The `/admin` group ends with
-  `.require_gate("admin")`, which sends guests to the login page and answers 403 to customers;
-  `rnx route:list` shows it as `gate:admin`.
+- **Admins are a role, not a column.** The `Permissions` module keeps roles in its own tables;
+  `shop:make-admin` and the seeder call `permissions::define_role` (idempotent) and
+  `user.assign_role(db, "admin")`. The `/admin` group ends with `.require_role("admin")`, which
+  sends guests to the login page and answers 403 to customers (`rnx route:list` shows
+  `role:admin`); handlers ask `user.has_role("admin")` and templates `'admin' in auth.roles`.
+  A `Policy` gets a plain `User` without roles, so `orders::show` checks the role before asking
+  the order's policy.
+- **Admin actions leave a trail.** With the `Audit` module, logins and account changes are
+  recorded on their own; moving an order records `order.status_changed` with the admin, the
+  order, `{from, to}` and the client IP (`audit::record`). `audit::for_subject(db, "orders", id,
+  n)` reads an order's history; `cargo run -- audit:prune --days 365` trims old entries.
+- **Save only what you changed.** A status change uses `order.save_only(db, &["status"])`, so it
+  never writes back stale copies of the other columns.
 
 ## Deploying
 

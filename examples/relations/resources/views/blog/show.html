@@ -11,6 +11,23 @@
 </article>
 
 <h2>Tags</h2>
+{# The pivot's own columns: when the post was tagged, and whether it is pinned on the tag's page. #}
+{% if tags %}
+<ul class="links">
+  {% for tag in tags %}
+  <li>
+    <a class="tag" href="{{ route('tags.show', tag.id) }}">#{{ tag.name }}</a>
+    {% if tag.pivot.created_at %}<span class="muted">tagged {{ tag.pivot.created_at | date('%d/%m/%Y') }}</span>{% endif %}
+    {% if tag.pivot.pinned %}<strong>pinned</strong>{% endif %}
+    <form method="post" action="{{ route('posts.pin', post.id, tag.id) }}" class="inline">
+      {{ csrf_field() }}{{ method_field('PUT') }}
+      <input type="hidden" name="pinned" value="{% if tag.pivot.pinned %}false{% else %}true{% endif %}">
+      <button>{% if tag.pivot.pinned %}Unpin{% else %}Pin{% endif %} on #{{ tag.name }}</button>
+    </form>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
 {# Pivot::sync makes the post's tags exactly the checked ones. #}
 <form method="post" action="{{ route('posts.tags', post.id) }}" class="tags">
   {{ csrf_field() }}{{ method_field('PUT') }}

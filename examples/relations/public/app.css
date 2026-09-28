@@ -18,3 +18,6 @@ th, td { text-align: left; padding: .4rem; border-bottom: 1px solid #eee; }
 .pagination { display: flex; gap: .25rem; margin-top: 1rem; }
 .pagination a, .pagination span { padding: .25rem .6rem; border: 1px solid #ddd; border-radius: .25rem; text-decoration: none; }
 .pagination [aria-current] { background: #222; color: #fff; }
+.links { list-style: none; padding: 0; }
+.links li { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: .25rem; }
+.inline { display: inline; }

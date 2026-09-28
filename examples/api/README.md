@@ -16,27 +16,50 @@ Get a token, then call the API with it:
 ```bash
 curl -X POST localhost:3000/api/tokens -H 'content-type: application/json' \
   -d '{"email":"demo@example.com","password":"password123","device":"curl"}'
+# → {"token":"1|…","abilities":["products:read","products:write"],"expires_at":"…","user":{…}}
 curl localhost:3000/api/products -H 'authorization: Bearer <token>'
+# → {"items":[…],"per_page":20,"next_cursor":null}   (next page: ?cursor=<next_cursor>)
+curl -X POST localhost:3000/api/products -H 'authorization: Bearer <token>' \
+  -H 'content-type: application/json' -d '{"name":"Susu","price":12000}'
 ```
+
+Add `"read_only":true` to the login body for a token that can only read: writing with it gets
+`403`.
 
 ## What's where
 
 | Feature | Where |
 |---|---|
-| Wiring: `Auth` without registration pages (users and tokens only), the seeder | [src/lib.rs](src/lib.rs) |
-| Routes, token issue and revoke, list/show/create products, validation, CORS and throttling | [src/app/products/mod.rs](src/app/products/mod.rs) |
+| Wiring: `Auth` without registration pages (users and tokens only), the nightly token cleanup, the seeder | [src/lib.rs](src/lib.rs) |
+| Routes and their abilities, token issue and revoke, list/show/create/delete products, validation, CORS and throttling | [src/app/products/mod.rs](src/app/products/mod.rs) |
 | The table | [migrations](migrations) |
 
-Routes: `POST /api/tokens`, `GET /api/products`, `POST /api/products`,
-`GET /api/products/{id}`, `DELETE /api/tokens/current` (revokes the token the request used: "log out" on one device), `DELETE /api/tokens` (revokes all of the user's tokens).
+Routes: `POST /api/tokens`; with `products:read`: `GET /api/products`, `GET /api/products/{id}`;
+with `products:write`: `POST /api/products`, `DELETE /api/products/{id}`; any valid token:
+`DELETE /api/tokens/current` (revokes the token the request used: "log out" on one device),
+`DELETE /api/tokens` (revokes all of the user's tokens).
 
 ## Things worth copying
 
 - **Only the login route skips CSRF.** `POST /api/tokens` uses `.without_csrf()`; no cookie is
-  involved. The other routes use `.require_auth()`, which answers 401 to a missing or wrong token.
+  involved. The other routes use `.require_auth()`, which answers 401 to a missing, wrong or
+  expired token.
+- **Tokens get abilities and an expiry.** `user.create_token_with(&db, device, &["products:read",
+  "products:write"], Some(expires_at))` issues a token that works for 30 days; a read-only login
+  gets only `products:read`. Routes ask for an ability with `.require_ability("products:write")`
+  (403 without it; logged-in browser sessions always pass). Like every route layer it guards only
+  the routes added before it, so reads and writes are separate groups, merged and then wrapped
+  in `.require_auth()` (added last, so it answers 401 before any ability is checked).
+- **Expired tokens are cleaned up.** The `Auth` module adds the `tokens:prune` command (`cargo run
+  -- tokens:prune` deletes tokens that expired over a day ago); the app also runs the same cleanup
+  every night with `.schedule(|s| s.daily_at("03:00", …))` calling
+  `renox::auth::prune_expired_tokens`.
 - **JSON bodies are validated like forms.** `Valid<T>` works on JSON too; bad input gets
   `422 {"message", "errors"}`. The product name is checked with `.unique("products", "name")`.
-- **Pagination as JSON.** `Json<Paginated<Product>>` returns the page with its `total`.
+- **Cursor pagination for the list.** `Product::query().cursor_paginate(&db, cursor, 20)` returns
+  `Json<CursorPage<Product>>`: `{"items", "per_page", "next_cursor"}`, newest first. The client
+  sends `next_cursor` back as `?cursor=…` until it is `null`. Unlike page numbers, rows added in
+  between don't shift the pages, and there is no `COUNT(*)`.
 - **CORS and a rate limit on the whole group.** `.cors(&["https://app.example.com"])` and
   `.throttle(60, Duration::from_secs(60))` (60 requests a minute).
 

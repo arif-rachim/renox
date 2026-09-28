@@ -1,4 +1,4 @@
-use relations::app::blog::model::{Category, Comment, POST_TAGS, Post, Tag};
+use relations::app::blog::model::{Category, Comment, POST_TAGS, Post, Tag, Tagging};
 use renox::prelude::*;
 use renox::testing::TestApp;
 
@@ -197,7 +197,72 @@ async fn the_report_joins_and_counts() {
         .assert_see("<td>Code</td><td>1</td><td>1</td>")
         .assert_see("<td>Uncategorized</td><td>1</td><td>0</td>")
         .assert_see("<td>#howto</td><td>2</td>")
-        .assert_see("<td>#news</td><td>0</td>");
+        .assert_see("<td>#news</td><td>0</td>")
+        .assert_see("<td>Ani</td><td>1</td>");
+}
+
+#[renox::test]
+async fn pivot_columns_pin_a_post_on_a_tag_page() {
+    let b = blog().await;
+    let db = b.app.db();
+    let (howto, review) = (b.tags[0].id, b.tags[2].id);
+    // Links carry timestamps; `pinned` defaults to false.
+    let beans = b.beans.taggings(db).await.unwrap();
+    assert_eq!(beans.len(), 2);
+    assert!(
+        beans
+            .iter()
+            .all(|(_, t)| !t.pinned && t.created_at.is_some())
+    );
+    b.app
+        .get(&format!("/posts/{}", b.beans.id))
+        .await
+        .assert_see("tagged ")
+        .assert_see("Pin on #howto");
+    // `attach_with` sets pivot columns; an existing link is left alone.
+    let added = POST_TAGS
+        .attach_with(db, b.rust.id, howto, &[("pinned", &true)])
+        .await
+        .unwrap();
+    assert!(!added);
+    let added = POST_TAGS
+        .attach_with(db, b.rust.id, review, &[("pinned", &true)])
+        .await
+        .unwrap();
+    assert!(added);
+    // Rust is pinned on #review, so it comes before Beans.
+    let text = b.app.get(&format!("/tags/{review}")).await.text();
+    let (rust, beans) = (text.find(">Rust<").unwrap(), text.find(">Beans<").unwrap());
+    assert!(rust < beans && text.contains("pinned"));
+    // Pinning from the post page: `update_pivot`.
+    let url = format!("/posts/{}/tags/{howto}/pin", b.beans.id);
+    b.app
+        .put(&url, &[("pinned", "true")])
+        .await
+        .assert_redirect(&format!("/posts/{}", b.beans.id));
+    let links = POST_TAGS
+        .load_with_pivot::<Tag, Tagging>(db, [b.beans.id])
+        .await
+        .unwrap();
+    let pinned: Vec<&str> = links[&b.beans.id]
+        .iter()
+        .filter(|(_, t)| t.pinned)
+        .map(|(tag, _)| tag.name.as_str())
+        .collect();
+    assert_eq!(pinned, ["howto"]);
+    b.app
+        .get(&format!("/posts/{}", b.beans.id))
+        .await
+        .assert_see("Pinned.")
+        .assert_see("Unpin on #howto");
+    // A tag the post doesn't have: nothing to pin.
+    b.app
+        .put(
+            &format!("/posts/{}/tags/{howto}/pin", b.loose.id),
+            &[("pinned", "true")],
+        )
+        .await
+        .assert_not_found();
 }
 
 #[renox::test]
