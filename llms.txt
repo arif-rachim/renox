@@ -22,7 +22,9 @@
   zones, `on_failure`, `schedule:run`); mail and notifications (with the in-app inbox); cookies
   and downloads; cache (`add`, `pull`, `increment`) and atomic locks; session, uploads and
   translations (plurals); signed URLs and private files; CSP, CORS and
-  webhooks; SEO and analytics; tests; configuration (`.env` and your own settings).
+  webhooks; SEO and analytics; tests; errors, logs and debugging (request ids, JSON logs,
+  `App::report`, named rate limiters, `/_renox/debug`); configuration (`.env` and your own
+  settings).
 - [README.md](README.md): install `rnx`, create and run an app, the generator commands.
 
 ## Examples (complete apps, tested in CI)
@@ -129,7 +131,8 @@ Every example has a README.md that walks through it.
 
 - [docs/postgresql.md](docs/postgresql.md): PostgreSQL apps, migrations per database, SQL that runs
   on both, tests with `TEST_DATABASE_URL`, moving data from SQLite.
-- [docs/operations.md](docs/operations.md): running in production: timeouts, `TRUSTED_PROXIES`,
+- [docs/operations.md](docs/operations.md): running in production: logs (JSON, files, request
+  ids), error reports (`App::report`), error pages, the debug inspector, timeouts, `TRUSTED_PROXIES`,
   `/health`, what happens when the database or SMTP fails, recovering failed jobs and webhook
   calls, backups (and what `APP_KEY` protects), migrations at deploy, the scheduler's time zone,
   tables to prune, maintenance mode.

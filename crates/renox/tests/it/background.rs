@@ -127,7 +127,13 @@ async fn locks_let_one_holder_in() {
             "held for its ttl"
         );
         tokio::time::sleep(Duration::from_millis(3100)).await;
-        let fresh = short.try_acquire().await.unwrap().expect("expired");
+        // The new holder's ttl is long, so a slow run can't expire it too.
+        let fresh = cache
+            .lock("short", Duration::from_secs(30))
+            .try_acquire()
+            .await
+            .unwrap()
+            .expect("expired");
         assert!(!stale.release().await.unwrap(), "{store}");
         assert!(short.is_held().await.unwrap());
         drop(fresh);

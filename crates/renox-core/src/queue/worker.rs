@@ -289,6 +289,14 @@ impl Worker {
             }
             Outcome::Failed(failure) => {
                 tracing::error!(job = %job.job, id = job.id, error = %failure.error, "job failed for good");
+                let report = crate::report::ErrorReport::new(
+                    &self.state,
+                    crate::report::ReportKind::Job,
+                    failure.error.lines().next().unwrap_or_default().to_owned(),
+                    failure.error.clone(),
+                    Some(format!("{} #{}", job.job, job.id)),
+                );
+                crate::report::send(&self.state, report);
                 if let (Some(handler), Ok(plain)) = (&handler, plain) {
                     let hook = (handler.failed)(plain, self.state.clone(), failure.error);
                     let hook = crate::context::scope_app(self.state.clone(), hook);

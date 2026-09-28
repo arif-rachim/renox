@@ -20,6 +20,7 @@ pub struct Registry {
     pub(crate) templates: Vec<crate::view::TemplateHook>,
     pub(crate) shares: Vec<(String, crate::view::ShareFn)>,
     pub(crate) channels: HashMap<String, crate::auth::notifications::ChannelFn>,
+    pub(crate) reporters: Vec<crate::report::ReportFn>,
     /// The `Permissions` module is on: load each user's roles.
     pub(crate) permissions: bool,
 }
@@ -135,6 +136,17 @@ impl Registry {
             name.to_owned(),
             crate::auth::notifications::channel_fn(send),
         );
+        self
+    }
+
+    /// Sends every error that needs a person to `reporter`; see
+    /// [`crate::report`].
+    pub fn report<F, Fut>(&mut self, reporter: F) -> &mut Self
+    where
+        F: Fn(crate::report::ErrorReport, AppState) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        self.reporters.push(crate::report::report_fn(reporter));
         self
     }
 

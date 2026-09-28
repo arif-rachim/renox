@@ -86,6 +86,14 @@ rnx make:middleware StampRequests                      # also make:component
   `locale` column on `users`); elsewhere use `state.lang("id")` or `state.mail_view_in(…)`.
 - The queue dashboard (`renox::queue::Dashboard`) is invisible until the app defines the
   `view-queue-dashboard` gate.
+- Debugging a request while developing: `/_renox/debug` lists the last requests with their SQL
+  (and flags N+1 queries); mail is at `/_renox/mail`. Logs carry a request id, also in the
+  response's `X-Request-Id`.
+- Error pages are `resources/views/errors/default.html` (and `errors/404.html`…), in the
+  layout. Send errors to a tracker with `App::report(|report, state| async move { … })`.
+- Per-user or per-key API limits: `App::rate_limiter("api", |req| Limit::per_minute(…))` and
+  `.throttle_by("api")` on the routes; a missing limiter is a boot error.
+- `route('products.index', q=q, page=2)` adds named arguments as the query string.
 - Tests: `#[renox::test] async fn …() { let app = TestApp::new({{crate_name}}::app()).await; … }`,
   with `app.acting_as(&user)`, `app.htmx()`, `assert_see`, `assert_invalid("field")`.
 

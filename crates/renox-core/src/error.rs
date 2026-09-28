@@ -245,6 +245,7 @@ impl IntoResponse for Error {
         let (detail, debug_detail) = match &self {
             Self::Internal(err) => {
                 tracing::error!(error = ?err, "internal server error");
+                crate::report::request_error(err);
                 template = err
                     .chain()
                     .find_map(|e| e.downcast_ref::<minijinja::Error>())

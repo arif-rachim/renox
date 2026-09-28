@@ -59,6 +59,7 @@ const BUILTIN: &[(&str, &str)] = &[
         include_str!("../views/mail/button.html"),
     ),
     ("renox/ui.html", include_str!("../views/ui.html")),
+    ("renox/debug.html", include_str!("../views/debug.html")),
     (
         "renox/queue/dashboard.html",
         include_str!("../views/queue/dashboard.html"),
@@ -170,15 +171,34 @@ impl Views {
             env.add_function(
                 "route",
                 move |name: String, params: Rest<Value>| -> Result<Value, minijinja::Error> {
-                    let params: Vec<&dyn std::fmt::Display> =
-                        params.iter().map(|p| p as &dyn std::fmt::Display).collect();
+                    // `route('products.index', page=2)`: named arguments are
+                    // the query string (`?page=2`).
+                    let (query, params): (Vec<&Value>, Vec<&Value>) =
+                        params.iter().partition(|p| p.is_kwargs());
+                    let params: Vec<&dyn std::fmt::Display> = params
+                        .iter()
+                        .map(|p| *p as &dyn std::fmt::Display)
+                        .collect();
                     // Percent-encoded, so safe to use in HTML without escaping `/`.
-                    routes
-                        .url(&name, &params)
-                        .map(Value::from_safe_string)
-                        .map_err(|err| {
-                            minijinja::Error::new(ErrorKind::InvalidOperation, err.to_string())
-                        })
+                    let mut url = routes.url(&name, &params).map_err(|err| {
+                        minijinja::Error::new(ErrorKind::InvalidOperation, err.to_string())
+                    })?;
+                    if let Some(kwargs) = query.first() {
+                        let mut pairs = form_urlencoded::Serializer::new(String::new());
+                        for key in kwargs.try_iter()? {
+                            let value = kwargs.get_item(&key)?;
+                            if value.is_none() || value.is_undefined() {
+                                continue;
+                            }
+                            pairs.append_pair(&key.to_string(), &value.to_string());
+                        }
+                        let pairs = pairs.finish();
+                        if !pairs.is_empty() {
+                            url.push(if url.contains('?') { '&' } else { '?' });
+                            url.push_str(&pairs.replace('&', "&amp;"));
+                        }
+                    }
+                    Ok(Value::from_safe_string(url))
                 },
             );
             // The current URL's query string with `page` set to `page`, for
@@ -284,25 +304,52 @@ impl Views {
         }
     }
 
-    fn render_error(&self, page: &ErrorPage, debug: bool, request: &str) -> anyhow::Result<String> {
+    /// The error page: the app's `errors/{status}.html`, else its
+    /// `errors/default.html`, else Renox's. With `globals` (a request's), an
+    /// app's page can extend its layout; a page that fails falls back to
+    /// Renox's, so an error in the layout doesn't hide the first error.
+    fn render_error(
+        &self,
+        page: &ErrorPage,
+        debug: bool,
+        request: &str,
+        globals: Option<Value>,
+    ) -> anyhow::Result<String> {
         let env = self.reloader.acquire_env()?;
-        let specific = format!("errors/{}.html", page.status.as_u16());
-        let template = match env.get_template(&specific) {
-            Ok(template) => template,
-            Err(err) if err.kind() == ErrorKind::TemplateNotFound => {
-                env.get_template("renox/error.html")?
-            }
-            Err(err) => return Err(err.into()),
-        };
-        Ok(template.render(context! {
+        let ctx = context! {
             status => page.status.as_u16(),
             reason => reason(page.status),
             detail => page.shown_detail(debug),
             // Only while developing: what was asked, and where a template failed.
             debug => debug,
-            request => debug.then_some(request),
+            request_line => debug.then_some(request),
             template => page.template.as_deref().filter(|_| debug),
-        })?)
+        };
+        for name in [
+            format!("errors/{}.html", page.status.as_u16()),
+            "errors/default.html".to_owned(),
+        ] {
+            let template = match env.get_template(&name) {
+                Ok(template) => template,
+                Err(err) if err.kind() == ErrorKind::TemplateNotFound => continue,
+                Err(err) => return Err(err.into()),
+            };
+            let rendered = match &globals {
+                Some(globals) => {
+                    let _current = CurrentGlobals::set(globals.clone());
+                    template.render(merge_maps([globals.clone(), ctx.clone()]))
+                }
+                None => template.render(ctx.clone()),
+            };
+            match rendered {
+                Ok(html) => return Ok(html),
+                Err(err) => {
+                    tracing::error!(error = ?err, template = %name, "the error page failed; showing Renox's");
+                    break;
+                }
+            }
+        }
+        Ok(env.get_template("renox/error.html")?.render(ctx)?)
     }
 }
 
@@ -683,7 +730,7 @@ pub(crate) async fn middleware(
         let globals = globals(
             &state,
             session.as_ref(),
-            current_user,
+            current_user.clone(),
             &htmx,
             &Requested {
                 path: &path,
@@ -709,7 +756,7 @@ pub(crate) async fn middleware(
                     .into_response();
                 match failed.extensions_mut().remove::<ErrorPage>() {
                     Some(page) => {
-                        error_response(&state, page, failed, wants_json, &htmx, &request_line)
+                        error_response(&state, page, failed, wants_json, &htmx, &request_line, None)
                     }
                     None => failed,
                 }
@@ -718,7 +765,23 @@ pub(crate) async fn middleware(
     }
 
     if let Some(page) = res.extensions_mut().remove::<ErrorPage>() {
-        return error_response(&state, page, res, wants_json, &htmx, &request_line);
+        // The app's error pages may extend its layout: give them what pages get.
+        let globals = (!wants_json || htmx.request).then(|| {
+            globals(
+                &state,
+                session.as_ref(),
+                current_user,
+                &htmx,
+                &Requested {
+                    path: &path,
+                    query: &query,
+                    nonce: &nonce,
+                    events: &[],
+                },
+                &locale,
+            )
+        });
+        return error_response(&state, page, res, wants_json, &htmx, &request_line, globals);
     }
     res
 }
@@ -731,14 +794,22 @@ fn error_response(
     wants_json: bool,
     htmx: &Htmx,
     request_line: &str,
+    globals: Option<Value>,
 ) -> Response {
     let debug = state.config.debug;
     if wants_json && !htmx.request {
-        return page.json(debug);
+        // Keep what the error response carried (`Retry-After` on a 429, …).
+        let mut json = page.json(debug);
+        for (name, value) in res.headers() {
+            if name != CONTENT_TYPE && name != CONTENT_LENGTH {
+                json.headers_mut().insert(name.clone(), value.clone());
+            }
+        }
+        return json;
     }
     let html = state
         .views
-        .render_error(&page, debug, request_line)
+        .render_error(&page, debug, request_line, globals)
         .unwrap_or_else(|err| {
             tracing::error!(error = ?err, "could not render the error page");
             crate::error::error_page(page.status, page.shown_detail(debug))

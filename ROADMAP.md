@@ -797,19 +797,21 @@ Notes from M20c (dashboard, mail, HTTP, storage):
       alert, tabs) and `make:component`
 - [x] Toasts over htmx; `once`; several fragments and out-of-band swaps;
       `HxRetarget`/`HxReswap`/`HxPushUrl`
-- [ ] `push`/`stack`; error pages rendered in the app layout (M21d)
+- [x] Error pages rendered in the app layout (M21d)
+- [ ] `push`/`stack` (M21e)
 - [x] Live validation over htmx (validate one field without running the handler)
-- [ ] Tailwind with its standalone CLI in `rnx serve` / `rnx build`, `rnx new --tailwind` (M21d)
+- [ ] Tailwind with its standalone CLI in `rnx serve` / `rnx build`, `rnx new --tailwind` (M21e)
 - [x] Resource scaffolding: `Routes::resource`, `rnx make:module --resource` (handlers, views,
       tests); `make:factory`, `make:seeder`, `make:test`, `make:notification`, `make:event`,
       `make:rule`, `make:middleware`
 - [x] Tests: `assert_json_path`/`assert_json`, session/auth/view assertions, time travel,
       event and notification fakes, a browser-test recipe
-- [ ] Errors and logs: `App::report(…)` (e.g. Sentry), `LOG_FORMAT=json`, log files, a request id;
+- [x] Errors and logs: `App::report(…)` (e.g. Sentry), `LOG_FORMAT=json`, log files, a request id;
       a debug inspector (`/_renox/debug`: requests, queries, jobs, mail)
 - [x] `Path` rejections as 404 (M21a)
-- [ ] Named, dynamic rate limiters; `route()` with query parameters;
-      more validation rules and form-request hooks (`authorize`, `prepare`, `after`, async rules)
+- [x] Named, dynamic rate limiters; `route()` with query parameters (M21d)
+- [ ] More validation rules and form-request hooks (`authorize`, `prepare`, `after`, async
+      rules) (M21e)
 - [ ] Typed app commands (a clap parser), prompts; zero-downtime deploy recipes; an opt-in
       server-side session store
 - [x] Authorization gaps found while moving examples/shop to `Permissions` (#53): policies
@@ -904,6 +906,37 @@ Notes from M21c (scaffolding and tests):
   skip every channel (mail, database, custom).
 - `TestResponse` gained a public `view` field (the rendered template).
 - Tailwind moves to M21d with the rest of the tooling.
+
+Notes from M21d (errors, logs, debugging):
+- Tailwind, `push`/`stack`, typed commands and prompts, the server-side session store,
+  zero-downtime recipes and the validation additions move to M21e, so this PR stays about
+  errors, logs and debugging.
+- Request id: the `request_id` layer runs outside `TraceLayer` so the span has it; an incoming
+  `X-Request-Id` is kept only when it's 8–64 of `[A-Za-z0-9._-]` (no log injection), else a
+  20-character random one is made.
+- `LOG_FORMAT=json` uses tracing-subscriber's JSON layer with the current span (`span`) and no
+  span list; `LOG_FILE` is opened in append mode behind a `Mutex<File>`; if it can't be opened,
+  logs go to stdout with a warning on stderr.
+- Reports: `report::send` spawns each reporter in `context::scope_app`, awaited in a second
+  task so a panic is logged, not propagated. Request reports read `RequestInfo`, which the
+  context middleware stores. A scheduled task's message is the first line of `{err:?}`
+  (`Error` has no `Display`). A job's `source` is `name #id`. Only `Error::Internal` 500s are
+  reported, not 4xx.
+- Error pages: `render_error` tries `errors/{status}.html`, then `errors/default.html` with the
+  page globals (`CurrentGlobals`, so imported macros see them too), then `renox/error.html`. If
+  the app's page fails to render, Renox's page is shown and the failure logged. The context's
+  debug request line was renamed `request_line`: `merge_maps` let the context's `None` hide the
+  `request` global, which broke `request.path` in layouts (found by the test).
+- Named limiters count in memory per process, or in the `cache` table (`named:{name}` keys)
+  with `CACHE_STORE=database`. A `throttle:name` mark without its limiter fails at boot.
+- The inspector records only while `APP_DEBUG` and `APP_ENV=local` (like live reload), outside
+  the context layer so the session's and user's SQL count, skipping `/_renox/*`. It keeps 50
+  requests and 200 statements each. Deviation: jobs and mail aren't repeated in it; the page
+  links to `/_renox/mail`, and the queue dashboard covers jobs.
+- JSON error responses (`page.json`) now keep the error response's headers; before, API
+  clients never got `Retry-After` from `throttle`. Found by examples/api's new limiter test.
+- `background::locks_let_one_holder_in` failed once under the full PostgreSQL run: the
+  re-taken lock had a 1 s ttl and could expire before `is_held`. It now uses 30 s.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

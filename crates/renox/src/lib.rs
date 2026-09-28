@@ -83,6 +83,11 @@ pub struct UiGuide;
 #[doc = include_str!("../../../docs/testing.md")]
 pub struct TestingGuide;
 
+/// Compiles the Rust in docs/operations.md as a doctest.
+#[cfg(doctest)]
+#[doc = include_str!("../../../docs/operations.md")]
+pub struct OperationsGuide;
+
 /// Compiles every Rust example in the README as a doctest, so the front page
 /// can't drift from the API.
 #[cfg(doctest)]

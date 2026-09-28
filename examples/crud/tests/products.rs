@@ -297,3 +297,16 @@ async fn the_cached_count_is_forgotten_by_the_hooks() {
         .await
         .assert_see("1 product in the shop");
 }
+
+#[renox::test]
+async fn error_pages_keep_the_layout() {
+    let app = TestApp::new(crud::app()).await;
+    let owner = user(&app, "owner@example.com").await;
+    app.acting_as(&owner);
+    // resources/views/errors/default.html: the navigation bar and account menu stay.
+    let res = app.get("/products/999/edit").await;
+    res.assert_not_found()
+        .assert_see("Not Found")
+        .assert_see("account-menu")
+        .assert_see("Back to the products");
+}

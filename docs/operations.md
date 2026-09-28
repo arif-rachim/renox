@@ -61,7 +61,7 @@ Several app servers can share one PostgreSQL database:
 - Each scheduled run is claimed once.
 - Migrations take turns.
 
-Set `CACHE_STORE=database` as well. Then the cache, `Routes::throttle` limits, the login lock
+Set `CACHE_STORE=database` as well. Then the cache, `Routes::throttle` and `throttle_by` limits, the login lock
 and cache locks (`state.cache.lock`) live in the `cache` table, so they hold across servers. With
 the default `memory` store, each server counts on its own (N servers allow N times the limit),
 and a lock only keeps out other tasks of the same process.
@@ -216,6 +216,62 @@ The flag file lives in `STORAGE_PATH`, so every process that shares that directo
 ## Logs
 
 - Logs go to stdout. Their level is set with `RUST_LOG` (e.g. `RUST_LOG=info,sqlx=warn`).
-- Each request's span carries its method, URI and the client IP.
+- `LOG_FORMAT=json` writes one JSON object per line, for Loki, Datadog, CloudWatch or
+  `jq`. The request's fields are in `span`:
+
+  ```json
+  {"timestamp":"…","level":"ERROR","fields":{"message":"request failed","error":"…"},
+   "target":"renox_core::error","span":{"id":"k3J9x2mQpL0aB7cDe4Fg","ip":"203.0.113.9","method":"POST","uri":"/checkout","name":"request"}}
+  ```
+
+- `LOG_FILE=storage/logs/app.log` appends to that file instead (without colors). Rotate it
+  with logrotate's `copytruncate`, or leave logs on stdout for journald or Docker.
+- Each request has an id: the `X-Request-Id` a proxy sent (kept when it's 8–64 characters of
+  `A-Z a-z 0-9 . _ -`), or a new one. It's in every log line of the request, in the response's
+  `X-Request-Id`, in error reports, and in handlers as the `RequestId` extractor. A visitor
+  who quotes it points you at the exact log lines.
 - Errors are logged with their cause. With `APP_DEBUG=false`, visitors see only the error page.
 - Job attempts log `job done`, `job failed, will retry` and `job failed for good`.
+
+## Error reports
+
+`App::report` gets every error a person should look at, in the background after the response
+is sent:
+
+- a request that answered 500 (with its method, path, request id, IP and user id);
+- a job that failed for good (`source` is its name and id, `send-invoice #42`);
+- a scheduled task that failed or panicked.
+
+```rust
+# use renox::prelude::*;
+use renox::report::ErrorReport;
+
+# let _ =
+App::new().report(|report: ErrorReport, state: AppState| async move {
+    // Sentry, Honeybadger, a Slack webhook… The report serializes to JSON.
+    if let Some(url) = state.config.var("ERROR_WEBHOOK") {
+        let _ = state.http.post(url).json(&report).send().await;
+    }
+})
+# ;
+```
+
+Several reporters can be added; one that fails or panics doesn't stop the others. 4xx errors
+(a 404, a failed validation) aren't reported.
+
+## Error pages
+
+`rnx new` writes `resources/views/errors/default.html`, which extends the app's layout, so an
+error page keeps the navigation bar and the signed-in user's menu. It gets the same globals as
+any page (`auth`, `request`, `t()`, `route()`…) plus `status`, `reason` and `detail` (the
+message of an `abort(…)`; a 500's cause only with `APP_DEBUG`). `errors/404.html`, or any
+status, wins for that status. If the app's page itself fails to render, Renox shows its own,
+so an error in the layout can't hide the original error. JSON clients get JSON.
+
+## Debug inspector
+
+With `APP_DEBUG=true` and `APP_ENV=local`, `/_renox/debug` lists the last 50 requests (newest
+first) with their status, time, the view they rendered and their SQL. A statement run three or
+more times in one request is flagged as a likely N+1. The page is never mounted in
+production or tests. Mail sent while developing is at `/_renox/mail`.
+

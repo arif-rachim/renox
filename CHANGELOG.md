@@ -10,6 +10,29 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M21d · Errors, logs and debugging
+
+- A request id per request: kept from a proxy's `X-Request-Id` when it looks like one, else
+  generated; in the log span, the response header, error reports and the `RequestId` extractor.
+- `LOG_FORMAT=json` (one object per line) and `LOG_FILE` (append to a file).
+- `App::report(|report: ErrorReport, state| async { … })` for 500s, jobs that failed for good and
+  failed scheduled tasks, run in the background.
+- Error pages use the app's layout: `errors/{status}.html`, then `errors/default.html` (new in
+  `rnx new`), with every page global plus `status`, `reason` and `detail`. Renox's own error
+  page uses the UI kit.
+- `route('name', id, q=…, page=2)`: named arguments become the query string.
+- Named rate limiters: `App::rate_limiter("api", |req| Limit::per_minute(60).by(…))` and
+  `Routes::throttle_by("api")`; `renox::rate_limit` is public.
+- `/_renox/debug` while developing (`APP_DEBUG` and `APP_ENV=local`): the last 50 requests with
+  status, time, view and SQL, flagging likely N+1 queries.
+- Fixed: JSON error responses dropped the headers of the error, e.g. `Retry-After` on a 429.
+- examples/crud has an error page in its layout; examples/api uses a named limiter (per user,
+  per IP for guests).
+- **Changed:** in the error template's context, the debug request line is `request_line` (it
+  was `request`, which hid the `request` global). An app's own `renox/error.html` that printed
+  `{{ request }}` should print `{{ request_line }}`. An existing `errors/default.html` is now
+  used for every error status.
+
 ### M21c · Scaffolding and test tools
 
 - `Routes::resource(path, name, Resource::new().index(..).create(..).store(..).show(..).edit(..)

@@ -106,6 +106,10 @@ pub struct Config {
     pub queue_workers: usize,
     /// Whether `serve` runs scheduled tasks, from `SCHEDULER`.
     pub scheduler: bool,
+    /// `text` (default) or `json` (one object per line), from `LOG_FORMAT`.
+    pub log_format: String,
+    /// Where logs go instead of stdout, from `LOG_FILE` (appended to).
+    pub log_file: Option<PathBuf>,
     /// The zone of scheduled times and the `date` filter, from
     /// `APP_TIMEZONE`: an IANA name (`Asia/Jakarta`), an offset (`+07:00`) or
     /// `UTC`. See [`crate::timezone::Zone`].
@@ -234,6 +238,14 @@ impl Config {
                 .parse()
                 .context("QUEUE_WORKERS must be a number")?,
             scheduler: v.bool("SCHEDULER", true)?,
+            log_format: match v.or("LOG_FORMAT", "text").as_str() {
+                format @ ("text" | "json") => format.to_owned(),
+                other => bail!("LOG_FORMAT must be text or json, got `{other}`"),
+            },
+            log_file: v
+                .get("LOG_FILE")
+                .filter(|p| !p.is_empty())
+                .map(PathBuf::from),
             timezone: v.or("APP_TIMEZONE", "UTC"),
             cache_store: v.or("CACHE_STORE", "memory"),
             storage_path: v.or("STORAGE_PATH", "storage").into(),
@@ -310,6 +322,8 @@ impl Default for Config {
             },
             queue_workers: 0,
             scheduler: false,
+            log_format: "text".into(),
+            log_file: None,
             timezone: "UTC".into(),
             cache_store: "memory".into(),
             storage_path: "storage".into(),
@@ -395,6 +409,17 @@ mod tests {
         assert_eq!(c.cache_store, "memory");
         assert_eq!(c.csp, CspMode::Relaxed);
         assert!(c.key.is_none() && c.mail.port.is_none());
+    }
+
+    #[test]
+    fn log_format_and_file() {
+        let c = load(&[]).unwrap();
+        assert_eq!((c.log_format.as_str(), c.log_file), ("text", None));
+        let c = load(&[("LOG_FORMAT", "json"), ("LOG_FILE", "storage/logs/app.log")]).unwrap();
+        assert_eq!(c.log_format, "json");
+        assert_eq!(c.log_file, Some(PathBuf::from("storage/logs/app.log")));
+        let err = load(&[("LOG_FORMAT", "xml")]).unwrap_err();
+        assert!(err.to_string().contains("LOG_FORMAT"), "{err}");
     }
 
     #[test]

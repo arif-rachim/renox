@@ -133,6 +133,7 @@ and is still alive across an `.await`. Collect into a `Vec` first, then await. A
 {% block content %}
 <h1>{{ title }}</h1>
 <a href="{{ route('products.edit', product.id) }}">Edit</a>   {# named route with parameters #}
+<a href="{{ route('products.index', sort='price', q=q) }}">…</a> {# named arguments: ?q=…&sort=price (none is left out) #}
 <img src="{{ asset('logo.png') }}">                           {# /logo.png?v=hash: cached a year, new URL on change #}
 <p>{{ t('shop.welcome', name=auth.user.name) if auth.check }}</p>
 {% if flash.status %}<p class="flash">{{ flash.status }}</p>{% endif %}
@@ -152,8 +153,12 @@ Every view also gets: `request.path`, `request.query`, `request.htmx`, `app.name
 and the functions `old()`, `error()`, `csrf_field()`, `method_field()`, `route()`, `asset()`,
 `storage_url()`, `t()`, `can()`, `page_url(n)`, `renox_head()`, `csp_nonce()` and `seo()`.
 
+Error pages are the app's own: `rnx new` writes `resources/views/errors/default.html`, which
+extends the layout and gets every global above plus `status`, `reason` and `detail`;
+`errors/404.html` (any status) wins for one status. Without them, Renox shows its own.
+
 Renox's own pages are templates you can replace: create the same file under `resources/views/`,
-e.g. `renox/error.html` (or `errors/404.html` for one status), `renox/auth/login.html` (also
+e.g. `renox/error.html`, `renox/auth/login.html` (also
 `register`, `forgot-password`, `reset-password`, `verify-email`, `layout`),
 `renox/mail/layout.html` and `renox/pagination.html`. The `pagination` macro must be imported:
 `{% from "renox/pagination.html" import pagination %}`.
@@ -1402,6 +1407,43 @@ bytes, e.g. signed webhooks), `request().without_csrf()`, `logout()`, `csrf_toke
 `let (res, queries) = renox::db::capture_queries(app.get("/posts")).await;` to count the SQL a
 request (or any future) runs.
 
+## Errors, logs and debugging
+
+```rust
+use renox::prelude::*;
+use renox::RequestId;
+use renox::rate_limit::Limit;
+use renox::report::ErrorReport;
+
+async fn show(id: RequestId) -> String {
+    format!("request {id}") // also the response's X-Request-Id and every log line's `id`
+}
+
+fn app() -> App {
+    App::new()
+        // 500s, jobs that failed for good and failed scheduled tasks, in the background.
+        .report(|report: ErrorReport, state: AppState| async move {
+            // report.kind, .message, .details, .source, .request (method, path, id, ip, user_id)
+            let _ = state.http.post("https://errors.example.com/api/events").json(&report).send().await;
+        })
+        // A limit picked per request; routes use it with `.throttle_by("api")`.
+        .rate_limiter("api", |req| match req.user {
+            Some(user) if user.has_role("partner") => Limit::none(),
+            Some(user) => Limit::per_minute(600).by(format!("user:{}", user.id)),
+            None => Limit::per_minute(60), // per IP
+        })
+}
+```
+
+- `LOG_FORMAT=json` writes one JSON object per line (with the request's span: `id`, `method`,
+  `uri`, `ip`); `LOG_FILE=storage/logs/app.log` appends there instead of stdout.
+- A request's `X-Request-Id` is kept when a proxy sends one (8–64 of `A-Z a-z 0-9 . _ -`),
+  otherwise it's generated.
+- `/_renox/debug` (only with `APP_DEBUG` and `APP_ENV=local`): the last 50 requests with their
+  status, time, view and SQL; a statement run 3+ times is flagged as a likely N+1. Mail is at
+  `/_renox/mail`, jobs at the queue dashboard (`renox::queue::Dashboard`).
+- A `throttle_by` without its `rate_limiter` stops the app at boot.
+
 ## Configuration (`.env`)
 
 `APP_ENV` (`local` | `production` | `testing`; also `dev`/`development`, `prod`, `test`; any other
@@ -1415,6 +1457,7 @@ address, `127.0.0.1`; `0.0.0.0` in a container) and `APP_PORT` (3000), `APP_LOCA
 `DATABASE_URL` (`sqlite://storage/app.db` or `postgres://…` with the `postgres` feature),
 `TEST_DATABASE_URL`, `MAIL_MAILER` (`log` | `smtp`), `QUEUE_WORKERS`, `SCHEDULER`,
 `CACHE_STORE` (`memory` | `database`: with several servers, also shares rate limits and the login lock), `STORAGE_DISK` (`local` | `s3`), `UPLOAD_MAX_SIZE` (MB),
+`LOG_FORMAT` (`text` | `json`), `LOG_FILE` (append to this file instead of stdout),
 `CSP` (`relaxed` | `strict` | `off`), `TRUSTED_PROXIES` (`127.0.0.1,10.0.0.0/8` or `*`: behind a
 proxy, rate limits, the login lock, logs and the `ClientIp` extractor use `X-Forwarded-For`).
 Timeouts in seconds: `DATABASE_ACQUIRE_TIMEOUT` (5), `DATABASE_STATEMENT_TIMEOUT` (30,

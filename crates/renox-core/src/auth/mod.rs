@@ -214,6 +214,11 @@ impl User {
     }
 }
 
+/// The logged-in user's id in the current request, if any.
+pub(crate) fn current_user_id() -> Option<i64> {
+    crate::context::get::<CurrentGrants>().map(|current| current.user_id)
+}
+
 fn current_grants(user_id: i64) -> Option<Arc<Grants>> {
     crate::context::get::<CurrentGrants>()
         .filter(|current| current.user_id == user_id)

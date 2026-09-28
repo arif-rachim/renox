@@ -115,6 +115,158 @@ pub(crate) async fn check(limiter: &Limiter, req: Request, next: Next) -> Respon
         Some(db) => shared_hit(limiter, db, &key(&req)).await,
         None => limiter.hit(&key(&req)),
     };
+    respond(verdict, limiter.max(), req, next).await
+}
+
+/// What a named limiter's rule sees of a request (`App::rate_limiter`).
+#[non_exhaustive]
+pub struct LimitRequest<'a> {
+    /// The logged-in user, if any.
+    pub user: Option<&'a crate::auth::User>,
+    pub ip: Option<std::net::IpAddr>,
+    pub method: &'a axum::http::Method,
+    pub path: &'a str,
+    pub headers: &'a axum::http::HeaderMap,
+}
+
+/// A limit a rule picks for one request: how many per how long, counted
+/// under which key (the user, or the IP for guests, unless `by` says).
+///
+/// ```
+/// # use renox::prelude::*;
+/// use renox::rate_limit::Limit;
+///
+/// # let _ =
+/// App::new().rate_limiter("api", |req| match req.user {
+///     Some(user) if user.has_role("partner") => Limit::none(),
+///     Some(_) => Limit::per_minute(600),
+///     None => Limit::per_minute(60), // per IP
+/// })
+/// # ;
+/// // then: Routes::new().get("/api/orders", orders).throttle_by("api")
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Limit {
+    max: u32,
+    per: Duration,
+    key: Option<String>,
+    unlimited: bool,
+}
+
+impl Limit {
+    pub fn per_minute(max: u32) -> Self {
+        Self::per(max, Duration::from_secs(60))
+    }
+
+    pub fn per_hour(max: u32) -> Self {
+        Self::per(max, Duration::from_secs(3600))
+    }
+
+    pub fn per(max: u32, per: Duration) -> Self {
+        Self {
+            max: max.max(1),
+            per: per.max(Duration::from_secs(1)),
+            key: None,
+            unlimited: false,
+        }
+    }
+
+    /// No limit for this request.
+    pub fn none() -> Self {
+        Self {
+            max: u32::MAX,
+            per: Duration::from_secs(1),
+            key: None,
+            unlimited: true,
+        }
+    }
+
+    /// Counts under `key` instead of the user or IP, e.g. an API key or
+    /// a team: `Limit::per_minute(100).by(format!("team:{team}"))`.
+    pub fn by(mut self, key: impl Into<String>) -> Self {
+        self.key = Some(key.into());
+        self
+    }
+}
+
+pub(crate) type LimitRule = std::sync::Arc<dyn Fn(&LimitRequest) -> Limit + Send + Sync>;
+
+/// A named limiter: its rule and its in-memory counters.
+pub(crate) struct NamedLimiter {
+    pub rule: LimitRule,
+    hits: Mutex<HashMap<String, (u32, Instant)>>,
+}
+
+impl NamedLimiter {
+    pub fn new(rule: LimitRule) -> Self {
+        Self {
+            rule,
+            hits: Mutex::new(HashMap::new()),
+        }
+    }
+
+    fn hit(&self, key: &str, limit: &Limit) -> Verdict {
+        let mut hits = self.hits.lock().unwrap_or_else(|e| e.into_inner());
+        if hits.len() >= SWEEP_AT {
+            hits.retain(|_, (_, start)| start.elapsed() < Duration::from_secs(24 * 60 * 60));
+        }
+        let entry = hits.entry(key.to_owned()).or_insert((0, Instant::now()));
+        if entry.1.elapsed() >= limit.per {
+            *entry = (0, Instant::now());
+        }
+        if entry.0 >= limit.max {
+            let left = limit.per.saturating_sub(entry.1.elapsed());
+            return Verdict::Limited {
+                retry_after: left.as_secs().max(1),
+            };
+        }
+        entry.0 += 1;
+        Verdict::Allowed {
+            remaining: limit.max - entry.0,
+        }
+    }
+}
+
+/// `Routes::throttle_by(name)`: the named limiter's rule picks the limit.
+pub(crate) async fn check_named(name: &str, req: Request, next: Next) -> Response {
+    let Some(state) = req.extensions().get::<crate::AppState>().cloned() else {
+        return next.run(req).await;
+    };
+    let Some(limiter) = state.limiters.get(name) else {
+        return Error::Internal(anyhow::anyhow!(
+            "no rate limiter `{name}`: define it with App::rate_limiter"
+        ))
+        .into_response();
+    };
+    let user = req
+        .extensions()
+        .get::<CurrentUser>()
+        .and_then(|c| c.user.clone());
+    let limit = (limiter.rule)(&LimitRequest {
+        user: user.as_deref(),
+        ip: crate::ClientIp::of(&req),
+        method: req.method(),
+        path: req.uri().path(),
+        headers: req.headers(),
+    });
+    if limit.unlimited {
+        return next.run(req).await;
+    }
+    let key = format!(
+        "{name}:{}:{}",
+        limit.key.clone().unwrap_or_else(|| key(&req)),
+        limit.per.as_secs()
+    );
+    let verdict = if state.config.cache_store == "database" {
+        let shared = Limiter::new(format!("named:{name}"), limit.max, limit.per);
+        shared_hit(&shared, &state.db, &key).await
+    } else {
+        limiter.hit(&key, &limit)
+    };
+    respond(verdict, limit.max, req, next).await
+}
+
+async fn respond(verdict: Verdict, max: u32, req: Request, next: Next) -> Response {
     match verdict {
         Verdict::Limited { retry_after } => {
             let mut res = Error::TooManyRequests.into_response();
@@ -126,7 +278,7 @@ pub(crate) async fn check(limiter: &Limiter, req: Request, next: Next) -> Respon
         Verdict::Allowed { remaining } => {
             let mut res = next.run(req).await;
             let headers = res.headers_mut();
-            headers.insert("x-ratelimit-limit", limiter.max().into());
+            headers.insert("x-ratelimit-limit", max.into());
             headers.insert("x-ratelimit-remaining", remaining.into());
             res
         }

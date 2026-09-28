@@ -24,6 +24,7 @@ Log in at `/login` (or register at `/register`), then add products at `/products
 | The policy: only the owner may update, delete or restore | [src/app/products/policy.rs](src/app/products/policy.rs) |
 | List, form and trash pages, built with the UI kit (`renox/ui.html`): a table with a confirmation sheet for deletes, a form with live validation, an inset grouped list | [resources/views/products](resources/views/products) |
 | The layout: a translucent navigation bar with an account menu, the kit's styles, the toast region | [resources/views/layouts/app.html](resources/views/layouts/app.html) |
+| Error pages (404, 403, 500…) in the layout | [resources/views/errors/default.html](resources/views/errors/default.html) |
 | The table, with `deleted_at`; `slug` added in a second migration | [migrations](migrations) |
 
 ## Things worth copying
@@ -58,6 +59,9 @@ Log in at `/login` (or register at `/register`), then add products at `/products
   - Delete is red text in the row and a sheet asks first, with Cancel focused.
   - On phones the slug column hides (`hide-narrow`) and a row's actions stack.
   - See [docs/ui.md](../../docs/ui.md) for the design rules the kit follows.
+- **Error pages in the layout.** `errors/default.html` extends the layout, so a 404 or a 403
+  keeps the navigation bar and the account menu, with a way back to the list. It gets
+  `status`, `reason` and `detail` besides the usual globals.
 - **Toasts.** `store`, `update`, `destroy` and `restore` return `(Toast::success(…), Redirect)`;
   `{{ toasts() }}` in the layout shows the toast on the next page, once.
 

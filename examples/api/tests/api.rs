@@ -294,3 +294,34 @@ async fn products_are_listed_with_a_cursor() {
         .await
         .assert_status(400);
 }
+
+#[renox::test]
+async fn guests_are_limited_per_ip_and_users_per_account() {
+    let app = app().await;
+    let token = bearer(&app).await; // one guest request
+    // Invalid input (422), so the login lock doesn't count these.
+    let wrong = json!({ "email": "not-an-email" });
+    for _ in 0..9 {
+        app.request()
+            .without_csrf()
+            .post_json("/api/tokens", &wrong)
+            .await
+            .assert_status(422);
+    }
+    let res = app
+        .request()
+        .without_csrf()
+        .post_json("/api/tokens", &wrong)
+        .await;
+    res.assert_status(429);
+    assert!(res.headers.get("retry-after").is_some());
+
+    // A logged-in user counts on their own, with a higher limit.
+    let res = app
+        .request()
+        .header("authorization", &token)
+        .get("/api/products")
+        .await;
+    res.assert_ok();
+    assert_eq!(res.headers.get("x-ratelimit-limit").unwrap(), "120");
+}

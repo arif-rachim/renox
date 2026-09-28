@@ -214,6 +214,18 @@ impl Task {
             }
             Err(err) => {
                 tracing::error!(task = %self.name, error = ?err, "scheduled task failed");
+                let report = crate::report::ErrorReport::new(
+                    &state,
+                    crate::report::ReportKind::ScheduledTask,
+                    format!("{err:?}")
+                        .lines()
+                        .next()
+                        .unwrap_or_default()
+                        .to_owned(),
+                    format!("{err:?}"),
+                    Some(self.name.clone()),
+                );
+                crate::report::send(&state, report);
                 if let Some(failed) = &self.on_failure {
                     let message = format!("{err:?}");
                     crate::context::scope_app(state.clone(), failed(state, err)).await;

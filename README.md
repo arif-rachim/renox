@@ -102,7 +102,8 @@ impl Module for Guestbook {
   with names (`route('products.edit', id)` in templates),
   guards (`.require_auth()`, `.guest_only()`, `.require_verified()`, `.require_gate("admin")`,
   `.require_role(…)`, `.require_permission(…)`, `.require_ability(…)` for API tokens,
-  `.require_password_confirmed()`) and rate limits (`.throttle(60, Duration::from_secs(60))`).
+  `.require_password_confirmed()`) and rate limits (`.throttle(60, Duration::from_secs(60))`, or
+  a named limiter that picks the limit per user or API key: `.throttle_by("api")`).
 - Encrypted cookie sessions, flash messages and old input come built in. CSRF protection is
   automatic for forms and htmx.
 - `_method` spoofing lets plain forms send PUT and DELETE.
@@ -125,7 +126,7 @@ impl Module for Guestbook {
 - `.fragment("block")` answers htmx with just one block. `HxTrigger`, `HxRedirect` and `Back`
   cover the rest.
 - `{{ csrf_field() }}`, `{{ method_field('PUT') }}`, `old()`, `error()`, `t()` and `route()` work
-  in every template, `can('update', product)` on models the handler wrapped with `Can::new`, and
+  in every template (`route('products.index', q=q)` adds a query string), `can('update', product)` on models the handler wrapped with `Can::new`, and
   `pagination(products)` once imported from `renox/pagination.html`.
 - `asset('app.css')` adds a content hash (`?v=…`), so assets can be cached for a year.
 - Components are macros that see the request (`old`, `error`, `t`, `can`, `auth`), and a UI kit
@@ -259,6 +260,11 @@ In production, timeouts keep a slow database or mail server from holding request
 feeds your load balancer, and panics in handlers, jobs and tasks are contained. CI checks this by
 stopping, pausing and locking the database under a running app
 ([running in production](docs/operations.md)).
+
+Every request gets an id that's in its log lines and its `X-Request-Id`. Logs can be JSON
+(`LOG_FORMAT=json`) or go to a file. `App::report` hands 500s, failed jobs and failed tasks to
+Sentry or a chat channel. Error pages use the app's layout. While developing,
+`/_renox/debug` shows the last requests with their SQL, and flags N+1 queries.
 </details>
 
 <details>
@@ -326,6 +332,8 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 | Blade components, Breeze's UI | Macros that see the request (`rnx make:component`), the `renox/ui.html` kit |
 | `routes/web.php`, `Route::prefix()->name()->group()` | `Module::routes`, `Routes::group("/admin", "admin.", …)` |
 | Middleware | `.require_auth()`, `.throttle(…)`, `Routes::route_layer`, `App::layer` |
+| `RateLimiter::for('api', …)` | `App::rate_limiter("api", …)` and `.throttle_by("api")` |
+| Exception reporting (`report()`), Telescope/Debugbar | `App::report(…)`, `/_renox/debug` |
 | Eloquent | `#[derive(Model)]` and the query builder; relations are explicit loaders ([docs/relations.md](docs/relations.md)) |
 | Form Requests | `Valid<T>` with `impl Validate` |
 | Gates and policies | `App::gate`, `impl Policy`, `user.authorize(…)`, `.require_gate(…)` |

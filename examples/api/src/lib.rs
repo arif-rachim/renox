@@ -8,14 +8,16 @@
 //!   tokens are pruned nightly.
 //! - The product list is cursor-paginated (`?cursor=<next_cursor>`).
 //! - Bad input gets `422 {"message", "errors"}`; guests get 401.
-//! - Browsers on `https://app.example.com` may call it (CORS), and each
-//!   caller gets at most 60 requests a minute.
+//! - Browsers on `https://app.example.com` may call it (CORS). Each user
+//!   gets 120 requests a minute; guests (logging in) 10 a minute per IP,
+//!   which also slows down password guessing.
 //!
 //! Run it: `cargo run -- migrate`, `cargo run -- db:seed`, `cargo run`, then
 //! `curl -X POST localhost:3000/api/tokens -H 'content-type: application/json'
 //!  -d '{"email":"demo@example.com","password":"password123","device":"curl"}'`.
 
 use renox::prelude::*;
+use renox::rate_limit::Limit;
 
 mod app;
 
@@ -28,6 +30,11 @@ pub fn app() -> App {
         // Users and the personal_access_tokens table; no pages needed here.
         .module(Auth::new().without_registration())
         .module(app::products::Products)
+        // `.throttle_by("api")` on the routes asks this for each request's limit.
+        .rate_limiter("api", |req| match req.user {
+            Some(user) => Limit::per_minute(120).by(format!("user:{}", user.id)),
+            None => Limit::per_minute(10), // per IP
+        })
         // The Auth module adds the `tokens:prune` command; run the same
         // cleanup every night so expired tokens don't pile up.
         .schedule(|s| {

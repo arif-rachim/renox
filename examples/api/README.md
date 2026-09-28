@@ -32,6 +32,7 @@ Add `"read_only":true` to the login body for a token that can only read: writing
 |---|---|
 | Wiring: `Auth` without registration pages (users and tokens only), the nightly token cleanup, the seeder | [src/lib.rs](src/lib.rs) |
 | Routes and their abilities, token issue and revoke, list/show/create/delete products, validation, CORS and throttling | [src/app/products/mod.rs](src/app/products/mod.rs) |
+| The `api` rate limiter: per user, or per IP for guests | [src/lib.rs](src/lib.rs) |
 | The table | [migrations](migrations) |
 
 Routes: `POST /api/tokens`; with `products:read`: `GET /api/products`, `GET /api/products/{id}`;
@@ -61,7 +62,10 @@ with `products:write`: `POST /api/products`, `DELETE /api/products/{id}`; any va
   sends `next_cursor` back as `?cursor=…` until it is `null`. Unlike page numbers, rows added in
   between don't shift the pages, and there is no `COUNT(*)`.
 - **CORS and a rate limit on the whole group.** `.cors(&["https://app.example.com"])` and
-  `.throttle(60, Duration::from_secs(60))` (60 requests a minute).
+  `.throttle_by("api")`. The `api` limiter (`App::rate_limiter` in lib.rs) picks the limit per
+  request: 120 a minute per user, 10 a minute per IP for guests, who can only log in. Over the
+  limit: `429` with `Retry-After`. Counting per user means several apps behind one office IP
+  don't share a limit.
 
 ## Tests
 

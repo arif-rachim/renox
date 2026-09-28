@@ -22,6 +22,7 @@ mod jobs;
 mod mail;
 mod method;
 mod models;
+mod operations;
 mod polish;
 #[cfg(feature = "postgres")]
 mod postgres;

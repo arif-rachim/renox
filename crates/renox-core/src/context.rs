@@ -158,7 +158,30 @@ pub(crate) async fn middleware(
     req: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> axum::response::Response {
-    scope_app(state, next.run(req)).await
+    let info = RequestInfo {
+        method: req.method().to_string(),
+        path: req.uri().path().to_owned(),
+        id: req
+            .extensions()
+            .get::<crate::RequestId>()
+            .map(|id| id.0.clone())
+            .unwrap_or_default(),
+        ip: crate::ClientIp::of(&req).map(|ip| ip.to_string()),
+    };
+    scope_app(state, async move {
+        set(info);
+        next.run(req).await
+    })
+    .await
+}
+
+/// What error reports say about the request they come from.
+#[derive(Debug, Clone)]
+pub(crate) struct RequestInfo {
+    pub method: String,
+    pub path: String,
+    pub id: String,
+    pub ip: Option<String>,
 }
 
 #[cfg(test)]
