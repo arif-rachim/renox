@@ -81,6 +81,61 @@ pub async fn scope<F: Future>(fut: F) -> F::Output {
     CONTEXT.scope(RefCell::new(Values::new()), fut).await
 }
 
+/// A value from the current context as a handler argument, e.g. the team a
+/// middleware picked: `Current(team): Current<CurrentTeam>`. A request
+/// without one is a 500 (a middleware should have set it); take
+/// `Option<Current<T>>` when it's optional.
+///
+/// ```
+/// # use renox::prelude::*;
+/// use renox::context::Current;
+///
+/// #[derive(Clone)]
+/// struct CurrentTeam(i64);
+///
+/// async fn dashboard(Current(team): Current<CurrentTeam>) -> String {
+///     format!("team {}", team.0)
+/// }
+/// ```
+#[derive(Debug, Clone)]
+pub struct Current<T>(pub T);
+
+impl<T, S> axum::extract::FromRequestParts<S> for Current<T>
+where
+    T: Clone + Send + Sync + 'static,
+    S: Send + Sync,
+{
+    type Rejection = crate::Error;
+
+    async fn from_request_parts(
+        _: &mut axum::http::request::Parts,
+        _: &S,
+    ) -> Result<Self, crate::Error> {
+        get::<T>().map(Current).ok_or_else(|| {
+            anyhow::anyhow!(
+                "no `{}` in the request's context: set it in a middleware with renox::context::set",
+                std::any::type_name::<T>()
+            )
+            .into()
+        })
+    }
+}
+
+impl<T, S> axum::extract::OptionalFromRequestParts<S> for Current<T>
+where
+    T: Clone + Send + Sync + 'static,
+    S: Send + Sync,
+{
+    type Rejection = std::convert::Infallible;
+
+    async fn from_request_parts(
+        _: &mut axum::http::request::Parts,
+        _: &S,
+    ) -> Result<Option<Self>, std::convert::Infallible> {
+        Ok(get::<T>().map(Current))
+    }
+}
+
 /// The app of the current request, job, task or command, e.g. for a model
 /// hook that emits an event or forgets a cache key. `None` outside one
 /// (a bare `tokio::spawn`, or a test calling models directly).

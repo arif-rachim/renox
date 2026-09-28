@@ -22,6 +22,7 @@ mod jobs;
 mod mail;
 mod method;
 mod models;
+mod polish;
 #[cfg(feature = "postgres")]
 mod postgres;
 mod query_builder;

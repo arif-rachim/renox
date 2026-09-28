@@ -32,6 +32,7 @@ pub mod mail;
 pub mod maintenance;
 mod method;
 mod module;
+mod path;
 mod provided;
 pub mod queue;
 mod rate_limit;
@@ -59,7 +60,7 @@ pub use auth::{AuthUser, Policy};
 pub use client_ip::{ClientIp, TrustedProxies};
 pub use config::{AnalyticsConfig, Config, CspMode, Environment};
 pub use cookies::{Cookies, SetCookie};
-pub use crypto::generate_key;
+pub use crypto::{generate_key, random_token};
 pub use csrf::{CSRF_FIELD, CSRF_HEADER};
 pub use download::Download;
 pub use embedded::Embedded;
@@ -68,6 +69,7 @@ pub use htmx::{Back, Htmx, HxRedirect, HxRefresh, HxTrigger};
 pub use i18n::Lang;
 pub use method::METHOD_FIELD;
 pub use module::Module;
+pub use path::Path;
 pub use provided::Provided;
 pub use registry::Registry;
 pub use routing::{RouteInfo, RouteTable, Routes};
@@ -80,6 +82,9 @@ pub use view_filters::format_number;
 
 pub use minijinja::context;
 
+/// `anyhow`, for errors with context: `renox::anyhow::anyhow!("…")`,
+/// `.context("…")`, `Error::permanent(err)`.
+pub use anyhow;
 pub use chrono;
 #[cfg(feature = "fake")]
 pub use fake;

@@ -725,7 +725,12 @@ change 29 s → 7 s, full run 19 s → 6 s.
 - **M20c** (`renox::http` + fake + schedule pings, queue dashboard module, localized mail and
   notifications, mail components, storage list/copy/rename): branch `m20c-background`. The
   dashboard page was browser-checked (desktop, 390 px, dark). M20 is done.
-- **Next: M21 (views and DX)**, from the Laravel parity review
+- **M21a** (rough edges from #53/#55: `User::has_role` via context grants, `users_with_role`,
+  confirm-password return for forms, `Db::retrying`, batch callbacks' `batch_id`
+  (`callback_of` migration), `run_all_jobs`, `capture_queries`, `Morph::count_many`,
+  `Current<T>`, seeders in context, old input on hook errors, `renox::Path` 404s): branch
+  `m21a-rough-edges`. Framework migrations are now 8 (tests list them).
+- **Next: M21b (views), M21c (scaffolding), M21d (errors, logs, limiters)**, from the Laravel parity review
   (`docs/audit/2026-09-laravel-parity.md`); the ROADMAP lists each milestone's items. **v1.0 is
   on hold** until the owner says to start it (docs site, starter kit, semver checks, real
   crates.io releases; the owner runs `cargo login`).

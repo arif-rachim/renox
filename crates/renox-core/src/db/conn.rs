@@ -218,6 +218,71 @@ impl Db {
         }
     }
 
+    /// Runs `work` again (up to `attempts` times, with a short, growing
+    /// pause) while it fails because another transaction got in the way
+    /// (SQLite busy, PostgreSQL serialization failure or deadlock). `work`
+    /// opens and commits its own transaction, so unlike
+    /// [`Db::transaction_retrying`] it can borrow from the caller, and it can
+    /// roll back and still return a value (drop or `rollback` the
+    /// transaction instead of committing).
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// enum Transfer { Done, Short }
+    ///
+    /// # async fn demo(db: Db, amount: i64, from: i64, to: i64) -> Result {
+    /// let outcome = db
+    ///     .retrying(3, || async {
+    ///         let mut tx = db.begin().await?;
+    ///         let taken = renox::db::sql(
+    ///             "UPDATE accounts SET balance = balance - ? WHERE id = ? AND balance >= ?",
+    ///         )
+    ///         .bind(amount) // borrowed from the caller
+    ///         .bind(from)
+    ///         .bind(amount)
+    ///         .execute(&mut tx)
+    ///         .await?;
+    ///         if taken == 0 {
+    ///             tx.rollback().await?;
+    ///             return Ok(Transfer::Short); // rolled back, with an answer
+    ///         }
+    ///         renox::db::sql("UPDATE accounts SET balance = balance + ? WHERE id = ?")
+    ///             .bind(amount)
+    ///             .bind(to)
+    ///             .execute(&mut tx)
+    ///             .await?;
+    ///         tx.commit().await?;
+    ///         Ok(Transfer::Done)
+    ///     })
+    ///     .await?;
+    /// # let _ = outcome; Ok(()) }
+    /// ```
+    pub fn retrying<'a, T, F, Fut>(
+        &'a self,
+        attempts: u32,
+        mut work: F,
+    ) -> impl Future<Output = crate::Result<T>> + Send + 'a
+    where
+        T: Send + 'a,
+        F: FnMut() -> Fut + Send + 'a,
+        Fut: Future<Output = crate::Result<T>> + Send + 'a,
+    {
+        let attempts = attempts.max(1);
+        async move {
+            let mut attempt = 1;
+            loop {
+                match work().await {
+                    Err(err) if attempt < attempts && err.is_retryable() => {
+                        let pause = std::time::Duration::from_millis(20 * u64::from(attempt));
+                        tokio::time::sleep(pause).await;
+                        attempt += 1;
+                    }
+                    other => return other,
+                }
+            }
+        }
+    }
+
     /// A transaction that takes SQLite's write lock at once (`BEGIN
     /// IMMEDIATE`), so what it reads can't change before it writes: the
     /// SQLite counterpart of `lock_for_update`. Same as `begin` on PostgreSQL.
@@ -533,6 +598,7 @@ impl Sql {
 
     pub async fn fetch_all<'c>(self, db: impl Executor<'c>) -> Result<Vec<Row>, DbError> {
         let Self { sql, args } = self;
+        super::query_log::record(&sql);
         dispatch!(db.into_conn(), |build, exec| build(sql, args)
             .fetch_all(exec)
             .await
@@ -541,6 +607,7 @@ impl Sql {
 
     pub async fn fetch_optional<'c>(self, db: impl Executor<'c>) -> Result<Option<Row>, DbError> {
         let Self { sql, args } = self;
+        super::query_log::record(&sql);
         dispatch!(db.into_conn(), |build, exec| build(sql, args)
             .fetch_optional(exec)
             .await
@@ -557,6 +624,7 @@ impl Sql {
     /// Runs the statement and returns the number of rows it changed.
     pub async fn execute<'c>(self, db: impl Executor<'c>) -> Result<u64, DbError> {
         let Self { sql, args } = self;
+        super::query_log::record(&sql);
         dispatch!(db.into_conn(), |build, exec| build(sql, args)
             .execute(exec)
             .await

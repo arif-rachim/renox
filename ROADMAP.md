@@ -806,15 +806,16 @@ Notes from M20c (dashboard, mail, HTTP, storage):
       event and notification fakes, a browser-test recipe
 - [ ] Errors and logs: `App::report(…)` (e.g. Sentry), `LOG_FORMAT=json`, log files, a request id;
       a debug inspector (`/_renox/debug`: requests, queries, jobs, mail)
-- [ ] Named, dynamic rate limiters; `route()` with query parameters; `Path` rejections as 404;
+- [x] `Path` rejections as 404 (M21a)
+- [ ] Named, dynamic rate limiters; `route()` with query parameters;
       more validation rules and form-request hooks (`authorize`, `prepare`, `after`, async rules)
 - [ ] Typed app commands (a clap parser), prompts; zero-downtime deploy recipes; an opt-in
       server-side session store
-- [ ] Authorization gaps found while moving examples/shop to `Permissions` (#53): policies
+- [x] Authorization gaps found while moving examples/shop to `Permissions` (#53): policies
       and `gate_before` see a plain `User` without its roles (`Policy::allows` can't say
       "admins see all", a super-admin can't be a role), and there is no loader for the users
       with a role (`permissions::users_with_role`)
-- [ ] Rough edges found while writing examples/teams, jobs, crud, relations and shop (#55):
+- [x] Rough edges found while writing examples/teams, jobs, crud, relations and shop (#55):
       - after `/confirm-password`, only a GET is remembered as the page to return to, so a
         guarded DELETE/PUT lands on `/` (`auth/account.rs`); `TestApp` has no way to mark the
         password as confirmed
@@ -828,6 +829,38 @@ Notes from M20c (dashboard, mail, HTTP, storage):
       - seeders get only a `Db` (no `state.encrypt`, config or `context::app()`); no public
         random-token helper; reading a context value in a handler needs a hand-written
         extractor
+
+Notes from M21a (rough edges):
+- M21 is split: M21a (this: the authorization gaps and rough edges from #53/#55, `Path` 404s);
+  M21b views (components that see the request, a `renox/ui` kit, toasts, fragments and
+  out-of-band swaps, live validation); M21c scaffolding (`Routes::resource`, generators,
+  Tailwind); M21d errors, logs, a debug inspector, rate limiters, typed commands.
+- `User::has_role` / `has_permission` read the grants the auth middleware put in
+  `renox::context` for the logged-in user, so they're synchronous and work in `Policy::allows`
+  and `gate_before`; for any other user, or outside a request, they're `false` (documented).
+  `permissions::users_with_role`.
+- After `/confirm-password`, a guarded POST/PUT/DELETE returns to the page the form was on
+  (`same_site_referer`), a GET to itself. `TestApp::confirm_password()`.
+- `Db::retrying(n, || async { … })`: the attempt opens and commits its own transaction, so it
+  borrows from the caller and can roll back with a value; `transaction_retrying` stays for the
+  closure-with-`tx` style. examples/shop's checkout uses it (no clones, no downcast).
+- A batch's `then`/`catch`/`finally` jobs carry `callback_of` (a new framework migration,
+  `00010101000120`) and see the batch in `JobContext::batch_id` without counting in it.
+  `TestApp::run_all_jobs()` runs retries and delayed jobs too.
+- `renox::anyhow` is re-exported; `Error::permanent_message`.
+- `renox::db::capture_queries(fut)` records a future's statements through a task-local, so
+  requests sent with `TestApp` count (spawned tasks and workers don't). examples/relations
+  dropped its tracing subscriber for it.
+- `Morph::count_many`; seeders run in the app's context (`context::app()`);
+  `renox::random_token()`; `context::Current<T>` (and `Option<Current<T>>`) as a handler
+  argument. examples/teams keeps its own extractor because it redirects to `/teams`.
+- A `ValidationError` raised after `Valid` (a model's `saving` hook, the handler) refills the
+  form with what `Valid` read (kept in the context as `SubmittedInput`).
+- `renox::Path` replaces axum's in the prelude: the same tuple struct, a 404 for values that
+  don't parse. Code naming `axum::extract::Path` keeps the old 400.
+- Seen twice and not reproduced since: the crud example's tests failed to boot during a full
+  `cargo test --workspace` right after a large rebuild (23 s, `testing.rs:67` "the app
+  boots"); the boot error wasn't captured. If it recurs, capture the panic message.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

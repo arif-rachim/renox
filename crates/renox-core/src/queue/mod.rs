@@ -81,6 +81,7 @@ use crate::{AppState, Error, Result};
 pub(crate) const MIGRATIONS: &[Migration] = &[
     crate::db::framework_migration!("queue", "00010101000100_create_jobs_table"),
     crate::db::framework_migration!("queue", "00010101000110_add_chains_and_batches_to_jobs"),
+    crate::db::framework_migration!("queue", "00010101000120_add_callback_of_to_jobs"),
 ];
 
 /// Payloads of `ENCRYPTED` jobs start with this; JSON never does.
@@ -213,7 +214,8 @@ pub struct JobContext {
     pub attempt: u32,
     /// The job's id (0 for [`AppState::dispatch_sync`]).
     pub id: i64,
-    /// The batch it belongs to, if any.
+    /// The batch it belongs to, or, for a batch's `then`/`catch`/`finally`
+    /// job, the batch it follows (read it with `queue.batch_status`).
     pub batch_id: Option<i64>,
 }
 
@@ -354,7 +356,7 @@ impl Queue {
     async fn push<J: Job>(&self, job: J, queue: &str, delay: Duration) -> Result<i64> {
         let encoded = self.encode(&job, queue)?;
         let id = match J::UNIQUE_FOR {
-            None => insert(&self.db, &encoded, delay, None, None).await?,
+            None => insert(&self.db, &encoded, delay, None, None, None).await?,
             Some(ttl) => {
                 let mut tx = self.db.begin().await?;
                 let id =
@@ -389,7 +391,7 @@ impl Queue {
     pub async fn dispatch_in<J: Job>(&self, tx: &mut Transaction, job: J) -> Result<i64> {
         let encoded = self.encode(&job, J::QUEUE)?;
         match J::UNIQUE_FOR {
-            None => insert(tx, &encoded, Duration::ZERO, None, None).await,
+            None => insert(tx, &encoded, Duration::ZERO, None, None, None).await,
             Some(ttl) => {
                 insert_unique(tx, &unique_key::<J>(&job), ttl, &encoded, Duration::ZERO).await
             }
@@ -498,8 +500,9 @@ impl Queue {
         }
         batches.execute(&mut tx).await?;
         let insert = format!(
-            "INSERT INTO jobs (queue, job, payload, max_attempts, available_at, created_at, chain, batch_id) \
-             SELECT queue, job, payload, max_attempts, ?, ?, chain, batch_id FROM failed_jobs{filter}"
+            "INSERT INTO jobs (queue, job, payload, max_attempts, available_at, created_at, chain, \
+             batch_id, callback_of) SELECT queue, job, payload, max_attempts, ?, ?, chain, batch_id, \
+             callback_of FROM failed_jobs{filter}"
         );
         let mut query = crate::db::sql(insert).bind(unix_now()).bind(unix_now());
         if let Some(id) = id {
@@ -563,11 +566,12 @@ async fn insert<'c>(
     delay: Duration,
     chain: Option<String>,
     batch_id: Option<i64>,
+    callback_of: Option<i64>,
 ) -> Result<i64> {
     let now = unix_now();
     let id: i64 = crate::db::sql(
-        "INSERT INTO jobs (queue, job, payload, max_attempts, available_at, created_at, chain, batch_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO jobs (queue, job, payload, max_attempts, available_at, created_at, chain, \
+         batch_id, callback_of) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(&job.queue)
     .bind(&job.job)
@@ -577,6 +581,7 @@ async fn insert<'c>(
     .bind(now)
     .bind(chain)
     .bind(batch_id)
+    .bind(callback_of)
     .scalar(db)
     .await?;
     Ok(id)
@@ -610,7 +615,7 @@ async fn insert_unique(
             .await?;
         return Ok(holder.parse().unwrap_or_default());
     }
-    let id = insert(&mut *tx, job, delay, None, None).await?;
+    let id = insert(&mut *tx, job, delay, None, None, None).await?;
     crate::db::sql("UPDATE cache SET value = ? WHERE key = ?")
         .bind(id.to_string())
         .bind(key)
@@ -652,7 +657,7 @@ impl Chain {
         let chain = (!rest.is_empty())
             .then(|| serde_json::to_string(&rest))
             .transpose()?;
-        let id = insert(&self.queue.db, &first, Duration::ZERO, chain, None).await?;
+        let id = insert(&self.queue.db, &first, Duration::ZERO, chain, None, None).await?;
         self.queue.wake_workers();
         Ok(id)
     }
@@ -740,7 +745,7 @@ impl Batch {
         .scalar(&mut tx)
         .await?;
         for job in &self.jobs {
-            insert(&mut tx, job, Duration::ZERO, None, Some(id)).await?;
+            insert(&mut tx, job, Duration::ZERO, None, Some(id), None).await?;
         }
         if self.jobs.is_empty() {
             finish_batch(&mut tx, id, 0).await?;
@@ -772,7 +777,7 @@ pub(crate) async fn batch_job_done(tx: &mut Transaction, batch_id: i64, failed: 
         return Ok(()); // pruned meanwhile
     };
     if failed && failures == 1 {
-        queue_follow_up(tx, catch).await?;
+        queue_follow_up(tx, catch, batch_id).await?;
     }
     if pending <= 0 {
         finish_batch(tx, batch_id, failures).await?;
@@ -793,15 +798,17 @@ async fn finish_batch(tx: &mut Transaction, batch_id: i64, failures: i64) -> Res
     .next()
     .unwrap_or_default();
     if failures == 0 && cancelled.is_none() {
-        queue_follow_up(tx, then).await?;
+        queue_follow_up(tx, then, batch_id).await?;
     }
-    queue_follow_up(tx, finally).await
+    queue_follow_up(tx, finally, batch_id).await
 }
 
-async fn queue_follow_up(tx: &mut Transaction, job: Option<String>) -> Result {
+/// Queues a batch's `then`/`catch`/`finally` job, which sees the batch in
+/// `JobContext::batch_id` but isn't counted in it.
+async fn queue_follow_up(tx: &mut Transaction, job: Option<String>, batch_id: i64) -> Result {
     if let Some(job) = job {
         let job: Encoded = serde_json::from_str(&job)?;
-        insert(&mut *tx, &job, Duration::ZERO, None, None).await?;
+        insert(&mut *tx, &job, Duration::ZERO, None, None, Some(batch_id)).await?;
     }
     Ok(())
 }
@@ -815,7 +822,7 @@ pub(crate) async fn continue_chain(tx: &mut Transaction, chain: &str) -> Result 
         let chain = (!rest.is_empty())
             .then(|| serde_json::to_string(&rest))
             .transpose()?;
-        insert(&mut *tx, &next, Duration::ZERO, chain, None).await?;
+        insert(&mut *tx, &next, Duration::ZERO, chain, None, None).await?;
     }
     Ok(())
 }

@@ -131,17 +131,18 @@ async fn migrations_run_in_batches_and_roll_back() {
             "00010101000301_store_webhook_payloads_as_bytes",
             "00010101000300_create_webhook_calls_table",
             "00010101000200_create_cache_table",
+            "00010101000120_add_callback_of_to_jobs",
             "00010101000110_add_chains_and_batches_to_jobs",
             "00010101000100_create_jobs_table"
         ]
     );
     assert!(Produk::all(kernel.db()).await.is_err(), "table is gone");
 
-    assert_eq!(kernel.migrate().await.unwrap().len(), 7);
+    assert_eq!(kernel.migrate().await.unwrap().len(), 8);
     Produk::create(kernel.db(), produk("Kopi", 1, None))
         .await
         .unwrap();
-    assert_eq!(kernel.fresh().await.unwrap().len(), 7);
+    assert_eq!(kernel.fresh().await.unwrap().len(), 8);
     assert!(
         Produk::all(kernel.db()).await.unwrap().is_empty(),
         "fresh drops data"

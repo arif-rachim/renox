@@ -64,6 +64,13 @@ rnx make:migration add_stock_to_products
   "`Send` is not general enough"): don't keep a closure or iterator that borrows a local across
   an `.await`; collect into a `Vec` first.
 - Money is `i64` in the smallest unit (rupiah, cents), never `f64`.
+- `user.has_role("admin")` on a plain `User` (policies, `gate_before`) only knows the current
+  request's user; in jobs and commands use `user.roles(&db).await`.
+- For a transaction that must be retried on conflicts and borrow locals, use
+  `db.retrying(3, || async { let mut tx = db.begin().await?; …; tx.commit().await?; Ok(v) })`.
+- Tests: count queries with `renox::db::capture_queries(future)`; `app.run_all_jobs()` also
+  runs retries waiting for their backoff; `app.confirm_password()` passes
+  `require_password_confirmed`.
 - Call other services with `state.http` (timeouts, retries), not a client of your own: tests
   then fake it with `app.fake_http().on("https://api.example.com/*", FakeResponse::json(…))`.
   While faking, a request without a matching fake is an error, never a real call.

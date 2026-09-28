@@ -448,9 +448,18 @@ pub(crate) async fn middleware(
             return res;
         }
         if let Some(session) = &session {
+            // A `ValidationError` made after `Valid` (a model hook, the
+            // handler) carries no input: refill with what `Valid` read.
+            let input = if failed.input.is_empty() {
+                crate::context::get::<crate::validation::extract::SubmittedInput>()
+                    .map(|submitted| submitted.0)
+                    .unwrap_or_default()
+            } else {
+                failed.input
+            };
             let flashed = session
                 .flash_errors(&failed.errors)
-                .and_then(|()| session.flash_input(&failed.input));
+                .and_then(|()| session.flash_input(&input));
             if let Err(err) = flashed {
                 return err.into_response();
             }

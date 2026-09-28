@@ -257,7 +257,7 @@ let products = Product::query()
 | `insert([...])`, `upsert` | `Model::insert_many(&db, rows)`, `Model::upsert(&db, rows, &["sku"], &["qty"])` |
 | `with('category')` | `relations::belongs_to` / `has_many` / `Pivot::load_for` (above) |
 | pivot `withPivot`, `withTimestamps`, `toggle`, `updateExistingPivot` | `Pivot::with_timestamps()`, `attach_with`, `load_with_pivot::<T, Row>`, `toggle`, `update_pivot` |
-| `morphMany`, `morphTo` | `Morph::load_many`, `Morph::of`, `Morph::parents::<P, _>` |
+| `morphMany`, `morphTo`, `withCount` on one | `Morph::load_many`, `Morph::of`, `Morph::parents::<P, _>`, `Morph::count_many` |
 | model events / observers | `#[model(hooks)]` + `impl ModelHooks` (`saving`, `saved`, `deleting`, `deleted`) |
 | `save()` of dirty columns, `update([...])` on a model | `model.save_changes(&db, &original)`, `model.save_only(&db, &["price"])` |
 | `withCount`, `withSum` | `relations::count_many(&db, &posts, Comment::query(), "post_id")`, `sum_many::<i64, _, _>(…, "total")` (0 for rows without children) |

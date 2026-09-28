@@ -189,13 +189,23 @@ async fn pay(payments: Provided<Payments>) -> String {
     format!("key starts with {}", &payments.api_key[..3])
 }
 
+#[derive(Clone)]
+struct Plan(&'static str);
+
 async fn stamp(user: Option<AuthUser>, req: Request, next: Next) -> Response {
+    renox::context::set(Plan(if user.is_some() { "member" } else { "guest" }));
     let mut res = next.run(req).await; // runs after the session and user are loaded
     res.headers_mut().insert("x-member", user.is_some().to_string().parse().unwrap());
     res
 }
 
+// A context value as an argument (500 if missing; `Option<Current<Plan>>` when optional).
+async fn plan(renox::context::Current(plan): renox::context::Current<Plan>) -> &'static str {
+    plan.0
+}
+
 fn wiring(app: App) -> App {
+    let _ = plan;
     app.provide(Payments { api_key: "sk_test_123".into() })
         .layer(from_fn(stamp)) // every route of the app's modules
 }
@@ -497,6 +507,9 @@ fn seeders(app: App) -> App {
     // `rnx db:seed`, or `rnx migrate:fresh --seed`
     app.seeder(|db| async move {
         Product::create_many(&db, 50).await?; // in one transaction
+        // Seeders run in the app's context: config, encrypt, the cache, random_token().
+        let state = renox::context::app().expect("in a seeder");
+        let _invite = (state.encrypt("secret"), renox::random_token());
         Ok(())
     })
 }
@@ -530,13 +543,15 @@ struct Product { id: i64, user_id: i64 }
 impl Policy for Product {
     fn allows(&self, user: &User, ability: &str) -> bool {
         match ability {
-            "update" | "delete" => self.user_id == user.id,
+            // has_role: the current request's roles (the Permissions module)
+            "update" | "delete" => self.user_id == user.id || user.has_role("admin"),
             _ => false,
         }
     }
 }
 
 // `AuthUser` sends guests to the login page; use `Option<AuthUser>` when optional.
+// `Path` is Renox's: `/products/abc` for a `Path<i64>` is a 404, like a missing product.
 async fn edit(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Result<View> {
     let product = Product::find_or_404(&db, id).await?;
     user.authorize("update", &product)?; // 403 unless allowed
@@ -807,7 +822,25 @@ async fn report(db: &Db) -> Result {
     let mut tx = db.begin().await?; // pass `&mut tx` wherever `db` goes
     renox::db::sql("UPDATE products SET price = price + ?").bind(1_000).execute(&mut tx).await?;
     tx.commit().await?; // dropped without commit = rolled back
-    let _ = (name, total);
+
+    // Retried on SQLite busy / PostgreSQL conflicts; borrows freely, may roll back with a value.
+    let raised = db
+        .retrying(3, || async {
+            let mut tx = db.begin().await?;
+            let n = renox::db::sql("UPDATE products SET price = ? WHERE price < ?")
+                .bind(total) // a local, borrowed
+                .bind(total)
+                .execute(&mut tx)
+                .await?;
+            if n > 100 {
+                tx.rollback().await?;
+                return Ok(0); // too many: undone, still an answer
+            }
+            tx.commit().await?;
+            Ok(n)
+        })
+        .await?;
+    let _ = (name, raised);
     Ok(())
 }
 ```
@@ -1295,8 +1328,11 @@ bytes, e.g. signed webhooks), `request().without_csrf()`, `logout()`, `csrf_toke
 `app.kernel().call("products:import", ["file.csv"])` (an app command), `assert_redirect`,
 `assert_hx_redirect`, `assert_header(name, value)`, `assert_unauthorized`, `assert_forbidden`,
 `assert_not_found`, `assert_dont_see`, `assert_database_missing` / `assert_database_count`,
-`queued_jobs()`, `run_jobs()`, `sent_mail()` / `assert_mail_sent`, `session_cookie()` /
-`use_session_cookie(…)` (play a second device), `app.kernel().run_scheduled("task")`.
+`queued_jobs()`, `run_jobs()`, `run_all_jobs()` (retries and delayed jobs too), `sent_mail()` /
+`assert_mail_sent`, `session_cookie()` / `use_session_cookie(…)` (play a second device),
+`app.kernel().run_scheduled("task")`, `confirm_password()`, `fake_http()`, and
+`let (res, queries) = renox::db::capture_queries(app.get("/posts")).await;` to count the SQL a
+request (or any future) runs.
 
 ## Configuration (`.env`)
 

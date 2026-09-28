@@ -47,9 +47,10 @@ pub mod prelude {
     pub use renox_core::{abort, abort_if, abort_unless};
     pub use renox_macros::{DbEnum, FromRow, Model};
 
-    pub use axum::extract::{Form, Json, Path, Query, State};
+    pub use axum::extract::{Form, Json, Query, State};
     pub use axum::http::StatusCode;
     pub use axum::response::{Html, IntoResponse, Redirect, Response};
+    pub use renox_core::Path;
 }
 
 /// Compiles the Rust in docs/types.md as a doctest.

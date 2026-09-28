@@ -10,6 +10,27 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M21a · Rough edges
+
+- `User::has_role` / `User::has_permission` (the current request's roles) for policies and
+  `gate_before`; `permissions::users_with_role(&db, role)`.
+- `/confirm-password` returns a guarded POST/PUT/DELETE to the page its form was on;
+  `TestApp::confirm_password()`.
+- `Db::retrying(n, || async { … })`: retried on conflicts, borrows from the caller, may roll
+  back and return a value.
+- A batch's `then`/`catch`/`finally` jobs see the batch in `JobContext::batch_id` (framework
+  migration `00010101000120_add_callback_of_to_jobs`: run `migrate`); `TestApp::run_all_jobs()`.
+- `renox::anyhow` re-exported; `Error::permanent_message`.
+- `renox::db::capture_queries(future)` returns the SQL a future ran (requests through `TestApp`
+  included).
+- `Morph::count_many`; `renox::random_token()`; `renox::context::Current<T>` as a handler
+  argument; seeders run in the app's context (`renox::context::app()`).
+- A `ValidationError` from a model hook or a handler keeps the old input on plain forms.
+- **Changed:** the prelude's `Path` is `renox::Path`: a route value that doesn't parse
+  (`/orders/abc` for `Path<i64>`) is a 404 page instead of a plain-text 400.
+- Examples: shop's checkout uses `db.retrying`; relations counts queries with
+  `capture_queries` and likes with `Morph::count_many`; jobs uses `run_all_jobs`.
+
 ### M20c · Dashboard, localized mail, HTTP client, storage
 
 - `renox::http` (`state.http`): get/post/put/patch/delete with query, headers, bearer/basic auth,

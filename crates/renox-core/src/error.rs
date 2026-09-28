@@ -81,6 +81,12 @@ impl Error {
         Self::Internal(anyhow::Error::new(Permanent(err.into())))
     }
 
+    /// [`Error::permanent`] with just a message:
+    /// `Err(Error::permanent_message("the card was declined"))`.
+    pub fn permanent_message(message: impl std::fmt::Display) -> Self {
+        Self::permanent(anyhow::anyhow!("{message}"))
+    }
+
     /// Whether the error was made with [`Error::permanent`].
     pub fn is_permanent(&self) -> bool {
         match self {

@@ -50,8 +50,9 @@ pub(crate) fn open(key: &Key, sealed: &str) -> anyhow::Result<String> {
         .context("the value can't be decrypted with this APP_KEY")
 }
 
-/// A random, URL-safe token with 256 bits of entropy.
-pub(crate) fn random_token() -> String {
+/// A random, URL-safe token with 256 bits of entropy (43 characters), e.g.
+/// for an invitation link or an API key.
+pub fn random_token() -> String {
     let mut bytes = [0u8; 32];
     rand::fill(&mut bytes);
     URL_SAFE_NO_PAD.encode(bytes)

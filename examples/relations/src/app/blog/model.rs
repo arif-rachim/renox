@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use renox::db::relations::{Morph, Pivot, count_many};
+use renox::db::relations::{Morph, Pivot};
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -77,15 +77,14 @@ impl Like {
 }
 
 /// The number of likes of each post (or each comment) of a page, in one
-/// `GROUP BY` query; 0 for those without likes. `count_many` with the
-/// type filter counts rows without loading them; `LIKEABLE.load_many` is
-/// the loader for when a page needs the likes themselves.
+/// `GROUP BY` query; 0 for those without likes. `LIKEABLE.count_many`
+/// counts rows without loading them; `LIKEABLE.load_many` is the loader
+/// for when a page needs the likes themselves.
 pub fn like_counts<'a, P: Model>(
     db: &'a Db,
     parents: &[P],
 ) -> impl Future<Output = Result<HashMap<i64, i64>>> + Send + 'a {
-    let likes = Like::where_eq("likeable_type", P::TABLE);
-    count_many(db, parents, likes, "likeable_id")
+    LIKEABLE.count_many(db, parents, Like::query())
 }
 
 /// A like with what was liked, for the "latest likes" list.

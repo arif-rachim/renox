@@ -68,9 +68,16 @@ pub(crate) async fn require_password_confirmed(
     if recently_confirmed(&session) {
         return next.run(req).await;
     }
-    if req.method() == axum::http::Method::GET {
-        let to = req.uri().path_and_query().map(|p| p.as_str().to_owned());
-        let _ = session.put(CONFIRM_INTENDED, to.unwrap_or_else(|| "/".into()));
+    // After confirming, go back: to this page for a GET; for a form that
+    // posts, puts or deletes, to the page the form was on (it can't be
+    // replayed), taken from `Referer` when it's this site's own path.
+    let back = if req.method() == axum::http::Method::GET {
+        req.uri().path_and_query().map(|p| p.as_str().to_owned())
+    } else {
+        crate::htmx::same_site_referer(req.headers())
+    };
+    if let Some(back) = back {
+        let _ = session.put(CONFIRM_INTENDED, back);
     }
     let confirm = req
         .extensions()

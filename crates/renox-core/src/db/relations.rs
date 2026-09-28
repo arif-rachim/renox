@@ -602,6 +602,18 @@ impl Morph {
         has_many(db, parents, children, self.id_column, foreign_key)
     }
 
+    /// How many children each parent has, in one `GROUP BY` query (0 for
+    /// parents without any): `withCount` for a polymorphic relation.
+    pub fn count_many<'a, C: Model, P: Model>(
+        &self,
+        db: &'a Db,
+        parents: &[P],
+        children: Query<C>,
+    ) -> impl Future<Output = Result<HashMap<i64, i64>>> + Send + 'a {
+        let children = children.where_eq(self.type_column, P::TABLE);
+        count_many(db, parents, children, self.id_column)
+    }
+
     /// The parents of type `P` of these children, by id, in one query;
     /// `parent` reads a child's type and id columns. Children of other
     /// parent types are skipped: call it once per type.

@@ -105,6 +105,25 @@ impl TestApp {
         self.kernel.run_jobs().await.expect("the queue runs")
     }
 
+    /// Runs every queued job, including those waiting for a delay or a
+    /// retry's backoff, until none is left (at most 1,000 rounds); returns
+    /// how many attempts ran. For tests of retries and `failed` hooks.
+    pub async fn run_all_jobs(&self) -> usize {
+        let mut ran = 0;
+        for _ in 0..1000 {
+            crate::db::sql("UPDATE jobs SET available_at = 0 WHERE reserved_at IS NULL")
+                .execute(self.db())
+                .await
+                .expect("the jobs table can be written");
+            let now = self.run_jobs().await;
+            if now == 0 {
+                break;
+            }
+            ran += now;
+        }
+        ran
+    }
+
     /// Names of the jobs waiting in the queue, oldest first.
     pub async fn queued_jobs(&self) -> Vec<String> {
         crate::db::sql("SELECT job FROM jobs ORDER BY id")
@@ -117,6 +136,15 @@ impl TestApp {
     pub fn acting_as(&self, user: &User) -> &Self {
         let session = self.session();
         login(&session, user, None).expect("the session accepts the login");
+        self.set_cookie(crate::session::cookie_pair(self.state(), &session));
+        self
+    }
+
+    /// Marks the password as just typed, so routes behind
+    /// `require_password_confirmed` let the user through.
+    pub fn confirm_password(&self) -> &Self {
+        let session = self.session();
+        crate::auth::account::mark_confirmed(&session).expect("the session accepts it");
         self.set_cookie(crate::session::cookie_pair(self.state(), &session));
         self
     }
