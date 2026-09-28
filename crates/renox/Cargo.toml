@@ -1,6 +1,6 @@
 [package]
 name = "renox"
-description = "A batteries-included web framework for Rust, inspired by Laravel: Axum + HTMX + Alpine.js + SQLite. (Early placeholder, work in progress.)"
+description = "A batteries-included web framework for Rust, inspired by Laravel: Axum, HTMX and Alpine.js, SQLite or PostgreSQL, deployed as one binary."
 readme = "../../README.md"
 version.workspace = true
 edition.workspace = true

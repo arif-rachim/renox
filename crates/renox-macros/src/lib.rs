@@ -1,5 +1,6 @@
 //! Procedural macros for Renox. Use them through the `renox` crate:
-//! `renox::Model` and `renox::migrations!`.
+//! `#[derive(Model, FromRow, DbEnum)]`, `renox::migrations!()`,
+//! `renox::embedded!()` and `#[renox::test]`.
 
 mod db_enum;
 mod embedded;

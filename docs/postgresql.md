@@ -32,7 +32,7 @@ This does three things:
 1. Turn on the feature in `Cargo.toml`:
 
    ```toml
-   renox = { git = "https://github.com/arif-rachim/renox", features = ["postgres"] }
+   renox = { git = "https://github.com/arif-rachim/renox", rev = "…", features = ["postgres"] }  # keep your rev
    ```
 
 2. Point `DATABASE_URL` at the server:

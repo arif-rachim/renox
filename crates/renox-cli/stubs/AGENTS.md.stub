@@ -1,25 +1,34 @@
 # {{title}}: notes for coding agents
 
 A [Renox](https://github.com/arif-rachim/renox) app: Rust + Axum + HTMX + Alpine.js, like Laravel.
-The framework is the `renox` dependency; don't copy its code into this app.
+The framework is the `renox` dependency; don't copy its code into this app. This app is pinned to
+one Renox version (the `renox` line in `Cargo.toml`); the links below are for that version.
 
-## How to do things
+## Where to look
 
-Check the Renox cheat-sheet first. It has one short, compiled example per task: routes, views,
-forms and validation, models, queries, pagination, auth and policies, HTMX, jobs, mail, cache,
-uploads, tests.
-- https://github.com/arif-rachim/renox/blob/main/CHEATSHEET.md
-- Local copy: in the `renox` checkout Cargo downloaded (`~/.cargo/git/checkouts/renox-*/*/`),
-  next to `llms.txt`, which lists complete example apps such as `examples/crud`.
+- **Cheat-sheet**, one short compiled example per task (routes, views, forms and validation,
+  models and queries, auth, HTMX, jobs, mail, notifications, uploads, config, tests):
+  {{renox_docs}}/CHEATSHEET.md
+- **llms.txt**, a map from every topic to a guide or an example file: {{renox_docs}}/llms.txt
+- **Whole apps:** `examples/shop` shows how everything fits (catalog, cart, checkout in a
+  transaction, queued mail, admin); `examples/htmx-recipes` for interactive pages;
+  `examples/relations` for related tables. Every example has a README.
+- **Guides:** `docs/relations.md` (relations are explicit: load a page's relations with
+  `relations::belongs_to` / `has_many` / `Pivot`, one query each, never one per row),
+  `docs/types.md` (form field → Rust type → column), `docs/postgresql.md`,
+  `docs/operations.md` (production).
+- Offline, the same files are in {{renox_source}}.
 
-Prefer the generators over writing boilerplate by hand:
+## Generators
+
+Prefer them over writing boilerplate by hand:
 
 ```bash
 rnx make:module products                               # src/app/products + view + registration
 rnx make:model Product --module products --migration   # model + migrations/*.sql
 rnx make:policy Product --module products
-rnx make:job SendReceipt --module products
-rnx make:command products:import --module products
+rnx make:job SendReceipt --module products             # registered in the module's register()
+rnx make:command products:import --module products     # then: rnx products:import FILE
 rnx make:mail order_shipped
 rnx make:migration add_stock_to_products
 ```
@@ -32,14 +41,26 @@ rnx make:migration add_stock_to_products
 - `resources/views/`: MiniJinja templates (`layouts/app.html` is the layout).
   `resources/lang/*.json`: translations. `public/`: static files.
 - `migrations/`: `TIMESTAMP_name.up.sql` / `.down.sql`, written for the database in
-  `DATABASE_URL` (`.env`).
-- `tests/`: integration tests with `renox::testing::TestApp`.
+  `DATABASE_URL` (`.env`). Never edit a migration that has run; add a new one.
+- `tests/`: integration tests; `tests/home.rs` is the pattern.
+
+## Things that trip agents up
+
+- Route parameters are `{id}` (axum 0.8), not `:id`: `.get("/products/{id}", show)`.
+- `.require_auth()` guards only the routes added before it in that `Routes`.
+- A handler that won't compile as a route ("the trait `Handler` is not implemented", or
+  "`Send` is not general enough"): don't keep a closure or iterator that borrows a local across
+  an `.await`; collect into a `Vec` first.
+- Money is `i64` in the smallest unit (rupiah, cents), never `f64`.
+- Tests: `#[renox::test] async fn …() { let app = TestApp::new({{crate_name}}::app()).await; … }`,
+  with `app.acting_as(&user)`, `app.htmx()`, `assert_see`, `assert_invalid("field")`.
 
 ## Checks before you finish
 
 ```bash
+cargo fmt
+cargo clippy --all-targets -- -D warnings
 cargo test            # boots the app on a fresh test database
-cargo clippy --all-targets
 rnx route:list        # confirm routes and their names
 ```
 

@@ -58,8 +58,8 @@ my-app/
 - [x] HTMX helpers: `Htmx` extractor, `view().fragment()`, `HxRedirect`, `HxRefresh`, `HxTrigger`, `Back`
 - [x] htmx 2.0.11 and Alpine.js 3.17.4 embedded with cache-forever URLs; `public/` served at the root
 - [x] CLI: `rnx new`, `rnx serve` (rebuild and restart on change), `rnx key:generate`
-- [ ] Route groups with a shared prefix and name prefix
-- [ ] CSRF token in multipart forms (moves to M6 with uploads; the header works today)
+- [x] Route groups with a shared prefix and name prefix (M14a, `Routes::group`)
+- [x] CSRF token in multipart forms (M6b)
 
 ### M2 · v0.3: Database
 - [x] SQLite pool from `DATABASE_URL` with WAL, foreign keys, a busy timeout; `State(db): State<Db>` in handlers
@@ -73,7 +73,7 @@ my-app/
 - [x] Transactions via `db.begin()`, seeders (`App::seeder`, `db:seed`), factories (`Factory`, `fake`)
 - [ ] Server-side sessions (deferred: cookie sessions cover M3 and M4). Revocation on logout
       comes first, as a session version (M13a, W2); a server-side store only if sessions outgrow 4 KB
-- [ ] Pagination links that keep other query parameters
+- [x] Pagination links that keep other query parameters (M10b)
 
 ### M3 · v0.4: Forms and validation
 - [x] `Valid<T>` extractor for forms, JSON bodies and GET query strings
@@ -87,7 +87,7 @@ my-app/
 - [x] Messages in English and Indonesian (`APP_LOCALE=en|id`); `error('field')` in templates
 - [x] Handlers can return their own `ValidationError` / `Errors`
 - [ ] `#[derive(Validate)]` with attribute rules, for forms that only need the basics
-- [ ] More rules: `regex`, dates, `digits`, file uploads (with M6)
+- [x] More rules: `regex`, dates, `digits` (M15b), file uploads (M6b)
 
 ### M4 · v0.5: Authentication and authorization
 M4a (done):
@@ -160,8 +160,7 @@ M6b (done):
       S3/R2/MinIO behind the `s3` cargo feature (object_store)
 - [x] CSRF `_token` read from multipart forms; `UPLOAD_MAX_SIZE` body limit (413 above it)
 - [x] `storage_url(key)` in templates; the guestbook takes an optional photo
-- [ ] Several files in one field (`Vec<Upload>`): forms now use serde_html_form (M12), which reads
-      sequences; needs a test and per-file rules
+- [x] Several files in one field (`Vec<Upload>`), with per-file rules (M15b)
 
 M6c (done):
 - [x] `resources/lang/{locale}.json` (`LANG_PATH`), nested or flat; reloaded on change in debug;
@@ -263,7 +262,7 @@ outdated APIs. Split in PRs: M10a (cheat-sheet, llms.txt, agent files in new app
 `examples/crud`), M10b (the framework gaps the examples exposed, below), M10c (the other
 examples, and the gaps they exposed) and M10d (doctests on public APIs).
 
-- [ ] Small, focused examples, one pattern each, every one compiled and tested in CI (an untested
+- [x] Small, focused examples, one pattern each, every one compiled and tested in CI (an untested
       example goes stale, and a stale example is worse than none):
   - [x] `examples/hello`: routes, views, forms, validation, uploads (exists)
   - [x] `examples/crud`: model, migration, pagination, soft deletes and a trash, policy, flash (M10a)
@@ -650,7 +649,8 @@ Notes from M17b:
   `DATABASE_URL`. sqlx's `Any` driver was not chosen as the plan because
   it supports fewer types (e.g. chrono timestamps) than the typed pools.
 - **Named routes:** implemented in Renox; axum does not provide them.
-- **Queue:** Renox's own SQLite queue (tables `jobs` and `failed_jobs`), so no Redis is required.
+- **Queue:** Renox's own queue in the app's database (tables `jobs` and `failed_jobs`, SQLite or
+  PostgreSQL with `FOR UPDATE SKIP LOCKED`), so no Redis is required.
   apalis was the plan, but its stable SQL backend needs sqlx 0.8 (which can't link next to our 0.9)
   and the 0.9 backend is still a release candidate; a small queue on our own pool also keeps
   dispatch, retries and the `queue:*` commands Laravel-like.
@@ -658,7 +658,23 @@ Notes from M17b:
   several instances share the database: each scheduled run is claimed in the `cache` table first,
   so only one instance runs it (since M9b), and queue workers are safe to run anywhere.
 - **Relations:** Rust has no runtime reflection, so there is no full Eloquent. `derive(Model)` covers
-  CRUD; relations are explicit methods; complex queries use `renox::db::sql()` (portable) or sqlx
-  directly through `db.sqlite()` / `db.postgres()` (e.g. for `query!`).
+  CRUD; relations are explicit methods for one row and loaders for a page of rows
+  (`relations::belongs_to`, `has_many`, `Pivot`, one query each, M15a); joins and reports use
+  `renox::db::sql(…).fetch_as` (portable) or sqlx directly through `db.sqlite()` / `db.postgres()`.
 - **Service container:** replaced by typed `AppState` and extractors.
-- **No REPL:** `rnx db:shell`, and app commands (planned in M14, A9) instead of Tinker.
+- **No REPL:** `rnx db:shell`, and app commands (`App::command`, M14a) instead of Tinker.
+
+## Not planned
+
+Kept out on purpose, so the framework stays small; some are good candidates for separate crates:
+
+- Eloquent-style relations resolved at run time (`$post->comments`): Rust has no reflection, and
+  hidden queries are where N+1 problems come from. Use the explicit loaders instead.
+- A schema builder for migrations: migrations are plain SQL, one file per database when they
+  differ.
+- Redis (queue, cache, sessions): the app's database covers them; `CACHE_STORE=database` for
+  several servers.
+- WebSockets and broadcasting.
+- OAuth/social login and two-factor authentication (plugin candidates).
+- A JavaScript build pipeline (Vite, Tailwind CLI): htmx and Alpine are bundled; bring your own
+  tooling if you need it.

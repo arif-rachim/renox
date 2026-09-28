@@ -39,6 +39,16 @@ fi
 cd shop
 grep '^renox' Cargo.toml
 
+step "no template placeholder left in the new app"
+if grep -rnE '\{\{[a-z_]+\}\}' . --exclude-dir=target; then
+    echo "FAIL: placeholders left above"
+    exit 1
+fi
+if [ -n "${FROM_GIT:-}" ]; then
+    rev=$(sed -n 's/.*rev = "\([0-9a-f]*\)".*/\1/p' Cargo.toml)
+    grep -q "renox/blob/$rev/CHEATSHEET.md" AGENTS.md # docs of the pinned commit
+fi
+
 step "every generator"
 "$RNX" make:module catalog
 "$RNX" make:model Product --module catalog --migration

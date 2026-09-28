@@ -8,22 +8,34 @@ date. For whole apps, see [`examples/`](examples) (the list is in [llms.txt](llm
 
 ```bash
 rnx new shop                         # or: rnx new shop --database postgres
+rnx key:generate                     # APP_KEY into .env (made from .env.example if missing)
 rnx serve                            # run, rebuild and reload on changes
 rnx make:module products             # routes + view, registered in src/lib.rs
 rnx make:model Product --module products --migration
+rnx make:migration add_sku_to_products
 rnx make:policy Product --module products
 rnx make:job SendReceipt --module products
 rnx make:command products:import --module products  # then `rnx products:import file.csv`
 rnx make:mail order_shipped
-rnx migrate                          # migrate:rollback, migrate:fresh --seed, db:seed
-rnx route:list                       # db:shell, queue:work, schedule:list, down, up
+rnx migrate                          # migrate:status, migrate:fresh --seed, db:seed
+rnx migrate:rollback --step 2        # the last 2 batches (default 1)
+rnx route:list                       # db:shell, schedule:list
+rnx queue:work --queue mail --workers 2  # --once: run what is queued, then stop
+rnx queue:failed                     # queue:retry <id|all>, queue:flush (deletes them)
+rnx schedule:work                    # tasks in their own process (SCHEDULER=false for serve)
+rnx webhook:failed                   # webhook:retry <id>
+rnx down --secret s3cret --retry 60  # 503 for everyone but visitors of /s3cret; `rnx up` ends it
 rnx build                            # one release binary in dist/; rnx make:deploy
 ```
+
+`serve` already runs the queue workers and the scheduler. `queue:work` and `schedule:work` are for
+running them in separate processes.
 
 ## App, module, routes
 
 ```rust
 use renox::prelude::*;
+use std::time::Duration;
 
 pub fn app() -> App {
     App::new()
@@ -41,15 +53,25 @@ impl Module for Products {
     }
 
     fn routes(&self) -> Routes {
-        let public = Routes::new().get("/products", index).name("products.index");
+        let public = Routes::new()
+            .get("/products", index).name("products.index")
+            .get("/products/{id}", show).name("products.show"); // axum 0.8: {id}, not :id; wildcard {*rest}
         let members = Routes::new()
             .post("/products", store)
             .name("products.store")
             .require_auth(); // covers the routes added before it
-        public.merge(members).group(
-            "/admin",   // path prefix
+        let checkout = Routes::new()
+            .post("/checkout", store).name("checkout")
+            .require_verified()                     // logged in, with a verified email
+            .throttle(10, Duration::from_secs(60)); // 10 a minute per user or IP, then 429
+        let guests = Routes::new()
+            .get("/welcome", index).name("welcome")
+            .guest_only(); // logged-in users go to the `home` route
+        public.merge(members).merge(checkout).merge(guests).group(
+            "/admin",   // path prefix: starts with `/`, never ends with one
             "admin.",   // name prefix
             Routes::new()
+                .get("/", index).name("dashboard")        // GET /admin, `admin.dashboard`
                 .get("/products", index).name("products") // GET /admin/products, `admin.products`
                 .require_auth(),                          // only the group's routes
         )
@@ -63,6 +85,11 @@ impl Module for Products {
 
 async fn index() -> View {
     view("products/index.html", context! { title => "Products" })
+}
+
+async fn show(Path(id): Path<i64>) -> Result<View> {
+    abort_if(id > 1_000_000, StatusCode::NOT_FOUND, "No such product.")?; // a status with a message
+    Ok(view("products/show.html", context! { id }))
 }
 
 async fn store() -> Redirect {
@@ -88,6 +115,11 @@ async fn download(order_paid: bool) -> Result<&'static str> {
 `src/main.rs` is only `fn main() -> renox::Result { shop::app().run() }`. The app lives in the
 library, so tests can boot it.
 
+When a handler won't compile as a route ("the trait `Handler<_, _>` is not implemented", or
+"`Send` is not general enough"), look for a closure or an iterator that borrows local variables
+and is still alive across an `.await`. Collect into a `Vec` first, then await. Also,
+`.require_auth()` covers only the routes added before it: a route added after it is public.
+
 ## Views (MiniJinja)
 
 ```html
@@ -108,6 +140,17 @@ library, so tests can boot it.
 With `APP_DEBUG` on, printing a variable that doesn't exist (`{{ prodcut.name }}`) is an error
 page showing the request, the error and the template line; `{% if x %}` on a missing one is fine,
 and so is `{{ flash.anything }}`.
+
+Every view also gets: `request.path`, `request.query`, `request.htmx`, `app.name`, `app.env`,
+`app.debug`, `app.url`, `app.locale`, `auth.check`, `auth.user`, `flash`, `errors`, `csrf_token`,
+and the functions `old()`, `error()`, `csrf_field()`, `method_field()`, `route()`, `asset()`,
+`storage_url()`, `t()`, `can()`, `page_url(n)`, `renox_head()`, `csp_nonce()` and `seo()`.
+
+Renox's own pages are templates you can replace: create the same file under `resources/views/`,
+e.g. `renox/error.html` (or `errors/404.html` for one status), `renox/auth/login.html` (also
+`register`, `forgot-password`, `reset-password`, `verify-email`, `layout`),
+`renox/mail/layout.html` and `renox/pagination.html`. The `pagination` macro must be imported:
+`{% from "renox/pagination.html" import pagination %}`.
 
 ```rust
 use renox::prelude::*;
@@ -212,6 +255,30 @@ async fn store(session: Session, Valid(form): Valid<ProductForm>) -> Result<Redi
   <p class="error" data-error-for="name">{{ error('name') }}</p>
   <button>Save</button>
 </form>
+```
+
+The same form for create and edit, with the row's id in a hidden input:
+
+```rust
+use renox::prelude::*;
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+struct ProductForm {
+    #[serde(default)]
+    id: i64, // <input type="hidden" name="id" value="{{ product.id }}">; 0 when creating
+    sku: String,
+    category_id: i64,
+}
+
+impl Validate for ProductForm {
+    fn rules(&self, v: &mut Validator) {
+        v.field("sku", &self.sku).required().unique("products", "sku").ignore(self.id); // skip this row
+        v.field("category_id", &self.category_id).exists("categories", "id").message("Pick a category.");
+        // Also: label("SKU code"), url(), between(1, 10), confirmed(&self.password_confirmation),
+        // accepted() for a checkbox, rule(self.qty % 6 == 0, "Sold by the half dozen.").
+    }
+}
 ```
 
 ## Model, migration, queries
@@ -330,6 +397,38 @@ async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
 }
 ```
 
+## Seeders and factories
+
+```rust
+use renox::fake::{Fake, faker::lorem::en::Word};
+use renox::prelude::*;
+
+#[derive(Model, serde::Serialize, Default)]
+#[model(table = "products")]
+struct Product { id: i64, name: String, price: i64 }
+
+impl Factory for Product {
+    fn definition() -> Self {
+        Product { name: Word().fake(), price: (5_000..50_000).fake(), ..Default::default() }
+    }
+}
+
+fn seeders(app: App) -> App {
+    // `rnx db:seed`, or `rnx migrate:fresh --seed`
+    app.seeder(|db| async move {
+        Product::create_many(&db, 50).await?; // in one transaction
+        Ok(())
+    })
+}
+
+async fn in_a_test(db: &Db) -> Result {
+    let draft = Product::make();                // not saved
+    let saved = Product::create_one(db).await?; // saved
+    let _ = (draft, saved);
+    Ok(())
+}
+```
+
 ```html
 <section id="products">
   {% for p in products.items %}<p>{{ p.name }}</p>{% endfor %}
@@ -412,6 +511,51 @@ async fn index(State(db): State<Db>, user: Option<AuthUser>) -> Result<View> {
 }
 ```
 
+```rust
+use renox::prelude::*;
+
+fn back_office() -> Auth {
+    Auth::new()
+        .verify_email()            // mails a link; guard routes with .require_verified()
+        .without_registration()    // no /register: an admin adds users
+        .redirect_to("/dashboard") // after login, when no page asked for one
+}
+
+#[derive(serde::Deserialize)]
+struct Login { email: String, password: String }
+
+// Your own login (Auth's /login already does this, with a lockout).
+async fn sign_in(State(state): State<AppState>, session: Session, Form(f): Form<Login>) -> Result<Redirect> {
+    let Some(user) = User::attempt(&state.db, &f.email, &f.password).await? else {
+        return Err(abort(StatusCode::UNAUTHORIZED, "Wrong email or password."));
+    };
+    renox::auth::login(&session, &user, None)?; // Some(state.config.remember_lifetime): "remember me"
+    Ok(Redirect::to("/dashboard"))
+}
+
+async fn sign_out(State(db): State<Db>, session: Session) -> Result<Redirect> {
+    renox::auth::logout(&db, &session).await?; // ends every session of the user
+    Ok(Redirect::to("/"))
+}
+
+async fn security(State(db): State<Db>, user: AuthUser) -> Result<View> {
+    let mut me = user.user().clone();
+    me.set_password(&db, "a new password").await?; // other sessions end
+    me.revoke_sessions(&db).await?;                 // "log out everywhere"
+    let admin = user.allows("admin");               // a gate as a bool; allows_async for gate_async
+    let billing = user.allows_async("billing").await?;
+    Ok(view("account/security.html", context! { admin, billing }))
+}
+
+// The database channel's inbox.
+async fn inbox(State(db): State<Db>, user: AuthUser) -> Result<View> {
+    let notifications = user.notifications(&db, 20).await?; // newest first; .data, .read_at
+    let unread = user.unread_notification_count(&db).await?;
+    user.mark_all_notifications_read(&db).await?; // or mark_notification_read(&db, id)
+    Ok(view("inbox.html", context! { notifications, unread }))
+}
+```
+
 ## HTMX
 
 ```rust
@@ -433,6 +577,13 @@ async fn after_delete() -> HxRedirect {
 
 async fn after_save(htmx: Htmx) -> Response {
     htmx.redirect("/todos") // HX-Redirect for htmx posts, 303 for plain forms
+}
+
+async fn after_import(htmx: Htmx) -> Response {
+    if htmx.wants_fragment() { // htmx, but not hx-boost
+        return HxRefresh.into_response(); // the browser reloads the page
+    }
+    Redirect::to("/todos").into_response()
 }
 ```
 
@@ -477,6 +628,7 @@ Migrations run in a transaction each. A migration with `CREATE INDEX CONCURRENTL
 ```rust
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 #[derive(Serialize, Deserialize)]
 struct SendReceipt {
@@ -485,6 +637,9 @@ struct SendReceipt {
 
 impl Job for SendReceipt {
     const NAME: &'static str = "send-receipt";
+    const QUEUE: &'static str = "mail";                // default "default"; queue:work --queue mail
+    const MAX_ATTEMPTS: u32 = 5;                       // default 3
+    const TIMEOUT: Duration = Duration::from_secs(30); // per attempt; default 60 s
 
     async fn handle(self, ctx: JobContext) -> Result {
         let mail = ctx.state.mail_view(
@@ -511,7 +666,9 @@ fn background(app: App) -> App {
             Ok(())
         })
         .schedule(|s| {
-            s.daily_at("02:00", "cleanup", |state| async move {
+            // Also every_minute(name, task), hourly(name, task), every(Duration, name, task).
+            s.every_minutes(5, "sync-stock", |_state| async move { Ok(()) }); // :00, :05, … on the clock
+            s.daily_at("02:00", "cleanup", |state| async move { // in APP_TIMEZONE
                 renox::db::sql("DELETE FROM carts WHERE updated_at < ?")
                     .bind(renox::db::now() - renox::chrono::TimeDelta::days(30))
                     .execute(&state.db)
@@ -523,6 +680,7 @@ fn background(app: App) -> App {
 
 async fn place_order(State(state): State<AppState>) -> Result<Redirect> {
     state.emit(OrderPlaced { order_id: 1 }).await?; // listeners run, the job is queued
+    state.queue.dispatch_after(SendReceipt { order_id: 1 }, Duration::from_secs(3600)).await?; // in an hour
     Ok(Redirect::to("/orders"))
 }
 
@@ -638,8 +796,14 @@ async fn misc(State(state): State<AppState>, session: Session, lang: Lang) -> Re
         .await?;
     session.put("cart", vec![1, 2, 3])?;
     let cart: Option<Vec<i64>> = session.get("cart");
+    // Also: pull (read and remove), remove, regenerate_token(), set_lifetime(minutes).
     let _ = cart;
-    Ok(lang.t("shop.count", &[("count", &count)])) // resources/lang/<locale>.json
+    Ok(lang.choice("cart.count", count, &[])) // "12 items"; lang.t("cart.hello", &[("name", &"Arif")])
+}
+
+async fn switch_language(session: Session, back: Back) -> Result<Back> {
+    renox::i18n::set_locale(&session, "id")?; // this visitor's language from the next request on
+    Ok(back)
 }
 
 #[derive(serde::Deserialize)]
@@ -656,6 +820,39 @@ impl Validate for PhotoForm {
 async fn upload(State(state): State<AppState>, Valid(form): Valid<PhotoForm>) -> Result<String> {
     let key = form.photo.store_public(&state.storage, "photos").await?;
     Ok(state.storage.url(&key)) // {{ storage_url(key) }} in templates
+}
+```
+
+Translations live in `resources/lang/<locale>.json`, nested or flat. `one|many` texts are plurals:
+
+```json
+{ "cart": { "count": "One item|:count items", "hello": "Hello, :name" } }
+```
+
+```html
+<p>{{ t('cart.count', count=cart_count) }} · {{ t('cart.hello', name=auth.user.name) }}</p>
+```
+
+## Signed URLs and private files
+
+```rust
+use renox::prelude::*;
+use renox::signed::ValidSignature;
+use std::time::Duration;
+
+// Routes::new().get("/invoices/{id}", show_invoice).name("invoices.show")
+async fn share(State(state): State<AppState>, Path(id): Path<i64>) -> Result<String> {
+    state.signed_url("invoices.show", &[&id], Duration::from_secs(3600)) // absolute; an hour
+}
+
+async fn show_invoice(_: ValidSignature, Path(id): Path<i64>) -> String {
+    format!("Invoice {id}") // an altered or expired link gets 403
+}
+
+async fn private_file(State(state): State<AppState>) -> Result<Redirect> {
+    // A key outside `public/`, as a link that works for 10 minutes (presigned on S3).
+    let url = state.storage.temporary_url(&state, "invoices/1.pdf", Duration::from_secs(600)).await?;
+    Ok(Redirect::to(&url))
 }
 ```
 
@@ -779,14 +976,47 @@ async fn members_only() {
 }
 ```
 
-Also available: `post_multipart(uri, &[("title", "x")], &[("photo", "a.png", &bytes)])`,
-`post_body` (exact bytes, e.g. signed webhooks), `assert_redirect`, `assert_forbidden`, `assert_not_found`, `assert_dont_see`,
-`assert_database_missing` / `assert_database_count`, `post_json`, `queued_jobs()`, `run_jobs()`,
-`sent_mail()` / `assert_mail_sent`.
+```rust
+use renox::prelude::*;
+use renox::testing::TestApp;
+
+fn app() -> App {
+    App::new()
+}
+
+#[renox::test]
+async fn with_settings() {
+    let app = TestApp::with_config(app(), |c| {
+        c.vars.insert("MIDTRANS_SERVER_KEY".into(), "test-key".into()); // what state.config.var reads
+        c.locale = "id".into();
+    })
+    .await;
+    let state = app.state(); // the AppState handlers get
+    let _ = state.config.var("MIDTRANS_SERVER_KEY");
+    let res = app.request().header("x-api-version", "2").json().get("/health").await;
+    let body: renox::serde_json::Value = res.json(); // also res.text(), res.header("…")
+    let _ = body;
+}
+```
+
+Also available: `put` / `patch` (form) and `delete`, `post_json`,
+`post_multipart(uri, &[("title", "x")], &[("photo", "a.png", &bytes)])`, `post_body` (exact
+bytes, e.g. signed webhooks), `request().without_csrf()`, `logout()`, `csrf_token()`,
+`app.kernel().call("products:import", ["file.csv"])` (an app command), `assert_redirect`,
+`assert_hx_redirect`, `assert_header(name, value)`, `assert_unauthorized`, `assert_forbidden`,
+`assert_not_found`, `assert_dont_see`, `assert_database_missing` / `assert_database_count`,
+`queued_jobs()`, `run_jobs()`, `sent_mail()` / `assert_mail_sent`.
 
 ## Configuration (`.env`)
 
-`APP_KEY` (`rnx key:generate`), `APP_DEBUG`, `APP_URL`, `APP_LOCALE`, `APP_TIMEZONE` (`+07:00`),
+`APP_ENV` (`local` | `production` | `testing`; also `dev`/`development`, `prod`, `test`; any other
+value, such as `staging`, stops the app at boot), `APP_KEY` (`rnx key:generate`; required in
+production), `APP_DEBUG` (on by default in `local`), `APP_NAME`, `APP_URL`, `APP_HOST` (an IP
+address, `127.0.0.1`; `0.0.0.0` in a container) and `APP_PORT` (3000), `APP_LOCALE`,
+`APP_FALLBACK_LOCALE`, `APP_TIMEZONE` (`+07:00`),
+`SESSION_LIFETIME` (minutes, 120), `REMEMBER_LIFETIME` (minutes, 43200 = 30 days),
+`SESSION_COOKIE` (`renox_session`), `MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME` (defaults to `APP_NAME`),
+`VIEWS_PATH` (`resources/views`), `PUBLIC_PATH` (`public`), `LANG_PATH` (`resources/lang`),
 `DATABASE_URL` (`sqlite://storage/app.db` or `postgres://…` with the `postgres` feature),
 `TEST_DATABASE_URL`, `MAIL_MAILER` (`log` | `smtp`), `QUEUE_WORKERS`, `SCHEDULER`,
 `CACHE_STORE` (`memory` | `database`: with several servers, also shares rate limits and the login lock), `STORAGE_DISK` (`local` | `s3`), `UPLOAD_MAX_SIZE` (MB),
@@ -794,3 +1024,19 @@ Also available: `post_multipart(uri, &[("title", "x")], &[("photo", "a.png", &by
 proxy, rate limits, the login lock, logs and the `ClientIp` extractor use `X-Forwarded-For`).
 Timeouts in seconds: `DATABASE_ACQUIRE_TIMEOUT` (5), `DATABASE_STATEMENT_TIMEOUT` (30,
 PostgreSQL; 0 = none), `REQUEST_TIMEOUT` (60; 0 = none), `MAIL_TIMEOUT` (10).
+
+Your own settings are plain `.env` lines, read with `config.var`. In tests, set them with
+`TestApp::with_config(app, |c| { c.vars.insert(…); })` (see Tests).
+
+```rust
+use renox::prelude::*;
+
+async fn pay(State(state): State<AppState>) -> Result<String> {
+    let key = state
+        .config
+        .var("MIDTRANS_KEY") // None when missing or empty
+        .ok_or_else(|| abort(StatusCode::SERVICE_UNAVAILABLE, "Payments are not set up."))?;
+    let live = state.config.env == Environment::Production; // also state.config.name, .url, .debug
+    Ok(format!("key of {} characters, live: {live}", key.len()))
+}
+```

@@ -1,7 +1,7 @@
 //! # Renox
 //!
 //! A batteries-included web framework for Rust, inspired by Laravel.
-//! Axum + HTMX + Alpine.js + SQLite.
+//! Axum + HTMX + Alpine.js + SQLite or PostgreSQL.
 //!
 //! ```no_run
 //! use renox::prelude::*;
