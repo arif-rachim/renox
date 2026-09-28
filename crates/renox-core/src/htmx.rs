@@ -131,6 +131,68 @@ impl IntoResponseParts for HxTrigger {
     }
 }
 
+/// Makes HTMX swap the response into another element than the request's
+/// `hx-target` (`HX-Retarget`), e.g. a form's errors into a summary box.
+pub struct HxRetarget(pub String);
+
+/// How HTMX swaps the response (`HX-Reswap`: `innerHTML`, `outerHTML`,
+/// `beforeend`, `none`…), overriding the request's `hx-swap`.
+pub struct HxReswap(pub String);
+
+/// Puts a URL in the browser's address bar and history (`HX-Push-Url`), e.g.
+/// the filters of a list; `HxPushUrl("false")` keeps it as it is.
+pub struct HxPushUrl(pub String);
+
+macro_rules! hx_header {
+    ($type:ty, $header:literal) => {
+        impl IntoResponseParts for $type {
+            type Error = Infallible;
+
+            fn into_response_parts(
+                self,
+                mut res: ResponseParts,
+            ) -> Result<ResponseParts, Infallible> {
+                set(&mut res, $header, &self.0);
+                Ok(res)
+            }
+        }
+    };
+}
+
+hx_header!(HxRetarget, "hx-retarget");
+hx_header!(HxReswap, "hx-reswap");
+hx_header!(HxPushUrl, "hx-push-url");
+
+/// Adds the event `name` with `detail` to the response's `HX-Trigger`,
+/// keeping the events already there.
+pub(crate) fn add_trigger<B>(
+    res: &mut axum::http::Response<B>,
+    name: &str,
+    detail: serde_json::Value,
+) {
+    use serde_json::{Map, Value};
+    let mut triggers = match res
+        .headers()
+        .get("hx-trigger")
+        .and_then(|v| v.to_str().ok())
+    {
+        Some(existing) if existing.trim_start().starts_with('{') => {
+            serde_json::from_str::<Map<String, Value>>(existing).unwrap_or_default()
+        }
+        Some(existing) => existing
+            .split(',')
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+            .map(|name| (name.to_owned(), Value::Null))
+            .collect(),
+        None => Map::new(),
+    };
+    triggers.insert(name.to_owned(), detail);
+    if let Ok(value) = axum::http::HeaderValue::from_str(&Value::Object(triggers).to_string()) {
+        res.headers_mut().insert("hx-trigger", value);
+    }
+}
+
 /// Redirects to the previous page (the `Referer`), or `/` when it's unknown
 /// or on another site (so a link from elsewhere can't use it as an open
 /// redirect).

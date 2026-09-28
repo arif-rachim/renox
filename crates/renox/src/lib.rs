@@ -73,6 +73,11 @@ pub struct AuthorizationGuide;
 #[doc = include_str!("../../../docs/queue.md")]
 pub struct QueueGuide;
 
+/// Compiles the Rust in docs/ui.md as a doctest.
+#[cfg(doctest)]
+#[doc = include_str!("../../../docs/ui.md")]
+pub struct UiGuide;
+
 /// Compiles every Rust example in the README as a doctest, so the front page
 /// can't drift from the API.
 #[cfg(doctest)]

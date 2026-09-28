@@ -1,35 +1,48 @@
 {% extends "layouts/app.html" %}
+{% from "renox/ui.html" import table, link_button, confirm, badge, empty %}
 
 {% block content %}
-<h1>Products</h1>
-<p class="count">{{ total }} product{{ "" if total == 1 else "s" }} in the shop.</p>
-{% if auth.check %}<p><a href="{{ route('products.create') }}">New product</a></p>{% endif %}
-
-<section id="products">
-  <table>
-    <tr><th>Name</th><th>Slug</th><th>Price</th><th></th></tr>
-    {% for product in products.items %}
-    <tr>
-      <td>{{ product.name }}</td>
-      <td><code>{{ product.slug }}</code></td>
-      <td>{{ product.price }}</td>
-      <td>
-        {% if can('update', product) %}<a href="{{ route('products.edit', product.id) }}">Edit</a>{% endif %}
-        {% if can('delete', product) %}
-        <form method="post" action="{{ route('products.destroy', product.id) }}">
-          {{ csrf_field() }}{{ method_field('DELETE') }}<button>Delete</button>
-        </form>
-        {% endif %}
-      </td>
-    </tr>
-    {% else %}
-    <tr><td colspan="4">No products yet.</td></tr>
-    {% endfor %}
-  </table>
-  {# Page links load the next page with HTMX and swap in just this section. #}
-  <div hx-boost="true" hx-target="#products" hx-select="#products" hx-swap="outerHTML">
-    {% from "renox/pagination.html" import pagination %}
-    {{ pagination(products) }}
+<div class="rx-stack">
+  <div class="rx-row">
+    <div>
+      <h1 class="rx-title">Products</h1>
+      <p class="rx-subtitle count">{{ total }} product{{ "" if total == 1 else "s" }} in the shop.</p>
+    </div>
+    <span class="rx-spacer"></span>
+    {% if auth.check %}{{ link_button(route('products.create'), "New product", variant="primary") }}{% endif %}
   </div>
-</section>
+
+  <section id="products" class="rx-stack">
+    {% if products.items %}
+    {% call table(["Name", ["Slug", "hide-narrow"], ["Price", "num"], ["", "num"]], caption="Products") %}
+      {% for product in products.items %}
+      <tr>
+        <td><strong>{{ product.name }}</strong></td>
+        <td class="rx-hide-narrow">{{ badge(product.slug) }}</td>
+        <td class="rx-num">Rp {{ product.price | number }}</td>
+        <td class="rx-num">
+          <div class="rx-row rx-row--end">
+            {% if can('update', product) %}{{ link_button(route('products.edit', product.id), "Edit", variant="plain", size="small") }}{% endif %}
+            {% if can('delete', product) %}
+              {{ confirm("delete-" ~ product.id, "Delete", route('products.destroy', product.id),
+                         "Delete “" ~ product.name ~ "”?",
+                         "It goes to the trash; you can restore it from there.",
+                         confirm_label="Move to trash", size="small") }}
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    {% endcall %}
+    {% else %}
+      {{ empty("No products yet", "Products you add show up here, with their price.",
+               route('products.create') if auth.check else none, "Add the first product") }}
+    {% endif %}
+    {# Page links load the next page with HTMX and swap in just this section. #}
+    <div hx-boost="true" hx-target="#products" hx-select="#products" hx-swap="outerHTML">
+      {% from "renox/pagination.html" import pagination %}
+      {{ pagination(products) }}
+    </div>
+  </section>
+</div>
 {% endblock %}

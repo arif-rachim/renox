@@ -209,7 +209,43 @@ impl Translator {
         self.texts(fallback)
             .get(key)
             .cloned()
+            .or_else(|| {
+                builtin(locale)
+                    .or_else(|| builtin(fallback))?
+                    .get(key)
+                    .map(|t| (*t).to_owned())
+            })
             .unwrap_or_else(|| key.to_owned())
+    }
+}
+
+/// Texts Renox's own templates use (the UI kit), for English and Indonesian;
+/// an app's `lang/*.json` can change them.
+fn builtin(locale: &str) -> Option<&'static HashMap<&'static str, &'static str>> {
+    static EN: std::sync::LazyLock<HashMap<&str, &str>> = std::sync::LazyLock::new(|| {
+        HashMap::from([
+            ("ui.optional", "optional"),
+            ("ui.cancel", "Cancel"),
+            ("ui.close", "Close"),
+            ("ui.dismiss", "Dismiss"),
+            ("ui.more", "More"),
+            ("ui.errors_title", "Please check the highlighted fields."),
+        ])
+    });
+    static ID: std::sync::LazyLock<HashMap<&str, &str>> = std::sync::LazyLock::new(|| {
+        HashMap::from([
+            ("ui.optional", "opsional"),
+            ("ui.cancel", "Batal"),
+            ("ui.close", "Tutup"),
+            ("ui.dismiss", "Tutup"),
+            ("ui.more", "Lainnya"),
+            ("ui.errors_title", "Periksa kembali isian yang ditandai."),
+        ])
+    });
+    match locale {
+        "en" => Some(&EN),
+        "id" => Some(&ID),
+        _ => None,
     }
 }
 

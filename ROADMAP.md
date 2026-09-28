@@ -792,12 +792,13 @@ Notes from M20c (dashboard, mail, HTTP, storage):
 - M20 is complete. M21 (views and developer experience) is next.
 
 ### M21 · v0.22: Views and developer experience
-- [ ] Components that see the request (`old`, `error`, `t`, `csrf_field`, `can`, `auth` inside
+- [x] Components that see the request (`old`, `error`, `t`, `csrf_field`, `can`, `auth` inside
       imported macros), a `renox/ui/*` kit (input, select, button, modal, dropdown, table, card,
       alert, tabs) and `make:component`
-- [ ] Flash as toasts over htmx; `push`/`stack`/`once`; error pages rendered in the app layout;
-      several fragments and out-of-band swaps; `HxRetarget`/`HxReswap`/`HxPushUrl`
-- [ ] Live validation over htmx (validate one field without running the handler)
+- [x] Toasts over htmx; `once`; several fragments and out-of-band swaps;
+      `HxRetarget`/`HxReswap`/`HxPushUrl`
+- [ ] `push`/`stack`; error pages rendered in the app layout (M21d)
+- [x] Live validation over htmx (validate one field without running the handler)
 - [ ] Tailwind with its standalone CLI in `rnx serve` / `rnx build`, `rnx new --tailwind`
 - [ ] Resource scaffolding: `Routes::resource`, `rnx make:module --resource` (handlers, views,
       tests); `make:factory`, `make:seeder`, `make:test`, `make:notification`, `make:event`,
@@ -861,6 +862,28 @@ Notes from M21a (rough edges):
 - Seen twice and not reproduced since: the crud example's tests failed to boot during a full
   `cargo test --workspace` right after a large rebuild (23 s, `testing.rs:67` "the app
   boots"); the boot error wasn't captured. If it recurs, capture the panic message.
+
+Notes from M21b (views):
+- Components: the request's globals (`old`, `error`, `errors`, `t`, `can`, `auth`, `request`,
+  `flash`, `csrf_field`, `once`, `toasts`…) are also environment globals (`RequestGlobal`) that
+  forward to the page being rendered, kept in a thread-local while it renders (rendering is
+  synchronous). So an imported macro sees what the page sees; the page's own context still wins.
+- The kit (`renox/ui.html`, `/_renox/ui-<hash>.css|js` via `renox_ui()`) follows Apple's HIG,
+  with web adjustments for WCAG AA (accent #0071E3, a darker red and secondary label). Rules in
+  docs/ui.md. The classes are `rx-*` only; no bare element is styled.
+- Built-in texts `ui.*` (en, id) are the translator's last fallback, after the app's files.
+- Toasts: `Toast` is a response part; the view middleware sends it in `HX-Trigger`
+  (`renox:toast`) for htmx swaps, or keeps it in the session (`_toasts`) for the next page. An
+  htmx redirect keeps it too.
+- Live validation: `X-Renox-Validate: field` makes `Valid<T>` answer `{field, errors}` and stop,
+  the handler never runs; the kit's script checks on blur, then on input while invalid.
+- `ui:publish` (app command; `rnx make:component --ui`) copies the kit from renox-core, so the
+  CLI crate carries no copy of its own.
+- `push`/`stack` aren't done: a layout renders its head before a child's blocks run, so a
+  stack would need a two-pass render. Error pages in the app layout move to M21d.
+- Browser-checked on examples/crud (desktop, 390 px, dark), which caught a sheet inheriting a
+  table cell's alignment, red row buttons out-shouting the primary action, a menu too
+  transparent over a button, and a table 8–21 px too wide on phones (actions now stack).
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

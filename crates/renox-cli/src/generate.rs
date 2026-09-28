@@ -434,6 +434,29 @@ pub fn mail(root: &Path, name: &str) -> Result<()> {
     Ok(())
 }
 
+pub fn component(root: &Path, name: &str) -> Result<()> {
+    check_name(name)?;
+    let snake = name.to_snake_case();
+    let path = root.join(format!("resources/views/components/{snake}.html"));
+    let body = COMPONENT.replace("NAME", &snake);
+    write_new(&path, &body)?;
+    println!("Use it with: {{% from \"components/{snake}.html\" import {snake} %}}");
+    Ok(())
+}
+
+const COMPONENT: &str = r#"{#- {% from "components/NAME.html" import NAME %}{{ NAME("field", "Label") }}
+    A component sees the request like the page does: old(), error(), t(),
+    csrf_field(), can(), auth, request. -#}
+{% macro NAME(name, label) -%}
+<div class="rx-field">
+  <label class="rx-label" for="rx-{{ name }}">{{ label }}</label>
+  <input class="rx-input" id="rx-{{ name }}" name="{{ name }}" value="{{ old(name) }}"
+    {%- if error(name) %} aria-invalid="true"{% endif %} aria-describedby="rx-{{ name }}-error">
+  <p class="rx-error" id="rx-{{ name }}-error" data-error-for="{{ name }}" aria-live="polite">{{ error(name) }}</p>
+</div>
+{%- endmacro %}
+"#;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -561,5 +584,15 @@ mod tests {
             "{code}"
         );
         assert_eq!(code.matches("fn register").count(), 1);
+    }
+
+    #[test]
+    fn components_use_the_request_helpers() {
+        let dir = app();
+        component(dir.path(), "PriceTag").unwrap();
+        let body = read(&dir, "resources/views/components/price_tag.html");
+        assert!(body.contains("{% macro price_tag(name, label) -%}"));
+        assert!(body.contains("{{ old(name) }}") && body.contains("{{ error(name) }}"));
+        assert!(component(dir.path(), "PriceTag").is_err(), "no overwrite");
     }
 }

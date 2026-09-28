@@ -1,0 +1,273 @@
+{#- Renox UI: form fields, buttons, cards, alerts, sheets, menus, tabs and
+    tables, after Apple's Human Interface Guidelines. In the layout's <head>:
+    {{ renox_head() }}{{ renox_ui() }}, and {{ toasts() }} in the <body>.
+
+    {% from "renox/ui.html" import input, button, card %}
+    {% call card(title="New product") %}
+      <form method="post" action="/products" data-live-validate>
+        {{ csrf_field() }}
+        {{ input("name", "Name", required=true) }}
+        {{ button("Save") }}
+      </form>
+    {% endcall %}
+
+    Fields refill themselves after a failed submit (`old`), show their
+    error (`error`) and tie the hint and error to the input for screen
+    readers. Copy this file with `rnx make:component --ui` to change it. -#}
+
+{%- macro _id(name) -%}rx-{{ name | replace(".", "-") | replace("[", "-") | replace("]", "") }}{%- endmacro -%}
+
+{%- macro _attrs(attrs) -%}
+{%- for key, value in attrs | items %} {{ key }}{% if value is not true %}="{{ value }}"{% endif %}{% endfor -%}
+{%- endmacro -%}
+
+{%- macro _label(id, label, required) -%}
+<label class="rx-label" for="{{ id }}">{{ label }}{% if not required %} <span class="rx-required">({{ t('ui.optional') }})</span>{% endif %}</label>
+{%- endmacro -%}
+
+{%- macro _describe(id, hint, message) -%}
+{%- if hint %}<p class="rx-hint" id="{{ id }}-hint">{{ hint }}</p>{% endif %}
+<p class="rx-error" id="{{ id }}-error" data-error-for="{{ caller() }}" aria-live="polite">{{ message }}</p>
+{%- endmacro -%}
+
+{#- A text field: text, email, password, number, date, url, tel, search… -#}
+{% macro input(name, label, type="text", value=none, hint=none, required=false, autocomplete=none, placeholder=none, attrs={}) -%}
+{%- set id = _id(name) %}
+{%- set message = error(name) %}
+<div class="rx-field">
+  {{ _label(id, label, required) }}
+  <input class="rx-input" id="{{ id }}" name="{{ name }}" type="{{ type }}"
+    {%- if type != "password" %} value="{{ old(name, value if value is not none else "") }}"{% endif %}
+    {%- if required %} required aria-required="true"{% endif %}
+    {%- if autocomplete %} autocomplete="{{ autocomplete }}"{% endif %}
+    {%- if placeholder %} placeholder="{{ placeholder }}"{% endif %}
+    {%- if message %} aria-invalid="true"{% endif %}
+    aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>
+  {% call _describe(id, hint, message) %}{{ name }}{% endcall %}
+</div>
+{%- endmacro %}
+
+{% macro textarea(name, label, value=none, rows=4, hint=none, required=false, placeholder=none, attrs={}) -%}
+{%- set id = _id(name) %}
+{%- set message = error(name) %}
+<div class="rx-field">
+  {{ _label(id, label, required) }}
+  <textarea class="rx-textarea" id="{{ id }}" name="{{ name }}" rows="{{ rows }}"
+    {%- if required %} required aria-required="true"{% endif %}
+    {%- if placeholder %} placeholder="{{ placeholder }}"{% endif %}
+    {%- if message %} aria-invalid="true"{% endif %}
+    aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>{{ old(name, value if value is not none else "") }}</textarea>
+  {% call _describe(id, hint, message) %}{{ name }}{% endcall %}
+</div>
+{%- endmacro %}
+
+{#- `options`: a list of values, or of [value, label] pairs. -#}
+{% macro select(name, label, options, selected=none, hint=none, required=false, placeholder=none, attrs={}) -%}
+{%- set id = _id(name) %}
+{%- set message = error(name) %}
+{%- set current = old(name, selected if selected is not none else "") | string %}
+<div class="rx-field">
+  {{ _label(id, label, required) }}
+  <select class="rx-select" id="{{ id }}" name="{{ name }}"
+    {%- if required %} required aria-required="true"{% endif %}
+    {%- if message %} aria-invalid="true"{% endif %}
+    aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>
+    {%- if placeholder %}<option value="">{{ placeholder }}</option>{% endif %}
+    {%- for option in options %}
+      {%- if option is string or option is number %}{% set value = option %}{% set text = option %}
+      {%- else %}{% set value = option[0] %}{% set text = option[1] %}{% endif %}
+    <option value="{{ value }}"{% if value | string == current %} selected{% endif %}>{{ text }}</option>
+    {%- endfor %}
+  </select>
+  {% call _describe(id, hint, message) %}{{ name }}{% endcall %}
+</div>
+{%- endmacro %}
+
+{#- A checkbox for a yes/no choice; `switch` looks like iOS' toggle, for
+    settings that take effect as a whole ("Email me updates"). -#}
+{% macro checkbox(name, label, checked=false, hint=none, value="on", switch=false, attrs={}) -%}
+{%- set id = _id(name) %}
+{%- set message = error(name) %}
+{%- set previous = old(name, none) %}
+{%- set on = (previous == value) if previous else checked %}
+<div class="rx-field">
+  <label class="rx-check{% if switch %} rx-check--switch{% endif %}" for="{{ id }}">
+    {%- if not switch %}<input class="rx-checkbox" type="checkbox" id="{{ id }}" name="{{ name }}" value="{{ value }}"{% if on %} checked{% endif %}{% if message %} aria-invalid="true"{% endif %} aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>{% endif %}
+    <span class="rx-check__text"><span>{{ label }}</span>{% if hint %}<span class="rx-hint" id="{{ id }}-hint">{{ hint }}</span>{% endif %}</span>
+    {%- if switch %}<input class="rx-switch" type="checkbox" role="switch" id="{{ id }}" name="{{ name }}" value="{{ value }}"{% if on %} checked{% endif %}{% if message %} aria-invalid="true"{% endif %} aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>{% endif %}
+  </label>
+  <p class="rx-error" id="{{ id }}-error" data-error-for="{{ name }}" aria-live="polite">{{ message }}</p>
+</div>
+{%- endmacro %}
+
+{#- One primary button per form: the action people came to take. Variants:
+    primary, secondary, plain, danger. -#}
+{% macro button(label, variant="primary", type="submit", name=none, value=none, size=none, block=false, attrs={}) -%}
+<button class="rx-button rx-button--{{ variant }}{% if size %} rx-button--{{ size }}{% endif %}{% if block %} rx-button--block{% endif %}" type="{{ type }}"
+  {%- if name %} name="{{ name }}"{% endif %}{% if value is not none %} value="{{ value }}"{% endif %}{{ _attrs(attrs) }}><span class="rx-button__label">{{ label }}</span></button>
+{%- endmacro %}
+
+{% macro link_button(href, label, variant="secondary", size=none, attrs={}) -%}
+<a class="rx-button rx-button--{{ variant }}{% if size %} rx-button--{{ size }}{% endif %}" href="{{ href }}"{{ _attrs(attrs) }}><span class="rx-button__label">{{ label }}</span></a>
+{%- endmacro %}
+
+{% macro card(title=none, subtitle=none) -%}
+<section class="rx-card"{% if title %} aria-labelledby="{{ _id(title | lower | replace(' ', '-')) }}-title"{% endif %}>
+  {%- if title %}
+  <header class="rx-card__header">
+    <h2 class="rx-card__title" id="{{ _id(title | lower | replace(' ', '-')) }}-title">{{ title }}</h2>
+    {%- if subtitle %}<p class="rx-subtitle">{{ subtitle }}</p>{% endif %}
+  </header>
+  {%- endif %}
+  {{ caller() }}
+</section>
+{%- endmacro %}
+
+{#- An inset grouped list, like Settings: `{% call group("Notifications") %}`
+    with one element per row. -#}
+{% macro group(title=none, footer=none) -%}
+<section class="rx-group">
+  {%- if title %}<h3 class="rx-group__title">{{ title }}</h3>{% endif %}
+  <div class="rx-group__body">{{ caller() }}</div>
+  {%- if footer %}<p class="rx-group__footer">{{ footer }}</p>{% endif %}
+</section>
+{%- endmacro %}
+
+{#- Kinds: info, success, warning, error. Color is never the only signal:
+    each has its own icon, and a title when given. -#}
+{% macro alert(message, kind="info", title=none) -%}
+<div class="rx-alert rx-alert--{{ kind }}" role="{{ 'alert' if kind == 'error' else 'status' }}">
+  <span class="rx-alert__icon" aria-hidden="true">{{ _icon(kind) }}</span>
+  <div>
+    {%- if title %}<p class="rx-alert__title">{{ title }}</p>{% endif %}
+    <p class="rx-alert__message">{{ message }}</p>
+  </div>
+</div>
+{%- endmacro %}
+
+{#- Every error of the last submit, above the form: where to look first on
+    long forms. Shows nothing when there are none. -#}
+{% macro form_errors(title=none) -%}
+{%- if errors %}
+<div class="rx-alert rx-alert--error" role="alert" tabindex="-1" data-rx-error-summary>
+  <span class="rx-alert__icon" aria-hidden="true">{{ _icon("error") }}</span>
+  <div>
+    <p class="rx-alert__title">{{ title or t('ui.errors_title') }}</p>
+    <ul class="rx-alert__list">
+      {%- for field, messages in errors | items %}
+      <li><a class="rx-link" href="#{{ _id(field) }}">{{ messages[0] }}</a></li>
+      {%- endfor %}
+    </ul>
+  </div>
+</div>
+{%- endif %}
+{%- endmacro %}
+
+{% macro badge(text, kind=none) -%}
+<span class="rx-badge{% if kind %} rx-badge--{{ kind }}{% endif %}">{{ text }}</span>
+{%- endmacro %}
+
+{#- A sheet (modal dialog). Open it with `open_button(id, label)` or any
+    element with data-rx-open="id"; Esc, the backdrop and data-rx-close close
+    it, and focus returns to what opened it. -#}
+{% macro sheet(id, title, message=none) -%}
+<dialog class="rx-sheet" id="{{ id }}" aria-labelledby="{{ id }}-title">
+  <div class="rx-sheet__inner">
+    <h2 class="rx-sheet__title" id="{{ id }}-title">{{ title }}</h2>
+    {%- if message %}<p class="rx-sheet__message">{{ message }}</p>{% endif %}
+    {{ caller() }}
+  </div>
+</dialog>
+{%- endmacro %}
+
+{% macro open_button(id, label, variant="secondary", size=none) -%}
+<button class="rx-button rx-button--{{ variant }}{% if size %} rx-button--{{ size }}{% endif %}" type="button" data-rx-open="{{ id }}" aria-haspopup="dialog"><span class="rx-button__label">{{ label }}</span></button>
+{%- endmacro %}
+
+{#- A destructive action behind a confirmation sheet: the button opens it,
+    Cancel is focused first, and only the sheet's button sends the form. -#}
+{% macro confirm(id, label, action, title, message, confirm_label=none, method="DELETE", size=none) -%}
+{{ open_button(id, label, variant="plain-danger", size=size) }}
+<dialog class="rx-sheet" id="{{ id }}" aria-labelledby="{{ id }}-title" aria-describedby="{{ id }}-message" role="alertdialog">
+  <div class="rx-sheet__inner">
+    <h2 class="rx-sheet__title" id="{{ id }}-title">{{ title }}</h2>
+    <p class="rx-sheet__message" id="{{ id }}-message">{{ message }}</p>
+    <div class="rx-sheet__actions">
+      <button class="rx-button rx-button--secondary" type="button" data-rx-close autofocus><span class="rx-button__label">{{ t('ui.cancel') }}</span></button>
+      <form method="post" action="{{ action }}">
+        {{ csrf_field() }}{% if method | upper != "POST" %}{{ method_field(method) }}{% endif %}
+        <button class="rx-button rx-button--danger" type="submit"><span class="rx-button__label">{{ confirm_label or label }}</span></button>
+      </form>
+    </div>
+  </div>
+</dialog>
+{%- endmacro %}
+
+{#- A menu of actions: `{% call menu(t('ui.more')) %}{{ menu_link("/x", "Edit") }}{% endcall %}` -#}
+{% macro menu(label, id=none, variant="secondary", size="small") -%}
+{%- set menu_id = id or ("rx-menu-" ~ (label | lower | replace(" ", "-"))) %}
+<div class="rx-menu" data-rx-menu>
+  <button class="rx-button rx-button--{{ variant }}{% if size %} rx-button--{{ size }}{% endif %}" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="{{ menu_id }}"><span class="rx-button__label">{{ label }}</span><span class="rx-button__chevron" aria-hidden="true"><svg viewBox="0 0 12 8" width="10" height="7"><path d="M1 1.5l5 5 5-5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+  <div class="rx-menu__list" id="{{ menu_id }}" role="menu" hidden>{{ caller() }}</div>
+</div>
+{%- endmacro %}
+
+{% macro menu_link(href, label) -%}
+<a class="rx-menu__item" role="menuitem" href="{{ href }}">{{ label }}</a>
+{%- endmacro %}
+
+{#- A menu item that sends a form (POST, or `method` through _method). -#}
+{% macro menu_action(action, label, method="POST", danger=false) -%}
+<form method="post" action="{{ action }}" role="none">{{ csrf_field() }}{% if method | upper != "POST" %}{{ method_field(method) }}{% endif %}<button class="rx-menu__item{% if danger %} rx-menu__item--danger{% endif %}" role="menuitem" type="submit">{{ label }}</button></form>
+{%- endmacro %}
+
+{% macro menu_separator() -%}<div class="rx-menu__separator" role="separator"></div>{%- endmacro %}
+
+{#- A segmented control: `tabs("orders", [["open", "Open"], ["done", "Done"]])`
+    then `{% call tab_panel("orders", "open", selected=true) %}…{% endcall %}`
+    for each. Arrow keys move between tabs. -#}
+{% macro tabs(id, items, selected=none, label=none) -%}
+{%- set current = selected or items[0][0] %}
+<div class="rx-segmented" role="tablist"{% if label %} aria-label="{{ label }}"{% endif %}>
+  {%- for item in items %}
+  <button class="rx-segmented__item" type="button" role="tab" id="{{ id }}-tab-{{ item[0] }}" aria-controls="{{ id }}-panel-{{ item[0] }}" aria-selected="{{ 'true' if item[0] == current else 'false' }}" tabindex="{{ 0 if item[0] == current else -1 }}">{{ item[1] }}</button>
+  {%- endfor %}
+</div>
+{%- endmacro %}
+
+{% macro tab_panel(id, key, selected=false) -%}
+<div class="rx-tabpanel" role="tabpanel" id="{{ id }}-panel-{{ key }}" aria-labelledby="{{ id }}-tab-{{ key }}" tabindex="0"{% if not selected %} hidden{% endif %}>{{ caller() }}</div>
+{%- endmacro %}
+
+{#- `{% call table(["Name", ["Price", "num"]]) %}<tr>…</tr>{% endcall %}`: a
+    heading can be [text, class] ("num" right-aligns figures). -#}
+{% macro table(head, caption=none) -%}
+<div class="rx-table-wrap">
+  <table class="rx-table">
+    {%- if caption %}<caption class="rx-visually-hidden">{{ caption }}</caption>{% endif %}
+    <thead><tr>
+      {%- for cell in head %}
+      {%- if cell is string %}<th scope="col">{{ cell }}</th>{% else %}<th scope="col" class="rx-{{ cell[1] }}">{{ cell[0] }}</th>{% endif %}
+      {%- endfor %}
+    </tr></thead>
+    <tbody>{{ caller() }}</tbody>
+  </table>
+</div>
+{%- endmacro %}
+
+{#- What an empty list says: what goes here, and the way to add the first. -#}
+{% macro empty(title, message=none, action_href=none, action_label=none) -%}
+<div class="rx-empty">
+  <p class="rx-empty__title">{{ title }}</p>
+  {%- if message %}<p class="rx-empty__message">{{ message }}</p>{% endif %}
+  {%- if action_href %}{{ link_button(action_href, action_label, variant="primary") }}{% endif %}
+</div>
+{%- endmacro %}
+
+{%- macro _icon(kind) -%}
+{%- if kind == "success" -%}<svg viewBox="0 0 20 20" width="20" height="20"><circle cx="10" cy="10" r="9" fill="currentColor"/><path d="M6 10.5l2.5 2.5L14 7.5" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+{%- elif kind == "warning" -%}<svg viewBox="0 0 20 20" width="20" height="20"><path d="M10 2l8.5 15h-17z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8v4M10 14.5h.01" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+{%- elif kind == "error" -%}<svg viewBox="0 0 20 20" width="20" height="20"><circle cx="10" cy="10" r="9" fill="currentColor"/><path d="M7 7l6 6M13 7l-6 6" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+{%- else -%}<svg viewBox="0 0 20 20" width="20" height="20"><circle cx="10" cy="10" r="9" fill="currentColor"/><path d="M10 9v5M10 6h.01" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+{%- endif -%}
+{%- endmacro -%}

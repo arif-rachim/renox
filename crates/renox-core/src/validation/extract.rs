@@ -66,6 +66,9 @@ where
     }
 }
 
+/// Sent by renox.js to validate one field as the user types (`data-live-validate`).
+pub(crate) const LIVE_HEADER: &str = "x-renox-validate";
+
 /// The input of the request's validated form, in [`crate::context`].
 #[derive(Clone)]
 pub(crate) struct SubmittedInput(pub Map<String, Value>);
@@ -81,6 +84,12 @@ pub(crate) async fn validate_request<T>(
 where
     T: DeserializeOwned + Validate + Send,
 {
+    let live_field = req
+        .headers()
+        .get(LIVE_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .filter(|f| !f.is_empty() && f.len() <= 200)
+        .map(str::to_owned);
     let locale_name = crate::i18n::request_locale(req.extensions(), state);
     let locale = &Messages {
         locale: Locale::parse(&locale_name),
@@ -157,6 +166,18 @@ where
                 errors.add(field, message.clone());
             }
         }
+    }
+    // Live validation (`data-live-validate` forms, renox.js): answer with
+    // one field's errors and stop, whatever the rest of the form says; the
+    // handler doesn't run, so nothing is saved.
+    if let Some(field) = live_field {
+        let messages: Vec<String> = errors
+            .iter()
+            .find(|(name, _)| *name == field)
+            .map(|(_, messages)| messages.to_vec())
+            .unwrap_or_default();
+        let body = serde_json::json!({ "field": field, "errors": messages });
+        return Err((axum::http::StatusCode::OK, axum::Json(body)).into_response());
     }
     if errors.is_empty() {
         // A later `ValidationError` (from a model's `saving` hook, say) is

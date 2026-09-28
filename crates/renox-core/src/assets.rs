@@ -14,6 +14,57 @@ const HTMX: &str = include_str!("../assets/htmx.min.js");
 const ALPINE: &str = include_str!("../assets/alpine.min.js");
 /// Alpine's build for `CSP=strict`: no `eval`, simpler expressions.
 const ALPINE_CSP: &str = include_str!("../assets/alpine-csp.min.js");
+/// The UI kit's styles and behavior (renox/ui.html).
+pub(crate) const UI_CSS: &str = include_str!("../assets/renox-ui.css");
+pub(crate) const UI_JS: &str = include_str!("../assets/renox-ui.js");
+
+static UI_URLS: LazyLock<[String; 2]> = LazyLock::new(|| {
+    [
+        format!("/_renox/ui-{:016x}.css", fnv1a(UI_CSS)),
+        format!("/_renox/ui-{:016x}.js", fnv1a(UI_JS)),
+    ]
+});
+
+/// `{{ renox_ui() }}`: the kit's stylesheet and script, for the `<head>`;
+/// `renox_ui(styles=false)` only the script, for an app with its own copy
+/// of the styles (`ui:publish`).
+pub(crate) fn ui_tags(styles: bool) -> String {
+    let [css, js] = &*UI_URLS;
+    let script = format!("<script src=\"{js}\" defer></script>");
+    if styles {
+        format!("<link rel=\"stylesheet\" href=\"{css}\">\n{script}")
+    } else {
+        script
+    }
+}
+
+/// `my-app ui:publish`: copies the kit into the app, to change it there.
+pub(crate) fn publish_ui(config: &crate::Config, force: bool) -> anyhow::Result<()> {
+    let view = config.views_path.join("components/ui.html");
+    let css = config.public_path.join("css/renox-ui.css");
+    for path in [&view, &css] {
+        if path.exists() && !force {
+            anyhow::bail!("{} exists; add --force to replace it", path.display());
+        }
+    }
+    let template = include_str!("../views/ui.html").replace(
+        "{% from \"renox/ui.html\" import",
+        "{% from \"components/ui.html\" import",
+    );
+    for (path, body) in [(&view, template.as_str()), (&css, UI_CSS)] {
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        std::fs::write(path, body)?;
+        println!("Wrote {}", path.display());
+    }
+    println!(
+        "Import from \"components/ui.html\", and in the layout replace {{{{ renox_ui() }}}} with\n  \
+         <link rel=\"stylesheet\" href=\"{{{{ asset('css/renox-ui.css') }}}}\">{{{{ renox_ui(styles=false) }}}}"
+    );
+    Ok(())
+}
+
 const RENOX: &str = r#"(function () {
   // Send the CSRF token with every HTMX request.
   document.addEventListener("htmx:configRequest", function (event) {
@@ -136,11 +187,27 @@ static URLS: LazyLock<[String; 4]> = LazyLock::new(|| {
 
 pub(crate) fn router() -> Router<AppState> {
     let [htmx, alpine, renox, alpine_csp] = &*URLS;
+    let [ui_css, ui_js] = &*UI_URLS;
     Router::new()
+        .route(
+            ui_css,
+            get(|| async { asset("text/css; charset=utf-8", UI_CSS) }),
+        )
+        .route(ui_js, get(|| async { js(UI_JS) }))
         .route(htmx, get(|| async { js(HTMX) }))
         .route(alpine, get(|| async { js(ALPINE) }))
         .route(renox, get(|| async { js(RENOX) }))
         .route(alpine_csp, get(|| async { js(ALPINE_CSP) }))
+}
+
+fn asset(content_type: &'static str, body: &'static str) -> impl IntoResponse {
+    (
+        [
+            (CONTENT_TYPE, content_type),
+            (CACHE_CONTROL, "public, max-age=31536000, immutable"),
+        ],
+        body,
+    )
 }
 
 fn js(body: &'static str) -> impl IntoResponse {
@@ -183,4 +250,34 @@ fn fnv1a(s: &str) -> u64 {
     s.bytes().fold(0xcbf29ce484222325, |hash, byte| {
         (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
     })
+}
+
+#[cfg(test)]
+mod ui_tests {
+    #[test]
+    fn publishing_the_kit_copies_it_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = crate::Config {
+            views_path: dir.path().join("views"),
+            public_path: dir.path().join("public"),
+            ..crate::Config::default()
+        };
+        super::publish_ui(&config, false).unwrap();
+        let view = std::fs::read_to_string(dir.path().join("views/components/ui.html")).unwrap();
+        assert!(
+            view.contains("{% macro input(") && !view.contains("from \"renox/ui.html\" import")
+        );
+        assert!(
+            std::fs::read_to_string(dir.path().join("public/css/renox-ui.css"))
+                .unwrap()
+                .contains("--rx-accent")
+        );
+        assert!(
+            super::publish_ui(&config, false).is_err(),
+            "no overwrite without --force"
+        );
+        super::publish_ui(&config, true).unwrap();
+        assert!(super::ui_tags(false).starts_with("<script"));
+        assert!(super::ui_tags(true).starts_with("<link rel=\"stylesheet\""));
+    }
 }

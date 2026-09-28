@@ -10,6 +10,24 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M21b · Views, components and the UI kit
+
+- Components see the request: `old`, `error`, `errors`, `t`, `can`, `auth`, `request`, `flash`,
+  `csrf_field` work inside imported macros; `once(key)`; `rnx make:component name`.
+- The UI kit `renox/ui.html` after Apple's Human Interface Guidelines, with its styles and
+  script (`{{ renox_ui() }}`):
+  - fields (`input`, `textarea`, `select`, `checkbox` with `switch`) and `button`/`link_button`;
+  - `card`, `group`, `alert`, `badge`, `form_errors`;
+  - `sheet`/`open_button`, `confirm`, `menu`, `tabs`/`tab_panel`, `table`, `empty`;
+  - dark mode, WCAG AA contrast, 44 pt targets, keyboard support, reduced motion.
+  `rnx make:component --ui` (`ui:publish`) copies the kit into the app. See docs/ui.md.
+- `Toast` (`success`, `info`, `warning`, `error`) as a response part, and `{{ toasts() }}`.
+- `View::also(block)` for out-of-band fragments; `HxRetarget`, `HxReswap`, `HxPushUrl`.
+- Live validation: `<form data-live-validate>` checks fields against `Valid<T>` without running
+  the handler.
+- Built-in `ui.*` texts in English and Indonesian.
+- examples/crud uses the kit and toasts.
+
 ### M21a · Rough edges
 
 - `User::has_role` / `User::has_permission` (the current request's roles) for policies and
