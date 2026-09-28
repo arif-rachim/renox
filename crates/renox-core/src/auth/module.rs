@@ -20,6 +20,10 @@ const MIGRATIONS: &[Migration] = &[
     crate::db::framework_migration!("auth", "00010101000002_create_personal_access_tokens_table"),
     crate::db::framework_migration!("auth", "00010101000003_create_notifications_table"),
     crate::db::framework_migration!("auth", "00010101000004_add_sessions_revoked_at_to_users"),
+    crate::db::framework_migration!(
+        "auth",
+        "00010101000005_add_abilities_to_personal_access_tokens"
+    ),
 ];
 
 struct Settings {
@@ -185,6 +189,20 @@ impl Module for Auth {
 
     fn migrations(&self) -> &'static [Migration] {
         MIGRATIONS
+    }
+
+    fn register(&self, app: &mut crate::Registry) {
+        // Schedule it, e.g. daily: `app.schedule().daily_at("03:00", …)`.
+        app.command(
+            "tokens:prune",
+            "Delete API tokens that expired more than a day ago",
+            |state, _args| async move {
+                let day = std::time::Duration::from_secs(24 * 60 * 60);
+                let pruned = super::prune_expired_tokens(&state.db, day).await?;
+                println!("Deleted {pruned} expired API tokens.");
+                Ok(())
+            },
+        );
     }
 
     fn routes(&self) -> Routes {

@@ -10,6 +10,28 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M18a · Tenancy, roles, gates, token abilities
+
+- `renox::context`: values for the current request, job, task or command (e.g. the current
+  team), with `set`, `get`, `remove` and `scope`.
+- Default scopes: `#[model(default_scope = "team_only")]`, applied by `query()`, `find`,
+  `where_eq` and the relation loaders; `Model::unscoped()`; `Query::none()` to fail closed.
+- `unique`/`exists` rules take `.where_eq(col, value)`, `.where_null(col)` and
+  `.where_not_null(col)`, e.g. unique per team and ignoring soft-deleted rows.
+- `Routes::require_gate("admin")` (async gates too), `App::gate_before(|user, ability| …)` for
+  super-admins, applied to gates, permissions and policies.
+- The `Permissions` module: roles and permissions tables, `permissions::define_role`, `grant`,
+  `revoke`, `delete_role`, `roles`; `user.assign_role`, `remove_role`, `sync_roles`, `roles`,
+  `permissions`; `AuthUser::has_role`, `has_permission`, `role_names`;
+  `Routes::require_role`, `require_permission`; `can('…')` and `auth.roles` in templates.
+- API token abilities: `create_token_with(&db, name, &["orders:read"], expires)`,
+  `AuthUser::token_can`, `Routes::require_ability`, `AccessToken.abilities`; `tokens:prune` and
+  `auth::prune_expired_tokens` delete expired tokens.
+- `Can::new` takes a `User` or an `AuthUser` (the latter applies `gate_before`).
+- examples/shop guards `/admin` with `require_gate("admin")` instead of its own extractor.
+- New framework migrations: `…000005_add_abilities_to_personal_access_tokens` (Auth) and
+  `…000500_create_roles_and_permissions_tables` (Permissions).
+
 ### Laravel parity review
 
 - docs/audit/2026-09-laravel-parity.md: every Laravel feature area compared with Renox, the

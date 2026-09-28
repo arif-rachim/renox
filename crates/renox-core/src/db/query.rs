@@ -420,6 +420,12 @@ impl<M: Model> Query<M> {
         self
     }
 
+    /// Matches no rows at all, e.g. a default scope when no tenant is set.
+    pub fn none(mut self) -> Self {
+        self.filters.push(Filter::Sql("1 = 0".into()));
+        self
+    }
+
     /// Include soft-deleted rows.
     pub fn with_trashed(mut self) -> Self {
         self.trashed = Trashed::With;

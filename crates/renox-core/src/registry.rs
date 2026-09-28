@@ -20,6 +20,8 @@ pub struct Registry {
     pub(crate) templates: Vec<crate::view::TemplateHook>,
     pub(crate) shares: Vec<(String, crate::view::ShareFn)>,
     pub(crate) channels: HashMap<String, crate::auth::notifications::ChannelFn>,
+    /// The `Permissions` module is on: load each user's roles.
+    pub(crate) permissions: bool,
 }
 
 impl Registry {

@@ -557,6 +557,83 @@ async fn inbox(State(db): State<Db>, user: AuthUser) -> Result<View> {
 }
 ```
 
+## Tenants, roles and permissions
+
+```rust
+use renox::prelude::*;
+use renox::auth::{Permissions, permissions};
+use renox::axum::{extract::Request, middleware::{Next, from_fn}};
+
+#[derive(Clone)]
+struct CurrentTeam(i64);
+
+// Every query of the model starts with its default scope; `Project::unscoped()` skips it.
+#[derive(Model, serde::Serialize, Default)]
+#[model(table = "projects", default_scope = "team_only")]
+struct Project { id: i64, team_id: i64, name: String }
+
+fn team_only(query: renox::db::Query<Project>) -> renox::db::Query<Project> {
+    match renox::context::get::<CurrentTeam>() { // this request's (or job's) value
+        Some(team) => query.where_eq("team_id", team.0),
+        None => query.none(), // no team, no rows
+    }
+}
+
+async fn pick_team(user: Option<AuthUser>, req: Request, next: Next) -> Response {
+    if let Some(team) = user.as_ref().and_then(|u| u.get::<i64>("team_id")) {
+        renox::context::set(CurrentTeam(team)); // jobs/commands: set it from the payload
+    }
+    next.run(req).await
+}
+
+fn app() -> App {
+    App::new()
+        .module(Auth::new())
+        .module(Permissions) // roles, permissions, and loading them per request
+        .layer(from_fn(pick_team))
+        .gate_before(|user, _ability| (user.get::<bool>("super_admin") == Some(true)).then_some(true))
+}
+
+fn routes() -> Routes {
+    let admin = Routes::new().get("/admin", || async { "hi" }).require_gate("admin"); // 403 unless
+    let editors = Routes::new().get("/drafts", || async { "" }).require_role("editor");
+    let publish = Routes::new().post("/publish", || async { "" }).require_permission("posts.publish");
+    let api = Routes::new().post("/api/orders", || async { "" }).require_ability("orders:write");
+    admin.merge(editors).merge(publish).merge(api) // shown in route:list as gate:admin, …
+}
+
+async fn setup(db: &Db, user: &User) -> Result {
+    permissions::define_role(db, "editor", &["posts.create", "posts.publish"]).await?; // exactly these
+    user.assign_role(db, "editor").await?; // also remove_role, sync_roles, roles, permissions
+    let token = user.create_token_with(db, "reports", &["orders:read"], None).await?; // limited
+    let _ = token.plain;
+    Ok(())
+}
+
+async fn check(user: AuthUser) -> String {
+    // allows: gate_before, a gate, then permissions. has_role/has_permission: exactly that.
+    format!("{} {} {}", user.allows("posts.publish"), user.has_role("editor"), user.token_can("orders:read"))
+}
+
+#[derive(serde::Deserialize)]
+struct ProjectForm { name: String, #[serde(default)] id: i64 }
+
+impl Validate for ProjectForm {
+    fn rules(&self, v: &mut Validator) {
+        let team = renox::context::get::<CurrentTeam>().map_or(0, |t| t.0);
+        v.field("name", &self.name)
+            .unique("projects", "name")
+            .ignore(self.id)
+            .where_eq("team_id", team)    // unique per team
+            .where_null("deleted_at");    // soft-deleted rows don't count
+    }
+}
+# let _ = (app, routes, setup, check);
+```
+
+In templates: `{% if can('posts.publish') %}` (a gate or a permission) and `auth.roles`.
+`rnx tokens:prune` deletes API tokens that expired more than a day ago.
+
 ## HTMX
 
 ```rust

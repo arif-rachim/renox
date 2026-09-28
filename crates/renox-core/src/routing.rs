@@ -135,6 +135,57 @@ impl Routes {
             .mark("verified")
     }
 
+    /// Only users the gate `name` lets through (`App::gate`, `gate_async` or
+    /// a permission of that name, after `gate_before`) may use the routes
+    /// added so far; guests are sent to log in, others get 403.
+    pub fn require_gate(self, name: &str) -> Self {
+        self.requirement(
+            crate::auth::Requirement::Gate(name.to_owned()),
+            "gate",
+            name,
+        )
+    }
+
+    /// Only users with `role` (the `Permissions` module) may use the routes
+    /// added so far; guests are sent to log in, others get 403.
+    pub fn require_role(self, role: &str) -> Self {
+        self.requirement(
+            crate::auth::Requirement::Role(role.to_owned()),
+            "role",
+            role,
+        )
+    }
+
+    /// Only users granted `permission` (the `Permissions` module, after
+    /// `gate_before`) may use the routes added so far.
+    pub fn require_permission(self, permission: &str) -> Self {
+        self.requirement(
+            crate::auth::Requirement::Permission(permission.to_owned()),
+            "permission",
+            permission,
+        )
+    }
+
+    /// Requests with an API token must have `ability`
+    /// (`User::create_token_with`); sessions and unrestricted tokens pass.
+    pub fn require_ability(self, ability: &str) -> Self {
+        self.requirement(
+            crate::auth::Requirement::Ability(ability.to_owned()),
+            "ability",
+            ability,
+        )
+    }
+
+    fn requirement(self, requirement: crate::auth::Requirement, kind: &str, name: &str) -> Self {
+        let requirement = std::sync::Arc::new(requirement);
+        self.route_layer(from_fn(
+            move |req: Request, next: axum::middleware::Next| {
+                crate::auth::require(requirement.clone(), req, next)
+            },
+        ))
+        .mark(&format!("{kind}:{name}"))
+    }
+
     /// Only guests may use the routes added so far; logged-in users are sent
     /// to the `home` route (e.g. for login and registration pages).
     pub fn guest_only(self) -> Self {

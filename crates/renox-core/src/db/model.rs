@@ -49,7 +49,40 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
     /// Updates `deleted_at` if the model has it.
     fn set_deleted_at(&mut self, _at: Option<DateTime>) {}
 
+    /// Conditions every query of this model starts with, e.g. the current
+    /// tenant, read from [`renox::context`](mod@crate::context). `query()`,
+    /// `find`, `all`, `where_eq` and the relation loaders apply it;
+    /// [`Model::unscoped`] doesn't. Saving, deleting and restoring a loaded
+    /// model work by its id. Set it with `#[model(default_scope = "…")]`:
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// #[derive(Clone)]
+    /// struct CurrentTeam(i64);
+    ///
+    /// #[derive(Model, serde::Serialize, Default)]
+    /// #[model(table = "projects", default_scope = "team_only")]
+    /// struct Project { id: i64, team_id: i64, name: String }
+    ///
+    /// fn team_only(query: renox::db::Query<Project>) -> renox::db::Query<Project> {
+    ///     match renox::context::get::<CurrentTeam>() {
+    ///         Some(team) => query.where_eq("team_id", team.0),
+    ///         None => query.none(), // no team, no rows: fail closed
+    ///     }
+    /// }
+    /// ```
+    fn default_scope(query: Query<Self>) -> Query<Self> {
+        query
+    }
+
+    /// A query with the default scope applied (see [`Model::default_scope`]).
     fn query() -> Query<Self> {
+        Self::default_scope(Query::new())
+    }
+
+    /// A query without the default scope, e.g. for an admin who sees every
+    /// tenant. Soft-deleted rows stay hidden unless asked for.
+    fn unscoped() -> Query<Self> {
         Query::new()
     }
 

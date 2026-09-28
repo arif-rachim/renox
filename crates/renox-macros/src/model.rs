@@ -21,6 +21,7 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
 
     let mut table = ident.to_string().to_snake_case();
     let mut soft_deletes = false;
+    let mut default_scope: Option<syn::Path> = None;
     for attr in input.attrs.iter().filter(|a| a.path().is_ident("model")) {
         attr.parse_nested_meta(|meta| {
             if meta.path.is_ident("table") {
@@ -29,8 +30,13 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
             } else if meta.path.is_ident("soft_deletes") {
                 soft_deletes = true;
                 Ok(())
+            } else if meta.path.is_ident("default_scope") {
+                default_scope = Some(meta.value()?.parse::<LitStr>()?.parse()?);
+                Ok(())
             } else {
-                Err(meta.error("expected `table = \"...\"` or `soft_deletes`"))
+                Err(meta.error(
+                    "expected `table = \"...\"`, `soft_deletes` or `default_scope = \"path::to::fn\"`",
+                ))
             }
         })?;
     }
@@ -133,6 +139,14 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
         }
     });
 
+    let default_scope_fn = default_scope.map(|path| {
+        quote! {
+            fn default_scope(query: ::renox::db::Query<Self>) -> ::renox::db::Query<Self> {
+                #path(query)
+            }
+        }
+    });
+
     let from_row_impl = crate::from_row::from_row_impl(ident, quote! { #(#from_row),* });
     Ok(quote! {
         #from_row_impl
@@ -161,6 +175,8 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
             }
 
             #set_deleted_at
+
+            #default_scope_fn
         }
     })
 }

@@ -1,0 +1,114 @@
+//! Values that belong to the current request or job, such as the current
+//! team of a multi-tenant app, readable anywhere down the call stack
+//! without passing them along (a model's `default_scope`, a listener, a
+//! helper).
+//!
+//! Every request, job, scheduled task and app command runs in a fresh,
+//! empty context. Set a value early (e.g. in an `App::layer` middleware
+//! after the user is known) and read it later:
+//!
+//! ```
+//! use renox::prelude::*;
+//!
+//! #[derive(Clone)]
+//! struct CurrentTeam(i64);
+//!
+//! async fn pick_team(user: Option<AuthUser>, req: Request, next: Next) -> Response {
+//!     if let Some(team) = user.as_ref().and_then(|u| u.get::<i64>("team_id")) {
+//!         renox::context::set(CurrentTeam(team));
+//!     }
+//!     next.run(req).await
+//! }
+//!
+//! # async fn demo() {
+//! // In a job or a command, the value comes from the payload instead:
+//! renox::context::set(CurrentTeam(7));
+//! let team = renox::context::get::<CurrentTeam>().map(|t| t.0); // Some(7)
+//! # assert_eq!(team, Some(7));
+//! # }
+//! # use renox::axum::{extract::Request, middleware::Next};
+//! # let _ = pick_team;
+//! ```
+//!
+//! A context lives in its task: `tokio::spawn` starts without one (wrap the
+//! future in [`scope`] to give it one).
+
+use std::any::{Any, TypeId};
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::future::Future;
+
+type Values = HashMap<TypeId, Box<dyn Any + Send + Sync>>;
+
+tokio::task_local! {
+    static CONTEXT: RefCell<Values>;
+}
+
+/// Stores `value` in the current context, replacing one of the same type.
+/// Outside a context (a bare `tokio::spawn`), it does nothing and returns
+/// false.
+pub fn set<T: Clone + Send + Sync + 'static>(value: T) -> bool {
+    CONTEXT
+        .try_with(|values| {
+            values
+                .borrow_mut()
+                .insert(TypeId::of::<T>(), Box::new(value));
+        })
+        .is_ok()
+}
+
+/// The value of type `T` in the current context, if one was set.
+pub fn get<T: Clone + Send + Sync + 'static>() -> Option<T> {
+    CONTEXT
+        .try_with(|values| {
+            values
+                .borrow()
+                .get(&TypeId::of::<T>())
+                .and_then(|value| value.downcast_ref::<T>())
+                .cloned()
+        })
+        .ok()
+        .flatten()
+}
+
+/// Removes the value of type `T` from the current context.
+pub fn remove<T: Send + Sync + 'static>() {
+    let _ = CONTEXT.try_with(|values| values.borrow_mut().remove(&TypeId::of::<T>()));
+}
+
+/// Runs `fut` in a fresh, empty context.
+pub async fn scope<F: Future>(fut: F) -> F::Output {
+    CONTEXT.scope(RefCell::new(Values::new()), fut).await
+}
+
+/// Runs each request in its own context.
+pub(crate) async fn middleware(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    scope(next.run(req)).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq)]
+    struct Team(i64);
+
+    #[tokio::test]
+    async fn values_live_in_their_scope() {
+        assert!(!set(Team(1)), "no context outside a scope");
+        assert_eq!(get::<Team>(), None);
+        scope(async {
+            assert!(set(Team(1)));
+            set(Team(2));
+            assert_eq!(get::<Team>(), Some(Team(2)));
+            assert_eq!(get::<String>(), None);
+            scope(async { assert_eq!(get::<Team>(), None, "a new scope starts empty") }).await;
+            remove::<Team>();
+            assert_eq!(get::<Team>(), None);
+        })
+        .await;
+    }
+}

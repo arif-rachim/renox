@@ -596,7 +596,8 @@ Notes from M17a:
   `Pivot::load` and `Query::first_or_create` compiled in doctests but not in a routed handler
   (their futures held a closure or a generic iterator across an `.await`, which fails axum's
   `Send` check; rustc issue #100013). `it/send_handlers.rs` now routes every data API.
-- Admin routes use an `Admin` extractor that checks the gate. A route-level
+- Admin routes used an `Admin` extractor that checks the gate (replaced by `require_gate` in
+  M18a). A route-level
   `require_gate("admin")` (like `require_auth`) would also show in `route:list`; it's a
   candidate for later.
 
@@ -611,13 +612,13 @@ Notes from M17b:
 From the Laravel parity review (docs/audit/2026-09-laravel-parity.md). What a typical SaaS needs
 before it can start: tenants, roles, accounts.
 
-- [ ] Tenancy: a default scope on models (`fn default_scope(q) -> Query<Self>`, bypassed with
+- [x] Tenancy: a default scope on models (`fn default_scope(q) -> Query<Self>`, bypassed with
       `.without_default_scope()`), e.g. filtering by a task-local current team
-- [ ] Scoped `unique`/`exists`: `.unique("products", "sku").ignore(id).where_eq("team_id", t)`,
+- [x] Scoped `unique`/`exists`: `.unique("products", "sku").ignore(id).where_eq("team_id", t)`,
       `.where_null("deleted_at")`
-- [ ] Roles and permissions (opt-in module): tables, `user.has_role`, `user.has_permission`,
+- [x] Roles and permissions (opt-in module): tables, `user.has_role`, `user.has_permission`,
       `Routes::require_role` / `require_permission`, permissions usable as gates
-- [ ] `Routes::require_gate("admin")` (async gates too, shown in `route:list`) and
+- [x] `Routes::require_gate("admin")` (async gates too, shown in `route:list`) and
       `App::gate_before(|user| Option<bool>)` for super-admins
 - [ ] Account pages in `Auth`: profile (name, email with re-verification), password (checks the
       current one and keeps this session logged in), delete account; `auth::change_password`
@@ -625,10 +626,23 @@ before it can start: tenants, roles, accounts.
       breached-password check) used by register/reset/change; `require_password_confirmed`
 - [ ] Auth events (`Registered`, `LoggedIn`, `LoginFailed`, `LockedOut`, `LoggedOut`,
       `PasswordReset`, `Verified`) and an opt-in audit log (`state.audit(user, action, subject)`)
-- [ ] API token abilities (`create_token(.., &["orders:read"])`, `token_can`,
+- [x] API token abilities (`create_token(.., &["orders:read"])`, `token_can`,
       `Routes::require_ability`), expired-token pruning
 - [ ] Log out this device only; log out other devices (keeps this one)
 - [ ] Accept bcrypt hashes from imported Laravel users and rehash to Argon2id at login
+
+Notes from M18a (tenancy, roles, gates, token abilities):
+- `renox::context`: every request, job, scheduled task and app command runs in its own
+  task-local context, so a default scope can read the current tenant without it being passed
+  around. `tokio::spawn` starts without one (`context::scope`).
+- A default scope is a plain function named in `#[model(default_scope = "…")]`; `unscoped()`
+  skips it and `none()` fails closed. Saving and deleting a loaded model work by id.
+- `gate_before` answers gates, permissions and policies (`authorize`, `Can::new` with an
+  `AuthUser`), not role membership.
+- Roles and permissions are loaded once per request (two queries) only when the `Permissions`
+  module is registered. `require_role/permission/gate/ability` show in `route:list`.
+- Remaining M18 items move to M18b: account pages, password rules and confirmation, auth events
+  and audit log, per-device logout, bcrypt import.
 
 ### M19 · v0.20: Data layer 2
 - [ ] Raw fragments in the builder: `where_raw`, `order_by_raw`, `select_raw` +

@@ -1,25 +1,11 @@
-//! The back office under `/admin`: products (with photos) and orders. Every
-//! handler takes `Admin`, so a customer gets 403 and a guest the login page.
+//! The back office under `/admin`: products (with photos) and orders. The
+//! group is guarded by the `admin` gate: a customer gets 403 and a guest the
+//! login page.
 
 mod orders;
 mod products;
 
-use renox::axum::extract::FromRequestParts;
-use renox::axum::http::request::Parts;
 use renox::prelude::*;
-
-/// A logged-in user who passes the `admin` gate (see `crate::app()`).
-pub struct Admin(pub AuthUser);
-
-impl<S: Send + Sync> FromRequestParts<S> for Admin {
-    type Rejection = Response;
-
-    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Response> {
-        let user = AuthUser::from_request_parts(parts, state).await?;
-        user.gate("admin").map_err(IntoResponse::into_response)?;
-        Ok(Admin(user))
-    }
-}
 
 pub struct AdminPanel;
 
@@ -51,12 +37,12 @@ impl Module for AdminPanel {
                 .name("orders.index")
                 .put("/orders/{id}/status", orders::update_status)
                 .name("orders.status")
-                .require_auth(),
+                .require_gate("admin"),
         )
     }
 }
 
-async fn dashboard(State(db): State<Db>, Admin(user): Admin) -> Result<View> {
+async fn dashboard(State(db): State<Db>, user: AuthUser) -> Result<View> {
     let pending: i64 = renox::db::sql("SELECT COUNT(*) FROM orders WHERE status = 'pending'")
         .scalar(&db)
         .await?;

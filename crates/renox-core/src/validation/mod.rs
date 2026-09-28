@@ -44,7 +44,7 @@ pub(crate) use messages::{render, template_for};
 pub use value::{FieldValue, Inspected};
 
 use crate::Result;
-use crate::db::{Db, DbValue, quote};
+use crate::db::{Db, DbValue, ToDbValue, quote};
 use chrono::NaiveDateTime;
 
 /// Validation errors: messages keyed by field name.
@@ -94,8 +94,25 @@ struct Pending {
     column: String,
     value: DbValue,
     ignore_id: Option<i64>,
+    /// Extra conditions (`where_eq`, `where_null`, `where_not_null`).
+    scope: Vec<ScopeCondition>,
     unique: bool,
     message: Option<String>,
+}
+
+/// A condition added to a `unique`/`exists` check.
+enum ScopeCondition {
+    Eq(String, DbValue),
+    Null(String),
+    NotNull(String),
+}
+
+impl ScopeCondition {
+    fn column(&self) -> &str {
+        match self {
+            Self::Eq(column, _) | Self::Null(column) | Self::NotNull(column) => column,
+        }
+    }
 }
 
 /// SQLite reads an unknown double-quoted column as a string literal, which
@@ -256,6 +273,9 @@ impl Validator {
             let dialect = db.dialect();
             if dialect == crate::db::Dialect::Sqlite {
                 ensure_sqlite_column(db, &check.table, &check.column).await?;
+                for condition in &check.scope {
+                    ensure_sqlite_column(db, &check.table, condition.column()).await?;
+                }
             }
             // Form input is text; PostgreSQL won't compare text with a number
             // column, so compare as text (a no-op for text columns).
@@ -272,11 +292,27 @@ impl Validator {
             if check.ignore_id.is_some() {
                 sql.push_str(" AND \"id\" != ?");
             }
+            let mut scope_values = Vec::new();
+            for condition in check.scope {
+                match condition {
+                    ScopeCondition::Eq(column, value) => {
+                        sql.push_str(&format!(" AND {} = ?", quote(&column)));
+                        scope_values.push(value);
+                    }
+                    ScopeCondition::Null(column) => {
+                        sql.push_str(&format!(" AND {} IS NULL", quote(&column)));
+                    }
+                    ScopeCondition::NotNull(column) => {
+                        sql.push_str(&format!(" AND {} IS NOT NULL", quote(&column)));
+                    }
+                }
+            }
             sql.push(')');
             let mut query = crate::db::sql(sql).bind(check.value);
             if let Some(id) = check.ignore_id {
                 query = query.bind(id);
             }
+            let query = query.bind_all(scope_values);
             let found: bool = query.scalar(db).await?;
             if found == check.unique {
                 let key = if check.unique { "unique" } else { "exists" };
@@ -696,6 +732,7 @@ impl Field<'_> {
                 column: column.to_owned(),
                 value: self.db_value.clone(),
                 ignore_id: None,
+                scope: Vec::new(),
                 unique,
                 message: None,
             });
@@ -720,6 +757,46 @@ impl Field<'_> {
     /// Some row in `table` has this value in `column`.
     pub fn exists(self, table: &str, column: &str) -> Self {
         self.database(table, column, false)
+    }
+
+    /// Only rows where `column = value` count for the preceding `unique` or
+    /// `exists`, e.g. the current team's: SKUs are unique per team.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # struct ProductForm { id: i64, sku: String, category_id: i64, team_id: i64 }
+    /// # impl Validate for ProductForm {
+    /// fn rules(&self, v: &mut Validator) {
+    ///     v.field("sku", &self.sku)
+    ///         .unique("products", "sku")
+    ///         .ignore(self.id)
+    ///         .where_eq("team_id", self.team_id)
+    ///         .where_null("deleted_at"); // soft-deleted rows don't count
+    ///     v.field("category_id", &self.category_id)
+    ///         .exists("categories", "id")
+    ///         .where_eq("team_id", self.team_id); // not another team's category
+    /// }
+    /// # }
+    /// ```
+    pub fn where_eq(self, column: &str, value: impl ToDbValue) -> Self {
+        self.scope(ScopeCondition::Eq(column.to_owned(), value.to_db_value()))
+    }
+
+    /// Only rows where `column` is null count (e.g. `deleted_at`).
+    pub fn where_null(self, column: &str) -> Self {
+        self.scope(ScopeCondition::Null(column.to_owned()))
+    }
+
+    /// Only rows where `column` is not null count.
+    pub fn where_not_null(self, column: &str) -> Self {
+        self.scope(ScopeCondition::NotNull(column.to_owned()))
+    }
+
+    fn scope(self, condition: ScopeCondition) -> Self {
+        if let Some(i) = self.last_pending {
+            self.v.pending[i].scope.push(condition);
+        }
+        self
     }
 }
 
