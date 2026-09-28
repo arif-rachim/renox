@@ -1,6 +1,7 @@
 //! A blog showing every kind of relation without N+1 queries:
 //! a post belongs to a category, has many comments, and has many tags
 //! through a pivot table that has columns of its own (pinned, timestamps).
+//! Likes belong to a post or a comment (a polymorphic relation, `Morph`).
 //! Pages load the related rows of a whole page in one query per relation
 //! (counts included); reports use the query builder's `group_by` and SQL
 //! joins read into structs.
@@ -13,7 +14,7 @@ use renox::db::relations::{belongs_to, count_many, has_many};
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use model::{Category, Comment, POST_TAGS, Post, Tag, Tagging};
+use model::{Category, Comment, LIKEABLE, Like, POST_TAGS, Post, Tag, Tagging};
 
 pub struct Blog;
 
@@ -30,6 +31,10 @@ impl Module for Blog {
             .name("posts.show")
             .post("/posts/{id}/comments", comment)
             .name("posts.comment")
+            .post("/posts/{id}/like", like_post)
+            .name("posts.like")
+            .post("/comments/{id}/like", like_comment)
+            .name("comments.like")
             .put("/posts/{id}/tags", retag)
             .name("posts.tags")
             .put("/posts/{id}/tags/{tag}/pin", pin)
@@ -52,11 +57,13 @@ struct Card {
     tags: Vec<Tag>,
     comments: i64,
     latest_comment: Option<Comment>,
+    likes: i64,
 }
 
-/// 10 posts with their categories, comment counts, latest comments and tags
-/// in 7 queries in all (count and page, categories, comment counts, latest
-/// comments, tag links and tags), whatever the page size.
+/// 10 posts with their categories, comment counts, latest comments, tags
+/// and like counts in 8 queries in all (count and page, categories, comment
+/// counts, latest comments, tag links and tags, like counts), whatever the
+/// page size.
 async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
     let posts = Post::query().latest().paginate(&db, page, 10).await?;
     let categories = belongs_to::<Category, _, _>(&db, &posts.items, |p| p.category_id).await?;
@@ -77,11 +84,14 @@ async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
     )
     .await?;
     let mut tags = POST_TAGS.load_for::<Tag, _>(&db, &posts.items).await?;
+    // Polymorphic: only likes whose `likeable_type` is "posts".
+    let likes = model::like_counts(&db, &posts.items).await?;
     let posts = posts.map(|post| Card {
         category: post.category_id.and_then(|id| categories.get(&id).cloned()),
         tags: tags.remove(&post.id).unwrap_or_default(),
         comments: counts.get(&post.id).copied().unwrap_or(0),
         latest_comment: latest.remove(&post.id).and_then(|mut c| c.pop()),
+        likes: likes.get(&post.id).copied().unwrap_or(0),
         post,
     });
     Ok(view("blog/index.html", context! { posts }))
@@ -95,12 +105,30 @@ struct TagLink {
     pivot: Tagging,
 }
 
+/// A comment with its number of likes, for the template.
+#[derive(Serialize)]
+struct CommentRow {
+    #[serde(flatten)]
+    comment: Comment,
+    likes: i64,
+}
+
 /// One post: the relation methods on `Post`, one query each (the tags with
-/// their pivot columns: one for the links, one for the tags).
+/// their pivot columns: one for the links, one for the tags). Likes: one
+/// query for the post's (`LIKEABLE.of`), one for all its comments'.
 async fn show(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
     let post = Post::find_or_404(&db, id).await?;
     let category = post.category(&db).await?;
     let comments = post.comments(&db).await?;
+    let likes = LIKEABLE.of(&post, Like::query()).count(&db).await?;
+    let comment_likes = model::like_counts(&db, &comments).await?;
+    let comments: Vec<CommentRow> = comments
+        .into_iter()
+        .map(|comment| CommentRow {
+            likes: comment_likes.get(&comment.id).copied().unwrap_or(0),
+            comment,
+        })
+        .collect();
     let tags: Vec<TagLink> = post
         .taggings(&db)
         .await?
@@ -111,7 +139,7 @@ async fn show(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
     let all_tags = Tag::query().order_by("name").get(&db).await?;
     Ok(view(
         "blog/show.html",
-        context! { post, category, comments, tags, tag_ids, all_tags },
+        context! { post, category, comments, tags, tag_ids, all_tags, likes },
     ))
 }
 
@@ -145,6 +173,23 @@ async fn comment(
     )
     .await?;
     Ok(Redirect::to(&format!("/posts/{}#comments", post.id)))
+}
+
+/// Likes the post: a `Like` whose type is "posts".
+async fn like_post(State(db): State<Db>, Path(id): Path<i64>) -> Result<Redirect> {
+    let post = Post::find_or_404(&db, id).await?;
+    Like::create(&db, Like::on(&post)).await?;
+    Ok(Redirect::to(&format!("/posts/{}", post.id)))
+}
+
+/// Likes a comment: the same table, type "comments".
+async fn like_comment(State(db): State<Db>, Path(id): Path<i64>) -> Result<Redirect> {
+    let comment = Comment::find_or_404(&db, id).await?;
+    Like::create(&db, Like::on(&comment)).await?;
+    Ok(Redirect::to(&format!(
+        "/posts/{}#comment-{}",
+        comment.post_id, comment.id
+    )))
 }
 
 /// The checked boxes of the tag form (none checked sends nothing).
@@ -285,8 +330,10 @@ async fn report(State(db): State<Db>) -> Result<View> {
         .where_has(Comment::query(), "post_id")
         .count(&db)
         .await?;
+    // `morphTo`: the latest likes with the post or comment each is on.
+    let likes = model::latest_likes(&db, 10).await?;
     Ok(view(
         "blog/report.html",
-        context! { categories, tags, commenters, discussed },
+        context! { categories, tags, commenters, discussed, likes },
     ))
 }

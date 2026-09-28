@@ -8,6 +8,9 @@
     {% for tag in tags %} <a class="tag" href="{{ route('tags.show', tag.id) }}">#{{ tag.name }}</a>{% endfor %}
   </p>
   <p>{{ post.body }}</p>
+  <form method="post" action="{{ route('posts.like', post.id) }}" class="inline">
+    {{ csrf_field() }}<button>♥ Like</button> <span class="likes">{{ likes }} like{{ "" if likes == 1 else "s" }}</span>
+  </form>
 </article>
 
 <h2>Tags</h2>
@@ -40,7 +43,13 @@
 
 <h2 id="comments">Comments ({{ comments | length }})</h2>
 {% for comment in comments %}
-<div class="comment"><strong>{{ comment.author }}</strong> <span class="muted">{{ comment.created_at | date('%d/%m/%Y') }}</span><p>{{ comment.body }}</p></div>
+<div class="comment" id="comment-{{ comment.id }}">
+  <strong>{{ comment.author }}</strong> <span class="muted">{{ comment.created_at | date('%d/%m/%Y') }}</span>
+  <p>{{ comment.body }}</p>
+  <form method="post" action="{{ route('comments.like', comment.id) }}" class="inline">
+    {{ csrf_field() }}<button>♥ Like</button> <span class="likes">{{ comment.likes }} like{{ "" if comment.likes == 1 else "s" }}</span>
+  </form>
+</div>
 {% else %}
 <p class="muted">No comments yet.</p>
 {% endfor %}

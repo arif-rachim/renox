@@ -480,3 +480,56 @@ async fn api_tokens_carry_abilities() {
         .collect();
     assert_eq!(left, ["cli", "pos"]);
 }
+
+/// An app's own BOOLEAN column on `users` reads as a `bool` on both
+/// databases: SQLite stores it as 0/1, which used to make `get::<bool>` (and
+/// a `gate_before` built on it) answer `None`.
+#[renox::test]
+async fn user_get_reads_boolean_columns() {
+    let app = TestApp::new(
+        App::new()
+            .module(Auth::new())
+            .gate("never", |_| false)
+            .gate_before(|user, _| (user.get::<bool>("super_admin") == Some(true)).then_some(true))
+            .module(BoolRoutes),
+    )
+    .await;
+    let column = match app.db().dialect() {
+        renox::db::Dialect::Postgres => "BOOLEAN NOT NULL DEFAULT FALSE",
+        _ => "BOOLEAN NOT NULL DEFAULT 0",
+    };
+    renox::db::sql(format!("ALTER TABLE users ADD COLUMN super_admin {column}"))
+        .execute(app.db())
+        .await
+        .unwrap();
+    let mut root = User::register(app.db(), "Root", "root@example.com", "password123")
+        .await
+        .unwrap();
+    root.set(app.db(), "super_admin", true).await.unwrap();
+    let plain = User::register(app.db(), "Plain", "plain@example.com", "password123")
+        .await
+        .unwrap();
+
+    let root = User::find(app.db(), root.id).await.unwrap().unwrap();
+    let plain = User::find(app.db(), plain.id).await.unwrap().unwrap();
+    assert_eq!(root.get::<bool>("super_admin"), Some(true));
+    assert_eq!(plain.get::<bool>("super_admin"), Some(false));
+    assert_eq!(root.get::<String>("super_admin"), None);
+
+    app.acting_as(&root).get("/never").await.assert_ok();
+    app.acting_as(&plain).get("/never").await.assert_forbidden();
+}
+
+struct BoolRoutes;
+
+impl Module for BoolRoutes {
+    fn name(&self) -> &'static str {
+        "bool-routes"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new()
+            .get("/never", || async { "in" })
+            .require_gate("never")
+    }
+}

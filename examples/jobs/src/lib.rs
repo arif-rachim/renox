@@ -1,8 +1,11 @@
 //! Example: background work. Placing an order emits `OrderPlaced`. Its
-//! listener queues the customer's receipt email and notifies the shop's
-//! admins, by mail and in the database. Scheduled tasks mail the day's
-//! sales on weekday evenings and the week's on Monday mornings (Jakarta
-//! time), guarded by a cache lock and with an alert when they fail.
+//! listener notifies the shop's admins, by mail and in the database. Paying
+//! queues a chain (charge the card, send the receipt, tell the warehouse)
+//! on a `high` priority queue, with an encrypted payload, job middleware
+//! and a `failed` hook. Staff send unique payment reminders and a batch of
+//! monthly statements with a live progress bar. Scheduled tasks mail the
+//! day's sales on weekday evenings and the week's on Monday mornings
+//! (Jakarta time), guarded by a cache lock and with an alert when they fail.
 //!
 //! All of it runs inside `cargo run` (queue workers and the scheduler are
 //! part of `serve`). With `MAIL_MAILER=log` the mails go to the log, and
@@ -12,7 +15,10 @@ use renox::prelude::*;
 
 mod app;
 
-pub use app::orders::{Order, daily_sales, weekly_sales};
+pub use app::orders::{
+    ChargePayment, NotifyWarehouse, Order, OrderStatus, RemindUnpaid, SendReceipt, SendStatement,
+    StatementsSent, daily_sales, weekly_sales,
+};
 
 pub fn app() -> App {
     App::new()

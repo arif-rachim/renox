@@ -21,4 +21,17 @@
   <tr><th>Author</th><th>Comments</th></tr>
   {% for row in commenters %}<tr><td>{{ row.author }}</td><td>{{ row.comments }}</td></tr>{% endfor %}
 </table>
+<h2>Latest likes</h2>
+{# A polymorphic "belongs to": each like is on a post or a comment. #}
+<ul class="links">
+  {% for like in likes %}
+  <li>
+    {% if like.post %}the post <a href="{{ route('posts.show', like.post.id) }}">{{ like.post.title }}</a>
+    {% elif like.comment %}a comment by {{ like.comment.author }} on <a href="{{ route('posts.show', like.comment.post_id) }}#comment-{{ like.comment.id }}">a post</a>
+    {% endif %}
+  </li>
+  {% else %}
+  <li class="muted">No likes yet.</li>
+  {% endfor %}
+</ul>
 {% endblock %}

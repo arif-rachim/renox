@@ -1,4 +1,6 @@
-use renox::db::relations::Pivot;
+use std::collections::HashMap;
+
+use renox::db::relations::{Morph, Pivot, count_many};
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -47,6 +49,80 @@ pub struct Tag {
 /// `with_timestamps()`: attaching (`attach`, `attach_with`, `sync`) fills the
 /// pivot's `created_at`/`updated_at`, and `update_pivot` its `updated_at`.
 pub const POST_TAGS: Pivot = Pivot::new("post_tags", "post_id", "tag_id").with_timestamps();
+
+/// A like on a post or a comment: a polymorphic "belongs to". The type
+/// column holds the parent's table (`Post::TABLE`, `Comment::TABLE`).
+#[derive(Model, Serialize, Deserialize, Default, Debug, Clone)]
+#[model(table = "likes")]
+pub struct Like {
+    pub id: i64,
+    pub likeable_type: String,
+    pub likeable_id: i64,
+    pub created_at: Option<DateTime>,
+    pub updated_at: Option<DateTime>,
+}
+
+/// Posts and comments ⇄ likes (`morphMany` / `morphTo`).
+pub const LIKEABLE: Morph = Morph::new("likeable_type", "likeable_id");
+
+impl Like {
+    /// A new like on `parent`, a post or a comment.
+    pub fn on<P: Model>(parent: &P) -> Self {
+        Like {
+            likeable_type: P::TABLE.into(),
+            likeable_id: parent.id(),
+            ..Default::default()
+        }
+    }
+}
+
+/// The number of likes of each post (or each comment) of a page, in one
+/// `GROUP BY` query; 0 for those without likes. `count_many` with the
+/// type filter counts rows without loading them; `LIKEABLE.load_many` is
+/// the loader for when a page needs the likes themselves.
+pub fn like_counts<'a, P: Model>(
+    db: &'a Db,
+    parents: &[P],
+) -> impl Future<Output = Result<HashMap<i64, i64>>> + Send + 'a {
+    let likes = Like::where_eq("likeable_type", P::TABLE);
+    count_many(db, parents, likes, "likeable_id")
+}
+
+/// A like with what was liked, for the "latest likes" list.
+#[derive(Serialize, Debug)]
+pub struct LikeOn {
+    #[serde(flatten)]
+    pub like: Like,
+    pub post: Option<Post>,
+    pub comment: Option<Comment>,
+}
+
+/// The latest likes and their parents (`morphTo`): one query for the likes,
+/// then one per parent type (`LIKEABLE.parents`), however many likes.
+pub async fn latest_likes(db: &Db, limit: u64) -> Result<Vec<LikeOn>> {
+    let likes = Like::query()
+        .order_by_desc("id")
+        .limit(limit)
+        .get(db)
+        .await?;
+    let parent = |like: &Like| (like.likeable_type.clone(), like.likeable_id);
+    let posts = LIKEABLE.parents::<Post, _>(db, &likes, parent).await?;
+    let comments = LIKEABLE.parents::<Comment, _>(db, &likes, parent).await?;
+    Ok(likes
+        .into_iter()
+        .map(|like| {
+            let (post, comment) = match like.likeable_type.as_str() {
+                Post::TABLE => (posts.get(&like.likeable_id).cloned(), None),
+                _ => (None, comments.get(&like.likeable_id).cloned()),
+            };
+            LikeOn {
+                like,
+                post,
+                comment,
+            }
+        })
+        .collect())
+}
 
 /// The pivot's own columns, read next to each tag (or post) by
 /// `Pivot::load_with_pivot`.

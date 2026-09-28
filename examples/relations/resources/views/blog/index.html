@@ -9,6 +9,7 @@
   <p class="muted">
     {{ post.comments }} comment{{ "" if post.comments == 1 else "s" }}
     {%- if post.latest_comment %}; latest by {{ post.latest_comment.author }}{% endif %}
+    · {{ post.likes }} like{{ "" if post.likes == 1 else "s" }}
   </p>
 </article>
 {% else %}

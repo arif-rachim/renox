@@ -144,10 +144,14 @@ impl User {
 
     /// One of the app's own columns (see `extra`), e.g.
     /// `user.get::<String>("role")`; `None` if missing, null or of another type.
+    /// A BOOLEAN column reads as `bool` on SQLite too, where it is stored as
+    /// 0 or 1.
     pub fn get<T: serde::de::DeserializeOwned>(&self, column: &str) -> Option<T> {
-        self.extra
-            .get(column)
-            .and_then(|value| serde_json::from_value(value.clone()).ok())
+        let value = self.extra.get(column)?;
+        serde_json::from_value(value.clone()).ok().or_else(|| {
+            let flag = value.as_i64().filter(|n| *n == 0 || *n == 1)?;
+            serde_json::from_value(serde_json::Value::Bool(flag == 1)).ok()
+        })
     }
 
     /// Sets one of the app's own columns in the database and in `extra`, e.g.

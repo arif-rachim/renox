@@ -5,3 +5,5 @@ code { background: #f4f4f4; padding: .1rem .3rem; border-radius: .2rem; }
 nav { display: flex; gap: 1rem; align-items: center; margin-bottom: 2rem; }
 nav > :first-child { margin-right: auto; }
 nav form { margin: 0; }
+.orders li { margin-bottom: .75rem; }
+.orders form { display: inline; margin-left: .5rem; }

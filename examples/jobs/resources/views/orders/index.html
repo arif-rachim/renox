@@ -12,7 +12,37 @@
   <p class="error" data-error-for="total">{{ error('total') }}</p>
   <button>Order</button>
 </form>
-<ul>
-  {% for order in orders %}<li>#{{ order.id }} {{ order.item }}: Rp {{ order.total }}</li>{% endfor %}
+
+<h2>Orders</h2>
+<ul class="orders">
+  {% for order in orders %}
+  <li>
+    #{{ order.id }} {{ order.item }}: Rp {{ order.total }} <em>{{ order.status }}</em>
+    {% if order.status == "unpaid" %}
+    {#- The card token would come from the payment provider's script; these are its test tokens. #}
+    <form method="post" action="{{ route('orders.pay', order.id) }}">
+      {{ csrf_field() }}
+      <select name="card_token" aria-label="Test card">
+        <option value="tok_visa">Card that works</option>
+        <option value="tok_declined">Card that is declined</option>
+        <option value="tok_unreachable">Gateway that times out</option>
+      </select>
+      <button>Pay</button>
+    </form>
+    {% if auth.check %}
+    <form method="post" action="{{ route('orders.remind', order.id) }}">
+      {{ csrf_field() }}<button>Remind customer</button>
+    </form>
+    {% endif %}
+    {% endif %}
+  </li>
+  {% endfor %}
 </ul>
+
+{% if auth.check %}
+<h2>Staff</h2>
+<form method="post" action="{{ route('statements.store') }}">
+  {{ csrf_field() }}<button>Email monthly statements</button>
+</form>
+{% endif %}
 {% endblock %}

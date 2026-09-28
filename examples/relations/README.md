@@ -1,7 +1,8 @@
 # examples/relations
 
 Relations the Renox way, on a small blog: a post belongs to a category, has many comments, and
-has many tags through a pivot table with columns of its own (pinned, timestamps). There are no
+has many tags through a pivot table with columns of its own (pinned, timestamps), and posts
+and comments both have likes (a polymorphic relation). There are no
 lazy, hidden queries: one row gets a method per relation, a page of rows gets one query per
 relation (counts included), and reports use the query builder or SQL joins. Read it with
 [docs/relations.md](../../docs/relations.md).
@@ -26,6 +27,9 @@ cargo run                        # http://127.0.0.1:3000
 | A category's posts (has many, from the parent) | `Post::where_eq("category_id", …)` in `category.posts(&db)` | `category` |
 | Report: posts and comments per category, posts per tag | SQL joins read with `fetch_as` into a `#[derive(FromRow)]` struct and a tuple | `report` |
 | Report: most active commenters | `Comment::query().group_by("author").select_as(…)` into a `#[derive(FromRow)]` struct | `report` |
+| Likes on a post or a comment (polymorphic): one `likes` table with `likeable_type` / `likeable_id`, a `Like` button on the post and on each comment | `Like`, `LIKEABLE: Morph`, `Like::on` in [model.rs](src/app/blog/model.rs); `like_post`, `like_comment` |
+| A post's like count; its comments' like counts; each card's like count | `LIKEABLE.of(&post, Like::query()).count(..)`; `like_counts` (`count_many` filtered on `likeable_type`, one query per page) | `show`, `index` |
+| The latest likes with what was liked (`morphTo`) | `LIKEABLE.parents::<Post, _>` and `::<Comment, _>`: one query for the likes, one per parent type | `latest_likes`, `report` |
 | Posts that have comments | `where_has(Comment::query(), "post_id")` (`whereHas`, an `EXISTS` without SQL) | `report` |
 
 ## Things worth copying
@@ -43,6 +47,14 @@ cargo run                        # http://127.0.0.1:3000
 - **Pivot tables can carry data.** `attach_with` / `update_pivot` write the extra columns,
   `load_with_pivot` reads them next to each model into a `#[derive(FromRow)]` struct
   (`Tagging`), and `with_timestamps()` keeps `created_at`/`updated_at` on every link.
+- **Polymorphic relations: the type column holds the parent's table.** `Like::on(&post)` fills
+  `likeable_type` with `Post::TABLE`; `Morph::of` narrows a query to one parent,
+  `Morph::load_many` loads the children of a page (grouped by parent id), `Morph::parents` goes
+  the other way, once per parent type. To count, filter `count_many` on the type column rather
+  than loading every like.
+- **No foreign key, so triggers tidy up.** A foreign key can't point at two tables; the likes
+  migration adds `AFTER DELETE` triggers on `posts` and `comments`, which also fire for comments
+  removed by `ON DELETE CASCADE` (a model hook never sees those).
 - **Reports: the builder for one table, SQL for joins.** `group_by` + `select_as` reads an
   aggregate of one table into a struct; a join with `GROUP BY` is clearest as SQL with
   `fetch_as`.
@@ -55,4 +67,7 @@ cargo test -p relations
 
 [tests/blog.rs](tests/blog.rs) checks each card's relations, comments, tag syncing (including an
 unknown tag being refused), both directions of many to many, pivot columns (pinning, timestamps,
-a tag the post doesn't have), the report's numbers and what deletes take with them.
+a tag the post doesn't have), the report's numbers, likes on posts and comments, and what
+deletes take with them. [tests/queries.rs](tests/queries.rs) counts the statements sqlx runs
+(its `sqlx::query` tracing events) to prove the likes of a page load in one query per type,
+however many there are; it's its own test binary because the counter is process-wide.

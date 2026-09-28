@@ -7,8 +7,9 @@ pub mod policy;
 
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
-use model::Product;
+use model::{COUNT_KEY, Product};
 
 pub struct Products;
 
@@ -62,14 +63,27 @@ async fn home() -> Redirect {
     Redirect::to("/products")
 }
 
-async fn index(State(db): State<Db>, user: Option<AuthUser>, Page(page): Page) -> Result<View> {
+async fn index(
+    State(state): State<AppState>,
+    user: Option<AuthUser>,
+    Page(page): Page,
+) -> Result<View> {
+    let db = &state.db;
+    // Cached for ten minutes; the model's `saved`/`deleted` hooks forget it,
+    // so it's never stale after a change made through the model.
+    let total: i64 = state
+        .cache
+        .remember(COUNT_KEY, Duration::from_secs(600), || async {
+            Ok(Product::query().count(db).await? as i64)
+        })
+        .await?;
     let products = Product::query()
         .latest()
-        .paginate(&db, page, 10)
+        .paginate(db, page, 10)
         .await?
         // Lets the view ask the policy: `can('update', product)`.
         .map(|product| Can::new(product, user.as_deref(), &["update", "delete"]));
-    Ok(view("products/index.html", context! { products }))
+    Ok(view("products/index.html", context! { products, total }))
 }
 
 async fn create() -> View {
@@ -106,12 +120,22 @@ async fn update(
     Path(id): Path<i64>,
     Valid(form): Valid<ProductForm>,
 ) -> Result<Redirect> {
-    let mut product = Product::find_or_404(&db, id).await?;
-    user.authorize("update", &product)?;
+    let original = Product::find_or_404(&db, id).await?;
+    user.authorize("update", &original)?;
+    let mut product = original.clone();
     product.name = form.name;
     product.price = form.price;
-    product.save(&db).await?;
-    session.flash("status", "Product updated.")?;
+    // Writes only the columns that differ from `original` (plus
+    // `updated_at`), including the slug the `saving` hook derives, so a
+    // concurrent change to another column isn't overwritten. `false` means
+    // nothing changed: no query, no `saved` hook.
+    let changed = product.save_changes(&db, &original).await?;
+    let status = if changed {
+        "Product updated."
+    } else {
+        "Nothing changed."
+    };
+    session.flash("status", status)?;
     Ok(Redirect::to("/products"))
 }
 
@@ -152,6 +176,7 @@ async fn restore(
         .ok_or(Error::NotFound)?;
     user.authorize("restore", &product)?;
     product.restore(&db).await?;
+    model::forget_count().await?; // `restore` runs no hooks
     session.flash("status", "Product restored.")?;
     Ok(Redirect::to("/products"))
 }

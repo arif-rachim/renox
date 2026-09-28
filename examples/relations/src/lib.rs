@@ -9,6 +9,8 @@
 //! - Changing a many-to-many: `Pivot::sync` from a form's checkboxes.
 //! - Pivot columns: `Pivot::with_timestamps`, `attach_with`, `update_pivot`
 //!   and `load_with_pivot` (a post pinned on a tag's page).
+//! - Polymorphic: likes on posts or comments (`Morph`: `of`, `parents`,
+//!   and `count_many` filtered by the type column).
 //! - Reports: SQL joins read into `#[derive(FromRow)]` structs and tuples,
 //!   `group_by` + `select_as` for one table, `where_has` for "has any".
 //!
@@ -27,7 +29,7 @@ use renox::fake::faker::lorem::en::{Paragraph, Sentence};
 use renox::fake::faker::name::en::FirstName;
 use renox::prelude::*;
 
-use app::blog::model::{Category, Comment, POST_TAGS, Post, Tag};
+use app::blog::model::{Category, Comment, Like, POST_TAGS, Post, Tag};
 
 pub fn app() -> App {
     App::new()
@@ -72,7 +74,13 @@ async fn seed(db: Db) -> Result {
                 body: Sentence(4..12).fake(),
                 ..Default::default()
             };
-            Comment::create(&db, comment).await?;
+            let comment = Comment::create(&db, comment).await?;
+            for _ in 0..(0..3).fake::<usize>() {
+                Like::create(&db, Like::on(&comment)).await?;
+            }
+        }
+        for _ in 0..(0..6).fake::<usize>() {
+            Like::create(&db, Like::on(&post)).await?;
         }
         let picked: Vec<i64> = tags
             .iter()

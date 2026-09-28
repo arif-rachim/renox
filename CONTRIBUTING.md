@@ -51,6 +51,11 @@ cargo test --workspace
   A new API also gets a line in [CHEATSHEET.md](CHEATSHEET.md) (compiled as a doctest too).
 - **Generators.** A change to `rnx new` or `rnx make:*` must keep `tests/cli/run.sh` passing:
   it builds and tests an app made with every generator.
+- **Docs and examples in step.** When a change adds or changes behaviour, update what
+  describes it: [CHEATSHEET.md](CHEATSHEET.md), [README.md](README.md) (feature tour),
+  [llms.txt](llms.txt), the guides in `docs/` (operations: new commands, tables that grow,
+  config), the new-app agent guide (`crates/renox-cli/stubs/AGENTS.md.stub`), and the examples
+  that show that area (use the new API where an example worked around its absence).
 - **Stability.** Read [docs/stability.md](docs/stability.md) before changing a public type.
   Breaking changes go in [CHANGELOG.md](CHANGELOG.md) under "Breaking".
 

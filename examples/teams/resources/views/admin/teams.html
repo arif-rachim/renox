@@ -1,0 +1,12 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<h1>All teams</h1>
+<p class="muted">Only super-admins see this page. The counts use <code>Project::unscoped()</code>.</p>
+<table>
+  <tr><th>Team</th><th>Projects</th></tr>
+  {% for item, projects in teams %}
+  <tr><td>{{ item.name }}</td><td>{{ projects }}</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

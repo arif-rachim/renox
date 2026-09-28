@@ -1,0 +1,19 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<h1>Monthly statements</h1>
+{#- htmx asks for this block every second until the batch is done; the handler
+    returns only the block (`.fragment("progress")`) for htmx requests. #}
+{% block progress %}
+<div id="progress"
+  {%- if not batch.finished %} hx-get="{{ route('statements.show', batch.id) }}" hx-trigger="every 1s" hx-swap="outerHTML"{% endif %}>
+  <progress max="100" value="{{ progress }}">{{ progress }}%</progress>
+  <p>
+    {{ batch.total - batch.pending - batch.failed }} of {{ batch.total }} sent
+    {%- if batch.failed %}, {{ batch.failed }} failed (see <code>queue:failed</code>){% endif %}
+    {%- if batch.finished %}. Done.{% else %}…{% endif %}
+  </p>
+</div>
+{% endblock %}
+<p><a href="{{ route('home') }}">Back to the orders</a></p>
+{% endblock %}

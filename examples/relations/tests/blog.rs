@@ -1,4 +1,4 @@
-use relations::app::blog::model::{Category, Comment, POST_TAGS, Post, Tag, Tagging};
+use relations::app::blog::model::{Category, Comment, Like, POST_TAGS, Post, Tag, Tagging};
 use renox::prelude::*;
 use renox::testing::TestApp;
 
@@ -281,4 +281,79 @@ async fn deleting_a_post_takes_its_comments_and_links() {
     let rust = Post::find_or_404(b.app.db(), b.rust.id).await.unwrap();
     assert_eq!(rust.category_id, None);
     assert!(Post::find(b.app.db(), b.loose.id).await.unwrap().is_some());
+}
+
+#[renox::test]
+async fn posts_and_comments_are_liked() {
+    let b = blog().await;
+    let url = format!("/posts/{}", b.beans.id);
+    b.app.get(&url).await.assert_see("0 likes");
+    b.app
+        .post(&format!("{url}/like"), &[])
+        .await
+        .assert_redirect(&url);
+    b.app.post(&format!("{url}/like"), &[]).await;
+    let ani = Comment::where_eq("author", "Ani")
+        .first(b.app.db())
+        .await
+        .unwrap()
+        .unwrap();
+    b.app
+        .post(&format!("/comments/{}/like", ani.id), &[])
+        .await
+        .assert_redirect(&format!("{url}#comment-{}", ani.id));
+
+    // Two likes on the post, one on Ani's comment, none on Budi's.
+    let page = b.app.get(&url).await;
+    page.assert_ok();
+    let text = page.text();
+    let likes = |from: &str| {
+        let start = text.find(from).unwrap();
+        let at = text[start..].find(r#"<span class="likes">"#).unwrap() + start;
+        text[at..at + 30].to_owned()
+    };
+    assert!(likes("<h1>").contains(">2 likes<"));
+    assert!(likes("<strong>Ani</strong>").contains(">1 like<"));
+    assert!(likes("<strong>Budi</strong>").contains(">0 likes<"));
+    b.app
+        .assert_database_has(
+            "likes",
+            &[("likeable_type", &"comments"), ("likeable_id", &ani.id)],
+        )
+        .await;
+
+    // The list counts the post's likes only; the report says what was liked.
+    let text = b.app.get("/").await.text();
+    let start = text.find(">Beans<").unwrap();
+    let end = text[start..].find("</article>").unwrap() + start;
+    assert!(text[start..end].contains("2 likes"));
+    b.app
+        .get("/report")
+        .await
+        .assert_see(">Beans</a>")
+        .assert_see("a comment by Ani");
+
+    b.app.post("/posts/999/like", &[]).await.assert_not_found();
+    b.app
+        .post("/comments/999/like", &[])
+        .await
+        .assert_not_found();
+}
+
+#[renox::test]
+async fn deleting_a_parent_deletes_its_likes() {
+    let b = blog().await;
+    let db = b.app.db();
+    let comment = Comment::where_eq("post_id", b.beans.id)
+        .first(db)
+        .await
+        .unwrap()
+        .unwrap();
+    Like::create(db, Like::on(&b.beans)).await.unwrap();
+    Like::create(db, Like::on(&comment)).await.unwrap();
+    Like::create(db, Like::on(&b.rust)).await.unwrap();
+    // The comment goes by ON DELETE CASCADE; the triggers take both likes.
+    let mut beans = b.beans.clone();
+    beans.delete(db).await.unwrap();
+    b.app.assert_database_count("likes", 1).await;
 }

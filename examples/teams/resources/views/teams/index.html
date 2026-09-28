@@ -1,0 +1,31 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<h1>Your teams</h1>
+{% if not teams %}<p>You're not in a team yet. Create one to start.</p>{% endif %}
+
+<table>
+  {% for item, membership in teams %}
+  <tr>
+    <td>{{ item.name }} <span class="badge">{{ membership.role }}</span></td>
+    <td>
+      {% if team and team.id == item.id %}
+      <strong>Current team</strong>
+      {% else %}
+      <form method="post" action="{{ route('teams.switch', item.id) }}">
+        {{ csrf_field() }}<button>Switch to {{ item.name }}</button>
+      </form>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h2>New team</h2>
+<form method="post" action="{{ route('teams.store') }}">
+  {{ csrf_field() }}
+  <label>Name <input name="name" value="{{ old('name') }}"></label>
+  <p class="error" data-error-for="name">{{ error('name') }}</p>
+  <button>Create team</button>
+</form>
+{% endblock %}

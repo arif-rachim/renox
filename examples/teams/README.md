@@ -1,0 +1,68 @@
+# examples/teams
+
+The official pattern for a multi-tenant SaaS. Users belong to teams (as an owner or a member),
+pick a current team, and only ever see that team's projects. Handlers never filter by team: the
+current team lives in `renox::context`, and the `Project` model's default scope reads it. Also
+shows a super-admin through `App::gate_before`, a team secret stored encrypted and revealed only
+after the password is confirmed, and the account pages from `Auth::new().account()`.
+
+```bash
+cd examples/teams
+rnx key:generate                 # keeps logins (and the encrypted secrets) across restarts
+cargo run -- migrate
+cargo run -- db:seed             # alice@, bob@ and carol@example.com / password123
+SUPER_ADMINS=alice@example.com cargo run   # http://127.0.0.1:3000
+cargo run -- projects:count      # every team's projects, across tenants
+```
+
+Alice owns Acme and is a member of Globex, so she can switch between them at `/teams`. Bob owns
+Globex, Carol is a member of Acme. With `SUPER_ADMINS` set, Alice also sees `/admin`.
+
+## What's where
+
+| Feature | Where |
+|---|---|
+| Wiring: `Auth::new().account()`, the modules, the tenancy layer, the shared `team`, `gate_before`, the `projects:count` command, the seeder | [src/lib.rs](src/lib.rs) |
+| The current team: session → membership check → `renox::context`, an extractor, a policy | [src/app/tenancy.rs](src/app/tenancy.rs) |
+| `Team`, the `team_user` pivot with a `role` (`MEMBERS`, `USER_TEAMS`), the secret helpers | [src/app/teams/model.rs](src/app/teams/model.rs) |
+| Create, switch, members, the encrypted secret behind `require_password_confirmed` | [src/app/teams/mod.rs](src/app/teams/mod.rs) |
+| `Project` with `default_scope = "team_only"` and a `saving` hook that fills `team_id` | [src/app/projects/model.rs](src/app/projects/model.rs) |
+| Project CRUD with no `team_id` in sight; name unique per team | [src/app/projects/mod.rs](src/app/projects/mod.rs) |
+| The super-admin check and the cross-team report with `Project::unscoped()` | [src/app/admin.rs](src/app/admin.rs) |
+| Pages | [resources/views](resources/views) |
+| Tables: `teams`, `team_user`, `projects` (unique `(team_id, name)`) | [migrations](migrations) |
+
+## Things worth copying
+
+- **The tenant is set once per request.** An `App::layer` middleware reads `current_team_id`
+  from the session, checks the membership in one query (falling back to the user's first team,
+  so a removed member can't keep a stale team) and calls `renox::context::set(team)`.
+- **A default scope that fails closed.** `team_only` adds `team_id = ?` for the current team and
+  `query.none()` without one, so a request, job or command that forgot the team sees nothing
+  rather than everything. `find_or_404` on another team's project is a plain 404.
+- **New rows join the current team by themselves.** `#[model(hooks)]` with a `saving` hook sets
+  `team_id` on create, and refuses to save without a team.
+- **Unique per team.** `.unique("projects", "name").ignore(self.id).where_eq("team_id", team)`,
+  backed by a unique index on `(team_id, name)`.
+- **Per-team roles live in the pivot.** The `Permissions` module's roles are global; a member's
+  role in one team is a `role` column on `team_user`, written with `attach_with` and read with
+  `load_with_pivot` (both directions, thanks to `Pivot::inverse`).
+- **`unscoped()` only where every tenant counts:** the super-admin page and `projects:count`.
+- **Super-admins in one place.** `gate_before` answers `Some(true)` for the emails in
+  `SUPER_ADMINS`, which passes `require_gate("admin")`, `user.authorize("manage", &team)` and
+  `can('admin')` in views. Everyone else gets `None` and the normal check.
+- **Secrets at rest.** `state.encrypt` seals the webhook secret (AES-256-GCM under `APP_KEY`);
+  the settings page shows only its last characters, and `/team/secret` asks for the password
+  again (`.require_password_confirmed()`) before showing it or making a new one.
+- **The current team in every view** with `App::share("team", …)`: `{% if team %}{{ team.name }}`.
+
+## Tests
+
+```bash
+cargo test -p teams
+```
+
+[tests/teams.rs](tests/teams.rs) covers isolation between teams (lists, edit/update/delete by id),
+switching (and being refused a team you're not in), falling back when removed from a team,
+unique names per team, the fail-closed scope without a team, the unscoped counts and command,
+the super-admin, adding members, and the encrypted secret with its password confirmation.

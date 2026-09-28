@@ -11,6 +11,10 @@ pub struct SendReceipt {
 
 impl Job for SendReceipt {
     const NAME: &'static str = "send-receipt";
+    // A customer is waiting for it: `queue:work --queue high,default` runs it
+    // before the reports and statements on `default`. (`state.queue.dispatch_on("high", job)`
+    // picks the queue for one dispatch instead.)
+    const QUEUE: &'static str = "high";
     // A mail server can be down for a while: retry five times, slower each time.
     const MAX_ATTEMPTS: u32 = 5;
 

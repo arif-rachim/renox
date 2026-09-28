@@ -791,6 +791,24 @@ Notes from M20b (queue):
       more validation rules and form-request hooks (`authorize`, `prepare`, `after`, async rules)
 - [ ] Typed app commands (a clap parser), prompts; zero-downtime deploy recipes; an opt-in
       server-side session store
+- [ ] Authorization gaps found while moving examples/shop to `Permissions` (#53): policies
+      and `gate_before` see a plain `User` without its roles (`Policy::allows` can't say
+      "admins see all", a super-admin can't be a role), and there is no loader for the users
+      with a role (`permissions::users_with_role`)
+- [ ] Rough edges found while writing examples/teams, jobs, crud, relations and shop (#55):
+      - after `/confirm-password`, only a GET is remembered as the page to return to, so a
+        guarded DELETE/PUT lands on `/` (`auth/account.rs`); `TestApp` has no way to mark the
+        password as confirmed
+      - `transaction_retrying` closures can't borrow from the caller and can't roll back with
+        a value (examples/shop downcasts an `Error::Internal`)
+      - a batch's `then`/`catch`/`finally` jobs get no `batch_id`, so `finally` can't read the
+        batch's status; `TestApp` can't run jobs still waiting for their backoff
+      - `Error::permanent` needs an `anyhow`-compatible error and `anyhow` isn't re-exported
+      - no query counter in `TestApp` (examples/relations counts sqlx tracing events)
+      - `Morph` has no `count_many`; a `saving` hook's error loses the old input on plain forms
+      - seeders get only a `Db` (no `state.encrypt`, config or `context::app()`); no public
+        random-token helper; reading a context value in a handler needs a hand-written
+        extractor
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

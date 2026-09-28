@@ -1,0 +1,30 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<h1>{{ team.name }}</h1>
+
+<h2>Members</h2>
+<table>
+  {% for member, membership in members %}
+  <tr><td>{{ member.name }}</td><td>{{ member.email }}</td><td><span class="badge">{{ membership.role }}</span></td></tr>
+  {% endfor %}
+</table>
+
+{% if manage %}
+<form method="post" action="{{ route('team.members.store') }}">
+  {{ csrf_field() }}
+  <label>Add a member by email <input name="email" type="email" value="{{ old('email') }}"></label>
+  <p class="error" data-error-for="email">{{ error('email') }}</p>
+  <button>Add member</button>
+</form>
+
+<h2>Webhook secret</h2>
+{% if secret %}
+<p><code>{{ secret }}</code> <a href="{{ route('team.secret') }}">Reveal</a></p>
+{% else %}
+<p class="muted">No secret yet.</p>
+<form method="post" action="{{ route('team.secret.rotate') }}">{{ csrf_field() }}<button>Make one</button></form>
+{% endif %}
+<p class="muted">It's stored encrypted; showing or changing it asks for your password.</p>
+{% endif %}
+{% endblock %}

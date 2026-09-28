@@ -341,6 +341,9 @@ async fn only_admins_get_into_the_admin() {
     .await
     .assert_forbidden();
     app.assert_database_count("products", 0).await;
+    // The role is checked before the password confirmation: a customer
+    // isn't even asked for it.
+    app.delete("/admin/products/1").await.assert_forbidden();
 
     // `shop:make-admin` promotes a registered user.
     app.kernel()
@@ -507,7 +510,28 @@ async fn admins_manage_products_with_photos() {
         .await
         .assert_see("Kopi Susu Gula Aren");
 
-    app.delete(&format!("/admin/products/{}", kopi.id))
+    // Deleting asks for the password first: `acting_as` logs in without
+    // typing it, so it doesn't count as confirmed (a real login does).
+    let destroy = format!("/admin/products/{}", kopi.id);
+    app.delete(&destroy)
+        .await
+        .assert_redirect("/confirm-password");
+    app.htmx()
+        .delete(&destroy)
+        .await
+        .assert_hx_redirect("/confirm-password");
+    app.assert_database_has("products", &[("id", &kopi.id)])
+        .await;
+    app.htmx()
+        .post("/confirm-password", &[("password", "wrong")])
+        .await
+        .assert_invalid("password");
+    // Only GET requests are remembered for after the confirmation, so a
+    // DELETE lands on the home page and is sent again.
+    app.post("/confirm-password", &[("password", "password123")])
+        .await
+        .assert_redirect("/");
+    app.delete(&destroy)
         .await
         .assert_redirect("/admin/products");
     app.assert_database_missing("products", &[("id", &kopi.id)])
