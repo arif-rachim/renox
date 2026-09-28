@@ -795,7 +795,7 @@ Notes from M20b (queue):
       and `gate_before` see a plain `User` without its roles (`Policy::allows` can't say
       "admins see all", a super-admin can't be a role), and there is no loader for the users
       with a role (`permissions::users_with_role`)
-- [ ] Rough edges found while writing examples/teams, jobs, crud, relations and shop (#54):
+- [ ] Rough edges found while writing examples/teams, jobs, crud, relations and shop (#55):
       - after `/confirm-password`, only a GET is remembered as the page to return to, so a
         guarded DELETE/PUT lands on `/` (`auth/account.rs`); `TestApp` has no way to mark the
         password as confirmed
