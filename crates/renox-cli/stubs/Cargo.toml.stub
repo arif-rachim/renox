@@ -15,3 +15,8 @@ opt-level = 3
 
 [profile.dev.package.blake2]
 opt-level = 3
+
+# Line numbers in backtraces, without full debug info: much smaller dev
+# binaries and faster links on every `rnx serve` rebuild.
+[profile.dev]
+debug = "line-tables-only"

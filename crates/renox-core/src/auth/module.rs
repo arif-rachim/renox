@@ -321,7 +321,7 @@ async fn store_login(
             .with_input(&json!({ "email": form.email, "remember": form.remember }))
     };
 
-    if let Some(seconds) = state.throttle.blocked_for(&form.email, ip) {
+    if let Some(seconds) = state.throttle.blocked_for(&form.email, ip).await {
         return Err(failed("auth.throttle", Some(seconds)).into());
     }
 
@@ -332,11 +332,11 @@ async fn store_login(
         .map_or_else(dummy_hash, |u| u.password.clone());
     let valid = verify_password(&form.password, &hash).await;
     let Some(user) = user.filter(|_| valid) else {
-        state.throttle.fail(&form.email, ip);
+        state.throttle.fail(&form.email, ip).await;
         return Err(failed("auth.failed", None).into());
     };
 
-    state.throttle.clear(&form.email, ip);
+    state.throttle.clear(&form.email, ip).await;
     let remember = form
         .remember
         .is_some()

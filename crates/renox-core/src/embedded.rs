@@ -57,11 +57,88 @@ pub(crate) fn serve(files: &PublicFiles, uri: &Uri) -> Response {
             StatusCode::OK,
             [
                 (CONTENT_TYPE, content_type(path)),
-                (CACHE_CONTROL, "public, max-age=3600"),
+                (CACHE_CONTROL, cache_control(uri)),
             ],
             *bytes,
         )
             .into_response(),
         None => Error::NotFound.into_response(),
+    }
+}
+
+/// Content versions for `asset()` URLs (`/app.css?v=1a2b3c4d`): a changed
+/// file gets a new URL, so browsers may keep each version for a year.
+pub(crate) enum AssetVersions {
+    /// Compiled in: hashed once at boot.
+    Embedded(HashMap<&'static str, String>),
+    /// Read from `PUBLIC_PATH`: hashed when first asked for and again after
+    /// the file changes (its modified time).
+    Disk {
+        root: std::path::PathBuf,
+        seen: std::sync::Mutex<HashMap<String, (std::time::SystemTime, String)>>,
+    },
+}
+
+fn short_hash(bytes: &[u8]) -> String {
+    crate::webhook::sha256_hex(bytes)[..8].to_owned()
+}
+
+impl AssetVersions {
+    pub(crate) fn new(
+        public: &std::path::Path,
+        embedded: Option<&'static [(&'static str, &'static [u8])]>,
+    ) -> Self {
+        match embedded {
+            Some(files) => Self::Embedded(
+                files
+                    .iter()
+                    .map(|(path, bytes)| (*path, short_hash(bytes)))
+                    .collect(),
+            ),
+            None => Self::Disk {
+                root: public.to_path_buf(),
+                seen: std::sync::Mutex::default(),
+            },
+        }
+    }
+
+    /// The version of the public file at `path`, if there is one.
+    pub(crate) fn version(&self, path: &str) -> Option<String> {
+        let path = path.trim_start_matches('/');
+        match self {
+            Self::Embedded(files) => files.get(path).cloned(),
+            Self::Disk { root, seen } => {
+                let file = root.join(path);
+                if !file.starts_with(root) || path.split('/').any(|part| part == "..") {
+                    return None;
+                }
+                let modified = std::fs::metadata(&file).and_then(|m| m.modified()).ok()?;
+                let mut seen = seen.lock().unwrap_or_else(|e| e.into_inner());
+                if let Some((at, hash)) = seen.get(path)
+                    && *at == modified
+                {
+                    return Some(hash.clone());
+                }
+                let hash = short_hash(&std::fs::read(&file).ok()?);
+                seen.insert(path.to_owned(), (modified, hash.clone()));
+                Some(hash)
+            }
+        }
+    }
+}
+
+/// Whether the request asks for a versioned file (`?v=…`), which can be
+/// cached for good.
+pub(crate) fn is_versioned(uri: &Uri) -> bool {
+    uri.query()
+        .is_some_and(|query| query.split('&').any(|pair| pair.starts_with("v=")))
+}
+
+/// `Cache-Control` for a public file: a year for versioned URLs.
+pub(crate) fn cache_control(uri: &Uri) -> &'static str {
+    if is_versioned(uri) {
+        "public, max-age=31536000, immutable"
+    } else {
+        "public, max-age=3600"
     }
 }

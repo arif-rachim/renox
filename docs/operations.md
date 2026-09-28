@@ -54,6 +54,21 @@ Don't set it when the app is reachable directly: anyone could then send a fake
 Also set `APP_URL` to the public `https://` address. Cookies are then marked `Secure`, HSTS is
 sent, and links in mails point to the right place.
 
+## Several servers
+
+Several app servers can share one PostgreSQL database:
+- The queue hands each job to one worker (`FOR UPDATE SKIP LOCKED`).
+- Each scheduled run is claimed once.
+- Migrations take turns.
+
+Set `CACHE_STORE=database` as well. Then the cache, `Routes::throttle` limits and the login lock
+are counted in the `cache` table, so they hold across servers. With the default `memory` store,
+each server counts on its own, and N servers allow N times the limit.
+
+Sessions live in their encrypted cookie, so any server can answer any request (no sticky
+sessions). Uploaded files must be on shared storage (`STORAGE_DISK=s3`) or on the one server that
+has the disk.
+
 ## `/health`
 
 `GET /health` is meant for load balancers, uptime monitors and container health checks.

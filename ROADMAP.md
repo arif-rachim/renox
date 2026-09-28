@@ -547,15 +547,25 @@ M15b · validation and requests:
       photos at once through htmx and shows invoices with `Download`
 
 ### M16 · v0.17: Developer experience and trust
-- [ ] Lighter builds: analytics (reqwest) behind a feature, rustls on `ring` so `aws-lc-sys`
-      isn't built by default, `fake` only where factories are used; documented dev-profile tips
-- [ ] Cache-busting `asset()` (content hash in the URL, long cache for hashed files)
-- [ ] `make:deploy` Dockerfile with dependency caching (cargo-chef)
-- [ ] Rate limits and the login lock optionally stored in the database for several servers;
-      multi-server caveats in docs/operations.md
+Two PRs.
+
+M16a · lighter builds and several servers:
+- [x] Lighter builds: reqwest uses rustls with the `ring` provider (as lettre does), so
+      `aws-lc-sys` (C, CMake) is no longer built; new default features `fake` (the `renox::fake`
+      re-export) and `server-events` (`analytics::ServerEvent` and its HTTP client) can be turned
+      off; `rnx new` sets `debug = "line-tables-only"` for dev builds;
+      [docs/development.md](docs/development.md) (linker, features, sccache, Docker)
+- [x] Cache-busting `asset()`: `/app.css?v=<content hash>` (hashed at boot for embedded files, by
+      modified time from disk), and versioned URLs are cached for a year (`immutable`)
+- [x] `make:deploy` Dockerfile with dependency caching (cargo-chef)
+- [x] With `CACHE_STORE=database`, `Routes::throttle` limits and the login lock are counted in the
+      `cache` table (`renox:count:…`), so several servers share them; a "Several servers" section
+      in docs/operations.md
+
+M16b · CI and trust:
 - [ ] CI: `rnx new` → every `make:*` → `cargo build` and `cargo test` on the result; trybuild
       tests for the macros; a feature matrix (cargo-hack) including a SQLite-only build; S3
-      against MinIO; MSRV; cargo-deny; coverage; semver checks
+      against MinIO; MSRV; cargo-deny; coverage; semver checks; a Docker build of `make:deploy`
 - [ ] Direct tests for APIs covered only indirectly (session `pull`/`reflash`/`set_lifetime`,
       `HxRedirect`/`HxRefresh`, `Validator::rule`, `fetch_optional`/`bind_all`, schedule
       constructors and offsets, signed URL tampering and expiry, plural 0, `Config::load`)

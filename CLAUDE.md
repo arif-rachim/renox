@@ -67,6 +67,7 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/cache.rs             Cache (memory / database store), remember()
   src/provided.rs          App::provide values: Provided<T> extractor, AppState::provided
   src/view_filters.rs      built-in template filters `number` and `date`; pub format_number
+  src/counters.rs          counters in the cache table (renox:count:…) for shared throttles/login lock
   src/cookies.rs           Cookies extractor (plain / encrypted with APP_KEY), SetCookie response part
   src/download.rs          Download: bytes, streamed file, Storage key, stream; safe Content-Disposition
   src/command.rs           app commands: Args, Command; App::command / Registry::command, Kernel::call
@@ -111,6 +112,7 @@ examples/crud/             the reference CRUD module (policy, soft deletes, pagi
 CHEATSHEET.md              one-page patterns for app authors/agents; its Rust is compiled as doctests
 llms.txt                   map for agents: which example/guide file shows what
 docs/postgresql.md         PostgreSQL guide for app authors
+docs/development.md        faster builds: profiles, linker, default features, sccache, cargo-chef
 docs/relations.md          relations without N+1, fetch_as/FromRow, query builder vs Laravel (doctested)
 docs/stability.md          semver scope, #[non_exhaustive] types, public-dependency policy (keep in sync
                            when adding public types or re-exports)
@@ -535,6 +537,10 @@ and the integration tests are one binary. Result: rebuild after a core change 29
   `db::FromRow` (supertrait of `Model`; derive(Model) emits both impls). Statements that run
   several times on one executor use `Conn::reborrow()`. Aggregate sums are cast (`db::Number`,
   sealed) so PostgreSQL's NUMERIC doesn't leak.
+- M16a conventions: keep `cargo tree -p hello -i aws-lc-rs` empty (reqwest is `rustls-no-provider`;
+  `analytics` installs the ring provider). renox-core is `default-features = false` in the
+  workspace deps; the `renox` crate owns the defaults (`fake`, `server-events`). Throttle ids come
+  from the covered routes (same in every process).
 - `target/` grows to ~100 GB over a few milestones and fills the disk (link errors, "No space left
   on device"); `cargo clean` it before the full two-database run.
 - This session's working directory (~/workspace/renoxium) isn't a git repo, so the Agent tool's
@@ -581,8 +587,9 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M14b extension points: template hooks + number/date filters, `share`, `provide`/`Provided`, `App::layer`, `User` extra columns, registration hooks, async gates, semi-strict debug templates, debug error page | merged to `main` |
 | M14c mail (recipients, cc/bcc, reply-to, from, attachments) and notifications (custom channels, `Recipient`, `notify_later`) | merged to `main` |
 | M15a query builder (groups, sub-queries, aggregates, bulk update/upsert, chunk), `FromRow` + `fetch_as`, `db::relations` (belongs_to, has_many, Pivot), docs/relations.md | merged to `main` |
-| M15b validation rules (regex, digits, dates, required_if…, each/nested, `Rule`), `Vec<Upload>`, `Cookies`/`SetCookie`, `Download` | PR from branch `m15b-validation-requests` |
-| M16 DX & trust (ROADMAP M16) | next; then M17, v1.0 |
+| M15b validation rules (regex, digits, dates, required_if…, each/nested, `Rule`), `Vec<Upload>`, `Cookies`/`SetCookie`, `Download` | merged to `main` |
+| M16a lighter builds (no aws-lc, default features `fake`/`server-events`), versioned `asset()`, cargo-chef Dockerfile, shared limits with `CACHE_STORE=database` | PR from branch `m16a-lighter-builds` |
+| M16b CI & trust (ROADMAP M16) | next; then M17, v1.0 |
 | v1.0 docs site, starter kit, semver guarantee | last |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on

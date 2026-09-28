@@ -145,7 +145,18 @@ impl Routes {
     /// Limits the routes added so far to `max` requests per `per`, counted per
     /// logged-in user or per IP address. Over the limit: 429 with `Retry-After`.
     pub fn throttle(self, max: u32, per: std::time::Duration) -> Self {
-        let limiter = std::sync::Arc::new(crate::rate_limit::Limiter::new(max, per));
+        let covered: Vec<String> = self
+            .listing
+            .iter()
+            .map(|route| format!("{} {}", route.method, route.path))
+            .collect();
+        let id =
+            crate::webhook::sha256_hex(format!("{}|{max}|{}", covered.join(","), per.as_secs()));
+        let limiter = std::sync::Arc::new(crate::rate_limit::Limiter::new(
+            id[..16].to_owned(),
+            max,
+            per,
+        ));
         self.route_layer(from_fn(
             move |req: Request, next: axum::middleware::Next| {
                 let limiter = limiter.clone();

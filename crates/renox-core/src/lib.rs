@@ -12,6 +12,7 @@ mod client_ip;
 pub mod command;
 mod config;
 mod cookies;
+mod counters;
 mod crypto;
 mod csrf;
 pub mod db;
@@ -75,6 +76,7 @@ pub use view_filters::format_number;
 pub use minijinja::context;
 
 pub use chrono;
+#[cfg(feature = "fake")]
 pub use fake;
 pub use serde;
 pub use serde_json;

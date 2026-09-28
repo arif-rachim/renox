@@ -133,6 +133,7 @@ impl Views {
         embedded: Option<&'static [(&'static str, &'static str)]>,
         hooks: Arc<Vec<TemplateHook>>,
         offset: i64,
+        versions: Arc<crate::embedded::AssetVersions>,
     ) -> Self {
         let dir = config.views_path.clone();
         let watch = config.debug && embedded.is_none() && dir.is_dir();
@@ -188,9 +189,15 @@ impl Views {
                     method.to_ascii_uppercase()
                 ))
             });
-            env.add_function("asset", |path: String| {
+            // `/app.css?v=1a2b3c4d`: a new URL whenever the file changes.
+            let versions = versions.clone();
+            env.add_function("asset", move |path: String| {
                 let mut url = String::from("/");
                 crate::routing::encode(&mut url, path.trim_start_matches('/'), true);
+                if let Some(version) = versions.version(&path) {
+                    url.push_str("?v=");
+                    url.push_str(&version);
+                }
                 Value::from_safe_string(url)
             });
             let storage = storage.clone();

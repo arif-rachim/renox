@@ -272,3 +272,77 @@ async fn health_reports_the_database() {
     assert_eq!(down.status, StatusCode::SERVICE_UNAVAILABLE);
     assert!(down.body.contains(r#""status":"error""#), "{}", down.body);
 }
+
+struct Limited;
+
+impl Module for Limited {
+    fn name(&self) -> &'static str {
+        "limited"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new()
+            .get("/search", || async { "results" })
+            .throttle(2, std::time::Duration::from_secs(60))
+    }
+}
+
+/// Two servers sharing one database: with `CACHE_STORE=database` they share
+/// rate limits and the login lock; with `memory` each counts its own.
+#[renox::test(flavor = "multi_thread", worker_threads = 4)]
+async fn several_servers_share_limits_with_the_database_store() {
+    use renox::testing::TestApp;
+    for (store, shared) in [("database", true), ("memory", false)] {
+        let dir = tempfile::tempdir().unwrap();
+        let url = format!("sqlite://{}/app.db", dir.path().display());
+        let server = |url: String| {
+            let store = store.to_owned();
+            TestApp::with_config(App::new().module(Auth::new()).module(Limited), move |c| {
+                c.database_url = url;
+                c.cache_store = store;
+            })
+        };
+        let a = server(url.clone()).await;
+        let b = server(url).await;
+        a.get("/search").await.assert_ok();
+        a.get("/search").await.assert_ok();
+        a.get("/search").await.assert_status(429);
+        let other = b.get("/search").await;
+        assert_eq!(
+            other.status.as_u16() == 429,
+            shared,
+            "{store}: {}",
+            other.status
+        );
+
+        User::register(a.db(), "Arif", "arif@example.com", "rahasia123")
+            .await
+            .unwrap();
+        for _ in 0..5 {
+            a.htmx()
+                .post(
+                    "/login",
+                    &[("email", "arif@example.com"), ("password", "salah")],
+                )
+                .await
+                .assert_invalid("email");
+        }
+        let res = b
+            .htmx()
+            .post(
+                "/login",
+                &[("email", "arif@example.com"), ("password", "rahasia123")],
+            )
+            .await;
+        if shared {
+            res.assert_invalid("email");
+            assert!(
+                res.text().contains("Too many login attempts"),
+                "{}",
+                res.text()
+            );
+        } else {
+            assert_ne!(res.status.as_u16(), 422, "memory: b has its own counts");
+        }
+    }
+}

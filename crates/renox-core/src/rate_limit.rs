@@ -22,6 +22,9 @@ use crate::auth::CurrentUser;
 const SWEEP_AT: usize = 10_000;
 
 pub(crate) struct Limiter {
+    /// Tells this limit's counters apart in the shared table: made from the
+    /// routes it covers and its numbers, so every server agrees on it.
+    id: String,
     max: u32,
     window: Duration,
     hits: Mutex<HashMap<String, (u32, Instant)>>,
@@ -33,8 +36,9 @@ pub(crate) enum Verdict {
 }
 
 impl Limiter {
-    pub fn new(max: u32, window: Duration) -> Self {
+    pub fn new(id: String, max: u32, window: Duration) -> Self {
         Self {
+            id,
             max: max.max(1),
             window,
             hits: Mutex::new(HashMap::new()),
@@ -81,8 +85,37 @@ fn key(req: &Request) -> String {
     }
 }
 
+/// Counts the request in the database (shared by every server), letting it
+/// through if the database can't be reached.
+async fn shared_hit(limiter: &Limiter, db: &crate::db::Db, key: &str) -> Verdict {
+    let key = format!("throttle:{}:{key}", limiter.id);
+    match crate::counters::increment(db, &key, limiter.window).await {
+        Ok((count, ends)) if count > limiter.max => Verdict::Limited {
+            retry_after: crate::counters::seconds_until(ends),
+        },
+        Ok((count, _)) => Verdict::Allowed {
+            remaining: limiter.max - count,
+        },
+        Err(err) => {
+            tracing::warn!(error = ?err, "could not count a rate-limited request");
+            Verdict::Allowed {
+                remaining: limiter.max,
+            }
+        }
+    }
+}
+
 pub(crate) async fn check(limiter: &Limiter, req: Request, next: Next) -> Response {
-    match limiter.hit(&key(&req)) {
+    let shared = req
+        .extensions()
+        .get::<crate::AppState>()
+        .filter(|state| state.config.cache_store == "database")
+        .map(|state| state.db.clone());
+    let verdict = match &shared {
+        Some(db) => shared_hit(limiter, db, &key(&req)).await,
+        None => limiter.hit(&key(&req)),
+    };
+    match verdict {
         Verdict::Limited { retry_after } => {
             let mut res = Error::TooManyRequests.into_response();
             if let Ok(value) = HeaderValue::from_str(&retry_after.to_string()) {
@@ -106,7 +139,7 @@ mod tests {
 
     #[test]
     fn counts_per_key_and_window() {
-        let limiter = Limiter::new(2, Duration::from_millis(50));
+        let limiter = Limiter::new("t".into(), 2, Duration::from_millis(50));
         assert!(matches!(
             limiter.hit("a"),
             Verdict::Allowed { remaining: 1 }
