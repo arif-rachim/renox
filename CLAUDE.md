@@ -82,11 +82,13 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            notifications (Recipient, Channel::Custom, notify/notify_to/
                            notify_later, SendToChannel job)
   src/queue/               Job trait, Queue (dispatch, dispatch_in), Worker
-  src/schedule.rs          Schedule + runner, run claims; APP_TIMEZONE offsets
+  src/schedule.rs          Schedule + runner, ScheduledTask builder, own cron parser, run claims
+  src/timezone.rs          Zone (UTC / fixed offset / IANA via chrono-tz) for APP_TIMEZONE
   src/events.rs            Event, listeners, AppState::emit
   src/mail.rs              Mail (recipients, cc/bcc/reply_to/from, attachments), Mailer
                            (smtp/log/memory), mail_view, queue_mail, /_renox/mail preview
-  src/cache.rs             Cache (memory / database store), remember()
+  src/cache.rs             Cache (memory / database store), remember(), add/pull/increment,
+                           Lock/LockGuard (`renox:lock:*` rows), prune
   src/counters.rs          counters in the cache table (renox:count:…) for shared throttles/login lock
   src/provided.rs          App::provide values: Provided<T> extractor, AppState::provided
   src/cookies.rs           Cookies extractor (plain / encrypted), SetCookie response part
@@ -505,8 +507,8 @@ Parsed in `crates/renox-core/src/config.rs`; defaults in parentheses.
   testing|test, production|prod; anything else fails at boot), `APP_DEBUG` (on in local),
   `APP_URL`, `APP_KEY` (required in production; `base64:…`, `rnx key:generate`), `APP_HOST`
   (127.0.0.1, an IP), `APP_PORT` (3000), `APP_LOCALE` (en; built-ins for en|id),
-  `APP_FALLBACK_LOCALE` (en), `APP_TIMEZONE` (`UTC` or an offset like `+07:00`; IANA names are
-  rejected).
+  `APP_FALLBACK_LOCALE` (en), `APP_TIMEZONE` (`UTC`, an offset like `+07:00`, or an IANA name like
+  `Asia/Jakarta`, with DST).
 - **Paths:** `VIEWS_PATH` (resources/views), `LANG_PATH` (resources/lang), `PUBLIC_PATH`
   (public), `STORAGE_PATH` (storage; holds `framework/down` for maintenance mode and `app/` for the
   local disk). Paths are relative to the working directory: run apps from their own directory.
@@ -681,7 +683,11 @@ change 29 s → 7 s, full run 19 s → 6 s.
 - **M19b** (model hooks, `context::app()`, `save_only`/`save_changes`, `state.encrypt`/
   `decrypt`, pivot data/timestamps/toggle, `Morph`): PR from branch `m19b-models`. Non-integer
   keys and `Encrypted<T>` are deferred (ROADMAP notes say why).
-- **Next: M20 (background), then M21 (views and DX)**, from the Laravel parity review
+- **M20a** (scheduler: cron/weekly/monthly, filters, IANA zones with DST, on_failure/on_success,
+  `schedule:run`; cache add/pull/increment, locks, prune): branch `m20a-background`. A cron
+  time skipped by DST runs right after the jump; intervals follow the current offset. Schedule
+  methods return `ScheduledTask` (DerefMut to `Schedule`) so add-chains still compile.
+- **Next: M20b (queue), M20c (dashboard, mail, HTTP client, storage), then M21 (views and DX)**, from the Laravel parity review
   (`docs/audit/2026-09-laravel-parity.md`); the ROADMAP lists each milestone's items. **v1.0 is
   on hold** until the owner says to start it (docs site, starter kit, semver checks, real
   crates.io releases; the owner runs `cargo login`).

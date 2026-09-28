@@ -140,7 +140,7 @@ impl Views {
         storage: Storage,
         embedded: Option<&'static [(&'static str, &'static str)]>,
         hooks: Arc<Vec<TemplateHook>>,
-        offset: i64,
+        zone: crate::timezone::Zone,
         versions: Arc<crate::embedded::AssetVersions>,
     ) -> Self {
         let dir = config.views_path.clone();
@@ -213,7 +213,7 @@ impl Views {
                 Value::from_safe_string(storage.url(&key))
             });
             env.add_filter("number", crate::view_filters::number);
-            env.add_filter("date", crate::view_filters::date(offset));
+            env.add_filter("date", crate::view_filters::date(zone));
             // The app's own functions and filters (`App::templates`).
             for hook in hooks.iter() {
                 hook(&mut env);

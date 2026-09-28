@@ -384,12 +384,59 @@ async fn misconfiguration_fails_at_boot() {
 
     let bad_zone = App::with_config({
         let mut c = config();
-        c.timezone = "Asia/Jakarta".into();
+        c.timezone = "Mars/Olympus".into();
         c
     })
     .boot()
     .await;
     assert!(format!("{:?}", bad_zone.err().unwrap()).contains("APP_TIMEZONE"));
+}
+
+#[tokio::test]
+async fn scheduled_tasks_run_on_demand_with_their_hooks() {
+    static RUNS: AtomicUsize = AtomicUsize::new(0);
+    let kernel = kernel_with(|app| {
+        app.schedule(|s| {
+            s.cron("0 3 * * *", "report", |state| async move {
+                RUNS.fetch_add(1, Ordering::SeqCst);
+                assert!(renox::context::app().is_some(), "runs in the app's context");
+                state.cache.put("report.ran", &true, None).await
+            })
+            .timezone("Asia/Jakarta")
+            .on_success(|state| async move {
+                let _ = state.cache.put("report.ok", &true, None).await;
+            });
+            s.daily_at("04:00", "broken", |_| async {
+                Err(abort(StatusCode::INTERNAL_SERVER_ERROR, "disk full"))
+            })
+            .on_failure(|state, err| async move {
+                let _ = state
+                    .cache
+                    .put("broken.error", &format!("{err:?}"), None)
+                    .await;
+            });
+            s.hourly("panics", |_| async { panic!("boom") })
+                .on_failure(|state, _| async move {
+                    let _ = state.cache.put("panics.caught", &true, None).await;
+                });
+        })
+    })
+    .await;
+    let cache = &kernel.state().cache;
+    kernel.run_scheduled("report").await.unwrap();
+    assert_eq!(RUNS.load(Ordering::SeqCst), 1);
+    assert_eq!(cache.get::<bool>("report.ok").await.unwrap(), Some(true));
+
+    assert!(kernel.run_scheduled("broken").await.is_err());
+    let error = cache.get::<String>("broken.error").await.unwrap().unwrap();
+    assert!(error.contains("disk full"), "{error}");
+
+    assert!(kernel.run_scheduled("panics").await.is_err());
+    assert_eq!(
+        cache.get::<bool>("panics.caught").await.unwrap(),
+        Some(true)
+    );
+    assert!(kernel.run_scheduled("nope").await.is_err());
 }
 
 #[tokio::test]

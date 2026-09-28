@@ -711,10 +711,11 @@ Notes from M19b (model features):
   the need explicitly; a field type comes back if the key can be made reachable everywhere.
 
 ### M20 · v0.21: Background 2
-- [ ] Schedules: `cron("0 9 * * 1-5")`, `weekly_on`, `monthly_on`, `weekdays`, `between`;
+- [x] Schedules: `cron("0 9 * * 1-5")`, `weekly_on`, `monthly_on`, `weekdays`, `between`;
       IANA time zones with DST (`APP_TIMEZONE=Asia/Jakarta`, per-task `timezone`)
-- [ ] Schedule hooks: `on_failure`, `ping_before`/`then_ping` (health checks), `schedule:run NAME`
-- [ ] Atomic locks: `state.cache.lock(key, ttl)`, `.block(wait)`
+- [x] Schedule hooks: `on_failure`, `schedule:run NAME` (`on_success` too)
+- [ ] Schedule pings: `ping_before`/`then_ping` (health checks), with the HTTP client below
+- [x] Atomic locks: `state.cache.lock(key, ttl)`, `.block(wait)`
 - [ ] Unique jobs (`UNIQUE_FOR`, `unique_id`), job middleware (rate limited, without
       overlapping), chains and batches with progress
 - [ ] Queue priority (`--queue high,default` drains in order), `dispatch_sync`, a `failed` hook,
@@ -723,8 +724,28 @@ Notes from M19b (model features):
 - [ ] Localized mail and notifications (`t()` in mail templates, a recipient's locale),
       per-recipient channels, mail components (panel, table)
 - [ ] An HTTP client for apps (`renox::http`: timeouts, retries) with `TestApp::fake_http`
-- [ ] Cache `add`/`pull`/`increment`, pruning expired rows of the database store; storage
-      listing/copy/move
+- [x] Cache `add`/`pull`/`increment`, pruning expired rows of the database store
+- [ ] Storage listing/copy/move
+
+Notes from M20a (scheduler, locks, cache):
+- M20 is split: M20a is the scheduler, locks and cache (ticked above); M20b the queue (unique
+  jobs, middleware, chains/batches, priority, `dispatch_sync`, failed hook, prune/forget,
+  encrypted payloads); M20c the dashboard, localized mail, the HTTP client (and schedule pings
+  on it) and storage listing.
+- `renox::timezone::Zone` is UTC, a fixed offset or an IANA zone (`chrono-tz`). Cron-style
+  tasks (`cron`, `daily_at`, `weekly_on`, `monthly_on`) follow the wall clock: a time skipped in
+  spring runs right after the jump, a repeated one runs once. Intervals (`every*`, `hourly`)
+  follow the current offset, so an hour of every-minute runs isn't lost in autumn.
+- The cron parser is Renox's own (5 fields, names, ranges, lists, steps, `@daily`…; day of
+  month and day of week OR-ed when both are set, as in every cron). An expression that never
+  matches, a bad zone or `between` time, and a duplicate task name are boot errors.
+- Adding a task returns `ScheduledTask`, which derefs to the `Schedule` so chains of adds keep
+  compiling. `Schedule::upcoming` now takes a `Zone` and returns the zone too.
+- Locks are `renox:lock:*` cache rows holding a random owner: `add` takes them, the owner's
+  `DELETE … WHERE value = ?` releases them, a dropped guard releases in the background, and the
+  ttl bounds a crashed holder. With `CACHE_STORE=memory` they only span one process.
+- The database store deletes expired rows at most once an hour per process as it writes, and
+  `cache:prune` does it on demand.
 
 ### M21 · v0.22: Views and developer experience
 - [ ] Components that see the request (`old`, `error`, `t`, `csrf_field`, `can`, `auth` inside

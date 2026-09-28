@@ -74,7 +74,7 @@ pub fn format_number(n: f64, decimals: u32, locale: &str) -> String {
 /// with chrono's format codes. A moment (`created_at`, …) is shown in
 /// `APP_TIMEZONE`; a date or a local date-time is shown as it is.
 pub(crate) fn date(
-    offset_secs: i64,
+    zone: crate::timezone::Zone,
 ) -> impl Fn(Value, Option<String>, Kwargs) -> Result<String, Error> + Send + Sync + 'static {
     move |value: Value, format: Option<String>, kwargs: Kwargs| {
         kwargs.assert_all_used()?;
@@ -83,9 +83,8 @@ pub(crate) fn date(
             .map(str::to_owned)
             .unwrap_or_else(|| value.to_string());
         let format = format.as_deref().unwrap_or("%Y-%m-%d");
-        let offset = chrono::FixedOffset::east_opt(offset_secs as i32)
-            .unwrap_or_else(|| chrono::FixedOffset::east_opt(0).expect("zero offset"));
         let formatted = if let Ok(moment) = chrono::DateTime::parse_from_rfc3339(&text) {
+            let offset = zone.fixed_at(moment.timestamp());
             moment.with_timezone(&offset).format(format).to_string()
         } else if let Ok(local) = text.parse::<chrono::NaiveDateTime>() {
             local.format(format).to_string()
