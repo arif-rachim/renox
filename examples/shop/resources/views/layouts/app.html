@@ -14,7 +14,7 @@
     {% if auth.check %}
     <a href="{{ route('cart.show') }}">{{ t('nav.cart') }} ({{ cart_count }})</a>
     <a href="{{ route('orders.index') }}">{{ t('nav.orders') }}</a>
-    {% if can('admin') %}<a href="{{ route('admin.dashboard') }}">Admin</a>{% endif %}
+    {% if 'admin' in auth.roles %}<a href="{{ route('admin.dashboard') }}">Admin</a>{% endif %}
     <form method="post" action="{{ route('logout') }}">{{ csrf_field() }}<button>{{ t('nav.logout') }}</button></form>
     {% else %}
     <a href="{{ route('login') }}">{{ t('nav.login') }}</a>

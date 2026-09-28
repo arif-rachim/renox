@@ -134,7 +134,9 @@ impl User {
         Self::find_or_404(db, id).await
     }
 
-    /// Changes the password, which also logs out the user's other sessions.
+    /// Changes the password. Every session of the user ends, this one too
+    /// (sessions hold a fingerprint of the password hash); in a handler use
+    /// [`crate::auth::change_password`], which logs this session in again.
     pub async fn set_password(&mut self, db: &Db, password: &str) -> Result {
         self.password = hash_password(password).await?;
         self.save(db).await

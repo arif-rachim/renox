@@ -3,7 +3,7 @@
 {% block content %}
 <h1>{{ heading }}</h1>
 <ul>
-  {% for post in posts %}<li><a href="{{ route('posts.show', post.id) }}">{{ post.title }}</a></li>
+  {% for post in posts %}<li><a href="{{ route('posts.show', post.id) }}">{{ post.title }}</a>{% if post.id in pinned %} <strong>pinned</strong>{% endif %}</li>
   {% else %}<li class="muted">No posts.</li>{% endfor %}
 </ul>
 {% endblock %}

@@ -76,11 +76,19 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            relations.rs (belongs_to/has_many/Pivot/Morph), value.rs (DbValue),
                            paginate.rs, migrate.rs (migrator), factory.rs, json.rs, error.rs
   src/validation/          Validator/rules (mod.rs), Valid<T> (extract.rs), en/id messages
-  src/auth/                User, hashing, login/logout, CurrentUser middleware, AuthUser, guards,
-                           Policy/gates (mod.rs), Auth module + pages (module.rs), password reset,
-                           verification, API tokens, LoginThrottle (pair/account/IP),
-                           notifications (Recipient, Channel::Custom, notify/notify_to/
-                           notify_later, SendToChannel job)
+  src/auth/                User, hashing (Argon2id + bcrypt import), login/logout (per device),
+                           change_password, CurrentUser middleware, AuthUser, guards, Access::check,
+                           Policy/gates (mod.rs), Auth module + pages (module.rs), account.rs
+                           (account pages, password confirmation), passwords.rs (reset),
+                           permissions.rs (Permissions module: roles, permissions), events.rs
+                           (LoggedIn, LoginFailed, …), verification, tokens.rs (API tokens,
+                           abilities, prune), LoginThrottle (pair/account/IP), notifications
+                           (Recipient, Channel::Custom, notify/notify_to/notify_later,
+                           SendToChannel job)
+  src/audit.rs             Audit module (audit_logs table, records auth events), audit::record,
+                           audit:prune
+  src/context.rs           renox::context: task-local values per request/job/task/command
+                           (default scopes, context::app())
   src/queue/               Job trait, Queue (dispatch, dispatch_in), Worker
   src/schedule.rs          Schedule + runner, ScheduledTask builder, own cron parser, run claims
   src/timezone.rs          Zone (UTC / fixed offset / IANA via chrono-tz) for APP_TIMEZONE
@@ -113,7 +121,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/embedded.rs          Embedded (views/lang/public compiled in), public-file serving + content types
   assets/                  vendored htmx.min.js (2.0.11), alpine.min.js (3.17.4) + Alpine CSP build
   views/                   built-in templates (error, pagination, auth/*, mail/*); see §4.3
-  migrations/              framework-owned migrations (auth/, queue/, cache/, webhook/); see §4.5
+  migrations/              framework-owned migrations (auth/, permissions/, audit/, queue/,
+                           cache/, webhook/); see §4.5
   tests/                   core-only integration tests (support/mod.rs has a small TestApp)
 crates/renox-macros/       proc macros: derive Model, FromRow, DbEnum; embedded!(), migrations!(),
                            #[renox::test]
@@ -146,7 +155,8 @@ docs/development.md        faster builds: profiles, linker, default features, sc
 docs/stability.md          semver scope, #[non_exhaustive] types, public-dependency policy
 docs/operations.md         production: timeouts, proxies, /health, failure table (kept in sync
                            with tests/chaos/run.sh), failed jobs/webhooks, backups
-docs/audit/                pre-1.0 audit (2026-09-pre-1.0.md)
+docs/audit/                pre-1.0 audit (2026-09-pre-1.0.md), Laravel parity review
+                           (2026-09-laravel-parity.md) and gap report (2026-09-laravel-gap-report.pdf)
 docs/assets/demo.gif       the README's demo (see §4.10)
 .github/workflows/ci.yml   CI jobs (see §4.11)
 ```
@@ -199,8 +209,9 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
 - **HTML escaping uses a custom formatter** (`view.rs::format_value`): escapes `& < > " '` but not
   `/` (MiniJinja's default escapes `/` as `&#x2f;`, which uglified URLs in pages and mail).
 - **The app binary is its own CLI** (like artisan): `my-app migrate|migrate:rollback|migrate:fresh|
-  migrate:status|db:seed|queue:work|queue:failed|queue:retry|queue:flush|webhook:failed|
-  webhook:retry|schedule:list|schedule:work|route:list|db:shell|down|up|help`, default `serve`,
+  migrate:status|db:seed|queue:work|queue:failed|queue:retry|queue:flush|queue:forget|
+  queue:prune-failed|queue:prune-batches|webhook:failed|webhook:retry|cache:prune|schedule:list|schedule:run|schedule:work|route:list|db:shell|down|
+  up|help`, default `serve` (modules add more: `tokens:prune` from Auth, `audit:prune` from Audit),
   plus the app's own commands (`App::command`; names can't clash with built-ins). Migrations and
   jobs are compiled into the app, so only the app can run them. `rnx <anything unknown>` forwards
   to `cargo run --quiet -- <args>`.
@@ -340,7 +351,7 @@ to the config tests there, give it a test-friendly value in `Default`, and docum
 App-specific settings need no field: `config.var(name)` reads `config.vars`, then the environment.
 
 ### 4.5 Migrations owned by the framework
-Names start with `0001…` so they sort before app migrations (`2026…`). There are thirteen:
+Names start with `0001…` so they sort before app migrations (`2026…`). There are fourteen:
 - Auth module (`auth/module.rs` `MIGRATIONS`): `00010101000000_create_users_table`,
   `…000001_create_password_reset_tokens_table`, `…000002_create_personal_access_tokens_table`,
   `…000003_create_notifications_table`, `…000004_add_sessions_revoked_at_to_users`,
@@ -348,7 +359,8 @@ Names start with `0001…` so they sort before app migrations (`2026…`). There
 - Permissions module (`auth/permissions.rs`): `00010101000500_create_roles_and_permissions_tables`
   (roles, permissions, permission_role, role_user).
 - Audit module (`audit.rs`): `00010101000600_create_audit_logs_table`.
-- Every app (registered in `App::boot`): `00010101000100_create_jobs_table` (queue),
+- Every app (registered in `App::boot`): `00010101000100_create_jobs_table` and
+  `00010101000110_add_chains_and_batches_to_jobs` (queue),
   `00010101000200_create_cache_table` (cache), `00010101000300_create_webhook_calls_table` and
   `00010101000301_store_webhook_payloads_as_bytes` (webhook.rs `MIGRATIONS`).
 
@@ -667,31 +679,31 @@ change 29 s → 7 s, full run 19 s → 6 s.
 
 ## 7. Where things stand (update this section when it changes)
 
-- **All milestones M0–M17 are merged to `main`**; the last was M17b (examples htmx-recipes and
-  relations, a README per example, `AuthUser::token_id`, `key:generate` creates `.env`; #44).
-  History: `CHANGELOG.md` (per milestone) and `ROADMAP.md` (per-milestone notes and decisions).
+- **All milestones M0–M20b are merged to `main`**; the last was M20b (#52). History:
+  `CHANGELOG.md` (per milestone) and `ROADMAP.md` (per-milestone notes and decisions).
 - After M17: a docs refresh (#45) and the Laravel parity review with M18–M21 planned (#46).
+  After M20a: a docs and examples catch-up (branch `claude/laravel-project-feature-report-i6wgz0`:
+  README, operations, examples moved to the M18–M20a APIs, the gap report PDF).
 - **M18a** (tenancy: `renox::context`, default scopes, scoped `unique`/`exists`; `require_gate`,
-  `gate_before`; the `Permissions` module; token abilities): PR from branch
-  `m18a-authorization`. Authorization is in one place: `auth::Access::check` (gate_before →
+  `gate_before`; the `Permissions` module; token abilities): merged (#47). Authorization is in one place: `auth::Access::check` (gate_before →
   gate → permission); `gate_before` doesn't answer role membership.
 - **M18b** (account pages, `Password` policy, password confirmation, per-device logout with a
-  `revoked_sessions` denylist, auth events + the `Audit` module, bcrypt import): PR from branch
-  `m18b-accounts`. Sessions: each login stores `_auth_session_id`; `resolve` checks the password
+  `revoked_sessions` denylist, auth events + the `Audit` module, bcrypt import): merged (#48).
+  Sessions: each login stores `_auth_session_id`; `resolve` checks the password
   fingerprint, `sessions_revoked_at` and the denylist in one query.
 - **M19a** (query builder: raw fragments, group/having/select_as, locks, EXISTS, count/sum
-  loaders, simple/cursor pagination, update_or_create, refresh, transaction helpers): PR from
-  branch `m19a-query-builder`. `Query` keeps `having_binds` apart and `all_binds()` joins them
+  loaders, simple/cursor pagination, update_or_create, refresh, transaction helpers): merged
+  (#49). `Query` keeps `having_binds` apart and `all_binds()` joins them
   after the WHERE binds; use it in every terminal method.
 - **M19b** (model hooks, `context::app()`, `save_only`/`save_changes`, `state.encrypt`/
-  `decrypt`, pivot data/timestamps/toggle, `Morph`): PR from branch `m19b-models`. Non-integer
+  `decrypt`, pivot data/timestamps/toggle, `Morph`): merged (#50). Non-integer
   keys and `Encrypted<T>` are deferred (ROADMAP notes say why).
 - **M20a** (scheduler: cron/weekly/monthly, filters, IANA zones with DST, on_failure/on_success,
-  `schedule:run`; cache add/pull/increment, locks, prune): branch `m20a-background`. A cron
+  `schedule:run`; cache add/pull/increment, locks, prune): merged (#51). A cron
   time skipped by DST runs right after the jump; intervals follow the current offset. Schedule
   methods return `ScheduledTask` (DerefMut to `Schedule`) so add-chains still compile.
 - **M20b** (queue: priority, unique, encrypted, middleware, failed hook, chains, batches,
-  dispatch_sync, forget/prune): branch `m20b-queue`. Adds framework migration
+  dispatch_sync, forget/prune): merged (#52). Adds framework migration
   `00010101000110`; tests that count framework migrations must follow it.
 - **Next: M20c (dashboard, mail, HTTP client, storage), then M21 (views and DX)**, from the Laravel parity review
   (`docs/audit/2026-09-laravel-parity.md`); the ROADMAP lists each milestone's items. **v1.0 is
@@ -699,6 +711,6 @@ change 29 s → 7 s, full run 19 s → 6 s.
   crates.io releases; the owner runs `cargo login`).
 - **Other open items** noted in ROADMAP: `#[derive(Validate)]`, choosing the locale from
   `Accept-Language` (opt-in).
-- As of M17: ~34k lines of Rust in `crates/` (stubs excluded), ~400 `#[test]`/`#[renox::test]`/
-  `#[tokio::test]` functions in `crates/` and `examples/` (plus doctests), and 37 direct
+- As of M20a: ~40k lines of Rust in `crates/` (stubs excluded), ~435 `#[test]`/`#[renox::test]`/
+  `#[tokio::test]` functions in `crates/` and `examples/` (plus doctests), and 39 direct
   dependencies in renox-core (5 optional). Keep dependencies lean and remove unused ones.

@@ -1,3 +1,4 @@
+use renox::audit::{self, Entry};
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -39,9 +40,12 @@ impl Validate for StatusForm {
 }
 
 /// Pending → paid → shipped; pending orders can be cancelled (their stock
-/// comes back). Shipping tells the customer.
+/// comes back). Shipping tells the customer. Every change is written to the
+/// audit log: who, which order, from and to, and from which address.
 pub async fn update_status(
     State(state): State<AppState>,
+    admin: AuthUser,
+    ClientIp(ip): ClientIp,
     session: Session,
     back: Back,
     Path(id): Path<i64>,
@@ -49,13 +53,16 @@ pub async fn update_status(
 ) -> Result<Back> {
     use OrderStatus::*;
     let mut order = Order::find_or_404(&state.db, id).await?;
-    match (order.status, form.status) {
+    let from = order.status;
+    match (from, form.status) {
         (Pending, Cancelled) => {
             checkout::cancel(&state.db, &order).await?;
         }
         (Pending, Paid) | (Paid, Shipped) => {
             order.status = form.status;
-            order.save(&state.db).await?;
+            // Only the status: a checkout running at the same time can't
+            // have its columns overwritten by this (older) copy.
+            order.save_only(&state.db, &["status"]).await?;
             if form.status == Shipped {
                 let customer = User::find_or_404(&state.db, order.user_id).await?;
                 state
@@ -70,6 +77,15 @@ pub async fn update_status(
             ));
         }
     }
+    audit::record(
+        &state.db,
+        Entry::new("order.status_changed")
+            .user(admin.id)
+            .subject("orders", order.id)
+            .data(json!({ "from": from, "to": form.status }))
+            .ip(ip),
+    )
+    .await?;
     session.flash("status", format!("Order #{} updated.", order.id))?;
     Ok(back)
 }

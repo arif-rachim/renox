@@ -1,7 +1,7 @@
 //! A guestbook showing Renox's features so far: named routes, views with a
 //! layout, sessions and flash messages, CSRF, HTMX fragments, validation with
 //! old input, SQLite with a model, migrations, a seeder and pagination,
-//! login/registration from the `Auth` module, and an event whose listener
+//! login/registration and the account page from the `Auth` module, and an event whose listener
 //! queues a job, plus a scheduled task and an app command
 //! (`cargo run -- entries:prune --days 7`).
 //!
@@ -209,7 +209,7 @@ pub fn app() -> App {
     App::new()
         .embed(renox::embedded!())
         .migrations(renox::migrations!())
-        .module(Auth::new().redirect_to("/"))
+        .module(Auth::new().account().redirect_to("/")) // login, register, /account
         .module(Guestbook)
         .seeder(|db| async move {
             Entry::create_many(&db, 30).await?;

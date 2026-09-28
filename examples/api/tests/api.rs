@@ -9,18 +9,28 @@ async fn app() -> TestApp {
     app
 }
 
-/// Logs in through the API and returns `Bearer <token>`.
+/// Logs in through the API and returns `Bearer <token>` (read and write).
 async fn bearer(app: &TestApp) -> String {
+    login(app, false).await
+}
+
+async fn login(app: &TestApp, read_only: bool) -> String {
     let res = app
         .request()
         .without_csrf()
         .post_json(
             "/api/tokens",
-            &json!({ "email": "arif@example.com", "password": "password123", "device": "test" }),
+            &json!({
+                "email": "arif@example.com",
+                "password": "password123",
+                "device": "test",
+                "read_only": read_only,
+            }),
         )
         .await;
     res.assert_ok();
     let body: serde_json::Value = res.json();
+    assert!(body["expires_at"].is_string());
     format!("Bearer {}", body["token"].as_str().unwrap())
 }
 
@@ -72,7 +82,8 @@ async fn the_api_needs_a_token() {
         .await;
     res.assert_ok();
     let page: serde_json::Value = res.json();
-    assert_eq!(page["total"], 0);
+    assert_eq!(page["items"], json!([]));
+    assert!(page["next_cursor"].is_null());
 }
 
 #[renox::test]
@@ -159,4 +170,127 @@ async fn revoked_tokens_stop_working() {
         .assert_status(204);
     assert_eq!(status(laptop).await, 401);
     assert_eq!(status(tablet).await, 401);
+}
+
+#[renox::test]
+async fn read_only_tokens_cannot_write() {
+    let app = app().await;
+    let reader = login(&app, true).await;
+    let writer = bearer(&app).await;
+    let create = |token: String| {
+        let app = &app;
+        async move {
+            app.request()
+                .without_csrf()
+                .json()
+                .header("authorization", &token)
+                .post_json("/api/products", &json!({ "name": "Kopi", "price": 18000 }))
+                .await
+        }
+    };
+    create(reader.clone()).await.assert_status(403);
+    let created = create(writer.clone()).await;
+    created.assert_status(201);
+    let id = created.json::<serde_json::Value>()["id"].as_i64().unwrap();
+
+    // The read-only token still reads, but can't delete.
+    app.request()
+        .header("authorization", &reader)
+        .get(&format!("/api/products/{id}"))
+        .await
+        .assert_ok();
+    let delete = |token: String| {
+        let app = &app;
+        async move {
+            app.request()
+                .without_csrf()
+                .json()
+                .header("authorization", &token)
+                .delete(&format!("/api/products/{id}"))
+                .await
+                .status
+                .as_u16()
+        }
+    };
+    assert_eq!(delete(reader).await, 403);
+    assert_eq!(delete(writer.clone()).await, 204);
+    assert_eq!(delete(writer).await, 404);
+}
+
+#[renox::test]
+async fn expired_tokens_stop_working() {
+    let app = app().await;
+    let user = User::find_by_email(app.db(), "arif@example.com")
+        .await
+        .unwrap()
+        .unwrap();
+    let yesterday = renox::db::now() - renox::chrono::TimeDelta::days(1);
+    let token = user
+        .create_token_with(app.db(), "old", &["products:read"], Some(yesterday))
+        .await
+        .unwrap();
+    app.request()
+        .json()
+        .header("authorization", &format!("Bearer {}", token.plain))
+        .get("/api/products")
+        .await
+        .assert_status(401);
+}
+
+#[renox::test]
+async fn products_are_listed_with_a_cursor() {
+    let app = app().await;
+    for i in 1..=25 {
+        let product = api::Product {
+            name: format!("Product {i:02}"),
+            price: i,
+            ..Default::default()
+        };
+        api::Product::create(app.db(), product).await.unwrap();
+    }
+    let token = bearer(&app).await;
+    let get = |url: String| {
+        let (app, token) = (&app, token.clone());
+        async move {
+            let res = app
+                .request()
+                .header("authorization", &token)
+                .get(&url)
+                .await;
+            res.assert_ok();
+            res.json::<serde_json::Value>()
+        }
+    };
+    // Newest first, 20 at a time.
+    let first = get("/api/products".into()).await;
+    let items = first["items"].as_array().unwrap();
+    assert_eq!(items.len(), 20);
+    assert_eq!(items[0]["name"], "Product 25");
+    let cursor = first["next_cursor"].as_str().unwrap().to_owned();
+
+    let second = get(format!("/api/products?cursor={cursor}")).await;
+    let names: Vec<&str> = second["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        names,
+        [
+            "Product 05",
+            "Product 04",
+            "Product 03",
+            "Product 02",
+            "Product 01"
+        ]
+    );
+    assert!(second["next_cursor"].is_null());
+
+    app.request()
+        .json()
+        .header("authorization", &token)
+        .get("/api/products?cursor=nope")
+        .await
+        .assert_status(400);
 }

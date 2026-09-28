@@ -1,17 +1,19 @@
 //! A blog showing every kind of relation without N+1 queries:
 //! a post belongs to a category, has many comments, and has many tags
-//! through a pivot table. Pages load the related rows of a whole page in one
-//! query per relation; reports use SQL joins read into structs.
+//! through a pivot table that has columns of its own (pinned, timestamps).
+//! Pages load the related rows of a whole page in one query per relation
+//! (counts included); reports use the query builder's `group_by` and SQL
+//! joins read into structs.
 
 pub mod model;
 
 use std::collections::HashMap;
 
-use renox::db::relations::{belongs_to, has_many};
+use renox::db::relations::{belongs_to, count_many, has_many};
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use model::{Category, Comment, POST_TAGS, Post, Tag};
+use model::{Category, Comment, POST_TAGS, Post, Tag, Tagging};
 
 pub struct Blog;
 
@@ -30,6 +32,8 @@ impl Module for Blog {
             .name("posts.comment")
             .put("/posts/{id}/tags", retag)
             .name("posts.tags")
+            .put("/posts/{id}/tags/{tag}/pin", pin)
+            .name("posts.pin")
             .get("/categories/{id}", category)
             .name("categories.show")
             .get("/tags/{id}", tag)
@@ -46,45 +50,64 @@ struct Card {
     post: Post,
     category: Option<Category>,
     tags: Vec<Tag>,
-    comments: usize,
+    comments: i64,
     latest_comment: Option<Comment>,
 }
 
-/// 10 posts with their categories, comments and tags in 6 queries in all
-/// (count and page, categories, comments, tag links and tags), whatever the
-/// page size.
+/// 10 posts with their categories, comment counts, latest comments and tags
+/// in 7 queries in all (count and page, categories, comment counts, latest
+/// comments, tag links and tags), whatever the page size.
 async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
     let posts = Post::query().latest().paginate(&db, page, 10).await?;
     let categories = belongs_to::<Category, _, _>(&db, &posts.items, |p| p.category_id).await?;
-    let mut comments = has_many(
+    // `withCount`: one GROUP BY query; posts without comments get 0.
+    let counts = count_many(&db, &posts.items, Comment::query(), "post_id").await?;
+    // Only the latest comment of each post: `has_many` with a filter that
+    // keeps one row per post, so a post with 500 comments loads one.
+    let mut latest = has_many(
         &db,
         &posts.items,
-        Comment::query().order_by_desc("id"),
+        Comment::query().where_raw(
+            "id = (SELECT MAX(latest.id) FROM comments latest \
+             WHERE latest.post_id = comments.post_id)",
+            std::iter::empty::<i64>(),
+        ),
         "post_id",
         |c| c.post_id,
     )
     .await?;
     let mut tags = POST_TAGS.load_for::<Tag, _>(&db, &posts.items).await?;
-    let posts = posts.map(|post| {
-        let comments = comments.remove(&post.id).unwrap_or_default();
-        Card {
-            category: post.category_id.and_then(|id| categories.get(&id).cloned()),
-            tags: tags.remove(&post.id).unwrap_or_default(),
-            comments: comments.len(),
-            latest_comment: comments.into_iter().next(),
-            post,
-        }
+    let posts = posts.map(|post| Card {
+        category: post.category_id.and_then(|id| categories.get(&id).cloned()),
+        tags: tags.remove(&post.id).unwrap_or_default(),
+        comments: counts.get(&post.id).copied().unwrap_or(0),
+        latest_comment: latest.remove(&post.id).and_then(|mut c| c.pop()),
+        post,
     });
     Ok(view("blog/index.html", context! { posts }))
 }
 
-/// One post: the relation methods on `Post`, one query each.
+/// A tag of the post with the pivot's columns, for the template.
+#[derive(Serialize)]
+struct TagLink {
+    #[serde(flatten)]
+    tag: Tag,
+    pivot: Tagging,
+}
+
+/// One post: the relation methods on `Post`, one query each (the tags with
+/// their pivot columns: one for the links, one for the tags).
 async fn show(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
     let post = Post::find_or_404(&db, id).await?;
     let category = post.category(&db).await?;
     let comments = post.comments(&db).await?;
-    let tags = post.tags(&db).await?;
-    let tag_ids: Vec<i64> = tags.iter().map(|t| t.id).collect();
+    let tags: Vec<TagLink> = post
+        .taggings(&db)
+        .await?
+        .into_iter()
+        .map(|(tag, pivot)| TagLink { tag, pivot })
+        .collect();
+    let tag_ids: Vec<i64> = tags.iter().map(|t| t.tag.id).collect();
     let all_tags = Tag::query().order_by("name").get(&db).await?;
     Ok(view(
         "blog/show.html",
@@ -150,24 +173,66 @@ async fn retag(
     Ok(Redirect::to(&format!("/posts/{}", post.id)))
 }
 
+#[derive(Deserialize)]
+struct PinForm {
+    pinned: bool,
+}
+
+impl Validate for PinForm {
+    fn rules(&self, _v: &mut Validator) {}
+}
+
+/// Changes a column of the pivot row (and its `updated_at`):
+/// `update_pivot` returns false when the post doesn't have the tag.
+async fn pin(
+    State(db): State<Db>,
+    session: Session,
+    Path((id, tag)): Path<(i64, i64)>,
+    Valid(form): Valid<PinForm>,
+) -> Result<Redirect> {
+    let post = Post::find_or_404(&db, id).await?;
+    if !POST_TAGS
+        .update_pivot(&db, post.id, tag, &[("pinned", &form.pinned)])
+        .await?
+    {
+        return Err(Error::NotFound);
+    }
+    let status = if form.pinned { "Pinned." } else { "Unpinned." };
+    session.flash("status", status)?;
+    Ok(Redirect::to(&format!("/posts/{}", post.id)))
+}
+
 /// "Has many" from the other side: the category's posts.
 async fn category(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
     let category = Category::find_or_404(&db, id).await?;
     let posts = category.posts(&db).await?;
+    let pinned: Vec<i64> = Vec::new();
     Ok(view(
         "blog/list.html",
-        context! { heading => category.name, posts },
+        context! { heading => category.name, posts, pinned },
     ))
 }
 
 /// Many to many, the other way round: `inverse()` goes from tags to posts.
+/// `load_with_pivot` reads the pivot's columns too: pinned posts first,
+/// then the most recently tagged.
 async fn tag(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
     let tag = Tag::find_or_404(&db, id).await?;
-    let mut by_tag: HashMap<i64, Vec<Post>> = POST_TAGS.inverse().load(&db, [tag.id]).await?;
-    let posts = by_tag.remove(&tag.id).unwrap_or_default();
+    let mut by_tag: HashMap<i64, Vec<(Post, Tagging)>> =
+        POST_TAGS.inverse().load_with_pivot(&db, [tag.id]).await?;
+    let mut links = by_tag.remove(&tag.id).unwrap_or_default();
+    links.sort_by(|(a, x), (b, y)| {
+        (y.pinned, y.created_at, b.id).cmp(&(x.pinned, x.created_at, a.id))
+    });
+    let pinned: Vec<i64> = links
+        .iter()
+        .filter(|(_, t)| t.pinned)
+        .map(|(p, _)| p.id)
+        .collect();
+    let posts: Vec<Post> = links.into_iter().map(|(post, _)| post).collect();
     Ok(view(
         "blog/list.html",
-        context! { heading => format!("#{}", tag.name), posts },
+        context! { heading => format!("#{}", tag.name), posts, pinned },
     ))
 }
 
@@ -179,7 +244,15 @@ struct CategoryStats {
     comments: i64,
 }
 
-/// Joins and aggregates are clearest as SQL, read into structs or tuples.
+/// A row of the "most active commenters" table.
+#[derive(FromRow, Serialize)]
+struct Commenter {
+    author: String,
+    comments: i64,
+}
+
+/// Joins are clearest as SQL, read into structs or tuples; an aggregate over
+/// one table reads well from the query builder (`group_by` + `select_as`).
 async fn report(State(db): State<Db>) -> Result<View> {
     let categories: Vec<CategoryStats> = renox::db::sql(
         "SELECT COALESCE(c.name, 'Uncategorized') AS category, \
@@ -198,13 +271,22 @@ async fn report(State(db): State<Db>) -> Result<View> {
     )
     .fetch_as(&db)
     .await?;
-    // A sub-query without writing SQL: posts that have at least one comment.
+    // One table, grouped: `group_by` checks the column name, `select_as`
+    // reads the aggregate into a `#[derive(FromRow)]` struct.
+    let commenters: Vec<Commenter> = Comment::query()
+        .group_by("author")
+        .order_by_raw("comments DESC, author")
+        .limit(5)
+        .select_as(&db, "author, COUNT(*) AS comments")
+        .await?;
+    // `whereHas` without writing SQL: posts with at least one comment
+    // (EXISTS); `where_doesnt_have` is the opposite.
     let discussed = Post::query()
-        .where_in_query("id", Comment::query(), "post_id")
+        .where_has(Comment::query(), "post_id")
         .count(&db)
         .await?;
     Ok(view(
         "blog/report.html",
-        context! { categories, tags, discussed },
+        context! { categories, tags, commenters, discussed },
     ))
 }

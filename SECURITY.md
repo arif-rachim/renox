@@ -40,9 +40,14 @@ what was audited before 1.0 and how each finding was fixed. In short:
 - CSRF tokens on every unsafe request, sessions in an encrypted and signed cookie,
   `SameSite=Lax`, `Secure` behind `https://`;
 - a Content-Security-Policy with nonces, security headers and HSTS;
-- Argon2id passwords, a login lock per email and per IP, constant-time comparisons for
-  tokens, signatures and webhook MACs;
-- parameterized SQL everywhere, with column names checked against the model;
+- Argon2id passwords (imported bcrypt hashes are rehashed at login), a password policy,
+  password confirmation for sensitive pages, a login lock per email and per IP,
+  constant-time comparisons for tokens, signatures and webhook MACs;
+- logout per device and "log out other devices", sessions that end on a password change,
+  API tokens with abilities and expiry;
+- parameterized SQL, with column names and operators checked against the model; the raw
+  fragments (`where_raw`, `order_by_raw`, `having_raw`, `select_as`, `sql()`) take SQL as
+  written, so identifiers in them are the app's to check, and values go through `?`;
 - uploads sniffed by content and served from a sandbox with `nosniff`;
 - signed URLs with expiry, and redirects that never leave the site;
 - `TRUSTED_PROXIES` so `X-Forwarded-For` is believed only from your proxy.

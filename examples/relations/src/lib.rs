@@ -3,10 +3,14 @@
 //!
 //! - One row: a method per relation (`post.comments(&db)`), in
 //!   [`app::blog::model`].
-//! - A page of rows: `belongs_to`, `has_many` and `Pivot::load_for` fetch
-//!   each relation of the whole page in one query (no N+1).
+//! - A page of rows: `belongs_to`, `has_many`, `count_many` and
+//!   `Pivot::load_for` fetch each relation of the whole page in one query
+//!   (no N+1).
 //! - Changing a many-to-many: `Pivot::sync` from a form's checkboxes.
-//! - Reports: SQL joins read into `#[derive(FromRow)]` structs and tuples.
+//! - Pivot columns: `Pivot::with_timestamps`, `attach_with`, `update_pivot`
+//!   and `load_with_pivot` (a post pinned on a tag's page).
+//! - Reports: SQL joins read into `#[derive(FromRow)]` structs and tuples,
+//!   `group_by` + `select_as` for one table, `where_has` for "has any".
 //!
 //! See docs/relations.md for the reference.
 //!
@@ -75,7 +79,13 @@ async fn seed(db: Db) -> Result {
             .filter(|_| (0..3).fake::<u8>() == 0)
             .map(|t| t.id)
             .collect();
-        POST_TAGS.attach(&db, post.id, picked).await?;
+        // Every fifth post is pinned on its first tag's page: a pivot column.
+        for (n, tag_id) in picked.into_iter().enumerate() {
+            let pinned = n == 0 && i % 5 == 0;
+            POST_TAGS
+                .attach_with(&db, post.id, tag_id, &[("pinned", &pinned)])
+                .await?;
+        }
     }
     Ok(())
 }

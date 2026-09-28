@@ -2,6 +2,7 @@
 
 use std::time::Duration;
 
+use renox::db::CursorPage;
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -29,18 +30,29 @@ impl Module for Products {
             .post("/api/tokens", issue_token)
             .name("api.tokens.store")
             .without_csrf();
-        let api = Routes::new()
+        // `require_ability` (like every route layer) guards only the routes
+        // added before it, so each ability gets its own group. A token
+        // without the ability gets 403; logged-in sessions always pass.
+        let read = Routes::new()
             .get("/api/products", index)
             .name("api.products.index")
-            .post("/api/products", store)
-            .name("api.products.store")
             .get("/api/products/{id}", show)
             .name("api.products.show")
+            .require_ability("products:read");
+        let write = Routes::new()
+            .post("/api/products", store)
+            .name("api.products.store")
+            .delete("/api/products/{id}", destroy)
+            .name("api.products.destroy")
+            .require_ability("products:write");
+        let account = Routes::new()
             .delete("/api/tokens/current", revoke_current)
             .name("api.tokens.destroy")
             .delete("/api/tokens", revoke_all)
-            .name("api.tokens.destroy_all")
-            .require_auth(); // a missing or wrong Bearer token → 401
+            .name("api.tokens.destroy_all");
+        // Added last, so it runs first: a missing, wrong or expired Bearer
+        // token → 401 before any ability is checked.
+        let api = read.merge(write).merge(account).require_auth();
         tokens
             .merge(api)
             .throttle(60, Duration::from_secs(60))
@@ -54,7 +66,14 @@ struct Login {
     password: String,
     /// Shown in the user's list of tokens, e.g. "Arif's iPhone".
     device: String,
+    /// `true` asks for a token that can only read (e.g. for a dashboard);
+    /// by default the token can read and write products.
+    #[serde(default)]
+    read_only: bool,
 }
+
+/// How long an API token works; the app logs in again after that.
+const TOKEN_LIFETIME_DAYS: i64 = 30;
 
 impl Validate for Login {
     fn rules(&self, v: &mut Validator) {
@@ -71,10 +90,23 @@ async fn issue_token(
     let Some(user) = User::attempt(&db, &login.email, &login.password).await? else {
         return Err(Error::Unauthorized);
     };
-    let token = user.create_token(&db, &login.device, None).await?;
-    Ok(Json(
-        json!({ "token": token.plain, "user": { "id": user.id, "name": user.name } }),
-    ))
+    // Give each token only the abilities it needs, and an expiry, so a
+    // leaked token is limited in what it can do and for how long.
+    let abilities: &[&str] = if login.read_only {
+        &["products:read"]
+    } else {
+        &["products:read", "products:write"]
+    };
+    let expires_at = renox::db::now() + renox::chrono::TimeDelta::days(TOKEN_LIFETIME_DAYS);
+    let token = user
+        .create_token_with(&db, &login.device, abilities, Some(expires_at))
+        .await?;
+    Ok(Json(json!({
+        "token": token.plain,
+        "abilities": abilities,
+        "expires_at": expires_at,
+        "user": { "id": user.id, "name": user.name },
+    })))
 }
 
 /// "Log out" in the app: this device's token stops working.
@@ -91,11 +123,22 @@ async fn revoke_all(State(db): State<Db>, user: AuthUser) -> Result<StatusCode> 
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn index(State(db): State<Db>, Page(page): Page) -> Result<Json<Paginated<Product>>> {
+#[derive(Deserialize)]
+struct ListParams {
+    /// The `next_cursor` of the previous response; none for the first page.
+    cursor: Option<String>,
+}
+
+/// Newest products first, 20 at a time. The reply's `next_cursor` goes back
+/// as `?cursor=…` for the next 20; it is `null` on the last page. Unlike page
+/// numbers, products added meanwhile don't shift the pages.
+async fn index(
+    State(db): State<Db>,
+    Query(params): Query<ListParams>,
+) -> Result<Json<CursorPage<Product>>> {
     Ok(Json(
         Product::query()
-            .order_by("name")
-            .paginate(&db, page, 20)
+            .cursor_paginate(&db, params.cursor.as_deref(), 20)
             .await?,
     ))
 }
@@ -134,4 +177,9 @@ async fn store(
         StatusCode::CREATED,
         Json(Product::create(&db, product).await?),
     ))
+}
+
+async fn destroy(State(db): State<Db>, Path(id): Path<i64>) -> Result<StatusCode> {
+    Product::find_or_404(&db, id).await?.delete(&db).await?;
+    Ok(StatusCode::NO_CONTENT)
 }

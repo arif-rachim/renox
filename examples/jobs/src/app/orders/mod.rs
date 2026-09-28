@@ -4,8 +4,10 @@
 mod new_order;
 mod receipt;
 
+use renox::mail::Mail;
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 pub use receipt::SendReceipt;
 
@@ -54,6 +56,8 @@ impl Module for Orders {
                     })
                     .await?;
                 let order = Order::find_or_404(&state.db, event.order_id).await?;
+                // Customers don't log in here, so every user is shop staff. With
+                // customer accounts, pick the admins by role (the `Permissions` module).
                 for admin in User::all(&state.db).await? {
                     state
                         .notify(&admin, &new_order::NewOrder(order.clone()))
@@ -61,7 +65,19 @@ impl Module for Orders {
                 }
                 Ok(())
             });
-        app.schedule().daily_at("21:00", "daily-sales", daily_sales);
+        let schedule = app.schedule();
+        // The shop is in Jakarta whatever APP_TIMEZONE says, and closed at weekends.
+        schedule
+            .daily_at("21:00", "daily-sales", daily_sales)
+            .weekdays()
+            .timezone("Asia/Jakarta")
+            .on_failure(report_failed);
+        // Min hour day month weekday: Mondays at 07:30, before the shop opens.
+        // (`weekly_on(Weekday::Mon, "07:30", …)` says the same.)
+        schedule
+            .cron("30 7 * * 1", "weekly-sales", weekly_sales)
+            .timezone("Asia/Jakarta")
+            .on_failure(report_failed);
     }
 }
 
@@ -104,23 +120,56 @@ async fn store(
     Ok(Redirect::to("/"))
 }
 
-/// Mails the day's order count and total to every admin (scheduled at 21:00
-/// in APP_TIMEZONE; `my-app schedule:list` shows when it runs next).
+/// Mails the day's order count and total to every admin (weekdays at 21:00
+/// in Jakarta; `my-app schedule:list` shows when it runs next).
 pub async fn daily_sales(state: AppState) -> Result {
-    let since = renox::db::now() - renox::chrono::TimeDelta::days(1);
-    let orders = Order::query()
-        .where_op("created_at", ">=", since)
-        .get(&state.db)
-        .await?;
-    let total: i64 = orders.iter().map(|o| o.total).sum();
+    sales_report(state, 1, "Today's sales", "today").await
+}
+
+/// The same for the last seven days, on Monday mornings.
+pub async fn weekly_sales(state: AppState) -> Result {
+    sales_report(state, 7, "This week's sales", "in the last 7 days").await
+}
+
+async fn sales_report(state: AppState, days: i64, subject: &str, period: &str) -> Result {
+    // Each scheduled run is claimed once, even with several servers on one
+    // database. The lock also covers `my-app schedule:run daily-sales` typed
+    // while the scheduled run is still going: the second one skips, so
+    // nobody gets the report twice. (Across servers it needs
+    // CACHE_STORE=database.)
+    let lock = state
+        .cache
+        .lock(&format!("sales-report:{days}"), Duration::from_secs(300));
+    let Some(guard) = lock.try_acquire().await? else {
+        return Ok(());
+    };
+
+    let since = renox::db::now() - renox::chrono::TimeDelta::days(days);
+    let recent = || Order::query().where_op("created_at", ">=", since);
+    // Counted and summed in SQL: no rows are loaded.
+    let count = recent().count(&state.db).await?;
+    let total: i64 = recent().sum(&state.db, "total").await?;
     for admin in User::all(&state.db).await? {
         let mail = state.mail_view(
             &admin.email,
-            "Today's sales",
-            "mail/daily-sales",
-            context! { count => orders.len(), total },
+            subject,
+            "mail/sales",
+            context! { count, total, period },
         )?;
         state.queue_mail(mail).await?;
     }
+    guard.release().await?;
     Ok(())
+}
+
+/// Runs when a report fails (the error is logged anyway): tells a person.
+async fn report_failed(state: AppState, err: Error) {
+    let to = state
+        .config
+        .var("ALERT_EMAIL")
+        .unwrap_or_else(|| "admin@example.com".into());
+    let mail = Mail::new(to, "A sales report failed", format!("{err:?}"));
+    if let Err(err) = state.queue_mail(mail).await {
+        eprintln!("could not queue the failure alert: {err:?}");
+    }
 }

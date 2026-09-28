@@ -2,7 +2,7 @@
 
 A guestbook that touches many Renox features in one file: named routes, a layout, sessions
 and flash messages, CSRF, htmx fragments, validation with old input, a model, migrations, a
-seeder, pagination, login and registration, an event whose listener queues a job, a scheduled
+seeder, pagination, login and registration, the account page, an event whose listener queues a job, a scheduled
 task, an app command, uploads and two languages. It is also the app used for live and browser
 testing. Read it for a quick tour; read [examples/crud](../crud) or
 [examples/shop](../shop) for how to structure a real app.
@@ -27,6 +27,7 @@ Other things to try: `/halo/<name>`, `/bahasa/en` and `/bahasa/id` to switch lan
 | The page: the form posted with htmx and Alpine, the `entries` block swapped on post and on page links | [resources/views/guestbook/index.html](resources/views/guestbook/index.html) |
 | Texts and validation field names in English and Indonesian | [resources/lang](resources/lang) |
 | The entries table, then a second migration adding `photo` | [migrations](migrations) |
+| The layout: the logged-in user's name links to `/account` (`route('account.show')`) | [resources/views/layouts/app.html](resources/views/layouts/app.html) |
 | Every setting, with comments | [.env.example](.env.example) |
 
 ## Things worth copying
@@ -38,6 +39,8 @@ Other things to try: `/halo/<name>`, `/bahasa/en` and `/bahasa/id` to switch lan
   with the fragment and an `HxTrigger`, and a plain post with a flash message and `Back`.
 - **Validation errors need no code in the handler.** `Valid<EntryForm>` sends plain posts back
   with errors and old input, and answers htmx posts with 422.
+- **Account pages for free.** `Auth::new().account()` adds `/account`: edit the profile,
+  change the password, log out other devices, delete the account.
 - **An optional photo.** `photo: Option<Upload>` with `.image().max(2048)`, stored with
   `store_public`.
 

@@ -1,3 +1,4 @@
+use renox::prelude::*;
 use renox::testing::TestApp;
 
 /// Tests don't read `.env`; the guestbook's default language is Indonesian.
@@ -67,4 +68,25 @@ async fn the_prune_command_deletes_old_entries() {
             .await
             .is_err()
     );
+}
+
+#[renox::test]
+async fn a_logged_in_guest_can_open_their_account() {
+    let app = app().await;
+    app.get("/account").await.assert_redirect("/login");
+
+    let user = User::register(app.db(), "Budi", "budi@example.com", "password123")
+        .await
+        .unwrap();
+    app.acting_as(&user);
+    // The layout links the name to the account page.
+    app.get("/")
+        .await
+        .assert_ok()
+        .assert_see(r#"<a href="/account">Budi</a>"#);
+    app.get("/account")
+        .await
+        .assert_ok()
+        .assert_see("Akun kamu")
+        .assert_see("budi@example.com");
 }

@@ -49,11 +49,13 @@ impl Order {
     }
 }
 
-/// Customers see their own orders; admins see every order.
+/// Customers see their own orders. Admins see every order too, but a policy
+/// gets a plain `User` (no roles), so `orders::show` checks
+/// `AuthUser::has_role` before asking it.
 impl Policy for Order {
     fn allows(&self, user: &User, ability: &str) -> bool {
         match ability {
-            "view" => self.user_id == user.id || crate::is_admin(user),
+            "view" => self.user_id == user.id,
             _ => false,
         }
     }

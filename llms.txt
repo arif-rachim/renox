@@ -15,9 +15,13 @@
   cursor pagination, transactions with retries); every field type; pagination; seeders and factories; auth,
   policies, gates, API tokens and your own login; tenants (`renox::context`, default scopes),
   roles and permissions, route guards for gates/roles/permissions/token abilities; the account
-  page, password rules and confirmation, per-device logout; auth events and the audit log; HTMX; raw SQL and transactions; jobs, events and
-  the schedule; mail and notifications (with the in-app inbox); cookies and downloads; cache,
-  session, uploads and translations (plurals); signed URLs and private files; CSP, CORS and
+  page, password rules and confirmation, per-device logout; auth events and the audit log;
+  model hooks, partial saves (`save_only`, `save_changes`) and encrypted values; HTMX; raw SQL
+  and transactions; jobs (priority, unique, encrypted, middleware, chains, batches), events and
+  the schedule (cron, weekly/monthly, weekdays, IANA time
+  zones, `on_failure`, `schedule:run`); mail and notifications (with the in-app inbox); cookies
+  and downloads; cache (`add`, `pull`, `increment`) and atomic locks; session, uploads and
+  translations (plurals); signed URLs and private files; CSP, CORS and
   webhooks; SEO and analytics; tests; configuration (`.env` and your own settings).
 - [README.md](README.md): install `rnx`, create and run an app, the generator commands.
 
@@ -28,13 +32,16 @@ Every example has a README.md that walks through it.
 - [examples/shop](examples/shop): a whole online shop, the example to read for how everything
   fits: catalog with htmx search, sort and pagination, a cached home page, SEO and a sitemap; a
   cart; checkout in one transaction that never oversells; an event whose listener queues the
-  confirmation mail; notifications; a daily task cancelling unpaid orders; an admin behind a gate
-  with photo uploads; en/id with plurals; the `make:deploy` files. Guide: its
+  confirmation mail; notifications; a daily task cancelling unpaid orders; an admin for the
+  `admin` role (the `Permissions` module, `require_role`) with photo uploads and an audit trail
+  of order status changes (the `Audit` module); en/id with plurals; the `make:deploy` files. Guide: its
   [README](examples/shop/README.md).
   - Checkout: [checkout.rs](examples/shop/src/app/orders/checkout.rs); orders, event, task:
     [orders/mod.rs](examples/shop/src/app/orders/mod.rs); admin:
     [admin/mod.rs](examples/shop/src/app/admin/mod.rs),
-    [admin/products.rs](examples/shop/src/app/admin/products.rs); tests:
+    [admin/products.rs](examples/shop/src/app/admin/products.rs),
+    [admin/orders.rs](examples/shop/src/app/admin/orders.rs) (audit); roles:
+    [lib.rs](examples/shop/src/lib.rs); tests:
     [tests/shop.rs](examples/shop/tests/shop.rs)
 - [examples/htmx-recipes](examples/htmx-recipes) ([README](examples/htmx-recipes/README.md)): htmx + Alpine recipes, each a few attributes and
   a handler that answers with a fragment: modal form (HX-Trigger closes it), inline edit
@@ -44,8 +51,10 @@ Every example has a README.md that walks through it.
   [views](examples/htmx-recipes/resources/views/tasks),
   [tests/recipes.rs](examples/htmx-recipes/tests/recipes.rs)
 - [examples/relations](examples/relations) ([README](examples/relations/README.md)): a blog: belongs to, has many, many to many through a
-  pivot (`Pivot::sync` from checkboxes, `inverse()`), a page loaded without N+1
-  (`belongs_to`, `has_many`, `load_for`), reports as SQL joins with `fetch_as`.
+  pivot (`Pivot::sync` from checkboxes, `inverse()`) with pivot columns (a pinned flag and
+  timestamps: `attach_with`, `update_pivot`, `load_with_pivot`), a page loaded without N+1
+  (`belongs_to`, `has_many`, `load_for`, `count_many`), `where_has`, a `group_by` + `select_as`
+  report, and reports as SQL joins with `fetch_as`.
   [src/app/blog/mod.rs](examples/relations/src/app/blog/mod.rs),
   [model.rs](examples/relations/src/app/blog/model.rs),
   [tests/blog.rs](examples/relations/tests/blog.rs)
@@ -59,12 +68,14 @@ Every example has a README.md that walks through it.
     [form.html](examples/crud/resources/views/products/form.html)
   - Tests: [examples/crud/tests/products.rs](examples/crud/tests/products.rs)
 - [examples/api](examples/api) ([README](examples/api/README.md)): a JSON API: tokens for a mobile app (`User::attempt`,
-  `create_token`), Bearer auth, JSON bodies validated with 422 errors, JSON 401/404, CORS and a
-  rate limit. [src/app/products/mod.rs](examples/api/src/app/products/mod.rs),
+  `create_token_with` with abilities and an expiry, pruned nightly), Bearer auth,
+  `require_ability` on reads and writes, a list with `cursor_paginate`, JSON bodies validated
+  with 422 errors, JSON 401/403/404, CORS and a rate limit. [src/app/products/mod.rs](examples/api/src/app/products/mod.rs),
   [tests/api.rs](examples/api/tests/api.rs)
 - [examples/jobs](examples/jobs) ([README](examples/jobs/README.md)): an event whose listener queues a receipt mail (a mail template
-  with a text version), a notification to admins by mail and in the database, and a scheduled
-  daily report. [src/app/orders/mod.rs](examples/jobs/src/app/orders/mod.rs),
+  with a text version), a notification to admins by mail and in the database, and scheduled
+  reports: daily on weekdays and weekly by `cron`, in `Asia/Jakarta`, with an `on_failure` alert,
+  a cache lock against overlapping runs, and counts and sums done in SQL. [src/app/orders/mod.rs](examples/jobs/src/app/orders/mod.rs),
   [receipt.rs](examples/jobs/src/app/orders/receipt.rs),
   [new_order.rs](examples/jobs/src/app/orders/new_order.rs),
   [tests/orders.rs](examples/jobs/tests/orders.rs)
@@ -90,7 +101,7 @@ Every example has a README.md that walks through it.
     [tests/payments.rs](examples/webhooks/tests/payments.rs)
 - [examples/hello](examples/hello) ([README](examples/hello/README.md)): a guestbook in one file: HTMX form posts that return
   fragments, a photo upload, an event whose listener queues a mail job, a scheduled task,
-  i18n (en/id) with a language switch, and a seeder.
+  i18n (en/id) with a language switch, login with the account page, and a seeder.
   - [examples/hello/src/lib.rs](examples/hello/src/lib.rs),
     [tests](examples/hello/tests/guestbook.rs)
 
@@ -100,7 +111,8 @@ Every example has a README.md that walks through it.
   on both, tests with `TEST_DATABASE_URL`, moving data from SQLite.
 - [docs/operations.md](docs/operations.md): running in production: timeouts, `TRUSTED_PROXIES`,
   `/health`, what happens when the database or SMTP fails, recovering failed jobs and webhook
-  calls, backups, migrations at deploy, maintenance mode.
+  calls, backups (and what `APP_KEY` protects), migrations at deploy, the scheduler's time zone,
+  tables to prune, maintenance mode.
 - [docs/development.md](docs/development.md): faster builds (profiles, linker, features to drop,
   sccache, the cargo-chef Dockerfile).
 - [docs/types.md](docs/types.md): every Rust field type with its form input and its SQLite and
@@ -118,6 +130,11 @@ Every example has a README.md that walks through it.
 - [ROADMAP.md](ROADMAP.md): milestones and design decisions.
 - [docs/audit/2026-09-pre-1.0.md](docs/audit/2026-09-pre-1.0.md): known issues (IDs W*, D*, A*) from
   the pre-1.0 audit, with repro tests and fix directions; ROADMAP M13/M14 track them.
-- `crates/renox-core/src`: the runtime. `db/` (Db, models, queries, migrations), `validation/`,
-  `auth/`, `queue/`, `schedule.rs`, `view.rs`, `testing.rs`.
+- [docs/audit/2026-09-laravel-parity.md](docs/audit/2026-09-laravel-parity.md): the Laravel
+  parity review behind M18–M21, and a later gap report
+  ([PDF](docs/audit/2026-09-laravel-gap-report.pdf), in Indonesian).
+- `crates/renox-core/src`: the runtime. `db/` (Db, models, queries, relations, migrations),
+  `validation/`, `auth/` (incl. `permissions.rs`, `account.rs`, `events.rs`, `tokens.rs`),
+  `audit.rs`, `context.rs`, `queue/`, `schedule.rs` + `timezone.rs`, `cache.rs`, `view.rs`,
+  `testing.rs`.
 - `crates/renox-cli`: `rnx`; `stubs/` holds the files `rnx new` writes.

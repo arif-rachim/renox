@@ -35,7 +35,8 @@ rnx new blog && cd blog                                             # or: --data
 rnx serve                                                           # http://127.0.0.1:3000
 ```
 
-The new app has a home page, login and registration, English and Indonesian texts, a test in
+The new app has a home page, login and registration, an account page (profile, password, other
+devices), English and Indonesian texts, a test in
 `tests/home.rs`, and an `AGENTS.md` for coding agents. With `--database postgres`, create the
 `blog` and `blog_test` databases first (or edit `.env`).
 
@@ -99,8 +100,9 @@ impl Module for Guestbook {
 
 - Routes are grouped in modules and in prefixed groups (`Routes::group("/admin", "admin.", …)`),
   with names (`route('products.edit', id)` in templates),
-  guards (`.require_auth()`, `.guest_only()`, `.require_verified()`) and rate limits
-  (`.throttle(60, Duration::from_secs(60))`).
+  guards (`.require_auth()`, `.guest_only()`, `.require_verified()`, `.require_gate("admin")`,
+  `.require_role(…)`, `.require_permission(…)`, `.require_ability(…)` for API tokens,
+  `.require_password_confirmed()`) and rate limits (`.throttle(60, Duration::from_secs(60))`).
 - Encrypted cookie sessions, flash messages and old input come built in. CSRF protection is
   automatic for forms and htmx.
 - `_method` spoofing lets plain forms send PUT and DELETE.
@@ -137,13 +139,18 @@ impl Module for Guestbook {
 - Plain SQL migrations run in batches (`migrate`, `migrate:rollback`, `migrate:fresh --seed`),
   with per-database files when SQL differs.
 - `#[derive(Model)]` gives you `create`, `save`, `delete` (with optional soft deletes), `find_or_404`,
-  a query builder (OR groups, sub-queries, aggregates, bulk updates, upserts, chunks), pagination and
-  factories with fake data.
-- Relations are explicit and N+1-free: `belongs_to`, `has_many` and many-to-many pivots load a page's
-  related rows in one query each ([guide](docs/relations.md)); joins read into
+  a query builder (OR groups, sub-queries, `where_has`, aggregates, `group_by`/`having`, raw
+  fragments, row locks, bulk updates, upserts, `update_or_create`, chunks), pagination (numbered,
+  simple or by cursor) and factories with fake data.
+- Models can save only what changed (`save_changes`, `save_only`), run hooks (`saving`, `saved`,
+  `deleting`, `deleted`) and carry a default scope, e.g. the current tenant, that every query
+  applies until `unscoped()`.
+- Relations are explicit and N+1-free: `belongs_to`, `has_many`, many-to-many pivots (with pivot
+  columns) and polymorphic `Morph` load a page's related rows in one query each, and `count_many` /
+  `sum_many` give counts and sums per row ([guide](docs/relations.md)); joins read into
   `#[derive(FromRow)]` structs with `fetch_as`.
-- For anything else there's raw SQL with `?` placeholders and transactions:
-  `renox::db::sql("…").bind(x).fetch_all(&db)`.
+- For anything else there's raw SQL with `?` placeholders, and transactions that can retry on a
+  busy database (`db.transaction_retrying(3, …)`): `renox::db::sql("…").bind(x).fetch_all(&db)`.
 - SQLite is the default. PostgreSQL is one feature flag away, with the same code
   ([guide](docs/postgresql.md)).
 </details>
@@ -157,18 +164,30 @@ impl Module for Guestbook {
   own reusable `Rule`s. Messages come in English
   and Indonesian, or from your own translations.
 - `Auth::new()` adds login, registration, logout, remember me, password reset and email
-  verification, with Argon2id hashing and login throttling.
-- API tokens (`Authorization: Bearer`) serve mobile apps and integrations.
-- Policies and gates: `user.authorize("update", &product)?` in handlers, `can(...)` in views.
+  verification, with Argon2id hashing and login throttling; `.account()` adds a profile page
+  (email change with re-verification, password, "log out other devices", delete account).
+  Logout ends only this device. Password rules come from `Password::min(12).mixed_case()…`, and
+  users imported from Laravel log in with their bcrypt hashes.
+- Auth events (`LoggedIn`, `LoginFailed`, `Registered`, …) and an opt-in `Audit` module that
+  records them, plus your own entries (`audit::record`).
+- API tokens (`Authorization: Bearer`) with abilities and expiry serve mobile apps and
+  integrations.
+- Policies and gates: `user.authorize("update", &product)?` in handlers, `can(...)` in views,
+  `App::gate_before` for super-admins, and an opt-in `Permissions` module with roles and
+  permissions (`user.assign_role(db, "editor")`, `.require_role("editor")`).
 </details>
 
 <details>
 <summary><b>Background work</b>: queue, scheduler, events, mail, notifications</summary>
 
 - The job queue lives in your own database, with retries, backoff and `queue:failed` / `queue:retry`.
-  On PostgreSQL, workers on several servers never take the same job.
-- The scheduler (`every_minutes(5, …)`, `daily_at("02:00", …)`) runs inside `serve`, and each run
-  is claimed once when several servers share the database.
+  On PostgreSQL, workers on several servers never take the same job. Queues drain in priority
+  order (`--queue high,default`); jobs can be unique, encrypted, rate limited or kept from
+  overlapping, have a `failed` hook, and run in chains or in batches with progress.
+- The scheduler (`every_minutes(5, …)`, `daily_at("02:00", …)`, `cron("30 9 * * 1-5", …)`,
+  `weekly_on`, `monthly_on`, with `weekdays()`, `between(…)`, `on_failure(…)`) runs inside
+  `serve` in `APP_TIMEZONE` or a task's own IANA zone, daylight saving included, and each run is
+  claimed once when several servers share the database.
 - Events and listeners are included.
 - Mail comes from templates, with a text version, several recipients, cc/bcc, reply-to and
   attachments, SMTP in production and a preview page at `/_renox/mail` while developing.
@@ -181,7 +200,9 @@ impl Module for Guestbook {
 
 - Uploads are ordinary form fields, checked by their content. They're stored locally or on S3/R2,
   with signed temporary URLs.
-- The cache (`remember`, `put`, `forget`) is kept in memory or in the database.
+- The cache (`remember`, `put`, `forget`, `add`, `pull`, `increment`) is kept in memory or in the
+  database, with atomic locks (`state.cache.lock("stock:42", ttl)`) that hold across servers on
+  the database store.
 - Each visitor gets their own locale, from `resources/lang/*.json`, with `t()` and plurals.
 </details>
 
@@ -255,18 +276,19 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 ## Examples
 
 - [`examples/shop`](examples/shop): a whole online shop: htmx search, a cart, checkout in one
-  transaction that never oversells, queued mail and notifications, an admin with photo uploads,
-  English and Indonesian, and its deploy files. Start here.
+  transaction that never oversells, queued mail and notifications, an admin for the `admin` role
+  with photo uploads and an audit trail, English and Indonesian, and its deploy files. Start here.
 - [`examples/htmx-recipes`](examples/htmx-recipes): a modal form, inline edit, infinite scroll,
   delete in place, tabs and a dropdown, with htmx, Alpine and fragment-returning handlers.
 - [`examples/relations`](examples/relations): a blog with belongs-to, has-many and many-to-many
-  (a pivot and `sync`), loaded without N+1, and reports as SQL joins.
+  (a pivot with its own columns and `sync`), loaded without N+1 with counts per post, and
+  reports with `group_by` and SQL joins.
 - [`examples/crud`](examples/crud): one resource end to end, with pagination, validation,
   owner-only edit and delete through a policy, soft deletes with a trash, and tests.
-- [`examples/api`](examples/api): a JSON API for a mobile app, with tokens, Bearer auth, JSON
-  validation errors, CORS and a rate limit.
-- [`examples/jobs`](examples/jobs): an event, a queued receipt mail, admin notifications and a
-  scheduled daily report.
+- [`examples/api`](examples/api): a JSON API for a mobile app, with tokens that carry abilities
+  and expire, Bearer auth, cursor pagination, JSON validation errors, CORS and a rate limit.
+- [`examples/jobs`](examples/jobs): an event, a queued receipt mail, admin notifications, and
+  daily and weekly reports scheduled in a time zone, with a failure alert and a lock.
 - [`examples/uploads`](examples/uploads): public photos checked by content, and private invoices
   behind expiring links.
 - [`examples/fields`](examples/fields): every form input type saved and shown back, on SQLite
@@ -275,7 +297,7 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 - [`examples/webhooks`](examples/webhooks): Midtrans, Xendit and Stripe webhooks marking orders
   paid, each tested with good, forged and repeated calls.
 - [`examples/hello`](examples/hello): the guestbook from the GIF, with an HTMX form, a photo upload,
-  an event that queues mail, a scheduled task, English and Indonesian, and login.
+  an event that queues mail, a scheduled task, English and Indonesian, login and an account page.
 
 ## Coming from Laravel
 
@@ -287,8 +309,11 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 | Middleware | `.require_auth()`, `.throttle(…)`, `Routes::route_layer`, `App::layer` |
 | Eloquent | `#[derive(Model)]` and the query builder; relations are explicit loaders ([docs/relations.md](docs/relations.md)) |
 | Form Requests | `Valid<T>` with `impl Validate` |
-| Gates and policies | `App::gate`, `impl Policy`, `user.authorize(…)` |
-| Breeze / Sanctum | `Auth::new()` (pages included) / API tokens (`create_token`, Bearer auth) |
+| Gates and policies | `App::gate`, `impl Policy`, `user.authorize(…)`, `.require_gate(…)` |
+| spatie/laravel-permission | the `Permissions` module: `assign_role`, `has_permission`, `.require_role(…)` |
+| Global scopes (tenancy) | `#[model(default_scope = "…")]` with `renox::context` |
+| Breeze / Sanctum | `Auth::new().account()` (pages included) / API tokens with abilities (`create_token_with`, `.require_ability(…)`) |
+| `Cache::lock` | `state.cache.lock(name, ttl)` |
 | Queues, mail, notifications, scheduler | `impl Job`, `mail_view`, `impl Notification`, `app.schedule()` |
 | `View::share` | `App::share` |
 | Tinker | `rnx db:shell` and your own commands (`App::command`) |
@@ -307,10 +332,14 @@ Not planned: runtime-reflected Eloquent-style models, Redis, and a REPL.
 
 ## Status
 
-Renox is **pre-1.0**. The examples of real apps are done; what's next is 1.0: a documentation
-site with a tutorial and a Laravel guide, semver checks, and the first real release on crates.io
-(today's crates there are placeholders, so install from Git as above). Until then the API may
-still change; breaking changes are listed in [CHANGELOG.md](CHANGELOG.md).
+Renox is **pre-1.0**. After the Laravel parity review
+([docs/audit/2026-09-laravel-parity.md](docs/audit/2026-09-laravel-parity.md)), milestones M18
+(tenancy, roles, accounts), M19 (query builder and models), M20a (scheduler, locks) and M20b
+(queue) are done; M20c (HTTP client, queue dashboard, localized mail) and M21 (views and
+developer experience) come next,
+then 1.0: a documentation site with a tutorial and a Laravel guide, semver checks, and the first
+real release on crates.io (today's crates there are placeholders, so install from Git as above).
+Until then the API may still change; breaking changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
 `rnx new` pins your app to the Renox commit your `rnx` was built from
 (`renox = { git = …, rev = "…" }`). To upgrade, reinstall `rnx` or move the `rev`, then read the

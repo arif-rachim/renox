@@ -248,6 +248,30 @@ async fn models(State(state): State<AppState>) -> Result<String> {
     ))
 }
 
+/// M20a's cache APIs, routed and called.
+async fn cache(State(state): State<AppState>) -> Result<String> {
+    let cache = &state.cache;
+    let first = cache.add("send:add", &vec![1, 2], None).await?;
+    let again = cache
+        .add("send:add", &"x", Some(Duration::from_secs(60)))
+        .await?;
+    let pulled: Option<Vec<i64>> = cache.pull("send:add").await?;
+    let count = cache.increment("send:count", 2).await? + cache.decrement("send:count", 1).await?;
+    let lock = cache.lock("send:lock", Duration::from_secs(5));
+    let guard = lock.try_acquire().await?;
+    let held = lock.is_held().await?;
+    drop(guard);
+    let guard = cache
+        .lock("send:block", Duration::from_secs(5))
+        .block(Duration::from_secs(1))
+        .await?;
+    let released = guard.release().await?;
+    Ok(format!(
+        "{first} {again} {} {count} {held} {released}",
+        pulled.map_or(0, |v| v.len())
+    ))
+}
+
 #[derive(serde::Serialize, serde::Deserialize)]
 struct Nudge(i64);
 
@@ -316,6 +340,7 @@ impl Module for Handlers {
             .get("/access", access)
             .get("/builder", builder)
             .get("/models", models)
+            .get("/cache", cache)
             .get("/background", background)
     }
 }
@@ -347,4 +372,8 @@ async fn data_apis_work_in_routed_handlers() {
         .await
         .assert_ok()
         .assert_see("3 6 true true 1 true 3");
+    app.get("/cache")
+        .await
+        .assert_ok()
+        .assert_see("true false 2 3 true true");
 }
