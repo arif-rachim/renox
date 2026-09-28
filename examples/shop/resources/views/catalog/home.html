@@ -1,0 +1,17 @@
+{% extends "layouts/app.html" %}
+
+{% block seo %}{{ seo(title=app.name, description=t('home.description')) }}{% endblock %}
+
+{% block content %}
+<h1>{{ t('home.title') }}</h1>
+<p class="categories">
+  {% for category in categories %}
+  <a href="{{ route('products.index') }}?category={{ category.slug }}">{{ category.name }}</a>
+  {% endfor %}
+</p>
+
+<h2>{{ t('home.new') }}</h2>
+<div class="grid">
+  {% for product in featured %}{% include "catalog/_card.html" %}{% else %}<p class="muted">{{ t('products.none') }}</p>{% endfor %}
+</div>
+{% endblock %}

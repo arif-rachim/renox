@@ -1,0 +1,33 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<h1>{{ t('nav.cart') }}</h1>
+{% if lines %}
+<table>
+  <tr><th>{{ t('cart.product') }}</th><th>{{ t('cart.price') }}</th><th>{{ t('cart.quantity') }}</th><th>{{ t('cart.subtotal') }}</th><th></th></tr>
+  {% for line in lines %}
+  <tr>
+    <td><a href="{{ route('products.show', line.product.slug) }}">{{ line.product.name }}</a></td>
+    <td>{{ line.product.price | rupiah }}</td>
+    <td>
+      <form method="post" action="{{ route('cart.update', line.item.id) }}" class="inline">
+        {{ csrf_field() }}{{ method_field('PATCH') }}
+        <input type="number" name="quantity" value="{{ line.item.quantity }}" min="1" max="99" aria-label="{{ t('cart.quantity') }}">
+        <button>{{ t('cart.update') }}</button>
+      </form>
+    </td>
+    <td>{{ line.subtotal | rupiah }}</td>
+    <td>
+      <form method="post" action="{{ route('cart.remove', line.item.id) }}">
+        {{ csrf_field() }}{{ method_field('DELETE') }}<button>{{ t('cart.remove') }}</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+  <tr><th colspan="3">{{ t('cart.total') }}</th><th>{{ total | rupiah }}</th><th></th></tr>
+</table>
+<p><a class="button" href="{{ route('checkout') }}">{{ t('cart.checkout') }}</a></p>
+{% else %}
+<p class="muted">{{ t('cart.empty') }} <a href="{{ route('products.index') }}">{{ t('nav.products') }}</a></p>
+{% endif %}
+{% endblock %}

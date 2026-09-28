@@ -1,0 +1,15 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<h1>{{ t('orders.order') }} #{{ order.id }}</h1>
+<p><span class="status status-{{ order.status }}">{{ t('orders.statuses.' ~ order.status) }}</span>
+   · {{ order.created_at | date('%d/%m/%Y %H:%M') }}</p>
+<table>
+  {% for item in items %}
+  <tr><td>{{ item.quantity }} × {{ item.name }}</td><td>{{ (item.price * item.quantity) | rupiah }}</td></tr>
+  {% endfor %}
+  <tr><th>{{ t('cart.total') }}</th><th>{{ order.total | rupiah }}</th></tr>
+</table>
+<p><strong>{{ t('orders.address') }}:</strong> {{ order.address }}</p>
+{% if order.status == 'pending' %}<p class="muted">{{ t('orders.pay_by_transfer', days=3) }}</p>{% endif %}
+{% endblock %}

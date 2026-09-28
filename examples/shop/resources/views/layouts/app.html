@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="{{ app.locale }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% block seo %}{{ seo() }}{% endblock %}
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
+  {{ renox_head() }}
+</head>
+<body>
+  <nav>
+    <a href="{{ route('home') }}"><strong>{{ app.name }}</strong></a>
+    <a href="{{ route('products.index') }}">{{ t('nav.products') }}</a>
+    {% if auth.check %}
+    <a href="{{ route('cart.show') }}">{{ t('nav.cart') }} ({{ cart_count }})</a>
+    <a href="{{ route('orders.index') }}">{{ t('nav.orders') }}</a>
+    {% if can('admin') %}<a href="{{ route('admin.dashboard') }}">Admin</a>{% endif %}
+    <form method="post" action="{{ route('logout') }}">{{ csrf_field() }}<button>{{ t('nav.logout') }}</button></form>
+    {% else %}
+    <a href="{{ route('login') }}">{{ t('nav.login') }}</a>
+    <a href="{{ route('register') }}">{{ t('nav.register') }}</a>
+    {% endif %}
+    <span class="lang"><a href="{{ route('language', 'id') }}">ID</a> · <a href="{{ route('language', 'en') }}">EN</a></span>
+  </nav>
+  <main>
+    {% if flash.status %}<p class="flash">{{ flash.status }}</p>{% endif %}
+    {% if flash.error %}<p class="flash flash-error">{{ flash.error }}</p>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

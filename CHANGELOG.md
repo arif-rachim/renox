@@ -10,6 +10,17 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M17a · examples/shop
+
+- `examples/shop`: a whole online shop with its README (catalog, cart, checkout in one
+  transaction, queued mail and notifications, a daily task, an admin with photo uploads, en/id,
+  deploy files).
+- **Fix:** `relations::belongs_to`, `has_many`, `Pivot::load`/`load_for` and
+  `Query::first_or_create` couldn't be awaited in a routed handler ("implementation of `Send` is
+  not general enough"). They now return `impl Future + Send` and hold no closure across an
+  `.await`; a test routes every data API so this can't come back unnoticed.
+- `first_or_create`'s closure must be `Send` (closures that capture only data are).
+
 ### Fixes
 
 - **Stale schema in pooled connections.** After a migration added a column, a connection opened

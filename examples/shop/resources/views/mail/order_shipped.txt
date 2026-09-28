@@ -1,0 +1,1 @@
+Good news: order #{{ order.id }} is on its way to {{ order.address }}.

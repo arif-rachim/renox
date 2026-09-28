@@ -1,0 +1,8 @@
+Thank you for your order #{{ order.id }}.
+
+{% for item in items %}{{ item.quantity }} x {{ item.name }}: {{ (item.price * item.quantity) | rupiah }}
+{% endfor %}
+Total: {{ order.total | rupiah }}
+
+Please transfer {{ order.total | rupiah }} within 3 days, mentioning order #{{ order.id }}.
+We'll send it to: {{ order.address }}

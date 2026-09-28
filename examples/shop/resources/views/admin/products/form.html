@@ -1,0 +1,46 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<h1>{{ "Edit " ~ product.name if product else "New product" }}</h1>
+{% include "admin/_nav.html" %}
+
+<form method="post" enctype="multipart/form-data"
+      action="{{ route('admin.products.update', product.id) if product else route('admin.products.store') }}">
+  {{ csrf_field() }}{% if product %}{{ method_field('PUT') }}{% endif %}
+
+  <label for="name">Name</label>
+  <input id="name" name="name" value="{{ old('name', product.name if product else '') }}">
+  <p class="error" data-error-for="name">{{ error('name') }}</p>
+
+  <label for="category_id">Category</label>
+  <select id="category_id" name="category_id">
+    <option value="">None</option>
+    {% set chosen = old('category_id', product.category_id if product else '') | string %}
+    {% for category in categories %}
+    <option value="{{ category.id }}" {% if chosen == category.id | string %}selected{% endif %}>{{ category.name }}</option>
+    {% endfor %}
+  </select>
+  <p class="error" data-error-for="category_id">{{ error('category_id') }}</p>
+
+  <label for="description">Description</label>
+  <textarea id="description" name="description" rows="4">{{ old('description', product.description if product else '') }}</textarea>
+  <p class="error" data-error-for="description">{{ error('description') }}</p>
+
+  <label for="price">Price (Rp)</label>
+  <input id="price" name="price" type="number" min="0" value="{{ old('price', product.price if product else '') }}">
+  <p class="error" data-error-for="price">{{ error('price') }}</p>
+
+  <label for="stock">Stock</label>
+  <input id="stock" name="stock" type="number" min="0" value="{{ old('stock', product.stock if product else 0) }}">
+  <p class="error" data-error-for="stock">{{ error('stock') }}</p>
+
+  <label><input type="checkbox" name="active" {% if old('active', product.active if product else true) %}checked{% endif %}> Shown in the shop</label>
+
+  <label for="photo">Photo</label>
+  {% if product and product.photo %}<img src="{{ storage_url(product.photo) }}" alt="" width="120">{% endif %}
+  <input id="photo" name="photo" type="file" accept="image/*">
+  <p class="error" data-error-for="photo">{{ error('photo') }}</p>
+
+  <button>Save</button>
+</form>
+{% endblock %}

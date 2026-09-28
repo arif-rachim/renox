@@ -1,0 +1,35 @@
+{% extends "layouts/app.html" %}
+
+{% block seo %}
+{%- if product.photo -%}
+{{ seo(title=product.name ~ " · " ~ app.name, description=product.description, image=storage_url(product.photo), type="product") }}
+{%- else -%}
+{{ seo(title=product.name ~ " · " ~ app.name, description=product.description, type="product") }}
+{%- endif -%}
+{% endblock %}
+
+{% block content %}
+<article class="product">
+  {% if product.photo %}<img src="{{ storage_url(product.photo) }}" alt="{{ product.name }}" width="480" height="320">{% endif %}
+  <div>
+    {% if category %}<p class="muted"><a href="{{ route('products.index') }}?category={{ category.slug }}">{{ category.name }}</a></p>{% endif %}
+    <h1>{{ product.name }}</h1>
+    <p class="price">{{ product.price | rupiah }}</p>
+    <p>{{ product.description }}</p>
+    {% if product.stock == 0 %}
+    <p class="muted">{{ t('products.sold_out') }}</p>
+    {% elif auth.check %}
+    <form method="post" action="{{ route('cart.add') }}" class="inline">
+      {{ csrf_field() }}
+      <input type="hidden" name="product_id" value="{{ product.id }}">
+      <input type="number" name="quantity" value="1" min="1" max="99" aria-label="{{ t('cart.quantity') }}">
+      <button>{{ t('cart.add') }}</button>
+      <p class="error" data-error-for="quantity">{{ error('quantity') }}</p>
+    </form>
+    <p class="muted">{{ t('products.in_stock', count=product.stock) }}</p>
+    {% else %}
+    <p><a href="{{ route('login') }}">{{ t('cart.login_to_buy') }}</a></p>
+    {% endif %}
+  </div>
+</article>
+{% endblock %}
