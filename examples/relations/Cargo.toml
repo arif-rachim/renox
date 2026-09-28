@@ -7,3 +7,7 @@ publish = false
 [dependencies]
 renox.workspace = true
 serde = { version = "1.0.229", features = ["derive"] }
+
+[dev-dependencies]
+# tests/queries.rs counts sqlx's statement events to prove "one query per type".
+tracing = "0.1.44"

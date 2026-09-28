@@ -2,6 +2,8 @@
 //! group ends with `.require_role("admin")` (the `Permissions` module): a
 //! customer gets 403 and a guest the login page. Order status changes are
 //! written to the audit log, and the dashboard shows the latest entries.
+//! Deleting a product asks for the password again
+//! (`.require_password_confirmed()`, the `Auth` module's `/confirm-password`).
 //!
 //! Made with `rnx make:module admin`.
 
@@ -38,12 +40,20 @@ impl Module for AdminPanel {
                 .name("products.edit")
                 .put("/products/{id}", products::update)
                 .name("products.update")
-                .delete("/products/{id}", products::destroy)
-                .name("products.destroy")
                 .get("/orders", orders::index)
                 .name("orders.index")
                 .put("/orders/{id}/status", orders::update_status)
                 .name("orders.status")
+                // Deleting a product can't be undone (and removes its
+                // photo): ask for the password first, if it wasn't typed in
+                // the last three hours. A guard covers only the routes added
+                // before it, so this route is its own group, merged in.
+                .merge(
+                    Routes::new()
+                        .delete("/products/{id}", products::destroy)
+                        .name("products.destroy")
+                        .require_password_confirmed(),
+                )
                 .require_role(crate::ADMIN),
         )
     }

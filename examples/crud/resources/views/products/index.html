@@ -2,14 +2,16 @@
 
 {% block content %}
 <h1>Products</h1>
+<p class="count">{{ total }} product{{ "" if total == 1 else "s" }} in the shop.</p>
 {% if auth.check %}<p><a href="{{ route('products.create') }}">New product</a></p>{% endif %}
 
 <section id="products">
   <table>
-    <tr><th>Name</th><th>Price</th><th></th></tr>
+    <tr><th>Name</th><th>Slug</th><th>Price</th><th></th></tr>
     {% for product in products.items %}
     <tr>
       <td>{{ product.name }}</td>
+      <td><code>{{ product.slug }}</code></td>
       <td>{{ product.price }}</td>
       <td>
         {% if can('update', product) %}<a href="{{ route('products.edit', product.id) }}">Edit</a>{% endif %}
@@ -21,7 +23,7 @@
       </td>
     </tr>
     {% else %}
-    <tr><td colspan="3">No products yet.</td></tr>
+    <tr><td colspan="4">No products yet.</td></tr>
     {% endfor %}
   </table>
   {# Page links load the next page with HTMX and swap in just this section. #}

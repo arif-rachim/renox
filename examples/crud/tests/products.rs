@@ -135,3 +135,160 @@ async fn the_list_offers_edit_and_delete_to_the_owner_only() {
     )
     .await;
 }
+
+#[renox::test]
+async fn the_saving_hook_fills_the_slug_on_create_and_update() {
+    let app = TestApp::new(crud::app()).await;
+    let me = user(&app, "me@example.com").await;
+    app.acting_as(&me);
+
+    app.post(
+        "/products",
+        &[("name", "Kopi Susu  Gula Aren"), ("price", "18000")],
+    )
+    .await
+    .assert_redirect("/products");
+    let product = Product::query().first(app.db()).await.unwrap().unwrap();
+    assert_eq!(product.slug, "kopi-susu-gula-aren");
+
+    app.put(
+        &format!("/products/{}", product.id),
+        &[("name", "Es Teh"), ("price", "18000")],
+    )
+    .await
+    .assert_redirect("/products");
+    app.assert_database_has("products", &[("id", &product.id), ("slug", &"es-teh")])
+        .await;
+
+    // Outside a request too: the hook runs for every model write.
+    let made = Product::create(
+        app.db(),
+        Product {
+            name: "Nasi Goreng!".into(),
+            ..Product::for_owner(&me)
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(made.slug, "nasi-goreng");
+}
+
+#[renox::test]
+async fn the_saving_hook_rejects_a_name_without_letters_or_digits() {
+    let app = TestApp::new(crud::app()).await;
+    app.acting_as(&user(&app, "me@example.com").await);
+
+    // `required` passes, the hook's check doesn't: a 422 on `name`.
+    app.htmx()
+        .post("/products", &[("name", "!!!"), ("price", "1")])
+        .await
+        .assert_invalid("name");
+    app.assert_database_count("products", 0).await;
+}
+
+#[renox::test]
+async fn bulk_updates_skip_the_hooks() {
+    let app = TestApp::new(crud::app()).await;
+    let owner = user(&app, "owner@example.com").await;
+    let product = Product::create(
+        app.db(),
+        Product {
+            name: "Tea".into(),
+            ..Product::for_owner(&owner)
+        },
+    )
+    .await
+    .unwrap();
+
+    // One UPDATE statement for any number of rows: no model is loaded, so
+    // `saving` never runs and the slug keeps its old value.
+    Product::where_eq("id", product.id)
+        .update(app.db(), &[("name", &"Green Tea")])
+        .await
+        .unwrap();
+    app.assert_database_has(
+        "products",
+        &[
+            ("id", &product.id),
+            ("name", &"Green Tea"),
+            ("slug", &"tea"),
+        ],
+    )
+    .await;
+}
+
+#[renox::test]
+async fn save_changes_writes_only_the_changed_columns() {
+    let app = TestApp::new(crud::app()).await;
+    let owner = user(&app, "owner@example.com").await;
+    let original = Product::create(
+        app.db(),
+        Product {
+            name: "Tea".into(),
+            price: 5_000,
+            ..Product::for_owner(&owner)
+        },
+    )
+    .await
+    .unwrap();
+
+    // Someone changes the price after we loaded the product...
+    Product::where_eq("id", original.id)
+        .update(app.db(), &[("price", &7_000)])
+        .await
+        .unwrap();
+
+    // ...and we rename it. Only `name`, `slug` (from the hook) and
+    // `updated_at` are written, so their price survives; `save` would have
+    // written our stale 5000 back.
+    let mut product = original.clone();
+    product.name = "Black Tea".into();
+    assert!(product.save_changes(app.db(), &original).await.unwrap());
+    app.assert_database_has(
+        "products",
+        &[
+            ("id", &original.id),
+            ("name", &"Black Tea"),
+            ("slug", &"black-tea"),
+            ("price", &7_000),
+        ],
+    )
+    .await;
+
+    // Nothing differs: no query, and `false`.
+    let unchanged = product.clone();
+    assert!(!product.save_changes(app.db(), &unchanged).await.unwrap());
+}
+
+#[renox::test]
+async fn the_cached_count_is_forgotten_by_the_hooks() {
+    let app = TestApp::new(crud::app()).await;
+    let me = user(&app, "me@example.com").await;
+    app.acting_as(&me);
+
+    app.get("/products")
+        .await
+        .assert_see("0 products in the shop");
+    app.post("/products", &[("name", "Tea"), ("price", "1")])
+        .await
+        .assert_redirect("/products");
+    app.get("/products")
+        .await
+        .assert_see("1 product in the shop");
+
+    let product = Product::query().first(app.db()).await.unwrap().unwrap();
+    app.delete(&format!("/products/{}", product.id))
+        .await
+        .assert_redirect("/products");
+    app.get("/products")
+        .await
+        .assert_see("0 products in the shop");
+
+    // `restore` runs no hooks; the handler forgets the count itself.
+    app.post(&format!("/products/{}/restore", product.id), &[])
+        .await
+        .assert_redirect("/products");
+    app.get("/products")
+        .await
+        .assert_see("1 product in the shop");
+}
