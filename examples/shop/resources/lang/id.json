@@ -1,0 +1,40 @@
+{
+  "nav": {
+    "products": "Produk", "cart": "Keranjang", "orders": "Pesanan saya",
+    "login": "Masuk", "register": "Daftar", "logout": "Keluar"
+  },
+  "home": {
+    "title": "Segar dari sangrai",
+    "description": "Kopi, teh dan camilan, diantar ke rumahmu.",
+    "new": "Baru di toko"
+  },
+  "products": {
+    "none": "Belum ada produk.",
+    "sold_out": "Habis",
+    "search": "Cari",
+    "all_categories": "Semua kategori",
+    "sort": { "newest": "Terbaru", "price_asc": "Termurah", "price_desc": "Termahal", "name": "Nama" },
+    "found": "Satu produk ditemukan|:count produk ditemukan",
+    "in_stock": "Tinggal satu|Stok :count"
+  },
+  "cart": {
+    "added": ":name masuk keranjang.",
+    "quantity": "Jumlah", "add": "Masukkan keranjang", "login_to_buy": "Masuk untuk membeli",
+    "product": "Produk", "price": "Harga", "subtotal": "Subtotal",
+    "update": "Ubah", "remove": "Hapus", "total": "Total",
+    "checkout": "Bayar", "empty": "Keranjangmu kosong."
+  },
+  "orders": {
+    "order": "Pesanan",
+    "placed": "Terima kasih! Pesanan #:id sudah dibuat.",
+    "out_of_stock": "Stok tidak cukup untuk: :names. Silakan ubah keranjangmu.",
+    "address": "Alamat pengiriman",
+    "pay_by_transfer": "Bayar lewat transfer bank dalam :days hari; pesanan yang belum dibayar dibatalkan.",
+    "place": "Buat pesanan",
+    "date": "Tanggal", "status": "Status", "none": "Belum ada pesanan.",
+    "statuses": { "pending": "Menunggu pembayaran", "paid": "Dibayar", "shipped": "Dikirim", "cancelled": "Dibatalkan" }
+  },
+  "renox": {
+    "validation": { "attributes": { "address": "alamat", "quantity": "jumlah" } }
+  }
+}

@@ -52,49 +52,60 @@ impl ForeignKey for Option<i64> {
 /// The parent of each child (`product.category_id` → `Category`), by id, in
 /// one query. Children without a parent, or whose parent is gone, have no
 /// entry.
-pub async fn belongs_to<P: Model, C, K: ForeignKey>(
-    db: &Db,
+//
+// Not an `async fn`: the ids are read before the future is made, so the
+// future holds no closure or borrowed children. Holding a `Fn(&C)` across an
+// `.await` makes the handler's future fail axum's `Send` check (rustc issue
+// #100013), and so do the other loaders below.
+pub fn belongs_to<'a, P: Model, C, K: ForeignKey>(
+    db: &'a Db,
     children: &[C],
     foreign_key: impl Fn(&C) -> K,
-) -> Result<HashMap<i64, P>> {
+) -> impl Future<Output = Result<HashMap<i64, P>>> + Send + 'a {
     let mut ids: Vec<i64> = children
         .iter()
         .filter_map(|c| foreign_key(c).key())
         .collect();
     ids.sort_unstable();
     ids.dedup();
-    if ids.is_empty() {
-        return Ok(HashMap::new());
+    async move {
+        if ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        Ok(P::find_many(db, ids)
+            .await?
+            .into_iter()
+            .map(|parent| (parent.id(), parent))
+            .collect())
     }
-    Ok(P::find_many(db, ids)
-        .await?
-        .into_iter()
-        .map(|parent| (parent.id(), parent))
-        .collect())
 }
 
 /// The children of each parent (`order` → its `OrderItem`s), grouped by the
 /// parent's id, in one query. `children` is the query to start from, for
 /// order and filters (`OrderItem::query()` for all); `column` is the
 /// children's foreign key column and `foreign_key` reads it.
-pub async fn has_many<C: Model, P: Model, K: ForeignKey>(
-    db: &Db,
+pub fn has_many<'a, C: Model, P: Model, K: ForeignKey>(
+    db: &'a Db,
     parents: &[P],
     children: Query<C>,
     column: &str,
-    foreign_key: impl Fn(&C) -> K,
-) -> Result<HashMap<i64, Vec<C>>> {
+    foreign_key: impl Fn(&C) -> K + Send + 'a,
+) -> impl Future<Output = Result<HashMap<i64, Vec<C>>>> + Send + 'a {
     let ids: Vec<i64> = parents.iter().map(Model::id).collect();
-    let mut grouped: HashMap<i64, Vec<C>> = HashMap::new();
-    if ids.is_empty() {
-        return Ok(grouped);
-    }
-    for child in children.where_in(column, ids).get(db).await? {
-        if let Some(parent) = foreign_key(&child).key() {
-            grouped.entry(parent).or_default().push(child);
+    let query = (!ids.is_empty()).then(|| children.where_in(column, ids));
+    async move {
+        let mut grouped: HashMap<i64, Vec<C>> = HashMap::new();
+        let Some(query) = query else {
+            return Ok(grouped);
+        };
+        let rows = query.get(db).await?;
+        for child in rows {
+            if let Some(parent) = foreign_key(&child).key() {
+                grouped.entry(parent).or_default().push(child);
+            }
         }
+        Ok(grouped)
     }
-    Ok(grouped)
 }
 
 /// A many-to-many relation through a pivot table with two id columns, e.g.
@@ -205,12 +216,20 @@ impl Pivot {
     }
 
     /// The right-hand models linked to each left id, in one query per table.
-    pub async fn load<T: Model + Clone>(
+    pub fn load<'a, T: Model + Clone>(
+        &'a self,
+        db: &'a Db,
+        lefts: impl IntoIterator<Item = i64>,
+    ) -> impl Future<Output = Result<HashMap<i64, Vec<T>>>> + Send + 'a {
+        let lefts: Vec<i64> = lefts.into_iter().collect();
+        self.load_ids(db, lefts)
+    }
+
+    async fn load_ids<T: Model + Clone>(
         &self,
         db: &Db,
-        lefts: impl IntoIterator<Item = i64>,
+        lefts: Vec<i64>,
     ) -> Result<HashMap<i64, Vec<T>>> {
-        let lefts: Vec<i64> = lefts.into_iter().collect();
         let mut grouped: HashMap<i64, Vec<T>> = HashMap::new();
         if lefts.is_empty() {
             return Ok(grouped);
@@ -243,11 +262,12 @@ impl Pivot {
     }
 
     /// `load` for these parents' ids.
-    pub async fn load_for<T: Model + Clone, P: Model>(
-        &self,
-        db: &Db,
+    pub fn load_for<'a, T: Model + Clone, P: Model>(
+        &'a self,
+        db: &'a Db,
         parents: &[P],
-    ) -> Result<HashMap<i64, Vec<T>>> {
-        self.load(db, parents.iter().map(Model::id)).await
+    ) -> impl Future<Output = Result<HashMap<i64, Vec<T>>>> + Send + 'a {
+        let ids: Vec<i64> = parents.iter().map(Model::id).collect();
+        self.load_ids(db, ids)
     }
 }

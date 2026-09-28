@@ -567,6 +567,14 @@ and the integration tests are one binary. Result: rebuild after a core change 29
   before it (`before_acquire`). Without it a pre-migration connection's `SELECT *` panicked in
   sqlx-sqlite (`row.rs` index out of bounds) and returned no rows. Mark per batch, not per
   migration: per migration made the PostgreSQL suite 2.5x slower (reconnects).
+- Handler futures must be `Send` for axum, and rustc (issue #100013) can't prove it when a
+  generic future holds a closure over `&T`, or a generic iterator, across an `.await`. Doctests
+  and plain tests don't route handlers, so they miss it. Data APIs that take closures or
+  iterators are plain `fn`s returning `impl Future + Send + 'a` that read what they need first
+  (`relations.rs`, `Query::first_or_create`). Add every new data API to `it/send_handlers.rs`.
+- Examples: a route group's index is `.get("/", …)` (not `""`, which panics). Examples are
+  workspace members (`renox.workspace = true`), so their `make:deploy` Dockerfile builds only in
+  a copy made by `rnx new` (the CI docker job covers that).
 - `target/` grows to ~100 GB over a few milestones and fills the disk (link errors, "No space left
   on device"); `cargo clean` it before the full two-database run.
 - This session's working directory (~/workspace/renoxium) isn't a git repo, so the Agent tool's
@@ -616,8 +624,9 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M15b validation rules (regex, digits, dates, required_if…, each/nested, `Rule`), `Vec<Upload>`, `Cookies`/`SetCookie`, `Download` | merged to `main` |
 | M16a lighter builds (no aws-lc, default features `fake`/`server-events`), versioned `asset()`, cargo-chef Dockerfile, shared limits with `CACHE_STORE=database` | merged to `main` (#40) |
 | M16b CI & trust: MSRV, cargo-hack, `tests/cli/run.sh` (rnx new + make:* + Docker), S3 on SeaweedFS, cargo-deny, coverage, direct tests, macro doctests, SECURITY/CONTRIBUTING/CHANGELOG | merged to `main` (#41) |
-| Fix: pooled connections with a stale schema after migrations (flaky macOS CI) | PR from branch `fix-stale-schema-connections` |
-| M17 examples (shop, htmx-recipes, relations, READMEs) | next; then v1.0 |
+| Fix: pooled connections with a stale schema after migrations (flaky macOS CI) | merged to `main` (#42) |
+| M17a `examples/shop` + README; fix: relation loaders / `first_or_create` not `Send` in routed handlers | PR from branch `m17a-shop-example` |
+| M17b examples htmx-recipes, relations, a README per example | next; then v1.0 |
 | v1.0 docs site, starter kit, semver guarantee | last |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on

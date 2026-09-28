@@ -1,0 +1,18 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<h1>{{ t('cart.checkout') }}</h1>
+<ul>
+  {% for line in lines %}<li>{{ line.item.quantity }} × {{ line.product.name }}: {{ line.subtotal | rupiah }}</li>{% endfor %}
+</ul>
+<p><strong>{{ t('cart.total') }}: {{ total | rupiah }}</strong></p>
+
+<form method="post" action="{{ route('checkout.place') }}">
+  {{ csrf_field() }}
+  <label for="address">{{ t('orders.address') }}</label>
+  <textarea id="address" name="address" rows="3">{{ old('address') }}</textarea>
+  <p class="error" data-error-for="address">{{ error('address') }}</p>
+  <p class="muted">{{ t('orders.pay_by_transfer', days=3) }}</p>
+  <button>{{ t('orders.place') }}</button>
+</form>
+{% endblock %}

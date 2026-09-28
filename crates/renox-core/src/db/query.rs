@@ -662,14 +662,24 @@ impl<M: Model> Query<M> {
     /// The first matching row, or `make()` saved as a new one. If another
     /// request creates it at the same moment (a unique index stops the
     /// second insert), the row it created is returned.
-    pub async fn first_or_create(self, db: &Db, make: impl FnOnce() -> M) -> Result<M> {
-        if let Some(found) = self.clone().first(db).await? {
-            return Ok(found);
-        }
-        match M::create(db, make()).await {
-            Ok(created) => Ok(created),
-            Err(err) if err.is_unique_violation() => self.first(db).await?.ok_or(err),
-            Err(err) => Err(err),
+    //
+    // Not an `async fn`: written that way, a handler awaiting it failed
+    // axum's `Send` check (rustc issue #100013; see it/send_handlers.rs).
+    #[allow(clippy::manual_async_fn)] // the `+ Send` in the signature is the point
+    pub fn first_or_create<'a>(
+        self,
+        db: &'a Db,
+        make: impl FnOnce() -> M + Send + 'a,
+    ) -> impl Future<Output = Result<M>> + Send + 'a {
+        async move {
+            if let Some(found) = self.clone().first(db).await? {
+                return Ok(found);
+            }
+            match M::create(db, make()).await {
+                Ok(created) => Ok(created),
+                Err(err) if err.is_unique_violation() => self.first(db).await?.ok_or(err),
+                Err(err) => Err(err),
+            }
         }
     }
 

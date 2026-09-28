@@ -15,6 +15,17 @@
 
 ## Examples (complete apps, tested in CI)
 
+- [examples/shop](examples/shop): a whole online shop, the example to read for how everything
+  fits: catalog with htmx search, sort and pagination, a cached home page, SEO and a sitemap; a
+  cart; checkout in one transaction that never oversells; an event whose listener queues the
+  confirmation mail; notifications; a daily task cancelling unpaid orders; an admin behind a gate
+  with photo uploads; en/id with plurals; the `make:deploy` files. Guide: its
+  [README](examples/shop/README.md).
+  - Checkout: [checkout.rs](examples/shop/src/app/orders/checkout.rs); orders, event, task:
+    [orders/mod.rs](examples/shop/src/app/orders/mod.rs); admin:
+    [admin/mod.rs](examples/shop/src/app/admin/mod.rs),
+    [admin/products.rs](examples/shop/src/app/admin/products.rs); tests:
+    [tests/shop.rs](examples/shop/tests/shop.rs)
 - [examples/crud](examples/crud): one resource end to end: model and migration, list with
   pagination, create and edit forms with validation, owner-only edit and delete through a policy,
   soft delete with a trash and restore, flash messages, and tests for each.

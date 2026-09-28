@@ -226,6 +226,9 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 
 ## Examples
 
+- [`examples/shop`](examples/shop): a whole online shop: htmx search, a cart, checkout in one
+  transaction that never oversells, queued mail and notifications, an admin with photo uploads,
+  English and Indonesian, and its deploy files. Start here.
 - [`examples/crud`](examples/crud): one resource end to end, with pagination, validation,
   owner-only edit and delete through a policy, soft deletes with a trash, and tests.
 - [`examples/api`](examples/api): a JSON API for a mobile app, with tokens, Bearer auth, JSON

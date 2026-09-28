@@ -583,13 +583,23 @@ Deviations in M16b:
   (a local MinIO/SeaweedFS) failed on every request.
 
 ### M17 · v0.18: Examples of real apps
-- [ ] `examples/shop`: auth with gates and policies, an admin with search, sort and pagination,
+- [x] `examples/shop`: auth with gates and policies, an admin with search, sort and pagination,
       uploads, checkout in a transaction, cache, mail and notifications, queue, i18n with
-      plurals, SEO, and its `make:deploy` output
+      plurals, SEO, and its `make:deploy` output (M17a)
 - [ ] `examples/htmx-recipes`: inline edit (`hx-patch`), infinite scroll, modal forms, delete
       with `HxRefresh`/`HxRedirect`, Alpine dropdown/tabs/modal
 - [ ] `examples/relations`: one-to-many and many-to-many with joins and eager loading
 - [ ] A README for every example
+
+Notes from M17a:
+- Split in two: M17a is `examples/shop` (and its README); M17b the other examples and READMEs.
+- The shop exposed a framework bug, fixed there: `relations::belongs_to`, `has_many`,
+  `Pivot::load` and `Query::first_or_create` compiled in doctests but not in a routed handler
+  (their futures held a closure or a generic iterator across an `.await`, which fails axum's
+  `Send` check; rustc issue #100013). `it/send_handlers.rs` now routes every data API.
+- Admin routes use an `Admin` extractor that checks the gate. A route-level
+  `require_gate("admin")` (like `require_auth`) would also show in `route:list`; it's a
+  candidate for later.
 
 ### v1.0
 - [ ] Documentation site built with Renox: a tutorial, a "Laravel → Renox" guide, the API

@@ -24,6 +24,7 @@ mod requests;
 #[cfg(feature = "s3")]
 mod s3;
 mod security;
+mod send_handlers;
 mod seo;
 mod testing;
 mod types;

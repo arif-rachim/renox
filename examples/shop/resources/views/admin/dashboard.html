@@ -1,0 +1,29 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<h1>Admin</h1>
+{% include "admin/_nav.html" %}
+<p><a href="{{ route('admin.orders.index') }}?status=pending">{{ pending }} pending order{{ "" if pending == 1 else "s" }}</a></p>
+
+<h2>Low stock</h2>
+<ul>
+  {% for product in low_stock %}
+  <li><a href="{{ route('admin.products.edit', product.id) }}">{{ product.name }}</a>: {{ product.stock }} left</li>
+  {% else %}
+  <li class="muted">Every product has 5 or more.</li>
+  {% endfor %}
+</ul>
+
+<h2>Notifications</h2>
+<ul>
+  {% for n in notifications %}
+  <li class="{{ 'unread' if not n.read_at }}">
+    {% if n.kind == 'new-order' %}New order <a href="{{ route('orders.show', n.data.order_id) }}">#{{ n.data.order_id }}</a>: {{ n.data.total | rupiah }}
+    {% else %}{{ n.kind }}{% endif %}
+    <span class="muted">{{ n.created_at | date('%d/%m %H:%M') }}</span>
+  </li>
+  {% else %}
+  <li class="muted">Nothing new.</li>
+  {% endfor %}
+</ul>
+{% endblock %}

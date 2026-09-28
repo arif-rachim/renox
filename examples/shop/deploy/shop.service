@@ -1,0 +1,18 @@
+# /etc/systemd/system/shop.service
+[Unit]
+Description=Shop
+After=network.target
+
+[Service]
+User=shop
+WorkingDirectory=/opt/shop
+EnvironmentFile=/opt/shop/.env
+ExecStartPre=/opt/shop/shop migrate
+ExecStart=/opt/shop/shop
+Restart=on-failure
+# Renox finishes running jobs on SIGTERM (up to 30 s).
+KillSignal=SIGTERM
+TimeoutStopSec=40
+
+[Install]
+WantedBy=multi-user.target

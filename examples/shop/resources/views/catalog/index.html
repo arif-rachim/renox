@@ -1,0 +1,41 @@
+{% extends "layouts/app.html" %}
+
+{% block seo %}{{ seo(title=t('nav.products') ~ " · " ~ app.name) }}{% endblock %}
+
+{% block content %}
+<h1>{{ t('nav.products') }}</h1>
+
+{# Typing or choosing asks for just the results (the `results` block) and
+   keeps the address bar in step, so the page can be shared or reloaded. #}
+<form class="filters" method="get" action="{{ route('products.index') }}"
+      hx-get="{{ route('products.index') }}" hx-target="#results" hx-swap="outerHTML" hx-push-url="true"
+      hx-trigger="input changed delay:300ms from:input[name=q], change from:select">
+  <input type="search" name="q" value="{{ filters.q or '' }}" placeholder="{{ t('products.search') }}">
+  <select name="category">
+    <option value="">{{ t('products.all_categories') }}</option>
+    {% for category in categories %}
+    <option value="{{ category.slug }}" {% if filters.category == category.slug %}selected{% endif %}>{{ category.name }}</option>
+    {% endfor %}
+  </select>
+  <select name="sort">
+    {% for value, label in [('newest', t('products.sort.newest')), ('price_asc', t('products.sort.price_asc')), ('price_desc', t('products.sort.price_desc')), ('name', t('products.sort.name'))] %}
+    <option value="{{ value }}" {% if filters.sort == value %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <noscript><button>{{ t('products.search') }}</button></noscript>
+</form>
+
+{% block results %}
+<section id="results">
+  <p class="muted">{{ t('products.found', count=products.total) }}</p>
+  <div class="grid">
+    {% for card in products.items %}
+    {% with product = card %}{% include "catalog/_card.html" %}{% endwith %}
+    {% endfor %}
+  </div>
+  <div hx-boost="true" hx-target="#results" hx-select="#results" hx-swap="outerHTML">
+    {% from "renox/pagination.html" import pagination %}{{ pagination(products) }}
+  </div>
+</section>
+{% endblock %}
+{% endblock %}

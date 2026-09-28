@@ -1,0 +1,8 @@
+<article class="card">
+  <a href="{{ route('products.show', product.slug) }}">
+    {% if product.photo %}<img src="{{ storage_url(product.photo) }}" alt="" width="240" height="160" loading="lazy">{% else %}<div class="no-photo"></div>{% endif %}
+    <h3>{{ product.name }}</h3>
+  </a>
+  <p class="price">{{ product.price | rupiah }}</p>
+  {% if product.stock == 0 %}<p class="muted">{{ t('products.sold_out') }}</p>{% endif %}
+</article>

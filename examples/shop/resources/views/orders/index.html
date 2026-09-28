@@ -1,0 +1,19 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<h1>{{ t('nav.orders') }}</h1>
+<table>
+  <tr><th>#</th><th>{{ t('orders.date') }}</th><th>{{ t('orders.status') }}</th><th>{{ t('cart.total') }}</th></tr>
+  {% for order in orders.items %}
+  <tr>
+    <td><a href="{{ route('orders.show', order.id) }}">#{{ order.id }}</a></td>
+    <td>{{ order.created_at | date('%d/%m/%Y %H:%M') }}</td>
+    <td><span class="status status-{{ order.status }}">{{ t('orders.statuses.' ~ order.status) }}</span></td>
+    <td>{{ order.total | rupiah }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="4" class="muted">{{ t('orders.none') }}</td></tr>
+  {% endfor %}
+</table>
+{% from "renox/pagination.html" import pagination %}{{ pagination(orders) }}
+{% endblock %}
