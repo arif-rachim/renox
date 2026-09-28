@@ -244,8 +244,17 @@ fn key_generate(show: bool) -> Result<()> {
         return Ok(());
     }
 
-    let env = std::fs::read_to_string(".env")
-        .context("no .env in this directory; run from your app or pass --show")?;
+    // No .env yet (a fresh clone): start one from .env.example, or empty.
+    let env = match std::fs::read_to_string(".env") {
+        Ok(env) => env,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            if !std::path::Path::new("Cargo.toml").is_file() {
+                anyhow::bail!("no .env or Cargo.toml here; run from your app or pass --show");
+            }
+            std::fs::read_to_string(".env.example").unwrap_or_default()
+        }
+        Err(err) => return Err(err).context("could not read .env"),
+    };
     let mut replaced = false;
     let mut lines: Vec<String> = env
         .lines()

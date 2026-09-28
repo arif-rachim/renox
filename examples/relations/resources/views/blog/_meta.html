@@ -1,0 +1,4 @@
+<p class="meta">
+  {% if post.category %}<a href="{{ route('categories.show', post.category.id) }}">{{ post.category.name }}</a>{% else %}Uncategorized{% endif %}
+  {% for tag in post.tags %} <a class="tag" href="{{ route('tags.show', tag.id) }}">#{{ tag.name }}</a>{% endfor %}
+</p>

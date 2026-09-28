@@ -1,0 +1,18 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<h1>Report</h1>
+<p>{{ discussed }} post{{ "" if discussed == 1 else "s" }} with comments.</p>
+
+<h2>By category</h2>
+<table>
+  <tr><th>Category</th><th>Posts</th><th>Comments</th></tr>
+  {% for row in categories %}<tr><td>{{ row.category }}</td><td>{{ row.posts }}</td><td>{{ row.comments }}</td></tr>{% endfor %}
+</table>
+
+<h2>Tags</h2>
+<table>
+  <tr><th>Tag</th><th>Posts</th></tr>
+  {% for name, posts in tags %}<tr><td>#{{ name }}</td><td>{{ posts }}</td></tr>{% endfor %}
+</table>
+{% endblock %}

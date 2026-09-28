@@ -1,0 +1,39 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<article>
+  <h1>{{ post.title }}</h1>
+  <p class="meta">
+    {% if category %}<a href="{{ route('categories.show', category.id) }}">{{ category.name }}</a>{% else %}Uncategorized{% endif %}
+    {% for tag in tags %} <a class="tag" href="{{ route('tags.show', tag.id) }}">#{{ tag.name }}</a>{% endfor %}
+  </p>
+  <p>{{ post.body }}</p>
+</article>
+
+<h2>Tags</h2>
+{# Pivot::sync makes the post's tags exactly the checked ones. #}
+<form method="post" action="{{ route('posts.tags', post.id) }}" class="tags">
+  {{ csrf_field() }}{{ method_field('PUT') }}
+  {% for tag in all_tags %}
+  <label><input type="checkbox" name="tags" value="{{ tag.id }}" {% if tag.id in tag_ids %}checked{% endif %}> {{ tag.name }}</label>
+  {% endfor %}
+  <p class="error" data-error-for="tags">{{ error('tags') }}</p>
+  <button>Save tags</button>
+</form>
+
+<h2 id="comments">Comments ({{ comments | length }})</h2>
+{% for comment in comments %}
+<div class="comment"><strong>{{ comment.author }}</strong> <span class="muted">{{ comment.created_at | date('%d/%m/%Y') }}</span><p>{{ comment.body }}</p></div>
+{% else %}
+<p class="muted">No comments yet.</p>
+{% endfor %}
+
+<form method="post" action="{{ route('posts.comment', post.id) }}" class="stack">
+  {{ csrf_field() }}
+  <input name="author" placeholder="Your name" value="{{ old('author') }}">
+  <p class="error" data-error-for="author">{{ error('author') }}</p>
+  <textarea name="body" rows="3" placeholder="Comment">{{ old('body') }}</textarea>
+  <p class="error" data-error-for="body">{{ error('body') }}</p>
+  <button>Comment</button>
+</form>
+{% endblock %}

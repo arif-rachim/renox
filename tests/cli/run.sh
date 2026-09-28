@@ -51,6 +51,13 @@ step "every generator"
 "$RNX" make:migration add_sku_to_products
 "$RNX" make:deploy
 
+step "key:generate on a fresh clone (no .env)"
+mv .env "$WORK/env.bak"
+"$RNX" key:generate
+grep -q '^APP_KEY=base64:' .env
+grep -q '^DATABASE_URL=' .env # the rest comes from .env.example
+cp "$WORK/env.bak" .env
+
 step "cargo build and test"
 cargo build --all-targets
 if [ "$DATABASE" = sqlite ]; then

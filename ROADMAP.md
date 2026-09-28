@@ -586,10 +586,10 @@ Deviations in M16b:
 - [x] `examples/shop`: auth with gates and policies, an admin with search, sort and pagination,
       uploads, checkout in a transaction, cache, mail and notifications, queue, i18n with
       plurals, SEO, and its `make:deploy` output (M17a)
-- [ ] `examples/htmx-recipes`: inline edit (`hx-patch`), infinite scroll, modal forms, delete
+- [x] `examples/htmx-recipes`: inline edit (`hx-patch`), infinite scroll, modal forms, delete
       with `HxRefresh`/`HxRedirect`, Alpine dropdown/tabs/modal
-- [ ] `examples/relations`: one-to-many and many-to-many with joins and eager loading
-- [ ] A README for every example
+- [x] `examples/relations`: one-to-many and many-to-many with joins and eager loading
+- [x] A README for every example (M17b)
 
 Notes from M17a:
 - Split in two: M17a is `examples/shop` (and its README); M17b the other examples and READMEs.
@@ -600,6 +600,12 @@ Notes from M17a:
 - Admin routes use an `Admin` extractor that checks the gate. A route-level
   `require_gate("admin")` (like `require_auth`) would also show in `route:list`; it's a
   candidate for later.
+
+Notes from M17b:
+- READMEs of the eight older examples were written by reading their code; two things they
+  turned up were fixed: `rnx key:generate` now creates `.env` (from `.env.example`) when it's
+  missing, and examples/api's `DELETE /api/tokens/current` revoked every token; there is now
+  `AuthUser::token_id()`, so it revokes only the one used, and `DELETE /api/tokens` all.
 
 ### v1.0
 - [ ] Documentation site built with Renox: a tutorial, a "Laravel → Renox" guide, the API

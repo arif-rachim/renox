@@ -111,8 +111,9 @@ impl User {
     }
 }
 
-/// The user behind `Authorization: Bearer <id|secret>`, if the token is valid.
-pub(crate) async fn authenticate(db: &Db, bearer: &str) -> Result<Option<User>> {
+/// The user behind `Authorization: Bearer <id|secret>` and the token's id,
+/// if the token is valid.
+pub(crate) async fn authenticate(db: &Db, bearer: &str) -> Result<Option<(User, i64)>> {
     let Some((id, secret)) = bearer.split_once('|') else {
         return Ok(None);
     };
@@ -138,5 +139,7 @@ pub(crate) async fn authenticate(db: &Db, bearer: &str) -> Result<Option<User>> 
         .bind(id)
         .execute(db)
         .await?;
-    User::find(db, row.try_get("user_id")?).await
+    Ok(User::find(db, row.try_get("user_id")?)
+        .await?
+        .map(|user| (user, id)))
 }

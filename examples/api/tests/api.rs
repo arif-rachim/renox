@@ -126,17 +126,37 @@ async fn products_are_created_with_json_and_validated() {
 #[renox::test]
 async fn revoked_tokens_stop_working() {
     let app = app().await;
-    let token = bearer(&app).await;
+    let phone = bearer(&app).await;
+    let laptop = bearer(&app).await;
+    let status = |token: String| {
+        let app = &app;
+        async move {
+            app.request()
+                .json()
+                .header("authorization", &token)
+                .get("/api/products")
+                .await
+                .status
+                .as_u16()
+        }
+    };
+    // Logging out on the phone leaves the laptop logged in.
     app.request()
         .without_csrf()
-        .header("authorization", &token)
+        .header("authorization", &phone)
         .delete("/api/tokens/current")
         .await
         .assert_status(204);
+    assert_eq!(status(phone.clone()).await, 401);
+    assert_eq!(status(laptop.clone()).await, 200);
+
+    let tablet = bearer(&app).await;
     app.request()
-        .json()
-        .header("authorization", &token)
-        .get("/api/products")
+        .without_csrf()
+        .header("authorization", &laptop)
+        .delete("/api/tokens")
         .await
-        .assert_status(401);
+        .assert_status(204);
+    assert_eq!(status(laptop).await, 401);
+    assert_eq!(status(tablet).await, 401);
 }

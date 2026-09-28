@@ -1,0 +1,8 @@
+{# One page of rows. When there are more, the last item loads the next page
+   as soon as it scrolls into view, and is replaced by it. #}
+{% for task in tasks.items %}{% include "tasks/_row.html" %}{% endfor %}
+{% if tasks.has_next %}
+<li class="loader" hx-get="{{ route('tasks.index') }}?page={{ tasks.page + 1 }}" hx-trigger="revealed" hx-swap="outerHTML">
+  <a href="{{ route('tasks.index') }}?page={{ tasks.page + 1 }}">More…</a>
+</li>
+{% endif %}

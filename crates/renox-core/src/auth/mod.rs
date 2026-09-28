@@ -143,8 +143,9 @@ pub(crate) type AsyncGate = Arc<
 pub(crate) struct CurrentUser {
     pub user: Option<Arc<User>>,
     pub gates: Gates,
-    /// Authenticated with `Authorization: Bearer`, so CSRF doesn't apply.
-    pub via_token: bool,
+    /// The API token of `Authorization: Bearer`, when that authenticated
+    /// the request (so CSRF doesn't apply).
+    pub token_id: Option<i64>,
 }
 
 /// The logged-in user. Requests without one are sent to the `login` route
@@ -155,6 +156,7 @@ pub struct AuthUser {
     user: Arc<User>,
     gates: Gates,
     state: Option<AppState>,
+    token_id: Option<i64>,
 }
 
 impl Deref for AuthUser {
@@ -166,6 +168,13 @@ impl Deref for AuthUser {
 }
 
 impl AuthUser {
+    /// The id of the API token this request logged in with
+    /// (`Authorization: Bearer`), or `None` for a session login. Revoke just
+    /// that token on "log out" from an app: `user.revoke_token(&db, id)`.
+    pub fn token_id(&self) -> Option<i64> {
+        self.token_id
+    }
+
     /// Whether the policy of `target` allows `ability`.
     pub fn can(&self, ability: &str, target: &impl Policy) -> bool {
         target.allows(&self.user, ability)
@@ -252,6 +261,7 @@ fn current(extensions: &axum::http::Extensions) -> Option<AuthUser> {
         user: current.user.clone()?,
         gates: current.gates.clone(),
         state: extensions.get::<AppState>().cloned(),
+        token_id: current.token_id,
     })
 }
 
@@ -305,26 +315,24 @@ pub(crate) async fn middleware(
         .and_then(|v| v.strip_prefix("Bearer "))
         .map(str::to_owned);
     let session = req.extensions().get::<Session>().cloned();
-    let (user, via_token) = match (&bearer, &session) {
+    let (user, token_id) = match (&bearer, &session) {
         // Only a token that authenticates turns CSRF off: a wrong or unknown
         // one leaves the request a guest's, with CSRF checked as usual.
         (Some(bearer), _) => match tokens::authenticate(&state.db, bearer.trim()).await {
-            Ok(user) => {
-                let valid = user.is_some();
-                (user, valid)
-            }
+            Ok(Some((user, id))) => (Some(user), Some(id)),
+            Ok(None) => (None, None),
             Err(err) => {
                 tracing::error!(error = ?err, "could not check the API token");
-                (None, false)
+                (None, None)
             }
         },
-        (None, Some(session)) => (resolve(&state, session).await, false),
-        (None, None) => (None, false),
+        (None, Some(session)) => (resolve(&state, session).await, None),
+        (None, None) => (None, None),
     };
     req.extensions_mut().insert(CurrentUser {
         user: user.map(Arc::new),
         gates: state.gates.clone(),
-        via_token,
+        token_id,
     });
     req.extensions_mut().insert(state);
     next.run(req).await
@@ -424,7 +432,9 @@ pub(crate) async fn require_verified(req: Request, next: Next) -> Response {
 }
 
 pub(crate) fn user_via_token(extensions: &axum::http::Extensions) -> bool {
-    extensions.get::<CurrentUser>().is_some_and(|c| c.via_token)
+    extensions
+        .get::<CurrentUser>()
+        .is_some_and(|c| c.token_id.is_some())
 }
 
 /// Route guard: only guests; logged-in users go to the `home` route.

@@ -1,0 +1,51 @@
+# examples/hello
+
+A guestbook that touches many Renox features in one file: named routes, a layout, sessions
+and flash messages, CSRF, htmx fragments, validation with old input, a model, migrations, a
+seeder, pagination, login and registration, an event whose listener queues a job, a scheduled
+task, an app command, uploads and two languages. It is also the app used for live and browser
+testing. Read it for a quick tour; read [examples/crud](../crud) or
+[examples/shop](../shop) for how to structure a real app.
+
+```bash
+cd examples/hello
+cp .env.example .env             # APP_LOCALE=id: the default language is Indonesian
+rnx key:generate                 # writes APP_KEY to .env
+cargo run -- migrate
+cargo run -- db:seed             # optional: 30 fake entries
+cargo run                        # http://127.0.0.1:3000
+```
+
+Other things to try: `/halo/<name>`, `/bahasa/en` and `/bahasa/id` to switch language, and
+`cargo run -- entries:prune --days 7`.
+
+## What's where
+
+| Feature | Where |
+|---|---|
+| Everything in Rust: the model and factory, the form and its rules, the `EntryPosted` event, the `ThankGuest` job, the `entries:prune` command, the every-minute task, the handlers, `app()` | [src/lib.rs](src/lib.rs) |
+| The page: the form posted with htmx and Alpine, the `entries` block swapped on post and on page links | [resources/views/guestbook/index.html](resources/views/guestbook/index.html) |
+| Texts and validation field names in English and Indonesian | [resources/lang](resources/lang) |
+| The entries table, then a second migration adding `photo` | [migrations](migrations) |
+| Every setting, with comments | [.env.example](.env.example) |
+
+## Things worth copying
+
+- **The app is a library.** `app()` lives in `src/lib.rs` and `main.rs` only runs it, so
+  `tests/` can boot the same app.
+- **One handler for htmx and plain posts.** `index` returns
+  `view(...).fragment("entries")`, so htmx requests get only that block. `store` answers htmx
+  with the fragment and an `HxTrigger`, and a plain post with a flash message and `Back`.
+- **Validation errors need no code in the handler.** `Valid<EntryForm>` sends plain posts back
+  with errors and old input, and answers htmx posts with 422.
+- **An optional photo.** `photo: Option<Upload>` with `.image().max(2048)`, stored with
+  `store_public`.
+
+## Tests
+
+```bash
+cargo test -p hello
+```
+
+Tests don't read `.env`, so [tests/guestbook.rs](tests/guestbook.rs) sets the locale to `id`
+itself.

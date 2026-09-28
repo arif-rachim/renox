@@ -229,6 +229,10 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 - [`examples/shop`](examples/shop): a whole online shop: htmx search, a cart, checkout in one
   transaction that never oversells, queued mail and notifications, an admin with photo uploads,
   English and Indonesian, and its deploy files. Start here.
+- [`examples/htmx-recipes`](examples/htmx-recipes): a modal form, inline edit, infinite scroll,
+  delete in place, tabs and a dropdown, with htmx, Alpine and fragment-returning handlers.
+- [`examples/relations`](examples/relations): a blog with belongs-to, has-many and many-to-many
+  (a pivot and `sync`), loaded without N+1, and reports as SQL joins.
 - [`examples/crud`](examples/crud): one resource end to end, with pagination, validation,
   owner-only edit and delete through a policy, soft deletes with a trash, and tests.
 - [`examples/api`](examples/api): a JSON API for a mobile app, with tokens, Bearer auth, JSON

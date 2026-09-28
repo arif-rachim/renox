@@ -1,0 +1,50 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+{# One Alpine component for the page: the active tab and whether the modal is
+   open. The modal closes when the server says `task-added` (HX-Trigger). #}
+<div x-data="{ tab: 'all', open: false }" @task-added.window="open = false; $refs.form.reset()">
+
+  <header class="bar">
+    <h1>Tasks <small>{{ open }} open</small></h1>
+    <button type="button" @click="open = true; $nextTick(() => $refs.title.focus())">New task</button>
+  </header>
+
+  {# Tabs: filtering happens in the browser (each row's x-show), no request. #}
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" :aria-selected="tab === 'all'" @click="tab = 'all'">All</button>
+    <button type="button" role="tab" :aria-selected="tab === 'open'" @click="tab = 'open'">Open</button>
+    <button type="button" role="tab" :aria-selected="tab === 'done'" @click="tab = 'done'">Done</button>
+  </div>
+
+  <ul id="tasks">
+    {% include "tasks/_rows.html" %}
+  </ul>
+  {% if tasks.total == 0 %}<p class="muted">Nothing to do. Add a task.</p>{% endif %}
+
+  <div class="actions">
+    {# Plain forms that htmx takes over: HX-Refresh reloads this page,
+       HX-Redirect goes to another one. #}
+    <form method="post" action="{{ route('tasks.clear_done') }}" hx-post="{{ route('tasks.clear_done') }}">
+      {{ csrf_field() }}<button>Clear done</button>
+    </form>
+    <form method="post" action="{{ route('tasks.archive') }}" hx-post="{{ route('tasks.archive') }}">
+      {{ csrf_field() }}<button>Archive done and see the summary</button>
+    </form>
+  </div>
+
+  {# Modal form: the new row goes to the top of the list (afterbegin). #}
+  <div class="modal" x-show="open" x-cloak @keydown.escape.window="open = false">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="new-task" @click.outside="open = false">
+      <h2 id="new-task">New task</h2>
+      <form x-ref="form" method="post" action="{{ route('tasks.store') }}"
+            hx-post="{{ route('tasks.store') }}" hx-target="#tasks" hx-swap="afterbegin">
+        {{ csrf_field() }}
+        <input name="title" x-ref="title" placeholder="What needs doing?" autocomplete="off">
+        <p class="error" data-error-for="title"></p>
+        <div><button>Add</button> <button type="button" @click="open = false">Cancel</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
