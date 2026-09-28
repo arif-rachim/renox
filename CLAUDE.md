@@ -225,7 +225,10 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
   errors next to inputs (`data-error-for` slots or inserted `<p class="error">`), sets
   `aria-invalid`, focuses the first invalid input in *page* order. Plain posts → 303 back with
   errors + old input flashed (never passwords).
-- **Queue is Renox's own** (`jobs`, `failed_jobs`, unix-second integers) on SQLite and PostgreSQL;
+- **Queue is Renox's own** (`jobs`, `failed_jobs`, `job_batches`, unix-second integers) on SQLite
+  and PostgreSQL; chains ride in `jobs.chain`, batches count in `job_batches` inside the same
+  transaction that finishes a job (`worker.rs::record`), unique claims are `renox:unique:*` cache
+  rows, encrypted payloads start with `enc:`;
   PostgreSQL workers reserve with `FOR UPDATE SKIP LOCKED`. apalis was the plan but its stable SQL
   backend needs sqlx 0.8 (can't link next to our 0.9: both link `libsqlite3-sys`).
 - **Workers and scheduler run inside `serve`** by default (single-process deploys). Several
@@ -687,7 +690,10 @@ change 29 s → 7 s, full run 19 s → 6 s.
   `schedule:run`; cache add/pull/increment, locks, prune): branch `m20a-background`. A cron
   time skipped by DST runs right after the jump; intervals follow the current offset. Schedule
   methods return `ScheduledTask` (DerefMut to `Schedule`) so add-chains still compile.
-- **Next: M20b (queue), M20c (dashboard, mail, HTTP client, storage), then M21 (views and DX)**, from the Laravel parity review
+- **M20b** (queue: priority, unique, encrypted, middleware, failed hook, chains, batches,
+  dispatch_sync, forget/prune): branch `m20b-queue`. Adds framework migration
+  `00010101000110`; tests that count framework migrations must follow it.
+- **Next: M20c (dashboard, mail, HTTP client, storage), then M21 (views and DX)**, from the Laravel parity review
   (`docs/audit/2026-09-laravel-parity.md`); the ROADMAP lists each milestone's items. **v1.0 is
   on hold** until the owner says to start it (docs site, starter kit, semver checks, real
   crates.io releases; the owner runs `cargo login`).

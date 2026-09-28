@@ -840,6 +840,10 @@ impl Job for SendReceipt {
     const MAX_ATTEMPTS: u32 = 5;                       // default 3
     const TIMEOUT: Duration = Duration::from_secs(30); // per attempt; default 60 s
 
+    // Also: const ENCRYPTED (payload sealed with APP_KEY), const UNIQUE_FOR + fn unique_id
+    // (one queued at a time), fn middleware (Middleware::without_overlapping(key),
+    // rate_limited(key, max, per)), async fn failed(self, state, error) once it fails for good.
+
     async fn handle(self, ctx: JobContext) -> Result {
         let mail = ctx.state.mail_view(
             "buyer@example.com",
@@ -891,6 +895,22 @@ async fn place_order(State(state): State<AppState>) -> Result<Redirect> {
     Ok(Redirect::to("/orders"))
 }
 
+async fn several(State(state): State<AppState>) -> Result<String> {
+    let queue = &state.queue;
+    queue.chain().then(SendReceipt { order_id: 1 }).then(SendReceipt { order_id: 2 }).dispatch().await?; // in order
+    let batch = queue
+        .batch("receipts") // side by side; the first failure cancels the rest unless .allow_failures()
+        .push(SendReceipt { order_id: 3 })
+        .push(SendReceipt { order_id: 4 })
+        .then(SendReceipt { order_id: 5 }) // all succeeded; also .catch(job), .finally(job)
+        .dispatch()
+        .await?;
+    let progress = queue.batch_status(batch).await?.map_or(0, |b| b.progress()); // 0–100
+    queue.dispatch_on("high", SendReceipt { order_id: 6 }).await?; // queue:work --queue high,default
+    state.dispatch_sync(SendReceipt { order_id: 7 }).await?; // now, in this request
+    Ok(format!("{progress}%"))
+}
+
 async fn checkout(State(state): State<AppState>) -> Result {
     let mut tx = state.db.begin().await?;
     // … insert the order with `&mut tx`
@@ -909,7 +929,8 @@ Jobs and scheduled tasks run inside `rnx serve` / `my-app serve` (`QUEUE_WORKERS
 `schedule:list` shows each task's next run and zone, `schedule:run NAME` runs one now (also
 `kernel.run_scheduled(name)` in tests).
 A job that errors, panics or passes its `TIMEOUT` is retried up to `MAX_ATTEMPTS`, then moved to
-`failed_jobs` (`queue:failed`, `queue:retry`); a panicking task or listener doesn't stop the others.
+`failed_jobs` (`queue:failed`, `queue:retry`, `queue:forget`, `queue:prune-failed`); a panicking
+task or listener doesn't stop the others.
 
 ## Mail and notifications
 

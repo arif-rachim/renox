@@ -112,9 +112,15 @@ my-app queue:failed          # list them, with their errors
 my-app queue:retry 12        # put one back on the queue with fresh attempts
 my-app queue:retry all
 my-app queue:flush           # delete them all
+my-app queue:forget 12       # delete one
+my-app queue:prune-failed --hours 168    # delete those older than a week (the default)
+my-app queue:prune-batches --hours 24    # delete finished batches
 ```
 
-Fix the cause first, then retry. `queue:retry` runs the same payload again.
+Fix the cause first, then retry. `queue:retry` runs the same payload again; a job of a chain
+resumes the chain, and a job of a batch counts in its batch again. A job's `failed` hook runs
+once it fails for good (not on `queue:retry`). Schedule the prune commands, e.g.
+`s.daily_at("03:00", "prune-failed", |state| async move { state.queue.prune_failed(week).await.map(drop) })`.
 
 ## Failed webhook calls
 

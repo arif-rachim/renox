@@ -18,6 +18,7 @@ mod embed;
 mod extension_points;
 mod i18n;
 mod infra;
+mod jobs;
 mod mail;
 mod method;
 mod models;
