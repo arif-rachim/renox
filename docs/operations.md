@@ -154,6 +154,10 @@ stop working, but no data is lost. Rotating the key has the same effect.
 - `migrate:status` shows each migration's batch, and flags applied migrations whose file was
   edited or deleted since they ran. To change the schema, add a new migration; never edit an
   applied one.
+- Restart the app after `migrate` (the Dockerfile and `deploy/README.md` do: migrate, then
+  start). Migrations run in-process (tests, `migrate:fresh`) are safe: connections opened before
+  them are dropped. But a server that keeps running across a migration made by another process
+  may keep connections that read the old schema until it restarts.
 - `migrate:rollback` undoes the last batch only if every migration in it has a `.down.sql`;
   otherwise it undoes nothing.
 

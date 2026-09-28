@@ -24,7 +24,7 @@ use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, S
 #[doc(hidden)]
 pub use conn::{Conn, bounds};
 pub use conn::{Db, Dialect, Executor, FromDb, Row, RowIndex, Sql, Transaction, sql};
-pub(crate) use conn::{RowInner, script};
+pub(crate) use conn::{RowInner, SchemaEpoch, script};
 pub use error::DbError;
 pub use factory::Factory;
 pub use from_row::FromRow;
@@ -85,7 +85,9 @@ pub(crate) async fn connect(config: &Config) -> anyhow::Result<Db> {
     {
         return connect_postgres(&test_url, config, true).await;
     }
-    connect_sqlite(config).await.map(Db::from)
+    let schema = SchemaEpoch::default();
+    let pool = connect_sqlite(config, schema.clone()).await?;
+    Ok(Db::from_sqlite(pool, schema))
 }
 
 /// `TEST_DATABASE_URL` from the environment, else from `.env` in the current
@@ -150,13 +152,19 @@ async fn connect_postgres(url: &str, config: &Config, fresh_schema: bool) -> any
     } else {
         pool_size
     };
+    let schema = SchemaEpoch::default();
+    let epoch = schema.clone();
     let pool = PgPoolOptions::new()
         .max_connections(pool_size)
         .acquire_timeout(config.database_acquire_timeout)
+        .before_acquire(move |_, meta| {
+            let fresh = !epoch.is_stale(meta.age);
+            Box::pin(async move { Ok(fresh) })
+        })
         .connect_with(options)
         .await
         .with_context(failed)?;
-    Ok(Db::from(pool))
+    Ok(Db::from_postgres(pool, schema))
 }
 
 #[cfg(not(feature = "postgres"))]
@@ -183,7 +191,7 @@ fn redact(url: &str) -> String {
 
 /// Opens a SQLite pool, creating the file and its directory if needed. File
 /// databases use WAL mode; every connection enforces foreign keys.
-async fn connect_sqlite(config: &Config) -> anyhow::Result<sqlx::SqlitePool> {
+async fn connect_sqlite(config: &Config, schema: SchemaEpoch) -> anyhow::Result<sqlx::SqlitePool> {
     let url = &config.database_url;
     let in_memory = is_memory(url);
 
@@ -214,7 +222,13 @@ async fn connect_sqlite(config: &Config) -> anyhow::Result<sqlx::SqlitePool> {
             .idle_timeout(None)
             .max_lifetime(None)
     } else {
-        SqlitePoolOptions::new().max_connections(config.database_pool_size)
+        // Connections opened before a migration would read the old schema.
+        SqlitePoolOptions::new()
+            .max_connections(config.database_pool_size)
+            .before_acquire(move |_, meta| {
+                let fresh = !schema.is_stale(meta.age);
+                Box::pin(async move { Ok(fresh) })
+            })
     }
     .acquire_timeout(if in_memory {
         // The one connection is busy for a moment at most, unless a task
