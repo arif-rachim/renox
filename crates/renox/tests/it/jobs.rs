@@ -47,20 +47,18 @@ impl Job for Urgent {
     }
 }
 
-/// Fails for good on its second attempt, and says so in its `failed` hook.
+/// Fails for good on its first attempt, and says so in its `failed` hook.
+/// (Permanent, not retried: a retry is due in the second it's recorded,
+/// which may be later than the jobs queued after it, so the order in a
+/// batch would depend on the clock.)
 #[derive(Serialize, Deserialize)]
 struct Broken(String);
 
 impl Job for Broken {
     const NAME: &'static str = "broken";
-    const MAX_ATTEMPTS: u32 = 2;
-
-    fn backoff(_: u32) -> Duration {
-        Duration::ZERO
-    }
 
     async fn handle(self, _: JobContext) -> Result {
-        Err(abort(StatusCode::BAD_GATEWAY, "the supplier is down"))
+        Err(Error::permanent(anyhow::anyhow!("the supplier is down")))
     }
 
     async fn failed(self, state: AppState, error: String) {
