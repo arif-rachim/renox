@@ -1,5 +1,4 @@
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::extract::{FromRequestParts, Request, State};
 use axum::http::header::{COOKIE, SET_COOKIE};
@@ -302,10 +301,7 @@ fn read_cookie(headers: &HeaderMap, name: &str, key: &Key) -> Option<Payload> {
 }
 
 fn unix_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or_default()
+    crate::clock::unix_secs().max(0) as u64
 }
 
 /// The session carried by a `Cookie` header value (a new one if absent or

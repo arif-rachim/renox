@@ -68,7 +68,7 @@ use crate::crypto::constant_time_eq;
 use crate::db::Db;
 use crate::{AppState, Error, Htmx, HxRedirect, Result, Session};
 
-const AUTH_ID: &str = "_auth_user_id";
+pub(crate) const AUTH_ID: &str = "_auth_user_id";
 const AUTH_HASH: &str = "_auth_password_hash";
 /// Unix milliseconds of the login, compared with `users.sessions_revoked_at`.
 const AUTH_AT: &str = "_auth_at";
@@ -488,9 +488,7 @@ async fn revoke_session(db: &Db, session: &Session, sid: &str) -> Result {
 }
 
 pub(crate) fn unix_millis() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| d.as_millis() as i64)
+    crate::clock::unix_millis()
 }
 
 /// Ties a session to the password it was logged in with, so changing the

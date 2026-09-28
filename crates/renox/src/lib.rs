@@ -40,8 +40,8 @@ pub mod prelude {
     pub use renox_core::webhook::{Webhook, WebhookCall, WebhookRequest};
     pub use renox_core::{
         App, AppState, Back, Config, Environment, Error, Errors, Htmx, HxRedirect, HxRefresh,
-        HxTrigger, Module, Result, Routes, Session, Valid, Validate, ValidationError, Validator,
-        View, context, view,
+        HxTrigger, Module, Resource, Result, Routes, Session, Valid, Validate, ValidationError,
+        Validator, View, context, view,
     };
     pub use renox_core::{AuthUser, ClientIp, Lang, Policy, Registry, Upload};
     pub use renox_core::{abort, abort_if, abort_unless};
@@ -77,6 +77,11 @@ pub struct QueueGuide;
 #[cfg(doctest)]
 #[doc = include_str!("../../../docs/ui.md")]
 pub struct UiGuide;
+
+/// Compiles the Rust in docs/testing.md as a doctest.
+#[cfg(doctest)]
+#[doc = include_str!("../../../docs/testing.md")]
+pub struct TestingGuide;
 
 /// Compiles every Rust example in the README as a doctest, so the front page
 /// can't drift from the API.

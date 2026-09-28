@@ -4,6 +4,7 @@ mod deploy;
 mod generate;
 mod make;
 mod new;
+mod scaffold;
 mod serve;
 
 use std::path::PathBuf;
@@ -58,7 +59,57 @@ enum Command {
     MakeModule {
         /// e.g. `produk` or `stok_barang`.
         name: String,
+        /// A whole resource: model, migration, factory, form, the seven
+        /// handlers (`Routes::resource`), views on the UI kit, and tests.
+        #[arg(long)]
+        resource: bool,
+        /// With --resource: the fields, e.g. "name:string price:money
+        /// notes:text active:bool due:date" (string, text, int, money, float,
+        /// bool, date). Default: name:string.
+        #[arg(long)]
+        fields: Option<String>,
+        /// With --resource: the model's name (default: the module's in the
+        /// singular, `products` → `Product`).
+        #[arg(long)]
+        model: Option<String>,
     },
+    /// Fake records for a model (`impl Factory`).
+    #[command(name = "make:factory")]
+    MakeFactory {
+        model: String,
+        #[arg(long)]
+        module: String,
+    },
+    /// A seeder for `db:seed`, registered on the App.
+    #[command(name = "make:seeder")]
+    MakeSeeder { name: String },
+    /// An integration test file in tests/.
+    #[command(name = "make:test")]
+    MakeTest { name: String },
+    /// A notification (mail and database) in a module.
+    #[command(name = "make:notification")]
+    MakeNotification {
+        name: String,
+        #[arg(long)]
+        module: String,
+    },
+    /// An event and a listener registered in its module.
+    #[command(name = "make:event")]
+    MakeEvent {
+        name: String,
+        #[arg(long)]
+        module: String,
+    },
+    /// A validation rule (`impl Rule`) in a module.
+    #[command(name = "make:rule")]
+    MakeRule {
+        name: String,
+        #[arg(long)]
+        module: String,
+    },
+    /// A middleware on every route of the app, registered with App::layer.
+    #[command(name = "make:middleware")]
+    MakeMiddleware { name: String },
     /// Create a model (and with --migration, its table's migration).
     #[command(name = "make:model")]
     MakeModel {
@@ -166,7 +217,22 @@ fn main() -> Result<()> {
         Command::Build => deploy::build(&app_root()?),
         Command::MakeDeploy => deploy::make_deploy(&app_root()?),
         Command::MakeMigration { name, path } => make::migration(&name, &path),
-        Command::MakeModule { name } => generate::module(&app_root()?, &name),
+        Command::MakeModule {
+            name,
+            resource: true,
+            fields,
+            model,
+        } => scaffold::resource(&app_root()?, &name, model.as_deref(), fields.as_deref()),
+        Command::MakeModule { name, .. } => generate::module(&app_root()?, &name),
+        Command::MakeFactory { model, module } => generate::factory(&app_root()?, &model, &module),
+        Command::MakeSeeder { name } => generate::seeder(&app_root()?, &name),
+        Command::MakeTest { name } => generate::test(&app_root()?, &name),
+        Command::MakeNotification { name, module } => {
+            generate::notification(&app_root()?, &name, &module)
+        }
+        Command::MakeEvent { name, module } => generate::event(&app_root()?, &name, &module),
+        Command::MakeRule { name, module } => generate::rule(&app_root()?, &name, &module),
+        Command::MakeMiddleware { name } => generate::middleware(&app_root()?, &name),
         Command::MakeModel {
             name,
             module,

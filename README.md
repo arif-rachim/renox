@@ -248,7 +248,8 @@ async fn login_page_and_registration_errors() {
 ```
 
 ```bash
-rnx make:module products                          # also make:model -m, make:policy, make:job, make:command, make:mail
+rnx make:module products --resource --fields "name:string price:money"  # a whole CRUD with tests
+                                                  # also make:model -m, make:policy, make:job, make:factory, make:test…
 rnx route:list                                    # every route with its name, module and guards
 rnx db:shell                                      # SQL prompt, no sqlite3/psql needed
 rnx build && rnx make:deploy                      # dist/blog + Dockerfile, systemd, Litestream
@@ -319,6 +320,8 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 | Laravel | Renox |
 |---|---|
 | `php artisan` | `rnx` (`rnx make:model`, `rnx migrate`, `rnx route:list`, …) |
+| `Route::resource`, `make:controller --resource` | `Routes::resource`, `rnx make:module --resource` |
+| `Event::fake`, `Notification::fake`, `$this->travel()` | `app.fake_events()`, `app.fake_notifications()`, `app.travel(…)` |
 | Blade | MiniJinja templates, with `{% extends %}` and `{% block %}` |
 | Blade components, Breeze's UI | Macros that see the request (`rnx make:component`), the `renox/ui.html` kit |
 | `routes/web.php`, `Route::prefix()->name()->group()` | `Module::routes`, `Routes::group("/admin", "admin.", …)` |

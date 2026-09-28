@@ -59,6 +59,16 @@ step "every generator"
 "$RNX" make:policy Product --module catalog
 "$RNX" make:mail order_shipped
 "$RNX" make:migration add_sku_to_products
+"$RNX" make:module products --resource --fields "name:string price:money notes:text active:bool due_on:date"
+"$RNX" make:module tags --resource
+"$RNX" make:factory Product --module catalog
+"$RNX" make:seeder DemoData
+"$RNX" make:test Checkout
+"$RNX" make:notification OrderShipped --module catalog
+"$RNX" make:event OrderPlaced --module catalog
+"$RNX" make:rule Npwp --module catalog
+"$RNX" make:middleware StampRequests
+"$RNX" make:component price_tag
 "$RNX" make:deploy
 
 step "key:generate on a fresh clone (no .env)"
@@ -77,6 +87,9 @@ if [ "$DATABASE" = sqlite ]; then
     cargo run -q -- migrate:status
     cargo run -q -- catalog:import
     cargo run -q -- route:list
+    cargo run -q -- db:seed
+    cargo run -q -- ui:publish
+    test -f resources/views/components/ui.html
 fi
 
 if [ -n "${DOCKER:-}" ]; then

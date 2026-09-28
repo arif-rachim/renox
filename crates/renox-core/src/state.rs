@@ -43,6 +43,57 @@ pub struct AppState {
         Arc<std::collections::HashMap<String, crate::auth::notifications::ChannelFn>>,
     /// The app's own values (`App::provide`).
     pub(crate) provided: crate::provided::ProvidedMap,
+    /// What tests asked to record instead of doing (`TestApp::fake_events`, …).
+    pub(crate) fakes: Arc<Fakes>,
+}
+
+/// A notification a test recorded instead of sending.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct SentNotification {
+    /// `Notification::kind`.
+    pub kind: &'static str,
+    pub to: crate::auth::Recipient,
+}
+
+/// Recorders for `TestApp::fake_events` and `fake_notifications`.
+#[derive(Default)]
+pub(crate) struct Fakes {
+    pub events: std::sync::Mutex<Option<Vec<Box<dyn std::any::Any + Send>>>>,
+    pub notifications: std::sync::Mutex<Option<Vec<SentNotification>>>,
+}
+
+impl Fakes {
+    /// Records `event` if events are faked; returns whether it did.
+    pub(crate) fn record_event<E: Send + 'static>(&self, event: E) -> bool {
+        let mut events = self.events.lock().unwrap_or_else(|e| e.into_inner());
+        match events.as_mut() {
+            Some(list) => {
+                list.push(Box::new(event));
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Records a notification if notifications are faked.
+    pub(crate) fn record_notification(
+        &self,
+        kind: &'static str,
+        to: &crate::auth::Recipient,
+    ) -> bool {
+        let mut sent = self.notifications.lock().unwrap_or_else(|e| e.into_inner());
+        match sent.as_mut() {
+            Some(list) => {
+                list.push(SentNotification {
+                    kind,
+                    to: to.clone(),
+                });
+                true
+            }
+            None => false,
+        }
+    }
 }
 
 impl AppState {

@@ -1,0 +1,726 @@
+//! `rnx make:module <name> --resource`: a whole resource from a field list,
+//! with the model, its migration and factory, validated forms, the seven
+//! handlers, views built on the UI kit, and tests.
+
+use std::fs;
+use std::path::Path;
+
+use anyhow::{Result, bail};
+use heck::{ToKebabCase, ToSnakeCase, ToTitleCase, ToUpperCamelCase};
+
+use crate::Database;
+use crate::generate::{add_mod, check_name, register_in_main, write_new};
+
+/// A field's type, as written in `--fields "name:string price:money"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Kind {
+    String,
+    Text,
+    Int,
+    Money,
+    Float,
+    Bool,
+    Date,
+}
+
+#[derive(Debug, Clone)]
+struct Field {
+    name: String,
+    kind: Kind,
+}
+
+const KINDS: &str = "string, text, int, money, float, bool, date";
+
+fn parse_fields(spec: &str) -> Result<Vec<Field>> {
+    let mut fields = Vec::new();
+    for part in spec.split([' ', ',']).filter(|p| !p.is_empty()) {
+        let (name, kind) = part.split_once(':').unwrap_or((part, "string"));
+        let kind = match kind {
+            "string" | "str" => Kind::String,
+            "text" => Kind::Text,
+            "int" | "integer" | "i64" => Kind::Int,
+            "money" => Kind::Money,
+            "float" | "f64" | "decimal" => Kind::Float,
+            "bool" | "boolean" => Kind::Bool,
+            "date" => Kind::Date,
+            other => bail!("unknown field type `{other}` for `{name}`; use one of {KINDS}"),
+        };
+        let name = name.to_snake_case();
+        check_name(&name)?;
+        if ["id", "created_at", "updated_at"].contains(&name.as_str()) {
+            bail!("`{name}` is added for you; leave it out of --fields");
+        }
+        if fields.iter().any(|f: &Field| f.name == name) {
+            bail!("`{name}` is listed twice");
+        }
+        fields.push(Field { name, kind });
+    }
+    if fields.is_empty() {
+        fields.push(Field {
+            name: "name".into(),
+            kind: Kind::String,
+        });
+    }
+    Ok(fields)
+}
+
+impl Field {
+    /// Sentence case, as labels are in the HIG: `due_on` → "Due on".
+    fn label(&self) -> String {
+        let words = self.name.to_title_case().to_lowercase();
+        let mut chars = words.chars();
+        chars
+            .next()
+            .map(|first| first.to_uppercase().chain(chars).collect())
+            .unwrap_or_default()
+    }
+
+    fn rust_type(&self) -> &'static str {
+        match self.kind {
+            Kind::String | Kind::Text => "String",
+            Kind::Int | Kind::Money => "i64",
+            Kind::Float => "f64",
+            Kind::Bool => "bool",
+            Kind::Date => "NaiveDate",
+        }
+    }
+
+    fn column(&self, database: Database) -> String {
+        let sql = match (self.kind, database) {
+            (Kind::String | Kind::Text, _) => "TEXT NOT NULL DEFAULT ''",
+            (Kind::Int | Kind::Money, Database::Sqlite) => "INTEGER NOT NULL DEFAULT 0",
+            (Kind::Int | Kind::Money, Database::Postgres) => "BIGINT NOT NULL DEFAULT 0",
+            (Kind::Float, Database::Sqlite) => "REAL NOT NULL DEFAULT 0",
+            (Kind::Float, Database::Postgres) => "DOUBLE PRECISION NOT NULL DEFAULT 0",
+            (Kind::Bool, Database::Sqlite) => "INTEGER NOT NULL DEFAULT 0",
+            (Kind::Bool, Database::Postgres) => "BOOLEAN NOT NULL DEFAULT FALSE",
+            (Kind::Date, Database::Sqlite) => "TEXT NOT NULL DEFAULT '1970-01-01'",
+            (Kind::Date, Database::Postgres) => "DATE NOT NULL DEFAULT '1970-01-01'",
+        };
+        format!("\"{}\" {sql}", self.name)
+    }
+
+    fn rules(&self) -> Option<String> {
+        let name = &self.name;
+        match self.kind {
+            Kind::String => Some(format!(
+                "v.field(\"{name}\", &self.{name}).required().max(255);"
+            )),
+            Kind::Text => Some(format!(
+                "v.field(\"{name}\", &self.{name}).required().max(10_000);"
+            )),
+            Kind::Money => Some(format!("v.field(\"{name}\", &self.{name}).min(0);")),
+            _ => None,
+        }
+    }
+
+    fn fake(&self) -> String {
+        match self.kind {
+            Kind::String => "Words(1..3).fake::<Vec<String>>().join(\" \")".into(),
+            Kind::Text => "Sentence(4..10).fake()".into(),
+            Kind::Int => "(1..100).fake()".into(),
+            Kind::Money => "(1_000..100_000).fake()".into(),
+            Kind::Float => "(1.0..100.0).fake()".into(),
+            Kind::Bool => "(0..2).fake::<u8>() == 1".into(),
+            Kind::Date => {
+                "NaiveDate::from_ymd_opt(2026, (1..13).fake(), (1..29).fake()).unwrap_or_default()"
+                    .into()
+            }
+        }
+    }
+
+    /// The form field in the create and edit views (UI kit components).
+    fn input(&self) -> String {
+        let (name, label) = (&self.name, self.label());
+        let value = format!("record.{name} if record else none");
+        match self.kind {
+            Kind::String => {
+                format!("{{{{ input(\"{name}\", \"{label}\", value={value}, required=true) }}}}")
+            }
+            Kind::Text => {
+                format!("{{{{ textarea(\"{name}\", \"{label}\", value={value}, required=true) }}}}")
+            }
+            Kind::Int => format!(
+                "{{{{ input(\"{name}\", \"{label}\", type=\"number\", value={value}, required=true) }}}}"
+            ),
+            Kind::Money => format!(
+                "{{{{ input(\"{name}\", \"{label}\", value={value}, required=true, hint=\"In the smallest unit (rupiah, cents), without dots.\", attrs={{\"inputmode\": \"numeric\"}}) }}}}"
+            ),
+            Kind::Float => format!(
+                "{{{{ input(\"{name}\", \"{label}\", type=\"number\", value={value}, required=true, attrs={{\"step\": \"any\"}}) }}}}"
+            ),
+            Kind::Bool => format!(
+                "{{{{ checkbox(\"{name}\", \"{label}\", checked=(record.{name} if record else false), switch=true) }}}}"
+            ),
+            Kind::Date => format!(
+                "{{{{ input(\"{name}\", \"{label}\", type=\"date\", value={value}, required=true) }}}}"
+            ),
+        }
+    }
+
+    /// How the value shows in the list and on the record's page.
+    fn display(&self, var: &str) -> String {
+        let value = format!("{var}.{}", self.name);
+        match self.kind {
+            Kind::Money => format!("{{{{ {value} | number }}}}"),
+            Kind::Bool => {
+                format!("{{{{ badge(\"Yes\", kind=\"success\") if {value} else badge(\"No\") }}}}")
+            }
+            _ => format!("{{{{ {value} }}}}"),
+        }
+    }
+
+    fn numeric(&self) -> bool {
+        matches!(self.kind, Kind::Int | Kind::Money | Kind::Float)
+    }
+
+    /// A value the generated tests post.
+    fn sample(&self, second: bool) -> &'static str {
+        match (self.kind, second) {
+            (Kind::String, false) => "First value",
+            (Kind::String, true) => "Changed value",
+            (Kind::Text, false) => "Some longer text.",
+            (Kind::Text, true) => "Other longer text.",
+            (Kind::Int, false) => "5",
+            (Kind::Int, true) => "7",
+            (Kind::Money, false) => "12000",
+            (Kind::Money, true) => "15000",
+            (Kind::Float, false) => "1.5",
+            (Kind::Float, true) => "2.5",
+            (Kind::Bool, _) => "on",
+            (Kind::Date, false) => "2026-01-15",
+            (Kind::Date, true) => "2026-02-20",
+        }
+    }
+}
+
+/// `products` → `Product`; `categories` → `Category`; `news` stays.
+fn singular(word: &str) -> String {
+    if let Some(stem) = word.strip_suffix("ies") {
+        format!("{stem}y")
+    } else if word.ends_with("sses") || word.ends_with("xes") || word.ends_with("ches") {
+        word[..word.len() - 2].to_owned()
+    } else if word.ends_with('s') && !word.ends_with("ss") && !word.ends_with("news") {
+        word[..word.len() - 1].to_owned()
+    } else {
+        word.to_owned()
+    }
+}
+
+/// The app's crate name, from its Cargo.toml (`-` becomes `_`).
+pub(crate) fn crate_name(root: &Path) -> Result<String> {
+    let manifest = fs::read_to_string(root.join("Cargo.toml"))?;
+    let name = manifest
+        .lines()
+        .find_map(|line| {
+            let (key, value) = line.split_once('=')?;
+            (key.trim() == "name").then(|| value.trim().trim_matches('"').to_owned())
+        })
+        .ok_or_else(|| anyhow::anyhow!("no package name in Cargo.toml"))?;
+    Ok(name.replace('-', "_"))
+}
+
+/// `rnx make:module products --resource [--model Product] [--fields …]`.
+pub fn resource(root: &Path, name: &str, model: Option<&str>, fields: Option<&str>) -> Result<()> {
+    check_name(name)?;
+    let module = name.to_snake_case();
+    let module_type = name.to_upper_camel_case();
+    let model = model.map_or_else(
+        || singular(&module).to_upper_camel_case(),
+        |m| m.to_upper_camel_case(),
+    );
+    if model == module_type {
+        bail!(
+            "the module `{module}` and its model would both be `{model}`: name the module in the plural, or pass --model"
+        );
+    }
+    let path = module.to_kebab_case();
+    let table = module.clone();
+    let title = module.to_title_case();
+    let fields = parse_fields(fields.unwrap_or(""))?;
+    let crate_name = crate_name(root)?;
+    let dir = root.join("src/app").join(&module);
+    if dir.exists() {
+        bail!("{} already exists", dir.display());
+    }
+
+    let replace = |template: &str| -> String {
+        template
+            .replace("__Model__", &model)
+            .replace("__Module__", &module_type)
+            .replace("__module__", &module)
+            .replace("__path__", &path)
+            .replace("__table__", &table)
+            .replace("__title__", &title)
+            .replace("__crate__", &crate_name)
+    };
+
+    // The model and its factory.
+    let uses_date = fields.iter().any(|f| f.kind == Kind::Date);
+    let model_fields: String = fields
+        .iter()
+        .map(|f| format!("    pub {}: {},\n", f.name, f.rust_type()))
+        .collect();
+    let fakes: String = fields
+        .iter()
+        .map(|f| format!("            {}: {},\n", f.name, f.fake()))
+        .collect();
+    let model_rs = replace(MODEL)
+        .replace("__fields__", &model_fields)
+        .replace("__fakes__", &fakes)
+        .replace(
+            "__date_use__",
+            if uses_date {
+                "use renox::chrono::NaiveDate;\n"
+            } else {
+                ""
+            },
+        );
+    let fakers: Vec<&str> = [(Kind::Text, "Sentence"), (Kind::String, "Words")]
+        .into_iter()
+        .filter(|(kind, _)| fields.iter().any(|f| f.kind == *kind))
+        .map(|(_, faker)| faker)
+        .collect();
+    let faker_use = if fakers.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "use renox::fake::faker::lorem::en::{{{}}};\n",
+            fakers.join(", ")
+        )
+    };
+    let model_rs = model_rs.replace("__faker_use__", &faker_use);
+    write_new(&dir.join("model.rs"), &model_rs)?;
+
+    // The module: routes, form, handlers.
+    let form_fields: String = fields
+        .iter()
+        .map(|f| {
+            let default = if f.kind == Kind::Bool {
+                "    /// An unchecked box sends nothing: false.\n    #[serde(default)]\n"
+            } else {
+                ""
+            };
+            format!("{default}    {}: {},\n", f.name, f.rust_type())
+        })
+        .collect();
+    let rules: String = fields
+        .iter()
+        .filter_map(Field::rules)
+        .map(|r| format!("        {r}\n"))
+        .collect();
+    let assign: String = fields
+        .iter()
+        .map(|f| format!("        record.{0} = self.{0};\n", f.name))
+        .collect();
+    let mod_rs = replace(MODULE)
+        .replace("__form_fields__", &form_fields)
+        .replace(
+            "__rules__",
+            if rules.is_empty() {
+                "        let _ = v;\n"
+            } else {
+                &rules
+            },
+        )
+        .replace("__assign__", &assign)
+        .replace(
+            "__date_use__",
+            if uses_date {
+                "use renox::chrono::NaiveDate;\n"
+            } else {
+                ""
+            },
+        );
+    write_new(&dir.join("mod.rs"), &mod_rs)?;
+
+    // Views.
+    let listed: Vec<&Field> = fields.iter().take(3).collect();
+    let head: Vec<String> = listed
+        .iter()
+        .map(|f| {
+            if f.numeric() {
+                format!("[\"{}\", \"num\"]", f.label())
+            } else {
+                format!("\"{}\"", f.label())
+            }
+        })
+        .chain(std::iter::once("[\"\", \"num\"]".to_owned()))
+        .collect();
+    let cells: String = listed
+        .iter()
+        .enumerate()
+        .map(|(i, f)| {
+            let class = if f.numeric() { " class=\"rx-num\"" } else { "" };
+            let value = f.display("record");
+            if i == 0 {
+                format!("        <td{class}><a class=\"rx-link\" href=\"{{{{ route('__module__.show', record.id) }}}}\"><strong>{value}</strong></a></td>\n")
+            } else {
+                format!("        <td{class}>{value}</td>\n")
+            }
+        })
+        .collect();
+    let first = &fields[0];
+    let heading = match first.kind {
+        Kind::String => format!("{{{{ record.{} }}}}", first.name),
+        _ => format!("{} #{{{{ record.id }}}}", model.to_title_case()),
+    };
+    let inputs: String = fields
+        .iter()
+        .map(|f| format!("      {}\n", f.input()))
+        .collect();
+    let details: String = fields
+        .iter()
+        .map(|f| {
+            format!(
+                "      <div class=\"rx-row\"><span class=\"rx-subtitle\">{}</span><span class=\"rx-spacer\"></span><span>{}</span></div>\n",
+                f.label(),
+                f.display("record")
+            )
+        })
+        .collect();
+    let views = root.join("resources/views").join(&module);
+    write_new(
+        &views.join("index.html"),
+        &replace(INDEX_VIEW)
+            .replace("__head__", &head.join(", "))
+            .replace("__cells__", &replace(&cells)),
+    )?;
+    write_new(
+        &views.join("form.html"),
+        &replace(FORM_VIEW).replace("__inputs__", &inputs),
+    )?;
+    write_new(
+        &views.join("show.html"),
+        &replace(SHOW_VIEW)
+            .replace("__heading__", &heading)
+            .replace("__details__", &details),
+    )?;
+
+    // Tests, through HTTP like a browser.
+    let form = |second: bool| -> String {
+        fields
+            .iter()
+            .map(|f| format!("(\"{}\", \"{}\")", f.name, f.sample(second)))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let check = fields
+        .iter()
+        .find(|f| f.kind == Kind::String)
+        .map(|f| (f.name.clone(), f.sample(false), f.sample(true)));
+    let blanked = |blank: &str| -> String {
+        fields
+            .iter()
+            .map(|f| {
+                let value = if f.name == blank { "" } else { f.sample(false) };
+                format!("(\"{}\", \"{value}\")", f.name)
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let (seen_first, seen_second, has_row, has_changed, invalid) = match &check {
+        Some((name, first, second)) => (
+            format!("\n        .assert_see(\"{first}\")"),
+            format!("\n    app.get(\"/__path__\").await.assert_see(\"{second}\");"),
+            format!(
+                "\n    app.assert_database_has(\"__table__\", &[(\"{name}\", &\"{first}\")]).await;"
+            ),
+            format!(
+                "\n    app.assert_database_has(\"__table__\", &[(\"{name}\", &\"{second}\")]).await;"
+            ),
+            format!(
+                "\n\n#[renox::test]\nasync fn invalid___module___are_refused() {{\n    let app = TestApp::new(__crate__::app()).await;\n    app.acting_as(&user(&app).await);\n    app.htmx()\n        .post(\"/__path__\", &[{blank}])\n        .await\n        .assert_invalid(\"{name}\");\n    app.assert_database_count(\"__table__\", 0).await;\n}}\n",
+                blank = blanked(name)
+            ),
+        ),
+        None => Default::default(),
+    };
+    let tests = replace(TESTS)
+        .replace("__form1__", &form(false))
+        .replace("__form2__", &form(true))
+        .replace("__seen_first__", &seen_first)
+        .replace("__seen_second__", &replace(&seen_second))
+        .replace("__has_row__", &replace(&has_row))
+        .replace("__has_changed__", &replace(&has_changed))
+        .replace("__invalid__", &replace(&invalid));
+    write_new(&root.join("tests").join(format!("{module}.rs")), &tests)?;
+
+    // The table.
+    let database = Database::of_current_app();
+    let columns: String = fields
+        .iter()
+        .map(|f| format!("    {},\n", f.column(database)))
+        .collect();
+    let (id, stamp) = match database {
+        Database::Sqlite => ("id INTEGER PRIMARY KEY AUTOINCREMENT", "TEXT"),
+        Database::Postgres => (
+            "id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY",
+            "TIMESTAMPTZ",
+        ),
+    };
+    let up = format!(
+        "CREATE TABLE \"{table}\" (\n    {id},\n{columns}    created_at {stamp},\n    updated_at {stamp}\n);\n"
+    );
+    crate::make::migration_with(
+        &format!("create_{table}_table"),
+        &root.join("migrations"),
+        &up,
+        &format!("DROP TABLE \"{table}\";\n"),
+    )?;
+
+    add_mod(&root.join("src/app/mod.rs"), &module)?;
+    register_in_main(
+        &root.join(if root.join("src/lib.rs").is_file() {
+            "src/lib.rs"
+        } else {
+            "src/main.rs"
+        }),
+        &format!("app::{module}::{module_type}"),
+    )?;
+    println!(
+        "Next: `rnx migrate`, then open /{path}. The layout needs {{{{ renox_ui() }}}} in <head> and {{{{ toasts() }}}} in <body> (apps from `rnx new` have them)."
+    );
+    Ok(())
+}
+
+const MODEL: &str = r#"use renox::fake::Fake;
+__faker_use__use renox::prelude::*;
+__date_use__use serde::{Deserialize, Serialize};
+
+#[derive(Model, Serialize, Deserialize, Default, Debug, Clone)]
+#[model(table = "__table__")]
+pub struct __Model__ {
+    pub id: i64,
+__fields__    pub created_at: Option<DateTime>,
+    pub updated_at: Option<DateTime>,
+}
+
+/// Fake records for seeders and tests: `__Model__::create_many(&db, 20)`.
+impl Factory for __Model__ {
+    fn definition() -> Self {
+        __Model__ {
+__fakes__            ..Default::default()
+        }
+    }
+}
+"#;
+
+const MODULE: &str = r#"//! Made with `rnx make:module __module__ --resource`: list, show, create,
+//! edit and delete __title__, for logged-in users.
+
+pub mod model;
+
+use renox::Toast;
+use renox::prelude::*;
+__date_use__use serde::Deserialize;
+
+use model::__Model__;
+
+pub struct __Module__;
+
+impl Module for __Module__ {
+    fn name(&self) -> &'static str {
+        "__module__"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new()
+            // GET /__path__, GET /__path__/new, POST /__path__, GET /__path__/{id},
+            // GET /__path__/{id}/edit, PUT /__path__/{id}, DELETE /__path__/{id};
+            // named __module__.index, __module__.create, …
+            .resource(
+                "/__path__",
+                "__module__",
+                Resource::new()
+                    .index(index)
+                    .create(create)
+                    .store(store)
+                    .show(show)
+                    .edit(edit)
+                    .update(update)
+                    .destroy(destroy),
+            )
+            .require_auth()
+    }
+}
+
+/// What the create and edit forms send.
+#[derive(Deserialize)]
+struct __Model__Form {
+__form_fields__}
+
+impl Validate for __Model__Form {
+    fn rules(&self, v: &mut Validator) {
+__rules__    }
+}
+
+impl __Model__Form {
+    fn fill(self, record: &mut __Model__) {
+__assign__    }
+}
+
+async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
+    let records = __Model__::query().latest().paginate(&db, page, 20).await?;
+    Ok(view("__module__/index.html", context! { records }))
+}
+
+async fn create() -> View {
+    view("__module__/form.html", context! {})
+}
+
+async fn store(State(db): State<Db>, Valid(form): Valid<__Model__Form>) -> Result<(Toast, Redirect)> {
+    let mut record = __Model__::default();
+    form.fill(&mut record);
+    __Model__::create(&db, record).await?;
+    Ok((Toast::success("Saved."), Redirect::to("/__path__")))
+}
+
+async fn show(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
+    let record = __Model__::find_or_404(&db, id).await?;
+    Ok(view("__module__/show.html", context! { record }))
+}
+
+async fn edit(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
+    let record = __Model__::find_or_404(&db, id).await?;
+    Ok(view("__module__/form.html", context! { record }))
+}
+
+async fn update(
+    State(db): State<Db>,
+    Path(id): Path<i64>,
+    Valid(form): Valid<__Model__Form>,
+) -> Result<(Toast, Redirect)> {
+    let mut record = __Model__::find_or_404(&db, id).await?;
+    form.fill(&mut record);
+    record.save(&db).await?;
+    Ok((Toast::success("Changes saved."), Redirect::to(&format!("/__path__/{id}"))))
+}
+
+async fn destroy(State(db): State<Db>, Path(id): Path<i64>) -> Result<(Toast, Redirect)> {
+    let mut record = __Model__::find_or_404(&db, id).await?;
+    record.delete(&db).await?;
+    Ok((Toast::success("Deleted."), Redirect::to("/__path__")))
+}
+"#;
+
+const INDEX_VIEW: &str = r#"{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import table, link_button, confirm, badge, empty %}
+{% from "renox/pagination.html" import pagination %}
+
+{% block content %}
+<div class="rx-stack">
+  <div class="rx-row">
+    <h1 class="rx-title">__title__</h1>
+    <span class="rx-spacer"></span>
+    {{ link_button(route('__module__.create'), "New", variant="primary") }}
+  </div>
+  {% if records.items %}
+    {% call table([__head__], caption="__title__") %}
+      {% for record in records.items %}
+      <tr>
+__cells__        <td class="rx-num">
+          <div class="rx-row rx-row--end">
+            {{ link_button(route('__module__.edit', record.id), "Edit", variant="plain", size="small") }}
+            {{ confirm("delete-" ~ record.id, "Delete", route('__module__.destroy', record.id),
+                       "Delete this?", "This can't be undone.", size="small") }}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    {% endcall %}
+    {{ pagination(records) }}
+  {% else %}
+    {{ empty("Nothing here yet", "What you add shows up in this list.", route('__module__.create'), "Add the first") }}
+  {% endif %}
+</div>
+{% endblock %}
+"#;
+
+const FORM_VIEW: &str = r#"{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import card, input, textarea, checkbox, button, link_button, form_errors %}
+
+{# One form for both: `record` is only set when editing. #}
+{% block content %}
+<div class="rx-stack">
+  <div>
+    <a class="rx-link" href="{{ route('__module__.index') }}">‹ __title__</a>
+    <h1 class="rx-title">{{ "Edit" if record else "New" }}</h1>
+  </div>
+  <form method="post" data-live-validate novalidate
+        action="{{ route('__module__.update', record.id) if record else route('__module__.store') }}">
+    {{ csrf_field() }}
+    {% if record %}{{ method_field('PUT') }}{% endif %}
+    {% call card() %}
+      {{ form_errors() }}
+__inputs__      <div class="rx-card__footer">
+        {{ link_button(route('__module__.index'), "Cancel", variant="plain") }}
+        {{ button("Save changes" if record else "Create") }}
+      </div>
+    {% endcall %}
+  </form>
+</div>
+{% endblock %}
+"#;
+
+const SHOW_VIEW: &str = r#"{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import group, link_button, confirm, badge %}
+
+{% block content %}
+<div class="rx-stack">
+  <div>
+    <a class="rx-link" href="{{ route('__module__.index') }}">‹ __title__</a>
+    <div class="rx-row">
+      <h1 class="rx-title">__heading__</h1>
+      <span class="rx-spacer"></span>
+      {{ link_button(route('__module__.edit', record.id), "Edit", variant="secondary", size="small") }}
+      {{ confirm("delete-" ~ record.id, "Delete", route('__module__.destroy', record.id),
+                 "Delete this?", "This can't be undone.", size="small") }}
+    </div>
+  </div>
+  {% call group() %}
+__details__  {% endcall %}
+</div>
+{% endblock %}
+"#;
+
+const TESTS: &str = r#"//! Made with `rnx make:module __module__ --resource`.
+
+use renox::prelude::*;
+use renox::testing::TestApp;
+
+async fn user(app: &TestApp) -> User {
+    User::register(app.db(), "Test", "test@example.com", "password123")
+        .await
+        .unwrap()
+}
+
+#[renox::test]
+async fn guests_are_sent_to_log_in() {
+    let app = TestApp::new(__crate__::app()).await;
+    app.get("/__path__").await.assert_redirect("/login");
+}
+
+#[renox::test]
+async fn __module___are_created_listed_changed_and_deleted() {
+    let app = TestApp::new(__crate__::app()).await;
+    app.acting_as(&user(&app).await);
+    app.get("/__path__").await.assert_ok().assert_view("__module__/index.html");
+    app.get("/__path__/new").await.assert_ok();
+
+    app.post("/__path__", &[__form1__])
+        .await
+        .assert_redirect("/__path__");__has_row__
+    app.get("/__path__")
+        .await
+        .assert_ok()__seen_first__;
+    app.get("/__path__/1").await.assert_ok().assert_view("__module__/show.html");
+    app.get("/__path__/1/edit").await.assert_ok();
+
+    app.put("/__path__/1", &[__form2__])
+        .await
+        .assert_redirect("/__path__/1");__has_changed____seen_second__
+    app.delete("/__path__/1").await.assert_redirect("/__path__");
+    app.assert_database_count("__table__", 0).await;
+    app.get("/__path__/1").await.assert_not_found();
+}__invalid__"#;

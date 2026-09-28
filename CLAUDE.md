@@ -8,7 +8,7 @@ repo, and every trap hit so far, so you don't have to rediscover them.
 - `CHANGELOG.md`: what changed, milestone by milestone.
 - `CONTRIBUTING.md`: the checks every change needs. `SECURITY.md`: how vulnerabilities are reported.
 - `CHEATSHEET.md` and `llms.txt`: the app author's view (patterns, and which example shows what).
-- `docs/*.md`: guides (types, relations, PostgreSQL, operations, development, stability).
+- `docs/*.md`: guides (types, relations, authorization, queue, ui, testing, PostgreSQL, operations, development, stability).
 - `docs/audit/`: the pre-1.0 audit (finding IDs W*, D*, A* used in ROADMAP M13/M14).
 
 ## 1. What Renox is
@@ -68,6 +68,7 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/view.rs              MiniJinja env, View response (fragment/also), render middleware, globals,
                            RequestGlobal (request globals inside imported macros), BUILTIN views
   src/toast.rs             Toast response part, the toast region markup
+  src/clock.rs             the current time with a test offset (TestApp::travel)
   views/ui.html            the UI kit (renox/ui.html); assets/renox-ui.css|js its styles and script
   src/view_filters.rs      built-in template filters `number` and `date`; pub format_number
   src/htmx.rs              Htmx extractor, HxRedirect/HxRefresh/HxTrigger, Back
@@ -738,7 +739,12 @@ change 29 s → 7 s, full run 19 s → 6 s.
   `View::also`, Hx headers, live validation via `X-Renox-Validate`, `ui:publish`,
   `make:component`): branch `m21b-views`, browser-checked on examples/crud. Keep new kit
   components `rx-`-prefixed, keyboard-usable, and at WCAG AA contrast (docs/ui.md rules).
-- **Next: M21c (scaffolding), M21d (errors, logs, limiters)**, from the Laravel parity review
+- **M21c** (`Routes::resource`, `make:module --resource` in renox-cli/src/scaffold.rs, new
+  generators, `rnx new` layout on the kit, `clock.rs` + `TestApp::travel`, event and
+  notification fakes in `AppState::fakes`, test assertions, `TestApp::serve`): branch
+  `m21c-scaffolding`. Time must be read through `clock` (`db::now`, `queue::unix_now`), not
+  `SystemTime::now`, so travel reaches it.
+- **Next: M21d (errors, logs, a debug inspector, limiters, Tailwind, push/stack)**, from the Laravel parity review
   (`docs/audit/2026-09-laravel-parity.md`); the ROADMAP lists each milestone's items. **v1.0 is
   on hold** until the owner says to start it (docs site, starter kit, semver checks, real
   crates.io releases; the owner runs `cargo login`).

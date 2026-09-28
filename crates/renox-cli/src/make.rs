@@ -32,6 +32,22 @@ pub fn migration(name: &str, dir: &Path) -> Result<()> {
     Ok(())
 }
 
+/// A migration with the SQL given (for generators that know the table).
+pub fn migration_with(name: &str, dir: &Path, up: &str, down: &str) -> Result<()> {
+    fs::create_dir_all(dir).with_context(|| format!("could not create {}", dir.display()))?;
+    let stem = format!("{}_{name}", next_version(dir, chrono::Utc::now()));
+    for (suffix, contents) in [("up", up), ("down", down)] {
+        let path = dir.join(format!("{stem}.{suffix}.sql"));
+        if path.exists() {
+            bail!("{} already exists", path.display());
+        }
+        fs::write(&path, contents)
+            .with_context(|| format!("could not write {}", path.display()))?;
+        println!("Created {}", path.display());
+    }
+    Ok(())
+}
+
 /// The current time as `YYYYMMDDHHMMSS`, moved past the newest migration in
 /// `dir`: migrations made in the same second (`make:model -m`, then
 /// `make:migration`) still run in the order they were made.

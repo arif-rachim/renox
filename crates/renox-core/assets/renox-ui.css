@@ -163,6 +163,7 @@
   display: grid;
   gap: var(--rx-space-4);
 }
+.rx-card > p, .rx-card > div > p:first-child { margin: 0; }
 .rx-card__header { display: grid; gap: var(--rx-space-1); }
 .rx-card__title { font-size: 1.1875rem; font-weight: 600; margin: 0; letter-spacing: -0.015em; }
 .rx-card__footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--rx-space-3); padding-top: var(--rx-space-2); }

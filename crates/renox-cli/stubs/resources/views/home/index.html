@@ -1,12 +1,16 @@
 {% extends "layouts/app.html" %}
+{% from "renox/ui.html" import card, button %}
 
 {% block content %}
-<h1>{{ app.name }}</h1>
-<p>{{ t('home.running') }}</p>
-
-<div x-data="{ count: 0 }">
-  <button @click="count++">Alpine.js clicks: <span x-text="count">0</span></button>
+<div class="rx-stack">
+  <h1 class="rx-title">{{ app.name }}</h1>
+  {% call card() %}
+    <p>{{ t('home.running') }}</p>
+    <div x-data="{ count: 0 }">
+      {{ button("Alpine.js clicks", variant="secondary", type="button", attrs={"@click": "count++"}) }}
+      <span class="rx-subtitle" x-text="count">0</span>
+    </div>
+    <p class="rx-subtitle">{{ t('home.edit') }}</p>
+  {% endcall %}
 </div>
-
-<p>{{ t('home.edit') }}</p>
 {% endblock %}
