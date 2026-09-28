@@ -73,7 +73,7 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/signed.rs            signed URLs (HMAC-SHA256) + ValidSignature extractor
   src/db/                  conn.rs (Db/Transaction/Row/sql(), Executor, SchemaEpoch), mod.rs
                            (connect, TEST_DATABASE_URL), model.rs, query.rs, from_row.rs,
-                           relations.rs (belongs_to/has_many/Pivot), value.rs (DbValue),
+                           relations.rs (belongs_to/has_many/Pivot/Morph), value.rs (DbValue),
                            paginate.rs, migrate.rs (migrator), factory.rs, json.rs, error.rs
   src/validation/          Validator/rules (mod.rs), Valid<T> (extract.rs), en/id messages
   src/auth/                User, hashing, login/logout, CurrentUser middleware, AuthUser, guards,
@@ -165,8 +165,8 @@ docs/assets/demo.gif       the README's demo (see §4.10)
 5. Merged at this level, so they skip everything below (sessions, maintenance): `assets::router()`
    (`/_renox/*.js`), `/health`, `/robots.txt` (unless `public/robots.txt` exists), `/_renox/live`
    (debug + local only) and the local disk's public files (`/storage/...`, sandboxed headers).
-6. `context` (`renox::context`: a fresh task-local context per request; jobs, scheduled tasks
-   and app commands get one too) → `session` (encrypted cookie) → `i18n` (`RequestLocale`: session `_locale`, else
+6. `context` (`renox::context`: a fresh task-local context per request holding the `AppState`
+   for `context::app()`; jobs, scheduled tasks and app commands get one too via `scope_app`) → `session` (encrypted cookie) → `i18n` (`RequestLocale`: session `_locale`, else
    `APP_LOCALE`) → `auth` (loads the user once from session or `Authorization: Bearer`, with the
    token's abilities, and the user's roles/permissions when the `Permissions` module is on;
    inserts `CurrentUser` and `AppState` into extensions) → `csrf` → `view` (renders `View`s and error
@@ -213,7 +213,11 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
   builder validates column names against `COLUMNS` and operators against a whitelist, so SQL
   injection via names is an error.
 - **Relations are explicit loaders, no lazy relations** (`db::relations`: `belongs_to`,
-  `has_many`, `Pivot`; each loads a page's related rows in one query). See docs/relations.md.
+  `has_many`, `Pivot`, `Morph`; each loads a page's related rows in one query). See
+  docs/relations.md.
+- **Model hooks are opt-in:** `#[model(hooks)]` makes the derive forward `Model::saving/saved/
+  deleting/deleted` to `impl ModelHooks`. Only `save`, `save_only`, `save_changes`, `delete`
+  and `force_delete` call them; bulk query methods never do. Keep it that way (documented).
 - **Validation:** fluent rules in `impl Validate` (no derive yet). `Valid<T>` handles form, JSON
   and GET query. HTMX/JSON failures → `422 {"message","errors"}`; the bundled `renox.js` places
   errors next to inputs (`data-error-for` slots or inserted `<p class="error">`), sets
@@ -289,6 +293,9 @@ holds a closure over `&T`, or a generic iterator, across an `.await`. Doctests a
 don't route handlers, so they miss it. Data APIs that take closures or iterators are plain `fn`s
 returning `impl Future<Output = …> + Send + 'a` that read what they need first (`relations.rs`,
 `Query::first_or_create`). Trait methods returning futures are declared `-> impl Future + Send`.
+In Rust 2024 such a return type captures every lifetime in the arguments (`children: &[C]` too),
+so a helper can't build a temporary `Vec` and pass `&tmp` to a loader: inline the query instead
+(see `Morph::parents`).
 **Add every new data API to `crates/renox/tests/it/send_handlers.rs`.** In middleware, don't keep
 a closure borrowing `req` alive across `next.run(req).await` (scope it in a block).
 
@@ -671,7 +678,10 @@ change 29 s → 7 s, full run 19 s → 6 s.
   loaders, simple/cursor pagination, update_or_create, refresh, transaction helpers): PR from
   branch `m19a-query-builder`. `Query` keeps `having_binds` apart and `all_binds()` joins them
   after the WHERE binds; use it in every terminal method.
-- **Next: M19b (model features), then M20–M21**, from the Laravel parity review
+- **M19b** (model hooks, `context::app()`, `save_only`/`save_changes`, `state.encrypt`/
+  `decrypt`, pivot data/timestamps/toggle, `Morph`): PR from branch `m19b-models`. Non-integer
+  keys and `Encrypted<T>` are deferred (ROADMAP notes say why).
+- **Next: M20 (background), then M21 (views and DX)**, from the Laravel parity review
   (`docs/audit/2026-09-laravel-parity.md`); the ROADMAP lists each milestone's items. **v1.0 is
   on hold** until the owner says to start it (docs site, starter kit, semver checks, real
   crates.io releases; the owner runs `cargo login`).

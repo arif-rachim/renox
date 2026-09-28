@@ -31,7 +31,7 @@ pub use from_row::FromRow;
 pub use json::Json;
 pub use migrate::{Migration, MigrationStatus, Scripts};
 pub(crate) use migrate::{Migrator, framework_migration};
-pub use model::Model;
+pub use model::{Model, ModelHooks};
 pub use paginate::{CursorPage, Page, Paginated, SimplePage};
 pub use query::{Number, Query};
 /// sqlx, for what Renox's own API doesn't cover: `Db::sqlite()`, `Db::postgres()`,

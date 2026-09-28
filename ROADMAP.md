@@ -665,13 +665,15 @@ Notes from M18b (accounts and security):
 - [x] Aggregate loaders: `relations::count_many`, `sum_many`, `exists_many` (one GROUP BY)
 - [x] `where_has` / `where_doesnt_have` (EXISTS), `where_not_in_query`
 - [ ] Non-integer keys: `#[model(key = "uuid")]` (UUID/ULID/string), loaders generic over the key
-- [ ] Model hooks: `saving`/`saved`/`deleting`/`deleted` trait methods called by `save`/`delete`
-- [ ] Partial saves: `save_only(&["price"])` and change tracking against the loaded row
-- [ ] Pivot data and timestamps (`attach_with`, `load_with::<T, PivotRow>`); polymorphic
+      (deferred, see the notes from M19b)
+- [x] Model hooks: `saving`/`saved`/`deleting`/`deleted` trait methods called by `save`/`delete`
+- [x] Partial saves: `save_only(&["price"])` and change tracking against the loaded row
+- [x] Pivot data and timestamps (`attach_with`, `load_with::<T, PivotRow>`); polymorphic
       relations (`Morph`)
 - [x] `simple_paginate` and `cursor_paginate`; `update_or_create`, `first_or_new`, `refresh`
 - [x] `db.transaction(|tx| …).retries(3)` (SQLite busy, PostgreSQL serialization), savepoints
-- [ ] `Encrypted<T>` field type (AES-GCM under `APP_KEY`), a public encrypt/decrypt API
+- [x] A public encrypt/decrypt API (`state.encrypt` / `state.decrypt`, AES-GCM under `APP_KEY`)
+- [ ] `Encrypted<T>` field type (deferred, see the notes from M19b)
 
 Notes from M19a (query builder):
 - M19 is split: M19a is the query builder (above, ticked); M19b the model features (non-integer
@@ -682,6 +684,31 @@ Notes from M19a (query builder):
 - `cursor_paginate` is keyset on `id`, newest first; other orders use `paginate`.
 - `where_raw`/`order_by_raw`/`having_raw`/`select_as` take SQL as written: identifiers are the
   app's to quote, and values go through `?`.
+
+Notes from M19b (model features):
+- Hooks are opt-in, `#[model(hooks)]` + `impl ModelHooks`, so a model without them pays
+  nothing and one with them can't forget the attribute silently (the default methods on `Model`
+  are no-ops). `saving`/`deleting` are sync and return `Result` (they check and fill fields);
+  `saved`/`deleted` are async. Bulk `Query::update`/`delete`, `insert_many`, `upsert` and
+  `restore` skip them, like Laravel's mass updates.
+- `renox::context::app()` returns the `AppState` in a request, job, scheduled task and app
+  command, so a hook can reach the cache, events or mail. Outside those (a test calling models
+  directly) it's `None`, so hooks must not rely on it for correctness.
+- `save_changes` runs `saving` first and then diffs against the original, so columns a hook
+  fills (a slug) are saved; `save_only` saves only the listed columns plus `updated_at`.
+- Polymorphic relations store `P::TABLE` as the type (no morph map; renaming a table means an
+  UPDATE of the type column). `Morph::parents` loads one parent type per call.
+- Pivot data goes in as `&[(&str, &dyn ToDbValue)]` and comes out as a `FromRow` struct read
+  from `SELECT *` on the pivot table.
+- **Deferred: non-integer keys.** `Model::id() -> i64`, `find_many`, every loader's
+  `HashMap<i64, _>`, `ForeignKey`, route model lookups and the `User` model all assume an
+  integer id, and 0 means "not saved". A key type parameter would touch every one and every
+  app's code; it wants its own milestone with a migration guide. Until then a UUID column with a
+  unique index next to the integer id (`where_eq("uuid", …)`) covers public ids.
+- **Deferred: `Encrypted<T>`.** Encoding a field needs the key, and sqlx's `Encode`/`Decode`
+  get no context; reading it from `renox::context` would make `save` fail (or store plain text)
+  in code without an app context, such as tests and seeders. `state.encrypt`/`decrypt` cover
+  the need explicitly; a field type comes back if the key can be made reachable everywhere.
 
 ### M20 · v0.21: Background 2
 - [ ] Schedules: `cron("0 9 * * 1-5")`, `weekly_on`, `monthly_on`, `weekdays`, `between`;

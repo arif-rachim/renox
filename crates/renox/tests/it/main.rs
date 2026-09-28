@@ -19,6 +19,7 @@ mod i18n;
 mod infra;
 mod mail;
 mod method;
+mod models;
 #[cfg(feature = "postgres")]
 mod postgres;
 mod query_builder;

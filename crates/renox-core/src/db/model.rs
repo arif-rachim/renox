@@ -75,6 +75,28 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
         query
     }
 
+    /// Runs before the row is written; an error stops the save. Implement
+    /// [`ModelHooks`] and add `#[model(hooks)]` rather than overriding it.
+    fn saving(&mut self, _creating: bool) -> Result {
+        Ok(())
+    }
+
+    /// Runs after the row is written (inside the caller's transaction, if
+    /// any); an error is returned by `save`. See [`ModelHooks`].
+    fn saved(&self, _created: bool) -> impl Future<Output = Result> + Send {
+        async { Ok(()) }
+    }
+
+    /// Runs before `delete`/`force_delete`; an error stops it. See [`ModelHooks`].
+    fn deleting(&self) -> Result {
+        Ok(())
+    }
+
+    /// Runs after `delete`/`force_delete`. See [`ModelHooks`].
+    fn deleted(&self) -> impl Future<Output = Result> + Send {
+        async { Ok(()) }
+    }
+
     /// A query with the default scope applied (see [`Model::default_scope`]).
     fn query() -> Query<Self> {
         Self::default_scope(Query::new())
@@ -194,6 +216,7 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
     fn save<'c, E: Executor<'c>>(&mut self, db: E) -> impl Future<Output = Result> + Send {
         async move {
             let creating = self.id() == 0;
+            self.saving(creating)?;
             self.touch(now(), creating);
             let columns: Vec<String> = Self::COLUMNS
                 .iter()
@@ -217,7 +240,7 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
                 self.set_id(id);
             } else {
                 if columns.is_empty() {
-                    return Ok(());
+                    return self.saved(false).await;
                 }
                 let sets: Vec<String> = columns.iter().map(|c| format!("{c} = ?")).collect();
                 let changed = sql(format!(
@@ -232,7 +255,74 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
                     return Err(Error::NotFound);
                 }
             }
-            Ok(())
+            self.saved(creating).await
+        }
+    }
+
+    /// Updates only `columns` (and `updated_at`, if the model has it) of a
+    /// saved model, so a concurrent change to another column isn't
+    /// overwritten. A column the `saving` hook changes is saved only if
+    /// it's listed.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # #[derive(Model, serde::Serialize, Default)]
+    /// # #[model(table = "posts")]
+    /// # struct Post { id: i64, title: String, views: i64 }
+    /// # async fn demo(db: Db, mut post: Post) -> Result {
+    /// post.title = "New title".into();
+    /// post.save_only(&db, &["title"]).await?; // leaves `views` alone
+    /// # Ok(()) }
+    /// ```
+    fn save_only<'c, E: Executor<'c>>(
+        &mut self,
+        db: E,
+        columns: &[&str],
+    ) -> impl Future<Output = Result> + Send {
+        let columns: Vec<String> = columns.iter().map(|c| (*c).to_owned()).collect();
+        async move {
+            self.saving(false)?;
+            update_columns(self, db, columns).await
+        }
+    }
+
+    /// Saves the columns that differ from `original` (the model as it was
+    /// loaded), including those the `saving` hook changes, and returns
+    /// whether anything was written. When nothing changed there's no query
+    /// and no `saved` hook.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # #[derive(Model, serde::Serialize, Default, Clone)]
+    /// # #[model(table = "posts")]
+    /// # struct Post { id: i64, title: String, views: i64 }
+    /// # async fn demo(db: Db) -> Result {
+    /// let original = Post::find_or_404(&db, 1).await?;
+    /// let mut post = original.clone();
+    /// post.title = "New title".into();
+    /// post.save_changes(&db, &original).await?; // UPDATE posts SET title = ?
+    /// # Ok(()) }
+    /// ```
+    fn save_changes<'c, E: Executor<'c>>(
+        &mut self,
+        db: E,
+        original: &Self,
+    ) -> impl Future<Output = Result<bool>> + Send {
+        let hooked = self.saving(false);
+        let changed: Vec<String> = Self::COLUMNS
+            .iter()
+            .filter(|c| **c != "id")
+            .zip(self.values().into_iter().zip(original.values()))
+            .filter(|(_, (now, before))| now != before)
+            .map(|(column, _)| (*column).to_owned())
+            .collect();
+        async move {
+            hooked?;
+            if changed.is_empty() {
+                return Ok(false);
+            }
+            update_columns(self, db, changed).await?;
+            Ok(true)
         }
     }
 
@@ -242,6 +332,7 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
             if !Self::SOFT_DELETES {
                 return self.force_delete(db).await;
             }
+            self.deleting()?;
             let at = now();
             sql(format!(
                 "UPDATE {} SET deleted_at = ? WHERE id = ?",
@@ -252,18 +343,19 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
             .execute(db)
             .await?;
             self.set_deleted_at(Some(at));
-            Ok(())
+            self.deleted().await
         }
     }
 
     /// Removes the row, even for models with soft deletes.
     fn force_delete<'c, E: Executor<'c>>(&self, db: E) -> impl Future<Output = Result> + Send {
         async move {
+            self.deleting()?;
             sql(format!("DELETE FROM {} WHERE id = ?", quote(Self::TABLE)))
                 .bind(self.id())
                 .execute(db)
                 .await?;
-            Ok(())
+            self.deleted().await
         }
     }
 
@@ -283,6 +375,99 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
             self.set_deleted_at(None);
             Ok(())
         }
+    }
+}
+
+/// `save_only` after the `saving` hook: writes `columns` and `updated_at`,
+/// then runs `saved`.
+async fn update_columns<'c, M: Model, E: Executor<'c>>(
+    model: &mut M,
+    db: E,
+    columns: Vec<String>,
+) -> Result {
+    if model.id() == 0 {
+        return Err(anyhow!("save_only on an unsaved {} row", M::TABLE).into());
+    }
+    for column in &columns {
+        if column == "id" || !M::COLUMNS.contains(&column.as_str()) {
+            return Err(anyhow!("{} has no column `{column}` to save", M::TABLE).into());
+        }
+    }
+    model.touch(now(), false);
+    let mut sets = Vec::new();
+    let mut binds = Vec::new();
+    for (column, value) in M::COLUMNS
+        .iter()
+        .filter(|c| **c != "id")
+        .zip(model.values())
+    {
+        if columns.iter().any(|c| c == column) || *column == "updated_at" {
+            sets.push(format!("{} = ?", quote(column)));
+            binds.push(value);
+        }
+    }
+    if !sets.is_empty() {
+        let changed = sql(format!(
+            "UPDATE {} SET {} WHERE id = ?",
+            quote(M::TABLE),
+            sets.join(", ")
+        ))
+        .bind_all(binds)
+        .bind(model.id())
+        .execute(db)
+        .await?;
+        if changed == 0 {
+            return Err(Error::NotFound);
+        }
+    }
+    model.saved(false).await
+}
+
+/// Code that runs around a model's writes, like Laravel's model events:
+/// fill a slug, check an invariant, forget a cache key, emit an event. Add
+/// `#[model(hooks)]` and implement the ones you need:
+///
+/// ```
+/// # use renox::prelude::*;
+/// use renox::db::ModelHooks;
+///
+/// #[derive(Model, serde::Serialize, Default)]
+/// #[model(table = "posts", hooks)]
+/// struct Post { id: i64, title: String, slug: String }
+///
+/// impl ModelHooks for Post {
+///     fn saving(&mut self, _creating: bool) -> Result {
+///         self.slug = self.title.to_lowercase().replace(' ', "-");
+///         Ok(())
+///     }
+///
+///     async fn saved(&self, _created: bool) -> Result {
+///         if let Some(state) = renox::context::app() { // the request's or job's app
+///             state.cache.forget("posts.latest").await?;
+///         }
+///         Ok(())
+///     }
+/// }
+/// ```
+///
+/// They run for `save`, `save_only`, `save_changes`, `create`, `delete` and
+/// `force_delete`, not for `restore` or bulk `Query::update`/`delete` and
+/// `insert_many`, which write many rows in one statement.
+pub trait ModelHooks {
+    fn saving(&mut self, _creating: bool) -> Result {
+        Ok(())
+    }
+
+    fn saved(&self, _created: bool) -> impl Future<Output = Result> + Send {
+        async { Ok(()) }
+    }
+
+    fn deleting(&self) -> Result {
+        Ok(())
+    }
+
+    fn deleted(&self) -> impl Future<Output = Result> + Send {
+        async { Ok(()) }
     }
 }
 

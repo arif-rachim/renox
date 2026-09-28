@@ -10,6 +10,21 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M19b · Model features
+
+- Model hooks: `#[model(hooks)]` and `impl renox::db::ModelHooks` with `saving` (may stop the
+  save or fill fields), `saved`, `deleting` (may stop the delete) and `deleted`. Bulk queries
+  don't run them.
+- `renox::context::app()`: the `AppState` of the current request, job, scheduled task or
+  command.
+- `Model::save_only(&db, &["col"])` and `Model::save_changes(&db, &original)` (the columns that
+  differ; returns whether anything was written).
+- `AppState::encrypt` / `AppState::decrypt` (AES-256-GCM under `APP_KEY`).
+- Pivot data: `Pivot::with_timestamps()`, `attach_with`, `update_pivot`, `toggle`,
+  `load_with_pivot::<T, PivotRow>`.
+- Polymorphic relations: `relations::Morph` with `of`, `load_many` and `parents`.
+- **Deferred:** non-integer primary keys and an `Encrypted<T>` field type (ROADMAP explains why).
+
 ### M19a · Query builder
 
 - `where_raw(sql, values)`, `order_by_raw(sql)`, `group_by(col)`, `having_raw(sql, values)` and

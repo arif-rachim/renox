@@ -123,6 +123,75 @@ let tag_ids = PRODUCT_TAGS.ids(&db, product_id).await?;
 # let _ = tag_ids; Ok(()) }
 ```
 
+## Pivot columns
+
+A pivot table may carry more than the two ids: a member's role, a quantity, when it was added.
+
+```rust
+# use renox::prelude::*;
+use renox::db::relations::Pivot;
+
+// team_user (team_id, user_id, role TEXT NOT NULL, created_at, updated_at)
+const MEMBERS: Pivot = Pivot::new("team_user", "team_id", "user_id").with_timestamps();
+
+#[derive(FromRow)]
+struct Membership { role: String, created_at: Option<DateTime> }
+
+# async fn demo(db: Db, team_id: i64) -> Result {
+MEMBERS.attach_with(&db, team_id, 7, &[("role", &"admin")]).await?; // false if already linked
+MEMBERS.update_pivot(&db, team_id, 7, &[("role", &"member")]).await?;
+let (added, removed) = MEMBERS.toggle(&db, team_id, [7, 8]).await?; // flips each link
+let members = MEMBERS.load_with_pivot::<User, Membership>(&db, [team_id]).await?;
+for (user, membership) in members.get(&team_id).map_or(&[][..], Vec::as_slice) {
+    println!("{}: {}", user.name, membership.role);
+}
+# let _ = (added, removed); Ok(()) }
+```
+
+`with_timestamps()` fills `created_at`/`updated_at` on `attach`, `attach_with`, `sync` and
+`toggle`, and `updated_at` on `update_pivot`.
+
+## Polymorphic relations
+
+A child that belongs to one of several tables (comments on posts and on videos) keeps the
+parent's table name and id in two columns. Renox writes `P::TABLE` (`"posts"`) as the type.
+
+```rust
+# use renox::prelude::*;
+use renox::db::relations::Morph;
+
+# #[derive(Model, serde::Serialize, Default, Clone)] #[model(table = "posts")] struct Post { id: i64, title: String }
+# #[derive(Model, serde::Serialize, Default, Clone)] #[model(table = "videos")] struct Video { id: i64, title: String }
+#[derive(Model, serde::Serialize, Default, Clone)]
+#[model(table = "comments")]
+struct Comment { id: i64, commentable_type: String, commentable_id: i64, body: String }
+
+const COMMENTABLE: Morph = Morph::new("commentable_type", "commentable_id");
+
+# async fn demo(db: Db, post: Post) -> Result {
+let comment = Comment {
+    commentable_type: Post::TABLE.into(),
+    commentable_id: post.id,
+    body: "Nice".into(),
+    ..Default::default()
+};
+Comment::create(&db, comment).await?;
+
+let count = COMMENTABLE.of(&post, Comment::query()).count(&db).await?; // this post's comments
+let posts = Post::query().latest().limit(20).get(&db).await?;
+let comments = COMMENTABLE.load_many(&db, &posts, Comment::query(), |c| c.commentable_id).await?;
+
+// The other way (morphTo): one query per parent type.
+let recent = Comment::query().latest().limit(50).get(&db).await?;
+let parent = |c: &Comment| (c.commentable_type.clone(), c.commentable_id);
+let on_posts = COMMENTABLE.parents::<Post, _>(&db, &recent, parent).await?;
+let on_videos = COMMENTABLE.parents::<Video, _>(&db, &recent, parent).await?;
+# let _ = (count, comments, on_posts, on_videos); Ok(()) }
+```
+
+The database can't enforce a foreign key here, so delete the children yourself, e.g. in the
+parent's `deleting` hook (see `ModelHooks` in the cheatsheet). Index the two columns together.
+
 ## Joins and reports: SQL read into structs
 
 A join or an aggregate is clearest as SQL. `fetch_as` reads the rows into:
@@ -187,6 +256,10 @@ let products = Product::query()
 | `chunk` | `.chunk(&db, 1000, \|rows\| async { … })` (by id) |
 | `insert([...])`, `upsert` | `Model::insert_many(&db, rows)`, `Model::upsert(&db, rows, &["sku"], &["qty"])` |
 | `with('category')` | `relations::belongs_to` / `has_many` / `Pivot::load_for` (above) |
+| pivot `withPivot`, `withTimestamps`, `toggle`, `updateExistingPivot` | `Pivot::with_timestamps()`, `attach_with`, `load_with_pivot::<T, Row>`, `toggle`, `update_pivot` |
+| `morphMany`, `morphTo` | `Morph::load_many`, `Morph::of`, `Morph::parents::<P, _>` |
+| model events / observers | `#[model(hooks)]` + `impl ModelHooks` (`saving`, `saved`, `deleting`, `deleted`) |
+| `save()` of dirty columns, `update([...])` on a model | `model.save_changes(&db, &original)`, `model.save_only(&db, &["price"])` |
 | `withCount`, `withSum` | `relations::count_many(&db, &posts, Comment::query(), "post_id")`, `sum_many::<i64, _, _>(…, "total")` (0 for rows without children) |
 | `whereHas`, `whereDoesntHave` | `.where_has(Comment::where_eq("approved", true), "post_id")`, `.where_doesnt_have(…)` (EXISTS) |
 | `whereNotIn(fn …)` (sub-query) | `.where_not_in_query(col, Other::query(), "col")` |

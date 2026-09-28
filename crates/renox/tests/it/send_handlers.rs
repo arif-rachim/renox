@@ -215,6 +215,39 @@ async fn builder(State(db): State<Db>) -> Result<String> {
     ))
 }
 
+/// M19b's model APIs, routed (not called: a compile-time `Send` check).
+async fn models(State(state): State<AppState>) -> Result<String> {
+    let db = &state.db;
+    let original = Note::find_or_404(db, 1).await?;
+    let mut note = original.clone();
+    note.stars += 1;
+    note.save_only(db, &["stars"]).await?;
+    let changed = note.save_changes(db, &original).await?;
+    NOTE_TAGS.attach_with(db, 1, 2, &[("tag_id", &2)]).await?;
+    NOTE_TAGS.update_pivot(db, 1, 2, &[]).await?;
+    let (on, off) = NOTE_TAGS.toggle(db, 1, [1, 2]).await?;
+    let pivots = NOTE_TAGS.load_with_pivot::<Tag, (i64,)>(db, [1]).await?;
+    const TAGGABLE: renox::db::relations::Morph =
+        renox::db::relations::Morph::new("name", "note_id");
+    let notes = Note::query().get(db).await?;
+    let tags = TAGGABLE
+        .load_many(db, &notes, Tag::query(), |t| t.note_id.unwrap_or(0))
+        .await?;
+    let all_tags = TAGGABLE.of(&note, Tag::query()).get(db).await?;
+    let parents = TAGGABLE
+        .parents::<Note, _>(db, &all_tags, |t| (t.name.clone(), t.note_id.unwrap_or(0)))
+        .await?;
+    let secret = state.decrypt(&state.encrypt("s"))?;
+    Ok(format!(
+        "{changed} {} {} {} {} {} {secret}",
+        on.len() + off.len(),
+        pivots.len(),
+        tags.len(),
+        parents.len(),
+        renox::context::app().is_some()
+    ))
+}
+
 struct Handlers;
 
 impl Module for Handlers {
@@ -229,6 +262,7 @@ impl Module for Handlers {
             .get("/more", more)
             .get("/access", access)
             .get("/builder", builder)
+            .get("/models", models)
     }
 }
 

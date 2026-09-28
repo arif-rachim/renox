@@ -181,17 +181,35 @@ fn grouped<'a, T: crate::db::FromDb + Default + Send + 'a, C: Model, P: Model>(
 
 /// A many-to-many relation through a pivot table with two id columns, e.g.
 /// `Pivot::new("product_tags", "product_id", "tag_id")`. Give the table a
-/// unique index on both columns.
+/// unique index on both columns. The table may have more columns (a role, a
+/// quantity): set them with [`Pivot::attach_with`] and
+/// [`Pivot::update_pivot`], read them with [`Pivot::load_with_pivot`].
 #[derive(Debug, Clone, Copy)]
 pub struct Pivot {
     table: &'static str,
     left: &'static str,
     right: &'static str,
+    timestamps: bool,
 }
+
+/// Extra pivot columns and their values, e.g. `&[("role", &"admin")]`.
+pub type PivotData<'a> = &'a [(&'a str, &'a (dyn super::ToDbValue + Sync))];
 
 impl Pivot {
     pub const fn new(table: &'static str, left: &'static str, right: &'static str) -> Self {
-        Self { table, left, right }
+        Self {
+            table,
+            left,
+            right,
+            timestamps: false,
+        }
+    }
+
+    /// The pivot table has `created_at` and `updated_at` columns, which
+    /// attaching and [`Pivot::update_pivot`] fill.
+    pub const fn with_timestamps(mut self) -> Self {
+        self.timestamps = true;
+        self
     }
 
     /// The same pivot seen from the other side (`tag_id` → `product_id`).
@@ -200,7 +218,48 @@ impl Pivot {
             table: self.table,
             left: self.right,
             right: self.left,
+            timestamps: self.timestamps,
         }
+    }
+
+    /// Links `left` to `right` unless they're linked already; returns
+    /// whether a link was added.
+    async fn insert_link(
+        &self,
+        conn: &mut super::Conn<'_>,
+        left: i64,
+        right: i64,
+        data: PivotData<'_>,
+    ) -> Result<bool> {
+        let mut columns = vec![quote(self.left), quote(self.right)];
+        let mut values = vec![
+            super::DbValue::Integer(left),
+            super::DbValue::Integer(right),
+        ];
+        for (column, value) in data {
+            columns.push(quote(column));
+            values.push(value.to_db_value());
+        }
+        if self.timestamps {
+            let at = super::ToDbValue::to_db_value(&super::now());
+            columns.extend([quote("created_at"), quote("updated_at")]);
+            values.extend([at.clone(), at]);
+        }
+        let marks = vec!["?"; columns.len()].join(", ");
+        let added = sql(format!(
+            "INSERT INTO {table} ({columns}) SELECT {marks} \
+             WHERE NOT EXISTS (SELECT 1 FROM {table} WHERE {l} = ? AND {r} = ?)",
+            table = quote(self.table),
+            columns = columns.join(", "),
+            l = quote(self.left),
+            r = quote(self.right),
+        ))
+        .bind_all(values)
+        .bind(left)
+        .bind(right)
+        .execute(conn.reborrow())
+        .await?;
+        Ok(added > 0)
     }
 
     /// The right-hand ids linked to `left`.
@@ -228,21 +287,88 @@ impl Pivot {
         let mut conn = db.into_conn();
         let mut added = 0;
         for right in rights {
-            added += sql(format!(
-                "INSERT INTO {table} ({l}, {r}) SELECT ?, ? \
-                 WHERE NOT EXISTS (SELECT 1 FROM {table} WHERE {l} = ? AND {r} = ?)",
-                table = quote(self.table),
-                l = quote(self.left),
-                r = quote(self.right),
-            ))
-            .bind(left)
-            .bind(right)
-            .bind(left)
-            .bind(right)
-            .execute(conn.reborrow())
-            .await?;
+            added += u64::from(self.insert_link(&mut conn, left, right, &[]).await?);
         }
         Ok(added)
+    }
+
+    /// Links `left` to `right` with extra pivot columns, unless they're
+    /// linked already (change those with [`Pivot::update_pivot`]); returns
+    /// whether a link was added.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # use renox::db::relations::Pivot;
+    /// const MEMBERS: Pivot = Pivot::new("team_user", "team_id", "user_id").with_timestamps();
+    /// # async fn demo(db: Db) -> Result {
+    /// MEMBERS.attach_with(&db, 1, 7, &[("role", &"admin")]).await?;
+    /// MEMBERS.update_pivot(&db, 1, 7, &[("role", &"member")]).await?;
+    /// # Ok(()) }
+    /// ```
+    pub async fn attach_with<'c>(
+        &self,
+        db: impl Executor<'c>,
+        left: i64,
+        right: i64,
+        data: PivotData<'_>,
+    ) -> Result<bool> {
+        let mut conn = db.into_conn();
+        self.insert_link(&mut conn, left, right, data).await
+    }
+
+    /// Changes extra columns of the link between `left` and `right` (and
+    /// `updated_at` with timestamps); returns whether they were linked.
+    pub async fn update_pivot<'c>(
+        &self,
+        db: impl Executor<'c>,
+        left: i64,
+        right: i64,
+        data: PivotData<'_>,
+    ) -> Result<bool> {
+        let mut sets = Vec::new();
+        let mut values = Vec::new();
+        for (column, value) in data {
+            sets.push(format!("{} = ?", quote(column)));
+            values.push(value.to_db_value());
+        }
+        if self.timestamps {
+            sets.push(format!("{} = ?", quote("updated_at")));
+            values.push(super::ToDbValue::to_db_value(&super::now()));
+        }
+        if sets.is_empty() {
+            return Ok(false);
+        }
+        let changed = sql(format!(
+            "UPDATE {} SET {} WHERE {} = ? AND {} = ?",
+            quote(self.table),
+            sets.join(", "),
+            quote(self.left),
+            quote(self.right)
+        ))
+        .bind_all(values)
+        .bind(left)
+        .bind(right)
+        .execute(db)
+        .await?;
+        Ok(changed > 0)
+    }
+
+    /// Links each of `rights` that isn't linked to `left` and unlinks each
+    /// that is, in one transaction; returns `(attached, detached)`.
+    pub async fn toggle(
+        &self,
+        db: &Db,
+        left: i64,
+        rights: impl IntoIterator<Item = i64>,
+    ) -> Result<(Vec<i64>, Vec<i64>)> {
+        let mut tx = db.begin().await?;
+        let current = self.ids(&mut tx, left).await?;
+        let (detach, attach): (Vec<i64>, Vec<i64>) =
+            rights.into_iter().partition(|id| current.contains(id));
+        self.detach(&mut tx, left, detach.iter().copied()).await?;
+        self.attach(&mut tx, left, attach.iter().copied()).await?;
+        tx.commit().await?;
+        Ok((attach, detach))
     }
 
     /// Unlinks `left` from `rights`; returns how many links were removed.
@@ -332,6 +458,66 @@ impl Pivot {
         Ok(grouped)
     }
 
+    /// Like [`Pivot::load`], with each model's pivot row decoded as `D`
+    /// (a `#[derive(FromRow)]` struct naming the pivot columns it wants).
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # use renox::db::relations::Pivot;
+    /// # const MEMBERS: Pivot = Pivot::new("team_user", "team_id", "user_id");
+    /// #[derive(FromRow)]
+    /// struct Membership { role: String }
+    ///
+    /// # async fn demo(db: Db) -> Result {
+    /// let members = MEMBERS.load_with_pivot::<User, Membership>(&db, [1]).await?;
+    /// for (user, membership) in members.get(&1).map_or(&[][..], Vec::as_slice) {
+    ///     println!("{} is {}", user.name, membership.role);
+    /// }
+    /// # Ok(()) }
+    /// ```
+    pub fn load_with_pivot<'a, T: Model + Clone, D: super::FromRow + Send + 'a>(
+        &'a self,
+        db: &'a Db,
+        lefts: impl IntoIterator<Item = i64>,
+    ) -> impl Future<Output = Result<HashMap<i64, Vec<(T, D)>>>> + Send + 'a {
+        let lefts: Vec<i64> = lefts.into_iter().collect();
+        async move {
+            let mut grouped: HashMap<i64, Vec<(T, D)>> = HashMap::new();
+            if lefts.is_empty() {
+                return Ok(grouped);
+            }
+            let marks = vec!["?"; lefts.len()].join(", ");
+            let rows = sql(format!(
+                "SELECT * FROM {} WHERE {} IN ({marks})",
+                quote(self.table),
+                quote(self.left)
+            ))
+            .bind_all(lefts.into_iter().map(super::DbValue::Integer))
+            .fetch_all(db)
+            .await?;
+            let mut links = Vec::with_capacity(rows.len());
+            for row in &rows {
+                let left: i64 = row.try_get(self.left)?;
+                let right: i64 = row.try_get(self.right)?;
+                links.push((left, right, D::from_row(row)?));
+            }
+            let mut rights: Vec<i64> = links.iter().map(|(_, right, _)| *right).collect();
+            rights.sort_unstable();
+            rights.dedup();
+            let models: HashMap<i64, T> = T::find_many(db, rights)
+                .await?
+                .into_iter()
+                .map(|model| (model.id(), model))
+                .collect();
+            for (left, right, data) in links {
+                if let Some(model) = models.get(&right) {
+                    grouped.entry(left).or_default().push((model.clone(), data));
+                }
+            }
+            Ok(grouped)
+        }
+    }
+
     /// `load` for these parents' ids.
     pub fn load_for<'a, T: Model + Clone, P: Model>(
         &'a self,
@@ -340,5 +526,109 @@ impl Pivot {
     ) -> impl Future<Output = Result<HashMap<i64, Vec<T>>>> + Send + 'a {
         let ids: Vec<i64> = parents.iter().map(Model::id).collect();
         self.load_ids(db, ids)
+    }
+}
+
+/// A polymorphic relation: a child row that belongs to one of several
+/// parent tables, through a type column holding the parent's table name and
+/// an id column, e.g. comments on both posts and videos:
+///
+/// ```
+/// # use renox::prelude::*;
+/// use renox::db::relations::Morph;
+///
+/// # #[derive(Model, serde::Serialize, Default, Clone)] struct Post { id: i64, title: String }
+/// # #[derive(Model, serde::Serialize, Default, Clone)] struct Video { id: i64, title: String }
+/// #[derive(Model, serde::Serialize, Default, Clone)]
+/// struct Comment { id: i64, commentable_type: String, commentable_id: i64, body: String }
+///
+/// const COMMENTABLE: Morph = Morph::new("commentable_type", "commentable_id");
+///
+/// # async fn demo(db: Db, post: Post) -> Result {
+/// Comment::create(&db, Comment {
+///     commentable_type: Post::TABLE.into(), // "posts"
+///     commentable_id: post.id,
+///     body: "Nice".into(),
+///     ..Default::default()
+/// }).await?;
+///
+/// let posts = Post::query().latest().limit(20).get(&db).await?;
+/// let comments = COMMENTABLE.load_many(&db, &posts, Comment::query(), |c| c.commentable_id).await?;
+/// let on_this_post = COMMENTABLE.of(&post, Comment::query()).count(&db).await?;
+///
+/// // The other way: each comment's parent, one query per parent type.
+/// let recent = Comment::query().latest().limit(50).get(&db).await?;
+/// let parent = |c: &Comment| (c.commentable_type.clone(), c.commentable_id);
+/// let post_parents = COMMENTABLE.parents::<Post, _>(&db, &recent, parent).await?;
+/// let video_parents = COMMENTABLE.parents::<Video, _>(&db, &recent, parent).await?;
+/// # let _ = (comments, on_this_post, post_parents, video_parents); Ok(()) }
+/// ```
+///
+/// There's no foreign key to the parents, so deleting a parent doesn't
+/// delete its children: do it in the parent's `deleting` hook
+/// ([`ModelHooks`](super::ModelHooks)) or its delete handler.
+#[derive(Debug, Clone, Copy)]
+pub struct Morph {
+    type_column: &'static str,
+    id_column: &'static str,
+}
+
+impl Morph {
+    pub const fn new(type_column: &'static str, id_column: &'static str) -> Self {
+        Self {
+            type_column,
+            id_column,
+        }
+    }
+
+    /// `children` narrowed to those of `parent`.
+    pub fn of<C: Model, P: Model>(&self, parent: &P, children: Query<C>) -> Query<C> {
+        children
+            .where_eq(self.type_column, P::TABLE)
+            .where_eq(self.id_column, parent.id())
+    }
+
+    /// The children of each parent, grouped by the parent's id, in one
+    /// query (`has_many` for a polymorphic relation). `foreign_key` reads
+    /// the id column.
+    pub fn load_many<'a, C: Model, P: Model>(
+        &self,
+        db: &'a Db,
+        parents: &[P],
+        children: Query<C>,
+        foreign_key: impl Fn(&C) -> i64 + Send + 'a,
+    ) -> impl Future<Output = Result<HashMap<i64, Vec<C>>>> + Send + 'a {
+        let children = children.where_eq(self.type_column, P::TABLE);
+        has_many(db, parents, children, self.id_column, foreign_key)
+    }
+
+    /// The parents of type `P` of these children, by id, in one query;
+    /// `parent` reads a child's type and id columns. Children of other
+    /// parent types are skipped: call it once per type.
+    pub fn parents<'a, P: Model, C>(
+        &self,
+        db: &'a Db,
+        children: &[C],
+        parent: impl Fn(&C) -> (String, i64),
+    ) -> impl Future<Output = Result<HashMap<i64, P>>> + Send + 'a {
+        let mut ids: Vec<i64> = children
+            .iter()
+            .filter_map(|child| {
+                let (kind, id) = parent(child);
+                (kind == P::TABLE).then_some(id)
+            })
+            .collect();
+        ids.sort_unstable();
+        ids.dedup();
+        async move {
+            if ids.is_empty() {
+                return Ok(HashMap::new());
+            }
+            Ok(P::find_many(db, ids)
+                .await?
+                .into_iter()
+                .map(|parent| (parent.id(), parent))
+                .collect())
+        }
     }
 }
