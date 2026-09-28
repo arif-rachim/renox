@@ -281,14 +281,17 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 - [`examples/htmx-recipes`](examples/htmx-recipes): a modal form, inline edit, infinite scroll,
   delete in place, tabs and a dropdown, with htmx, Alpine and fragment-returning handlers.
 - [`examples/relations`](examples/relations): a blog with belongs-to, has-many and many-to-many
-  (a pivot with its own columns and `sync`), loaded without N+1 with counts per post, and
-  reports with `group_by` and SQL joins.
+  (a pivot with its own columns and `sync`), polymorphic likes, loaded without N+1 with counts
+  per post, and reports with `group_by` and SQL joins.
+- [`examples/teams`](examples/teams): a multi-tenant SaaS: teams and members, a default scope
+  that keeps each team's projects apart, a super-admin, and an encrypted team secret.
 - [`examples/crud`](examples/crud): one resource end to end, with pagination, validation,
-  owner-only edit and delete through a policy, soft deletes with a trash, and tests.
+  owner-only edit and delete through a policy, soft deletes with a trash, model hooks, and tests.
 - [`examples/api`](examples/api): a JSON API for a mobile app, with tokens that carry abilities
   and expire, Bearer auth, cursor pagination, JSON validation errors, CORS and a rate limit.
 - [`examples/jobs`](examples/jobs): an event, a queued receipt mail, admin notifications, and
-  daily and weekly reports scheduled in a time zone, with a failure alert and a lock.
+  daily and weekly reports scheduled in a time zone, and the queue's chains, batches with a
+  progress bar, unique and encrypted jobs.
 - [`examples/uploads`](examples/uploads): public photos checked by content, and private invoices
   behind expiring links.
 - [`examples/fields`](examples/fields): every form input type saved and shown back, on SQLite

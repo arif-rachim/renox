@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="{{ app.locale }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% block seo %}{{ seo() }}{% endblock %}
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
+  {{ renox_head() }}
+</head>
+<body>
+  <nav>
+    <a href="{{ route('projects.index') }}"><strong>{{ app.name }}</strong></a>
+    {% if auth.check %}
+      {#- `team` is shared with every view (App::share): the current team, or none. #}
+      {% if team %}
+      <a href="{{ route('team.settings') }}">{{ team.name }} <span class="badge">{{ team.role }}</span></a>
+      {% endif %}
+      <a href="{{ route('teams.index') }}">Switch team</a>
+      {% if can('admin') %}<a href="{{ route('admin.teams') }}">Admin</a>{% endif %}
+      <a href="{{ route('account.show') }}">{{ auth.user.name }}</a>
+      <form method="post" action="{{ route('logout') }}">{{ csrf_field() }}<button>Log out</button></form>
+    {% else %}
+      <a href="{{ route('login') }}">Log in</a>
+      <a href="{{ route('register') }}">Register</a>
+    {% endif %}
+  </nav>
+  <main>
+    {% if flash.status %}<p class="flash">{{ flash.status }}</p>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

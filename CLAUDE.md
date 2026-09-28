@@ -145,7 +145,8 @@ examples/                  workspace members, each with a README.md and its own 
   webhooks/                Midtrans / Xendit / Stripe webhooks
   shop/                    a whole online shop (auth, admin, checkout, mail, queue, i18n, deploy)
   htmx-recipes/            modal form, inline edit, infinite scroll, tabs, HxRefresh/HxRedirect
-  relations/               belongs to, has many, many to many, no N+1
+  relations/               belongs to, has many, many to many (pivot columns), Morph, no N+1
+  teams/                   multi-tenant SaaS: default scopes, renox::context, gate_before, encrypt
 tests/chaos/               app + run.sh (postgres|sqlite) that the `chaos` CI job injects faults
                            into (docker pause/stop/restart, python3 holding SQLite's lock)
 tests/cli/run.sh           `rnx new` + every `make:*`, then build and test the app (CI `cli`/`docker`)

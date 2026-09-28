@@ -10,6 +10,28 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### Guides and examples for M18–M20b
+
+- Guides, compiled as doctests: [docs/authorization.md](docs/authorization.md) (gates,
+  policies, roles and permissions, `gate_before`, token abilities, tenants, password
+  confirmation, audit) and [docs/queue.md](docs/queue.md) (retries, `dispatch_in`, priority,
+  unique jobs, middleware, encrypted payloads, chains, batches, testing).
+- New example `examples/teams`: a multi-tenant SaaS with a default scope that fails closed,
+  the current team in `renox::context`, per-team roles on the pivot, `unscoped()` for admin
+  code, names unique per team, `gate_before`, and an encrypted secret behind password
+  confirmation.
+- examples/jobs: payment as a chain with an encrypted, rate-limited job and a `failed` hook, a
+  `high` queue, unique reminders, and statements as a batch with an htmx progress bar.
+  **Changed:** the receipt goes out after payment, not when the order is placed.
+- examples/crud: model hooks (a slug, a cached count) and `save_changes`. examples/relations:
+  likes through `Morph`, and a query-count test. examples/shop: product delete behind
+  `require_password_confirmed`, checkout in `transaction_retrying`.
+- Fixed: `User::get::<bool>` on an app's own BOOLEAN column returned `None` on SQLite (stored
+  as 0/1), so a `gate_before` built on it never fired.
+- CLAUDE.md §4.11 and CONTRIBUTING ask every milestone to keep README, the guides, the agent
+  stub and the examples in step; the parity review got a status note; the gap report PDF
+  covers M20b; ROADMAP M21 lists the rough edges the examples ran into.
+
 ### Docs and examples catch-up after M20b
 
 - Docs brought in line with M18–M20a: the README's feature tour, Laravel table and status;

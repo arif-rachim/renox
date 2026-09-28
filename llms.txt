@@ -34,7 +34,8 @@ Every example has a README.md that walks through it.
   cart; checkout in one transaction that never oversells; an event whose listener queues the
   confirmation mail; notifications; a daily task cancelling unpaid orders; an admin for the
   `admin` role (the `Permissions` module, `require_role`) with photo uploads and an audit trail
-  of order status changes (the `Audit` module); en/id with plurals; the `make:deploy` files. Guide: its
+  of order status changes (the `Audit` module), product delete behind password confirmation;
+  checkout in `transaction_retrying`; en/id with plurals; the `make:deploy` files. Guide: its
   [README](examples/shop/README.md).
   - Checkout: [checkout.rs](examples/shop/src/app/orders/checkout.rs); orders, event, task:
     [orders/mod.rs](examples/shop/src/app/orders/mod.rs); admin:
@@ -54,13 +55,15 @@ Every example has a README.md that walks through it.
   pivot (`Pivot::sync` from checkboxes, `inverse()`) with pivot columns (a pinned flag and
   timestamps: `attach_with`, `update_pivot`, `load_with_pivot`), a page loaded without N+1
   (`belongs_to`, `has_many`, `load_for`, `count_many`), `where_has`, a `group_by` + `select_as`
-  report, and reports as SQL joins with `fetch_as`.
+  report, likes on posts and comments through a polymorphic `Morph`, and reports as SQL joins
+  with `fetch_as`; tests/queries.rs counts queries to prove no N+1.
   [src/app/blog/mod.rs](examples/relations/src/app/blog/mod.rs),
   [model.rs](examples/relations/src/app/blog/model.rs),
   [tests/blog.rs](examples/relations/tests/blog.rs)
 - [examples/crud](examples/crud) ([README](examples/crud/README.md)): one resource end to end: model and migration, list with
   pagination, create and edit forms with validation, owner-only edit and delete through a policy,
-  soft delete with a trash and restore, flash messages, and tests for each.
+  soft delete with a trash and restore, model hooks (`#[model(hooks)]`: a slug filled on save,
+  a cached count forgotten), `save_changes` on update, flash messages, and tests for each.
   - Routes and handlers: [examples/crud/src/app/products/mod.rs](examples/crud/src/app/products/mod.rs)
   - Model, factory, policy: [model.rs](examples/crud/src/app/products/model.rs),
     [policy.rs](examples/crud/src/app/products/policy.rs)
@@ -75,10 +78,25 @@ Every example has a README.md that walks through it.
 - [examples/jobs](examples/jobs) ([README](examples/jobs/README.md)): an event whose listener queues a receipt mail (a mail template
   with a text version), a notification to admins by mail and in the database, and scheduled
   reports: daily on weekdays and weekly by `cron`, in `Asia/Jakarta`, with an `on_failure` alert,
-  a cache lock against overlapping runs, and counts and sums done in SQL. [src/app/orders/mod.rs](examples/jobs/src/app/orders/mod.rs),
+  a cache lock against overlapping runs, and counts and sums done in SQL. The M20b queue:
+  payment as a chain (charge → receipt → warehouse) with an encrypted, rate-limited charge job
+  and its `failed` hook, receipts on a `high` queue, unique reminders, and monthly statements
+  as a batch with an htmx progress bar. [src/app/orders/mod.rs](examples/jobs/src/app/orders/mod.rs),
+  [payment.rs](examples/jobs/src/app/orders/payment.rs),
+  [remind.rs](examples/jobs/src/app/orders/remind.rs),
+  [statements.rs](examples/jobs/src/app/orders/statements.rs),
   [receipt.rs](examples/jobs/src/app/orders/receipt.rs),
   [new_order.rs](examples/jobs/src/app/orders/new_order.rs),
   [tests/orders.rs](examples/jobs/tests/orders.rs)
+- [examples/teams](examples/teams) ([README](examples/teams/README.md)): a multi-tenant SaaS:
+  teams with per-team roles on the pivot, the current team in `renox::context` (checked by a
+  middleware), a `Project` model with a default scope that fails closed, `unscoped()` for the
+  admin report and a command, project names unique per team, `gate_before` for super-admins,
+  and a team secret sealed with `state.encrypt` behind password confirmation.
+  [tenancy.rs](examples/teams/src/app/tenancy.rs),
+  [projects/model.rs](examples/teams/src/app/projects/model.rs),
+  [teams/mod.rs](examples/teams/src/app/teams/mod.rs),
+  [tests/teams.rs](examples/teams/tests/teams.rs)
 - [examples/uploads](examples/uploads) ([README](examples/uploads/README.md)): public photos checked by content, private invoices behind
   expiring signed links, `post_multipart` in tests.
   [src/app/documents/mod.rs](examples/uploads/src/app/documents/mod.rs),
