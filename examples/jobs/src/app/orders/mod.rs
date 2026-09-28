@@ -1,15 +1,35 @@
 //! Made with `rnx make:module orders`, `rnx make:model Order --module orders -m`,
-//! `rnx make:job SendReceipt --module orders` and `rnx make:mail receipt`.
+//! `rnx make:job SendReceipt --module orders` (and `ChargePayment`,
+//! `NotifyWarehouse`, `RemindUnpaid`, `SendStatement`, `StatementsSent`),
+//! `rnx make:migration add_status_to_orders` and `rnx make:mail receipt`.
 
 mod new_order;
+mod payment;
 mod receipt;
+mod remind;
+mod statements;
 
 use renox::mail::Mail;
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
+pub use payment::{ChargePayment, NotifyWarehouse};
 pub use receipt::SendReceipt;
+pub use remind::RemindUnpaid;
+pub use statements::{SendStatement, StatementsSent};
+
+/// Where an order is. Stored as text (`unpaid`, `processing`, …).
+#[derive(DbEnum, Debug, Clone, Copy, PartialEq, Default)]
+pub enum OrderStatus {
+    #[default]
+    Unpaid,
+    /// The customer paid; the charge is queued.
+    Processing,
+    Paid,
+    /// The charge failed for good: someone has to look at it.
+    NeedsAttention,
+}
 
 #[derive(Model, Serialize, Deserialize, Default, Debug, Clone)]
 #[model(table = "orders")]
@@ -19,6 +39,7 @@ pub struct Order {
     pub item: String,
     /// In rupiah.
     pub total: i64,
+    pub status: OrderStatus,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
 }
@@ -39,22 +60,34 @@ impl Module for Orders {
     }
 
     fn routes(&self) -> Routes {
-        Routes::new()
+        let public = Routes::new()
             .get("/", index)
             .name("home")
             .post("/orders", store)
             .name("orders.store")
+            .post("/orders/{id}/pay", payment::pay)
+            .name("orders.pay");
+        let staff = Routes::new()
+            .post("/orders/{id}/remind", remind::remind)
+            .name("orders.remind")
+            .post("/statements", statements::store)
+            .name("statements.store")
+            .get("/statements/{id}", statements::show)
+            .name("statements.show")
+            .require_auth();
+        public.merge(staff)
     }
 
     fn register(&self, app: &mut Registry) {
         app.job::<SendReceipt>()
-            // Listeners run right away, so they only queue the slow parts.
+            .job::<ChargePayment>()
+            .job::<NotifyWarehouse>()
+            .job::<RemindUnpaid>()
+            .job::<SendStatement>()
+            .job::<StatementsSent>()
+            // Listeners run right away; the notification's mail is sent here,
+            // the receipt waits until the order is paid (`payment::pay`).
             .listen(|event: OrderPlaced, state| async move {
-                state
-                    .dispatch(SendReceipt {
-                        order_id: event.order_id,
-                    })
-                    .await?;
                 let order = Order::find_or_404(&state.db, event.order_id).await?;
                 // Customers don't log in here, so every user is shop staff. With
                 // customer accounts, pick the admins by role (the `Permissions` module).
@@ -116,7 +149,10 @@ async fn store(
     };
     let order = Order::create(&state.db, order).await?;
     state.emit(OrderPlaced { order_id: order.id }).await?;
-    session.flash("status", "Thanks! Your receipt is on its way.")?;
+    session.flash(
+        "status",
+        "Thanks! Pay below and your receipt is on its way.",
+    )?;
     Ok(Redirect::to("/"))
 }
 
