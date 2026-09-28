@@ -23,7 +23,8 @@ order becomes `needs_attention` at once) and one whose gateway times out (three 
 the same). `cargo run -- queue:failed` lists what failed for good. Mails go to the log (`MAIL_MAILER=log`
 is the default), and while `APP_DEBUG` is on they are listed at `/_renox/mail`.
 `cargo run -- schedule:list` shows the scheduled tasks and when they run next;
-`cargo run -- schedule:run daily-sales` runs one now.
+`cargo run -- schedule:run daily-sales` runs one now. Logged in as the admin, `/_renox/queue`
+shows the queue: jobs waiting, throughput, failed jobs (retry or forget them) and batches.
 
 ## What's where
 
@@ -38,6 +39,7 @@ is the default), and while `APP_DEBUG` is on they are listed at `/_renox/mail`.
 | The `status` column (`OrderStatus`, a `DbEnum`) | [migrations](migrations), [src/app/orders/mod.rs](src/app/orders/mod.rs) |
 | `NewOrder`: a notification sent by mail and stored in the database | [src/app/orders/new_order.rs](src/app/orders/new_order.rs) |
 | Mail templates: the receipt (HTML and text) and the sales report | [resources/views/mail](resources/views/mail) |
+| The queue dashboard and the gate that lets the admin see it | [src/lib.rs](src/lib.rs) |
 
 ## Things worth copying
 

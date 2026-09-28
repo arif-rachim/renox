@@ -426,7 +426,10 @@ impl Job for SendMail {
 impl AppState {
     /// Renders `{view}.html` into a mail, with `{view}.txt` as the text
     /// version when it exists (otherwise text made from the HTML).
-    /// Templates see `app` besides `ctx`, and can extend `renox/mail/layout.html`.
+    /// Templates see `app` (`app.locale` too) and `t(key, …)` in the
+    /// [`current_locale`](crate::i18n::current_locale) besides `ctx`, can
+    /// extend `renox/mail/layout.html` and import
+    /// `renox/mail/components.html` (`button`, `panel`, `table`).
     pub fn mail_view(
         &self,
         to: impl Into<String>,
@@ -434,9 +437,13 @@ impl AppState {
         view: &str,
         ctx: impl Serialize,
     ) -> Result<Mail> {
+        let locale = crate::i18n::current_locale(self);
         let ctx = minijinja::value::merge_maps([
             minijinja::Value::from_serialize(&ctx),
-            context! { app => context! { name => self.config.name, url => self.config.url } },
+            context! {
+                app => context! { name => self.config.name, url => self.config.url, locale => locale },
+                t => crate::view::translate_function(self, &locale),
+            },
         ]);
         let html = self.views.render(&format!("{view}.html"), &ctx)?;
         let text = match self.views.render(&format!("{view}.txt"), &ctx) {
@@ -445,6 +452,18 @@ impl AppState {
             Err(err) => return Err(err.into()),
         };
         Ok(Mail::new(to, subject, text.trim().to_owned()).html(html))
+    }
+
+    /// `mail_view` in `locale` (the recipient's language).
+    pub fn mail_view_in(
+        &self,
+        locale: &str,
+        to: impl Into<String>,
+        subject: impl Into<String>,
+        view: &str,
+        ctx: impl Serialize,
+    ) -> Result<Mail> {
+        crate::i18n::with_locale(Some(locale), || self.mail_view(to, subject, view, ctx))
     }
 
     /// Sends `mail` from a queue worker, retrying up to five times.

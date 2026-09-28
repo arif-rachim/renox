@@ -338,10 +338,9 @@ Not planned: runtime-reflected Eloquent-style models, Redis, and a REPL.
 
 Renox is **pre-1.0**. After the Laravel parity review
 ([docs/audit/2026-09-laravel-parity.md](docs/audit/2026-09-laravel-parity.md)), milestones M18
-(tenancy, roles, accounts), M19 (query builder and models), M20a (scheduler, locks) and M20b
-(queue) are done; M20c (HTTP client, queue dashboard, localized mail) and M21 (views and
-developer experience) come next,
-then 1.0: a documentation site with a tutorial and a Laravel guide, semver checks, and the first
+(tenancy, roles, accounts), M19 (query builder and models) and M20 (scheduler, locks, queue,
+HTTP client, queue dashboard, localized mail) are done; M21 (views and developer experience)
+comes next, then 1.0: a documentation site with a tutorial and a Laravel guide, semver checks, and the first
 real release on crates.io (today's crates there are placeholders, so install from Git as above).
 Until then the API may still change; breaking changes are listed in [CHANGELOG.md](CHANGELOG.md).
 

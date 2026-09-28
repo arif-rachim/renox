@@ -89,6 +89,12 @@ impl TestApp {
         self.kernel.mailer()
     }
 
+    /// Answers `state.http` requests with fakes and records them, instead
+    /// of reaching the network; see [`crate::http::FakeHttp`].
+    pub fn fake_http(&self) -> crate::http::FakeHttp {
+        self.state().http.fake()
+    }
+
     /// Mail sent so far.
     pub fn sent_mail(&self) -> Vec<Mail> {
         self.kernel.mailer().sent()

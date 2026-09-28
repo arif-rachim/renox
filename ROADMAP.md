@@ -719,18 +719,18 @@ Notes from M19b (model features):
 - [x] Schedules: `cron("0 9 * * 1-5")`, `weekly_on`, `monthly_on`, `weekdays`, `between`;
       IANA time zones with DST (`APP_TIMEZONE=Asia/Jakarta`, per-task `timezone`)
 - [x] Schedule hooks: `on_failure`, `schedule:run NAME` (`on_success` too)
-- [ ] Schedule pings: `ping_before`/`then_ping` (health checks), with the HTTP client below
+- [x] Schedule pings: `ping_before`/`then_ping` (health checks), with the HTTP client below
 - [x] Atomic locks: `state.cache.lock(key, ttl)`, `.block(wait)`
 - [x] Unique jobs (`UNIQUE_FOR`, `unique_id`), job middleware (rate limited, without
       overlapping), chains and batches with progress
 - [x] Queue priority (`--queue high,default` drains in order), `dispatch_sync`, a `failed` hook,
       `queue:forget`, `queue:prune-failed`, encrypted payloads
-- [ ] A queue dashboard (`/_renox/queue`, gated) with pending, failed, throughput and wait time
-- [ ] Localized mail and notifications (`t()` in mail templates, a recipient's locale),
+- [x] A queue dashboard (`/_renox/queue`, gated) with pending, failed, throughput and wait time
+- [x] Localized mail and notifications (`t()` in mail templates, a recipient's locale),
       per-recipient channels, mail components (panel, table)
-- [ ] An HTTP client for apps (`renox::http`: timeouts, retries) with `TestApp::fake_http`
+- [x] An HTTP client for apps (`renox::http`: timeouts, retries) with `TestApp::fake_http`
 - [x] Cache `add`/`pull`/`increment`, pruning expired rows of the database store
-- [ ] Storage listing/copy/move
+- [x] Storage listing/copy/move
 
 Notes from M20a (scheduler, locks, cache):
 - M20 is split: M20a is the scheduler, locks and cache (ticked above); M20b the queue (unique
@@ -771,6 +771,25 @@ Notes from M20b (queue):
   per process. A held-back job goes back with its attempt uncounted.
 - `dispatch_sync` runs `handle` only: no retries, middleware or `failed` hook.
 - `Batch::push` (not `add`, which clippy reads as `Add::add`).
+
+Notes from M20c (dashboard, mail, HTTP, storage):
+- `renox::http` wraps reqwest (one client per process, ring for TLS) behind a new default
+  feature `http`; `server-events` now depends on it and GA4 events go through `state.http`,
+  so they're faked in tests too. Responses are read whole (no streaming yet). The fake answers
+  by glob pattern (`*`, optional method), in turn with the last answer repeating, and records
+  every request; a request with no fake is an error rather than a real call.
+- Schedule pings are GETs with a 10 s timeout and one retry; a failing ping is logged only.
+- The dashboard is a module (`renox::queue::Dashboard`) behind the `view-queue-dashboard` gate,
+  with no exception for local development: define the gate. It polls itself every 5 s with htmx
+  (`hx-select`). Throughput comes from per-minute `renox:queue:done|failed:*` counters in the
+  `cache` table, written in the worker's finishing transaction and kept two hours.
+- The current locale is, in order: the recipient's while a notification builds its messages
+  (a thread-local, since `to_mail` is synchronous), the request's (now also in
+  `renox::context`), or `APP_LOCALE`. `Recipient::locale()` reads `in_locale(..)` or a
+  `locale` column on `users` if the app added one. `to_channel` gets no state, so channel
+  messages read `to.locale()` themselves.
+- Storage `rename` is Laravel's `move` (`move` is a Rust keyword). `delete_all("")` is refused.
+- M20 is complete. M21 (views and developer experience) is next.
 
 ### M21 · v0.22: Views and developer experience
 - [ ] Components that see the request (`old`, `error`, `t`, `csrf_field`, `can`, `auth` inside

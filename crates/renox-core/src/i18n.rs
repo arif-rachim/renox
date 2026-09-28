@@ -251,6 +251,48 @@ pub fn format(text: &str, params: &[(&str, String)], count: Option<i64>) -> Stri
 #[derive(Debug, Clone)]
 pub(crate) struct RequestLocale(pub String);
 
+/// The request's language in [`crate::context`], for code without the
+/// request (mail views, notifications).
+#[derive(Debug, Clone)]
+struct ContextLocale(String);
+
+thread_local! {
+    /// Set while a notification builds its messages for a recipient.
+    static OVERRIDE: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+}
+
+/// The language to use now: the recipient's while a notification is built,
+/// else the current request's (or the one a job set with
+/// [`with_locale`]), else `APP_LOCALE`.
+pub fn current_locale(state: &AppState) -> String {
+    OVERRIDE
+        .with(|o| o.borrow().clone())
+        .or_else(|| crate::context::get::<ContextLocale>().map(|l| l.0))
+        .unwrap_or_else(|| state.config.locale.clone())
+}
+
+/// Runs `f` (synchronous code, e.g. building a mail) in `locale`; `None`
+/// leaves the language as it is.
+pub fn with_locale<T>(locale: Option<&str>, f: impl FnOnce() -> T) -> T {
+    let Some(locale) = locale else { return f() };
+    let previous = OVERRIDE.with(|o| o.borrow_mut().replace(locale.to_owned()));
+    struct Restore(Option<String>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            let previous = self.0.take();
+            OVERRIDE.with(|o| *o.borrow_mut() = previous);
+        }
+    }
+    let _restore = Restore(previous);
+    f()
+}
+
+/// Makes `locale` the language of the rest of this request, job or task
+/// (e.g. a job that mails a user in their language).
+pub fn set_current_locale(locale: &str) {
+    crate::context::set(ContextLocale(locale.to_owned()));
+}
+
 /// Makes `locale` this visitor's language from the next request on.
 pub fn set_locale(session: &Session, locale: &str) -> Result {
     session.put(SESSION_KEY, locale)
@@ -272,6 +314,7 @@ pub(crate) async fn middleware(
                 || state.translator.locales().iter().any(|l| l == locale)
         });
     let locale = chosen.unwrap_or_else(|| state.config.locale.clone());
+    set_current_locale(&locale);
     req.extensions_mut().insert(RequestLocale(locale));
     next.run(req).await
 }
@@ -323,6 +366,19 @@ impl Lang {
         self.state
             .translator
             .get(&self.locale, &self.state.config.fallback_locale, key)
+    }
+}
+
+impl AppState {
+    /// The texts of `locale`, for code without a request (a job, a mail
+    /// to someone in another language).
+    pub fn lang(&self, locale: &str) -> Lang {
+        Lang::of(self, locale)
+    }
+
+    /// The texts of the [`current_locale`].
+    pub fn current_lang(&self) -> Lang {
+        Lang::of(self, &current_locale(self))
     }
 }
 

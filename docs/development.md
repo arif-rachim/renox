@@ -30,8 +30,9 @@ On macOS the default linker (ld-prime) is already fast. On Windows, use `rust-ll
 
 ## Fewer dependencies
 
-Renox's default features are `fake` (the `renox::fake` re-export used by factories) and
-`server-events` (`analytics::ServerEvent`, which brings an HTTP client). An app that uses neither
+Renox's default features are `fake` (the `renox::fake` re-export used by factories), `http`
+(real requests for `state.http`, which brings reqwest; the test fake works without it) and
+`server-events` (`analytics::ServerEvent`, which needs `http`). An app that uses none of them
 can drop them:
 
 ```toml

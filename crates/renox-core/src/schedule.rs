@@ -62,6 +62,11 @@ type FailFn =
     Arc<dyn Fn(AppState, Error) -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync>;
 type DoneFn = Arc<dyn Fn(AppState) -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync>;
 
+const PING_BEFORE: usize = 0;
+const PING_AFTER: usize = 1;
+const PING_SUCCESS: usize = 2;
+const PING_FAILURE: usize = 3;
+
 /// When a run is "never" (an impossible schedule, or filters that exclude
 /// every run).
 const NEVER: i64 = i64::MAX;
@@ -107,6 +112,8 @@ struct Task {
     between: Option<(u32, u32)>,
     on_failure: Option<FailFn>,
     on_success: Option<DoneFn>,
+    /// URLs to GET: before a run, after it, after a success, after a failure.
+    pings: [Vec<String>; 4],
 }
 
 impl Task {
@@ -155,8 +162,43 @@ impl Task {
         NEVER
     }
 
-    /// Runs the task once, with its hooks, in a fresh context.
+    /// GETs the `which` ping URLs (health checks); failures are logged.
+    async fn ping(&self, state: &AppState, which: usize) {
+        for url in &self.pings[which] {
+            let sent = state
+                .http
+                .get(url)
+                .timeout(Duration::from_secs(10))
+                .retry(1, Duration::from_secs(1))
+                .send()
+                .await;
+            match sent {
+                Ok(res) if res.ok() => {}
+                Ok(res) => {
+                    tracing::warn!(task = %self.name, url, status = %res.status(), "schedule ping answered with an error")
+                }
+                Err(err) => {
+                    tracing::warn!(task = %self.name, url, error = ?err, "schedule ping failed")
+                }
+            }
+        }
+    }
+
+    /// Runs the task once, with its hooks and pings, in a fresh context.
     async fn execute(&self, state: AppState) -> Result {
+        self.ping(&state, PING_BEFORE).await;
+        let outcome = self.execute_inner(state.clone()).await;
+        self.ping(&state, PING_AFTER).await;
+        let which = if outcome.is_ok() {
+            PING_SUCCESS
+        } else {
+            PING_FAILURE
+        };
+        self.ping(&state, which).await;
+        outcome
+    }
+
+    async fn execute_inner(&self, state: AppState) -> Result {
         let run = crate::context::scope_app(state.clone(), (self.run)(state.clone()));
         let run = std::panic::AssertUnwindSafe(run);
         let outcome = match futures_util::FutureExt::catch_unwind(run).await {
@@ -288,6 +330,35 @@ impl ScheduledTask<'_> {
         })
     }
 
+    /// GETs `url` before each run, e.g. a health check's "start" URL
+    /// (Healthchecks.io, Cronitor, Better Stack). A failing ping is logged,
+    /// never stops the task.
+    pub fn ping_before(self, url: impl Into<String>) -> Self {
+        self.ping(PING_BEFORE, url.into())
+    }
+
+    /// GETs `url` after each run, however it went.
+    pub fn then_ping(self, url: impl Into<String>) -> Self {
+        self.ping(PING_AFTER, url.into())
+    }
+
+    /// GETs `url` after a successful run.
+    pub fn ping_on_success(self, url: impl Into<String>) -> Self {
+        self.ping(PING_SUCCESS, url.into())
+    }
+
+    /// GETs `url` after a failed run.
+    pub fn ping_on_failure(self, url: impl Into<String>) -> Self {
+        self.ping(PING_FAILURE, url.into())
+    }
+
+    fn ping(self, which: usize, url: String) -> Self {
+        self.edit(|t| {
+            t.pings[which].push(url);
+            Ok(())
+        })
+    }
+
     /// Runs after a run succeeds.
     pub fn on_success<F, Fut>(self, hook: F) -> Self
     where
@@ -332,6 +403,7 @@ impl Schedule {
             between: None,
             on_failure: None,
             on_success: None,
+            pings: Default::default(),
         });
         let index = Some(self.tasks.len() - 1);
         ScheduledTask {

@@ -9,7 +9,8 @@
 //!
 //! All of it runs inside `cargo run` (queue workers and the scheduler are
 //! part of `serve`). With `MAIL_MAILER=log` the mails go to the log, and
-//! while debugging they're listed at /_renox/mail.
+//! while debugging they're listed at /_renox/mail. The queue dashboard is
+//! at /_renox/queue for the admin.
 
 use renox::prelude::*;
 
@@ -26,6 +27,10 @@ pub fn app() -> App {
         .migrations(renox::migrations!())
         .module(Auth::new())
         .module(app::orders::Orders)
+        .module(renox::queue::Dashboard)
+        .gate(renox::queue::DASHBOARD_GATE, |user| {
+            user.email == "admin@example.com"
+        })
         .seeder(|db| async move {
             User::register(&db, "Admin", "admin@example.com", "password123").await?;
             Ok(())

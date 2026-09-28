@@ -57,6 +57,7 @@ use serde_json::Value;
 
 use super::User;
 use crate::db::{DateTime, Db, now};
+use crate::i18n::with_locale;
 use crate::mail::Mail;
 use crate::queue::{Job, JobContext};
 use crate::{AppState, Result};
@@ -83,6 +84,9 @@ pub struct Recipient {
     pub user: Option<User>,
     /// An address per channel, e.g. `mail` → `a@b.c`, `whatsapp` → `+62…`.
     pub routes: BTreeMap<String, String>,
+    /// The language to write in; see [`Recipient::locale`].
+    #[serde(default)]
+    pub language: Option<String>,
 }
 
 impl Recipient {
@@ -90,6 +94,7 @@ impl Recipient {
         Self {
             user: Some(user.clone()),
             routes: BTreeMap::new(),
+            language: None,
         }
     }
 
@@ -116,6 +121,25 @@ impl Recipient {
     pub fn email(&self) -> Option<String> {
         self.address("mail")
     }
+
+    /// Writes to this recipient in `locale` (e.g. `"id"`).
+    pub fn in_locale(mut self, locale: impl Into<String>) -> Self {
+        self.language = Some(locale.into());
+        self
+    }
+
+    /// The recipient's language: the one given with [`Recipient::in_locale`],
+    /// else the user's `locale` column if the `users` table has one.
+    /// Notifications build their messages in it (`t()` in mail views,
+    /// `state.current_lang()` in code).
+    pub fn locale(&self) -> Option<String> {
+        self.language.clone().or_else(|| {
+            self.user
+                .as_ref()?
+                .get::<String>("locale")
+                .filter(|l| !l.is_empty())
+        })
+    }
 }
 
 impl From<&User> for Recipient {
@@ -136,6 +160,12 @@ pub trait Notification: Send + Sync {
 
     fn channels(&self) -> Vec<Channel> {
         vec![Channel::Mail]
+    }
+
+    /// The channels for this recipient (e.g. WhatsApp only for users who
+    /// turned it on); `channels()` unless overridden.
+    fn channels_for(&self, _to: &Recipient) -> Vec<Channel> {
+        self.channels()
     }
 
     fn to_mail(&self, _to: &Recipient, _state: &AppState) -> Result<Mail> {
@@ -207,8 +237,8 @@ impl Job for SendToChannel {
 /// The channels a notification is delivered to, in delivery order: the
 /// database row first, so a failure there doesn't leave a sent message
 /// behind that a retry would send again; mail last.
-fn ordered(notification: &impl Notification) -> Vec<Channel> {
-    let mut channels = notification.channels();
+fn ordered(notification: &impl Notification, to: &Recipient) -> Vec<Channel> {
+    let mut channels = notification.channels_for(to);
     channels.sort_by_key(|channel| match channel {
         Channel::Database => 0,
         Channel::Custom(_) => 1,
@@ -250,16 +280,18 @@ impl AppState {
     /// so a failure doesn't leave a message behind that a retry would send
     /// again.
     pub async fn notify_to(&self, to: &Recipient, notification: &impl Notification) -> Result {
-        for channel in ordered(notification) {
+        let locale = to.locale();
+        let locale = locale.as_deref();
+        for channel in ordered(notification, to) {
             match channel {
                 Channel::Database => self.store_notification(to, notification).await?,
                 Channel::Custom(name) => {
                     let send = self.channel(name)?;
-                    let message = notification.to_channel(name, to)?;
+                    let message = with_locale(locale, || notification.to_channel(name, to))?;
                     send(self.clone(), to.clone(), message).await?;
                 }
                 Channel::Mail => {
-                    let mail = notification.to_mail(to, self)?;
+                    let mail = with_locale(locale, || notification.to_mail(to, self))?;
                     self.mailer.send(mail).await?;
                 }
             }
@@ -276,12 +308,14 @@ impl AppState {
         notification: &impl Notification,
     ) -> Result {
         let to = to.into();
-        for channel in ordered(notification) {
+        let locale = to.locale();
+        let locale = locale.as_deref();
+        for channel in ordered(notification, &to) {
             match channel {
                 Channel::Database => self.store_notification(&to, notification).await?,
                 Channel::Custom(name) => {
                     self.channel(name)?; // fail now for an unknown channel
-                    let message = notification.to_channel(name, &to)?;
+                    let message = with_locale(locale, || notification.to_channel(name, &to))?;
                     self.dispatch(SendToChannel {
                         channel: name.to_owned(),
                         to: to.clone(),
@@ -290,7 +324,7 @@ impl AppState {
                     .await?;
                 }
                 Channel::Mail => {
-                    let mail = notification.to_mail(&to, self)?;
+                    let mail = with_locale(locale, || notification.to_mail(&to, self))?;
                     self.queue_mail(mail).await?;
                 }
             }

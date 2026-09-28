@@ -10,6 +10,24 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M20c · Dashboard, localized mail, HTTP client, storage
+
+- `renox::http` (`state.http`): get/post/put/patch/delete with query, headers, bearer/basic auth,
+  JSON/form/raw bodies, timeouts, retries; `Response::json/text/error_for_status`. A new default
+  feature `http` (`server-events` needs it).
+- `TestApp::fake_http()`: `on(pattern, FakeResponse)`, `sent()`, `assert_sent`,
+  `assert_not_sent`, `assert_sent_count`; requests without a fake fail.
+- Schedule pings: `ping_before`, `then_ping`, `ping_on_success`, `ping_on_failure`.
+- The queue dashboard: `.module(renox::queue::Dashboard)` at `/_renox/queue`, gated by
+  `view-queue-dashboard`; `Queue::stats()` (`QueueStats`) and `Queue::recent_batches`.
+- Localized mail and notifications: `t()` and `app.locale` in mail views,
+  `Recipient::in_locale` / `Recipient::locale()` (a `users.locale` column is read if present),
+  `Notification::channels_for(to)`, `state.mail_view_in(locale, …)`, `state.lang(locale)`,
+  `state.current_lang()`, `renox::i18n::{current_locale, with_locale, set_current_locale}`.
+- Mail components: `renox/mail/components.html` with `button`, `panel`, `table`, `divider`.
+- Storage: `list(prefix)` (`FileInfo`), `copy`, `rename`, `size`, `delete_all(prefix)`, on the
+  local disk and S3.
+
 ### Guides and examples for M18–M20b
 
 - Guides, compiled as doctests: [docs/authorization.md](docs/authorization.md) (gates,
