@@ -5,7 +5,7 @@ use std::time::Duration;
 use tokio::sync::watch;
 use tokio::task::JoinSet;
 
-use super::{Handlers, JobContext, unix_now};
+use super::{Handlers, JobContext, Middleware, MiddlewareKind, unix_now};
 use crate::AppState;
 use crate::db::Dialect;
 
@@ -22,6 +22,8 @@ struct Reserved {
     payload: String,
     attempts: u32,
     max_attempts: u32,
+    chain: Option<String>,
+    batch_id: Option<i64>,
 }
 
 /// Runs queued jobs.
@@ -56,6 +58,17 @@ impl Failure {
     }
 }
 
+/// What became of a reserved job.
+enum Outcome {
+    Done,
+    /// Its batch was cancelled: not run, counted as done.
+    Skipped,
+    /// Middleware held it back: queued again after the wait, the attempt
+    /// not counted.
+    Released(Duration),
+    Failed(Failure),
+}
+
 fn panic_message(err: tokio::task::JoinError) -> String {
     match err.try_into_panic() {
         Ok(panic) => format!("the job panicked: {}", crate::error::panic_message(&*panic)),
@@ -63,25 +76,20 @@ fn panic_message(err: tokio::task::JoinError) -> String {
     }
 }
 
-async fn fail(
-    tx: &mut crate::db::Transaction,
-    queue: &str,
-    job: &str,
-    payload: &str,
-    max_attempts: u32,
-    error: &str,
-) -> crate::Result {
+async fn fail(tx: &mut crate::db::Transaction, job: &Reserved, error: &str) -> crate::Result {
     crate::db::sql(
-        "INSERT INTO failed_jobs (queue, job, payload, max_attempts, error, failed_at) \
-         VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO failed_jobs (queue, job, payload, max_attempts, error, failed_at, chain, batch_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
-    .bind(queue)
-    .bind(job)
-    .bind(payload)
-    .bind(i64::from(max_attempts))
+    .bind(&job.queue)
+    .bind(&job.job)
+    .bind(&job.payload)
+    .bind(i64::from(job.max_attempts))
     .bind(error)
     .bind(unix_now())
-    .execute(tx)
+    .bind(job.chain.clone())
+    .bind(job.batch_id)
+    .execute(&mut *tx)
     .await?;
     Ok(())
 }
@@ -120,11 +128,18 @@ impl Worker {
 
     async fn reserve(&self) -> crate::Result<Option<Reserved>> {
         let now = unix_now();
-        let queues = if self.queues.is_empty() {
-            String::new()
+        let (queues, order) = if self.queues.is_empty() {
+            (String::new(), String::new())
         } else {
             let marks = vec!["?"; self.queues.len()].join(", ");
-            format!(" AND queue IN ({marks})")
+            // Listed first, drained first.
+            let whens: String = (0..self.queues.len())
+                .map(|i| format!(" WHEN ? THEN {i}"))
+                .collect();
+            (
+                format!(" AND queue IN ({marks})"),
+                format!("CASE queue{whens} END, "),
+            )
         };
         // SQLite runs one write at a time, so the UPDATE is enough. On
         // PostgreSQL, workers on several servers must not pick the same row.
@@ -137,14 +152,14 @@ impl Worker {
                 SELECT id FROM jobs WHERE available_at <= ? \
                 AND (reserved_at IS NULL OR reserved_at <= ?) \
                 AND attempts < max_attempts{queues} \
-                ORDER BY available_at, id LIMIT 1{lock}) \
-             RETURNING id, queue, job, payload, attempts, max_attempts"
+                ORDER BY {order}available_at, id LIMIT 1{lock}) \
+             RETURNING id, queue, job, payload, attempts, max_attempts, chain, batch_id"
         );
         let mut query = crate::db::sql(sql)
             .bind(now)
             .bind(now)
             .bind(now - RESERVATION);
-        for queue in &self.queues {
+        for queue in self.queues.iter().chain(&self.queues) {
             query = query.bind(queue);
         }
         let Some(row) = query.fetch_optional(&self.state.db).await? else {
@@ -157,7 +172,59 @@ impl Worker {
             payload: row.try_get("payload")?,
             attempts: row.try_get::<i64>("attempts")? as u32,
             max_attempts: row.try_get::<i64>("max_attempts")? as u32,
+            chain: row.try_get("chain")?,
+            batch_id: row.try_get("batch_id")?,
         }))
+    }
+
+    async fn batch_cancelled(&self, batch_id: Option<i64>) -> crate::Result<bool> {
+        let Some(id) = batch_id else {
+            return Ok(false);
+        };
+        let cancelled: Option<Option<i64>> =
+            crate::db::sql("SELECT cancelled_at FROM job_batches WHERE id = ?")
+                .bind(id)
+                .scalar_optional(&self.state.db)
+                .await?;
+        Ok(cancelled.flatten().is_some())
+    }
+
+    /// Checks the job's middleware; `Some(wait)` puts it back for `wait`.
+    /// A lock it takes is returned to be held while the job runs.
+    async fn check_middleware(
+        &self,
+        middleware: Vec<Middleware>,
+        timeout: Duration,
+    ) -> crate::Result<(Option<Duration>, Vec<crate::cache::LockGuard>)> {
+        let mut guards = Vec::new();
+        for Middleware(kind) in middleware {
+            match kind {
+                MiddlewareKind::WithoutOverlapping { key, release_after } => {
+                    let lock = self
+                        .state
+                        .cache
+                        .lock(&format!("overlap:{key}"), timeout + Duration::from_secs(60));
+                    match lock.try_acquire().await? {
+                        Some(guard) => guards.push(guard),
+                        None => return Ok((Some(release_after), guards)),
+                    }
+                }
+                MiddlewareKind::RateLimited { key, max, per } => {
+                    let per = per.as_secs() as i64;
+                    let now = unix_now();
+                    let window = now - now.rem_euclid(per);
+                    let counter = format!("renox:rate:{key}:{window}");
+                    let cache = &self.state.cache;
+                    let ttl = Duration::from_secs(per as u64 + 1);
+                    cache.add(&counter, &0, Some(ttl)).await?;
+                    if cache.increment(&counter, 1).await? > i64::from(max) {
+                        let wait = (window + per - now).max(1) as u64;
+                        return Ok((Some(Duration::from_secs(wait)), guards));
+                    }
+                }
+            }
+        }
+        Ok((None, guards))
     }
 
     /// Runs one available job; returns whether there was one.
@@ -170,34 +237,27 @@ impl Worker {
         if let Some(handler) = &handler {
             self.extend_reservation(&job, handler.timeout).await?;
         }
-        let outcome = match &handler {
-            None => Err(Failure::permanent(format!(
+        let plain = self.state.queue.open(&job.payload);
+        let unique = match (&handler, &plain) {
+            (Some(handler), Ok(plain)) => (handler.unique_key)(plain),
+            _ => None,
+        };
+        let mut guards = Vec::new();
+        let outcome = match (&handler, plain.as_ref()) {
+            (None, _) => Outcome::Failed(Failure::permanent(format!(
                 "no handler registered for job `{}`",
                 job.job
             ))),
-            Some(handler) => {
-                let ctx = JobContext {
-                    state: self.state.clone(),
-                    attempt: job.attempts,
-                };
-                // Its own task, so a panic is a failed attempt, not a dead worker.
-                let run = (handler.run)(job.payload.clone(), ctx);
-                let run = crate::context::scope_app(self.state.clone(), run);
-                let mut task = tokio::spawn(run);
-                match tokio::time::timeout(handler.timeout, &mut task).await {
-                    Ok(Ok(Ok(()))) => Ok(()),
-                    Ok(Ok(Err(err))) => Err(Failure {
-                        permanent: err.is_permanent(),
-                        error: format!("{err:?}"),
-                    }),
-                    Ok(Err(join)) => Err(Failure::retry(panic_message(join))),
-                    Err(_) => {
-                        task.abort();
-                        Err(Failure::retry(format!(
-                            "timed out after {:?}",
-                            handler.timeout
-                        )))
-                    }
+            (Some(_), Err(err)) => Outcome::Failed(Failure::permanent(format!("{err:?}"))),
+            (Some(_), Ok(_)) if self.batch_cancelled(job.batch_id).await? => Outcome::Skipped,
+            (Some(handler), Ok(plain)) => {
+                let (release, held) = self
+                    .check_middleware((handler.middleware)(plain), handler.timeout)
+                    .await?;
+                guards = held;
+                match release {
+                    Some(wait) => Outcome::Released(wait),
+                    None => self.attempt(handler, &job, plain.clone()).await,
                 }
             }
         };
@@ -208,60 +268,126 @@ impl Worker {
             .as_ref()
             .map(|h| (h.backoff)(job.attempts))
             .unwrap_or_default();
-        retry_write(|| self.record(&job, &outcome, backoff)).await?;
+        retry_write(|| self.record(&job, &outcome, backoff, unique.as_deref())).await?;
+        for guard in guards {
+            let _ = guard.release().await;
+        }
         match outcome {
-            Ok(()) => tracing::info!(job = %job.job, id = job.id, "job done"),
-            Err(failure) if !failure.permanent && job.attempts < job.max_attempts => {
+            Outcome::Done => tracing::info!(job = %job.job, id = job.id, "job done"),
+            Outcome::Skipped => {
+                tracing::info!(job = %job.job, id = job.id, "job skipped: its batch was cancelled");
+            }
+            Outcome::Released(wait) => {
+                tracing::debug!(job = %job.job, id = job.id, ?wait, "job held back by its middleware");
+            }
+            Outcome::Failed(failure) if !failure.permanent && job.attempts < job.max_attempts => {
                 tracing::warn!(job = %job.job, id = job.id, attempt = job.attempts, error = %failure.error, "job failed, will retry");
             }
-            Err(failure) => {
+            Outcome::Failed(failure) => {
                 tracing::error!(job = %job.job, id = job.id, error = %failure.error, "job failed for good");
+                if let (Some(handler), Ok(plain)) = (&handler, plain) {
+                    let hook = (handler.failed)(plain, self.state.clone(), failure.error);
+                    let hook = crate::context::scope_app(self.state.clone(), hook);
+                    if tokio::spawn(hook).await.is_err() {
+                        tracing::error!(job = %job.job, id = job.id, "the job's failed hook panicked");
+                    }
+                }
             }
         }
         Ok(true)
     }
 
-    /// Writes a job's outcome: deleted, back on the queue, or failed.
+    /// One attempt, in its own task so a panic is a failed attempt, not a
+    /// dead worker.
+    async fn attempt(
+        &self,
+        handler: &super::JobHandler,
+        job: &Reserved,
+        payload: String,
+    ) -> Outcome {
+        let ctx = JobContext {
+            state: self.state.clone(),
+            attempt: job.attempts,
+            id: job.id,
+            batch_id: job.batch_id,
+        };
+        let run = (handler.run)(payload, ctx);
+        let run = crate::context::scope_app(self.state.clone(), run);
+        let mut task = tokio::spawn(run);
+        match tokio::time::timeout(handler.timeout, &mut task).await {
+            Ok(Ok(Ok(()))) => Outcome::Done,
+            Ok(Ok(Err(err))) => Outcome::Failed(Failure {
+                permanent: err.is_permanent(),
+                error: format!("{err:?}"),
+            }),
+            Ok(Err(join)) => Outcome::Failed(Failure::retry(panic_message(join))),
+            Err(_) => {
+                task.abort();
+                Outcome::Failed(Failure::retry(format!(
+                    "timed out after {:?}",
+                    handler.timeout
+                )))
+            }
+        }
+    }
+
+    /// Writes a job's outcome: deleted (with its chain, batch and unique
+    /// claim moved on), back on the queue, or failed.
     async fn record(
         &self,
         job: &Reserved,
-        outcome: &Result<(), Failure>,
+        outcome: &Outcome,
         backoff: Duration,
+        unique: Option<&str>,
     ) -> crate::Result {
         let db = &self.state.db;
-        match outcome {
-            Ok(()) => {
-                crate::db::sql("DELETE FROM jobs WHERE id = ?")
-                    .bind(job.id)
-                    .execute(db)
-                    .await?;
+        let failure = match outcome {
+            Outcome::Released(wait) => {
+                crate::db::sql(
+                    "UPDATE jobs SET reserved_at = NULL, available_at = ?, \
+                     attempts = attempts - 1 WHERE id = ?",
+                )
+                .bind(unix_now() + wait.as_secs() as i64)
+                .bind(job.id)
+                .execute(db)
+                .await?;
+                return Ok(());
             }
-            Err(failure) if !failure.permanent && job.attempts < job.max_attempts => {
+            Outcome::Failed(failure) if !failure.permanent && job.attempts < job.max_attempts => {
                 crate::db::sql("UPDATE jobs SET reserved_at = NULL, available_at = ? WHERE id = ?")
                     .bind(unix_now() + backoff.as_secs() as i64)
                     .bind(job.id)
                     .execute(db)
                     .await?;
+                return Ok(());
             }
-            Err(failure) => {
-                let mut tx = db.begin().await?;
-                let deleted = crate::db::sql("DELETE FROM jobs WHERE id = ?")
-                    .bind(job.id)
-                    .execute(&mut tx)
-                    .await?;
-                if deleted > 0 {
-                    fail(
-                        &mut tx,
-                        &job.queue,
-                        &job.job,
-                        &job.payload,
-                        job.max_attempts,
-                        &failure.error,
-                    )
-                    .await?;
+            Outcome::Failed(failure) => Some(failure),
+            Outcome::Done | Outcome::Skipped => None,
+        };
+        let mut tx = db.begin().await?;
+        let deleted = crate::db::sql("DELETE FROM jobs WHERE id = ?")
+            .bind(job.id)
+            .execute(&mut tx)
+            .await?;
+        if deleted > 0 {
+            match failure {
+                Some(failure) => fail(&mut tx, job, &failure.error).await?,
+                None => {
+                    if let (Outcome::Done, Some(chain)) = (outcome, &job.chain) {
+                        super::continue_chain(&mut tx, chain).await?;
+                    }
                 }
-                tx.commit().await?;
             }
+            if let Some(batch) = job.batch_id {
+                super::batch_job_done(&mut tx, batch, failure.is_some()).await?;
+            }
+            if let Some(key) = unique {
+                super::release_unique(&mut tx, key).await?;
+            }
+        }
+        tx.commit().await?;
+        if deleted > 0 {
+            self.state.queue.wake_workers();
         }
         Ok(())
     }
@@ -296,23 +422,40 @@ impl Worker {
         let mut tx = self.state.db.begin().await?;
         let rows = crate::db::sql(
             "DELETE FROM jobs WHERE attempts >= max_attempts AND reserved_at IS NOT NULL \
-             AND reserved_at <= ? RETURNING queue, job, payload, max_attempts",
+             AND reserved_at <= ? \
+             RETURNING id, queue, job, payload, attempts, max_attempts, chain, batch_id",
         )
         .bind(now - RESERVATION)
         .fetch_all(&mut tx)
         .await?;
         for row in &rows {
-            let job: String = row.try_get("job")?;
+            let job = Reserved {
+                id: row.try_get("id")?,
+                queue: row.try_get("queue")?,
+                job: row.try_get("job")?,
+                payload: row.try_get("payload")?,
+                attempts: row.try_get::<i64>("attempts")? as u32,
+                max_attempts: row.try_get::<i64>("max_attempts")? as u32,
+                chain: row.try_get("chain")?,
+                batch_id: row.try_get("batch_id")?,
+            };
             fail(
                 &mut tx,
-                &row.try_get::<String>("queue")?,
                 &job,
-                &row.try_get::<String>("payload")?,
-                row.try_get::<i64>("max_attempts")? as u32,
                 "the worker stopped during the last attempt (crash, kill or out of memory)",
             )
             .await?;
-            tracing::error!(job = %job, "job's last attempt never finished; moved to failed_jobs");
+            if let Some(batch) = job.batch_id {
+                super::batch_job_done(&mut tx, batch, true).await?;
+            }
+            let unique = self.handlers.get(job.job.as_str()).and_then(|handler| {
+                let plain = self.state.queue.open(&job.payload).ok()?;
+                (handler.unique_key)(&plain)
+            });
+            if let Some(key) = unique {
+                super::release_unique(&mut tx, &key).await?;
+            }
+            tracing::error!(job = %job.job, "job's last attempt never finished; moved to failed_jobs");
         }
         tx.commit().await?;
         Ok(())

@@ -716,9 +716,9 @@ Notes from M19b (model features):
 - [x] Schedule hooks: `on_failure`, `schedule:run NAME` (`on_success` too)
 - [ ] Schedule pings: `ping_before`/`then_ping` (health checks), with the HTTP client below
 - [x] Atomic locks: `state.cache.lock(key, ttl)`, `.block(wait)`
-- [ ] Unique jobs (`UNIQUE_FOR`, `unique_id`), job middleware (rate limited, without
+- [x] Unique jobs (`UNIQUE_FOR`, `unique_id`), job middleware (rate limited, without
       overlapping), chains and batches with progress
-- [ ] Queue priority (`--queue high,default` drains in order), `dispatch_sync`, a `failed` hook,
+- [x] Queue priority (`--queue high,default` drains in order), `dispatch_sync`, a `failed` hook,
       `queue:forget`, `queue:prune-failed`, encrypted payloads
 - [ ] A queue dashboard (`/_renox/queue`, gated) with pending, failed, throughput and wait time
 - [ ] Localized mail and notifications (`t()` in mail templates, a recipient's locale),
@@ -746,6 +746,26 @@ Notes from M20a (scheduler, locks, cache):
   ttl bounds a crashed holder. With `CACHE_STORE=memory` they only span one process.
 - The database store deletes expired rows at most once an hour per process as it writes, and
   `cache:prune` does it on demand.
+
+Notes from M20b (queue):
+- One migration (`00010101000110_add_chains_and_batches_to_jobs`): `chain` and `batch_id`
+  columns on `jobs` and `failed_jobs`, and a `job_batches` table. Apps get it with `migrate`.
+- A chain is a JSON array of the remaining jobs carried by the running one; the worker queues
+  the next in the same transaction that deletes the finished job. A failure keeps the rest in
+  `failed_jobs.chain`, so `queue:retry` resumes it.
+- A batch's counters (`pending`, `failed`) change in the transaction that finishes a job.
+  `then`/`catch`/`finally` are jobs stored with the batch (closures can't be stored); the first
+  failure cancels the batch unless `allow_failures()`, and jobs of a cancelled batch are
+  skipped (counted, not run). Retrying a batch job puts it back in the counts.
+- Unique jobs claim `renox:unique:NAME:ID` in the `cache` table whatever `CACHE_STORE` is (like
+  schedule claims), holding the job id so a second dispatch returns it; the claim goes when the
+  job finishes for good or its `UNIQUE_FOR` runs out. Chains and batches don't check it.
+- Encrypted payloads are `enc:` + the `state.encrypt` format; JSON never starts with `enc:`.
+  A payload that doesn't decrypt (another `APP_KEY`) fails for good with that reason.
+- Middleware uses the cache store: with `memory`, `without_overlapping` and `rate_limited` hold
+  per process. A held-back job goes back with its attempt uncounted.
+- `dispatch_sync` runs `handle` only: no retries, middleware or `failed` hook.
+- `Batch::push` (not `add`, which clippy reads as `Add::add`).
 
 ### M21 · v0.22: Views and developer experience
 - [ ] Components that see the request (`old`, `error`, `t`, `csrf_field`, `can`, `auth` inside
