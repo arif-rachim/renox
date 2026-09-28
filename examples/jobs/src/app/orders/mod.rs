@@ -75,7 +75,12 @@ impl Module for Orders {
             .get("/statements/{id}", statements::show)
             .name("statements.show")
             .require_auth();
-        public.merge(staff)
+        // The pretend payment gateway `ChargePayment` calls when
+        // PAYMENT_GATEWAY_URL is unset.
+        let sandbox = Routes::new()
+            .post("/sandbox/gateway/charges", payment::sandbox_charge)
+            .without_csrf();
+        public.merge(staff).merge(sandbox)
     }
 
     fn register(&self, app: &mut Registry) {

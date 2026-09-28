@@ -192,14 +192,19 @@ impl Module for Guestbook {
 - Mail comes from templates, with a text version, several recipients, cc/bcc, reply-to and
   attachments, SMTP in production and a preview page at `/_renox/mail` while developing.
 - Notifications go by mail, to the database and through your own channels (WhatsApp, SMS…), now
-  or through the queue, to users or to plain addresses.
+  or through the queue, to users or to plain addresses, each in the recipient's language, with
+  channels chosen per recipient. Mail views have `t()` and components (button, panel, table).
+- A queue dashboard at `/_renox/queue` (behind a gate) shows waiting jobs, throughput, failed
+  jobs to retry or forget, and batch progress.
+- `state.http` calls other services with timeouts and retries; in tests, `app.fake_http()`
+  answers instead and no request reaches the network. Scheduled tasks can ping health checks.
 </details>
 
 <details>
 <summary><b>Files, cache, translations</b></summary>
 
 - Uploads are ordinary form fields, checked by their content. They're stored locally or on S3/R2,
-  with signed temporary URLs.
+  with signed temporary URLs; `storage.list`, `copy` and `rename` work on both.
 - The cache (`remember`, `put`, `forget`, `add`, `pull`, `increment`) is kept in memory or in the
   database, with atomic locks (`state.cache.lock("stock:42", ttl)`) that hold across servers on
   the database store.
@@ -318,6 +323,8 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 | Breeze / Sanctum | `Auth::new().account()` (pages included) / API tokens with abilities (`create_token_with`, `.require_ability(…)`) |
 | `Cache::lock` | `state.cache.lock(name, ttl)` |
 | Queues, mail, notifications, scheduler | `impl Job`, `mail_view`, `impl Notification`, `app.schedule()` |
+| Horizon | the queue dashboard: `.module(renox::queue::Dashboard)` |
+| `Http::` facade, `Http::fake()` | `state.http`, `app.fake_http()` |
 | `View::share` | `App::share` |
 | Tinker | `rnx db:shell` and your own commands (`App::command`) |
 | Livewire | htmx and Alpine.js, with handlers that return fragments |

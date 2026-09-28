@@ -33,7 +33,7 @@ shows the queue: jobs waiting, throughput, failed jobs (retry or forget them) an
 | Wiring: the `Auth` module, the orders module, the seeder | [src/lib.rs](src/lib.rs) |
 | The model, the `OrderPlaced` event and its listener, the order form, the daily and weekly sales reports | [src/app/orders/mod.rs](src/app/orders/mod.rs) |
 | `SendReceipt`: a queued job with retries, on the `high` queue | [src/app/orders/receipt.rs](src/app/orders/receipt.rs) |
-| Paying: the chain `ChargePayment` → `SendReceipt` → `NotifyWarehouse`; `ChargePayment`'s encrypted payload, middleware and `failed` hook; the stand-in gateway | [src/app/orders/payment.rs](src/app/orders/payment.rs) |
+| Paying: the chain `ChargePayment` → `SendReceipt` → `NotifyWarehouse`; `ChargePayment`'s encrypted payload, middleware and `failed` hook; the gateway call over `state.http` and the sandbox gateway | [src/app/orders/payment.rs](src/app/orders/payment.rs) |
 | `RemindUnpaid`: a unique job (one per order while queued) | [src/app/orders/remind.rs](src/app/orders/remind.rs) |
 | Monthly statements: a batch with a `then` job, and its progress page | [src/app/orders/statements.rs](src/app/orders/statements.rs), [resources/views/orders/statements.html](resources/views/orders/statements.html) |
 | The `status` column (`OrderStatus`, a `DbEnum`) | [migrations](migrations), [src/app/orders/mod.rs](src/app/orders/mod.rs) |
@@ -56,9 +56,15 @@ shows the queue: jobs waiting, throughput, failed jobs (retry or forget them) an
   each job is queued when the one before succeeds, so a declined card never gets a receipt.
   `pay` also moves the order from `unpaid` to `processing` with a conditional `update`, so a
   double click can't queue two charges.
-- **Permanent vs. retryable errors.** The stand-in gateway returns
-  `Error::permanent(..)` for a declined card (straight to `failed_jobs`) and a plain error for a
-  timeout (retried up to `MAX_ATTEMPTS`, waiting `Job::backoff` between attempts).
+- **Calling the gateway over HTTP.** `gateway::charge` posts to `PAYMENT_GATEWAY_URL/charges`
+  with `state.http`: basic auth with the secret key (`PAYMENT_GATEWAY_KEY`), an
+  `idempotency-key` of `order-{id}` so a retry can't charge twice, and a 15 s timeout. Unset,
+  the URL is this app's own `/sandbox/gateway` route, which answers like a provider's test
+  mode: `tok_declined` → 402, `tok_unreachable` → 503, any other token → 201. The tests don't
+  use it: `app.fake_http()` answers instead, and one test checks the request itself.
+- **Permanent vs. retryable errors.** A 402 (declined) becomes `Error::permanent(..)`
+  (straight to `failed_jobs`); no answer, a 429 or a 5xx is a plain error (retried up to
+  `MAX_ATTEMPTS`, waiting `Job::backoff` between attempts).
 - **A `failed` hook.** `ChargePayment::failed` runs once, after the last attempt: it marks the
   order `needs_attention` and mails the admins.
 - **Job middleware.** `ChargePayment::middleware` returns

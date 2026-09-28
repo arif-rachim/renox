@@ -107,6 +107,11 @@ and has no automated test yet.
 
 ## Failed jobs
 
+`/_renox/queue` (the `renox::queue::Dashboard` module, behind the `view-queue-dashboard` gate)
+shows the queue and the failed jobs with retry and forget buttons; the commands below do the
+same from a shell. `state.queue.stats()` has the numbers for monitoring (ready jobs, the oldest
+wait, jobs done and failed in the last hour).
+
 A job that fails every attempt (`Job::MAX_ATTEMPTS`, 3 by default) moves to `failed_jobs` with
 its error. An error made with `Error::permanent` goes there after the first attempt, because
 retrying can't fix it. So does a payload that no longer decodes.

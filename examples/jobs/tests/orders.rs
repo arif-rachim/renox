@@ -1,6 +1,13 @@
 use jobs::{Order, OrderStatus, SendReceipt};
+use renox::http::FakeResponse;
 use renox::prelude::*;
 use renox::testing::TestApp;
+
+/// The payment gateway answers with `response` (tests never reach it).
+fn gateway(app: &TestApp, response: FakeResponse) {
+    app.fake_http()
+        .on("POST */sandbox/gateway/charges", response);
+}
 
 async fn app() -> TestApp {
     let app = TestApp::new(jobs::app()).await;
@@ -74,6 +81,7 @@ async fn an_order_notifies_admins() {
 #[renox::test]
 async fn paying_runs_the_chain_in_order() {
     let app = app().await;
+    gateway(&app, FakeResponse::json(201, json!({ "id": "ch_1" })));
     place(&app).await;
     app.post("/orders/1/pay", &[("card_token", "tok_visa")])
         .await
@@ -112,6 +120,7 @@ async fn paying_runs_the_chain_in_order() {
 #[renox::test]
 async fn the_card_token_is_encrypted_in_the_queue() {
     let app = app().await;
+    gateway(&app, FakeResponse::json(201, json!({ "id": "ch_1" })));
     place(&app).await;
     app.post("/orders/1/pay", &[("card_token", "tok_visa")])
         .await
@@ -130,6 +139,10 @@ async fn the_card_token_is_encrypted_in_the_queue() {
 #[renox::test]
 async fn a_declined_card_stops_the_chain_and_flags_the_order() {
     let app = app().await;
+    gateway(
+        &app,
+        FakeResponse::json(402, json!({ "error": "card_declined" })),
+    );
     place(&app).await;
     app.post("/orders/1/pay", &[("card_token", "tok_declined")])
         .await
@@ -156,6 +169,7 @@ async fn a_declined_card_stops_the_chain_and_flags_the_order() {
 #[renox::test]
 async fn the_failed_hook_runs_after_the_last_attempt() {
     let app = app().await;
+    gateway(&app, FakeResponse::connection_error());
     place(&app).await;
     app.post("/orders/1/pay", &[("card_token", "tok_unreachable")])
         .await
@@ -180,7 +194,7 @@ async fn the_failed_hook_runs_after_the_last_attempt() {
         .into_iter()
         .find(|m| m.subject == "Payment for order #1 failed")
         .unwrap();
-    assert!(alert.text.contains("timed out"), "{}", alert.text);
+    assert!(alert.text.contains("connection refused"), "{}", alert.text);
     assert!(app.queued_jobs().await.is_empty());
 }
 
@@ -401,4 +415,52 @@ async fn a_failed_report_alerts_someone() {
     assert!(app.kernel().run_scheduled("daily-sales").await.is_err());
     app.run_jobs().await;
     app.assert_mail_sent("admin@example.com", "A sales report failed");
+}
+
+#[renox::test]
+async fn the_charge_request_carries_the_amount_and_an_idempotency_key() {
+    let app = app().await;
+    gateway(&app, FakeResponse::status(503)); // then…
+    gateway(&app, FakeResponse::json(201, json!({ "id": "ch_1" })));
+    place(&app).await;
+    app.post("/orders/1/pay", &[("card_token", "tok_visa")])
+        .await
+        .assert_redirect("/");
+    app.run_jobs().await; // 503: retried later
+    assert_eq!(order(&app, 1).await.status, OrderStatus::Processing);
+    renox::db::sql("UPDATE jobs SET available_at = 0")
+        .execute(app.db())
+        .await
+        .unwrap();
+    app.run_jobs().await;
+    assert_eq!(order(&app, 1).await.status, OrderStatus::Paid);
+
+    let http = app.fake_http();
+    http.assert_sent_count(2);
+    let charge = &http.sent()[1];
+    assert_eq!(charge.method, "POST");
+    assert_eq!(charge.json()["amount"], 18000);
+    assert_eq!(charge.json()["source"], "tok_visa");
+    assert_eq!(charge.header("idempotency-key"), Some("order-1"));
+    assert!(
+        charge
+            .header("authorization")
+            .unwrap()
+            .starts_with("Basic ")
+    );
+}
+
+#[renox::test]
+async fn the_sandbox_gateway_answers_like_a_provider() {
+    let app = app().await;
+    let charge = |token: &'static str| json!({ "amount": 5000, "source": token });
+    app.post_json("/sandbox/gateway/charges", &charge("tok_visa"))
+        .await
+        .assert_status(201);
+    app.post_json("/sandbox/gateway/charges", &charge("tok_declined"))
+        .await
+        .assert_status(402);
+    app.post_json("/sandbox/gateway/charges", &charge("tok_unreachable"))
+        .await
+        .assert_status(503);
 }

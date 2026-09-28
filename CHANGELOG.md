@@ -27,6 +27,11 @@ changes by milestone (each one pull request; details in its description and in
 - Mail components: `renox/mail/components.html` with `button`, `panel`, `table`, `divider`.
 - Storage: `list(prefix)` (`FileInfo`), `copy`, `rename`, `size`, `delete_all(prefix)`, on the
   local disk and S3.
+- examples/jobs: the charge job calls the payment gateway with `state.http` (basic auth, an
+  idempotency key, 402 → permanent, 5xx → retried); unset, `PAYMENT_GATEWAY_URL` is a sandbox
+  route in the example; the tests fake it with `app.fake_http()`. The admin gets the queue
+  dashboard. README, docs/queue.md, docs/operations.md, llms.txt and the new-app `AGENTS.md`
+  cover the HTTP client, the dashboard and localized notifications.
 
 ### Guides and examples for M18–M20b
 
