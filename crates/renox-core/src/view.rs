@@ -58,6 +58,7 @@ const BUILTIN: &[(&str, &str)] = &[
         "renox/mail/button.html",
         include_str!("../views/mail/button.html"),
     ),
+    ("renox/ui.html", include_str!("../views/ui.html")),
     (
         "renox/queue/dashboard.html",
         include_str!("../views/queue/dashboard.html"),
@@ -220,6 +221,19 @@ impl Views {
             env.add_function("storage_url", move |key: String| {
                 Value::from_safe_string(storage.url(&key))
             });
+            // The request's values for components: `old`, `error`, `t`, `can`,
+            // `csrf_field`, `auth`, `request`, `flash`… work inside imported
+            // macros too, not only in the rendered template.
+            for name in REQUEST_GLOBALS {
+                env.add_global(*name, Value::from_object(RequestGlobal(name)));
+            }
+            env.add_function("renox_ui", |kwargs: minijinja::value::Kwargs| {
+                let styles: Option<bool> = kwargs.get("styles")?;
+                kwargs.assert_all_used()?;
+                Ok::<_, minijinja::Error>(Value::from_safe_string(crate::assets::ui_tags(
+                    styles.unwrap_or(true),
+                )))
+            });
             env.add_filter("number", crate::view_filters::number);
             env.add_filter("date", crate::view_filters::date(zone));
             // The app's own functions and filters (`App::templates`).
@@ -252,12 +266,19 @@ impl Views {
     ) -> anyhow::Result<String> {
         let env = self.reloader.acquire_env()?;
         let template = env.get_template(&view.name)?;
+        // Components (macros imported from other templates) don't see this
+        // context; they reach the same values through `RequestGlobal`s.
+        let _current = CurrentGlobals::set(globals.clone());
         // The last map wins: shared values, then the handler's, then Renox's.
         let ctx = merge_maps([shared, view.ctx.clone(), globals]);
         match &view.fragment {
             Some(block) if htmx.wants_fragment() => {
                 let mut captured = template.render_captured_to(ctx, std::io::sink())?;
-                Ok(captured.with_state_mut(|state| state.render_block(block))?)
+                let mut out = captured.with_state_mut(|state| state.render_block(block))?;
+                for extra in &view.also {
+                    out.push_str(&captured.with_state_mut(|state| state.render_block(extra))?);
+                }
+                Ok(out)
             }
             _ => Ok(template.render(ctx)?),
         }
@@ -282,6 +303,117 @@ impl Views {
             request => debug.then_some(request),
             template => page.template.as_deref().filter(|_| debug),
         })?)
+    }
+}
+
+/// The globals Renox gives each rendered page (see `globals`), which
+/// components reach through the environment.
+const REQUEST_GLOBALS: &[&str] = &[
+    "app",
+    "auth",
+    "t",
+    "can",
+    "request",
+    "csrf_token",
+    "csrf_field",
+    "flash",
+    "errors",
+    "error",
+    "old",
+    "renox_head",
+    "seo",
+    "csp_nonce",
+    "toasts",
+    "once",
+];
+
+thread_local! {
+    /// The globals of the page being rendered on this thread.
+    static CURRENT: std::cell::RefCell<Option<Value>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Makes `globals` the current page's while alive (rendering is synchronous).
+struct CurrentGlobals(Option<Value>);
+
+impl CurrentGlobals {
+    fn set(globals: Value) -> Self {
+        Self(CURRENT.with(|c| c.borrow_mut().replace(globals)))
+    }
+}
+
+impl Drop for CurrentGlobals {
+    fn drop(&mut self) {
+        let previous = self.0.take();
+        CURRENT.with(|c| *c.borrow_mut() = previous);
+    }
+}
+
+/// A request global as seen from the environment: forwards to the value of
+/// the page being rendered, so an imported macro gets the same `old()`,
+/// `auth`, `t()`… as the template that called it.
+#[derive(Debug)]
+struct RequestGlobal(&'static str);
+
+impl RequestGlobal {
+    fn current(&self) -> Option<Value> {
+        CURRENT
+            .with(|c| c.borrow().clone())
+            .and_then(|globals| globals.get_attr(self.0).ok())
+            .filter(|v| !v.is_undefined())
+    }
+}
+
+impl minijinja::value::Object for RequestGlobal {
+    fn repr(self: &Arc<Self>) -> minijinja::value::ObjectRepr {
+        minijinja::value::ObjectRepr::Map
+    }
+
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        self.current()?
+            .get_item(key)
+            .ok()
+            .filter(|v| !v.is_undefined())
+    }
+
+    fn enumerate(self: &Arc<Self>) -> minijinja::value::Enumerator {
+        match self
+            .current()
+            .and_then(|v| v.try_iter().ok().map(|keys| keys.collect::<Vec<_>>()))
+        {
+            Some(keys)
+                if self
+                    .current()
+                    .is_some_and(|v| v.kind() == minijinja::value::ValueKind::Map) =>
+            {
+                minijinja::value::Enumerator::Values(keys)
+            }
+            _ => minijinja::value::Enumerator::Empty,
+        }
+    }
+
+    fn is_true(self: &Arc<Self>) -> bool {
+        self.current().is_some_and(|v| v.is_true())
+    }
+
+    fn call(
+        self: &Arc<Self>,
+        state: &minijinja::State<'_, '_>,
+        args: &[Value],
+    ) -> Result<Value, minijinja::Error> {
+        match self.current() {
+            Some(value) => value.call(state, args),
+            None => Err(minijinja::Error::new(
+                ErrorKind::InvalidOperation,
+                format!("`{}` is only available while rendering a page", self.0),
+            )),
+        }
+    }
+
+    fn render(self: &Arc<Self>, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.current() {
+            Some(value) => std::fmt::Display::fmt(&value, f),
+            None => Ok(()),
+        }
     }
 }
 
@@ -374,6 +506,8 @@ pub struct View {
     name: String,
     ctx: Value,
     fragment: Option<String>,
+    /// More blocks sent with the fragment, for out-of-band swaps.
+    also: Vec<String>,
     status: StatusCode,
 }
 
@@ -384,6 +518,7 @@ pub fn view(name: impl Into<String>, ctx: impl Serialize) -> View {
         name: name.into(),
         ctx: Value::from_serialize(ctx),
         fragment: None,
+        also: Vec::new(),
         status: StatusCode::OK,
     }
 }
@@ -392,6 +527,22 @@ impl View {
     /// For HTMX requests (except `hx-boost`), render only this `{% block %}`.
     pub fn fragment(mut self, block: impl Into<String>) -> Self {
         self.fragment = Some(block.into());
+        self
+    }
+
+    /// For the same HTMX requests, also render `block` after the fragment,
+    /// to update other parts of the page in one response: give the block's
+    /// root element an `id` and `hx-swap-oob="true"` and htmx swaps it into
+    /// the element with that id.
+    ///
+    /// ```html
+    /// {% block row %}<tr id="order-{{ order.id }}">…</tr>{% endblock %}
+    /// {% block count %}<span id="order-count" hx-swap-oob="true">{{ count }}</span>{% endblock %}
+    /// ```
+    ///
+    /// `view("orders/index.html", ctx).fragment("row").also("count")`
+    pub fn also(mut self, block: impl Into<String>) -> Self {
+        self.also.push(block.into());
         self
     }
 
@@ -442,6 +593,27 @@ pub(crate) async fn middleware(
         format!("{method} {path}?{query}")
     };
     let mut res = next.run(req).await;
+
+    if let Some(crate::toast::PendingToasts(toasts)) =
+        res.extensions_mut().remove::<crate::toast::PendingToasts>()
+    {
+        // An htmx swap shows them now; a page (or an htmx redirect) on the
+        // next page, from the session.
+        if htmx.request && !res.headers().contains_key("hx-redirect") {
+            crate::htmx::add_trigger(
+                &mut res,
+                crate::toast::EVENT,
+                serde_json::json!({ "toasts": toasts }),
+            );
+        } else if let Some(session) = &session {
+            let mut waiting: Vec<crate::Toast> =
+                session.get(crate::toast::SESSION_KEY).unwrap_or_default();
+            waiting.extend(toasts);
+            if let Err(err) = session.put(crate::toast::SESSION_KEY, &waiting) {
+                return err.into_response();
+            }
+        }
+    }
 
     if let Some(failed) = res.extensions_mut().remove::<ValidationError>() {
         if htmx.request || wants_json {
@@ -673,6 +845,11 @@ fn globals(
         crate::csrf::CSRF_FIELD
     ));
     let old_input = session.cloned();
+    let toast_session = session.cloned();
+    let dismiss_label = state
+        .translator
+        .get(locale, &state.config.fallback_locale, "ui.dismiss");
+    let seen = std::sync::Mutex::new(std::collections::HashSet::<String>::new());
     let user = current_user.as_ref().and_then(|c| c.user.clone());
     let roles = current_user
         .as_ref()
@@ -744,6 +921,20 @@ fn globals(
         seo => seo,
         csp_nonce => Value::from_function(move || nonce.clone()),
         csrf_field => Value::from_function(move || field.clone()),
+        // `{{ toasts() }}`: the toast region, with the toasts waiting for
+        // this page (taken from the session: shown once).
+        toasts => Value::from_function(move || {
+            let waiting: Vec<crate::Toast> = toast_session
+                .as_ref()
+                .and_then(|s| s.pull(crate::toast::SESSION_KEY))
+                .unwrap_or_default();
+            Value::from_safe_string(crate::toast::region(&waiting, &dismiss_label))
+        }),
+        // `{% if once('date-picker') %}…{% endif %}`: true the first time a key
+        // is asked for on a page, e.g. for a component's script.
+        once => Value::from_function(move |key: String| {
+            seen.lock().unwrap_or_else(|e| e.into_inner()).insert(key)
+        }),
         old => Value::from_function(move |field: String, default: Option<Value>| {
             old_input
                 .as_ref()

@@ -64,6 +64,10 @@ rnx make:migration add_stock_to_products
   "`Send` is not general enough"): don't keep a closure or iterator that borrows a local across
   an `.await`; collect into a `Vec` first.
 - Money is `i64` in the smallest unit (rupiah, cents), never `f64`.
+- UI: prefer the kit (`{% from "renox/ui.html" import input, button, … %}`, docs/ui.md) over
+  hand-written form markup: it refills fields, shows errors and handles accessibility. Keep one
+  primary button per form; put destructive actions behind `confirm(…)`. Give feedback with
+  `Toast::success(…)` returned next to the `Redirect`, and put `{{ toasts() }}` in the layout.
 - `user.has_role("admin")` on a plain `User` (policies, `gate_before`) only knows the current
   request's user; in jobs and commands use `user.roles(&db).await`.
 - For a transaction that must be retried on conflicts and borrow locals, use

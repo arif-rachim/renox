@@ -128,6 +128,13 @@ impl Module for Guestbook {
   in every template, `can('update', product)` on models the handler wrapped with `Can::new`, and
   `pagination(products)` once imported from `renox/pagination.html`.
 - `asset('app.css')` adds a content hash (`?v=…`), so assets can be cached for a year.
+- Components are macros that see the request (`old`, `error`, `t`, `can`, `auth`), and a UI kit
+  after Apple's Human Interface Guidelines ships with Renox (`renox/ui.html`):
+  - form fields, buttons, cards, alerts, sheets, menus, tabs and tables, with dark mode;
+  - keyboard support and WCAG AA contrast;
+  - toasts (`Toast::success(…)`) and live validation.
+- `.also("block")` sends out-of-band blocks with a fragment; `HxRetarget`, `HxReswap` and
+  `HxPushUrl` set the other htmx headers.
 </details>
 
 <details>
@@ -313,6 +320,7 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 |---|---|
 | `php artisan` | `rnx` (`rnx make:model`, `rnx migrate`, `rnx route:list`, …) |
 | Blade | MiniJinja templates, with `{% extends %}` and `{% block %}` |
+| Blade components, Breeze's UI | Macros that see the request (`rnx make:component`), the `renox/ui.html` kit |
 | `routes/web.php`, `Route::prefix()->name()->group()` | `Module::routes`, `Routes::group("/admin", "admin.", …)` |
 | Middleware | `.require_auth()`, `.throttle(…)`, `Routes::route_layer`, `App::layer` |
 | Eloquent | `#[derive(Model)]` and the query builder; relations are explicit loaders ([docs/relations.md](docs/relations.md)) |

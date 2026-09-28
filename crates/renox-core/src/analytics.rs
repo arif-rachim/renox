@@ -32,11 +32,11 @@
 use std::convert::Infallible;
 
 use axum::extract::FromRequestParts;
+use axum::http::Response;
 use axum::http::header::{COOKIE, LOCATION};
 use axum::http::request::Parts;
-use axum::http::{HeaderValue, Response};
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
 
 use crate::{Result, Session};
 
@@ -94,26 +94,7 @@ pub(crate) fn deliverable_by_htmx<B>(res: &Response<B>) -> bool {
 
 /// Adds the events to the response's `HX-Trigger`, keeping any it has.
 pub(crate) fn add_trigger<B>(res: &mut Response<B>, events: Vec<Event>) {
-    let mut triggers = match res
-        .headers()
-        .get("hx-trigger")
-        .and_then(|v| v.to_str().ok())
-    {
-        Some(existing) if existing.trim_start().starts_with('{') => {
-            serde_json::from_str::<Map<String, Value>>(existing).unwrap_or_default()
-        }
-        Some(existing) => existing
-            .split(',')
-            .map(str::trim)
-            .filter(|name| !name.is_empty())
-            .map(|name| (name.to_owned(), Value::Null))
-            .collect(),
-        None => Map::new(),
-    };
-    triggers.insert(TRIGGER.to_owned(), json!({ "events": events }));
-    if let Ok(value) = HeaderValue::from_str(&Value::Object(triggers).to_string()) {
-        res.headers_mut().insert("hx-trigger", value);
-    }
+    crate::htmx::add_trigger(res, TRIGGER, json!({ "events": events }));
 }
 
 /// The GA4 client id from the `_ga` cookie (`GA1.1.123.456` → `123.456`),
@@ -157,6 +138,7 @@ mod server_event {
     use super::*;
     use crate::config::Environment;
     use crate::queue::{Job, JobContext};
+    use serde_json::Map;
 
     /// An event sent from the server to GA4 (Measurement Protocol), as a queue
     /// job so a slow or failing request never holds up the page. Needs
@@ -248,6 +230,7 @@ mod server_event {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::http::HeaderValue;
 
     #[test]
     fn reads_the_client_id_from_the_ga_cookie() {

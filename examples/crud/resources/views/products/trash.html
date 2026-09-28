@@ -1,17 +1,26 @@
 {% extends "layouts/app.html" %}
+{% from "renox/ui.html" import group, button, empty %}
 
 {% block content %}
-<h1>Trash</h1>
-<ul>
-  {% for product in products %}
-  <li>
-    {{ product.name }}
-    <form method="post" action="{{ route('products.restore', product.id) }}">
-      {{ csrf_field() }}<button>Restore</button>
-    </form>
-  </li>
+<div class="rx-stack">
+  <div>
+    <a class="rx-link" href="{{ route('products.index') }}">‹ Products</a>
+    <h1 class="rx-title">Trash</h1>
+  </div>
+  {% if products %}
+    {% call group(footer="Restored products go back to the shop with their old name and price.") %}
+      {% for product in products %}
+      <div class="rx-row">
+        <span>{{ product.name }}</span>
+        <span class="rx-spacer"></span>
+        <form method="post" action="{{ route('products.restore', product.id) }}">
+          {{ csrf_field() }}{{ button("Restore", variant="secondary", size="small") }}
+        </form>
+      </div>
+      {% endfor %}
+    {% endcall %}
   {% else %}
-  <li>The trash is empty.</li>
-  {% endfor %}
-</ul>
+    {{ empty("The trash is empty", "Deleted products wait here until you restore them.") }}
+  {% endif %}
+</div>
 {% endblock %}

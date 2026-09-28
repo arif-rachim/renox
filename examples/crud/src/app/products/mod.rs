@@ -5,6 +5,7 @@
 pub mod model;
 pub mod policy;
 
+use renox::Toast;
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -93,9 +94,8 @@ async fn create() -> View {
 async fn store(
     State(db): State<Db>,
     user: AuthUser,
-    session: Session,
     Valid(form): Valid<ProductForm>,
-) -> Result<Redirect> {
+) -> Result<(Toast, Redirect)> {
     let product = Product {
         user_id: user.id,
         name: form.name,
@@ -103,8 +103,11 @@ async fn store(
         ..Default::default()
     };
     Product::create(&db, product).await?;
-    session.flash("status", "Product created.")?;
-    Ok(Redirect::to("/products"))
+    // Shown on the next page (or at once for an htmx request).
+    Ok((
+        Toast::success("Product created."),
+        Redirect::to("/products"),
+    ))
 }
 
 async fn edit(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Result<View> {
@@ -116,10 +119,9 @@ async fn edit(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Resu
 async fn update(
     State(db): State<Db>,
     user: AuthUser,
-    session: Session,
     Path(id): Path<i64>,
     Valid(form): Valid<ProductForm>,
-) -> Result<Redirect> {
+) -> Result<(Toast, Redirect)> {
     let original = Product::find_or_404(&db, id).await?;
     user.authorize("update", &original)?;
     let mut product = original.clone();
@@ -130,26 +132,26 @@ async fn update(
     // concurrent change to another column isn't overwritten. `false` means
     // nothing changed: no query, no `saved` hook.
     let changed = product.save_changes(&db, &original).await?;
-    let status = if changed {
-        "Product updated."
+    let toast = if changed {
+        Toast::success("Product updated.")
     } else {
-        "Nothing changed."
+        Toast::info("Nothing changed.")
     };
-    session.flash("status", status)?;
-    Ok(Redirect::to("/products"))
+    Ok((toast, Redirect::to("/products")))
 }
 
 async fn destroy(
     State(db): State<Db>,
     user: AuthUser,
-    session: Session,
     Path(id): Path<i64>,
-) -> Result<Redirect> {
+) -> Result<(Toast, Redirect)> {
     let mut product = Product::find_or_404(&db, id).await?;
     user.authorize("delete", &product)?;
     product.delete(&db).await?; // soft: sets deleted_at
-    session.flash("status", "Product moved to the trash.")?;
-    Ok(Redirect::to("/products"))
+    Ok((
+        Toast::success(format!("“{}” moved to the trash.", product.name)),
+        Redirect::to("/products"),
+    ))
 }
 
 async fn trash(State(db): State<Db>, user: AuthUser) -> Result<View> {
@@ -165,9 +167,8 @@ async fn trash(State(db): State<Db>, user: AuthUser) -> Result<View> {
 async fn restore(
     State(db): State<Db>,
     user: AuthUser,
-    session: Session,
     Path(id): Path<i64>,
-) -> Result<Redirect> {
+) -> Result<(Toast, Redirect)> {
     let mut product = Product::query()
         .only_trashed()
         .where_eq("id", id)
@@ -177,6 +178,8 @@ async fn restore(
     user.authorize("restore", &product)?;
     product.restore(&db).await?;
     model::forget_count().await?; // `restore` runs no hooks
-    session.flash("status", "Product restored.")?;
-    Ok(Redirect::to("/products"))
+    Ok((
+        Toast::success("Product restored."),
+        Redirect::to("/products"),
+    ))
 }

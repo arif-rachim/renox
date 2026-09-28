@@ -95,6 +95,19 @@ enum Command {
         #[arg(long)]
         module: String,
     },
+    /// Create a view component (a macro that can use `old`, `error`, `t`…),
+    /// or with `--ui` copy Renox's UI kit into the app to change it.
+    #[command(name = "make:component")]
+    MakeComponent {
+        /// e.g. `price_tag`: resources/views/components/price_tag.html.
+        name: Option<String>,
+        /// Copy renox/ui.html and its CSS into the app (`my-app ui:publish`).
+        #[arg(long)]
+        ui: bool,
+        /// With --ui: replace files already there.
+        #[arg(long)]
+        force: bool,
+    },
     /// Create an HTML and a text mail template.
     #[command(name = "make:mail")]
     MakeMail {
@@ -163,6 +176,20 @@ fn main() -> Result<()> {
         Command::MakeCmd { name, module } => generate::command(&app_root()?, &name, &module),
         Command::MakePolicy { model, module } => generate::policy(&app_root()?, &model, &module),
         Command::MakeMail { name } => generate::mail(&app_root()?, &name),
+        Command::MakeComponent {
+            ui: true, force, ..
+        } => {
+            let args: Vec<String> = if force {
+                vec!["--force".into()]
+            } else {
+                Vec::new()
+            };
+            app_command("ui:publish", &args)
+        }
+        Command::MakeComponent {
+            name: Some(name), ..
+        } => generate::component(&app_root()?, &name),
+        Command::MakeComponent { .. } => Err(anyhow::anyhow!("give a name, or --ui")),
         Command::Migrate { args } => app_command("migrate", &args),
         Command::MigrateRollback { args } => app_command("migrate:rollback", &args),
         Command::MigrateFresh { args } => app_command("migrate:fresh", &args),

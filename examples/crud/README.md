@@ -22,7 +22,8 @@ Log in at `/login` (or register at `/register`), then add products at `/products
 | Routes (public list, members-only create/edit/update/delete/trash/restore), form validation, handlers | [src/app/products/mod.rs](src/app/products/mod.rs) |
 | The model with `soft_deletes` and `hooks` (`impl ModelHooks`: a slug, a check, a cache key forgotten), a factory, `for_owner` for seeders and tests | [src/app/products/model.rs](src/app/products/model.rs) |
 | The policy: only the owner may update, delete or restore | [src/app/products/policy.rs](src/app/products/policy.rs) |
-| List, form and trash pages | [resources/views/products](resources/views/products) |
+| List, form and trash pages, built with the UI kit (`renox/ui.html`): a table with a confirmation sheet for deletes, a form with live validation, an inset grouped list | [resources/views/products](resources/views/products) |
+| The layout: a translucent navigation bar with an account menu, the kit's styles, the toast region | [resources/views/layouts/app.html](resources/views/layouts/app.html) |
 | The table, with `deleted_at`; `slug` added in a second migration | [migrations](migrations) |
 
 ## Things worth copying
@@ -49,6 +50,16 @@ Log in at `/login` (or register at `/register`), then add products at `/products
   and nothing at all is written when nothing changed.
 - **PUT and DELETE from plain forms.** Forms post with `method_field('PUT')` or a
   `_method=DELETE` field.
+- **The UI kit.** The pages import `input`, `button`, `card`, `table`, `confirm`, `menu`… from
+  `renox/ui.html`. Fields refill themselves and show their errors; `form_errors()` sums them up
+  above the form.
+  - The form has `data-live-validate`: a field is checked when it's left and again as it's
+    fixed, without saving.
+  - Delete is red text in the row and a sheet asks first, with Cancel focused.
+  - On phones the slug column hides (`hide-narrow`) and a row's actions stack.
+  - See [docs/ui.md](../../docs/ui.md) for the design rules the kit follows.
+- **Toasts.** `store`, `update`, `destroy` and `restore` return `(Toast::success(…), Redirect)`;
+  `{{ toasts() }}` in the layout shows the toast on the next page, once.
 
 ## Tests
 

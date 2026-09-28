@@ -2,28 +2,39 @@
 <html lang="{{ app.locale }}">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
   {#- Title, description, canonical URL and social cards; a page overrides it with
       {% block seo %}{{ seo(title="…", description="…", image="…") }}{% endblock %} -#}
   {% block seo %}{{ seo() }}{% endblock %}
-  <link rel="stylesheet" href="{{ asset('app.css') }}">
   {{ renox_head() }}
+  {#- The UI kit (renox/ui.html): its styles and behavior. -#}
+  {{ renox_ui() }}
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
 </head>
-<body>
-  <nav>
-    <a href="{{ route('products.index') }}"><strong>{{ app.name }}</strong></a>
-    {% if auth.check %}
-    <a href="{{ route('products.trash') }}">Trash</a>
-    <span>{{ auth.user.name }}</span>
-    <form method="post" action="{{ route('logout') }}">{{ csrf_field() }}<button>Log out</button></form>
-    {% else %}
-    <a href="{{ route('login') }}">Log in</a>
-    <a href="{{ route('register') }}">Register</a>
-    {% endif %}
-  </nav>
-  <main>
-    {% if flash.status %}<p class="flash">{{ flash.status }}</p>{% endif %}
+<body class="rx-page">
+  <a class="rx-visually-hidden skip" href="#main">Skip to content</a>
+  <header class="bar">
+    <nav class="bar__inner" aria-label="Main">
+      <a class="bar__brand" href="{{ route('products.index') }}">{{ app.name }}</a>
+      <span class="rx-spacer"></span>
+      {% from "renox/ui.html" import menu, menu_link, menu_action, menu_separator, link_button %}
+      {% if auth.check %}
+        {% call menu(auth.user.name, id="account-menu", variant="plain") %}
+          {{ menu_link(route('products.trash'), "Trash") }}
+          {{ menu_separator() }}
+          {{ menu_action(route('logout'), "Log out") }}
+        {% endcall %}
+      {% else %}
+        {{ link_button(route('login'), "Log in", variant="plain", size="small") }}
+        {{ link_button(route('register'), "Register", variant="primary", size="small") }}
+      {% endif %}
+    </nav>
+  </header>
+  <main class="rx-container" id="main">
     {% block content %}{% endblock %}
   </main>
+  {#- Toasts from `Toast::success(…)`, after a redirect or an htmx request. -#}
+  {{ toasts() }}
 </body>
 </html>

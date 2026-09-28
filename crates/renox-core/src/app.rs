@@ -57,6 +57,7 @@ Commands:
                             Delete batches finished more than N hours ago (default 24)
   webhook:failed            List webhook calls whose processing failed
   webhook:retry <id>        Process a stored webhook call again
+  ui:publish [--force]      Copy the UI kit (renox/ui.html and its CSS) into the app to change it
   cache:prune               Delete expired rows of the database cache store
   schedule:list             List scheduled tasks and when they run next
   schedule:run <task>       Run one scheduled task now
@@ -753,6 +754,10 @@ impl App {
                 "Deleted {} failed job(s).",
                 kernel.state.queue.flush_failed().await?
             ),
+            "ui:publish" => {
+                let force = args.iter().any(|a| a == "--force");
+                crate::assets::publish_ui(&kernel.state.config, force)?;
+            }
             "cache:prune" => println!(
                 "Deleted {} expired cache row(s).",
                 kernel.state.cache.prune().await?
@@ -836,6 +841,7 @@ const BUILT_IN_COMMANDS: &[&str] = &[
     "webhook:failed",
     "webhook:retry",
     "cache:prune",
+    "ui:publish",
     "schedule:list",
     "schedule:run",
     "schedule:work",

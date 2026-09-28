@@ -95,7 +95,12 @@ async fn deleted_products_go_to_the_trash_and_come_back() {
     app.delete(&format!("/products/{}", product.id))
         .await
         .assert_redirect("/products");
-    app.get("/products").await.assert_dont_see(&product.name);
+    // Gone from the list; the toast names it ("“Espresso” moved to the trash.").
+    app.get("/products")
+        .await
+        .assert_see("“Espresso” moved to the trash.")
+        .assert_dont_see("<strong>Espresso</strong>");
+    app.get("/products").await.assert_dont_see(&product.name); // the toast shows once
     app.get("/products/trash").await.assert_see(&product.name);
 
     app.post(&format!("/products/{}/restore", product.id), &[])

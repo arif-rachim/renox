@@ -65,7 +65,10 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            require_verified/throttle/cors/route_layer/merge), RouteTable + URLs
   src/session.rs           encrypted cookie session + middleware
   src/csrf.rs              CSRF middleware
-  src/view.rs              MiniJinja env, View response, render middleware, globals, BUILTIN views
+  src/view.rs              MiniJinja env, View response (fragment/also), render middleware, globals,
+                           RequestGlobal (request globals inside imported macros), BUILTIN views
+  src/toast.rs             Toast response part, the toast region markup
+  views/ui.html            the UI kit (renox/ui.html); assets/renox-ui.css|js its styles and script
   src/view_filters.rs      built-in template filters `number` and `date`; pub format_number
   src/htmx.rs              Htmx extractor, HxRedirect/HxRefresh/HxTrigger, Back
   src/assets.rs            embedded htmx/Alpine/renox.js with hashed URLs; renox.js source lives here
@@ -730,7 +733,12 @@ change 29 s → 7 s, full run 19 s → 6 s.
   (`callback_of` migration), `run_all_jobs`, `capture_queries`, `Morph::count_many`,
   `Current<T>`, seeders in context, old input on hook errors, `renox::Path` 404s): branch
   `m21a-rough-edges`. Framework migrations are now 8 (tests list them).
-- **Next: M21b (views), M21c (scaffolding), M21d (errors, logs, limiters)**, from the Laravel parity review
+- **M21b** (components that see the request via `RequestGlobal` + a thread-local of the page's
+  globals, the HIG-style kit `views/ui.html` + `assets/renox-ui.{css,js}`, `toast.rs`,
+  `View::also`, Hx headers, live validation via `X-Renox-Validate`, `ui:publish`,
+  `make:component`): branch `m21b-views`, browser-checked on examples/crud. Keep new kit
+  components `rx-`-prefixed, keyboard-usable, and at WCAG AA contrast (docs/ui.md rules).
+- **Next: M21c (scaffolding), M21d (errors, logs, limiters)**, from the Laravel parity review
   (`docs/audit/2026-09-laravel-parity.md`); the ROADMAP lists each milestone's items. **v1.0 is
   on hold** until the owner says to start it (docs site, starter kit, semver checks, real
   crates.io releases; the owner runs `cargo login`).

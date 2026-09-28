@@ -173,6 +173,26 @@ fn view_extras(app: App) -> App {
 }
 ```
 
+## Components and the UI kit (details in docs/ui.md)
+
+```html
+{# layout: {{ renox_head() }}{{ renox_ui() }} in <head>, <body class="rx-page">, {{ toasts() }} #}
+{% from "renox/ui.html" import card, input, select, checkbox, button, confirm, table, form_errors %}
+<form method="post" action="/products" data-live-validate novalidate>{{ csrf_field() }}
+  {% call card(title="New product") %}
+    {{ form_errors() }}
+    {{ input("name", "Name", required=true, hint="Shown on the list") }}
+    {{ select("size", "Size", [["s", "Small"], ["m", "Medium"]]) }}
+    {{ checkbox("featured", "Featured", switch=true) }}
+    {{ button("Create product") }}
+  {% endcall %}
+</form>
+{{ confirm("del-7", "Delete", "/products/7", "Delete “Kopi”?", "It goes to the trash.") }}
+{# Your own: rnx make:component price_tag -> components/price_tag.html, a macro that can use
+   old(), error(), t(), can(), auth, csrf_field() like the page. rnx make:component --ui copies
+   the kit into the app. {% if once('x') %} renders once per page. #}
+```
+
 ## Your own shared values and middleware
 
 ```rust
@@ -773,6 +793,7 @@ In templates: `{% if can('posts.publish') %}` (a gate or a permission) and `auth
 
 ```rust
 use renox::prelude::*;
+use renox::{HxPushUrl, HxReswap, HxRetarget, Toast};
 
 // A form posted with hx-post gets just the `list` block of the page back;
 // a normal request gets the whole page.
@@ -792,6 +813,18 @@ async fn after_save(htmx: Htmx) -> Response {
     htmx.redirect("/todos") // HX-Redirect for htmx posts, 303 for plain forms
 }
 
+async fn after_toggle() -> (Toast, HxRetarget, HxReswap, HxPushUrl, View) {
+    // A toast (HX-Trigger for htmx; the next page otherwise), and several blocks at once:
+    // blocks after the first need an id and hx-swap-oob="true".
+    (
+        Toast::success("Order updated"), // also info, warning, error (errors stay until dismissed)
+        HxRetarget("#orders".into()),
+        HxReswap("outerHTML".into()),
+        HxPushUrl("/orders?status=open".into()),
+        view("orders/index.html", context! {}).fragment("rows").also("count"),
+    )
+}
+
 async fn after_import(htmx: Htmx) -> Response {
     if htmx.wants_fragment() { // htmx, but not hx-boost
         return HxRefresh.into_response(); // the browser reloads the page
@@ -800,7 +833,9 @@ async fn after_import(htmx: Htmx) -> Response {
 }
 ```
 
-`Back` redirects to the previous page (the Referer). HTMX requests send the CSRF token by
+`Back` redirects to the previous page (the Referer). `<form data-live-validate>` (with the UI
+kit's script) checks each field against `Valid<T>`'s rules as it's left, without running the
+handler. HTMX requests send the CSRF token by
 themselves. Errors of list items (`photos.1`, `tags.0`) show at the list's input and its
 `data-error-for="photos"` slot, and `{{ error('photos') }}` includes them. Boosted requests (`hx-boost`) get whole pages, so pair them with `hx-select`.
 

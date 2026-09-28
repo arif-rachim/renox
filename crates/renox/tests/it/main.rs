@@ -36,6 +36,7 @@ mod seo;
 mod services;
 mod testing;
 mod types;
+mod ui;
 mod uploads;
 mod validation;
 mod web_security;
