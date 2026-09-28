@@ -31,6 +31,21 @@ impl DbError {
         matches!(self.0, sqlx::Error::RowNotFound)
     }
 
+    /// Another transaction got in the way and trying again may work:
+    /// SQLite's "database is locked" (busy), PostgreSQL's serialization
+    /// failure or deadlock. `Db::transaction_retrying` retries on these.
+    pub fn is_retryable(&self) -> bool {
+        let sqlx::Error::Database(db) = &self.0 else {
+            return false;
+        };
+        match db.code() {
+            Some(code) if code == "40001" || code == "40P01" => true,
+            // SQLite's primary codes 5 (BUSY) and 6 (LOCKED), extended or not.
+            Some(code) => code.parse::<i32>().is_ok_and(|c| matches!(c & 0xff, 5 | 6)),
+            None => false,
+        }
+    }
+
     /// No connection was free within `DATABASE_ACQUIRE_TIMEOUT`.
     pub fn is_timeout(&self) -> bool {
         matches!(self.0, sqlx::Error::PoolTimedOut)

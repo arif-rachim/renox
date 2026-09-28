@@ -101,6 +101,56 @@ impl<T> Paginated<T> {
     }
 }
 
+/// One page without the total (`Query::simple_paginate`): one query, for
+/// "previous / next" links on large tables.
+///
+/// ```jinja
+/// {% from "renox/pagination.html" import simple_pagination %}
+/// {{ simple_pagination(orders) }}
+/// ```
+#[derive(Debug, Clone, Serialize)]
+#[non_exhaustive]
+pub struct SimplePage<T> {
+    pub items: Vec<T>,
+    pub page: u32,
+    pub per_page: u32,
+    pub has_prev: bool,
+    pub has_next: bool,
+}
+
+impl<T> SimplePage<T> {
+    pub fn map<U>(self, f: impl FnMut(T) -> U) -> SimplePage<U> {
+        SimplePage {
+            items: self.items.into_iter().map(f).collect(),
+            page: self.page,
+            per_page: self.per_page,
+            has_prev: self.has_prev,
+            has_next: self.has_next,
+        }
+    }
+}
+
+/// Rows after a cursor (`Query::cursor_paginate`), newest first: stable
+/// while rows are added, and fast at any depth. Pass `next_cursor` back as
+/// the cursor to get the following rows; `None` means there are no more.
+#[derive(Debug, Clone, Serialize)]
+#[non_exhaustive]
+pub struct CursorPage<T> {
+    pub items: Vec<T>,
+    pub per_page: u32,
+    pub next_cursor: Option<String>,
+}
+
+impl<T> CursorPage<T> {
+    pub fn map<U>(self, f: impl FnMut(T) -> U) -> CursorPage<U> {
+        CursorPage {
+            items: self.items.into_iter().map(f).collect(),
+            per_page: self.per_page,
+            next_cursor: self.next_cursor,
+        }
+    }
+}
+
 /// First, last, and two pages either side of the current one.
 fn window(page: u32, last: u32) -> Vec<Option<u32>> {
     let mut pages = Vec::new();

@@ -11,7 +11,8 @@
   `rnx` commands; modules, routes, path parameters, route groups and guards (auth, verified,
   guest, throttle); views, template globals and overriding built-in pages; `App::share` and
   `App::templates`; `App::provide` and `App::layer`; forms and validation (`unique`/`exists`);
-  models, migrations and queries; every field type; pagination; seeders and factories; auth,
+  models, migrations and queries (raw fragments, grouping, locks, update_or_create, simple and
+  cursor pagination, transactions with retries); every field type; pagination; seeders and factories; auth,
   policies, gates, API tokens and your own login; tenants (`renox::context`, default scopes),
   roles and permissions, route guards for gates/roles/permissions/token abilities; the account
   page, password rules and confirmation, per-device logout; auth events and the audit log; HTMX; raw SQL and transactions; jobs, events and

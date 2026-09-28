@@ -1,6 +1,6 @@
 use std::future::Future;
 
-use super::{DateTime, DbValue, Executor, Query, ToDbValue, now, quote, sql};
+use super::{DateTime, Db, DbValue, Executor, Query, ToDbValue, now, quote, sql};
 use crate::{Error, Result};
 use anyhow::anyhow;
 
@@ -84,6 +84,20 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
     /// tenant. Soft-deleted rows stay hidden unless asked for.
     fn unscoped() -> Query<Self> {
         Query::new()
+    }
+
+    /// Reloads the model's row (e.g. after an `increment` or another request
+    /// changed it); a deleted row is a 404.
+    fn refresh(&mut self, db: &Db) -> impl Future<Output = Result<()>> + Send {
+        async move {
+            let id = self.id();
+            *self = Self::unscoped()
+                .with_trashed()
+                .where_eq("id", id)
+                .first_or_404(db)
+                .await?;
+            Ok(())
+        }
     }
 
     /// Shorthand for `query().where_eq(column, value)`.

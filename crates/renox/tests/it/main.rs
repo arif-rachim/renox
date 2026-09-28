@@ -21,6 +21,7 @@ mod mail;
 mod method;
 #[cfg(feature = "postgres")]
 mod postgres;
+mod query_builder;
 mod queue;
 mod requests;
 #[cfg(feature = "s3")]

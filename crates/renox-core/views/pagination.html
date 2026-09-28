@@ -16,3 +16,16 @@
 </nav>
 {%- endif %}
 {%- endmacro %}
+
+{#- Previous / next links for a `SimplePage` (no total):
+    {% from "renox/pagination.html" import simple_pagination %}
+    {{ simple_pagination(orders) }} -#}
+{% macro simple_pagination(p) -%}
+{% if p.has_prev or p.has_next -%}
+<nav class="pagination" aria-label="Pagination">
+  {%- if p.has_prev %}<a href="{{ page_url(p.page - 1) }}" rel="prev">&laquo;</a>{% else %}<span aria-disabled="true">&laquo;</span>{% endif %}
+  <span aria-current="page">{{ p.page }}</span>
+  {%- if p.has_next %}<a href="{{ page_url(p.page + 1) }}" rel="next">&raquo;</a>{% else %}<span aria-disabled="true">&raquo;</span>{% endif -%}
+</nav>
+{%- endif %}
+{%- endmacro %}

@@ -667,7 +667,11 @@ change 29 s → 7 s, full run 19 s → 6 s.
   `revoked_sessions` denylist, auth events + the `Audit` module, bcrypt import): PR from branch
   `m18b-accounts`. Sessions: each login stores `_auth_session_id`; `resolve` checks the password
   fingerprint, `sessions_revoked_at` and the denylist in one query.
-- **Next: M19–M21**, from the Laravel parity review
+- **M19a** (query builder: raw fragments, group/having/select_as, locks, EXISTS, count/sum
+  loaders, simple/cursor pagination, update_or_create, refresh, transaction helpers): PR from
+  branch `m19a-query-builder`. `Query` keeps `having_binds` apart and `all_binds()` joins them
+  after the WHERE binds; use it in every terminal method.
+- **Next: M19b (model features), then M20–M21**, from the Laravel parity review
   (`docs/audit/2026-09-laravel-parity.md`); the ROADMAP lists each milestone's items. **v1.0 is
   on hold** until the owner says to start it (docs site, starter kit, semver checks, real
   crates.io releases; the owner runs `cargo login`).
