@@ -36,7 +36,7 @@ use axum::http::Response;
 use axum::http::header::{COOKIE, LOCATION};
 use axum::http::request::Parts;
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
 
 use crate::{Result, Session};
 
@@ -138,6 +138,7 @@ mod server_event {
     use super::*;
     use crate::config::Environment;
     use crate::queue::{Job, JobContext};
+    use serde_json::Map;
 
     /// An event sent from the server to GA4 (Measurement Protocol), as a queue
     /// job so a slow or failing request never holds up the page. Needs
