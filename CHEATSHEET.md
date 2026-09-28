@@ -388,6 +388,18 @@ fn auth() -> Auth {
         })
 }
 
+// API tokens (`Authorization: Bearer …`, no CSRF): issue one, and revoke the
+// one a request used ("log out" on one device) or all of them.
+async fn issue(State(db): State<Db>, user: AuthUser) -> Result<String> {
+    Ok(user.create_token(&db, "phone", None).await?.plain) // shown once
+}
+async fn log_out_device(State(db): State<Db>, user: AuthUser) -> Result<StatusCode> {
+    if let Some(id) = user.token_id() {
+        user.revoke_token(&db, id).await?; // user.revoke_tokens(&db) for every device
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
 // For `{% if can('update', product) %}` in the view, attach the abilities.
 async fn index(State(db): State<Db>, user: Option<AuthUser>) -> Result<View> {
     let products: Vec<_> = Product::query()

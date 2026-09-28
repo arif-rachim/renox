@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="{{ app.locale }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% block seo %}{{ seo(title="htmx recipes") }}{% endblock %}
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
+  {#- htmx, Alpine, the CSRF token for htmx requests, and validation errors next to inputs. -#}
+  {{ renox_head() }}
+</head>
+<body>
+  <main>
+    {% if flash.status %}<p class="flash">{{ flash.status }}</p>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<h1>Posts</h1>
+{% for post in posts.items %}
+<article class="card">
+  <h2><a href="{{ route('posts.show', post.id) }}">{{ post.title }}</a></h2>
+  {% include "blog/_meta.html" %}
+  <p class="muted">
+    {{ post.comments }} comment{{ "" if post.comments == 1 else "s" }}
+    {%- if post.latest_comment %}; latest by {{ post.latest_comment.author }}{% endif %}
+  </p>
+</article>
+{% else %}
+<p class="muted">No posts yet. Run <code>cargo run -- db:seed</code>.</p>
+{% endfor %}
+{% from "renox/pagination.html" import pagination %}{{ pagination(posts) }}
+{% endblock %}

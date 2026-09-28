@@ -625,9 +625,9 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M16a lighter builds (no aws-lc, default features `fake`/`server-events`), versioned `asset()`, cargo-chef Dockerfile, shared limits with `CACHE_STORE=database` | merged to `main` (#40) |
 | M16b CI & trust: MSRV, cargo-hack, `tests/cli/run.sh` (rnx new + make:* + Docker), S3 on SeaweedFS, cargo-deny, coverage, direct tests, macro doctests, SECURITY/CONTRIBUTING/CHANGELOG | merged to `main` (#41) |
 | Fix: pooled connections with a stale schema after migrations (flaky macOS CI) | merged to `main` (#42) |
-| M17a `examples/shop` + README; fix: relation loaders / `first_or_create` not `Send` in routed handlers | PR from branch `m17a-shop-example` |
-| M17b examples htmx-recipes, relations, a README per example | next; then v1.0 |
-| v1.0 docs site, starter kit, semver guarantee | last |
+| M17a `examples/shop` + README; fix: relation loaders / `first_or_create` not `Send` in routed handlers | merged to `main` (#43) |
+| M17b examples htmx-recipes, relations, a README per example, `AuthUser::token_id`, `key:generate` creates `.env` | PR from branch `m17b-examples` |
+| v1.0: docs site, starter kit, semver-checks, publishing (owner runs `cargo login`) | next |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on
 an up-to-date `main`. Open the next milestone's PR only after the previous one is merged (§6.3).

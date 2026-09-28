@@ -1,0 +1,7 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<h1>Summary</h1>
+<p>{{ open }} task{{ "" if open == 1 else "s" }} still open.</p>
+<p><a href="{{ route('tasks.index') }}">Back to the list</a></p>
+{% endblock %}

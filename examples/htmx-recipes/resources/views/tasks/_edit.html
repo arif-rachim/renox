@@ -1,0 +1,12 @@
+<li id="task-{{ task.id }}" class="task editing">
+  {# Save answers with the row; Escape asks for the row as it was. Errors
+     (422) appear in the slot below without replacing anything. #}
+  <form method="post" action="{{ route('tasks.update', task.id) }}"
+        hx-patch="{{ route('tasks.update', task.id) }}" hx-target="closest li" hx-swap="outerHTML">
+    {{ csrf_field() }}{{ method_field('PATCH') }}
+    <input name="title" value="{{ task.title }}" autofocus aria-label="Title"
+           hx-get="{{ route('tasks.show', task.id) }}" hx-trigger="keyup[key=='Escape']" hx-target="closest li" hx-swap="outerHTML">
+    <button>Save</button>
+    <p class="error" data-error-for="title"></p>
+  </form>
+</li>

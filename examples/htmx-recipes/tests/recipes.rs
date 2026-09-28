@@ -1,0 +1,140 @@
+//! Each recipe answers htmx with the smallest fragment and plain requests
+//! with a redirect.
+
+use htmx_recipes::app::tasks::Task;
+use renox::prelude::*;
+use renox::testing::TestApp;
+
+async fn with_tasks(n: usize) -> TestApp {
+    let app = TestApp::new(htmx_recipes::app()).await;
+    for i in 1..=n {
+        Task::create(
+            app.db(),
+            Task {
+                title: format!("Task {i}"),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    }
+    app
+}
+
+#[renox::test]
+async fn the_page_loads_more_rows_as_you_scroll() {
+    let app = with_tasks(20).await;
+    app.get("/")
+        .await
+        .assert_ok()
+        .assert_see("<html")
+        .assert_see(">Task 20<") // newest first
+        .assert_dont_see(">Task 5<")
+        .assert_see(r#"hx-get="/?page=2" hx-trigger="revealed""#)
+        .assert_see("20 open");
+
+    // The loader asks with htmx and gets only the next rows, and no loader
+    // after the last page.
+    let more = app.htmx().get("/?page=2").await;
+    more.assert_ok()
+        .assert_see(">Task 5<")
+        .assert_see(">Task 1<")
+        .assert_dont_see("<html")
+        .assert_dont_see("page=3");
+}
+
+#[renox::test]
+async fn the_modal_adds_a_row_and_closes() {
+    let app = with_tasks(0).await;
+    let res = app.htmx().post("/tasks", &[("title", "Buy coffee")]).await;
+    res.assert_ok()
+        .assert_header("hx-trigger", "task-added")
+        .assert_see(r#"<li id="task-1""#)
+        .assert_see(">Buy coffee<")
+        .assert_dont_see("<html");
+
+    // Errors come back as 422 JSON, shown in the modal's form.
+    app.htmx()
+        .post("/tasks", &[("title", "")])
+        .await
+        .assert_invalid("title");
+    // Without JavaScript it's a normal form post.
+    app.post("/tasks", &[("title", "Buy tea")])
+        .await
+        .assert_redirect("/");
+    app.assert_database_count("tasks", 2).await;
+}
+
+#[renox::test]
+async fn titles_are_edited_in_place() {
+    let app = with_tasks(1).await;
+    app.htmx()
+        .get("/tasks/1/edit")
+        .await
+        .assert_see(r#"value="Task 1""#)
+        .assert_see(r#"hx-patch="/tasks/1""#)
+        .assert_see(r#"hx-trigger="keyup[key=='Escape']""#);
+    app.htmx()
+        .patch("/tasks/1", &[("title", "Renamed")])
+        .await
+        .assert_ok()
+        .assert_see(">Renamed<")
+        .assert_see(r#"hx-trigger="dblclick""#);
+    app.htmx()
+        .patch("/tasks/1", &[("title", &"x".repeat(101))])
+        .await
+        .assert_invalid("title");
+    // Escape: the row as it is.
+    app.htmx().get("/tasks/1").await.assert_see(">Renamed<");
+    app.htmx().get("/tasks/9/edit").await.assert_not_found();
+}
+
+#[renox::test]
+async fn checkboxes_toggle_and_rows_delete_in_place() {
+    let app = with_tasks(2).await;
+    app.htmx()
+        .patch("/tasks/1/toggle", &[])
+        .await
+        .assert_see(r#"class="task done""#)
+        .assert_see("checked");
+    assert!(Task::find_or_404(app.db(), 1).await.unwrap().done);
+    app.htmx()
+        .patch("/tasks/1/toggle", &[])
+        .await
+        .assert_dont_see("checked");
+
+    // An empty answer: htmx swaps the row for nothing.
+    let res = app.htmx().delete("/tasks/1").await;
+    res.assert_ok();
+    assert_eq!(res.text(), "");
+    app.delete("/tasks/2").await.assert_redirect("/");
+    app.assert_database_count("tasks", 0).await;
+}
+
+#[renox::test]
+async fn bulk_actions_refresh_or_redirect() {
+    let app = with_tasks(3).await;
+    for id in [1, 2] {
+        app.htmx().patch(&format!("/tasks/{id}/toggle"), &[]).await;
+    }
+
+    app.htmx()
+        .post("/tasks/clear-done", &[])
+        .await
+        .assert_header("hx-refresh", "true");
+    app.get("/").await.assert_see("2 done tasks cleared.");
+    app.assert_database_count("tasks", 1).await;
+
+    app.htmx().patch("/tasks/3/toggle", &[]).await;
+    app.htmx()
+        .post("/tasks/archive", &[])
+        .await
+        .assert_hx_redirect("/summary");
+    app.get("/summary")
+        .await
+        .assert_see("1 tasks archived.")
+        .assert_see("0 tasks still open.");
+    app.post("/tasks/archive", &[])
+        .await
+        .assert_redirect("/summary");
+}

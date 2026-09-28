@@ -36,8 +36,10 @@ impl Module for Products {
             .name("api.products.store")
             .get("/api/products/{id}", show)
             .name("api.products.show")
-            .delete("/api/tokens/current", revoke_tokens)
+            .delete("/api/tokens/current", revoke_current)
             .name("api.tokens.destroy")
+            .delete("/api/tokens", revoke_all)
+            .name("api.tokens.destroy_all")
             .require_auth(); // a missing or wrong Bearer token → 401
         tokens
             .merge(api)
@@ -75,7 +77,16 @@ async fn issue_token(
     ))
 }
 
-async fn revoke_tokens(State(db): State<Db>, user: AuthUser) -> Result<StatusCode> {
+/// "Log out" in the app: this device's token stops working.
+async fn revoke_current(State(db): State<Db>, user: AuthUser) -> Result<StatusCode> {
+    if let Some(id) = user.token_id() {
+        user.revoke_token(&db, id).await?;
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// "Log out everywhere": every token of this user stops working.
+async fn revoke_all(State(db): State<Db>, user: AuthUser) -> Result<StatusCode> {
     user.revoke_tokens(&db).await?;
     Ok(StatusCode::NO_CONTENT)
 }

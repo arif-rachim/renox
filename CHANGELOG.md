@@ -10,6 +10,17 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M17b · More examples, a README for each
+
+- `examples/htmx-recipes` (modal form, inline edit, toggle, dropdown with delete, infinite
+  scroll, tabs, `HxRefresh`, `HxRedirect`) and `examples/relations` (belongs to, has many,
+  many to many with `sync` and `inverse`, no N+1, SQL reports).
+- A README for every example.
+- `AuthUser::token_id()`: the API token the request logged in with, to revoke just that one.
+- `rnx key:generate` creates `.env` (from `.env.example` when there is one) instead of failing.
+- examples/api: `DELETE /api/tokens/current` revokes only the token used; `DELETE /api/tokens`
+  revokes all.
+
 ### M17a · examples/shop
 
 - `examples/shop`: a whole online shop with its README (catalog, cart, checkout in one
