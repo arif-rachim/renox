@@ -73,7 +73,9 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/view_filters.rs      built-in template filters `number` and `date`; pub format_number
   src/htmx.rs              Htmx extractor, HxRedirect/HxRefresh/HxTrigger, Back
   src/assets.rs            embedded htmx/Alpine/renox.js with hashed URLs; renox.js source lives here
-  src/error.rs             Error enum, IntoResponse, error pages, Debug for main(), panic_message
+  src/error.rs             Error enum, IntoResponse, error pages (the app's errors/{status}.html,
+                           errors/default.html with the page globals, else renox/error.html),
+                           Debug for main(), panic_message
   src/crypto.rs            APP_KEY parsing/generation, random tokens, constant_time_eq
   src/signed.rs            signed URLs (HMAC-SHA256) + ValidSignature extractor
   src/db/                  conn.rs (Db/Transaction/Row/sql(), Executor, SchemaEpoch), mod.rs
@@ -108,7 +110,12 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/cookies.rs           Cookies extractor (plain / encrypted), SetCookie response part
   src/download.rs          Download: bytes, streamed file, Storage key, stream; safe Content-Disposition
   src/command.rs           app commands: Args, Command; App::command / Registry::command, Kernel::call
-  src/rate_limit.rs        Limiter + middleware behind Routes::throttle
+  src/rate_limit.rs        Limiter + middleware behind Routes::throttle; named limiters
+                           (App::rate_limiter: LimitRequest → Limit, Routes::throttle_by)
+  src/request_id.rs        RequestId extractor + middleware (X-Request-Id)
+  src/report.rs            ErrorReport/ReportKind, App::report reporters (500s, jobs failed for
+                           good, failed scheduled tasks), sent in the background
+  src/inspector.rs         /_renox/debug: ring buffer of the last 50 requests (views/debug.html)
   src/client_ip.rs         ClientIp extractor + TrustedProxies (TRUSTED_PROXIES); resolved once in
                            security::middleware, read by throttle, login lock, trace span
   src/maintenance.rs       down/up/status + middleware (bypass cookie)
@@ -186,13 +193,16 @@ docs/assets/demo.gif       the README's demo (see §4.10)
    `X-HTTP-Method-Override`). It wraps the whole router via
    `Router::new().fallback_service(layer(router))`, because route layers run after axum has
    matched the method.
-3. `TraceLayer` (span with method, uri, client IP).
+3. `request_id::middleware` (keeps an acceptable incoming `X-Request-Id` or makes one; sets it
+   on the request, the response and as the `RequestId` extension), then `TraceLayer` (span
+   `request` with id, method, uri, client IP; `LOG_FORMAT=json` prints it as `span`).
 4. `DefaultBodyLimit` (`UPLOAD_MAX_SIZE`).
 5. Merged at this level, so they skip everything below (sessions, maintenance): `assets::router()`
    (`/_renox/*.js`), `/health`, `/robots.txt` (unless `public/robots.txt` exists), `/_renox/live`
    (debug + local only) and the local disk's public files (`/storage/...`, sandboxed headers).
-6. `context` (`renox::context`: a fresh task-local context per request holding the `AppState`
-   for `context::app()`; jobs, scheduled tasks and app commands get one too via `scope_app`) → `session` (encrypted cookie) → `i18n` (`RequestLocale`: session `_locale`, else
+6. `inspector` (only with debug + local: records the request's status, time, view and SQL via
+   `capture_queries`, skipping `/_renox/*`) → `context` (`renox::context`: a fresh task-local context per request holding the `AppState`
+   for `context::app()`, and the `RequestInfo` error reports read; jobs, scheduled tasks and app commands get one too via `scope_app`) → `session` (encrypted cookie) → `i18n` (`RequestLocale`: session `_locale`, else
    `APP_LOCALE`) → `auth` (loads the user once from session or `Authorization: Bearer`, with the
    token's abilities, and the user's roles/permissions when the `Permissions` module is on;
    inserts `CurrentUser` and `AppState` into extensions) → `csrf` → `view` (renders `View`s and error
@@ -200,8 +210,8 @@ docs/assets/demo.gif       the README's demo (see §4.10)
    `storage/framework/down` exists; inside `view` so the 503 uses the error template) → `guard`
    (a handler panic or a run past `REQUEST_TIMEOUT` becomes a 500 with the error page).
 7. `App::layer` layers (first added = outermost), around the modules' routes only.
-8. Routes. Also inside the layers: `/_renox/files` (storage), `/_renox/mail` (only with
-   `APP_DEBUG`), and the fallback: `public/` (`ServeDir`, or the embedded files) with a 404.
+8. Routes. Also inside the layers: `/_renox/files` (storage), `/_renox/mail` and
+   `/_renox/debug` (only with `APP_DEBUG`; the inspector answers 404 unless also local), and the fallback: `public/` (`ServeDir`, or the embedded files) with a 404.
 
 Because `AppState` and `CurrentUser` are in request extensions, guards (`require_auth`, …) are
 plain `from_fn` middlewares with no state parameter and can be added from `Module::routes()`.
@@ -556,6 +566,9 @@ Parsed in `crates/renox-core/src/config.rs`; defaults in parentheses.
 - **Requests:** `REQUEST_TIMEOUT` (seconds, 60; 0 = none), `UPLOAD_MAX_SIZE` (MB, 10),
   `TRUSTED_PROXIES` (addresses, CIDR ranges or `*`), `CSP` (relaxed|strict|off, also `false`/`none`
   for off; relaxed is the owner's chosen default).
+- **Logs:** `RUST_LOG` (info), `LOG_FORMAT` (text|json; anything else fails at boot),
+  `LOG_FILE` (append there instead of stdout, no ANSI colors; falls back to stdout if it can't
+  be opened).
 - **Mail:** `MAIL_MAILER` (log; smtp|log|memory), `MAIL_HOST`, `MAIL_PORT`, `MAIL_ENCRYPTION`
   (starttls; tls|starttls|none), `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS`,
   `MAIL_FROM_NAME`, `MAIL_TIMEOUT` (seconds, 10, the whole send).

@@ -1,7 +1,5 @@
 //! Made with `rnx make:module products` and `rnx make:model Product --module products -m`.
 
-use std::time::Duration;
-
 use renox::db::CursorPage;
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -55,7 +53,8 @@ impl Module for Products {
         let api = read.merge(write).merge(account).require_auth();
         tokens
             .merge(api)
-            .throttle(60, Duration::from_secs(60))
+            // The limit is picked per request by the `api` limiter (lib.rs).
+            .throttle_by("api")
             .cors(&["https://app.example.com"])
     }
 }

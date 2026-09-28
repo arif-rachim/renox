@@ -148,6 +148,13 @@ and worth keeping in an app's own pages:
   - Text sizes are in `rem`, so they follow the reader's settings.
   - Sheet and toast placement respect the notch and the home indicator (safe areas).
 
+### Error pages
+
+`rnx new` writes `resources/views/errors/default.html`: the layout with the kit's `empty`
+component and a way home, so a 404 or a 403 keeps the navigation bar. `errors/<status>.html`
+replaces it for one status; the page gets `status`, `reason` and `detail` besides the usual
+globals. Renox's own error page (used when an app has none) is built on the kit too.
+
 ## Toasts
 
 Return a `Toast` with the response:

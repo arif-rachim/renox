@@ -43,6 +43,12 @@ pub struct AppState {
         Arc<std::collections::HashMap<String, crate::auth::notifications::ChannelFn>>,
     /// The app's own values (`App::provide`).
     pub(crate) provided: crate::provided::ProvidedMap,
+    /// `/_renox/debug`'s recent requests, while developing locally.
+    pub(crate) inspector: Option<Arc<crate::inspector::Inspector>>,
+    /// Named rate limiters (`App::rate_limiter`).
+    pub(crate) limiters: Arc<std::collections::HashMap<String, crate::rate_limit::NamedLimiter>>,
+    /// The app's error reporters (`App::report`).
+    pub(crate) reporters: Arc<Vec<crate::report::ReportFn>>,
     /// What tests asked to record instead of doing (`TestApp::fake_events`, …).
     pub(crate) fakes: Arc<Fakes>,
 }

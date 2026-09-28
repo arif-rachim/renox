@@ -106,6 +106,7 @@ pub struct App {
     csp: crate::security::Csp,
     provided: HashMap<std::any::TypeId, Arc<dyn std::any::Any + Send + Sync>>,
     layers: Vec<AppLayer>,
+    limiters: HashMap<String, crate::rate_limit::LimitRule>,
 }
 
 /// A layer from `App::layer`, applied to the app's routes at boot.
@@ -127,6 +128,7 @@ impl App {
             csp: crate::security::Csp::default(),
             provided: HashMap::new(),
             layers: Vec::new(),
+            limiters: HashMap::new(),
         }
     }
 
@@ -336,6 +338,34 @@ impl App {
 
     /// Adds a notification channel (WhatsApp, SMS, Slack…); see
     /// [`Registry::channel`].
+    /// A named rate limit for `Routes::throttle_by(name)`, whose `rule`
+    /// picks the limit for each request (by user, role, IP, API key…); see
+    /// [`crate::rate_limit::Limit`].
+    pub fn rate_limiter(
+        mut self,
+        name: &str,
+        rule: impl Fn(&crate::rate_limit::LimitRequest) -> crate::rate_limit::Limit
+        + Send
+        + Sync
+        + 'static,
+    ) -> Self {
+        self.limiters
+            .insert(name.to_owned(), std::sync::Arc::new(rule));
+        self
+    }
+
+    /// Sends every error that needs a person (a 500, a job that failed for
+    /// good, a failed scheduled task) to `reporter`, e.g. an error tracker;
+    /// see [`crate::report`].
+    pub fn report<F, Fut>(mut self, reporter: F) -> Self
+    where
+        F: Fn(crate::report::ErrorReport, AppState) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        self.registry.report(reporter);
+        self
+    }
+
     pub fn channel<F, Fut>(mut self, name: &str, send: F) -> Self
     where
         F: Fn(AppState, crate::auth::Recipient, serde_json::Value) -> Fut + Send + Sync + 'static,
@@ -412,6 +442,7 @@ impl App {
             templates,
             shares,
             channels,
+            reporters,
             permissions,
         } = self.registry;
         if let Some(name) = duplicate_job {
@@ -480,6 +511,22 @@ impl App {
         }
         listing.extend(framework_routes(&config));
         listing.sort_by(|a, b| (&a.path, &a.method).cmp(&(&b.path, &b.method)));
+        // `throttle_by("name")` needs `App::rate_limiter("name", …)`.
+        for route in &listing {
+            for mark in &route.middleware {
+                if let Some(name) = mark.strip_prefix("throttle:")
+                    && !name.contains('/')
+                    && !self.limiters.contains_key(name)
+                {
+                    return Err(anyhow!(
+                        "{} {} uses throttle_by(\"{name}\"), but there's no App::rate_limiter(\"{name}\", …)",
+                        route.method,
+                        route.path
+                    )
+                    .into());
+                }
+            }
+        }
         for route in &listing {
             for provider in route
                 .middleware
@@ -538,6 +585,8 @@ impl App {
                 ])
             }),
             listeners: Arc::new(listeners),
+            inspector: (config.debug && config.env == Environment::Local)
+                .then(|| Arc::new(crate::inspector::Inspector::default())),
             config: Arc::new(config),
             routes,
             views,
@@ -551,6 +600,13 @@ impl App {
             async_gates: Arc::new(self.async_gates),
             shares: Arc::new(shares),
             channels: Arc::new(channels),
+            reporters: Arc::new(reporters),
+            limiters: Arc::new(
+                self.limiters
+                    .into_iter()
+                    .map(|(name, rule)| (name, crate::rate_limit::NamedLimiter::new(rule)))
+                    .collect(),
+            ),
             provided: Arc::new(self.provided),
             throttle: Arc::new(LoginThrottle::new(shared_counters.clone())),
         };
@@ -1162,7 +1218,9 @@ fn build_router(
     let not_found = || async { Error::NotFound };
     let router = router.merge(crate::storage::router());
     let router = if state.config.debug {
-        router.merge(crate::mail::preview_router())
+        router
+            .merge(crate::mail::preview_router())
+            .merge(crate::inspector::router())
     } else {
         router
     };
@@ -1231,6 +1289,11 @@ fn build_router(
             state.clone(),
             crate::context::middleware,
         ))
+        // `/_renox/debug`: around it all, so the session's and user's SQL count.
+        .layer(from_fn_with_state(
+            state.clone(),
+            crate::inspector::middleware,
+        ))
         .merge(assets::router())
         .merge(crate::health::router())
         .merge(robots(&state, embedded_public))
@@ -1242,14 +1305,21 @@ fn build_router(
         .layer(
             TraceLayer::new_for_http().make_span_with(|req: &axum::extract::Request| {
                 let ip = crate::ClientIp::of(req).map(|ip| ip.to_string());
-                tracing::debug_span!(
+                let id = req
+                    .headers()
+                    .get(crate::request_id::HEADER)
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or_default();
+                tracing::info_span!(
                     "request",
+                    id = %id,
                     method = %req.method(),
                     uri = %req.uri(),
                     ip = ip.as_deref().unwrap_or("unknown"),
                 )
             }),
         )
+        .layer(from_fn(crate::request_id::middleware))
         .with_state(state.clone());
     // Method spoofing must change the method before the router matches it.
     let limit = state.config.upload_max_size;
@@ -1335,7 +1405,39 @@ fn init_tracing(config: &Config, long_running: bool) {
         (false, _) => "warn",
     };
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(default));
-    let _ = tracing_subscriber::fmt().with_env_filter(filter).try_init();
+    // LOG_FILE appends to a file (rotate it with logrotate, or leave logs to
+    // journald/Docker on stdout); LOG_FORMAT=json writes one JSON object per
+    // line, with the request span's fields (id, method, uri, ip).
+    let file = config.log_file.as_ref().and_then(|path| {
+        match std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+        {
+            Ok(file) => Some(std::sync::Mutex::new(file)),
+            Err(err) => {
+                eprintln!("LOG_FILE {}: {err}; logging to stdout", path.display());
+                None
+            }
+        }
+    });
+    let json = config.log_format == "json";
+    let builder = tracing_subscriber::fmt().with_env_filter(filter);
+    let _ = match (json, file) {
+        (true, Some(file)) => builder
+            .json()
+            .with_current_span(true)
+            .with_span_list(false)
+            .with_writer(file)
+            .try_init(),
+        (true, None) => builder
+            .json()
+            .with_current_span(true)
+            .with_span_list(false)
+            .try_init(),
+        (false, Some(file)) => builder.with_ansi(false).with_writer(file).try_init(),
+        (false, None) => builder.try_init(),
+    };
 }
 
 async fn shutdown_signal() {

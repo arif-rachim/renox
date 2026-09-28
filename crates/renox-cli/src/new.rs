@@ -32,6 +32,10 @@ const STUBS: &[(&str, &str)] = &[
         "resources/views/home/index.html",
         include_str!("../stubs/resources/views/home/index.html"),
     ),
+    (
+        "resources/views/errors/default.html",
+        include_str!("../stubs/resources/views/errors/default.html"),
+    ),
     ("public/app.css", include_str!("../stubs/public/app.css")),
     (
         "resources/lang/en.json",

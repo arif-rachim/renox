@@ -281,6 +281,19 @@ impl Routes {
         .mark(&format!("throttle:{max}/{}s", per.as_secs()))
     }
 
+    /// Limits the routes added so far with the named limiter `name`
+    /// (`App::rate_limiter`), whose rule picks the limit per request.
+    pub fn throttle_by(self, name: &str) -> Self {
+        let owned = name.to_owned();
+        self.route_layer(from_fn(
+            move |req: Request, next: axum::middleware::Next| {
+                let name = owned.clone();
+                async move { crate::rate_limit::check_named(&name, req, next).await }
+            },
+        ))
+        .mark(&format!("throttle:{name}"))
+    }
+
     /// Receives `W`'s webhooks at `path` (POST): verifies, stores once per
     /// event and processes them in the queue. See `renox::webhook`. The
     /// route is named `webhooks.<provider>`, skips CSRF and keeps working in
