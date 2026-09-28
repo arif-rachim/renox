@@ -359,11 +359,14 @@ async fn only_admins_get_into_the_admin() {
     app.get("/").await.assert_see(">Admin</a>");
     app.get("/admin").await.assert_ok();
     assert_eq!(budi.roles(app.db()).await.unwrap(), ["admin"]);
-    // Promoting twice is harmless, and the role list stays the same.
-    app.kernel()
-        .call("shop:make-admin", ["budi@example.com"])
-        .await
-        .unwrap();
+    // Promoting twice is harmless, and the role list stays the same. Without
+    // the email, the command asks for it.
+    renox::prompt::answering(
+        ["budi@example.com"],
+        app.kernel().call("shop:make-admin", [""; 0]),
+    )
+    .await
+    .unwrap();
     assert_eq!(budi.roles(app.db()).await.unwrap(), ["admin"]);
     let admins = shop::admins(app.db()).await.unwrap();
     assert_eq!(admins.iter().map(|u| u.id).collect::<Vec<_>>(), [budi.id]);

@@ -31,6 +31,14 @@ async fn users_create_products() {
     let app = TestApp::new(crud::app()).await;
     let me = user(&app, "me@example.com").await;
     app.acting_as(&me);
+    // The form pushes a robots tag into the layout's head.
+    let form = app.get("/products/new").await;
+    let html = form.text();
+    let head = &html[..html.find("</head>").unwrap()];
+    assert!(
+        head.contains(r#"<meta name="robots" content="noindex">"#),
+        "{head}"
+    );
 
     app.post("/products", &[("name", "Tea"), ("price", "9000")])
         .await

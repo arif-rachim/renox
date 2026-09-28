@@ -336,8 +336,13 @@ impl App {
         self
     }
 
-    /// Adds a notification channel (WhatsApp, SMS, Slack…); see
-    /// [`Registry::channel`].
+    /// A command whose arguments are declared with clap; see
+    /// [`AppCommand`](crate::command::AppCommand).
+    pub fn typed_command<T: crate::command::AppCommand>(mut self) -> Self {
+        self.registry.typed_command::<T>();
+        self
+    }
+
     /// A named rate limit for `Routes::throttle_by(name)`, whose `rule`
     /// picks the limit for each request (by user, role, IP, API key…); see
     /// [`crate::rate_limit::Limit`].
@@ -366,6 +371,8 @@ impl App {
         self
     }
 
+    /// Adds a notification channel (WhatsApp, SMS, Slack…); see
+    /// [`Registry::channel`].
     pub fn channel<F, Fut>(mut self, name: &str, send: F) -> Self
     where
         F: Fn(AppState, crate::auth::Recipient, serde_json::Value) -> Fut + Send + Sync + 'static,

@@ -64,7 +64,12 @@ fn docs_url(rev: Option<&str>) -> String {
     format!("{RENOX_GIT}/blob/{}", rev.unwrap_or("main"))
 }
 
-pub fn run(name: &str, renox_path: Option<&Path>, database: Database) -> Result<()> {
+pub fn run(
+    name: &str,
+    renox_path: Option<&Path>,
+    database: Database,
+    tailwind: bool,
+) -> Result<()> {
     validate_name(name)?;
     let root = Path::new(name);
     if root.exists() {
@@ -143,12 +148,58 @@ pub fn run(name: &str, renox_path: Option<&Path>, database: Database) -> Result<
             .with_context(|| format!("could not write {}", path.display()))?;
     }
 
+    if tailwind {
+        use_tailwind(root)?;
+    }
+
     match database {
         Database::Sqlite => println!("Created {name}. Next:\n\n    cd {name}\n    rnx serve\n"),
         Database::Postgres => println!(
             "Created {name}. Next: create the `{crate_name}` and `{crate_name}_test` databases \
              (or edit DATABASE_URL and TEST_DATABASE_URL in .env), then\n\n    cd {name}\n    rnx serve\n"
         ),
+    }
+    Ok(())
+}
+
+/// `--tailwind`: the app's styles move into Tailwind's input, the layout
+/// links the built file, and the CSS is built once if the CLI can be had.
+fn use_tailwind(root: &Path) -> Result<()> {
+    let own = fs::read_to_string(root.join("public/app.css"))?;
+    fs::remove_file(root.join("public/app.css"))?;
+    let input = root.join(crate::tailwind::INPUT);
+    fs::create_dir_all(input.parent().expect("the input has a parent"))?;
+    // The app's own rules (the navigation bar…), without the stub's header comment.
+    let rules = own
+        .split_once("*/")
+        .map_or(own.as_str(), |(_, rest)| rest.trim_start());
+    fs::write(
+        &input,
+        format!(
+            "{}
+{rules}",
+            crate::tailwind::INPUT_STUB
+        ),
+    )?;
+
+    let layout = root.join("resources/views/layouts/app.html");
+    let html = fs::read_to_string(&layout)?.replace(
+        "<link rel=\"stylesheet\" href=\"{{ asset('app.css') }}\">",
+        "{#- Built by Tailwind from resources/css/app.css (`rnx serve`, `rnx build`). -#}\n  \
+         <link rel=\"stylesheet\" href=\"{{ asset('css/app.css') }}\">",
+    );
+    fs::write(&layout, html)?;
+    let home = root.join("resources/views/home/index.html");
+    let html = fs::read_to_string(&home)?.replace(
+        "    <p class=\"rx-subtitle\">{{ t('home.edit') }}</p>",
+        "    <p class=\"rx-subtitle\">{{ t('home.edit') }}</p>\n    \
+         <p class=\"mt-2 text-sm font-medium text-emerald-700 dark:text-emerald-400\">\
+         Tailwind is on: edit resources/css/app.css, or use its classes in any view.</p>",
+    );
+    fs::write(&home, html)?;
+
+    if let Err(err) = crate::tailwind::build(root, false) {
+        eprintln!("rnx: Tailwind isn't built yet ({err:#}); `rnx serve` will try again.");
     }
     Ok(())
 }

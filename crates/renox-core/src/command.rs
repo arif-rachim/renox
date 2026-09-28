@@ -21,6 +21,42 @@
 //!
 //! Commands run after the app boots (the database is connected, migrations
 //! are not run for you) and appear in `my-app help`.
+//!
+//! A typed command declares its arguments with clap, so they're parsed and
+//! checked for you, and `my-app catalog:import --help` prints its usage:
+//!
+//! ```
+//! # use renox::prelude::*;
+//! use renox::clap;
+//! use renox::command::AppCommand;
+//!
+//! /// Import products from a CSV file.
+//! #[derive(clap::Parser)]
+//! #[command(name = "catalog:import")]
+//! struct ImportCatalog {
+//!     /// The CSV file.
+//!     file: std::path::PathBuf,
+//!     /// Show what would change without saving.
+//!     #[arg(long)]
+//!     dry_run: bool,
+//!     #[arg(long, default_value_t = 500)]
+//!     batch: usize,
+//! }
+//!
+//! impl AppCommand for ImportCatalog {
+//!     async fn run(self, state: AppState) -> Result {
+//!         println!("importing {} ({} a batch)", self.file.display(), self.batch);
+//!         # let _ = state;
+//!         Ok(())
+//!     }
+//! }
+//!
+//! # let _ =
+//! App::new().typed_command::<ImportCatalog>()
+//! # ;
+//! ```
+//!
+//! Ask for what's missing with [`crate::prompt`].
 
 use std::future::Future;
 use std::pin::Pin;
@@ -88,6 +124,13 @@ impl Args {
     }
 }
 
+/// A command whose arguments are a clap `Parser`: its `#[command(name = …)]`
+/// is the command's name, and its doc comment (or `about`) the line in
+/// `my-app help`. Register it with [`App::typed_command`](crate::App::typed_command).
+pub trait AppCommand: clap::Parser + Send + 'static {
+    fn run(self, state: AppState) -> impl Future<Output = Result> + Send;
+}
+
 pub(crate) type CommandFn =
     Arc<dyn Fn(AppState, Args) -> Pin<Box<dyn Future<Output = Result> + Send>> + Send + Sync>;
 
@@ -107,6 +150,51 @@ where
         name: name.to_owned(),
         about: about.to_owned(),
         run: Arc::new(move |state, args| Box::pin(run(state, args))),
+    }
+}
+
+pub(crate) fn typed<T: AppCommand>() -> Command {
+    let definition = T::command();
+    let name = definition.get_name().to_owned();
+    let about = definition
+        .get_about()
+        .map(|about| about.to_string())
+        .unwrap_or_default();
+    let bin = name.clone();
+    Command {
+        name,
+        about,
+        run: Arc::new(move |state, args: Args| {
+            let bin = bin.clone();
+            Box::pin(async move {
+                match T::try_parse_from(std::iter::once(bin).chain(args.0)) {
+                    Ok(command) => command.run(state).await,
+                    // `--help` / `--version`: printed, and that's a success.
+                    Err(err)
+                        if matches!(
+                            err.kind(),
+                            clap::error::ErrorKind::DisplayHelp
+                                | clap::error::ErrorKind::DisplayVersion
+                        ) =>
+                    {
+                        print!("{}", err.render());
+                        Ok(())
+                    }
+                    // What's wrong, then how to call it (clap includes the
+                    // usage for some errors; `Error: ` is added by main).
+                    Err(err) => {
+                        let rendered = err.render().to_string();
+                        let message = rendered.trim_end();
+                        let message = message.strip_prefix("error: ").unwrap_or(message);
+                        Err(crate::Error::Internal(if message.contains("Usage:") {
+                            anyhow::anyhow!("{message}")
+                        } else {
+                            anyhow::anyhow!("{message}\n\n{}", T::command().render_usage())
+                        }))
+                    }
+                }
+            })
+        }),
     }
 }
 

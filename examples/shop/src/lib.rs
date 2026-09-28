@@ -18,6 +18,8 @@ pub mod app;
 
 use renox::audit::Audit;
 use renox::auth::{Permissions, permissions};
+use renox::clap;
+use renox::command::AppCommand;
 use renox::prelude::*;
 
 use app::catalog::model::{Category, Product};
@@ -53,11 +55,7 @@ pub fn app() -> App {
             .await?;
             Ok(n)
         })
-        .command(
-            "shop:make-admin",
-            "Give a registered user the admin role: shop:make-admin EMAIL",
-            make_admin,
-        )
+        .typed_command::<MakeAdmin>()
         .seeder(seed)
 }
 
@@ -86,17 +84,28 @@ pub async fn admins(db: &Db) -> Result<Vec<User>> {
         .await
 }
 
-async fn make_admin(state: AppState, args: renox::command::Args) -> Result {
-    let Some(email) = args.positional().first().copied() else {
-        return Err(Error::BadRequest("usage: shop:make-admin EMAIL".into()));
-    };
-    let user = User::where_eq("email", email)
-        .first(&state.db)
-        .await?
-        .ok_or_else(|| Error::BadRequest(format!("no user has the email {email}")))?;
-    make_admin_of(&state.db, &user).await?;
-    println!("{email} is an admin now.");
-    Ok(())
+/// Give a registered user the admin role.
+#[derive(clap::Parser)]
+#[command(name = "shop:make-admin")]
+struct MakeAdmin {
+    /// Their email; asked for when it's left out.
+    email: Option<String>,
+}
+
+impl AppCommand for MakeAdmin {
+    async fn run(self, state: AppState) -> Result {
+        let email = match self.email {
+            Some(email) => email,
+            None => renox::prompt::ask("Email of the new admin").await?,
+        };
+        let user = User::where_eq("email", &email)
+            .first(&state.db)
+            .await?
+            .ok_or_else(|| Error::BadRequest(format!("no user has the email {email}")))?;
+        make_admin_of(&state.db, &user).await?;
+        println!("{email} is an admin now.");
+        Ok(())
+    }
 }
 
 async fn seed(db: Db) -> Result {

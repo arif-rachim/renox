@@ -3,6 +3,8 @@
 
 {# One form for both: `product` is only set when editing. #}
 {% block content %}
+{#- Into the layout's head (`stack('head')`): forms needn't be in search results. -#}
+{% call push('head') %}<meta name="robots" content="noindex">{% endcall %}
 <div class="rx-stack">
   <div>
     <a class="rx-link" href="{{ route('products.index') }}">‹ Products</a>

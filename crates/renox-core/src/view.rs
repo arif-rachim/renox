@@ -247,6 +247,7 @@ impl Views {
             for name in REQUEST_GLOBALS {
                 env.add_global(*name, Value::from_object(RequestGlobal(name)));
             }
+            crate::view_stack::register(&mut env);
             env.add_function("renox_ui", |kwargs: minijinja::value::Kwargs| {
                 let styles: Option<bool> = kwargs.get("styles")?;
                 kwargs.assert_all_used()?;
@@ -291,17 +292,19 @@ impl Views {
         let _current = CurrentGlobals::set(globals.clone());
         // The last map wins: shared values, then the handler's, then Renox's.
         let ctx = merge_maps([shared, view.ctx.clone(), globals]);
-        match &view.fragment {
+        let stacks = crate::view_stack::Scope::begin();
+        let html = match &view.fragment {
             Some(block) if htmx.wants_fragment() => {
                 let mut captured = template.render_captured_to(ctx, std::io::sink())?;
                 let mut out = captured.with_state_mut(|state| state.render_block(block))?;
                 for extra in &view.also {
                     out.push_str(&captured.with_state_mut(|state| state.render_block(extra))?);
                 }
-                Ok(out)
+                out
             }
-            _ => Ok(template.render(ctx)?),
-        }
+            _ => template.render(ctx)?,
+        };
+        Ok(stacks.finish(html))
     }
 
     /// The error page: the app's `errors/{status}.html`, else its
@@ -337,7 +340,10 @@ impl Views {
             let rendered = match &globals {
                 Some(globals) => {
                     let _current = CurrentGlobals::set(globals.clone());
-                    template.render(merge_maps([globals.clone(), ctx.clone()]))
+                    let stacks = crate::view_stack::Scope::begin();
+                    template
+                        .render(merge_maps([globals.clone(), ctx.clone()]))
+                        .map(|html| stacks.finish(html))
                 }
                 None => template.render(ctx.clone()),
             };

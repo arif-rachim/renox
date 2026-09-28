@@ -6,6 +6,7 @@ mod make;
 mod new;
 mod scaffold;
 mod serve;
+mod tailwind;
 
 use std::path::PathBuf;
 
@@ -38,6 +39,9 @@ enum Command {
         /// The database the app starts with.
         #[arg(long, value_enum, default_value_t = Database::Sqlite)]
         database: Database,
+        /// Style pages with Tailwind CSS (its standalone CLI, no Node) next to the UI kit.
+        #[arg(long)]
+        tailwind: bool,
     },
     /// Run the app, rebuilding and restarting it when source files change.
     Serve {
@@ -188,8 +192,20 @@ enum Command {
     /// Run the app's seeders.
     #[command(name = "db:seed")]
     DbSeed,
-    /// Build a release binary into dist/.
+    /// Build a release binary into dist/ (and, with Tailwind, minified CSS first).
     Build,
+    /// Build public/css/app.css with Tailwind (`rnx serve` and `rnx build` do it for you).
+    Tailwind {
+        /// Rebuild whenever a view or the input changes.
+        #[arg(long)]
+        watch: bool,
+        /// Optimize and minify, as `rnx build` does.
+        #[arg(long)]
+        minify: bool,
+    },
+    /// Download the pinned Tailwind CSS standalone CLI (checked by SHA-256) and print its path.
+    #[command(name = "tailwind:install")]
+    TailwindInstall,
     /// Create a Dockerfile, a systemd unit, a Litestream config and a deploy guide.
     #[command(name = "make:deploy")]
     MakeDeploy,
@@ -211,7 +227,13 @@ fn main() -> Result<()> {
             name,
             renox_path,
             database,
-        } => new::run(&name, renox_path.as_deref(), database),
+            tailwind,
+        } => new::run(&name, renox_path.as_deref(), database, tailwind),
+        Command::Tailwind { watch, minify } => tailwind::run(&app_root()?, watch, minify),
+        Command::TailwindInstall => {
+            println!("{}", tailwind::binary()?.display());
+            Ok(())
+        }
         Command::Serve { cargo_args } => serve::run(&cargo_args),
         Command::KeyGenerate { show } => key_generate(show),
         Command::Build => deploy::build(&app_root()?),

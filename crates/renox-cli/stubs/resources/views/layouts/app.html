@@ -11,6 +11,8 @@
   {#- The UI kit (renox/ui.html, docs/ui.md): its styles and behavior. -#}
   {{ renox_ui() }}
   <link rel="stylesheet" href="{{ asset('app.css') }}">
+  {#- What pages and components push: {% call push('head') %}…{% endcall %} -#}
+  {{ stack('head') }}
 </head>
 <body class="rx-page">
   <a class="rx-visually-hidden skip" href="#main">Skip to content</a>
@@ -37,5 +39,7 @@
   </main>
   {#- Toasts from `Toast::success(…)`, after a redirect or an htmx request. -#}
   {{ toasts() }}
+  {#- Scripts pushed by pages and components, e.g. a chart library, once. -#}
+  {{ stack('scripts') }}
 </body>
 </html>

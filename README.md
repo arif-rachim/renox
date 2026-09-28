@@ -129,6 +129,10 @@ impl Module for Guestbook {
   in every template (`route('products.index', q=q)` adds a query string), `can('update', product)` on models the handler wrapped with `Can::new`, and
   `pagination(products)` once imported from `renox/pagination.html`.
 - `asset('app.css')` adds a content hash (`?v=…`), so assets can be cached for a year.
+- Stacks: a page or component pushes a script or a `<meta>` into the layout's
+  `{{ stack('scripts') }}` / `{{ stack('head') }}`, once if asked (`{% call push('scripts', once='chart') %}`).
+- Tailwind CSS without Node: `rnx new --tailwind`, and `rnx serve` / `rnx build` run Tailwind's
+  standalone CLI (downloaded once, checked by SHA-256).
 - Components are macros that see the request (`old`, `error`, `t`, `can`, `auth`), and a UI kit
   after Apple's Human Interface Guidelines ships with Renox (`renox/ui.html`):
   - form fields, buttons, cards, alerts, sheets, menus, tabs and tables, with dark mode;
@@ -251,6 +255,7 @@ async fn login_page_and_registration_errors() {
 ```bash
 rnx make:module products --resource --fields "name:string price:money"  # a whole CRUD with tests
                                                   # also make:model -m, make:policy, make:job, make:factory, make:test…
+rnx make:command orders:close                     # a typed command (clap): --help, checked arguments, prompts
 rnx route:list                                    # every route with its name, module and guards
 rnx db:shell                                      # SQL prompt, no sqlite3/psql needed
 rnx build && rnx make:deploy                      # dist/blog + Dockerfile, systemd, Litestream
@@ -346,6 +351,9 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 | `Http::` facade, `Http::fake()` | `state.http`, `app.fake_http()` |
 | `View::share` | `App::share` |
 | Tinker | `rnx db:shell` and your own commands (`App::command`) |
+| Artisan commands (`$signature`, `$this->ask()`, `confirm()`, `secret()`, `choice()`) | `impl AppCommand` on a clap struct, `renox::prompt::{ask, confirm, secret, choice}` |
+| `@push` / `@stack` | `{% call push('scripts') %}…{% endcall %}` / `{{ stack('scripts') }}` |
+| Vite + Tailwind | `rnx new --tailwind` (the standalone CLI, no Node) |
 | Livewire | htmx and Alpine.js, with handlers that return fragments |
 
 Not planned: runtime-reflected Eloquent-style models, Redis, and a REPL.

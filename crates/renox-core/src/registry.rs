@@ -71,6 +71,13 @@ impl Registry {
         self
     }
 
+    /// A command whose arguments are declared with clap; see
+    /// [`AppCommand`](crate::command::AppCommand).
+    pub fn typed_command<T: crate::command::AppCommand>(&mut self) -> &mut Self {
+        self.commands.push(crate::command::typed::<T>());
+        self
+    }
+
     /// Adds template functions, filters or globals, e.g. a `rupiah` filter:
     ///
     /// ```

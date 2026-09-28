@@ -25,6 +25,20 @@ pub fn run(cargo_args: &[String]) -> Result<()> {
             .with_context(|| format!("could not watch {}", path.display()))?;
     }
 
+    // Tailwind rebuilds public/css/app.css on its own; the app's live reload
+    // then refreshes the page. It stops with rnx (Ctrl-C reaches both).
+    let _tailwind = if crate::tailwind::enabled(Path::new(".")) {
+        match crate::tailwind::watch(Path::new(".")) {
+            Ok(child) => Some(KillOnDrop(child)),
+            Err(err) => {
+                eprintln!("rnx: Tailwind didn't start: {err:#}");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     let mut snapshot = fingerprint();
     let mut app: Option<Child> = None;
     loop {
@@ -93,6 +107,14 @@ fn start(exe: &Path) -> Result<Child> {
     Command::new(exe)
         .spawn()
         .with_context(|| format!("could not start {}", exe.display()))
+}
+
+struct KillOnDrop(Child);
+
+impl Drop for KillOnDrop {
+    fn drop(&mut self) {
+        stop(&mut self.0);
+    }
 }
 
 fn stop(child: &mut Child) {

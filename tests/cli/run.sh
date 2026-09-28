@@ -86,6 +86,14 @@ if [ "$DATABASE" = sqlite ]; then
     cargo run -q -- migrate
     cargo run -q -- migrate:status
     cargo run -q -- catalog:import
+    # A typed command (clap): its flags, its --help, and a clear error.
+    cargo run -q -- catalog:import --dry-run | grep -q 'dry run'
+    cargo run -q -- catalog:import --help | grep -q -- '--dry-run'
+    if cargo run -q -- catalog:import --bogus 2>"$WORK/err.txt"; then
+        echo "FAIL: an unknown flag was accepted"
+        exit 1
+    fi
+    grep -q 'Usage: catalog:import' "$WORK/err.txt"
     cargo run -q -- route:list
     cargo run -q -- db:seed
     cargo run -q -- ui:publish
@@ -118,6 +126,24 @@ if [ -n "${DOCKER:-}" ]; then
     echo
     curl -sf -o /dev/null "http://127.0.0.1:$PORT/catalog" && echo "ok   /catalog"
     docker image ls "$IMAGE" --format 'image size: {{.Size}}'
+fi
+
+if [ "$DATABASE" = sqlite ]; then
+    step "rnx new site --tailwind (downloads the pinned Tailwind CLI once)"
+    cd "$WORK"
+    if [ -n "${FROM_GIT:-}" ]; then
+        "$RNX" new site --tailwind
+    else
+        "$RNX" new site --renox-path "$REPO" --tailwind
+    fi
+    cd site
+    test -f resources/css/app.css
+    test ! -e public/app.css
+    grep -q "asset('css/app.css')" resources/views/layouts/app.html
+    grep -q 'text-emerald-700' public/css/app.css # built from the views
+    "$RNX" tailwind --minify
+    grep -q 'text-emerald-700' public/css/app.css
+    cargo test
 fi
 
 echo
