@@ -44,7 +44,8 @@ deny.toml                  cargo-deny: licenses, advisories, banned crates, sour
 crates/renox/              facade crate apps depend on: re-exports renox-core, the macros, prelude
   src/lib.rs               `pub use renox_core::*`, macros (DbEnum, FromRow, Model, embedded!,
                            migrations!, #[renox::test]), prelude, and cfg(doctest) holders:
-                           ReadMe, CheatSheet, TypesGuide, RelationsGuide, MacroCompileErrors
+                           ReadMe, CheatSheet, TypesGuide, RelationsGuide, AuthorizationGuide,
+                           QueueGuide, MacroCompileErrors
   tests/it/                ONE integration-test binary (main.rs + a module per area); add new areas
                            as `mod x;` in main.rs. Notable modules: send_handlers.rs (every data
                            API in a routed handler), web_security.rs, data_resilience.rs,
@@ -150,6 +151,10 @@ tests/chaos/               app + run.sh (postgres|sqlite) that the `chaos` CI jo
 tests/cli/run.sh           `rnx new` + every `make:*`, then build and test the app (CI `cli`/`docker`)
 docs/types.md              HTML input ↔ Rust ↔ SQLite ↔ PostgreSQL (doctest `TypesGuide`)
 docs/relations.md          relations without N+1, fetch_as/FromRow (doctest `RelationsGuide`)
+docs/authorization.md      gates, policies, roles/permissions, token abilities, tenants (doctest
+                           `AuthorizationGuide`)
+docs/queue.md              jobs, retries, priority, unique, middleware, chains, batches (doctest
+                           `QueueGuide`)
 docs/postgresql.md         PostgreSQL guide for app authors
 docs/development.md        faster builds: profiles, linker, default features, sccache, cargo-chef
 docs/stability.md          semver scope, #[non_exhaustive] types, public-dependency policy

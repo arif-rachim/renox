@@ -324,7 +324,8 @@ Not planned: runtime-reflected Eloquent-style models, Redis, and a REPL.
 ## Documentation
 
 - [CHEATSHEET.md](CHEATSHEET.md): one short, compiled example per task.
-- Guides: [relations](docs/relations.md), [field types](docs/types.md),
+- Guides: [relations](docs/relations.md), [authorization and tenants](docs/authorization.md),
+  [the queue](docs/queue.md), [field types](docs/types.md),
   [PostgreSQL](docs/postgresql.md), [production](docs/operations.md),
   [faster builds](docs/development.md), [stability and versions](docs/stability.md).
 - [llms.txt](llms.txt): a map of the docs and examples for coding agents.

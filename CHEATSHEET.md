@@ -544,7 +544,8 @@ async fn edit(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Resu
 }
 
 fn gates(app: App) -> App {
-    // `role` is a column the app added to `users` (read with user.get, change with user.set).
+    // A gate on a column the app added to `users`; for roles use the `Permissions` module
+    // (below, "Tenants, roles and permissions") and docs/authorization.md.
     app.gate("admin", |user| user.get::<String>("role").as_deref() == Some("admin")) // user.gate("admin")?
         // May query the database; check with `user.gate_async("billing").await?` in handlers.
         .gate_async("billing", |user, state| async move {

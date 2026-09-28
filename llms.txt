@@ -117,6 +117,12 @@ Every example has a README.md that walks through it.
   sccache, the cargo-chef Dockerfile).
 - [docs/types.md](docs/types.md): every Rust field type with its form input and its SQLite and
   PostgreSQL column (`DbEnum`, `Json<T>`, dates and times, money, UUID).
+- [docs/authorization.md](docs/authorization.md): which tool answers which question (gates,
+  policies, the `Permissions` module, `gate_before`, token abilities, tenants with default
+  scopes and `renox::context`, password confirmation, the audit log), mapped to Laravel's.
+- [docs/queue.md](docs/queue.md): jobs, retries and `failed`, `dispatch_in`, priority, unique
+  jobs, middleware (overlap, rate limits), encrypted payloads, chains and batches with
+  progress, testing jobs; mapped to Laravel's.
 - [docs/relations.md](docs/relations.md): relations without N+1 (`belongs_to`, `has_many`, `Pivot`
   with pivot columns, polymorphic `Morph`), joins with `fetch_as` and `#[derive(FromRow)]`, the query builder mapped to Laravel's.
 - [docs/stability.md](docs/stability.md): what semver covers, which types may grow

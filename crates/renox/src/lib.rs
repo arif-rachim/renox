@@ -62,6 +62,16 @@ pub struct TypesGuide;
 #[doc = include_str!("../../../docs/relations.md")]
 pub struct RelationsGuide;
 
+/// Compiles the Rust in docs/authorization.md as a doctest.
+#[cfg(doctest)]
+#[doc = include_str!("../../../docs/authorization.md")]
+pub struct AuthorizationGuide;
+
+/// Compiles the Rust in docs/queue.md as a doctest.
+#[cfg(doctest)]
+#[doc = include_str!("../../../docs/queue.md")]
+pub struct QueueGuide;
+
 /// Compiles every Rust example in the README as a doctest, so the front page
 /// can't drift from the API.
 #[cfg(doctest)]
