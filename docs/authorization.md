@@ -181,9 +181,9 @@ async fn editors(db: &Db) -> Result<Vec<User>> {
 ## Super-admins: `gate_before`
 
 `App::gate_before` is asked before every gate, permission and policy check. It returns
-`Some(true)` (allow), `Some(false)` (deny) or `None` (go on to the check itself). It sees the
-`User` without roles, and it doesn't answer `require_role` / `has_role`, which mean exactly
-that role. Base it on the user row, e.g. a column:
+`Some(true)` (allow), `Some(false)` (deny) or `None` (go on to the check itself). It doesn't
+answer `require_role` / `has_role`, which mean exactly that role. Base it on a role (the
+`Permissions` module) or on the user row, e.g. a column:
 
 ```rust
 use renox::prelude::*;
@@ -191,9 +191,16 @@ use renox::prelude::*;
 fn app() -> App {
     App::new()
         .module(Auth::new())
-        .gate_before(|user, _ability| (user.get::<bool>("super_admin") == Some(true)).then_some(true))
+        .gate_before(|user, _ability| user.has_role("super-admin").then_some(true))
+        // or: (user.get::<bool>("super_admin") == Some(true)).then_some(true)
 }
 ```
+
+`User::has_role` and `User::has_permission` answer from the roles loaded for the current
+request, so they work in `gate_before` and in `Policy::allows` ("admins may edit any post").
+For another user, or outside a request (a job, a command), they say `false`: use the async
+`user.roles(&db)` there. `permissions::users_with_role(&db, "admin")` lists the users with a
+role, e.g. to notify every admin.
 
 ## API tokens and abilities
 
@@ -292,7 +299,8 @@ async fn count_all(db: &Db) -> Result<u64> {
 
 ## Testing authorization
 
-`TestApp::acting_as(&user)` logs a user in; `assert_forbidden()`, `assert_not_found()` and
+`TestApp::acting_as(&user)` logs a user in, `confirm_password()` lets it through
+`require_password_confirmed`; `assert_forbidden()`, `assert_not_found()` and
 `assert_redirect("/login")` check the refusals. Test the negative cases: another user's row,
 another team's row, a token without the ability, a guest.
 

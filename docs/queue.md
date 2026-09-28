@@ -257,8 +257,14 @@ deletes finished batches.
 
 `TestApp` doesn't start workers. `app.queued_jobs()` lists what was queued (names, in order),
 `app.run_jobs().await` runs every job that is due, until none is left (the next job of a
-chain and a batch's callbacks too; a retry still waiting for its backoff is not due), and `state.dispatch_sync(job)` runs one job now, in the caller. Assert what the
-job did: rows written, `app.sent_mail()`.
+chain and a batch's callbacks too; a retry still waiting for its backoff is not due),
+`app.run_all_jobs().await` runs delayed jobs and retries too, and `state.dispatch_sync(job)`
+runs one job now, in the caller. Assert what the job did: rows written, `app.sent_mail()`.
+
+A batch's `then`, `catch` and `finally` jobs get the batch in `ctx.batch_id` (without being
+counted in it), so `finally` can read `queue.batch_status(id)`. `Error::permanent_message("…")`
+fails a job for good without an error type of your own; `renox::anyhow` is re-exported for
+errors with context.
 
 ## The dashboard
 

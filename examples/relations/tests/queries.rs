@@ -1,47 +1,19 @@
 //! No N+1: the likes of a page are loaded in a fixed number of queries,
-//! however many posts, comments and likes there are. Its own test binary,
-//! because it counts every statement of the process (sqlx reports each one
-//! as a `tracing` event with the target `sqlx::query`).
-
-use std::sync::atomic::{AtomicUsize, Ordering};
+//! however many posts, comments and likes there are.
+//! `renox::db::capture_queries` records the statements a future runs.
 
 use relations::app::blog::model::{self, Comment, LIKEABLE, Like, Post};
 use renox::prelude::*;
 use renox::testing::TestApp;
-use tracing::span::{Attributes, Id, Record};
-use tracing::{Event, Metadata, Subscriber};
-
-static QUERIES: AtomicUsize = AtomicUsize::new(0);
-
-/// Counts sqlx's statement events and ignores everything else.
-struct CountQueries;
-
-impl Subscriber for CountQueries {
-    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
-        metadata.target() == "sqlx::query"
-    }
-    fn new_span(&self, _: &Attributes<'_>) -> Id {
-        Id::from_u64(1)
-    }
-    fn record(&self, _: &Id, _: &Record<'_>) {}
-    fn record_follows_from(&self, _: &Id, _: &Id) {}
-    fn event(&self, _: &Event<'_>) {
-        QUERIES.fetch_add(1, Ordering::SeqCst);
-    }
-    fn enter(&self, _: &Id) {}
-    fn exit(&self, _: &Id) {}
-}
 
 /// The statements `f` runs.
 async fn queries<T>(f: impl Future<Output = T>) -> (T, usize) {
-    let before = QUERIES.load(Ordering::SeqCst);
-    let out = f.await;
-    (out, QUERIES.load(Ordering::SeqCst) - before)
+    let (out, statements) = renox::db::capture_queries(f).await;
+    (out, statements.len())
 }
 
 #[renox::test]
 async fn likes_of_a_page_load_in_one_query_per_type() {
-    tracing::subscriber::set_global_default(CountQueries).unwrap();
     let app = TestApp::new(relations::app()).await;
     let db = app.db();
     let mut posts = Vec::new();

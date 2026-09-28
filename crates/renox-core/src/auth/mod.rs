@@ -32,7 +32,7 @@
 //! }
 //! ```
 
-mod account;
+pub(crate) mod account;
 pub mod events;
 mod module;
 pub mod notifications;
@@ -188,6 +188,36 @@ impl Access {
             None => grants.permissions.contains(name),
         }
     }
+}
+
+/// The logged-in user's grants, in [`crate::context`] for the request.
+#[derive(Clone)]
+pub(crate) struct CurrentGrants {
+    user_id: i64,
+    grants: Arc<Grants>,
+}
+
+impl User {
+    /// Whether this user has `role` (the `Permissions` module), answered
+    /// from the roles loaded for the current request, so it works in
+    /// `Policy::allows` and `App::gate_before` ("admins may do anything").
+    /// It is `false` for any other user, and outside a request (a job, a
+    /// command): use the async `user.roles(&db)` there.
+    pub fn has_role(&self, role: &str) -> bool {
+        current_grants(self.id).is_some_and(|g| g.roles.iter().any(|r| r == role))
+    }
+
+    /// Like [`User::has_role`], for a permission granted by one of the
+    /// user's roles.
+    pub fn has_permission(&self, permission: &str) -> bool {
+        current_grants(self.id).is_some_and(|g| g.permissions.contains(permission))
+    }
+}
+
+fn current_grants(user_id: i64) -> Option<Arc<Grants>> {
+    crate::context::get::<CurrentGrants>()
+        .filter(|current| current.user_id == user_id)
+        .map(|current| current.grants)
 }
 
 /// The current user's roles and permissions (`Permissions` module), loaded
@@ -510,12 +540,21 @@ pub(crate) async fn middleware(
         }
         _ => Grants::default(),
     };
+    let grants = Arc::new(grants);
+    if let Some(user) = &user {
+        // For `User::has_role` in policies and `gate_before`, which get a
+        // plain `User`.
+        crate::context::set(CurrentGrants {
+            user_id: user.id,
+            grants: grants.clone(),
+        });
+    }
     req.extensions_mut().insert(CurrentUser {
         user: user.map(Arc::new),
         gates: state.gates.clone(),
         token_id: token.as_ref().map(|t| t.0),
         abilities: token.and_then(|t| t.1).map(Arc::new),
-        grants: Arc::new(grants),
+        grants,
     });
     req.extensions_mut().insert(state);
     next.run(req).await

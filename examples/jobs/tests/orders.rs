@@ -428,11 +428,7 @@ async fn the_charge_request_carries_the_amount_and_an_idempotency_key() {
         .assert_redirect("/");
     app.run_jobs().await; // 503: retried later
     assert_eq!(order(&app, 1).await.status, OrderStatus::Processing);
-    renox::db::sql("UPDATE jobs SET available_at = 0")
-        .execute(app.db())
-        .await
-        .unwrap();
-    app.run_jobs().await;
+    app.run_all_jobs().await; // the retry too, without waiting for its backoff
     assert_eq!(order(&app, 1).await.status, OrderStatus::Paid);
 
     let http = app.fake_http();

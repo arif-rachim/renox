@@ -46,7 +46,7 @@
 use std::collections::HashSet;
 
 use super::{Grants, User};
-use crate::db::{Db, Migration, now, sql};
+use crate::db::{Db, Migration, Model, now, sql};
 use crate::{Module, Registry, Result, Routes};
 
 const MIGRATIONS: &[Migration] = &[crate::db::framework_migration!(
@@ -215,6 +215,20 @@ impl User {
         list.sort();
         Ok(list)
     }
+}
+
+/// The users who have `role`, ordered by id (e.g. to notify every admin).
+pub async fn users_with_role(db: &Db, role: &str) -> Result<Vec<User>> {
+    let ids: Vec<i64> = sql(
+        "SELECT ru.user_id FROM role_user ru JOIN roles r ON r.id = ru.role_id \
+         WHERE r.name = ? ORDER BY ru.user_id",
+    )
+    .bind(role)
+    .scalars(db)
+    .await?;
+    let mut users = User::find_many(db, ids).await?;
+    users.sort_by_key(|u| u.id);
+    Ok(users)
 }
 
 /// A user's roles and permissions, for the auth middleware.

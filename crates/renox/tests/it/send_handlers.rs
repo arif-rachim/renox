@@ -325,6 +325,31 @@ async fn background(State(state): State<AppState>) -> Result<String> {
     ))
 }
 
+/// M21a's APIs, routed (not called: a compile-time `Send` check).
+async fn polish(State(state): State<AppState>, user: AuthUser) -> Result<String> {
+    let db = &state.db;
+    let label = String::from("borrowed");
+    let n = db
+        .retrying(2, || async {
+            let mut tx = db.begin().await?;
+            let n = Note::query().count(&mut tx).await?;
+            tx.commit().await?;
+            Ok(format!("{label} {n}"))
+        })
+        .await?;
+    let admins = renox::auth::permissions::users_with_role(db, "admin").await?;
+    let likes = renox::db::relations::Morph::new("name", "note_id")
+        .count_many(db, &Note::query().get(db).await?, Tag::query())
+        .await?;
+    Ok(format!(
+        "{n} {} {} {} {}",
+        admins.len(),
+        likes.len(),
+        user.has_role("admin"),
+        renox::random_token().len()
+    ))
+}
+
 struct Handlers;
 
 impl Module for Handlers {
@@ -342,6 +367,7 @@ impl Module for Handlers {
             .get("/models", models)
             .get("/cache", cache)
             .get("/background", background)
+            .get("/polish", polish)
     }
 }
 

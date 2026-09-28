@@ -207,7 +207,8 @@ impl App {
         self
     }
 
-    /// Registers a seeder for `db:seed`. Seeders run in registration order.
+    /// Registers a seeder for `db:seed`. Seeders run in registration order,
+    /// in the app's context: `renox::context::app()` gives the `AppState`.
     ///
     /// ```
     /// # use renox::prelude::*;
@@ -1030,7 +1031,9 @@ impl Kernel {
     /// Runs every seeder in registration order.
     pub async fn seed(&self) -> Result {
         for seeder in &self.seeders {
-            seeder(self.db().clone()).await?;
+            // In the app's context, so a seeder can reach `renox::context::app()`
+            // (config, `encrypt`, the cache) and model hooks see it too.
+            crate::context::scope_app(self.state.clone(), seeder(self.db().clone())).await?;
         }
         Ok(())
     }

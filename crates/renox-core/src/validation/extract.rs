@@ -66,6 +66,10 @@ where
     }
 }
 
+/// The input of the request's validated form, in [`crate::context`].
+#[derive(Clone)]
+pub(crate) struct SubmittedInput(pub Map<String, Value>);
+
 /// What `Valid` does, with `extra` rules added to `T`'s own; returns the
 /// data and the submitted fields (without files).
 #[allow(clippy::result_large_err)] // the rejection is a response, like axum's
@@ -155,6 +159,9 @@ where
         }
     }
     if errors.is_empty() {
+        // A later `ValidationError` (from a model's `saving` hook, say) is
+        // sent back with this input, so the form is refilled.
+        crate::context::set(SubmittedInput(input.clone()));
         Ok((data, input))
     } else {
         Err(ValidationError::new(errors)

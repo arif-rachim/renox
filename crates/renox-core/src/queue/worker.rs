@@ -24,6 +24,8 @@ struct Reserved {
     max_attempts: u32,
     chain: Option<String>,
     batch_id: Option<i64>,
+    /// The batch this `then`/`catch`/`finally` job follows.
+    callback_of: Option<i64>,
 }
 
 /// Runs queued jobs.
@@ -78,8 +80,8 @@ fn panic_message(err: tokio::task::JoinError) -> String {
 
 async fn fail(tx: &mut crate::db::Transaction, job: &Reserved, error: &str) -> crate::Result {
     crate::db::sql(
-        "INSERT INTO failed_jobs (queue, job, payload, max_attempts, error, failed_at, chain, batch_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO failed_jobs (queue, job, payload, max_attempts, error, failed_at, chain, \
+         batch_id, callback_of) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&job.queue)
     .bind(&job.job)
@@ -89,6 +91,7 @@ async fn fail(tx: &mut crate::db::Transaction, job: &Reserved, error: &str) -> c
     .bind(unix_now())
     .bind(job.chain.clone())
     .bind(job.batch_id)
+    .bind(job.callback_of)
     .execute(&mut *tx)
     .await?;
     Ok(())
@@ -153,7 +156,7 @@ impl Worker {
                 AND (reserved_at IS NULL OR reserved_at <= ?) \
                 AND attempts < max_attempts{queues} \
                 ORDER BY {order}available_at, id LIMIT 1{lock}) \
-             RETURNING id, queue, job, payload, attempts, max_attempts, chain, batch_id"
+             RETURNING id, queue, job, payload, attempts, max_attempts, chain, batch_id, callback_of"
         );
         let mut query = crate::db::sql(sql)
             .bind(now)
@@ -174,6 +177,7 @@ impl Worker {
             max_attempts: row.try_get::<i64>("max_attempts")? as u32,
             chain: row.try_get("chain")?,
             batch_id: row.try_get("batch_id")?,
+            callback_of: row.try_get("callback_of")?,
         }))
     }
 
@@ -309,7 +313,7 @@ impl Worker {
             state: self.state.clone(),
             attempt: job.attempts,
             id: job.id,
-            batch_id: job.batch_id,
+            batch_id: job.batch_id.or(job.callback_of),
         };
         let run = (handler.run)(payload, ctx);
         let run = crate::context::scope_app(self.state.clone(), run);
@@ -426,7 +430,7 @@ impl Worker {
         let rows = crate::db::sql(
             "DELETE FROM jobs WHERE attempts >= max_attempts AND reserved_at IS NOT NULL \
              AND reserved_at <= ? \
-             RETURNING id, queue, job, payload, attempts, max_attempts, chain, batch_id",
+             RETURNING id, queue, job, payload, attempts, max_attempts, chain, batch_id, callback_of",
         )
         .bind(now - RESERVATION)
         .fetch_all(&mut tx)
@@ -441,6 +445,7 @@ impl Worker {
                 max_attempts: row.try_get::<i64>("max_attempts")? as u32,
                 chain: row.try_get("chain")?,
                 batch_id: row.try_get("batch_id")?,
+                callback_of: row.try_get("callback_of")?,
             };
             fail(
                 &mut tx,
