@@ -120,21 +120,36 @@ impl Validate for ResetForm {
         v.field("email", &super::user::normalize_email(&self.email))
             .required()
             .email();
-        v.field("password", &self.password)
-            .label(password)
-            .required()
-            .min(8)
-            .confirmed(&self.password_confirmation);
+        // The password is checked with the app's policy in `reset`.
+        let _ = password;
     }
 }
 
 pub(super) async fn reset(
+    axum::extract::Extension(settings): axum::extract::Extension<
+        std::sync::Arc<super::module::Settings>,
+    >,
     State(state): State<AppState>,
     session: Session,
     htmx: Htmx,
     lang: Lang,
-    Valid(form): Valid<ResetForm>,
+    req: axum::extract::Request,
 ) -> Result<Response> {
+    let policy = settings.password.clone();
+    let validated =
+        crate::validation::extract::validate_request(req, &state, move |form: &ResetForm, _, v| {
+            let password = super::module::label(v, "password");
+            v.field("password", &form.password)
+                .label(password)
+                .required()
+                .password(&policy)
+                .confirmed(&form.password_confirmation);
+        })
+        .await;
+    let form = match validated {
+        Ok((form, _)) => form,
+        Err(rejection) => return Ok(rejection),
+    };
     let text = texts(&lang);
     let row = crate::db::sql("SELECT token, created_at FROM password_reset_tokens WHERE email = ?")
         .bind(super::user::normalize_email(&form.email))
@@ -169,6 +184,8 @@ pub(super) async fn reset(
         .bind(&user.email)
         .execute(&state.db)
         .await?;
+    let event = super::events::PasswordReset { user_id: user.id };
+    super::events::announce(&state, event).await;
     session.flash("status", &text["password_reset_done"])?;
     Ok(go(&htmx, state.url("login", &[])?))
 }

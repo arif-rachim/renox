@@ -121,6 +121,22 @@ impl TestApp {
         self
     }
 
+    /// The session cookie as the browser holds it (`name=value`), e.g. to
+    /// play a second device: save one, log in again, switch back with
+    /// [`TestApp::use_session_cookie`].
+    pub fn session_cookie(&self) -> Option<String> {
+        self.cookie
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+    }
+
+    /// Sends this session cookie from now on (see [`TestApp::session_cookie`]).
+    pub fn use_session_cookie(&self, cookie: Option<String>) -> &Self {
+        *self.cookie.lock().unwrap_or_else(|e| e.into_inner()) = cookie;
+        self
+    }
+
     fn session(&self) -> crate::Session {
         let cookie = self
             .cookie

@@ -32,6 +32,8 @@
 //! }
 //! ```
 
+mod account;
+pub mod events;
 mod module;
 pub mod notifications;
 mod passwords;
@@ -53,12 +55,13 @@ use axum::http::{Method, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Redirect, Response};
 
+pub(crate) use account::require_password_confirmed;
 pub use module::{Auth, Registration};
 pub use notifications::{Channel, DatabaseNotification, Notification, Recipient};
 pub use permissions::Permissions;
 pub(crate) use throttle::LoginThrottle;
 pub use tokens::{AccessToken, NewToken, prune_expired_tokens};
-pub use user::{User, hash_password, verify_password};
+pub use user::{User, hash_password, needs_rehash, verify_password};
 pub use verification::send_verification;
 
 use crate::crypto::constant_time_eq;
@@ -69,6 +72,8 @@ const AUTH_ID: &str = "_auth_user_id";
 const AUTH_HASH: &str = "_auth_password_hash";
 /// Unix milliseconds of the login, compared with `users.sessions_revoked_at`.
 const AUTH_AT: &str = "_auth_at";
+/// A random id per login, so one device can be logged out (`revoked_sessions`).
+const AUTH_SID: &str = "_auth_session_id";
 const INTENDED: &str = "_intended";
 
 /// Decides whether a user may perform an ability on a model.
@@ -384,19 +389,71 @@ pub fn login(session: &Session, user: &User, remember: Option<u64>) -> Result {
     session.put(AUTH_ID, user.id)?;
     session.put(AUTH_HASH, fingerprint(&user.password))?;
     session.put(AUTH_AT, unix_millis())?;
+    session.put(AUTH_SID, crate::crypto::random_token())?;
     if let Some(minutes) = remember {
         session.set_lifetime(minutes);
     }
     Ok(())
 }
 
-/// Ends the session entirely (user, data and CSRF token), and every other
-/// session of the same user, so a copied cookie stops working too.
+/// Logs this device out: ends the session (user, data and CSRF token), and
+/// remembers its id so a copy of the cookie stops working too. The user's
+/// other devices stay logged in; see [`logout_other_devices`] and
+/// [`User::revoke_sessions`].
 pub async fn logout(db: &Db, session: &Session) -> Result {
-    if let Some(id) = session.get::<i64>(AUTH_ID) {
-        user::revoke_sessions(db, id).await?;
+    match (session.get::<i64>(AUTH_ID), session.get::<String>(AUTH_SID)) {
+        (Some(_), Some(sid)) => revoke_session(db, session, &sid).await?,
+        // Logged in before sessions had ids: end them all to be safe.
+        (Some(id), None) => {
+            user::revoke_sessions(db, id).await?;
+        }
+        _ => {}
     }
     session.flush();
+    Ok(())
+}
+
+/// Logs the user out everywhere except this device (e.g. "log out other
+/// devices", or after a password change).
+pub async fn logout_other_devices(db: &Db, session: &Session, user: &User) -> Result {
+    let cut_off = user::revoke_sessions(db, user.id).await?;
+    // Logged in again after the cut-off (even within the same millisecond),
+    // so this session survives it.
+    let lifetime = session.lifetime();
+    login(session, user, lifetime)?;
+    session.put(AUTH_AT, cut_off + 1)?;
+    Ok(())
+}
+
+/// Changes the user's password and keeps this session logged in; every
+/// other session ends.
+pub async fn change_password(
+    db: &Db,
+    session: &Session,
+    user: &mut User,
+    password: &str,
+) -> Result {
+    user.set_password(db, password).await?;
+    logout_other_devices(db, session, user).await
+}
+
+/// Denylists one session id until a copy of its cookie would have expired.
+async fn revoke_session(db: &Db, session: &Session, sid: &str) -> Result {
+    let minutes = session.lifetime().unwrap_or(60 * 24 * 30);
+    let expires = crate::db::now() + chrono::Duration::minutes(minutes as i64);
+    crate::db::sql("DELETE FROM revoked_sessions WHERE expires_at < ?")
+        .bind(crate::db::now())
+        .execute(db)
+        .await?;
+    crate::db::sql(
+        "INSERT INTO revoked_sessions (id, expires_at) SELECT ?, ? \
+         WHERE NOT EXISTS (SELECT 1 FROM revoked_sessions WHERE id = ?)",
+    )
+    .bind(sid)
+    .bind(expires)
+    .bind(sid)
+    .execute(db)
+    .await?;
     Ok(())
 }
 
@@ -468,10 +525,12 @@ async fn resolve(state: &AppState, session: &Session) -> Option<User> {
     let id: i64 = session.get(AUTH_ID)?;
     let hash: String = session.get(AUTH_HASH).unwrap_or_default();
     let logged_in_at: i64 = session.get(AUTH_AT).unwrap_or(0);
-    match User::find_with_revocation(&state.db, id).await {
-        Ok(Some((user, revoked_at)))
+    let sid: String = session.get(AUTH_SID).unwrap_or_default();
+    match User::find_with_revocation(&state.db, id, &sid).await {
+        Ok(Some((user, revoked_at, session_revoked)))
             if constant_time_eq(&fingerprint(&user.password), &hash)
-                && (revoked_at == 0 || logged_in_at > revoked_at) =>
+                && (revoked_at == 0 || logged_in_at > revoked_at)
+                && !session_revoked =>
         {
             Some(user)
         }
@@ -481,6 +540,7 @@ async fn resolve(state: &AppState, session: &Session) -> Option<User> {
             session.remove(AUTH_ID);
             session.remove(AUTH_HASH);
             session.remove(AUTH_AT);
+            session.remove(AUTH_SID);
             None
         }
         Err(err) => {

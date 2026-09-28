@@ -63,6 +63,8 @@ pub(super) async fn verify(
         let mut user = auth.user().clone();
         user.email_verified_at = Some(now());
         user.save(&state.db).await?;
+        let event = super::events::EmailVerified { user_id: user.id };
+        super::events::announce(&state, event).await;
     }
     session.flash("status", &texts(&lang)["verified"])?;
     Ok(axum::response::Redirect::to(&home(&state)).into_response())

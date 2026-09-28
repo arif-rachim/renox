@@ -710,6 +710,17 @@ impl Field<'_> {
     }
 
     /// A reusable rule; see [`Rule`].
+    /// The value meets `policy` (length, letters, mixed case, numbers,
+    /// symbols); see [`Password`].
+    pub fn password(mut self, policy: &Password) -> Self {
+        if let (true, Inspected::Text(text)) = (self.present(), &self.value)
+            && let Some((key, params)) = policy.broken(text)
+        {
+            self.fail(key, &params);
+        }
+        self
+    }
+
     pub fn apply(mut self, rule: &impl Rule) -> Self {
         if !self.present() {
             return self;
@@ -797,6 +808,94 @@ impl Field<'_> {
             self.v.pending[i].scope.push(condition);
         }
         self
+    }
+}
+
+/// What a password must contain; `Field::password(&policy)` checks it.
+/// The built-in register, reset and account forms use the app's policy
+/// (`Auth::password_rules`), `Password::min(8)` by default.
+///
+/// ```
+/// # use renox::prelude::*;
+/// use renox::validation::Password;
+/// # struct Form { password: String }
+/// # impl Validate for Form {
+/// fn rules(&self, v: &mut Validator) {
+///     let policy = Password::min(12).mixed_case().numbers().symbols();
+///     v.field("password", &self.password).required().password(&policy);
+/// }
+/// # }
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Password {
+    min: usize,
+    letters: bool,
+    mixed_case: bool,
+    numbers: bool,
+    symbols: bool,
+}
+
+impl Password {
+    /// At least `min` characters.
+    pub fn min(min: usize) -> Self {
+        Self {
+            min,
+            letters: false,
+            mixed_case: false,
+            numbers: false,
+            symbols: false,
+        }
+    }
+
+    /// At least one letter.
+    pub fn letters(mut self) -> Self {
+        self.letters = true;
+        self
+    }
+
+    /// At least one uppercase and one lowercase letter.
+    pub fn mixed_case(mut self) -> Self {
+        self.mixed_case = true;
+        self
+    }
+
+    /// At least one digit.
+    pub fn numbers(mut self) -> Self {
+        self.numbers = true;
+        self
+    }
+
+    /// At least one character that isn't a letter, digit or space.
+    pub fn symbols(mut self) -> Self {
+        self.symbols = true;
+        self
+    }
+
+    /// The first rule `password` breaks: a message key and its parameters.
+    fn broken(&self, password: &str) -> Option<(&'static str, Vec<(&'static str, String)>)> {
+        if password.chars().count() < self.min {
+            return Some(("min.string", vec![("min", self.min.to_string())]));
+        }
+        let has = |test: fn(&char) -> bool| password.chars().any(|c| test(&c));
+        if self.letters && !has(|c| c.is_alphabetic()) {
+            return Some(("password.letters", Vec::new()));
+        }
+        if self.mixed_case && !(has(|c| c.is_uppercase()) && has(|c| c.is_lowercase())) {
+            return Some(("password.mixed", Vec::new()));
+        }
+        if self.numbers && !has(|c| c.is_numeric()) {
+            return Some(("password.numbers", Vec::new()));
+        }
+        if self.symbols && !has(|c| !c.is_alphanumeric() && !c.is_whitespace()) {
+            return Some(("password.symbols", Vec::new()));
+        }
+        None
+    }
+}
+
+impl Default for Password {
+    fn default() -> Self {
+        Self::min(8)
     }
 }
 

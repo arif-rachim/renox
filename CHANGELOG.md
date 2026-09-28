@@ -10,6 +10,29 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M18b · Accounts and security
+
+- `Auth::account()`: `/account` with profile (a new email is verified again), password change,
+  "log out other devices" and account deletion; overridable `renox/auth/account.html`.
+- `Auth::password_rules(Password::min(12).mixed_case().numbers().symbols())` for the register,
+  reset and account forms; `Field::password(&policy)` for any form; `Password::min(8)` stays the
+  default.
+- `Routes::require_password_confirmed()` and `/confirm-password` (three hours, like Laravel).
+- **Behaviour change:** `auth::logout` ends this device only (a copied cookie dies too); new
+  `auth::logout_other_devices` and `auth::change_password` keep this session; `User::delete_account`.
+- Auth events in `renox::auth::events` (`Registered`, `LoggedIn`, `LoginFailed`, `LockedOut`,
+  `LoggedOut`, `PasswordReset`, `PasswordChanged`, `EmailVerified`, `ProfileUpdated`,
+  `OtherDevicesLoggedOut`, `AccountDeleted`).
+- The `Audit` module (`renox::audit`): an `audit_logs` table recording every auth event,
+  `audit::record(Entry::new(..).user(..).subject(..).data(..).ip(..))`, `latest`, `for_user`,
+  `for_subject`, `prune`, and `rnx audit:prune --days N`.
+- Users imported from Laravel log in with their bcrypt hashes and are rehashed to Argon2id
+  (`auth::needs_rehash`); `User::attempt` rehashes too.
+- `TestApp::session_cookie` / `use_session_cookie` to play several devices in tests.
+- New apps from `rnx new` turn the account page on and link it from the layout.
+- New framework migrations: `…000006_create_revoked_sessions_table` (Auth) and
+  `…000600_create_audit_logs_table` (Audit).
+
 ### M18a · Tenancy, roles, gates, token abilities
 
 - `renox::context`: values for the current request, job, task or command (e.g. the current

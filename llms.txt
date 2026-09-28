@@ -13,7 +13,8 @@
   `App::templates`; `App::provide` and `App::layer`; forms and validation (`unique`/`exists`);
   models, migrations and queries; every field type; pagination; seeders and factories; auth,
   policies, gates, API tokens and your own login; tenants (`renox::context`, default scopes),
-  roles and permissions, route guards for gates/roles/permissions/token abilities; HTMX; raw SQL and transactions; jobs, events and
+  roles and permissions, route guards for gates/roles/permissions/token abilities; the account
+  page, password rules and confirmation, per-device logout; auth events and the audit log; HTMX; raw SQL and transactions; jobs, events and
   the schedule; mail and notifications (with the in-app inbox); cookies and downloads; cache,
   session, uploads and translations (plurals); signed URLs and private files; CSP, CORS and
   webhooks; SEO and analytics; tests; configuration (`.env` and your own settings).
