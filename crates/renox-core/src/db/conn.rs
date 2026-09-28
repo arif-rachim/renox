@@ -157,9 +157,71 @@ impl Db {
         Ok(Transaction { inner })
     }
 
+    /// Runs `work` in a transaction: committed when it returns `Ok`, rolled
+    /// back when it returns `Err`.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # async fn demo(db: Db) -> Result {
+    /// let moved = db
+    ///     .transaction_retrying(3, |tx| {
+    ///         Box::pin(async move {
+    ///             renox::db::sql("UPDATE accounts SET balance = balance - 100 WHERE id = 1")
+    ///                 .execute(&mut *tx)
+    ///                 .await?;
+    ///             renox::db::sql("UPDATE accounts SET balance = balance + 100 WHERE id = 2")
+    ///                 .execute(&mut *tx)
+    ///                 .await?;
+    ///             Ok(100)
+    ///         })
+    ///     })
+    ///     .await?;
+    /// # let _: i64 = moved; Ok(()) }
+    /// ```
+    pub async fn transaction<T, F>(&self, work: F) -> crate::Result<T>
+    where
+        F: for<'t> FnMut(
+            &'t mut Transaction,
+        ) -> futures_util::future::BoxFuture<'t, crate::Result<T>>,
+    {
+        self.transaction_retrying(1, work).await
+    }
+
+    /// Like [`Db::transaction`], trying up to `attempts` times when another
+    /// transaction got in the way (SQLite busy, PostgreSQL serialization
+    /// failure or deadlock), with a short, growing pause in between. `work`
+    /// must be safe to run again.
+    pub async fn transaction_retrying<T, F>(&self, attempts: u32, mut work: F) -> crate::Result<T>
+    where
+        F: for<'t> FnMut(
+            &'t mut Transaction,
+        ) -> futures_util::future::BoxFuture<'t, crate::Result<T>>,
+    {
+        let attempts = attempts.max(1);
+        let mut attempt = 1;
+        loop {
+            let outcome = async {
+                let mut tx = self.begin().await?;
+                let value = work(&mut tx).await?;
+                tx.commit().await?;
+                Ok::<T, crate::Error>(value)
+            }
+            .await;
+            match outcome {
+                Err(err) if attempt < attempts && err.is_retryable() => {
+                    let pause = std::time::Duration::from_millis(20 * u64::from(attempt));
+                    tokio::time::sleep(pause).await;
+                    attempt += 1;
+                }
+                other => return other,
+            }
+        }
+    }
+
     /// A transaction that takes SQLite's write lock at once (`BEGIN
-    /// IMMEDIATE`), so a check made inside it holds until commit.
-    pub(crate) async fn begin_immediate(&self) -> Result<Transaction, DbError> {
+    /// IMMEDIATE`), so what it reads can't change before it writes: the
+    /// SQLite counterpart of `lock_for_update`. Same as `begin` on PostgreSQL.
+    pub async fn begin_immediate(&self) -> Result<Transaction, DbError> {
         let inner = match &self.pool {
             Pool::Sqlite(pool) => TxInner::Sqlite(pool.begin_with("BEGIN IMMEDIATE").await?),
             #[cfg(feature = "postgres")]

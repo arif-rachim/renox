@@ -12,7 +12,8 @@ commit that `rnx` was built from.
 - **New fields on these structs.** Build them with their constructors, `Default` or
   `TestApp::with_config(app, |c| …)`, not with struct literals:
   - `Config`, `MailConfig`, `StorageConfig`, `AnalyticsConfig`
-  - `Mail`, `User`, `Paginated`, `RouteInfo`, `MigrationStatus`, `FailedJob`
+  - `Mail`, `User`, `Paginated`, `SimplePage`, `CursorPage`, `RouteInfo`, `MigrationStatus`,
+    `FailedJob`, `audit::AuditLog`, the `auth::events` structs
   - `DatabaseNotification`, `AccessToken`, `NewToken`
   - `WebhookRequest`, `WebhookCall`, `JobContext`, `Htmx`, `Down`, `analytics::Event`
   - `view::ViewContext`, `auth::Registration`, `auth::Recipient`, `mail::Attachment`

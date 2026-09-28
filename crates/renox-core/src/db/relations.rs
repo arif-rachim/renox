@@ -108,6 +108,77 @@ pub fn has_many<'a, C: Model, P: Model, K: ForeignKey>(
     }
 }
 
+/// How many children each parent has (`withCount`), in one `GROUP BY`
+/// query; parents without children get 0. `children` sets the filters.
+///
+/// ```
+/// # use renox::prelude::*;
+/// # use renox::db::relations::{count_many, sum_many};
+/// # #[derive(Model, serde::Serialize, Default)] struct Post { id: i64, title: String }
+/// # #[derive(Model, serde::Serialize, Default)] struct Comment { id: i64, post_id: i64, approved: bool }
+/// # #[derive(Model, serde::Serialize, Default)] struct Order { id: i64, user_id: i64, total: i64 }
+/// # async fn demo(db: Db, posts: Vec<Post>, users: Vec<User>) -> Result {
+/// let comments = count_many(&db, &posts, Comment::where_eq("approved", true), "post_id").await?;
+/// let spent = sum_many::<i64, _, _>(&db, &users, Order::query(), "user_id", "total").await?;
+/// let n = comments[&posts[0].id]; // 0 when a post has none
+/// # let _ = (n, spent); Ok(()) }
+/// ```
+pub fn count_many<'a, C: Model, P: Model>(
+    db: &'a Db,
+    parents: &[P],
+    children: Query<C>,
+    column: &str,
+) -> impl Future<Output = Result<HashMap<i64, i64>>> + Send + 'a {
+    grouped(db, parents, children, column, "COUNT(*)".to_owned())
+}
+
+/// The sum of `sum_column` over each parent's children (`withSum`), 0 for
+/// parents without children; `T` is `i64` or `f64`.
+pub fn sum_many<'a, T: super::Number + Default + Send + 'a, C: Model, P: Model>(
+    db: &'a Db,
+    parents: &[P],
+    children: Query<C>,
+    column: &str,
+    sum_column: &str,
+) -> impl Future<Output = Result<HashMap<i64, T>>> + Send + 'a {
+    let expression = if C::COLUMNS.contains(&sum_column) {
+        format!(
+            "CAST(COALESCE(SUM({}), 0) AS {})",
+            quote(sum_column),
+            T::SQL_TYPE
+        )
+    } else {
+        // Let the query report the unknown column.
+        format!("SUM({})", quote(sum_column))
+    };
+    let checked = children.check_column(sum_column);
+    grouped(db, parents, checked, column, expression)
+}
+
+fn grouped<'a, T: crate::db::FromDb + Default + Send + 'a, C: Model, P: Model>(
+    db: &'a Db,
+    parents: &[P],
+    children: Query<C>,
+    column: &str,
+    expression: String,
+) -> impl Future<Output = Result<HashMap<i64, T>>> + Send + 'a {
+    let ids: Vec<i64> = parents.iter().map(Model::id).collect();
+    let column = column.to_owned();
+    async move {
+        let mut totals: HashMap<i64, T> = ids.iter().map(|id| (*id, T::default())).collect();
+        if ids.is_empty() {
+            return Ok(totals);
+        }
+        let rows: Vec<(i64, T)> = children
+            .where_in(&column, ids)
+            .group_by(&column)
+            .select_as(db, &format!("{}, {expression}", quote(&column)))
+            .await?;
+        totals.extend(rows);
+        Ok(totals)
+    }
+}
+
 /// A many-to-many relation through a pivot table with two id columns, e.g.
 /// `Pivot::new("product_tags", "product_id", "tag_id")`. Give the table a
 /// unique index on both columns.

@@ -659,19 +659,29 @@ Notes from M18b (accounts and security):
   fails the login. The `Audit` module records them all and gives apps `audit::record`.
 
 ### M19 · v0.20: Data layer 2
-- [ ] Raw fragments in the builder: `where_raw`, `order_by_raw`, `select_raw` +
+- [x] Raw fragments in the builder: `where_raw`, `order_by_raw`, `select_raw` +
       `group_by`/`having` read into `FromRow`; `to_sql()` for debugging
-- [ ] `lock_for_update()` / `shared_lock()` (PostgreSQL), a public `begin_immediate` (SQLite)
-- [ ] Aggregate loaders: `relations::count_many`, `sum_many`, `exists_many` (one GROUP BY)
-- [ ] `where_has` / `where_doesnt_have` (EXISTS), `where_not_in_query`
+- [x] `lock_for_update()` / `shared_lock()` (PostgreSQL), a public `begin_immediate` (SQLite)
+- [x] Aggregate loaders: `relations::count_many`, `sum_many`, `exists_many` (one GROUP BY)
+- [x] `where_has` / `where_doesnt_have` (EXISTS), `where_not_in_query`
 - [ ] Non-integer keys: `#[model(key = "uuid")]` (UUID/ULID/string), loaders generic over the key
 - [ ] Model hooks: `saving`/`saved`/`deleting`/`deleted` trait methods called by `save`/`delete`
 - [ ] Partial saves: `save_only(&["price"])` and change tracking against the loaded row
 - [ ] Pivot data and timestamps (`attach_with`, `load_with::<T, PivotRow>`); polymorphic
       relations (`Morph`)
-- [ ] `simple_paginate` and `cursor_paginate`; `update_or_create`, `first_or_new`, `refresh`
-- [ ] `db.transaction(|tx| …).retries(3)` (SQLite busy, PostgreSQL serialization), savepoints
+- [x] `simple_paginate` and `cursor_paginate`; `update_or_create`, `first_or_new`, `refresh`
+- [x] `db.transaction(|tx| …).retries(3)` (SQLite busy, PostgreSQL serialization), savepoints
 - [ ] `Encrypted<T>` field type (AES-GCM under `APP_KEY`), a public encrypt/decrypt API
+
+Notes from M19a (query builder):
+- M19 is split: M19a is the query builder (above, ticked); M19b the model features (non-integer
+  keys, hooks, partial saves, pivot data, polymorphic relations, `Encrypted<T>`).
+- Transactions take a closure returning `Box::pin(async move { … })` (the usual way to lend a
+  `&mut Transaction` to async code); `transaction_retrying(n, …)` retries on `DbError::
+  is_retryable` (SQLite busy/locked, PostgreSQL 40001/40P01). Savepoints are not done.
+- `cursor_paginate` is keyset on `id`, newest first; other orders use `paginate`.
+- `where_raw`/`order_by_raw`/`having_raw`/`select_as` take SQL as written: identifiers are the
+  app's to quote, and values go through `?`.
 
 ### M20 · v0.21: Background 2
 - [ ] Schedules: `cron("0 9 * * 1-5")`, `weekly_on`, `monthly_on`, `weekdays`, `between`;

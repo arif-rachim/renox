@@ -341,10 +341,40 @@ async fn queries(db: &Db) -> Result {
     let _ = (cheap, one, total, found, revenue, names, first);
     Ok(())
 }
+
+async fn more_queries(db: &Db) -> Result {
+    let today = Product::query()
+        .where_raw("DATE(created_at) = DATE(?)", [renox::db::now()]) // SQL the builder lacks
+        .order_by_raw("price DESC, id")
+        .get(db)
+        .await?;
+    let per_owner: Vec<(i64, i64)> = Product::query() // a report, read into a tuple
+        .group_by("user_id")
+        .having_raw("COUNT(*) > ?", [1])
+        .select_as(db, "user_id, COUNT(*)")
+        .await?;
+    let mut tea = Product::where_eq("name", "Tea")
+        .update_or_create(db, || Product { name: "Tea".into(), ..Default::default() }, |p| p.price = 9_500)
+        .await?; // also first_or_new
+    tea.refresh(db).await?; // reload after someone else changed it
+    let page = Product::query().simple_paginate(db, 1, 50).await?; // no COUNT: prev/next only
+    let feed = Product::query().cursor_paginate(db, None, 50).await?; // .next_cursor for the next call
+    let (sql, values) = Product::where_eq("price", 1).to_sql(db.dialect())?; // debugging
+    let moved = db
+        .transaction_retrying(3, |tx| {
+            // committed on Ok, rolled back on Err, retried on SQLite busy / PostgreSQL conflicts
+            Box::pin(async move { Product::where_eq("id", 1).lock_for_update().count(&mut *tx).await })
+        })
+        .await?;
+    let _ = (today, per_owner, page, feed, sql, values, moved);
+    Ok(())
+}
 ```
 
 Relations are explicit: a method for one related row, and loaders for a page of rows
-(`relations::belongs_to`, `has_many`, `Pivot` for many-to-many, one query each, no N+1).
+(`relations::belongs_to`, `has_many`, `Pivot` for many-to-many, `count_many`/`sum_many` for
+counts and totals per row; one query each, no N+1). Filter by related rows with
+`.where_has(Review::where_eq("stars", 5), "product_id")` / `.where_doesnt_have(…)`.
 For joins and reports, use `sql("…").fetch_as::<T>(&db)` with `#[derive(FromRow)]` or a tuple.
 See [docs/relations.md](docs/relations.md).
 

@@ -10,6 +10,20 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M19a · Query builder
+
+- `where_raw(sql, values)`, `order_by_raw(sql)`, `group_by(col)`, `having_raw(sql, values)` and
+  `select_as::<T>(db, "col, COUNT(*)")` into a `FromRow` struct or tuple; `count` counts groups.
+- `to_sql(dialect)` returns the SELECT and its values.
+- `lock_for_update()` / `shared_lock()` (PostgreSQL); `Db::begin_immediate()` is public (SQLite).
+- `where_has(children, fk)` / `where_doesnt_have` (EXISTS), `where_not_in_query`.
+- `relations::count_many` and `sum_many` (withCount / withSum, 0 for rows without children).
+- `simple_paginate` (`SimplePage`, `simple_pagination` macro) and `cursor_paginate`
+  (`CursorPage`, keyset on id).
+- `first_or_new`, `update_or_create`, `Model::refresh`.
+- `Db::transaction(|tx| Box::pin(async move { … }))` and `transaction_retrying(n, …)`;
+  `DbError::is_retryable`, `Error::is_retryable`.
+
 ### M18b · Accounts and security
 
 - `Auth::account()`: `/account` with profile (a new email is verified again), password change,

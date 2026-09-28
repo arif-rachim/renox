@@ -187,3 +187,13 @@ let products = Product::query()
 | `chunk` | `.chunk(&db, 1000, \|rows\| async { … })` (by id) |
 | `insert([...])`, `upsert` | `Model::insert_many(&db, rows)`, `Model::upsert(&db, rows, &["sku"], &["qty"])` |
 | `with('category')` | `relations::belongs_to` / `has_many` / `Pivot::load_for` (above) |
+| `withCount`, `withSum` | `relations::count_many(&db, &posts, Comment::query(), "post_id")`, `sum_many::<i64, _, _>(…, "total")` (0 for rows without children) |
+| `whereHas`, `whereDoesntHave` | `.where_has(Comment::where_eq("approved", true), "post_id")`, `.where_doesnt_have(…)` (EXISTS) |
+| `whereNotIn(fn …)` (sub-query) | `.where_not_in_query(col, Other::query(), "col")` |
+| `whereRaw`, `orderByRaw` | `.where_raw("DATE(created_at) = DATE(?)", [value])`, `.order_by_raw("total DESC")` |
+| `groupBy`, `having`, `selectRaw` | `.group_by(col).having_raw("COUNT(*) > ?", [2]).select_as::<(i64, i64), _>(&db, "col, COUNT(*)")` |
+| `lockForUpdate`, `sharedLock` | `.lock_for_update()` / `.shared_lock()` on `&mut tx` (PostgreSQL; SQLite: `db.begin_immediate()`) |
+| `firstOrNew`, `updateOrCreate`, `refresh` | `.first_or_new(&db, \|\| new)`, `.update_or_create(&db, \|\| new, \|m\| …)`, `model.refresh(&db)` |
+| `simplePaginate`, `cursorPaginate` | `.simple_paginate(&db, page, per)` (`simple_pagination` macro), `.cursor_paginate(&db, cursor, per)` |
+| `DB::transaction(fn, 3)` | `db.transaction_retrying(3, \|tx\| Box::pin(async move { … }))`, `db.transaction(…)` |
+| `toSql` | `.to_sql(db.dialect())` |

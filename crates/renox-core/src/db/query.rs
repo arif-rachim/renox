@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
 
+use super::paginate::{CursorPage, SimplePage};
 use super::{Db, DbValue, Dialect, Executor, FromDb, Model, Paginated, ToDbValue, now, quote, sql};
 use crate::Result;
 use anyhow::anyhow;
@@ -49,6 +50,13 @@ enum Filter {
     Group { any: bool, filters: Vec<Filter> },
     /// `NOT (…)`.
     Not(Box<Filter>),
+    /// `[NOT] EXISTS (SELECT 1 FROM table WHERE correlation AND …)`.
+    Exists {
+        not: bool,
+        table: &'static str,
+        correlation: String,
+        filters: Vec<Filter>,
+    },
     /// `column IN (SELECT sub_column FROM table WHERE …)`.
     InQuery {
         column: String,
@@ -82,6 +90,21 @@ impl Filter {
                 format!("({})", parts.join(joiner))
             }
             Filter::Not(filter) => format!("NOT ({})", filter.render(dialect)),
+            Filter::Exists {
+                not,
+                table,
+                correlation,
+                filters,
+            } => {
+                let mut parts = vec![correlation.clone()];
+                parts.extend(filters.iter().map(|f| f.render(dialect)));
+                format!(
+                    "{}EXISTS (SELECT 1 FROM {} WHERE {})",
+                    if *not { "NOT " } else { "" },
+                    quote(table),
+                    parts.join(" AND ")
+                )
+            }
             Filter::InQuery {
                 column,
                 table,
@@ -162,9 +185,13 @@ fn json_in(kind: &str, column: &str, dialect: Dialect) -> String {
 pub struct Query<M> {
     filters: Vec<Filter>,
     binds: Vec<DbValue>,
+    group: Vec<String>,
+    having: Vec<String>,
+    having_binds: Vec<DbValue>,
     order: Vec<String>,
     limit: Option<u64>,
     offset: Option<u64>,
+    lock: Option<&'static str>,
     trashed: Trashed,
     error: Option<String>,
     model: PhantomData<fn() -> M>,
@@ -175,9 +202,13 @@ impl<M> Clone for Query<M> {
         Self {
             filters: self.filters.clone(),
             binds: self.binds.clone(),
+            group: self.group.clone(),
+            having: self.having.clone(),
+            having_binds: self.having_binds.clone(),
             order: self.order.clone(),
             limit: self.limit,
             offset: self.offset,
+            lock: self.lock,
             trashed: self.trashed,
             error: self.error.clone(),
             model: PhantomData,
@@ -190,9 +221,13 @@ impl<M: Model> Query<M> {
         Self {
             filters: Vec::new(),
             binds: Vec::new(),
+            group: Vec::new(),
+            having: Vec::new(),
+            having_binds: Vec::new(),
             order: Vec::new(),
             limit: None,
             offset: None,
+            lock: None,
             trashed: Trashed::Without,
             error: None,
             model: PhantomData,
@@ -354,6 +389,73 @@ impl<M: Model> Query<M> {
         self
     }
 
+    /// Like `where_in_query`, keeping the rows whose `column` is *not* among
+    /// the sub-query's values.
+    pub fn where_not_in_query<N: Model>(
+        self,
+        column: &str,
+        sub: Query<N>,
+        sub_column: &str,
+    ) -> Self {
+        let before = self.filters.len();
+        let mut query = self.where_in_query(column, sub, sub_column);
+        if query.filters.len() > before
+            && let Some(last) = query.filters.pop()
+        {
+            query.filters.push(Filter::Not(Box::new(last)));
+        }
+        query
+    }
+
+    /// Rows that have at least one related row in `children`, joined by the
+    /// children's `foreign_key` column to this model's `id` (`EXISTS`):
+    /// products with a 5-star review.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # #[derive(Model, serde::Serialize, Default)] struct Product { id: i64, name: String }
+    /// # #[derive(Model, serde::Serialize, Default)] struct Review { id: i64, product_id: i64, stars: i64 }
+    /// # async fn demo(db: Db) -> Result {
+    /// let loved = Product::query()
+    ///     .where_has(Review::where_eq("stars", 5), "product_id")
+    ///     .get(&db)
+    ///     .await?;
+    /// let unreviewed = Product::query().where_doesnt_have(Review::query(), "product_id").count(&db).await?;
+    /// # let _ = (loved, unreviewed); Ok(()) }
+    /// ```
+    pub fn where_has<N: Model>(self, children: Query<N>, foreign_key: &str) -> Self {
+        self.related(children, foreign_key, false)
+    }
+
+    /// Rows without any related row in `children` (`NOT EXISTS`).
+    pub fn where_doesnt_have<N: Model>(self, children: Query<N>, foreign_key: &str) -> Self {
+        self.related(children, foreign_key, true)
+    }
+
+    fn related<N: Model>(mut self, mut children: Query<N>, foreign_key: &str, not: bool) -> Self {
+        let foreign_key = children.column(foreign_key);
+        if let Some(error) = children.error.take() {
+            self.error.get_or_insert(error);
+        }
+        if let Some(foreign_key) = foreign_key {
+            let trashed = children.trashed_filter();
+            let mut filters = children.filters;
+            filters.extend(trashed);
+            self.filters.push(Filter::Exists {
+                not,
+                table: N::TABLE,
+                correlation: format!(
+                    "{}.{foreign_key} = {}.\"id\"",
+                    quote(N::TABLE),
+                    quote(M::TABLE)
+                ),
+                filters,
+            });
+            self.binds.extend(children.binds);
+        }
+        self
+    }
+
     /// Any of the conditions `group` adds must hold (`OR`), in parentheses:
     /// `.where_any(|q| q.where_eq("status", "new").where_op("total", ">", 100))`.
     pub fn where_any(self, group: impl FnOnce(Self) -> Self) -> Self {
@@ -420,6 +522,76 @@ impl<M: Model> Query<M> {
         self
     }
 
+    /// A condition in SQL, for what the builder doesn't cover (dates, JSON,
+    /// full-text search, …), with `?` for each value. Column names are yours
+    /// to quote; never build `sql` from user input.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # #[derive(Model, serde::Serialize, Default)] struct Order { id: i64, total: i64, created_at: Option<DateTime> }
+    /// # async fn demo(db: Db) -> Result {
+    /// let today = Order::query()
+    ///     .where_raw("DATE(created_at) = DATE(?)", [renox::db::now()])
+    ///     .order_by_raw("total DESC, id")
+    ///     .get(&db)
+    ///     .await?;
+    /// # let _ = today; Ok(()) }
+    /// ```
+    pub fn where_raw<V: ToDbValue>(
+        mut self,
+        sql: &str,
+        values: impl IntoIterator<Item = V>,
+    ) -> Self {
+        self.filters.push(Filter::Sql(format!("({sql})")));
+        self.binds
+            .extend(values.into_iter().map(|v| v.to_db_value()));
+        self
+    }
+
+    /// An `ORDER BY` term in SQL, e.g. `"total DESC, id"` (no values; never
+    /// from user input).
+    pub fn order_by_raw(mut self, sql: &str) -> Self {
+        self.order.push(sql.to_owned());
+        self
+    }
+
+    /// Groups rows by `column`, for `select_as` and `count`:
+    /// `.group_by("user_id").select_as::<(i64, i64), _>(&db, "user_id, COUNT(*)")`.
+    pub fn group_by(mut self, column: &str) -> Self {
+        if let Some(column) = self.column(column) {
+            self.group.push(column);
+        }
+        self
+    }
+
+    /// A condition on the groups, in SQL with `?` for each value:
+    /// `.having_raw("COUNT(*) > ?", [2])`.
+    pub fn having_raw<V: ToDbValue>(
+        mut self,
+        sql: &str,
+        values: impl IntoIterator<Item = V>,
+    ) -> Self {
+        self.having.push(format!("({sql})"));
+        self.having_binds
+            .extend(values.into_iter().map(|v| v.to_db_value()));
+        self
+    }
+
+    /// Locks the matching rows until the transaction ends (`FOR UPDATE`),
+    /// e.g. to read a balance and write it back safely. Use it on `&mut tx`.
+    /// PostgreSQL only: on SQLite a write transaction already holds the whole
+    /// database, so start it with `db.begin_immediate()` instead.
+    pub fn lock_for_update(mut self) -> Self {
+        self.lock = Some("FOR UPDATE");
+        self
+    }
+
+    /// Like `lock_for_update`, but others may still read-lock (`FOR SHARE`).
+    pub fn shared_lock(mut self) -> Self {
+        self.lock = Some("FOR SHARE");
+        self
+    }
+
     /// Matches no rows at all, e.g. a default scope when no tenant is set.
     pub fn none(mut self) -> Self {
         self.filters.push(Filter::Sql("1 = 0".into()));
@@ -482,6 +654,7 @@ impl<M: Model> Query<M> {
             quote(M::TABLE),
             self.where_sql(dialect)
         );
+        sql.push_str(&self.group_sql());
         if !self.order.is_empty() {
             sql.push_str(&format!(" ORDER BY {}", self.order.join(", ")));
         }
@@ -495,7 +668,71 @@ impl<M: Model> Query<M> {
             (None, Some(offset)) => sql.push_str(&format!(" OFFSET {offset}")),
             (None, None) => {}
         }
+        if let (Some(lock), Dialect::Postgres) = (self.lock, dialect) {
+            sql.push(' ');
+            sql.push_str(lock);
+        }
         sql
+    }
+
+    fn group_sql(&self) -> String {
+        let mut sql = String::new();
+        if !self.group.is_empty() {
+            sql.push_str(&format!(" GROUP BY {}", self.group.join(", ")));
+        }
+        if !self.having.is_empty() {
+            sql.push_str(&format!(" HAVING {}", self.having.join(" AND ")));
+        }
+        sql
+    }
+
+    /// The query's values in the order its SQL uses them.
+    fn all_binds(&self) -> Vec<DbValue> {
+        let mut binds = self.binds.clone();
+        binds.extend(self.having_binds.iter().cloned());
+        binds
+    }
+
+    /// Records an error if `column` isn't one of the model's.
+    pub(crate) fn check_column(mut self, column: &str) -> Self {
+        let _ = self.column(column);
+        self
+    }
+
+    /// The SELECT this query runs and its values, e.g. to log or debug it.
+    pub fn to_sql(&self, dialect: Dialect) -> Result<(String, Vec<DbValue>)> {
+        self.check()?;
+        Ok((self.select_sql(dialect), self.all_binds()))
+    }
+
+    /// Selects `columns` (SQL, e.g. `"user_id, COUNT(*) AS orders"`) of the
+    /// matching rows, with `group_by`/`having_raw`, read into a
+    /// `#[derive(FromRow)]` struct or a tuple:
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # #[derive(Model, serde::Serialize, Default)] struct Order { id: i64, user_id: i64, total: i64, status: String }
+    /// # async fn demo(db: Db) -> Result {
+    /// let big_spenders: Vec<(i64, i64)> = Order::where_eq("status", "paid")
+    ///     .group_by("user_id")
+    ///     .having_raw("SUM(total) > ?", [1_000_000])
+    ///     .order_by_raw("2 DESC")
+    ///     .select_as(&db, "user_id, CAST(SUM(total) AS BIGINT)")
+    ///     .await?;
+    /// # let _ = big_spenders; Ok(()) }
+    /// ```
+    pub async fn select_as<'c, T: super::FromRow, E: Executor<'c>>(
+        self,
+        db: E,
+        columns: &str,
+    ) -> Result<Vec<T>> {
+        self.check()?;
+        let db = db.into_conn();
+        let statement = self.select_columns_sql(db.dialect(), columns);
+        Ok(sql(statement)
+            .bind_all(self.all_binds())
+            .fetch_as(db)
+            .await?)
     }
 
     /// One aggregate over the matching rows (order and limit don't apply).
@@ -576,7 +813,10 @@ impl<M: Model> Query<M> {
         self.check()?;
         let db = db.into_conn();
         let statement = self.select_columns_sql(db.dialect(), &column);
-        Ok(sql(statement).bind_all(self.binds).scalars(db).await?)
+        Ok(sql(statement)
+            .bind_all(self.all_binds())
+            .scalars(db)
+            .await?)
     }
 
     /// Sets columns on every matching row (and `updated_at` when the model
@@ -726,7 +966,7 @@ impl<M: Model> Query<M> {
         self.check()?;
         let db = db.into_conn();
         let rows = sql(self.select_sql(db.dialect()))
-            .bind_all(self.binds)
+            .bind_all(self.all_binds())
             .fetch_all(db)
             .await?;
         Ok(rows
@@ -739,17 +979,25 @@ impl<M: Model> Query<M> {
         Ok(self.limit(1).get(db).await?.into_iter().next())
     }
 
+    /// How many rows match (with `group_by`: how many groups).
     pub async fn count<'c, E: Executor<'c>>(self, db: E) -> Result<u64> {
         self.check()?;
         let db = db.into_conn();
-        let count: i64 = sql(format!(
-            "SELECT COUNT(*) FROM {}{}",
-            quote(M::TABLE),
-            self.where_sql(db.dialect())
-        ))
-        .bind_all(self.binds)
-        .scalar(db)
-        .await?;
+        let statement = if self.group.is_empty() {
+            format!(
+                "SELECT COUNT(*) FROM {}{}",
+                quote(M::TABLE),
+                self.where_sql(db.dialect())
+            )
+        } else {
+            format!(
+                "SELECT COUNT(*) FROM (SELECT 1 AS one FROM {}{}{}) AS groups",
+                quote(M::TABLE),
+                self.where_sql(db.dialect()),
+                self.group_sql()
+            )
+        };
+        let count: i64 = sql(statement).bind_all(self.all_binds()).scalar(db).await?;
         Ok(count as u64)
     }
 
@@ -769,6 +1017,115 @@ impl<M: Model> Query<M> {
             .get(db)
             .await?;
         Ok(Paginated::new(items, page, per_page, total))
+    }
+
+    /// One page without counting the rows (one query instead of two): for
+    /// "previous / next" links on large tables. `page` starts at 1.
+    pub async fn simple_paginate(self, db: &Db, page: u32, per_page: u32) -> Result<SimplePage<M>> {
+        let page = page.max(1);
+        let per_page = per_page.clamp(1, 1000);
+        let mut items = self
+            .limit(u64::from(per_page) + 1)
+            .offset(u64::from(page - 1) * u64::from(per_page))
+            .get(db)
+            .await?;
+        let has_next = items.len() > per_page as usize;
+        items.truncate(per_page as usize);
+        Ok(SimplePage {
+            items,
+            page,
+            per_page,
+            has_prev: page > 1,
+            has_next,
+        })
+    }
+
+    /// The `per_page` newest rows after `cursor` (by id; the query's own
+    /// order doesn't apply), for APIs and infinite scroll on big tables:
+    /// unlike page numbers, rows added meanwhile don't shift the pages.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # #[derive(Model, serde::Serialize, Default)] struct Event { id: i64, name: String }
+    /// #[derive(serde::Deserialize)]
+    /// struct Params { cursor: Option<String> }
+    ///
+    /// async fn events(State(db): State<Db>, Query(p): Query<Params>) -> Result<Json<renox::db::CursorPage<Event>>> {
+    ///     Ok(Json(Event::query().cursor_paginate(&db, p.cursor.as_deref(), 50).await?))
+    /// }
+    /// ```
+    pub async fn cursor_paginate(
+        mut self,
+        db: &Db,
+        cursor: Option<&str>,
+        per_page: u32,
+    ) -> Result<CursorPage<M>> {
+        let per_page = per_page.clamp(1, 1000);
+        if let Some(cursor) = cursor {
+            let Ok(after) = cursor.parse::<i64>() else {
+                return Err(crate::Error::BadRequest("invalid cursor".into()));
+            };
+            self = self.where_op("id", "<", after);
+        }
+        self.order.clear();
+        let mut items = self
+            .order_by_desc("id")
+            .limit(u64::from(per_page) + 1)
+            .get(db)
+            .await?;
+        let more = items.len() > per_page as usize;
+        items.truncate(per_page as usize);
+        let next_cursor = more
+            .then(|| items.last().map(|last| last.id().to_string()))
+            .flatten();
+        Ok(CursorPage {
+            items,
+            per_page,
+            next_cursor,
+        })
+    }
+
+    /// The first matching row, or `make()` unsaved (`firstOrNew`).
+    pub async fn first_or_new(self, db: &Db, make: impl FnOnce() -> M + Send) -> Result<M> {
+        Ok(match self.first(db).await? {
+            Some(found) => found,
+            None => make(),
+        })
+    }
+
+    /// Changes the first matching row with `change`, or creates `make()`
+    /// with `change` applied (`updateOrCreate`); returns it saved.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # #[derive(Model, serde::Serialize, Default)] struct Setting { id: i64, user_id: i64, key: String, value: String }
+    /// # async fn demo(db: Db) -> Result {
+    /// let theme = Setting::where_eq("user_id", 7)
+    ///     .where_eq("key", "theme")
+    ///     .update_or_create(
+    ///         &db,
+    ///         || Setting { user_id: 7, key: "theme".into(), ..Default::default() },
+    ///         |s| s.value = "dark".into(),
+    ///     )
+    ///     .await?;
+    /// # let _ = theme; Ok(()) }
+    /// ```
+    #[allow(clippy::manual_async_fn)] // the `+ Send` in the signature is the point
+    pub fn update_or_create<'a>(
+        self,
+        db: &'a Db,
+        make: impl FnOnce() -> M + Send + 'a,
+        change: impl FnOnce(&mut M) + Send + 'a,
+    ) -> impl Future<Output = Result<M>> + Send + 'a {
+        async move {
+            let mut model = match self.first(db).await? {
+                Some(found) => found,
+                None => make(),
+            };
+            change(&mut model);
+            model.save(db).await?;
+            Ok(model)
+        }
     }
 
     /// Deletes every matching row (soft-deletes them for models with soft deletes).

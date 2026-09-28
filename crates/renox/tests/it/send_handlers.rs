@@ -174,6 +174,47 @@ async fn access(State(db): State<Db>, user: AuthUser, session: Session) -> Resul
     Ok(format!("{} {} {scoped}", roles.len(), all.len()))
 }
 
+/// M19a's data APIs, routed (not called: a compile-time `Send` check).
+async fn builder(State(db): State<Db>) -> Result<String> {
+    let notes = Note::query().get(&db).await?;
+    let counts = renox::db::relations::count_many(&db, &notes, Tag::query(), "note_id").await?;
+    let sums =
+        renox::db::relations::sum_many::<i64, _, _>(&db, &notes, Tag::query(), "note_id", "id")
+            .await?;
+    let groups: Vec<(i64, i64)> = Note::query()
+        .group_by("stars")
+        .select_as(&db, "stars, COUNT(*)")
+        .await?;
+    let simple = Note::query().simple_paginate(&db, 1, 10).await?;
+    let cursor = Note::query().cursor_paginate(&db, None, 10).await?;
+    let mut note = Note::query()
+        .update_or_create(&db, Note::default, |n| n.body = "u".into())
+        .await?;
+    note.refresh(&db).await?;
+    let fresh = Note::query().first_or_new(&db, Note::default).await?;
+    let has = Note::query()
+        .where_has(Tag::query(), "note_id")
+        .count(&db)
+        .await?;
+    let moved: i64 = db
+        .transaction_retrying(2, |tx| {
+            Box::pin(
+                async move { Ok(Note::query().lock_for_update().count(&mut *tx).await? as i64) },
+            )
+        })
+        .await?;
+    Ok(format!(
+        "{} {} {} {} {} {} {} {moved}",
+        counts.len(),
+        sums.len(),
+        groups.len(),
+        simple.items.len(),
+        cursor.items.len(),
+        fresh.id,
+        has
+    ))
+}
+
 struct Handlers;
 
 impl Module for Handlers {
@@ -187,6 +228,7 @@ impl Module for Handlers {
             .get("/queries", queries)
             .get("/more", more)
             .get("/access", access)
+            .get("/builder", builder)
     }
 }
 
