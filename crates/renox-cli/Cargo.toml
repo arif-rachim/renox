@@ -4,6 +4,7 @@ description = "rnx, the command-line tool for the Renox web framework (like Lara
 readme = "../../README.md"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true

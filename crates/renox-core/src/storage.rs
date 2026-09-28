@@ -270,8 +270,10 @@ fn s3(config: &StorageConfig) -> anyhow::Result<Disk> {
         )
         .with_region(config.region.clone().unwrap_or_else(|| "auto".into()));
     if let Some(endpoint) = &config.endpoint {
+        // A local MinIO or SeaweedFS usually speaks plain http.
         builder = builder
             .with_endpoint(endpoint)
+            .with_allow_http(endpoint.starts_with("http://"))
             .with_virtual_hosted_style_request(false);
     }
     if let (Some(id), Some(secret)) = (&config.access_key_id, &config.secret_access_key) {

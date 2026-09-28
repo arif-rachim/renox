@@ -2194,6 +2194,8 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
+ "renox",
+ "serde",
  "syn 2.0.119",
 ]
 

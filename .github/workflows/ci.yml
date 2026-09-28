@@ -90,3 +90,118 @@ jobs:
       # Stops, pauses and restarts PostgreSQL (or locks SQLite) under a running
       # app and checks it answers fast and recovers; see docs/operations.md.
       - run: tests/chaos/run.sh ${{ matrix.database }}
+
+  msrv:
+    name: MSRV (1.94)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Keep in step with `rust-version` in Cargo.toml.
+      - uses: dtolnay/rust-toolchain@1.94
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace --all-targets --all-features
+
+  features:
+    name: feature matrix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack
+      # Every feature on its own, none (a SQLite-only build) and all of them:
+      # a missing `#[cfg(feature = …)]` fails here.
+      - run: cargo hack check -p renox-core -p renox --each-feature --no-dev-deps
+
+  cli:
+    name: rnx new + make:* (${{ matrix.database }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, postgres]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target/cli-e2e"
+      # A new app with every generator's output must build and pass its tests.
+      - run: tests/cli/run.sh ${{ matrix.database }}
+
+  docker:
+    name: docker (make:deploy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # `rnx new` pins the app to this commit, which GitHub has (a PR's
+          # merge commit may be gone by the time the image builds).
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target/cli-e2e"
+      # As users do: Renox from GitHub, the Dockerfile `make:deploy` writes,
+      # then the container must answer /health.
+      - run: tests/cli/run.sh
+        env:
+          FROM_GIT: 1
+          DOCKER: 1
+
+  s3:
+    name: S3 storage (SeaweedFS)
+    runs-on: ubuntu-latest
+    env:
+      TEST_S3_ENDPOINT: http://127.0.0.1:8333
+      TEST_S3_BUCKET: renox-test
+      TEST_S3_ACCESS_KEY_ID: renox
+      TEST_S3_SECRET_ACCESS_KEY: renox-secret
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # MinIO no longer publishes images; SeaweedFS speaks the same S3 API.
+      - name: Start SeaweedFS
+        run: |
+          docker run -d --name renox-s3 -p 8333:8333 \
+            -e AWS_ACCESS_KEY_ID=$TEST_S3_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY=$TEST_S3_SECRET_ACCESS_KEY \
+            chrislusf/seaweedfs:4.47 server -s3 -ip.bind=0.0.0.0
+          for _ in $(seq 60); do
+            docker exec renox-s3 sh -c "echo 's3.bucket.create -name $TEST_S3_BUCKET' | weed shell" 2>/dev/null \
+              | grep -q "created bucket" && exit 0
+            sleep 1
+          done
+          docker logs renox-s3 | tail -40
+          exit 1
+      - run: cargo test -p renox --features s3 --test it s3
+
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Licenses, RustSec advisories, banned crates and sources (deny.toml).
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      # Informational: the summary is in the job's log and summary page.
+      - run: cargo llvm-cov -p renox -p renox-core -p renox-cli --summary-only | tee coverage.txt
+      - run: |
+          echo '### Line coverage' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          tail -n 40 coverage.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

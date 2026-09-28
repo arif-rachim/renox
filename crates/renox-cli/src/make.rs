@@ -18,7 +18,7 @@ pub fn migration(name: &str, dir: &Path) -> Result<()> {
     }
 
     fs::create_dir_all(dir).with_context(|| format!("could not create {}", dir.display()))?;
-    let stem = format!("{}_{name}", chrono::Utc::now().format("%Y%m%d%H%M%S"));
+    let stem = format!("{}_{name}", next_version(dir, chrono::Utc::now()));
     let (up_sql, down_sql) = template(name, Database::of_current_app());
     for (suffix, contents) in [("up", up_sql), ("down", down_sql)] {
         let path = dir.join(format!("{stem}.{suffix}.sql"));
@@ -30,6 +30,26 @@ pub fn migration(name: &str, dir: &Path) -> Result<()> {
         println!("Created {}", path.display());
     }
     Ok(())
+}
+
+/// The current time as `YYYYMMDDHHMMSS`, moved past the newest migration in
+/// `dir`: migrations made in the same second (`make:model -m`, then
+/// `make:migration`) still run in the order they were made.
+fn next_version(dir: &Path, now: chrono::DateTime<chrono::Utc>) -> String {
+    let now: u64 = now.format("%Y%m%d%H%M%S").to_string().parse().unwrap_or(0);
+    let newest = fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|entry| {
+            let name = entry.file_name().into_string().ok()?;
+            let digits = name.split('_').next()?;
+            (digits.len() == 14).then(|| digits.parse::<u64>().ok())?
+        })
+        .max()
+        .unwrap_or(0);
+    // Past a `…59` second this isn't a valid time, but it only has to sort.
+    format!("{:014}", now.max(newest + 1))
 }
 
 /// A starting point: a table for `create_<table>_table`, otherwise comments.
@@ -63,6 +83,21 @@ fn template(name: &str, database: Database) -> (String, String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn migrations_made_in_the_same_second_keep_their_order() {
+        let dir = tempfile::tempdir().unwrap();
+        let now = chrono::DateTime::parse_from_rfc3339("2026-09-28T10:00:00Z")
+            .unwrap()
+            .to_utc();
+        assert_eq!(next_version(dir.path(), now), "20260928100000");
+        fs::write(dir.path().join("20260928100000_create_a_table.up.sql"), "").unwrap();
+        fs::write(dir.path().join("00010101000100_renox.up.sql"), "").unwrap();
+        fs::write(dir.path().join("README.md"), "").unwrap();
+        assert_eq!(next_version(dir.path(), now), "20260928100001");
+        let later = now + chrono::Duration::minutes(1);
+        assert_eq!(next_version(dir.path(), later), "20260928100100");
+    }
 
     #[test]
     fn creates_table_templates() {

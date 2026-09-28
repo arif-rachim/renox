@@ -9,6 +9,7 @@ mod background_resilience;
 mod data_layer;
 mod data_resilience;
 mod database;
+mod direct;
 mod dx;
 mod embed;
 mod extension_points;
@@ -20,6 +21,8 @@ mod method;
 mod postgres;
 mod queue;
 mod requests;
+#[cfg(feature = "s3")]
+mod s3;
 mod security;
 mod seo;
 mod testing;

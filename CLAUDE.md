@@ -354,7 +354,9 @@ migration changes migration counts asserted in `crates/renox/tests/database.rs`.
   "Generated with Claude Code" line.
 - Before every commit: `cargo fmt --all && cargo clippy --workspace --all-targets -- -D warnings
   && RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps && cargo test --workspace`.
-  CI runs exactly these (fmt/clippy/doc on Ubuntu; tests on Ubuntu, macOS, Windows).
+  CI runs exactly these (fmt/clippy/doc on Ubuntu; tests on Ubuntu, macOS, Windows), plus
+  PostgreSQL, chaos, MSRV, the feature matrix, `tests/cli/run.sh` (SQLite, PostgreSQL, Docker),
+  S3, cargo-deny and coverage.
 - After pushing, watch CI (`gh run watch <id> -R arif-rachim/renox --exit-status`) and tick the
   "CI green" box in the PR body.
 - Don't stack PRs on unmerged branches (see §6.3). Push the next milestone's branch but open its PR
@@ -541,6 +543,25 @@ and the integration tests are one binary. Result: rebuild after a core change 29
   `analytics` installs the ring provider). renox-core is `default-features = false` in the
   workspace deps; the `renox` crate owns the defaults (`fake`, `server-events`). Throttle ids come
   from the covered routes (same in every process).
+- M16b conventions:
+  - MSRV is `rust-version` in the workspace `Cargo.toml` (1.94, set by sqlx 0.9); the `msrv` CI
+    job uses the same number, so raise both together and note it in CHANGELOG.md.
+  - Macro misuse is tested with `compile_fail` doctests on `#[cfg(doctest)] struct
+    MacroCompileErrors` in `crates/renox/src/lib.rs` (not trybuild, and not in renox-macros:
+    a proc-macro crate can't export that struct). The macros' own docs are real doctests that
+    use `renox` (a dev-dependency of renox-macros).
+  - `Config::from_vars(|name| …)` is `from_env` without the process environment; test config
+    parsing through it, never by setting env vars (tests run in parallel).
+  - `tests/cli/run.sh [postgres]` makes an app with every generator and builds/tests it
+    (`FROM_GIT=1 DOCKER=1` for the Docker job). Add every new `make:*` there.
+  - S3 tests (`it/s3.rs`, `--features s3`) run only with `TEST_S3_*` set. MinIO's images are
+    gone from Docker Hub/quay; CI uses `chrislusf/seaweedfs` (bucket via `weed shell`).
+    object_store needs `with_allow_http` for `http://` endpoints (bug found by that job).
+  - `deny.toml` doesn't ban aws-lc (the `s3` feature brings it via object_store); the lint job's
+    `cargo tree` guard covers default builds.
+  - `rnx make:job` / `make:command` insert their `app.job::<…>()` / `app.command(…)` into the
+    module's `fn register` (creating it before `fn routes`); `make:migration` bumps the
+    timestamp past the newest migration.
 - `target/` grows to ~100 GB over a few milestones and fills the disk (link errors, "No space left
   on device"); `cargo clean` it before the full two-database run.
 - This session's working directory (~/workspace/renoxium) isn't a git repo, so the Agent tool's
@@ -588,8 +609,9 @@ and the integration tests are one binary. Result: rebuild after a core change 29
 | M14c mail (recipients, cc/bcc, reply-to, from, attachments) and notifications (custom channels, `Recipient`, `notify_later`) | merged to `main` |
 | M15a query builder (groups, sub-queries, aggregates, bulk update/upsert, chunk), `FromRow` + `fetch_as`, `db::relations` (belongs_to, has_many, Pivot), docs/relations.md | merged to `main` |
 | M15b validation rules (regex, digits, dates, required_if…, each/nested, `Rule`), `Vec<Upload>`, `Cookies`/`SetCookie`, `Download` | merged to `main` |
-| M16a lighter builds (no aws-lc, default features `fake`/`server-events`), versioned `asset()`, cargo-chef Dockerfile, shared limits with `CACHE_STORE=database` | PR from branch `m16a-lighter-builds` |
-| M16b CI & trust (ROADMAP M16) | next; then M17, v1.0 |
+| M16a lighter builds (no aws-lc, default features `fake`/`server-events`), versioned `asset()`, cargo-chef Dockerfile, shared limits with `CACHE_STORE=database` | merged to `main` (#40) |
+| M16b CI & trust: MSRV, cargo-hack, `tests/cli/run.sh` (rnx new + make:* + Docker), S3 on SeaweedFS, cargo-deny, coverage, direct tests, macro doctests, SECURITY/CONTRIBUTING/CHANGELOG | PR from branch `m16b-ci-and-trust` |
+| M17 examples (shop, htmx-recipes, relations, READMEs) | next; then v1.0 |
 | v1.0 docs site, starter kit, semver guarantee | last |
 
 Before starting work, check open PRs with `gh pr list -R arif-rachim/renox` and base new branches on

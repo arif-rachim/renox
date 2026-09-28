@@ -223,6 +223,52 @@ fn register_in_main(main_rs: &Path, path: &str) -> Result<()> {
     Ok(())
 }
 
+/// Adds `call` to the module's `register`, creating that method before
+/// `fn routes` when the module has none. Prints what to add when the file
+/// doesn't look like a generated module.
+fn register_in_module(mod_rs: &Path, call: &str) -> Result<()> {
+    let hint = || println!("Register it in the module's `register`: {call}");
+    let Ok(source) = fs::read_to_string(mod_rs) else {
+        hint();
+        return Ok(());
+    };
+    if source.contains(call) {
+        return Ok(());
+    }
+    let mut lines: Vec<String> = source.lines().map(str::to_owned).collect();
+    if let Some(at) = lines
+        .iter()
+        .position(|l| l.trim() == "fn register(&self, app: &mut Registry) {")
+    {
+        let indent: String = lines[at]
+            .chars()
+            .take_while(|c| c.is_whitespace())
+            .collect();
+        lines.insert(at + 1, format!("{indent}    {call}"));
+    } else if let Some(at) = lines
+        .iter()
+        .position(|l| l.trim() == "fn routes(&self) -> Routes {")
+    {
+        let indent: String = lines[at]
+            .chars()
+            .take_while(|c| c.is_whitespace())
+            .collect();
+        let method = [
+            format!("{indent}fn register(&self, app: &mut Registry) {{"),
+            format!("{indent}    {call}"),
+            format!("{indent}}}"),
+            String::new(),
+        ];
+        lines.splice(at..at, method);
+    } else {
+        hint();
+        return Ok(());
+    }
+    fs::write(mod_rs, lines.join("\n") + "\n")?;
+    println!("Updated {} ({call})", shown(mod_rs));
+    Ok(())
+}
+
 /// `rnx make:model Produk [--module produk] [--migration]`.
 pub fn model(root: &Path, name: &str, module: Option<&str>, migration: bool) -> Result<()> {
     check_name(name)?;
@@ -288,8 +334,10 @@ impl Job for {pascal} {{
         ),
     )?;
     add_mod(&dir.join("mod.rs"), &snake)?;
-    println!("Register it in the module's `register`: app.job::<{snake}::{pascal}>();");
-    Ok(())
+    register_in_module(
+        &dir.join("mod.rs"),
+        &format!("app.job::<{snake}::{pascal}>();"),
+    )
 }
 
 /// `rnx make:command admin:create --module users`: an app command in the
@@ -328,10 +376,10 @@ pub async fn run(state: AppState, args: Args) -> Result {{
         ),
     )?;
     add_mod(&dir.join("mod.rs"), &snake)?;
-    println!(
-        "Register it in the module's `register`: app.command(\"{name}\", \"What it does\", {snake}::run);"
-    );
-    Ok(())
+    register_in_module(
+        &dir.join("mod.rs"),
+        &format!("app.command(\"{name}\", \"What it does\", {snake}::run);"),
+    )
 }
 
 /// `rnx make:policy Produk --module produk`: `impl Policy` for a model.
@@ -494,5 +542,24 @@ mod tests {
                 .join("resources/views/mail/pesanan_dikirim.txt")
                 .exists()
         );
+    }
+
+    #[test]
+    fn jobs_and_commands_register_themselves_in_their_module() {
+        let dir = app();
+        module(dir.path(), "orders").unwrap();
+        job(dir.path(), "SendReceipt", "orders").unwrap();
+        command(dir.path(), "orders:close", "orders").unwrap();
+        job(dir.path(), "SendReceipt", "orders").unwrap_err(); // the file exists
+        let code = read(&dir, "src/app/orders/mod.rs");
+        assert!(
+            code.contains(
+                "    fn register(&self, app: &mut Registry) {\n        \
+             app.command(\"orders:close\", \"What it does\", orders_close::run);\n        \
+             app.job::<send_receipt::SendReceipt>();\n    }\n\n    fn routes(&self) -> Routes {"
+            ),
+            "{code}"
+        );
+        assert_eq!(code.matches("fn register").count(), 1);
     }
 }

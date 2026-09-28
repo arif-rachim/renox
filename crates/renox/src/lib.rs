@@ -73,3 +73,59 @@ pub struct ReadMe;
 #[cfg(doctest)]
 #[doc = include_str!("../../../CHEATSHEET.md")]
 pub struct CheatSheet;
+
+/// Mistakes the derives turn into compile errors (checked as doctests).
+///
+/// A model needs an `id`:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model)]
+/// struct NoId { name: String }
+/// ```
+///
+/// `soft_deletes` needs `deleted_at`:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model)]
+/// #[model(soft_deletes)]
+/// struct NoDeletedAt { id: i64 }
+/// ```
+///
+/// Unknown attributes are refused:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model)]
+/// #[model(tabel = "typo")]
+/// struct Typo { id: i64 }
+/// ```
+///
+/// Generic structs can't be models:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model)]
+/// struct Generic<T> { id: i64, value: T }
+/// ```
+///
+/// `DbEnum` is for fieldless enums:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(DbEnum)]
+/// enum WithData { A(i64) }
+/// ```
+///
+/// `FromRow` needs named fields:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(FromRow)]
+/// struct Tuple(i64);
+/// ```
+///
+/// A field type that can't come from a column doesn't compile either:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// struct NotAColumn;
+/// #[derive(FromRow)]
+/// struct Row { value: NotAColumn }
+/// ```
+#[cfg(doctest)]
+pub struct MacroCompileErrors;
