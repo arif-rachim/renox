@@ -91,6 +91,23 @@ them to the `sessions` table (tests/shop.rs runs a customer with it). `deploy/` 
 - **Save only what you changed.** A status change uses `order.save_only(db, &["status"])`, so it
   never writes back stale copies of the other columns.
 
+## Tests
+
+```bash
+cargo test -p shop
+```
+
+[tests/shop.rs](tests/shop.rs) drives the shop as customers and admins do, with `TestApp`
+(`acting_as`, `htmx()`, `assert_see`, `assert_view("orders/checkout.html")`,
+`assert_invalid`). Time and side effects are faked, not waited for or undone:
+- `app.travel(2 * DAY)` places a second order two days after the first, and two more days
+  later `app.at_travelled_time(app.kernel().run_scheduled("cancel-unpaid-orders"))` cancels
+  only the older one (a day after that, the second goes too).
+- `app.fake_notifications()` records the confirmation and the admins' "new order" without
+  mail, jobs or database rows (`assert_notified(&budi, "order-confirmation")`);
+  `app.fake_events()` keeps the `OrderPlaced` listener from running, so checkout is tested
+  alone (`assert_emitted::<OrderPlaced>(..)`).
+
 ## Deploying
 
 `Dockerfile` and `deploy/` are exactly what `rnx make:deploy` writes. In an app made with

@@ -77,9 +77,15 @@ writes the tests of a whole resource (create, list, show, edit, update, delete, 
 
 `app.travel(Duration::from_secs(3600))` moves the clock forward for what the `TestApp` does
 next: requests, `run_jobs` and `run_all_jobs`. `renox::db::now()`, sessions, signed URLs, the
-queue, the cache and password confirmation all follow it. `app.at_travelled_time(fut)` runs
-other code, such as a model call, at that time. `app.travel_back()` returns to the present.
-Travel adds up.
+queue, the cache, rate limits, the login lock and password confirmation all follow it, and
+so do `TestApp`'s own session helpers (past `SESSION_LIFETIME`, the next request starts a new
+session with its own CSRF token). `app.at_travelled_time(fut)` runs other code, such as a
+model call, a scheduled task (`app.kernel().run_scheduled(..)`) or a command, at that time.
+`app.travel_back()` returns to the present. Travel adds up.
+
+Travel reaches only time read through Renox: `renox::db::now()` in app code, not
+`SystemTime::now()` or `chrono::Utc::now()`. Prefer it to rewriting `created_at` with SQL or
+sleeping; examples/shop, jobs, api and hello show it.
 
 ```rust
 # use renox::prelude::*;

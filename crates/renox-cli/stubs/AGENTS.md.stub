@@ -16,8 +16,10 @@ one Renox version (the `renox` line in `Cargo.toml`); the links below are for th
   `examples/relations` for related tables. Every example has a README.
 - **Guides:** `docs/relations.md` (relations are explicit: load a page's relations with
   `relations::belongs_to` / `has_many` / `Pivot`, one query each, never one per row),
-  `docs/types.md` (form field → Rust type → column), `docs/postgresql.md`,
-  `docs/operations.md` (production).
+  `docs/types.md` (form field → Rust type → column), `docs/ui.md` (the UI kit, toasts,
+  fragments, live validation), `docs/testing.md` (TestApp, fakes, time travel),
+  `docs/authorization.md` (gates, policies, roles, token abilities, tenants), `docs/queue.md`
+  (jobs, retries, chains, batches), `docs/postgresql.md`, `docs/operations.md` (production).
 - Offline, the same files are in {{renox_source}}.
 
 ## Generators
@@ -109,7 +111,19 @@ rnx make:middleware StampRequests                      # also make:component
 - If `resources/css/app.css` exists, the app uses Tailwind: `rnx serve` rebuilds
   `public/css/app.css`; commit that file. Use utilities for layout and the kit for controls.
 - Tests: `#[renox::test] async fn …() { let app = TestApp::new({{crate_name}}::app()).await; … }`,
-  with `app.acting_as(&user)`, `app.htmx()`, `assert_see`, `assert_invalid("field")`.
+  with `app.acting_as(&user)`, `app.htmx()`, `assert_see`, `assert_view("products/index.html")`,
+  `assert_invalid("field")`, and for JSON `assert_json_path("data.0.name", "Kopi")`.
+- Read the time with `renox::db::now()` (or `DateTime` fields the framework fills), never
+  `SystemTime::now()` / `chrono::Utc::now()`: only then does `app.travel(Duration)` reach it.
+  Don't wait in tests or rewrite `created_at` with SQL: travel. Requests and `app.run_jobs()`
+  see the moved clock; code called directly (a task, a model method, `app.kernel().call`)
+  needs `app.at_travelled_time(future)`.
+- Faking in tests: `app.fake_events()` records events without running listeners
+  (`assert_emitted::<OrderPlaced>(|e| …)`); `app.fake_notifications()` records notifications
+  without mail, jobs or rows (`assert_notified(&user, "kind")`); `app.fake_http()` answers
+  `state.http`.
+- `v.each("tags", &self.tags, |t| t.required().max(20))` keys errors `tags.0`, `tags.1`…:
+  `assert_invalid("tags.1")` in tests; `error('tags')` in a template shows the first.
 
 ## Checks before you finish
 

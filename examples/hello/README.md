@@ -17,13 +17,14 @@ cargo run                        # http://127.0.0.1:3000
 ```
 
 Other things to try: `/halo/<name>`, `/bahasa/en` and `/bahasa/id` to switch language, and
-`cargo run -- entries:prune --days 7`.
+`cargo run -- entries:prune --days 7` (it asks before deleting; `--force` doesn't, and
+`cargo run -- entries:prune --help` lists the options).
 
 ## What's where
 
 | Feature | Where |
 |---|---|
-| Everything in Rust: the model and factory, the form and its rules, the `EntryPosted` event, the `ThankGuest` job, the `entries:prune` command, the every-minute task, the handlers, `app()` | [src/lib.rs](src/lib.rs) |
+| Everything in Rust: the model and factory, the form and its rules, the `EntryPosted` event, the `ThankGuest` job, the `entries:prune` command (a clap `AppCommand` that confirms with `renox::prompt`), the every-minute task, the handlers, `app()` | [src/lib.rs](src/lib.rs) |
 | The page: the form posted with htmx and Alpine, the `entries` block swapped on post and on page links | [resources/views/guestbook/index.html](resources/views/guestbook/index.html) |
 | Texts and validation field names in English and Indonesian | [resources/lang](resources/lang) |
 | The entries table, then a second migration adding `photo` | [migrations](migrations) |
@@ -51,4 +52,6 @@ cargo test -p hello
 ```
 
 Tests don't read `.env`, so [tests/guestbook.rs](tests/guestbook.rs) sets the locale to `id`
-itself.
+itself. The prune test moves the clock forty days with `app.travel(..)` between two entries,
+then runs the command on the moved clock with the answers typed for it:
+`app.at_travelled_time(renox::prompt::answering(["no"], app.kernel().call("entries:prune", ..)))`.

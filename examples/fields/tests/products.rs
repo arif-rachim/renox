@@ -117,5 +117,36 @@ async fn invalid_values_are_reported_together() {
         .assert_invalid("stock")
         .assert_invalid("weight_kg")
         .assert_invalid("size")
-        .assert_invalid("colors");
+        .assert_invalid("colors.0");
+}
+
+async fn post_colors(app: &TestApp, colors: &[&str]) -> renox::testing::TestResponse {
+    let mut form = vec![("name", "Kaos"), ("size", "small")];
+    form.extend(colors.iter().map(|color| ("colors", *color)));
+    app.htmx().post("/products", &form).await
+}
+
+#[renox::test]
+async fn each_color_is_checked_and_repeats_are_refused() {
+    let app = TestApp::new(fields::app()).await;
+    // Only the unknown one is reported, under its index.
+    let res = post_colors(&app, &["black", "purple"]).await;
+    res.assert_invalid("colors.1");
+    assert!(res.json_path("errors.colors.0").is_null());
+    // The repeat gets the error (case and spaces don't make it new).
+    post_colors(&app, &["red", "Red "])
+        .await
+        .assert_invalid("colors.1");
+
+    // Without htmx: back to the form, with the first item's error in the
+    // `colors` slot.
+    app.request()
+        .header("referer", "/products/new")
+        .post("/products", &[("name", "Kaos"), ("colors", "purple")])
+        .await
+        .assert_redirect("/products/new");
+    app.get("/products/new")
+        .await
+        .assert_see(r#"data-error-for="colors">"#)
+        .assert_see("The selected colors #1 is invalid.");
 }

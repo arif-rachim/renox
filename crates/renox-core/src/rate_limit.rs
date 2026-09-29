@@ -6,9 +6,10 @@
 //! `Retry-After`; every allowed response carries `X-RateLimit-Limit` and
 //! `X-RateLimit-Remaining`.
 
+use crate::clock::Stamp;
 use std::collections::HashMap;
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use axum::extract::Request;
 use axum::http::HeaderValue;
@@ -27,7 +28,7 @@ pub(crate) struct Limiter {
     id: String,
     max: u32,
     window: Duration,
-    hits: Mutex<HashMap<String, (u32, Instant)>>,
+    hits: Mutex<HashMap<String, (u32, Stamp)>>,
 }
 
 pub(crate) enum Verdict {
@@ -50,9 +51,9 @@ impl Limiter {
         if hits.len() >= SWEEP_AT {
             hits.retain(|_, (_, start)| start.elapsed() < self.window);
         }
-        let entry = hits.entry(key.to_owned()).or_insert((0, Instant::now()));
+        let entry = hits.entry(key.to_owned()).or_insert((0, Stamp::now()));
         if entry.1.elapsed() >= self.window {
-            *entry = (0, Instant::now());
+            *entry = (0, Stamp::now());
         }
         if entry.0 >= self.max {
             let left = self.window.saturating_sub(entry.1.elapsed());
@@ -194,7 +195,7 @@ pub(crate) type LimitRule = std::sync::Arc<dyn Fn(&LimitRequest) -> Limit + Send
 /// A named limiter: its rule and its in-memory counters.
 pub(crate) struct NamedLimiter {
     pub rule: LimitRule,
-    hits: Mutex<HashMap<String, (u32, Instant)>>,
+    hits: Mutex<HashMap<String, (u32, Stamp)>>,
 }
 
 impl NamedLimiter {
@@ -210,9 +211,9 @@ impl NamedLimiter {
         if hits.len() >= SWEEP_AT {
             hits.retain(|_, (_, start)| start.elapsed() < Duration::from_secs(24 * 60 * 60));
         }
-        let entry = hits.entry(key.to_owned()).or_insert((0, Instant::now()));
+        let entry = hits.entry(key.to_owned()).or_insert((0, Stamp::now()));
         if entry.1.elapsed() >= limit.per {
-            *entry = (0, Instant::now());
+            *entry = (0, Stamp::now());
         }
         if entry.0 >= limit.max {
             let left = limit.per.saturating_sub(entry.1.elapsed());

@@ -62,9 +62,12 @@ impl Validate for ProductForm {
         v.field("stock", &self.stock).min(0);
         v.field("weight_kg", &self.weight_kg).min(0);
         v.field("price", &self.price).min(0);
-        let known = self.colors.iter().all(|c| COLORS.contains(&c.as_str()));
-        v.field("colors", &self.colors.join(","))
-            .rule(known, "Pick colors from the list.");
+        // Rules for each item of a list: errors are keyed `colors.0`,
+        // `colors.1`…, and `error('colors')` in the form shows the first.
+        v.each("colors", &self.colors, |color| color.one_of(COLORS));
+        // A color ticked twice (a crafted request, or two inputs for one
+        // value): the repeat gets the error.
+        v.distinct("colors", &self.colors);
     }
 }
 

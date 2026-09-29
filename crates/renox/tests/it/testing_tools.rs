@@ -75,6 +75,11 @@ impl Module for Things {
                 Ok::<_, Error>("ok")
             })
             .get("/now", || async { renox::db::now().to_rfc3339() })
+            .merge(
+                Routes::new()
+                    .get("/limited", || async { "ok" })
+                    .throttle(2, Duration::from_secs(60)),
+            )
     }
 
     fn register(&self, app: &mut Registry) {
@@ -185,6 +190,44 @@ async fn time_travel_moves_the_clock_for_requests_and_jobs() {
         .sign_path("/things/1", Duration::from_secs(60))
         .unwrap();
     assert!(link.contains("expires="));
+}
+
+async fn login(app: &TestApp, password: &str) -> renox::testing::TestResponse {
+    app.post(
+        "/login",
+        &[("email", "arif@example.com"), ("password", password)],
+    )
+    .await
+}
+
+#[renox::test]
+async fn time_travel_reaches_rate_limits_and_the_login_lock() {
+    let (app, _dir) = app().await;
+    for _ in 0..2 {
+        app.get("/limited").await.assert_ok();
+    }
+    app.get("/limited").await.assert_status(429);
+    app.travel(Duration::from_secs(61));
+    app.get("/limited").await.assert_ok();
+
+    User::register(app.db(), "Arif", "arif@example.com", "password123")
+        .await
+        .unwrap();
+    for _ in 0..5 {
+        login(&app, "wrong").await;
+    }
+    login(&app, "password123").await;
+    app.assert_guest();
+    app.travel(Duration::from_secs(61));
+    login(&app, "password123").await.assert_redirect("/");
+    app.assert_authenticated(None);
+
+    // Past the session's lifetime: the next request starts a new session,
+    // and TestApp's CSRF token comes from that one (not a 419).
+    app.travel(Duration::from_secs(3 * 24 * 60 * 60));
+    app.assert_guest();
+    login(&app, "password123").await.assert_redirect("/");
+    app.assert_authenticated(None);
 }
 
 #[renox::test]

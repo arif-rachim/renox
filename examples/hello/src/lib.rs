@@ -3,7 +3,7 @@
 //! old input, SQLite with a model, migrations, a seeder and pagination,
 //! login/registration and the account page from the `Auth` module, and an event whose listener
 //! queues a job, plus a scheduled task and an app command
-//! (`cargo run -- entries:prune --days 7`).
+//! (`cargo run -- entries:prune --days 7`, a clap `AppCommand`).
 //!
 //! The app lives in this library (`app()`), so `tests/` can boot it;
 //! `main.rs` only runs it. Run it from this directory:
@@ -14,6 +14,8 @@
 //! cargo run
 //! ```
 
+use renox::clap;
+use renox::command::AppCommand;
 use renox::fake::Fake;
 use renox::fake::faker::lorem::en::Sentence;
 use renox::fake::faker::name::en::FirstName;
@@ -117,11 +119,7 @@ impl Module for Guestbook {
                 Ok(())
             });
         // `cargo run -- entries:prune --days 7`
-        app.command(
-            "entries:prune",
-            "Delete entries older than --days (default 30)",
-            prune,
-        );
+        app.typed_command::<PruneEntries>();
         app.schedule()
             .every_minute("count-entries", |state| async move {
                 let total = Entry::query().count(&state.db).await?;
@@ -131,20 +129,38 @@ impl Module for Guestbook {
     }
 }
 
-/// The `entries:prune` command.
-async fn prune(state: AppState, args: renox::command::Args) -> Result {
-    let days: i64 = args
-        .value("--days")
-        .unwrap_or("30")
-        .parse()
-        .map_err(|_| Error::BadRequest("--days must be a number".into()))?;
-    let cutoff = renox::db::now() - renox::chrono::TimeDelta::days(days);
-    let deleted = Entry::query()
-        .where_op("created_at", "<", cutoff)
-        .delete(&state.db)
-        .await?;
-    println!("Deleted {deleted} entries older than {days} days.");
-    Ok(())
+/// Delete entries older than --days (default 30).
+///
+/// The doc comment above is the line in `cargo run -- help`; clap parses the
+/// arguments (`--days x` is an error) and writes `entries:prune --help`.
+#[derive(clap::Parser)]
+#[command(name = "entries:prune")]
+struct PruneEntries {
+    /// Keep entries younger than this many days.
+    #[arg(long, default_value_t = 30)]
+    days: i64,
+    /// Don't ask first (asked only in a terminal; cron never waits).
+    #[arg(long)]
+    force: bool,
+}
+
+impl AppCommand for PruneEntries {
+    async fn run(self, state: AppState) -> Result {
+        let cutoff = renox::db::now() - renox::chrono::TimeDelta::days(self.days);
+        let old = || Entry::query().where_op("created_at", "<", cutoff);
+        let count = old().count(&state.db).await?;
+        if count == 0 {
+            println!("No entries older than {} days.", self.days);
+            return Ok(());
+        }
+        let question = format!("Delete {count} entries older than {} days?", self.days);
+        if !self.force && !renox::prompt::confirm(&question, true).await? {
+            return Ok(());
+        }
+        let deleted = old().delete(&state.db).await?;
+        println!("Deleted {deleted} entries older than {} days.", self.days);
+        Ok(())
+    }
 }
 
 async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
