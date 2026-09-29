@@ -798,9 +798,9 @@ Notes from M20c (dashboard, mail, HTTP, storage):
 - [x] Toasts over htmx; `once`; several fragments and out-of-band swaps;
       `HxRetarget`/`HxReswap`/`HxPushUrl`
 - [x] Error pages rendered in the app layout (M21d)
-- [ ] `push`/`stack` (M21e)
+- [x] `push`/`stack` (M21e)
 - [x] Live validation over htmx (validate one field without running the handler)
-- [ ] Tailwind with its standalone CLI in `rnx serve` / `rnx build`, `rnx new --tailwind` (M21e)
+- [x] Tailwind with its standalone CLI in `rnx serve` / `rnx build`, `rnx new --tailwind` (M21e)
 - [x] Resource scaffolding: `Routes::resource`, `rnx make:module --resource` (handlers, views,
       tests); `make:factory`, `make:seeder`, `make:test`, `make:notification`, `make:event`,
       `make:rule`, `make:middleware`
@@ -811,9 +811,12 @@ Notes from M20c (dashboard, mail, HTTP, storage):
 - [x] `Path` rejections as 404 (M21a)
 - [x] Named, dynamic rate limiters; `route()` with query parameters (M21d)
 - [ ] More validation rules and form-request hooks (`authorize`, `prepare`, `after`, async
-      rules) (M21e)
-- [ ] Typed app commands (a clap parser), prompts; zero-downtime deploy recipes; an opt-in
-      server-side session store
+      rules) (M21f)
+- [x] Typed app commands (a clap parser), prompts (M21e)
+- [ ] Zero-downtime deploy recipes; an opt-in server-side session store (M21f)
+- [ ] Renox's own auth pages (`renox/auth/*`: login, register, reset, verify) on the UI kit:
+      they still have their pre-kit look (a black button, default links) in apps built on the kit
+      (found in the M21e browser check) (M21f)
 - [x] Authorization gaps found while moving examples/shop to `Permissions` (#53): policies
       and `gate_before` see a plain `User` without its roles (`Policy::allows` can't say
       "admins see all", a super-admin can't be a role), and there is no loader for the users
@@ -937,6 +940,35 @@ Notes from M21d (errors, logs, debugging):
   clients never got `Retry-After` from `throttle`. Found by examples/api's new limiter test.
 - `background::locks_let_one_holder_in` failed once under the full PostgreSQL run: the
   re-taken lock had a 1 s ttl and could expire before `is_held`. It now uses 30 s.
+
+Notes from M21e (Tailwind, stacks, typed commands):
+- M21e as planned held six items; it's split. M21e: Tailwind, `push`/`stack`, typed commands and
+  prompts. M21f: the server-side session store, the validation additions and form-request
+  hooks, zero-downtime deploy recipes.
+- Tailwind: `rnx` pins v4.3.3 with the SHA-256 of each release asset
+  (`crates/renox-cli/src/tailwind.rs`), downloads with the system `curl` (Windows 10+ has it)
+  so the CLI gets no HTTP client, into `RNX_CACHE_DIR` / the platform cache; `TAILWIND_BIN`
+  overrides it. An app "uses Tailwind" when `resources/css/app.css` exists. `serve` runs
+  `--watch=always` as a child killed on exit; `build` minifies before `cargo build`. The
+  output is committed because the `make:deploy` Dockerfile doesn't run Tailwind. To update:
+  bump `VERSION` and copy the new `sha256sums.txt`.
+- Stacks: `stack(name)` renders `<!--renox-stack:{nonce}:{name}-->`, a nonce per render so
+  text that looks like a marker is left alone; `push`/`prepend` are functions used with
+  `{% call %}` (MiniJinja passes `caller` as a kwarg to any callable) and collect into a
+  thread-local `Scope` set around `render_view` and the app's error pages. Fragments and mails
+  have no scope, so pushes there are dropped.
+- Typed commands: `App::command` stays as it was. Making it generic over the argument type
+  would break every unannotated closure (`|state, args| …`), so typed commands are a trait,
+  `AppCommand: clap::Parser`, registered with `App::typed_command::<T>()`; the name and the
+  help line come from clap. `--help` prints and succeeds; a parse error returns clap's message
+  plus the usage. clap is a renox-core dependency (no default features) re-exported as
+  `renox::clap`, so derives resolve through `use renox::clap;`. `rnx make:command` writes a
+  typed command now.
+- Prompts go to stderr; without a terminal they read lines from stdin, and at EOF a question
+  with a default takes it, one without fails naming the question. `prompt::answering` feeds
+  answers through a task-local. `secret` uses `rpassword` (new dependency, small).
+- examples/shop's `shop:make-admin` is typed and asks for a missing email; examples/crud's
+  form pushes a robots `noindex` into the head.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

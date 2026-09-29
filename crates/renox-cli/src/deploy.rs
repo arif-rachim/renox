@@ -25,6 +25,11 @@ fn package_name(root: &Path) -> Result<String> {
 
 /// `rnx build`: a release build copied to `dist/<name>`.
 pub fn build(root: &Path) -> Result<()> {
+    // Embedded apps carry public/ in the binary, so the CSS comes first.
+    if crate::tailwind::enabled(root) {
+        crate::tailwind::build(root, true)?;
+        println!("Built {} (minified).", crate::tailwind::OUTPUT);
+    }
     let Some(exe) = crate::serve::build(&["--release".to_owned()])? else {
         bail!("the release build failed");
     };

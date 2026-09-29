@@ -59,6 +59,10 @@ Log in at `/login` (or register at `/register`), then add products at `/products
   - Delete is red text in the row and a sheet asks first, with Cancel focused.
   - On phones the slug column hides (`hide-narrow`) and a row's actions stack.
   - See [docs/ui.md](../../docs/ui.md) for the design rules the kit follows.
+- **`push` / `stack`.** The layout has `{{ stack('head') }}` and `{{ stack('scripts') }}`; the
+  form page pushes `<meta name="robots" content="noindex">` into the head from its content
+  block with `{% call push('head') %}…{% endcall %}`. A component that needs a script pushes
+  it with `once='key'`, so it's added once however often the component appears.
 - **Error pages in the layout.** `errors/default.html` extends the layout, so a 404 or a 403
   keeps the navigation bar and the account menu, with a way back to the list. It gets
   `status`, `reason` and `detail` besides the usual globals.

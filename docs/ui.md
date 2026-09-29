@@ -8,7 +8,9 @@ covers:
 - toasts;
 - fragments and out-of-band swaps;
 - htmx response headers;
-- live validation.
+- live validation;
+- stacks (`push` / `stack`);
+- Tailwind CSS.
 
 ## Components see the request
 
@@ -208,6 +210,64 @@ with the header `X-Renox-Validate: field`. The `Valid` extractor answers with th
 errors as JSON and **the handler doesn't run**, so nothing is saved until the form is
 submitted. The rules are the form's own, database checks such as `unique` included.
 
+## Stacks
+
+A page or a component often needs something in another part of the layout: a script at the end
+of `<body>`, a style or a `<meta>` in `<head>`. The layout names the places with `stack`, and
+anything rendered for the page adds to them with `push`:
+
+```html
+{# layouts/app.html (rnx new's layout has both) #}
+<head>… {{ stack('head') }}</head>
+<body>… {{ stack('scripts') }}</body>
+```
+
+```html
+{# components/chart.html #}
+{% macro chart(id, data) -%}
+{% call push('scripts', once='chart') %}
+  <script src="{{ asset('js/chart.js') }}" nonce="{{ csp_nonce() }}"></script>
+{% endcall %}
+<canvas id="{{ id }}" data-points="{{ data | tojson }}"></canvas>
+{%- endmacro %}
+```
+
+- `push(name)` adds to the end of the stack, `prepend(name)` to the front.
+- `once='key'` adds it only the first time that key is pushed to that stack on the page, however
+  many charts there are.
+- Pushes work from the page's blocks, from included templates and from imported components,
+  and they reach a stack that was rendered earlier (the head): the layout's head is written
+  before the page's blocks run, so `stack` leaves a marker that's filled in once the page is
+  done.
+- htmx fragments (`.fragment("rows")`) have no layout, so what they push goes nowhere. Put a
+  fragment's script in the fragment itself.
+- Error pages (`errors/*.html`) have stacks too. Mails don't.
+
+## Tailwind CSS
+
+`rnx new shop --tailwind` sets it up; for an existing app, create `resources/css/app.css`:
+
+```css
+@import "tailwindcss";
+@source "../views";
+```
+
+and link the output in the layout: `<link rel="stylesheet" href="{{ asset('css/app.css') }}">`.
+
+- `rnx serve` runs Tailwind in watch mode next to the app: it rebuilds `public/css/app.css` when
+  a view changes, and the page reloads.
+- `rnx build` builds it minified before compiling, so an embedded binary carries it. `rnx tailwind`
+  builds it once (`--minify`, `--watch`).
+- There's no Node: `rnx` downloads Tailwind's standalone CLI (v4, the version `rnx` pins) once into
+  your cache and checks its SHA-256. `rnx tailwind:install` does it ahead of time;
+  `TAILWIND_BIN=/path/to/tailwindcss` uses another binary, `RNX_CACHE_DIR` moves the cache.
+- Commit `public/css/app.css`: the Dockerfile from `make:deploy` builds the app without
+  Tailwind.
+- The kit's `rx-*` rules sit outside Tailwind's cascade layers, so the components keep their
+  look, and utilities (`mt-4`, `text-sm`, `md:grid-cols-2`) lay out around them. Tailwind's reset
+  changes bare elements (headings, lists, links without a class) in your own markup; style those
+  with utilities or the kit's classes (`rx-title`, `rx-link`).
+
 ## Coming from Laravel
 
 | Laravel | Renox |
@@ -216,5 +276,7 @@ submitted. The rules are the form's own, database checks such as `unique` includ
 | Breeze's components | `renox/ui.html` (`rnx make:component --ui` to copy it) |
 | `session()->flash('status')` + a toast library | `Toast::success(…)` and `{{ toasts() }}` |
 | `@once` | `{% if once('key') %}` |
+| `@push('scripts')` / `@stack('scripts')`, `@pushOnce`, `@prepend` | `{% call push('scripts') %}…{% endcall %}` / `{{ stack('scripts') }}`, `push(…, once='key')`, `prepend` |
+| Vite + Tailwind | `rnx new --tailwind`: Tailwind's standalone CLI in `rnx serve` / `rnx build` |
 | `@fragment` / `fragments([...])` | `.fragment("rows").also("count")` |
 | Precognition (live validation) | `data-live-validate` and `Valid<T>` |

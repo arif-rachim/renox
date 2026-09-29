@@ -70,6 +70,7 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/toast.rs             Toast response part, the toast region markup
   src/clock.rs             the current time with a test offset (TestApp::travel)
   views/ui.html            the UI kit (renox/ui.html); assets/renox-ui.css|js its styles and script
+  src/view_stack.rs        push/prepend/stack: markers filled in after the page renders (Scope)
   src/view_filters.rs      built-in template filters `number` and `date`; pub format_number
   src/htmx.rs              Htmx extractor, HxRedirect/HxRefresh/HxTrigger, Back
   src/assets.rs            embedded htmx/Alpine/renox.js with hashed URLs; renox.js source lives here
@@ -109,7 +110,9 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/provided.rs          App::provide values: Provided<T> extractor, AppState::provided
   src/cookies.rs           Cookies extractor (plain / encrypted), SetCookie response part
   src/download.rs          Download: bytes, streamed file, Storage key, stream; safe Content-Disposition
-  src/command.rs           app commands: Args, Command; App::command / Registry::command, Kernel::call
+  src/command.rs           app commands: Args, Command; App::command / Registry::command, Kernel::call;
+                           AppCommand (a clap Parser) + App::typed_command (renox::clap re-exported)
+  src/prompt.rs            ask/ask_or/secret/confirm/choice for commands; `answering` for tests
   src/rate_limit.rs        Limiter + middleware behind Routes::throttle; named limiters
                            (App::rate_limiter: LimitRequest → Limit, Routes::throttle_by)
   src/request_id.rs        RequestId extractor + middleware (X-Request-Id)
@@ -143,7 +146,9 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
 crates/renox-macros/       proc macros: derive Model, FromRow, DbEnum; embedded!(), migrations!(),
                            #[renox::test]
 crates/renox-cli/          `rnx`: main.rs (key:generate, forwarding), new.rs, serve.rs, make.rs +
-                           generate.rs (make:*), deploy.rs (make:deploy)
+                           generate.rs (make:*), deploy.rs (make:deploy), tailwind.rs (the pinned
+                           standalone CLI: download via curl + SHA-256 check, build/watch; used by
+                           new --tailwind, serve, build)
   build.rs                 sets RENOX_GIT_REV (the commit `rnx new` pins apps to)
   stubs/                   the files `rnx new` writes (Cargo.toml.stub, env.stub, build.rs, src/,
                            resources/, migrations/, tests/, AGENTS.md.stub + CLAUDE.md.stub: the

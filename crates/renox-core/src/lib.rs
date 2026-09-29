@@ -35,6 +35,7 @@ pub mod maintenance;
 mod method;
 mod module;
 mod path;
+pub mod prompt;
 mod provided;
 pub mod queue;
 pub mod rate_limit;
@@ -57,6 +58,7 @@ pub mod upload;
 pub mod validation;
 pub mod view;
 mod view_filters;
+mod view_stack;
 pub mod webhook;
 
 pub use app::{App, Kernel};
@@ -95,6 +97,7 @@ pub use minijinja::context;
 /// `.context("…")`, `Error::permanent(err)`.
 pub use anyhow;
 pub use chrono;
+pub use clap;
 #[cfg(feature = "fake")]
 pub use fake;
 pub use serde;

@@ -392,17 +392,31 @@ pub fn command(root: &Path, name: &str, module: &str) -> Result<()> {
     }
     let module = module.to_snake_case();
     let dir = module_dir(root, &module)?;
+    let pascal = snake.to_upper_camel_case();
     write_new(
         &dir.join(format!("{snake}.rs")),
         &format!(
-            r#"use renox::command::Args;
+            r#"use renox::clap;
+use renox::command::AppCommand;
 use renox::prelude::*;
 
-/// `my-app {name} …`
-pub async fn run(state: AppState, args: Args) -> Result {{
-    let _ = (state, args);
-    println!("{name}: done");
-    Ok(())
+/// What it does (shown in `my-app help`).
+#[derive(clap::Parser)]
+#[command(name = "{name}")]
+pub struct {pascal} {{
+    /// Show what would happen without changing anything.
+    #[arg(long)]
+    pub dry_run: bool,
+}}
+
+impl AppCommand for {pascal} {{
+    /// `my-app {name} [--dry-run]`; `--help` lists the arguments. Ask for what's
+    /// missing with `renox::prompt::ask(…)`.
+    async fn run(self, state: AppState) -> Result {{
+        let _ = state;
+        println!("{name}: done{{}}", if self.dry_run {{ " (dry run)" }} else {{ "" }});
+        Ok(())
+    }}
 }}
 "#
         ),
@@ -410,7 +424,7 @@ pub async fn run(state: AppState, args: Args) -> Result {{
     add_mod(&dir.join("mod.rs"), &snake)?;
     register_in_module(
         &dir.join("mod.rs"),
-        &format!("app.command(\"{name}\", \"What it does\", {snake}::run);"),
+        &format!("app.typed_command::<{snake}::{pascal}>();"),
     )
 }
 
@@ -794,7 +808,9 @@ mod tests {
                 .contains(r#"const NAME: &'static str = "kirim-struk";"#)
         );
         command(dir.path(), "stok:import", "produk").unwrap();
-        assert!(read(&dir, "src/app/produk/stok_import.rs").contains("pub async fn run("));
+        assert!(
+            read(&dir, "src/app/produk/stok_import.rs").contains("impl AppCommand for StokImport")
+        );
         assert!(command(dir.path(), "Bad Name", "produk").is_err());
         assert!(command(dir.path(), "self", "produk").is_err());
         policy(dir.path(), "Produk", "produk").unwrap();
@@ -838,7 +854,7 @@ mod tests {
         assert!(
             code.contains(
                 "    fn register(&self, app: &mut Registry) {\n        \
-             app.command(\"orders:close\", \"What it does\", orders_close::run);\n        \
+             app.typed_command::<orders_close::OrdersClose>();\n        \
              app.job::<send_receipt::SendReceipt>();\n    }\n\n    fn routes(&self) -> Routes {"
             ),
             "{code}"

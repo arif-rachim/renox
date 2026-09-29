@@ -13,8 +13,9 @@ cargo run                        # http://127.0.0.1:3000
 ```
 
 Register a customer at `/register`, or promote any registered user with
-`cargo run -- shop:make-admin you@example.com` (it gives them the `admin` role, creating the role
-on a fresh install).
+`cargo run -- shop:make-admin you@example.com`. It gives them the `admin` role, creating the role
+on a fresh install. It's a typed command (`impl AppCommand`, arguments declared with clap) and asks
+for the email when it's left out.
 
 ## What's where
 

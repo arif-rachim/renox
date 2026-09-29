@@ -7,7 +7,7 @@ date. For whole apps, see [`examples/`](examples) (the list is in [llms.txt](llm
 ## Commands
 
 ```bash
-rnx new shop                         # or: rnx new shop --database postgres
+rnx new shop                         # or: --database postgres, --tailwind (Tailwind CSS, no Node)
 rnx key:generate                     # APP_KEY into .env (made from .env.example if missing)
 rnx serve                            # run, rebuild and reload on changes
 rnx make:module products             # routes + view, registered in src/lib.rs
@@ -17,7 +17,7 @@ rnx make:model Product --module products --migration
 rnx make:migration add_sku_to_products
 rnx make:policy Product --module products
 rnx make:job SendReceipt --module products
-rnx make:command products:import --module products  # then `rnx products:import file.csv`
+rnx make:command products:import --module products  # typed (clap); `rnx products:import --help`
 rnx make:mail order_shipped
 rnx make:factory Product --module products  # also make:seeder DemoData, make:test checkout
 rnx make:notification OrderShipped --module orders  # also make:event, make:rule (--module)
@@ -32,6 +32,7 @@ rnx schedule:work                    # tasks in their own process (SCHEDULER=fal
 rnx webhook:failed                   # webhook:retry <id>
 rnx down --secret s3cret --retry 60  # 503 for everyone but visitors of /s3cret; `rnx up` ends it
 rnx build                            # one release binary in dist/; rnx make:deploy
+rnx tailwind --watch                 # resources/css/app.css -> public/css/app.css (serve/build do it)
 ```
 
 `serve` already runs the queue workers and the scheduler. `queue:work` and `schedule:work` are for
@@ -41,6 +42,8 @@ running them in separate processes.
 
 ```rust
 use renox::prelude::*;
+use renox::clap;
+use renox::command::AppCommand;
 use std::time::Duration;
 
 pub fn app() -> App {
@@ -84,8 +87,9 @@ impl Module for Products {
     }
 
     fn register(&self, app: &mut Registry) {
-        // `my-app products:import file.csv` (or `rnx products:import …`)
-        app.command("products:import", "Import products from a CSV file", import);
+        // `my-app products:import file.csv --dry-run` (or `rnx products:import …`)
+        app.typed_command::<ImportProducts>();
+        // Untyped: app.command("name", "about", |state, args: renox::command::Args| async { … })
     }
 }
 
@@ -102,12 +106,28 @@ async fn store() -> Redirect {
     Redirect::to("/products")
 }
 
-async fn import(state: AppState, args: renox::command::Args) -> Result {
-    let Some(file) = args.positional().first().copied() else {
-        return Err(Error::BadRequest("usage: products:import FILE [--dry-run]".into()));
-    };
-    let _ = (state, file, args.has("--dry-run"));
-    Ok(())
+/// Import products from a CSV file.     (the line in `my-app help`)
+#[derive(clap::Parser)]
+#[command(name = "products:import")]
+struct ImportProducts {
+    /// The CSV file; asked for when it's left out.
+    file: Option<String>,
+    #[arg(long)]
+    dry_run: bool,
+}
+
+impl AppCommand for ImportProducts {
+    async fn run(self, state: AppState) -> Result {
+        let file = match self.file {
+            Some(file) => file,
+            None => renox::prompt::ask("CSV file").await?, // also ask_or, secret, confirm, choice
+        };
+        if !self.dry_run && !renox::prompt::confirm(&format!("Import {file}?"), true).await? {
+            return Ok(());
+        }
+        let _ = state;
+        Ok(())
+    }
 }
 
 async fn download(order_paid: bool) -> Result<&'static str> {
@@ -117,6 +137,11 @@ async fn download(order_paid: bool) -> Result<&'static str> {
     Ok("the file")
 }
 ```
+
+Wrong arguments print what's wrong and the usage; `--help` lists them. In tests:
+`app.kernel().call("products:import", ["a.csv", "--dry-run"]).await`, and
+`renox::prompt::answering(["a.csv", "yes"], app.kernel().call("products:import", [""; 0])).await`
+answers the questions.
 
 `src/main.rs` is only `fn main() -> renox::Result { shop::app().run() }`. The app lives in the
 library, so tests can boot it.
@@ -202,7 +227,17 @@ fn view_extras(app: App) -> App {
 {# Your own: rnx make:component price_tag -> components/price_tag.html, a macro that can use
    old(), error(), t(), can(), auth, csrf_field() like the page. rnx make:component --ui copies
    the kit into the app. {% if once('x') %} renders once per page. #}
+
+{# Stacks: the layout has {{ stack('head') }} in <head> and {{ stack('scripts') }} before
+   </body>; any page, block or component adds to them, even after the head was rendered: #}
+{% call push('scripts', once='chart') %}<script src="{{ asset('chart.js') }}" nonce="{{ csp_nonce() }}"></script>{% endcall %}
+{% call prepend('head') %}<meta name="robots" content="noindex">{% endcall %}
 ```
+
+Tailwind: `rnx new shop --tailwind` (or create `resources/css/app.css` with
+`@import "tailwindcss"; @source "../views";`). `rnx serve` rebuilds `public/css/app.css` as views
+change, `rnx build` minifies it; link it with `{{ asset('css/app.css') }}`. The kit's `rx-*`
+classes keep working next to the utilities.
 
 ## Your own shared values and middleware
 

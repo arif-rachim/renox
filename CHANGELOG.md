@@ -10,6 +10,21 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M21e · Tailwind, stacks and typed commands
+
+- Tailwind CSS without Node: `rnx new --tailwind`; an app with `resources/css/app.css` gets
+  Tailwind in `rnx serve` (watch) and `rnx build` (minified) into `public/css/app.css`. `rnx
+  tailwind [--watch] [--minify]`, `rnx tailwind:install`. The standalone CLI (v4.3.3) is
+  downloaded once and checked by SHA-256; `TAILWIND_BIN` and `RNX_CACHE_DIR` override.
+- Stacks: `{{ stack('scripts') }}` in the layout; `{% call push('scripts') %}…{% endcall %}`,
+  `prepend`, and `once='key'` from pages, blocks and components. `rnx new`'s layout has
+  `stack('head')` and `stack('scripts')`.
+- Typed commands: `impl AppCommand` on a clap `Parser`, `App::typed_command::<T>()`; `--help`,
+  argument errors with the usage. `renox::clap` is re-exported. `rnx make:command` writes one.
+- `renox::prompt`: `ask`, `ask_or`, `secret`, `confirm`, `choice`; `answering(…)` for tests.
+- examples: shop's `shop:make-admin` is typed and asks for a missing email; crud's form pushes
+  into the head.
+
 ### M21d · Errors, logs and debugging
 
 - A request id per request: kept from a proxy's `X-Request-Id` when it looks like one, else
