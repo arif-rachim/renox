@@ -145,9 +145,7 @@ async fn index(State(db): State<Db>, user: AuthUser, Page(page): Page) -> Result
 
 async fn show(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Result<View> {
     let order = Order::find_or_404(&db, id).await?;
-    if !user.has_role(crate::ADMIN) {
-        user.authorize("view", &order)?;
-    }
+    user.authorize("view", &order)?; // the owner or an admin
     let items = order.items(&db).await?;
     Ok(view("orders/show.html", context! { order, items }))
 }

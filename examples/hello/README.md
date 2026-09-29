@@ -28,7 +28,7 @@ Other things to try: `/halo/<name>`, `/bahasa/en` and `/bahasa/id` to switch lan
 | Texts and validation field names in English and Indonesian | [resources/lang](resources/lang) |
 | The entries table, then a second migration adding `photo` | [migrations](migrations) |
 | The layout: the logged-in user's name links to `/account` (`route('account.show')`) | [resources/views/layouts/app.html](resources/views/layouts/app.html) |
-| Every setting, with comments | [.env.example](.env.example) |
+| The settings the guestbook uses, with comments (every setting: `rnx new`'s `.env.example`) | [.env.example](.env.example) |
 
 ## Things worth copying
 

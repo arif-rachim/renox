@@ -16,9 +16,18 @@ changes by milestone (each one pull request; details in its description and in
   `00010101000210`), the cookie holds only an id; a new id at each login and logout; rows keyed
   by the id's SHA-256; `user_id` column. Cookie sessions carry over when switching.
   `session:prune`, `Session::prune_expired(&db)`.
-- `serve` accepts a listening socket from systemd (socket activation). `rnx make:deploy` writes
+- Every app gets the `sessions` table (with either driver): run `migrate` after upgrading.
+- `serve` accepts a listening socket from systemd (socket activation, `LISTEN_FDS`). `rnx make:deploy` writes
   `deploy/<app>.socket`; its README explains deploys without refused connections, migrations
   that old and new code both accept, and two copies behind Caddy.
+- `Toast` and `ToastKind` are `#[non_exhaustive]` (build toasts with `Toast::success(…)` and
+  friends).
+- Docs and examples checked against M21: the socket recipe stops the service before enabling
+  the socket (systemd can't listen while the app holds the port); the shop admin's product delete
+  asks in the kit's confirmation sheet (its `hx-confirm` never ran); the shop's order policy
+  checks the admin role itself and uses `users_with_role`; crud's layout shows flashed messages;
+  `rnx make:mail` prints how to actually send the mail; authorization.md, stability.md, the README,
+  llms.txt and the ROADMAP no longer describe pre-M21 limits.
 
 ### M21f · Form requests, more rules, auth pages on the kit
 

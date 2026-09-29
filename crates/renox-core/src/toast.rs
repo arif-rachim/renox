@@ -27,6 +27,7 @@ pub(crate) const EVENT: &str = "renox:toast";
 /// stays until dismissed (errors do: they need reading).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum ToastKind {
     Success,
     Info,
@@ -36,6 +37,7 @@ pub enum ToastKind {
 
 /// A toast; return it with the response. See the [module docs](self).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Toast {
     pub kind: ToastKind,
     pub message: String,

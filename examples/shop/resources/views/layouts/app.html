@@ -6,6 +6,8 @@
   {% block seo %}{{ seo() }}{% endblock %}
   <link rel="stylesheet" href="{{ asset('app.css') }}">
   {{ renox_head() }}
+  {#- The UI kit's script and styles (rx-* classes only), for the confirmation sheet. -#}
+  {{ renox_ui() }}
 </head>
 <body>
   <nav>

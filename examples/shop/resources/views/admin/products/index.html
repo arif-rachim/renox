@@ -1,4 +1,5 @@
 {% extends "layouts/app.html" %}
+{% from "renox/ui.html" import confirm %}
 
 {% block content %}
 <h1>Products</h1>
@@ -24,10 +25,10 @@
     <td>{{ product.stock }}</td>
     <td>{{ "yes" if product.active else "no" }}</td>
     <td>
-      <form method="post" action="{{ route('admin.products.destroy', product.id) }}"
-            hx-confirm="Delete {{ product.name }}?">
-        {{ csrf_field() }}{{ method_field('DELETE') }}<button>Delete</button>
-      </form>
+      {#- A sheet asks first (Cancel focused); only its button sends the DELETE. -#}
+      {{ confirm("delete-" ~ product.id, "Delete", route('admin.products.destroy', product.id),
+                 "Delete " ~ product.name ~ "?", "It disappears from the shop. Orders already placed keep its name and price.",
+                 size="small") }}
     </td>
   </tr>
   {% else %}

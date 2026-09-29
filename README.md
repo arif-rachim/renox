@@ -31,13 +31,14 @@ You need Rust 1.94 or later.
 
 ```bash
 cargo install --locked --git https://github.com/arif-rachim/renox renox-cli   # installs `rnx`
-rnx new blog && cd blog                                             # or: --database postgres
+rnx new blog && cd blog                                             # or: --database postgres, --tailwind
 rnx serve                                                           # http://127.0.0.1:3000
 ```
 
-The new app has a home page, login and registration, an account page (profile, password, other
-devices), English and Indonesian texts, a test in
-`tests/home.rs`, and an `AGENTS.md` for coding agents. With `--database postgres`, create the
+The new app has a layout built with the UI kit (navigation bar, account menu, toasts), a home
+page, login and registration, an account page (profile, password, other devices), an error page
+in the layout, English and Indonesian texts, a test in `tests/home.rs`, and an `AGENTS.md` for
+coding agents. With `--database postgres`, create the
 `blog` and `blog_test` databases first (or edit `.env`).
 
 `rnx serve` rebuilds and restarts on Rust changes, and the browser reloads itself when a view
@@ -262,7 +263,7 @@ rnx make:module products --resource --fields "name:string price:money"  # a whol
 rnx make:command orders:close                     # a typed command (clap): --help, checked arguments, prompts
 rnx route:list                                    # every route with its name, module and guards
 rnx db:shell                                      # SQL prompt, no sqlite3/psql needed
-rnx build && rnx make:deploy                      # dist/blog + Dockerfile, systemd, Litestream
+rnx build && rnx make:deploy                      # dist/blog + Dockerfile, systemd (+ socket), Litestream
 ```
 
 `rnx make:deploy` also writes a systemd socket unit: deploys then restart the app without
@@ -271,7 +272,7 @@ refusing a single connection.
 In production, timeouts keep a slow database or mail server from holding requests, `/health`
 feeds your load balancer, and panics in handlers, jobs and tasks are contained. CI checks this by
 stopping, pausing and locking the database under a running app
-([running in production](docs/operations.md)).
+([running in production](docs/operations.md)). Tests are covered in [docs/testing.md](docs/testing.md).
 
 Every request gets an id that's in its log lines and its `X-Request-Id`. Logs can be JSON
 (`LOG_FORMAT=json`) or go to a file. `App::report` hands 500s, failed jobs and failed tasks to
@@ -308,18 +309,22 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 
 - [`examples/shop`](examples/shop): a whole online shop: htmx search, a cart, checkout in one
   transaction that never oversells, queued mail and notifications, an admin for the `admin` role
-  with photo uploads and an audit trail, English and Indonesian, and its deploy files. Start here.
+  with photo uploads and an audit trail, a typed `shop:make-admin` command that asks for what's
+  missing, English and Indonesian, and its deploy files (with the systemd socket). Start here.
 - [`examples/htmx-recipes`](examples/htmx-recipes): a modal form, inline edit, infinite scroll,
   delete in place, tabs and a dropdown, with htmx, Alpine and fragment-returning handlers.
 - [`examples/relations`](examples/relations): a blog with belongs-to, has-many and many-to-many
   (a pivot with its own columns and `sync`), polymorphic likes, loaded without N+1 with counts
   per post, and reports with `group_by` and SQL joins.
 - [`examples/teams`](examples/teams): a multi-tenant SaaS: teams and members, a default scope
-  that keeps each team's projects apart, a super-admin, and an encrypted team secret.
-- [`examples/crud`](examples/crud): one resource end to end, with pagination, validation,
-  owner-only edit and delete through a policy, soft deletes with a trash, model hooks, and tests.
+  that keeps each team's projects apart, a super-admin, an encrypted team secret, and a form
+  request (`prepare`, `authorize`, `after`) for adding members.
+- [`examples/crud`](examples/crud): one resource end to end on the UI kit, with pagination, live
+  validation, toasts, owner-only edit and delete through a policy (behind a confirmation sheet),
+  soft deletes with a trash, model hooks, an error page in the layout, and tests.
 - [`examples/api`](examples/api): a JSON API for a mobile app, with tokens that carry abilities
-  and expire, Bearer auth, cursor pagination, JSON validation errors, CORS and a rate limit.
+  and expire, Bearer auth, cursor pagination, JSON validation errors, CORS and a named rate
+  limiter (per user, per IP for guests).
 - [`examples/jobs`](examples/jobs): an event, a queued receipt mail, admin notifications, and
   daily and weekly reports scheduled in a time zone, and the queue's chains, batches with a
   progress bar, unique and encrypted jobs.
@@ -368,7 +373,8 @@ Not planned: runtime-reflected Eloquent-style models, Redis, and a REPL.
 ## Documentation
 
 - [CHEATSHEET.md](CHEATSHEET.md): one short, compiled example per task.
-- Guides: [relations](docs/relations.md), [authorization and tenants](docs/authorization.md),
+- Guides: [views and the UI kit](docs/ui.md), [testing](docs/testing.md),
+  [relations](docs/relations.md), [authorization and tenants](docs/authorization.md),
   [the queue](docs/queue.md), [field types](docs/types.md),
   [PostgreSQL](docs/postgresql.md), [production](docs/operations.md),
   [faster builds](docs/development.md), [stability and versions](docs/stability.md).
@@ -379,9 +385,10 @@ Not planned: runtime-reflected Eloquent-style models, Redis, and a REPL.
 
 Renox is **pre-1.0**. After the Laravel parity review
 ([docs/audit/2026-09-laravel-parity.md](docs/audit/2026-09-laravel-parity.md)), milestones M18
-(tenancy, roles, accounts), M19 (query builder and models) and M20 (scheduler, locks, queue,
-HTTP client, queue dashboard, localized mail) are done; M21 (views and developer experience)
-comes next, then 1.0: a documentation site with a tutorial and a Laravel guide, semver checks, and the first
+(tenancy, roles, accounts), M19 (query builder and models), M20 (scheduler, locks, queue,
+HTTP client, queue dashboard, localized mail) and M21 (the UI kit, scaffolding, test tools,
+error reports and logs, Tailwind, typed commands, form requests, database sessions, deploys
+without refused connections) are done. Next is 1.0: a documentation site with a tutorial and a Laravel guide, semver checks, and the first
 real release on crates.io (today's crates there are placeholders, so install from Git as above).
 Until then the API may still change; breaking changes are listed in [CHANGELOG.md](CHANGELOG.md).
 

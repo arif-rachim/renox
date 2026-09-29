@@ -10,7 +10,7 @@
 //! - Pivot columns: `Pivot::with_timestamps`, `attach_with`, `update_pivot`
 //!   and `load_with_pivot` (a post pinned on a tag's page).
 //! - Polymorphic: likes on posts or comments (`Morph`: `of`, `parents`,
-//!   and `count_many` filtered by the type column).
+//!   and `Morph::count_many` for many parents in one query).
 //! - Reports: SQL joins read into `#[derive(FromRow)]` structs and tuples,
 //!   `group_by` + `select_as` for one table, `where_has` for "has any".
 //!

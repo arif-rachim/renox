@@ -39,7 +39,7 @@ Every example has a README.md that walks through it.
   confirmation mail; notifications; a daily task cancelling unpaid orders; an admin for the
   `admin` role (the `Permissions` module, `require_role`) with photo uploads and an audit trail
   of order status changes (the `Audit` module), product delete behind password confirmation;
-  checkout in `transaction_retrying`; en/id with plurals; the `make:deploy` files. Guide: its
+  checkout in `db.retrying`; en/id with plurals; the `make:deploy` files. Guide: its
   [README](examples/shop/README.md).
   - Checkout: [checkout.rs](examples/shop/src/app/orders/checkout.rs); orders, event, task:
     [orders/mod.rs](examples/shop/src/app/orders/mod.rs); admin:
@@ -67,12 +67,16 @@ Every example has a README.md that walks through it.
 - [examples/crud](examples/crud) ([README](examples/crud/README.md)): one resource end to end: model and migration, list with
   pagination, create and edit forms with validation, owner-only edit and delete through a policy,
   soft delete with a trash and restore, model hooks (`#[model(hooks)]`: a slug filled on save,
-  a cached count forgotten), `save_changes` on update, flash messages, and tests for each.
+  a cached count forgotten), `save_changes` on update, and tests for each. It is the example of
+  the UI kit (`renox/ui.html`: fields, table, confirmation sheet, menu), toasts, live validation
+  (`data-live-validate`), `push`/`stack` and an error page in the layout.
   - Routes and handlers: [examples/crud/src/app/products/mod.rs](examples/crud/src/app/products/mod.rs)
   - Model, factory, policy: [model.rs](examples/crud/src/app/products/model.rs),
     [policy.rs](examples/crud/src/app/products/policy.rs)
   - Views: [index.html](examples/crud/resources/views/products/index.html),
-    [form.html](examples/crud/resources/views/products/form.html)
+    [form.html](examples/crud/resources/views/products/form.html),
+    [layouts/app.html](examples/crud/resources/views/layouts/app.html),
+    [errors/default.html](examples/crud/resources/views/errors/default.html)
   - Tests: [examples/crud/tests/products.rs](examples/crud/tests/products.rs)
 - [examples/api](examples/api) ([README](examples/api/README.md)): a JSON API: tokens for a mobile app (`User::attempt`,
   `create_token_with` with abilities and an expiry, pruned nightly), Bearer auth,

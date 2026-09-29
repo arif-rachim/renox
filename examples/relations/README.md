@@ -28,7 +28,7 @@ cargo run                        # http://127.0.0.1:3000
 | Report: posts and comments per category, posts per tag | SQL joins read with `fetch_as` into a `#[derive(FromRow)]` struct and a tuple | `report` |
 | Report: most active commenters | `Comment::query().group_by("author").select_as(…)` into a `#[derive(FromRow)]` struct | `report` |
 | Likes on a post or a comment (polymorphic): one `likes` table with `likeable_type` / `likeable_id`, a `Like` button on the post and on each comment | `Like`, `LIKEABLE: Morph`, `Like::on` in [model.rs](src/app/blog/model.rs); `like_post`, `like_comment` |
-| A post's like count; its comments' like counts; each card's like count | `LIKEABLE.of(&post, Like::query()).count(..)`; `like_counts` (`count_many` filtered on `likeable_type`, one query per page) | `show`, `index` |
+| A post's like count; its comments' like counts; each card's like count | `LIKEABLE.of(&post, Like::query()).count(..)`; `like_counts` (`Morph::count_many`: `LIKEABLE.count_many(db, parents, Like::query())`, one query per page) | `show`, `index` |
 | The latest likes with what was liked (`morphTo`) | `LIKEABLE.parents::<Post, _>` and `::<Comment, _>`: one query for the likes, one per parent type | `latest_likes`, `report` |
 | Posts that have comments | `where_has(Comment::query(), "post_id")` (`whereHas`, an `EXISTS` without SQL) | `report` |
 
@@ -50,8 +50,8 @@ cargo run                        # http://127.0.0.1:3000
 - **Polymorphic relations: the type column holds the parent's table.** `Like::on(&post)` fills
   `likeable_type` with `Post::TABLE`; `Morph::of` narrows a query to one parent,
   `Morph::load_many` loads the children of a page (grouped by parent id), `Morph::parents` goes
-  the other way, once per parent type. To count, filter `count_many` on the type column rather
-  than loading every like.
+  the other way, once per parent type. To count, `Morph::count_many` counts the children of many parents
+  in one query rather than loading every like.
 - **No foreign key, so triggers tidy up.** A foreign key can't point at two tables; the likes
   migration adds `AFTER DELETE` triggers on `posts` and `comments`, which also fire for comments
   removed by `ON DELETE CASCADE` (a model hook never sees those).
@@ -68,6 +68,7 @@ cargo test -p relations
 [tests/blog.rs](tests/blog.rs) checks each card's relations, comments, tag syncing (including an
 unknown tag being refused), both directions of many to many, pivot columns (pinning, timestamps,
 a tag the post doesn't have), the report's numbers, likes on posts and comments, and what
-deletes take with them. [tests/queries.rs](tests/queries.rs) counts the statements sqlx runs
-(its `sqlx::query` tracing events) to prove the likes of a page load in one query per type,
-however many there are; it's its own test binary because the counter is process-wide.
+deletes take with them. [tests/queries.rs](tests/queries.rs) counts the statements with
+`renox::db::capture_queries` to prove the likes of a page load in one query per type, however
+many there are. While developing, `/_renox/debug` shows each request's SQL and flags a statement
+run three or more times (a likely N+1).

@@ -39,7 +39,7 @@ async fn likes_of_a_page_load_in_one_query_per_type() {
         posts.push(post);
         comments.push(comment);
     }
-    // The counter works: one statement is one event.
+    // The counter works: one statement is one entry.
     let (_, n) = queries(Post::query().count(db)).await;
     assert_eq!(n, 1);
 

@@ -513,10 +513,19 @@ async fn admins_manage_products_with_photos() {
         .await
         .assert_see("Kopi Susu Gula Aren");
 
+    // The list offers delete behind a confirmation sheet; only the sheet's
+    // button sends the DELETE.
+    let list = app.get("/admin/products").await;
+    list.assert_see(&format!("data-rx-open=\"delete-{}\"", kopi.id))
+        .assert_see("role=\"alertdialog\"")
+        .assert_see(&format!("action=\"/admin/products/{}\"", kopi.id));
+
     // Deleting asks for the password first: `acting_as` logs in without
     // typing it, so it doesn't count as confirmed (a real login does).
     let destroy = format!("/admin/products/{}", kopi.id);
-    app.delete(&destroy)
+    app.request()
+        .header("referer", "/admin/products")
+        .delete(&destroy)
         .await
         .assert_redirect("/confirm-password");
     app.htmx()
@@ -529,11 +538,11 @@ async fn admins_manage_products_with_photos() {
         .post("/confirm-password", &[("password", "wrong")])
         .await
         .assert_invalid("password");
-    // Only GET requests are remembered for after the confirmation, so a
-    // DELETE lands on the home page and is sent again.
+    // After the confirmation the admin is back on the list the DELETE was
+    // sent from, and presses Delete again.
     app.post("/confirm-password", &[("password", "password123")])
         .await
-        .assert_redirect("/");
+        .assert_redirect("/admin/products");
     app.delete(&destroy)
         .await
         .assert_redirect("/admin/products");

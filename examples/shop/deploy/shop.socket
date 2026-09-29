@@ -1,8 +1,9 @@
 # /etc/systemd/system/shop.socket
 # systemd holds the listening socket and hands it to shop.service, so a
 # restart (a deploy) makes new connections wait a moment instead of being
-# refused. Enable this socket instead of starting the service on its own:
-#   sudo systemctl enable --now shop.socket
+# refused. Stop the service (it holds the port), enable this socket, start it:
+#   sudo systemctl stop shop && sudo systemctl enable --now shop.socket
+#   sudo systemctl start shop
 [Unit]
 Description=Shop (listening socket)
 

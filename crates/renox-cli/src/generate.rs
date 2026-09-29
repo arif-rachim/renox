@@ -476,7 +476,10 @@ pub fn mail(root: &Path, name: &str) -> Result<()> {
         &dir.join(format!("{snake}.txt")),
         "Hello!\n\n{{ app.url }}\n",
     )?;
-    println!("Send it with: state.mail_view(to, subject, \"mail/{snake}\", context! {{}})");
+    println!(
+        "Send it with: state.queue_mail(state.mail_view(to, subject, \"mail/{snake}\", context! {{}})?).await?\n\
+         (or state.mailer.send(…) to send it now)"
+    );
     Ok(())
 }
 

@@ -30,7 +30,7 @@ rnx make:module products --resource --fields "name:string price:money"  # a whol
 rnx make:model Product --module products --migration   # model + migrations/*.sql
 rnx make:policy Product --module products
 rnx make:job SendReceipt --module products             # registered in the module's register()
-rnx make:command products:import --module products     # then: rnx products:import FILE
+rnx make:command products:import --module products     # typed (clap); rnx products:import --help
 rnx make:mail order_shipped
 rnx make:migration add_stock_to_products
 rnx make:factory Product --module products             # also make:seeder, make:test

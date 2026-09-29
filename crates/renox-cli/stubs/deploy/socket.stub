@@ -1,8 +1,9 @@
 # /etc/systemd/system/{{name}}.socket
 # systemd holds the listening socket and hands it to {{name}}.service, so a
 # restart (a deploy) makes new connections wait a moment instead of being
-# refused. Enable this socket instead of starting the service on its own:
-#   sudo systemctl enable --now {{name}}.socket
+# refused. Stop the service (it holds the port), enable this socket, start it:
+#   sudo systemctl stop {{name}} && sudo systemctl enable --now {{name}}.socket
+#   sudo systemctl start {{name}}
 [Unit]
 Description={{title}} (listening socket)
 

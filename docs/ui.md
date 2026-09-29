@@ -159,7 +159,8 @@ and worth keeping in an app's own pages:
 
 `rnx new` writes `resources/views/errors/default.html`: the layout with the kit's `empty`
 component and a way home, so a 404 or a 403 keeps the navigation bar. `errors/<status>.html`
-replaces it for one status; the page gets `status`, `reason` and `detail` besides the usual
+replaces it for one status; the page gets `status`, `reason` and `detail` (with `APP_DEBUG`
+also `request_line` and `template`) besides the usual
 globals. Renox's own error page (used when an app has none) is built on the kit too.
 
 ## Toasts

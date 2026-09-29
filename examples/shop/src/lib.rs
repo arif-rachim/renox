@@ -70,18 +70,9 @@ pub async fn make_admin_of(db: &Db, user: &User) -> Result {
     user.assign_role(db, ADMIN).await
 }
 
-/// Everyone with the admin role. The `Permissions` module has no "users
-/// with role" loader, so this asks the `role_user` table in a sub-query.
+/// Everyone with the admin role (e.g. to tell them about a new order), by id.
 pub async fn admins(db: &Db) -> Result<Vec<User>> {
-    User::query()
-        .where_raw(
-            "id IN (SELECT ru.user_id FROM role_user ru \
-             JOIN roles r ON r.id = ru.role_id WHERE r.name = ?)",
-            [ADMIN],
-        )
-        .order_by("id")
-        .get(db)
-        .await
+    permissions::users_with_role(db, ADMIN).await
 }
 
 /// Give a registered user the admin role.
