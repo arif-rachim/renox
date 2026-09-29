@@ -4,6 +4,7 @@
 pub mod model;
 
 use renox::prelude::*;
+use renox::validation::FormContext;
 use serde::Deserialize;
 
 use super::tenancy::{CurrentTeam, SESSION_KEY};
@@ -56,9 +57,36 @@ struct MemberForm {
     email: String,
 }
 
+/// A form request: `prepare`, `authorize` and `after` run inside `Valid`,
+/// so the handler only adds the member.
 impl Validate for MemberForm {
+    fn prepare(&mut self) {
+        self.email = self.email.trim().to_lowercase();
+    }
+
+    /// Only the team's owners add members; anyone else gets 403 before the
+    /// email is even looked at.
+    async fn authorize(&self, form: &FormContext<'_>) -> Result<bool> {
+        let (Some(user), Some(team)) = (form.user, CurrentTeam::get()) else {
+            return Ok(false);
+        };
+        Ok(user.authorize("manage", &team).is_ok())
+    }
+
     fn rules(&self, v: &mut Validator) {
         v.field("email", &self.email).required().email();
+    }
+
+    /// Checks the database once the email is valid: an error here is shown
+    /// next to the field, like a rule's.
+    async fn after(&self, form: &FormContext<'_>, errors: &mut Errors) -> Result {
+        if User::find_by_email(&form.state.db, &self.email)
+            .await?
+            .is_none()
+        {
+            errors.add("email", "Nobody has signed up with this email address yet.");
+        }
+        Ok(())
     }
 }
 
@@ -128,17 +156,14 @@ async fn settings(
 /// Adds an existing user to the current team as a member.
 async fn add_member(
     State(db): State<Db>,
-    user: AuthUser,
     session: Session,
     team: CurrentTeam,
     Valid(form): Valid<MemberForm>,
 ) -> Result<Redirect> {
-    user.authorize("manage", &team)?;
-    let Some(member) = User::find_by_email(&db, &form.email).await? else {
-        let mut errors = Errors::new();
-        errors.add("email", "Nobody has signed up with this email address yet.");
-        return Err(errors.into());
-    };
+    // `MemberForm::authorize` checked the role and `after` that the user exists.
+    let member = User::find_by_email(&db, &form.email)
+        .await?
+        .ok_or(Error::NotFound)?;
     let added = MEMBERS
         .attach_with(&db, team.id, member.id, &[("role", &MEMBER)])
         .await?;

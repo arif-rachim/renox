@@ -90,6 +90,13 @@ where
         .and_then(|v| v.to_str().ok())
         .filter(|f| !f.is_empty() && f.len() <= 200)
         .map(str::to_owned);
+    // For `authorize` and `after`, taken before the body is read.
+    let user = req
+        .extensions()
+        .get::<crate::auth::CurrentUser>()
+        .and_then(|current| current.user.clone());
+    let method = req.method().clone();
+    let path = req.uri().path().to_owned();
     let locale_name = crate::i18n::request_locale(req.extensions(), state);
     let locale = &Messages {
         locale: Locale::parse(&locale_name),
@@ -144,7 +151,7 @@ where
         }
     };
 
-    let (data, mut errors) = match parsed {
+    let (mut data, mut errors): (T, Errors) = match parsed {
         Parsed::Ok(data, errors) => (data, errors),
         Parsed::Invalid(errors) => {
             return Err(ValidationError::new(errors)
@@ -152,6 +159,20 @@ where
                 .into_response());
         }
     };
+    data.prepare();
+    let form = super::FormContext {
+        state,
+        user: user.as_deref(),
+        method: &method,
+        path: &path,
+    };
+    if !data
+        .authorize(&form)
+        .await
+        .map_err(IntoResponse::into_response)?
+    {
+        return Err(Error::Forbidden.into_response());
+    }
     let mut validator = Validator::rules_with_texts(&data, locale.locale, locale.texts.clone());
     extra(&data, &input, &mut validator);
     let rule_errors = validator
@@ -166,6 +187,11 @@ where
                 errors.add(field, message.clone());
             }
         }
+    }
+    if errors.is_empty() {
+        data.after(&form, &mut errors)
+            .await
+            .map_err(IntoResponse::into_response)?;
     }
     // Live validation (`data-live-validate` forms, renox.js): answer with
     // one field's errors and stop, whatever the rest of the form says; the

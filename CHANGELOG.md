@@ -10,6 +10,20 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M21f · Form requests, more rules, auth pages on the kit
+
+- Form requests: `Validate` gains optional `prepare`, `authorize` (403 before the rules) and
+  `after` (async checks once the rules pass, errors shown on the field), with `FormContext`.
+- Rules: `alpha`, `alpha_num`, `alpha_dash`, `lowercase`, `uppercase`, `starts_with`,
+  `ends_with`, `uuid`, `ip`, `size`, `required_without`, `prohibited_if`,
+  `Validator::distinct`; English and Indonesian messages.
+- Renox's sign-in and account pages use the UI kit (and have stacks). Deleting the account asks
+  in a kit sheet instead of a browser dialog. The kit's `input` takes `id=`.
+- examples/teams adds members through a form request.
+- **Changed:** apps that override `renox/auth/*.html` keep their files; apps that styled the
+  old markup (`.card`, `.error`, `.status` in `renox/auth/layout.html`) should restyle for the
+  kit's classes.
+
 ### M21e · Tailwind, stacks and typed commands
 
 - Tailwind CSS without Node: `rnx new --tailwind`; an app with `resources/css/app.css` gets

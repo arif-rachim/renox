@@ -310,7 +310,10 @@ impl Validate for ProductForm {
         v.each("tags", &self.tags, |tag| tag.required().max(20)); // errors on tags.0, tags.1, …
         v.each("photos", &self.photos, |photo| photo.image().max(2048));
         // Also: digits(n), digits_between(a, b), date(), before…, one_of, same, different,
-        // v.nested("lines", &self.lines) for a Vec of structs, .apply(&MyRule) with `validation::Rule`.
+        // alpha, alpha_num, alpha_dash, lowercase, uppercase, starts_with(&["08"]), ends_with,
+        // uuid, ip, size(n), required_without(&other), prohibited_if(cond),
+        // v.distinct("tags", &self.tags), v.nested("lines", &self.lines) for a Vec of structs,
+        // .apply(&MyRule) with `validation::Rule`.
     }
 }
 
@@ -331,6 +334,30 @@ async fn store(session: Session, Valid(form): Valid<ProductForm>) -> Result<Redi
   <p class="error" data-error-for="name">{{ error('name') }}</p>
   <button>Save</button>
 </form>
+```
+
+A form request (Laravel's `FormRequest`): three optional hooks around the rules.
+
+```rust
+use renox::prelude::*;
+use renox::validation::FormContext;
+
+#[derive(serde::Deserialize)]
+struct Invite { email: String }
+
+impl Validate for Invite {
+    fn prepare(&mut self) { self.email = self.email.trim().to_lowercase(); } // first
+    async fn authorize(&self, form: &FormContext<'_>) -> Result<bool> {    // false -> 403
+        Ok(form.user.is_some_and(|u| u.has_role("owner")))
+    }
+    fn rules(&self, v: &mut Validator) { v.field("email", &self.email).required().email(); }
+    async fn after(&self, form: &FormContext<'_>, errors: &mut Errors) -> Result { // rules passed
+        if User::find_by_email(&form.state.db, &self.email).await?.is_none() {
+            errors.add("email", "Nobody has signed up with this email yet."); // shown like a rule's
+        }
+        Ok(())
+    }
+}
 ```
 
 The same form for create and edit, with the row's id in a hidden input:

@@ -810,11 +810,11 @@ Notes from M20c (dashboard, mail, HTTP, storage):
       a debug inspector (`/_renox/debug`: requests, queries, jobs, mail)
 - [x] `Path` rejections as 404 (M21a)
 - [x] Named, dynamic rate limiters; `route()` with query parameters (M21d)
-- [ ] More validation rules and form-request hooks (`authorize`, `prepare`, `after`, async
+- [x] More validation rules and form-request hooks (`authorize`, `prepare`, `after`, async
       rules) (M21f)
 - [x] Typed app commands (a clap parser), prompts (M21e)
-- [ ] Zero-downtime deploy recipes; an opt-in server-side session store (M21f)
-- [ ] Renox's own auth pages (`renox/auth/*`: login, register, reset, verify) on the UI kit:
+- [ ] Zero-downtime deploy recipes; an opt-in server-side session store (M21g)
+- [x] Renox's own auth pages (`renox/auth/*`: login, register, reset, verify) on the UI kit:
       they still have their pre-kit look (a black button, default links) in apps built on the kit
       (found in the M21e browser check) (M21f)
 - [x] Authorization gaps found while moving examples/shop to `Permissions` (#53): policies
@@ -969,6 +969,30 @@ Notes from M21e (Tailwind, stacks, typed commands):
   answers through a task-local. `secret` uses `rpassword` (new dependency, small).
 - examples/shop's `shop:make-admin` is typed and asks for a missing email; examples/crud's
   form pushes a robots `noindex` into the head.
+
+Notes from M21f (forms and the auth pages):
+- M21f is split again: M21f the forms side (rules, form-request hooks, the auth pages on the
+  kit); M21g the operations side (the server-side session store, zero-downtime recipes).
+- Form-request hooks are default methods on `Validate` (non-breaking): `prepare(&mut self)`,
+  `authorize(&self, &FormContext) -> impl Future<Output = Result<bool>> + Send` and
+  `after(&self, &FormContext, &mut Errors)`. The defaults return `std::future::ready`, so they
+  capture nothing and stay `Send` for any form; an app's `async fn` override needs the form to
+  be `Sync` (plain data is). `Valid` runs parse → `prepare` → `authorize` (403) → rules →
+  `after` (only when the rules passed) → live-validation answer or handler. `authorize` needs
+  the input, so a form that doesn't parse gets its 422 before `authorize` runs.
+  `FormContext` (`#[non_exhaustive]`) carries the state, user, method and path. "Async rules"
+  are `after`: `rules` stays synchronous (its database checks are already deferred).
+- New rules: `alpha`, `alpha_num`, `alpha_dash` (Unicode letters count), `lowercase`,
+  `uppercase`, `starts_with`, `ends_with`, `uuid`, `ip`, `size`, `required_without`,
+  `prohibited_if`, and `Validator::distinct` (trimmed, case-insensitive; the repeat gets the
+  error). `none_of` already was Laravel's `not_in`.
+- Auth pages: `renox/auth/layout.html` uses `renox_ui()`, the kit's `rx-auth*` classes (new in
+  renox-ui.css), toasts and stacks; every form is a kit `card` with `input`s (`block` primary
+  buttons, as on iOS sign-in screens). The account page's delete moved from `hx-confirm` (a
+  browser dialog) to a kit sheet with the password and the filled red button; the three
+  `password` fields on that page use the kit `input`'s new `id=` parameter.
+- examples/teams' `MemberForm` is a form request: the owner check and the "nobody has this
+  email" lookup moved out of the handler.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

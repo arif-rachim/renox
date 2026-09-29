@@ -79,7 +79,7 @@ Then import what a page needs:
 
 | Component | What it is |
 |---|---|
-| `input(name, label, type=…, value=…, hint=…, required=…, autocomplete=…, placeholder=…, attrs={…})` | A labelled text field with its hint and error. It is refilled after a failed submit, except for passwords. |
+| `input(name, label, type=…, value=…, hint=…, required=…, autocomplete=…, placeholder=…, attrs={…}, id=…)` | A labelled text field with its hint and error. It is refilled after a failed submit, except for passwords. `id` tells apart two fields of the same name on one page. |
 | `textarea`, `select(name, label, options, selected=…, placeholder=…)` | The same for longer text and for a choice. `options` are values or `[value, label]` pairs. |
 | `checkbox(name, label, checked=…, switch=…)` | A checkbox, or an iOS-style switch for settings. The whole row is the target. |
 | `button(label, variant=…, size=…, block=…)` | Variants: `primary`, `secondary`, `plain`, `danger` and `plain-danger`. The button shows a spinner while its form or htmx request is being sent. |
@@ -93,6 +93,11 @@ Then import what a page needs:
 | `tabs(id, items, selected=…)` + `tab_panel(id, key, selected=…)` | A segmented control; the arrow keys, Home and End move between tabs. |
 | `table(head, caption=…)` | A table in a card. A heading `["Total", "num"]` right-aligns its column, and `["Slug", "hide-narrow"]` hides it on phones. |
 | `empty(title, message, action_href, action_label)` | What an empty list says, with the way to add the first item. |
+
+Renox's own pages use the kit too: the sign-in pages (`renox/auth/*`: login, registration,
+password reset, email verification, password confirmation, the account page) and the error
+page. They have `stack('head')` and `stack('scripts')`; to change one, put a file with the same
+name under `resources/views/renox/auth/`.
 
 The kit's own texts ("optional", "Cancel", the error summary's title) come in English and
 Indonesian. An app can change them in `lang/*.json`, under the keys `ui.optional`,

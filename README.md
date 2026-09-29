@@ -172,11 +172,14 @@ impl Module for Guestbook {
 
 - `Valid<T>` validates forms, JSON bodies and query strings with rules such as `required`,
   `required_if`, `email`, `between`, `matches` (regex), `digits`, dates (`before`, `after`),
-  `unique`, `exists`, `same`, `image` and `mimes`, per item of a list (`each`, `nested`), and your
-  own reusable `Rule`s. Messages come in English
+  `unique`, `exists`, `same`, `alpha_dash`, `uuid`, `ip`, `size`, `image` and `mimes`, per item of
+  a list (`each`, `nested`, `distinct`), and your own reusable `Rule`s. Messages come in English
   and Indonesian, or from your own translations.
+- Form requests: `prepare` tidies the input, `authorize` answers 403 before any rule, and
+  `after` runs checks that need the database, with errors shown like a rule's.
 - `Auth::new()` adds login, registration, logout, remember me, password reset and email
-  verification, with Argon2id hashing and login throttling; `.account()` adds a profile page
+  verification, with Argon2id hashing and login throttling, on pages built with the UI kit;
+  `.account()` adds a profile page
   (email change with re-verification, password, "log out other devices", delete account).
   Logout ends only this device. Password rules come from `Password::min(12).mixed_case()…`, and
   users imported from Laravel log in with their bcrypt hashes.
@@ -340,7 +343,7 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 | `RateLimiter::for('api', …)` | `App::rate_limiter("api", …)` and `.throttle_by("api")` |
 | Exception reporting (`report()`), Telescope/Debugbar | `App::report(…)`, `/_renox/debug` |
 | Eloquent | `#[derive(Model)]` and the query builder; relations are explicit loaders ([docs/relations.md](docs/relations.md)) |
-| Form Requests | `Valid<T>` with `impl Validate` |
+| Form Requests (`authorize`, `prepareForValidation`, `after`) | `Valid<T>` with `impl Validate` (`authorize`, `prepare`, `after`) |
 | Gates and policies | `App::gate`, `impl Policy`, `user.authorize(…)`, `.require_gate(…)` |
 | spatie/laravel-permission | the `Permissions` module: `assign_role`, `has_permission`, `.require_role(…)` |
 | Global scopes (tenancy) | `#[model(default_scope = "…")]` with `renox::context` |

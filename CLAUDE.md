@@ -83,7 +83,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            (connect, TEST_DATABASE_URL), model.rs, query.rs, from_row.rs,
                            relations.rs (belongs_to/has_many/Pivot/Morph), value.rs (DbValue),
                            paginate.rs, migrate.rs (migrator), factory.rs, json.rs, error.rs
-  src/validation/          Validator/rules (mod.rs), Valid<T> (extract.rs), en/id messages
+  src/validation/          Validator/rules (mod.rs), Valid<T> (extract.rs: prepare → authorize →
+                           rules → after, FormContext), en/id messages
   src/auth/                User, hashing (Argon2id + bcrypt import), login/logout (per device),
                            change_password, CurrentUser middleware, AuthUser, guards, Access::check,
                            Policy/gates (mod.rs), Auth module + pages (module.rs), account.rs
