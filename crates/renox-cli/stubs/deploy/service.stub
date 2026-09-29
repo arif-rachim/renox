@@ -2,6 +2,8 @@
 [Unit]
 Description={{title}}
 After=network.target
+# With deploy/{{name}}.socket enabled, systemd passes the listening socket and
+# restarts don't refuse connections (see deploy/README.md).
 
 [Service]
 User={{name}}

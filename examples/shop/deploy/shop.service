@@ -2,6 +2,8 @@
 [Unit]
 Description=Shop
 After=network.target
+# With deploy/shop.socket enabled, systemd passes the listening socket and
+# restarts don't refuse connections (see deploy/README.md).
 
 [Service]
 User=shop

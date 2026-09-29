@@ -1,0 +1,17 @@
+# /etc/systemd/system/shop.socket
+# systemd holds the listening socket and hands it to shop.service, so a
+# restart (a deploy) makes new connections wait a moment instead of being
+# refused. Enable this socket instead of starting the service on its own:
+#   sudo systemctl enable --now shop.socket
+[Unit]
+Description=Shop (listening socket)
+
+[Socket]
+# The address the app would listen on (APP_HOST:APP_PORT); the app uses this
+# socket instead of opening its own.
+ListenStream=127.0.0.1:3000
+# Connections that may wait while the app restarts.
+Backlog=4096
+
+[Install]
+WantedBy=sockets.target

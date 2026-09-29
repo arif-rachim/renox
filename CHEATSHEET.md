@@ -25,7 +25,7 @@ rnx make:middleware StampRequests    # on every route (App::layer)
 rnx make:component price_tag         # --ui copies the UI kit into the app
 rnx migrate                          # migrate:status, migrate:fresh --seed, db:seed
 rnx migrate:rollback --step 2        # the last 2 batches (default 1)
-rnx route:list                       # db:shell, schedule:list, schedule:run NAME, cache:prune
+rnx route:list                       # db:shell, schedule:list, schedule:run NAME, cache:prune, session:prune
 rnx queue:work --queue mail --workers 2  # --once: run what is queued, then stop
 rnx queue:failed                     # queue:retry <id|all>, queue:flush (deletes them)
 rnx schedule:work                    # tasks in their own process (SCHEDULER=false for serve)
@@ -1514,7 +1514,8 @@ production), `APP_DEBUG` (on by default in `local`), `APP_NAME`, `APP_URL`, `APP
 address, `127.0.0.1`; `0.0.0.0` in a container) and `APP_PORT` (3000), `APP_LOCALE`,
 `APP_FALLBACK_LOCALE`, `APP_TIMEZONE` (`Asia/Jakarta`, `+07:00` or `UTC`),
 `SESSION_LIFETIME` (minutes, 120), `REMEMBER_LIFETIME` (minutes, 43200 = 30 days),
-`SESSION_COOKIE` (`renox_session`), `MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME` (defaults to `APP_NAME`),
+`SESSION_COOKIE` (`renox_session`), `SESSION_DRIVER` (`cookie` | `database`: the `sessions`
+table, no 4 KB limit, a new id at each login/logout), `MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME` (defaults to `APP_NAME`),
 `VIEWS_PATH` (`resources/views`), `PUBLIC_PATH` (`public`), `LANG_PATH` (`resources/lang`),
 `DATABASE_URL` (`sqlite://storage/app.db` or `postgres://…` with the `postgres` feature),
 `TEST_DATABASE_URL`, `MAIL_MAILER` (`log` | `smtp`), `QUEUE_WORKERS`, `SCHEDULER`,

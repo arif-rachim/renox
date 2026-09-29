@@ -59,6 +59,7 @@ Commands:
   webhook:retry <id>        Process a stored webhook call again
   ui:publish [--force]      Copy the UI kit (renox/ui.html and its CSS) into the app to change it
   cache:prune               Delete expired rows of the database cache store
+  session:prune             Delete expired sessions (SESSION_DRIVER=database)
   schedule:list             List scheduled tasks and when they run next
   schedule:run <task>       Run one scheduled task now
   schedule:work             Run scheduled tasks (when SCHEDULER=false for serve)
@@ -433,6 +434,7 @@ impl App {
         self.registry.job::<crate::analytics::ServerEvent>();
         let mut migrations = crate::queue::MIGRATIONS.to_vec();
         migrations.push(crate::cache::MIGRATION);
+        migrations.push(crate::session::MIGRATION);
         migrations.extend(crate::webhook::MIGRATIONS);
         migrations.extend(self.migrations);
         for module in &self.modules {
@@ -584,6 +586,10 @@ impl App {
                 Some(files) => crate::i18n::Translator::embedded(files.lang)?,
                 None => crate::i18n::Translator::load(&config.lang_path, config.debug)?,
             }),
+            // Tests read database sessions synchronously (`TestApp::session_get`).
+            session_mirror: (config.session_driver == "database"
+                && config.env == Environment::Testing)
+                .then(Default::default),
             live: (config.debug && config.env == Environment::Local).then(|| {
                 crate::live::Live::start(vec![
                     config.views_path.clone(),
@@ -822,6 +828,10 @@ impl App {
                 let force = args.iter().any(|a| a == "--force");
                 crate::assets::publish_ui(&kernel.state.config, force)?;
             }
+            "session:prune" => println!(
+                "Deleted {} expired session(s).",
+                crate::Session::prune_expired(&kernel.state.db).await?
+            ),
             "cache:prune" => println!(
                 "Deleted {} expired cache row(s).",
                 kernel.state.cache.prune().await?
@@ -887,6 +897,25 @@ impl App {
     }
 }
 
+/// The listening socket systemd passes with socket activation
+/// (`LISTEN_FDS`, a `.socket` unit): it stays open while the service
+/// restarts, so connections wait in its queue instead of being refused.
+fn inherited_listener() -> Result<Option<TcpListener>> {
+    let mut fds = listenfd::ListenFd::from_env();
+    let Some(listener) = fds
+        .take_tcp_listener(0)
+        .map_err(|err| anyhow!("the socket systemd passed isn't a TCP listener: {err}"))?
+    else {
+        return Ok(None);
+    };
+    listener
+        .set_nonblocking(true)
+        .map_err(anyhow::Error::from)?;
+    Ok(Some(
+        TcpListener::from_std(listener).map_err(anyhow::Error::from)?,
+    ))
+}
+
 /// Built-in commands; an app command can't take one of these names.
 const BUILT_IN_COMMANDS: &[&str] = &[
     "serve",
@@ -905,6 +934,7 @@ const BUILT_IN_COMMANDS: &[&str] = &[
     "webhook:failed",
     "webhook:retry",
     "cache:prune",
+    "session:prune",
     "ui:publish",
     "schedule:list",
     "schedule:run",
@@ -1022,7 +1052,13 @@ impl Kernel {
     /// until Ctrl-C or SIGTERM; then lets running jobs finish.
     pub async fn serve(self) -> Result {
         let config = self.state.config.clone();
-        let listener = TcpListener::bind(config.addr()).await?;
+        let listener = match inherited_listener()? {
+            Some(listener) => {
+                tracing::info!("using the socket systemd passed (socket activation)");
+                listener
+            }
+            None => TcpListener::bind(config.addr()).await?,
+        };
         tracing::info!(
             "{} listening on http://{}",
             config.name,

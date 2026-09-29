@@ -17,6 +17,10 @@ Register a customer at `/register`, or promote any registered user with
 on a fresh install. It's a typed command (`impl AppCommand`, arguments declared with clap) and asks
 for the email when it's left out.
 
+Nothing in the shop depends on where sessions live: `SESSION_DRIVER=database` in `.env` moves
+them to the `sessions` table (tests/shop.rs runs a customer with it). `deploy/` has what
+`rnx make:deploy` writes, including `shop.socket` for deploys that refuse no connection.
+
 ## What's where
 
 | Feature | Where |

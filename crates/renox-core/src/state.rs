@@ -31,6 +31,10 @@ pub struct AppState {
     pub(crate) live: Option<Arc<crate::live::Live>>,
     pub(crate) listeners: Listeners,
     pub(crate) key: Key,
+    /// With `SESSION_DRIVER=database` in tests, sessions are kept here
+    /// instead of the table (keyed by the id's hash).
+    pub(crate) session_mirror:
+        Option<Arc<std::sync::Mutex<std::collections::HashMap<String, String>>>>,
     pub(crate) gates: Gates,
     pub(crate) async_gates: Arc<std::collections::HashMap<String, crate::auth::AsyncGate>>,
     pub(crate) throttle: Arc<LoginThrottle>,

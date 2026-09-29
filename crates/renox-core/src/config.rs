@@ -78,6 +78,10 @@ pub struct Config {
     pub session_lifetime: u64,
     /// Name of the session cookie, from `SESSION_COOKIE`.
     pub session_cookie: String,
+    /// Where sessions live, from `SESSION_DRIVER`: `cookie` (default: the
+    /// whole session in an encrypted cookie) or `database` (the cookie holds
+    /// an id; the `sessions` table holds the rest).
+    pub session_driver: String,
     /// Minutes a "remember me" login lasts, from `REMEMBER_LIFETIME` (30 days).
     pub remember_lifetime: u64,
     /// SQLite database, from `DATABASE_URL`, e.g. `sqlite://storage/app.db`.
@@ -196,6 +200,10 @@ impl Config {
                 .parse()
                 .context("SESSION_LIFETIME must be a number of minutes")?,
             session_cookie: v.or("SESSION_COOKIE", "renox_session"),
+            session_driver: match v.or("SESSION_DRIVER", "cookie").as_str() {
+                driver @ ("cookie" | "database") => driver.to_owned(),
+                other => bail!("SESSION_DRIVER must be cookie or database, got `{other}`"),
+            },
             remember_lifetime: v
                 .or("REMEMBER_LIFETIME", "43200")
                 .parse()
@@ -305,6 +313,7 @@ impl Default for Config {
             public_path: "public".into(),
             session_lifetime: 120,
             session_cookie: "renox_session".into(),
+            session_driver: "cookie".into(),
             remember_lifetime: 43_200,
             database_url: "sqlite::memory:".into(),
             database_pool_size: 8,
@@ -409,6 +418,18 @@ mod tests {
         assert_eq!(c.cache_store, "memory");
         assert_eq!(c.csp, CspMode::Relaxed);
         assert!(c.key.is_none() && c.mail.port.is_none());
+    }
+
+    #[test]
+    fn session_driver() {
+        assert_eq!(load(&[]).unwrap().session_driver, "cookie");
+        assert_eq!(
+            load(&[("SESSION_DRIVER", "database")])
+                .unwrap()
+                .session_driver,
+            "database"
+        );
+        assert!(load(&[("SESSION_DRIVER", "redis")]).is_err());
     }
 
     #[test]

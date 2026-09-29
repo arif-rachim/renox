@@ -813,7 +813,7 @@ Notes from M20c (dashboard, mail, HTTP, storage):
 - [x] More validation rules and form-request hooks (`authorize`, `prepare`, `after`, async
       rules) (M21f)
 - [x] Typed app commands (a clap parser), prompts (M21e)
-- [ ] Zero-downtime deploy recipes; an opt-in server-side session store (M21g)
+- [x] Zero-downtime deploy recipes; an opt-in server-side session store (M21g)
 - [x] Renox's own auth pages (`renox/auth/*`: login, register, reset, verify) on the UI kit:
       they still have their pre-kit look (a black button, default links) in apps built on the kit
       (found in the M21e browser check) (M21f)
@@ -993,6 +993,29 @@ Notes from M21f (forms and the auth pages):
   `password` fields on that page use the kit `input`'s new `id=` parameter.
 - examples/teams' `MemberForm` is a form request: the owner check and the "nobody has this
   email" lookup moved out of the handler.
+
+Notes from M21g (sessions and deploys):
+- `SESSION_DRIVER=database`: the encrypted cookie holds `{"sid"}` instead of the payload
+  (`Stored`, untagged); rows are keyed by `sha256(sid)`. A request loads its row and writes it
+  when the payload's fingerprint (data, flash, token, lifetime) changed, when the id is new, or
+  once a minute to move `expires_at`. `regenerate_token` (login) and `flush` (logout) set
+  `rotate`: the old row is deleted and a new id issued. A whole-session cookie is still read in
+  database mode, so switching drivers keeps everyone logged in, and `TestApp` writes those.
+  Expired rows: a 1-in-50 request lottery spawns a prune; `session:prune` /
+  `Session::prune_expired`. The table's migration (`00010101000210`) is always installed.
+- Tests can't await the database from `TestApp`'s synchronous session helpers on a
+  current-thread runtime, so with `APP_ENV=testing` the database driver keeps sessions in
+  `AppState::session_mirror` (same code path, keyed the same). Tests that set another env use
+  the real table (tests/it/sessions.rs does both).
+- Found by the tests: a session given a new id (rotation, or a cookie converted from the
+  cookie driver) whose content hadn't changed was only `UPDATE`d, so no row existed; a new id
+  now always inserts.
+- Zero downtime: `serve` takes a socket from systemd (`listenfd`, `LISTEN_FDS`) before binding
+  its own; `make:deploy` writes `deploy/<app>.socket` and the README's recipe (plus expand /
+  contract migrations and a two-copy Caddy setup). Measured with transient user units
+  (`systemd-run --user --socket-property=…`) and back-to-back requests over three restarts:
+  0 of 1,350 refused with the socket, 280 of 1,288 without.
+- M21 is complete.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`
