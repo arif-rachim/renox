@@ -1,6 +1,7 @@
 //! The cart, kept in the database per user so it survives logins on other
 //! devices. Every route needs a login.
 
+use renox::Toast;
 use renox::db::relations::belongs_to;
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -91,11 +92,10 @@ impl Validate for AddForm {
 async fn add(
     State(db): State<Db>,
     user: AuthUser,
-    session: Session,
     lang: Lang,
     back: Back,
     Valid(form): Valid<AddForm>,
-) -> Result<Back> {
+) -> Result<(Toast, Back)> {
     let product = Product::find_or_404(&db, form.product_id).await?;
     abort_unless(
         product.active,
@@ -116,8 +116,10 @@ async fn add(
     .bind(renox::db::now())
     .execute(&db)
     .await?;
-    session.flash("status", lang.t("cart.added", &[("name", &product.name)]))?;
-    Ok(back)
+    Ok((
+        Toast::success(lang.t("cart.added", &[("name", &product.name)])),
+        back,
+    ))
 }
 
 #[derive(Deserialize)]

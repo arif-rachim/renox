@@ -44,6 +44,9 @@ impl Module for Pages {
                     "ok",
                 )
             })
+            .post("/clear", || async {
+                (Toast::success("Cleared"), HxRefresh)
+            })
             .get("/list", || async {
                 view("list.html", context! { count => 3 })
                     .fragment("rows")
@@ -182,6 +185,12 @@ async fn toasts_follow_the_next_page_or_ride_htmx() {
         "Saved <draft>"
     );
     assert_eq!(trigger["renox:toast"]["toasts"][1]["kind"], "error");
+    // An htmx refresh reloads the page, which would lose a toast sent in
+    // HX-Trigger: it waits in the session for that page instead.
+    let res = app.htmx().post("/clear", &[]).await;
+    res.assert_header("hx-refresh", "true");
+    assert!(res.header("hx-trigger").is_none());
+    app.get("/form").await.assert_see("Cleared");
     // Not htmx: saved for the next page, escaped there.
     app.post("/save", &[]).await.assert_ok();
     app.get("/form")

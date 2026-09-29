@@ -7,11 +7,15 @@
   <link rel="stylesheet" href="{{ asset('app.css') }}">
   {#- htmx, Alpine, the CSRF token for htmx requests, and validation errors next to inputs. -#}
   {{ renox_head() }}
+  {#- The UI kit's script and styles (rx-* classes only): here for the toasts. -#}
+  {{ renox_ui() }}
 </head>
 <body>
   <main>
     {% if flash.status %}<p class="flash">{{ flash.status }}</p>{% endif %}
     {% block content %}{% endblock %}
   </main>
+  {#- Toasts: after a redirect or a refresh from the session, over htmx from HX-Trigger. -#}
+  {{ toasts() }}
 </body>
 </html>

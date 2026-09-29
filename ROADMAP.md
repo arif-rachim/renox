@@ -1024,6 +1024,22 @@ Notes from M21g (sessions and deploys):
   0 of 1,350 refused with the socket, 280 of 1,288 without.
 - M21 is complete.
 
+Notes from M21h (the examples on the kit):
+- After the audit of docs and examples against M21 (#63), the examples that still had
+  hand-written markup moved to the kit: shop, teams, and htmx-recipes (which keeps its
+  hand-rolled Alpine modal, dropdown and tabs as the recipes, and points to the kit's versions).
+  The tests, `hello`'s command and the stubs follow in M21i.
+- Moving them found three framework bugs, fixed here: `add_trigger` put raw UTF-8 in
+  `HX-Trigger` (`HeaderValue::from_str` failed and the toast was silently dropped: any
+  non-ASCII toast over htmx), now `\u`-escaped JSON; toasts with `HX-Refresh` went to
+  `HX-Trigger` and the reload lost them, now they go to the session like `HX-Redirect`; error
+  pages lacked `App::share` values, which broke a layout using one under strict undefined
+  (debug), now shares are computed for error pages too and a failing one is only logged.
+- `background::locks_let_one_holder_in` flaked again on PostgreSQL under the full run, in its
+  eight-waiter part (10 s each); it checks one-at-a-time, so waiters now wait up to 60 s.
+- The shop's brown accent was checked for WCAG AA with the kit's formula: white on the button
+  colour 7.8:1 (light) and 6.5:1 (dark), the link colour 7:1 or more on the page.
+
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`
       (resource tables and forms); billing later

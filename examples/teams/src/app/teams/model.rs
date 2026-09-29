@@ -63,10 +63,9 @@ impl Team {
     }
 }
 
-/// A new webhook signing secret (32 random bytes, base64).
+/// A new webhook signing secret (32 random bytes, URL-safe base64).
 pub fn new_secret() -> String {
-    let key = renox::generate_key(); // "base64:…", the same randomness as APP_KEY
-    format!("whsec_{}", key.trim_start_matches("base64:"))
+    format!("whsec_{}", renox::random_token())
 }
 
 /// `whsec_…ab12`: enough to recognise a secret, not to use it.

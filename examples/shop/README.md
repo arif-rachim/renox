@@ -34,9 +34,20 @@ them to the `sessions` table (tests/shop.rs runs a customer with it). `deploy/` 
 | Notifications: a queued confirmation mail (HTML and text) and a database row for the customer, a database row for every admin, a "shipped" mail | [src/app/orders/notifications.rs](src/app/orders/notifications.rs), [resources/views/mail](resources/views/mail) |
 | `/admin`: a route group guarded by the `admin` role (`require_role`), products with photo uploads and search/sort (deleting one asks for the password again), orders moved pending → paid → shipped (each move written to the audit log), a dashboard with pending orders, low stock, notifications and recent activity | [src/app/admin](src/app/admin) |
 | English and Indonesian, with plurals (`0 products`, `One product`, `3 products`) and translated validation labels | [resources/lang](resources/lang) |
-| Deploy: Dockerfile (cargo-chef), systemd unit, Litestream, from `rnx make:deploy` | [Dockerfile](Dockerfile), [deploy/](deploy) |
+| Pages on the UI kit (`renox/ui.html`): a navigation bar with the cart and an account menu, product cards, kit fields and tables, status badges, toasts, the confirmation sheets, an error page in the layout, the coffee-brown accent | [resources/views](resources/views), [layouts/app.html](resources/views/layouts/app.html), [public/app.css](public/app.css) |
+| Deploy: Dockerfile (cargo-chef), systemd unit and socket, Litestream, from `rnx make:deploy` | [Dockerfile](Dockerfile), [deploy/](deploy) |
 
 ## Things worth copying
+
+- **The UI kit, rebranded.** Every page uses the kit (`renox/ui.html`): `input`, `select`-style
+  fields, `table`, `badge`, `group`, `card`, `empty`, `menu` and `confirm`. The shop's colour is
+  the kit's accent token (`--rx-accent` in [public/app.css](public/app.css)), chosen so white on
+  it and it as link text keep WCAG AA contrast in light and dark mode. Actions answer with a
+  toast (`(Toast::success(…), Redirect)`, an error toast for an out-of-stock checkout), and
+  links with filters use `route('products.index', category=…)`.
+- **Destructive actions ask first.** Deleting a product and cancelling an order open a sheet
+  with the safe choice focused; the checkout address is checked as it's typed
+  (`data-live-validate`).
 
 - **Stock is taken in the database, not in Rust.** `UPDATE products SET stock = stock - ?
   WHERE id = ? AND stock >= ?` checks and takes in one statement, so two customers can't buy the

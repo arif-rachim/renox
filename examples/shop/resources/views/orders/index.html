@@ -1,19 +1,22 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-<h1>{{ t('nav.orders') }}</h1>
-<table>
-  <tr><th>#</th><th>{{ t('orders.date') }}</th><th>{{ t('orders.status') }}</th><th>{{ t('cart.total') }}</th></tr>
+{% from "renox/ui.html" import table, empty %}
+{% from "orders/_status.html" import status_badge %}
+<h1 class="rx-title">{{ t('nav.orders') }}</h1>
+{% if orders.items %}
+{% call table(["#", [t('orders.date'), "hide-narrow"], t('orders.status'), [t('cart.total'), "num"]], caption=t('nav.orders')) %}
   {% for order in orders.items %}
   <tr>
-    <td><a href="{{ route('orders.show', order.id) }}">#{{ order.id }}</a></td>
-    <td>{{ order.created_at | date('%d/%m/%Y %H:%M') }}</td>
-    <td><span class="status status-{{ order.status }}">{{ t('orders.statuses.' ~ order.status) }}</span></td>
-    <td>{{ order.total | rupiah }}</td>
+    <td><a class="rx-link" href="{{ route('orders.show', order.id) }}">#{{ order.id }}</a></td>
+    <td class="rx-hide-narrow">{{ order.created_at | date('%d/%m/%Y %H:%M') }}</td>
+    <td>{{ status_badge(order.status, t('orders.statuses.' ~ order.status)) }}</td>
+    <td class="rx-num">{{ order.total | rupiah }}</td>
   </tr>
-  {% else %}
-  <tr><td colspan="4" class="muted">{{ t('orders.none') }}</td></tr>
   {% endfor %}
-</table>
+{% endcall %}
 {% from "renox/pagination.html" import pagination %}{{ pagination(orders) }}
+{% else %}
+<div class="rx-card">{{ empty(t('orders.none'), none, route('products.index'), t('nav.products')) }}</div>
+{% endif %}
 {% endblock %}

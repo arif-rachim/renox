@@ -1,33 +1,35 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-<h1>{{ t('nav.cart') }}</h1>
+{% from "renox/ui.html" import table, button, link_button, empty %}
+<h1 class="rx-title">{{ t('nav.cart') }}</h1>
 {% if lines %}
-<table>
-  <tr><th>{{ t('cart.product') }}</th><th>{{ t('cart.price') }}</th><th>{{ t('cart.quantity') }}</th><th>{{ t('cart.subtotal') }}</th><th></th></tr>
+{% call table([t('cart.product'), [t('cart.price'), "num"], t('cart.quantity'), [t('cart.subtotal'), "num"], ""], caption=t('nav.cart')) %}
   {% for line in lines %}
   <tr>
-    <td><a href="{{ route('products.show', line.product.slug) }}">{{ line.product.name }}</a></td>
-    <td>{{ line.product.price | rupiah }}</td>
+    <td><a class="rx-link" href="{{ route('products.show', line.product.slug) }}">{{ line.product.name }}</a></td>
+    <td class="rx-num">{{ line.product.price | rupiah }}</td>
     <td>
-      <form method="post" action="{{ route('cart.update', line.item.id) }}" class="inline">
+      <form method="post" action="{{ route('cart.update', line.item.id) }}" class="qty">
         {{ csrf_field() }}{{ method_field('PATCH') }}
-        <input type="number" name="quantity" value="{{ line.item.quantity }}" min="1" max="99" aria-label="{{ t('cart.quantity') }}">
-        <button>{{ t('cart.update') }}</button>
+        <input class="rx-input" type="number" name="quantity" value="{{ line.item.quantity }}" min="1" max="99"
+               aria-label="{{ t('cart.quantity') }}: {{ line.product.name }}">
+        {{ button(t('cart.update'), variant="secondary", size="small") }}
       </form>
     </td>
-    <td>{{ line.subtotal | rupiah }}</td>
+    <td class="rx-num">{{ line.subtotal | rupiah }}</td>
     <td>
+      {#- Taking a line out is easy to undo (add it again), so it asks nothing: red text only. -#}
       <form method="post" action="{{ route('cart.remove', line.item.id) }}">
-        {{ csrf_field() }}{{ method_field('DELETE') }}<button>{{ t('cart.remove') }}</button>
+        {{ csrf_field() }}{{ method_field('DELETE') }}{{ button(t('cart.remove'), variant="plain-danger", size="small") }}
       </form>
     </td>
   </tr>
   {% endfor %}
-  <tr><th colspan="3">{{ t('cart.total') }}</th><th>{{ total | rupiah }}</th><th></th></tr>
-</table>
-<p><a class="button" href="{{ route('checkout') }}">{{ t('cart.checkout') }}</a></p>
+  <tr><td colspan="3"><strong>{{ t('cart.total') }}</strong></td><td class="rx-num"><strong>{{ total | rupiah }}</strong></td><td></td></tr>
+{% endcall %}
+<div class="rx-card__footer">{{ link_button(route('checkout'), t('cart.checkout'), variant="primary") }}</div>
 {% else %}
-<p class="muted">{{ t('cart.empty') }} <a href="{{ route('products.index') }}">{{ t('nav.products') }}</a></p>
+<div class="rx-card">{{ empty(t('cart.empty'), none, route('products.index'), t('nav.products')) }}</div>
 {% endif %}
 {% endblock %}

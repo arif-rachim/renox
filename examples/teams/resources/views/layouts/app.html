@@ -2,31 +2,48 @@
 <html lang="{{ app.locale }}">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
   {% block seo %}{{ seo() }}{% endblock %}
-  <link rel="stylesheet" href="{{ asset('app.css') }}">
   {{ renox_head() }}
+  {#- The UI kit (renox/ui.html): fields, tables, badges, sheets, menus, toasts. -#}
+  {{ renox_ui() }}
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
+  {{ stack('head') }}
 </head>
-<body>
-  <nav>
-    <a href="{{ route('projects.index') }}"><strong>{{ app.name }}</strong></a>
-    {% if auth.check %}
-      {#- `team` is shared with every view (App::share): the current team, or none. #}
-      {% if team %}
-      <a href="{{ route('team.settings') }}">{{ team.name }} <span class="badge">{{ team.role }}</span></a>
+<body class="rx-page">
+  <a class="rx-visually-hidden skip" href="#main">Skip to content</a>
+  {% from "renox/ui.html" import menu, menu_link, menu_action, menu_separator, link_button, badge, alert %}
+  <header class="bar">
+    <nav class="bar__inner" aria-label="Main">
+      <a class="bar__brand" href="{{ route('projects.index') }}">{{ app.name }}</a>
+      {% if auth.check %}
+        {#- `team` is shared with every view (App::share): the current team, or none. -#}
+        {% if team %}
+        <a class="bar__link" href="{{ route('team.settings') }}">{{ team.name }} {{ badge(team.role) }}</a>
+        {% endif %}
+        <span class="rx-spacer"></span>
+        {% call menu(auth.user.name, id="account-menu", variant="plain") %}
+          {{ menu_link(route('teams.index'), "Switch team") }}
+          {% if can('admin') %}{{ menu_link(route('admin.teams'), "All teams (admin)") }}{% endif %}
+          {{ menu_link(route('account.show'), "Account") }}
+          {{ menu_separator() }}
+          {{ menu_action(route('logout'), "Log out") }}
+        {% endcall %}
+      {% else %}
+        <span class="rx-spacer"></span>
+        {{ link_button(route('login'), "Log in", variant="plain", size="small") }}
+        {{ link_button(route('register'), "Register", variant="primary", size="small") }}
       {% endif %}
-      <a href="{{ route('teams.index') }}">Switch team</a>
-      {% if can('admin') %}<a href="{{ route('admin.teams') }}">Admin</a>{% endif %}
-      <a href="{{ route('account.show') }}">{{ auth.user.name }}</a>
-      <form method="post" action="{{ route('logout') }}">{{ csrf_field() }}<button>Log out</button></form>
-    {% else %}
-      <a href="{{ route('login') }}">Log in</a>
-      <a href="{{ route('register') }}">Register</a>
-    {% endif %}
-  </nav>
-  <main>
-    {% if flash.status %}<p class="flash">{{ flash.status }}</p>{% endif %}
-    {% block content %}{% endblock %}
+    </nav>
+  </header>
+  <main class="rx-container" id="main">
+    <div class="rx-stack">
+      {% if flash.status %}{{ alert(flash.status, kind="success") }}{% endif %}
+      {% block content %}{% endblock %}
+    </div>
   </main>
+  {{ toasts() }}
+  {{ stack('scripts') }}
 </body>
 </html>

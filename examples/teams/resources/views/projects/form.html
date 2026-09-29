@@ -2,17 +2,24 @@
 
 {# One form for both: `project` is only set when editing. #}
 {% block content %}
-<h1>{{ "Edit project" if project else "New project" }} <span class="muted">in {{ team.name }}</span></h1>
-<form method="post"
+{% from "renox/ui.html" import card, input, textarea, button, link_button %}
+<div>
+  <a class="rx-link" href="{{ route('projects.index') }}">‹ Projects</a>
+  <h1 class="rx-title">{{ "Edit project" if project else "New project" }}</h1>
+  <p class="rx-subtitle">In {{ team.name }}</p>
+</div>
+<form method="post" data-live-validate novalidate
       action="{{ route('projects.update', project.id) if project else route('projects.store') }}">
   {{ csrf_field() }}
   {% if project %}{{ method_field('PUT') }}<input type="hidden" name="id" value="{{ project.id }}">{% endif %}
-  <label>Name <input name="name" value="{{ old('name', project.name if project else '') }}"></label>
-  <p class="error" data-error-for="name">{{ error('name') }}</p>
-  <label>Description
-    <textarea name="description" rows="3">{{ old('description', project.description if project else '') }}</textarea>
-  </label>
-  <p class="error" data-error-for="description">{{ error('description') }}</p>
-  <p><button>Save</button> <a href="{{ route('projects.index') }}">Cancel</a></p>
+  {% call card() %}
+    {{ input("name", "Name", value=project.name if project else none, required=true,
+             hint="Unique within the team.") }}
+    {{ textarea("description", "Description", value=project.description if project else none, rows=3) }}
+    <div class="rx-card__footer">
+      {{ link_button(route('projects.index'), "Cancel", variant="plain") }}
+      {{ button("Save changes" if project else "Create project") }}
+    </div>
+  {% endcall %}
 </form>
 {% endblock %}

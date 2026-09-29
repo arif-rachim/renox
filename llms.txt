@@ -39,7 +39,9 @@ Every example has a README.md that walks through it.
   confirmation mail; notifications; a daily task cancelling unpaid orders; an admin for the
   `admin` role (the `Permissions` module, `require_role`) with photo uploads and an audit trail
   of order status changes (the `Audit` module), product delete behind password confirmation;
-  checkout in `db.retrying`; en/id with plurals; the `make:deploy` files. Guide: its
+  checkout in `db.retrying`; en/id with plurals; the `make:deploy` files (with the systemd
+  socket); every page on the UI kit with a rebranded accent, toasts and confirmation sheets; a
+  typed `shop:make-admin` command with a prompt. Guide: its
   [README](examples/shop/README.md).
   - Checkout: [checkout.rs](examples/shop/src/app/orders/checkout.rs); orders, event, task:
     [orders/mod.rs](examples/shop/src/app/orders/mod.rs); admin:
@@ -51,7 +53,8 @@ Every example has a README.md that walks through it.
 - [examples/htmx-recipes](examples/htmx-recipes) ([README](examples/htmx-recipes/README.md)): htmx + Alpine recipes, each a few attributes and
   a handler that answers with a fragment: modal form (HX-Trigger closes it), inline edit
   (`hx-patch`, Escape cancels), toggle, dropdown with delete (empty 200), infinite scroll
-  (`revealed`), client-side tabs, `HxRefresh`, `HxRedirect`.
+  (`revealed`), client-side tabs, `HxRefresh`, `HxRedirect`; an out-of-band count
+  (`.fragment("row").also("count")`), `HxRetarget`/`HxReswap` for a duplicate, toasts over htmx.
   [src/app/tasks/mod.rs](examples/htmx-recipes/src/app/tasks/mod.rs),
   [views](examples/htmx-recipes/resources/views/tasks),
   [tests/recipes.rs](examples/htmx-recipes/tests/recipes.rs)
@@ -102,7 +105,9 @@ Every example has a README.md that walks through it.
   teams with per-team roles on the pivot, the current team in `renox::context` (checked by a
   middleware), a `Project` model with a default scope that fails closed, `unscoped()` for the
   admin report and a command, project names unique per team, `gate_before` for super-admins,
-  and a team secret sealed with `state.encrypt` behind password confirmation.
+  and a team secret sealed with `state.encrypt` behind password confirmation; a form request
+  (`MemberForm`: `prepare`, `authorize`, `after`) checked live (`data-live-validate`); pages on
+  the UI kit with confirmation sheets and toasts.
   [tenancy.rs](examples/teams/src/app/tenancy.rs),
   [projects/model.rs](examples/teams/src/app/projects/model.rs),
   [teams/mod.rs](examples/teams/src/app/teams/mod.rs),

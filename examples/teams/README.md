@@ -29,7 +29,7 @@ Globex, Carol is a member of Acme. With `SUPER_ADMINS` set, Alice also sees `/ad
 | `Project` with `default_scope = "team_only"` and a `saving` hook that fills `team_id` | [src/app/projects/model.rs](src/app/projects/model.rs) |
 | Project CRUD with no `team_id` in sight; name unique per team | [src/app/projects/mod.rs](src/app/projects/mod.rs) |
 | The super-admin check and the cross-team report with `Project::unscoped()` | [src/app/admin.rs](src/app/admin.rs) |
-| Pages | [resources/views](resources/views) |
+| Pages on the UI kit: a navigation bar with the current team and an account menu, kit forms with live validation, tables, confirmation sheets (delete a project, replace the secret), toasts, an error page in the layout | [resources/views](resources/views) |
 | Tables: `teams`, `team_user`, `projects` (unique `(team_id, name)`) | [migrations](migrations) |
 
 ## Things worth copying
@@ -38,7 +38,8 @@ Globex, Carol is a member of Acme. With `SUPER_ADMINS` set, Alice also sees `/ad
   `prepare` lowercases the email, `authorize` lets only the team's owners through (403
   before any rule runs), the rules check the email, and `after` looks the person up in the
   database, adding a field error when nobody has that email. The handler is left with adding
-  the member.
+  the member. The form has `data-live-validate`, so that lookup already answers when the field
+  is left (a test sends `X-Renox-Validate: email`).
 
 - **The tenant is set once per request.** An `App::layer` middleware reads `current_team_id`
   from the session, checks the membership in one query (falling back to the user's first team,

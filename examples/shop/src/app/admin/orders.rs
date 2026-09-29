@@ -1,3 +1,4 @@
+use renox::Toast;
 use renox::audit::{self, Entry};
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -46,11 +47,10 @@ pub async fn update_status(
     State(state): State<AppState>,
     admin: AuthUser,
     ClientIp(ip): ClientIp,
-    session: Session,
     back: Back,
     Path(id): Path<i64>,
     Valid(form): Valid<StatusForm>,
-) -> Result<Back> {
+) -> Result<(Toast, Back)> {
     use OrderStatus::*;
     let mut order = Order::find_or_404(&state.db, id).await?;
     let from = order.status;
@@ -86,6 +86,8 @@ pub async fn update_status(
             .ip(ip),
     )
     .await?;
-    session.flash("status", format!("Order #{} updated.", order.id))?;
-    Ok(back)
+    Ok((
+        Toast::success(format!("Order #{} updated.", order.id)),
+        back,
+    ))
 }

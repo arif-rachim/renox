@@ -108,7 +108,7 @@ async fn customers_browse_search_filter_and_sort() {
     results
         .assert_ok()
         .assert_see("Teh Tarik")
-        .assert_dont_see("<nav>");
+        .assert_dont_see("<header");
 }
 
 #[renox::test]
@@ -236,9 +236,10 @@ async fn checkout_takes_the_stock_and_confirms_by_mail() {
     assert_eq!(budi.unread_notification_count(app.db()).await.unwrap(), 1);
     assert_eq!(boss.unread_notification_count(app.db()).await.unwrap(), 1);
     app.acting_as(&boss);
-    app.get("/admin")
-        .await
-        .assert_see(&format!("New order <a href=\"/orders/{}\">", order.id));
+    app.get("/admin").await.assert_see(&format!(
+        "New order <a class=\"rx-link\" href=\"/orders/{}\">",
+        order.id
+    ));
 }
 
 #[renox::test]
@@ -416,7 +417,7 @@ async fn order_status_changes_are_audited() {
 
     // The dashboard lists it.
     app.get("/admin").await.assert_ok().assert_see(&format!(
-        "moved order <a href=\"/orders/{0}\">#{0}</a> from pending to paid",
+        "moved order <a class=\"rx-link\" href=\"/orders/{0}\">#{0}</a> from pending to paid",
         order.id
     ));
 }
@@ -549,6 +550,10 @@ async fn admins_manage_products_with_photos() {
     app.assert_database_missing("products", &[("id", &kopi.id)])
         .await;
     assert!(!app.state().storage.exists(&photo).await.unwrap());
+    // The list the redirect leads to says so, once, in a toast.
+    app.get("/admin/products")
+        .await
+        .assert_see("“Kopi Susu Gula Aren” deleted.");
     app.get("/").await.assert_dont_see("Gula Aren");
 }
 
@@ -691,4 +696,18 @@ async fn the_shop_runs_the_same_with_database_sessions() {
         .assert_see("Kopi Susu masuk keranjang.")
         .assert_see("Rp 50.000");
     assert_eq!(app.session_get::<String>("_locale").as_deref(), Some("id"));
+}
+
+#[renox::test]
+async fn error_pages_keep_the_shop_layout() {
+    // With APP_DEBUG an undefined value in the layout is an error, so this
+    // also checks that error pages get the shared `cart_count`.
+    let app = TestApp::with_config(shop::app(), |c| c.debug = true).await;
+    let budi = customer(&app, "budi@example.com").await;
+    app.acting_as(&budi);
+    let res = app.get("/products/no-such-coffee").await;
+    res.assert_not_found()
+        .assert_see(r#"class="bar__brand""#)
+        .assert_see("Cart (0)")
+        .assert_see("That page isn&#39;t here.");
 }

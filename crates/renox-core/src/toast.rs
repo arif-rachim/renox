@@ -12,8 +12,9 @@
 //! ```
 //!
 //! After a redirect the toast waits in the session for the next page; an
-//! htmx request gets it at once (in `HX-Trigger`). Put `{{ toasts() }}` in
-//! the layout, once, and include `renox_ui_styles()`.
+//! htmx request gets it at once (in `HX-Trigger`), unless it redirects or
+//! refreshes (`HxRedirect`, `HxRefresh`), which also wait for the next page.
+//! Put `{{ toasts() }}` in the layout, once, and `{{ renox_ui() }}` in its head.
 
 use axum::response::{IntoResponse, IntoResponseParts, Response, ResponseParts};
 use serde::{Deserialize, Serialize};

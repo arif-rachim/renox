@@ -1,42 +1,40 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-<h1>Admin</h1>
+{% from "renox/ui.html" import group, link_button %}
+<h1 class="rx-title">Admin</h1>
 {% include "admin/_nav.html" %}
-<p><a href="{{ route('admin.orders.index') }}?status=pending">{{ pending }} pending order{{ "" if pending == 1 else "s" }}</a></p>
+<p>{{ link_button(route('admin.orders.index', status='pending'), pending ~ " pending order" ~ ("" if pending == 1 else "s"), size="small") }}</p>
 
-<h2>Low stock</h2>
-<ul>
+{% call group(title="Low stock") %}
   {% for product in low_stock %}
-  <li><a href="{{ route('admin.products.edit', product.id) }}">{{ product.name }}</a>: {{ product.stock }} left</li>
+  <div><a class="rx-link" href="{{ route('admin.products.edit', product.id) }}">{{ product.name }}</a>: {{ product.stock }} left</div>
   {% else %}
-  <li class="muted">Every product has 5 or more.</li>
+  <div class="rx-subtitle">Every product has 5 or more.</div>
   {% endfor %}
-</ul>
+{% endcall %}
 
-<h2>Notifications</h2>
-<ul>
+{% call group(title="Notifications") %}
   {% for n in notifications %}
-  <li class="{{ 'unread' if not n.read_at }}">
-    {% if n.kind == 'new-order' %}New order <a href="{{ route('orders.show', n.data.order_id) }}">#{{ n.data.order_id }}</a>: {{ n.data.total | rupiah }}
+  <div class="{{ 'unread' if not n.read_at }}">
+    {% if n.kind == 'new-order' %}New order <a class="rx-link" href="{{ route('orders.show', n.data.order_id) }}">#{{ n.data.order_id }}</a>: {{ n.data.total | rupiah }}
     {% else %}{{ n.kind }}{% endif %}
-    <span class="muted">{{ n.created_at | date('%d/%m %H:%M') }}</span>
-  </li>
+    <span class="rx-subtitle">{{ n.created_at | date('%d/%m %H:%M') }}</span>
+  </div>
   {% else %}
-  <li class="muted">Nothing new.</li>
+  <div class="rx-subtitle">Nothing new.</div>
   {% endfor %}
-</ul>
+{% endcall %}
 
-<h2>Recent activity</h2>
-<ul>
+{% call group(title="Recent activity") %}
   {% for entry in activity %}
-  <li>
-    {% if entry.action == 'order.status_changed' %}User #{{ entry.user_id }} moved order <a href="{{ route('orders.show', entry.subject_id) }}">#{{ entry.subject_id }}</a> from {{ entry.data.from }} to {{ entry.data.to }}
+  <div>
+    {% if entry.action == 'order.status_changed' %}User #{{ entry.user_id }} moved order <a class="rx-link" href="{{ route('orders.show', entry.subject_id) }}">#{{ entry.subject_id }}</a> from {{ entry.data.from }} to {{ entry.data.to }}
     {% else %}{{ entry.action }}{% if entry.user_id %} (user #{{ entry.user_id }}){% endif %}{% endif %}
-    <span class="muted">{{ entry.created_at | date('%d/%m %H:%M') }}</span>
-  </li>
+    <span class="rx-subtitle">{{ entry.created_at | date('%d/%m %H:%M') }}</span>
+  </div>
   {% else %}
-  <li class="muted">Nothing recorded yet.</li>
+  <div class="rx-subtitle">Nothing recorded yet.</div>
   {% endfor %}
-</ul>
+{% endcall %}
 {% endblock %}

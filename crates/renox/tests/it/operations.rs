@@ -370,3 +370,28 @@ async fn failed_jobs_and_scheduled_tasks_are_reported() {
     );
     assert!(task.details.contains("disk full"), "{}", task.details);
 }
+
+#[renox::test]
+async fn error_pages_get_shared_values_too() {
+    // A layout that shows a shared value (a cart count) must work on error
+    // pages; with APP_DEBUG an undefined value is an error, so without the
+    // shares the app's page would fail and Renox's would show instead.
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("errors")).unwrap();
+    std::fs::write(
+        dir.path().join("errors/404.html"),
+        "<p>Cart ({{ cart_count }})</p>Lost",
+    )
+    .unwrap();
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(
+        App::new().share("cart_count", |_| async { Ok(3) }),
+        move |c| {
+            c.views_path = path;
+            c.debug = true;
+        },
+    )
+    .await;
+    let res = app.get("/nowhere").await;
+    res.assert_not_found().assert_see("<p>Cart (3)</p>Lost");
+}

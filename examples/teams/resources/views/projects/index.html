@@ -1,24 +1,29 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-<h1>{{ team.name }}'s projects</h1>
-<p><a href="{{ route('projects.create') }}">New project</a></p>
+{% from "renox/ui.html" import table, link_button, confirm, empty %}
+<div class="row-actions row-actions--between">
+  <h1 class="rx-title">{{ team.name }}'s projects</h1>
+  {{ link_button(route('projects.create'), "New project", variant="primary") }}
+</div>
 
-<table>
-  <tr><th>Name</th><th>Description</th><th></th></tr>
+{% if projects %}
+{% call table(["Name", ["Description", "hide-narrow"], ""], caption="Projects") %}
   {% for project in projects %}
   <tr>
     <td>{{ project.name }}</td>
-    <td class="muted">{{ project.description }}</td>
+    <td class="rx-hide-narrow">{{ project.description }}</td>
     <td>
-      <a href="{{ route('projects.edit', project.id) }}">Edit</a>
-      <form method="post" action="{{ route('projects.destroy', project.id) }}">
-        {{ csrf_field() }}{{ method_field('DELETE') }}<button>Delete</button>
-      </form>
+      <div class="row-actions">
+        {{ link_button(route('projects.edit', project.id), "Edit", variant="plain", size="small") }}
+        {{ confirm("delete-" ~ project.id, "Delete", route('projects.destroy', project.id),
+                   "Delete " ~ project.name ~ "?", "It's gone for everyone in " ~ team.name ~ ".", size="small") }}
+      </div>
     </td>
   </tr>
-  {% else %}
-  <tr><td colspan="3">No projects yet.</td></tr>
   {% endfor %}
-</table>
+{% endcall %}
+{% else %}
+<div class="rx-card">{{ empty("No projects yet.", "Projects belong to the team; everyone in it sees them.", route('projects.create'), "New project") }}</div>
+{% endif %}
 {% endblock %}

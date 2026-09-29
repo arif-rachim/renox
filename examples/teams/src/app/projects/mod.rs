@@ -3,6 +3,7 @@
 
 pub mod model;
 
+use renox::Toast;
 use renox::prelude::*;
 use serde::Deserialize;
 
@@ -76,18 +77,19 @@ async fn create(_team: CurrentTeam) -> View {
 
 async fn store(
     State(db): State<Db>,
-    session: Session,
     _team: CurrentTeam,
     Valid(form): Valid<ProjectForm>,
-) -> Result<Redirect> {
+) -> Result<(Toast, Redirect)> {
     let project = Project {
         name: form.name,
         description: form.description.unwrap_or_default(),
         ..Default::default() // team_id: filled in by the `saving` hook
     };
-    Project::create(&db, project).await?;
-    session.flash("status", "Project created.")?;
-    Ok(Redirect::to("/projects"))
+    let project = Project::create(&db, project).await?;
+    Ok((
+        Toast::success(format!("“{}” created.", project.name)),
+        Redirect::to("/projects"),
+    ))
 }
 
 async fn edit(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
@@ -98,10 +100,9 @@ async fn edit(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
 
 async fn update(
     State(db): State<Db>,
-    session: Session,
     Path(id): Path<i64>,
     Valid(form): Valid<ProjectForm>,
-) -> Result<Redirect> {
+) -> Result<(Toast, Redirect)> {
     let mut project = Project::find_or_404(&db, id).await?;
     // The unique rule skipped the form's `id`: it must be this project.
     abort_if(
@@ -112,13 +113,17 @@ async fn update(
     project.name = form.name;
     project.description = form.description.unwrap_or_default();
     project.save(&db).await?;
-    session.flash("status", "Project updated.")?;
-    Ok(Redirect::to("/projects"))
+    Ok((
+        Toast::success(format!("“{}” saved.", project.name)),
+        Redirect::to("/projects"),
+    ))
 }
 
-async fn destroy(State(db): State<Db>, session: Session, Path(id): Path<i64>) -> Result<Redirect> {
+async fn destroy(State(db): State<Db>, Path(id): Path<i64>) -> Result<(Toast, Redirect)> {
     let mut project = Project::find_or_404(&db, id).await?;
     project.delete(&db).await?;
-    session.flash("status", "Project deleted.")?;
-    Ok(Redirect::to("/projects"))
+    Ok((
+        Toast::success(format!("“{}” deleted.", project.name)),
+        Redirect::to("/projects"),
+    ))
 }

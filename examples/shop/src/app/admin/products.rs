@@ -1,3 +1,4 @@
+use renox::Toast;
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -64,15 +65,16 @@ pub async fn create(State(db): State<Db>) -> Result<View> {
 
 pub async fn store(
     State(state): State<AppState>,
-    session: Session,
     Valid(form): Valid<ProductForm>,
-) -> Result<Redirect> {
+) -> Result<(Toast, Redirect)> {
     let mut product = Product::default();
     fill(&state, &mut product, form).await?;
-    Product::create(&state.db, product).await?;
+    let product = Product::create(&state.db, product).await?;
     state.cache.forget(FEATURED).await?;
-    session.flash("status", "Product created.")?;
-    Ok(Redirect::to("/admin/products"))
+    Ok((
+        Toast::success(format!("“{}” created.", product.name)),
+        Redirect::to("/admin/products"),
+    ))
 }
 
 pub async fn edit(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
@@ -86,31 +88,33 @@ pub async fn edit(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
 
 pub async fn update(
     State(state): State<AppState>,
-    session: Session,
     Path(id): Path<i64>,
     Valid(form): Valid<ProductForm>,
-) -> Result<Redirect> {
+) -> Result<(Toast, Redirect)> {
     let mut product = Product::find_or_404(&state.db, id).await?;
     fill(&state, &mut product, form).await?;
     product.save(&state.db).await?;
     state.cache.forget(FEATURED).await?;
-    session.flash("status", "Product saved.")?;
-    Ok(Redirect::to("/admin/products"))
+    Ok((
+        Toast::success(format!("“{}” saved.", product.name)),
+        Redirect::to("/admin/products"),
+    ))
 }
 
 pub async fn destroy(
     State(state): State<AppState>,
-    session: Session,
     Path(id): Path<i64>,
-) -> Result<Redirect> {
+) -> Result<(Toast, Redirect)> {
     let mut product = Product::find_or_404(&state.db, id).await?;
     product.delete(&state.db).await?; // orders keep the name and price
     if let Some(photo) = &product.photo {
         state.storage.delete(photo).await?;
     }
     state.cache.forget(FEATURED).await?;
-    session.flash("status", "Product deleted.")?;
-    Ok(Redirect::to("/admin/products"))
+    Ok((
+        Toast::success(format!("“{}” deleted.", product.name)),
+        Redirect::to("/admin/products"),
+    ))
 }
 
 /// Copies the form into the product; a new photo replaces the old one.

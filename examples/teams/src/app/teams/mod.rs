@@ -3,6 +3,7 @@
 
 pub mod model;
 
+use renox::Toast;
 use renox::prelude::*;
 use renox::validation::FormContext;
 use serde::Deserialize;
@@ -106,11 +107,13 @@ async fn store(
     user: AuthUser,
     session: Session,
     Valid(form): Valid<TeamForm>,
-) -> Result<Redirect> {
+) -> Result<(Toast, Redirect)> {
     let team = Team::found(&db, &form.name, &user).await?;
     session.put(SESSION_KEY, team.id)?; // work in the new team right away
-    session.flash("status", format!("Team {} created.", team.name))?;
-    Ok(Redirect::to("/projects"))
+    Ok((
+        Toast::success(format!("Team {} created.", team.name)),
+        Redirect::to("/projects"),
+    ))
 }
 
 /// Makes another of the user's teams the current one.
@@ -119,15 +122,17 @@ async fn switch(
     user: AuthUser,
     session: Session,
     Path(id): Path<i64>,
-) -> Result<Redirect> {
+) -> Result<(Toast, Redirect)> {
     // Only teams the user belongs to (the middleware checks again anyway).
     if Team::role_of(&db, id, user.id).await?.is_none() {
         return Err(Error::Forbidden);
     }
     let team = Team::find_or_404(&db, id).await?;
     session.put(SESSION_KEY, team.id)?;
-    session.flash("status", format!("Switched to {}.", team.name))?;
-    Ok(Redirect::to("/projects"))
+    Ok((
+        Toast::success(format!("Switched to {}.", team.name)),
+        Redirect::to("/projects"),
+    ))
 }
 
 /// Members and the (masked) secret of the current team.
@@ -156,10 +161,9 @@ async fn settings(
 /// Adds an existing user to the current team as a member.
 async fn add_member(
     State(db): State<Db>,
-    session: Session,
     team: CurrentTeam,
     Valid(form): Valid<MemberForm>,
-) -> Result<Redirect> {
+) -> Result<(Toast, Redirect)> {
     // `MemberForm::authorize` checked the role and `after` that the user exists.
     let member = User::find_by_email(&db, &form.email)
         .await?
@@ -167,13 +171,12 @@ async fn add_member(
     let added = MEMBERS
         .attach_with(&db, team.id, member.id, &[("role", &MEMBER)])
         .await?;
-    let status = if added {
-        format!("{} joined {}.", member.name, team.name)
+    let toast = if added {
+        Toast::success(format!("{} joined {}.", member.name, team.name))
     } else {
-        format!("{} is already in {}.", member.name, team.name)
+        Toast::info(format!("{} is already in {}.", member.name, team.name))
     };
-    session.flash("status", status)?;
-    Ok(Redirect::to("/team"))
+    Ok((toast, Redirect::to("/team")))
 }
 
 /// The secret in full, after the password was confirmed.
@@ -195,16 +198,14 @@ async fn show_secret(
 async fn rotate_secret(
     State(state): State<AppState>,
     user: AuthUser,
-    session: Session,
     team: CurrentTeam,
-) -> Result<Redirect> {
+) -> Result<(Toast, Redirect)> {
     user.authorize("manage", &team)?;
     let mut row = Team::find_or_404(&state.db, team.id).await?;
     row.webhook_secret = Some(state.encrypt(&model::new_secret()));
     row.save_only(&state.db, &["webhook_secret"]).await?;
-    session.flash(
-        "status",
-        "A new secret was made. Update your webhook sender.",
-    )?;
-    Ok(Redirect::to("/team/secret"))
+    Ok((
+        Toast::success("A new secret was made. Update your webhook sender."),
+        Redirect::to("/team/secret"),
+    ))
 }

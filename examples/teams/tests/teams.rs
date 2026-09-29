@@ -339,6 +339,19 @@ async fn owners_add_members_and_members_cannot() {
         .post("/team/members", &[("email", "nobody@example.com")])
         .await
         .assert_invalid("email");
+    // Live validation (data-live-validate) runs the form request too: the
+    // database lookup in `after` answers while the field is left, and the
+    // handler doesn't run.
+    let live = w
+        .app
+        .htmx()
+        .header("X-Renox-Validate", "email")
+        .post("/team/members", &[("email", "nobody@example.com")])
+        .await;
+    live.assert_ok().assert_json_path(
+        "errors.0",
+        "Nobody has signed up with this email address yet.",
+    );
     w.app
         .post("/team/members", &[("email", "Carol@Example.com")])
         .await
