@@ -793,8 +793,9 @@ Notes from M20c (dashboard, mail, HTTP, storage):
 
 ### M21 · v0.22: Views and developer experience
 - [x] Components that see the request (`old`, `error`, `t`, `csrf_field`, `can`, `auth` inside
-      imported macros), a `renox/ui/*` kit (input, select, button, modal, dropdown, table, card,
-      alert, tabs) and `make:component`
+      imported macros), the `renox/ui.html` kit (input, textarea, select, checkbox, button,
+      card, group, alert, badge, form_errors, sheet, confirm, menu, tabs, table, empty) and
+      `make:component`
 - [x] Toasts over htmx; `once`; several fragments and out-of-band swaps;
       `HxRetarget`/`HxReswap`/`HxPushUrl`
 - [x] Error pages rendered in the app layout (M21d)
@@ -807,13 +808,19 @@ Notes from M20c (dashboard, mail, HTTP, storage):
 - [x] Tests: `assert_json_path`/`assert_json`, session/auth/view assertions, time travel,
       event and notification fakes, a browser-test recipe
 - [x] Errors and logs: `App::report(…)` (e.g. Sentry), `LOG_FORMAT=json`, log files, a request id;
-      a debug inspector (`/_renox/debug`: requests, queries, jobs, mail)
+      a debug inspector (`/_renox/debug`: requests, views and queries; mail stays at
+      `/_renox/mail`, jobs on the queue dashboard)
 - [x] `Path` rejections as 404 (M21a)
 - [x] Named, dynamic rate limiters; `route()` with query parameters (M21d)
 - [x] More validation rules and form-request hooks (`authorize`, `prepare`, `after`, async
       rules) (M21f)
 - [x] Typed app commands (a clap parser), prompts (M21e)
 - [x] Zero-downtime deploy recipes; an opt-in server-side session store (M21g)
+- [ ] Deferred from M21 (small items the Laravel parity review planned here, not built):
+      subdomain and fallback routes (`Route::domain`, `Route::fallback`); the current route's
+      name in views (`routeIs`); `Redirect::route` and a public `intended`; session
+      `push`/`increment`; factory states and sequences; plural ranges and the locale from
+      `Accept-Language`; MiniJinja `loop_controls` and `@class`-style helpers
 - [x] Renox's own auth pages (`renox/auth/*`: login, register, reset, verify) on the UI kit:
       they still have their pre-kit look (a black button, default links) in apps built on the kit
       (found in the M21e browser check) (M21f)
@@ -1036,8 +1043,10 @@ On hold until the owner starts it; M18–M21 come first.
   features where dependencies are heavy. Separate `renox-http`/`-db`/`-view` crates would all need
   `AppState` and `App` would need all of them, so splitting now only adds indirection. Revisit if
   compile times demand it.
-- **Sessions:** stored in an encrypted, signed cookie (AES-256-GCM via `APP_KEY`), so M1 needs no
-  database. Keep sessions small (old input is capped in M13a, W5); a server-side store is deferred.
+- **Sessions:** by default stored in an encrypted, signed cookie (AES-256-GCM via `APP_KEY`), so
+  M1 needed no database; keep those small (old input is capped in M13a, W5). Since M21g,
+  `SESSION_DRIVER=database` keeps only an id in the cookie and the session in the `sessions`
+  table (keyed by sha256(id), a new id at each login and logout).
 - **Templates:** MiniJinja (runtime, overridable, reloadable). Askama may be offered later.
 - **Auth sessions:** the session stores the user id and a fingerprint of the password hash, so a
   password change ends other sessions without a separate token column. "Remember me" makes the
@@ -1092,5 +1101,6 @@ Kept out on purpose, so the framework stays small; some are good candidates for 
   several servers.
 - WebSockets and broadcasting.
 - OAuth/social login and two-factor authentication (plugin candidates).
-- A JavaScript build pipeline (Vite, Tailwind CLI): htmx and Alpine are bundled; bring your own
-  tooling if you need it.
+- A Node/Vite build pipeline: htmx and Alpine are bundled, and Tailwind runs through its
+  standalone CLI (`rnx new --tailwind`, `rnx tailwind`, M21e). Other front-end tooling is the
+  app's own.

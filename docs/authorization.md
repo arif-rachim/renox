@@ -13,6 +13,7 @@ and [examples/teams](../examples/teams) (tenants).
 | May this user do X at all? | a gate (`App::gate`, `gate_async`) | `.require_gate("x")`, `user.gate("x")?`, `can('x')` |
 | May this user do X to *this* row? | a policy (`impl Policy`) | `user.authorize("update", &row)?`, `can('update', row)` |
 | Which job does the user have? | roles and permissions (the `Permissions` module) | `.require_role`, `.require_permission`, `has_role` |
+| May this user send this form? | `Validate::authorize` (a form request) | the `Valid<T>` extractor: 403 before the rules |
 | Who may do everything? | `App::gate_before` | before every gate, permission and policy |
 | What may this API token do? | token abilities | `.require_ability("orders:write")`, `token_can` |
 | Which rows exist for this user at all? | a default scope (tenants) | every query of the model |
@@ -96,9 +97,9 @@ async fn index(State(db): State<Db>, user: AuthUser) -> Result<View> {
 }
 ```
 
-A policy gets the plain `User`, **without its roles**: "admins see every invoice" can't be
-written inside `allows`. Ask the role first, then the policy
-([examples/shop](../examples/shop/src/app/orders/mod.rs) does this):
+A policy can check roles too: `has_role` on the `User` it gets reads the roles the request
+loaded (the `Permissions` module), so "accountants see every invoice" sits in `allows`
+([examples/shop](../examples/shop/src/app/orders/model.rs) does this for its admins):
 
 ```rust
 use renox::prelude::*;
@@ -109,18 +110,23 @@ struct Invoice { id: i64, user_id: i64 }
 
 impl Policy for Invoice {
     fn allows(&self, user: &User, ability: &str) -> bool {
-        ability == "view" && self.user_id == user.id
+        ability == "view" && (self.user_id == user.id || user.has_role("accountant"))
     }
 }
 
 async fn show(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Result<View> {
     let invoice = Invoice::find_or_404(&db, id).await?;
-    if !user.has_role("accountant") {
-        user.authorize("view", &invoice)?;
-    }
+    user.authorize("view", &invoice)?; // the owner or an accountant
     Ok(view("invoices/show.html", context! { invoice }))
 }
 ```
+
+Outside a request (a job, a command) the roles aren't loaded and `has_role` says `false`; ask
+`user.roles(&db)` there.
+
+A form can ask too, before its rules run: `Validate::authorize` gets a `FormContext` (the state
+and the user), and `false` answers 403 (the CHEATSHEET's "Form + validation" shows a form
+request).
 
 ## Roles and permissions
 
@@ -162,21 +168,8 @@ async fn check(user: AuthUser) -> String {
   them; then a new role needs no code change. A role with no permissions (`&[]`) is fine when the
   app only checks the role itself, as examples/shop does with `admin`.
 - In templates: `{% if 'editor' in auth.roles %}` and `{% if can('posts.publish') %}`.
-- There is no loader for "the users with a role" yet; query `role_user` with a sub-query:
-
-```rust
-use renox::prelude::*;
-
-async fn editors(db: &Db) -> Result<Vec<User>> {
-    User::query()
-        .where_raw(
-            "id IN (SELECT ru.user_id FROM role_user ru JOIN roles r ON r.id = ru.role_id WHERE r.name = ?)",
-            ["editor"],
-        )
-        .get(db)
-        .await
-}
-```
+- `permissions::users_with_role(&db, "editor")` lists the users with a role, e.g. to notify
+  every editor.
 
 ## Super-admins: `gate_before`
 
@@ -199,8 +192,7 @@ fn app() -> App {
 `User::has_role` and `User::has_permission` answer from the roles loaded for the current
 request, so they work in `gate_before` and in `Policy::allows` ("admins may edit any post").
 For another user, or outside a request (a job, a command), they say `false`: use the async
-`user.roles(&db)` there. `permissions::users_with_role(&db, "admin")` lists the users with a
-role, e.g. to notify every admin.
+`user.roles(&db)` there.
 
 ## API tokens and abilities
 
@@ -311,6 +303,8 @@ another team's row, a token without the ability, a guest.
 | `Gate::define`, `@can`, `can:` middleware | `App::gate` / `gate_async`, `can(…)`, `.require_gate(…)` |
 | Policies, `$this->authorize()` | `impl Policy`, `user.authorize(…)?`, `Can::new` for views |
 | `Gate::before` | `App::gate_before` |
+| FormRequest `authorize()` | `impl Validate { async fn authorize(&self, form: &FormContext) }` |
+| spatie `User::role('x')->get()` | `permissions::users_with_role(&db, "x")` |
 | spatie/laravel-permission | the `Permissions` module |
 | Sanctum abilities, `tokenCan` | `create_token_with`, `.require_ability(…)`, `token_can` |
 | Global scopes (`addGlobalScope`), tenancy packages | `#[model(default_scope = "…")]` + `renox::context` |

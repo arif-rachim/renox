@@ -17,9 +17,11 @@ commit that `rnx` was built from.
   - `DatabaseNotification`, `AccessToken`, `NewToken`
   - `WebhookRequest`, `WebhookCall`, `JobContext`, `Htmx`, `Down`, `analytics::Event`
   - `view::ViewContext`, `auth::Registration`, `auth::Recipient`, `mail::Attachment`
+  - `Toast`, `report::ErrorReport`, `report::RequestReport`, `validation::FormContext`,
+    `rate_limit::LimitRequest`, `SentNotification`
 - **New variants on these enums.** A `match` on them needs a `_` arm:
   - `Error`, `Environment`, `CspMode`, `Channel`, `Locale`, `DbValue`, `Inspected` (a `Rule`
-    matching on `Inspected` needs a `_` arm)
+    matching on `Inspected` needs a `_` arm), `ToastKind`, `report::ReportKind`
 - New methods, functions, modules, template functions, validation rules, CLI commands and `.env`
   settings (always with defaults).
 - New provided methods on traits you implement (`Model`, `Notification`, …); `FromRow` stays one
@@ -36,7 +38,9 @@ because of a dependency.
 
 | Crate | Where it shows up |
 |---|---|
-| `axum` (0.8) | Handlers and extractors (`Path`, `Query`, `Form`, `Json`, `State`), `Routes::route(MethodRouter)`, `From<axum::Router>`, `Kernel::router()`, re-exported as `renox::axum` |
+| `axum` (0.8) | Handlers and extractors (`Query`, `Form`, `Json`, `State`), `Routes::route(MethodRouter)`, `From<axum::Router>`, `Kernel::router()`, re-exported as `renox::axum`. The prelude's `Path` is Renox's own `renox::Path` (a 404 when a value doesn't parse) |
+| `clap` (4) | `command::AppCommand` (a `clap::Parser`), re-exported as `renox::clap` |
+| `anyhow` (1) | `Error::Internal`, `Error::permanent`, re-exported as `renox::anyhow` |
 | `tower` / `tower-http` (0.5 / 0.7) | `Routes::route_layer(L)`, `Routes::cors_layer(CorsLayer)` (`renox::cors`) |
 | `minijinja` (2) | `context!`, template values |
 | `tokio` (1), `serde` (1), `serde_json` (1), `chrono` (0.4) | Re-exported and used throughout |
@@ -56,7 +60,9 @@ because of a dependency.
 
 - Items marked `#[doc(hidden)]` (used by Renox's own macros).
 - The HTML of the built-in pages under `renox/…` (override them in your views to fix their
-  markup).
+  markup). For the UI kit (`renox/ui.html`), the macro names and keyword arguments, the `rx-*`
+  class names apps use and the `--rx-*` tokens are kept; its inner markup may change.
+  `rnx make:component --ui` copies the kit into the app to freeze it.
 - The exact wording of built-in messages.
 - The minimum supported Rust version (MSRV), now Rust 1.94 (`rust-version` in `Cargo.toml`,
   checked in CI): it may rise in a minor release, and CHANGELOG.md says so.

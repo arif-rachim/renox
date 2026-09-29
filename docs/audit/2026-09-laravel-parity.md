@@ -7,10 +7,14 @@ found the Renox equivalent in the code (file:line), and rated it. The Renox side
 against the code at `c0df3d0` (M17b). The Laravel side comes mostly from the reviewers'
 knowledge of Laravel 11/12, spot-checked against the docs where it mattered.
 
-> **Status (after M20b):** this review is a snapshot at M17 and its tables are kept as they
-> were. Most gaps marked M18, M19 and M20 are closed since (tenancy, roles and permissions,
-> account pages, the query builder and model features, cron and time zones, locks, the queue);
-> ROADMAP.md ticks what was built and lists what was deferred. A later gap report, in
+> **Status (after M21):** this review is a snapshot at M17 and its tables are kept as they
+> were. The gaps marked M18–M21 are closed since (tenancy, roles and permissions, account
+> pages, the query builder and model features, cron and time zones, locks, the queue, the UI
+> kit and htmx helpers, scaffolding, test tools, logs and error reports, Tailwind, typed
+> commands, form requests, database sessions), except a few small M21 rows that ROADMAP.md
+> lists as "Deferred from M21": subdomain and fallback routes, `routeIs`, `redirect()->route`
+> and a public `intended`, session `push`/`increment`, factory states, plural ranges with
+> `Accept-Language`, and `@class`/`loop_controls`. A later gap report, in
 > Indonesian, is [2026-09-laravel-gap-report.pdf](2026-09-laravel-gap-report.pdf).
 
 Legend: ✅ equivalent · 🟡 partial · ❌ missing · ⛔ not planned (see ROADMAP "Not planned").

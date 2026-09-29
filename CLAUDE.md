@@ -45,7 +45,7 @@ crates/renox/              facade crate apps depend on: re-exports renox-core, t
   src/lib.rs               `pub use renox_core::*`, macros (DbEnum, FromRow, Model, embedded!,
                            migrations!, #[renox::test]), prelude, and cfg(doctest) holders:
                            ReadMe, CheatSheet, TypesGuide, RelationsGuide, AuthorizationGuide,
-                           QueueGuide, MacroCompileErrors
+                           QueueGuide, UiGuide, TestingGuide, OperationsGuide, MacroCompileErrors
   tests/it/                ONE integration-test binary (main.rs + a module per area); add new areas
                            as `mod x;` in main.rs. Notable modules: send_handlers.rs (every data
                            API in a routed handler), web_security.rs, data_resilience.rs,
@@ -54,7 +54,8 @@ crates/renox/              facade crate apps depend on: re-exports renox-core, t
                            (`s3` feature), extension_points.rs, api_foundations.rs, data_layer.rs
   tests/migrations/, migrations_plain/, migrations_types/, views/   fixtures (not under it/)
 crates/renox-core/         ALL runtime code (see §3 for why one crate)
-  src/app.rs               App builder, boot(), Kernel, router assembly, app-binary commands
+  src/app.rs               App builder, boot(), Kernel, router assembly, app-binary commands;
+                           serve takes systemd's socket (listenfd, LISTEN_FDS) before binding
   src/config.rs            Config from env/.env (see §5)
   src/state.rs             AppState (Clone): config, routes, views, db, mailer, queue, cache,
                            storage, translator, listeners, key, gates/async gates, shares,
@@ -85,7 +86,10 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/db/                  conn.rs (Db/Transaction/Row/sql(), Executor, SchemaEpoch), mod.rs
                            (connect, TEST_DATABASE_URL), model.rs, query.rs, from_row.rs,
                            relations.rs (belongs_to/has_many/Pivot/Morph), value.rs (DbValue),
-                           paginate.rs, migrate.rs (migrator), factory.rs, json.rs, error.rs
+                           paginate.rs, migrate.rs (migrator), factory.rs, json.rs, error.rs,
+                           query_log.rs (capture_queries: a task-local statement log, also
+                           feeding /_renox/debug)
+  src/path.rs              renox::Path: axum's Path with a 404 (not 400) when a value won't parse
   src/validation/          Validator/rules (mod.rs), Valid<T> (extract.rs: prepare → authorize →
                            rules → after, FormContext), en/id messages
   src/auth/                User, hashing (Argon2id + bcrypt import), login/logout (per device),
@@ -143,21 +147,24 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/method.rs            method spoofing layer (in front of the router)
   src/embedded.rs          Embedded (views/lang/public compiled in), public-file serving + content types
   assets/                  vendored htmx.min.js (2.0.11), alpine.min.js (3.17.4) + Alpine CSP build
-  views/                   built-in templates (error, pagination, auth/*, mail/*); see §4.3
+  views/                   built-in templates (error, pagination, auth/*, mail/*, ui.html (the kit),
+                           debug.html (/_renox/debug), queue/dashboard.html); see §4.3
   migrations/              framework-owned migrations (auth/, permissions/, audit/, queue/,
-                           cache/, webhook/); see §4.5
+                           cache/, session/, webhook/); see §4.5
   tests/                   core-only integration tests (support/mod.rs has a small TestApp)
 crates/renox-macros/       proc macros: derive Model, FromRow, DbEnum; embedded!(), migrations!(),
                            #[renox::test]
 crates/renox-cli/          `rnx`: main.rs (key:generate, forwarding), new.rs, serve.rs, make.rs +
-                           generate.rs (make:*), deploy.rs (make:deploy), tailwind.rs (the pinned
+                           generate.rs (make:*), scaffold.rs (make:module --resource --fields),
+                           deploy.rs (build, make:deploy), tailwind.rs (the pinned
                            standalone CLI: download via curl + SHA-256 check, build/watch; used by
                            new --tailwind, serve, build)
   build.rs                 sets RENOX_GIT_REV (the commit `rnx new` pins apps to)
   stubs/                   the files `rnx new` writes (Cargo.toml.stub, env.stub, build.rs, src/,
                            resources/, migrations/, tests/, AGENTS.md.stub + CLAUDE.md.stub: the
                            new app's agent guide, named .stub so agents in this repo don't load
-                           it); stubs/deploy/: Dockerfile/systemd/Litestream templates
+                           it); stubs/deploy/: Dockerfile, systemd service and socket (socket
+                           activation), Litestream templates
 examples/                  workspace members, each with a README.md and its own tests:
   hello/                   guestbook exercising many features; used for live/browser testing
   crud/                    the reference CRUD module (policy, soft deletes, pagination)
@@ -174,6 +181,10 @@ examples/                  workspace members, each with a README.md and its own 
 tests/chaos/               app + run.sh (postgres|sqlite) that the `chaos` CI job injects faults
                            into (docker pause/stop/restart, python3 holding SQLite's lock)
 tests/cli/run.sh           `rnx new` + every `make:*`, then build and test the app (CI `cli`/`docker`)
+docs/ui.md                 components, the UI kit, toasts, fragments, htmx headers, live
+                           validation, stacks, Tailwind (doctest `UiGuide`)
+docs/testing.md            TestApp: requests, assertions, fakes, time travel, browser tests
+                           (doctest `TestingGuide`)
 docs/types.md              HTML input ↔ Rust ↔ SQLite ↔ PostgreSQL (doctest `TypesGuide`)
 docs/relations.md          relations without N+1, fetch_as/FromRow (doctest `RelationsGuide`)
 docs/authorization.md      gates, policies, roles/permissions, token abilities, tenants (doctest
@@ -184,7 +195,9 @@ docs/postgresql.md         PostgreSQL guide for app authors
 docs/development.md        faster builds: profiles, linker, default features, sccache, cargo-chef
 docs/stability.md          semver scope, #[non_exhaustive] types, public-dependency policy
 docs/operations.md         production: timeouts, proxies, /health, failure table (kept in sync
-                           with tests/chaos/run.sh), failed jobs/webhooks, backups
+                           with tests/chaos/run.sh), failed jobs/webhooks, backups, deploys
+                           without refused connections, sessions, logs, error reports, error
+                           pages, the debug inspector (doctest `OperationsGuide`)
 docs/audit/                pre-1.0 audit (2026-09-pre-1.0.md), Laravel parity review
                            (2026-09-laravel-parity.md) and gap report (2026-09-laravel-gap-report.pdf)
 docs/assets/demo.gif       the README's demo (see §4.10)
@@ -211,7 +224,7 @@ docs/assets/demo.gif       the README's demo (see §4.10)
    (debug + local only) and the local disk's public files (`/storage/...`, sandboxed headers).
 6. `inspector` (only with debug + local: records the request's status, time, view and SQL via
    `capture_queries`, skipping `/_renox/*`) → `context` (`renox::context`: a fresh task-local context per request holding the `AppState`
-   for `context::app()`, and the `RequestInfo` error reports read; jobs, scheduled tasks and app commands get one too via `scope_app`) → `session` (encrypted cookie) → `i18n` (`RequestLocale`: session `_locale`, else
+   for `context::app()`, and the `RequestInfo` error reports read; jobs, scheduled tasks and app commands get one too via `scope_app`) → `session` (cookie or database driver) → `i18n` (`RequestLocale`: session `_locale`, else
    `APP_LOCALE`) → `auth` (loads the user once from session or `Authorization: Bearer`, with the
    token's abilities, and the user's roles/permissions when the `Permissions` module is on;
    inserts `CurrentUser` and `AppState` into extensions) → `csrf` → `view` (renders `View`s and error
@@ -231,8 +244,10 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
 - **Cargo features:** `renox` defaults to `fake` and `server-events`; optional `postgres`, `s3`,
   `uuid`. renox-core is `default-features = false` in the workspace deps; the `renox` crate owns
   the defaults.
-- **Sessions are an encrypted, signed cookie** (`cookie` PrivateJar, key derived from `APP_KEY`),
-  so no DB is needed. Keep session data small (a warning is logged over 4 KB). Flash data lives
+- **Sessions are an encrypted, signed cookie by default** (`cookie` PrivateJar, key derived from
+  `APP_KEY`), so no DB is needed; keep that small (a warning is logged over 4 KB).
+  `SESSION_DRIVER=database` (M21g) puts only an id in the cookie and the session in `sessions`
+  (keyed by sha256(id), a new id at each login and logout). Flash data lives
   one request. A per-session lifetime override powers "remember me". Logout bumps
   `users.sessions_revoked_at`, checked on every request, so it ends every session of the user.
 - **Auth sessions store the user id + a fingerprint of the password hash** (no remember-token
@@ -243,9 +258,11 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
   `/` (MiniJinja's default escapes `/` as `&#x2f;`, which uglified URLs in pages and mail).
 - **The app binary is its own CLI** (like artisan): `my-app migrate|migrate:rollback|migrate:fresh|
   migrate:status|db:seed|queue:work|queue:failed|queue:retry|queue:flush|queue:forget|
-  queue:prune-failed|queue:prune-batches|webhook:failed|webhook:retry|cache:prune|schedule:list|schedule:run|schedule:work|route:list|db:shell|down|
+  queue:prune-failed|queue:prune-batches|webhook:failed|webhook:retry|cache:prune|session:prune|
+  ui:publish|schedule:list|schedule:run|schedule:work|route:list|db:shell|down|
   up|help`, default `serve` (modules add more: `tokens:prune` from Auth, `audit:prune` from Audit),
-  plus the app's own commands (`App::command`; names can't clash with built-ins). Migrations and
+  plus the app's own commands (`App::command`, or `App::typed_command` for a clap `AppCommand`;
+  names can't clash with built-ins). Migrations and
   jobs are compiled into the app, so only the app can run them. `rnx <anything unknown>` forwards
   to `cargo run --quiet -- <args>`.
 - **Own migrator** (table `renox_migrations`, Laravel-style batches) instead of sqlx's, to support
@@ -384,7 +401,7 @@ to the config tests there, give it a test-friendly value in `Default`, and docum
 App-specific settings need no field: `config.var(name)` reads `config.vars`, then the environment.
 
 ### 4.5 Migrations owned by the framework
-Names start with `0001…` so they sort before app migrations (`2026…`). There are fourteen:
+Names start with `0001…` so they sort before app migrations (`2026…`). There are sixteen:
 - Auth module (`auth/module.rs` `MIGRATIONS`): `00010101000000_create_users_table`,
   `…000001_create_password_reset_tokens_table`, `…000002_create_personal_access_tokens_table`,
   `…000003_create_notifications_table`, `…000004_add_sessions_revoked_at_to_users`,
@@ -392,9 +409,11 @@ Names start with `0001…` so they sort before app migrations (`2026…`). There
 - Permissions module (`auth/permissions.rs`): `00010101000500_create_roles_and_permissions_tables`
   (roles, permissions, permission_role, role_user).
 - Audit module (`audit.rs`): `00010101000600_create_audit_logs_table`.
-- Every app (registered in `App::boot`): `00010101000100_create_jobs_table` and
-  `00010101000110_add_chains_and_batches_to_jobs` (queue),
-  `00010101000200_create_cache_table` (cache), `00010101000300_create_webhook_calls_table` and
+- Every app (registered in `App::boot`; seven, which tests/it/database.rs lists):
+  `00010101000100_create_jobs_table`, `00010101000110_add_chains_and_batches_to_jobs` and
+  `00010101000120_add_callback_of_to_jobs` (queue), `00010101000200_create_cache_table` (cache),
+  `00010101000210_create_sessions_table` (session.rs, installed whatever `SESSION_DRIVER` is),
+  `00010101000300_create_webhook_calls_table` and
   `00010101000301_store_webhook_payloads_as_bytes` (webhook.rs `MIGRATIONS`).
 
 Each is `NAME.up.sql` (SQLite) + `NAME.postgres.up.sql` + a shared `NAME.down.sql`, included with
@@ -478,11 +497,13 @@ PostgreSQL suite 2.5x slower (reconnects).
 ### 4.9 The CLI (`rnx`)
 - Apps are lib + bin: `src/lib.rs` has `pub fn app() -> App`, `main.rs` runs it, `tests/` boot it.
   `rnx make:module` registers modules in `src/lib.rs` (falls back to `main.rs` for older apps).
-- `rnx make:job` / `make:command` insert their `app.job::<…>()` / `app.command(…)` into the
+- `rnx make:job` / `make:command` insert their `app.job::<…>()` / `app.typed_command::<…>()` into the
   module's `fn register` (creating it before `fn routes`); `make:migration` bumps the timestamp
   past the newest migration.
 - `tests/cli/run.sh [postgres]` makes an app with every generator and builds/tests it
   (`FROM_GIT=1 DOCKER=1` for the Docker job). **Add every new `make:*` there.**
+  With sqlite it also makes `rnx new site --tailwind` (downloads the pinned Tailwind CLI with
+  `curl`, so it needs the network) and runs `rnx tailwind --minify` and the app's tests.
 - `rnx new` pins `rev` from `renox-cli/build.rs` (`git rev-parse HEAD`, else the cargo checkout
   directory's short rev). Testing it through `cargo install --git` needs the change committed,
   since that builds the committed tree.
@@ -590,6 +611,9 @@ Parsed in `crates/renox-core/src/config.rs`; defaults in parentheses.
   `GA4_API_SECRET`, `GTM_CONTAINER_ID`.
 - **App-specific:** anything else through `config.var(name)` (`config.vars` first, then the
   environment; empty counts as missing).
+- **Set by others:** `LISTEN_FDS`/`LISTEN_PID` (systemd socket activation; `serve` uses that
+  socket). For `rnx` itself: `TAILWIND_BIN` (a Tailwind binary to use instead of the pinned
+  download) and `RNX_CACHE_DIR` (where downloads are kept).
 - **Tests only:** `TEST_DATABASE_URL` (read in `db/mod.rs`, env or `.env`; see §4.7) and
   `TEST_S3_*` (the S3 test).
 
@@ -723,7 +747,8 @@ change 29 s → 7 s, full run 19 s → 6 s.
 
 ## 7. Where things stand (update this section when it changes)
 
-- **All milestones M0–M20b are merged to `main`**; the last was M20b (#52). History:
+- **All milestones M0–M21g are merged to `main`**; the last was M21g (#62), followed by a docs
+  and examples audit against M21. History:
   `CHANGELOG.md` (per milestone) and `ROADMAP.md` (per-milestone notes and decisions).
 - After M17: a docs refresh (#45) and the Laravel parity review with M18–M21 planned (#46).
   After M20a: a docs and examples catch-up (branch `claude/laravel-project-feature-report-i6wgz0`:
@@ -750,29 +775,40 @@ change 29 s → 7 s, full run 19 s → 6 s.
   dispatch_sync, forget/prune): merged (#52). Adds framework migration
   `00010101000110`; tests that count framework migrations must follow it.
 - **M20c** (`renox::http` + fake + schedule pings, queue dashboard module, localized mail and
-  notifications, mail components, storage list/copy/rename): branch `m20c-background`. The
+  notifications, mail components, storage list/copy/rename): merged (#54). The
   dashboard page was browser-checked (desktop, 390 px, dark). M20 is done.
 - **M21a** (rough edges from #53/#55: `User::has_role` via context grants, `users_with_role`,
   confirm-password return for forms, `Db::retrying`, batch callbacks' `batch_id`
   (`callback_of` migration), `run_all_jobs`, `capture_queries`, `Morph::count_many`,
-  `Current<T>`, seeders in context, old input on hook errors, `renox::Path` 404s): branch
-  `m21a-rough-edges`. Framework migrations are now 8 (tests list them).
+  `Current<T>`, seeders in context, old input on hook errors, `renox::Path` 404s): merged (#56).
 - **M21b** (components that see the request via `RequestGlobal` + a thread-local of the page's
   globals, the HIG-style kit `views/ui.html` + `assets/renox-ui.{css,js}`, `toast.rs`,
   `View::also`, Hx headers, live validation via `X-Renox-Validate`, `ui:publish`,
-  `make:component`): branch `m21b-views`, browser-checked on examples/crud. Keep new kit
+  `make:component`): merged (#57), browser-checked on examples/crud. Keep new kit
   components `rx-`-prefixed, keyboard-usable, and at WCAG AA contrast (docs/ui.md rules).
 - **M21c** (`Routes::resource`, `make:module --resource` in renox-cli/src/scaffold.rs, new
   generators, `rnx new` layout on the kit, `clock.rs` + `TestApp::travel`, event and
-  notification fakes in `AppState::fakes`, test assertions, `TestApp::serve`): branch
-  `m21c-scaffolding`. Time must be read through `clock` (`db::now`, `queue::unix_now`), not
+  notification fakes in `AppState::fakes`, test assertions, `TestApp::serve`): merged (#58). Time must be read through `clock` (`db::now`, `queue::unix_now`), not
   `SystemTime::now`, so travel reaches it.
-- **Next: M21d (errors, logs, a debug inspector, limiters, Tailwind, push/stack)**, from the Laravel parity review
-  (`docs/audit/2026-09-laravel-parity.md`); the ROADMAP lists each milestone's items. **v1.0 is
-  on hold** until the owner says to start it (docs site, starter kit, semver checks, real
-  crates.io releases; the owner runs `cargo login`).
+- **M21d** (request id outside `TraceLayer`, `LOG_FORMAT`/`LOG_FILE`, `App::report`, error pages
+  in the app layout, `route()` query strings, named limiters, `/_renox/debug`): merged (#59).
+  A context key that is `None` hides a global of the same name (`merge_maps` takes the first
+  map's value, even `None`): the error page's debug key became `request_line` for that.
+- **M21e** (Tailwind's standalone CLI pinned in renox-cli/src/tailwind.rs with SHA-256 sums,
+  `push`/`stack` markers filled after the render, `AppCommand` + `typed_command`,
+  `renox::prompt`): merged (#60). Stacks are dropped in fragments and mails (no scope there).
+- **M21f** (`Validate` hooks `prepare`/`authorize`/`after` + `FormContext`, new rules, Renox's
+  auth pages on the kit): merged (#61).
+- **M21g** (`SESSION_DRIVER=database`: `Stored::Handle` cookies, rows keyed by sha256(id), id
+  rotation at login/logout, `AppState::session_mirror` under `APP_ENV=testing`; systemd socket
+  activation via `listenfd` + `deploy/<app>.socket`): merged (#62). A session given a new id must
+  always be INSERTed, whatever its content.
+- **M21 is complete.** Next is the owner's call; **v1.0 is on hold** until the owner says to
+  start it (docs site, starter kit, semver checks, real crates.io releases; the owner runs
+  `cargo login`). Small M21 items that weren't built are listed in ROADMAP ("Deferred from
+  M21").
 - **Other open items** noted in ROADMAP: `#[derive(Validate)]`, choosing the locale from
   `Accept-Language` (opt-in).
-- As of M20a: ~40k lines of Rust in `crates/` (stubs excluded), ~435 `#[test]`/`#[renox::test]`/
-  `#[tokio::test]` functions in `crates/` and `examples/` (plus doctests), and 39 direct
+- As of M21g: ~50k lines of Rust in `crates/` (stubs excluded), ~540 `#[test]`/`#[renox::test]`/
+  `#[tokio::test]` functions in `crates/` and `examples/` (plus doctests), and 42 direct
   dependencies in renox-core (5 optional). Keep dependencies lean and remove unused ones.

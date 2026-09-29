@@ -1,6 +1,7 @@
 {% extends "layouts/app.html" %}
 {#- Every error page (404, 403, 500…), in the app's layout. Add errors/404.html
-    and friends for one status; `status`, `reason` and `detail` are set. -#}
+    and friends for one status; `status`, `reason` and `detail` are set (with APP_DEBUG
+    also `request_line` and `template`). -#}
 {% block seo %}<title>{{ status }} {{ reason }} · {{ app.name }}</title>{% endblock %}
 {% block content %}
 {% from "renox/ui.html" import empty %}

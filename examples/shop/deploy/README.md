@@ -35,8 +35,11 @@ systemd socket activation, systemd keeps the port open and queues them:
 ```bash
 sudo cp deploy/shop.socket /etc/systemd/system/
 sudo systemctl daemon-reload
+sudo systemctl stop shop             # it holds the port; the socket takes it over
 sudo systemctl enable --now shop.socket
-sudo systemctl restart shop     # from now on: waits, never refuses
+sudo systemctl start shop
+# From now on, deploys are: copy the new binary, then
+sudo systemctl restart shop          # connections wait, none are refused
 ```
 
 Keep `ListenStream` in the socket file equal to `APP_HOST:APP_PORT`. The

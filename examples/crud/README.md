@@ -61,8 +61,9 @@ Log in at `/login` (or register at `/register`), then add products at `/products
   - See [docs/ui.md](../../docs/ui.md) for the design rules the kit follows.
 - **`push` / `stack`.** The layout has `{{ stack('head') }}` and `{{ stack('scripts') }}`; the
   form page pushes `<meta name="robots" content="noindex">` into the head from its content
-  block with `{% call push('head') %}…{% endcall %}`. A component that needs a script pushes
-  it with `once='key'`, so it's added once however often the component appears.
+  block with `{% call push('head') %}…{% endcall %}`. (A component that needs a script would
+  push it with `once='key'`, so it's added once however often the component appears; see
+  docs/ui.md.)
 - **Error pages in the layout.** `errors/default.html` extends the layout, so a 404 or a 403
   keeps the navigation bar and the account menu, with a way back to the list. It gets
   `status`, `reason` and `detail` besides the usual globals.

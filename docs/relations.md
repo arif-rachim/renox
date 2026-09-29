@@ -268,5 +268,5 @@ let products = Product::query()
 | `lockForUpdate`, `sharedLock` | `.lock_for_update()` / `.shared_lock()` on `&mut tx` (PostgreSQL; SQLite: `db.begin_immediate()`) |
 | `firstOrNew`, `updateOrCreate`, `refresh` | `.first_or_new(&db, \|\| new)`, `.update_or_create(&db, \|\| new, \|m\| …)`, `model.refresh(&db)` |
 | `simplePaginate`, `cursorPaginate` | `.simple_paginate(&db, page, per)` (`simple_pagination` macro), `.cursor_paginate(&db, cursor, per)` |
-| `DB::transaction(fn, 3)` | `db.transaction_retrying(3, \|tx\| Box::pin(async move { … }))`, `db.transaction(…)` |
+| `DB::transaction(fn, 3)` | `db.retrying(3, \|\| async { let mut tx = db.begin().await?; … })` (borrows from the caller), `db.transaction_retrying(…)`, `db.transaction(…)` |
 | `toSql` | `.to_sql(db.dialect())` |

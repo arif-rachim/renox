@@ -44,7 +44,7 @@ TRUSTED_PROXIES=*                  # whoever connects (a platform whose proxy IP
 ```
 
 Without this setting:
-- `Routes::throttle` counts every visitor as one.
+- `Routes::throttle` and named limiters (`throttle_by`) count every guest as one.
 - The login lock counts per email only.
 - Logs show the proxy's address.
 
@@ -188,12 +188,15 @@ deploy only makes them wait. `rnx make:deploy` writes `deploy/<app>.socket`:
 
 ```bash
 sudo cp deploy/shop.socket /etc/systemd/system/ && sudo systemctl daemon-reload
+sudo systemctl stop shop                  # it holds the port; the socket takes it over
 sudo systemctl enable --now shop.socket
-sudo systemctl restart shop        # new binary: migrate, then take over the same socket
+sudo systemctl start shop
+sudo systemctl restart shop               # each deploy: migrate, then take over the socket
 ```
 
 The app uses the socket systemd passes (`LISTEN_FDS`) instead of opening `APP_HOST:APP_PORT`;
-keep the socket's `ListenStream` at that address. Measured on a laptop with Renox's hello
+keep the socket's `ListenStream` at that address. Stop the service before enabling the socket
+the first time: while the app holds the port, systemd can't listen on it ("Failed to listen"). Measured on a laptop with Renox's hello
 example and requests sent back to back through three restarts: without the socket, 280 of 1,288
 requests were refused; with it, all 1,350 answered.
 
@@ -316,7 +319,9 @@ Several reporters can be added; one that fails or panics doesn't stop the others
 `rnx new` writes `resources/views/errors/default.html`, which extends the app's layout, so an
 error page keeps the navigation bar and the signed-in user's menu. It gets the same globals as
 any page (`auth`, `request`, `t()`, `route()`…) plus `status`, `reason` and `detail` (the
-message of an `abort(…)`; a 500's cause only with `APP_DEBUG`). `errors/404.html`, or any
+message of an `abort(…)`; a 500's cause only with `APP_DEBUG`). With `APP_DEBUG` it also gets
+`debug`, `request_line` (the request that failed) and `template` (where a template failed), for
+a developer box on the page. `errors/404.html`, or any
 status, wins for that status. If the app's page itself fails to render, Renox shows its own,
 so an error in the layout can't hide the original error. JSON clients get JSON.
 

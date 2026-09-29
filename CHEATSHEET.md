@@ -176,7 +176,9 @@ and so is `{{ flash.anything }}`.
 Every view also gets: `request.path`, `request.query`, `request.htmx`, `app.name`, `app.env`,
 `app.debug`, `app.url`, `app.locale`, `auth.check`, `auth.user`, `flash`, `errors`, `csrf_token`,
 and the functions `old()`, `error()`, `csrf_field()`, `method_field()`, `route()`, `asset()`,
-`storage_url()`, `t()`, `can()`, `page_url(n)`, `renox_head()`, `csp_nonce()` and `seo()`.
+`storage_url()`, `t()`, `can()`, `page_url(n)`, `renox_head()`, `csp_nonce()`, `seo()`,
+`renox_ui()` (the UI kit), `toasts()`, `once(key)`, `stack(name)` and, with `{% call %}`,
+`push(name)` / `prepend(name)`.
 
 Error pages are the app's own: `rnx new` writes `resources/views/errors/default.html`, which
 extends the layout and gets every global above plus `status`, `reason` and `detail`;

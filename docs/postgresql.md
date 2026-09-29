@@ -41,7 +41,7 @@ This does three things:
    `DATABASE_POOL_SIZE` (default 8) sets the pool size on both.
 
 3. Make your migrations run on PostgreSQL. See [Migrations](#migrations) below. Renox's own tables
-   (users, tokens, notifications, jobs, cache) already have PostgreSQL versions.
+   (users, tokens, notifications, jobs, cache, sessions) already have PostgreSQL versions.
 
 4. Run `my-app migrate`, then [copy the data](#moving-the-data) if the app already has some.
 
@@ -174,7 +174,7 @@ Timeouts keep a slow or unreachable database from holding requests: a query wait
 `DATABASE_STATEMENT_TIMEOUT` (30 s; `0` for no limit, e.g. for a long report job, or `SET
 statement_timeout` in its transaction), and a request answers within `REQUEST_TIMEOUT` (60 s).
 
-`rnx make:deploy` writes the same Dockerfile and systemd unit. Set `DATABASE_URL` to the
+`rnx make:deploy` writes the same Dockerfile, systemd unit and socket unit. Set `DATABASE_URL` to the
 PostgreSQL server in the environment; the Dockerfile's SQLite default is only a fallback. Skip
 the Litestream part of `deploy/README.md`, which is for SQLite; back up PostgreSQL with your
 provider's backups or `pg_dump`.
