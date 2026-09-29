@@ -76,7 +76,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   views/ui.html            the UI kit (renox/ui.html); assets/renox-ui.css|js its styles and script
   src/view_stack.rs        push/prepend/stack: markers filled in after the page renders (Scope)
   src/view_filters.rs      built-in template filters `number` and `date`; pub format_number
-  src/htmx.rs              Htmx extractor, HxRedirect/HxRefresh/HxTrigger, Back
+  src/htmx.rs              Htmx extractor, HxRedirect/HxRefresh/HxTrigger/HxRetarget/HxReswap/
+                           HxPushUrl, Back; add_trigger (JSON HX-Trigger, non-ASCII \u-escaped)
   src/assets.rs            embedded htmx/Alpine/renox.js with hashed URLs; renox.js source lives here
   src/error.rs             Error enum, IntoResponse, error pages (the app's errors/{status}.html,
                            errors/default.html with the page globals, else renox/error.html),
@@ -174,10 +175,13 @@ examples/                  workspace members, each with a README.md and its own 
   postgres/                one app on PostgreSQL + SQLite (package `postgres-app`)
   fields/                  every form field type ↔ Rust ↔ SQLite / PostgreSQL
   webhooks/                Midtrans / Xendit / Stripe webhooks
-  shop/                    a whole online shop (auth, admin, checkout, mail, queue, i18n, deploy)
-  htmx-recipes/            modal form, inline edit, infinite scroll, tabs, HxRefresh/HxRedirect
+  shop/                    a whole online shop on the UI kit (auth, admin, checkout, mail, queue,
+                           i18n, deploy with the systemd socket, a rebranded accent)
+  htmx-recipes/            modal form, inline edit, infinite scroll, tabs, HxRefresh/HxRedirect,
+                           an out-of-band count (.also), HxRetarget/HxReswap, toasts
   relations/               belongs to, has many, many to many (pivot columns), Morph, no N+1
-  teams/                   multi-tenant SaaS: default scopes, renox::context, gate_before, encrypt
+  teams/                   multi-tenant SaaS on the UI kit: default scopes, renox::context,
+                           gate_before, encrypt, a form request checked live
 tests/chaos/               app + run.sh (postgres|sqlite) that the `chaos` CI job injects faults
                            into (docker pause/stop/restart, python3 holding SQLite's lock)
 tests/cli/run.sh           `rnx new` + every `make:*`, then build and test the app (CI `cli`/`docker`)
@@ -747,8 +751,8 @@ change 29 s → 7 s, full run 19 s → 6 s.
 
 ## 7. Where things stand (update this section when it changes)
 
-- **All milestones M0–M21g are merged to `main`**; the last was M21g (#62), followed by a docs
-  and examples audit against M21. History:
+- **All milestones M0–M21h are merged to `main`**; the last was M21h (#64), after a docs and
+  examples audit against M21 (#63). History:
   `CHANGELOG.md` (per milestone) and `ROADMAP.md` (per-milestone notes and decisions).
 - After M17: a docs refresh (#45) and the Laravel parity review with M18–M21 planned (#46).
   After M20a: a docs and examples catch-up (branch `claude/laravel-project-feature-report-i6wgz0`:
@@ -803,17 +807,31 @@ change 29 s → 7 s, full run 19 s → 6 s.
   rotation at login/logout, `AppState::session_mirror` under `APP_ENV=testing`; systemd socket
   activation via `listenfd` + `deploy/<app>.socket`): merged (#62). A session given a new id must
   always be INSERTed, whatever its content.
-- **After M21:** a docs and examples audit (#63), then M21h (shop, teams and htmx-recipes on the
-  kit; three framework fixes: non-ASCII `HX-Trigger`, toasts with `HxRefresh`, shares on error
-  pages) and M21i (example tests on time travel and fakes, `hello`'s typed command, stubs).
-  Toasts must survive any response htmx turns into a new page (redirect, refresh): they go to
-  the session there.
+- **Docs and examples audit** (#63): three read-only audits compared every doc, example and stub
+  with M21; fixed the socket recipe's order, the shop admin delete that asked nothing, crud's
+  missing flash, `make:mail`'s hint, and many pre-M21 statements.
+- **M21h** (shop, teams and htmx-recipes on the kit; htmx-recipes adds `.also()`,
+  `HxRetarget`/`HxReswap` and toasts): merged (#64). Three framework fixes: `add_trigger`
+  `\u`-escapes non-ASCII (a raw UTF-8 `HX-Trigger` failed and the toast was silently dropped),
+  toasts with `HxRefresh` wait in the session like `HxRedirect`, and error pages get `App::share`
+  values (a layout using one failed under strict undefined). Toasts must survive any response
+  htmx turns into a new page: they go to the session there.
+- **Next: M21i** (agreed, not started): the examples' tests on time travel, fakes,
+  `assert_json_path`/`assert_view` (shop, jobs, api, hello); `hello`'s `entries:prune` as a typed
+  command; `fields` with `each` + `one_of` + `distinct`; `App::report` in examples/jobs; the
+  AGENTS stub's traps and guide list, `env.stub` (SESSION_LIFETIME, APP_HOST…), the stub's
+  `tests/home.rs` with `assert_view`; tick ROADMAP M2's server-side-sessions box (done in M21g).
 - **M21 is complete.** Next is the owner's call; **v1.0 is on hold** until the owner says to
   start it (docs site, starter kit, semver checks, real crates.io releases; the owner runs
   `cargo login`). Small M21 items that weren't built are listed in ROADMAP ("Deferred from
   M21").
-- **Other open items** noted in ROADMAP: `#[derive(Validate)]`, choosing the locale from
-  `Accept-Language` (opt-in).
-- As of M21g: ~50k lines of Rust in `crates/` (stubs excluded), ~540 `#[test]`/`#[renox::test]`/
+- **Open before or after 1.0** (ROADMAP `- [ ]`), as discussed with the owner (no decision yet):
+  the only API-changing one is non-integer model keys (`#[model(key = "uuid")]`), so it belongs
+  before 1.0; the rest only add and may come in 1.x: savepoints, `Encrypted<T>`,
+  `#[derive(Validate)]`, locale from `Accept-Language`, an optional HIBP check, "Deferred from
+  M21" (subdomain/fallback routes, `routeIs`, `Redirect::route` + public `intended`, session
+  `push`/`increment`, factory states, plural ranges, `loop_controls`), and the plugins
+  (`renox-oauth`, `renox-2fa`, `renox-admin`, separate crates after 1.0).
+- As of M21h: ~50k lines of Rust in `crates/` (stubs excluded), ~545 `#[test]`/`#[renox::test]`/
   `#[tokio::test]` functions in `crates/` and `examples/` (plus doctests), and 42 direct
   dependencies in renox-core (5 optional). Keep dependencies lean and remove unused ones.
