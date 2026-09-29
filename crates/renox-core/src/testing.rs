@@ -345,18 +345,22 @@ impl TestApp {
 
     /// Logs `user` in for the following requests.
     pub fn acting_as(&self, user: &User) -> &Self {
-        let session = self.session();
-        login(&session, user, None).expect("the session accepts the login");
-        self.set_cookie(crate::session::cookie_pair(self.state(), &session));
+        self.at_travelled_time_sync(|| {
+            let session = self.session();
+            login(&session, user, None).expect("the session accepts the login");
+            self.set_cookie(crate::session::cookie_pair(self.state(), &session));
+        });
         self
     }
 
     /// Marks the password as just typed, so routes behind
     /// `require_password_confirmed` let the user through.
     pub fn confirm_password(&self) -> &Self {
-        let session = self.session();
-        crate::auth::account::mark_confirmed(&session).expect("the session accepts it");
-        self.set_cookie(crate::session::cookie_pair(self.state(), &session));
+        self.at_travelled_time_sync(|| {
+            let session = self.session();
+            crate::auth::account::mark_confirmed(&session).expect("the session accepts it");
+            self.set_cookie(crate::session::cookie_pair(self.state(), &session));
+        });
         self
     }
 
@@ -388,7 +392,14 @@ impl TestApp {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .clone();
-        crate::session::from_cookie(self.state(), cookie.as_deref())
+        // Read at the travelled time, as the next request will: a session
+        // that has expired by then starts afresh (with a new CSRF token).
+        self.at_travelled_time_sync(|| crate::session::from_cookie(self.state(), cookie.as_deref()))
+    }
+
+    fn at_travelled_time_sync<T>(&self, f: impl FnOnce() -> T) -> T {
+        let offset = self.offset.load(std::sync::atomic::Ordering::SeqCst);
+        crate::clock::with_offset_sync(offset, f)
     }
 
     fn set_cookie(&self, pair: String) {
@@ -397,9 +408,11 @@ impl TestApp {
 
     /// The CSRF token of the current session, creating the session if needed.
     pub fn csrf_token(&self) -> String {
-        let session = self.session();
-        self.set_cookie(crate::session::cookie_pair(self.state(), &session));
-        session.token()
+        self.at_travelled_time_sync(|| {
+            let session = self.session();
+            self.set_cookie(crate::session::cookie_pair(self.state(), &session));
+            session.token()
+        })
     }
 
     /// A request with extra headers, e.g. `app.request().htmx().post(..)`.

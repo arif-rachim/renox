@@ -72,3 +72,8 @@ with `products:write`: `POST /api/products`, `DELETE /api/products/{id}`; any va
 ```bash
 cargo test -p api
 ```
+
+[tests/api.rs](tests/api.rs) logs in through the API and checks the JSON with
+`assert_json_path("items", json!([]))`, `json_path("errors.name.0")` and `assert_json`
+(the listed keys only). Time is moved, not waited for: `app.travel(29 * DAY)` keeps a token
+working and two more days expire it, and `app.travel(61 s)` lets a rate-limited guest try again.

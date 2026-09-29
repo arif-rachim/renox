@@ -1,5 +1,8 @@
 use renox::prelude::*;
 use renox::testing::TestApp;
+use std::time::Duration;
+
+const DAY: u64 = 24 * 60 * 60;
 
 /// Tests don't read `.env`; the guestbook's default language is Indonesian.
 async fn app() -> TestApp {
@@ -50,24 +53,25 @@ async fn the_prune_command_deletes_old_entries() {
     let app = app().await;
     app.post("/entries", &[("name", "Arif"), ("message", "Kopinya enak")])
         .await;
-    renox::db::sql("UPDATE entries SET created_at = ?")
-        .bind(renox::db::now() - renox::chrono::TimeDelta::days(40))
-        .execute(app.db())
-        .await
-        .unwrap();
+    // Forty days later, another entry; then the command, on the moved clock.
+    app.travel(Duration::from_secs(40 * DAY));
     app.post("/entries", &[("name", "Budi"), ("message", "Tehnya juga")])
         .await;
-    app.kernel()
-        .call("entries:prune", ["--days", "30"])
-        .await
-        .unwrap();
+    let prune = |args: &'static [&'static str], answer: &'static str| {
+        app.at_travelled_time(renox::prompt::answering(
+            [answer],
+            app.kernel().call("entries:prune", args.iter().copied()),
+        ))
+    };
+    // "Delete 1 entries older than 30 days?" → no.
+    prune(&[], "no").await.unwrap();
+    app.assert_database_count("entries", 2).await;
+    prune(&["--days", "30"], "yes").await.unwrap();
     app.assert_database_count("entries", 1).await;
-    assert!(
-        app.kernel()
-            .call("entries:prune", ["--days", "x"])
-            .await
-            .is_err()
-    );
+    app.assert_database_has("entries", &[("name", &"Budi")])
+        .await;
+    // clap checks the arguments.
+    assert!(prune(&["--days", "x"], "yes").await.is_err());
 }
 
 #[renox::test]

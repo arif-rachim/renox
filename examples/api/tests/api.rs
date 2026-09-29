@@ -1,5 +1,8 @@
 use renox::prelude::*;
 use renox::testing::TestApp;
+use std::time::Duration;
+
+const DAY: Duration = Duration::from_secs(24 * 60 * 60);
 
 async fn app() -> TestApp {
     let app = TestApp::new(api::app()).await;
@@ -53,9 +56,8 @@ async fn tokens_are_issued_for_the_right_password_only() {
         .post_json("/api/tokens", &json!({ "email": "not-an-email" }))
         .await;
     missing.assert_status(422);
-    let errors: serde_json::Value = missing.json();
-    assert!(errors["errors"]["email"].is_array());
-    assert!(errors["errors"]["password"].is_array());
+    assert!(missing.json_path("errors.email").is_array());
+    assert!(missing.json_path("errors.password").is_array());
     assert!(bearer(&app).await.starts_with("Bearer "));
 }
 
@@ -80,10 +82,9 @@ async fn the_api_needs_a_token() {
         .header("authorization", &token)
         .get("/api/products")
         .await;
-    res.assert_ok();
-    let page: serde_json::Value = res.json();
-    assert_eq!(page["items"], json!([]));
-    assert!(page["next_cursor"].is_null());
+    res.assert_ok()
+        .assert_json_path("items", json!([]))
+        .assert_json_path("next_cursor", json!(null));
 }
 
 #[renox::test]
@@ -102,28 +103,28 @@ async fn products_are_created_with_json_and_validated() {
         }
     };
     let created = post(json!({ "name": "Kopi", "price": 18000 })).await;
-    created.assert_status(201);
-    let product: serde_json::Value = created.json();
-    assert_eq!(product["name"], "Kopi");
+    created
+        .assert_status(201)
+        .assert_json(json!({ "name": "Kopi", "price": 18000 }));
 
     let invalid = post(json!({ "name": "Kopi", "price": -1 })).await;
     invalid.assert_status(422);
-    let body: serde_json::Value = invalid.json();
     assert!(
-        body["errors"]["name"][0]
+        invalid
+            .json_path("errors.name.0")
             .as_str()
             .unwrap()
             .contains("taken")
     );
-    assert!(body["errors"]["price"].is_array());
+    assert!(invalid.json_path("errors.price").is_array());
 
-    let id = product["id"].as_i64().unwrap();
-    let res = app
-        .request()
+    let id = created.json_path("id").as_i64().unwrap();
+    app.request()
         .header("authorization", &token)
         .get(&format!("/api/products/{id}"))
-        .await;
-    res.assert_ok();
+        .await
+        .assert_ok()
+        .assert_json_path("name", "Kopi");
     let missing = app
         .request()
         .json()
@@ -217,6 +218,27 @@ async fn read_only_tokens_cannot_write() {
     assert_eq!(delete(writer).await, 404);
 }
 
+/// The status of `GET /api/products` with `token`.
+async fn list_status(app: &TestApp, token: &str) -> u16 {
+    app.request()
+        .json()
+        .header("authorization", token)
+        .get("/api/products")
+        .await
+        .status
+        .as_u16()
+}
+
+#[renox::test]
+async fn tokens_expire_after_thirty_days() {
+    let app = app().await;
+    let token = bearer(&app).await;
+    app.travel(29 * DAY);
+    assert_eq!(list_status(&app, &token).await, 200);
+    app.travel(2 * DAY);
+    assert_eq!(list_status(&app, &token).await, 401);
+}
+
 #[renox::test]
 async fn expired_tokens_stop_working() {
     let app = app().await;
@@ -263,9 +285,8 @@ async fn products_are_listed_with_a_cursor() {
     };
     // Newest first, 20 at a time.
     let first = get("/api/products".into()).await;
-    let items = first["items"].as_array().unwrap();
-    assert_eq!(items.len(), 20);
-    assert_eq!(items[0]["name"], "Product 25");
+    assert_eq!(first["items"].as_array().unwrap().len(), 20);
+    assert_eq!(first["items"][0]["name"], "Product 25");
     let cursor = first["next_cursor"].as_str().unwrap().to_owned();
 
     let second = get(format!("/api/products?cursor={cursor}")).await;
@@ -314,7 +335,7 @@ async fn guests_are_limited_per_ip_and_users_per_account() {
         .post_json("/api/tokens", &wrong)
         .await;
     res.assert_status(429);
-    assert!(res.headers.get("retry-after").is_some());
+    assert!(res.header("retry-after").is_some());
 
     // A logged-in user counts on their own, with a higher limit.
     let res = app
@@ -322,6 +343,13 @@ async fn guests_are_limited_per_ip_and_users_per_account() {
         .header("authorization", &token)
         .get("/api/products")
         .await;
-    res.assert_ok();
-    assert_eq!(res.headers.get("x-ratelimit-limit").unwrap(), "120");
+    res.assert_ok().assert_header("x-ratelimit-limit", "120");
+
+    // A minute later the guest may try again.
+    app.travel(Duration::from_secs(61));
+    app.request()
+        .without_csrf()
+        .post_json("/api/tokens", &wrong)
+        .await
+        .assert_status(422);
 }

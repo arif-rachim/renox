@@ -33,6 +33,27 @@ pub(crate) fn unix_millis() -> i64 {
         .map_or(0, |d| d.as_millis() as i64)
 }
 
+/// A moment on this clock, for in-memory windows (rate limits, the login
+/// lock) that `TestApp::travel` must reach: `Instant` ignores it.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Stamp(i64);
+
+impl Stamp {
+    pub(crate) fn now() -> Self {
+        Self(unix_millis())
+    }
+
+    /// Time since this stamp; zero if the clock went back.
+    pub(crate) fn elapsed(&self) -> Duration {
+        Duration::from_millis(u64::try_from(unix_millis() - self.0).unwrap_or(0))
+    }
+}
+
+/// Runs `f` with the clock `seconds` ahead, for synchronous code.
+pub(crate) fn with_offset_sync<T>(seconds: i64, f: impl FnOnce() -> T) -> T {
+    OFFSET.sync_scope(seconds, f)
+}
+
 /// Runs `fut` with the clock `seconds` ahead (behind when negative).
 pub(crate) async fn with_offset<F: Future>(seconds: i64, fut: F) -> F::Output {
     OFFSET.scope(seconds, fut).await

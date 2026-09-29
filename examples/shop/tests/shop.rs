@@ -4,6 +4,10 @@
 use renox::audit;
 use renox::prelude::*;
 use renox::testing::TestApp;
+use shop::app::orders::OrderPlaced;
+use std::time::Duration;
+
+const DAY: Duration = Duration::from_secs(24 * 60 * 60);
 use shop::app::catalog::model::{Category, Product};
 use shop::app::orders::model::{Order, OrderStatus};
 
@@ -76,6 +80,7 @@ async fn customers_browse_search_filter_and_sort() {
     app.get("/")
         .await
         .assert_ok()
+        .assert_view("catalog/home.html")
         .assert_see("Kopi Susu")
         .assert_see("Rp 25.000")
         .assert_dont_see("Kopi Hitam")
@@ -203,6 +208,7 @@ async fn checkout_takes_the_stock_and_confirms_by_mail() {
     app.get("/checkout")
         .await
         .assert_ok()
+        .assert_view("orders/checkout.html")
         .assert_see("Rp 68.000");
     app.htmx()
         .post("/checkout", &[("address", "short")])
@@ -225,6 +231,7 @@ async fn checkout_takes_the_stock_and_confirms_by_mail() {
     app.assert_database_count("cart_items", 0).await;
     app.get(&format!("/orders/{}", order.id))
         .await
+        .assert_view("orders/show.html")
         .assert_see("Thank you! Order #")
         .assert_see("2 × Kopi Susu")
         .assert_see("Waiting for payment");
@@ -605,42 +612,70 @@ async fn admins_move_orders_along_and_customers_hear_about_it() {
     assert_eq!(stock(&app, kopi.id).await, 3);
 }
 
+async fn status(app: &TestApp, order_id: i64) -> OrderStatus {
+    Order::find_or_404(app.db(), order_id).await.unwrap().status
+}
+
 #[renox::test]
 async fn unpaid_orders_are_cancelled_after_three_days() {
     let app = shop().await;
     let kopi = product(&app, "Kopi Susu", 25_000, 5).await;
     let budi = customer(&app, "budi@example.com").await;
     let old = placed_order(&app, &budi, &kopi, 2).await;
+    // Two days later, another order; then two more days pass.
+    app.travel(2 * DAY);
     let recent = placed_order(&app, &budi, &kopi, 1).await;
-    renox::db::sql("UPDATE orders SET created_at = ? WHERE id = ?")
-        .bind(renox::db::now() - renox::chrono::TimeDelta::days(4))
-        .bind(old.id)
-        .execute(app.db())
+    app.travel(2 * DAY);
+
+    // What the scheduler runs at 03:00 (`schedule:run cancel-unpaid-orders`),
+    // on the moved clock.
+    app.at_travelled_time(app.kernel().run_scheduled("cancel-unpaid-orders"))
         .await
         .unwrap();
-
-    // What the daily task runs.
-    assert_eq!(
-        shop::app::orders::cancel_unpaid(app.state()).await.unwrap(),
-        1
-    );
-    assert_eq!(
-        Order::find_or_404(app.db(), old.id).await.unwrap().status,
-        OrderStatus::Cancelled
-    );
-    assert_eq!(
-        Order::find_or_404(app.db(), recent.id)
-            .await
-            .unwrap()
-            .status,
-        OrderStatus::Pending
-    );
+    assert_eq!(status(&app, old.id).await, OrderStatus::Cancelled);
+    assert_eq!(status(&app, recent.id).await, OrderStatus::Pending);
     assert_eq!(stock(&app, kopi.id).await, 4);
     assert_eq!(
-        shop::app::orders::cancel_unpaid(app.state()).await.unwrap(),
+        app.at_travelled_time(shop::app::orders::cancel_unpaid(app.state()))
+            .await
+            .unwrap(),
         0,
         "only once"
     );
+    // A day later the second one goes too.
+    app.travel(DAY);
+    assert_eq!(
+        app.at_travelled_time(shop::app::orders::cancel_unpaid(app.state()))
+            .await
+            .unwrap(),
+        1
+    );
+    assert_eq!(stock(&app, kopi.id).await, 5);
+}
+
+#[renox::test]
+async fn checkout_emits_order_placed_and_notifies_without_sending() {
+    let app = shop().await;
+    let boss = admin(&app).await;
+    let kopi = product(&app, "Kopi Susu", 25_000, 5).await;
+    let budi = customer(&app, "budi@example.com").await;
+
+    // The listener runs, but its notifications are only recorded: no mail,
+    // no jobs, no database rows.
+    app.fake_notifications();
+    placed_order(&app, &budi, &kopi, 1).await;
+    app.assert_notified(&budi, "order-confirmation")
+        .assert_notified(&boss, "new-order");
+    assert!(app.queued_jobs().await.is_empty());
+    assert_eq!(boss.unread_notification_count(app.db()).await.unwrap(), 0);
+
+    // With events faked the listener doesn't run at all: the checkout
+    // handler is tested alone.
+    app.fake_events();
+    let second = placed_order(&app, &budi, &kopi, 1).await;
+    app.assert_emitted::<OrderPlaced>(|event| event.order_id == second.id);
+    assert_eq!(app.emitted::<OrderPlaced>().len(), 1, "only while faked");
+    assert_eq!(app.notifications().len(), 2, "no listener, no new ones");
 }
 
 #[renox::test]

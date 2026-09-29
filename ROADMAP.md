@@ -71,8 +71,8 @@ my-app/
 - [x] Query builder: `where_eq/op/like/in/null/not_null`, `order_by`, `latest`, `limit`, `offset`, `get`, `first`, `count`, `exists`, bulk `delete`; unknown columns and operators are errors
 - [x] Pagination: `Page` extractor, `paginate()`, built-in `renox/pagination.html` macro
 - [x] Transactions via `db.begin()`, seeders (`App::seeder`, `db:seed`), factories (`Factory`, `fake`)
-- [ ] Server-side sessions (deferred: cookie sessions cover M3 and M4). Revocation on logout
-      comes first, as a session version (M13a, W2); a server-side store only if sessions outgrow 4 KB
+- [x] Server-side sessions: revocation on logout came first, as a session version (M13a, W2);
+      the store itself is `SESSION_DRIVER=database` (M21g)
 - [x] Pagination links that keep other query parameters (M10b)
 
 ### M3 · v0.4: Forms and validation
@@ -1039,6 +1039,30 @@ Notes from M21h (the examples on the kit):
   eight-waiter part (10 s each); it checks one-at-a-time, so waiters now wait up to 60 s.
 - The shop's brown accent was checked for WCAG AA with the kit's formula: white on the button
   colour 7.8:1 (light) and 6.5:1 (dark), the link colour 7:1 or more on the page.
+
+Notes from M21i (the examples' tests, hello's command, the stubs):
+- The examples' tests fake time and side effects instead of rewriting rows or waiting:
+  `app.travel` in jobs (backoff between attempts, a unique job's `UNIQUE_FOR`, the daily
+  report), api (a token's 30 days, the guests' rate limit), hello (the prune command) and shop
+  (unpaid orders cancelled by the scheduled task, run with `run_scheduled` on the moved
+  clock); `fake_events` / `fake_notifications` in jobs and shop; `assert_view`,
+  `assert_json_path`, `assert_json` in shop, jobs and api.
+- examples/jobs reports errors with `App::report(post_to_chat)`: a line per error to
+  `ERROR_WEBHOOK_URL` over `state.http`, tested with `fake_http` (a declined card).
+- examples/hello's `entries:prune` is a typed command (clap) that asks before deleting
+  (`renox::prompt::confirm`, `--force` skips it); the test answers with `prompt::answering`.
+- examples/fields checks its colours with `v.each(.., |c| c.one_of(COLORS))` and
+  `v.distinct`; errors are keyed `colors.1`.
+- Stubs: `tests/home.rs` uses `assert_view` and time travel (a session past its lifetime);
+  `env.stub` lists `APP_HOST`, `DATABASE_POOL_SIZE`, the session lifetimes and cookie, and the
+  paths; the AGENTS stub lists all the guides and adds traps about the clock, fakes and
+  `each` keys.
+- Using `travel` in the examples found two framework bugs, fixed here: the in-memory rate
+  limiters and the login lock timed their windows with `Instant`, so travel didn't reach
+  them (a limited guest stayed limited); they now use `clock::Stamp`. And `TestApp`'s own
+  session helpers (the CSRF token, `acting_as`, `assert_guest`) read the cookie on the real
+  clock while the server read it on the moved one, so any form post after travelling past
+  `SESSION_LIFETIME` got a 419; they now run on the travelled clock too.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

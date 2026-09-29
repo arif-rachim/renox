@@ -133,8 +133,10 @@ async fn cookie_sessions_carry_over_and_expired_rows_are_pruned() {
     .execute(app.db())
     .await
     .unwrap();
-    assert_eq!(Session::prune_expired(app.db()).await.unwrap(), 1);
-    assert_eq!(rows(&app).await, 1);
+    // A request's background prune (1 in 50) may have beaten us to it.
+    let pruned = Session::prune_expired(app.db()).await.unwrap();
+    assert!(pruned <= 1, "{pruned}");
+    assert_eq!(rows(&app).await, 1, "only the live session is left");
     app.get("/whoami").await.assert_see("Budi");
 }
 

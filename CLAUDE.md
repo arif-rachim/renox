@@ -72,7 +72,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/view.rs              MiniJinja env, View response (fragment/also), render middleware, globals,
                            RequestGlobal (request globals inside imported macros), BUILTIN views
   src/toast.rs             Toast response part, the toast region markup
-  src/clock.rs             the current time with a test offset (TestApp::travel)
+  src/clock.rs             the current time with a test offset (TestApp::travel); Stamp for
+                           in-memory windows (rate limits, login lock), never Instant
   views/ui.html            the UI kit (renox/ui.html); assets/renox-ui.css|js its styles and script
   src/view_stack.rs        push/prepend/stack: markers filled in after the page renders (Scope)
   src/view_filters.rs      built-in template filters `number` and `date`; pub format_number
@@ -752,7 +753,7 @@ change 29 s → 7 s, full run 19 s → 6 s.
 ## 7. Where things stand (update this section when it changes)
 
 - **All milestones M0–M21h are merged to `main`**; the last was M21h (#64), after a docs and
-  examples audit against M21 (#63). History:
+  examples audit against M21 (#63). M21i is in review. History:
   `CHANGELOG.md` (per milestone) and `ROADMAP.md` (per-milestone notes and decisions).
 - After M17: a docs refresh (#45) and the Laravel parity review with M18–M21 planned (#46).
   After M20a: a docs and examples catch-up (branch `claude/laravel-project-feature-report-i6wgz0`:
@@ -816,11 +817,12 @@ change 29 s → 7 s, full run 19 s → 6 s.
   toasts with `HxRefresh` wait in the session like `HxRedirect`, and error pages get `App::share`
   values (a layout using one failed under strict undefined). Toasts must survive any response
   htmx turns into a new page: they go to the session there.
-- **Next: M21i** (agreed, not started): the examples' tests on time travel, fakes,
-  `assert_json_path`/`assert_view` (shop, jobs, api, hello); `hello`'s `entries:prune` as a typed
-  command; `fields` with `each` + `one_of` + `distinct`; `App::report` in examples/jobs; the
-  AGENTS stub's traps and guide list, `env.stub` (SESSION_LIFETIME, APP_HOST…), the stub's
-  `tests/home.rs` with `assert_view`; tick ROADMAP M2's server-side-sessions box (done in M21g).
+- **M21i** (the examples' tests on `travel`, fakes, `assert_view`/`assert_json_path`;
+  `App::report` in examples/jobs; hello's typed `entries:prune`; fields with `each` +
+  `one_of` + `distinct`; the stubs): PR open, waiting for review. Two framework fixes found by
+  travelling: in-memory rate limits and the login lock used `Instant` (now `clock::Stamp`), and
+  `TestApp`'s session helpers read the cookie on the real clock (now the travelled one, via
+  `clock::with_offset_sync`). Anything timed in memory must use `clock`, not `Instant`.
 - **M21 is complete.** Next is the owner's call; **v1.0 is on hold** until the owner says to
   start it (docs site, starter kit, semver checks, real crates.io releases; the owner runs
   `cargo login`). Small M21 items that weren't built are listed in ROADMAP ("Deferred from

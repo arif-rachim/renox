@@ -40,6 +40,7 @@ shows the queue: jobs waiting, throughput, failed jobs (retry or forget them) an
 | `NewOrder`: a notification sent by mail and stored in the database | [src/app/orders/new_order.rs](src/app/orders/new_order.rs) |
 | Mail templates: the receipt (HTML and text) and the sales report | [resources/views/mail](resources/views/mail) |
 | The queue dashboard and the gate that lets the admin see it | [src/lib.rs](src/lib.rs) |
+| `post_to_chat`: an `App::report` reporter that posts errors to a chat webhook | [src/lib.rs](src/lib.rs) |
 
 ## Things worth copying
 
@@ -99,6 +100,11 @@ shows the queue: jobs waiting, throughput, failed jobs (retry or forget them) an
   `schedule:run` typed by hand) holds it. Across servers this needs `CACHE_STORE=database`.
 - **Tell someone when it fails.** `.on_failure(report_failed)` queues an alert mail to
   `ALERT_EMAIL` (default `admin@example.com`); the failure is logged either way.
+- **Errors that need a person reach the team.** `App::report(post_to_chat)` gets every 500,
+  every job that failed for good (a declined card) and every failed scheduled task, and posts
+  a line like `[production] charge-payment #1: the card was declined` to `ERROR_WEBHOOK_URL`
+  (a Slack, Discord or Google Chat incoming webhook) with `state.http`. Reporters run in the
+  background; errors are logged with or without them.
 - **Admins are every user** here, since customers don't log in. With customer accounts, pick
   staff by role with the `Permissions` module.
 
@@ -111,8 +117,16 @@ cargo test -p jobs
 [tests/orders.rs](tests/orders.rs) checks queued jobs with `app.queued_jobs()`, runs them with
 `app.run_jobs()` (or one at a time with `app.kernel().worker(..).run_next()`), and reads the sent
 mail. It covers the chain's order, the encrypted payload (the token isn't in the `jobs` table), a
-declined card, the `failed` hook after the third attempt (the test skips the backoff with
-`UPDATE jobs SET available_at = 0`), one reminder for two clicks, the batch reaching 100 % with its
-`then` job, and a worker for `high,default` taking the receipt before an earlier report. It also
-checks the reports' counts and sums (old orders left out), that a held lock skips a run, and that
-a failing report sends the alert.
+declined card, the `failed` hook after the third attempt, one reminder for two clicks, the batch
+reaching 100 % with its `then` job, and a worker for `high,default` taking the receipt before an
+earlier report. It also checks the reports' counts and sums, that a held lock skips a run, that a
+failing report sends the alert, and that a failed job is posted to the chat (`fake_http`).
+
+Time and side effects are faked, not waited for:
+- `app.travel(Duration)` moves the clock for requests and `run_jobs`: past `Job::backoff`
+  between attempts, past a unique job's `UNIQUE_FOR` hour, three days ahead for the daily
+  report (code called directly runs inside `app.at_travelled_time(..)`).
+- `app.fake_events()` records `OrderPlaced` without running the listener
+  (`assert_emitted::<OrderPlaced>(|e| e.order_id == 1)`), so the handler is tested alone.
+- `app.fake_notifications()` records `NewOrder` for each admin (`assert_notified(&user,
+  "new-order")`) without mail or database rows.

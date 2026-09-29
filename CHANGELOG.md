@@ -10,6 +10,25 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M21i · The examples' tests, typed commands and the stubs
+
+- Fixed: `TestApp::travel` didn't reach the in-memory rate limits (`Routes::throttle`,
+  `throttle_by`) or the login lock: they measured time with `Instant`. They now read Renox's
+  clock.
+- Fixed: after `TestApp::travel` past the session lifetime, `TestApp`'s CSRF token and
+  `acting_as` still used the old session, so the next form post got a 419; they now see the
+  moved clock, as the server does.
+- examples/jobs: `App::report` posts errors to a chat webhook (`ERROR_WEBHOOK_URL`); tests use
+  time travel for retries and unique jobs, `fake_events`, `fake_notifications` and
+  `fake_http` for the reporter.
+- examples/api, shop, hello: tests use `travel` instead of rewriting dates in SQL, plus
+  `assert_view`, `assert_json_path` and `assert_json`; shop runs its daily task by name.
+- examples/hello: `entries:prune` is a typed command that asks before deleting (`--force`).
+- examples/fields: colours checked with `each` + `one_of` and `distinct`.
+- `rnx new`: `tests/home.rs` shows `assert_view` and time travel; `.env` lists `APP_HOST`,
+  `DATABASE_POOL_SIZE`, `SESSION_LIFETIME`, `REMEMBER_LIFETIME`, `SESSION_COOKIE` and the
+  paths; `AGENTS.md` lists every guide and adds traps about the clock and test fakes.
+
 ### M21h · The examples on the UI kit
 
 - examples/shop and examples/teams: every page on the UI kit (navigation bar with an account

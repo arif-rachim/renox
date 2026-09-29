@@ -1,7 +1,8 @@
-use jobs::{Order, OrderStatus, SendReceipt};
+use jobs::{Order, OrderPlaced, OrderStatus, SendReceipt};
 use renox::http::FakeResponse;
 use renox::prelude::*;
 use renox::testing::TestApp;
+use std::time::Duration;
 
 /// The payment gateway answers with `response` (tests never reach it).
 fn gateway(app: &TestApp, response: FakeResponse) {
@@ -68,6 +69,7 @@ async fn an_order_notifies_admins() {
     assert_eq!(order(&app, 1).await.status, OrderStatus::Unpaid);
     app.get("/")
         .await
+        .assert_view("orders/index.html")
         .assert_see("<em>unpaid</em>")
         .assert_see("tok_declined")
         .assert_dont_see("Remind customer");
@@ -76,6 +78,44 @@ async fn an_order_notifies_admins() {
         .await
         .assert_see("Remind customer")
         .assert_see("Email monthly statements");
+}
+
+#[renox::test]
+async fn placing_an_order_emits_order_placed() {
+    let app = app().await;
+    // Listeners don't run: this checks the handler alone.
+    app.fake_events();
+    place(&app).await;
+    app.assert_emitted::<OrderPlaced>(|event| event.order_id == 1);
+    assert!(app.sent_mail().is_empty());
+    // Nothing is emitted for an invalid order.
+    app.htmx()
+        .post("/orders", &[("item", "Kopi")])
+        .await
+        .assert_status(422);
+    assert_eq!(app.emitted::<OrderPlaced>().len(), 1);
+}
+
+#[renox::test]
+async fn the_listener_notifies_every_admin() {
+    let app = app().await;
+    let second = User::register(app.db(), "Sari", "sari@example.com", "password123")
+        .await
+        .unwrap();
+    // Notifications are recorded, not sent: no mail, no database rows.
+    app.fake_notifications();
+    place(&app).await;
+    app.assert_notified(&admin(&app).await, "new-order")
+        .assert_notified(&second, "new-order");
+    assert_eq!(app.notifications().len(), 2);
+    assert!(app.sent_mail().is_empty());
+    assert!(
+        second
+            .unread_notifications(app.db())
+            .await
+            .unwrap()
+            .is_empty()
+    );
 }
 
 #[renox::test]
@@ -181,12 +221,9 @@ async fn the_failed_hook_runs_after_the_last_attempt() {
             OrderStatus::Processing,
             "still waiting before attempt {attempt}"
         );
-        // Skip the wait between attempts (`Job::backoff`).
-        renox::db::sql("UPDATE jobs SET available_at = 0")
-            .execute(app.db())
-            .await
-            .unwrap();
         app.run_jobs().await;
+        // Past the wait before the next attempt (`Job::backoff`: 10 s, then 20 s).
+        app.travel(Duration::from_secs(30));
     }
     assert_eq!(order(&app, 1).await.status, OrderStatus::NeedsAttention);
     let alert = app
@@ -219,6 +256,22 @@ async fn a_reminder_is_queued_once_per_order() {
     // Once it has run, the next reminder is queued again.
     app.post("/orders/1/remind", &[]).await.assert_redirect("/");
     assert_eq!(app.queued_jobs().await, ["remind-unpaid"]);
+}
+
+#[renox::test]
+async fn a_stuck_reminder_stops_blocking_after_an_hour() {
+    let app = app().await;
+    place(&app).await;
+    app.acting_as(&admin(&app).await);
+    app.post("/orders/1/remind", &[]).await.assert_redirect("/");
+    // No worker picks it up (say they are all down): the claim lasts
+    // `UNIQUE_FOR`, one hour.
+    app.travel(Duration::from_secs(30 * 60));
+    app.post("/orders/1/remind", &[]).await.assert_redirect("/");
+    assert_eq!(app.queued_jobs().await, ["remind-unpaid"]);
+    app.travel(Duration::from_secs(31 * 60));
+    app.post("/orders/1/remind", &[]).await.assert_redirect("/");
+    assert_eq!(app.queued_jobs().await, ["remind-unpaid", "remind-unpaid"]);
 }
 
 #[renox::test]
@@ -334,16 +387,24 @@ async fn the_daily_report_sums_todays_orders() {
         };
         Order::create(app.db(), order).await.unwrap();
     }
-    // An order from last week is left out of today's report.
-    let old = Order {
+    // Three days later, one more order; the first two are left out of that
+    // day's report.
+    app.travel(Duration::from_secs(3 * 24 * 60 * 60));
+    let today = Order {
         customer_email: "b@example.com".into(),
         item: "Teh".into(),
         total: 5_000,
-        created_at: Some(renox::db::now() - renox::chrono::TimeDelta::days(3)),
         ..Default::default()
     };
-    Order::create(app.db(), old).await.unwrap();
-    jobs::daily_sales(app.state().clone()).await.unwrap(); // what the scheduler runs at 21:00
+    // `at_travelled_time` for code called directly: `created_at` and the
+    // report's "since" both read the moved clock.
+    app.at_travelled_time(Order::create(app.db(), today))
+        .await
+        .unwrap();
+    // What the scheduler runs at 21:00.
+    app.at_travelled_time(jobs::daily_sales(app.state().clone()))
+        .await
+        .unwrap();
     app.run_jobs().await;
     let report = app
         .sent_mail()
@@ -351,7 +412,7 @@ async fn the_daily_report_sums_todays_orders() {
         .find(|m| m.subject == "Today's sales")
         .unwrap();
     assert!(
-        report.text.contains("2 order(s) today, Rp 27000"),
+        report.text.contains("1 order(s) today, Rp 5000"),
         "{}",
         report.text
     );
@@ -459,4 +520,47 @@ async fn the_sandbox_gateway_answers_like_a_provider() {
     app.post_json("/sandbox/gateway/charges", &charge("tok_unreachable"))
         .await
         .assert_status(503);
+}
+
+#[renox::test]
+async fn failures_are_posted_to_the_chat() {
+    let app = TestApp::with_config(jobs::app(), |config| {
+        config.vars.insert(
+            "ERROR_WEBHOOK_URL".into(),
+            "https://chat.example.com/hook".into(),
+        );
+    })
+    .await;
+    gateway(
+        &app,
+        FakeResponse::json(402, json!({ "error": "card_declined" })),
+    );
+    app.fake_http().on(
+        "POST https://chat.example.com/hook",
+        FakeResponse::status(200),
+    );
+    place(&app).await;
+    app.post("/orders/1/pay", &[("card_token", "tok_declined")])
+        .await
+        .assert_redirect("/");
+    app.run_jobs().await; // the declined charge fails for good
+
+    // Reporters run in the background, after the job is recorded.
+    let posted = || {
+        app.fake_http()
+            .sent()
+            .into_iter()
+            .find(|request| request.url == "https://chat.example.com/hook")
+    };
+    for _ in 0..100 {
+        if posted().is_some() {
+            break;
+        }
+        renox::tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    let text = posted().expect("the report was posted").json()["text"].clone();
+    assert_eq!(
+        text, "[testing] charge-payment #1: the card was declined",
+        "{text}"
+    );
 }

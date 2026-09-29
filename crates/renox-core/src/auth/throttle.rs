@@ -1,7 +1,8 @@
+use crate::clock::Stamp;
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// Failed logins, counted three ways, so neither rotating IPs nor rotating
 /// emails gets around the lock (in memory, or in the database with
@@ -107,7 +108,7 @@ impl LoginThrottle {
 pub(crate) struct Throttle {
     max_attempts: u32,
     window: Duration,
-    attempts: Mutex<HashMap<String, (u32, Instant)>>,
+    attempts: Mutex<HashMap<String, (u32, Stamp)>>,
 }
 
 impl Throttle {
@@ -131,9 +132,7 @@ impl Throttle {
     pub fn fail(&self, key: &str) {
         let mut attempts = self.attempts.lock().unwrap_or_else(|e| e.into_inner());
         attempts.retain(|_, (_, since)| since.elapsed() < self.window);
-        let entry = attempts
-            .entry(key.to_owned())
-            .or_insert((0, Instant::now()));
+        let entry = attempts.entry(key.to_owned()).or_insert((0, Stamp::now()));
         entry.0 += 1;
     }
 

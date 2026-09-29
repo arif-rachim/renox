@@ -7,3 +7,4 @@ publish = false
 [dependencies]
 renox.workspace = true
 serde = { version = "1.0.229", features = ["derive"] }
+tracing = "0.1.44"
