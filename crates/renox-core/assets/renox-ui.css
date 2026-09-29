@@ -412,6 +412,15 @@
   .rx-sheet__actions .rx-button { width: 100%; }
 }
 
+/* ---------- Sign-in pages (renox/auth/*) ---------- */
+
+.rx-auth { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: var(--rx-space-8) var(--rx-space-4); }
+.rx-auth__inner { width: min(100%, 25rem); display: grid; gap: var(--rx-space-5); }
+.rx-auth--wide .rx-auth__inner { width: min(100%, 36rem); }
+.rx-auth__brand { text-align: center; font-size: var(--rx-text-title); font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+.rx-auth__brand a { color: var(--rx-label); text-decoration: none; }
+.rx-auth__alt { text-align: center; margin: 0; font-size: var(--rx-text-subhead); color: var(--rx-secondary-label); }
+
 /* ---------- Toasts ---------- */
 
 .rx-toasts {

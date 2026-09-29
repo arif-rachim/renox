@@ -22,7 +22,8 @@
   zones, `on_failure`, `schedule:run`); mail and notifications (with the in-app inbox); cookies
   and downloads; cache (`add`, `pull`, `increment`) and atomic locks; session, uploads and
   translations (plurals); signed URLs and private files; CSP, CORS and
-  webhooks; SEO and analytics; tests; typed app commands (clap) and prompts; stacks (`push`/`stack`);
+  webhooks; SEO and analytics; tests; form requests (`prepare`, `authorize`, `after`) and the full rule list; typed app commands
+  (clap) and prompts; stacks (`push`/`stack`);
   Tailwind; errors, logs and debugging (request ids, JSON logs,
   `App::report`, named rate limiters, `/_renox/debug`); configuration (`.env` and your own
   settings).

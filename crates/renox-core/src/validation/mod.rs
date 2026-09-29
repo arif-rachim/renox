@@ -82,9 +82,87 @@ impl Errors {
     }
 }
 
-/// Declares the rules for a form. Used by the `Valid<T>` extractor.
+/// Declares the rules for a form. Used by the `Valid<T>` extractor, which
+/// calls, in order: [`prepare`](Validate::prepare),
+/// [`authorize`](Validate::authorize), [`rules`](Validate::rules) and, when
+/// they pass, [`after`](Validate::after). Only `rules` is required.
+///
+/// ```
+/// # use renox::prelude::*;
+/// use renox::validation::FormContext;
+///
+/// #[derive(serde::Deserialize)]
+/// struct Invite { email: String, team_id: i64 }
+///
+/// impl Validate for Invite {
+///     // Laravel's prepareForValidation: tidy the input first.
+///     fn prepare(&mut self) {
+///         self.email = self.email.trim().to_lowercase();
+///     }
+///
+///     // Laravel's authorize: `false` answers 403 before any rule runs.
+///     async fn authorize(&self, form: &FormContext<'_>) -> Result<bool> {
+///         Ok(form.user.is_some_and(|user| user.has_role("owner")))
+///     }
+///
+///     fn rules(&self, v: &mut Validator) {
+///         v.field("email", &self.email).required().email();
+///     }
+///
+///     // Laravel's `after`: checks that need the database or several fields,
+///     // once the rules pass. Errors added here are shown like any other.
+///     async fn after(&self, form: &FormContext<'_>, errors: &mut Errors) -> Result {
+///         let members: i64 = renox::db::sql("SELECT COUNT(*) FROM team_user WHERE team_id = ?")
+///             .bind(self.team_id)
+///             .scalar(&form.state.db)
+///             .await?;
+///         if members >= 10 {
+///             errors.add("email", "This team is full (10 members).");
+///         }
+///         Ok(())
+///     }
+/// }
+/// ```
 pub trait Validate {
     fn rules(&self, v: &mut Validator);
+
+    /// Tidies the input before anything checks it (Laravel's
+    /// `prepareForValidation`): trim, lowercase an email, fill a slug. The
+    /// form refilled after an error still shows what was typed.
+    fn prepare(&mut self) {}
+
+    /// Whether this request may send the form (Laravel's `authorize`), e.g.
+    /// only the team's owner invites. `false` answers 403 before the rules
+    /// run. It sees the input, so it runs once the input is read.
+    fn authorize(
+        &self,
+        form: &FormContext<'_>,
+    ) -> impl std::future::Future<Output = Result<bool>> + Send {
+        let _ = form;
+        std::future::ready(Ok(true))
+    }
+
+    /// Checks that need the database, another service or several fields,
+    /// once the rules pass (Laravel's `after`, and async rules). Add
+    /// errors with `errors.add(field, message)`.
+    fn after(
+        &self,
+        form: &FormContext<'_>,
+        errors: &mut Errors,
+    ) -> impl std::future::Future<Output = Result> + Send {
+        let _ = (form, errors);
+        std::future::ready(Ok(()))
+    }
+}
+
+/// What [`Validate::authorize`] and [`Validate::after`] see of the request.
+#[non_exhaustive]
+pub struct FormContext<'a> {
+    pub state: &'a crate::AppState,
+    /// The logged-in user, if any.
+    pub user: Option<&'a crate::auth::User>,
+    pub method: &'a axum::http::Method,
+    pub path: &'a str,
 }
 
 struct Pending {
@@ -163,8 +241,6 @@ impl Validator {
         messages::template_for(self.locale, self.texts.as_ref(), key)
     }
 
-    /// Starts the rules for one field. The label in messages defaults to the
-    /// name with `_` replaced by spaces.
     /// A field's name for messages: the app's translation
     /// (`renox.validation.attributes.{name}`) or the name with spaces.
     fn translated_label(&self, name: &str) -> Option<String> {
@@ -232,6 +308,32 @@ impl Validator {
         }
     }
 
+    /// No two items of a list are the same (Laravel's `distinct`), e.g. the
+    /// emails invited at once; each repeat gets the error, keyed `name.i`.
+    pub fn distinct<T: FieldValue>(&mut self, name: &str, items: &[T]) {
+        let base = self.label_for(name);
+        let template = self.template("distinct");
+        let mut seen: Vec<Inspected> = Vec::new();
+        for (i, item) in items.iter().enumerate() {
+            let value = match item.inspect() {
+                Inspected::Text(text) => Inspected::Text(text.trim().to_lowercase()),
+                other => other,
+            };
+            if value == Inspected::Missing {
+                continue;
+            }
+            if seen.contains(&value) {
+                let label = format!("{base} #{}", i + 1);
+                self.errors
+                    .add(format!("{name}.{i}"), render(&template, &label, &[]));
+            } else {
+                seen.push(value);
+            }
+        }
+    }
+
+    /// Starts the rules for one field. The label in messages defaults to the
+    /// name with `_` replaced by spaces.
     pub fn field<'v>(&'v mut self, name: &str, value: &impl FieldValue) -> Field<'v> {
         let translated = self.translated_label(name);
         let mut field = Field {
@@ -673,6 +775,104 @@ impl Field<'_> {
         self
     }
 
+    fn text_rule(
+        mut self,
+        key: &str,
+        ok: impl Fn(&str) -> bool,
+        params: &[(&str, String)],
+    ) -> Self {
+        if let (true, Inspected::Text(text)) = (self.present(), &self.value)
+            && !ok(text)
+        {
+            self.fail(key, params);
+        }
+        self
+    }
+
+    /// Letters only (any language's: `é`, `ü`, `ß` count).
+    pub fn alpha(self) -> Self {
+        self.text_rule("alpha", |t| t.chars().all(char::is_alphabetic), &[])
+    }
+
+    /// Letters and digits only.
+    pub fn alpha_num(self) -> Self {
+        self.text_rule("alpha_num", |t| t.chars().all(char::is_alphanumeric), &[])
+    }
+
+    /// Letters, digits, `-` and `_`, e.g. a username or a slug.
+    pub fn alpha_dash(self) -> Self {
+        self.text_rule(
+            "alpha_dash",
+            |t| {
+                t.chars()
+                    .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+            },
+            &[],
+        )
+    }
+
+    /// No uppercase letters.
+    pub fn lowercase(self) -> Self {
+        self.text_rule("lowercase", |t| !t.chars().any(char::is_uppercase), &[])
+    }
+
+    /// No lowercase letters.
+    pub fn uppercase(self) -> Self {
+        self.text_rule("uppercase", |t| !t.chars().any(char::is_lowercase), &[])
+    }
+
+    /// Starts with one of `prefixes`, e.g. `.starts_with(&["08", "+62"])`.
+    pub fn starts_with(self, prefixes: &[&str]) -> Self {
+        let values = prefixes.join(", ");
+        self.text_rule(
+            "starts_with",
+            |t| prefixes.iter().any(|p| t.starts_with(p)),
+            &[("values", values)],
+        )
+    }
+
+    /// Ends with one of `suffixes`, e.g. `.ends_with(&["@company.com"])`.
+    pub fn ends_with(self, suffixes: &[&str]) -> Self {
+        let values = suffixes.join(", ");
+        self.text_rule(
+            "ends_with",
+            |t| suffixes.iter().any(|s| t.ends_with(s)),
+            &[("values", values)],
+        )
+    }
+
+    /// A UUID (`8-4-4-4-12` hexadecimal digits).
+    pub fn uuid(self) -> Self {
+        self.text_rule("uuid", is_uuid, &[])
+    }
+
+    /// An IPv4 or IPv6 address.
+    pub fn ip(self) -> Self {
+        self.text_rule("ip", |t| t.trim().parse::<std::net::IpAddr>().is_ok(), &[])
+    }
+
+    /// Exactly `size` characters, items, kilobytes (files), or equal to it as
+    /// a number (Laravel's `size`).
+    pub fn size(self, size: impl Into<f64>) -> Self {
+        let size = size.into();
+        self.size_rule("size", |s| s == size, &[("size", number(size))])
+    }
+
+    /// Required when `other` is empty, e.g. an email when there's no phone.
+    pub fn required_without(self, other: &impl FieldValue) -> Self {
+        let missing = other.inspect() == Inspected::Missing;
+        self.required_if(missing)
+    }
+
+    /// Must be empty when `condition` holds (Laravel's `prohibited_if`), e.g.
+    /// no discount code on a gift card order.
+    pub fn prohibited_if(mut self, condition: bool) -> Self {
+        if condition && !self.failed && self.value != Inspected::Missing {
+            self.fail("prohibited", &[]);
+        }
+        self
+    }
+
     /// Required when `condition` holds, e.g.
     /// `.required_if(self.kind == "company")` for a company name.
     pub fn required_if(self, condition: bool) -> Self {
@@ -709,7 +909,6 @@ impl Field<'_> {
         self
     }
 
-    /// A reusable rule; see [`Rule`].
     /// The value meets `policy` (length, letters, mixed case, numbers,
     /// symbols); see [`Password`].
     pub fn password(mut self, policy: &Password) -> Self {
@@ -721,6 +920,7 @@ impl Field<'_> {
         self
     }
 
+    /// A reusable rule; see [`Rule`].
     pub fn apply(mut self, rule: &impl Rule) -> Self {
         if !self.present() {
             return self;
@@ -931,6 +1131,15 @@ impl Default for Password {
 pub trait Rule {
     /// `Err(message)` when `value` breaks the rule.
     fn check(&self, value: &Inspected) -> std::result::Result<(), String>;
+}
+
+fn is_uuid(text: &str) -> bool {
+    let groups: Vec<&str> = text.trim().split('-').collect();
+    groups.len() == 5
+        && groups
+            .iter()
+            .zip([8, 4, 4, 4, 12])
+            .all(|(g, n)| g.len() == n && g.chars().all(|c| c.is_ascii_hexdigit()))
 }
 
 /// Compiled patterns, so a rule in a hot form doesn't recompile each time.

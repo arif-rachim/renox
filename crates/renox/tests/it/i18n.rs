@@ -195,13 +195,13 @@ async fn built_in_texts_can_be_translated() {
 
     let login = visitor.get("/login").await.1;
     assert!(
-        login.contains("<h2>Log masuk</h2>"),
+        login.contains(">Log masuk</h2>"),
         "renox.auth.* overrides the built-in page"
     );
     assert!(login.contains(r#"<html lang="ms">"#));
     visitor.get("/lang/id").await;
     assert!(
-        visitor.get("/login").await.1.contains("<h2>Masuk</h2>"),
+        visitor.get("/login").await.1.contains(">Masuk</h2>"),
         "built-in Indonesian"
     );
 }

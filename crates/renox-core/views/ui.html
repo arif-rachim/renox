@@ -31,8 +31,9 @@
 {%- endmacro -%}
 
 {#- A text field: text, email, password, number, date, url, tel, search… -#}
-{% macro input(name, label, type="text", value=none, hint=none, required=false, autocomplete=none, placeholder=none, attrs={}) -%}
-{%- set id = _id(name) %}
+{#- `id`: when a page has two fields of the same name (in separate forms). -#}
+{% macro input(name, label, type="text", value=none, hint=none, required=false, autocomplete=none, placeholder=none, attrs={}, id=none) -%}
+{%- set id = id or _id(name) %}
 {%- set message = error(name) %}
 <div class="rx-field">
   {{ _label(id, label, required) }}

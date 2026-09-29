@@ -1,25 +1,19 @@
 {% extends "renox/auth/layout.html" %}
+{% from "renox/ui.html" import card, input, checkbox, button, alert %}
 {% block title %}{{ text.login_title }} · {{ app.name }}{% endblock %}
 {% block content %}
-<form class="card" method="post" action="{{ route('login') }}" hx-post="{{ route('login') }}">
+<form method="post" action="{{ route('login') }}" hx-post="{{ route('login') }}">
   {{ csrf_field() }}
-  <h2>{{ text.login_title }}</h2>
-  {% if flash.status %}<p class="status">{{ flash.status }}</p>{% endif %}
-  <label>{{ text.email }}
-    <input type="email" name="email" value="{{ old('email') }}" autocomplete="username" required autofocus>
-  </label>
-  <p class="error" data-error-for="email">{{ error('email') }}</p>
-  <label>{{ text.password }}
-    <input type="password" name="password" autocomplete="current-password" required>
-  </label>
-  <p class="error" data-error-for="password">{{ error('password') }}</p>
-  <label class="check">
-    <input type="checkbox" name="remember" value="1" {% if old('remember') %}checked{% endif %}> {{ text.remember }}
-  </label>
-  <button type="submit">{{ text.login_button }}</button>
-  <p class="alt"><a href="{{ route('password.request') }}">{{ text.forgot_link }}</a></p>
-  {% if registration %}
-  <p class="alt">{{ text.no_account }} <a href="{{ route('register') }}">{{ text.register_button }}</a></p>
-  {% endif %}
+  {% call card(title=text.login_title) %}
+    {% if flash.status %}{{ alert(flash.status, kind="success") }}{% endif %}
+    {{ input("email", text.email, type="email", required=true, autocomplete="username", attrs={"autofocus": true}) }}
+    {{ input("password", text.password, type="password", required=true, autocomplete="current-password") }}
+    {{ checkbox("remember", text.remember, value="1") }}
+    {{ button(text.login_button, block=true) }}
+    <p class="rx-auth__alt"><a class="rx-link" href="{{ route('password.request') }}">{{ text.forgot_link }}</a></p>
+  {% endcall %}
 </form>
+{% if registration %}
+<p class="rx-auth__alt">{{ text.no_account }} <a class="rx-link" href="{{ route('register') }}">{{ text.register_button }}</a></p>
+{% endif %}
 {% endblock %}

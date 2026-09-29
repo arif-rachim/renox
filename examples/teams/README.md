@@ -25,7 +25,7 @@ Globex, Carol is a member of Acme. With `SUPER_ADMINS` set, Alice also sees `/ad
 | Wiring: `Auth::new().account()`, the modules, the tenancy layer, the shared `team`, `gate_before`, the `projects:count` command, the seeder | [src/lib.rs](src/lib.rs) |
 | The current team: session → membership check → `renox::context`, an extractor, a policy | [src/app/tenancy.rs](src/app/tenancy.rs) |
 | `Team`, the `team_user` pivot with a `role` (`MEMBERS`, `USER_TEAMS`), the secret helpers | [src/app/teams/model.rs](src/app/teams/model.rs) |
-| Create, switch, members, the encrypted secret behind `require_password_confirmed` | [src/app/teams/mod.rs](src/app/teams/mod.rs) |
+| Create, switch, members (a form request: `MemberForm`'s `prepare`, `authorize`, `after`), the encrypted secret behind `require_password_confirmed` | [src/app/teams/mod.rs](src/app/teams/mod.rs) |
 | `Project` with `default_scope = "team_only"` and a `saving` hook that fills `team_id` | [src/app/projects/model.rs](src/app/projects/model.rs) |
 | Project CRUD with no `team_id` in sight; name unique per team | [src/app/projects/mod.rs](src/app/projects/mod.rs) |
 | The super-admin check and the cross-team report with `Project::unscoped()` | [src/app/admin.rs](src/app/admin.rs) |
@@ -33,6 +33,12 @@ Globex, Carol is a member of Acme. With `SUPER_ADMINS` set, Alice also sees `/ad
 | Tables: `teams`, `team_user`, `projects` (unique `(team_id, name)`) | [migrations](migrations) |
 
 ## Things worth copying
+
+- **A form request.** `MemberForm` (`impl Validate`) does what Laravel's form requests do:
+  `prepare` lowercases the email, `authorize` lets only the team's owners through (403
+  before any rule runs), the rules check the email, and `after` looks the person up in the
+  database, adding a field error when nobody has that email. The handler is left with adding
+  the member.
 
 - **The tenant is set once per request.** An `App::layer` middleware reads `current_team_id`
   from the session, checks the membership in one query (falling back to the user's first team,
