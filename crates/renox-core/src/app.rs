@@ -1157,6 +1157,7 @@ fn framework_routes(config: &Config) -> Vec<RouteInfo> {
     let mut routes = vec![
         route("GET", "/health"),
         route("GET", "/robots.txt"),
+        route("GET", "/favicon.ico"),
         route("GET", "/_renox/{asset}"),
         route("GET", "/_renox/files/{*key}"),
         route("GET", "/storage/{*path}"),
@@ -1340,6 +1341,7 @@ fn build_router(
         .merge(assets::router())
         .merge(crate::health::router())
         .merge(robots(&state, embedded_public))
+        .merge(favicon(&state, embedded_public))
         .merge(crate::live::router())
         .merge(public_files(&state))
         .layer(axum::extract::DefaultBodyLimit::max(
@@ -1378,20 +1380,49 @@ fn build_router(
         .layer(from_fn_with_state(state, crate::security::middleware))
 }
 
+/// Whether the app ships `name` in `public/` (on disk, or embedded).
+fn has_public_file(
+    state: &AppState,
+    embedded_public: Option<&'static [(&'static str, &'static [u8])]>,
+    name: &str,
+) -> bool {
+    match embedded_public {
+        Some(files) => files.iter().any(|(path, _)| *path == name),
+        None => state.config.public_path.join(name).is_file(),
+    }
+}
+
 /// The generated `/robots.txt`, unless the app ships its own in `public/`.
 fn robots(
     state: &AppState,
     embedded_public: Option<&'static [(&'static str, &'static [u8])]>,
 ) -> Router<AppState> {
-    let own = match embedded_public {
-        Some(files) => files.iter().any(|(path, _)| *path == "robots.txt"),
-        None => state.config.public_path.join("robots.txt").is_file(),
-    };
-    if own {
+    if has_public_file(state, embedded_public, "robots.txt") {
         Router::new()
     } else {
         crate::seo::robots_router(state)
     }
+}
+
+/// `/favicon.ico` answers 204 (no icon, cached for a day) unless the app
+/// ships one in `public/`: browsers ask for it on every site, and a 404
+/// would run the whole stack, render the error page and log it each time.
+fn favicon(
+    state: &AppState,
+    embedded_public: Option<&'static [(&'static str, &'static [u8])]>,
+) -> Router<AppState> {
+    if has_public_file(state, embedded_public, "favicon.ico") {
+        return Router::new();
+    }
+    Router::new().route(
+        "/favicon.ico",
+        axum::routing::get(|| async {
+            (
+                axum::http::StatusCode::NO_CONTENT,
+                [(axum::http::header::CACHE_CONTROL, "public, max-age=86400")],
+            )
+        }),
+    )
 }
 
 /// Public files of the local disk at `/storage/...`, outside sessions.

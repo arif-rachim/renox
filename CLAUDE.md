@@ -225,7 +225,8 @@ docs/assets/demo.gif       the README's demo (see §4.10)
    `request` with id, method, uri, client IP; `LOG_FORMAT=json` prints it as `span`).
 4. `DefaultBodyLimit` (`UPLOAD_MAX_SIZE`).
 5. Merged at this level, so they skip everything below (sessions, maintenance): `assets::router()`
-   (`/_renox/*.js`), `/health`, `/robots.txt` (unless `public/robots.txt` exists), `/_renox/live`
+   (`/_renox/*.js`), `/health`, `/robots.txt` (unless `public/robots.txt` exists), `/favicon.ico`
+   (204 unless `public/favicon.ico` exists), `/_renox/live`
    (debug + local only) and the local disk's public files (`/storage/...`, sandboxed headers).
 6. `inspector` (only with debug + local: records the request's status, time, view and SQL via
    `capture_queries`, skipping `/_renox/*`) → `context` (`renox::context`: a fresh task-local context per request holding the `AppState`
@@ -752,8 +753,8 @@ change 29 s → 7 s, full run 19 s → 6 s.
 
 ## 7. Where things stand (update this section when it changes)
 
-- **All milestones M0–M21h are merged to `main`**; the last was M21h (#64), after a docs and
-  examples audit against M21 (#63). M21i is in review. History:
+- **All milestones M0–M21i are merged to `main`**; the last was M21i (#66), after a docs and
+  examples audit against M21 (#63). History:
   `CHANGELOG.md` (per milestone) and `ROADMAP.md` (per-milestone notes and decisions).
 - After M17: a docs refresh (#45) and the Laravel parity review with M18–M21 planned (#46).
   After M20a: a docs and examples catch-up (branch `claude/laravel-project-feature-report-i6wgz0`:
@@ -819,10 +820,12 @@ change 29 s → 7 s, full run 19 s → 6 s.
   htmx turns into a new page: they go to the session there.
 - **M21i** (the examples' tests on `travel`, fakes, `assert_view`/`assert_json_path`;
   `App::report` in examples/jobs; hello's typed `entries:prune`; fields with `each` +
-  `one_of` + `distinct`; the stubs): PR open, waiting for review. Two framework fixes found by
+  `one_of` + `distinct`; the stubs): merged (#66). Two framework fixes found by
   travelling: in-memory rate limits and the login lock used `Instant` (now `clock::Stamp`), and
   `TestApp`'s session helpers read the cookie on the real clock (now the travelled one, via
   `clock::with_offset_sync`). Anything timed in memory must use `clock`, not `Instant`.
+- **After M21, small fixes** (`fix-favicon`): `/favicon.ico` answers 204 unless the app ships
+  one (every example logged a 404 console error when run in a browser).
 - **M21 is complete.** Next is the owner's call; **v1.0 is on hold** until the owner says to
   start it (docs site, starter kit, semver checks, real crates.io releases; the owner runs
   `cargo login`). Small M21 items that weren't built are listed in ROADMAP ("Deferred from

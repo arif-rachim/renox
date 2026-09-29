@@ -353,6 +353,7 @@ M11c · SEO and analytics (done):
       since imported macros can't see the page's `app`/`request`): title, description, canonical
       (APP_URL + path, no query), OpenGraph, Twitter cards; `<html lang="{{ app.locale }}">` and a
       `{% block seo %}` in the generated layout; `noindex, nofollow` outside production
+- [x] `/favicon.ico` answers 204 (cached a day) unless `public/favicon.ico` exists (after M21)
 - [x] `/robots.txt` generated unless `public/robots.txt` exists (production: allow + the sitemap
       when a route is named `sitemap`; elsewhere disallow); `renox::seo::Sitemap` builder
 - [x] Search Console verification meta (`GOOGLE_SITE_VERIFICATION`)
