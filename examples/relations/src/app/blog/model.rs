@@ -67,7 +67,7 @@ pub const LIKEABLE: Morph = Morph::new("likeable_type", "likeable_id");
 
 impl Like {
     /// A new like on `parent`, a post or a comment.
-    pub fn on<P: Model>(parent: &P) -> Self {
+    pub fn on<P: Model<Key = i64>>(parent: &P) -> Self {
         Like {
             likeable_type: P::TABLE.into(),
             likeable_id: parent.id(),
@@ -80,7 +80,7 @@ impl Like {
 /// `GROUP BY` query; 0 for those without likes. `LIKEABLE.count_many`
 /// counts rows without loading them; `LIKEABLE.load_many` is the loader
 /// for when a page needs the likes themselves.
-pub fn like_counts<'a, P: Model>(
+pub fn like_counts<'a, P: Model<Key = i64>>(
     db: &'a Db,
     parents: &[P],
 ) -> impl Future<Output = Result<HashMap<i64, i64>>> + Send + 'a {

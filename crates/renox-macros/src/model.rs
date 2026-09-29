@@ -81,12 +81,13 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
     }
 
     let column = |name: &str| fields.iter().find(|f| f.name == name && !f.skip);
-    if column("id").is_none() {
+    let Some(id_field) = column("id") else {
         return Err(Error::new_spanned(
             ident,
-            "a Model needs an `id: i64` field",
+            "a Model needs an `id` field (`i64`, `Ulid`, `Uuid` or `String`)",
         ));
-    }
+    };
+    let key_type = &id_field.ty;
     let deleted_at = column("deleted_at");
     if soft_deletes && deleted_at.is_none() {
         return Err(Error::new_spanned(
@@ -177,11 +178,14 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
             const COLUMNS: &'static [&'static str] = &[#(#columns),*];
             const SOFT_DELETES: bool = #soft_deletes;
 
-            fn id(&self) -> i64 {
-                self.id
+            type Key = #key_type;
+
+            #[allow(clippy::clone_on_copy)]
+            fn id(&self) -> Self::Key {
+                ::core::clone::Clone::clone(&self.id)
             }
 
-            fn set_id(&mut self, id: i64) {
+            fn set_id(&mut self, id: Self::Key) {
                 self.id = id;
             }
 

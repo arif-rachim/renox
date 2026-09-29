@@ -30,6 +30,7 @@ Prefer them over writing boilerplate by hand:
 rnx make:module products                               # src/app/products + view + registration
 rnx make:module products --resource --fields "name:string price:money"  # a whole CRUD, with tests
 rnx make:model Product --module products --migration   # model + migrations/*.sql
+rnx make:model Invoice --key ulid --migration          # id: Ulid (also uuid, string)
 rnx make:policy Product --module products
 rnx make:job SendReceipt --module products             # registered in the module's register()
 rnx make:command products:import --module products     # typed (clap); rnx products:import --help
@@ -62,6 +63,10 @@ rnx make:middleware StampRequests                      # also make:component
   `auth::change_password`, which keeps the user logged in.
 - A model with `#[model(default_scope = "…")]` (e.g. the current team) filters every query,
   including `find`; use `Model::unscoped()` in admin code and commands that must see all rows.
+- A model's key is its `id` field's type: `i64`, `renox::db::Ulid`, `renox::uuid::Uuid` (the
+  `uuid` feature) or `String`. ULIDs and UUIDs are made on insert; a `String` key must be set,
+  and a new row goes in with `Model::insert`/`create` (`save` on a set key updates, or 404s).
+  Generic helpers over models that need a number write `M: Model<Key = i64>`.
 - Model hooks (`#[model(hooks)]`) run on `save`, `save_only`, `save_changes` and `delete`, never
   on bulk `Query::update` / `delete`, `insert_many` or `upsert`.
 - Scheduled task names must be unique (a duplicate is a boot error); `rnx schedule:list` shows

@@ -7,4 +7,3 @@ publish = false
 [dependencies]
 renox = { workspace = true, features = ["uuid", "postgres"] }
 serde = { version = "1.0.229", features = ["derive"] }
-uuid = { version = "1", features = ["v4", "serde"] }

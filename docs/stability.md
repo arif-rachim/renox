@@ -25,7 +25,8 @@ commit that `rnx` was built from.
 - New methods, functions, modules, template functions, validation rules, CLI commands and `.env`
   settings (always with defaults).
 - New provided methods on traits you implement (`Model`, `Notification`, …); `FromRow` stays one
-  method. `db::Number` is sealed: only `i64` and `f64`.
+  method. `db::Number` is sealed: only `i64` and `f64`. `db::ModelKey` is sealed too (`i64`,
+  `Ulid`, `Uuid`, `String`), so new key types and new methods on it aren't breaking.
 
 `Dialect` is deliberately not in that list. Supporting a third database would change the SQL every
 app writes, so it would come with a major release.
@@ -45,6 +46,7 @@ because of a dependency.
 | `minijinja` (2) | `context!`, template values |
 | `tokio` (1), `serde` (1), `serde_json` (1), `chrono` (0.4) | Re-exported and used throughout |
 | `fake` (5) | `Factory` definitions, re-exported as `renox::fake` |
+| `uuid` (1) | `Uuid` model keys and fields, re-exported as `renox::uuid` (the `uuid` feature) |
 | `chrono-tz` (0.10) | `renox::timezone::Zone::Named(chrono_tz::Tz)` (not re-exported; parse zones with `"Asia/Jakarta".parse::<Zone>()`) |
 
 **`sqlx` is not part of the stable API.**

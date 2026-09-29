@@ -301,8 +301,14 @@ fn register_in_module(mod_rs: &Path, call: &str) -> Result<()> {
     Ok(())
 }
 
-/// `rnx make:model Produk [--module produk] [--migration]`.
-pub fn model(root: &Path, name: &str, module: Option<&str>, migration: bool) -> Result<()> {
+/// `rnx make:model Produk [--module produk] [--migration] [--key ulid]`.
+pub fn model(
+    root: &Path,
+    name: &str,
+    module: Option<&str>,
+    migration: bool,
+    key: crate::KeyType,
+) -> Result<()> {
     check_name(name)?;
     let pascal = name.to_upper_camel_case();
     let table = name.to_snake_case();
@@ -314,16 +320,32 @@ pub fn model(root: &Path, name: &str, module: Option<&str>, migration: bool) -> 
         "model".into()
     };
 
+    let (import, id_doc) = match key {
+        crate::KeyType::Integer => ("", ""),
+        crate::KeyType::Ulid => (
+            "use renox::db::Ulid;\n",
+            "    /// Made on insert (`Ulid::default()` means \"not saved yet\").\n",
+        ),
+        crate::KeyType::Uuid => (
+            "use renox::uuid::Uuid;\n",
+            "    /// A UUID v7 made on insert (needs renox's `uuid` feature).\n",
+        ),
+        crate::KeyType::String => (
+            "",
+            "    /// Set by the app: save a new row with `insert` or `create`.\n",
+        ),
+    };
+    let id_type = key.rust_type();
     write_new(
         &dir.join(format!("{file}.rs")),
         &format!(
-            r#"use renox::prelude::*;
+            r#"{import}use renox::prelude::*;
 use serde::{{Deserialize, Serialize}};
 
 #[derive(Model, Serialize, Deserialize, Default, Debug, Clone)]
 #[model(table = "{table}")]
 pub struct {pascal} {{
-    pub id: i64,
+{id_doc}    pub id: {id_type},
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
 }}
@@ -332,7 +354,16 @@ pub struct {pascal} {{
     )?;
     add_mod(&dir.join("mod.rs"), &file)?;
     if migration {
-        crate::make::migration(&format!("create_{table}_table"), &root.join("migrations"))?;
+        crate::make::migration_keyed(
+            &format!("create_{table}_table"),
+            &root.join("migrations"),
+            key,
+        )?;
+    }
+    if key == crate::KeyType::Uuid {
+        println!(
+            "Uuid keys need renox's `uuid` feature: renox = {{ …, features = [\"uuid\"] }} in Cargo.toml"
+        );
     }
     Ok(())
 }
@@ -789,7 +820,7 @@ mod tests {
     fn models_jobs_policies_and_mails() {
         let dir = app();
         module(dir.path(), "produk").unwrap();
-        model(dir.path(), "Produk", None, true).unwrap();
+        model(dir.path(), "Produk", None, true, crate::KeyType::Integer).unwrap();
         let code = read(&dir, "src/app/produk/model.rs");
         assert!(
             code.contains(r#"#[model(table = "produk")]"#) && code.contains("pub struct Produk {")
@@ -799,7 +830,27 @@ mod tests {
             .collect();
         assert_eq!(migrations.len(), 2, "up and down");
 
-        model(dir.path(), "Kategori", Some("produk"), false).unwrap();
+        model(
+            dir.path(),
+            "Kategori",
+            Some("produk"),
+            false,
+            crate::KeyType::Integer,
+        )
+        .unwrap();
+        model(
+            dir.path(),
+            "Faktur",
+            Some("produk"),
+            false,
+            crate::KeyType::Ulid,
+        )
+        .unwrap();
+        let faktur = read(&dir, "src/app/produk/faktur.rs");
+        assert!(
+            faktur.starts_with("use renox::db::Ulid;\n") && faktur.contains("    pub id: Ulid,\n"),
+            "{faktur}"
+        );
         assert!(
             dir.path().join("src/app/produk/kategori.rs").exists(),
             "model.rs is taken"
@@ -830,7 +881,14 @@ mod tests {
             assert!(mods.contains(m), "{mods}");
         }
         assert!(
-            model(dir.path(), "Order", Some("nope"), false).is_err(),
+            model(
+                dir.path(),
+                "Order",
+                Some("nope"),
+                false,
+                crate::KeyType::Integer
+            )
+            .is_err(),
             "unknown module"
         );
 

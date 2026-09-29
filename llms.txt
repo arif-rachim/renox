@@ -126,7 +126,8 @@ Every example has a README.md that walks through it.
 - [examples/fields](examples/fields) ([README](examples/fields/README.md)): every form field type (text, textarea, number, money,
   checkbox, select → `DbEnum`, multi-select → `Json<Vec<String>>`, time, datetime-local, date,
   UUID) saved and shown back in the edit form, on SQLite and PostgreSQL; list items checked
-  with `each` + `one_of` and `distinct`. The mapping table is
+  with `each` + `one_of` and `distinct`; products keyed by `id: Uuid` (a model key other than
+  an integer, M22). The mapping table is
   [docs/types.md](docs/types.md). [src/app/products/mod.rs](examples/fields/src/app/products/mod.rs),
   [form.html](examples/fields/resources/views/products/form.html),
   [tests/products.rs](examples/fields/tests/products.rs)
@@ -170,7 +171,8 @@ Every example has a README.md that walks through it.
   jobs, middleware (overlap, rate limits), encrypted payloads, chains and batches with
   progress, the dashboard, testing jobs; mapped to Laravel's.
 - [docs/relations.md](docs/relations.md): relations without N+1 (`belongs_to`, `has_many`, `Pivot`
-  with pivot columns, polymorphic `Morph`), joins with `fetch_as` and `#[derive(FromRow)]`, the query builder mapped to Laravel's.
+  with pivot columns, polymorphic `Morph`), keys other than integers (`Pivot<Ulid, i64>`), joins
+  with `fetch_as` and `#[derive(FromRow)]`, the query builder mapped to Laravel's.
 - [docs/stability.md](docs/stability.md): what semver covers, which types may grow
   (`#[non_exhaustive]`), public dependencies (axum yes, sqlx only through escape hatches).
 - `rnx make:deploy` writes `deploy/README.md` (Docker, systemd, Litestream backups).

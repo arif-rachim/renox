@@ -1,6 +1,6 @@
 use std::future::Future;
 
-use super::{DateTime, Db, DbValue, Executor, Query, ToDbValue, now, quote, sql};
+use super::{DateTime, Db, DbValue, Executor, ModelKey, Query, ToDbValue, now, quote, sql};
 use crate::{Error, Result};
 use anyhow::anyhow;
 
@@ -27,7 +27,9 @@ use anyhow::anyhow;
 /// # let _ = murah; Ok(()) }
 /// ```
 ///
-/// The primary key is an `id: i64` column; `0` means "not saved yet".
+/// The primary key is the `id` column. Its type is the `id` field's: `i64`
+/// (numbered by the database; `0` means "not saved yet"), or a
+/// [`Ulid`](super::Ulid), a UUID or a `String` (see [`ModelKey`]).
 pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
     const TABLE: &'static str;
     /// Every column, including `id`.
@@ -40,8 +42,11 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
     /// The built-in `User` does this to keep the app's own columns.
     const SELECT_ALL: bool = false;
 
-    fn id(&self) -> i64;
-    fn set_id(&mut self, id: i64);
+    /// The type of the `id` field.
+    type Key: ModelKey;
+
+    fn id(&self) -> Self::Key;
+    fn set_id(&mut self, id: Self::Key);
     /// Values of every column except `id`, in `COLUMNS` order.
     fn values(&self) -> Vec<DbValue>;
     /// Updates `created_at` / `updated_at` if the model has them.
@@ -133,7 +138,7 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
 
     fn find<'c, E: Executor<'c>>(
         db: E,
-        id: i64,
+        id: Self::Key,
     ) -> impl Future<Output = Result<Option<Self>>> + Send {
         Self::query().where_eq("id", id).first(db)
     }
@@ -141,9 +146,9 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
     /// The rows with these ids, in id order (missing ids are skipped).
     fn find_many<'c, E: Executor<'c>>(
         db: E,
-        ids: impl IntoIterator<Item = i64>,
+        ids: impl IntoIterator<Item = Self::Key>,
     ) -> impl Future<Output = Result<Vec<Self>>> + Send {
-        let ids: Vec<i64> = ids.into_iter().collect();
+        let ids: Vec<Self::Key> = ids.into_iter().collect();
         Self::query().where_in("id", ids).order_by("id").get(db)
     }
 
@@ -196,37 +201,51 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
     /// Like `find`, but a missing row becomes a 404 response.
     fn find_or_404<'c, E: Executor<'c>>(
         db: E,
-        id: i64,
+        id: Self::Key,
     ) -> impl Future<Output = Result<Self>> + Send {
-        async move { Self::find(db, id).await?.ok_or(Error::NotFound) }
+        let found = Self::find(db, id);
+        async move { found.await?.ok_or(Error::NotFound) }
     }
 
-    /// Saves a new model and returns it with its id and timestamps.
+    /// Inserts a new model and returns it with its id and timestamps.
     fn create<'c, E: Executor<'c>>(
         db: E,
         mut model: Self,
     ) -> impl Future<Output = Result<Self>> + Send {
         async move {
-            model.save(db).await?;
+            model.insert(db).await?;
             Ok(model)
         }
     }
 
-    /// Inserts the model if its id is `0`, otherwise updates its row.
-    fn save<'c, E: Executor<'c>>(&mut self, db: E) -> impl Future<Output = Result> + Send {
+    /// Inserts the model as a new row, whatever its id: an unsaved id gets a
+    /// new key (from the database for `i64`, a new ULID or UUID v7), a set
+    /// one is written as it is (a `String` key must be set).
+    fn insert<'c, E: Executor<'c>>(&mut self, db: E) -> impl Future<Output = Result> + Send {
         async move {
-            let creating = self.id() == 0;
-            self.saving(creating)?;
-            self.touch(now(), creating);
-            let columns: Vec<String> = Self::COLUMNS
+            self.saving(true)?;
+            self.touch(now(), true);
+            if self.id().is_unsaved()
+                && let Some(key) = Self::Key::generate()
+            {
+                self.set_id(key);
+            }
+            let key = self.id();
+            let mut columns: Vec<String> = Self::COLUMNS
                 .iter()
                 .filter(|c| **c != "id")
                 .map(|c| quote(c))
                 .collect();
-            let values = self.values();
+            let mut values = self.values();
             let table = quote(Self::TABLE);
-
-            if creating {
+            if key.is_unsaved() {
+                if !<Self::Key as ModelKey>::AUTO_INCREMENT {
+                    return Err(anyhow!(
+                        "set the `id` of a new {} row before inserting it",
+                        Self::TABLE
+                    )
+                    .into());
+                }
                 let sql_text = if columns.is_empty() {
                     format!("INSERT INTO {table} DEFAULT VALUES RETURNING id")
                 } else {
@@ -236,26 +255,56 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
                         columns.join(", ")
                     )
                 };
-                let id: i64 = sql(sql_text).bind_all(values).scalar(db).await?;
+                let id: Self::Key = sql(sql_text).bind_all(values).scalar(db).await?;
                 self.set_id(id);
             } else {
-                if columns.is_empty() {
-                    return self.saved(false).await;
-                }
-                let sets: Vec<String> = columns.iter().map(|c| format!("{c} = ?")).collect();
-                let changed = sql(format!(
-                    "UPDATE {table} SET {} WHERE id = ?",
-                    sets.join(", ")
+                columns.insert(0, quote("id"));
+                values.insert(0, key.to_db_value());
+                let marks = vec!["?"; columns.len()].join(", ");
+                sql(format!(
+                    "INSERT INTO {table} ({}) VALUES ({marks})",
+                    columns.join(", ")
                 ))
                 .bind_all(values)
-                .bind(self.id())
                 .execute(db)
                 .await?;
-                if changed == 0 {
-                    return Err(Error::NotFound);
-                }
             }
-            self.saved(creating).await
+            self.saved(true).await
+        }
+    }
+
+    /// Inserts the model if its id is unsaved (`0`, an empty ULID…),
+    /// otherwise updates its row.
+    fn save<'c, E: Executor<'c>>(&mut self, db: E) -> impl Future<Output = Result> + Send {
+        async move {
+            if self.id().is_unsaved() {
+                return self.insert(db).await;
+            }
+            self.saving(false)?;
+            self.touch(now(), false);
+            let columns: Vec<String> = Self::COLUMNS
+                .iter()
+                .filter(|c| **c != "id")
+                .map(|c| quote(c))
+                .collect();
+            let values = self.values();
+            let table = quote(Self::TABLE);
+            if columns.is_empty() {
+                return self.saved(false).await;
+            }
+            let sets: Vec<String> = columns.iter().map(|c| format!("{c} = ?")).collect();
+            let changed = sql(format!(
+                "UPDATE {table} SET {} WHERE id = ?",
+                sets.join(", ")
+            ))
+            .bind_all(values)
+            .bind(self.id())
+            .execute(db)
+            .await?;
+            if changed == 0 {
+                return Err(Error::NotFound);
+            }
+            self.saved(false).await
         }
     }
 
@@ -385,7 +434,7 @@ async fn update_columns<'c, M: Model, E: Executor<'c>>(
     db: E,
     columns: Vec<String>,
 ) -> Result {
-    if model.id() == 0 {
+    if model.id().is_unsaved() {
         return Err(anyhow!("save_only on an unsaved {} row", M::TABLE).into());
     }
     for column in &columns {

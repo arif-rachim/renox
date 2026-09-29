@@ -54,6 +54,8 @@ step "every generator"
 "$RNX" make:model Product --module catalog --migration
 "$RNX" make:module stock_movement
 "$RNX" make:model StockMovement -m
+"$RNX" make:model Invoice --module catalog --key ulid -m
+"$RNX" make:model Supplier --module catalog --key string -m
 "$RNX" make:job SendReceipt --module catalog
 "$RNX" make:command catalog:import --module catalog
 "$RNX" make:policy Product --module catalog

@@ -109,6 +109,23 @@ pub struct CheatSheet;
 /// struct NoId { name: String }
 /// ```
 ///
+/// The `id` must be a key type (`i64`, `Ulid`, `Uuid` or `String`):
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model)]
+/// struct FloatId { id: f64, name: String }
+/// ```
+/// …which these are:
+/// ```
+/// # use renox::prelude::*;
+/// #[derive(Model)]
+/// struct Numbered { id: i64, name: String }
+/// #[derive(Model)]
+/// struct Coded { id: String, name: String }
+/// #[derive(Model)]
+/// struct Sortable { id: renox::db::Ulid, name: String }
+/// ```
+///
 /// `soft_deletes` needs `deleted_at`:
 /// ```compile_fail
 /// # use renox::prelude::*;

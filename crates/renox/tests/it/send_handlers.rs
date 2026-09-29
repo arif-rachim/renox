@@ -350,6 +350,70 @@ async fn polish(State(state): State<AppState>, user: AuthUser) -> Result<String>
     ))
 }
 
+/// M22: a ULID-keyed model through the same loaders.
+#[derive(Model, serde::Serialize, Default, Clone)]
+#[model(table = "docs")]
+struct Doc {
+    id: renox::db::Ulid,
+    title: String,
+}
+
+#[derive(Model, serde::Serialize, Default, Clone)]
+#[model(table = "pages")]
+struct Page {
+    id: i64,
+    doc_id: renox::db::Ulid,
+}
+
+const DOC_TAGS: Pivot<renox::db::Ulid, i64> = Pivot::new("doc_tags", "doc_id", "tag_id");
+
+async fn keyed(State(db): State<Db>) -> Result<String> {
+    let mut doc = Doc {
+        title: "Handbook".into(),
+        ..Default::default()
+    };
+    doc.insert(&db).await?;
+    let doc = Doc::find_or_404(&db, doc.id.clone()).await?;
+    Page::create(
+        &db,
+        Page {
+            doc_id: doc.id.clone(),
+            ..Default::default()
+        },
+    )
+    .await?;
+    let docs = Doc::find_many(&db, [doc.id.clone()]).await?;
+    let pages = Page::query().get(&db).await?;
+    let parents = belongs_to::<Doc, _, _>(&db, &pages, |p| p.doc_id.clone()).await?;
+    let children = has_many(&db, &docs, Page::query(), "doc_id", |p| p.doc_id.clone()).await?;
+    let counts = renox::db::relations::count_many(&db, &docs, Page::query(), "doc_id").await?;
+    DOC_TAGS.attach(&db, doc.id.clone(), [1]).await?;
+    DOC_TAGS.sync(&db, doc.id.clone(), [1, 2]).await?;
+    DOC_TAGS.toggle(&db, doc.id.clone(), [2]).await?;
+    let tags = DOC_TAGS.load_for::<Tag, _>(&db, &docs).await?;
+    let morph = renox::db::relations::Morph::new("title", "id")
+        .parents::<Doc, _>(&db, &pages, |p| ("docs".into(), p.doc_id.clone()))
+        .await?;
+    let mut chunked = 0;
+    Doc::query()
+        .chunk(&db, 10, |rows| {
+            chunked += rows.len();
+            async { Ok(()) }
+        })
+        .await?;
+    let page = Doc::query().cursor_paginate(&db, None, 10).await?;
+    Ok(format!(
+        "{} {} {} {} {} {} {chunked} {}",
+        parents.len(),
+        children.len(),
+        counts[&doc.id],
+        tags[&doc.id].len(),
+        morph.len(),
+        docs.len(),
+        page.items.len()
+    ))
+}
+
 struct Handlers;
 
 impl Module for Handlers {
@@ -368,6 +432,7 @@ impl Module for Handlers {
             .get("/cache", cache)
             .get("/background", background)
             .get("/polish", polish)
+            .get("/keyed", keyed)
     }
 }
 
@@ -384,6 +449,9 @@ async fn data_apis_work_in_routed_handlers() {
         ),
         format!("CREATE TABLE tags (id {id}, note_id BIGINT, name TEXT NOT NULL)"),
         "CREATE TABLE note_tags (note_id BIGINT NOT NULL, tag_id BIGINT NOT NULL)".into(),
+        "CREATE TABLE docs (id TEXT PRIMARY KEY, title TEXT NOT NULL)".into(),
+        format!("CREATE TABLE pages (id {id}, doc_id TEXT NOT NULL)"),
+        "CREATE TABLE doc_tags (doc_id TEXT NOT NULL, tag_id BIGINT NOT NULL)".into(),
         "INSERT INTO notes (body) VALUES ('x')".into(),
         "INSERT INTO tags (note_id, name) VALUES (1, 'kopi'), (NULL, 'teh')".into(),
     ] {
@@ -402,4 +470,8 @@ async fn data_apis_work_in_routed_handlers() {
         .await
         .assert_ok()
         .assert_see("true false 2 3 true true");
+    app.get("/keyed")
+        .await
+        .assert_ok()
+        .assert_see("1 1 1 1 1 1 1 1");
 }

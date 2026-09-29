@@ -83,6 +83,8 @@ impl Model for User {
         "updated_at",
     ];
 
+    type Key = i64;
+
     fn id(&self) -> i64 {
         self.id
     }
