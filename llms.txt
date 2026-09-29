@@ -134,7 +134,8 @@ Every example has a README.md that walks through it.
 - [docs/postgresql.md](docs/postgresql.md): PostgreSQL apps, migrations per database, SQL that runs
   on both, tests with `TEST_DATABASE_URL`, moving data from SQLite.
 - [docs/operations.md](docs/operations.md): running in production: logs (JSON, files, request
-  ids), error reports (`App::report`), error pages, the debug inspector, timeouts, `TRUSTED_PROXIES`,
+  ids), error reports (`App::report`), error pages, the debug inspector, deploys without refused
+  connections (systemd socket activation), database sessions, timeouts, `TRUSTED_PROXIES`,
   `/health`, what happens when the database or SMTP fails, recovering failed jobs and webhook
   calls, backups (and what `APP_KEY` protects), migrations at deploy, the scheduler's time zone,
   tables to prune, maintenance mode.

@@ -104,7 +104,8 @@ impl Module for Guestbook {
   `.require_role(…)`, `.require_permission(…)`, `.require_ability(…)` for API tokens,
   `.require_password_confirmed()`) and rate limits (`.throttle(60, Duration::from_secs(60))`, or
   a named limiter that picks the limit per user or API key: `.throttle_by("api")`).
-- Encrypted cookie sessions, flash messages and old input come built in. CSRF protection is
+- Encrypted cookie sessions (or `SESSION_DRIVER=database`), flash messages and old input come
+  built in. CSRF protection is
   automatic for forms and htmx.
 - `_method` spoofing lets plain forms send PUT and DELETE.
 - Security headers and a Content-Security-Policy are on by default, and CORS can be enabled per
@@ -263,6 +264,9 @@ rnx route:list                                    # every route with its name, m
 rnx db:shell                                      # SQL prompt, no sqlite3/psql needed
 rnx build && rnx make:deploy                      # dist/blog + Dockerfile, systemd, Litestream
 ```
+
+`rnx make:deploy` also writes a systemd socket unit: deploys then restart the app without
+refusing a single connection.
 
 In production, timeouts keep a slow database or mail server from holding requests, `/health`
 feeds your load balancer, and panics in handlers, jobs and tasks are contained. CI checks this by

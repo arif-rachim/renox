@@ -61,6 +61,10 @@ const FILES: &[(&str, &str)] = &[
         include_str!("../stubs/deploy/service.stub"),
     ),
     (
+        "deploy/{{name}}.socket",
+        include_str!("../stubs/deploy/socket.stub"),
+    ),
+    (
         "deploy/litestream.yml",
         include_str!("../stubs/deploy/litestream.stub"),
     ),
@@ -124,6 +128,12 @@ mod tests {
         assert!(
             unit.contains("Description=Toko Kopi")
                 && unit.contains("ExecStartPre=/opt/toko-kopi/toko-kopi migrate")
+        );
+        let socket = fs::read_to_string(dir.path().join("deploy/toko-kopi.socket")).unwrap();
+        assert!(
+            socket.contains("Description=Toko Kopi (listening socket)")
+                && socket.contains("ListenStream=127.0.0.1:3000"),
+            "{socket}"
         );
         assert!(
             fs::read_to_string(dir.path().join("deploy/litestream.yml"))

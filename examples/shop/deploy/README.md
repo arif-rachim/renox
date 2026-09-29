@@ -26,6 +26,50 @@ compiled in) plus a `.env` file and a `storage/` directory.
 4. Updates: copy the new binary and `sudo systemctl restart shop`
    (migrations run before it starts).
 
+## Deploys without refused connections
+
+Out of the box, a restart closes the port for the second or two the app takes
+to stop and start; visitors in that moment get "connection refused". With
+systemd socket activation, systemd keeps the port open and queues them:
+
+```bash
+sudo cp deploy/shop.socket /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now shop.socket
+sudo systemctl restart shop     # from now on: waits, never refuses
+```
+
+Keep `ListenStream` in the socket file equal to `APP_HOST:APP_PORT`. The
+service stops gracefully on SIGTERM (running jobs finish first), then the new
+binary runs its migrations and takes over the same socket.
+
+Migrations must work with the old and the new code for that moment (and
+while a second server is still on the old version):
+
+- add a column as nullable or with a default, and backfill it later;
+- rename or drop a column in two deploys: first stop using it, then drop it;
+- a long backfill belongs in a job or a command, not in the migration.
+
+For deploys that must never pause (a slow start, a warm cache), run two copies
+behind Caddy (ports 3000 and 3001, each with its own `APP_PORT`) and restart
+them one at a time; Caddy sends traffic to the one that answers `/health`:
+
+```
+your-domain.com {
+    reverse_proxy 127.0.0.1:3000 127.0.0.1:3001 {
+        lb_policy first
+        health_uri /health
+        health_interval 2s
+        lb_try_duration 10s
+    }
+}
+```
+
+Two copies can share one SQLite file on the same machine; the queue and the
+scheduler already take each job and each run once. Use `CACHE_STORE=database`
+(and `SESSION_DRIVER=database` if sessions outgrow a cookie) so both copies
+see the same rate limits, locks and sessions.
+
 ## Backups with Litestream
 
 For SQLite apps. On PostgreSQL, set `DATABASE_URL` to the server instead and use

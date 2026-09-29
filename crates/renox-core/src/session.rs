@@ -35,6 +35,19 @@ struct Inner {
     token: String,
     /// Minutes this session lasts instead of `SESSION_LIFETIME` ("remember me").
     lifetime: Option<u64>,
+    /// The session needs a new id (login, logout): with `SESSION_DRIVER=database`
+    /// the old row is deleted, so a copy of the old cookie stops working.
+    rotate: bool,
+}
+
+/// What the encrypted cookie holds: the whole session (`SESSION_DRIVER=cookie`)
+/// or its id (`database`). A database app still reads a whole-session cookie,
+/// so switching drivers logs nobody out (and `TestApp` can write one).
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+enum Stored {
+    Handle { sid: String },
+    Full(Payload),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -81,6 +94,7 @@ impl Session {
                 flash_next: Map::new(),
                 token: p.token,
                 lifetime: p.lifetime,
+                rotate: false,
             },
             None => Inner {
                 token: random_token(),
@@ -197,7 +211,9 @@ impl Session {
 
     /// Issues a new CSRF token, e.g. after logging in.
     pub fn regenerate_token(&self) {
-        self.lock().token = random_token();
+        let mut inner = self.lock();
+        inner.token = random_token();
+        inner.rotate = true;
     }
 
     /// Removes all data and flashed values and issues a new CSRF token.
@@ -205,8 +221,13 @@ impl Session {
         let mut inner = self.lock();
         *inner = Inner {
             token: random_token(),
+            rotate: true,
             ..Inner::default()
         };
+    }
+
+    fn take_rotate(&self) -> bool {
+        std::mem::take(&mut self.lock().rotate)
     }
 
     pub(crate) fn lifetime(&self) -> Option<u64> {
@@ -244,8 +265,16 @@ pub(crate) async fn middleware(
 ) -> Response {
     let config = &state.config;
     let now = unix_now();
-    let payload = read_cookie(req.headers(), &config.session_cookie, &state.key)
-        .filter(|payload| payload.expires > now);
+    let database = config.session_driver == "database";
+    let (sid, payload) = match read_cookie(req.headers(), &config.session_cookie, &state.key) {
+        Some(Stored::Handle { sid }) if database => {
+            let payload = store::load(&state, &sid, now).await;
+            (payload.is_some().then_some(sid), payload)
+        }
+        Some(Stored::Full(payload)) if payload.expires > now => (None, Some(payload)),
+        _ => (None, None),
+    };
+    let loaded = payload.as_ref().map(store::fingerprint);
     let session = Session::new(payload);
     req.extensions_mut().insert(session.clone());
 
@@ -253,7 +282,28 @@ pub(crate) async fn middleware(
 
     let lifetime = session.lifetime().unwrap_or(config.session_lifetime) * 60;
     let payload = session.to_payload(now + lifetime);
-    let value = match serde_json::to_string(&payload) {
+    let stored = if database {
+        let rotate = session.take_rotate();
+        let (sid, fresh) = match sid {
+            Some(old) if rotate => {
+                store::destroy(&state, &old).await;
+                (random_token(), true)
+            }
+            Some(sid) => (sid, false),
+            None => (random_token(), true),
+        };
+        // A new id has no row yet, whatever the session holds.
+        let changed = fresh || loaded.as_deref() != Some(store::fingerprint(&payload).as_str());
+        if let Err(err) = store::save(&state, &sid, &payload, now, changed).await {
+            tracing::error!(error = ?err, "could not save the session");
+            return res;
+        }
+        store::maybe_prune(&state, now);
+        Stored::Handle { sid }
+    } else {
+        Stored::Full(payload)
+    };
+    let value = match serde_json::to_string(&stored) {
         Ok(value) => value,
         Err(err) => {
             tracing::error!(error = %err, "could not serialize the session");
@@ -274,7 +324,8 @@ pub(crate) async fn middleware(
         if encoded.len() > 4000 {
             tracing::warn!(
                 bytes = encoded.len(),
-                "the session cookie is larger than browsers reliably store"
+                "the session cookie is larger than browsers reliably store; \
+                 SESSION_DRIVER=database keeps sessions on the server"
             );
         }
         if let Ok(value) = HeaderValue::from_str(&encoded) {
@@ -284,7 +335,154 @@ pub(crate) async fn middleware(
     res
 }
 
-fn read_cookie(headers: &HeaderMap, name: &str, key: &Key) -> Option<Payload> {
+/// The `sessions` table (`SESSION_DRIVER=database`).
+mod store {
+    use super::Payload;
+    use crate::{AppState, Result};
+
+    /// Rows are keyed by the id's hash, so the table alone takes over nothing.
+    fn key(sid: &str) -> String {
+        crate::webhook::sha256_hex(sid)
+    }
+
+    /// What decides whether a session changed (not its expiry).
+    pub(super) fn fingerprint(payload: &Payload) -> String {
+        serde_json::to_string(&(
+            &payload.data,
+            &payload.flash,
+            &payload.token,
+            payload.lifetime,
+        ))
+        .unwrap_or_default()
+    }
+
+    pub(super) async fn load(state: &AppState, sid: &str, now: u64) -> Option<Payload> {
+        let key = key(sid);
+        if let Some(mirror) = &state.session_mirror {
+            return mirror
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .get(&key)
+                .and_then(|json| serde_json::from_str::<Payload>(json).ok())
+                .filter(|p| p.expires > now);
+        }
+        let row: Option<String> =
+            crate::db::sql("SELECT payload FROM sessions WHERE id = ? AND expires_at > ?")
+                .bind(key)
+                .bind(now as i64)
+                .scalar_optional(&state.db)
+                .await
+                .map_err(|err| tracing::error!(error = ?err, "could not read a session"))
+                .ok()
+                .flatten();
+        row.and_then(|json| serde_json::from_str(&json).ok())
+    }
+
+    /// Writes the session when it changed, and otherwise at most once a
+    /// minute to move its expiry along.
+    pub(super) async fn save(
+        state: &AppState,
+        sid: &str,
+        payload: &Payload,
+        now: u64,
+        changed: bool,
+    ) -> Result {
+        let key = key(sid);
+        let json = serde_json::to_string(payload).map_err(anyhow::Error::from)?;
+        if let Some(mirror) = &state.session_mirror {
+            mirror
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .insert(key, json);
+            return Ok(());
+        }
+        let user_id = payload
+            .data
+            .get(crate::auth::AUTH_ID)
+            .and_then(serde_json::Value::as_i64);
+        if changed {
+            crate::db::sql(
+                "INSERT INTO sessions (id, user_id, payload, expires_at, last_activity) \
+                 VALUES (?, ?, ?, ?, ?) ON CONFLICT (id) DO UPDATE SET user_id = excluded.user_id, \
+                 payload = excluded.payload, expires_at = excluded.expires_at, \
+                 last_activity = excluded.last_activity",
+            )
+            .bind(key)
+            .bind(user_id)
+            .bind(json)
+            .bind(payload.expires as i64)
+            .bind(now as i64)
+            .execute(&state.db)
+            .await?;
+        } else {
+            crate::db::sql(
+                "UPDATE sessions SET expires_at = ?, last_activity = ? \
+                 WHERE id = ? AND last_activity < ?",
+            )
+            .bind(payload.expires as i64)
+            .bind(now as i64)
+            .bind(key)
+            .bind(now as i64 - 60)
+            .execute(&state.db)
+            .await?;
+        }
+        Ok(())
+    }
+
+    pub(super) async fn destroy(state: &AppState, sid: &str) {
+        let key = key(sid);
+        if let Some(mirror) = &state.session_mirror {
+            mirror
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .remove(&key);
+            return;
+        }
+        if let Err(err) = crate::db::sql("DELETE FROM sessions WHERE id = ?")
+            .bind(key)
+            .execute(&state.db)
+            .await
+        {
+            tracing::error!(error = ?err, "could not delete a session");
+        }
+    }
+
+    /// Now and then (1 request in 50), deletes expired sessions in the background.
+    pub(super) fn maybe_prune(state: &AppState, now: u64) {
+        if state.session_mirror.is_some() || rand::random_range(0..50) != 0 {
+            return;
+        }
+        let db = state.db.clone();
+        tokio::spawn(async move {
+            if let Err(err) = prune(&db, now).await {
+                tracing::warn!(error = ?err, "could not prune sessions");
+            }
+        });
+    }
+
+    pub(crate) async fn prune(db: &crate::db::Db, now: u64) -> Result<u64> {
+        Ok(crate::db::sql("DELETE FROM sessions WHERE expires_at <= ?")
+            .bind(now as i64)
+            .execute(db)
+            .await?)
+    }
+}
+
+impl Session {
+    /// Deletes expired rows of the `sessions` table (`SESSION_DRIVER=database`)
+    /// and returns how many; `my-app session:prune` runs it. Requests also
+    /// prune now and then, so this is for a quiet app or a schedule.
+    pub async fn prune_expired(db: &crate::db::Db) -> Result<u64> {
+        store::prune(db, unix_now()).await
+    }
+}
+
+/// The sessions table's migration, always installed (it's empty with the
+/// cookie driver).
+pub(crate) const MIGRATION: crate::db::Migration =
+    crate::db::framework_migration!("session", "00010101000210_create_sessions_table");
+
+fn read_cookie(headers: &HeaderMap, name: &str, key: &Key) -> Option<Stored> {
     let mut jar = CookieJar::new();
     for header in headers.get_all(COOKIE) {
         let Ok(header) = header.to_str() else {
@@ -311,15 +509,27 @@ pub(crate) fn from_cookie(state: &AppState, cookie_header: Option<&str>) -> Sess
     if let Some(value) = cookie_header.and_then(|v| HeaderValue::from_str(v).ok()) {
         headers.insert(COOKIE, value);
     }
-    let payload = read_cookie(&headers, &state.config.session_cookie, &state.key)
-        .filter(|payload| payload.expires > unix_now());
-    Session::new(payload)
+    let now = unix_now();
+    let payload = match read_cookie(&headers, &state.config.session_cookie, &state.key) {
+        Some(Stored::Full(payload)) => Some(payload),
+        // A database session, read back through the test mirror.
+        Some(Stored::Handle { sid }) => state.session_mirror.as_ref().and_then(|mirror| {
+            mirror
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .get(&crate::webhook::sha256_hex(&sid))
+                .and_then(|json| serde_json::from_str::<Payload>(json).ok())
+        }),
+        None => None,
+    };
+    Session::new(payload.filter(|payload| payload.expires > now))
 }
 
 /// `session` encrypted as a `name=value` cookie pair. Used by `renox::testing`.
 pub(crate) fn cookie_pair(state: &AppState, session: &Session) -> String {
     let lifetime = session.lifetime().unwrap_or(state.config.session_lifetime) * 60;
-    let value = serde_json::to_string(&session.to_payload(unix_now() + lifetime))
+    // A whole-session cookie, which the database driver reads too.
+    let value = serde_json::to_string(&Stored::Full(session.to_payload(unix_now() + lifetime)))
         .expect("session payloads serialize");
     let mut jar = CookieJar::new();
     jar.private_mut(&state.key)

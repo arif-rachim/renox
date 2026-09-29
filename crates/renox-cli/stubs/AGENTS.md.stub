@@ -98,6 +98,8 @@ rnx make:middleware StampRequests                      # also make:component
   `impl AppCommand`, registered with `app.typed_command::<T>()`); ask for missing values with
   `renox::prompt::ask/confirm/secret/choice`, and answer them in tests with
   `renox::prompt::answering([...], app.kernel().call(...))`.
+- Sessions are an encrypted cookie (~4 KB) unless `.env` says `SESSION_DRIVER=database`; don't
+  put large data in a cookie session.
 - Forms: prefer `impl Validate` hooks to code in the handler: `prepare` (tidy input),
   `authorize` (403 before the rules), `after` (database checks, errors shown on the field).
   Rules include `alpha_dash`, `uuid`, `ip`, `size`, `starts_with`, `required_without`,

@@ -662,3 +662,24 @@ async fn the_shop_speaks_indonesian_with_plurals() {
     app.get("/language/xx").await; // unknown: ignored
     app.get("/").await.assert_see("Segar dari sangrai");
 }
+
+#[renox::test]
+async fn the_shop_runs_the_same_with_database_sessions() {
+    // SESSION_DRIVER=database: login, the flashed message and the chosen
+    // language live in the `sessions` table instead of the cookie.
+    let app = TestApp::with_config(shop::app(), |c| c.session_driver = "database".into()).await;
+    let kopi = product(&app, "Kopi Susu", 25_000, 5).await;
+    let budi = customer(&app, "budi@example.com").await;
+    app.acting_as(&budi);
+    app.get("/language/id").await;
+    app.post(
+        "/cart",
+        &[("product_id", &kopi.id.to_string()), ("quantity", "2")],
+    )
+    .await;
+    app.get("/cart")
+        .await
+        .assert_see("Kopi Susu masuk keranjang.")
+        .assert_see("Rp 50.000");
+    assert_eq!(app.session_get::<String>("_locale").as_deref(), Some("id"));
+}

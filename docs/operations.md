@@ -66,8 +66,8 @@ and cache locks (`state.cache.lock`) live in the `cache` table, so they hold acr
 the default `memory` store, each server counts on its own (N servers allow N times the limit),
 and a lock only keeps out other tasks of the same process.
 
-Sessions live in their encrypted cookie, so any server can answer any request (no sticky
-sessions). Uploaded files must be on shared storage (`STORAGE_DISK=s3`) or on the one server that
+Sessions live in their encrypted cookie, or with `SESSION_DRIVER=database` in the `sessions`
+table (see Sessions); either way any server can answer any request (no sticky sessions). Uploaded files must be on shared storage (`STORAGE_DISK=s3`) or on the one server that
 has the disk.
 
 ## `/health`
@@ -179,6 +179,57 @@ re-encrypt such values with the new key before switching.
 - `migrate:rollback` undoes the last batch only if every migration in it has a `.down.sql`;
   otherwise it undoes nothing.
 
+## Deploys without refused connections
+
+A restart closes the port for the moment between the old process stopping (it finishes running
+jobs first) and the new one listening; visitors then get "connection refused". With systemd
+socket activation, systemd holds the port and queues connections while the app restarts, so a
+deploy only makes them wait. `rnx make:deploy` writes `deploy/<app>.socket`:
+
+```bash
+sudo cp deploy/shop.socket /etc/systemd/system/ && sudo systemctl daemon-reload
+sudo systemctl enable --now shop.socket
+sudo systemctl restart shop        # new binary: migrate, then take over the same socket
+```
+
+The app uses the socket systemd passes (`LISTEN_FDS`) instead of opening `APP_HOST:APP_PORT`;
+keep the socket's `ListenStream` at that address. Measured on a laptop with Renox's hello
+example and requests sent back to back through three restarts: without the socket, 280 of 1,288
+requests were refused; with it, all 1,350 answered.
+
+The same deploy runs old code against new migrations for a moment (and for longer with several
+servers), so write migrations both versions accept:
+
+- add columns as nullable or with a default; backfill in a job or a command;
+- rename or drop a column over two deploys: stop reading it, then drop it;
+- add an index with `CREATE INDEX CONCURRENTLY` on PostgreSQL (see above).
+
+When a restart must not pause at all (a slow start, a warm cache), run two copies of the app on
+two ports behind Caddy and restart them one at a time; `deploy/README.md` has the Caddyfile
+(`lb_policy first` with `health_uri /health`). They can share a SQLite file on one machine; set
+`CACHE_STORE=database` (and `SESSION_DRIVER=database` for large sessions) so both see the same
+rate limits, locks and sessions.
+
+## Sessions
+
+By default the whole session (the login, flashed messages, old input, the CSRF token) is
+encrypted into its cookie: nothing to store, but browsers drop cookies over about 4 KB, and a
+copied cookie stays valid until it expires or the user logs out (Renox then refuses it).
+
+`SESSION_DRIVER=database` keeps sessions in the `sessions` table and only an id in the cookie:
+
+- no size limit (a large cart, long old input);
+- each login and logout gives the session a new id and deletes the old row, so a copied cookie
+  stops working at once;
+- the table has `user_id`, e.g. to show a user their sessions or end them from an admin page;
+- rows are keyed by the id's SHA-256, so a copy of the table alone takes over no session.
+
+Each request reads its row, and writes it only when the session changed (or once a minute, to
+extend it). Switching drivers logs nobody out: a cookie written by the cookie driver is read and
+moved into the table. Expired rows are deleted now and then by requests, and by
+`my-app session:prune` (`Session::prune_expired(&db)`). In tests (`APP_ENV=testing`) database
+sessions are kept in memory, so `TestApp`'s session helpers keep working.
+
 ## Scheduled tasks and housekeeping
 
 The scheduler runs inside `serve` (or alone with `schedule:work`). Its times follow
@@ -199,6 +250,7 @@ hand:
 | `personal_access_tokens` | expired API tokens | `tokens:prune` (Auth module): tokens expired more than a day ago |
 | `audit_logs` | every audited action (Audit module) | `audit:prune --days 365` |
 | `revoked_sessions` | logouts | itself, on each logout |
+| `sessions` (`SESSION_DRIVER=database`) | visits | itself, now and then; `session:prune` on demand |
 | `failed_jobs` | jobs that failed for good | `queue:prune-failed --hours 168`, `queue:flush` (see Failed jobs) |
 | `job_batches` | every dispatched batch | `queue:prune-batches --hours 24` (finished batches) |
 | `webhook_calls` | every received webhook | nothing yet: delete old `processed` rows yourself if it matters |

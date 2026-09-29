@@ -63,7 +63,10 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/registry.rs          Registry: jobs, listeners, schedule, commands, channels, shares, templates
   src/routing.rs           Routes builder (get/post/…/name/group/require_auth/guest_only/
                            require_verified/throttle/cors/route_layer/merge), RouteTable + URLs
-  src/session.rs           encrypted cookie session + middleware
+  src/session.rs           session + middleware: an encrypted cookie holding the whole session
+                           (cookie driver) or its id (`Stored::Handle`, database driver:
+                           `sessions` table keyed by sha256(id), rotation on login/logout,
+                           a test mirror in `AppState::session_mirror`)
   src/csrf.rs              CSRF middleware
   src/view.rs              MiniJinja env, View response (fragment/also), render middleware, globals,
                            RequestGlobal (request globals inside imported macros), BUILTIN views
@@ -564,7 +567,8 @@ Parsed in `crates/renox-core/src/config.rs`; defaults in parentheses.
 - **Paths:** `VIEWS_PATH` (resources/views), `LANG_PATH` (resources/lang), `PUBLIC_PATH`
   (public), `STORAGE_PATH` (storage; holds `framework/down` for maintenance mode and `app/` for the
   local disk). Paths are relative to the working directory: run apps from their own directory.
-- **Sessions:** `SESSION_LIFETIME` (minutes, 120), `SESSION_COOKIE` (renox_session),
+- **Sessions:** `SESSION_DRIVER` (cookie|database), `SESSION_LIFETIME` (minutes, 120),
+  `SESSION_COOKIE` (renox_session),
   `REMEMBER_LIFETIME` (minutes, 43200).
 - **Database:** `DATABASE_URL` (sqlite://storage/app.db, or `postgres://…` with the `postgres`
   feature; other schemes fail), `DATABASE_POOL_SIZE` (8, at least 1), `DATABASE_ACQUIRE_TIMEOUT`

@@ -10,6 +10,16 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M21g · Database sessions and deploys without refused connections
+
+- `SESSION_DRIVER=database`: sessions in a `sessions` table (new framework migration
+  `00010101000210`), the cookie holds only an id; a new id at each login and logout; rows keyed
+  by the id's SHA-256; `user_id` column. Cookie sessions carry over when switching.
+  `session:prune`, `Session::prune_expired(&db)`.
+- `serve` accepts a listening socket from systemd (socket activation). `rnx make:deploy` writes
+  `deploy/<app>.socket`; its README explains deploys without refused connections, migrations
+  that old and new code both accept, and two copies behind Caddy.
+
 ### M21f · Form requests, more rules, auth pages on the kit
 
 - Form requests: `Validate` gains optional `prepare`, `authorize` (403 before the rules) and
