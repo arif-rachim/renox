@@ -12,6 +12,7 @@
     "none": "Belum ada produk.",
     "sold_out": "Habis",
     "search": "Cari",
+    "category": "Kategori", "sort_by": "Urutkan",
     "all_categories": "Semua kategori",
     "sort": { "newest": "Terbaru", "price_asc": "Termurah", "price_desc": "Termahal", "name": "Nama" },
     "found": "Satu produk ditemukan|:count produk ditemukan",

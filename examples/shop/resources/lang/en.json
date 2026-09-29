@@ -12,6 +12,7 @@
     "none": "No products yet.",
     "sold_out": "Sold out",
     "search": "Search",
+    "category": "Category", "sort_by": "Sort by",
     "all_categories": "All categories",
     "sort": { "newest": "Newest", "price_asc": "Cheapest", "price_desc": "Most expensive", "name": "Name" },
     "found": "One product found|:count products found",

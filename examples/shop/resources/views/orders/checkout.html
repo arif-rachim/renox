@@ -1,18 +1,18 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-<h1>{{ t('cart.checkout') }}</h1>
-<ul>
-  {% for line in lines %}<li>{{ line.item.quantity }} × {{ line.product.name }}: {{ line.subtotal | rupiah }}</li>{% endfor %}
-</ul>
-<p><strong>{{ t('cart.total') }}: {{ total | rupiah }}</strong></p>
+{% from "renox/ui.html" import card, textarea, button, group %}
+<h1 class="rx-title">{{ t('cart.checkout') }}</h1>
+{% call group(footer=t('cart.total') ~ ": " ~ (total | rupiah)) %}
+  {% for line in lines %}<div>{{ line.item.quantity }} × {{ line.product.name }}: {{ line.subtotal | rupiah }}</div>{% endfor %}
+{% endcall %}
 
-<form method="post" action="{{ route('checkout.place') }}">
+{# Live validation: the address is checked when it's left, before anything is sent. #}
+<form method="post" action="{{ route('checkout.place') }}" data-live-validate novalidate>
   {{ csrf_field() }}
-  <label for="address">{{ t('orders.address') }}</label>
-  <textarea id="address" name="address" rows="3">{{ old('address') }}</textarea>
-  <p class="error" data-error-for="address">{{ error('address') }}</p>
-  <p class="muted">{{ t('orders.pay_by_transfer', days=3) }}</p>
-  <button>{{ t('orders.place') }}</button>
+  {% call card() %}
+    {{ textarea("address", t('orders.address'), rows=3, required=true, hint=t('orders.pay_by_transfer', days=3)) }}
+    <div class="rx-card__footer">{{ button(t('orders.place')) }}</div>
+  {% endcall %}
 </form>
 {% endblock %}

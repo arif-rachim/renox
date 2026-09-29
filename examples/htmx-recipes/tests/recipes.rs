@@ -51,7 +51,28 @@ async fn the_modal_adds_a_row_and_closes() {
         .assert_header("hx-trigger", "task-added")
         .assert_see(r#"<li id="task-1""#)
         .assert_see(">Buy coffee<")
+        .assert_see(r#"<small id="open-count" hx-swap-oob="true">1 open</small>"#)
         .assert_dont_see("<html");
+
+    // The same task again: the server retargets the answer to the existing
+    // row (HX-Retarget, HX-Reswap) instead of adding a copy, closes the
+    // modal and says why in a toast, all in one HX-Trigger.
+    let res = app
+        .htmx()
+        .post("/tasks", &[("title", " Buy coffee ")])
+        .await;
+    res.assert_ok()
+        .assert_header("hx-retarget", "#task-1")
+        .assert_header("hx-reswap", "outerHTML")
+        .assert_see(r#"<li id="task-1""#);
+    let trigger: renox::serde_json::Value =
+        renox::serde_json::from_str(res.header("hx-trigger").unwrap()).unwrap();
+    assert!(trigger.get("task-added").is_some(), "{trigger}");
+    assert_eq!(
+        trigger["renox:toast"]["toasts"][0]["message"],
+        "That task is already on the list."
+    );
+    app.assert_database_count("tasks", 1).await;
 
     // Errors come back as 422 JSON, shown in the modal's form.
     app.htmx()
@@ -103,10 +124,20 @@ async fn checkboxes_toggle_and_rows_delete_in_place() {
         .await
         .assert_dont_see("checked");
 
-    // An empty answer: htmx swaps the row for nothing.
+    // The row's part of the answer is empty, so htmx swaps the row for
+    // nothing; the open count comes along out of band, and a toast says it.
     let res = app.htmx().delete("/tasks/1").await;
     res.assert_ok();
-    assert_eq!(res.text(), "");
+    assert_eq!(
+        res.text(),
+        r#"<small id="open-count" hx-swap-oob="true">1 open</small>"#
+    );
+    let trigger: renox::serde_json::Value =
+        renox::serde_json::from_str(res.header("hx-trigger").unwrap()).unwrap();
+    assert_eq!(
+        trigger["renox:toast"]["toasts"][0]["message"],
+        "“Task 1” deleted."
+    );
     app.delete("/tasks/2").await.assert_redirect("/");
     app.assert_database_count("tasks", 0).await;
 }
@@ -122,6 +153,7 @@ async fn bulk_actions_refresh_or_redirect() {
         .post("/tasks/clear-done", &[])
         .await
         .assert_header("hx-refresh", "true");
+    // The toast waited in the session for the reloaded page.
     app.get("/").await.assert_see("2 done tasks cleared.");
     app.assert_database_count("tasks", 1).await;
 

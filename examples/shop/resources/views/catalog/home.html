@@ -3,15 +3,24 @@
 {% block seo %}{{ seo(title=app.name, description=t('home.description')) }}{% endblock %}
 
 {% block content %}
-<h1>{{ t('home.title') }}</h1>
-<p class="categories">
-  {% for category in categories %}
-  <a href="{{ route('products.index') }}?category={{ category.slug }}">{{ category.name }}</a>
-  {% endfor %}
-</p>
-
-<h2>{{ t('home.new') }}</h2>
-<div class="grid">
-  {% for product in featured %}{% include "catalog/_card.html" %}{% else %}<p class="muted">{{ t('products.none') }}</p>{% endfor %}
+{% from "renox/ui.html" import link_button, empty %}
+<div>
+  <h1 class="rx-title">{{ t('home.title') }}</h1>
+  <p class="rx-subtitle">{{ t('home.description') }}</p>
 </div>
+{# route() with named arguments adds them as the query string: /products?category=kopi #}
+<ul class="chips" aria-label="{{ t('products.all_categories') }}">
+  {% for category in categories %}
+  <li>{{ link_button(route('products.index', category=category.slug), category.name, size="small") }}</li>
+  {% endfor %}
+</ul>
+
+<h2 class="rx-card__title">{{ t('home.new') }}</h2>
+{% if featured %}
+<div class="grid">
+  {% for product in featured %}{% include "catalog/_card.html" %}{% endfor %}
+</div>
+{% else %}
+<div class="rx-card">{{ empty(t('products.none')) }}</div>
+{% endif %}
 {% endblock %}

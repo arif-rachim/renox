@@ -654,9 +654,12 @@ pub(crate) async fn middleware(
     if let Some(crate::toast::PendingToasts(toasts)) =
         res.extensions_mut().remove::<crate::toast::PendingToasts>()
     {
-        // An htmx swap shows them now; a page (or an htmx redirect) on the
-        // next page, from the session.
-        if htmx.request && !res.headers().contains_key("hx-redirect") {
+        // An htmx swap shows them now; a page, an htmx redirect or refresh
+        // on the next page, from the session (the reload would lose them).
+        if htmx.request
+            && !res.headers().contains_key("hx-redirect")
+            && !res.headers().contains_key("hx-refresh")
+        {
             crate::htmx::add_trigger(
                 &mut res,
                 crate::toast::EVENT,
@@ -771,9 +774,29 @@ pub(crate) async fn middleware(
     }
 
     if let Some(page) = res.extensions_mut().remove::<ErrorPage>() {
-        // The app's error pages may extend its layout: give them what pages get.
-        let globals = (!wants_json || htmx.request).then(|| {
-            globals(
+        // The app's error pages may extend its layout: give them what pages
+        // get, the values `App::share`s included (a layout's cart count).
+        let globals = if !wants_json || htmx.request {
+            let mut shared = std::collections::BTreeMap::new();
+            for (key, compute) in state.shares.iter() {
+                let ctx = ViewContext {
+                    state: state.clone(),
+                    user: current_user.as_ref().and_then(|c| c.user.clone()),
+                    locale: locale.clone(),
+                    path: path.clone(),
+                };
+                // A share that fails here only leaves its value out: the page
+                // is about another error, which it mustn't hide.
+                match compute(ctx).await {
+                    Ok(value) => {
+                        shared.insert(key.clone(), value);
+                    }
+                    Err(err) => {
+                        tracing::warn!(error = ?err, key = %key, "a shared view value failed on an error page")
+                    }
+                }
+            }
+            let page_globals = globals(
                 &state,
                 session.as_ref(),
                 current_user,
@@ -785,8 +808,11 @@ pub(crate) async fn middleware(
                     events: &[],
                 },
                 &locale,
-            )
-        });
+            );
+            Some(merge_maps([page_globals, Value::from_serialize(&shared)]))
+        } else {
+            None
+        };
         return error_response(&state, page, res, wants_json, &htmx, &request_line, globals);
     }
     res

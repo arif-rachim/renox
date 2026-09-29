@@ -6,6 +6,7 @@ pub mod checkout;
 pub mod model;
 pub mod notifications;
 
+use renox::Toast;
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -116,21 +117,21 @@ impl Validate for CheckoutForm {
 async fn place(
     State(state): State<AppState>,
     user: AuthUser,
-    session: Session,
     lang: Lang,
     Valid(form): Valid<CheckoutForm>,
-) -> Result<Redirect> {
+) -> Result<Response> {
     match checkout::place(&state.db, user.id, form.address.trim()).await? {
         Checkout::Placed(order) => {
             state.emit(OrderPlaced { order_id: order.id }).await?;
-            session.flash("status", lang.t("orders.placed", &[("id", &order.id)]))?;
-            Ok(Redirect::to(&format!("/orders/{}", order.id)))
+            let toast = Toast::success(lang.t("orders.placed", &[("id", &order.id)]));
+            Ok((toast, Redirect::to(&format!("/orders/{}", order.id))).into_response())
         }
-        Checkout::EmptyCart => Ok(Redirect::to("/cart")),
+        Checkout::EmptyCart => Ok(Redirect::to("/cart").into_response()),
         Checkout::OutOfStock(names) => {
             let names = names.join(", ");
-            session.flash("error", lang.t("orders.out_of_stock", &[("names", &names)]))?;
-            Ok(Redirect::to("/cart"))
+            // An error toast stays until it's dismissed: it needs reading.
+            let toast = Toast::error(lang.t("orders.out_of_stock", &[("names", &names)]));
+            Ok((toast, Redirect::to("/cart")).into_response())
         }
     }
 }

@@ -1,29 +1,36 @@
 {% extends "layouts/app.html" %}
-{% from "renox/ui.html" import confirm %}
+{% from "renox/ui.html" import confirm, table, link_button, button, badge, empty %}
 
 {% block content %}
-<h1>Products</h1>
+<h1 class="rx-title">Products</h1>
 {% include "admin/_nav.html" %}
-<p><a class="button" href="{{ route('admin.products.create') }}">New product</a></p>
 
-<form class="filters" method="get">
-  <input type="search" name="q" value="{{ filters.q or '' }}" placeholder="Name">
-  <select name="sort">
-    {% for value in ['newest', 'name', 'price', 'stock'] %}
-    <option value="{{ value }}" {% if filters.sort == value %}selected{% endif %}>Sort by {{ value }}</option>
-    {% endfor %}
-  </select>
-  <button>Filter</button>
+<form class="toolbar" method="get" role="search">
+  <div class="rx-field">
+    <label class="rx-label" for="filter-q">Name</label>
+    <input class="rx-input" id="filter-q" type="search" name="q" value="{{ filters.q or '' }}">
+  </div>
+  <div class="rx-field">
+    <label class="rx-label" for="filter-sort">Sort by</label>
+    <select class="rx-select" id="filter-sort" name="sort">
+      {% for value in ['newest', 'name', 'price', 'stock'] %}
+      <option value="{{ value }}" {% if filters.sort == value %}selected{% endif %}>{{ value | capitalize }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {{ button("Filter", variant="secondary") }}
+  <span class="rx-spacer"></span>
+  {{ link_button(route('admin.products.create'), "New product", variant="primary") }}
 </form>
 
-<table>
-  <tr><th>Name</th><th>Price</th><th>Stock</th><th>Shown</th><th></th></tr>
+{% if products.items %}
+{% call table(["Name", ["Price", "num"], ["Stock", "num"], ["Shown", "hide-narrow"], ""], caption="Products") %}
   {% for product in products.items %}
   <tr>
-    <td><a href="{{ route('admin.products.edit', product.id) }}">{{ product.name }}</a></td>
-    <td>{{ product.price | rupiah }}</td>
-    <td>{{ product.stock }}</td>
-    <td>{{ "yes" if product.active else "no" }}</td>
+    <td><a class="rx-link" href="{{ route('admin.products.edit', product.id) }}">{{ product.name }}</a></td>
+    <td class="rx-num">{{ product.price | rupiah }}</td>
+    <td class="rx-num">{% if product.stock < 5 %}{{ badge(product.stock, kind="warning") }}{% else %}{{ product.stock }}{% endif %}</td>
+    <td class="rx-hide-narrow">{{ "Yes" if product.active else "No" }}</td>
     <td>
       {#- A sheet asks first (Cancel focused); only its button sends the DELETE. -#}
       {{ confirm("delete-" ~ product.id, "Delete", route('admin.products.destroy', product.id),
@@ -31,9 +38,10 @@
                  size="small") }}
     </td>
   </tr>
-  {% else %}
-  <tr><td colspan="5" class="muted">No products.</td></tr>
   {% endfor %}
-</table>
+{% endcall %}
 {% from "renox/pagination.html" import pagination %}{{ pagination(products) }}
+{% else %}
+<div class="rx-card">{{ empty("No products.", "Add the first one; it shows in the shop once it's marked as shown.", route('admin.products.create'), "New product") }}</div>
+{% endif %}
 {% endblock %}

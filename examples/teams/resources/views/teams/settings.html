@@ -1,30 +1,37 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-<h1>{{ team.name }}</h1>
+{% from "renox/ui.html" import card, input, button, badge, table, open_button, sheet %}
+<h1 class="rx-title">{{ team.name }}</h1>
 
-<h2>Members</h2>
-<table>
+{% call table(["Name", ["Email", "hide-narrow"], "Role"], caption="Members") %}
   {% for member, membership in members %}
-  <tr><td>{{ member.name }}</td><td>{{ member.email }}</td><td><span class="badge">{{ membership.role }}</span></td></tr>
+  <tr><td>{{ member.name }}</td><td class="rx-hide-narrow">{{ member.email }}</td><td>{{ badge(membership.role) }}</td></tr>
   {% endfor %}
-</table>
+{% endcall %}
 
 {% if manage %}
-<form method="post" action="{{ route('team.members.store') }}">
+{#- A form request (MemberForm): only owners get through `authorize`, and `after` looks the
+    email up. With data-live-validate, that lookup already runs when the field is left. -#}
+<form method="post" action="{{ route('team.members.store') }}" data-live-validate novalidate>
   {{ csrf_field() }}
-  <label>Add a member by email <input name="email" type="email" value="{{ old('email') }}"></label>
-  <p class="error" data-error-for="email">{{ error('email') }}</p>
-  <button>Add member</button>
+  {% call card(title="Add member") %}
+    {{ input("email", "Email", type="email", required=true, autocomplete="off",
+             hint="Someone who has signed up; they join as a member.") }}
+    <div class="rx-card__footer">{{ button("Add member") }}</div>
+  {% endcall %}
 </form>
 
-<h2>Webhook secret</h2>
-{% if secret %}
-<p><code>{{ secret }}</code> <a href="{{ route('team.secret') }}">Reveal</a></p>
-{% else %}
-<p class="muted">No secret yet.</p>
-<form method="post" action="{{ route('team.secret.rotate') }}">{{ csrf_field() }}<button>Make one</button></form>
-{% endif %}
-<p class="muted">It's stored encrypted; showing or changing it asks for your password.</p>
+{% call card(title="Webhook secret", subtitle="It's stored encrypted; showing or changing it asks for your password.") %}
+  {% if secret %}
+  <p class="secret">{{ secret }}</p>
+  <div class="rx-card__footer">
+    <a class="rx-button rx-button--secondary" href="{{ route('team.secret') }}"><span class="rx-button__label">Reveal</span></a>
+  </div>
+  {% else %}
+  <p class="rx-subtitle">No secret yet.</p>
+  <form method="post" action="{{ route('team.secret.rotate') }}" class="rx-card__footer">{{ csrf_field() }}{{ button("Make one") }}</form>
+  {% endif %}
+{% endcall %}
 {% endif %}
 {% endblock %}

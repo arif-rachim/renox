@@ -2,32 +2,47 @@
 <html lang="{{ app.locale }}">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
   {% block seo %}{{ seo() }}{% endblock %}
-  <link rel="stylesheet" href="{{ asset('app.css') }}">
   {{ renox_head() }}
-  {#- The UI kit's script and styles (rx-* classes only), for the confirmation sheet. -#}
+  {#- The UI kit (renox/ui.html): fields, tables, badges, sheets, menus, toasts. -#}
   {{ renox_ui() }}
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
+  {{ stack('head') }}
 </head>
-<body>
-  <nav>
-    <a href="{{ route('home') }}"><strong>{{ app.name }}</strong></a>
-    <a href="{{ route('products.index') }}">{{ t('nav.products') }}</a>
-    {% if auth.check %}
-    <a href="{{ route('cart.show') }}">{{ t('nav.cart') }} ({{ cart_count }})</a>
-    <a href="{{ route('orders.index') }}">{{ t('nav.orders') }}</a>
-    {% if 'admin' in auth.roles %}<a href="{{ route('admin.dashboard') }}">Admin</a>{% endif %}
-    <form method="post" action="{{ route('logout') }}">{{ csrf_field() }}<button>{{ t('nav.logout') }}</button></form>
-    {% else %}
-    <a href="{{ route('login') }}">{{ t('nav.login') }}</a>
-    <a href="{{ route('register') }}">{{ t('nav.register') }}</a>
-    {% endif %}
-    <span class="lang"><a href="{{ route('language', 'id') }}">ID</a> · <a href="{{ route('language', 'en') }}">EN</a></span>
-  </nav>
-  <main>
-    {% if flash.status %}<p class="flash">{{ flash.status }}</p>{% endif %}
-    {% if flash.error %}<p class="flash flash-error">{{ flash.error }}</p>{% endif %}
-    {% block content %}{% endblock %}
+<body class="rx-page">
+  <a class="rx-visually-hidden skip" href="#main">Skip to content</a>
+  {% from "renox/ui.html" import menu, menu_link, menu_action, menu_separator, link_button, alert %}
+  <header class="bar">
+    <nav class="bar__inner" aria-label="Main">
+      <a class="bar__brand" href="{{ route('home') }}">{{ app.name }}</a>
+      <a class="bar__link" href="{{ route('products.index') }}">{{ t('nav.products') }}</a>
+      <span class="rx-spacer"></span>
+      {% if auth.check %}
+        <a class="bar__link" href="{{ route('cart.show') }}">{{ t('nav.cart') }} ({{ cart_count }})</a>
+        {% call menu(auth.user.name, id="account-menu", variant="plain") %}
+          {{ menu_link(route('orders.index'), t('nav.orders')) }}
+          {% if 'admin' in auth.roles %}{{ menu_link(route('admin.dashboard'), "Admin") }}{% endif %}
+          {{ menu_separator() }}
+          {{ menu_action(route('logout'), t('nav.logout')) }}
+        {% endcall %}
+      {% else %}
+        {{ link_button(route('login'), t('nav.login'), variant="plain", size="small") }}
+        {{ link_button(route('register'), t('nav.register'), variant="primary", size="small") }}
+      {% endif %}
+      <span class="bar__lang"><a class="rx-link" href="{{ route('language', 'id') }}" lang="id">ID</a> · <a class="rx-link" href="{{ route('language', 'en') }}" lang="en">EN</a></span>
+    </nav>
+  </header>
+  <main class="rx-container rx-container--wide" id="main">
+    <div class="rx-stack">
+      {#- Messages the Auth module flashes; the shop's own use toasts. -#}
+      {% if flash.status %}{{ alert(flash.status, kind="success") }}{% endif %}
+      {% block content %}{% endblock %}
+    </div>
   </main>
+  {#- Toasts from `(Toast::success(…), Redirect)`: "Kopi is in your cart." -#}
+  {{ toasts() }}
+  {{ stack('scripts') }}
 </body>
 </html>

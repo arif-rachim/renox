@@ -188,9 +188,33 @@ pub(crate) fn add_trigger<B>(
         None => Map::new(),
     };
     triggers.insert(name.to_owned(), detail);
-    if let Ok(value) = axum::http::HeaderValue::from_str(&Value::Object(triggers).to_string()) {
-        res.headers_mut().insert("hx-trigger", value);
+    // Headers are ASCII: "“Kopi” masuk keranjang ✓" goes as \u escapes, which
+    // JSON.parse turns back into the same text.
+    let json = ascii_json(&Value::Object(triggers).to_string());
+    match axum::http::HeaderValue::from_str(&json) {
+        Ok(value) => {
+            res.headers_mut().insert("hx-trigger", value);
+        }
+        Err(err) => tracing::warn!(error = %err, "could not send an HX-Trigger header"),
     }
+}
+
+/// JSON text with every non-ASCII character written as `\uXXXX` (a pair
+/// of them above U+FFFF). serde_json only leaves such characters inside
+/// strings, where the escapes mean the same.
+fn ascii_json(json: &str) -> String {
+    let mut out = String::with_capacity(json.len());
+    for c in json.chars() {
+        if c.is_ascii() {
+            out.push(c);
+        } else {
+            let mut units = [0u16; 2];
+            for unit in c.encode_utf16(&mut units) {
+                out.push_str(&format!("\\u{unit:04x}"));
+            }
+        }
+    }
+    out
 }
 
 /// Redirects to the previous page (the `Referer`), or `/` when it's unknown
@@ -245,5 +269,30 @@ pub(crate) fn is_local_path(path: &str) -> bool {
 impl IntoResponse for Back {
     fn into_response(self) -> Response {
         Redirect::to(self.0.as_deref().unwrap_or("/")).into_response()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn triggers_carry_any_text_as_ascii_json() {
+        let mut res = axum::http::Response::new(());
+        res.headers_mut().insert(
+            "hx-trigger",
+            axum::http::HeaderValue::from_static("task-added"),
+        );
+        let text = "“Kopi” masuk keranjang ✓ 🎉";
+        add_trigger(
+            &mut res,
+            "renox:toast",
+            serde_json::json!({ "message": text }),
+        );
+        let header = res.headers()["hx-trigger"].to_str().unwrap();
+        assert!(header.is_ascii(), "{header}");
+        let back: serde_json::Value = serde_json::from_str(header).unwrap();
+        assert_eq!(back["renox:toast"]["message"], text);
+        assert!(back.get("task-added").is_some(), "earlier events are kept");
     }
 }

@@ -1,15 +1,14 @@
-body { font-family: system-ui, sans-serif; max-width: 46rem; margin: 3rem auto; padding: 0 1rem; color: #222; line-height: 1.5; }
-button { font: inherit; padding: .4rem .9rem; }
-input, textarea { font: inherit; padding: .35rem; width: 100%; box-sizing: border-box; }
-label { display: block; margin-top: .75rem; }
-code { background: #f4f4f4; padding: .1rem .3rem; border-radius: .2rem; }
-table { width: 100%; border-collapse: collapse; }
-th, td { text-align: left; padding: .4rem; border-bottom: 1px solid #eee; vertical-align: top; }
-td form { display: inline; margin: 0; }
-.flash { background: #e8f5e9; padding: .75rem; border-radius: .25rem; }
-.error { color: #b00020; margin: .25rem 0 0; }
-.muted { color: #777; }
-.badge { font-size: .8rem; background: #eef; padding: .05rem .4rem; border-radius: .6rem; }
-nav { display: flex; gap: 1rem; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; }
-nav > :first-child { margin-right: auto; }
-nav form { margin: 0; }
+/* The app's own styles, on top of the Renox UI kit (rx-* classes, docs/ui.md). */
+.bar {
+  position: sticky; top: 0; z-index: 30;
+  background: var(--rx-material);
+  -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 0.5px solid var(--rx-separator);
+}
+.bar__inner { width: min(100% - 32px, 44rem); margin-inline: auto; min-height: 52px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.bar__brand { font-weight: 700; font-size: 1.0625rem; color: var(--rx-label); text-decoration: none; letter-spacing: -0.02em; }
+.bar__link { color: var(--rx-label); text-decoration: none; font-size: var(--rx-text-subhead); min-height: var(--rx-target); display: inline-flex; align-items: center; gap: 6px; }
+.skip:focus { position: fixed !important; top: 8px; left: 8px; width: auto; height: auto; clip: auto; padding: 8px 12px; background: var(--rx-surface); border-radius: 8px; z-index: 100; }
+.secret { font-family: var(--rx-mono); font-size: var(--rx-text-subhead); word-break: break-all; background: var(--rx-fill); padding: 10px 12px; border-radius: var(--rx-radius-s); margin: 0; }
+.row-actions { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.row-actions--between { justify-content: space-between; align-items: center; }

@@ -6,7 +6,7 @@
 <div x-data="{ tab: 'all', open: false }" @task-added.window="open = false; $refs.form.reset()">
 
   <header class="bar">
-    <h1>Tasks <small>{{ open }} open</small></h1>
+    <h1>Tasks <small id="open-count">{{ open }} open</small></h1>
     <button type="button" @click="open = true; $nextTick(() => $refs.title.focus())">New task</button>
   </header>
 

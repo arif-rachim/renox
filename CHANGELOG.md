@@ -10,6 +10,23 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M21h · The examples on the UI kit
+
+- examples/shop and examples/teams: every page on the UI kit (navigation bar with an account
+  menu, kit fields and tables, badges, toasts instead of flashed messages, confirmation sheets
+  for deleting and cancelling, live validation, an error page in the layout); the shop
+  rebrands the kit's accent. `route()` query arguments for filter links; teams' secret uses
+  `renox::random_token()`.
+- examples/htmx-recipes: an out-of-band count (`.fragment("row").also("count")`),
+  `HxRetarget`/`HxReswap` for a duplicate task, toasts over htmx, `route()` for the scroll
+  loader.
+- Fixed: toasts with non-ASCII text (curly quotes, accents, emoji) were dropped from htmx
+  responses, because a header can't hold them raw; `HX-Trigger` now escapes them in its JSON.
+- Fixed: a toast returned with `HxRefresh` was sent in `HX-Trigger` and lost on the reload; it
+  now waits in the session, as with `HxRedirect`.
+- Fixed: error pages didn't get `App::share` values, so a layout using one (a cart count)
+  failed to render them with `APP_DEBUG` (Renox's page showed instead).
+
 ### M21g · Database sessions and deploys without refused connections
 
 - `SESSION_DRIVER=database`: sessions in a `sessions` table (new framework migration

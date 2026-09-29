@@ -1,34 +1,56 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-<h1>Orders</h1>
+{% from "renox/ui.html" import table, button, link_button, empty, open_button, sheet %}
+{% from "orders/_status.html" import status_badge %}
+<h1 class="rx-title">Orders</h1>
 {% include "admin/_nav.html" %}
-<p class="filters">
-  <a href="{{ route('admin.orders.index') }}">All</a>
-  {% for status in statuses %}<a href="?status={{ status }}" {% if filters.status == status %}aria-current="page"{% endif %}>{{ status }}</a>{% endfor %}
-</p>
-<table>
-  <tr><th>#</th><th>Date</th><th>Total</th><th>Status</th><th></th></tr>
+<nav class="chips" aria-label="Filter by status">
+  {{ link_button(route('admin.orders.index'), "All", variant=("plain" if filters.status else "secondary"), size="small") }}
+  {% for status in statuses %}
+  {{ link_button(route('admin.orders.index', status=status), status | capitalize, variant=("secondary" if filters.status == status else "plain"), size="small",
+                 attrs=({"aria-current": "page"} if filters.status == status else {})) }}
+  {% endfor %}
+</nav>
+{% if orders.items %}
+{% call table(["#", ["Date", "hide-narrow"], ["Total", "num"], "Status", ""], caption="Orders") %}
   {% for order in orders.items %}
   <tr>
-    <td><a href="{{ route('orders.show', order.id) }}">#{{ order.id }}</a></td>
-    <td>{{ order.created_at | date('%d/%m/%Y %H:%M') }}</td>
-    <td>{{ order.total | rupiah }}</td>
-    <td><span class="status status-{{ order.status }}">{{ order.status }}</span></td>
-    <td class="actions">
+    <td><a class="rx-link" href="{{ route('orders.show', order.id) }}">#{{ order.id }}</a></td>
+    <td class="rx-hide-narrow">{{ order.created_at | date('%d/%m/%Y %H:%M') }}</td>
+    <td class="rx-num">{{ order.total | rupiah }}</td>
+    <td>{{ status_badge(order.status) }}</td>
+    <td class="qty">
       {% set next = {'pending': ['paid', 'cancelled'], 'paid': ['shipped']}[order.status] or [] %}
       {% for status in next %}
+      {% if status == "cancelled" %}
+      {#- Cancelling can't be undone (the stock goes back): red text here, the filled red
+          button in the sheet, "Keep order" focused first. -#}
+      {{ open_button("cancel-" ~ order.id, "Cancel order", variant="plain-danger", size="small") }}
+      {% call sheet("cancel-" ~ order.id, "Cancel order #" ~ order.id ~ "?", "Its items go back into stock. This can't be undone.") %}
+        <div class="rx-sheet__actions">
+          <button class="rx-button rx-button--secondary" type="button" data-rx-close autofocus><span class="rx-button__label">Keep order</span></button>
+          <form method="post" action="{{ route('admin.orders.status', order.id) }}">
+            {{ csrf_field() }}{{ method_field('PUT') }}
+            <input type="hidden" name="status" value="cancelled">
+            {{ button("Cancel order", variant="danger") }}
+          </form>
+        </div>
+      {% endcall %}
+      {% else %}
       <form method="post" action="{{ route('admin.orders.status', order.id) }}">
         {{ csrf_field() }}{{ method_field('PUT') }}
         <input type="hidden" name="status" value="{{ status }}">
-        <button>Mark {{ status }}</button>
+        {{ button("Mark " ~ status, variant="secondary", size="small") }}
       </form>
+      {% endif %}
       {% endfor %}
     </td>
   </tr>
-  {% else %}
-  <tr><td colspan="5" class="muted">No orders.</td></tr>
   {% endfor %}
-</table>
+{% endcall %}
 {% from "renox/pagination.html" import pagination %}{{ pagination(orders) }}
+{% else %}
+<div class="rx-card">{{ empty("No orders.") }}</div>
+{% endif %}
 {% endblock %}

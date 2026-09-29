@@ -1,31 +1,32 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-<h1>Your teams</h1>
-{% if not teams %}<p>You're not in a team yet. Create one to start.</p>{% endif %}
+{% from "renox/ui.html" import card, input, button, badge, group %}
+<h1 class="rx-title">Your teams</h1>
+{% if not teams %}<p class="rx-subtitle">You're not in a team yet. Create one to start.</p>{% endif %}
 
-<table>
+{% if teams %}
+{% call group() %}
   {% for item, membership in teams %}
-  <tr>
-    <td>{{ item.name }} <span class="badge">{{ membership.role }}</span></td>
-    <td>
-      {% if team and team.id == item.id %}
-      <strong>Current team</strong>
-      {% else %}
-      <form method="post" action="{{ route('teams.switch', item.id) }}">
-        {{ csrf_field() }}<button>Switch to {{ item.name }}</button>
-      </form>
-      {% endif %}
-    </td>
-  </tr>
+  <div class="row-actions row-actions--between">
+    <span>{{ item.name }} {{ badge(membership.role) }}</span>
+    {% if team and team.id == item.id %}
+    {{ badge("Current team", kind="success") }}
+    {% else %}
+    <form method="post" action="{{ route('teams.switch', item.id) }}">
+      {{ csrf_field() }}{{ button("Switch to " ~ item.name, variant="secondary", size="small") }}
+    </form>
+    {% endif %}
+  </div>
   {% endfor %}
-</table>
+{% endcall %}
+{% endif %}
 
-<h2>New team</h2>
-<form method="post" action="{{ route('teams.store') }}">
+<form method="post" action="{{ route('teams.store') }}" data-live-validate novalidate>
   {{ csrf_field() }}
-  <label>Name <input name="name" value="{{ old('name') }}"></label>
-  <p class="error" data-error-for="name">{{ error('name') }}</p>
-  <button>Create team</button>
+  {% call card(title="New team") %}
+    {{ input("name", "Name", required=true, autocomplete="organization") }}
+    <div class="rx-card__footer">{{ button("Create team") }}</div>
+  {% endcall %}
 </form>
 {% endblock %}

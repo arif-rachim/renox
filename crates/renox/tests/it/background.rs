@@ -152,7 +152,9 @@ async fn locks_let_one_holder_in() {
             .map(|_| {
                 let (lock, inside, most) = (lock.clone(), inside.clone(), most.clone());
                 tokio::spawn(async move {
-                    let guard = lock.block(Duration::from_secs(10)).await.unwrap();
+                    // Generous: this checks one-at-a-time, not how fast eight
+                    // waiters get through (slow on PostgreSQL under a full run).
+                    let guard = lock.block(Duration::from_secs(60)).await.unwrap();
                     let now = inside.fetch_add(1, Ordering::SeqCst) + 1;
                     most.fetch_max(now, Ordering::SeqCst);
                     tokio::time::sleep(Duration::from_millis(20)).await;

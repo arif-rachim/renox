@@ -5,6 +5,7 @@
 use renox::fake::Fake;
 use renox::fake::faker::lorem::en::Sentence;
 use renox::prelude::*;
+use renox::{HxReswap, HxRetarget, Toast};
 use serde::{Deserialize, Serialize};
 
 /// Rows per page (and per infinite-scroll load).
@@ -83,13 +84,32 @@ impl Validate for TaskForm {
     }
 }
 
-/// From the modal: the new row, and an event the modal listens for to close.
-/// Invalid input gets a 422 whose errors appear in the modal's form.
+/// From the modal: the new row (and the open count, out of band), and an
+/// event the modal listens for to close. Invalid input gets a 422 whose
+/// errors appear in the modal's form.
+///
+/// A task that's already on the list isn't added twice: the server changes
+/// where the answer goes (`HX-Retarget` to that row, `HX-Reswap: outerHTML`)
+/// and says so in a toast.
 async fn store(State(db): State<Db>, htmx: Htmx, Valid(form): Valid<TaskForm>) -> Result<Response> {
+    let title = form.title.trim().to_owned();
+    if let Some(task) = Task::where_eq("title", &title).first(&db).await?
+        && htmx.request
+    {
+        let target = format!("#task-{}", task.id);
+        return Ok((
+            HxRetarget(target),
+            HxReswap("outerHTML".into()),
+            HxTrigger("task-added".into()),
+            Toast::info("That task is already on the list."),
+            answer(&db, Some(task)).await?,
+        )
+            .into_response());
+    }
     let task = Task::create(
         &db,
         Task {
-            title: form.title,
+            title,
             ..Default::default()
         },
     )
@@ -97,7 +117,7 @@ async fn store(State(db): State<Db>, htmx: Htmx, Valid(form): Valid<TaskForm>) -
     if htmx.request {
         return Ok((
             HxTrigger("task-added".into()),
-            view("tasks/_row.html", context! { task }),
+            answer(&db, Some(task)).await?,
         )
             .into_response());
     }
@@ -125,43 +145,46 @@ async fn update(
     let mut task = Task::find_or_404(&db, id).await?;
     task.title = form.title;
     task.save(&db).await?;
-    row_or_home(htmx, task)
+    row_or_home(&db, htmx, task).await
 }
 
 async fn toggle(State(db): State<Db>, htmx: Htmx, Path(id): Path<i64>) -> Result<Response> {
     let mut task = Task::find_or_404(&db, id).await?;
     task.done = !task.done;
     task.save(&db).await?;
-    row_or_home(htmx, task)
+    row_or_home(&db, htmx, task).await
 }
 
-/// htmx swaps the row with this empty answer, which removes it.
+/// htmx swaps the row with an empty answer, which removes it; the open
+/// count comes along out of band, and a toast confirms it.
 async fn destroy(State(db): State<Db>, htmx: Htmx, Path(id): Path<i64>) -> Result<Response> {
     let mut task = Task::find_or_404(&db, id).await?;
     task.delete(&db).await?;
+    let toast = Toast::success(format!("“{}” deleted.", task.title));
     if htmx.request {
-        return Ok(StatusCode::OK.into_response());
+        return Ok((toast, answer(&db, None).await?).into_response());
     }
-    Ok(Redirect::to("/").into_response())
+    Ok((toast, Redirect::to("/")).into_response())
 }
 
 /// Many rows change at once: simplest to reload the page (`HX-Refresh`).
-async fn clear_done(State(db): State<Db>, htmx: Htmx, session: Session) -> Result<Response> {
+/// The toast waits in the session for the reloaded page.
+async fn clear_done(State(db): State<Db>, htmx: Htmx) -> Result<Response> {
     let gone = Task::where_eq("done", true).delete(&db).await?;
-    session.flash("status", format!("{gone} done tasks cleared."))?;
+    let toast = Toast::success(format!("{gone} done tasks cleared."));
     if htmx.request {
-        return Ok(HxRefresh.into_response());
+        return Ok((toast, HxRefresh).into_response());
     }
-    Ok(Redirect::to("/").into_response())
+    Ok((toast, Redirect::to("/")).into_response())
 }
 
 /// Done with the list: go to another page (`HX-Redirect` for htmx, 303 for
 /// a plain form, both from `htmx.redirect`).
-async fn archive(State(db): State<Db>, htmx: Htmx, session: Session) -> Result<Response> {
+async fn archive(State(db): State<Db>, htmx: Htmx) -> Result<Response> {
     let done = Task::where_eq("done", true).count(&db).await?;
     Task::where_eq("done", true).delete(&db).await?;
-    session.flash("status", format!("{done} tasks archived."))?;
-    Ok(htmx.redirect("/summary"))
+    let toast = Toast::success(format!("{done} tasks archived."));
+    Ok((toast, htmx.redirect("/summary")).into_response())
 }
 
 async fn summary(State(db): State<Db>) -> Result<View> {
@@ -169,9 +192,17 @@ async fn summary(State(db): State<Db>) -> Result<View> {
     Ok(view("tasks/summary.html", context! { open }))
 }
 
-fn row_or_home(htmx: Htmx, task: Task) -> Result<Response> {
+async fn row_or_home(db: &Db, htmx: Htmx, task: Task) -> Result<Response> {
     if htmx.request {
-        return Ok(view("tasks/_row.html", context! { task }).into_response());
+        return Ok(answer(db, Some(task)).await?.into_response());
     }
     Ok(Redirect::to("/").into_response())
+}
+
+/// The row (or nothing) and the open count, out of band (tasks/answer.html).
+async fn answer(db: &Db, task: Option<Task>) -> Result<View> {
+    let open = Task::where_eq("done", false).count(db).await?;
+    Ok(view("tasks/answer.html", context! { task, open })
+        .fragment("row")
+        .also("count"))
 }

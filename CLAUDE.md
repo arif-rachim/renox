@@ -803,6 +803,11 @@ change 29 s → 7 s, full run 19 s → 6 s.
   rotation at login/logout, `AppState::session_mirror` under `APP_ENV=testing`; systemd socket
   activation via `listenfd` + `deploy/<app>.socket`): merged (#62). A session given a new id must
   always be INSERTed, whatever its content.
+- **After M21:** a docs and examples audit (#63), then M21h (shop, teams and htmx-recipes on the
+  kit; three framework fixes: non-ASCII `HX-Trigger`, toasts with `HxRefresh`, shares on error
+  pages) and M21i (example tests on time travel and fakes, `hello`'s typed command, stubs).
+  Toasts must survive any response htmx turns into a new page (redirect, refresh): they go to
+  the session there.
 - **M21 is complete.** Next is the owner's call; **v1.0 is on hold** until the owner says to
   start it (docs site, starter kit, semver checks, real crates.io releases; the owner runs
   `cargo login`). Small M21 items that weren't built are listed in ROADMAP ("Deferred from
