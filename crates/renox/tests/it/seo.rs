@@ -192,6 +192,30 @@ async fn an_apps_own_robots_txt_wins() {
 }
 
 #[renox::test]
+async fn favicon_ico_is_quiet_unless_the_app_has_one() {
+    let (app, _dir) = app(|_| {}).await;
+    let res = app.get("/favicon.ico").await;
+    res.assert_status(204)
+        .assert_header("cache-control", "public, max-age=86400");
+    assert!(res.body.is_empty());
+    assert!(res.header("set-cookie").is_none(), "no session for it");
+
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("public")).unwrap();
+    std::fs::write(dir.path().join("public/favicon.ico"), b"\0\0\x01\0icon").unwrap();
+    std::fs::write(dir.path().join("page.html"), PAGE).unwrap();
+    let (views, public) = (dir.path().to_path_buf(), dir.path().join("public"));
+    let app = TestApp::with_config(App::new().module(Shop), |c| {
+        c.views_path = views;
+        c.public_path = public;
+    })
+    .await;
+    let res = app.get("/favicon.ico").await;
+    res.assert_ok();
+    assert_eq!(&res.body[..], b"\0\0\x01\0icon");
+}
+
+#[renox::test]
 async fn events_reach_the_browser_with_the_page_the_swap_or_the_next_page() {
     let (app, _dir) = app(|_| {}).await;
 

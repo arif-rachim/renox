@@ -234,7 +234,7 @@ impl Module for Guestbook {
 - `{{ seo(title=…, description=…, image=…) }}` writes the title, description, canonical URL,
   OpenGraph and Twitter card tags.
 - `robots.txt` is generated for you, and `Sitemap` builds `sitemap.xml` from routes and models.
-  Staging servers say `noindex`.
+  Staging servers say `noindex`. `/favicon.ico` answers a quiet 204 until you add one.
 - Search Console verification, GA4 and Tag Manager come from `.env`, CSP-ready with nonces, and
   only in production.
 - `analytics::event(&session, "sign_up", …)` reaches `gtag` with the htmx swap, the page or the

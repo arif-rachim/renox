@@ -10,6 +10,12 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### After M21 · Small fixes
+
+- `/favicon.ico` answers `204 No Content` (cached for a day) unless the app has
+  `public/favicon.ico`. Browsers ask for it on every site; the 404 it got before ran the
+  whole middleware stack, rendered the error page and logged a console error each time.
+
 ### M21i · The examples' tests, typed commands and the stubs
 
 - Fixed: `TestApp::travel` didn't reach the in-memory rate limits (`Routes::throttle`,
