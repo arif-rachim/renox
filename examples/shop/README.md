@@ -88,6 +88,16 @@ them to the `sessions` table (tests/shop.rs runs a customer with it). `deploy/` 
   recorded on their own; moving an order records `order.status_changed` with the admin, the
   order, `{from, to}` and the client IP (`audit::record`). `audit::for_subject(db, "orders", id,
   n)` reads an order's history; `cargo run -- audit:prune --days 365` trims old entries.
+- **Recently viewed, in the session.** The product page calls `session.push("recently_viewed",
+  id)` and keeps the last eight; the home page shows the newest four, each once, with
+  `{% break %}` in the loop.
+- **Texts that count.** The stock hint is one translation with Laravel's plural ranges:
+  `"{0} Sold out|{1} Only one left|[2,5] Only :count left|[6,*] :count in stock"` (and in
+  Indonesian). Sold-out cards get an extra class with
+  `class_names('product-card', {'product-card--sold-out': product.stock == 0})`.
+- **Redirects by route name.** After checkout, `Redirect::route("orders.show", &[&order.id])?`;
+  the admin goes back with `Redirect::route("admin.products.index", &[])?`. The admin nav marks
+  its section with `route_is('admin.products.*')` (`views/admin/_nav.html`).
 - **Save only what you changed.** A status change uses `order.save_only(db, &["status"])`, so it
   never writes back stale copies of the other columns.
 
@@ -107,6 +117,10 @@ cargo test -p shop
   mail, jobs or database rows (`assert_notified(&budi, "order-confirmation")`);
   `app.fake_events()` keeps the `OrderPlaced` listener from running, so checkout is tested
   alone (`assert_emitted::<OrderPlaced>(..)`).
+
+They also check the recently viewed list (order, four at most, eight ids in the session), the
+stock texts' ranges in both languages, the sold-out class, and that the admin nav marks one
+section.
 
 ## Deploying
 

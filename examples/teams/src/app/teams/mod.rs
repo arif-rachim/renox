@@ -3,10 +3,10 @@
 
 pub mod model;
 
-use renox::Toast;
 use renox::db::Encrypted;
 use renox::prelude::*;
 use renox::validation::FormContext;
+use renox::{DomainParams, Toast};
 use serde::Deserialize;
 
 use super::tenancy::{CurrentTeam, SESSION_KEY};
@@ -39,8 +39,38 @@ impl Module for Teams {
             .post("/team/secret", rotate_secret)
             .name("team.secret.rotate")
             .require_password_confirmed();
-        members.merge(secret)
+        // Every team's public page on its own host: acme.localhost:3000 in
+        // development (browsers send *.localhost to this machine), set
+        // TEAM_DOMAIN=example.com for acme.example.com.
+        let domain = std::env::var("TEAM_DOMAIN").unwrap_or_else(|_| "localhost".into());
+        let public = Routes::new()
+            .get("/", public_page)
+            .name("teams.public")
+            // Any other path on a team's host goes to its page.
+            .fallback(|| async { Redirect::to("/") });
+        members
+            .merge(secret)
+            .domain(&format!("{{team}}.{domain}"), public)
     }
+}
+
+/// A team's public page: its name and how many members and projects it has.
+async fn public_page(State(db): State<Db>, domain: DomainParams) -> Result<View> {
+    let slug = domain.get("team").unwrap_or_default();
+    let team = Team::where_eq("slug", slug)
+        .first(&db)
+        .await?
+        .ok_or(Error::NotFound)?;
+    let members = MEMBERS.ids(&db, team.id).await?.len();
+    // Projects are scoped to the visitor's current team: count them unscoped.
+    let projects = crate::app::projects::model::Project::unscoped()
+        .where_eq("team_id", team.id)
+        .count(&db)
+        .await?;
+    Ok(view(
+        "teams/public.html",
+        context! { public_team => team, members, projects },
+    ))
 }
 
 #[derive(Deserialize)]

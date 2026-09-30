@@ -25,12 +25,12 @@ Globex, Carol is a member of Acme. With `SUPER_ADMINS` set, Alice also sees `/ad
 | Wiring: `Auth::new().account()`, the modules, the tenancy layer, the shared `team`, `gate_before`, the `projects:count` command, the seeder | [src/lib.rs](src/lib.rs) |
 | The current team: session → membership check → `renox::context`, an extractor, a policy | [src/app/tenancy.rs](src/app/tenancy.rs) |
 | `Team`, the `team_user` pivot with a `role` (`MEMBERS`, `USER_TEAMS`), the secret helpers | [src/app/teams/model.rs](src/app/teams/model.rs) |
-| Create, switch, members (a form request: `MemberForm`'s `prepare`, `authorize`, `after`), the encrypted secret behind `require_password_confirmed` | [src/app/teams/mod.rs](src/app/teams/mod.rs) |
+| Create, switch, members (a form request: `MemberForm`'s `prepare`, `authorize`, `after`), the encrypted secret behind `require_password_confirmed`, each team's public page on its own host (`Routes::domain`, `DomainParams`, a domain fallback) | [src/app/teams/mod.rs](src/app/teams/mod.rs) |
 | `Project` with `default_scope = "team_only"` and a `saving` hook that fills `team_id` | [src/app/projects/model.rs](src/app/projects/model.rs) |
 | Project CRUD with no `team_id` in sight; name unique per team | [src/app/projects/mod.rs](src/app/projects/mod.rs) |
 | The super-admin check and the cross-team report with `Project::unscoped()` | [src/app/admin.rs](src/app/admin.rs) |
 | Pages on the UI kit: a navigation bar with the current team and an account menu, kit forms with live validation, tables, confirmation sheets (delete a project, replace the secret), toasts, an error page in the layout | [resources/views](resources/views) |
-| Tables: `teams`, `team_user`, `projects` (unique `(team_id, name)`) | [migrations](migrations) |
+| Tables: `teams`, `team_user`, `projects` (unique `(team_id, name)`); `slug` added in a later migration | [migrations](migrations) |
 
 ## Things worth copying
 
@@ -62,6 +62,12 @@ Globex, Carol is a member of Acme. With `SUPER_ADMINS` set, Alice also sees `/ad
   under `APP_KEY`) and read as the plain secret, with no `encrypt`/`decrypt` calls in handlers;
   the settings page shows only its last characters, and `/team/secret` asks for the password
   again (`.require_password_confirmed()`) before showing it or making a new one.
+- **A page per team on its own host.** `Routes::domain("{team}.localhost", …)` serves each
+  team's public page at `acme.localhost:3000` (browsers send `*.localhost` to this machine;
+  set `TEAM_DOMAIN=example.com` for `acme.example.com`). The handler reads the team from the
+  `DomainParams` extractor (`domain.get("team")`), and a `fallback` inside the domain sends any
+  other path there to `/`. That host gets only these routes; the app stays on the plain host.
+  Slugs are made from the name (`acme`, then `acme-2`).
 - **The current team in every view** with `App::share("team", …)`: `{% if team %}{{ team.name }}`.
 
 ## Tests
@@ -73,4 +79,6 @@ cargo test -p teams
 [tests/teams.rs](tests/teams.rs) covers isolation between teams (lists, edit/update/delete by id),
 switching (and being refused a team you're not in), falling back when removed from a team,
 unique names per team, the fail-closed scope without a team, the unscoped counts and command,
-the super-admin, adding members, and the encrypted secret with its password confirmation.
+the super-admin, adding members, the encrypted secret with its password confirmation, and the
+public pages (per host, with counts but no project names, an unknown team a 404, other paths
+redirected, a second "Acme" getting `acme-2`).

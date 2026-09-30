@@ -38,7 +38,10 @@ impl Module for Catalog {
 }
 
 /// The home page: the newest products (cached) and the categories.
-async fn home(State(state): State<AppState>) -> Result<View> {
+/// The session key of the products a visitor opened last (their ids).
+const RECENT: &str = "recently_viewed";
+
+async fn home(State(state): State<AppState>, session: Session) -> Result<View> {
     let db = &state.db;
     let featured: Vec<Product> = state
         .cache
@@ -52,7 +55,20 @@ async fn home(State(state): State<AppState>) -> Result<View> {
         })
         .await?;
     let categories = Category::query().order_by("name").get(db).await?;
-    Ok(view("catalog/home.html", context! { featured, categories }))
+    // Newest first, each once; the template shows the first four.
+    let mut ids: Vec<i64> = session.get(RECENT).unwrap_or_default();
+    ids.reverse();
+    let mut seen = std::collections::HashSet::new();
+    ids.retain(|id| seen.insert(*id));
+    let found = Product::find_many(db, ids.iter().copied()).await?;
+    let recent: Vec<&Product> = ids
+        .iter()
+        .filter_map(|id| found.iter().find(|p| p.id == *id && p.active))
+        .collect();
+    Ok(view(
+        "catalog/home.html",
+        context! { featured, categories, recent },
+    ))
 }
 
 /// `/products?q=kopi&category=minuman&sort=price_asc&page=2`
@@ -117,11 +133,18 @@ async fn index(
     .fragment("results"))
 }
 
-async fn show(State(db): State<Db>, Path(slug): Path<String>) -> Result<View> {
+async fn show(State(db): State<Db>, session: Session, Path(slug): Path<String>) -> Result<View> {
     let product = Product::where_eq("slug", &slug)
         .where_eq("active", true)
         .first_or_404(&db)
         .await?;
+    // Remembered for "Recently viewed" on the home page; the last eight
+    // only, so the session cookie stays small.
+    if session.push(RECENT, product.id)? > 8 {
+        let mut ids: Vec<i64> = session.get(RECENT).unwrap_or_default();
+        ids.drain(..ids.len() - 8);
+        session.put(RECENT, ids)?;
+    }
     let category = product.category(&db).await?;
     Ok(view("catalog/show.html", context! { product, category }))
 }

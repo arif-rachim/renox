@@ -763,3 +763,64 @@ async fn error_pages_keep_the_shop_layout() {
         .assert_see("Cart (0)")
         .assert_see("That page isn&#39;t here.");
 }
+
+#[renox::test]
+async fn the_home_page_shows_recently_viewed_products() {
+    let app = shop().await;
+    for (name, stock) in [
+        ("Kopi A", 5),
+        ("Kopi B", 5),
+        ("Kopi C", 5),
+        ("Kopi D", 5),
+        ("Kopi E", 5),
+    ] {
+        product(&app, name, 10_000, stock).await;
+    }
+    app.get("/").await.assert_dont_see("Recently viewed");
+    for slug in ["kopi-a", "kopi-b", "kopi-c", "kopi-a", "kopi-d", "kopi-e"] {
+        app.get(&format!("/products/{slug}")).await.assert_ok();
+    }
+    let home = app.get("/").await.text();
+    let recent = home
+        .split("Recently viewed")
+        .nth(1)
+        .and_then(|rest| rest.split("New in the shop").next())
+        .expect("a recently viewed section");
+    // Newest first, each once, four at most (`{% break %}`).
+    let order: Vec<usize> = ["Kopi E", "Kopi D", "Kopi A", "Kopi C"]
+        .iter()
+        .map(|name| recent.find(&format!(">{name}<")).expect(name))
+        .collect();
+    assert!(order.windows(2).all(|w| w[0] < w[1]), "{order:?}");
+    assert!(!recent.contains(">Kopi B<"), "only four");
+    // The session keeps eight ids at most.
+    for _ in 0..6 {
+        app.get("/products/kopi-b").await;
+    }
+    assert!(
+        app.session_get::<Vec<i64>>("recently_viewed")
+            .unwrap()
+            .len()
+            <= 8
+    );
+}
+
+#[renox::test]
+async fn stock_texts_use_plural_ranges_and_sold_out_cards_are_marked() {
+    let app = shop().await;
+    product(&app, "Kopi Susu", 25_000, 3).await;
+    product(&app, "Kopi Hitam", 15_000, 0).await;
+    let budi = customer(&app, "budi@example.com").await;
+    app.acting_as(&budi);
+    app.get("/products/kopi-susu")
+        .await
+        .assert_see("Only 3 left");
+    app.get("/language/id").await;
+    app.get("/products/kopi-susu")
+        .await
+        .assert_see("Tinggal 3 lagi");
+    app.get("/products")
+        .await
+        .assert_see(r#"class="product-card product-card--sold-out""#)
+        .assert_see(r#"<article class="product-card">"#);
+}

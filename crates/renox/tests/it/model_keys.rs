@@ -397,6 +397,110 @@ async fn chunks_and_cursor_pages_follow_ulid_order() {
     ));
 }
 
+#[renox::test]
+async fn many_rows_at_once_get_their_keys() {
+    let app = app().await;
+    let db = app.db();
+    // ULIDs are made for the whole batch.
+    let batch: Vec<Invoice> = (1..=3)
+        .map(|n| Invoice {
+            number: format!("B-{n}"),
+            total: n,
+            ..Default::default()
+        })
+        .collect();
+    assert_eq!(Invoice::insert_many(db, batch).await.unwrap(), 3);
+    let stored = Invoice::query().order_by("id").get(db).await.unwrap();
+    assert_eq!(stored.len(), 3);
+    assert!(stored.iter().all(|i| i.id.as_str().len() == 26));
+    assert_eq!(stored[0].number, "B-1", "made in order");
+
+    // String keys are written as set; a missing one stops the insert.
+    let customers = vec![
+        Customer {
+            id: "A".into(),
+            name: "Acme".into(),
+        },
+        Customer {
+            id: "B".into(),
+            name: "Bolt".into(),
+        },
+    ];
+    Customer::insert_many(db, customers).await.unwrap();
+    assert_eq!(
+        Customer::find_or_404(db, "B".into()).await.unwrap().name,
+        "Bolt"
+    );
+    let keyless = vec![Customer {
+        name: "Nameless".into(),
+        ..Default::default()
+    }];
+    assert!(Customer::insert_many(db, keyless).await.is_err());
+
+    // Upserts too: a new row gets a key, a clash updates the old one.
+    let feed = vec![
+        Customer {
+            id: "A".into(),
+            name: "Acme Corp".into(),
+        },
+        Customer {
+            id: "C".into(),
+            name: "Cargo".into(),
+        },
+    ];
+    Customer::upsert(db, feed, &["id"], &["name"])
+        .await
+        .unwrap();
+    let all = Customer::all(db).await.unwrap();
+    assert_eq!(all.len(), 3);
+    assert_eq!(all[0].name, "Acme Corp", "updated by its key");
+}
+
+/// `unique(…).ignore(id)` with a ULID: the row being edited doesn't clash
+/// with itself.
+#[derive(serde::Deserialize)]
+struct InvoiceForm {
+    number: String,
+    #[serde(skip)]
+    editing: Option<Ulid>,
+}
+
+impl Validate for InvoiceForm {
+    fn rules(&self, v: &mut Validator) {
+        let number = v.field("number", &self.number).unique("invoices", "number");
+        if let Some(id) = &self.editing {
+            number.ignore(id.clone());
+        }
+    }
+}
+
+#[renox::test]
+async fn unique_ignores_a_ulid_row() {
+    let app = app().await;
+    let db = app.db();
+    let own = invoice(db, "INV-1", 1, None).await;
+    let clean = |form: InvoiceForm| {
+        let db = db.clone();
+        async move {
+            Validator::rules_of(&form, renox::validation::Locale::En)
+                .finish(&db)
+                .await
+                .unwrap()
+                .is_empty()
+        }
+    };
+    let taken = InvoiceForm {
+        number: "INV-1".into(),
+        editing: None,
+    };
+    assert!(!clean(taken).await);
+    let itself = InvoiceForm {
+        number: "INV-1".into(),
+        editing: Some(own.id.clone()),
+    };
+    assert!(clean(itself).await);
+}
+
 struct Invoices;
 
 impl Module for Invoices {

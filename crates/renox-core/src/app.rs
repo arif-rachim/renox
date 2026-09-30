@@ -1429,7 +1429,9 @@ fn build_router(
             }
         })
     } else if public.is_dir() {
-        let files = ServeDir::new(public).not_found_service(not_found.clone().into_service());
+        // `fallback`, not `not_found_service`: the latter makes every answer
+        // a 404, and an app's fallback may redirect or answer 200.
+        let files = ServeDir::new(public).fallback(not_found.clone().into_service());
         router.fallback(move |req: axum::extract::Request| {
             let files = files.clone();
             async move {

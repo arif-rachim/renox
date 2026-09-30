@@ -1,0 +1,13 @@
+{% extends "layouts/app.html" %}
+
+{#- The public page of a team, on its own host: `{slug}.TEAM_DOMAIN`. -#}
+{% block content %}
+{% from "renox/ui.html" import card %}
+<div>
+  <h1 class="rx-title">{{ public_team.name }}</h1>
+  <p class="rx-subtitle">A team on Renox Teams</p>
+</div>
+{% call card() %}
+  <p>{{ members }} {{ "member" if members == 1 else "members" }} · {{ projects }} {{ "project" if projects == 1 else "projects" }}</p>
+{% endcall %}
+{% endblock %}

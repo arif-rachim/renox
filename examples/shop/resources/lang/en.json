@@ -6,7 +6,8 @@
   "home": {
     "title": "Fresh from the roastery",
     "description": "Coffee, tea and snacks, delivered to your door.",
-    "new": "New in the shop"
+    "new": "New in the shop",
+    "recent": "Recently viewed"
   },
   "products": {
     "none": "No products yet.",
@@ -16,7 +17,7 @@
     "all_categories": "All categories",
     "sort": { "newest": "Newest", "price_asc": "Cheapest", "price_desc": "Most expensive", "name": "Name" },
     "found": "One product found|:count products found",
-    "in_stock": "Only one left|:count in stock"
+    "in_stock": "{0} Sold out|{1} Only one left|[2,5] Only :count left|[6,*] :count in stock"
   },
   "cart": {
     "added": ":name is in your cart.",

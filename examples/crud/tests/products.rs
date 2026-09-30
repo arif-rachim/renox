@@ -318,3 +318,81 @@ async fn error_pages_keep_the_layout() {
         .assert_see("account-menu")
         .assert_see("Back to the products");
 }
+
+#[renox::test]
+async fn the_form_tidies_the_name_before_the_rules() {
+    let app = TestApp::new(crud::app()).await;
+    let owner = user(&app, "owner@example.com").await;
+    app.acting_as(&owner);
+    app.post(
+        "/products",
+        &[("name", "  Kopi   Susu "), ("price", "18000")],
+    )
+    .await
+    .assert_redirect("/products");
+    app.assert_database_has(
+        "products",
+        &[("name", &"Kopi Susu"), ("slug", &"kopi-susu")],
+    )
+    .await;
+    // Only spaces: `required` sees an empty name.
+    app.htmx()
+        .post("/products", &[("name", "    "), ("price", "1")])
+        .await
+        .assert_invalid("name");
+}
+
+#[renox::test]
+async fn an_import_skips_bad_lines_and_keeps_the_rest() {
+    let app = TestApp::new(crud::app()).await;
+    user(&app, "owner@example.com").await;
+    let dir = std::env::temp_dir().join(format!("crud-import-{}", renox::random_token()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("products.csv");
+    std::fs::write(
+        &file,
+        "name,price\nKopi Susu,18000\nTeh, abc\n!!!,5000\n\nGula Aren,12000\n",
+    )
+    .unwrap();
+    let path = file.display().to_string();
+    app.kernel()
+        .call(
+            "products:import",
+            [path.as_str(), "--owner", "owner@example.com"],
+        )
+        .await
+        .unwrap();
+    // Line 3 (a bad price) and line 4 (the saving hook refuses "!!!")
+    // were undone alone; the others are in.
+    let names: Vec<String> = Product::query()
+        .order_by("id")
+        .pluck(app.db(), "name")
+        .await
+        .unwrap();
+    assert_eq!(names, ["Kopi Susu", "Gula Aren"]);
+    assert!(
+        app.kernel()
+            .call(
+                "products:import",
+                [path.as_str(), "--owner", "nobody@example.com"]
+            )
+            .await
+            .is_err()
+    );
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[renox::test]
+async fn the_seeder_uses_factory_states() {
+    let app = TestApp::new(crud::app()).await;
+    app.kernel().seed().await.unwrap();
+    assert_eq!(Product::query().count(app.db()).await.unwrap(), 25);
+    let premium: Vec<String> = Product::query()
+        .where_like("name", "Premium %")
+        .order_by("price")
+        .pluck(app.db(), "name")
+        .await
+        .unwrap();
+    assert_eq!(premium.first().map(String::as_str), Some("Premium 1"));
+    assert_eq!(premium.len(), 5);
+}

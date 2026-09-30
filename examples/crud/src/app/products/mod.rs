@@ -1,12 +1,15 @@
 //! Made with `rnx make:module products`,
-//! `rnx make:model Product --module products --migration` and
-//! `rnx make:policy Product --module products`, then filled in.
+//! `rnx make:model Product --module products --migration`,
+//! `rnx make:policy Product --module products` and
+//! `rnx make:command products:import --module products`, then filled in.
 
+pub mod import;
 pub mod model;
 pub mod policy;
 
 use renox::Toast;
 use renox::prelude::*;
+use renox::validation::ValidateHooks;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -44,19 +47,28 @@ impl Module for Products {
             .require_auth();
         public.merge(members)
     }
+
+    fn register(&self, app: &mut Registry) {
+        // `cargo run -- products:import products.csv --owner demo@example.com`
+        app.typed_command::<import::ImportProducts>();
+    }
 }
 
-/// What the create and edit forms send.
-#[derive(Deserialize, Serialize)]
+/// What the create and edit forms send. The rules are attributes
+/// (`#[derive(Validate)]`); `#[validate(hooks)]` adds `prepare` below.
+#[derive(Deserialize, Serialize, Validate)]
+#[validate(hooks)]
 struct ProductForm {
+    #[validate(required, max = 100)]
     name: String,
+    #[validate(min = 0)]
     price: i64,
 }
 
-impl Validate for ProductForm {
-    fn rules(&self, v: &mut Validator) {
-        v.field("name", &self.name).required().max(100);
-        v.field("price", &self.price).min(0);
+impl ValidateHooks for ProductForm {
+    /// Before the rules: "  Kopi   Susu " is saved (and checked) as "Kopi Susu".
+    fn prepare(&mut self) {
+        self.name = self.name.split_whitespace().collect::<Vec<_>>().join(" ");
     }
 }
 

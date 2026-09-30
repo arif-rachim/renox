@@ -9,6 +9,8 @@ use serde::Serialize;
 pub struct Team {
     pub id: i64,
     pub name: String,
+    /// The team's host name part: `acme` for `acme.localhost`.
+    pub slug: String,
     /// Stored encrypted with `APP_KEY`, read as the plain secret. Never sent
     /// to templates.
     #[serde(skip_serializing)]
@@ -37,10 +39,12 @@ impl Team {
     /// Creates a team with `owner` as its owner, in one transaction.
     pub async fn found(db: &Db, name: &str, owner: &User) -> Result<Team> {
         let mut tx = db.begin().await?;
+        let slug = free_slug(&mut tx, name).await?;
         let team = Team::create(
             &mut tx,
             Team {
                 name: name.into(),
+                slug,
                 ..Default::default()
             },
         )
@@ -80,4 +84,27 @@ pub fn mask(secret: &str) -> String {
         .rev()
         .collect();
     format!("whsec_…{tail}")
+}
+
+/// `name` as a host label ("Acme Corp" → `acme-corp`), with `-2`, `-3`… when
+/// another team has it.
+async fn free_slug(tx: &mut renox::db::Transaction, name: &str) -> Result<String> {
+    let base: String = name
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_ascii_lowercase)
+        .collect::<Vec<_>>()
+        .join("-");
+    let base = if base.is_empty() {
+        "team".to_owned()
+    } else {
+        base
+    };
+    let mut slug = base.clone();
+    let mut n = 1;
+    while Team::where_eq("slug", &slug).exists(&mut *tx).await? {
+        n += 1;
+        slug = format!("{base}-{n}");
+    }
+    Ok(slug)
 }

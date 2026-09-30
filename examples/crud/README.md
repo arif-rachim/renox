@@ -12,14 +12,17 @@ cargo run -- db:seed             # demo@example.com / password123 and 25 fake pr
 cargo run                        # http://127.0.0.1:3000
 ```
 
-Log in at `/login` (or register at `/register`), then add products at `/products/new`.
+Log in at `/login` (or register at `/register`), then add products at `/products/new`. To add
+many at once: `cargo run -- products:import products.csv --owner demo@example.com` (lines of
+`name,price`; bad lines are skipped and listed).
 
 ## What's where
 
 | Feature | Where |
 |---|---|
-| Wiring: the `Auth` module, the products module, the seeder | [src/lib.rs](src/lib.rs) |
-| Routes (public list, members-only create/edit/update/delete/trash/restore), form validation, handlers | [src/app/products/mod.rs](src/app/products/mod.rs) |
+| Wiring: the `Auth` module, the products module, the seeder (factory states and a sequence) | [src/lib.rs](src/lib.rs) |
+| Routes (public list, members-only create/edit/update/delete/trash/restore), the form (`#[derive(Validate)]` with a `prepare` hook), handlers | [src/app/products/mod.rs](src/app/products/mod.rs) |
+| `products:import`: a CSV import in one transaction, each line in a savepoint | [src/app/products/import.rs](src/app/products/import.rs) |
 | The model with `soft_deletes` and `hooks` (`impl ModelHooks`: a slug, a check, a cache key forgotten), a factory, `for_owner` for seeders and tests | [src/app/products/model.rs](src/app/products/model.rs) |
 | The policy: only the owner may update, delete or restore | [src/app/products/policy.rs](src/app/products/policy.rs) |
 | List, form and trash pages, built with the UI kit (`renox/ui.html`): a table with a confirmation sheet for deletes, a form with live validation, an inset grouped list | [resources/views/products](resources/views/products) |
@@ -31,6 +34,15 @@ Log in at `/login` (or register at `/register`), then add products at `/products
 
 - **Public and members-only routes in one module.** Two `Routes` groups, the second ending in
   `.require_auth()`, joined with `merge`. Guests who open `/products/new` go to `/login`.
+- **Rules as attributes.** `ProductForm` derives `Validate`
+  (`#[validate(required, max = 100)]`); `#[validate(hooks)]` + `impl ValidateHooks` adds
+  `prepare`, which tidies the name ("  Kopi   Susu " → "Kopi Susu") before the rules run.
+- **An import that survives bad lines.** `products:import` opens one transaction and runs each
+  line in `tx.savepoint(|tx| …)`: a line with a bad price, or a name the `saving` hook refuses,
+  is undone alone and listed; the rest is committed together. On PostgreSQL a failed
+  statement stops a whole transaction unless it failed inside a savepoint.
+- **Seeders with factory states.** `Product::factory().count(20).state(…)` gives the demo
+  owner 20 products, and `.sequence(|i, p| …)` names five "Premium 1…5" with rising prices.
 - **Every write checks the policy.** `edit`, `update`, `destroy` and `restore` call
   `user.authorize(...)` after loading the product; anyone else gets 403.
 - **The view asks the policy too.** The list wraps each product in
@@ -78,4 +90,5 @@ cargo test -p crud
 
 [tests/products.rs](tests/products.rs) covers guests, validation, ownership, the trash, what
 the list shows to whom, the hooks (slug on create and update, the rejected name, the cached
-count, bulk updates skipping them) and `save_changes` keeping a concurrent edit.
+count, bulk updates skipping them), `save_changes` keeping a concurrent edit, the form's
+`prepare` hook, the import (bad lines skipped, the rest kept) and the seeder's factory states.

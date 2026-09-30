@@ -94,6 +94,8 @@ impl Module for Site {
             .domain(
                 "admin.example.com",
                 Routes::new()
+                    // Not a 404: a fallback's own status is kept.
+                    .fallback(|| async { Redirect::to("/") })
                     .get("/", || async { "admin" })
                     .name("admin.dashboard")
                     .get("/menu", || async { view("menu.html", context! {}) })
@@ -117,9 +119,7 @@ impl Module for Billing {
         // Another module adds to the same domain.
         Routes::new().domain(
             "admin.example.com",
-            Routes::new()
-                .get("/invoices", || async { "invoices" })
-                .fallback(|| async { (StatusCode::NOT_FOUND, "no admin page") }),
+            Routes::new().get("/invoices", || async { "invoices" }),
         )
     }
 }
@@ -191,10 +191,11 @@ async fn domains_have_their_own_routes() {
         .await
         .assert_status(404)
         .assert_see("no page at /invoices");
+    // The admin domain's fallback redirects (a public directory exists, and
+    // the status isn't turned into a 404).
     on(&app, "admin.example.com", "/beans/1")
         .await
-        .assert_status(404)
-        .assert_see("no admin page");
+        .assert_redirect("/");
     // Renox's own routes and public files work on every host.
     on(&app, "admin.example.com", "/health").await.assert_ok();
     on(&app, "admin.example.com", "/robots-extra.txt")

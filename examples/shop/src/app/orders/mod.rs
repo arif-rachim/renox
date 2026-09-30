@@ -124,7 +124,8 @@ async fn place(
         Checkout::Placed(order) => {
             state.emit(OrderPlaced { order_id: order.id }).await?;
             let toast = Toast::success(lang.t("orders.placed", &[("id", &order.id)]));
-            Ok((toast, Redirect::to(&format!("/orders/{}", order.id))).into_response())
+            // A named route, filled in: /orders/42.
+            Ok((toast, Redirect::route("orders.show", &[&order.id])?).into_response())
         }
         Checkout::EmptyCart => Ok(Redirect::to("/cart").into_response()),
         Checkout::OutOfStock(names) => {

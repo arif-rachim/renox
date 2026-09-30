@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 pub const COUNT_KEY: &str = "products.count";
 
 // `hooks` makes the derive call `impl ModelHooks for Product` around
-// `save`, `create`, `save_only`, `save_changes`, `delete` and
+// `save`, `create`/`insert`, `save_only`, `save_changes`, `delete` and
 // `force_delete`. Bulk writes (`Product::where_eq(..).update(..)`,
 // `Query::delete`, `insert_many`) and `restore` don't run them.
 #[derive(Model, Serialize, Deserialize, Default, Debug, Clone)]

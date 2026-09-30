@@ -41,7 +41,9 @@ Every example has a README.md that walks through it.
   of order status changes (the `Audit` module), product delete behind password confirmation;
   checkout in `db.retrying`; en/id with plurals; the `make:deploy` files (with the systemd
   socket); every page on the UI kit with a rebranded accent, toasts and confirmation sheets; a
-  typed `shop:make-admin` command with a prompt; an admin nav marked with `route_is`; tests with time travel (unpaid orders cancelled
+  typed `shop:make-admin` command with a prompt; an admin nav marked with `route_is`; recently
+  viewed products (`session.push`, `{% break %}`), stock texts with plural ranges,
+  `class_names`, `Redirect::route`; tests with time travel (unpaid orders cancelled
   by the scheduled task), event and notification fakes and `assert_view`. Guide: its
   [README](examples/shop/README.md).
   - Checkout: [checkout.rs](examples/shop/src/app/orders/checkout.rs); orders, event, task:
@@ -73,8 +75,11 @@ Every example has a README.md that walks through it.
   soft delete with a trash and restore, model hooks (`#[model(hooks)]`: a slug filled on save,
   a cached count forgotten), `save_changes` on update, and tests for each. It is the example of
   the UI kit (`renox/ui.html`: fields, table, confirmation sheet, menu), toasts, live validation
-  (`data-live-validate`), `push`/`stack` and an error page in the layout.
-  - Routes and handlers: [examples/crud/src/app/products/mod.rs](examples/crud/src/app/products/mod.rs)
+  (`data-live-validate`), `push`/`stack` and an error page in the layout. The form is
+  `#[derive(Validate)]` with a `prepare` hook; `products:import` imports a CSV with a savepoint
+  per line; the seeder uses factory states and a sequence.
+  - Routes and handlers: [examples/crud/src/app/products/mod.rs](examples/crud/src/app/products/mod.rs);
+    the import: [import.rs](examples/crud/src/app/products/import.rs)
   - Model, factory, policy: [model.rs](examples/crud/src/app/products/model.rs),
     [policy.rs](examples/crud/src/app/products/policy.rs)
   - Views: [index.html](examples/crud/resources/views/products/index.html),
@@ -85,7 +90,7 @@ Every example has a README.md that walks through it.
 - [examples/api](examples/api) ([README](examples/api/README.md)): a JSON API: tokens for a mobile app (`User::attempt`,
   `create_token_with` with abilities and an expiry, pruned nightly), Bearer auth,
   `require_ability` on reads and writes, a list with `cursor_paginate`, JSON bodies validated
-  with 422 errors, JSON 401/403/404, CORS and a rate limit; tests with `assert_json_path` and
+  with 422 errors, JSON 401/403/404, CORS and a rate limit; products keyed by `Ulid`; tests with `assert_json_path` and
   time travel (token expiry, the rate limit's window). [src/app/products/mod.rs](examples/api/src/app/products/mod.rs),
   [tests/api.rs](examples/api/tests/api.rs)
 - [examples/jobs](examples/jobs) ([README](examples/jobs/README.md)): an event whose listener queues a receipt mail (a mail template
@@ -108,7 +113,8 @@ Every example has a README.md that walks through it.
   teams with per-team roles on the pivot, the current team in `renox::context` (checked by a
   middleware), a `Project` model with a default scope that fails closed, `unscoped()` for the
   admin report and a command, project names unique per team, `gate_before` for super-admins,
-  and a team secret in an `Encrypted<String>` field behind password confirmation; a form request
+  and a team secret in an `Encrypted<String>` field behind password confirmation; each team's
+  public page on its own host (`Routes::domain`, `DomainParams`, a domain fallback); a form request
   (`MemberForm`: `prepare`, `authorize`, `after`) checked live (`data-live-validate`); pages on
   the UI kit with confirmation sheets and toasts.
   [tenancy.rs](examples/teams/src/app/tenancy.rs),

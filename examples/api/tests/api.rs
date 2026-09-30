@@ -118,7 +118,8 @@ async fn products_are_created_with_json_and_validated() {
     );
     assert!(invalid.json_path("errors.price").is_array());
 
-    let id = created.json_path("id").as_i64().unwrap();
+    let id = created.json_path("id").as_str().unwrap().to_owned();
+    assert_eq!(id.len(), 26, "a ULID");
     app.request()
         .header("authorization", &token)
         .get(&format!("/api/products/{id}"))
@@ -129,10 +130,16 @@ async fn products_are_created_with_json_and_validated() {
         .request()
         .json()
         .header("authorization", &token)
-        .get("/api/products/999")
+        .get("/api/products/01J9Z3ABCDEFGHJKMNPQRSTVWX")
         .await;
     missing.assert_status(404);
-    println!("404 body: {}", missing.text());
+    // A malformed id is a 404 too, not a 400.
+    app.request()
+        .json()
+        .header("authorization", &token)
+        .get("/api/products/42")
+        .await
+        .assert_status(404);
 }
 
 #[renox::test]
@@ -192,7 +199,7 @@ async fn read_only_tokens_cannot_write() {
     create(reader.clone()).await.assert_status(403);
     let created = create(writer.clone()).await;
     created.assert_status(201);
-    let id = created.json::<serde_json::Value>()["id"].as_i64().unwrap();
+    let id = created.json_path("id").as_str().unwrap().to_owned();
 
     // The read-only token still reads, but can't delete.
     app.request()
@@ -201,7 +208,7 @@ async fn read_only_tokens_cannot_write() {
         .await
         .assert_ok();
     let delete = |token: String| {
-        let app = &app;
+        let (app, id) = (&app, id.clone());
         async move {
             app.request()
                 .without_csrf()

@@ -1199,6 +1199,28 @@ Notes from M25:
   `*` is ignored; available means `en`/`id` or a lang file. The middleware computes the
   locale in a block (§4.2: a closure borrowing `req` across `next.run` isn't `Send`).
 
+### M26 · Completeness before 1.0
+An audit after M25 (asked by the owner: are the examples, tests and docs complete?) found
+two bugs in M22's keys, M22–M25 features no example shows, stale or missing docs, 379
+public items without a doc comment, and weak coverage in `renox-cli`. Three PRs:
+- [x] M26a: the key bugs (`insert_many`/`upsert`, `unique().ignore()`), examples for M22–M25
+      (crud: derive + hooks, a CSV import with savepoints, factory states; api: `Ulid` keys;
+      shop: recently viewed, plural ranges, `class_names`, `Redirect::route`; teams: public
+      pages with `Routes::domain` and a fallback)
+- [ ] M26b: docs brought up to date, every public item documented, `missing_docs` in CI
+- [ ] M26c: tests for `renox-cli` (`serve`, `scaffold`, `new`, `tailwind`) and the weak core
+      files (`db/error.rs`, `path.rs`, `db/json.rs`, `app.rs` commands)
+
+Notes from M26a:
+- Found by writing the examples: a `Routes::fallback` that redirects (teams) answered 404
+  with a `Location` header. `ServeDir::not_found_service` forces 404; `ServeDir::fallback`
+  keeps the status. The framework test had a fallback that answered 404 anyway, so it passed;
+  it now redirects.
+- `write_many` writes the `id` column for keys the app owns and makes missing ULIDs/UUIDs
+  first, before any statement; an `i64` id is still left to the database.
+- `lock_for_update` still has no example (the CHEATSHEET shows it); the shop's checkout
+  takes stock with a conditional `UPDATE`, which is the better pattern there.
+
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`
       (resource tables and forms); billing later

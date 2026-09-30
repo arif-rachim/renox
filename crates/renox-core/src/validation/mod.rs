@@ -218,7 +218,7 @@ struct Pending {
     table: String,
     column: String,
     value: DbValue,
-    ignore_id: Option<i64>,
+    ignore_id: Option<crate::db::DbValue>,
     /// Extra conditions (`where_eq`, `where_null`, `where_not_null`).
     scope: Vec<ScopeCondition>,
     unique: bool,
@@ -1004,10 +1004,12 @@ impl Field<'_> {
         self.database(table, column, true)
     }
 
-    /// Skips the row with this id in the preceding `unique`, for updates.
-    pub fn ignore(self, id: i64) -> Self {
+    /// Skips the row with this id in the preceding `unique`, for updates:
+    /// `.unique("products", "sku").ignore(product.id)`, whatever the key's
+    /// type (`i64`, `Ulid`, `Uuid`, `String`).
+    pub fn ignore(self, id: impl crate::db::ToDbValue) -> Self {
         if let Some(i) = self.last_pending {
-            self.v.pending[i].ignore_id = Some(id);
+            self.v.pending[i].ignore_id = Some(id.to_db_value());
         }
         self
     }
