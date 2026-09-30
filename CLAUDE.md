@@ -296,7 +296,10 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
 - **Model hooks are opt-in:** `#[model(hooks)]` makes the derive forward `Model::saving/saved/
   deleting/deleted` to `impl ModelHooks`. Only `save`, `save_only`, `save_changes`, `delete`
   and `force_delete` call them; bulk query methods never do. Keep it that way (documented).
-- **Validation:** fluent rules in `impl Validate` (no derive yet). `Valid<T>` handles form, JSON
+- **Validation:** fluent rules in `impl Validate`, or `#[derive(Validate)]` (M25:
+  each `#[validate(item)]` becomes a call on the field's rules, so every `Field` rule works;
+  `label` goes first; `each`/`distinct`/`rename` are special; `#[validate(hooks)]` forwards
+  to `ValidateHooks`). `Valid<T>` handles form, JSON
   and GET query. HTMX/JSON failures → `422 {"message","errors"}`; the bundled `renox.js` places
   errors next to inputs (`data-error-for` slots or inserted `<p class="error">`), sets
   `aria-invalid`, focuses the first invalid input in *page* order. Plain posts → 303 back with
@@ -853,8 +856,11 @@ picks the build, not the terminal.
   with the key carried by `Db`/`Transaction`/`Row`, examples/teams on it): merged (#70).
 - **M24** (C: `Routes::domain`/`fallback`, `route_is`/`CurrentRoute`, `Redirect::route`/
   `intended`, session `push`/`increment`, `Factory::factory()` states and sequences, plural
-  ranges, `loop_controls`, `class_names`): branch `m24-laravel-leftovers`. A domain's host
+  ranges, `loop_controls`, `class_names`): merged (#71). A domain's host
   gets only that domain's routes (no fall-through, unlike Laravel).
+- **M25** (D: `#[derive(Validate)]` + `ValidateHooks`, `App::detect_locale` for
+  `Accept-Language` with `Vary`; hello and `make:module --resource` use the derive): branch
+  `m25-derive-validate`.
 - **M21 is complete.** Next is the owner's call; **v1.0 is on hold** until the owner says to
   start it (docs site, starter kit, semver checks, real crates.io releases; the owner runs
   `cargo login`). Small M21 items that weren't built are listed in ROADMAP ("Deferred from

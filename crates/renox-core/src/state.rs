@@ -38,6 +38,8 @@ pub struct AppState {
     pub(crate) gates: Gates,
     pub(crate) async_gates: Arc<std::collections::HashMap<String, crate::auth::AsyncGate>>,
     pub(crate) throttle: Arc<LoginThrottle>,
+    /// `App::detect_locale`: the browser's `Accept-Language` picks the locale.
+    pub(crate) detect_locale: bool,
     pub(crate) security: Arc<crate::security::Security>,
     pub(crate) webhooks: crate::webhook::Handlers,
     /// Values every view gets (`App::share`).

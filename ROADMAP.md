@@ -86,7 +86,7 @@ my-app/
 - [x] `label()` and `message()` per field; empty inputs count as missing; wrong types become field errors
 - [x] Messages in English and Indonesian (`APP_LOCALE=en|id`); `error('field')` in templates
 - [x] Handlers can return their own `ValidationError` / `Errors`
-- [ ] `#[derive(Validate)]` with attribute rules, for forms that only need the basics
+- [x] `#[derive(Validate)]` with attribute rules, for forms that only need the basics (M25)
 - [x] More rules: `regex`, dates, `digits` (M15b), file uploads (M6b)
 
 ### M4 · v0.5: Authentication and authorization
@@ -173,7 +173,7 @@ M6c (done):
       beyond en/id work without changing Renox
 - [x] Validation messages and auth pages follow the visitor's language
 - [x] The guestbook and `rnx new` apps ship `en.json` and `id.json`; the guestbook has an ID | EN switch
-- [ ] Choosing the language from `Accept-Language` (opt-in)
+- [x] Choosing the language from `Accept-Language` (opt-in): `App::detect_locale()` (M25)
 
 ### M7 · v0.8: CLI and developer experience
 - [x] Generators: `rnx make:module` (routes, view, `pub mod` and `.module(..)` in main.rs),
@@ -1174,6 +1174,30 @@ Notes from M24:
   handler that uses them stays `Send` (checked in `send_handlers.rs`).
 - Plural ranges follow Laravel: `{n}` exactly, `[a,b]` inclusive, `*` open; no match takes
   the last text; texts without ranges keep the `one|many` rule.
+
+### M25 · Derived validation and the browser's language
+D of the owner's B/C/D before 1.0.
+- [x] `#[derive(Validate)]`: `#[validate(required, max = 100, unique("users", "email"), …)]`
+      on fields, each item a call on the field's rules; `each(…)`, `distinct`, `rename`;
+      `label` applied first; generic structs work
+- [x] `#[validate(hooks)]` on the struct + `validation::ValidateHooks` (`prepare`,
+      `authorize`, `after`)
+- [x] `App::detect_locale()`: the first `Accept-Language` language the app has texts for
+      (whole tag, then its language), after the session's choice and before `APP_LOCALE`;
+      `Vary: Accept-Language` on responses
+- [x] `rnx make:module --resource` writes a derived form; examples/hello uses the derive
+      and `detect_locale`
+
+Notes from M25:
+- The derive doesn't know the rules: `max = 100` becomes `.max(100)` on the field, so any
+  rule of `Field` (and future ones) works and a typo is a compile error that names the
+  missing method. Arguments are pasted inside `rules(&self, …)`, so `confirmed(&self.x)`
+  and `same("again", &self.again)` work.
+- Found by its test: a `label` after `required` didn't reach the messages (they're built
+  when a rule fails), so the derive moves `label` to the front.
+- `Accept-Language`: qualities are honoured (`q=0` refused), ties keep the header's order,
+  `*` is ignored; available means `en`/`id` or a lang file. The middleware computes the
+  locale in a block (§4.2: a closure borrowing `req` across `next.run` isn't `Send`).
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

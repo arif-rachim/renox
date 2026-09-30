@@ -390,18 +390,64 @@ pub(crate) async fn middleware(
     mut req: Request,
     next: Next,
 ) -> Response {
-    let chosen = req
-        .extensions()
-        .get::<Session>()
-        .and_then(|s| s.get::<String>(SESSION_KEY))
-        .filter(|locale| {
-            matches!(locale.as_str(), "en" | "id")
-                || state.translator.locales().iter().any(|l| l == locale)
+    // In a block: nothing borrowing `req` may live across `next.run(req)` (§4.2).
+    let locale = {
+        let available = |locale: &str| {
+            matches!(locale, "en" | "id") || state.translator.locales().iter().any(|l| l == locale)
+        };
+        let chosen = req
+            .extensions()
+            .get::<Session>()
+            .and_then(|s| s.get::<String>(SESSION_KEY))
+            .filter(|locale| available(locale));
+        let chosen = chosen.or_else(|| {
+            if !state.detect_locale {
+                return None;
+            }
+            req.headers()
+                .get(axum::http::header::ACCEPT_LANGUAGE)
+                .and_then(|v| v.to_str().ok())
+                .and_then(|header| from_accept_language(header, available))
         });
-    let locale = chosen.unwrap_or_else(|| state.config.locale.clone());
+        chosen.unwrap_or_else(|| state.config.locale.clone())
+    };
     set_current_locale(&locale);
     req.extensions_mut().insert(RequestLocale(locale));
-    next.run(req).await
+    let mut res = next.run(req).await;
+    if state.detect_locale {
+        res.headers_mut().append(
+            axum::http::header::VARY,
+            axum::http::HeaderValue::from_static("Accept-Language"),
+        );
+    }
+    res
+}
+
+/// The first language of an `Accept-Language` header (`id-ID,id;q=0.9,
+/// en;q=0.8`) that `available` accepts, by quality: the whole tag
+/// (`pt-br`), then its language (`pt`).
+fn from_accept_language(header: &str, available: impl Fn(&str) -> bool) -> Option<String> {
+    let mut wanted: Vec<(f32, usize, String)> = header
+        .split(',')
+        .enumerate()
+        .filter_map(|(order, item)| {
+            let mut parts = item.split(';');
+            let tag = parts.next()?.trim().to_ascii_lowercase();
+            let quality = parts
+                .find_map(|p| p.trim().strip_prefix("q="))
+                .map_or(Some(1.0), |q| q.trim().parse::<f32>().ok())?;
+            (!tag.is_empty() && tag != "*" && quality > 0.0).then_some((quality, order, tag))
+        })
+        .collect();
+    // Highest quality first; the header's order among equals.
+    wanted.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(&b.1)));
+    wanted.into_iter().find_map(|(_, _, tag)| {
+        if available(&tag) {
+            return Some(tag);
+        }
+        let language = tag.split(['-', '_']).next()?;
+        available(language).then(|| language.to_owned())
+    })
 }
 
 pub(crate) fn request_locale(extensions: &axum::http::Extensions, state: &AppState) -> String {
@@ -486,6 +532,31 @@ impl<S: Send + Sync> FromRequestParts<S> for Lang {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn accept_language_picks_the_first_available() {
+        let ours = |l: &str| matches!(l, "en" | "id" | "pt-br");
+        assert_eq!(
+            from_accept_language("id-ID,id;q=0.9,en;q=0.8", ours).as_deref(),
+            Some("id")
+        );
+        assert_eq!(
+            from_accept_language("fr, en;q=0.5", ours).as_deref(),
+            Some("en")
+        );
+        assert_eq!(
+            from_accept_language("en;q=0.2, id;q=0.9", ours).as_deref(),
+            Some("id")
+        );
+        assert_eq!(
+            from_accept_language("PT-BR", ours).as_deref(),
+            Some("pt-br")
+        );
+        assert_eq!(from_accept_language("de, fr;q=0.8", ours), None);
+        assert_eq!(from_accept_language("id;q=0, *", ours), None);
+        assert_eq!(from_accept_language("", ours), None);
+        assert_eq!(from_accept_language("en;q=abc", ours), None);
+    }
 
     #[test]
     fn formats_placeholders_and_plurals() {

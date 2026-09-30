@@ -26,7 +26,7 @@
 //! ```
 
 pub use renox_core::*;
-pub use renox_macros::{DbEnum, FromRow, Model, embedded, migrations, test};
+pub use renox_macros::{DbEnum, FromRow, Model, Validate, embedded, migrations, test};
 
 pub use axum;
 pub use tokio;
@@ -45,7 +45,7 @@ pub mod prelude {
     };
     pub use renox_core::{AuthUser, ClientIp, Lang, Policy, Registry, Upload};
     pub use renox_core::{RedirectExt, abort, abort_if, abort_unless};
-    pub use renox_macros::{DbEnum, FromRow, Model};
+    pub use renox_macros::{DbEnum, FromRow, Model, Validate};
 
     pub use axum::extract::{Form, Json, Query, State};
     pub use axum::http::StatusCode;
@@ -124,6 +124,26 @@ pub struct CheatSheet;
 /// struct Coded { id: String, name: String }
 /// #[derive(Model)]
 /// struct Sortable { id: renox::db::Ulid, name: String }
+/// ```
+///
+/// A `#[validate(…)]` rule must exist (a typo is a compile error):
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(serde::Deserialize, Validate)]
+/// struct Typo { #[validate(requred)] name: String }
+/// ```
+/// …while real ones compile, with arguments that may use `self`:
+/// ```
+/// # use renox::prelude::*;
+/// #[derive(serde::Deserialize, Validate)]
+/// struct Ok { #[validate(required, max = 10, same("again", &self.again))] name: String, again: String }
+/// ```
+///
+/// `Validate` is derived for structs with named fields only:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(serde::Deserialize, Validate)]
+/// enum NotAForm { A }
 /// ```
 ///
 /// `soft_deletes` needs `deleted_at`:

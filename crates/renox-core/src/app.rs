@@ -108,6 +108,7 @@ pub struct App {
     provided: HashMap<std::any::TypeId, Arc<dyn std::any::Any + Send + Sync>>,
     layers: Vec<AppLayer>,
     limiters: HashMap<String, crate::rate_limit::LimitRule>,
+    detect_locale: bool,
 }
 
 /// A layer from `App::layer`, applied to the app's routes at boot.
@@ -131,7 +132,26 @@ impl App {
             provided: HashMap::new(),
             layers: Vec::new(),
             limiters: HashMap::new(),
+            detect_locale: false,
         }
+    }
+
+    /// Picks a visitor's language from their browser (`Accept-Language`)
+    /// when they haven't chosen one: the first of their languages this app
+    /// has texts for (the built-in `en` and `id`, or a
+    /// `resources/lang/<locale>.json`), else `APP_LOCALE`. A language set
+    /// with `i18n::set_locale` still wins. Responses then carry
+    /// `Vary: Accept-Language`, so caches keep the languages apart.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # let _ =
+    /// App::new().detect_locale()
+    /// # ;
+    /// ```
+    pub fn detect_locale(mut self) -> Self {
+        self.detect_locale = true;
+        self
     }
 
     /// Wraps every route of the app's modules in a tower layer, e.g. a
@@ -663,6 +683,7 @@ impl App {
             ),
             provided: Arc::new(self.provided),
             throttle: Arc::new(LoginThrottle::new(shared_counters.clone())),
+            detect_locale: self.detect_locale,
         };
 
         let public = embedded.map(|e| e.public);

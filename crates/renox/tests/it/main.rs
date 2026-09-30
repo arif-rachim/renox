@@ -12,6 +12,7 @@ mod background_resilience;
 mod data_layer;
 mod data_resilience;
 mod database;
+mod derive_validate;
 mod direct;
 mod dx;
 mod embed;

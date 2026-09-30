@@ -44,21 +44,17 @@ impl Factory for Entry {
     }
 }
 
-#[derive(Deserialize)]
+/// The form and its rules. Field names in messages come from
+/// resources/lang/*.json (`renox.validation.attributes.*`), in the
+/// visitor's language.
+#[derive(Deserialize, Validate)]
 struct EntryForm {
+    #[validate(required, max = 50)]
     name: String,
+    #[validate(required, between(3, 280))]
     message: String,
+    #[validate(image, max = 2048)] // KB; the content is sniffed, not the name
     photo: Option<Upload>,
-}
-
-impl Validate for EntryForm {
-    fn rules(&self, v: &mut Validator) {
-        // Field names in messages come from resources/lang/*.json
-        // (`renox.validation.attributes.*`), in the visitor's language.
-        v.field("name", &self.name).required().max(50);
-        v.field("message", &self.message).required().between(3, 280);
-        v.field("photo", &self.photo).image().max(2048);
-    }
 }
 
 /// Emitted when someone signs the guestbook.
@@ -227,6 +223,9 @@ pub fn app() -> App {
         .migrations(renox::migrations!())
         .module(Auth::new().account().redirect_to("/")) // login, register, /account
         .module(Guestbook)
+        // A visitor who hasn't picked a language gets their browser's (en or
+        // id), else APP_LOCALE; /bahasa/{locale} still wins.
+        .detect_locale()
         .seeder(|db| async move {
             Entry::create_many(&db, 30).await?;
             Ok(())

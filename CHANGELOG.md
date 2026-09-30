@@ -10,6 +10,19 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M25 · Derived validation and the browser's language
+
+- `#[derive(Validate)]`: rules as attributes on the form's fields,
+  `#[validate(required, max = 100, unique("users", "email"))]`; `each(…)`, `distinct`,
+  `rename = "…"`, `label = "…"`. `#[validate(hooks)]` with `impl ValidateHooks` for
+  `prepare`, `authorize` and `after`. `impl Validate` by hand still works.
+- `App::detect_locale()`: visitors who haven't chosen a language get their browser's
+  (`Accept-Language`) when the app has texts for it; responses carry
+  `Vary: Accept-Language`.
+- `rnx make:module --resource` writes the form with `#[derive(Validate)]`.
+- examples/hello: its form uses the derive, and the guestbook follows the browser's
+  language until a visitor picks one.
+
 ### M24 · Laravel's leftovers from M21
 
 - `Routes::domain("admin.example.com", routes)` and `Routes::domain("{account}.example.com",

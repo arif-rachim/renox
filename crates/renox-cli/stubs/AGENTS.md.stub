@@ -115,6 +115,10 @@ rnx make:middleware StampRequests                      # also make:component
   `renox::prompt::answering([...], app.kernel().call(...))`.
 - Sessions are an encrypted cookie (~4 KB) unless `.env` says `SESSION_DRIVER=database`; don't
   put large data in a cookie session.
+- Forms: `#[derive(Validate)]` with `#[validate(required, max = 100, …)]` on the fields for
+  plain rules (each item is a rule method; `each(…)`, `distinct`, `rename`), `impl Validate`
+  by hand when rules depend on each other. `App::detect_locale()` follows the browser's
+  language.
 - Forms: prefer `impl Validate` hooks to code in the handler: `prepare` (tidy input),
   `authorize` (403 before the rules), `after` (database checks, errors shown on the field).
   Rules include `alpha_dash`, `uuid`, `ip`, `size`, `starts_with`, `required_without`,

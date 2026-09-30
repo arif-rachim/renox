@@ -7,6 +7,7 @@ mod embedded;
 mod from_row;
 mod migrations;
 mod model;
+mod validate;
 
 use proc_macro::TokenStream;
 use syn::{DeriveInput, parse_macro_input};
@@ -30,13 +31,52 @@ use syn::{DeriveInput, parse_macro_input};
 /// ```
 ///
 /// - `table` defaults to the struct name in snake_case (no pluralisation).
-/// - An `id: i64` field is required.
+/// - An `id` field is required; its type is the key (`i64`, `Ulid`, `Uuid` or
+///   `String`, see `renox::db::ModelKey`).
 /// - `created_at` / `updated_at` fields are filled on save.
 /// - `soft_deletes` needs a `deleted_at: Option<DateTime>` field.
 #[proc_macro_derive(Model, attributes(model))]
 pub fn derive_model(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     model::expand(input)
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
+}
+
+/// Implements `renox::Validate` from `#[validate(…)]` attributes on the
+/// fields, for forms that need only rules:
+///
+/// ```
+/// # use renox::prelude::*;
+/// #[derive(serde::Deserialize, Validate)]
+/// struct Signup {
+///     #[validate(required, max = 100, label = "Full name")]
+///     name: String,
+///     #[validate(required, email, unique("users", "email"))]
+///     email: String,
+///     #[validate(required, min = 8, confirmed(&self.password_confirmation))]
+///     password: String,
+///     password_confirmation: String,
+///     #[validate(max = 5, each(required, max = 20), distinct)]
+///     tags: Vec<String>,
+///     #[validate(rename = "t-shirt", one_of(&["S", "M", "L"]))]
+///     size: String,
+/// }
+/// ```
+///
+/// Each item is a call on the field's rules, in order: `required` is
+/// `.required()`, `max = 100` is `.max(100)`, `unique("users", "email")` is
+/// `.unique("users", "email")`, so every rule of `renox::validation::Field`
+/// works, and arguments may use `self`. Three are special: `each(…)` applies
+/// rules to each item of a list (errors `tags.0`, …), `distinct` refuses
+/// repeated items, and `rename = "…"` names the field as the form does. For
+/// `prepare`, `authorize` and `after`, add `#[validate(hooks)]` on the struct
+/// and `impl renox::validation::ValidateHooks`. Anything else: implement
+/// `Validate` by hand.
+#[proc_macro_derive(Validate, attributes(validate))]
+pub fn derive_validate(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    validate::expand(input)
         .unwrap_or_else(|err| err.to_compile_error())
         .into()
 }

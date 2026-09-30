@@ -100,16 +100,12 @@ impl Field {
         format!("\"{}\" {sql}", self.name)
     }
 
-    fn rules(&self) -> Option<String> {
-        let name = &self.name;
+    /// The field's `#[validate(…)]` rules, for `#[derive(Validate)]`.
+    fn rules(&self) -> Option<&'static str> {
         match self.kind {
-            Kind::String => Some(format!(
-                "v.field(\"{name}\", &self.{name}).required().max(255);"
-            )),
-            Kind::Text => Some(format!(
-                "v.field(\"{name}\", &self.{name}).required().max(10_000);"
-            )),
-            Kind::Money => Some(format!("v.field(\"{name}\", &self.{name}).min(0);")),
+            Kind::String => Some("required, max = 255"),
+            Kind::Text => Some("required, max = 10_000"),
+            Kind::Money => Some("min = 0"),
             _ => None,
         }
     }
@@ -301,13 +297,12 @@ pub fn resource(root: &Path, name: &str, model: Option<&str>, fields: Option<&st
             } else {
                 ""
             };
-            format!("{default}    {}: {},\n", f.name, f.rust_type())
+            let rules = f
+                .rules()
+                .map(|rules| format!("    #[validate({rules})]\n"))
+                .unwrap_or_default();
+            format!("{default}{rules}    {}: {},\n", f.name, f.rust_type())
         })
-        .collect();
-    let rules: String = fields
-        .iter()
-        .filter_map(Field::rules)
-        .map(|r| format!("        {r}\n"))
         .collect();
     let assign: String = fields
         .iter()
@@ -315,14 +310,6 @@ pub fn resource(root: &Path, name: &str, model: Option<&str>, fields: Option<&st
         .collect();
     let mod_rs = replace(MODULE)
         .replace("__form_fields__", &form_fields)
-        .replace(
-            "__rules__",
-            if rules.is_empty() {
-                "        let _ = v;\n"
-            } else {
-                &rules
-            },
-        )
         .replace("__assign__", &assign)
         .replace(
             "__date_use__",
@@ -545,15 +532,13 @@ impl Module for __Module__ {
     }
 }
 
-/// What the create and edit forms send.
-#[derive(Deserialize)]
+/// What the create and edit forms send, and its rules (each `#[validate(…)]`
+/// item is a rule: `required`, `max = 255`, `unique("table", "column")`…).
+/// For `prepare`, `authorize` or `after`, add `#[validate(hooks)]` and
+/// `impl renox::validation::ValidateHooks`.
+#[derive(Deserialize, Validate)]
 struct __Model__Form {
 __form_fields__}
-
-impl Validate for __Model__Form {
-    fn rules(&self, v: &mut Validator) {
-__rules__    }
-}
 
 impl __Model__Form {
     fn fill(self, record: &mut __Model__) {
