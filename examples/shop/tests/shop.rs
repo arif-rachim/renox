@@ -457,6 +457,23 @@ async fn admins_manage_products_with_photos() {
         .await
         .unwrap();
     assert_eq!(kopi.category_id, Some(drinks.id));
+    // The admin nav marks the current section only (`route_is(…)`).
+    for (page, section) in [
+        ("/admin/products?q=kopi", "Products"),
+        ("/admin", "Dashboard"),
+    ] {
+        let html = app.get(page).await.text();
+        let current: Vec<&str> = html
+            .split("<a ")
+            .filter(|link| link.contains(r#"aria-current="page""#))
+            .collect();
+        assert_eq!(current.len(), 1, "{page}");
+        assert!(
+            current[0].contains(&format!(">{section}<")),
+            "{}",
+            current[0]
+        );
+    }
     let photo = kopi.photo.clone().expect("a photo");
     assert!(
         photo.starts_with("public/products/") && photo.ends_with(".png"),

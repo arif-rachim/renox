@@ -100,6 +100,34 @@ pub(crate) fn date(
     }
 }
 
+/// `class_names('btn', {'btn-active': active, 'hidden': not shown})`: the
+/// strings given, plus the keys of maps whose value is true, joined with
+/// spaces (Blade's `@class`). Empty strings and `none` are skipped.
+///
+/// ```text
+/// <a class="{{ class_names('tab', {'tab-active': route_is('orders.*')}) }}">Orders</a>
+/// ```
+pub(crate) fn class_names(parts: minijinja::value::Rest<minijinja::Value>) -> String {
+    let mut classes: Vec<String> = Vec::new();
+    for part in parts.iter() {
+        if let Some(text) = part.as_str() {
+            classes.extend(text.split_whitespace().map(str::to_owned));
+        } else if part.kind() == minijinja::value::ValueKind::Map
+            && let Ok(keys) = part.try_iter()
+        {
+            for key in keys {
+                let on = part.get_item(&key).is_ok_and(|v| v.is_true());
+                if on && let Some(name) = key.as_str() {
+                    classes.extend(name.split_whitespace().map(str::to_owned));
+                }
+            }
+        }
+    }
+    let mut seen = std::collections::HashSet::new();
+    classes.retain(|class| seen.insert(class.clone()));
+    classes.join(" ")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

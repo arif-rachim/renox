@@ -286,3 +286,6 @@ and link the output in the layout: `<link rel="stylesheet" href="{{ asset('css/a
 | Vite + Tailwind | `rnx new --tailwind`: Tailwind's standalone CLI in `rnx serve` / `rnx build` |
 | `@fragment` / `fragments([...])` | `.fragment("rows").also("count")` |
 | Precognition (live validation) | `data-live-validate` and `Valid<T>` |
+| `@class(['tab', 'active' => $on])` | `class_names('tab', {'active': on})` |
+| `request()->routeIs('admin.*')` | `route_is('admin.*')` (and `request.route`, the route's name) |
+| `@break` / `@continue` in `@foreach` | `{% break %}` / `{% continue %}` |

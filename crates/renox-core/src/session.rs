@@ -138,6 +138,42 @@ impl Session {
         self.lock().data.remove(key)
     }
 
+    /// Appends `value` to the list stored under `key` (a new list if there
+    /// is none; a value that isn't a list becomes its first item), e.g. the
+    /// recently viewed products. Returns the list's new length.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # fn demo(session: Session) -> Result {
+    /// session.push("recent", 42)?;
+    /// let views = session.increment("views", 1)?; // 1, then 2, …
+    /// # let _ = views; Ok(()) }
+    /// ```
+    pub fn push(&self, key: &str, value: impl Serialize) -> Result<usize> {
+        let value = serde_json::to_value(value)?;
+        let mut inner = self.lock();
+        let entry = inner
+            .data
+            .entry(key.to_owned())
+            .or_insert_with(|| Value::Array(Vec::new()));
+        if !entry.is_array() {
+            *entry = Value::Array(vec![entry.take()]);
+        }
+        let list = entry.as_array_mut().expect("made an array above");
+        list.push(value);
+        Ok(list.len())
+    }
+
+    /// Adds `by` (which may be negative) to the number under `key`, taking a
+    /// missing or non-numeric value as 0, and returns the new number.
+    pub fn increment(&self, key: &str, by: i64) -> Result<i64> {
+        let mut inner = self.lock();
+        let current = inner.data.get(key).and_then(Value::as_i64).unwrap_or(0);
+        let next = current.saturating_add(by);
+        inner.data.insert(key.to_owned(), Value::from(next));
+        Ok(next)
+    }
+
     /// Reads a value and removes it.
     pub fn pull<T: DeserializeOwned>(&self, key: &str) -> Option<T> {
         let value = self.lock().data.remove(key)?;

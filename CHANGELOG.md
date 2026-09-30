@@ -10,6 +10,26 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M24 · Laravel's leftovers from M21
+
+- `Routes::domain("admin.example.com", routes)` and `Routes::domain("{account}.example.com",
+  …)` with the `DomainParams` extractor: routes for other hosts, where the same path may
+  mean another page. A host that matches a domain gets that domain's routes (plus Renox's
+  own and the public files); other hosts get the routes without a domain. `route:list`
+  shows a DOMAIN column when there are any.
+- `Routes::fallback(handler)`: what answers when no route and no public file does.
+- `route_is('admin.*', …)` and `request.route` in views; the `CurrentRoute` extractor.
+- `Redirect::route("products.show", &[&id])?` and `Redirect::intended(&session, "/")`
+  (`RedirectExt`, in the prelude).
+- `session.push(key, value)` and `session.increment(key, by)`.
+- `Product::factory().count(3).state(f).sequence(|i, p| …).create(&db)` (and `make`,
+  `make_one`, `create_one`).
+- Plural ranges in translations: `"{0} Sold out|[1,5] Only :count left|[6,*] In stock"`.
+- `{% break %}` and `{% continue %}` in templates, and `class_names('tab', {'active': on})`.
+- `RouteInfo` has a `domain` field (it's `#[non_exhaustive]`); `RouteTable::name_of`
+  (new) takes the domain.
+- examples/shop's admin nav marks its section with `route_is`.
+
 ### M23 · Savepoints and encrypted fields
 
 - `Transaction::savepoint(|tx| Box::pin(async move { … }))`: a transaction inside the

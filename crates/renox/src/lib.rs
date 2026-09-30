@@ -44,7 +44,7 @@ pub mod prelude {
         Validator, View, context, view,
     };
     pub use renox_core::{AuthUser, ClientIp, Lang, Policy, Registry, Upload};
-    pub use renox_core::{abort, abort_if, abort_unless};
+    pub use renox_core::{RedirectExt, abort, abort_if, abort_unless};
     pub use renox_macros::{DbEnum, FromRow, Model};
 
     pub use axum::extract::{Form, Json, Query, State};

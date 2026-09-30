@@ -111,7 +111,8 @@ pub struct App {
 }
 
 /// A layer from `App::layer`, applied to the app's routes at boot.
-type AppLayer = Box<dyn FnOnce(Router<AppState>) -> Router<AppState> + Send>;
+/// Applied to the app's router and to each `Routes::domain` router.
+type AppLayer = Box<dyn Fn(Router<AppState>) -> Router<AppState> + Send + Sync>;
 
 impl App {
     /// Creates an application that loads its configuration from `.env` on start.
@@ -167,7 +168,7 @@ impl App {
         <L::Service as tower::Service<axum::extract::Request>>::Future: Send + 'static,
     {
         self.layers
-            .push(Box::new(move |router| router.layer(layer)));
+            .push(Box::new(move |router| router.layer(layer.clone())));
         self
     }
 
@@ -473,51 +474,90 @@ impl App {
         let db = crate::db::connect(&config).await?.with_key(key.clone());
 
         let mut router = Router::new();
+        let mut fallback: Option<axum::routing::MethodRouter<AppState>> = None;
+        // One router per `Routes::domain` pattern, with its own fallback.
+        let mut domains: Vec<(
+            crate::domain::DomainPattern,
+            Router<AppState>,
+            Option<axum::routing::MethodRouter<AppState>>,
+        )> = Vec::new();
         let mut routes = RouteTable::default();
         let mut listing: Vec<RouteInfo> = Vec::new();
         for module in &self.modules {
             tracing::debug!(module = module.name(), "registering module");
-            let (module_router, names, infos) = module.routes().into_parts();
-            for info in &infos {
-                let clash = listing.iter().find(|other| {
-                    other.path == info.path
-                        && (other.method == info.method
-                            || other.method == "*"
-                            || info.method == "*")
-                });
-                if let Some(other) = clash {
+            let parts = module.routes().into_parts();
+            check_clashes(&listing, &parts.listing, None, module.name())?;
+            router = merge_routes(router, parts.router, module.name())?;
+            for (name, path) in parts.names {
+                routes.insert(name, path)?;
+            }
+            listing.extend(parts.listing.into_iter().map(|info| RouteInfo {
+                module: module.name().to_owned(),
+                ..info
+            }));
+            if let Some(handler) = parts.fallback {
+                if fallback.is_some() {
                     return Err(anyhow!(
-                        "{} {} is defined by both the `{}` and the `{}` module",
-                        info.method,
-                        info.path,
-                        other.module,
+                        "two modules set a fallback route (`{}` is the second)",
                         module.name()
                     )
                     .into());
                 }
+                fallback = Some(handler);
             }
-            // Anything else axum refuses to merge is a boot error, not a panic.
-            router = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                router.merge(module_router)
-            }))
-            .map_err(|panic| {
-                let message = crate::error::panic_message(&*panic);
-                anyhow!(
-                    "the routes of the `{}` module clash: {message}",
-                    module.name()
-                )
-            })?;
-            for (name, path) in names {
-                routes.insert(name, path)?;
+            for (text, domain_routes) in parts.domains {
+                let pattern = crate::domain::DomainPattern::parse(&text)?;
+                let inner = domain_routes.into_parts();
+                if !inner.domains.is_empty() {
+                    return Err(anyhow!(
+                        "Routes::domain(\"{text}\", …) inside another domain (module `{}`)",
+                        module.name()
+                    )
+                    .into());
+                }
+                check_clashes(
+                    &listing,
+                    &inner.listing,
+                    Some(pattern.as_str()),
+                    module.name(),
+                )?;
+                let at = match domains.iter().position(|(p, _, _)| *p == pattern) {
+                    Some(at) => at,
+                    None => {
+                        domains.push((pattern.clone(), Router::new(), None));
+                        domains.len() - 1
+                    }
+                };
+                let (_, domain_router, domain_fallback) = &mut domains[at];
+                *domain_router =
+                    merge_routes(std::mem::take(domain_router), inner.router, module.name())?;
+                if let Some(handler) = inner.fallback {
+                    if domain_fallback.is_some() {
+                        return Err(anyhow!(
+                            "two fallbacks for the domain `{text}` (module `{}`)",
+                            module.name()
+                        )
+                        .into());
+                    }
+                    *domain_fallback = Some(handler);
+                }
+                for (name, path) in inner.names {
+                    routes.set_domain(&name, pattern.as_str());
+                    routes.insert(name, path)?;
+                }
+                listing.extend(inner.listing.into_iter().map(|info| RouteInfo {
+                    module: module.name().to_owned(),
+                    domain: Some(pattern.as_str().to_owned()),
+                    ..info
+                }));
             }
-            listing.extend(infos.into_iter().map(|info| RouteInfo {
-                module: module.name().to_owned(),
-                ..info
-            }));
         }
         // The app's own layers; the first one added ends up outermost.
-        for layer in self.layers.into_iter().rev() {
+        for layer in self.layers.iter().rev() {
             router = layer(router);
+            for (_, domain_router, _) in &mut domains {
+                *domain_router = layer(std::mem::take(domain_router));
+            }
         }
         listing.extend(framework_routes(&config));
         listing.sort_by(|a, b| (&a.path, &a.method).cmp(&(&b.path, &b.method)));
@@ -625,9 +665,25 @@ impl App {
             throttle: Arc::new(LoginThrottle::new(shared_counters.clone())),
         };
 
+        let public = embedded.map(|e| e.public);
+        let default = build_router(router, state.clone(), public, fallback);
+        let router = if domains.is_empty() {
+            default
+        } else {
+            let hosts = domains
+                .into_iter()
+                .map(|(pattern, router, fallback)| {
+                    (
+                        pattern,
+                        build_router(router, state.clone(), public, fallback),
+                    )
+                })
+                .collect();
+            crate::domain::dispatch(hosts, default)
+        };
         Ok(Kernel {
             listing,
-            router: build_router(router, state.clone(), embedded.map(|e| e.public)),
+            router,
             state,
             migrator,
             seeders: self.seeders,
@@ -1154,6 +1210,7 @@ fn framework_routes(config: &Config) -> Vec<RouteInfo> {
         name: None,
         module: "renox".to_owned(),
         middleware: Vec::new(),
+        domain: None,
     };
     let mut routes = vec![
         route("GET", "/health"),
@@ -1174,20 +1231,30 @@ fn framework_routes(config: &Config) -> Vec<RouteInfo> {
 }
 
 fn print_routes(routes: &[RouteInfo]) {
-    let rows: Vec<[String; 5]> = routes
+    let with_domains = routes.iter().any(|r| r.domain.is_some());
+    let rows: Vec<Vec<String>> = routes
         .iter()
         .map(|r| {
-            [
+            let mut row = vec![
                 r.method.clone(),
                 r.path.clone(),
                 r.name.clone().unwrap_or_default(),
                 r.module.clone(),
                 r.middleware.join(", "),
-            ]
+            ];
+            if with_domains {
+                row.insert(0, r.domain.clone().unwrap_or_default());
+            }
+            row
         })
         .collect();
-    let header = ["METHOD", "PATH", "NAME", "MODULE", "MIDDLEWARE"].map(str::to_owned);
-    let mut widths = header.clone().map(|h| h.len());
+    let mut header: Vec<String> = ["METHOD", "PATH", "NAME", "MODULE", "MIDDLEWARE"]
+        .map(str::to_owned)
+        .to_vec();
+    if with_domains {
+        header.insert(0, "DOMAIN".into());
+    }
+    let mut widths: Vec<usize> = header.iter().map(String::len).collect();
     for row in &rows {
         for (width, cell) in widths.iter_mut().zip(row) {
             *width = (*width).max(cell.chars().count());
@@ -1196,8 +1263,8 @@ fn print_routes(routes: &[RouteInfo]) {
     for row in std::iter::once(&header).chain(&rows) {
         let line: Vec<String> = row
             .iter()
-            .zip(widths)
-            .map(|(cell, width)| format!("{cell:<width$}"))
+            .zip(&widths)
+            .map(|(cell, width)| format!("{cell:<width$}", width = *width))
             .collect();
         println!("{}", line.join("  ").trim_end());
     }
@@ -1255,12 +1322,68 @@ async fn guard(
     })
 }
 
+/// Adds a module's routes; what axum refuses to merge is a boot error.
+fn merge_routes(
+    router: Router<AppState>,
+    other: Router<AppState>,
+    module: &str,
+) -> Result<Router<AppState>> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| router.merge(other))).map_err(
+        |panic| {
+            let message = crate::error::panic_message(&*panic);
+            anyhow!("the routes of the `{module}` module clash: {message}").into()
+        },
+    )
+}
+
+/// A route of `module` that another module defines already (on the same
+/// domain, or both without one).
+fn check_clashes(
+    listing: &[RouteInfo],
+    new: &[RouteInfo],
+    domain: Option<&str>,
+    module: &str,
+) -> Result {
+    for info in new {
+        let clash = listing.iter().find(|other| {
+            other.domain.as_deref() == domain
+                && other.path == info.path
+                && (other.method == info.method || other.method == "*" || info.method == "*")
+        });
+        if let Some(other) = clash {
+            let on = domain.map(|d| format!(" on {d}")).unwrap_or_default();
+            return Err(anyhow!(
+                "{} {}{on} is defined by both the `{}` and the `{module}` module",
+                info.method,
+                info.path,
+                other.module,
+            )
+            .into());
+        }
+    }
+    Ok(())
+}
+
 fn build_router(
     router: Router<AppState>,
     state: AppState,
     embedded_public: Option<&'static [(&'static str, &'static [u8])]>,
+    fallback: Option<axum::routing::MethodRouter<AppState>>,
 ) -> Router {
-    let not_found = || async { Error::NotFound };
+    // No route and no public file: the app's fallback (`Routes::fallback`), else a 404.
+    let fallback = fallback.map(|handler| handler.with_state(state.clone()));
+    let not_found = move |req: axum::extract::Request| {
+        let fallback = fallback.clone();
+        async move {
+            match fallback {
+                Some(handler) => match tower::ServiceExt::oneshot(handler, req).await {
+                    Ok(res) => res,
+                    Err(never) => match never {},
+                },
+                None => axum::response::IntoResponse::into_response(Error::NotFound),
+            }
+        }
+    };
     let router = router.merge(crate::storage::router());
     let router = if state.config.debug {
         router
@@ -1272,12 +1395,20 @@ fn build_router(
     let public = state.config.public_path.clone();
     let router = if let Some(files) = embedded_public {
         let files = crate::embedded::public_map(files);
-        router.fallback(move |uri: axum::http::Uri| {
-            let files = files.clone();
-            async move { crate::embedded::serve(&files, &uri) }
+        let not_found = not_found.clone();
+        router.fallback(move |req: axum::extract::Request| {
+            let (files, not_found) = (files.clone(), not_found.clone());
+            async move {
+                let res = crate::embedded::serve(&files, req.uri());
+                if res.status() == axum::http::StatusCode::NOT_FOUND {
+                    not_found(req).await
+                } else {
+                    res
+                }
+            }
         })
     } else if public.is_dir() {
-        let files = ServeDir::new(public).not_found_service(not_found.into_service());
+        let files = ServeDir::new(public).not_found_service(not_found.clone().into_service());
         router.fallback(move |req: axum::extract::Request| {
             let files = files.clone();
             async move {

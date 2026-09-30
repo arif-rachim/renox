@@ -350,6 +350,9 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 | Blade | MiniJinja templates, with `{% extends %}` and `{% block %}` |
 | Blade components, Breeze's UI | Macros that see the request (`rnx make:component`), the `renox/ui.html` kit |
 | `routes/web.php`, `Route::prefix()->name()->group()` | `Module::routes`, `Routes::group("/admin", "admin.", …)` |
+| `Route::domain`, `Route::fallback`, `redirect()->route()`, `->intended()` | `Routes::domain(…)`, `Routes::fallback(…)`, `Redirect::route(…)`, `Redirect::intended(…)` |
+| `routeIs`, `@class`, `trans_choice` ranges | `route_is('admin.*')`, `class_names(…)`, `{0} none\|[1,*] :count` in lang files |
+| Factory states and sequences | `Product::factory().count(3).state(f).sequence(\|i, p\| …)` |
 | Middleware | `.require_auth()`, `.throttle(…)`, `Routes::route_layer`, `App::layer` |
 | `RateLimiter::for('api', …)` | `App::rate_limiter("api", …)` and `.throttle_by("api")` |
 | Exception reporting (`report()`), Telescope/Debugbar | `App::report(…)`, `/_renox/debug` |
@@ -390,8 +393,9 @@ Renox is **pre-1.0**. After the Laravel parity review
 (tenancy, roles, accounts), M19 (query builder and models), M20 (scheduler, locks, queue,
 HTTP client, queue dashboard, localized mail) and M21 (the UI kit, scaffolding, test tools,
 error reports and logs, Tailwind, typed commands, form requests, database sessions, deploys
-without refused connections), M22 (model keys other than integers) and M23 (savepoints,
-encrypted fields) are done. Next is 1.0: a documentation site with a tutorial and a Laravel guide, semver checks, and the first
+without refused connections), M22 (model keys other than integers), M23 (savepoints,
+encrypted fields) and M24 (domain and fallback routes, `route_is`, factory states, plural
+ranges) are done. Next is 1.0: a documentation site with a tutorial and a Laravel guide, semver checks, and the first
 real release on crates.io (today's crates there are placeholders, so install from Git as above).
 Until then the API may still change; breaking changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
