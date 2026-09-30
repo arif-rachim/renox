@@ -20,6 +20,7 @@ mod forms;
 mod i18n;
 mod infra;
 mod jobs;
+mod leftovers;
 mod mail;
 mod method;
 mod model_keys;

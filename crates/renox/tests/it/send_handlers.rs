@@ -445,6 +445,29 @@ async fn sealed(State(db): State<Db>) -> Result<String> {
     Ok(format!("{label} {}", *vault.secret))
 }
 
+/// M24: factory states (closures) and session helpers in a routed handler.
+impl Factory for Note {
+    fn definition() -> Self {
+        Note {
+            body: format!("note {}", renox::random_token()),
+            ..Default::default()
+        }
+    }
+}
+
+async fn factories(State(db): State<Db>, session: Session) -> Result<String> {
+    let label = String::from("borrowed");
+    let notes = Note::factory()
+        .count(2)
+        .state(|n: &mut Note| n.stars = 5)
+        .sequence(move |i, n: &mut Note| n.body = format!("{label} {i}"))
+        .create(&db)
+        .await?;
+    let one = Note::factory().create_one(&db).await?;
+    let pushed = session.push("seen", one.id)?;
+    Ok(format!("{} {pushed}", notes.len()))
+}
+
 struct Handlers;
 
 impl Module for Handlers {
@@ -465,6 +488,7 @@ impl Module for Handlers {
             .get("/polish", polish)
             .get("/keyed", keyed)
             .get("/sealed", sealed)
+            .get("/factories", factories)
     }
 }
 
@@ -511,4 +535,5 @@ async fn data_apis_work_in_routed_handlers() {
         .await
         .assert_ok()
         .assert_see("borrowed s3cret");
+    app.get("/factories").await.assert_ok().assert_see("2 1");
 }

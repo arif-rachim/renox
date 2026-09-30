@@ -1,8 +1,9 @@
 {#- The admin's sections; the current one is marked for screen readers too. -#}
 {% from "renox/ui.html" import link_button %}
 <nav class="chips" aria-label="Admin">
-  {% for name, label in [("admin.dashboard", "Dashboard"), ("admin.products.index", "Products"), ("admin.orders.index", "Orders")] %}
-  {{ link_button(route(name), label, variant=("secondary" if request.path == route(name) else "plain"), size="small",
-                 attrs=({"aria-current": "page"} if request.path == route(name) else {})) }}
+  {#- `route_is` matches the section by route name (`admin.products.*`), whatever the query. -#}
+  {% for name, label, section in [("admin.dashboard", "Dashboard", "admin.dashboard"), ("admin.products.index", "Products", "admin.products.*"), ("admin.orders.index", "Orders", "admin.orders.*")] %}
+  {{ link_button(route(name), label, variant=("secondary" if route_is(section) else "plain"), size="small",
+                 attrs=({"aria-current": "page"} if route_is(section) else {})) }}
   {% endfor %}
 </nav>

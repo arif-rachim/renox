@@ -105,6 +105,10 @@ rnx make:middleware StampRequests                      # also make:component
 - Per-user or per-key API limits: `App::rate_limiter("api", |req| Limit::per_minute(…))` and
   `.throttle_by("api")` on the routes; a missing limiter is a boot error.
 - `route('products.index', q=q, page=2)` adds named arguments as the query string.
+  `Redirect::route("products.show", &[&id])?` does the same from Rust; `route_is('admin.*')`
+  marks the current section in a nav.
+- `Routes::domain("admin.example.com", …)`: that host gets only those routes (plus Renox's
+  own and public files), not the routes without a domain; the proxy must pass `Host` on.
 - Commands: `rnx make:command orders:close` writes a typed one (a clap struct with
   `impl AppCommand`, registered with `app.typed_command::<T>()`); ask for missing values with
   `renox::prompt::ask/confirm/secret/choice`, and answer them in tests with

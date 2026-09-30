@@ -819,11 +819,12 @@ Notes from M20c (dashboard, mail, HTTP, storage):
       rules) (M21f)
 - [x] Typed app commands (a clap parser), prompts (M21e)
 - [x] Zero-downtime deploy recipes; an opt-in server-side session store (M21g)
-- [ ] Deferred from M21 (small items the Laravel parity review planned here, not built):
-      subdomain and fallback routes (`Route::domain`, `Route::fallback`); the current route's
-      name in views (`routeIs`); `Redirect::route` and a public `intended`; session
-      `push`/`increment`; factory states and sequences; plural ranges and the locale from
-      `Accept-Language`; MiniJinja `loop_controls` and `@class`-style helpers
+- [x] Deferred from M21 (small items the Laravel parity review planned here), built in M24:
+      subdomain and fallback routes (`Routes::domain`, `Routes::fallback`); the current route's
+      name in views (`route_is`, `request.route`, `CurrentRoute`); `Redirect::route` and
+      `Redirect::intended`; session `push`/`increment`; factory states and sequences
+      (`Factory::factory()`); plural ranges; MiniJinja `loop_controls` and `class_names`.
+      The locale from `Accept-Language` moved to D (with `#[derive(Validate)]`)
 - [x] Renox's own auth pages (`renox/auth/*`: login, register, reset, verify) on the UI kit:
       they still have their pre-kit look (a black button, default links) in apps built on the kit
       (found in the M21e browser check) (M21f)
@@ -1137,6 +1138,42 @@ Notes from M23:
 - Savepoints are plain SQL on both databases (sqlx's nested `begin` would need a lifetime
   on `Transaction`, a breaking change). A cancelled savepoint future leaves it open until
   the transaction ends, which rolls it back with the rest.
+
+### M24 · Laravel's leftovers from M21
+C of the owner's B/C/D before 1.0: the small items M21 deferred.
+- [x] `Routes::domain("admin.example.com" | "{account}.example.com", routes)`, the
+      `DomainParams` extractor, a DOMAIN column in `route:list`
+- [x] `Routes::fallback(handler)` (per app, or per domain)
+- [x] `route_is(pattern, …)` and `request.route` in views, the `CurrentRoute` extractor
+- [x] `Redirect::route(name, params)` and `Redirect::intended(&session, fallback)`
+      (`RedirectExt`, in the prelude)
+- [x] `Session::push` and `Session::increment`
+- [x] `Factory::factory()` → `FactoryBuilder`: `count`, `state`, `sequence`, `make`,
+      `make_one`, `create`, `create_one`
+- [x] Plural ranges in translations: `{0} …|[1,5] …|[6,*] …`
+- [x] `{% break %}` / `{% continue %}` (MiniJinja's `loop_controls`) and `class_names(…)`
+- [x] examples/shop's admin nav marks its section with `route_is`
+
+Notes from M24:
+- Domains: each pattern gets a whole router of its own (the same middleware stack, Renox's
+  routes, public files and its own fallback), and the outermost service picks one by the
+  `Host` header (port ignored, case-insensitive). A host that matches a domain gets only
+  that domain's routes; other hosts get the routes without a domain. Unlike Laravel, a
+  domain's host doesn't fall through to the routes without one: that's what lets the same
+  path mean different pages, which one axum router can't hold. `App::layer` layers are
+  applied to every router (`AppLayer` became `Fn`).
+- Route names stay global; `route()` gives the path. `RouteTable::name_of(path, domain)`
+  needs the domain: `/menu` exists on two hosts in the tests and got the other host's name
+  until the dispatcher marked the matched domain (`MatchedDomain`) for the lookup.
+- `Routes::fallback` replaces the 404 after public files (disk or embedded); a second one
+  for the same app or domain is a boot error, as are domains inside domains and `domain`
+  or `fallback` inside a path `group`.
+- `Redirect::route` needs the app, which `renox::context::app()` gives in handlers,
+  middleware, jobs and commands; `intended` is the one the login page used.
+- Factory closures run while building the models, before the returned future, so a
+  handler that uses them stays `Send` (checked in `send_handlers.rs`).
+- Plural ranges follow Laravel: `{n}` exactly, `[a,b]` inclusive, `*` open; no match takes
+  the last text; texts without ranges keep the `one|many` rule.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

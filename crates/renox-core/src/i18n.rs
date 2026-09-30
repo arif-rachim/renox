@@ -250,9 +250,12 @@ fn builtin(locale: &str) -> Option<&'static HashMap<&'static str, &'static str>>
 }
 
 /// Fills `:name` (and `:Name`, capitalised) placeholders, and picks the
-/// singular or plural side of `one|many` texts when `count` is given.
+/// singular or plural side of `one|many` texts when `count` is given, or
+/// the matching range of `{0} none|[1,5] a few|[6,*] many` texts (Laravel's
+/// `trans_choice` ranges: `{n}` exactly, `[a,b]` from a to b, `*` open).
 pub fn format(text: &str, params: &[(&str, String)], count: Option<i64>) -> String {
     let text = match (count, text.split_once('|')) {
+        (Some(count), Some(_)) if has_ranges(text) => choose_range(text, count),
         (Some(1), Some((one, _))) => one.to_owned(),
         (Some(_), Some((_, many))) => many.to_owned(),
         _ => text.to_owned(),
@@ -281,6 +284,52 @@ pub fn format(text: &str, params: &[(&str, String)], count: Option<i64>) -> Stri
             .replace(&format!(":{name}"), &value);
     }
     out
+}
+
+/// Whether a `|` text uses ranges (`{0} …|[1,*] …`).
+fn has_ranges(text: &str) -> bool {
+    text.split('|')
+        .any(|part| part.trim_start().starts_with(['{', '[']))
+}
+
+/// The part of a ranged text whose range holds `count`; the last part when
+/// none does. The range itself is left out.
+fn choose_range(text: &str, count: i64) -> String {
+    let parts: Vec<&str> = text.split('|').collect();
+    for part in &parts {
+        let part = part.trim_start();
+        let (range, rest) = if let Some(inner) = part.strip_prefix('{') {
+            match inner.split_once('}') {
+                Some((exact, rest)) => ((exact, exact), rest),
+                None => continue,
+            }
+        } else if let Some(inner) = part.strip_prefix('[') {
+            match inner.split_once(']').and_then(|(range, rest)| {
+                range.split_once(',').map(|(from, to)| ((from, to), rest))
+            }) {
+                Some(found) => found,
+                None => continue,
+            }
+        } else {
+            continue;
+        };
+        let bound = |text: &str, open: i64| match text.trim() {
+            "*" => Some(open),
+            number => number.parse::<i64>().ok(),
+        };
+        let (Some(from), Some(to)) = (bound(range.0, i64::MIN), bound(range.1, i64::MAX)) else {
+            continue;
+        };
+        if (from..=to).contains(&count) {
+            return rest.trim_start().to_owned();
+        }
+    }
+    let last = parts.last().copied().unwrap_or_default().trim_start();
+    // Without a matching range, the last text, minus its range.
+    match last.find([']', '}']) {
+        Some(end) if last.starts_with(['{', '[']) => last[end + 1..].trim_start().to_owned(),
+        _ => last.to_owned(),
+    }
 }
 
 /// The language chosen for the current request.
@@ -458,6 +507,20 @@ mod tests {
         assert_eq!(format("one|:count many", &[], Some(-1)), "-1 many");
         // Without a plural form the text is used as it is.
         assert_eq!(format(":count item", &[], Some(3)), "3 item");
+        // Laravel's ranges.
+        let ranged = "{0} Belum ada pesan|[1,5] Ada :count pesan|[6,*] Banyak pesan (:count)";
+        assert_eq!(format(ranged, &[], Some(0)), "Belum ada pesan");
+        assert_eq!(format(ranged, &[], Some(1)), "Ada 1 pesan");
+        assert_eq!(format(ranged, &[], Some(5)), "Ada 5 pesan");
+        assert_eq!(format(ranged, &[], Some(40)), "Banyak pesan (40)");
+        assert_eq!(
+            format("[*,-1] minus|{0} nol|[1,*] :count", &[], Some(-3)),
+            "minus"
+        );
+        // No range matches: the last text.
+        assert_eq!(format("{1} one|{2} two", &[], Some(7)), "two");
+        // Without a count, ranged texts are left alone.
+        assert_eq!(format("{0} a|[1,*] b", &[], None), "{0} a|[1,*] b");
         assert_eq!(
             format(
                 ":name :names",

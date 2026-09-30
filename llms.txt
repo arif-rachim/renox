@@ -41,7 +41,7 @@ Every example has a README.md that walks through it.
   of order status changes (the `Audit` module), product delete behind password confirmation;
   checkout in `db.retrying`; en/id with plurals; the `make:deploy` files (with the systemd
   socket); every page on the UI kit with a rebranded accent, toasts and confirmation sheets; a
-  typed `shop:make-admin` command with a prompt; tests with time travel (unpaid orders cancelled
+  typed `shop:make-admin` command with a prompt; an admin nav marked with `route_is`; tests with time travel (unpaid orders cancelled
   by the scheduled task), event and notification fakes and `assert_view`. Guide: its
   [README](examples/shop/README.md).
   - Checkout: [checkout.rs](examples/shop/src/app/orders/checkout.rs); orders, event, task:

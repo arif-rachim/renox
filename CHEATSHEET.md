@@ -76,14 +76,23 @@ impl Module for Products {
         let guests = Routes::new()
             .get("/welcome", index).name("welcome")
             .guest_only(); // logged-in users go to the `home` route
-        public.merge(members).merge(checkout).merge(guests).group(
-            "/admin",   // path prefix: starts with `/`, never ends with one
-            "admin.",   // name prefix
-            Routes::new()
-                .get("/", index).name("dashboard")        // GET /admin, `admin.dashboard`
-                .get("/products", index).name("products") // GET /admin/products, `admin.products`
-                .require_auth(),                          // only the group's routes
-        )
+        public
+            .merge(members)
+            .merge(checkout)
+            .merge(guests)
+            .group(
+                "/admin",   // path prefix: starts with `/`, never ends with one
+                "admin.",   // name prefix
+                Routes::new()
+                    .get("/", index).name("dashboard")        // GET /admin, `admin.dashboard`
+                    .get("/products", index).name("products") // GET /admin/products, `admin.products`
+                    .require_auth(),                          // only the group's routes
+            )
+            // Another host: its own routes (the same paths may mean other pages there).
+            // `{account}.example.com` works too; read it with the `renox::DomainParams` extractor.
+            .domain("partners.example.com", Routes::new().get("/", index).name("partners.home"))
+            // What answers when no route and no public file does (instead of the 404 page).
+            .fallback(|| async { (StatusCode::NOT_FOUND, "Nothing here. Try the search.") })
     }
 
     fn register(&self, app: &mut Registry) {
@@ -102,8 +111,14 @@ async fn show(Path(id): Path<i64>) -> Result<View> {
     Ok(view("products/show.html", context! { id }))
 }
 
-async fn store() -> Redirect {
-    Redirect::to("/products")
+async fn store(session: Session) -> Result<Redirect> {
+    let _back = Redirect::intended(&session, "/products"); // where a guard sent them from, else /products
+    Redirect::route("products.show", &[&42]) // a named route: /products/42
+}
+
+async fn menu(route: renox::CurrentRoute) -> String {
+    // The matched route's name; in templates `route_is('admin.*')` and `request.route`.
+    format!("{} {}", route.name().unwrap_or("-"), route.is("products.*"))
 }
 
 /// Import products from a CSV file.     (the line in `my-app help`)
@@ -166,6 +181,8 @@ and is still alive across an `.await`. Collect into a `Vec` first, then await. A
 <p>{{ product.price | number }}</p>                            {# 75.000 (id) / 75,000 (en); number(2) #}
 <p>{{ order.created_at | date('%d/%m/%Y %H:%M') }}</p>        {# in APP_TIMEZONE; default %Y-%m-%d #}
 <span>{{ cart_count }}</span>                                  {# from App::share #}
+<a class="{{ class_names('tab', {'tab-active': route_is('products.*')}) }}">Products</a> {# @class #}
+{% for p in products %}{% if loop.index > 3 %}{% break %}{% endif %}{{ p.name }}{% endfor %} {# also continue #}
 {% endblock %}
 ```
 
@@ -173,10 +190,12 @@ With `APP_DEBUG` on, printing a variable that doesn't exist (`{{ prodcut.name }}
 page showing the request, the error and the template line; `{% if x %}` on a missing one is fine,
 and so is `{{ flash.anything }}`.
 
-Every view also gets: `request.path`, `request.query`, `request.htmx`, `app.name`, `app.env`,
+Every view also gets: `request.path`, `request.query`, `request.route` (the route's name),
+`request.htmx`, `app.name`, `app.env`,
 `app.debug`, `app.url`, `app.locale`, `auth.check`, `auth.user`, `flash`, `errors`, `csrf_token`,
 and the functions `old()`, `error()`, `csrf_field()`, `method_field()`, `route()`, `asset()`,
-`storage_url()`, `t()`, `can()`, `page_url(n)`, `renox_head()`, `csp_nonce()`, `seo()`,
+`storage_url()`, `t()`, `can()`, `route_is(pattern, …)`, `class_names(…)`, `page_url(n)`,
+`renox_head()`, `csp_nonce()`, `seo()`,
 `renox_ui()` (the UI kit), `toasts()`, `once(key)`, `stack(name)` and, with `{% call %}`,
 `push(name)` / `prepend(name)`.
 
@@ -650,10 +669,21 @@ fn seeders(app: App) -> App {
     })
 }
 
+/// A state: a plain function that changes the model.
+fn premium(p: &mut Product) {
+    p.price = 250_000;
+}
+
 async fn in_a_test(db: &Db) -> Result {
     let draft = Product::make();                // not saved
     let saved = Product::create_one(db).await?; // saved
-    let _ = (draft, saved);
+    let three = Product::factory()
+        .count(3)
+        .state(premium)
+        .sequence(|i, p| p.name = format!("Kopi {}", i + 1)) // by position: 0, 1, 2
+        .create(db)                                          // or .make() unsaved
+        .await?;
+    let _ = (draft, saved, three);
     Ok(())
 }
 ```
@@ -1275,7 +1305,10 @@ async fn misc(State(state): State<AppState>, session: Session, lang: Lang) -> Re
     state.storage.copy("public/a.png", "public/b.png").await?; // also rename (move), size, delete_all(prefix)
     let _ = (visits, first, otp, files);
     session.put("cart", vec![1, 2, 3])?;
+    session.push("cart", 4)?; // appends to the list (makes one if needed)
+    let visits_here = session.increment("visits", 1)?; // 1, 2, …
     let cart: Option<Vec<i64>> = session.get("cart");
+    let _ = visits_here;
     // Also: pull (read and remove), remove, regenerate_token(), set_lifetime(minutes).
     let _ = cart;
     Ok(lang.choice("cart.count", count, &[])) // "12 items"; lang.t("cart.hello", &[("name", &"Arif")])
@@ -1303,10 +1336,12 @@ async fn upload(State(state): State<AppState>, Valid(form): Valid<PhotoForm>) ->
 }
 ```
 
-Translations live in `resources/lang/<locale>.json`, nested or flat. `one|many` texts are plurals:
+Translations live in `resources/lang/<locale>.json`, nested or flat. `one|many` texts are plurals,
+and Laravel's ranges pick by count (`{n}` exactly, `[a,b]`, `*` for open):
 
 ```json
-{ "cart": { "count": "One item|:count items", "hello": "Hello, :name" } }
+{ "cart": { "count": "One item|:count items", "hello": "Hello, :name",
+            "stock": "{0} Sold out|[1,5] Only :count left|[6,*] In stock" } }
 ```
 
 ```html

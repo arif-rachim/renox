@@ -51,6 +51,9 @@ Without this setting:
 Don't set it when the app is reachable directly: anyone could then send a fake
 `X-Forwarded-For`. `ClientIp` in a handler gives the same address the app uses.
 
+Routes on other hosts (`Routes::domain("admin.example.com", …)`) are chosen by the `Host`
+header, so the proxy must pass it on: Caddy does; with nginx, `proxy_set_header Host $host`.
+
 Also set `APP_URL` to the public `https://` address. Cookies are then marked `Secure`, HSTS is
 sent, and links in mails point to the right place.
 

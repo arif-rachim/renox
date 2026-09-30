@@ -34,6 +34,17 @@ pub struct Routes {
     names: Vec<(String, String)>,
     last_path: Option<String>,
     listing: Vec<RouteInfo>,
+    fallback: Option<MethodRouter<AppState>>,
+    domains: Vec<(String, Routes)>,
+}
+
+/// What a module's `Routes` hold, for `App::boot`.
+pub(crate) struct RouteParts {
+    pub router: Router<AppState>,
+    pub names: Vec<(String, String)>,
+    pub listing: Vec<RouteInfo>,
+    pub fallback: Option<MethodRouter<AppState>>,
+    pub domains: Vec<(String, Routes)>,
 }
 
 /// One route as `route:list` shows it.
@@ -48,6 +59,8 @@ pub struct RouteInfo {
     pub module: String,
     /// Guards and limits, e.g. `auth`, `throttle:60/60s`.
     pub middleware: Vec<String>,
+    /// The host pattern of a `Routes::domain` route, e.g. `admin.example.com`.
+    pub domain: Option<String>,
 }
 
 macro_rules! method {
@@ -138,6 +151,7 @@ impl Routes {
             name: None,
             module: String::new(),
             middleware: Vec::new(),
+            domain: None,
         });
         self
     }
@@ -381,6 +395,69 @@ impl Routes {
         self.router = self.router.merge(other.router);
         self.names.extend(other.names);
         self.listing.extend(other.listing);
+        self.domains.extend(other.domains);
+        assert!(
+            self.fallback.is_none() || other.fallback.is_none(),
+            "Routes::merge: both sides have a fallback"
+        );
+        self.fallback = self.fallback.or(other.fallback);
+        self.last_path = None;
+        self
+    }
+
+    /// What answers a request no route and no public file matches: a page
+    /// of your own instead of the 404 page (Laravel's `Route::fallback`).
+    /// One per app, or per domain inside [`Routes::domain`].
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// async fn missing(uri: axum::http::Uri) -> (StatusCode, String) {
+    ///     (StatusCode::NOT_FOUND, format!("Nothing at {}. Try the search.", uri.path()))
+    /// }
+    /// # let _: Routes =
+    /// Routes::new().fallback(missing)
+    /// # ;
+    /// ```
+    pub fn fallback<H, T>(mut self, handler: H) -> Self
+    where
+        H: Handler<T, AppState>,
+        T: 'static,
+    {
+        assert!(
+            self.fallback.is_none(),
+            "Routes::fallback: these routes have a fallback already"
+        );
+        self.fallback = Some(routing::any(handler));
+        self
+    }
+
+    /// Routes served only on hosts matching `pattern`, e.g.
+    /// `admin.example.com`, or `{account}.example.com` with the account in
+    /// [`DomainParams`](crate::DomainParams) (Laravel's `Route::domain`).
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # async fn dashboard() {}
+    /// # async fn home() {}
+    /// # let _: Routes =
+    /// Routes::new()
+    ///     .get("/", home) // other hosts
+    ///     .domain(
+    ///         "admin.example.com",
+    ///         Routes::new().get("/", dashboard).name("admin.dashboard").require_auth(),
+    ///     )
+    /// # ;
+    /// ```
+    ///
+    /// A host that matches a domain gets that domain's routes only (all
+    /// modules' routes for that pattern), plus Renox's own (`/health`, the
+    /// scripts, public files); every other host gets the routes without a
+    /// domain. So the same path can mean different pages on different hosts.
+    /// `route()` gives the path, as for other routes. Matching uses the
+    /// `Host` header: behind a proxy, keep it (Caddy and nginx's
+    /// `proxy_set_header Host $host` do).
+    pub fn domain(mut self, pattern: &str, routes: impl Into<Routes>) -> Self {
+        self.domains.push((pattern.to_owned(), routes.into()));
         self.last_path = None;
         self
     }
@@ -415,6 +492,10 @@ impl Routes {
             "Routes::group(\"{path}\", …): the prefix must start with `/` and not end with one"
         );
         let routes = routes.into();
+        assert!(
+            routes.domains.is_empty() && routes.fallback.is_none(),
+            "Routes::group(\"{path}\", …): put `domain` and `fallback` outside path groups"
+        );
         let join = |inner: &str| {
             if inner == "/" {
                 path.to_owned()
@@ -439,8 +520,14 @@ impl Routes {
         self
     }
 
-    pub(crate) fn into_parts(self) -> (Router<AppState>, Vec<(String, String)>, Vec<RouteInfo>) {
-        (self.router, self.names, self.listing)
+    pub(crate) fn into_parts(self) -> RouteParts {
+        RouteParts {
+            router: self.router,
+            names: self.names,
+            listing: self.listing,
+            fallback: self.fallback,
+            domains: self.domains,
+        }
     }
 }
 
@@ -457,6 +544,8 @@ impl From<Router<AppState>> for Routes {
 #[derive(Debug, Default)]
 pub struct RouteTable {
     paths: HashMap<String, String>,
+    /// The `Routes::domain` pattern of names defined inside one.
+    domains: HashMap<String, String>,
 }
 
 impl RouteTable {
@@ -471,6 +560,23 @@ impl RouteTable {
     /// The path pattern of a named route, e.g. `/produk/{id}`.
     pub fn path(&self, name: &str) -> Option<&str> {
         self.paths.get(name).map(String::as_str)
+    }
+
+    /// Records that `name` belongs to the routes of `domain`.
+    pub(crate) fn set_domain(&mut self, name: &str, domain: &str) {
+        self.domains.insert(name.to_owned(), domain.to_owned());
+    }
+
+    /// The name of the route with this path pattern (axum's `MatchedPath`,
+    /// e.g. `/produk/{id}`) on `domain` (`None` for routes without one).
+    pub fn name_of(&self, path: &str, domain: Option<&str>) -> Option<&str> {
+        self.paths
+            .iter()
+            .filter(|(name, p)| {
+                p.as_str() == path && self.domains.get(*name).map(String::as_str) == domain
+            })
+            .map(|(name, _)| name.as_str())
+            .min()
     }
 
     /// All named routes as `(name, path)`, sorted by name.
@@ -619,4 +725,112 @@ impl Resource {
         update => |h| routing::put(h.clone()).patch(h),
         destroy => routing::delete,
     );
+}
+
+/// Whether a route name matches a pattern where `*` stands for anything,
+/// e.g. `admin.*` or `products.*`, like Laravel's `routeIs`.
+pub(crate) fn route_name_matches(name: &str, pattern: &str) -> bool {
+    let mut parts = pattern.split('*');
+    let first = parts.next().unwrap_or_default();
+    let Some(mut rest) = name.strip_prefix(first) else {
+        return false;
+    };
+    let parts: Vec<&str> = parts.collect();
+    let Some((last, middle)) = parts.split_last() else {
+        return rest.is_empty(); // no `*`: the whole name
+    };
+    for part in middle {
+        match rest.find(part) {
+            Some(at) => rest = &rest[at + part.len()..],
+            None => return false,
+        }
+    }
+    rest.ends_with(last)
+}
+
+/// The route that answers this request, from a handler or middleware:
+/// its name (`products.show`) and path pattern (`/products/{id}`).
+///
+/// ```
+/// # use renox::prelude::*;
+/// use renox::CurrentRoute;
+///
+/// async fn menu(route: CurrentRoute) -> String {
+///     if route.is("admin.*") { "admin".into() } else { route.name().unwrap_or("?").into() }
+/// }
+/// ```
+///
+/// In templates: `{% if route_is('products.*') %}` and `request.route`.
+#[derive(Debug, Clone)]
+pub struct CurrentRoute {
+    name: Option<String>,
+    path: Option<String>,
+}
+
+impl CurrentRoute {
+    /// The route's name, if it has one.
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    /// The path pattern the request matched, e.g. `/products/{id}`.
+    pub fn path(&self) -> Option<&str> {
+        self.path.as_deref()
+    }
+
+    /// Whether the route's name matches any of `patterns` (`*` stands for
+    /// anything): `route.is("admin.*")`.
+    pub fn is(&self, pattern: &str) -> bool {
+        self.name
+            .as_deref()
+            .is_some_and(|name| route_name_matches(name, pattern))
+    }
+
+    pub(crate) fn of(extensions: &axum::http::Extensions, state: &AppState) -> Self {
+        let path = extensions
+            .get::<axum::extract::MatchedPath>()
+            .map(|p| p.as_str().to_owned());
+        let domain = extensions
+            .get::<crate::domain::MatchedDomain>()
+            .map(|d| &*d.0);
+        let name = path
+            .as_deref()
+            .and_then(|p| state.routes.name_of(p, domain))
+            .map(str::to_owned);
+        Self { name, path }
+    }
+}
+
+impl<S: Send + Sync> axum::extract::FromRequestParts<S> for CurrentRoute {
+    type Rejection = Infallible;
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        _: &S,
+    ) -> Result<Self, Infallible> {
+        Ok(match parts.extensions.get::<AppState>() {
+            Some(state) => Self::of(&parts.extensions, state),
+            None => Self {
+                name: None,
+                path: None,
+            },
+        })
+    }
+}
+
+#[cfg(test)]
+mod route_name_tests {
+    use super::route_name_matches;
+
+    #[test]
+    fn patterns_match_like_laravel() {
+        assert!(route_name_matches("admin.users.index", "admin.*"));
+        assert!(route_name_matches("admin.users.index", "*.index"));
+        assert!(route_name_matches("admin.users.index", "admin.*.index"));
+        assert!(route_name_matches("products.show", "products.show"));
+        assert!(!route_name_matches("products.show", "products"));
+        assert!(!route_name_matches("shop.products.show", "products.*"));
+        assert!(route_name_matches("anything", "*"));
+        assert!(!route_name_matches("admin", "admin.*"));
+    }
 }

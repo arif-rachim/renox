@@ -63,7 +63,11 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/module.rs            Module trait: name, routes, migrations, register
   src/registry.rs          Registry: jobs, listeners, schedule, commands, channels, shares, templates
   src/routing.rs           Routes builder (get/post/…/name/group/require_auth/guest_only/
-                           require_verified/throttle/cors/route_layer/merge), RouteTable + URLs
+                           require_verified/throttle/cors/route_layer/merge/domain/fallback),
+                           RouteTable + URLs (name_of for route_is), CurrentRoute
+  src/domain.rs            Routes::domain: DomainPattern, host dispatch between routers,
+                           DomainParams / MatchedDomain
+  src/redirect.rs          RedirectExt: Redirect::route / Redirect::intended
   src/session.rs           session + middleware: an encrypted cookie holding the whole session
                            (cookie driver) or its id (`Stored::Handle`, database driver:
                            `sessions` table keyed by sha256(id), rotation on login/logout,
@@ -240,6 +244,9 @@ docs/assets/demo.gif       the README's demo (see §4.10)
 7. `App::layer` layers (first added = outermost), around the modules' routes only.
 8. Routes. Also inside the layers: `/_renox/files` (storage), `/_renox/mail` and
    `/_renox/debug` (only with `APP_DEBUG`; the inspector answers 404 unless also local), and the fallback: `public/` (`ServeDir`, or the embedded files) with a 404.
+
+With `Routes::domain`, `build_router` runs once per domain pattern (each with the whole stack
+above and its own fallback), and `domain::dispatch` picks one router per request by `Host`.
 
 Because `AppState` and `CurrentUser` are in request extensions, guards (`require_auth`, …) are
 plain `from_fn` middlewares with no state parameter and can be added from `Module::routes()`.
@@ -840,12 +847,14 @@ picks the build, not the terminal.
   `debug = "line-tables-only"` (#68, after two OOM kills during workspace builds).
 - **M22** (model keys: `Model::Key` from the `id` field's type, `Ulid`, `Model::insert`,
   relations generic over keys, `Pivot<L, R>`, `make:model --key`, examples/fields on `Uuid`):
-  branch `m22-model-keys`. Generic code over models that needs an integer id says
+  merged (#69). Generic code over models that needs an integer id says
   `M: Model<Key = i64>`.
 - **M23** (B of the owner's B/C/D before 1.0: `Transaction::savepoint`, `db::Encrypted<T>`
-  with the key carried by `Db`/`Transaction`/`Row`, examples/teams on it): branch
-  `m23-savepoints-encrypted`. Then C (M21's deferred items) and D (`#[derive(Validate)]`,
-  `Accept-Language`), one PR each.
+  with the key carried by `Db`/`Transaction`/`Row`, examples/teams on it): merged (#70).
+- **M24** (C: `Routes::domain`/`fallback`, `route_is`/`CurrentRoute`, `Redirect::route`/
+  `intended`, session `push`/`increment`, `Factory::factory()` states and sequences, plural
+  ranges, `loop_controls`, `class_names`): branch `m24-laravel-leftovers`. A domain's host
+  gets only that domain's routes (no fall-through, unlike Laravel).
 - **M21 is complete.** Next is the owner's call; **v1.0 is on hold** until the owner says to
   start it (docs site, starter kit, semver checks, real crates.io releases; the owner runs
   `cargo login`). Small M21 items that weren't built are listed in ROADMAP ("Deferred from

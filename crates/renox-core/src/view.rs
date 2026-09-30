@@ -257,6 +257,7 @@ impl Views {
             });
             env.add_filter("number", crate::view_filters::number);
             env.add_filter("date", crate::view_filters::date(zone));
+            env.add_function("class_names", crate::view_filters::class_names);
             // The app's own functions and filters (`App::templates`).
             for hook in hooks.iter() {
                 hook(&mut env);
@@ -371,6 +372,7 @@ const REQUEST_GLOBALS: &[&str] = &[
     "t",
     "can",
     "request",
+    "route_is",
     "csrf_token",
     "csrf_field",
     "flash",
@@ -631,6 +633,9 @@ pub(crate) async fn middleware(
     let method = req.method().clone();
     let path = req.uri().path().to_owned();
     let query = req.uri().query().unwrap_or_default().to_owned();
+    let route = crate::routing::CurrentRoute::of(req.extensions(), &state)
+        .name()
+        .map(str::to_owned);
     let nonce = req
         .extensions()
         .get::<crate::security::CspNonce>()
@@ -744,6 +749,7 @@ pub(crate) async fn middleware(
             &Requested {
                 path: &path,
                 query: &query,
+                route: route.as_deref(),
                 nonce: &nonce,
                 events: &events,
             },
@@ -804,6 +810,7 @@ pub(crate) async fn middleware(
                 &Requested {
                     path: &path,
                     query: &query,
+                    route: route.as_deref(),
                     nonce: &nonce,
                     events: &[],
                 },
@@ -891,6 +898,8 @@ impl minijinja::value::Object for Flashed {
 struct Requested<'a> {
     path: &'a str,
     query: &'a str,
+    /// The matched route's name, if it has one.
+    route: Option<&'a str>,
     nonce: &'a str,
     /// Analytics events for this page's head.
     events: &'a [crate::analytics::Event],
@@ -1010,8 +1019,20 @@ fn globals(
         request => context! {
             path => requested.path,
             query => requested.query,
+            route => requested.route,
             htmx => htmx.request,
             boosted => htmx.boosted,
+        },
+        // `route_is('admin.*')`, `route_is('products.index', 'products.show')`.
+        route_is => {
+            let route = requested.route.map(str::to_owned);
+            Value::from_function(move |patterns: minijinja::value::Rest<String>| {
+                route.as_deref().is_some_and(|name| {
+                    patterns
+                        .iter()
+                        .any(|pattern| crate::routing::route_name_matches(name, pattern))
+                })
+            })
         },
         csrf_token => token,
         flash => Value::from_object(Flashed(session.map(Session::flashed).unwrap_or_default())),
