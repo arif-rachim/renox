@@ -38,6 +38,22 @@ async fn signing_the_guestbook_thanks_the_owner_by_mail() {
 }
 
 #[renox::test]
+async fn the_browser_language_is_used_until_one_is_chosen() {
+    let app = app().await; // APP_LOCALE=id
+    app.request()
+        .header("accept-language", "en-GB,en;q=0.9")
+        .get("/")
+        .await
+        .assert_see("Guestbook");
+    app.get("/bahasa/id").await;
+    app.request()
+        .header("accept-language", "en-GB,en;q=0.9")
+        .get("/")
+        .await
+        .assert_see("Buku Tamu");
+}
+
+#[renox::test]
 async fn empty_entries_are_rejected() {
     let app = app().await;
     app.htmx()

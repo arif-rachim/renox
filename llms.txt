@@ -139,7 +139,8 @@ Every example has a README.md that walks through it.
     [tests/payments.rs](examples/webhooks/tests/payments.rs)
 - [examples/hello](examples/hello) ([README](examples/hello/README.md)): a guestbook in one file: HTMX form posts that return
   fragments, a photo upload, an event whose listener queues a mail job, a scheduled task,
-  i18n (en/id) with a language switch, login with the account page, a seeder, and a typed
+  i18n (en/id) with a language switch and the browser's language (`detect_locale`), a
+  `#[derive(Validate)]` form, login with the account page, a seeder, and a typed
   `entries:prune` command that confirms (tested with time travel and `prompt::answering`).
   - [examples/hello/src/lib.rs](examples/hello/src/lib.rs),
     [tests](examples/hello/tests/guestbook.rs)

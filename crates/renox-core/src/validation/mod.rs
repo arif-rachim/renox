@@ -155,6 +155,53 @@ pub trait Validate {
     }
 }
 
+/// `prepare`, `authorize` and `after` for a struct with
+/// `#[derive(Validate)]`, which writes `rules` from its `#[validate(…)]`
+/// attributes: add `#[validate(hooks)]` on the struct and implement the
+/// ones you need.
+///
+/// ```
+/// # use renox::prelude::*;
+/// use renox::validation::{FormContext, ValidateHooks};
+///
+/// #[derive(serde::Deserialize, Validate)]
+/// #[validate(hooks)]
+/// struct Invite {
+///     #[validate(required, email)]
+///     email: String,
+/// }
+///
+/// impl ValidateHooks for Invite {
+///     fn prepare(&mut self) {
+///         self.email = self.email.trim().to_lowercase();
+///     }
+///
+///     async fn authorize(&self, form: &FormContext<'_>) -> Result<bool> {
+///         Ok(form.user.is_some())
+///     }
+/// }
+/// ```
+pub trait ValidateHooks {
+    fn prepare(&mut self) {}
+
+    fn authorize(
+        &self,
+        form: &FormContext<'_>,
+    ) -> impl std::future::Future<Output = Result<bool>> + Send {
+        let _ = form;
+        std::future::ready(Ok(true))
+    }
+
+    fn after(
+        &self,
+        form: &FormContext<'_>,
+        errors: &mut Errors,
+    ) -> impl std::future::Future<Output = Result> + Send {
+        let _ = (form, errors);
+        std::future::ready(Ok(()))
+    }
+}
+
 /// What [`Validate::authorize`] and [`Validate::after`] see of the request.
 #[non_exhaustive]
 pub struct FormContext<'a> {

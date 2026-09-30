@@ -178,7 +178,8 @@ impl Module for Guestbook {
   `required_if`, `email`, `between`, `matches` (regex), `digits`, dates (`before`, `after`),
   `unique`, `exists`, `same`, `alpha_dash`, `uuid`, `ip`, `size`, `image` and `mimes`, per item of
   a list (`each`, `nested`, `distinct`), and your own reusable `Rule`s. Messages come in English
-  and Indonesian, or from your own translations.
+  and Indonesian, or from your own translations. Simple forms declare them as attributes:
+  `#[derive(Validate)]` with `#[validate(required, email, unique("users", "email"))]`.
 - Form requests: `prepare` tidies the input, `authorize` answers 403 before any rule, and
   `after` runs checks that need the database, with errors shown like a rule's.
 - `Auth::new()` adds login, registration, logout, remember me, password reset and email
@@ -227,7 +228,8 @@ impl Module for Guestbook {
 - The cache (`remember`, `put`, `forget`, `add`, `pull`, `increment`) is kept in memory or in the
   database, with atomic locks (`state.cache.lock("stock:42", ttl)`) that hold across servers on
   the database store.
-- Each visitor gets their own locale, from `resources/lang/*.json`, with `t()` and plurals.
+- Each visitor gets their own locale (chosen, or their browser's with `App::detect_locale()`),
+  from `resources/lang/*.json`, with `t()`, plurals and Laravel's plural ranges.
 </details>
 
 <details>
@@ -357,7 +359,7 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 | `RateLimiter::for('api', …)` | `App::rate_limiter("api", …)` and `.throttle_by("api")` |
 | Exception reporting (`report()`), Telescope/Debugbar | `App::report(…)`, `/_renox/debug` |
 | Eloquent | `#[derive(Model)]` and the query builder; relations are explicit loaders ([docs/relations.md](docs/relations.md)) |
-| Form Requests (`authorize`, `prepareForValidation`, `after`) | `Valid<T>` with `impl Validate` (`authorize`, `prepare`, `after`) |
+| Form Requests (`authorize`, `prepareForValidation`, `after`) | `Valid<T>` with `impl Validate` (`authorize`, `prepare`, `after`), or `#[derive(Validate)]` for the rules |
 | Gates and policies | `App::gate`, `impl Policy`, `user.authorize(…)`, `.require_gate(…)` |
 | spatie/laravel-permission | the `Permissions` module: `assign_role`, `has_permission`, `.require_role(…)` |
 | Global scopes (tenancy) | `#[model(default_scope = "…")]` with `renox::context` |
@@ -394,8 +396,8 @@ Renox is **pre-1.0**. After the Laravel parity review
 HTTP client, queue dashboard, localized mail) and M21 (the UI kit, scaffolding, test tools,
 error reports and logs, Tailwind, typed commands, form requests, database sessions, deploys
 without refused connections), M22 (model keys other than integers), M23 (savepoints,
-encrypted fields) and M24 (domain and fallback routes, `route_is`, factory states, plural
-ranges) are done. Next is 1.0: a documentation site with a tutorial and a Laravel guide, semver checks, and the first
+encrypted fields), M24 (domain and fallback routes, `route_is`, factory states, plural
+ranges) and M25 (`#[derive(Validate)]`, the browser's language) are done. Next is 1.0: a documentation site with a tutorial and a Laravel guide, semver checks, and the first
 real release on crates.io (today's crates there are placeholders, so install from Git as above).
 Until then the API may still change; breaking changes are listed in [CHANGELOG.md](CHANGELOG.md).
 

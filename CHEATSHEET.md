@@ -338,6 +338,20 @@ impl Validate for ProductForm {
     }
 }
 
+/// The same kind of rules as attributes: each item is a call on the field's rules
+/// (`max = 100` is `.max(100)`), plus `each(…)`, `distinct` and `rename = "…"`.
+/// `#[validate(hooks)]` + `impl validation::ValidateHooks` for prepare/authorize/after.
+#[derive(Deserialize, Validate)]
+struct ContactForm {
+    #[validate(required, max = 100, label = "Your name")]
+    name: String,
+    #[validate(required, email)]
+    email: String,
+    #[serde(default)]
+    #[validate(max = 5, each(required, max = 20), distinct)]
+    topics: Vec<String>,
+}
+
 // Invalid input never reaches the handler. A plain form post goes back with
 // errors and old input; an HTMX post gets a 422 and the errors appear next to
 // the fields. Every field's errors show at once, even when one doesn't parse.
