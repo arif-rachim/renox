@@ -692,6 +692,12 @@ binaries each paid a full link. The workspace `Cargo.toml` builds `argon2` with 
 the dev profile; new apps get the same plus `blake2` from `stubs/Cargo.toml.stub` (profiles only
 apply at a workspace root). The integration tests are one binary. Result: rebuild after a core
 change 29 s → 7 s, full run 19 s → 6 s.
+The workspace's dev profile has `debug = "line-tables-only"` (as `rnx new` apps do): full
+debug info made the `it` binary 415 MB and its link peak at 1.7 GB, and a workspace build
+with 8 link jobs ran the 15 GB machine out of memory (systemd-oomd killed the terminal and
+the agent in it, twice). Now 150 MB and 0.76 GB. Run heavy builds with `-j 4`, one at a
+time, ideally in their own scope (`systemd-run --user --scope -p MemoryHigh=9G …`) so oomd
+picks the build, not the terminal.
 
 ### 6.7 Library/API traps
 - **sqlx 0.9:** dynamic SQL needs `sqlx::AssertSqlSafe(string)`; `SqliteArguments` has no lifetime;

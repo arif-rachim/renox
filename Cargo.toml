@@ -21,5 +21,11 @@ renox-macros = { path = "crates/renox-macros", version = "0.0.1" }
 # Password hashing (Argon2) is deliberately slow, and far slower unoptimised:
 # every login, registration and auth test paid for it. Optimise just these
 # crates in dev and test builds; the rest stays quick to compile.
+# Line numbers in backtraces, without full debug info (as in apps made by
+# `rnx new`): much smaller test binaries and lighter, faster links. Full debug
+# info let a workspace build with 8 link jobs run a 15 GB machine out of memory.
+[profile.dev]
+debug = "line-tables-only"
+
 [profile.dev.package.argon2]
 opt-level = 3
