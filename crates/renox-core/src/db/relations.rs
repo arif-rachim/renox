@@ -36,6 +36,7 @@ use crate::Result;
 /// A foreign key's value for a parent keyed by `K`: the key itself (`i64`,
 /// a `Ulid`…), or an `Option` of it for an optional relation.
 pub trait ForeignKey<K> {
+    /// The parent's key, or `None` when the relation is empty.
     fn key(self) -> Option<K>;
 }
 
@@ -221,6 +222,7 @@ impl<L, R> std::fmt::Debug for Pivot<L, R> {
 pub type PivotData<'a> = &'a [(&'a str, &'a (dyn super::ToDbValue + Sync))];
 
 impl<L, R> Pivot<L, R> {
+    /// A pivot `table` joining the `left` key column to the `right` key column.
     pub const fn new(table: &'static str, left: &'static str, right: &'static str) -> Self {
         Self {
             table,
@@ -600,6 +602,7 @@ pub struct Morph {
 }
 
 impl Morph {
+    /// A polymorphic relation stored in `type_column` (the parent's table) and `id_column`.
     pub const fn new(type_column: &'static str, id_column: &'static str) -> Self {
         Self {
             type_column,

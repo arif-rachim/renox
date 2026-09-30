@@ -221,6 +221,7 @@ impl App {
         self
     }
 
+    /// Adds a module: its routes, migrations and registrations.
     pub fn module(mut self, module: impl Module) -> Self {
         self.modules.push(Box::new(module));
         self
@@ -311,6 +312,8 @@ impl App {
         self
     }
 
+    /// Defines the gate `name` with a check that can await, e.g. to query
+    /// the database. `can(name)` and `require_gate` ask it like any gate.
     pub fn gate_async<F, Fut>(mut self, name: &str, check: F) -> Self
     where
         F: Fn(User, AppState) -> Fut + Send + Sync + 'static,
@@ -1093,6 +1096,7 @@ impl Kernel {
         self.schedule.run_now(self.state.clone(), name).await
     }
 
+    /// The assembled router, e.g. to drive with `tower::ServiceExt::oneshot`.
     pub fn router(&self) -> Router {
         self.router.clone()
     }
@@ -1107,6 +1111,7 @@ impl Kernel {
         &self.state
     }
 
+    /// The database connection pool.
     pub fn db(&self) -> &Db {
         &self.state.db
     }
@@ -1208,6 +1213,7 @@ impl Kernel {
         Ok(done.into_iter().map(str::to_owned).collect())
     }
 
+    /// Every migration and whether it has run, as `migrate:status` prints them.
     pub async fn migration_status(&self) -> Result<Vec<MigrationStatus>> {
         Ok(self.migrator.status(self.db()).await?)
     }

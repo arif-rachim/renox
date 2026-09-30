@@ -7,7 +7,9 @@ use axum::routing::get;
 
 use crate::AppState;
 
+/// The version of the bundled htmx.
 pub const HTMX_VERSION: &str = "2.0.11";
+/// The version of the bundled Alpine.js.
 pub const ALPINE_VERSION: &str = "3.17.4";
 
 const HTMX: &str = include_str!("../assets/htmx.min.js");

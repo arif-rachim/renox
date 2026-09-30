@@ -6,15 +6,22 @@ use crate::db::{DbValue, ToDbValue};
 pub enum Inspected {
     /// `None`, or text that is empty after trimming.
     Missing,
+    /// Non-empty text.
     Text(String),
+    /// A number.
     Number(f64),
+    /// A boolean, e.g. a checkbox.
     Bool(bool),
+    /// A list (`Vec`) with this many items.
     Items(usize),
     /// An uploaded file: size in kilobytes, the extension its content (or
     /// else its name) indicates, and whether it really is an image.
     File {
+        /// Size in kilobytes.
         kilobytes: f64,
+        /// The extension its content indicates, else its name's.
         extension: String,
+        /// Whether the content really is an image.
         image: bool,
     },
     /// A date or a date and time (a date alone is its midnight).
@@ -24,6 +31,7 @@ pub enum Inspected {
 /// A value that can be validated. Implemented for strings, numbers, `bool`,
 /// `Option<T>` and `Vec<T>`.
 pub trait FieldValue {
+    /// What rules see of the value.
     fn inspect(&self) -> Inspected;
     /// The value as a query parameter, for `unique` and `exists`.
     fn db_value(&self) -> DbValue;

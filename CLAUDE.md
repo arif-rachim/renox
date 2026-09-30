@@ -42,7 +42,7 @@ CHEATSHEET.md              one-page patterns for app authors/agents (compiled: `
 llms.txt                   map for agents: which example/guide file shows what
 deny.toml                  cargo-deny: licenses, advisories, banned crates, sources
 crates/renox/              facade crate apps depend on: re-exports renox-core, the macros, prelude
-  src/lib.rs               `pub use renox_core::*`, macros (DbEnum, FromRow, Model, embedded!,
+  src/lib.rs               `pub use renox_core::*`, macros (DbEnum, FromRow, Model, Validate, embedded!,
                            migrations!, #[renox::test]), prelude, and cfg(doctest) holders:
                            ReadMe, CheatSheet, TypesGuide, RelationsGuide, AuthorizationGuide,
                            QueueGuide, UiGuide, TestingGuide, OperationsGuide, MacroCompileErrors
@@ -71,10 +71,12 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/session.rs           session + middleware: an encrypted cookie holding the whole session
                            (cookie driver) or its id (`Stored::Handle`, database driver:
                            `sessions` table keyed by sha256(id), rotation on login/logout,
+                           push/increment helpers,
                            a test mirror in `AppState::session_mirror`)
   src/csrf.rs              CSRF middleware
-  src/view.rs              MiniJinja env, View response (fragment/also), render middleware, globals,
-                           RequestGlobal (request globals inside imported macros), BUILTIN views
+  src/view.rs              MiniJinja env, View response (fragment/also), render middleware, globals
+                           (request.route, route_is, loop controls), RequestGlobal (request globals
+                           inside imported macros), BUILTIN views
   src/toast.rs             Toast response part, the toast region markup
   src/clock.rs             the current time with a test offset (TestApp::travel); Stamp for
                            in-memory windows (rate limits, login lock), never Instant
@@ -89,15 +91,18 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            Debug for main(), panic_message
   src/crypto.rs            APP_KEY parsing/generation, random tokens, constant_time_eq
   src/signed.rs            signed URLs (HMAC-SHA256) + ValidSignature extractor
-  src/db/                  conn.rs (Db/Transaction/Row/sql(), Executor, SchemaEpoch), mod.rs
+  src/db/                  conn.rs (Db/Transaction/Row/sql(), Executor, SchemaEpoch, savepoints,
+                           the key for Encrypted columns), key.rs (ModelKey, Ulid), encrypted.rs
+                           (Encrypted<T>, Unsealed), mod.rs
                            (connect, TEST_DATABASE_URL), model.rs, query.rs, from_row.rs,
                            relations.rs (belongs_to/has_many/Pivot/Morph), value.rs (DbValue),
                            paginate.rs, migrate.rs (migrator), factory.rs, json.rs, error.rs,
                            query_log.rs (capture_queries: a task-local statement log, also
                            feeding /_renox/debug)
   src/path.rs              renox::Path: axum's Path with a 404 (not 400) when a value won't parse
-  src/validation/          Validator/rules (mod.rs), Valid<T> (extract.rs: prepare → authorize →
-                           rules → after, FormContext), en/id messages
+  src/validation/          Validator/rules (mod.rs, ValidateHooks for the derive), Valid<T>
+                           (extract.rs: prepare → authorize → rules → after, FormContext), en/id
+                           messages
   src/auth/                User, hashing (Argon2id + bcrypt import), login/logout (per device),
                            change_password, CurrentUser middleware, AuthUser, guards, Access::check,
                            Policy/gates (mod.rs), Auth module + pages (module.rs), account.rs
@@ -141,7 +146,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/storage.rs           Storage (local disk; S3 with the `s3` feature), temporary URLs, /_renox/files,
                            list/copy/rename/size/delete_all
   src/http.rs              renox::http client (reqwest behind the `http` feature) + FakeHttp
-  src/i18n.rs              Translator (lang JSON files), format(), RequestLocale middleware, Lang
+  src/i18n.rs              Translator (lang JSON files), format() with plurals and ranges,
+                           RequestLocale middleware (Accept-Language with App::detect_locale), Lang
   src/live.rs              live reload: file-time polling, /_renox/live SSE, stop() on shutdown
   src/shell.rs             db:shell (run_with takes any input/output, for tests)
   src/testing.rs           TestApp / TestRequest / TestResponse for apps' tests
@@ -158,8 +164,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   migrations/              framework-owned migrations (auth/, permissions/, audit/, queue/,
                            cache/, session/, webhook/); see §4.5
   tests/                   core-only integration tests (support/mod.rs has a small TestApp)
-crates/renox-macros/       proc macros: derive Model, FromRow, DbEnum; embedded!(), migrations!(),
-                           #[renox::test]
+crates/renox-macros/       proc macros: derive Model, FromRow, DbEnum, Validate (validate.rs);
+                           embedded!(), migrations!(), #[renox::test]
 crates/renox-cli/          `rnx`: main.rs (key:generate, forwarding), new.rs, serve.rs, make.rs +
                            generate.rs (make:*), scaffold.rs (make:module --resource --fields),
                            deploy.rs (build, make:deploy), tailwind.rs (the pinned
@@ -172,21 +178,25 @@ crates/renox-cli/          `rnx`: main.rs (key:generate, forwarding), new.rs, se
                            it); stubs/deploy/: Dockerfile, systemd service and socket (socket
                            activation), Litestream templates
 examples/                  workspace members, each with a README.md and its own tests:
-  hello/                   guestbook exercising many features; used for live/browser testing
-  crud/                    the reference CRUD module (policy, soft deletes, pagination)
-  api/                     JSON API with tokens, CORS, rate limit
+  hello/                   guestbook exercising many features (derive Validate, detect_locale);
+                           used for live/browser testing
+  crud/                    the reference CRUD module (policy, soft deletes, pagination, derive
+                           Validate + hooks, a CSV import with savepoints, factory states)
+  api/                     JSON API with tokens, CORS, rate limit, Ulid keys
   jobs/                    events, queued mail, notifications, schedule
   uploads/                 public / private files, several files, Download
   postgres/                one app on PostgreSQL + SQLite (package `postgres-app`)
-  fields/                  every form field type ↔ Rust ↔ SQLite / PostgreSQL
+  fields/                  every form field type ↔ Rust ↔ SQLite / PostgreSQL; products keyed by Uuid
   webhooks/                Midtrans / Xendit / Stripe webhooks
   shop/                    a whole online shop on the UI kit (auth, admin, checkout, mail, queue,
-                           i18n, deploy with the systemd socket, a rebranded accent)
+                           i18n, deploy with the systemd socket, a rebranded accent, route_is,
+                           recently viewed, plural ranges)
   htmx-recipes/            modal form, inline edit, infinite scroll, tabs, HxRefresh/HxRedirect,
                            an out-of-band count (.also), HxRetarget/HxReswap, toasts
   relations/               belongs to, has many, many to many (pivot columns), Morph, no N+1
   teams/                   multi-tenant SaaS on the UI kit: default scopes, renox::context,
-                           gate_before, encrypt, a form request checked live
+                           gate_before, Encrypted<String>, a form request checked live, public
+                           team pages on their own host (Routes::domain)
 tests/chaos/               app + run.sh (postgres|sqlite) that the `chaos` CI job injects faults
                            into (docker pause/stop/restart, python3 holding SQLite's lock)
 tests/cli/run.sh           `rnx new` + every `make:*`, then build and test the app (CI `cli`/`docker`)
@@ -235,7 +245,7 @@ docs/assets/demo.gif       the README's demo (see §4.10)
 6. `inspector` (only with debug + local: records the request's status, time, view and SQL via
    `capture_queries`, skipping `/_renox/*`) → `context` (`renox::context`: a fresh task-local context per request holding the `AppState`
    for `context::app()`, and the `RequestInfo` error reports read; jobs, scheduled tasks and app commands get one too via `scope_app`) → `session` (cookie or database driver) → `i18n` (`RequestLocale`: session `_locale`, else
-   `APP_LOCALE`) → `auth` (loads the user once from session or `Authorization: Bearer`, with the
+   `Accept-Language` with `App::detect_locale` (adds `Vary`), else `APP_LOCALE`) → `auth` (loads the user once from session or `Authorization: Bearer`, with the
    token's abilities, and the user's roles/permissions when the `Permissions` module is on;
    inserts `CurrentUser` and `AppState` into extensions) → `csrf` → `view` (renders `View`s and error
    pages; `ValidationError` → redirect back for plain forms) → `maintenance` (503 while
@@ -294,8 +304,8 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
   `has_many`, `Pivot`, `Morph`; each loads a page's related rows in one query). See
   docs/relations.md.
 - **Model hooks are opt-in:** `#[model(hooks)]` makes the derive forward `Model::saving/saved/
-  deleting/deleted` to `impl ModelHooks`. Only `save`, `save_only`, `save_changes`, `delete`
-  and `force_delete` call them; bulk query methods never do. Keep it that way (documented).
+  deleting/deleted` to `impl ModelHooks`. Only `save`, `insert` (and `create`), `save_only`,
+  `save_changes`, `delete` and `force_delete` call them; bulk query methods never do. Keep it that way (documented).
 - **Validation:** fluent rules in `impl Validate`, or `#[derive(Validate)]` (M25:
   each `#[validate(item)]` becomes a call on the field's rules, so every `Field` rule works;
   `label` goes first; `each`/`distinct`/`rename` are special; `#[validate(hooks)]` forwards
@@ -365,7 +375,8 @@ outgrow one server. `Db` is Renox's own type (`db/conn.rs`): a private enum over
 ### 4.1 Public API and docs
 - Laravel naming where it maps cleanly (route names like `password.reset`, `verification.notice`,
   commands like `queue:work`), Rust idioms otherwise.
-- Every public item gets a doc comment. Doc examples are doctests: never write ```` ```ignore ````.
+- Every public item gets a doc comment (`#![warn(missing_docs)]` in the three library crates;
+  clippy `-D warnings` fails without one). Doc examples are doctests: never write ```` ```ignore ````.
   renox is a dev-dependency of renox-core and renox-macros, so examples `use renox::prelude::*`
   as apps do. Hide setup with `# ` lines and wrap statements in
   `# async fn demo(..) -> Result { … # Ok(()) }`; examples that would start a server are `no_run`.
@@ -774,8 +785,8 @@ picks the build, not the terminal.
 
 ## 7. Where things stand (update this section when it changes)
 
-- **All milestones M0–M21i are merged to `main`**; the last was M21i (#66), after a docs and
-  examples audit against M21 (#63). History:
+- **All milestones M0–M25 are merged to `main`**, then M26a (#73); the owner's B/C/D before
+  1.0 were M23–M25. History:
   `CHANGELOG.md` (per milestone) and `ROADMAP.md` (per-milestone notes and decisions).
 - After M17: a docs refresh (#45) and the Laravel parity review with M18–M21 planned (#46).
   After M20a: a docs and examples catch-up (branch `claude/laravel-project-feature-report-i6wgz0`:
@@ -793,7 +804,7 @@ picks the build, not the terminal.
   after the WHERE binds; use it in every terminal method.
 - **M19b** (model hooks, `context::app()`, `save_only`/`save_changes`, `state.encrypt`/
   `decrypt`, pivot data/timestamps/toggle, `Morph`): merged (#50). Non-integer
-  keys and `Encrypted<T>` are deferred (ROADMAP notes say why).
+  keys and `Encrypted<T>` were deferred there and done in M22/M23.
 - **M20a** (scheduler: cron/weekly/monthly, filters, IANA zones with DST, on_failure/on_success,
   `schedule:run`; cache add/pull/increment, locks, prune): merged (#51). A cron
   time skipped by DST runs right after the jump; intervals follow the current offset. Schedule
@@ -859,23 +870,20 @@ picks the build, not the terminal.
   ranges, `loop_controls`, `class_names`): merged (#71). A domain's host
   gets only that domain's routes (no fall-through, unlike Laravel).
 - **M25** (D: `#[derive(Validate)]` + `ValidateHooks`, `App::detect_locale` for
-  `Accept-Language` with `Vary`; hello and `make:module --resource` use the derive): branch
-  `m25-derive-validate`.
+  `Accept-Language` with `Vary`; hello and `make:module --resource` use the derive): merged
+  (#72).
 - **M26** (completeness before 1.0, three PRs): M26a (key bugs in `insert_many`/`upsert` and
-  `unique().ignore()`, the fallback status bug, examples for M22–M25) on branch
-  `m26a-keys-and-examples`; then M26b (docs, every public item documented, `missing_docs`)
-  and M26c (tests for `renox-cli` and weak core files).
-- **M21 is complete.** Next is the owner's call; **v1.0 is on hold** until the owner says to
-  start it (docs site, starter kit, semver checks, real crates.io releases; the owner runs
-  `cargo login`). Small M21 items that weren't built are listed in ROADMAP ("Deferred from
-  M21").
-- **Open before or after 1.0** (ROADMAP `- [ ]`), as discussed with the owner (no decision yet):
-  the only API-changing one is non-integer model keys (`#[model(key = "uuid")]`), so it belongs
-  before 1.0; the rest only add and may come in 1.x: savepoints, `Encrypted<T>`,
-  `#[derive(Validate)]`, locale from `Accept-Language`, an optional HIBP check, "Deferred from
-  M21" (subdomain/fallback routes, `routeIs`, `Redirect::route` + public `intended`, session
-  `push`/`increment`, factory states, plural ranges, `loop_controls`), and the plugins
-  (`renox-oauth`, `renox-2fa`, `renox-admin`, separate crates after 1.0).
-- As of M21h: ~50k lines of Rust in `crates/` (stubs excluded), ~545 `#[test]`/`#[renox::test]`/
+  `unique().ignore()`, the fallback status bug, examples for M22–M25): merged (#73). M26b (docs
+  brought up to date, the 380 undocumented public items documented, `missing_docs` enforced,
+  `RedirectExt` sealed, `InvalidUlid` non-exhaustive): branch `m26b-docs`. Then M26c (tests for `renox-cli` and weak core files).
+- **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
+  crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
+  Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.
+- **Still open** (ROADMAP `- [ ]`): an optional HIBP check; the plugins (`renox-2fa`,
+  `renox-oauth`, `renox-admin`, separate crates). A Laravel gap review after M25 (in the
+  conversation that planned M26) ranked them: release and docs first, then 2FA and social
+  login, then small adds (validation rules like `json`/`gt`/`decimal`/`dimensions`, several
+  storage disks, route model binding), then admin, search, realtime (SSE) and billing.
+- As of M26a: ~54k lines of Rust in `crates/` (stubs excluded), ~578 `#[test]`/`#[renox::test]`/
   `#[tokio::test]` functions in `crates/` and `examples/` (plus doctests), and 42 direct
   dependencies in renox-core (5 optional). Keep dependencies lean and remove unused ones.

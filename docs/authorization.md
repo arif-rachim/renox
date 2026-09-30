@@ -303,7 +303,7 @@ another team's row, a token without the ability, a guest.
 | `Gate::define`, `@can`, `can:` middleware | `App::gate` / `gate_async`, `can(…)`, `.require_gate(…)` |
 | Policies, `$this->authorize()` | `impl Policy`, `user.authorize(…)?`, `Can::new` for views |
 | `Gate::before` | `App::gate_before` |
-| FormRequest `authorize()` | `impl Validate { async fn authorize(&self, form: &FormContext) }` |
+| FormRequest `authorize()` | `impl Validate { async fn authorize(&self, form: &FormContext) }`, or `#[derive(Validate)]` + `#[validate(hooks)]` + `impl ValidateHooks` |
 | spatie `User::role('x')->get()` | `permissions::users_with_role(&db, "x")` |
 | spatie/laravel-permission | the `Permissions` module |
 | Sanctum abilities, `tokenCan` | `create_token_with`, `.require_ability(…)`, `token_can` |

@@ -76,18 +76,22 @@ impl TestApp {
         }
     }
 
+    /// The booted app behind this `TestApp`.
     pub fn kernel(&self) -> &Kernel {
         &self.kernel
     }
 
+    /// The app's shared state.
     pub fn state(&self) -> &AppState {
         self.kernel.state()
     }
 
+    /// The app's database, migrated at start.
     pub fn db(&self) -> &Db {
         self.kernel.db()
     }
 
+    /// The app's mailer (the `memory` driver unless the config changes it).
     pub fn mailer(&self) -> &Mailer {
         self.kernel.mailer()
     }
@@ -184,6 +188,7 @@ impl TestApp {
         self
     }
 
+    /// Panics unless no `E` was emitted since `fake_events`.
     #[track_caller]
     pub fn assert_not_emitted<E: crate::events::Event>(&self) -> &Self {
         let emitted = self.emitted::<E>();
@@ -248,6 +253,7 @@ impl TestApp {
         self
     }
 
+    /// Panics unless no notification was recorded since `fake_notifications`.
     #[track_caller]
     pub fn assert_nothing_notified(&self) -> &Self {
         let sent = self.notifications();
@@ -260,6 +266,7 @@ impl TestApp {
         self.session().get(key)
     }
 
+    /// Panics unless the session holds `key`.
     #[track_caller]
     pub fn assert_session_has(&self, key: &str) -> &Self {
         assert!(
@@ -269,6 +276,7 @@ impl TestApp {
         self
     }
 
+    /// Panics if the session holds `key`.
     #[track_caller]
     pub fn assert_session_missing(&self, key: &str) -> &Self {
         assert!(
@@ -290,6 +298,7 @@ impl TestApp {
         self
     }
 
+    /// Panics unless the session is a guest's (no one logged in).
     #[track_caller]
     pub fn assert_guest(&self) -> &Self {
         let id: Option<i64> = self.session().get(crate::auth::AUTH_ID);
@@ -429,6 +438,7 @@ impl TestApp {
         self.request().htmx()
     }
 
+    /// A GET request.
     pub async fn get(&self, uri: &str) -> TestResponse {
         self.request().get(uri).await
     }
@@ -438,14 +448,17 @@ impl TestApp {
         self.request().post(uri, form).await
     }
 
+    /// A form PUT (urlencoded), with the CSRF token.
     pub async fn put(&self, uri: &str, form: &[(&str, &str)]) -> TestResponse {
         self.request().put(uri, form).await
     }
 
+    /// A form PATCH (urlencoded), with the CSRF token.
     pub async fn patch(&self, uri: &str, form: &[(&str, &str)]) -> TestResponse {
         self.request().patch(uri, form).await
     }
 
+    /// A DELETE request, with the CSRF token.
     pub async fn delete(&self, uri: &str) -> TestResponse {
         self.request().delete(uri).await
     }
@@ -529,6 +542,7 @@ impl TestApp {
         }
     }
 
+    /// Fails unless `table` has exactly `expected` rows.
     pub async fn assert_database_count(&self, table: &str, expected: i64) {
         let count = self.where_count(table, &[]).await;
         assert_eq!(count, expected, "rows in `{table}`");
@@ -566,6 +580,7 @@ pub struct TestRequest<'a> {
 }
 
 impl TestRequest<'_> {
+    /// Adds a request header; may be called several times.
     pub fn header(mut self, name: &str, value: &str) -> Self {
         self.headers.push((name.to_owned(), value.to_owned()));
         self
@@ -587,22 +602,27 @@ impl TestRequest<'_> {
         self
     }
 
+    /// Sends it as a GET.
     pub async fn get(self, uri: &str) -> TestResponse {
         self.send(Method::GET, uri, None, Body::empty()).await
     }
 
+    /// Sends it as a form post (urlencoded), with the CSRF token unless `without_csrf`.
     pub async fn post(self, uri: &str, form: &[(&str, &str)]) -> TestResponse {
         self.form(Method::POST, uri, form).await
     }
 
+    /// Sends it as a form PUT (urlencoded), with the CSRF token unless `without_csrf`.
     pub async fn put(self, uri: &str, form: &[(&str, &str)]) -> TestResponse {
         self.form(Method::PUT, uri, form).await
     }
 
+    /// Sends it as a form PATCH (urlencoded), with the CSRF token unless `without_csrf`.
     pub async fn patch(self, uri: &str, form: &[(&str, &str)]) -> TestResponse {
         self.form(Method::PATCH, uri, form).await
     }
 
+    /// Sends it as a DELETE, with the CSRF token unless `without_csrf`.
     pub async fn delete(self, uri: &str) -> TestResponse {
         self.send(Method::DELETE, uri, None, Body::empty()).await
     }
@@ -657,6 +677,7 @@ impl TestRequest<'_> {
         .await
     }
 
+    /// Sends `body` as a JSON POST, with the CSRF token unless `without_csrf`.
     pub async fn post_json(self, uri: &str, body: &impl Serialize) -> TestResponse {
         let body = serde_json::to_vec(body).expect("the body serializes");
         self.send(
@@ -749,14 +770,18 @@ impl TestRequest<'_> {
 /// the start of the body, and return `&Self` so they can be chained.
 #[derive(Debug, Clone)]
 pub struct TestResponse {
+    /// The response status.
     pub status: StatusCode,
+    /// The response headers.
     pub headers: HeaderMap,
+    /// The response body, read in full.
     pub body: Bytes,
     /// The template the page was rendered from, if it was a view.
     pub view: Option<String>,
 }
 
 impl TestResponse {
+    /// The body as text (invalid UTF-8 replaced).
     pub fn text(&self) -> String {
         String::from_utf8_lossy(&self.body).into_owned()
     }
@@ -771,6 +796,7 @@ impl TestResponse {
         })
     }
 
+    /// The value of header `name`; `None` when it's missing or not text.
     pub fn header(&self, name: &str) -> Option<&str> {
         self.headers
             .get(HeaderName::from_bytes(name.as_bytes()).ok()?)
@@ -785,6 +811,7 @@ impl TestResponse {
         }
     }
 
+    /// Panics unless the status is `expected`.
     #[track_caller]
     pub fn assert_status(&self, expected: u16) -> &Self {
         if self.status.as_u16() != expected {
@@ -797,21 +824,25 @@ impl TestResponse {
         self
     }
 
+    /// Panics unless the status is 200.
     #[track_caller]
     pub fn assert_ok(&self) -> &Self {
         self.assert_status(200)
     }
 
+    /// Panics unless the status is 404.
     #[track_caller]
     pub fn assert_not_found(&self) -> &Self {
         self.assert_status(404)
     }
 
+    /// Panics unless the status is 403.
     #[track_caller]
     pub fn assert_forbidden(&self) -> &Self {
         self.assert_status(403)
     }
 
+    /// Panics unless the status is 401.
     #[track_caller]
     pub fn assert_unauthorized(&self) -> &Self {
         self.assert_status(401)
@@ -856,6 +887,7 @@ impl TestResponse {
         self
     }
 
+    /// Panics if the body contains `text` (as written, e.g. already HTML-escaped).
     #[track_caller]
     pub fn assert_dont_see(&self, text: &str) -> &Self {
         if self.text().contains(text) {
@@ -906,6 +938,7 @@ impl TestResponse {
         self
     }
 
+    /// Panics unless header `name` is exactly `value`.
     #[track_caller]
     pub fn assert_header(&self, name: &str, value: &str) -> &Self {
         let actual = self.header(name);

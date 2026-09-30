@@ -9,13 +9,19 @@ use crate::db::{DateTime, Db, Model, now};
 #[derive(Debug, Clone, Serialize)]
 #[non_exhaustive]
 pub struct AccessToken {
+    /// The `personal_access_tokens` row id, also the part before `|` in the plain token.
     pub id: i64,
+    /// The user the token acts as.
     pub user_id: i64,
+    /// A label chosen at creation, e.g. the device or integration.
     pub name: String,
     /// What the token may do (`AuthUser::token_can`); `None` for everything.
     pub abilities: Option<Vec<String>>,
+    /// When a request last authenticated with it; `None` if never used.
     pub last_used_at: Option<DateTime>,
+    /// When it stops working; `None` for never.
     pub expires_at: Option<DateTime>,
+    /// When it was created.
     pub created_at: Option<DateTime>,
 }
 
@@ -24,7 +30,9 @@ pub struct AccessToken {
 #[derive(Debug, Clone, Serialize)]
 #[non_exhaustive]
 pub struct NewToken {
+    /// The stored token.
     pub token: AccessToken,
+    /// The secret as `<id>|<random>`; not stored, so it can't be shown again.
     pub plain: String,
 }
 

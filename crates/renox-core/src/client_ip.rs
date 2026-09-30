@@ -63,6 +63,8 @@ pub struct TrustedProxies {
 }
 
 impl TrustedProxies {
+    /// Parses a `TRUSTED_PROXIES` list; fails on a bad address or prefix, or `*`
+    /// mixed with addresses.
     pub fn parse(list: &str) -> anyhow::Result<Self> {
         let mut proxies = Self::default();
         for item in list.split(',').map(str::trim).filter(|s| !s.is_empty()) {
@@ -94,6 +96,7 @@ impl TrustedProxies {
         Ok(proxies)
     }
 
+    /// Whether `ip` is a trusted proxy.
     pub fn contains(&self, ip: IpAddr) -> bool {
         self.any
             || self

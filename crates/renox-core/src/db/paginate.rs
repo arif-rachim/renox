@@ -44,21 +44,30 @@ impl<S: Send + Sync> FromRequestParts<S> for Page {
 #[derive(Debug, Clone, Serialize)]
 #[non_exhaustive]
 pub struct Paginated<T> {
+    /// The rows on this page.
     pub items: Vec<T>,
+    /// The current page, 1-based.
     pub page: u32,
+    /// Rows per page.
     pub per_page: u32,
+    /// Rows matching the query on all pages.
     pub total: u64,
+    /// The last page number, at least 1 (also when there are no rows).
     pub last_page: u32,
     /// Position of the first and last item on this page (1-based), 0 when empty.
     pub from: u64,
+    /// Position of the last item on this page (1-based), 0 when empty.
     pub to: u64,
+    /// Whether there is a page before this one.
     pub has_prev: bool,
+    /// Whether there is a page after this one.
     pub has_next: bool,
     /// Page numbers to link to; `None` marks a gap ("…").
     pub pages: Vec<Option<u32>>,
 }
 
 impl<T> Paginated<T> {
+    /// A page of `items` out of `total` rows; works out the other fields.
     pub fn new(items: Vec<T>, page: u32, per_page: u32, total: u64) -> Self {
         let last_page = total.div_ceil(u64::from(per_page)).max(1) as u32;
         let from = if items.is_empty() {
@@ -85,6 +94,7 @@ impl<T> Paginated<T> {
         }
     }
 
+    /// Converts the items, keeping the page information.
     pub fn map<U>(self, f: impl FnMut(T) -> U) -> Paginated<U> {
         Paginated {
             items: self.items.into_iter().map(f).collect(),
@@ -111,14 +121,20 @@ impl<T> Paginated<T> {
 #[derive(Debug, Clone, Serialize)]
 #[non_exhaustive]
 pub struct SimplePage<T> {
+    /// The rows on this page.
     pub items: Vec<T>,
+    /// The current page, 1-based.
     pub page: u32,
+    /// Rows per page.
     pub per_page: u32,
+    /// Whether there is a page before this one.
     pub has_prev: bool,
+    /// Whether there is a page after this one (one extra row was found).
     pub has_next: bool,
 }
 
 impl<T> SimplePage<T> {
+    /// Converts the items, keeping the page information.
     pub fn map<U>(self, f: impl FnMut(T) -> U) -> SimplePage<U> {
         SimplePage {
             items: self.items.into_iter().map(f).collect(),
@@ -136,12 +152,16 @@ impl<T> SimplePage<T> {
 #[derive(Debug, Clone, Serialize)]
 #[non_exhaustive]
 pub struct CursorPage<T> {
+    /// The rows after the cursor.
     pub items: Vec<T>,
+    /// Rows per page.
     pub per_page: u32,
+    /// The cursor for the following rows; `None` on the last page.
     pub next_cursor: Option<String>,
 }
 
 impl<T> CursorPage<T> {
+    /// Converts the items, keeping the cursor.
     pub fn map<U>(self, f: impl FnMut(T) -> U) -> CursorPage<U> {
         CursorPage {
             items: self.items.into_iter().map(f).collect(),

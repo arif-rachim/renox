@@ -2,7 +2,10 @@
 //!
 //! Most applications should depend on the `renox` crate instead, which
 //! re-exports everything here through `renox::prelude`.
-#![recursion_limit = "256"] // the built-in auth texts are one large `json!`
+#![recursion_limit = "256"]
+// the built-in auth texts are one large `json!`
+// Every public item is documented; clippy's `-D warnings` in CI keeps it so.
+#![warn(missing_docs)]
 
 pub mod analytics;
 mod app;
@@ -58,6 +61,7 @@ pub mod timezone;
 pub mod toast;
 pub mod upload;
 pub mod validation;
+/// Views: MiniJinja templates, the `View` response and template globals.
 pub mod view;
 mod view_filters;
 mod view_stack;

@@ -78,6 +78,7 @@ impl Storage {
         Ok(Self { disk })
     }
 
+    /// Writes `bytes` to `key`, replacing any file there.
     pub async fn put(&self, key: &str, bytes: Bytes) -> Result {
         let key = check_key(key)?;
         match &self.disk {
@@ -130,6 +131,7 @@ impl Storage {
         }
     }
 
+    /// Whether a file exists at `key`.
     pub async fn exists(&self, key: &str) -> Result<bool> {
         let key = check_key(key)?;
         match &self.disk {
@@ -349,6 +351,8 @@ impl Storage {
         Ok(files.len())
     }
 
+    /// The public URL of `key` (under `public/`): `/storage/…` on the local
+    /// disk, or under `STORAGE_URL` on S3 when set.
     pub fn url(&self, key: &str) -> String {
         let key = key.trim_start_matches('/');
         let rest = key.strip_prefix("public/").unwrap_or(key);
@@ -427,7 +431,9 @@ async fn create_parent(path: &Path) -> Result {
 pub struct FileInfo {
     /// Its key, e.g. `invoices/2026/a.pdf`.
     pub key: String,
+    /// Its size in bytes.
     pub size: u64,
+    /// When it last changed, if the disk says.
     pub modified: Option<chrono::DateTime<chrono::Utc>>,
 }
 
@@ -443,10 +449,15 @@ fn encode_path(key: &str) -> String {
 pub struct StorageConfig {
     /// `local` or `s3`.
     pub disk: String,
+    /// The S3 bucket, from `S3_BUCKET`.
     pub bucket: Option<String>,
+    /// The S3 region, from `S3_REGION`.
     pub region: Option<String>,
+    /// An S3-compatible endpoint, from `S3_ENDPOINT` (AWS when unset).
     pub endpoint: Option<String>,
+    /// The S3 access key id, from `S3_ACCESS_KEY_ID`.
     pub access_key_id: Option<String>,
+    /// The S3 secret key, from `S3_SECRET_ACCESS_KEY`.
     pub secret_access_key: Option<String>,
     /// Public base URL for keys under `public/` (bucket URL or CDN), for S3.
     pub url: Option<String>,

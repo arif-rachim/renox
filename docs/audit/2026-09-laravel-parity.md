@@ -14,7 +14,8 @@ knowledge of Laravel 11/12, spot-checked against the docs where it mattered.
 > commands, form requests, database sessions), except a few small M21 rows that ROADMAP.md
 > lists as "Deferred from M21": subdomain and fallback routes, `routeIs`, `redirect()->route`
 > and a public `intended`, session `push`/`increment`, factory states, plural ranges with
-> `Accept-Language`, and `@class`/`loop_controls`. A later gap report, in
+> `Accept-Language`, and `@class`/`loop_controls`; those closed in M24 and M25 (with non-integer
+keys in M22, savepoints and encrypted fields in M23). A later gap report, in
 > Indonesian, is [2026-09-laravel-gap-report.pdf](2026-09-laravel-gap-report.pdf).
 
 Legend: ✅ equivalent · 🟡 partial · ❌ missing · ⛔ not planned (see ROADMAP "Not planned").

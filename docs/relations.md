@@ -273,6 +273,10 @@ let products = Product::query()
 | `groupBy`, `having`, `selectRaw` | `.group_by(col).having_raw("COUNT(*) > ?", [2]).select_as::<(i64, i64), _>(&db, "col, COUNT(*)")` |
 | `lockForUpdate`, `sharedLock` | `.lock_for_update()` / `.shared_lock()` on `&mut tx` (PostgreSQL; SQLite: `db.begin_immediate()`) |
 | `firstOrNew`, `updateOrCreate`, `refresh` | `.first_or_new(&db, \|\| new)`, `.update_or_create(&db, \|\| new, \|m\| …)`, `model.refresh(&db)` |
+| `HasUlids`, `HasUuids`, string keys | `id: Ulid` / `id: Uuid` / `id: String` (made on insert, or set by you); `Pivot<Ulid, i64>` |
+| `insert()` of one model with its key | `model.insert(&db)` (always an INSERT; `Model::insert_many` for many rows) |
+| `encrypted` cast | `Encrypted<T>` fields |
+| `DB::transaction` inside a transaction | `tx.savepoint(\|tx\| Box::pin(async move { … }))` |
 | `simplePaginate`, `cursorPaginate` | `.simple_paginate(&db, page, per)` (`simple_pagination` macro), `.cursor_paginate(&db, cursor, per)` |
 | `DB::transaction(fn, 3)` | `db.retrying(3, \|\| async { let mut tx = db.begin().await?; … })` (borrows from the caller), `db.transaction_retrying(…)`, `db.transaction(…)` |
 | `toSql` | `.to_sql(db.dialect())` |

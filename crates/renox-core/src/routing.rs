@@ -53,7 +53,9 @@ pub(crate) struct RouteParts {
 pub struct RouteInfo {
     /// `GET`, `POST`, … or `*` for a `route()` whose methods Renox can't see.
     pub method: String,
+    /// The path pattern, e.g. `/posts/{id}`.
     pub path: String,
+    /// The route's name, if it has one.
     pub name: Option<String>,
     /// The module that defined it, or `renox` for the framework's own.
     pub module: String,
@@ -65,6 +67,7 @@ pub struct RouteInfo {
 
 macro_rules! method {
     ($($method:ident),*) => {$(
+        /// Adds a route for this HTTP method (the function's name) at `path`.
         pub fn $method<H, T>(self, path: &str, handler: H) -> Self
         where
             H: Handler<T, AppState>,
@@ -76,6 +79,7 @@ macro_rules! method {
 }
 
 impl Routes {
+    /// An empty set of routes.
     pub fn new() -> Self {
         Self::default()
     }
@@ -390,6 +394,7 @@ impl Routes {
         self
     }
 
+    /// Adds the routes of `other`, with their names and layers.
     pub fn merge(mut self, other: impl Into<Routes>) -> Self {
         let other = other.into();
         self.router = self.router.merge(other.router);
@@ -699,6 +704,7 @@ pub struct Resource {
 
 macro_rules! resource_action {
     ($($action:ident => $router:expr),* $(,)?) => {$(
+        /// Sets the handler of this action (the function's name).
         pub fn $action<H, T>(mut self, handler: H) -> Self
         where
             H: Handler<T, AppState>,
@@ -712,6 +718,7 @@ macro_rules! resource_action {
 }
 
 impl Resource {
+    /// A resource with no actions; add them with `index`, `store`, …
     pub fn new() -> Self {
         Self::default()
     }

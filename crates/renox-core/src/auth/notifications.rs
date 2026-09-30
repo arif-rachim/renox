@@ -81,6 +81,7 @@ pub enum Channel {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct Recipient {
+    /// The user, if the recipient has an account.
     pub user: Option<User>,
     /// An address per channel, e.g. `mail` → `a@b.c`, `whatsapp` → `+62…`.
     pub routes: BTreeMap<String, String>,
@@ -90,6 +91,7 @@ pub struct Recipient {
 }
 
 impl Recipient {
+    /// The user, at their email address (and any addresses added with `and`).
     pub fn for_user(user: &User) -> Self {
         Self {
             user: Some(user.clone()),
@@ -118,6 +120,7 @@ impl Recipient {
         })
     }
 
+    /// The address for the `mail` channel (see [`Recipient::address`]).
     pub fn email(&self) -> Option<String> {
         self.address("mail")
     }
@@ -154,10 +157,12 @@ impl From<&Recipient> for Recipient {
     }
 }
 
+/// A message to a [`Recipient`], with a version for each channel it goes out on.
 pub trait Notification: Send + Sync {
     /// Stored with database notifications, e.g. to pick an icon.
     fn kind(&self) -> &'static str;
 
+    /// The channels to deliver on; only `Channel::Mail` unless overridden.
     fn channels(&self) -> Vec<Channel> {
         vec![Channel::Mail]
     }
@@ -168,10 +173,12 @@ pub trait Notification: Send + Sync {
         self.channels()
     }
 
+    /// The mail for `Channel::Mail`; an error unless overridden.
     fn to_mail(&self, _to: &Recipient, _state: &AppState) -> Result<Mail> {
         Err(anyhow!("notification `{}` has no mail version", self.kind()).into())
     }
 
+    /// The JSON stored for `Channel::Database` (`DatabaseNotification::data`); `null` by default.
     fn to_database(&self, _to: &Recipient) -> Value {
         Value::Null
     }
@@ -191,10 +198,15 @@ pub trait Notification: Send + Sync {
 #[derive(Debug, Clone, Serialize)]
 #[non_exhaustive]
 pub struct DatabaseNotification {
+    /// The `notifications` row id.
     pub id: i64,
+    /// The notification's [`Notification::kind`].
     pub kind: String,
+    /// What [`Notification::to_database`] returned.
     pub data: Value,
+    /// When it was marked read; `None` while unread.
     pub read_at: Option<DateTime>,
+    /// When it was stored.
     pub created_at: DateTime,
 }
 
@@ -364,6 +376,7 @@ impl User {
         rows.iter().map(from_row).collect()
     }
 
+    /// The user's unread notifications, newest first.
     pub async fn unread_notifications(&self, db: &Db) -> Result<Vec<DatabaseNotification>> {
         let rows = crate::db::sql(
             "SELECT id, kind, data, read_at, created_at FROM notifications \
@@ -375,6 +388,7 @@ impl User {
         rows.iter().map(from_row).collect()
     }
 
+    /// How many of the user's notifications are unread.
     pub async fn unread_notification_count(&self, db: &Db) -> Result<i64> {
         Ok(crate::db::sql(
             "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read_at IS NULL",
@@ -397,6 +411,7 @@ impl User {
         Ok(done > 0)
     }
 
+    /// Marks all the user's unread notifications read; returns how many there were.
     pub async fn mark_all_notifications_read(&self, db: &Db) -> Result<u64> {
         let done = crate::db::sql(
             "UPDATE notifications SET read_at = ? WHERE user_id = ? AND read_at IS NULL",

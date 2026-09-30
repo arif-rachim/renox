@@ -36,6 +36,7 @@ impl Default for Zone {
 }
 
 impl Zone {
+    /// Coordinated Universal Time.
     pub const UTC: Zone = Zone::Fixed(0);
 
     /// The offset from UTC at the moment `unix` (seconds), in seconds.

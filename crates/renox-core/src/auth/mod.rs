@@ -93,6 +93,7 @@ const INTENDED: &str = "_intended";
 /// }
 /// ```
 pub trait Policy {
+    /// Whether `user` may perform `ability` (e.g. `"update"`) on this model.
     fn allows(&self, user: &User, ability: &str) -> bool;
 }
 
@@ -114,8 +115,10 @@ pub trait Policy {
 /// guests get `false` for every ability.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct Can<T> {
+    /// The model, serialized as its own fields.
     #[serde(flatten)]
     pub item: T,
+    /// Each asked ability and whether it is allowed, serialized as `_can`.
     #[serde(rename = "_can")]
     pub abilities: std::collections::BTreeMap<String, bool>,
 }
@@ -123,6 +126,7 @@ pub struct Can<T> {
 /// Who asks a policy, for [`Can::new`]: a [`User`], or an [`AuthUser`],
 /// which also applies `App::gate_before` (pass `user.as_ref()` for that).
 pub trait Viewer {
+    /// The user the policy is asked about.
     fn as_user(&self) -> &User;
 
     /// `App::gate_before`'s answer, if any.
@@ -148,6 +152,7 @@ impl Viewer for AuthUser {
 }
 
 impl<T: Policy> Can<T> {
+    /// Asks `item`'s policy about each of `abilities`; a guest (`None`) gets `false` for all.
     pub fn new<V: Viewer + ?Sized>(item: T, user: Option<&V>, abilities: &[&str]) -> Self {
         let abilities = abilities
             .iter()
@@ -378,6 +383,7 @@ impl AuthUser {
         }
     }
 
+    /// The logged-in user.
     pub fn user(&self) -> &User {
         &self.user
     }

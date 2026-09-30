@@ -216,6 +216,31 @@ with the header `X-Renox-Validate: field`. The `Valid` extractor answers with th
 errors as JSON and **the handler doesn't run**, so nothing is saved until the form is
 submitted. The rules are the form's own, database checks such as `unique` included.
 
+## The current route, conditional classes, loops
+
+A navigation marks the current section with `route_is` (the route's name; `*` stands for
+anything), and `class_names` builds a `class` attribute from the classes whose condition holds:
+
+```html
+<a href="{{ route('admin.products.index') }}"
+   class="{{ class_names('tab', {'tab-active': route_is('admin.products.*')}) }}"
+   {% if route_is('admin.products.*') %}aria-current="page"{% endif %}>Products</a>
+{# request.route is the name itself, e.g. "admin.products.edit" #}
+```
+
+`route_is` also takes several patterns (`route_is('orders.*', 'checkout')`). In Rust, the
+`CurrentRoute` extractor gives the same (`route.is("admin.*")`, `route.name()`). Loops may stop
+early or skip items with `{% break %}` and `{% continue %}`:
+
+```html
+{% for product in recently_viewed %}{% if loop.index > 4 %}{% break %}{% endif %}…{% endfor %}
+```
+
+A text that depends on a count uses Laravel's plural ranges in the lang file, `{n}` for exactly
+n, `[a,b]` for a range and `*` for no end: `"{0} Sold out|{1} Only one left|[2,5] Only :count
+left|[6,*] :count in stock"`, printed with `{{ t('products.in_stock', count=product.stock) }}`
+(examples/shop).
+
 ## Stacks
 
 A page or a component often needs something in another part of the layout: a script at the end

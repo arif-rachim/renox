@@ -12,8 +12,11 @@ use crate::storage::StorageConfig;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Environment {
+    /// `local` (also `dev`, `development`), the default.
     Local,
+    /// `testing` (also `test`).
     Testing,
+    /// `production` (also `prod`); requires `APP_KEY`.
     Production,
 }
 
@@ -61,14 +64,19 @@ impl CspMode {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Config {
+    /// The application's name, from `APP_NAME` (Renox).
     pub name: String,
+    /// The environment, from `APP_ENV` (local).
     pub env: Environment,
     /// Show error details and backtraces in responses. Never enable in production.
     pub debug: bool,
+    /// The public base URL, from `APP_URL` (`http://{host}:{port}`).
     pub url: String,
     /// Secret used for signing and encryption. Required in production.
     pub key: Option<String>,
+    /// The IP address to listen on, from `APP_HOST` (127.0.0.1).
     pub host: IpAddr,
+    /// The port to listen on, from `APP_PORT` (3000).
     pub port: u16,
     /// Where templates live, from `VIEWS_PATH`.
     pub views_path: PathBuf,
@@ -294,6 +302,7 @@ impl Config {
             .filter(|v| !v.is_empty())
     }
 
+    /// The address to listen on: `host` and `port`.
     pub fn addr(&self) -> SocketAddr {
         SocketAddr::new(self.host, self.port)
     }

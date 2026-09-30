@@ -51,6 +51,7 @@ impl Module for Dashboard {
 #[derive(Debug, Clone, Serialize)]
 #[non_exhaustive]
 pub struct QueueCounts {
+    /// The queue's name.
     pub queue: String,
     /// Available now, waiting for a worker.
     pub ready: i64,
@@ -64,6 +65,7 @@ pub struct QueueCounts {
 #[derive(Debug, Clone, Serialize)]
 #[non_exhaustive]
 pub struct QueueStats {
+    /// One entry per queue that has jobs, by name.
     pub queues: Vec<QueueCounts>,
     /// Seconds the oldest ready job has waited.
     pub oldest_wait: Option<i64>,
@@ -71,6 +73,7 @@ pub struct QueueStats {
     pub done_last_hour: i64,
     /// Jobs that failed for good in the last hour.
     pub failed_last_hour: i64,
+    /// Rows in `failed_jobs`, of any age.
     pub failed_total: i64,
 }
 

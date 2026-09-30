@@ -21,6 +21,7 @@ use crate::Result;
 /// # Ok(()) }
 /// ```
 pub trait Factory: Model {
+    /// A model with sample values (usually fake data), not saved.
     fn definition() -> Self;
 
     /// A new, unsaved model.

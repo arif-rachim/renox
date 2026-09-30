@@ -106,6 +106,7 @@ pub struct Views {
 #[non_exhaustive]
 #[derive(Clone)]
 pub struct ViewContext {
+    /// The application state.
     pub state: AppState,
     /// The logged-in user, if any.
     pub user: Option<Arc<crate::auth::User>>,
@@ -605,6 +606,7 @@ impl View {
         self
     }
 
+    /// The response status (200 by default).
     pub fn status(mut self, status: StatusCode) -> Self {
         self.status = status;
         self

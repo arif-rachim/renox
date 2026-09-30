@@ -18,15 +18,16 @@ commit that `rnx` was built from.
   - `WebhookRequest`, `WebhookCall`, `JobContext`, `Htmx`, `Down`, `analytics::Event`
   - `view::ViewContext`, `auth::Registration`, `auth::Recipient`, `mail::Attachment`
   - `Toast`, `report::ErrorReport`, `report::RequestReport`, `validation::FormContext`,
-    `rate_limit::LimitRequest`, `SentNotification`
+    `rate_limit::LimitRequest`, `SentNotification`, `db::InvalidUlid`
 - **New variants on these enums.** A `match` on them needs a `_` arm:
   - `Error`, `Environment`, `CspMode`, `Channel`, `Locale`, `DbValue`, `Inspected` (a `Rule`
     matching on `Inspected` needs a `_` arm), `ToastKind`, `report::ReportKind`
 - New methods, functions, modules, template functions, validation rules, CLI commands and `.env`
   settings (always with defaults).
-- New provided methods on traits you implement (`Model`, `Notification`, …); `FromRow` stays one
-  method. `db::Number` is sealed: only `i64` and `f64`. `db::ModelKey` is sealed too (`i64`,
-  `Ulid`, `Uuid`, `String`), so new key types and new methods on it aren't breaking.
+- New provided methods on traits you implement (`Model`, `Notification`, `ModelHooks`,
+  `validation::ValidateHooks`, …); `FromRow` stays one method. `db::Number` is sealed: only `i64`
+  and `f64`. `db::ModelKey` is sealed too (`i64`, `Ulid`, `Uuid`, `String`), so new key types
+  and new methods on it aren't breaking, and so is `RedirectExt` (only for axum's `Redirect`).
 
 `Dialect` is deliberately not in that list. Supporting a third database would change the SQL every
 app writes, so it would come with a major release.

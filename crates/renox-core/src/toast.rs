@@ -30,9 +30,13 @@ pub(crate) const EVENT: &str = "renox:toast";
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum ToastKind {
+    /// Something worked.
     Success,
+    /// Neutral information.
     Info,
+    /// Something needs attention.
     Warning,
+    /// Something failed.
     Error,
 }
 
@@ -40,11 +44,14 @@ pub enum ToastKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct Toast {
+    /// Its kind, which sets its colour and icon.
     pub kind: ToastKind,
+    /// The text shown.
     pub message: String,
 }
 
 impl Toast {
+    /// A toast of `kind`.
     pub fn new(kind: ToastKind, message: impl Into<String>) -> Self {
         Self {
             kind,
@@ -52,14 +59,17 @@ impl Toast {
         }
     }
 
+    /// A success toast.
     pub fn success(message: impl Into<String>) -> Self {
         Self::new(ToastKind::Success, message)
     }
 
+    /// An info toast.
     pub fn info(message: impl Into<String>) -> Self {
         Self::new(ToastKind::Info, message)
     }
 
+    /// A warning toast.
     pub fn warning(message: impl Into<String>) -> Self {
         Self::new(ToastKind::Warning, message)
     }

@@ -88,6 +88,7 @@ impl FromRequestParts<AppState> for Cookies {
 pub struct SetCookie(Cookie<'static>);
 
 impl SetCookie {
+    /// A cookie `name` with `value` and the defaults above.
     pub fn new(state: &AppState, name: impl Into<String>, value: impl Into<String>) -> Self {
         let mut cookie = Cookie::new(name.into(), value.into());
         cookie.set_path("/");
@@ -121,6 +122,7 @@ impl SetCookie {
         self
     }
 
+    /// Limits the cookie to URLs under `path` (default `/`).
     pub fn path(mut self, path: impl Into<String>) -> Self {
         self.0.set_path(path.into());
         self

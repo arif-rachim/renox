@@ -21,8 +21,10 @@ use crate::{Registry, Routes};
 /// }
 /// ```
 pub trait Module: Send + Sync + 'static {
+    /// The module's name, shown by `route:list`.
     fn name(&self) -> &'static str;
 
+    /// The module's routes; none by default.
     fn routes(&self) -> Routes {
         Routes::new()
     }

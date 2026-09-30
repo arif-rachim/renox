@@ -19,7 +19,9 @@ use crate::{Error, Result, Session};
 /// let back = Redirect::intended(&session, "/dashboard");
 /// # let _ = back; Ok(to_product) }
 /// ```
-pub trait RedirectExt: Sized {
+///
+/// The trait is sealed: it's implemented for `Redirect` only, so it can grow.
+pub trait RedirectExt: sealed::Sealed + Sized {
     /// A 303 redirect to the named route `name` with `params` filling its
     /// `{…}` placeholders in order. Needs the app, so it works in handlers,
     /// middleware, jobs and commands (not in code outside any of them).
@@ -30,6 +32,11 @@ pub trait RedirectExt: Sized {
     /// `fallback`. The stored page is used once and only if it's on this
     /// site.
     fn intended(session: &Session, fallback: &str) -> Self;
+}
+
+mod sealed {
+    pub trait Sealed {}
+    impl Sealed for axum::response::Redirect {}
 }
 
 impl RedirectExt for Redirect {
