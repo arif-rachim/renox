@@ -13,7 +13,7 @@
 //! - `Project::unscoped()` where every team counts: the super-admin page and
 //!   the `projects:count` command.
 //! - A super-admin through `App::gate_before` (the emails in `SUPER_ADMINS`).
-//! - A team secret sealed with `state.encrypt`, shown only after the
+//! - A team secret in an `Encrypted<String>` field, shown only after the
 //!   password is confirmed (`require_password_confirmed`).
 //! - Account pages from `Auth::new().account()`.
 //!

@@ -525,7 +525,7 @@ See [docs/relations.md](docs/relations.md): pivot columns (`attach_with`, `load_
 ## Model hooks, partial saves, encrypted values
 
 ```rust
-use renox::db::ModelHooks;
+use renox::db::{Encrypted, ModelHooks};
 use renox::prelude::*;
 
 #[derive(Model, serde::Serialize, Default, Clone)]
@@ -535,7 +535,7 @@ struct Post {
     title: String,
     slug: String,
     views: i64,
-    api_secret: String, // stored encrypted
+    api_secret: Encrypted<String>, // a TEXT column holding it sealed; any serde type works
 }
 
 impl ModelHooks for Post {
@@ -561,9 +561,12 @@ async fn edit(state: &AppState, id: i64) -> Result {
     post.title = "New title".into();
     post.save_only(db, &["title"]).await?; // only these columns (+ updated_at); `views` untouched
     post.save_changes(db, &original).await?; // the columns that differ; false if none
-    post.api_secret = state.encrypt("sk_live_123"); // AES-256-GCM under APP_KEY
-    let secret = state.decrypt(&post.api_secret)?; // Err if tampered or another key
-    let _ = secret;
+    post.api_secret = Encrypted::new("sk_live_123".into()); // sealed (AES-256-GCM, APP_KEY) on save
+    let secret: &str = &post.api_secret; // plain when read; Debug prints `Encrypted(..)`
+    // Can't be searched (a fresh nonce per write). For a value outside a model:
+    let sealed = state.encrypt("sk_live_123");
+    let plain = state.decrypt(&sealed)?; // Err if tampered or another key
+    let _ = (secret, plain);
     Ok(())
 }
 ```
@@ -971,6 +974,10 @@ async fn report(db: &Db) -> Result {
 
     let mut tx = db.begin().await?; // pass `&mut tx` wherever `db` goes
     renox::db::sql("UPDATE products SET price = price + ?").bind(1_000).execute(&mut tx).await?;
+    // A savepoint: on Err only its own changes are undone and the transaction goes on (nests).
+    let bonus: Result<u64> = tx
+        .savepoint(|tx| Box::pin(async move { Ok(renox::db::sql("UPDATE stock SET n = n - 1").execute(&mut *tx).await?) }))
+        .await;
     tx.commit().await?; // dropped without commit = rolled back
 
     // Retried on SQLite busy / PostgreSQL conflicts; borrows freely, may roll back with a value.
@@ -990,7 +997,7 @@ async fn report(db: &Db) -> Result {
             Ok(n)
         })
         .await?;
-    let _ = (name, raised);
+    let _ = (name, raised, bonus);
     Ok(())
 }
 ```

@@ -25,6 +25,9 @@ pub enum DbValue {
     /// A 16-byte BLOB on SQLite; `UUID` on PostgreSQL.
     #[cfg(feature = "uuid")]
     Uuid(uuid::Uuid),
+    /// An [`Encrypted`](super::Encrypted) field's value, sealed with the
+    /// database's key when the statement runs (text in the column).
+    Encrypted(super::encrypted::Unsealed),
 }
 
 impl DbValue {
@@ -45,6 +48,7 @@ impl DbValue {
             DbValue::Json(v) => v.clone(),
             #[cfg(feature = "uuid")]
             DbValue::Uuid(v) => Value::from(v.to_string()),
+            DbValue::Encrypted(_) => Value::from("[encrypted]"),
         }
     }
 

@@ -67,6 +67,10 @@ rnx make:middleware StampRequests                      # also make:component
   `uuid` feature) or `String`. ULIDs and UUIDs are made on insert; a `String` key must be set,
   and a new row goes in with `Model::insert`/`create` (`save` on a set key updates, or 404s).
   Generic helpers over models that need a number write `M: Model<Key = i64>`.
+- Secrets in a table (API keys, id numbers): a field of type `renox::db::Encrypted<String>`
+  (sealed with `APP_KEY`, read as plain), not `state.encrypt` by hand. It can't be searched;
+  changing `APP_KEY` makes it unreadable. `tx.savepoint(|tx| Box::pin(async move { … }))`
+  undoes only its own part of a transaction on `Err`.
 - Model hooks (`#[model(hooks)]`) run on `save`, `save_only`, `save_changes` and `delete`, never
   on bulk `Query::update` / `delete`, `insert_many` or `upsert`.
 - Scheduled task names must be unique (a duplicate is a boot error); `rnx schedule:list` shows

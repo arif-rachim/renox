@@ -4,6 +4,7 @@
 pub mod model;
 
 use renox::Toast;
+use renox::db::Encrypted;
 use renox::prelude::*;
 use renox::validation::FormContext;
 use serde::Deserialize;
@@ -147,10 +148,7 @@ async fn settings(
         .await?
         .remove(&team.id)
         .unwrap_or_default();
-    let secret = match &row.webhook_secret {
-        Some(sealed) => Some(model::mask(&state.decrypt(sealed)?)),
-        None => None,
-    };
+    let secret = row.webhook_secret.as_deref().map(|s| model::mask(s));
     let manage = user.can("manage", &team);
     Ok(view(
         "teams/settings.html",
@@ -187,10 +185,8 @@ async fn show_secret(
 ) -> Result<View> {
     user.authorize("manage", &team)?;
     let row = Team::find_or_404(&state.db, team.id).await?;
-    let secret = match &row.webhook_secret {
-        Some(sealed) => Some(state.decrypt(sealed)?), // Err if tampered with
-        None => None,
-    };
+    // Opened when the row was read (an error if the column was tampered with).
+    let secret = row.webhook_secret.map(Encrypted::into_inner);
     Ok(view("teams/secret.html", context! { secret }))
 }
 
@@ -202,7 +198,7 @@ async fn rotate_secret(
 ) -> Result<(Toast, Redirect)> {
     user.authorize("manage", &team)?;
     let mut row = Team::find_or_404(&state.db, team.id).await?;
-    row.webhook_secret = Some(state.encrypt(&model::new_secret()));
+    row.webhook_secret = Some(Encrypted::new(model::new_secret()));
     row.save_only(&state.db, &["webhook_secret"]).await?;
     Ok((
         Toast::success("A new secret was made. Update your webhook sender."),

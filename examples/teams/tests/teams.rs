@@ -421,7 +421,12 @@ async fn the_secret_is_encrypted_and_needs_the_password() {
         .scalar(w.app.db())
         .await
         .unwrap();
-    let secret = w.app.state().decrypt(&stored).unwrap();
+    let secret = Team::find_or_404(w.app.db(), w.acme.id)
+        .await
+        .unwrap()
+        .webhook_secret
+        .unwrap()
+        .into_inner();
     assert!(secret.starts_with("whsec_"), "{secret}");
     assert!(!stored.contains(&secret), "the column holds ciphertext");
     assert!(!stored.starts_with("whsec_"));

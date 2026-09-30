@@ -157,7 +157,8 @@ sent, so signatures can be checked again.
 **Files.** Uploads live in `STORAGE_PATH/app` (or the S3 bucket). Back that directory up too.
 
 **Keys.** Keep `.env`'s `APP_KEY` with the backups. Without it, sessions end and signed links
-stop working. Values the app sealed with `state.encrypt`, and queued jobs with encrypted
+stop working. `Encrypted<T>` model fields, values the app sealed with `state.encrypt`, and
+queued jobs with encrypted
 payloads (`const ENCRYPTED`), can't be read any more: that data is lost unless you still have
 the old key. Rotating the key has the same effect, so decrypt and
 re-encrypt such values with the new key before switching.

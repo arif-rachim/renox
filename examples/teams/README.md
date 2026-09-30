@@ -58,7 +58,8 @@ Globex, Carol is a member of Acme. With `SUPER_ADMINS` set, Alice also sees `/ad
 - **Super-admins in one place.** `gate_before` answers `Some(true)` for the emails in
   `SUPER_ADMINS`, which passes `require_gate("admin")`, `user.authorize("manage", &team)` and
   `can('admin')` in views. Everyone else gets `None` and the normal check.
-- **Secrets at rest.** `state.encrypt` seals the webhook secret (AES-256-GCM under `APP_KEY`);
+- **Secrets at rest.** `webhook_secret: Option<Encrypted<String>>` is stored sealed (AES-256-GCM
+  under `APP_KEY`) and read as the plain secret, with no `encrypt`/`decrypt` calls in handlers;
   the settings page shows only its last characters, and `/team/secret` asks for the password
   again (`.require_password_confirmed()`) before showing it or making a new one.
 - **The current team in every view** with `App::share("team", …)`: `{% if team %}{{ team.name }}`.

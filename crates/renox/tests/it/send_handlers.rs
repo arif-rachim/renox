@@ -414,6 +414,37 @@ async fn keyed(State(db): State<Db>) -> Result<String> {
     ))
 }
 
+/// M23: a savepoint (a closure) and an `Encrypted` field in a routed handler.
+#[derive(Model, serde::Serialize, Default, Clone)]
+#[model(table = "vaults")]
+struct Vault {
+    id: i64,
+    secret: renox::db::Encrypted<String>,
+}
+
+async fn sealed(State(db): State<Db>) -> Result<String> {
+    let label = String::from("borrowed");
+    let mut tx = db.begin().await?;
+    let inner = tx
+        .savepoint(|tx| {
+            Box::pin(async move {
+                let vault = Vault::create(
+                    &mut *tx,
+                    Vault {
+                        secret: renox::db::Encrypted::new("s3cret".into()),
+                        ..Default::default()
+                    },
+                )
+                .await?;
+                Ok(vault.id)
+            })
+        })
+        .await?;
+    tx.commit().await?;
+    let vault = Vault::find_or_404(&db, inner).await?;
+    Ok(format!("{label} {}", *vault.secret))
+}
+
 struct Handlers;
 
 impl Module for Handlers {
@@ -433,6 +464,7 @@ impl Module for Handlers {
             .get("/background", background)
             .get("/polish", polish)
             .get("/keyed", keyed)
+            .get("/sealed", sealed)
     }
 }
 
@@ -450,6 +482,7 @@ async fn data_apis_work_in_routed_handlers() {
         format!("CREATE TABLE tags (id {id}, note_id BIGINT, name TEXT NOT NULL)"),
         "CREATE TABLE note_tags (note_id BIGINT NOT NULL, tag_id BIGINT NOT NULL)".into(),
         "CREATE TABLE docs (id TEXT PRIMARY KEY, title TEXT NOT NULL)".into(),
+        format!("CREATE TABLE vaults (id {id}, secret TEXT NOT NULL)"),
         format!("CREATE TABLE pages (id {id}, doc_id TEXT NOT NULL)"),
         "CREATE TABLE doc_tags (doc_id TEXT NOT NULL, tag_id BIGINT NOT NULL)".into(),
         "INSERT INTO notes (body) VALUES ('x')".into(),
@@ -474,4 +507,8 @@ async fn data_apis_work_in_routed_handlers() {
         .await
         .assert_ok()
         .assert_see("1 1 1 1 1 1 1 1");
+    app.get("/sealed")
+        .await
+        .assert_ok()
+        .assert_see("borrowed s3cret");
 }
