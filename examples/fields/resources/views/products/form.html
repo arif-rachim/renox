@@ -7,7 +7,7 @@
 
 {% block content %}
 <h1>{{ "Edit " ~ product.name if product else "New product" }}</h1>
-<form method="post" action="{{ route('products.update', product.public_id) if product else route('products.store') }}">
+<form method="post" action="{{ route('products.update', product.id) if product else route('products.store') }}">
   {{ csrf_field() }}{% if product %}{{ method_field('PUT') }}{% endif %}
 
   <label>Name <input name="name" value="{{ value('name') }}"></label>

@@ -28,24 +28,26 @@
 //! ```
 
 use std::collections::HashMap;
+use std::marker::PhantomData;
 
-use super::{Db, Executor, Model, Query, quote, sql};
+use super::{Db, Executor, Model, ModelKey, Query, ToDbValue, quote, sql};
 use crate::Result;
 
-/// A foreign key's value: `i64`, or `Option<i64>` for an optional relation.
-pub trait ForeignKey {
-    fn key(&self) -> Option<i64>;
+/// A foreign key's value for a parent keyed by `K`: the key itself (`i64`,
+/// a `Ulid`…), or an `Option` of it for an optional relation.
+pub trait ForeignKey<K> {
+    fn key(self) -> Option<K>;
 }
 
-impl ForeignKey for i64 {
-    fn key(&self) -> Option<i64> {
-        Some(*self)
+impl<K: ModelKey> ForeignKey<K> for K {
+    fn key(self) -> Option<K> {
+        Some(self)
     }
 }
 
-impl ForeignKey for Option<i64> {
-    fn key(&self) -> Option<i64> {
-        *self
+impl<K: ModelKey> ForeignKey<K> for Option<K> {
+    fn key(self) -> Option<K> {
+        self
     }
 }
 
@@ -57,12 +59,12 @@ impl ForeignKey for Option<i64> {
 // future holds no closure or borrowed children. Holding a `Fn(&C)` across an
 // `.await` makes the handler's future fail axum's `Send` check (rustc issue
 // #100013), and so do the other loaders below.
-pub fn belongs_to<'a, P: Model, C, K: ForeignKey>(
+pub fn belongs_to<'a, P: Model, C, K: ForeignKey<P::Key>>(
     db: &'a Db,
     children: &[C],
     foreign_key: impl Fn(&C) -> K,
-) -> impl Future<Output = Result<HashMap<i64, P>>> + Send + 'a {
-    let mut ids: Vec<i64> = children
+) -> impl Future<Output = Result<HashMap<P::Key, P>>> + Send + 'a {
+    let mut ids: Vec<P::Key> = children
         .iter()
         .filter_map(|c| foreign_key(c).key())
         .collect();
@@ -84,17 +86,17 @@ pub fn belongs_to<'a, P: Model, C, K: ForeignKey>(
 /// parent's id, in one query. `children` is the query to start from, for
 /// order and filters (`OrderItem::query()` for all); `column` is the
 /// children's foreign key column and `foreign_key` reads it.
-pub fn has_many<'a, C: Model, P: Model, K: ForeignKey>(
+pub fn has_many<'a, C: Model, P: Model, K: ForeignKey<P::Key>>(
     db: &'a Db,
     parents: &[P],
     children: Query<C>,
     column: &str,
     foreign_key: impl Fn(&C) -> K + Send + 'a,
-) -> impl Future<Output = Result<HashMap<i64, Vec<C>>>> + Send + 'a {
-    let ids: Vec<i64> = parents.iter().map(Model::id).collect();
+) -> impl Future<Output = Result<HashMap<P::Key, Vec<C>>>> + Send + 'a {
+    let ids: Vec<P::Key> = parents.iter().map(Model::id).collect();
     let query = (!ids.is_empty()).then(|| children.where_in(column, ids));
     async move {
-        let mut grouped: HashMap<i64, Vec<C>> = HashMap::new();
+        let mut grouped: HashMap<P::Key, Vec<C>> = HashMap::new();
         let Some(query) = query else {
             return Ok(grouped);
         };
@@ -128,7 +130,7 @@ pub fn count_many<'a, C: Model, P: Model>(
     parents: &[P],
     children: Query<C>,
     column: &str,
-) -> impl Future<Output = Result<HashMap<i64, i64>>> + Send + 'a {
+) -> impl Future<Output = Result<HashMap<P::Key, i64>>> + Send + 'a {
     grouped(db, parents, children, column, "COUNT(*)".to_owned())
 }
 
@@ -140,7 +142,7 @@ pub fn sum_many<'a, T: super::Number + Default + Send + 'a, C: Model, P: Model>(
     children: Query<C>,
     column: &str,
     sum_column: &str,
-) -> impl Future<Output = Result<HashMap<i64, T>>> + Send + 'a {
+) -> impl Future<Output = Result<HashMap<P::Key, T>>> + Send + 'a {
     let expression = if C::COLUMNS.contains(&sum_column) {
         format!(
             "CAST(COALESCE(SUM({}), 0) AS {})",
@@ -161,15 +163,16 @@ fn grouped<'a, T: crate::db::FromDb + Default + Send + 'a, C: Model, P: Model>(
     children: Query<C>,
     column: &str,
     expression: String,
-) -> impl Future<Output = Result<HashMap<i64, T>>> + Send + 'a {
-    let ids: Vec<i64> = parents.iter().map(Model::id).collect();
+) -> impl Future<Output = Result<HashMap<P::Key, T>>> + Send + 'a {
+    let ids: Vec<P::Key> = parents.iter().map(Model::id).collect();
     let column = column.to_owned();
     async move {
-        let mut totals: HashMap<i64, T> = ids.iter().map(|id| (*id, T::default())).collect();
+        let mut totals: HashMap<P::Key, T> =
+            ids.iter().map(|id| (id.clone(), T::default())).collect();
         if ids.is_empty() {
             return Ok(totals);
         }
-        let rows: Vec<(i64, T)> = children
+        let rows: Vec<(P::Key, T)> = children
             .where_in(&column, ids)
             .group_by(&column)
             .select_as(db, &format!("{}, {expression}", quote(&column)))
@@ -184,24 +187,47 @@ fn grouped<'a, T: crate::db::FromDb + Default + Send + 'a, C: Model, P: Model>(
 /// unique index on both columns. The table may have more columns (a role, a
 /// quantity): set them with [`Pivot::attach_with`] and
 /// [`Pivot::update_pivot`], read them with [`Pivot::load_with_pivot`].
-#[derive(Debug, Clone, Copy)]
-pub struct Pivot {
+///
+/// `L` and `R` are the key types of the two sides, `i64` unless given:
+/// `const TAGS: Pivot<Ulid, i64> = Pivot::new("invoice_tags", "invoice_id", "tag_id");`
+pub struct Pivot<L = i64, R = i64> {
     table: &'static str,
     left: &'static str,
     right: &'static str,
     timestamps: bool,
+    keys: PhantomData<fn() -> (L, R)>,
+}
+
+impl<L, R> Clone for Pivot<L, R> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<L, R> Copy for Pivot<L, R> {}
+
+impl<L, R> std::fmt::Debug for Pivot<L, R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Pivot")
+            .field("table", &self.table)
+            .field("left", &self.left)
+            .field("right", &self.right)
+            .field("timestamps", &self.timestamps)
+            .finish()
+    }
 }
 
 /// Extra pivot columns and their values, e.g. `&[("role", &"admin")]`.
 pub type PivotData<'a> = &'a [(&'a str, &'a (dyn super::ToDbValue + Sync))];
 
-impl Pivot {
+impl<L, R> Pivot<L, R> {
     pub const fn new(table: &'static str, left: &'static str, right: &'static str) -> Self {
         Self {
             table,
             left,
             right,
             timestamps: false,
+            keys: PhantomData,
         }
     }
 
@@ -213,29 +239,29 @@ impl Pivot {
     }
 
     /// The same pivot seen from the other side (`tag_id` → `product_id`).
-    pub const fn inverse(self) -> Self {
-        Self {
+    pub const fn inverse(self) -> Pivot<R, L> {
+        Pivot {
             table: self.table,
             left: self.right,
             right: self.left,
             timestamps: self.timestamps,
+            keys: PhantomData,
         }
     }
+}
 
+impl<L: ModelKey, R: ModelKey> Pivot<L, R> {
     /// Links `left` to `right` unless they're linked already; returns
     /// whether a link was added.
     async fn insert_link(
         &self,
         conn: &mut super::Conn<'_>,
-        left: i64,
-        right: i64,
+        left: &L,
+        right: &R,
         data: PivotData<'_>,
     ) -> Result<bool> {
         let mut columns = vec![quote(self.left), quote(self.right)];
-        let mut values = vec![
-            super::DbValue::Integer(left),
-            super::DbValue::Integer(right),
-        ];
+        let mut values = vec![left.to_db_value(), right.to_db_value()];
         for (column, value) in data {
             columns.push(quote(column));
             values.push(value.to_db_value());
@@ -255,15 +281,15 @@ impl Pivot {
             r = quote(self.right),
         ))
         .bind_all(values)
-        .bind(left)
-        .bind(right)
+        .bind(left.to_db_value())
+        .bind(right.to_db_value())
         .execute(conn.reborrow())
         .await?;
         Ok(added > 0)
     }
 
     /// The right-hand ids linked to `left`.
-    pub async fn ids<'c>(&self, db: impl Executor<'c>, left: i64) -> Result<Vec<i64>> {
+    pub async fn ids<'c>(&self, db: impl Executor<'c>, left: L) -> Result<Vec<R>> {
         Ok(sql(format!(
             "SELECT {} FROM {} WHERE {} = ? ORDER BY {}",
             quote(self.right),
@@ -281,13 +307,13 @@ impl Pivot {
     pub async fn attach<'c>(
         &self,
         db: impl Executor<'c>,
-        left: i64,
-        rights: impl IntoIterator<Item = i64>,
+        left: L,
+        rights: impl IntoIterator<Item = R>,
     ) -> Result<u64> {
         let mut conn = db.into_conn();
         let mut added = 0;
         for right in rights {
-            added += u64::from(self.insert_link(&mut conn, left, right, &[]).await?);
+            added += u64::from(self.insert_link(&mut conn, &left, &right, &[]).await?);
         }
         Ok(added)
     }
@@ -308,12 +334,12 @@ impl Pivot {
     pub async fn attach_with<'c>(
         &self,
         db: impl Executor<'c>,
-        left: i64,
-        right: i64,
+        left: L,
+        right: R,
         data: PivotData<'_>,
     ) -> Result<bool> {
         let mut conn = db.into_conn();
-        self.insert_link(&mut conn, left, right, data).await
+        self.insert_link(&mut conn, &left, &right, data).await
     }
 
     /// Changes extra columns of the link between `left` and `right` (and
@@ -321,8 +347,8 @@ impl Pivot {
     pub async fn update_pivot<'c>(
         &self,
         db: impl Executor<'c>,
-        left: i64,
-        right: i64,
+        left: L,
+        right: R,
         data: PivotData<'_>,
     ) -> Result<bool> {
         let mut sets = Vec::new();
@@ -358,15 +384,16 @@ impl Pivot {
     pub async fn toggle(
         &self,
         db: &Db,
-        left: i64,
-        rights: impl IntoIterator<Item = i64>,
-    ) -> Result<(Vec<i64>, Vec<i64>)> {
+        left: L,
+        rights: impl IntoIterator<Item = R>,
+    ) -> Result<(Vec<R>, Vec<R>)> {
         let mut tx = db.begin().await?;
-        let current = self.ids(&mut tx, left).await?;
-        let (detach, attach): (Vec<i64>, Vec<i64>) =
+        let current = self.ids(&mut tx, left.clone()).await?;
+        let (detach, attach): (Vec<R>, Vec<R>) =
             rights.into_iter().partition(|id| current.contains(id));
-        self.detach(&mut tx, left, detach.iter().copied()).await?;
-        self.attach(&mut tx, left, attach.iter().copied()).await?;
+        self.detach(&mut tx, left.clone(), detach.iter().cloned())
+            .await?;
+        self.attach(&mut tx, left, attach.iter().cloned()).await?;
         tx.commit().await?;
         Ok((attach, detach))
     }
@@ -375,10 +402,10 @@ impl Pivot {
     pub async fn detach<'c>(
         &self,
         db: impl Executor<'c>,
-        left: i64,
-        rights: impl IntoIterator<Item = i64>,
+        left: L,
+        rights: impl IntoIterator<Item = R>,
     ) -> Result<u64> {
-        let rights: Vec<i64> = rights.into_iter().collect();
+        let rights: Vec<R> = rights.into_iter().collect();
         if rights.is_empty() {
             return Ok(0);
         }
@@ -390,62 +417,61 @@ impl Pivot {
             quote(self.right)
         ))
         .bind(left)
-        .bind_all(rights.into_iter().map(super::DbValue::Integer))
+        .bind_all(rights.iter().map(ToDbValue::to_db_value))
         .execute(db)
         .await?)
     }
 
     /// Makes `left` linked to exactly `rights` (e.g. the checked boxes of a
     /// form), in one transaction.
-    pub async fn sync(&self, db: &Db, left: i64, rights: impl IntoIterator<Item = i64>) -> Result {
-        let wanted: Vec<i64> = rights.into_iter().collect();
+    pub async fn sync(&self, db: &Db, left: L, rights: impl IntoIterator<Item = R>) -> Result {
+        let wanted: Vec<R> = rights.into_iter().collect();
         let mut tx = db.begin().await?;
-        let current = self.ids(&mut tx, left).await?;
-        let gone: Vec<i64> = current
-            .iter()
-            .copied()
+        let current = self.ids(&mut tx, left.clone()).await?;
+        let gone: Vec<R> = current
+            .into_iter()
             .filter(|id| !wanted.contains(id))
             .collect();
-        self.detach(&mut tx, left, gone).await?;
+        self.detach(&mut tx, left.clone(), gone).await?;
         self.attach(&mut tx, left, wanted).await?;
         tx.commit().await?;
         Ok(())
     }
 
     /// The right-hand models linked to each left id, in one query per table.
-    pub fn load<'a, T: Model + Clone>(
+    pub fn load<'a, T: Model<Key = R> + Clone>(
         &'a self,
         db: &'a Db,
-        lefts: impl IntoIterator<Item = i64>,
-    ) -> impl Future<Output = Result<HashMap<i64, Vec<T>>>> + Send + 'a {
-        let lefts: Vec<i64> = lefts.into_iter().collect();
+        lefts: impl IntoIterator<Item = L>,
+    ) -> impl Future<Output = Result<HashMap<L, Vec<T>>>> + Send + 'a {
+        let lefts: Vec<L> = lefts.into_iter().collect();
         self.load_ids(db, lefts)
     }
 
-    async fn load_ids<T: Model + Clone>(
+    async fn load_ids<T: Model<Key = R> + Clone>(
         &self,
         db: &Db,
-        lefts: Vec<i64>,
-    ) -> Result<HashMap<i64, Vec<T>>> {
-        let mut grouped: HashMap<i64, Vec<T>> = HashMap::new();
+        lefts: Vec<L>,
+    ) -> Result<HashMap<L, Vec<T>>> {
+        let mut grouped: HashMap<L, Vec<T>> = HashMap::new();
         if lefts.is_empty() {
             return Ok(grouped);
         }
         let marks = vec!["?"; lefts.len()].join(", ");
-        let links: Vec<(i64, i64)> = sql(format!(
+        let links: Vec<(L, R)> = sql(format!(
             "SELECT {}, {} FROM {} WHERE {} IN ({marks})",
             quote(self.left),
             quote(self.right),
             quote(self.table),
             quote(self.left)
         ))
-        .bind_all(lefts.into_iter().map(super::DbValue::Integer))
+        .bind_all(lefts.iter().map(ToDbValue::to_db_value))
         .fetch_as(db)
         .await?;
-        let mut rights: Vec<i64> = links.iter().map(|(_, right)| *right).collect();
+        let mut rights: Vec<R> = links.iter().map(|(_, right)| right.clone()).collect();
         rights.sort_unstable();
         rights.dedup();
-        let models: HashMap<i64, T> = T::find_many(db, rights)
+        let models: HashMap<R, T> = T::find_many(db, rights)
             .await?
             .into_iter()
             .map(|model| (model.id(), model))
@@ -475,14 +501,14 @@ impl Pivot {
     /// }
     /// # Ok(()) }
     /// ```
-    pub fn load_with_pivot<'a, T: Model + Clone, D: super::FromRow + Send + 'a>(
+    pub fn load_with_pivot<'a, T: Model<Key = R> + Clone, D: super::FromRow + Send + 'a>(
         &'a self,
         db: &'a Db,
-        lefts: impl IntoIterator<Item = i64>,
-    ) -> impl Future<Output = Result<HashMap<i64, Vec<(T, D)>>>> + Send + 'a {
-        let lefts: Vec<i64> = lefts.into_iter().collect();
+        lefts: impl IntoIterator<Item = L>,
+    ) -> impl Future<Output = Result<HashMap<L, Vec<(T, D)>>>> + Send + 'a {
+        let lefts: Vec<L> = lefts.into_iter().collect();
         async move {
-            let mut grouped: HashMap<i64, Vec<(T, D)>> = HashMap::new();
+            let mut grouped: HashMap<L, Vec<(T, D)>> = HashMap::new();
             if lefts.is_empty() {
                 return Ok(grouped);
             }
@@ -492,19 +518,19 @@ impl Pivot {
                 quote(self.table),
                 quote(self.left)
             ))
-            .bind_all(lefts.into_iter().map(super::DbValue::Integer))
+            .bind_all(lefts.iter().map(ToDbValue::to_db_value))
             .fetch_all(db)
             .await?;
             let mut links = Vec::with_capacity(rows.len());
             for row in &rows {
-                let left: i64 = row.try_get(self.left)?;
-                let right: i64 = row.try_get(self.right)?;
+                let left: L = row.try_get(self.left)?;
+                let right: R = row.try_get(self.right)?;
                 links.push((left, right, D::from_row(row)?));
             }
-            let mut rights: Vec<i64> = links.iter().map(|(_, right, _)| *right).collect();
+            let mut rights: Vec<R> = links.iter().map(|(_, right, _)| right.clone()).collect();
             rights.sort_unstable();
             rights.dedup();
-            let models: HashMap<i64, T> = T::find_many(db, rights)
+            let models: HashMap<R, T> = T::find_many(db, rights)
                 .await?
                 .into_iter()
                 .map(|model| (model.id(), model))
@@ -519,12 +545,12 @@ impl Pivot {
     }
 
     /// `load` for these parents' ids.
-    pub fn load_for<'a, T: Model + Clone, P: Model>(
+    pub fn load_for<'a, T: Model<Key = R> + Clone, P: Model<Key = L>>(
         &'a self,
         db: &'a Db,
         parents: &[P],
-    ) -> impl Future<Output = Result<HashMap<i64, Vec<T>>>> + Send + 'a {
-        let ids: Vec<i64> = parents.iter().map(Model::id).collect();
+    ) -> impl Future<Output = Result<HashMap<L, Vec<T>>>> + Send + 'a {
+        let ids: Vec<L> = parents.iter().map(Model::id).collect();
         self.load_ids(db, ids)
     }
 }
@@ -596,8 +622,8 @@ impl Morph {
         db: &'a Db,
         parents: &[P],
         children: Query<C>,
-        foreign_key: impl Fn(&C) -> i64 + Send + 'a,
-    ) -> impl Future<Output = Result<HashMap<i64, Vec<C>>>> + Send + 'a {
+        foreign_key: impl Fn(&C) -> P::Key + Send + 'a,
+    ) -> impl Future<Output = Result<HashMap<P::Key, Vec<C>>>> + Send + 'a {
         let children = children.where_eq(self.type_column, P::TABLE);
         has_many(db, parents, children, self.id_column, foreign_key)
     }
@@ -609,7 +635,7 @@ impl Morph {
         db: &'a Db,
         parents: &[P],
         children: Query<C>,
-    ) -> impl Future<Output = Result<HashMap<i64, i64>>> + Send + 'a {
+    ) -> impl Future<Output = Result<HashMap<P::Key, i64>>> + Send + 'a {
         let children = children.where_eq(self.type_column, P::TABLE);
         count_many(db, parents, children, self.id_column)
     }
@@ -621,9 +647,9 @@ impl Morph {
         &self,
         db: &'a Db,
         children: &[C],
-        parent: impl Fn(&C) -> (String, i64),
-    ) -> impl Future<Output = Result<HashMap<i64, P>>> + Send + 'a {
-        let mut ids: Vec<i64> = children
+        parent: impl Fn(&C) -> (String, P::Key),
+    ) -> impl Future<Output = Result<HashMap<P::Key, P>>> + Send + 'a {
+        let mut ids: Vec<P::Key> = children
             .iter()
             .filter_map(|child| {
                 let (kind, id) = parent(child);

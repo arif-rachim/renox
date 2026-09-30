@@ -4,8 +4,8 @@
 use renox::chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use renox::db::Json;
 use renox::prelude::*;
+use renox::uuid::Uuid;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 /// A `<select>`, stored as text (`small`, `medium`, `large`).
 #[derive(DbEnum, Debug, Clone, Copy, PartialEq, Default)]
@@ -21,9 +21,9 @@ pub const COLORS: &[&str] = &["black", "white", "red", "green"];
 #[derive(Model, Serialize, Default, Debug, Clone, PartialEq)]
 #[model(table = "products")]
 pub struct Product {
-    pub id: i64,
-    /// Safe to show in URLs, unlike the sequential id (renox's `uuid` feature).
-    pub public_id: Uuid,
+    /// The key: a UUID v7 made on insert (renox's `uuid` feature). Safe to
+    /// show in URLs, unlike a sequential number.
+    pub id: Uuid,
     pub name: String,
     pub description: Option<String>,
     pub stock: i64,
@@ -102,9 +102,9 @@ impl Module for Products {
             .name("products.create")
             .post("/products", store)
             .name("products.store")
-            .get("/products/{public_id}/edit", edit)
+            .get("/products/{id}/edit", edit)
             .name("products.edit")
-            .put("/products/{public_id}", update)
+            .put("/products/{id}", update)
             .name("products.update")
     }
 }
@@ -114,13 +114,6 @@ fn form_view(product: Option<&Product>) -> View {
         "products/form.html",
         context! { product, sizes => Size::ALL, colors => COLORS },
     )
-}
-
-async fn find(db: &Db, public_id: Uuid) -> Result<Product> {
-    Product::where_eq("public_id", public_id)
-        .first(db)
-        .await?
-        .ok_or(Error::NotFound)
 }
 
 async fn index(State(db): State<Db>) -> Result<View> {
@@ -133,31 +126,25 @@ async fn create() -> View {
 }
 
 async fn store(State(db): State<Db>, Valid(form): Valid<ProductForm>) -> Result<Redirect> {
-    let mut product = Product {
-        public_id: Uuid::new_v4(),
-        ..Default::default()
-    };
+    let mut product = Product::default(); // the nil UUID: not saved yet
     form.apply(&mut product);
     let product = Product::create(&db, product).await?;
-    Ok(Redirect::to(&format!(
-        "/products/{}/edit",
-        product.public_id
-    )))
+    Ok(Redirect::to(&format!("/products/{}/edit", product.id)))
 }
 
-async fn edit(State(db): State<Db>, Path(public_id): Path<Uuid>) -> Result<View> {
-    Ok(form_view(Some(&find(&db, public_id).await?)))
+async fn edit(State(db): State<Db>, Path(id): Path<Uuid>) -> Result<View> {
+    Ok(form_view(Some(&Product::find_or_404(&db, id).await?)))
 }
 
 async fn update(
     State(db): State<Db>,
     session: Session,
-    Path(public_id): Path<Uuid>,
+    Path(id): Path<Uuid>,
     Valid(form): Valid<ProductForm>,
 ) -> Result<Redirect> {
-    let mut product = find(&db, public_id).await?;
+    let mut product = Product::find_or_404(&db, id).await?;
     form.apply(&mut product);
     product.save(&db).await?;
     session.flash("status", "Saved.")?;
-    Ok(Redirect::to(&format!("/products/{public_id}/edit")))
+    Ok(Redirect::to(&format!("/products/{id}/edit")))
 }

@@ -102,12 +102,18 @@ In the template, `{{ card.category.name }}` and `{% for tag in card.tags %}` rea
 Each loader takes the page's rows, so it works the same for `get()`, `paginate()` and `chunk()`.
 
 - `belongs_to::<Parent, _, _>(db, &children, |child| child.parent_id)` returns a
-  `HashMap<parent id, Parent>`. The key may be `i64` or `Option<i64>`.
+  `HashMap<parent id, Parent>`. The closure returns the parent's key or an `Option` of it:
+  `i64`, or a `Ulid`, `Uuid` or `String` for parents keyed that way (`.clone()` those).
 - `has_many(db, &parents, Child::query()…, "parent_id", |child| child.parent_id)` returns a
   `HashMap<parent id, Vec<Child>>`. The query sets the children's order and filters.
 - `Pivot::load_for::<Target, _>(db, &parents)` / `load(db, ids)` returns a
   `HashMap<parent id, Vec<Target>>`. `Pivot::inverse()` gives the other direction.
 - `Model::find_many(db, ids)` returns the rows with these ids.
+
+The maps are keyed by the parent's key type (`Model::Key`). A pivot between models with other
+keys names them, left then right: `Pivot<Ulid, i64>`; `Pivot` alone is `Pivot<i64, i64>`.
+A polymorphic relation's id column holds the parents' key, so every parent type of one `Morph`
+needs the same key type.
 
 ## Changing a many-to-many
 

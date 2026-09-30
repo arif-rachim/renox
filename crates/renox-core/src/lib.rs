@@ -106,3 +106,7 @@ pub use serde_json;
 pub use sqlx as __sqlx;
 /// CORS configuration for `Routes::cors_layer`.
 pub use tower_http::cors;
+/// `uuid`, for `Uuid` model keys and fields (the `uuid` feature):
+/// `renox::uuid::Uuid`.
+#[cfg(feature = "uuid")]
+pub use uuid;

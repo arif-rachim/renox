@@ -13,7 +13,7 @@ rnx serve                            # run, rebuild and reload on changes
 rnx make:module products             # routes + view, registered in src/lib.rs
 rnx make:module products --resource --fields "name:string price:money notes:text active:bool due_on:date"
                                      # model, migration, factory, form, 7 handlers, UI-kit views, tests
-rnx make:model Product --module products --migration
+rnx make:model Product --module products --migration   # --key ulid|uuid|string for other ids
 rnx make:migration add_sku_to_products
 rnx make:policy Product --module products
 rnx make:job SendReceipt --module products
@@ -475,6 +475,44 @@ async fn more_queries(db: &Db) -> Result {
     Ok(())
 }
 ```
+
+Keys other than numbers: the `id` field's type is the key (`rnx make:model Invoice --key ulid
+-m` writes both). `Ulid` and `Uuid` (renox's `uuid` feature, a v7) are made on insert; a `String`
+key is yours to set, so a new row goes in with `insert`/`create` (`save` updates a set key).
+Relations and pivots follow the key type.
+
+```sql
+CREATE TABLE invoices (id TEXT PRIMARY KEY, number TEXT NOT NULL, total INTEGER NOT NULL);
+-- Uuid: id BLOB PRIMARY KEY (SQLite), id UUID PRIMARY KEY (PostgreSQL)
+CREATE TABLE invoice_tags (invoice_id TEXT NOT NULL, tag_id INTEGER NOT NULL, UNIQUE (invoice_id, tag_id));
+```
+
+```rust
+use renox::db::Ulid;
+use renox::db::relations::Pivot;
+use renox::prelude::*;
+
+#[derive(Model, serde::Serialize, Default, Clone)]
+#[model(table = "invoices")]
+struct Invoice {
+    id: Ulid, // Ulid::default() = not saved yet; `01J9Z3…` once saved
+    number: String,
+    total: i64,
+}
+
+const INVOICE_TAGS: Pivot<Ulid, i64> = Pivot::new("invoice_tags", "invoice_id", "tag_id");
+
+async fn show(State(db): State<Db>, Path(id): Path<Ulid>) -> Result<Json<Invoice>> {
+    // A malformed ULID in the path is a 404, like a missing row.
+    Ok(Json(Invoice::find_or_404(&db, id).await?))
+}
+
+async fn tag(db: &Db, invoice: &Invoice) -> Result {
+    INVOICE_TAGS.sync(db, invoice.id.clone(), [1, 2]).await
+}
+```
+
+Generic code over models names the key when it needs one: `fn like<P: Model<Key = i64>>(p: &P)`.
 
 Relations are explicit: a method for one related row, and loaders for a page of rows
 (`relations::belongs_to`, `has_many`, `Pivot` for many-to-many, `count_many`/`sum_many` for

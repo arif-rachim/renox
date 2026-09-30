@@ -937,21 +937,19 @@ impl<M: Model> Query<M> {
         F: FnMut(Vec<M>) -> Fut,
         Fut: std::future::Future<Output = Result>,
     {
-        let mut last = 0_i64;
+        let mut last: Option<M::Key> = None;
         let mut seen = 0_u64;
         loop {
             let mut page = self.clone();
             page.order.clear();
             page.limit = None;
             page.offset = None;
-            let rows = page
-                .where_op("id", ">", last)
-                .order_by("id")
-                .limit(size.max(1))
-                .get(db)
-                .await?;
+            if let Some(last) = last.take() {
+                page = page.where_op("id", ">", last);
+            }
+            let rows = page.order_by("id").limit(size.max(1)).get(db).await?;
             let Some(tail) = rows.last() else { break };
-            last = tail.id();
+            last = Some(tail.id());
             let full = rows.len() as u64 == size.max(1);
             seen += rows.len() as u64;
             each(rows).await?;
@@ -1043,6 +1041,8 @@ impl<M: Model> Query<M> {
     /// The `per_page` newest rows after `cursor` (by id; the query's own
     /// order doesn't apply), for APIs and infinite scroll on big tables:
     /// unlike page numbers, rows added meanwhile don't shift the pages.
+    /// "Newest" is the key's order: creation order for `i64`, ULIDs and
+    /// UUID v7s; a `String` key pages in text order.
     ///
     /// ```
     /// # use renox::prelude::*;
@@ -1062,7 +1062,7 @@ impl<M: Model> Query<M> {
     ) -> Result<CursorPage<M>> {
         let per_page = per_page.clamp(1, 1000);
         if let Some(cursor) = cursor {
-            let Ok(after) = cursor.parse::<i64>() else {
+            let Ok(after) = cursor.parse::<M::Key>() else {
                 return Err(crate::Error::BadRequest("invalid cursor".into()));
             };
             self = self.where_op("id", "<", after);

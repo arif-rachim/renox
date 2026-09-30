@@ -277,7 +277,9 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
   files are picked up (`rnx new` writes it).
 - **Models:** `#[derive(Model)]` generates `impl ::renox::db::Model` (and `FromRow`) using
   `::renox::…` paths; values go through `DbValue`/`ToDbValue`, rows decode via `Row::try_get`, so
-  apps don't need sqlx directly. Primary key is always `id: i64`, `0` = unsaved. Table name =
+  apps don't need sqlx directly. The primary key column is always `id`; its type is the key
+  (`Model::Key`, sealed `ModelKey`: `i64`, `Ulid`, `Uuid`, `String`, M22); an empty key (`0`,
+  nil, `""`) = unsaved, ULIDs/UUID v7s are made on insert. Table name =
   snake_case struct name (no pluralisation; Indonesian names don't pluralise with "s"). The query
   builder validates column names against `COLUMNS` and operators against a whitelist, so SQL
   injection via names is an error.
@@ -830,8 +832,13 @@ picks the build, not the terminal.
   travelling: in-memory rate limits and the login lock used `Instant` (now `clock::Stamp`), and
   `TestApp`'s session helpers read the cookie on the real clock (now the travelled one, via
   `clock::with_offset_sync`). Anything timed in memory must use `clock`, not `Instant`.
-- **After M21, small fixes** (`fix-favicon`): `/favicon.ico` answers 204 unless the app ships
-  one (every example logged a 404 console error when run in a browser).
+- **After M21, small fixes:** `/favicon.ico` answers 204 unless the app ships one (#67; every
+  example logged a 404 console error when run in a browser); the workspace dev profile uses
+  `debug = "line-tables-only"` (#68, after two OOM kills during workspace builds).
+- **M22** (model keys: `Model::Key` from the `id` field's type, `Ulid`, `Model::insert`,
+  relations generic over keys, `Pivot<L, R>`, `make:model --key`, examples/fields on `Uuid`):
+  branch `m22-model-keys`. Generic code over models that needs an integer id says
+  `M: Model<Key = i64>`.
 - **M21 is complete.** Next is the owner's call; **v1.0 is on hold** until the owner says to
   start it (docs site, starter kit, semver checks, real crates.io releases; the owner runs
   `cargo login`). Small M21 items that weren't built are listed in ROADMAP ("Deferred from

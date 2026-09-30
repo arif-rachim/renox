@@ -1,6 +1,5 @@
 CREATE TABLE products (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    public_id BLOB NOT NULL UNIQUE,
+    id BLOB PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
     stock INTEGER NOT NULL,

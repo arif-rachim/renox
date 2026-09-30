@@ -668,8 +668,8 @@ Notes from M18b (accounts and security):
 - [x] Aggregate loaders: `relations::count_many`, `sum_many` (one GROUP BY; "has any" is a
       count above zero, or `where_has` to filter)
 - [x] `where_has` / `where_doesnt_have` (EXISTS), `where_not_in_query`
-- [ ] Non-integer keys: `#[model(key = "uuid")]` (UUID/ULID/string), loaders generic over the key
-      (deferred, see the notes from M19b)
+- [x] Non-integer keys (M22): the `id` field's type is the key (`i64`, `Ulid`, `Uuid`, `String`),
+      loaders generic over it
 - [x] Model hooks: `saving`/`saved`/`deleting`/`deleted` trait methods called by `save`/`delete`
 - [x] Partial saves: `save_only(&["price"])` and change tracking against the loaded row
 - [x] Pivot data and timestamps (`attach_with`, `load_with_pivot::<T, PivotRow>`); polymorphic
@@ -710,7 +710,8 @@ Notes from M19b (model features):
   `HashMap<i64, _>`, `ForeignKey`, route model lookups and the `User` model all assume an
   integer id, and 0 means "not saved". A key type parameter would touch every one and every
   app's code; it wants its own milestone with a migration guide. Until then a UUID column with a
-  unique index next to the integer id (`where_eq("uuid", …)`) covers public ids.
+  unique index next to the integer id (`where_eq("uuid", …)`) covers public ids. (Done in
+  M22, with the key type read from the `id` field.)
 - **Deferred: `Encrypted<T>`.** Encoding a field needs the key, and sqlx's `Encode`/`Decode`
   get no context; reading it from `renox::context` would make `save` fail (or store plain text)
   in code without an app context, such as tests and seeders. `state.encrypt`/`decrypt` cover
@@ -1065,6 +1066,43 @@ Notes from M21i (the examples' tests, hello's command, the stubs):
   clock while the server read it on the moved one, so any form post after travelling past
   `SESSION_LIFETIME` got a 419; they now run on the travelled clock too.
 
+### M22 · Model keys other than integers
+The one pre-1.0 change the owner picked from the open items: it changes `Model`'s API, so it
+comes before 1.0; savepoints and `Encrypted<T>` only add and can wait.
+- [x] `Model::Key` (the `id` field's type, `ModelKey`: `i64`, `renox::db::Ulid`, `uuid::Uuid`
+      with the `uuid` feature, `String`); `id()`/`set_id`/`find`/`find_many`/`find_or_404` use it
+- [x] `Ulid`: 26-character Crockford text, monotonic within a millisecond, serde as text, a 404
+      from `Path<Ulid>` when malformed; `Uuid` keys are v7 (time-ordered)
+- [x] `Model::insert` (always an INSERT, with a set key or a new one); `create` inserts;
+      `save` inserts when the key is unsaved, else updates (a `String` key must be set)
+- [x] Relations generic over keys: `belongs_to`, `has_many`, `count_many`, `sum_many`,
+      `ForeignKey<K>`, `Pivot<L = i64, R = i64>`, `Morph` (the parents' key)
+- [x] `chunk` and `cursor_paginate` by any key; `renox::uuid` re-exported
+- [x] `rnx make:model … --key integer|ulid|uuid|string` (model and migration)
+- [x] examples/fields keys products by `Uuid` (its `public_id` workaround is gone)
+
+Notes from M22:
+- The ROADMAP asked for `#[model(key = "uuid")]`. Reading the key from the `id` field's type
+  needs no attribute and can't disagree with the field; the column name stays `id`.
+- Existing code keeps compiling: `id: i64` models, `Pivot` constants (`Pivot<i64, i64>` by
+  default, so `sync(&db, id, [1, 2])` still infers `i64`), and the loaders. What breaks is
+  generic code over models that assumed an `i64` id: add `M: Model<Key = i64>` (one change in
+  examples/relations). `find(db, id)` takes `Self::Key`, not `impl Into<Self::Key>`: the
+  latter broke inference for `find(db, row.try_get("user_id")?)` (in Renox's own tokens.rs).
+- `create` now always inserts, so `Tag::create(db, Tag { id: 42, … })` keeps id 42 instead of
+  updating row 42. `save` of a set key that isn't in the table is still a 404, never a silent
+  insert: a `String`-keyed row goes in with `insert`/`create`.
+- `ModelKey` is sealed (like `db::Number`), so it may grow without breaking apps; its
+  `#[diagnostic::on_unimplemented]` note lists the key types when an `id` is an `f64`.
+- ULIDs are made by Renox (no new dependency): 48-bit milliseconds from `clock` (so
+  `TestApp::travel` reaches them) and 80 random bits, incremented within a millisecond so a
+  process's ULIDs sort in order; `chunk`/`cursor_paginate` rely on that order.
+- Not changed: `User` keeps `i64` ids; `audit_logs.subject_id`, `notifications` and
+  `personal_access_tokens` refer to users or integer subjects (`audit::record` takes an `i64`).
+  Audit subjects with other keys would need a text column; not asked for yet.
+- The workspace dev profile uses `debug = "line-tables-only"` since this milestone (separate
+  PR): full debug info ran a 15 GB machine out of memory during workspace builds.
+
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`
       (resource tables and forms); billing later
@@ -1110,6 +1148,10 @@ On hold until the owner starts it; M18–M21 come first.
   app binary runs them; `rnx` forwards to it.
 - **Models:** values are bound through `DbValue`/`ToDbValue` and rows decoded with sqlx, so the
   derive only needs `renox` as a dependency.
+- **Model keys (M22):** the key is the `id` field's type, `Model::Key` (sealed `ModelKey`: `i64`,
+  `Ulid`, `Uuid`, `String`), not an attribute: the type is already written, and the compiler
+  checks it. The column is always `id`. An empty key (`0`, nil, `""`) means "not saved";
+  ULIDs and UUID v7s are made in Rust on insert, so the row's key is known before the write.
 - **Databases:** SQLite first (one file, no server, WAL; enough for one server). PostgreSQL (M9) is
   an opt-in `postgres` feature with the same `Db` API; one app uses one database, picked from
   `DATABASE_URL`. sqlx's `Any` driver was not chosen as the plan because

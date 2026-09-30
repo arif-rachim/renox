@@ -34,8 +34,11 @@ package already enables renox's `postgres` and `uuid` features.
 - **A checkbox is a `bool`.** Checked sends `on`; unchecked sends nothing, which becomes `false`.
 - **Empty inputs become `None`.** `Option<String>`, `Option<NaiveTime>`, `Option<NaiveDateTime>`
   and `Option<NaiveDate>` are `None` when the input is left empty.
-- **UUIDs in URLs.** Pages use `public_id: Uuid`, not the sequential `id`
-  (`/products/{public_id}/edit`).
+- **A UUID key.** `id: Uuid` makes the product's key a UUID v7, made on insert (the nil
+  UUID of `Product::default()` means "not saved yet"). URLs show it
+  (`/products/{id}/edit`) without revealing how many products there are, and
+  `Product::find_or_404(&db, id)` takes it from `Path<Uuid>`. The column is `BLOB PRIMARY KEY`
+  on SQLite and `UUID PRIMARY KEY` on PostgreSQL. `renox::uuid::Uuid` is renox's re-export.
 
 ## Tests
 

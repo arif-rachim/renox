@@ -45,7 +45,7 @@ async fn a_product_round_trips_from_the_form_to_the_database_and_back() {
             .and_hms_opt(10, 30, 0)
     );
     assert_eq!(product.released_on, NaiveDate::from_ymd_opt(2026, 9, 27));
-    assert_eq!(edit, format!("/products/{}/edit", product.public_id));
+    assert_eq!(edit, format!("/products/{}/edit", product.id));
 
     // The edit form shows every value in the format its input expects.
     app.get(&edit)

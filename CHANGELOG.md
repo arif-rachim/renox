@@ -10,6 +10,27 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M22 · Model keys other than integers
+
+- A model's key is its `id` field's type: `i64` as before, or `renox::db::Ulid` and `Uuid`
+  (renox's `uuid` feature; a v7), both made on insert, or a `String` the app sets. `Model` has
+  `type Key: ModelKey`; `id()`, `set_id`, `find`, `find_or_404` and `find_many` use it.
+- `renox::db::Ulid`: sortable 26-character ids (monotonic within a millisecond), stored as
+  text, serialized as text; a malformed one in `Path<Ulid>` is a 404. `renox::uuid` is
+  re-exported with the `uuid` feature.
+- `Model::insert`: always an INSERT, with the key set or a new one.
+- Relation loaders are generic over keys: `belongs_to`, `has_many`, `count_many`, `sum_many`
+  and `Morph` return maps keyed by the parent's key; `Pivot<L = i64, R = i64>` names the two
+  sides' key types (`Pivot` alone is unchanged).
+- `chunk` and `cursor_paginate` work with any key type (cursors are the key's text).
+- `rnx make:model Invoice --key ulid|uuid|string [-m]` writes the model and its migration.
+- examples/fields keys its products by `Uuid` instead of an extra `public_id` column (run
+  `migrate:fresh` there).
+- **Breaking:** generic code over models that uses `id()` as an `i64` needs
+  `M: Model<Key = i64>`. `ForeignKey` takes the key type (`ForeignKey<K>`). Hand-written
+  `impl Model` blocks add `type Key = i64;`. `create` now always inserts: a model created with
+  a non-zero `id` keeps it (it used to update that row).
+
 ### After M21 · Small fixes
 
 - `/favicon.ico` answers `204 No Content` (cached for a day) unless the app has
