@@ -1,3 +1,4 @@
+use renox::db::Encrypted;
 use renox::db::relations::Pivot;
 use renox::prelude::*;
 use serde::Serialize;
@@ -8,10 +9,10 @@ use serde::Serialize;
 pub struct Team {
     pub id: i64,
     pub name: String,
-    /// Sealed with `state.encrypt`; open it with `state.decrypt`. Never sent
+    /// Stored encrypted with `APP_KEY`, read as the plain secret. Never sent
     /// to templates.
     #[serde(skip_serializing)]
-    pub webhook_secret: Option<String>,
+    pub webhook_secret: Option<Encrypted<String>>,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
 }

@@ -9,6 +9,9 @@
 #[cfg(any(feature = "postgres", test))]
 use std::borrow::Cow;
 use std::fmt;
+use std::sync::Arc;
+
+use cookie::Key;
 
 use sqlx::sqlite::{Sqlite, SqliteArguments, SqlitePool, SqliteRow};
 use sqlx::{AssertSqlSafe, Column, Row as _};
@@ -44,6 +47,8 @@ impl fmt::Display for Dialect {
 pub struct Db {
     pool: Pool,
     schema: SchemaEpoch,
+    /// Seals and opens `Encrypted` columns (`APP_KEY`, set at boot).
+    key: Option<Arc<Key>>,
 }
 
 /// When this process last changed the schema (migrations ran).
@@ -102,7 +107,18 @@ impl From<PgPool> for Db {
 
 impl Db {
     fn with_epoch(pool: Pool, schema: SchemaEpoch) -> Self {
-        Self { pool, schema }
+        Self {
+            pool,
+            schema,
+            key: None,
+        }
+    }
+
+    /// The key `Encrypted` columns are sealed and opened with (the app's
+    /// `APP_KEY`, set at boot).
+    pub(crate) fn with_key(mut self, key: Key) -> Self {
+        self.key = Some(Arc::new(key));
+        self
     }
 
     pub(crate) fn from_sqlite(pool: SqlitePool, schema: SchemaEpoch) -> Self {
@@ -154,7 +170,11 @@ impl Db {
             #[cfg(feature = "postgres")]
             Pool::Postgres(pool) => TxInner::Postgres(pool.begin().await?),
         };
-        Ok(Transaction { inner })
+        Ok(Transaction {
+            inner,
+            key: self.key.clone(),
+            savepoints: 0,
+        })
     }
 
     /// Runs `work` in a transaction: committed when it returns `Ok`, rolled
@@ -292,7 +312,11 @@ impl Db {
             #[cfg(feature = "postgres")]
             Pool::Postgres(pool) => TxInner::Postgres(pool.begin().await?),
         };
-        Ok(Transaction { inner })
+        Ok(Transaction {
+            inner,
+            key: self.key.clone(),
+            savepoints: 0,
+        })
     }
 
     /// Closes every connection; later queries fail.
@@ -308,6 +332,9 @@ impl Db {
 /// A database transaction, from [`Db::begin`].
 pub struct Transaction {
     inner: TxInner,
+    key: Option<Arc<Key>>,
+    /// Savepoints open inside it (for their names).
+    savepoints: u32,
 }
 
 enum TxInner {
@@ -338,6 +365,67 @@ impl Transaction {
             TxInner::Sqlite(tx) => Ok(tx.rollback().await?),
             #[cfg(feature = "postgres")]
             TxInner::Postgres(tx) => Ok(tx.rollback().await?),
+        }
+    }
+
+    /// Runs `work` inside a savepoint (a transaction inside the
+    /// transaction): when it returns `Err`, only what it did is undone and
+    /// the transaction goes on; when it returns `Ok`, its changes stay, to
+    /// be committed (or rolled back) with the rest. Savepoints nest.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # async fn demo(db: Db) -> Result {
+    /// let mut tx = db.begin().await?;
+    /// renox::db::sql("INSERT INTO orders (total) VALUES (?)").bind(18_000).execute(&mut tx).await?;
+    /// // Optional: a voucher that may be used up already. If it is, the order stays.
+    /// let voucher = tx
+    ///     .savepoint(|tx| {
+    ///         Box::pin(async move {
+    ///             let used = renox::db::sql("UPDATE vouchers SET used = used + 1 WHERE code = ? AND used < max_uses")
+    ///                 .bind("KOPI10")
+    ///                 .execute(&mut *tx)
+    ///                 .await?;
+    ///             renox::abort_if(used == 0, StatusCode::CONFLICT, "used up")?;
+    ///             Ok(())
+    ///         })
+    ///     })
+    ///     .await;
+    /// tx.commit().await?;
+    /// # let _ = voucher; Ok(()) }
+    /// ```
+    ///
+    /// On PostgreSQL a failed statement stops the whole transaction until
+    /// it rolls back; inside a savepoint only the savepoint rolls back, so
+    /// the transaction can go on after an expected failure (a unique
+    /// violation you handle, say).
+    pub async fn savepoint<T, F>(&mut self, work: F) -> crate::Result<T>
+    where
+        F: for<'t> FnOnce(
+            &'t mut Transaction,
+        ) -> futures_util::future::BoxFuture<'t, crate::Result<T>>,
+    {
+        let name = format!("renox_savepoint_{}", self.savepoints + 1);
+        sql(format!("SAVEPOINT {name}")).execute(&mut *self).await?;
+        self.savepoints += 1;
+        let outcome = work(self).await;
+        self.savepoints -= 1;
+        match outcome {
+            Ok(value) => {
+                sql(format!("RELEASE SAVEPOINT {name}"))
+                    .execute(&mut *self)
+                    .await?;
+                Ok(value)
+            }
+            Err(err) => {
+                sql(format!("ROLLBACK TO SAVEPOINT {name}"))
+                    .execute(&mut *self)
+                    .await?;
+                sql(format!("RELEASE SAVEPOINT {name}"))
+                    .execute(&mut *self)
+                    .await?;
+                Err(err)
+            }
         }
     }
 }
@@ -381,6 +469,14 @@ impl<'c> Executor<'c> for Conn<'c> {
 }
 
 impl Conn<'_> {
+    /// The key for `Encrypted` columns of the database this runs on.
+    fn key(&self) -> Option<Arc<Key>> {
+        match self {
+            Conn::Pool(db) => db.key.clone(),
+            Conn::Tx(tx) => tx.key.clone(),
+        }
+    }
+
     /// The same connection for one more statement.
     pub(crate) fn reborrow(&mut self) -> Conn<'_> {
         match self {
@@ -437,6 +533,23 @@ macro_rules! dispatch {
     };
 }
 
+/// Seals the values of `Encrypted` fields with the database's key.
+fn seal(key: Option<&Key>, args: Vec<DbValue>) -> Result<Vec<DbValue>, DbError> {
+    args.into_iter()
+        .map(|value| match value {
+            DbValue::Encrypted(plain) => match key {
+                Some(key) => Ok(DbValue::Text(super::encrypted::seal(key, &plain.0))),
+                None => Err(DbError::from(sqlx::Error::Encode(
+                    "an Encrypted value needs the app's Db (it has the APP_KEY); \
+                     this Db was made outside App"
+                        .into(),
+                ))),
+            },
+            other => Ok(other),
+        })
+        .collect()
+}
+
 fn sqlite_query(
     sql: String,
     args: Vec<DbValue>,
@@ -475,6 +588,8 @@ fn postgres_query(
             DbValue::Json(v) => query.bind(sqlx::types::Json(v)),
             #[cfg(feature = "uuid")]
             DbValue::Uuid(v) => query.bind(v),
+            // Sealed into `Text` before the statement is built.
+            DbValue::Encrypted(_) => query.bind(UntypedNull),
         },
     )
 }
@@ -599,19 +714,30 @@ impl Sql {
     pub async fn fetch_all<'c>(self, db: impl Executor<'c>) -> Result<Vec<Row>, DbError> {
         let Self { sql, args } = self;
         super::query_log::record(&sql);
-        dispatch!(db.into_conn(), |build, exec| build(sql, args)
+        let conn = db.into_conn();
+        let key = conn.key();
+        let args = seal(key.as_deref(), args)?;
+        let rows: Vec<Row> = dispatch!(conn, |build, exec| build(sql, args)
             .fetch_all(exec)
             .await
-            .map(|rows| rows.into_iter().map(Row::from).collect()))
+            .map(|rows| rows.into_iter().map(Row::from).collect()))?;
+        Ok(rows
+            .into_iter()
+            .map(|row| row.with_key(key.clone()))
+            .collect())
     }
 
     pub async fn fetch_optional<'c>(self, db: impl Executor<'c>) -> Result<Option<Row>, DbError> {
         let Self { sql, args } = self;
         super::query_log::record(&sql);
-        dispatch!(db.into_conn(), |build, exec| build(sql, args)
+        let conn = db.into_conn();
+        let key = conn.key();
+        let args = seal(key.as_deref(), args)?;
+        let row: Option<Row> = dispatch!(conn, |build, exec| build(sql, args)
             .fetch_optional(exec)
             .await
-            .map(|row| row.map(Row::from)))
+            .map(|row| row.map(Row::from)))?;
+        Ok(row.map(|row| row.with_key(key)))
     }
 
     /// The first row; an error if there is none.
@@ -625,7 +751,9 @@ impl Sql {
     pub async fn execute<'c>(self, db: impl Executor<'c>) -> Result<u64, DbError> {
         let Self { sql, args } = self;
         super::query_log::record(&sql);
-        dispatch!(db.into_conn(), |build, exec| build(sql, args)
+        let conn = db.into_conn();
+        let args = seal(conn.key().as_deref(), args)?;
+        dispatch!(conn, |build, exec| build(sql, args)
             .execute(exec)
             .await
             .map(|done| done.rows_affected()))
@@ -699,7 +827,7 @@ pub(crate) async fn script<'c>(db: impl Executor<'c>, sql: &str) -> Result<u64, 
 }
 
 /// One result row. Read columns by name or position with [`Row::try_get`].
-pub struct Row(pub(crate) RowInner);
+pub struct Row(pub(crate) RowInner, Option<Arc<Key>>);
 
 pub(crate) enum RowInner {
     Sqlite(SqliteRow),
@@ -709,25 +837,30 @@ pub(crate) enum RowInner {
 
 impl From<SqliteRow> for Row {
     fn from(row: SqliteRow) -> Self {
-        Self(RowInner::Sqlite(row))
+        Self(RowInner::Sqlite(row), None)
     }
 }
 
 #[cfg(feature = "postgres")]
 impl From<PgRow> for Row {
     fn from(row: PgRow) -> Self {
-        Self(RowInner::Postgres(row))
+        Self(RowInner::Postgres(row), None)
     }
 }
 
 impl Row {
+    fn with_key(mut self, key: Option<Arc<Key>>) -> Self {
+        self.1 = key;
+        self
+    }
+
     /// A column's value, by name (`"nama"`) or position (`0`).
     pub fn try_get<T: FromDb>(&self, index: impl RowIndex) -> Result<T, DbError> {
-        match &self.0 {
+        super::encrypted::reading(self.1.as_ref(), || match &self.0 {
             RowInner::Sqlite(row) => Ok(row.try_get(index)?),
             #[cfg(feature = "postgres")]
             RowInner::Postgres(row) => Ok(row.try_get(index)?),
-        }
+        })
     }
 
     /// A column's value as JSON, whatever its type; `null` when it can't be

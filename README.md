@@ -158,8 +158,9 @@ impl Module for Guestbook {
   simple or by cursor) and factories with fake data. The key is the `id` field's type: a
   number the database counts, or a ULID, UUID or string (`rnx make:model Invoice --key ulid`).
 - Models can save only what changed (`save_changes`, `save_only`), run hooks (`saving`, `saved`,
-  `deleting`, `deleted`) and carry a default scope, e.g. the current tenant, that every query
-  applies until `unscoped()`.
+  `deleting`, `deleted`), carry a default scope, e.g. the current tenant, that every query
+  applies until `unscoped()`, and keep secrets encrypted at rest (`Encrypted<String>` fields,
+  sealed with `APP_KEY`). Transactions nest with savepoints (`tx.savepoint(…)`).
 - Relations are explicit and N+1-free: `belongs_to`, `has_many`, many-to-many pivots (with pivot
   columns) and polymorphic `Morph` load a page's related rows in one query each, and `count_many` /
   `sum_many` give counts and sums per row ([guide](docs/relations.md)); joins read into
@@ -389,7 +390,8 @@ Renox is **pre-1.0**. After the Laravel parity review
 (tenancy, roles, accounts), M19 (query builder and models), M20 (scheduler, locks, queue,
 HTTP client, queue dashboard, localized mail) and M21 (the UI kit, scaffolding, test tools,
 error reports and logs, Tailwind, typed commands, form requests, database sessions, deploys
-without refused connections) and M22 (model keys other than integers) are done. Next is 1.0: a documentation site with a tutorial and a Laravel guide, semver checks, and the first
+without refused connections), M22 (model keys other than integers) and M23 (savepoints,
+encrypted fields) are done. Next is 1.0: a documentation site with a tutorial and a Laravel guide, semver checks, and the first
 real release on crates.io (today's crates there are placeholders, so install from Git as above).
 Until then the API may still change; breaking changes are listed in [CHANGELOG.md](CHANGELOG.md).
 

@@ -10,6 +10,18 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M23 · Savepoints and encrypted fields
+
+- `Transaction::savepoint(|tx| Box::pin(async move { … }))`: a transaction inside the
+  transaction; on `Err` only its changes are undone and the transaction goes on (on
+  PostgreSQL too, after a failed statement). Savepoints nest.
+- `renox::db::Encrypted<T>`: a model field stored encrypted with `APP_KEY` (AES-256-GCM,
+  sealed JSON in a `TEXT` column) and read as `T`; `Option<Encrypted<T>>` for nullable
+  columns. Works in handlers, jobs, commands, seeders and tests alike: the app's `Db` carries
+  the key. Its `Debug` hides the value; the column can't be searched.
+- `DbValue` has a new variant, `Encrypted` (it's `#[non_exhaustive]`).
+- examples/teams keeps its webhook secret in an `Encrypted<String>` field.
+
 ### M22 · Model keys other than integers
 
 - A model's key is its `id` field's type: `i64` as before, or `renox::db::Ulid` and `Uuid`

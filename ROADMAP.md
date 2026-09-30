@@ -677,9 +677,9 @@ Notes from M18b (accounts and security):
 - [x] `simple_paginate` and `cursor_paginate`; `update_or_create`, `first_or_new`, `refresh`
 - [x] `db.transaction(|tx| …)` and `db.transaction_retrying(3, |tx| …)` (SQLite busy,
       PostgreSQL serialization)
-- [ ] Savepoints (nested transactions)
+- [x] Savepoints (nested transactions): `tx.savepoint(|tx| …)` (M23)
 - [x] A public encrypt/decrypt API (`state.encrypt` / `state.decrypt`, AES-GCM under `APP_KEY`)
-- [ ] `Encrypted<T>` field type (deferred, see the notes from M19b)
+- [x] `Encrypted<T>` field type (M23; the key travels with the `Db`, see the notes from M23)
 
 Notes from M19a (query builder):
 - M19 is split: M19a is the query builder (above, ticked); M19b the model features (non-integer
@@ -716,6 +716,7 @@ Notes from M19b (model features):
   get no context; reading it from `renox::context` would make `save` fail (or store plain text)
   in code without an app context, such as tests and seeders. `state.encrypt`/`decrypt` cover
   the need explicitly; a field type comes back if the key can be made reachable everywhere.
+  (Done in M23: the `Db` carries the key, so no context is needed.)
 
 ### M20 · v0.21: Background 2
 - [x] Schedules: `cron("0 9 * * 1-5")`, `weekly_on`, `monthly_on`, `weekdays`, `between`;
@@ -1102,6 +1103,40 @@ Notes from M22:
   Audit subjects with other keys would need a text column; not asked for yet.
 - The workspace dev profile uses `debug = "line-tables-only"` since this milestone (separate
   PR): full debug info ran a 15 GB machine out of memory during workspace builds.
+
+### M23 · Savepoints and encrypted fields
+The first of three follow-ups the owner asked for before 1.0 (B: this; C: the rest of M21's
+deferred items; D: `#[derive(Validate)]` and `Accept-Language`).
+- [x] `Transaction::savepoint(|tx| Box::pin(async move { … }))`: `SAVEPOINT` before, `RELEASE`
+      on `Ok`, `ROLLBACK TO` + `RELEASE` on `Err` (the error is returned); nests; works inside
+      `db.transaction(…)`
+- [x] `renox::db::Encrypted<T>` (any serde `T`, stored as sealed JSON text; `Option` for
+      nullable columns), `Deref`/`DerefMut`/`new`/`into_inner`, transparent serde, a `Debug`
+      that hides the value
+- [x] The `Db` built at boot carries a key derived from `APP_KEY` (and so do its
+      transactions); statements seal `DbValue::Encrypted` just before they run, rows open
+      `Encrypted` columns with the key of the `Db` that read them
+- [x] examples/teams stores its webhook secret in an `Encrypted<String>` field (no
+      `state.encrypt`/`decrypt` in its handlers)
+
+Notes from M23:
+- Why this works now when M19b deferred it: M19b looked for the key at encode/decode time
+  (sqlx gives no context there) or in `renox::context` (absent in tests and bare code). The
+  key now travels with the data instead: `Db` → `Transaction` → `Conn` for writes, and each
+  `Row` keeps the key of the `Db` that fetched it; `Row::try_get` sets it in a thread-local
+  for the synchronous decode only. Two apps with different keys in one process each use
+  their own.
+- `DbValue::Encrypted(Unsealed)` holds the plain JSON until the statement runs, so
+  `save_changes` compares plain values (a fresh nonce would make every save a change) and
+  `Debug` of a `DbValue` or `Sql` never shows it (`Unsealed` prints `..`).
+- Sealing uses the same AES-256-GCM as `state.encrypt` with other associated data
+  (`renox.column`), so a sealed column can't be passed off as a `state.encrypt` value or an
+  encrypted cookie. `APP_KEY` rotation isn't handled (docs/operations.md says what's lost).
+- A `Db` made outside `App` (`Db::from(pool)`) has no key: writing or reading an
+  `Encrypted` column fails with a message saying so, never stores plain text.
+- Savepoints are plain SQL on both databases (sqlx's nested `begin` would need a lifetime
+  on `Transaction`, a breaking change). A cancelled savepoint future leaves it open until
+  the transaction ends, which rolls it back with the rest.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

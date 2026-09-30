@@ -108,7 +108,7 @@ Every example has a README.md that walks through it.
   teams with per-team roles on the pivot, the current team in `renox::context` (checked by a
   middleware), a `Project` model with a default scope that fails closed, `unscoped()` for the
   admin report and a command, project names unique per team, `gate_before` for super-admins,
-  and a team secret sealed with `state.encrypt` behind password confirmation; a form request
+  and a team secret in an `Encrypted<String>` field behind password confirmation; a form request
   (`MemberForm`: `prepare`, `authorize`, `after`) checked live (`data-live-validate`); pages on
   the UI kit with confirmation sheets and toasts.
   [tenancy.rs](examples/teams/src/app/tenancy.rs),

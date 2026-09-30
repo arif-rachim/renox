@@ -3,6 +3,7 @@
 //! factories.
 
 mod conn;
+mod encrypted;
 mod error;
 mod factory;
 mod from_row;
@@ -27,6 +28,7 @@ use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, S
 pub use conn::{Conn, bounds};
 pub use conn::{Db, Dialect, Executor, FromDb, Row, RowIndex, Sql, Transaction, sql};
 pub(crate) use conn::{RowInner, SchemaEpoch, script};
+pub use encrypted::{Encrypted, Unsealed};
 pub use error::DbError;
 pub use factory::Factory;
 pub use from_row::FromRow;

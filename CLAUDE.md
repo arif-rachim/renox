@@ -341,6 +341,9 @@ outgrow one server. `Db` is Renox's own type (`db/conn.rs`): a private enum over
   per dialect at execution, with binds kept in render order. `like` → `ILIKE` on PostgreSQL;
   `OFFSET` without `LIMIT -1` there. Aggregate sums are cast (`db::Number`, sealed) so
   PostgreSQL's NUMERIC doesn't leak.
+- `Db` (and every `Transaction` it begins) carries the `APP_KEY`-derived key (`with_key` at
+  boot); `Sql::execute`/`fetch_*` seal `DbValue::Encrypted` with it and give each `Row` the key
+  for `Encrypted` columns. A new place that makes rows or binds values must keep that.
 - Public database APIs return `db::DbError`, never `sqlx::Error`; macros reach sqlx through the
   hidden `renox::__sqlx`.
 - Emails: `auth::user::normalize_email` (trim + lowercase) on register, lookup, reset and the
@@ -839,6 +842,10 @@ picks the build, not the terminal.
   relations generic over keys, `Pivot<L, R>`, `make:model --key`, examples/fields on `Uuid`):
   branch `m22-model-keys`. Generic code over models that needs an integer id says
   `M: Model<Key = i64>`.
+- **M23** (B of the owner's B/C/D before 1.0: `Transaction::savepoint`, `db::Encrypted<T>`
+  with the key carried by `Db`/`Transaction`/`Row`, examples/teams on it): branch
+  `m23-savepoints-encrypted`. Then C (M21's deferred items) and D (`#[derive(Validate)]`,
+  `Accept-Language`), one PR each.
 - **M21 is complete.** Next is the owner's call; **v1.0 is on hold** until the owner says to
   start it (docs site, starter kit, semver checks, real crates.io releases; the owner runs
   `cargo login`). Small M21 items that weren't built are listed in ROADMAP ("Deferred from

@@ -465,11 +465,12 @@ impl App {
             .map_err(|err| anyhow!("APP_TIMEZONE: {err}"))?;
 
         let migrator = Migrator::new(migrations)?;
-        let db = crate::db::connect(&config).await?;
         let key = match &config.key {
             Some(key) => parse_key(key)?,
             None => parse_key(&crate::generate_key())?,
         };
+        // `Encrypted` model fields are sealed and opened with APP_KEY.
+        let db = crate::db::connect(&config).await?.with_key(key.clone());
 
         let mut router = Router::new();
         let mut routes = RouteTable::default();

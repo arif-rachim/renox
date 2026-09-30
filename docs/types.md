@@ -23,6 +23,7 @@ SQLite and PostgreSQL.
 | (public ids) | `uuid::Uuid`, with renox's `uuid` feature (`renox::uuid::Uuid`) | `BLOB` | `UUID` |
 | (sortable public ids) | `renox::db::Ulid` | `TEXT` | `TEXT` |
 | (bytes) | `Vec<u8>` | `BLOB` | `BYTEA` |
+| (secrets: an id number, a bank account, an API key) | `Encrypted<T>` (`renox::db::Encrypted`, any serde `T`), sealed with `APP_KEY` | `TEXT` | `TEXT` |
 | any optional field | `Option<T>` | nullable | nullable |
 
 ## Enums
