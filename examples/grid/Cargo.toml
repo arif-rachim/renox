@@ -5,5 +5,5 @@ edition = "2024"
 publish = false
 
 [dependencies]
-renox.workspace = true
+renox = { workspace = true, features = ["xlsx"] }
 serde = { version = "1.0.229", features = ["derive"] }

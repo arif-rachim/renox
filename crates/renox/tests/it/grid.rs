@@ -68,7 +68,10 @@ impl Module for Orders {
     }
 
     fn routes(&self) -> Routes {
-        Routes::new().get("/orders", index).get("/totals", totals)
+        Routes::new()
+            .get("/orders", index)
+            .get("/totals", totals)
+            .get("/exports", exports)
     }
 }
 
@@ -78,6 +81,16 @@ async fn index(request: GridRequest) -> Result<View> {
         .await?
         .extend(|order| json!({ "points": [1, order.total % 7, 3] }));
     Ok(view("orders.html", context! { orders => page }))
+}
+
+/// M27c: the same grid with its export menu.
+async fn exports(request: GridRequest) -> Result<Response> {
+    let grid = grid().exports();
+    if let Some(file) = grid.export(GridOrder::query(), &request).await? {
+        return Ok(file);
+    }
+    let page = grid.page(GridOrder::query(), &request).await?;
+    Ok(view("orders.html", context! { orders => page }).into_response())
 }
 
 /// `Grid::filter` for figures over every filtered row.
@@ -635,4 +648,79 @@ async fn row_order_checks_its_column() {
         order.save::<GridTask>(app.db(), "position").await.unwrap(),
         2
     );
+}
+
+// ---------- M27c: exports ----------
+
+#[renox::test]
+async fn exports_hold_every_filtered_row() {
+    let (app, _views) = app().await;
+    GridOrder::create(
+        app.db(),
+        GridOrder {
+            number: "=HYPERLINK(\"x\")".into(),
+            status: "paid".into(),
+            tags: Json(vec!["online".into(), "promo".into()]),
+            total: 7,
+            ordered_on: NaiveDate::from_ymd_opt(2026, 4, 1).unwrap(),
+            paid: true,
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    // The menu links keep the filters.
+    let page = app.get("/exports?in.status=paid").await;
+    page.assert_see("in.status=paid&amp;export=csv")
+        .assert_see("in.status=paid&amp;export=print");
+    assert_eq!(
+        page.text().contains("export=xlsx"),
+        cfg!(feature = "xlsx"),
+        "Excel only with the feature"
+    );
+
+    let csv = app.get("/exports?in.status=paid&export=csv").await;
+    csv.assert_ok()
+        .assert_header("content-type", "text/csv; charset=utf-8");
+    let text = csv.text();
+    let lines: Vec<&str> = text.trim_start_matches('\u{feff}').lines().collect();
+    // Paid rows on all pages (per_page is 10), placed_at hidden, the custom
+    // chart left out; groups in the headings.
+    assert_eq!(
+        lines[0],
+        "Order,State / Status,State / Paid,Tags,Total,Ordered"
+    );
+    assert_eq!(lines.len(), 1 + 4);
+    assert!(
+        lines.contains(&"XX-105,Paid,Yes,Online,45000,2026-03-31"),
+        "{text}"
+    );
+    // Labels joined and quoted; a formula is made text.
+    assert!(
+        lines.contains(&"\"'=HYPERLINK(\"\"x\"\")\",Paid,Yes,\"Online, Promo\",7,2026-04-01"),
+        "{text}"
+    );
+
+    let print = app.get("/exports?in.status=paid&export=print").await;
+    print
+        .assert_ok()
+        .assert_see("<title>Orders</title>")
+        .assert_see(">State</th>")
+        .assert_see(r#"<td class="num">45,000</td>"#)
+        .assert_see("4 rows")
+        .assert_see("data-grid-print");
+
+    let xlsx = app.get("/exports?export=xlsx").await;
+    if cfg!(feature = "xlsx") {
+        xlsx.assert_ok().assert_header(
+            "content-type",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        );
+        assert!(xlsx.body.starts_with(b"PK"), "a zip");
+    } else {
+        xlsx.assert_status(400);
+    }
+    app.get("/exports?export=docx").await.assert_status(400);
+    // Without `export`, the page.
+    app.get("/exports").await.assert_see("rx-grid");
 }

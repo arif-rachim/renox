@@ -171,3 +171,24 @@ async fn regions_share_merged_cells() {
     assert!(html.contains("<template data-grid-details>"));
     assert!(html.contains("items</div>") || html.contains(" items"));
 }
+
+#[renox::test]
+async fn every_filtered_row_exports() {
+    let app = with_orders(60).await;
+    let paid = Order::where_eq("status", "paid")
+        .count(app.db())
+        .await
+        .unwrap();
+    let csv = app.get("/?in.status=paid&export=csv").await;
+    csv.assert_ok();
+    // One heading line, then every paid order (not just a page of 25).
+    assert_eq!(csv.text().lines().count() as u64, 1 + paid);
+    let xlsx = app.get("/regions?export=xlsx").await;
+    xlsx.assert_ok();
+    assert!(xlsx.body.starts_with(b"PK"));
+    app.get("/?export=print")
+        .await
+        .assert_ok()
+        .assert_see("Print or save as PDF")
+        .assert_see("60 rows");
+}

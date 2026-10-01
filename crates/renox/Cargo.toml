@@ -25,6 +25,8 @@ s3 = ["renox-core/s3"]
 postgres = ["renox-core/postgres"]
 # `uuid::Uuid` model fields (BLOB on SQLite, UUID on PostgreSQL).
 uuid = ["renox-core/uuid"]
+# Excel exports of data grids (`Grid::exports`, `export=xlsx`).
+xlsx = ["renox-core/xlsx"]
 
 [dependencies]
 renox-core.workspace = true

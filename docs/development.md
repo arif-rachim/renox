@@ -40,7 +40,8 @@ renox = { git = "…", rev = "…", default-features = false }
 # or keep some: default-features = false, features = ["fake"]
 ```
 
-`postgres`, `s3` and `uuid` are off unless you turn them on. `s3` is the heaviest: it brings the
+`postgres`, `s3`, `uuid` and `xlsx` (Excel exports of data grids) are off unless you turn them
+on. `s3` is the heaviest: it brings the
 AWS SDK's HTTP client and TLS stack.
 
 TLS uses rustls with the `ring` provider, so no C crypto library (aws-lc) is compiled; only

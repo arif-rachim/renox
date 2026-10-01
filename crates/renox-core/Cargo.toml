@@ -24,10 +24,13 @@ s3 = ["dep:object_store"]
 postgres = ["sqlx/postgres"]
 # `uuid::Uuid` model fields (BLOB on SQLite, UUID on PostgreSQL).
 uuid = ["dep:uuid", "sqlx/uuid"]
+# Excel exports of data grids (`renox::grid`, `export=xlsx`).
+xlsx = ["dep:rust_xlsxwriter"]
 
 [dependencies]
 anyhow = "1.0.104"
 argon2 = "0.6.0"
+rust_xlsxwriter = { version = "0.99.1", default-features = false, features = ["chrono"], optional = true }
 # Verifies bcrypt hashes of users imported from Laravel (rehashed to Argon2id at login).
 bcrypt = { version = "0.19.3", default-features = false, features = ["std"] }
 axum = { version = "0.8.9", features = ["multipart"] }

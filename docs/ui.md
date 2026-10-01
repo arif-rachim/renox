@@ -361,6 +361,37 @@ async fn reorder(State(db): State<Db>, Form(order): Form<RowOrder>) -> Result<St
   within the groups of the merged columns before it. Sort by them (`sort_by("region,city")`).
   Merging is off while rows can be dragged, and merged columns aren't editable.
 
+### Exports
+
+`.exports()` adds an export menu to the toolbar, and the handler answers its links first:
+
+```rust
+# use renox::prelude::*;
+# use renox::grid::{Column, Grid, GridRequest};
+# #[derive(Model, serde::Serialize, Default)] struct Order { id: i64, number: String }
+# fn orders_grid() -> Grid { Grid::new("orders").column(Column::text("number", "Order")).exports() }
+async fn index(request: GridRequest) -> Result<Response> {
+    if let Some(file) = orders_grid().export(Order::query(), &request).await? {
+        return Ok(file); // ?export=csv|xlsx|print
+    }
+    let page = orders_grid().page(Order::query(), &request).await?;
+    Ok(view("orders/index.html", context! { orders => page }).into_response())
+}
+```
+
+Each export holds every row the filters match (up to `grid::MAX_EXPORT_ROWS`), sorted as on
+screen, in the columns the user shows on wide screens (custom columns left out):
+
+- **CSV**: UTF-8 with a BOM (Excel reads it), headings like `Amounts / Total`, labels for
+  choices and tags, numbers without separators; text starting with `=`, `+`, `-` or `@` gets a
+  `'` so a spreadsheet doesn't run it.
+- **Excel** (the `xlsx` feature, `renox = { …, features = ["xlsx"] }`, through
+  `rust_xlsxwriter`): grouped headings merged as on screen, numbers and dates as numbers and
+  dates, the headings and frozen-left columns frozen. Without the feature the menu has no Excel
+  link and `export=xlsx` is a 400.
+- **Print**: a plain page (headings repeated on every printed page, landscape) with a button to
+  print or save as PDF.
+
 ## Stacks
 
 A page or a component often needs something in another part of the layout: a script at the end

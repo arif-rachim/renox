@@ -10,6 +10,13 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M27c · Data grid exports
+
+- New: `Grid::exports()` and `Grid::export`: CSV, Excel and a print page (for PDF) of every
+  row the filters match, in the user's columns.
+- New: the `xlsx` feature (`rust_xlsxwriter`, off by default) for Excel exports, with merged
+  headings, typed numbers and dates, and frozen panes.
+
 ### M27b · Data grid: details, editing, row order, merged cells
 
 - New: `Grid::audit()` opens who created and last changed a row (and when) under it;

@@ -60,6 +60,10 @@ const BUILTIN: &[(&str, &str)] = &[
     ),
     ("renox/ui.html", include_str!("../views/ui.html")),
     ("renox/grid.html", include_str!("../views/grid.html")),
+    (
+        "renox/grid_print.html",
+        include_str!("../views/grid_print.html"),
+    ),
     ("renox/debug.html", include_str!("../views/debug.html")),
     (
         "renox/queue/dashboard.html",
