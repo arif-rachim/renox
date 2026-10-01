@@ -31,6 +31,8 @@ pub struct Order {
     pub trend: Json<Vec<i64>>,
     /// Percent of the items shipped.
     pub fulfilled: i64,
+    /// Where the row sits when sorted by hand (`Grid::reorder`).
+    pub position: i64,
     pub created_by: String,
     pub updated_by: String,
     pub created_at: Option<DateTime>,

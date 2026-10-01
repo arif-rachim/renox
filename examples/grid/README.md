@@ -31,9 +31,20 @@ cargo run               # http://127.0.0.1:3000
   sales went up), a progress bar and an Open button, drawn by
   `resources/views/orders/index.html` for the `custom` columns.
 
+- **Details.** Click a row: who created it and who changed it last, and when.
+- **Edit in place.** Double-click a cell (or focus it and press Enter) in Name,
+  Status, Tags, Items, Total, Discount, Ordered or Paid; Enter saves, Escape
+  cancels. The pencil edits the whole row. Wrong values (Items over 999) show
+  their error in the cell.
+- **Drag rows.** Show the # column and sort by it: the handle at the left of
+  each row drags it, or moves it with the arrow keys.
+- **Merged cells.** *By region* sorts by region and city: equal neighbours share
+  one cell, cities nested in their region; a row's details fit between them.
+
 ## Files
 
-- `src/app/orders/mod.rs`: the grid's definition (`orders_grid`) and the handler.
+- `src/app/orders/mod.rs`: the grids (`orders_grid`, `regions_grid`), the page
+  handlers, `update` (edits) and `reorder`.
 - `src/app/orders/model.rs`: the `Order` model and its factory.
 - `resources/views/orders/index.html`: the page and its custom cells.
 - `public/app.css`: the dashboard shell (a bar on top, the grid filling the rest).

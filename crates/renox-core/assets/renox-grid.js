@@ -45,7 +45,11 @@
       th.classList.toggle("rx-grid__off", n === 0);
     });
     var span = grid.querySelector("[data-grid-span]");
-    if (span) span.colSpan = Math.max(shown.size, 1);
+    if (span) span.colSpan = Math.max(shown.size, 1) + (grid.querySelector("thead th[data-tools]") ? 1 : 0);
+    // Open details are rebuilt for the new columns.
+    rowsOf(grid).forEach(function (row) {
+      if (row._rxDetail) { closeDetails(grid, row); openDetails(grid, row); }
+    });
     layoutPins(grid);
   }
 
@@ -62,8 +66,8 @@
       var th = grid.querySelector('thead th[data-col="' + CSS.escape(key) + '"]');
       return th ? th.getBoundingClientRect().width : 0;
     }
-    function place(keys, side) {
-      var at = 0, last = null;
+    function place(keys, side, start) {
+      var at = start || 0, last = null;
       keys.forEach(function (key) {
         if (!shown.has(key)) return;
         offsets[key] = at;
@@ -76,7 +80,16 @@
       });
       if (last) cellsOf(grid, last).forEach(function (cell) { cell.classList.add("rx-grid__edge-" + side); });
     }
-    place(cfg.left || [], "left");
+    var tools = grid.querySelectorAll(".rx-grid__table [data-tools]");
+    var toolsWidth = 0;
+    if (tools.length) {
+      toolsWidth = tools[0].getBoundingClientRect().width;
+      tools.forEach(function (cell) { cell.style.left = "0px"; });
+    }
+    place(cfg.left || [], "left", toolsWidth);
+    if (tools.length && !(cfg.left || []).some(function (k) { return shown.has(k); })) {
+      tools.forEach(function (cell) { cell.classList.add("rx-grid__edge-left"); });
+    }
     place((cfg.right || []).slice().reverse(), "right");
     grid.querySelectorAll(".rx-grid__table th[data-cols][data-pin]").forEach(function (th) {
       var side = th.getAttribute("data-pin");
@@ -308,6 +321,371 @@
     var first = pop.querySelector("input:not([type=hidden]), select");
     if (first && !compact.matches) first.focus();
   }, true);
+
+  // ---------- Row details ----------
+
+  function visibleKeys(grid) {
+    var shown = shownSet(grid);
+    return (config(grid).order || []).filter(function (k) { return shown.has(k); });
+  }
+
+  // Cells of merged columns that span past `row` (they cover the next row).
+  function spanning(row) {
+    var next = row.nextElementSibling;
+    while (next && next.hasAttribute("data-grid-detail")) next = next.nextElementSibling;
+    var covered = next && next.getAttribute("data-covered");
+    return covered ? covered.split(" ") : [];
+  }
+
+  function groupCell(grid, row, key) {
+    // The cell starting the merged group that `row` belongs to.
+    for (var r = row; r; r = r.previousElementSibling) {
+      var cell = r.querySelector('td[data-col="' + CSS.escape(key) + '"]');
+      if (cell) return cell;
+    }
+    return null;
+  }
+
+  function openDetails(grid, row) {
+    var template = row.querySelector("template[data-grid-details]");
+    if (!template || row._rxDetail) return;
+    var detail = document.createElement("tr");
+    detail.setAttribute("data-grid-detail", "");
+    detail.className = "rx-grid__detail-row";
+    var span = spanning(row);
+    var shown = shownSet(grid);
+    // Merged cells spanning past this row take one more row; the details fill
+    // the columns between them, as one or more cells.
+    var hasTools = !!grid.querySelector("thead th[data-tools]");
+    var segments = [], current = hasTools ? 1 : 0;
+    visibleKeys(grid).forEach(function (key) {
+      if (span.indexOf(key) >= 0) {
+        if (current) segments.push(current);
+        current = 0;
+      } else {
+        current += 1;
+      }
+    });
+    if (current) segments.push(current);
+    span.forEach(function (key) {
+      if (!shown.has(key)) return;
+      var cell = groupCell(grid, row, key);
+      if (cell) cell.rowSpan += 1;
+    });
+    // The details go in the widest run of columns, not in the row tools
+    // alone (left of merged cells), and the later one on a tie.
+    var widest = 0, best = -1;
+    segments.forEach(function (n, i) {
+      var toolsOnly = hasTools && i === 0 && n === 1 && segments.length > 1 && span.length;
+      var size = toolsOnly ? 0 : n;
+      if (size >= best) { best = size; widest = i; }
+    });
+    segments.forEach(function (n, i) {
+      var td = document.createElement("td");
+      td.colSpan = n;
+      td.className = "rx-grid__detail";
+      if (i === widest) td.appendChild(template.content.cloneNode(true));
+      detail.appendChild(td);
+    });
+    row.after(detail);
+    row._rxDetail = { el: detail, span: span.filter(function (k) { return shown.has(k); }) };
+    row.classList.add("rx-grid__row--open");
+    var button = row.querySelector("[data-grid-expand]");
+    if (button) button.setAttribute("aria-expanded", "true");
+  }
+
+  function closeDetails(grid, row) {
+    var open = row._rxDetail;
+    if (!open) return;
+    open.span.forEach(function (key) {
+      var cell = groupCell(grid, row, key);
+      if (cell && cell.rowSpan > 1) cell.rowSpan -= 1;
+    });
+    open.el.remove();
+    row._rxDetail = null;
+    row.classList.remove("rx-grid__row--open");
+    var button = row.querySelector("[data-grid-expand]");
+    if (button) button.setAttribute("aria-expanded", "false");
+  }
+
+  function toggleDetails(grid, row) {
+    if (row._rxDetail) closeDetails(grid, row); else openDetails(grid, row);
+  }
+
+  // ---------- Editing ----------
+
+  function columnOf(grid, key) { return (config(grid).columns || {})[key] || {}; }
+
+  function rawValue(cell) {
+    try { return JSON.parse(cell.getAttribute("data-raw")); } catch (_) { return null; }
+  }
+
+  function editor(grid, cell) {
+    var key = cell.getAttribute("data-col");
+    var col = columnOf(grid, key);
+    var value = rawValue(cell);
+    var wrap = document.createElement("span");
+    wrap.className = "rx-grid__editor";
+    var input;
+    if (col.kind === "bool") {
+      input = document.createElement("input");
+      input.type = "checkbox";
+      input.checked = !!value;
+    } else if (col.kind === "select") {
+      input = document.createElement("select");
+      (col.options || []).forEach(function (o) {
+        var opt = new Option(o[1], o[0], false, o[0] === value);
+        input.appendChild(opt);
+      });
+    } else if (col.kind === "tags") {
+      input = document.createElement("span");
+      input.className = "rx-grid__editor-tags";
+      input.setAttribute("role", "group");
+      input.setAttribute("aria-label", col.label || key);
+      (col.options || []).forEach(function (o) {
+        var label = document.createElement("label");
+        var box = document.createElement("input");
+        box.type = "checkbox";
+        box.value = o[0];
+        box.checked = (value || []).indexOf(o[0]) >= 0;
+        label.appendChild(box);
+        label.appendChild(document.createTextNode(" " + o[1]));
+        input.appendChild(label);
+      });
+    } else {
+      input = document.createElement("input");
+      input.type = { number: "number", money: "number", date: "date", date_time: "datetime-local" }[col.kind] || "text";
+      if (input.type === "number") input.step = "any";
+      var v = value == null ? "" : String(value);
+      if (col.kind === "date_time") v = v.slice(0, 16);
+      input.value = v;
+    }
+    input.classList.add("rx-grid__editor-input");
+    input.setAttribute("data-grid-input", key);
+    if (input.tagName !== "SPAN") {
+      input.name = key;
+      input.setAttribute("aria-label", col.label || key);
+    }
+    wrap.appendChild(input);
+    return wrap;
+  }
+
+  function valueOf(grid, cell) {
+    var key = cell.getAttribute("data-col");
+    var col = columnOf(grid, key);
+    var input = cell.querySelector("[data-grid-input]");
+    if (!input) return undefined;
+    if (col.kind === "bool") return input.checked ? "true" : "false";
+    if (col.kind === "tags") {
+      return Array.prototype.map.call(input.querySelectorAll("input:checked"), function (b) { return b.value; });
+    }
+    return input.value;
+  }
+
+  function startEdit(grid, cell) {
+    if (cell._rxOriginal != null) return;
+    cell._rxOriginal = cell.innerHTML;
+    cell.innerHTML = "";
+    cell.appendChild(editor(grid, cell));
+    cell.classList.add("rx-grid__editing");
+  }
+
+  function stopEdit(cell) {
+    if (cell._rxOriginal == null) return;
+    cell.innerHTML = cell._rxOriginal;
+    cell._rxOriginal = null;
+    cell.classList.remove("rx-grid__editing");
+  }
+
+  // Sends the row's edited cells; the grid reloads its page when saved, and
+  // a 422 shows the errors next to the fields (renox.js).
+  function save(grid, row, cells) {
+    var url = row.getAttribute("data-edit");
+    if (!url || !window.htmx) return;
+    var values = {};
+    cells.forEach(function (cell) {
+      var v = valueOf(grid, cell);
+      if (v !== undefined) values[cell.getAttribute("data-col")] = v;
+    });
+    row.setAttribute("aria-busy", "true");
+    window.htmx.ajax("PATCH", url, { source: row, values: values, swap: "none" }).then(function () {
+      row.removeAttribute("aria-busy");
+    });
+  }
+
+  document.addEventListener("htmx:afterRequest", function (event) {
+    var row = event.detail.elt;
+    if (!row || !row.matches || !row.matches("tr[data-edit]")) return;
+    var grid = row.closest("form.rx-grid");
+    row.removeAttribute("aria-busy");
+    if (event.detail.successful) {
+      grid._rxKeepPage = true;
+      submit(grid, true);
+    }
+  });
+
+  function editRow(grid, row, on) {
+    var cells = row.querySelectorAll("td[data-editable]");
+    cells.forEach(function (cell) { if (on) startEdit(grid, cell); else stopEdit(cell); });
+    row.classList.toggle("rx-grid__row--editing", on);
+    row.querySelector("[data-grid-edit-row]").hidden = on;
+    row.querySelector("[data-grid-save-row]").hidden = !on;
+    row.querySelector("[data-grid-cancel-row]").hidden = !on;
+    if (on && cells[0]) {
+      var first = cells[0].querySelector("input, select");
+      if (first) first.focus();
+    }
+  }
+
+  function editCell(grid, cell) {
+    var row = cell.closest("tr");
+    if (row.classList.contains("rx-grid__row--editing")) return;
+    startEdit(grid, cell);
+    var input = cell.querySelector("input, select");
+    if (input) { input.focus(); if (input.select && input.type === "text") input.select(); }
+  }
+
+  function commitCell(grid, cell) {
+    if (cell._rxOriginal == null) return;
+    var before = JSON.stringify(rawValue(cell));
+    var now = valueOf(grid, cell);
+    var col = columnOf(grid, cell.getAttribute("data-col"));
+    var same = col.kind === "bool" ? (String(rawValue(cell)) === now)
+      : col.kind === "tags" ? JSON.stringify(now) === before
+      : String(rawValue(cell) == null ? "" : rawValue(cell)).slice(0, col.kind === "date_time" ? 16 : undefined) === now;
+    if (same) { stopEdit(cell); return; }
+    save(grid, cell.closest("tr"), [cell]);
+  }
+
+  document.addEventListener("dblclick", function (event) {
+    var cell = event.target.closest && event.target.closest("td[data-editable]");
+    if (!cell) return;
+    var grid = cell.closest("form.rx-grid");
+    if (grid) editCell(grid, cell);
+  });
+
+  document.addEventListener("keydown", function (event) {
+    var grid = event.target.closest && event.target.closest("form.rx-grid");
+    if (!grid) return;
+    var cell = event.target.closest("td[data-editable]");
+    if (cell && event.target === cell && (event.key === "Enter" || event.key === "F2")) {
+      event.preventDefault();
+      editCell(grid, cell);
+      return;
+    }
+    var input = event.target.closest("[data-grid-input], .rx-grid__editor-tags");
+    if (cell && input) {
+      var row = cell.closest("tr");
+      var rowMode = row.classList.contains("rx-grid__row--editing");
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (rowMode) editRow(grid, row, false); else { stopEdit(cell); cell.focus(); }
+      } else if (event.key === "Enter" && event.target.type !== "checkbox") {
+        // Enter saves instead of submitting the grid's filters.
+        event.preventDefault();
+        if (rowMode) save(grid, row, Array.prototype.slice.call(row.querySelectorAll("td[data-editable]")));
+        else commitCell(grid, cell);
+      }
+      return;
+    }
+    var grip = event.target.closest("[data-grid-drag]");
+    if (grip && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+      event.preventDefault();
+      moveRow(grid, grip.closest("tr"), event.key === "ArrowUp" ? -1 : 1);
+      grip.focus();
+    }
+  });
+
+  document.addEventListener("focusout", function (event) {
+    var cell = event.target.closest && event.target.closest("td.rx-grid__editing");
+    if (!cell) return;
+    var row = cell.closest("tr");
+    if (row.classList.contains("rx-grid__row--editing")) return;
+    var grid = cell.closest("form.rx-grid");
+    // Leaving the cell (not moving between its own checkboxes) saves it.
+    setTimeout(function () {
+      if (!cell.contains(document.activeElement)) commitCell(grid, cell);
+    }, 0);
+  });
+
+  // ---------- Rows in order ----------
+
+  function rowsOf(grid) {
+    return Array.prototype.slice.call(grid.querySelectorAll(".rx-grid__table tbody tr[data-id]"));
+  }
+
+  function saveOrder(grid) {
+    var cfg = config(grid);
+    if (!cfg.reorder) return;
+    var body = new URLSearchParams();
+    body.append("ids", rowsOf(grid).map(function (row) { return row.getAttribute("data-id"); }).join(","));
+    body.append("offset", String(cfg.offset || 0));
+    fetch(cfg.reorder, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-Token": csrf() },
+      body: body
+    });
+  }
+
+  function moveRow(grid, row, by) {
+    closeDetails(grid, row);
+    var rows = rowsOf(grid), i = rows.indexOf(row), j = i + by;
+    if (j < 0 || j >= rows.length) return;
+    closeDetails(grid, rows[j]);
+    if (by < 0) rows[j].before(row); else rows[j].after(row);
+    saveOrder(grid);
+  }
+
+  var drag = null;
+  document.addEventListener("pointerdown", function (event) {
+    var grip = event.target.closest && event.target.closest("[data-grid-drag]:not(:disabled)");
+    if (!grip) return;
+    var grid = grip.closest("form.rx-grid");
+    var row = grip.closest("tr");
+    rowsOf(grid).forEach(function (r) { closeDetails(grid, r); });
+    drag = { grid: grid, row: row, moved: false };
+    row.classList.add("rx-grid__row--dragging");
+    grip.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+  document.addEventListener("pointermove", function (event) {
+    if (!drag) return;
+    var under = document.elementFromPoint(event.clientX, event.clientY);
+    var target = under && under.closest && under.closest("tr[data-id]");
+    if (!target || target === drag.row || target.closest("form.rx-grid") !== drag.grid) return;
+    var r = target.getBoundingClientRect();
+    if (event.clientY < r.top + r.height / 2) target.before(drag.row); else target.after(drag.row);
+    drag.moved = true;
+  });
+  function endDrag() {
+    if (!drag) return;
+    drag.row.classList.remove("rx-grid__row--dragging");
+    if (drag.moved) saveOrder(drag.grid);
+    drag = null;
+  }
+  document.addEventListener("pointerup", endDrag);
+  document.addEventListener("pointercancel", endDrag);
+
+  document.addEventListener("click", function (event) {
+    var grid = event.target.closest && event.target.closest("form.rx-grid");
+    if (!grid) return;
+    var t = event.target.closest("[data-grid-expand], [data-grid-edit-row], [data-grid-save-row], [data-grid-cancel-row]");
+    if (t) {
+      var row = t.closest("tr");
+      if (t.hasAttribute("data-grid-expand")) toggleDetails(grid, row);
+      else if (t.hasAttribute("data-grid-edit-row")) editRow(grid, row, true);
+      else if (t.hasAttribute("data-grid-save-row")) save(grid, row, Array.prototype.slice.call(row.querySelectorAll("td[data-editable]")));
+      else editRow(grid, row, false);
+      return;
+    }
+    // A click on a row (not on a control in it) opens its details.
+    var plain = event.target.closest("tr[data-grid-row]");
+    if (plain && !event.target.closest("a, button, input, select, label, textarea, td.rx-grid__editing, td[data-editable]:focus")) {
+      if (window.getSelection && String(window.getSelection())) return;
+      toggleDetails(grid, plain);
+    }
+  });
 
   // ---------- Setup ----------
 

@@ -683,6 +683,9 @@ async fn index(request: GridRequest) -> Result<View> {
 
 `{% from "renox/grid.html" import grid %}` then `{% call(row, column) grid(orders) %}…{% endcall %}`
 inside `<main class="rx-grid-fill">`; `{{ sparkline(row.trend) }}` draws a small chart.
+More: `.audit()` (who changed a row, under it), `Column::editable()` + `.edit_url("/orders/{id}")`
+(PATCH, `Valid<T>` with `Option` fields), `.reorder("position", url)` + `RowOrder::save`,
+`Column::merge()` with `sort_by("region,city")`.
 
 ## Seeders and factories
 

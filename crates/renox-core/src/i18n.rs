@@ -268,6 +268,14 @@ fn builtin(locale: &str) -> Option<&'static HashMap<&'static str, &'static str>>
             ("ui.grid.reset", "Reset columns"),
             ("ui.grid.filtered", "filtered"),
             ("ui.grid.loading", "Loading…"),
+            ("ui.grid.created", "Created"),
+            ("ui.grid.updated", "Last updated"),
+            ("ui.grid.details", "Details"),
+            ("ui.grid.edit", "Edit row"),
+            ("ui.grid.save", "Save"),
+            ("ui.grid.move", "Drag to reorder (or use the arrow keys)"),
+            ("ui.grid.sort_to_move", "Sort by order to move rows"),
+            ("ui.grid.row_tools", "Row"),
         ])
     });
     static ID: std::sync::LazyLock<HashMap<&str, &str>> = std::sync::LazyLock::new(|| {
@@ -316,6 +324,20 @@ fn builtin(locale: &str) -> Option<&'static HashMap<&'static str, &'static str>>
             ("ui.grid.reset", "Atur ulang kolom"),
             ("ui.grid.filtered", "tersaring"),
             ("ui.grid.loading", "Memuat…"),
+            ("ui.grid.created", "Dibuat"),
+            ("ui.grid.updated", "Terakhir diubah"),
+            ("ui.grid.details", "Detail"),
+            ("ui.grid.edit", "Ubah baris"),
+            ("ui.grid.save", "Simpan"),
+            (
+                "ui.grid.move",
+                "Seret untuk mengurutkan (atau pakai tombol panah)",
+            ),
+            (
+                "ui.grid.sort_to_move",
+                "Urutkan menurut urutan untuk memindah baris",
+            ),
+            ("ui.grid.row_tools", "Baris"),
         ])
     });
     match locale {

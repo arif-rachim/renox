@@ -10,7 +10,13 @@
 //!   with, `%` patterns), number ranges, a date range calendar, choices;
 //! - grouped headings (Customer, Location, Amounts, Charts);
 //! - custom cells: a sparkline, a progress bar and buttons;
-//! - pages, sorting and filters from the server, in the URL.
+//! - pages, sorting and filters from the server, in the URL;
+//! - a click on a row opens who created and last changed it (`audit`);
+//! - cells edited in place or a whole row in edit mode, validated by
+//!   `Valid<OrderEdit>` (`edit_url`);
+//! - rows dragged into order while sorted by # (`reorder`);
+//! - a second grid (`/regions`) where equal regions and cities share one cell
+//!   (`merge`), with details of the page's own under each row.
 //!
 //! ```text
 //! cargo run -- migrate
@@ -33,6 +39,10 @@ pub fn app() -> App {
         .seeder(|db| async move {
             User::register(&db, "Demo", "demo@example.com", "password").await?;
             Order::create_many(&db, 480).await?;
+            // Hand-sorted order starts as the order they were made in.
+            renox::db::sql("UPDATE orders SET position = id")
+                .execute(&db)
+                .await?;
             Ok(())
         })
 }

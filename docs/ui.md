@@ -318,6 +318,49 @@ and drawn with the `grid` macro; a call block draws the `custom` columns:
 - The grid needs only the page around it to have a height: `rx-grid-fill` is a flex child taking
   the rest of a column-flex `body` (`height: 100dvh`), as examples/grid does.
 
+### Details, editing, row order and merged cells
+
+```rust
+# use renox::prelude::*;
+use renox::grid::{Column, Grid, RowOrder};
+# #[derive(Model, serde::Serialize, Default)]
+# struct Order { id: i64, region: String, city: String, customer: String, position: i64 }
+
+fn orders_grid() -> Grid {
+    Grid::new("orders")
+        .column(Column::text("region", "Region").merge()) // equal neighbours share a cell…
+        .column(Column::text("city", "City").merge())     // …nested in their region
+        .column(Column::text("customer", "Name").editable())
+        .column(Column::number("position", "#"))
+        .sort_by("region,city")
+        .audit()                       // a click on a row: created/updated by and at
+        .details()                     // …and the page's own `_details`
+        .edit_url("/orders/{id}")      // PATCH with the changed fields
+        .reorder("position", "/orders/reorder")
+}
+
+async fn reorder(State(db): State<Db>, Form(order): Form<RowOrder>) -> Result<StatusCode> {
+    order.save::<Order>(&db, "position").await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+```
+
+- **Details.** A click on a row (or the chevron in the row tools) opens a row under it with the
+  audit fields the row has (`created_by`, `created_at`, `updated_by`, `updated_at`) and, with
+  `.details()`, what the page's call block draws for `column.key == "_details"`.
+- **Editing.** An editable cell opens an editor for its kind on a double-click, Enter or F2;
+  Enter or leaving the cell saves, Escape cancels. The pencil in the row tools edits all of the
+  row's editable cells at once (✓ saves, ✕ cancels). Saving sends `PATCH {edit_url}` with only
+  the edited fields as a form, so the handler reads them as `Valid<T>` with `Option` fields;
+  a 2xx (a `Toast` shows) reloads the grid's page, a 422 shows the errors in the cells.
+- **Row order.** While the grid is sorted by the order column ascending (`sort=position`), the
+  handle in the row tools drags a row (mouse or touch), and the arrow keys move it; the page's
+  new order is posted as `ids=4,2,9&offset=25`, which `RowOrder::save` writes in one transaction
+  (`updated_at` is left alone). Sorted any other way, the handle is off.
+- **Merged cells.** A merged column draws one cell for neighbouring rows with the same value,
+  within the groups of the merged columns before it. Sort by them (`sort_by("region,city")`).
+  Merging is off while rows can be dragged, and merged columns aren't editable.
+
 ## Stacks
 
 A page or a component often needs something in another part of the layout: a script at the end

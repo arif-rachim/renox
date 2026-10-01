@@ -10,7 +10,13 @@
 </head>
 <body class="dashboard">
   <header class="topbar">
-    <a class="brand" href="{{ route('orders.index') }}">Sales</a>
+    <div class="topbar__start">
+      <a class="brand" href="{{ route('orders.index') }}">Sales</a>
+      <nav class="tabs" aria-label="Views">
+        <a class="{{ class_names('tab', {'tab--on': route_is('orders.index')}) }}" href="{{ route('orders.index') }}"{% if route_is('orders.index') %} aria-current="page"{% endif %}>Orders</a>
+        <a class="{{ class_names('tab', {'tab--on': route_is('orders.regions')}) }}" href="{{ route('orders.regions') }}"{% if route_is('orders.regions') %} aria-current="page"{% endif %}>By region</a>
+      </nav>
+    </div>
     <nav class="topbar__nav">
       {%- if auth.check %}
       <span class="topbar__user">{{ auth.user.name }}</span>

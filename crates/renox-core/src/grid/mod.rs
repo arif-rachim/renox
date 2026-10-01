@@ -122,6 +122,8 @@ pub struct Column {
     decimals: Option<u8>,
     options: Vec<(String, String)>,
     width: Option<String>,
+    editable: bool,
+    merge: bool,
 }
 
 impl Column {
@@ -140,6 +142,8 @@ impl Column {
             decimals: None,
             options: Vec::new(),
             width: None,
+            editable: false,
+            merge: false,
         }
     }
 
@@ -263,6 +267,25 @@ impl Column {
         self
     }
 
+    /// Cells can be edited in place (double-click, Enter or F2; Enter saves,
+    /// Escape cancels) and in the row's edit mode. Saving sends the value
+    /// to the grid's [`Grid::edit_url`]. Not for custom columns, nor for
+    /// merged ones.
+    pub fn editable(mut self) -> Self {
+        self.editable = self.kind != Kind::Custom;
+        self
+    }
+
+    /// Neighbouring rows with the same value share one cell. Merged columns
+    /// nest from left to right: a column merges only within the merged
+    /// groups of the merged columns before it (Region, then City). Merging
+    /// is off while rows are dragged into order.
+    pub fn merge(mut self) -> Self {
+        self.merge = true;
+        self.editable = false;
+        self
+    }
+
     /// The column's key.
     pub fn key(&self) -> &str {
         &self.key
@@ -285,6 +308,10 @@ pub struct Grid {
     per_page: u32,
     per_page_options: Vec<u32>,
     sort: Option<String>,
+    audit: bool,
+    details: bool,
+    edit_url: Option<String>,
+    reorder: Option<(String, String)>,
 }
 
 impl Grid {
@@ -298,7 +325,46 @@ impl Grid {
             per_page: 25,
             per_page_options: PER_PAGE_OPTIONS.to_vec(),
             sort: None,
+            audit: false,
+            details: false,
+            edit_url: None,
+            reorder: None,
         }
+    }
+
+    /// A click on a row (or its chevron) opens details under it: who
+    /// created and last changed the row, and when, from its `created_by`,
+    /// `created_at`, `updated_by` and `updated_at` values (those it has).
+    pub fn audit(mut self) -> Self {
+        self.audit = true;
+        self
+    }
+
+    /// A click on a row opens details under it, drawn by the page's
+    /// template: `caller(row, column)` with `column.key == "_details"`.
+    /// With [`Grid::audit`], the audit fields come first.
+    pub fn details(mut self) -> Self {
+        self.details = true;
+        self
+    }
+
+    /// Where edits are sent: `PATCH` to this URL with `{id}` replaced by the
+    /// row's id, the changed fields as a form (`customer=…`, `tags=a&tags=b`,
+    /// `paid=true`). Answer with a 2xx (a `Toast` shows), or with
+    /// `Valid<T>`'s 422 and the errors show next to the fields; the grid
+    /// then reloads its page.
+    pub fn edit_url(mut self, url: &str) -> Self {
+        self.edit_url = Some(url.to_owned());
+        self
+    }
+
+    /// Rows can be dragged into order (or moved with the arrow keys on
+    /// their handle) while the grid is sorted by `column` ascending; the
+    /// new order of the page is `POST`ed to `url` as `ids` and `offset`
+    /// (see [`RowOrder`]).
+    pub fn reorder(mut self, column: &str, url: &str) -> Self {
+        self.reorder = Some((column.to_owned(), url.to_owned()));
+        self
     }
 
     /// The heading shown above the grid.
@@ -324,7 +390,9 @@ impl Grid {
     }
 
     /// The order before the user sorts: a column key, `-` first for
-    /// descending (`"-created_at"`). Ties are broken by `id`.
+    /// descending (`"-created_at"`), or several separated by commas
+    /// (`"region,city,-total"`, what merged columns want). Ties are broken
+    /// by `id`.
     pub fn sort_by(mut self, sort: &str) -> Self {
         self.sort = Some(sort.to_owned());
         self
@@ -392,17 +460,39 @@ impl Grid {
         query
     }
 
-    fn sorted<M: Model>(&self, query: Query<M>, state: &State_) -> Query<M> {
-        let query = match &state.sort {
-            Some((key, true)) => query.order_by_desc(key),
-            Some((key, false)) => query.order_by(key),
-            None => query,
+    fn sorted<M: Model>(&self, mut query: Query<M>, state: &State_) -> Query<M> {
+        let keys: Vec<(String, bool)> = if state.defaulted {
+            self.default_sort()
+        } else {
+            state.sort.iter().cloned().collect()
         };
-        if state.sort.as_ref().is_some_and(|(key, _)| key == "id") {
+        for (key, desc) in &keys {
+            query = if *desc {
+                query.order_by_desc(key)
+            } else {
+                query.order_by(key)
+            };
+        }
+        if keys.iter().any(|(key, _)| key == "id") {
             query
         } else {
             query.order_by("id")
         }
+    }
+
+    /// `sort_by`'s keys: `"region,city,-total"`.
+    fn default_sort(&self) -> Vec<(String, bool)> {
+        self.sort
+            .as_deref()
+            .unwrap_or("")
+            .split(',')
+            .map(str::trim)
+            .filter(|k| !k.is_empty())
+            .map(|k| match k.strip_prefix('-') {
+                Some(key) => (key.to_owned(), true),
+                None => (k.to_owned(), false),
+            })
+            .collect()
     }
 
     /// The columns in the user's order: frozen-left ones first, then the
@@ -608,6 +698,8 @@ impl Filter {
 struct State_ {
     filters: BTreeMap<String, Filter>,
     sort: Option<(String, bool)>,
+    /// `sort` is the grid's default, not in the query string.
+    defaulted: bool,
     page: u32,
     per_page: u32,
 }
@@ -672,18 +764,16 @@ impl State_ {
             }
             .is_empty()
         });
-        if sort.is_none()
-            && let Some(default) = &grid.sort
-        {
-            let (key, desc) = match default.strip_prefix('-') {
-                Some(key) => (key, true),
-                None => (default.as_str(), false),
-            };
-            sort = Some((key.to_owned(), desc));
+        // Without a sort of the user's, the grid's (its first key marks the
+        // heading).
+        let defaulted = sort.is_none();
+        if defaulted {
+            sort = grid.default_sort().into_iter().next();
         }
         Self {
             filters,
             sort,
+            defaulted,
             page,
             per_page,
         }
@@ -713,7 +803,7 @@ impl State_ {
                 out.push((format!("in.{key}"), v.clone()));
             }
         }
-        if let Some((key, desc)) = &self.sort {
+        if let Some((key, desc)) = self.sort.as_ref().filter(|_| !self.defaulted) {
             out.push((
                 "sort".into(),
                 format!("{}{key}", if *desc { "-" } else { "" }),
@@ -926,6 +1016,8 @@ impl<M: Serialize> GridPage<M> {
             .clone()
             .unwrap_or_else(|| self.grid.default_visible(false));
         let sort = self.state.sort.clone();
+        // Rows can be dragged while sorted by the order column, ascending.
+        let dragging = matches!((&self.grid.reorder, &sort), (Some((column, _)), Some((key, false))) if column == key);
         let columns: Vec<Value> = ordered
             .iter()
             .map(|(c, pin)| {
@@ -950,6 +1042,8 @@ impl<M: Serialize> GridPage<M> {
                     },
                     "compact": compact.contains(&c.key),
                     "wide": wide.contains(&c.key),
+                    "editable": c.editable && self.grid.edit_url.is_some(),
+                    "merge": c.merge && !dragging,
                 })
             })
             .collect();
@@ -969,6 +1063,40 @@ impl<M: Serialize> GridPage<M> {
                 Value::Object(row)
             })
             .collect();
+        let merged: Vec<&str> = if dragging {
+            Vec::new()
+        } else {
+            ordered
+                .iter()
+                .filter(|(c, _)| c.merge)
+                .map(|(c, _)| c.key.as_str())
+                .collect()
+        };
+        let spans = merge_spans(&rows, &merged);
+        let rows: Vec<Value> = rows
+            .into_iter()
+            .zip(spans)
+            .map(|(mut row, merge)| {
+                let id = row.get("id").map(|id| match id {
+                    Value::String(s) => s.clone(),
+                    other => other.to_string(),
+                });
+                if let Value::Object(map) = &mut row {
+                    map.insert(
+                        "_rx".into(),
+                        json!({
+                            "id": id,
+                            "spans": merge.spans,
+                            "covered": merge.covered,
+                            "groups": merge.groups,
+                            "edit": self.grid.edit_url.as_ref().zip(id.as_ref()).map(|(url, id)| url.replace("{id}", id)),
+                        }),
+                    );
+                }
+                row
+            })
+            .collect();
+        let editable = self.grid.edit_url.is_some() && self.grid.columns.iter().any(|c| c.editable);
         let query = self.state.query_string();
         let config = json!({
             "id": self.grid.id,
@@ -982,6 +1110,14 @@ impl<M: Serialize> GridPage<M> {
                 "compact": self.grid.default_visible(true),
                 "wide": self.grid.default_visible(false),
             },
+            "columns": ordered.iter().map(|(c, _)| (c.key.clone(), json!({
+                "kind": c.kind,
+                "label": c.label,
+                "options": c.options,
+                "editable": c.editable && self.grid.edit_url.is_some(),
+            }))).collect::<Map<_, _>>(),
+            "reorder": self.grid.reorder.as_ref().filter(|_| dragging).map(|(_, url)| url),
+            "offset": u64::from(self.rows.page.saturating_sub(1)) * u64::from(self.rows.per_page),
         });
         json!({
             "id": self.grid.id,
@@ -1002,10 +1138,19 @@ impl<M: Serialize> GridPage<M> {
                 "pages": self.rows.pages,
             },
             "per_page_options": self.grid.per_page_options,
-            "sort": sort.map(|(key, desc)| format!("{}{key}", if desc { "-" } else { "" })),
+            "sort": sort.filter(|_| !self.state.defaulted).map(|(key, desc)| format!("{}{key}", if desc { "-" } else { "" })),
             "query": query,
             "filtered": self.state.filters.len(),
             "config": config.to_string(),
+            "audit": self.grid.audit,
+            "details": self.grid.audit || self.grid.details,
+            "custom_details": self.grid.details,
+            "editable": editable,
+            "reorder": self.grid.reorder.as_ref().map(|(column, _)| json!({
+                "column": column,
+                "active": dragging,
+            })),
+            "tools": self.grid.audit || self.grid.details || editable || self.grid.reorder.is_some(),
         })
     }
 }
@@ -1016,6 +1161,128 @@ impl<M: Serialize> Serialize for GridPage<M> {
         serializer: S,
     ) -> std::result::Result<S::Ok, S::Error> {
         self.to_value().serialize(serializer)
+    }
+}
+
+/// Where a row sits in the merged columns' groups.
+#[derive(Debug, Default, Clone, PartialEq)]
+struct MergeInfo {
+    /// For the rows starting a group: how many rows the cell spans.
+    spans: Map<String, Value>,
+    /// The merged columns whose cell an earlier row draws.
+    covered: Vec<String>,
+    /// The group of each merged column, e.g. `city-3` (its first row).
+    groups: Map<String, Value>,
+}
+
+/// Groups neighbouring rows with equal values in the `merged` columns,
+/// each nested in the groups of the columns before it.
+fn merge_spans(rows: &[Value], merged: &[&str]) -> Vec<MergeInfo> {
+    let mut info = vec![MergeInfo::default(); rows.len()];
+    // Where each row's group starts, per column.
+    let mut starts: Vec<Vec<usize>> = vec![vec![0; merged.len()]; rows.len()];
+    for i in 0..rows.len() {
+        let mut outer_break = i == 0;
+        for (k, key) in merged.iter().enumerate() {
+            let same = !outer_break && rows[i].get(*key) == rows[i - 1].get(*key);
+            if same {
+                starts[i][k] = starts[i - 1][k];
+            } else {
+                starts[i][k] = i;
+                outer_break = true;
+            }
+        }
+    }
+    for (k, key) in merged.iter().enumerate() {
+        for i in 0..rows.len() {
+            let start = starts[i][k];
+            info[i]
+                .groups
+                .insert((*key).to_owned(), format!("{key}-{start}").into());
+            if start == i {
+                let len = (i..rows.len()).take_while(|&j| starts[j][k] == i).count();
+                info[i].spans.insert((*key).to_owned(), len.into());
+            } else {
+                info[i].covered.push((*key).to_owned());
+            }
+        }
+    }
+    info
+}
+
+/// The new order of a page of rows, as a reorderable grid sends it
+/// (`ids=4,2,9`: the ids in their new order, `offset` the position of the
+/// first), read with axum's `Form`:
+///
+/// ```
+/// # use renox::prelude::*;
+/// use renox::grid::RowOrder;
+/// # #[derive(Model, serde::Serialize, Default)] struct Task { id: i64, position: i64 }
+/// async fn reorder(State(db): State<Db>, Form(order): Form<RowOrder>) -> Result<StatusCode> {
+///     order.save::<Task>(&db, "position").await?;
+///     Ok(StatusCode::NO_CONTENT)
+/// }
+/// ```
+#[derive(Debug, Clone, Default, Deserialize)]
+#[non_exhaustive]
+pub struct RowOrder {
+    /// The rows' ids, in their new order (sent separated by commas).
+    #[serde(default, deserialize_with = "comma_list")]
+    pub ids: Vec<String>,
+    /// The position of the first row (the rows before this page).
+    #[serde(default)]
+    pub offset: u64,
+}
+
+fn comma_list<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> std::result::Result<Vec<String>, D::Error> {
+    let text = String::deserialize(d)?;
+    Ok(text
+        .split(',')
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+        .map(str::to_owned)
+        .collect())
+}
+
+impl RowOrder {
+    /// Writes `offset + n` into `column` of the n-th row, in one
+    /// transaction. Ids that don't parse as the model's key are an error;
+    /// `updated_at` is left alone.
+    pub async fn save<M: Model>(&self, db: &Db, column: &str) -> Result<u64> {
+        if !M::COLUMNS.contains(&column) || column == "id" {
+            return Err(Error::Internal(anyhow::anyhow!(
+                "`{}` has no column `{column}` to order by",
+                M::TABLE
+            )));
+        }
+        if self.ids.len() > 1000 {
+            return Err(Error::BadRequest("too many rows".into()));
+        }
+        let mut keys = Vec::with_capacity(self.ids.len());
+        for id in &self.ids {
+            let key: M::Key = id
+                .parse()
+                .map_err(|_| Error::BadRequest(format!("`{id}` is not an id")))?;
+            keys.push(key);
+        }
+        let sql = format!(
+            "UPDATE \"{}\" SET \"{column}\" = ? WHERE \"id\" = ?",
+            M::TABLE
+        );
+        let mut tx = db.begin().await?;
+        let mut changed = 0;
+        for (n, key) in keys.into_iter().enumerate() {
+            let position = i64::try_from(self.offset + n as u64).unwrap_or(i64::MAX);
+            changed += crate::db::sql(&sql)
+                .bind(position)
+                .bind(key)
+                .execute(&mut tx)
+                .await?;
+        }
+        tx.commit().await?;
+        Ok(changed)
     }
 }
 
@@ -1283,6 +1550,38 @@ mod tests {
             .column(Column::text("d", "D"))
             .column(Column::text("e", "E"));
         assert_eq!(plain.default_visible(true), ["a", "c", "d"]);
+    }
+
+    #[test]
+    fn merged_columns_nest() {
+        let rows: Vec<Value> = [
+            ("java", "Bandung"),
+            ("java", "Bandung"),
+            ("java", "Jakarta"),
+            ("bali", "Jakarta"),
+            ("bali", "Denpasar"),
+            ("java", "Denpasar"),
+        ]
+        .iter()
+        .map(|(r, c)| json!({ "region": r, "city": c }))
+        .collect();
+        let info = merge_spans(&rows, &["region", "city"]);
+        let spans = |i: usize| {
+            (
+                info[i].spans.get("region").cloned(),
+                info[i].spans.get("city").cloned(),
+            )
+        };
+        assert_eq!(spans(0), (Some(json!(3)), Some(json!(2))));
+        assert_eq!(info[1].covered, ["region", "city"]);
+        assert_eq!(spans(2), (None, Some(json!(1))));
+        assert_eq!(info[2].covered, ["region"]);
+        // Jakarta again, but under another region: a new group.
+        assert_eq!(spans(3), (Some(json!(2)), Some(json!(1))));
+        assert_eq!(spans(4), (None, Some(json!(1))));
+        assert_eq!(spans(5), (Some(json!(1)), Some(json!(1))));
+        assert_eq!(info[1].groups["city"], "city-0");
+        assert!(merge_spans(&rows, &[]).iter().all(|m| m.spans.is_empty()));
     }
 
     #[test]
