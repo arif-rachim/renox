@@ -10,6 +10,12 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M27d · Data grid: moving and resizing columns
+
+- New: drag a heading to move its column; drag a heading's edge to resize it (double-click for
+  the automatic width, arrow keys from the keyboard). Widths are kept per user with the other
+  column choices (`GridPrefs::widths`).
+
 ### M27c · Data grid exports
 
 - New: `Grid::exports()` and `Grid::export`: CSV, Excel and a print page (for PDF) of every

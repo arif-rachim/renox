@@ -304,6 +304,10 @@ and drawn with the `grid` macro; a call block draws the `custom` columns:
   shows and hides columns for the current screen size, moves them and freezes them left or
   right; a logged-in user's choices are kept in `grid_preferences` (every app has the table),
   a guest's in the session.
+- **Moving and resizing columns.** Drag a heading (with a mouse) to move its column, or move it
+  in the column menu (on touch screens too); drag the edge of a heading to resize the column,
+  double-click the edge for the automatic width, or focus it and use the arrow keys. Widths
+  are kept with the other choices (`GridPrefs::widths`).
 - **Grouped headings.** `.under(["Amounts"])`, or deeper (`.under(["Sales", "Q1"])`); neighbours
   under the same headings share them, and a heading never spans a frozen edge.
 - **The query string.** `q.number=A%`, `m.number=starts`, `min.total=1000`, `max.total=…`,

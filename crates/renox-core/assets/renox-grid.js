@@ -224,7 +224,7 @@
   // ---------- The column menu ----------
 
   function prefs(cfg) {
-    return { order: cfg.order, left: cfg.left, right: cfg.right, compact: cfg.compact, wide: cfg.wide };
+    return { order: cfg.order, left: cfg.left, right: cfg.right, compact: cfg.compact, wide: cfg.wide, widths: cfg.widths || {} };
   }
 
   function save(grid, method) {
@@ -692,11 +692,150 @@
     if (event.target.closest && event.target.closest("[data-grid-print]")) window.print();
   });
 
+  // ---------- Column widths ----------
+
+  function applyWidths(grid) {
+    var widths = config(grid).widths || {};
+    grid.querySelectorAll(".rx-grid__table [data-col]").forEach(function (cell) {
+      var w = widths[cell.getAttribute("data-col")];
+      cell.style.width = cell.style.minWidth = cell.style.maxWidth = w ? w + "px" : "";
+      cell.classList.toggle("rx-grid__sized", !!w);
+    });
+  }
+
+  function setWidth(grid, key, width) {
+    var cfg = config(grid);
+    cfg.widths = cfg.widths || {};
+    if (width == null) delete cfg.widths[key];
+    else cfg.widths[key] = Math.round(Math.max(40, Math.min(2000, width)));
+    applyWidths(grid);
+    layoutPins(grid);
+  }
+
+  function savePrefs(grid) {
+    var cfg = config(grid);
+    var body = prefs(cfg);
+    body.widths = cfg.widths || {};
+    return fetch(cfg.prefs, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify(body)
+    });
+  }
+
+  var resizing = null;
+  document.addEventListener("pointerdown", function (event) {
+    var handle = event.target.closest && event.target.closest("[data-grid-resize]");
+    if (!handle) return;
+    var th = handle.closest("th[data-col]");
+    var grid = handle.closest("form.rx-grid");
+    resizing = { grid: grid, key: th.getAttribute("data-col"), x: event.clientX, width: th.getBoundingClientRect().width };
+    grid.classList.add("rx-grid--resizing");
+    handle.setPointerCapture(event.pointerId);
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
+  document.addEventListener("pointermove", function (event) {
+    if (!resizing) return;
+    var dir = getComputedStyle(resizing.grid).direction === "rtl" ? -1 : 1;
+    setWidth(resizing.grid, resizing.key, resizing.width + (event.clientX - resizing.x) * dir);
+  });
+  function endResize() {
+    if (!resizing) return;
+    resizing.grid.classList.remove("rx-grid--resizing");
+    savePrefs(resizing.grid);
+    resizing = null;
+  }
+  document.addEventListener("pointerup", endResize);
+  document.addEventListener("pointercancel", endResize);
+
+  document.addEventListener("dblclick", function (event) {
+    var handle = event.target.closest && event.target.closest("[data-grid-resize]");
+    if (!handle) return;
+    var grid = handle.closest("form.rx-grid");
+    setWidth(grid, handle.closest("th").getAttribute("data-col"), null);
+    savePrefs(grid);
+  });
+
+  document.addEventListener("keydown", function (event) {
+    var handle = event.target.closest && event.target.closest("[data-grid-resize]");
+    if (!handle || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
+    event.preventDefault();
+    var grid = handle.closest("form.rx-grid");
+    var th = handle.closest("th");
+    var step = event.shiftKey ? 50 : 10;
+    setWidth(grid, th.getAttribute("data-col"), th.getBoundingClientRect().width + (event.key === "ArrowRight" ? step : -step));
+    clearTimeout(grid._rxSaveWidths);
+    grid._rxSaveWidths = setTimeout(function () { savePrefs(grid); }, 400);
+  });
+
+  // ---------- Moving columns by their heading ----------
+
+  var moving = null;
+  document.addEventListener("pointerdown", function (event) {
+    if (event.pointerType === "touch" || event.button !== 0) return;
+    var th = event.target.closest && event.target.closest(".rx-grid__table thead th[data-col]");
+    if (!th || event.target.closest("[data-grid-resize], .rx-grid__pop, .rx-grid__filter")) return;
+    moving = { grid: th.closest("form.rx-grid"), th: th, x: event.clientX, y: event.clientY, active: false, target: null };
+  });
+  document.addEventListener("pointermove", function (event) {
+    if (!moving) return;
+    if (!moving.active) {
+      if (Math.abs(event.clientX - moving.x) + Math.abs(event.clientY - moving.y) < 8) return;
+      moving.active = true;
+      moving.grid.classList.add("rx-grid--moving");
+      moving.th.classList.add("rx-grid__moving");
+    }
+    var under = document.elementFromPoint(event.clientX, event.clientY);
+    var target = under && under.closest && under.closest(".rx-grid__table thead th[data-col]");
+    moving.grid.querySelectorAll(".rx-grid__drop-before, .rx-grid__drop-after").forEach(function (el) {
+      el.classList.remove("rx-grid__drop-before", "rx-grid__drop-after");
+    });
+    moving.target = null;
+    if (!target || target === moving.th || target.closest("form.rx-grid") !== moving.grid) return;
+    var r = target.getBoundingClientRect();
+    var after = event.clientX > r.left + r.width / 2;
+    target.classList.add(after ? "rx-grid__drop-after" : "rx-grid__drop-before");
+    moving.target = { key: target.getAttribute("data-col"), after: after };
+  });
+  document.addEventListener("pointerup", function () {
+    if (!moving) return;
+    var m = moving;
+    moving = null;
+    if (!m.active) return;
+    m.grid.classList.remove("rx-grid--moving");
+    m.th.classList.remove("rx-grid__moving");
+    m.grid.querySelectorAll(".rx-grid__drop-before, .rx-grid__drop-after").forEach(function (el) {
+      el.classList.remove("rx-grid__drop-before", "rx-grid__drop-after");
+    });
+    // The click that ends a drag doesn't sort.
+    m.grid._rxNoClick = true;
+    setTimeout(function () { m.grid._rxNoClick = false; }, 0);
+    if (!m.target) return;
+    var cfg = config(m.grid);
+    var key = m.th.getAttribute("data-col");
+    var order = cfg.order.filter(function (k) { return k !== key; });
+    var at = order.indexOf(m.target.key) + (m.target.after ? 1 : 0);
+    order.splice(at, 0, key);
+    cfg.order = order;
+    ["compact", "wide", "left", "right"].forEach(function (name) {
+      var set = new Set(cfg[name] || []);
+      cfg[name] = order.filter(function (k) { return set.has(k); });
+    });
+    savePrefs(m.grid).then(function () { m.grid._rxKeepPage = true; submit(m.grid, true); });
+  });
+  document.addEventListener("click", function (event) {
+    var grid = event.target.closest && event.target.closest("form.rx-grid");
+    if (grid && grid._rxNoClick) { event.preventDefault(); event.stopPropagation(); }
+  }, true);
+
   // ---------- Setup ----------
 
   function setup(grid) {
     if (grid._rxReady) return;
     grid._rxReady = true;
+    applyWidths(grid);
     applyVisibility(grid);
     var scroll = grid.querySelector(".rx-grid__scroll");
     if (scroll) scroll.addEventListener("scroll", function () { edges(grid); }, { passive: true });
