@@ -125,14 +125,16 @@
   // Empty fields and defaults stay out of the URL.
   function trim(grid) {
     var disabled = [];
+    var prefix = config(grid).prefix || "";
     grid.querySelectorAll("[name]").forEach(function (el) {
-      if (el.disabled) return;
-      var name = el.name, drop = false;
+      if (el.disabled || el.closest(".rx-grid__editor")) return;
+      var full = el.name, drop = false;
+      var name = full.indexOf(prefix) === 0 ? full.slice(prefix.length) : full;
       if ((el.type === "checkbox" || el.type === "radio") && !el.checked) return;
       if (el.value === "") drop = true;
       if (name === "page" && el.value === "1") drop = true;
       if (name.indexOf("m.") === 0) {
-        var text = grid.querySelector('[name="q.' + CSS.escape(name.slice(2)) + '"]');
+        var text = grid.querySelector('[name="' + CSS.escape(prefix + "q." + name.slice(2)) + '"]');
         if (!text || !text.value.trim() || el.value === "contains") drop = true;
       }
       if (drop) { el.disabled = true; disabled.push(el); }
@@ -149,6 +151,7 @@
     var grid = event.target.closest && event.target.closest("form.rx-grid");
     if (!grid || event.target !== grid) return;
     if (!grid._rxKeepPage) setState(grid, "page", "1");
+    if (grid._rxFocusSearch) { window._rxSearchFocus = grid.id; grid._rxFocusSearch = false; }
     grid._rxKeepPage = false;
     trim(grid);
     // Without htmx the browser submits the form itself; give the fields back after.
@@ -161,6 +164,13 @@
   });
 
   document.addEventListener("click", function (event) {
+    var search = event.target.closest && event.target.closest("[data-grid-clear-search]");
+    if (search) {
+      var g = search.closest("form.rx-grid");
+      g.querySelector("[data-grid-search]").value = "";
+      submit(g);
+      return;
+    }
     var target = event.target.closest && event.target.closest("[data-grid-sort], [data-grid-page], [data-grid-clear], [data-grid-clear-all], [data-grid-move], [data-grid-reset]");
     if (!target) return;
     var grid = target.closest("form.rx-grid");
@@ -178,6 +188,8 @@
       submit(grid);
     } else if (target.hasAttribute("data-grid-clear-all")) {
       grid.querySelectorAll("[data-grid-filter]").forEach(clearFields);
+      var box = grid.querySelector("[data-grid-search]");
+      if (box) box.value = "";
       submit(grid);
     } else if (target.hasAttribute("data-grid-move")) {
       move(grid, target.closest("[data-grid-pick]").getAttribute("data-grid-pick"), parseInt(target.getAttribute("data-grid-move"), 10));
@@ -680,6 +692,14 @@
       return;
     }
     // A click on a row (not on a control in it) opens its details.
+    // A row with a link of its own opens it (Ctrl/Cmd: in a new tab).
+    var linked = event.target.closest("tr[data-href]");
+    if (linked && !event.target.closest("a, button, input, select, label, textarea, td.rx-grid__editing")) {
+      if (window.getSelection && String(window.getSelection())) return;
+      if (event.ctrlKey || event.metaKey) window.open(linked.getAttribute("data-href"), "_blank", "noopener");
+      else window.location.assign(linked.getAttribute("data-href"));
+      return;
+    }
     var plain = event.target.closest("tr[data-grid-row]");
     if (plain && !event.target.closest("a, button, input, select, label, textarea, td.rx-grid__editing, td[data-editable]:focus")) {
       if (window.getSelection && String(window.getSelection())) return;
@@ -830,6 +850,20 @@
     if (grid && grid._rxNoClick) { event.preventDefault(); event.stopPropagation(); }
   }, true);
 
+  // The search box asks as you type, after a pause.
+  document.addEventListener("input", function (event) {
+    var box = event.target.closest && event.target.closest("[data-grid-search]");
+    if (!box) return;
+    var grid = box.closest("form.rx-grid");
+    clearTimeout(grid._rxSearch);
+    grid._rxSearch = setTimeout(function () { grid._rxFocusSearch = true; submit(grid); }, 350);
+  });
+
+  document.addEventListener("keydown", function (event) {
+    var row = event.target.matches && event.target.matches("tr[data-href]") ? event.target : null;
+    if (row && event.key === "Enter") window.location.assign(row.getAttribute("data-href"));
+  });
+
   // ---------- Setup ----------
 
   function setup(grid) {
@@ -847,6 +881,11 @@
         pending = true;
         requestAnimationFrame(function () { pending = false; layoutPins(grid); });
       }).observe(table);
+    }
+    if (window._rxSearchFocus === grid.id) {
+      window._rxSearchFocus = null;
+      var box = grid.querySelector("[data-grid-search]");
+      if (box) { box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
     }
     if (reopen === grid.id) {
       reopen = null;

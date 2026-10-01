@@ -43,16 +43,32 @@ pub fn orders_grid() -> Grid {
     Grid::new("orders")
         .title("Orders")
         .column(Column::number("position", "#").hidden())
-        .column(Column::text("number", "Order").frozen().mobile())
+        // `searchable`: the toolbar's search box looks in these.
+        .column(
+            Column::text("number", "Order")
+                .frozen()
+                .mobile()
+                .searchable(),
+        )
         .column(
             Column::text("customer", "Name")
                 .under(["Customer"])
                 .mobile()
-                .editable(),
+                .editable()
+                .searchable(),
         )
-        .column(Column::text("email", "Email").under(["Customer"]).hidden())
+        .column(
+            Column::text("email", "Email")
+                .under(["Customer"])
+                .hidden()
+                .searchable(),
+        )
         .column(Column::select("region", "Region", REGIONS).under(["Location"]))
-        .column(Column::text("city", "City").under(["Location"]))
+        .column(
+            Column::text("city", "City")
+                .under(["Location"])
+                .searchable(),
+        )
         .column(
             Column::select("status", "Status", STATUSES)
                 .mobile()
@@ -85,6 +101,12 @@ pub fn orders_grid() -> Grid {
         )
         .column(Column::custom("actions", "Actions").frozen_right())
         .sort_by("-ordered_on")
+        // The chevron opens the audit details; the link icon opens the order.
+        .row_url("/orders/{id}")
+        .empty_state(
+            "No orders yet",
+            Some("Orders show up here as customers buy."),
+        )
         .audit()
         // CSV, Excel and a print page of every filtered row (`export` below).
         .exports()
@@ -105,12 +127,13 @@ pub fn regions_grid() -> Grid {
                 .mobile(),
         )
         .column(Column::text("city", "City").merge().frozen().mobile())
-        .column(Column::text("number", "Order").mobile())
-        .column(Column::text("customer", "Customer"))
+        .column(Column::text("number", "Order").mobile().searchable())
+        .column(Column::text("customer", "Customer").searchable())
         .column(Column::select("status", "Status", STATUSES))
         .column(Column::money("total", "Total (Rp)"))
         .column(Column::date("ordered_on", "Ordered"))
         .sort_by("region,city,-total")
+        .row_url("/orders/{id}")
         .audit()
         .details()
         .exports()

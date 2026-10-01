@@ -746,3 +746,145 @@ async fn exports_hold_every_filtered_row() {
     // Without `export`, the page.
     app.get("/exports").await.assert_see("rx-grid");
 }
+
+// ---------- M28a: prefixes, search, chips, row links, empty state ----------
+
+fn search_grid(prefix: Option<&str>) -> Grid {
+    let grid = Grid::new("orders")
+        .column(Column::text("number", "Order").searchable())
+        .column(Column::select("status", "Status", [("new", "New"), ("paid", "Paid")]).searchable())
+        .column(Column::money("total", "Total"))
+        .sort_by("number")
+        .row_url("/orders/{id}")
+        .empty_state("No orders yet", Some("They show up here."));
+    match prefix {
+        Some(p) => grid.prefix(p),
+        None => grid,
+    }
+}
+
+struct Searching;
+
+impl Module for Searching {
+    fn name(&self) -> &'static str {
+        "searching"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new()
+            .get("/search", |request: GridRequest| async move {
+                let page = search_grid(None).page(GridOrder::query(), &request).await?;
+                Ok::<_, Error>(view("orders.html", context! { orders => page }))
+            })
+            .get("/two", |request: GridRequest| async move {
+                let a = search_grid(Some("a"))
+                    .page(GridOrder::query(), &request)
+                    .await?;
+                let b = Grid::new("others")
+                    .prefix("b")
+                    .column(Column::text("number", "Order"))
+                    .page(GridOrder::query(), &request)
+                    .await?;
+                Ok::<_, Error>(view("two.html", context! { a, b }))
+            })
+            .get("/none", |request: GridRequest| async move {
+                let page = search_grid(None)
+                    .page(GridOrder::where_eq("number", "nothing"), &request)
+                    .await?;
+                Ok::<_, Error>(view("orders.html", context! { orders => page }))
+            })
+    }
+}
+
+async fn search_app() -> (TestApp, tempfile::TempDir) {
+    let (_, views) = app().await; // for its views
+    std::fs::write(
+        views.path().join("two.html"),
+        r#"{% from "renox/grid.html" import grid %}{{ grid(a) }}{{ grid(b) }}"#,
+    )
+    .unwrap();
+    let app = TestApp::with_config(App::new().migrations(&[SCHEMA]).module(Searching), |c| {
+        c.views_path = views.path().to_path_buf()
+    })
+    .await;
+    for (number, status, total) in [
+        ("SO-001", "new", 5),
+        ("SO-002", "paid", 7),
+        ("XX-003", "paid", 9),
+    ] {
+        GridOrder::create(
+            app.db(),
+            GridOrder {
+                number: number.into(),
+                status: status.into(),
+                total,
+                ordered_on: NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    }
+    (app, views)
+}
+
+#[renox::test]
+async fn the_search_box_looks_in_searchable_columns() {
+    let (app, _views) = search_app().await;
+    let found = |q: &'static str| {
+        let app = &app;
+        async move { numbers(&app.get(&format!("/search?{q}")).await.text()) }
+    };
+    assert_eq!(found("search=so-").await, ["SO-001", "SO-002"], "any case");
+    assert_eq!(
+        found("search=paid").await,
+        ["SO-002", "XX-003"],
+        "the status column"
+    );
+    assert_eq!(found("search=so+paid").await, ["SO-002"], "every word");
+    assert_eq!(found("search=%25").await.len(), 3, "% is LIKE's wildcard");
+    let res = app.get("/search?search=paid&in.status=paid").await;
+    res.assert_see(r#"name="search" value="paid""#)
+        .assert_see("data-grid-clear-search")
+        .assert_see("Search: “paid”")
+        .assert_see("Status: Paid");
+}
+
+#[renox::test]
+async fn rows_link_and_empty_grids_say_why() {
+    let (app, _views) = search_app().await;
+    let id = GridOrder::where_eq("number", "SO-001")
+        .first(app.db())
+        .await
+        .unwrap()
+        .unwrap()
+        .id;
+    app.get("/search")
+        .await
+        .assert_see(&format!(r#"data-href="/orders/{id}" tabindex="0""#));
+    app.get("/none")
+        .await
+        .assert_see("No orders yet")
+        .assert_see("They show up here.");
+    app.get("/search?search=zzz")
+        .await
+        .assert_see("Nothing matches these filters.")
+        .assert_dont_see("No orders yet");
+}
+
+#[renox::test]
+async fn two_grids_on_a_page_keep_their_own_values() {
+    let (app, _views) = search_app().await;
+    let html = app
+        .get("/two?a.search=SO-002&b.sort=-number&tab=2")
+        .await
+        .text();
+    let (first, second) = html.split_once("id=\"grid-others\"").unwrap();
+    assert_eq!(numbers(first), ["SO-002"]);
+    assert_eq!(numbers(second), ["XX-003", "SO-002", "SO-001"]);
+    // Each keeps the other's values and the page's own.
+    assert!(first.contains(r#"<input type="hidden" name="b.sort" value="-number">"#));
+    assert!(first.contains(r#"<input type="hidden" name="tab" value="2">"#));
+    assert!(second.contains(r#"<input type="hidden" name="a.search" value="SO-002">"#));
+    assert!(first.contains(r#"name="a.page""#) && second.contains(r#"name="b.page""#));
+}

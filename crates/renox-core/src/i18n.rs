@@ -268,6 +268,9 @@ fn builtin(locale: &str) -> Option<&'static HashMap<&'static str, &'static str>>
             ("ui.grid.reset", "Reset columns"),
             ("ui.grid.filtered", "filtered"),
             ("ui.grid.loading", "Loading…"),
+            ("ui.grid.search", "Search"),
+            ("ui.grid.active_filters", "Active filters"),
+            ("ui.grid.open", "Open"),
             ("ui.grid.resize", "Column width"),
             (
                 "ui.grid.resize_hint",
@@ -337,6 +340,9 @@ fn builtin(locale: &str) -> Option<&'static HashMap<&'static str, &'static str>>
             ("ui.grid.reset", "Atur ulang kolom"),
             ("ui.grid.filtered", "tersaring"),
             ("ui.grid.loading", "Memuat…"),
+            ("ui.grid.search", "Cari"),
+            ("ui.grid.active_filters", "Saringan aktif"),
+            ("ui.grid.open", "Buka"),
             ("ui.grid.resize", "Lebar kolom"),
             (
                 "ui.grid.resize_hint",

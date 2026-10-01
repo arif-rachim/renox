@@ -686,7 +686,8 @@ inside `<main class="rx-grid-fill">`; `{{ sparkline(row.trend) }}` draws a small
 More: `.audit()` (who changed a row, under it), `Column::editable()` + `.edit_url("/orders/{id}")`
 (PATCH, `Valid<T>` with `Option` fields), `.reorder("position", url)` + `RowOrder::save`,
 `Column::merge()` with `sort_by("region,city")`, `.exports()` + `grid.export(query, &request)`
-(CSV, Excel with the `xlsx` feature, a print page).
+(CSV, Excel with the `xlsx` feature, a print page), `Column::searchable()` (the search box),
+`.row_url("/orders/{id}")`, `.empty_state(…)`, `.prefix("orders")` for two grids on a page.
 
 ## Seeders and factories
 

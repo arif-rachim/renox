@@ -73,7 +73,8 @@ Every example has a README.md that walks through it.
   (`sparkline`, a progress bar, buttons), pages and sorting from the server; audit details
   under a row, cells and rows edited in place (`PATCH` + `Valid<OrderEdit>`), rows dragged
   into order (`RowOrder`), `/regions` with merged region and city cells, and exports (CSV,
-  Excel with the `xlsx` feature, a print page for PDF).
+  Excel with the `xlsx` feature, a print page for PDF), a search box, filter chips and rows
+  that open their order.
   [src/app/orders/mod.rs](examples/grid/src/app/orders/mod.rs),
   [views](examples/grid/resources/views/orders),
   [tests/grid.rs](examples/grid/tests/grid.rs)

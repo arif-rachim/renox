@@ -13,14 +13,14 @@ use crate::{Error, Result};
 pub const MAX_EXPORT_ROWS: u64 = 100_000;
 
 /// The links of the export menu: the page's filters and sort, plus `export`.
-pub(super) fn urls(path: &str, query: &[(String, String)]) -> Value {
+pub(super) fn urls(path: &str, query: &[(String, String)], per_page: &str, export: &str) -> Value {
     let link = |format: &str| {
         let mut pairs: Vec<(&str, &str)> = query
             .iter()
-            .filter(|(k, _)| k != "per_page")
+            .filter(|(k, _)| k != per_page && k != export)
             .map(|(k, v)| (k.as_str(), v.as_str()))
             .collect();
-        pairs.push(("export", format));
+        pairs.push((export, format));
         format!(
             "{path}?{}",
             serde_html_form::to_string(&pairs).unwrap_or_default()
@@ -62,7 +62,7 @@ impl Grid {
         query: Query<M>,
         request: &GridRequest,
     ) -> Result<Option<Response>> {
-        let Some(format) = request.param("export") else {
+        let Some(format) = request.param(&self.name("export")) else {
             return Ok(None);
         };
         let prefs = load_prefs(request, &self.id).await;
@@ -116,7 +116,7 @@ impl Grid {
                     total => rows.len(),
                     printed => crate::db::now().to_rfc3339(),
                     back => format!("{}?{}", request.path, serde_html_form::to_string(
-                        request.params.iter().filter(|(k, _)| k != "export").collect::<Vec<_>>()
+                        request.params.iter().filter(|(k, _)| *k != self.name("export")).collect::<Vec<_>>()
                     ).unwrap_or_default()),
                 },
             )
@@ -392,6 +392,8 @@ mod tests {
                 ("q.name".into(), "kopi susu".into()),
                 ("per_page".into(), "25".into()),
             ],
+            "per_page",
+            "export",
         );
         assert_eq!(urls["csv"], "/orders?q.name=kopi+susu&export=csv");
         assert_eq!(urls["print"], "/orders?q.name=kopi+susu&export=print");
