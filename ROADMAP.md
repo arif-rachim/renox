@@ -1265,7 +1265,7 @@ cells, exports on the server (CSV, Excel, PDF through a print page). Three PRs:
       the column menu, frozen columns left and right, `grid_preferences` (users) or the
       session (guests), Cally's date range calendar, custom cells (`caller(row, column)`,
       `GridPage::extend`, `sparkline`), the dashboard layout (`rx-grid-fill`), examples/grid
-- [ ] M27b: row details with audit fields (created/updated by and at), cell and row edit
+- [x] M27b: row details with audit fields (created/updated by and at), cell and row edit
       modes (validated, saved per cell or per row), drag-and-drop row order, merged cells
       (same values in a row of cells, hierarchical between columns)
 - [ ] M27c: exports of every filtered row: CSV, Excel (`rust_xlsxwriter`, headings merged
@@ -1281,6 +1281,19 @@ Notes from M27a:
   fragment handling, and without htmx it still works as a plain form.
 - Tags filter with `CAST(column AS TEXT) LIKE '%"value"%'`, which works on SQLite's TEXT and
   PostgreSQL's JSONB alike.
+
+Notes from M27b:
+- Details rows are made by the script from a `<template>` in each row, not by the server, so
+  merged cells can make room: the cells spanning past the row grow by one row, and the details
+  fill the runs of columns between them (one cell per run, the content in the widest).
+- Saving an edit reloads the grid's page instead of replacing the row: merged cells, sorting
+  and filters may all change, and a page is one request. The request goes through htmx, so
+  renox.js shows 422 errors next to the editors and toasts work as everywhere.
+- `RowOrder` takes the ids as one comma-separated field: axum's `Form` (serde_urlencoded)
+  can't read a repeated field into a `Vec`.
+- Merged columns need the rows sorted by them; with a user's own sort they still merge equal
+  neighbours, by value. The tools column (drag, details, edit) is frozen at the left edge,
+  before the user's frozen columns.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

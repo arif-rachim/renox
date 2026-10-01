@@ -83,3 +83,91 @@ async fn each_user_keeps_their_columns() {
         .assert_see(r#"data-col="customer" data-pin="left""#);
     app.assert_database_count("grid_preferences", 1).await;
 }
+
+#[renox::test]
+async fn cells_are_edited_in_place() {
+    let app = with_orders(1).await;
+    let order = Order::query().first(app.db()).await.unwrap().unwrap();
+    let user = User::register(app.db(), "Sari", "sari@example.com", "password123")
+        .await
+        .unwrap();
+    app.acting_as(&user);
+    let url = format!("/orders/{}", order.id);
+    app.get("/")
+        .await
+        .assert_see(&format!(r#"data-edit="{url}""#));
+    let res = app
+        .htmx()
+        .patch(
+            &url,
+            &[
+                ("customer", "Ibu Ani"),
+                ("paid", "true"),
+                ("tags", "promo"),
+                ("tags", "nope"),
+            ],
+        )
+        .await;
+    res.assert_status(204);
+    assert!(
+        res.header("hx-trigger")
+            .is_some_and(|t| t.contains("saved")),
+        "a toast"
+    );
+    let saved = Order::find_or_404(app.db(), order.id).await.unwrap();
+    assert_eq!(saved.customer, "Ibu Ani");
+    assert!(saved.paid);
+    assert_eq!(saved.tags.0, ["promo"], "unknown tags dropped");
+    assert_eq!(saved.updated_by, "Sari");
+    // Invalid values: 422 with the errors, nothing saved.
+    app.htmx()
+        .patch(&url, &[("items", "5000"), ("status", "lost")])
+        .await
+        .assert_invalid("items")
+        .assert_invalid("status");
+    assert_eq!(
+        Order::find_or_404(app.db(), order.id).await.unwrap().items,
+        saved.items
+    );
+}
+
+#[renox::test]
+async fn rows_are_dragged_into_order() {
+    let app = with_orders(3).await;
+    let ids: Vec<i64> = Order::query()
+        .order_by("id")
+        .get(app.db())
+        .await
+        .unwrap()
+        .iter()
+        .map(|o| o.id)
+        .collect();
+    let page = app.get("/?sort=position").await;
+    page.assert_ok().assert_dont_see("data-grid-drag disabled");
+    let new_order = format!("{},{},{}", ids[2], ids[0], ids[1]);
+    app.post(
+        "/orders/reorder",
+        &[("ids", new_order.as_str()), ("offset", "0")],
+    )
+    .await
+    .assert_status(204);
+    let sorted: Vec<i64> = Order::query()
+        .order_by("position")
+        .get(app.db())
+        .await
+        .unwrap()
+        .iter()
+        .map(|o| o.id)
+        .collect();
+    assert_eq!(sorted, [ids[2], ids[0], ids[1]]);
+}
+
+#[renox::test]
+async fn regions_share_merged_cells() {
+    let app = with_orders(40).await;
+    let html = app.get("/regions").await.text();
+    assert!(html.contains("rx-grid__merged"));
+    assert!(html.contains("data-covered="));
+    assert!(html.contains("<template data-grid-details>"));
+    assert!(html.contains("items</div>") || html.contains(" items"));
+}

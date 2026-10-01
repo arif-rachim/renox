@@ -23,6 +23,11 @@
 {%- elif name == "prev" -%}<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M12.5 4.5L7 10l5.5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
 {%- elif name == "next" -%}<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M7.5 4.5L13 10l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
 {%- elif name == "up" -%}<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M5 12.5L10 7l5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+{%- elif name == "chevron" -%}<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M7.5 4.5L13 10l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+{%- elif name == "edit" -%}<svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true"><path d="M4 13.5V16h2.5l7.4-7.4-2.5-2.5zM12.6 4.9l2.5 2.5 1.3-1.3a1 1 0 000-1.4l-1.1-1.1a1 1 0 00-1.4 0z" fill="currentColor"/></svg>
+{%- elif name == "grip" -%}<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><g fill="currentColor"><circle cx="7.5" cy="5" r="1.4"/><circle cx="12.5" cy="5" r="1.4"/><circle cx="7.5" cy="10" r="1.4"/><circle cx="12.5" cy="10" r="1.4"/><circle cx="7.5" cy="15" r="1.4"/><circle cx="12.5" cy="15" r="1.4"/></g></svg>
+{%- elif name == "check" -%}<svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true"><path d="M5 10.5l3 3L15 6.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+{%- elif name == "close" -%}<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
 {%- elif name == "down" -%}<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M5 7.5L10 13l5-5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
 {%- endif -%}
 {%- endmacro -%}
@@ -95,6 +100,23 @@
 </div>
 {%- endmacro -%}
 
+{#- What opens under a row: the audit fields, then the page's own details. -#}
+{%- macro _details(page, row, caller_fn) -%}
+<div class="rx-grid__details">
+  {%- if page.audit %}
+  <dl class="rx-grid__audit">
+    {%- if row.created_by is defined or row.created_at is defined %}
+    <div><dt>{{ t('ui.grid.created') }}</dt><dd>{{ row.created_by or "—" }}{% if row.created_at %} · <time datetime="{{ row.created_at }}">{{ row.created_at | date("%Y-%m-%d %H:%M") }}</time>{% endif %}</dd></div>
+    {%- endif %}
+    {%- if row.updated_by is defined or row.updated_at is defined %}
+    <div><dt>{{ t('ui.grid.updated') }}</dt><dd>{{ row.updated_by or "—" }}{% if row.updated_at %} · <time datetime="{{ row.updated_at }}">{{ row.updated_at | date("%Y-%m-%d %H:%M") }}</time>{% endif %}</dd></div>
+    {%- endif %}
+  </dl>
+  {%- endif %}
+  {%- if page.custom_details and caller_fn %}<div class="rx-grid__more">{{ caller_fn(row, {"key": "_details", "kind": "details"}) }}</div>{% endif %}
+</div>
+{%- endmacro -%}
+
 {% macro grid(page, tools=none) -%}
 {{ renox_grid() }}
 {%- set id = "grid-" ~ page.id -%}
@@ -143,6 +165,9 @@
       <thead>
         {%- for heading_row in page.header %}
         <tr>
+          {%- if loop.first and page.tools %}
+          <th scope="col" rowspan="{{ page.header | length }}" class="rx-grid__tools-col" data-tools data-pin="left"><span class="rx-visually-hidden">{{ t('ui.grid.row_tools') }}</span></th>
+          {%- endif %}
           {%- for h in heading_row %}
           {%- if h.group %}
           <th scope="colgroup" colspan="{{ h.colspan }}" class="rx-grid__group" data-cols="{{ h.keys | join(' ') }}"{% if h.pin %} data-pin="{{ h.pin }}"{% endif %}>{{ h.label }}</th>
@@ -171,12 +196,36 @@
         {%- endfor %}
       </thead>
       <tbody>
+        {%- set caller_fn = caller if caller is defined else none %}
         {%- for row in page.rows %}
-        <tr data-id="{{ row.id }}">
-          {%- for column in page.columns %}
-          <td data-col="{{ column.key }}"{% if column.pin %} data-pin="{{ column.pin }}"{% endif %}{% if column.numeric %} class="rx-grid__num"{% endif %}>
-            {%- if column.kind == "custom" %}{% if caller is defined %}{{ caller(row, column) }}{% endif %}{% else %}{{ _value(column, row[column.key]) }}{% endif -%}
+        <tr data-id="{{ row._rx.id }}"{% if row._rx.covered %} data-covered="{{ row._rx.covered | join(' ') }}"{% endif %}{% if row._rx.edit %} data-edit="{{ row._rx.edit }}"{% endif %}{% if page.details %} data-grid-row{% endif %}>
+          {%- if page.tools %}
+          <td class="rx-grid__tools-col" data-tools data-pin="left">
+            <span class="rx-grid__row-tools">
+            {%- if page.reorder %}
+            <button type="button" class="rx-grid__tool rx-grid__grip" data-grid-drag{% if not page.reorder.active %} disabled title="{{ t('ui.grid.sort_to_move') }}"{% endif %} aria-label="{{ t('ui.grid.move') }}">{{ _icon("grip") }}</button>
+            {%- endif %}
+            {%- if page.details %}
+            <button type="button" class="rx-grid__tool rx-grid__expand" data-grid-expand aria-expanded="false" aria-label="{{ t('ui.grid.details') }}">{{ _icon("chevron") }}</button>
+            {%- endif %}
+            {%- if page.editable and row._rx.edit %}
+            <button type="button" class="rx-grid__tool" data-grid-edit-row aria-label="{{ t('ui.grid.edit') }}">{{ _icon("edit") }}</button>
+            <button type="button" class="rx-grid__tool rx-grid__tool--save" data-grid-save-row aria-label="{{ t('ui.grid.save') }}" hidden>{{ _icon("check") }}</button>
+            <button type="button" class="rx-grid__tool" data-grid-cancel-row aria-label="{{ t('ui.cancel') }}" hidden>{{ _icon("close") }}</button>
+            {%- endif %}
+            </span>
+            {%- if page.details %}<template data-grid-details>{{ _details(page, row, caller_fn) }}</template>{% endif %}
           </td>
+          {%- endif %}
+          {%- for column in page.columns %}
+          {%- if not (column.merge and column.key in row._rx.covered) %}
+          <td data-col="{{ column.key }}"{% if column.pin %} data-pin="{{ column.pin }}"{% endif %}
+              {%- if column.merge and row._rx.spans[column.key] %} rowspan="{{ row._rx.spans[column.key] }}" data-group="{{ row._rx.groups[column.key] }}"{% endif %}
+              {%- if column.editable and row._rx.edit %} data-editable tabindex="0" data-raw='{{ row[column.key] | tojson }}'{% endif %}
+              {%- if column.numeric or column.merge %} class="{{ class_names({'rx-grid__num': column.numeric, 'rx-grid__merged': column.merge}) }}"{% endif %}>
+            {%- if column.kind == "custom" %}{% if caller_fn %}{{ caller_fn(row, column) }}{% endif %}{% else %}{{ _value(column, row[column.key]) }}{% endif -%}
+          </td>
+          {%- endif %}
           {%- endfor %}
         </tr>
         {%- else %}

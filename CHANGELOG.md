@@ -10,6 +10,19 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M27b · Data grid: details, editing, row order, merged cells
+
+- New: `Grid::audit()` opens who created and last changed a row (and when) under it;
+  `Grid::details()` adds what the page draws for `_details`.
+- New: `Column::editable()` with `Grid::edit_url`: cells edited in place (double-click, Enter,
+  F2) or a whole row in edit mode, sent as `PATCH` and validated by the app's `Valid<T>`,
+  errors shown in the cells.
+- New: `Grid::reorder(column, url)`: rows dragged (or moved with the arrow keys) into order
+  while sorted by that column, saved with `grid::RowOrder::save`.
+- New: `Column::merge()`: neighbouring equal values share one cell, nested from left to right.
+- `Grid::sort_by` takes several keys (`"region,city,-total"`); the default sort no longer
+  goes into the URL.
+
 ### M27a · Data grid
 
 - New: `renox::grid`, a data grid for dashboards: `Grid` and `Column` in Rust (text, number,

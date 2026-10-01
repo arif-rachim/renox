@@ -70,7 +70,9 @@ Every example has a README.md that walks through it.
   columns on a phone and all on a desktop, the column menu (per screen size, order, freeze left
   or right; kept per user or in the session), a filter per heading by kind (text with `%`,
   number ranges, a date range calendar, choices, tags), grouped headings, custom cells
-  (`sparkline`, a progress bar, buttons), pages and sorting from the server.
+  (`sparkline`, a progress bar, buttons), pages and sorting from the server; audit details
+  under a row, cells and rows edited in place (`PATCH` + `Valid<OrderEdit>`), rows dragged
+  into order (`RowOrder`), and `/regions` with merged region and city cells.
   [src/app/orders/mod.rs](examples/grid/src/app/orders/mod.rs),
   [views](examples/grid/resources/views/orders),
   [tests/grid.rs](examples/grid/tests/grid.rs)

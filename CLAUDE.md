@@ -889,9 +889,9 @@ picks the build, not the terminal.
   `RedirectExt` sealed, `InvalidUlid` non-exhaustive): merged (#74). M26c (tests for `renox-cli` and weak core files, `App::run_args`,
   `renox::Path` answers 500 for a parameter the route lacks): merged (#75). M26 is done.
 - **M27** (a data grid, asked by the owner before v1.0; three PRs): M27a (`renox::grid` +
-  `renox/grid.html`, Cally, `grid_preferences`, `sparkline`, examples/grid): branch
-  `m27a-grid`. M27b (row details with audit fields, cell/row editing, row drag, merged cells)
-  and M27c (CSV/Excel/print exports) follow.
+  `renox/grid.html`, Cally, `grid_preferences`, `sparkline`, examples/grid): merged (#76). M27b
+  (`audit`/`details`, `editable` + `edit_url`, `reorder` + `RowOrder`, `merge`, several
+  default sort keys): branch `m27b-grid-edit`. M27c (CSV/Excel/print exports) follows.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.
