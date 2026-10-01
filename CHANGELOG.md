@@ -10,6 +10,22 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M27a · Data grid
+
+- New: `renox::grid`, a data grid for dashboards: `Grid` and `Column` in Rust (text, number,
+  money, date, datetime, bool, select, tags and custom columns), `GridRequest`, and the `grid`
+  macro of `renox/grid.html`. It fills its container with only the rows scrolling, filters each
+  column by its kind from the query string (text with `%` patterns, ranges, a date range
+  calendar, choices), sorts and pages on the server, groups headings (`Column::under`), shows
+  different columns on phones and desktops, and freezes columns left or right.
+- New: the column menu's choices are kept per user in the new framework table
+  `grid_preferences` (migration `00010101000220_create_grid_preferences_table`, in every app),
+  or in the session for guests (`POST`/`DELETE /_renox/grid/{grid}/prefs`).
+- New: `{{ sparkline(values) }}`, a small line or bar chart as inline SVG.
+- Bundled: Cally 0.9.2 (MIT), the calendar web components the date filters use
+  (`renox::CALLY_VERSION`).
+- New example: examples/grid, a sales dashboard.
+
 ### M26c · Tests for the CLI and the weak spots
 
 - New: `App::run_args(["migrate:status"])` runs any command of the app binary from code (a

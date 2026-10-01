@@ -20,6 +20,31 @@ const ALPINE_CSP: &str = include_str!("../assets/alpine-csp.min.js");
 pub(crate) const UI_CSS: &str = include_str!("../assets/renox-ui.css");
 pub(crate) const UI_JS: &str = include_str!("../assets/renox-ui.js");
 
+/// The data grid's styles and behavior (renox/grid.html), and the date
+/// range calendar its date filters use.
+pub(crate) const GRID_CSS: &str = include_str!("../assets/renox-grid.css");
+pub(crate) const GRID_JS: &str = include_str!("../assets/renox-grid.js");
+/// The version of the bundled Cally (calendar web components, MIT).
+pub const CALLY_VERSION: &str = "0.9.2";
+const CALLY: &str = include_str!("../assets/cally.js");
+
+static GRID_URLS: LazyLock<[String; 3]> = LazyLock::new(|| {
+    [
+        format!("/_renox/grid-{:016x}.css", fnv1a(GRID_CSS)),
+        format!("/_renox/grid-{:016x}.js", fnv1a(GRID_JS)),
+        format!("/_renox/cally-{:016x}.js", fnv1a(CALLY)),
+    ]
+});
+
+/// `{{ renox_grid() }}` (the `grid` macro calls it): the grid's stylesheet
+/// and scripts. Twice on a page is harmless.
+pub(crate) fn grid_tags() -> String {
+    let [css, js, cally] = &*GRID_URLS;
+    format!(
+        "<link rel=\"stylesheet\" href=\"{css}\">\n<script src=\"{js}\" defer></script>\n<script type=\"module\" src=\"{cally}\"></script>"
+    )
+}
+
 static UI_URLS: LazyLock<[String; 2]> = LazyLock::new(|| {
     [
         format!("/_renox/ui-{:016x}.css", fnv1a(UI_CSS)),
@@ -196,6 +221,12 @@ pub(crate) fn router() -> Router<AppState> {
             get(|| async { asset("text/css; charset=utf-8", UI_CSS) }),
         )
         .route(ui_js, get(|| async { js(UI_JS) }))
+        .route(
+            &GRID_URLS[0],
+            get(|| async { asset("text/css; charset=utf-8", GRID_CSS) }),
+        )
+        .route(&GRID_URLS[1], get(|| async { js(GRID_JS) }))
+        .route(&GRID_URLS[2], get(|| async { js(CALLY) }))
         .route(htmx, get(|| async { js(HTMX) }))
         .route(alpine, get(|| async { js(ALPINE) }))
         .route(renox, get(|| async { js(RENOX) }))

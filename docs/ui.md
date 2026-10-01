@@ -241,6 +241,83 @@ n, `[a,b]` for a range and `*` for no end: `"{0} Sold out|{1} Only one left|[2,5
 left|[6,*] :count in stock"`, printed with `{{ t('products.in_stock', count=product.stock) }}`
 (examples/shop).
 
+## Data grids
+
+`renox::grid` is a table for dashboards and back offices: it fills its container (only the rows
+scroll, the toolbar and the pagination stay put, on a phone too), each heading has a filter
+that suits the column, and pages, sorting and filters come from the server and stay in the URL.
+A grid is defined in Rust:
+
+```rust
+# use renox::prelude::*;
+use renox::grid::{Column, Grid, GridRequest};
+# #[derive(Model, serde::Serialize, Default)]
+# struct Order { id: i64, number: String, customer: String, status: String, total: i64,
+#     ordered_on: renox::chrono::NaiveDate, trend: renox::db::Json<Vec<i64>> }
+
+fn orders_grid() -> Grid {
+    Grid::new("orders")
+        .title("Orders")
+        .column(Column::text("number", "Order").frozen().mobile())
+        .column(Column::text("customer", "Name").under(["Customer"]).mobile())
+        .column(Column::select("status", "Status", [("new", "New"), ("paid", "Paid")]).mobile())
+        .column(Column::money("total", "Total").under(["Amounts"]))
+        .column(Column::date("ordered_on", "Ordered"))
+        .column(Column::custom("trend", "Last 7 days"))
+        .column(Column::custom("actions", "").frozen_right())
+        .sort_by("-ordered_on")
+}
+
+async fn index(request: GridRequest) -> Result<View> {
+    let page = orders_grid()
+        .page(Order::query(), &request)
+        .await?
+        .extend(|order| json!({ "up": order.trend.last() >= order.trend.first() }));
+    Ok(view("orders/index.html", context! { orders => page }))
+}
+```
+
+and drawn with the `grid` macro; a call block draws the `custom` columns:
+
+```html
+{% from "renox/grid.html" import grid %}
+<main class="rx-grid-fill">
+  {% call(row, column) grid(orders) %}
+    {% if column.key == "trend" %}<span class="{{ 'rx-up' if row.up else 'rx-down' }}">{{ sparkline(row.trend) }}</span>
+    {% elif column.key == "actions" %}{{ link_button(route('orders.show', {'id': row.id}), "Open", size="small") }}{% endif %}
+  {% endcall %}
+</main>
+```
+
+| Column | Shows | Filter |
+|---|---|---|
+| `text` | the text | contains / starts with / ends with / equals, or a pattern with `%` (`kop%`) |
+| `number` (`.decimals(n)`), `money` | right-aligned, with the locale's separators | from–to |
+| `date`, `datetime` | `2026-03-05` (a moment in `APP_TIMEZONE`) | a date range: two date fields and a calendar ([Cally](https://wicky.nillia.ms/cally/), bundled) |
+| `bool` | Yes / No | yes, no |
+| `select(key, label, options)` | the option's label | pick some |
+| `tags(key, label, options)` | a JSON array (`Json<Vec<String>>`) as badges | rows with any of the picked |
+| `custom` | whatever the page draws | none |
+
+- **Columns per screen.** On a phone (under 768 px) the columns marked `.mobile()` show (the first
+  three when none are); on wider screens all but `.hidden()` ones. The column menu (top right)
+  shows and hides columns for the current screen size, moves them and freezes them left or
+  right; a logged-in user's choices are kept in `grid_preferences` (every app has the table),
+  a guest's in the session.
+- **Grouped headings.** `.under(["Amounts"])`, or deeper (`.under(["Sales", "Q1"])`); neighbours
+  under the same headings share them, and a heading never spans a frozen edge.
+- **The query string.** `q.number=A%`, `m.number=starts`, `min.total=1000`, `max.total=…`,
+  `from.ordered_on=2026-01-01`, `to.…`, `in.status=paid` (repeated), `sort=-total`, `page=2`,
+  `per_page=50` (only the sizes the grid offers: 10, 25, 50, 100 and its `.per_page(n)`). Only
+  columns of the grid filter or sort; anything else is ignored.
+- `grid.filter(query, &request)` is the same filters and sort as a `Query`, for totals or an
+  export over every filtered row. `GridRequest::new(&db, path, &params)` builds a request in
+  tests and commands.
+- `{{ sparkline(values) }}` draws a small line (or `kind="bars"`) chart as inline SVG; it takes
+  the text color, so `rx-up` / `rx-down` around it color it.
+- The grid needs only the page around it to have a height: `rx-grid-fill` is a flex child taking
+  the rest of a column-flex `body` (`height: 100dvh`), as examples/grid does.
+
 ## Stacks
 
 A page or a component often needs something in another part of the layout: a script at the end

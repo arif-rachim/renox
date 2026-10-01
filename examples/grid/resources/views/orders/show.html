@@ -1,0 +1,16 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import card, link_button, badge %}
+
+{% block content %}
+<main class="page">
+  {% call card(title=order.number, subtitle=order.customer) %}
+    <dl class="facts">
+      <dt>Status</dt><dd>{{ badge(order.status) }}</dd>
+      <dt>Total</dt><dd>Rp {{ order.total | number }}</dd>
+      <dt>Ordered</dt><dd>{{ order.ordered_on | date }}</dd>
+      <dt>City</dt><dd>{{ order.city }}</dd>
+    </dl>
+  {% endcall %}
+  {{ link_button(route('orders.index'), "Back to orders") }}
+</main>
+{% endblock %}

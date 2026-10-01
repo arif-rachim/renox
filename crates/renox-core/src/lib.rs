@@ -28,6 +28,7 @@ mod download;
 mod embedded;
 mod error;
 pub mod events;
+pub mod grid;
 mod health;
 mod htmx;
 pub mod http;
@@ -68,7 +69,7 @@ mod view_stack;
 pub mod webhook;
 
 pub use app::{App, Kernel};
-pub use assets::{ALPINE_VERSION, HTMX_VERSION};
+pub use assets::{ALPINE_VERSION, CALLY_VERSION, HTMX_VERSION};
 pub use auth::{AuthUser, Policy};
 pub use client_ip::{ClientIp, TrustedProxies};
 pub use config::{AnalyticsConfig, Config, CspMode, Environment};

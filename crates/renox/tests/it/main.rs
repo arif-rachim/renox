@@ -19,6 +19,7 @@ mod dx;
 mod embed;
 mod extension_points;
 mod forms;
+mod grid;
 mod i18n;
 mod infra;
 mod jobs;

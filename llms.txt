@@ -13,7 +13,7 @@
   `App::templates`; `App::provide` and `App::layer`; forms and validation (`unique`/`exists`);
   models, migrations and queries (raw fragments, grouping, locks, update_or_create, simple and
   cursor pagination, transactions with retries); model keys other than integers (`Ulid`,
-  `Uuid`, `String`, `rnx make:model --key`); every field type; pagination; seeders and factories; auth,
+  `Uuid`, `String`, `rnx make:model --key`); every field type; pagination; data grids; seeders and factories; auth,
   policies, gates, API tokens and your own login; tenants (`renox::context`, default scopes),
   roles and permissions, route guards for gates/roles/permissions/token abilities; the account
   page, password rules and confirmation, per-device logout; auth events and the audit log;
@@ -65,6 +65,15 @@ Every example has a README.md that walks through it.
   [src/app/tasks/mod.rs](examples/htmx-recipes/src/app/tasks/mod.rs),
   [views](examples/htmx-recipes/resources/views/tasks),
   [tests/recipes.rs](examples/htmx-recipes/tests/recipes.rs)
+- [examples/grid](examples/grid) ([README](examples/grid/README.md)): a sales dashboard on one data grid
+  (`renox::grid` + `renox/grid.html`): fills the screen with only the rows scrolling, three
+  columns on a phone and all on a desktop, the column menu (per screen size, order, freeze left
+  or right; kept per user or in the session), a filter per heading by kind (text with `%`,
+  number ranges, a date range calendar, choices, tags), grouped headings, custom cells
+  (`sparkline`, a progress bar, buttons), pages and sorting from the server.
+  [src/app/orders/mod.rs](examples/grid/src/app/orders/mod.rs),
+  [views](examples/grid/resources/views/orders),
+  [tests/grid.rs](examples/grid/tests/grid.rs)
 - [examples/relations](examples/relations) ([README](examples/relations/README.md)): a blog: belongs to, has many, many to many through a
   pivot (`Pivot::sync` from checkboxes, `inverse()`) with pivot columns (a pinned flag and
   timestamps: `attach_with`, `update_pivot`, `load_with_pivot`), a page loaded without N+1
@@ -177,7 +186,8 @@ Every example has a README.md that walks through it.
   counting queries, a browser-test recipe.
 - [docs/ui.md](docs/ui.md): components that see the request, the UI kit (`renox/ui.html`: fields,
   buttons, cards, sheets, menus, tabs, tables) and its design rules, toasts, out-of-band
-  fragments, htmx headers, live validation.
+  fragments, htmx headers, live validation, data grids (`renox::grid`: columns, filters,
+  preferences, `sparkline`).
 - [docs/queue.md](docs/queue.md): jobs, retries and `failed`, `dispatch_in`, priority, unique
   jobs, middleware (overlap, rate limits), encrypted payloads, chains and batches with
   progress, the dashboard, testing jobs; mapped to Laravel's.
