@@ -76,26 +76,32 @@ impl fmt::Debug for Http {
 }
 
 impl Http {
+    /// A `GET` request to `url`.
     pub fn get(&self, url: impl Into<String>) -> Request {
         self.request(Method::GET, url)
     }
 
+    /// A `POST` request to `url`.
     pub fn post(&self, url: impl Into<String>) -> Request {
         self.request(Method::POST, url)
     }
 
+    /// A `PUT` request to `url`.
     pub fn put(&self, url: impl Into<String>) -> Request {
         self.request(Method::PUT, url)
     }
 
+    /// A `PATCH` request to `url`.
     pub fn patch(&self, url: impl Into<String>) -> Request {
         self.request(Method::PATCH, url)
     }
 
+    /// A `DELETE` request to `url`.
     pub fn delete(&self, url: impl Into<String>) -> Request {
         self.request(Method::DELETE, url)
     }
 
+    /// A request with any method; 30 s timeout and no retries unless changed.
     pub fn request(&self, method: Method, url: impl Into<String>) -> Request {
         Request {
             http: self.clone(),
@@ -150,6 +156,7 @@ impl Request {
         self
     }
 
+    /// Adds a header (repeatable: a name may be sent more than once).
     pub fn header(mut self, name: &str, value: impl Into<String>) -> Self {
         self.headers.push((name.to_owned(), value.into()));
         self
@@ -337,6 +344,7 @@ pub struct Response {
 }
 
 impl Response {
+    /// The response's status code.
     pub fn status(&self) -> StatusCode {
         self.status
     }
@@ -354,10 +362,12 @@ impl Response {
             .map(|(_, v)| v.as_str())
     }
 
+    /// The body as raw bytes.
     pub fn bytes(&self) -> &[u8] {
         &self.body
     }
 
+    /// The body as text; invalid UTF-8 becomes U+FFFD.
     pub fn text(&self) -> String {
         String::from_utf8_lossy(&self.body).into_owned()
     }
@@ -389,14 +399,18 @@ impl Response {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct SentRequest {
+    /// The HTTP method, upper case (`"POST"`).
     pub method: String,
     /// With its query string.
     pub url: String,
+    /// The headers sent, including `content-type` when the request had a body.
     pub headers: Vec<(String, String)>,
+    /// The body as text (lossy UTF-8); empty when there was none.
     pub body: String,
 }
 
 impl SentRequest {
+    /// The first header `name` (any case).
     pub fn header(&self, name: &str) -> Option<&str> {
         self.headers
             .iter()
@@ -421,6 +435,7 @@ pub struct FakeResponse {
 }
 
 impl FakeResponse {
+    /// An empty response with this status (500 if the code is invalid).
     pub fn status(status: u16) -> Self {
         Self {
             status: StatusCode::from_u16(status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
@@ -430,12 +445,14 @@ impl FakeResponse {
         }
     }
 
+    /// A JSON response with `content-type: application/json`.
     pub fn json(status: u16, body: serde_json::Value) -> Self {
         Self::status(status)
             .header("content-type", "application/json")
             .body(body.to_string())
     }
 
+    /// A plain-text response with this status and body.
     pub fn text(status: u16, body: impl Into<String>) -> Self {
         Self::status(status).body(body.into())
     }
@@ -448,11 +465,13 @@ impl FakeResponse {
         }
     }
 
+    /// Adds a response header.
     pub fn header(mut self, name: &str, value: &str) -> Self {
         self.headers.push((name.to_owned(), value.to_owned()));
         self
     }
 
+    /// Sets the response body.
     pub fn body(mut self, body: impl Into<Vec<u8>>) -> Self {
         self.body = body.into();
         self
@@ -507,6 +526,7 @@ impl FakeHttp {
         );
     }
 
+    /// Panics if a sent request matches.
     #[track_caller]
     pub fn assert_not_sent(&self, check: impl Fn(&SentRequest) -> bool) {
         assert!(
@@ -515,6 +535,7 @@ impl FakeHttp {
         );
     }
 
+    /// Panics unless exactly `expected` requests were sent.
     #[track_caller]
     pub fn assert_sent_count(&self, expected: usize) {
         assert_eq!(self.sent().len(), expected, "HTTP requests sent");

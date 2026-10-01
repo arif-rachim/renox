@@ -69,6 +69,7 @@ use crate::{AppState, Result};
 pub struct Args(Vec<String>);
 
 impl Args {
+    /// Arguments from these words, e.g. for `Kernel::call` in tests.
     pub fn new(args: impl IntoIterator<Item = impl Into<String>>) -> Self {
         Self(args.into_iter().map(Into::into).collect())
     }
@@ -128,6 +129,7 @@ impl Args {
 /// is the command's name, and its doc comment (or `about`) the line in
 /// `my-app help`. Register it with [`App::typed_command`](crate::App::typed_command).
 pub trait AppCommand: clap::Parser + Send + 'static {
+    /// Runs the command with its parsed arguments.
     fn run(self, state: AppState) -> impl Future<Output = Result> + Send;
 }
 

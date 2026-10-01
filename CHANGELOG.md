@@ -10,6 +10,17 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M26b · Docs brought up to date
+
+- Every public item has a doc comment now (379 were missing, mostly struct fields and
+  methods); `#![warn(missing_docs)]` keeps it that way in CI.
+- `RedirectExt` is sealed and `db::InvalidUlid` is `#[non_exhaustive]` (neither was meant to
+  be implemented or built by apps).
+- Guides, README, CHEATSHEET, llms.txt, the example READMEs and the files `rnx new` writes
+  now cover M22–M25: model keys, savepoints, `Encrypted`, domain and fallback routes,
+  `route_is`, `class_names`, loops, plural ranges, factory states, `#[derive(Validate)]` and
+  `detect_locale`.
+
 ### M26a · Key fixes, and examples for M22–M25
 
 - Fixed: `insert_many` and `upsert` left the key out for `Ulid`, `Uuid` and `String` keys (a

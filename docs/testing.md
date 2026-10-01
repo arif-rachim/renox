@@ -58,7 +58,9 @@ writes the tests of a whole resource (create, list, show, edit, update, delete, 
 - `renox::db::capture_queries(future)` returns what the future ran, requests included, so a
   test can catch an N+1:
   `let (res, queries) = capture_queries(app.get("/posts")).await; assert!(queries.len() <= 3);`
-- Factories fill tables: `Product::create_many(app.db(), 20).await`.
+- Factories fill tables: `Product::create_many(app.db(), 20).await`, or with states and
+  sequences: `Product::factory().count(3).state(sold_out).sequence(|i, p| p.name =
+  format!("Kopi {i}")).create(app.db()).await` (`make()` for unsaved models).
 
 ## Jobs, events, notifications, mail, HTTP
 

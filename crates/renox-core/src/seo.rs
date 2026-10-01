@@ -234,6 +234,7 @@ pub struct Sitemap {
 }
 
 impl Sitemap {
+    /// An empty sitemap; URLs are made absolute with `APP_URL`.
     pub fn new(state: &AppState) -> Self {
         Self {
             base: state.config.url.clone(),
@@ -259,6 +260,7 @@ impl Sitemap {
         Ok(self.add(&path, last_modified))
     }
 
+    /// The sitemap as XML.
     pub fn to_xml(&self) -> String {
         let mut xml = String::from(
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\

@@ -47,7 +47,9 @@ const TRIGGER: &str = "renox:analytics";
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct Event {
+    /// The event name, e.g. `sign_up`.
     pub name: String,
+    /// The event's parameters, a JSON object (empty when missing).
     #[serde(default)]
     pub params: Value,
 }
@@ -167,6 +169,7 @@ mod server_event {
             }
         }
 
+        /// Adds a parameter; a value that can't be serialized becomes `null`.
         pub fn param(mut self, key: &str, value: impl Serialize) -> Self {
             self.params.insert(
                 key.to_owned(),

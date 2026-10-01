@@ -20,12 +20,15 @@ use crate::{AppState, Error, Result};
 
 const BYPASS_COOKIE: &str = "renox_maintenance";
 
+/// The maintenance state `down` writes to `storage/framework/down`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct Down {
+    /// When the app went down, in unix seconds.
     pub since: i64,
     /// Seconds to suggest in `Retry-After`.
     pub retry: Option<u64>,
+    /// The path that sets the bypass cookie (`/{secret}`), if any.
     pub secret: Option<String>,
 }
 
@@ -57,6 +60,7 @@ pub fn up(storage: &Path) -> Result<bool> {
     }
 }
 
+/// The maintenance state, or `None` while the app is up.
 pub fn status(storage: &Path) -> Option<Down> {
     let text = std::fs::read_to_string(file(storage)).ok()?;
     serde_json::from_str(&text).ok()

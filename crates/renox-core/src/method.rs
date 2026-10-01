@@ -17,6 +17,7 @@ use axum::http::{HeaderMap, Method, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 
+/// The form field that overrides a POST's method (`PUT`, `PATCH` or `DELETE`).
 pub const METHOD_FIELD: &str = "_method";
 const METHOD_HEADER: &str = "x-http-method-override";
 

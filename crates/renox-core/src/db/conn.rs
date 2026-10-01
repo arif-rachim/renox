@@ -25,7 +25,9 @@ use sqlx::postgres::{PgArguments, PgPool, PgRow, Postgres};
 /// Which database engine a [`Db`] talks to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Dialect {
+    /// SQLite.
     Sqlite,
+    /// PostgreSQL (the `postgres` feature).
     Postgres,
 }
 
@@ -136,6 +138,7 @@ impl Db {
         self.schema.changed();
     }
 
+    /// The engine this pool talks to.
     pub fn dialect(&self) -> Dialect {
         match self.pool {
             Pool::Sqlite(_) => Dialect::Sqlite,
@@ -344,6 +347,7 @@ enum TxInner {
 }
 
 impl Transaction {
+    /// The engine this transaction runs on.
     pub fn dialect(&self) -> Dialect {
         match self.inner {
             TxInner::Sqlite(_) => Dialect::Sqlite,
@@ -352,6 +356,7 @@ impl Transaction {
         }
     }
 
+    /// Commits the transaction.
     pub async fn commit(self) -> Result<(), DbError> {
         match self.inner {
             TxInner::Sqlite(tx) => Ok(tx.commit().await?),
@@ -360,6 +365,7 @@ impl Transaction {
         }
     }
 
+    /// Rolls the transaction back (dropping it uncommitted does the same).
     pub async fn rollback(self) -> Result<(), DbError> {
         match self.inner {
             TxInner::Sqlite(tx) => Ok(tx.rollback().await?),
@@ -711,6 +717,7 @@ impl Sql {
         self
     }
 
+    /// Runs the statement and returns every row.
     pub async fn fetch_all<'c>(self, db: impl Executor<'c>) -> Result<Vec<Row>, DbError> {
         let Self { sql, args } = self;
         super::query_log::record(&sql);
@@ -727,6 +734,7 @@ impl Sql {
             .collect())
     }
 
+    /// Runs the statement and returns the first row, if any.
     pub async fn fetch_optional<'c>(self, db: impl Executor<'c>) -> Result<Option<Row>, DbError> {
         let Self { sql, args } = self;
         super::query_log::record(&sql);

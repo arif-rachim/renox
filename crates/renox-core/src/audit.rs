@@ -183,13 +183,21 @@ impl Entry {
 #[derive(Debug, Clone, Serialize)]
 #[non_exhaustive]
 pub struct AuditLog {
+    /// The `audit_logs` row id.
     pub id: i64,
+    /// Who did it; `None` when unknown (e.g. a failed login).
     pub user_id: Option<i64>,
+    /// What happened, e.g. `auth.login` or `order.refunded`.
     pub action: String,
+    /// The kind of record it happened to, e.g. `orders`.
     pub subject_type: Option<String>,
+    /// That record's id.
     pub subject_id: Option<i64>,
+    /// Details, e.g. the old and new values; `{}` when none were given.
     pub data: Value,
+    /// Where the request came from, if recorded.
     pub ip: Option<String>,
+    /// When it was recorded.
     pub created_at: DateTime,
 }
 

@@ -48,10 +48,13 @@ pub enum ReportKind {
 #[derive(Debug, Clone, Serialize)]
 #[non_exhaustive]
 pub struct RequestReport {
+    /// The HTTP method, e.g. `POST`.
     pub method: String,
+    /// The URL path, without the query string.
     pub path: String,
     /// The request id, also in the logs and the response's `X-Request-Id`.
     pub id: String,
+    /// The client's IP address (`ClientIp`), if known.
     pub ip: Option<String>,
     /// The logged-in user, if any.
     pub user_id: Option<i64>,
@@ -61,6 +64,7 @@ pub struct RequestReport {
 #[derive(Debug, Clone, Serialize)]
 #[non_exhaustive]
 pub struct ErrorReport {
+    /// Where it happened: a request, a job or a scheduled task.
     pub kind: ReportKind,
     /// The error's own message.
     pub message: String,
@@ -68,7 +72,9 @@ pub struct ErrorReport {
     pub details: String,
     /// The scheduled task's name, or the job's name and id (`send-invoice #42`).
     pub source: Option<String>,
+    /// The request, for [`ReportKind::Request`].
     pub request: Option<RequestReport>,
+    /// `APP_ENV`: `local`, `testing` or `production`.
     pub environment: String,
     /// Unix seconds.
     pub at: i64,

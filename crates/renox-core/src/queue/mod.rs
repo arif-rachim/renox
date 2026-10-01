@@ -125,6 +125,7 @@ pub trait Job: Serialize + DeserializeOwned + Send + Sync + 'static {
         Vec::new()
     }
 
+    /// Does the work; an error fails the attempt (retried unless `Error::permanent`).
     fn handle(self, ctx: JobContext) -> impl Future<Output = Result> + Send;
 
     /// Runs once the job has failed for good (attempts used up, or a
@@ -209,6 +210,7 @@ impl Middleware {
 /// What a job gets when it runs.
 #[non_exhaustive]
 pub struct JobContext {
+    /// The app's state (database, mailer, queue…).
     pub state: AppState,
     /// 1 on the first try.
     pub attempt: u32,
@@ -463,6 +465,7 @@ impl Queue {
             .await?)
     }
 
+    /// Jobs that failed for good, oldest first.
     pub async fn failed(&self) -> Result<Vec<FailedJob>> {
         let rows = crate::db::sql(
             "SELECT id, queue, job, payload, error, failed_at FROM failed_jobs ORDER BY id",
@@ -837,13 +840,17 @@ pub(crate) async fn release_unique(tx: &mut Transaction, key: &str) -> Result {
 #[derive(Debug, Clone, Serialize)]
 #[non_exhaustive]
 pub struct BatchStatus {
+    /// The `job_batches` row id.
     pub id: i64,
+    /// The name given to [`Queue::batch`].
     pub name: String,
+    /// Jobs in the batch.
     pub total: i64,
     /// Jobs not run yet (or being retried).
     pub pending: i64,
     /// Jobs that failed for good.
     pub failed: i64,
+    /// Cancelled by a failure (without `allow_failures`) or `cancel_batch`.
     pub cancelled: bool,
     /// Every job has run or been skipped.
     pub finished: bool,
@@ -865,10 +872,15 @@ impl BatchStatus {
 #[derive(Debug, Clone, Serialize)]
 #[non_exhaustive]
 pub struct FailedJob {
+    /// The `failed_jobs` row id, for `queue:retry` and `queue:forget`.
     pub id: i64,
+    /// The queue it ran on.
     pub queue: String,
+    /// The job type's [`Job::NAME`].
     pub job: String,
+    /// The serialized job (JSON, or `enc:…` when encrypted).
     pub payload: String,
+    /// The last attempt's error.
     pub error: String,
     /// Unix seconds.
     pub failed_at: i64,

@@ -16,16 +16,25 @@ use crate::{Config, Result, RouteTable, Views};
 /// Shared state available to every handler through `State<AppState>`.
 #[derive(Clone)]
 pub struct AppState {
+    /// The configuration.
     pub config: Arc<Config>,
+    /// Named routes, to build URLs.
     pub routes: Arc<RouteTable>,
+    /// The template engine.
     pub views: Views,
+    /// The database connection pool.
     pub db: Db,
+    /// Sends mail (`MAIL_MAILER`).
     pub mailer: Mailer,
+    /// Dispatches jobs.
     pub queue: Queue,
+    /// The cache (`CACHE_STORE`).
     pub cache: Cache,
+    /// The file storage disk (`STORAGE_DISK`).
     pub storage: Storage,
     /// Calls other services; faked in tests (`TestApp::fake_http`).
     pub http: crate::http::Http,
+    /// Translations from `LANG_PATH` and the built-in ones.
     pub translator: Arc<Translator>,
     /// Live reload, only while developing locally.
     pub(crate) live: Option<Arc<crate::live::Live>>,
@@ -65,6 +74,7 @@ pub struct AppState {
 pub struct SentNotification {
     /// `Notification::kind`.
     pub kind: &'static str,
+    /// Who it was sent to.
     pub to: crate::auth::Recipient,
 }
 

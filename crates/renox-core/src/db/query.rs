@@ -248,6 +248,7 @@ impl<M: Model> Query<M> {
         }
     }
 
+    /// Filters on `column = value`.
     pub fn where_eq(self, column: &str, value: impl ToDbValue) -> Self {
         self.where_op(column, "=", value)
     }
@@ -273,10 +274,12 @@ impl<M: Model> Query<M> {
         self
     }
 
+    /// Filters on `column LIKE pattern`, ignoring ASCII case (`%` and `_` are wildcards).
     pub fn where_like(self, column: &str, pattern: impl ToDbValue) -> Self {
         self.where_op(column, "like", pattern)
     }
 
+    /// Filters on `column IS NULL`.
     pub fn where_null(mut self, column: &str) -> Self {
         if let Some(column) = self.column(column) {
             self.filters.push(Filter::Sql(format!("{column} IS NULL")));
@@ -284,6 +287,7 @@ impl<M: Model> Query<M> {
         self
     }
 
+    /// Filters on `column IS NOT NULL`.
     pub fn where_not_null(mut self, column: &str) -> Self {
         if let Some(column) = self.column(column) {
             self.filters
@@ -292,10 +296,12 @@ impl<M: Model> Query<M> {
         self
     }
 
+    /// Filters on `column IN (…)`; an empty list matches no rows.
     pub fn where_in<V: ToDbValue>(self, column: &str, values: impl IntoIterator<Item = V>) -> Self {
         self.in_list(column, values, false)
     }
 
+    /// Filters on `column NOT IN (…)`; an empty list matches every row.
     pub fn where_not_in<V: ToDbValue>(
         self,
         column: &str,
@@ -487,6 +493,7 @@ impl<M: Model> Query<M> {
         if condition { add(self) } else { self }
     }
 
+    /// Sorts by `column`, ascending; call again to add tie-breakers.
     pub fn order_by(mut self, column: &str) -> Self {
         if let Some(column) = self.column(column) {
             self.order.push(format!("{column} ASC"));
@@ -494,6 +501,7 @@ impl<M: Model> Query<M> {
         self
     }
 
+    /// Sorts by `column`, descending; call again to add tie-breakers.
     pub fn order_by_desc(mut self, column: &str) -> Self {
         if let Some(column) = self.column(column) {
             self.order.push(format!("{column} DESC"));
@@ -517,6 +525,7 @@ impl<M: Model> Query<M> {
         self
     }
 
+    /// Skips the first `offset` rows.
     pub fn offset(mut self, offset: u64) -> Self {
         self.offset = Some(offset.min(i64::MAX as u64));
         self
@@ -960,6 +969,7 @@ impl<M: Model> Query<M> {
         Ok(seen)
     }
 
+    /// Runs the query and returns every matching row.
     pub async fn get<'c, E: Executor<'c>>(self, db: E) -> Result<Vec<M>> {
         self.check()?;
         let db = db.into_conn();
@@ -973,6 +983,7 @@ impl<M: Model> Query<M> {
             .collect::<std::result::Result<_, _>>()?)
     }
 
+    /// The first matching row (in the query's order), or `None`.
     pub async fn first<'c, E: Executor<'c>>(self, db: E) -> Result<Option<M>> {
         Ok(self.limit(1).get(db).await?.into_iter().next())
     }
@@ -999,6 +1010,7 @@ impl<M: Model> Query<M> {
         Ok(count as u64)
     }
 
+    /// Whether any row matches.
     pub async fn exists<'c, E: Executor<'c>>(self, db: E) -> Result<bool> {
         Ok(self.count(db).await? > 0)
     }

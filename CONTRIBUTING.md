@@ -47,7 +47,9 @@ cargo test --workspace
   TEST_DATABASE_URL=postgres://postgres:postgres@localhost:55432/renox_test \
       cargo test -p renox -p renox-core -p renox-cli -p postgres-app -p fields --features renox/postgres
   ```
-- **Docs that compile.** Public items have doc comments, and their examples run as doctests.
+- **Docs that compile.** Public items have doc comments (`#![warn(missing_docs)]` in `renox`,
+  `renox-core` and `renox-macros`, so clippy's `-D warnings` refuses a public item without
+  one), and their examples run as doctests.
   A new API also gets a line in [CHEATSHEET.md](CHEATSHEET.md) (compiled as a doctest too).
 - **Generators.** A change to `rnx new` or `rnx make:*` must keep `tests/cli/run.sh` passing:
   it builds and tests an app made with every generator.

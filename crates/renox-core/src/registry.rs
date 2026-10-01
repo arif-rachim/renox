@@ -157,6 +157,7 @@ impl Registry {
         self
     }
 
+    /// The schedule, to add tasks to.
     pub fn schedule(&mut self) -> &mut Schedule {
         &mut self.schedule
     }

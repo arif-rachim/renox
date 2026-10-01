@@ -121,6 +121,7 @@ impl Session {
         serde_json::from_value(value.clone()).ok()
     }
 
+    /// Whether `key` is set, including values flashed by the previous request.
     pub fn has(&self, key: &str) -> bool {
         let inner = self.lock();
         inner.data.contains_key(key)
@@ -128,12 +129,14 @@ impl Session {
             || inner.flashed.contains_key(key)
     }
 
+    /// Stores a value under `key`.
     pub fn put(&self, key: &str, value: impl Serialize) -> Result {
         let value = serde_json::to_value(value)?;
         self.lock().data.insert(key.to_owned(), value);
         Ok(())
     }
 
+    /// Removes `key` and returns its value, if it was set.
     pub fn remove(&self, key: &str) -> Option<Value> {
         self.lock().data.remove(key)
     }

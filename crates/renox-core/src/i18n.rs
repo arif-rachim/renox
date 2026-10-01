@@ -465,6 +465,7 @@ pub(crate) fn request_locale(extensions: &axum::http::Extensions, state: &AppSta
 /// ```
 #[derive(Clone)]
 pub struct Lang {
+    /// The request's locale, e.g. `en`.
     pub locale: String,
     pub(crate) state: AppState,
 }
@@ -482,6 +483,8 @@ impl Lang {
         self.state.translator.texts(&self.locale)
     }
 
+    /// Translates `key`, replacing `:name` placeholders with `params`; falls
+    /// back to `APP_FALLBACK_LOCALE`, then to the key itself.
     pub fn t(&self, key: &str, params: &[(&str, &dyn Display)]) -> String {
         let params: Vec<(&str, String)> = params.iter().map(|(k, v)| (*k, v.to_string())).collect();
         format(&self.raw(key), &params, None)

@@ -124,9 +124,13 @@ pub(crate) async fn check(limiter: &Limiter, req: Request, next: Next) -> Respon
 pub struct LimitRequest<'a> {
     /// The logged-in user, if any.
     pub user: Option<&'a crate::auth::User>,
+    /// The client's IP (`ClientIp`), if known.
     pub ip: Option<std::net::IpAddr>,
+    /// The request method.
     pub method: &'a axum::http::Method,
+    /// The request path.
     pub path: &'a str,
+    /// The request headers.
     pub headers: &'a axum::http::HeaderMap,
 }
 
@@ -155,14 +159,17 @@ pub struct Limit {
 }
 
 impl Limit {
+    /// At most `max` requests a minute.
     pub fn per_minute(max: u32) -> Self {
         Self::per(max, Duration::from_secs(60))
     }
 
+    /// At most `max` requests an hour.
     pub fn per_hour(max: u32) -> Self {
         Self::per(max, Duration::from_secs(3600))
     }
 
+    /// At most `max` requests (at least 1) per `per`.
     pub fn per(max: u32, per: Duration) -> Self {
         Self {
             max: max.max(1),

@@ -51,10 +51,12 @@ use super::{DbValue, ToDbValue};
 pub struct Encrypted<T>(T);
 
 impl<T> Encrypted<T> {
+    /// Wraps a plain value; it is encrypted when the model is saved.
     pub fn new(value: T) -> Self {
         Self(value)
     }
 
+    /// The plain value.
     pub fn into_inner(self) -> T {
         self.0
     }

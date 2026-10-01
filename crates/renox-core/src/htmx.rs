@@ -31,6 +31,7 @@ pub struct Htmx {
 }
 
 impl Htmx {
+    /// Reads the htmx request headers.
     pub fn from_headers(headers: &HeaderMap) -> Self {
         let text = |name: &str| {
             headers

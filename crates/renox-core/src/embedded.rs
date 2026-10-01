@@ -14,8 +14,11 @@ use crate::Error;
 /// `(relative path, contents)`. Built by `renox::embedded!()`.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Embedded {
+    /// Templates from `resources/views`.
     pub views: &'static [(&'static str, &'static str)],
+    /// Translation files from `resources/lang`.
     pub lang: &'static [(&'static str, &'static str)],
+    /// Files from `public`, served at the site root.
     pub public: &'static [(&'static str, &'static [u8])],
 }
 

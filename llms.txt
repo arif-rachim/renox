@@ -12,17 +12,21 @@
   guest, throttle); views, template globals and overriding built-in pages; `App::share` and
   `App::templates`; `App::provide` and `App::layer`; forms and validation (`unique`/`exists`);
   models, migrations and queries (raw fragments, grouping, locks, update_or_create, simple and
-  cursor pagination, transactions with retries); every field type; pagination; seeders and factories; auth,
+  cursor pagination, transactions with retries); model keys other than integers (`Ulid`,
+  `Uuid`, `String`, `rnx make:model --key`); every field type; pagination; seeders and factories; auth,
   policies, gates, API tokens and your own login; tenants (`renox::context`, default scopes),
   roles and permissions, route guards for gates/roles/permissions/token abilities; the account
   page, password rules and confirmation, per-device logout; auth events and the audit log;
-  model hooks, partial saves (`save_only`, `save_changes`) and encrypted values; HTMX; raw SQL
-  and transactions; jobs (priority, unique, encrypted, middleware, chains, batches), events and
+  model hooks, partial saves (`save_only`, `save_changes`) and encrypted fields
+  (`Encrypted<T>`); HTMX; raw SQL and transactions (savepoints); jobs (priority, unique, encrypted, middleware, chains, batches), events and
   the schedule (cron, weekly/monthly, weekdays, IANA time
   zones, `on_failure`, `schedule:run`); mail and notifications (with the in-app inbox); cookies
   and downloads; cache (`add`, `pull`, `increment`) and atomic locks; session, uploads and
-  translations (plurals); signed URLs and private files; CSP, CORS and
-  webhooks; SEO and analytics; tests; form requests (`prepare`, `authorize`, `after`) and the full rule list; typed app commands
+  translations (plurals and ranges, the browser's language); session `push`/`increment`;
+  factory states and sequences; domain and fallback routes, `Redirect::route`/`intended`,
+  `route_is`, `class_names`, `{% break %}`; signed URLs and private files; CSP, CORS and
+  webhooks; SEO and analytics; tests; form requests (`prepare`, `authorize`, `after`),
+  `#[derive(Validate)]` and the full rule list; typed app commands
   (clap) and prompts; stacks (`push`/`stack`);
   Tailwind; errors, logs and debugging (request ids, JSON logs,
   `App::report`, named rate limiters, `/_renox/debug`); configuration (`.env` and your own
@@ -130,8 +134,8 @@ Every example has a README.md that walks through it.
   [src/app/tasks/mod.rs](examples/postgres/src/app/tasks/mod.rs),
   [migrations/](examples/postgres/migrations)
 - [examples/fields](examples/fields) ([README](examples/fields/README.md)): every form field type (text, textarea, number, money,
-  checkbox, select → `DbEnum`, multi-select → `Json<Vec<String>>`, time, datetime-local, date,
-  UUID) saved and shown back in the edit form, on SQLite and PostgreSQL; list items checked
+  checkbox, select → `DbEnum`, multi-select → `Json<Vec<String>>`, time, datetime-local, date)
+  saved and shown back in the edit form, on SQLite and PostgreSQL; list items checked
   with `each` + `one_of` and `distinct`; products keyed by `id: Uuid` (a model key other than
   an integer, M22). The mapping table is
   [docs/types.md](docs/types.md). [src/app/products/mod.rs](examples/fields/src/app/products/mod.rs),

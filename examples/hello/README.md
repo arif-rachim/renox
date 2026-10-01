@@ -9,7 +9,7 @@ testing. Read it for a quick tour; read [examples/crud](../crud) or
 
 ```bash
 cd examples/hello
-cp .env.example .env             # APP_LOCALE=id: the default language is Indonesian
+cp .env.example .env             # APP_LOCALE=id: Indonesian unless the browser prefers English
 rnx key:generate                 # writes APP_KEY to .env
 cargo run -- migrate
 cargo run -- db:seed             # optional: 30 fake entries
@@ -24,7 +24,7 @@ Other things to try: `/halo/<name>`, `/bahasa/en` and `/bahasa/id` to switch lan
 
 | Feature | Where |
 |---|---|
-| Everything in Rust: the model and factory, the form and its rules, the `EntryPosted` event, the `ThankGuest` job, the `entries:prune` command (a clap `AppCommand` that confirms with `renox::prompt`), the every-minute task, the handlers, `app()` | [src/lib.rs](src/lib.rs) |
+| Everything in Rust: the model and factory, the form and its rules (`#[derive(Validate)]`), `detect_locale`, the `EntryPosted` event, the `ThankGuest` job, the `entries:prune` command (a clap `AppCommand` that confirms with `renox::prompt`), the every-minute task, the handlers, `app()` | [src/lib.rs](src/lib.rs) |
 | The page: the form posted with htmx and Alpine, the `entries` block swapped on post and on page links | [resources/views/guestbook/index.html](resources/views/guestbook/index.html) |
 | Texts and validation field names in English and Indonesian | [resources/lang](resources/lang) |
 | The entries table, then a second migration adding `photo` | [migrations](migrations) |
@@ -32,6 +32,12 @@ Other things to try: `/halo/<name>`, `/bahasa/en` and `/bahasa/id` to switch lan
 | The settings the guestbook uses, with comments (every setting: `rnx new`'s `.env.example`) | [.env.example](.env.example) |
 
 ## Things worth copying
+
+- **Rules as attributes.** `EntryForm` derives `Validate`: `#[validate(required, max = 50)]` on
+  the name, `#[validate(image, max = 2048)]` on the optional photo.
+- **The visitor's language.** `App::detect_locale()` gives a visitor their browser's language
+  (English or Indonesian) until they pick one with `/bahasa/{locale}`; `APP_LOCALE=id` is the
+  fallback for other languages.
 
 - **The app is a library.** `app()` lives in `src/lib.rs` and `main.rs` only runs it, so
   `tests/` can boot the same app.
@@ -52,6 +58,7 @@ cargo test -p hello
 ```
 
 Tests don't read `.env`, so [tests/guestbook.rs](tests/guestbook.rs) sets the locale to `id`
-itself. The prune test moves the clock forty days with `app.travel(..)` between two entries,
+itself; one test sends `Accept-Language: en` and gets the English page until `/bahasa/id` is
+chosen. The prune test moves the clock forty days with `app.travel(..)` between two entries,
 then runs the command on the moved clock with the answers typed for it:
 `app.at_travelled_time(renox::prompt::answering(["no"], app.kernel().call("entries:prune", ..)))`.

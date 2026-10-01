@@ -1,8 +1,8 @@
 # Types: from the form to the database and back
 
-One table for choosing a field type. Every row is exercised by
-[`examples/fields`](../examples/fields) (a form with every input) and by Renox's own tests, on
-SQLite and PostgreSQL.
+One table for choosing a field type. The form inputs are exercised by
+[`examples/fields`](../examples/fields) (a form with every input, products keyed by `Uuid`), and
+every row by Renox's own tests, on SQLite and PostgreSQL.
 
 | HTML input | Rust type (form and model) | SQLite column | PostgreSQL column |
 |---|---|---|---|

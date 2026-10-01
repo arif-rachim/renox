@@ -21,14 +21,20 @@ use crate::{Error, Result};
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct User {
+    /// The `users` row id; `0` before it is saved.
     pub id: i64,
+    /// The display name.
     pub name: String,
+    /// The email address (Renox's forms store it trimmed and lowercased).
     pub email: String,
     /// The Argon2 hash; never serialized, so it can't leak into templates or JSON.
     #[serde(skip_serializing, default)]
     pub password: String,
+    /// When the email address was confirmed; `None` while unverified.
     pub email_verified_at: Option<DateTime>,
+    /// When the account was created.
     pub created_at: Option<DateTime>,
+    /// When the row was last saved.
     pub updated_at: Option<DateTime>,
     /// The app's own columns, by name.
     #[serde(flatten, default)]
@@ -238,14 +244,17 @@ impl User {
         Ok(())
     }
 
+    /// Whether `password` matches the stored hash (Argon2id or an imported bcrypt one).
     pub async fn check_password(&self, password: &str) -> bool {
         verify_password(password, &self.password).await
     }
 
+    /// Whether `target`'s [`Policy`] allows this user `ability`.
     pub fn can(&self, ability: &str, target: &impl Policy) -> bool {
         target.allows(self, ability)
     }
 
+    /// Like [`User::can`], but a refusal becomes a 403 error.
     pub fn authorize(&self, ability: &str, target: &impl Policy) -> Result {
         if self.can(ability, target) {
             Ok(())

@@ -110,11 +110,14 @@ pub trait Webhook: Send + Sync + 'static {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct WebhookRequest {
+    /// The request's headers.
     pub headers: HeaderMap,
+    /// The raw body, unparsed.
     pub body: Bytes,
 }
 
 impl WebhookRequest {
+    /// A header's value; `None` if it is missing or not visible ASCII.
     pub fn header(&self, name: &str) -> Option<&str> {
         self.headers.get(name).and_then(|v| v.to_str().ok())
     }
@@ -134,7 +137,9 @@ impl WebhookRequest {
 #[derive(Debug, Clone, Serialize)]
 #[non_exhaustive]
 pub struct WebhookCall {
+    /// The `webhook_calls` row id, for `webhook:retry`.
     pub id: i64,
+    /// The [`Webhook::PROVIDER`] that received it.
     pub provider: String,
     /// The provider's id, or `sha256:` and its hash when longer than 200 bytes.
     pub event_id: String,
@@ -142,9 +147,11 @@ pub struct WebhookCall {
     pub payload: Vec<u8>,
     /// `received`, `processed` or `failed`.
     pub status: String,
+    /// The last processing error; `None` unless `failed`.
     pub error: Option<String>,
     /// Unix seconds.
     pub received_at: i64,
+    /// When processing succeeded, in Unix seconds; `None` until then.
     pub processed_at: Option<i64>,
 }
 
@@ -164,6 +171,7 @@ impl WebhookCall {
         Ok(std::str::from_utf8(&self.payload)?)
     }
 
+    /// The call with this id, if any.
     pub async fn find(db: &Db, id: i64) -> Result<Option<Self>> {
         let row = crate::db::sql(format!("SELECT {COLUMNS} FROM webhook_calls WHERE id = ?"))
             .bind(id)

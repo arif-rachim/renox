@@ -69,6 +69,7 @@ enum Store {
     Database(Db),
 }
 
+/// The app's cache (`state.cache`), in memory or the `cache` table (`CACHE_STORE`).
 #[derive(Clone)]
 pub struct Cache {
     store: Store,
@@ -144,6 +145,7 @@ impl Cache {
         }
     }
 
+    /// Whether `key` holds a value that hasn't expired.
     pub async fn has(&self, key: &str) -> Result<bool> {
         Ok(self.raw(key).await?.is_some())
     }
@@ -432,6 +434,7 @@ impl Cache {
         lock
     }
 
+    /// Removes `key` (nothing happens if it's missing).
     pub async fn forget(&self, key: &str) -> Result {
         match &self.store {
             Store::Memory(map) => {

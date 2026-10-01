@@ -160,6 +160,7 @@ impl Ulid {
         Self(text)
     }
 
+    /// The ULID as text; empty for an unsaved model.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -167,6 +168,7 @@ impl Ulid {
 
 /// The text isn't a ULID (26 Crockford base-32 characters).
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct InvalidUlid;
 
 impl fmt::Display for InvalidUlid {

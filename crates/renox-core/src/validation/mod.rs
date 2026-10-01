@@ -53,18 +53,22 @@ use chrono::NaiveDateTime;
 pub struct Errors(BTreeMap<String, Vec<String>>);
 
 impl Errors {
+    /// No errors.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Adds `message` to the messages of `field`.
     pub fn add(&mut self, field: impl Into<String>, message: impl Into<String>) {
         self.0.entry(field.into()).or_default().push(message.into());
     }
 
+    /// Whether there are no errors.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
+    /// Whether `field` has at least one error.
     pub fn has(&self, field: &str) -> bool {
         self.0.contains_key(field)
     }
@@ -77,6 +81,7 @@ impl Errors {
             .map(String::as_str)
     }
 
+    /// Every field with its messages, fields in alphabetical order.
     pub fn iter(&self) -> impl Iterator<Item = (&str, &[String])> {
         self.0.iter().map(|(f, m)| (f.as_str(), m.as_slice()))
     }
@@ -124,6 +129,7 @@ impl Errors {
 /// }
 /// ```
 pub trait Validate {
+    /// Declares the fields' rules on `v`; they run after `prepare` and `authorize`.
     fn rules(&self, v: &mut Validator);
 
     /// Tidies the input before anything checks it (Laravel's
@@ -182,8 +188,11 @@ pub trait Validate {
 /// }
 /// ```
 pub trait ValidateHooks {
+    /// Tidies the input before anything checks it; see [`Validate::prepare`].
     fn prepare(&mut self) {}
 
+    /// Whether this request may send the form; `false` answers 403. See
+    /// [`Validate::authorize`].
     fn authorize(
         &self,
         form: &FormContext<'_>,
@@ -192,6 +201,7 @@ pub trait ValidateHooks {
         std::future::ready(Ok(true))
     }
 
+    /// Checks run once the rules pass; see [`Validate::after`].
     fn after(
         &self,
         form: &FormContext<'_>,
@@ -205,10 +215,13 @@ pub trait ValidateHooks {
 /// What [`Validate::authorize`] and [`Validate::after`] see of the request.
 #[non_exhaustive]
 pub struct FormContext<'a> {
+    /// The app's state, e.g. for its database.
     pub state: &'a crate::AppState,
     /// The logged-in user, if any.
     pub user: Option<&'a crate::auth::User>,
+    /// The request's HTTP method.
     pub method: &'a axum::http::Method,
+    /// The request's path, without the query string.
     pub path: &'a str,
 }
 
@@ -268,6 +281,7 @@ pub struct Validator {
 }
 
 impl Validator {
+    /// A validator whose messages are in `locale`.
     pub fn new(locale: Locale) -> Self {
         Self {
             locale,
@@ -574,6 +588,7 @@ impl Field<'_> {
         self
     }
 
+    /// Fails when the value is missing: `None`, or text that is blank after trimming.
     pub fn required(mut self) -> Self {
         if !self.failed && self.value == Inspected::Missing {
             self.fail("required", &[]);
@@ -615,6 +630,7 @@ impl Field<'_> {
         self.size_rule("max", |s| s <= max, &[("max", number(max))])
     }
 
+    /// Between `min` and `max` inclusive, measured as `min`/`max` do.
     pub fn between(self, min: impl Into<f64>, max: impl Into<f64>) -> Self {
         let (min, max) = (min.into(), max.into());
         self.size_rule(
@@ -624,6 +640,7 @@ impl Field<'_> {
         )
     }
 
+    /// An email address: something before a single `@`, a dotted domain, no spaces.
     pub fn email(mut self) -> Self {
         if let (true, Inspected::Text(text)) = (self.present(), &self.value)
             && !is_email(text)
@@ -633,6 +650,7 @@ impl Field<'_> {
         self
     }
 
+    /// An `http://` or `https://` URL with a host and no spaces.
     pub fn url(mut self) -> Self {
         if let (true, Inspected::Text(text)) = (self.present(), &self.value)
             && !is_url(text)
@@ -784,6 +802,7 @@ impl Field<'_> {
         }
     }
 
+    /// A date on or before `limit`.
     pub fn before_or_equal(self, limit: impl FieldValue) -> Self {
         match limit.inspect() {
             Inspected::Date(limit) => self.date_rule("before_or_equal", limit, |d, l| d <= l),
@@ -799,6 +818,7 @@ impl Field<'_> {
         }
     }
 
+    /// A date on or after `limit`.
     pub fn after_or_equal(self, limit: impl FieldValue) -> Self {
         match limit.inspect() {
             Inspected::Date(limit) => self.date_rule("after_or_equal", limit, |d, l| d >= l),
@@ -1283,11 +1303,14 @@ const DONT_FLASH: &[&str] = &[
 /// ```
 #[derive(Debug, Clone)]
 pub struct ValidationError {
+    /// The messages, keyed by field name.
     pub errors: Errors,
+    /// The submitted values flashed back into the form (never passwords).
     pub input: Map<String, Value>,
 }
 
 impl ValidationError {
+    /// An error with these messages and no input to refill.
     pub fn new(errors: Errors) -> Self {
         Self {
             errors,

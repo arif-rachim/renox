@@ -24,6 +24,7 @@ use super::{DbError, FromDb, Row};
 /// # let _ = (sales, pairs); Ok(()) }
 /// ```
 pub trait FromRow: Sized {
+    /// Decodes one row, by column name or position.
     fn from_row(row: &Row) -> Result<Self, DbError>;
 }
 

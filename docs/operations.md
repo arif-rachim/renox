@@ -53,6 +53,8 @@ Don't set it when the app is reachable directly: anyone could then send a fake
 
 Routes on other hosts (`Routes::domain("admin.example.com", …)`) are chosen by the `Host`
 header, so the proxy must pass it on: Caddy does; with nginx, `proxy_set_header Host $host`.
+An app with `App::detect_locale()` answers `Vary: Accept-Language`: a CDN or caching proxy in
+front must keep that header, or it would serve one visitor's language to another.
 
 Also set `APP_URL` to the public `https://` address. Cookies are then marked `Secure`, HSTS is
 sent, and links in mails point to the right place.

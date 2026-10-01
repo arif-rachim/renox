@@ -31,6 +31,7 @@ use anyhow::anyhow;
 /// (numbered by the database; `0` means "not saved yet"), or a
 /// [`Ulid`](super::Ulid), a UUID or a `String` (see [`ModelKey`]).
 pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
+    /// The table name (the snake_case struct name unless `#[model(table = …)]`).
     const TABLE: &'static str;
     /// Every column, including `id`.
     const COLUMNS: &'static [&'static str];
@@ -45,7 +46,9 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
     /// The type of the `id` field.
     type Key: ModelKey;
 
+    /// The primary key.
     fn id(&self) -> Self::Key;
+    /// Sets the primary key (after an insert, for keys the database numbers).
     fn set_id(&mut self, id: Self::Key);
     /// Values of every column except `id`, in `COLUMNS` order.
     fn values(&self) -> Vec<DbValue>;
@@ -132,10 +135,12 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
         Self::query().where_eq(column, value)
     }
 
+    /// Every row, in id order.
     fn all<'c, E: Executor<'c>>(db: E) -> impl Future<Output = Result<Vec<Self>>> + Send {
         Self::query().order_by("id").get(db)
     }
 
+    /// The row with this id, or `None`.
     fn find<'c, E: Executor<'c>>(
         db: E,
         id: Self::Key,
@@ -505,22 +510,26 @@ async fn update_columns<'c, M: Model, E: Executor<'c>>(
 /// }
 /// ```
 ///
-/// They run for `save`, `save_only`, `save_changes`, `create`, `delete` and
+/// They run for `save`, `save_only`, `save_changes`, `create`, `insert`, `delete` and
 /// `force_delete`, not for `restore` or bulk `Query::update`/`delete` and
 /// `insert_many`, which write many rows in one statement.
 pub trait ModelHooks {
+    /// Runs before the row is written (`creating` is true for an insert); an error cancels it.
     fn saving(&mut self, _creating: bool) -> Result {
         Ok(())
     }
 
+    /// Runs after the row is written (`created` is true for an insert).
     fn saved(&self, _created: bool) -> impl Future<Output = Result> + Send {
         async { Ok(()) }
     }
 
+    /// Runs before the row is deleted; an error cancels the delete.
     fn deleting(&self) -> Result {
         Ok(())
     }
 
+    /// Runs after the row is deleted.
     fn deleted(&self) -> impl Future<Output = Result> + Send {
         async { Ok(()) }
     }

@@ -1207,7 +1207,7 @@ public items without a doc comment, and weak coverage in `renox-cli`. Three PRs:
       (crud: derive + hooks, a CSV import with savepoints, factory states; api: `Ulid` keys;
       shop: recently viewed, plural ranges, `class_names`, `Redirect::route`; teams: public
       pages with `Routes::domain` and a fallback)
-- [ ] M26b: docs brought up to date, every public item documented, `missing_docs` in CI
+- [x] M26b: docs brought up to date, every public item documented, `missing_docs` in CI
 - [ ] M26c: tests for `renox-cli` (`serve`, `scaffold`, `new`, `tailwind`) and the weak core
       files (`db/error.rs`, `path.rs`, `db/json.rs`, `app.rs` commands)
 
@@ -1220,6 +1220,22 @@ Notes from M26a:
   first, before any statement; an `i64` id is still left to the database.
 - `lock_for_update` still has no example (the CHEATSHEET shows it); the shop's checkout
   takes stock with a conditional `UPDATE`, which is the better pattern there.
+
+Notes from M26b:
+- 379 public items in renox-core (and `renox::prelude`) had no doc comment: struct fields,
+  methods, enum variants. They were written in four parallel batches by file (no two batches
+  on one file, no builds meanwhile), then the claims marked uncertain were checked against
+  the code (error statuses, S3 defaults, lettre's ports, email normalization, migration
+  names; one reworded). `#![warn(missing_docs)]` in `renox`, `renox-core` and `renox-macros`
+  makes CI's clippy (`-D warnings`) refuse an undocumented public item from now on.
+- The docs audit's findings: CLAUDE.md (§2 files, §3 i18n and hooks, §7 status and counts),
+  the guides (ui: the current route, `class_names`, loops, plural ranges; testing: factory
+  states; authorization: derived form requests; postgresql: key columns, savepoints after a
+  failed statement; relations: ULID/UUID keys, `insert`, `encrypted`, savepoints; operations:
+  `Vary` behind a CDN), README (Web tour, Laravel table), llms.txt, the hello README, the
+  AGENTS stub and `env.stub`, CHEATSHEET (hooks on `insert`, `detect_locale`).
+- `RedirectExt` is sealed (only axum's `Redirect` implements it) and `InvalidUlid` is
+  `#[non_exhaustive]`, so both may grow after 1.0; docs/stability.md lists them.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

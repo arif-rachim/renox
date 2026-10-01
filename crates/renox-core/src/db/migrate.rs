@@ -54,10 +54,12 @@ pub(crate) use framework_migration;
 /// that database; the plain file may then be left out if both are given.
 #[derive(Debug, Clone, Copy)]
 pub struct Migration {
+    /// The migration's name, e.g. `20260101000000_create_products_table`; names sort the runs.
     pub name: &'static str,
     /// SQL for every database without its own version (may be empty when
     /// each database has one).
     pub up: &'static str,
+    /// SQL that undoes `up` on databases without their own version; `None`: irreversible.
     pub down: Option<&'static str>,
     /// Used instead of `up`/`down` on SQLite.
     pub sqlite: Option<Scripts>,
@@ -68,6 +70,7 @@ pub struct Migration {
 /// One database's own version of a migration.
 #[derive(Debug, Clone, Copy)]
 pub struct Scripts {
+    /// The SQL that applies the migration on this database.
     pub up: &'static str,
     /// Falls back to the migration's plain `down` when `None`.
     pub down: Option<&'static str>,
@@ -107,7 +110,9 @@ impl Migration {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct MigrationStatus {
+    /// The migration's name.
     pub name: String,
+    /// The batch it ran in; `None` when it hasn't run.
     pub batch: Option<i64>,
     /// Applied, but its file is no longer registered.
     pub missing: bool,

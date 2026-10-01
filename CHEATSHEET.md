@@ -604,7 +604,7 @@ async fn edit(state: &AppState, id: i64) -> Result {
 }
 ```
 
-Hooks run for `save`, `create`, `save_only`, `save_changes`, `delete` and `force_delete`, not
+Hooks run for `save`, `create`/`insert`, `save_only`, `save_changes`, `delete` and `force_delete`, not
 for bulk `Query::update`/`delete` or `insert_many`.
 
 ## Every field type (details in docs/types.md)
@@ -1330,6 +1330,7 @@ async fn misc(State(state): State<AppState>, session: Session, lang: Lang) -> Re
 
 async fn switch_language(session: Session, back: Back) -> Result<Back> {
     renox::i18n::set_locale(&session, "id")?; // this visitor's language from the next request on
+    // (App::new().detect_locale() picks the browser's language until the visitor chooses one)
     Ok(back)
 }
 

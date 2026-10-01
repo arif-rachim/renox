@@ -46,6 +46,7 @@ pub struct Upload {
     pub file_name: String,
     /// The type the browser declared, e.g. `image/jpeg`. Don't trust it for security.
     pub content_type: String,
+    /// The file's content.
     pub bytes: Bytes,
 }
 
@@ -66,6 +67,7 @@ const ACTIVE_EXTENSIONS: &[&str] = &[
 ];
 
 impl Upload {
+    /// Size of the content in bytes.
     pub fn size(&self) -> usize {
         self.bytes.len()
     }

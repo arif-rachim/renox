@@ -56,20 +56,28 @@ const OUTBOX: usize = 50;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[non_exhaustive]
 pub struct Mail {
+    /// Recipients.
     pub to: Vec<String>,
+    /// The subject line.
     pub subject: String,
+    /// The plain-text body.
     pub text: String,
+    /// An HTML body, sent next to `text` when set.
     #[serde(default)]
     pub html: Option<String>,
+    /// Carbon-copy recipients.
     #[serde(default)]
     pub cc: Vec<String>,
+    /// Blind-carbon-copy recipients.
     #[serde(default)]
     pub bcc: Vec<String>,
+    /// The address replies go to.
     #[serde(default)]
     pub reply_to: Option<String>,
     /// Sender instead of `MAIL_FROM_ADDRESS` / `MAIL_FROM_NAME`.
     #[serde(default)]
     pub from: Option<String>,
+    /// Files sent with the mail.
     #[serde(default)]
     pub attachments: Vec<Attachment>,
 }
@@ -78,6 +86,7 @@ pub struct Mail {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[non_exhaustive]
 pub struct Attachment {
+    /// The file name the recipient sees, e.g. `INV-001.pdf`.
     pub filename: String,
     /// e.g. `application/pdf`.
     pub content_type: String,
@@ -102,6 +111,7 @@ mod base64_bytes {
 }
 
 impl Mail {
+    /// A mail to `to` with this subject and plain-text body.
     pub fn new(to: impl Into<String>, subject: impl Into<String>, text: impl Into<String>) -> Self {
         Self {
             to: vec![to.into()],
@@ -116,6 +126,7 @@ impl Mail {
         }
     }
 
+    /// Adds an HTML body; `text` is still sent as the plain alternative.
     pub fn html(mut self, html: impl Into<String>) -> Self {
         self.html = Some(html.into());
         self
@@ -127,16 +138,19 @@ impl Mail {
         self
     }
 
+    /// Adds a carbon-copy recipient.
     pub fn cc(mut self, address: impl Into<String>) -> Self {
         self.cc.push(address.into());
         self
     }
 
+    /// Adds a blind-carbon-copy recipient.
     pub fn bcc(mut self, address: impl Into<String>) -> Self {
         self.bcc.push(address.into());
         self
     }
 
+    /// Where replies go.
     pub fn reply_to(mut self, address: impl Into<String>) -> Self {
         self.reply_to = Some(address.into());
         self
@@ -148,6 +162,7 @@ impl Mail {
         self
     }
 
+    /// Attaches `data` as a file named `filename` of type `content_type`.
     pub fn attach(
         mut self,
         filename: impl Into<String>,
@@ -178,13 +193,19 @@ impl Mail {
 pub struct MailConfig {
     /// `smtp`, `log` or `memory`.
     pub mailer: String,
+    /// SMTP server, from `MAIL_HOST` (default `localhost`).
     pub host: String,
+    /// SMTP port, from `MAIL_PORT`; `None` uses the encryption's usual port.
     pub port: Option<u16>,
+    /// SMTP user name, from `MAIL_USERNAME`.
     pub username: Option<String>,
+    /// SMTP password, from `MAIL_PASSWORD`.
     pub password: Option<String>,
     /// `tls` (usually port 465), `starttls` (587) or `none` (e.g. Mailpit on 1025).
     pub encryption: String,
+    /// Sender address, from `MAIL_FROM_ADDRESS` (default `hello@example.com`).
     pub from_address: String,
+    /// Sender name, from `MAIL_FROM_NAME`.
     pub from_name: Option<String>,
     /// How long sending one mail over SMTP may take, from `MAIL_TIMEOUT` in
     /// seconds (default 10).
@@ -251,6 +272,8 @@ impl Mailer {
         })
     }
 
+    /// Sends `mail` through the configured driver (the `log` and `memory` drivers
+    /// only record it).
     pub async fn send(&self, mail: Mail) -> Result {
         match &self.driver {
             Driver::Log => tracing::info!(

@@ -111,6 +111,7 @@ pub struct Auth {
 }
 
 impl Auth {
+    /// Registration on, account pages and email verification off, the default `Password` policy.
     pub fn new() -> Self {
         Self {
             password: crate::validation::Password::default(),

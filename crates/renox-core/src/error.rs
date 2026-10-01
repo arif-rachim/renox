@@ -1,6 +1,7 @@
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Response};
 
+/// The result type handlers return; `Error` by default.
 pub type Result<T = (), E = Error> = std::result::Result<T, E>;
 
 /// The error type handlers return. Any `anyhow`-compatible error converts into
@@ -19,9 +20,13 @@ pub type Result<T = (), E = Error> = std::result::Result<T, E>;
 /// ```
 #[non_exhaustive]
 pub enum Error {
+    /// 400, with a message that is safe to show visitors.
     BadRequest(String),
+    /// 401: the request needs a logged-in user.
     Unauthorized,
+    /// 403: the user may not do this.
     Forbidden,
+    /// 404.
     NotFound,
     /// The CSRF token was missing or wrong, usually because the session expired.
     PageExpired,
@@ -34,6 +39,7 @@ pub enum Error {
     /// Any status, with a message that is safe to show visitors (on the
     /// error page, or as `message` in JSON).
     Status(StatusCode, String),
+    /// 500 (409 for a unique-constraint violation); details are shown only in debug.
     Internal(anyhow::Error),
 }
 
@@ -123,6 +129,7 @@ impl Error {
         }
     }
 
+    /// The HTTP status this error responds with.
     pub fn status(&self) -> StatusCode {
         match self {
             Self::BadRequest(_) => StatusCode::BAD_REQUEST,

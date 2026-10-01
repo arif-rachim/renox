@@ -7,7 +7,9 @@ use axum::response::{IntoResponse, Response};
 use crate::crypto::constant_time_eq;
 use crate::{Error, Session};
 
+/// The request header that carries the CSRF token (htmx and `fetch` requests).
 pub const CSRF_HEADER: &str = "x-csrf-token";
+/// The form field that carries the CSRF token.
 pub const CSRF_FIELD: &str = "_token";
 
 /// Finds the text field `name` in a buffered multipart body. The body was

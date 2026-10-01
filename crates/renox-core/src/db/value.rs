@@ -8,17 +8,25 @@ use chrono::{FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum DbValue {
+    /// SQL `NULL`.
     Null,
+    /// A 64-bit integer (`INTEGER` on SQLite, `BIGINT` on PostgreSQL).
     Integer(i64),
+    /// A 64-bit float (`REAL` on SQLite, `DOUBLE PRECISION` on PostgreSQL).
     Real(f64),
+    /// Text.
     Text(String),
+    /// Bytes (`BLOB` on SQLite, `BYTEA` on PostgreSQL).
     Blob(Vec<u8>),
+    /// A boolean (`0`/`1` on SQLite, `BOOLEAN` on PostgreSQL).
     Bool(bool),
     /// A point in time with its offset (`TIMESTAMPTZ` on PostgreSQL).
     DateTime(chrono::DateTime<FixedOffset>),
     /// A date and time without a zone (`TIMESTAMP` on PostgreSQL).
     NaiveDateTime(NaiveDateTime),
+    /// A date (`YYYY-MM-DD` text on SQLite, `DATE` on PostgreSQL).
     Date(NaiveDate),
+    /// A time of day (text on SQLite, `TIME` on PostgreSQL).
     Time(NaiveTime),
     /// Text on SQLite; JSON on PostgreSQL (fits `JSONB` and `TEXT` columns).
     Json(serde_json::Value),
@@ -74,6 +82,7 @@ impl DbValue {
 /// scalar types, `Option`, chrono dates and `serde_json::Value`; implement it
 /// for your own types to use them in models and `where_*` filters.
 pub trait ToDbValue {
+    /// The value to bind for `self`.
     fn to_db_value(&self) -> DbValue;
 }
 

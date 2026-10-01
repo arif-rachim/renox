@@ -31,7 +31,9 @@ use crate::events::Event;
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Registered {
+    /// The new user's id.
     pub user_id: i64,
+    /// The new user's email address (normalized).
     pub email: String,
 }
 
@@ -39,7 +41,9 @@ pub struct Registered {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct LoggedIn {
+    /// The user who logged in.
     pub user_id: i64,
+    /// The client's IP address (`ClientIp`), if known.
     pub ip: Option<String>,
 }
 
@@ -47,7 +51,9 @@ pub struct LoggedIn {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct LoginFailed {
+    /// The email address that was entered.
     pub email: String,
+    /// The client's IP address (`ClientIp`), if known.
     pub ip: Option<String>,
 }
 
@@ -55,8 +61,11 @@ pub struct LoginFailed {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct LockedOut {
+    /// The email address that was entered.
     pub email: String,
+    /// The client's IP address (`ClientIp`), if known.
     pub ip: Option<String>,
+    /// Seconds left until another attempt is allowed.
     pub seconds: u64,
 }
 
@@ -64,6 +73,7 @@ pub struct LockedOut {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct LoggedOut {
+    /// The user who logged out.
     pub user_id: i64,
 }
 
@@ -71,6 +81,7 @@ pub struct LoggedOut {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct PasswordReset {
+    /// The user whose password was reset.
     pub user_id: i64,
 }
 
@@ -78,6 +89,7 @@ pub struct PasswordReset {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct PasswordChanged {
+    /// The user whose password changed.
     pub user_id: i64,
 }
 
@@ -85,6 +97,7 @@ pub struct PasswordChanged {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct EmailVerified {
+    /// The user whose email address was confirmed.
     pub user_id: i64,
 }
 
@@ -92,7 +105,9 @@ pub struct EmailVerified {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct ProfileUpdated {
+    /// The user whose profile changed.
     pub user_id: i64,
+    /// Whether the email address changed.
     pub email_changed: bool,
 }
 
@@ -100,6 +115,7 @@ pub struct ProfileUpdated {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct OtherDevicesLoggedOut {
+    /// The user whose other sessions were ended.
     pub user_id: i64,
 }
 
@@ -107,7 +123,9 @@ pub struct OtherDevicesLoggedOut {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct AccountDeleted {
+    /// The deleted user's id (no longer in `users`).
     pub user_id: i64,
+    /// The deleted user's email address.
     pub email: String,
 }
 

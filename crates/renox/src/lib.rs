@@ -24,6 +24,7 @@
 //!     App::new().module(Hello).run()
 //! }
 //! ```
+#![warn(missing_docs)]
 
 pub use renox_core::*;
 pub use renox_macros::{DbEnum, FromRow, Model, Validate, embedded, migrations, test};
@@ -31,6 +32,9 @@ pub use renox_macros::{DbEnum, FromRow, Model, Validate, embedded, migrations, t
 pub use axum;
 pub use tokio;
 
+/// What most files of an app import: `use renox::prelude::*;` brings the
+/// app builder, modules and routes, models and queries, validation, auth,
+/// views, jobs and events, and axum's extractors and responses.
 pub mod prelude {
     pub use renox_core::auth::{Auth, Can, User};
     pub use renox_core::db::{DateTime, Db, Factory, FromRow, Model, Page, Paginated};
