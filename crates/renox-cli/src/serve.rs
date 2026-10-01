@@ -172,3 +172,44 @@ fn is_ignored(path: &Path) -> bool {
         .and_then(|n| n.to_str())
         .is_some_and(|n| (n.starts_with('.') && n != ".env") || n.ends_with('~'))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn editor_files_are_ignored_but_env_is_not() {
+        for ignored in [".main.rs.swp", "src/.#lib.rs", "main.rs~", ".DS_Store"] {
+            assert!(is_ignored(Path::new(ignored)), "{ignored}");
+        }
+        for watched in ["src/main.rs", ".env", "Cargo.toml", "migrations/x.up.sql"] {
+            assert!(!is_ignored(Path::new(watched)), "{watched}");
+        }
+    }
+
+    #[test]
+    fn the_fingerprint_changes_with_content_not_with_ignored_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("src");
+        fs::create_dir_all(src.join("app")).unwrap();
+        fs::write(src.join("main.rs"), "fn main() {}").unwrap();
+        fs::write(src.join("app/mod.rs"), "").unwrap();
+        let print = || {
+            let mut files = Vec::new();
+            collect(&src, &mut files);
+            collect(&dir.path().join("missing"), &mut files); // nothing, no error
+            files.sort();
+            files
+        };
+        let first = print();
+        assert_eq!(first.len(), 2);
+        assert_eq!(print(), first, "reading files changes nothing");
+
+        fs::write(src.join(".main.rs.swp"), "swap").unwrap();
+        assert_eq!(print(), first, "swap files don't count");
+
+        fs::write(src.join("main.rs"), "fn main() { println!(); }").unwrap();
+        assert_ne!(print(), first, "a new size is a change");
+    }
+}

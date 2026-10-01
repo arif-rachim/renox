@@ -233,4 +233,14 @@ mod tests {
         }
         assert_eq!(hex(&[0, 15, 255]), "000fff");
     }
+
+    #[test]
+    fn apps_with_an_input_file_use_tailwind() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(!enabled(dir.path()));
+        let input = dir.path().join(INPUT);
+        fs::create_dir_all(input.parent().unwrap()).unwrap();
+        fs::write(&input, INPUT_STUB).unwrap();
+        assert!(enabled(dir.path()));
+    }
 }

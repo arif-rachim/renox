@@ -709,3 +709,159 @@ async fn __module___are_created_listed_changed_and_deleted() {
     app.assert_database_count("__table__", 0).await;
     app.get("/__path__/1").await.assert_not_found();
 }__invalid__"#;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn app() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("src/app/home")).unwrap();
+        fs::create_dir_all(dir.path().join("migrations")).unwrap();
+        fs::write(
+            dir.path().join("Cargo.toml"),
+            "[package]\nname = \"my-shop\"\nversion = \"0.1.0\"\n",
+        )
+        .unwrap();
+        fs::write(dir.path().join("src/app/mod.rs"), "pub mod home;\n").unwrap();
+        fs::write(
+            dir.path().join("src/lib.rs"),
+            "pub mod app;\n\npub fn app() -> renox::App {\n    renox::App::new()\n        .migrations(renox::migrations!())\n        .module(app::home::Home)\n}\n",
+        )
+        .unwrap();
+        dir
+    }
+
+    fn read(dir: &tempfile::TempDir, path: &str) -> String {
+        fs::read_to_string(dir.path().join(path)).unwrap()
+    }
+
+    #[test]
+    fn fields_parse_with_types_and_aliases() {
+        let fields = parse_fields("title, Price:money stock:int done:boolean due_on:date").unwrap();
+        let kinds: Vec<_> = fields.iter().map(|f| (f.name.as_str(), f.kind)).collect();
+        assert_eq!(
+            kinds,
+            [
+                ("title", Kind::String),
+                ("price", Kind::Money),
+                ("stock", Kind::Int),
+                ("done", Kind::Bool),
+                ("due_on", Kind::Date),
+            ]
+        );
+        assert_eq!(fields[4].label(), "Due on");
+        assert_eq!(fields[1].rust_type(), "i64");
+        assert!(fields[1].numeric() && !fields[0].numeric());
+        assert_eq!(fields[0].rules(), Some("required, max = 255"));
+        assert_eq!(fields[3].rules(), None);
+        assert!(
+            fields[3]
+                .column(Database::Postgres)
+                .contains("BOOLEAN NOT NULL DEFAULT FALSE")
+        );
+        assert!(
+            fields[3]
+                .column(Database::Sqlite)
+                .contains("INTEGER NOT NULL DEFAULT 0")
+        );
+        assert!(fields[1].display("row").contains("| number"));
+
+        // Nothing given: one `name` text field.
+        let fields = parse_fields("").unwrap();
+        assert_eq!(fields.len(), 1);
+        assert_eq!(
+            (fields[0].name.as_str(), fields[0].kind),
+            ("name", Kind::String)
+        );
+    }
+
+    #[test]
+    fn bad_fields_are_refused() {
+        let error = |spec: &str| parse_fields(spec).unwrap_err().to_string();
+        assert!(error("price:currency").contains("unknown field type `currency`"));
+        assert!(error("id:int").contains("added for you"));
+        assert!(error("created_at:date").contains("added for you"));
+        assert!(error("name name:text").contains("listed twice"));
+    }
+
+    #[test]
+    fn plurals_become_singular() {
+        for (plural, single) in [
+            ("products", "product"),
+            ("categories", "category"),
+            ("boxes", "box"),
+            ("classes", "class"),
+            ("batches", "batch"),
+            ("news", "news"),
+            ("address", "address"),
+            ("barang", "barang"),
+        ] {
+            assert_eq!(singular(plural), single);
+        }
+    }
+
+    #[test]
+    fn the_crate_name_comes_from_cargo_toml() {
+        let dir = app();
+        assert_eq!(crate_name(dir.path()).unwrap(), "my_shop");
+        fs::write(dir.path().join("Cargo.toml"), "[package]\n").unwrap();
+        assert!(crate_name(dir.path()).is_err());
+    }
+
+    #[test]
+    fn a_resource_writes_every_file_and_registers_its_module() {
+        let dir = app();
+        resource(
+            dir.path(),
+            "products",
+            None,
+            Some("name price:money in_stock:bool"),
+        )
+        .unwrap();
+
+        let model = read(&dir, "src/app/products/model.rs");
+        assert!(model.contains("pub struct Product"));
+        assert!(model.contains("pub price: i64,"));
+        assert!(model.contains("pub in_stock: bool,"));
+        let module = read(&dir, "src/app/products/mod.rs");
+        assert!(module.contains("pub struct Products;"));
+        assert!(!module.contains("__"), "every placeholder is filled");
+        for view in ["index", "form", "show"] {
+            let html = read(&dir, &format!("resources/views/products/{view}.html"));
+            assert!(!html.contains("__Model__") && !html.contains("__path__"));
+        }
+        let tests = read(&dir, "tests/products.rs");
+        assert!(tests.contains("my_shop::app()"));
+        assert!(!tests.contains("__"));
+
+        let migrations: Vec<_> = fs::read_dir(dir.path().join("migrations"))
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
+        let up = migrations
+            .iter()
+            .find(|name| name.ends_with("create_products_table.up.sql"))
+            .expect("an up migration");
+        let sql = read(&dir, &format!("migrations/{up}"));
+        assert!(sql.contains("CREATE TABLE \"products\""));
+        assert!(sql.contains("\"in_stock\""));
+
+        assert!(read(&dir, "src/app/mod.rs").contains("pub mod products;"));
+        assert!(read(&dir, "src/lib.rs").contains(".module(app::products::Products)"));
+
+        // A second time is refused, without touching the first.
+        let again = resource(dir.path(), "products", None, None).unwrap_err();
+        assert!(again.to_string().contains("already exists"));
+    }
+
+    #[test]
+    fn a_resource_needs_a_model_name_apart_from_its_module() {
+        let dir = app();
+        let error = resource(dir.path(), "news", None, None).unwrap_err();
+        assert!(error.to_string().contains("--model"), "{error}");
+        resource(dir.path(), "news", Some("article"), Some("title body:text")).unwrap();
+        assert!(read(&dir, "src/app/news/model.rs").contains("pub struct Article"));
+        assert!(resource(dir.path(), "bad name!", None, None).is_err());
+    }
+}

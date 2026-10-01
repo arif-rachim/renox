@@ -1208,7 +1208,7 @@ public items without a doc comment, and weak coverage in `renox-cli`. Three PRs:
       shop: recently viewed, plural ranges, `class_names`, `Redirect::route`; teams: public
       pages with `Routes::domain` and a fallback)
 - [x] M26b: docs brought up to date, every public item documented, `missing_docs` in CI
-- [ ] M26c: tests for `renox-cli` (`serve`, `scaffold`, `new`, `tailwind`) and the weak core
+- [x] M26c: tests for `renox-cli` (`serve`, `scaffold`, `new`, `tailwind`) and the weak core
       files (`db/error.rs`, `path.rs`, `db/json.rs`, `app.rs` commands)
 
 Notes from M26a:
@@ -1236,6 +1236,20 @@ Notes from M26b:
   AGENTS stub and `env.stub`, CHEATSHEET (hooks on `insert`, `detect_locale`).
 - `RedirectExt` is sealed (only axum's `Redirect` implements it) and `InvalidUlid` is
   `#[non_exhaustive]`, so both may grow after 1.0; docs/stability.md lists them.
+
+Notes from M26c:
+- Coverage before (CI's llvm-cov): renox-cli's `serve.rs` and `scaffold.rs` 0%, `main.rs`
+  10%, `tailwind.rs` 15%, `new.rs` 38%; in renox-core `db/error.rs` 48%, `path.rs` 56%,
+  `db/json.rs` 63%, `app.rs` 66% (its commands ran only from the CLI job).
+- The CLI's untested parts were split from their side effects so they test without a
+  network or a working directory: `new::run_in(parent, …)`, `with_key(env, key)` for
+  `key:generate`; `serve`'s fingerprint is tested through `collect`, Tailwind's download
+  isn't (the CLI job runs it).
+- `App::run_args` is new public API, added so the binary's built-in commands can be tested
+  from `it/commands.rs` (and useful for programs that drive an app).
+- Found by the tests: `renox::Path` turned every rejection into a 404, including a handler
+  asking for a parameter its route doesn't have (axum's `WrongNumberOfParameters`) and an
+  unsupported type. Those are the app's bugs and now answer 500.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

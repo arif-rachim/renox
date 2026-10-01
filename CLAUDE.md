@@ -51,7 +51,8 @@ crates/renox/              facade crate apps depend on: re-exports renox-core, t
                            API in a routed handler), web_security.rs, data_resilience.rs,
                            background_resilience.rs, direct.rs (APIs otherwise tested only
                            indirectly), database.rs, postgres.rs (`postgres` feature), s3.rs
-                           (`s3` feature), extension_points.rs, api_foundations.rs, data_layer.rs
+                           (`s3` feature), extension_points.rs, api_foundations.rs, data_layer.rs,
+                           commands.rs (the binary's built-in commands via `App::run_args`)
   tests/migrations/, migrations_plain/, migrations_types/, views/   fixtures (not under it/)
 crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/app.rs               App builder, boot(), Kernel, router assembly, app-binary commands;
@@ -100,6 +101,7 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            query_log.rs (capture_queries: a task-local statement log, also
                            feeding /_renox/debug)
   src/path.rs              renox::Path: axum's Path with a 404 (not 400) when a value won't parse
+                           (a parameter the route lacks is a 500)
   src/validation/          Validator/rules (mod.rs, ValidateHooks for the derive), Valid<T>
                            (extract.rs: prepare → authorize → rules → after, FormContext), en/id
                            messages
@@ -785,7 +787,7 @@ picks the build, not the terminal.
 
 ## 7. Where things stand (update this section when it changes)
 
-- **All milestones M0–M25 are merged to `main`**, then M26a (#73); the owner's B/C/D before
+- **All milestones M0–M25 are merged to `main`**, then M26a (#73) and M26b (#74); the owner's B/C/D before
   1.0 were M23–M25. History:
   `CHANGELOG.md` (per milestone) and `ROADMAP.md` (per-milestone notes and decisions).
 - After M17: a docs refresh (#45) and the Laravel parity review with M18–M21 planned (#46).
@@ -875,7 +877,8 @@ picks the build, not the terminal.
 - **M26** (completeness before 1.0, three PRs): M26a (key bugs in `insert_many`/`upsert` and
   `unique().ignore()`, the fallback status bug, examples for M22–M25): merged (#73). M26b (docs
   brought up to date, the 380 undocumented public items documented, `missing_docs` enforced,
-  `RedirectExt` sealed, `InvalidUlid` non-exhaustive): branch `m26b-docs`. Then M26c (tests for `renox-cli` and weak core files).
+  `RedirectExt` sealed, `InvalidUlid` non-exhaustive): merged (#74). M26c (tests for `renox-cli` and weak core files, `App::run_args`,
+  `renox::Path` answers 500 for a parameter the route lacks): branch `m26c-tests`.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.

@@ -3,6 +3,7 @@
 use std::ops::{Deref, DerefMut};
 
 use axum::extract::FromRequestParts;
+use axum::extract::path::ErrorKind;
 use axum::extract::rejection::PathRejection;
 use axum::http::request::Parts;
 use serde::de::DeserializeOwned;
@@ -46,7 +47,14 @@ where
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Error> {
         match axum::extract::Path::<T>::from_request_parts(parts, state).await {
             Ok(axum::extract::Path(value)) => Ok(Path(value)),
-            Err(PathRejection::FailedToDeserializePathParams(_)) => Err(Error::NotFound),
+            // A visitor's value that doesn't parse (`/products/abc`): not found.
+            // A parameter count or type that can't work is the app's mistake.
+            Err(PathRejection::FailedToDeserializePathParams(err)) => match err.kind() {
+                ErrorKind::WrongNumberOfParameters { .. } | ErrorKind::UnsupportedType { .. } => {
+                    Err(anyhow::anyhow!("{err}").into())
+                }
+                _ => Err(Error::NotFound),
+            },
             // The route has no such parameters: a mistake in the app.
             Err(other) => Err(anyhow::anyhow!("{other}").into()),
         }
