@@ -10,6 +10,17 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M26c · Tests for the CLI and the weak spots
+
+- New: `App::run_args(["migrate:status"])` runs any command of the app binary from code (a
+  test, or a program driving the app), as `my-app migrate:status` would.
+- Fixed: a handler taking `renox::Path` on a route without that parameter answered 404; that
+  is the app's mistake, so it is a 500 now. A value that doesn't parse is still a 404.
+- Tests for `rnx`: argument parsing, `make:module --resource` (fields, plurals, every file
+  written and registered), `rnx new` (every placeholder filled, PostgreSQL apps), the
+  `serve` fingerprint, `key:generate`'s `.env` edit, Tailwind detection. Tests for the
+  binary's built-in commands, `DbError`'s questions and `db::Json`.
+
 ### M26b · Docs brought up to date
 
 - Every public item has a doc comment now (379 were missing, mostly struct fields and

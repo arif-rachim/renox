@@ -9,6 +9,7 @@ mod auth_email;
 mod authorization;
 mod background;
 mod background_resilience;
+mod commands;
 mod data_layer;
 mod data_resilience;
 mod database;

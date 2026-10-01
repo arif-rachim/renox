@@ -733,6 +733,21 @@ impl App {
             .block_on(self.run_command(&args))
     }
 
+    /// Runs one command as the app binary would, e.g. from a test or a
+    /// program that drives the app: `["migrate:status"]`, `["down",
+    /// "--secret", "abc"]`, or `[]` for `serve`. Output goes to stdout.
+    ///
+    /// ```no_run
+    /// # use renox::prelude::*;
+    /// # async fn demo() -> Result {
+    /// App::new().run_args(["migrate"]).await?;
+    /// # Ok(()) }
+    /// ```
+    pub async fn run_args(self, args: impl IntoIterator<Item = impl Into<String>>) -> Result {
+        let args: Vec<String> = args.into_iter().map(Into::into).collect();
+        self.run_command(&args).await
+    }
+
     /// Starts the server on the current Tokio runtime.
     pub async fn serve(self) -> Result {
         self.run_command(&[]).await

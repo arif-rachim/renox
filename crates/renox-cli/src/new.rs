@@ -70,8 +70,19 @@ pub fn run(
     database: Database,
     tailwind: bool,
 ) -> Result<()> {
+    run_in(Path::new("."), name, renox_path, database, tailwind)
+}
+
+/// `run`, making the app in `parent` (tests use a temporary directory).
+fn run_in(
+    parent: &Path,
+    name: &str,
+    renox_path: Option<&Path>,
+    database: Database,
+    tailwind: bool,
+) -> Result<()> {
     validate_name(name)?;
-    let root = Path::new(name);
+    let root = &parent.join(name);
     if root.exists() {
         bail!("`{name}` already exists");
     }
@@ -265,6 +276,75 @@ mod tests {
             format!("https://github.com/arif-rachim/renox/blob/{rev}")
         );
         assert!(docs_url(None).ends_with("/blob/main"));
+    }
+
+    /// A written file with `\n` line ends (Windows checkouts give the stubs `\r\n`).
+    fn read_lf(path: std::path::PathBuf) -> String {
+        fs::read_to_string(path).unwrap().replace("\r\n", "\n")
+    }
+
+    #[test]
+    fn makes_an_app_with_every_placeholder_filled() {
+        let dir = tempfile::tempdir().unwrap();
+        let checkout = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        run_in(
+            dir.path(),
+            "toko-kopi",
+            Some(&checkout),
+            Database::Sqlite,
+            false,
+        )
+        .unwrap();
+        let root = dir.path().join("toko-kopi");
+        for (file, _) in STUBS {
+            let text = fs::read_to_string(root.join(file)).unwrap();
+            // `{{name}}`-style placeholders (templates' `{{ x }}` has spaces).
+            let left = text.split("{{").skip(1).any(|rest| {
+                rest.split_once("}}").is_some_and(|(inner, _)| {
+                    !inner.is_empty() && inner.chars().all(|c| c.is_ascii_lowercase() || c == '_')
+                })
+            });
+            assert!(!left, "{file} still has a placeholder");
+        }
+        let cargo = fs::read_to_string(root.join("Cargo.toml")).unwrap();
+        assert!(cargo.contains("name = \"toko-kopi\""), "{cargo}");
+        assert!(cargo.contains("renox = { path = "), "{cargo}");
+        // The real .env has a key; the example doesn't.
+        let env = read_lf(root.join(".env"));
+        assert!(env.contains("APP_KEY=base64:"), "{env}");
+        let example = read_lf(root.join(".env.example"));
+        assert!(example.contains("APP_KEY=\n"), "{example}");
+        assert!(env.contains("DATABASE_URL=sqlite://storage/app.db"));
+        // AGENTS.md names the crate in its test example.
+        let agents = fs::read_to_string(root.join("AGENTS.md")).unwrap();
+        assert!(agents.contains("toko_kopi::app()"));
+        // Not twice, and not over a bad name or a checkout that isn't Renox.
+        assert!(run_in(dir.path(), "toko-kopi", None, Database::Sqlite, false).is_err());
+        assert!(run_in(dir.path(), "Toko", None, Database::Sqlite, false).is_err());
+        assert!(
+            run_in(
+                dir.path(),
+                "other",
+                Some(dir.path()),
+                Database::Sqlite,
+                false
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn postgres_apps_point_at_their_databases() {
+        let dir = tempfile::tempdir().unwrap();
+        run_in(dir.path(), "kasir", None, Database::Postgres, false).unwrap();
+        let root = dir.path().join("kasir");
+        let cargo = fs::read_to_string(root.join("Cargo.toml")).unwrap();
+        assert!(cargo.contains("features = [\"postgres\"]"), "{cargo}");
+        let env = read_lf(root.join(".env"));
+        assert!(env.contains("DATABASE_URL=postgres://postgres:postgres@localhost:5432/kasir\n"));
+        assert!(env.contains(
+            "\nTEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/kasir_test"
+        ));
     }
 
     #[test]

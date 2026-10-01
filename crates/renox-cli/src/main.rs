@@ -409,6 +409,14 @@ fn key_generate(show: bool) -> Result<()> {
         }
         Err(err) => return Err(err).context("could not read .env"),
     };
+    std::fs::write(".env", with_key(&env, &key)).context("could not write .env")?;
+    println!("APP_KEY written to .env. Existing sessions are now invalid.");
+    Ok(())
+}
+
+/// `.env`'s text with `APP_KEY` set to `key` (added when missing; a later
+/// definition is commented out, an `export` kept).
+fn with_key(env: &str, key: &str) -> String {
     let mut replaced = false;
     let mut lines: Vec<String> = env
         .lines()
@@ -430,7 +438,124 @@ fn key_generate(show: bool) -> Result<()> {
     if !replaced {
         lines.push(format!("APP_KEY={key}"));
     }
-    std::fs::write(".env", lines.join("\n") + "\n").context("could not write .env")?;
-    println!("APP_KEY written to .env. Existing sessions are now invalid.");
-    Ok(())
+    lines.join("\n") + "\n"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(args: &[&str]) -> Command {
+        Cli::try_parse_from(std::iter::once("rnx").chain(args.iter().copied()))
+            .unwrap()
+            .command
+    }
+
+    #[test]
+    fn commands_parse_with_their_options() {
+        assert!(matches!(
+            parse(&["new", "toko", "--database", "postgres", "--tailwind"]),
+            Command::New { name, database: Database::Postgres, tailwind: true, renox_path: None } if name == "toko"
+        ));
+        assert!(matches!(
+            parse(&["make:model", "Order", "-m", "--key", "ulid"]),
+            Command::MakeModel {
+                migration: true,
+                key: KeyType::Ulid,
+                module: None,
+                ..
+            }
+        ));
+        assert!(matches!(
+            parse(&["make:model", "Order"]),
+            Command::MakeModel {
+                key: KeyType::Integer,
+                ..
+            }
+        ));
+        assert!(matches!(
+            parse(&["make:module", "products", "--resource", "--fields", "name price:money"]),
+            Command::MakeModule { resource: true, fields: Some(f), model: None, .. } if f == "name price:money"
+        ));
+        assert!(matches!(
+            parse(&["serve", "--release"]),
+            Command::Serve { cargo_args } if cargo_args == ["--release"]
+        ));
+        assert!(matches!(
+            parse(&["migrate:rollback", "--step", "2"]),
+            Command::MigrateRollback { args } if args == ["--step", "2"]
+        ));
+        assert!(matches!(
+            parse(&["make:component", "--ui", "--force"]),
+            Command::MakeComponent {
+                name: None,
+                ui: true,
+                force: true
+            }
+        ));
+        // Anything else goes to the app.
+        assert!(matches!(
+            parse(&["queue:work", "--queue", "mail"]),
+            Command::App(args) if args == ["queue:work", "--queue", "mail"]
+        ));
+        // A generator's required option is required.
+        assert!(Cli::try_parse_from(["rnx", "make:job", "SendReceipt"]).is_err());
+        assert!(Cli::try_parse_from(["rnx", "make:model", "X", "--key", "float"]).is_err());
+    }
+
+    #[test]
+    fn database_urls_pick_the_engine() {
+        assert_eq!(Database::of_url("postgres://u@h/db"), Database::Postgres);
+        assert_eq!(Database::of_url("postgresql://u@h/db"), Database::Postgres);
+        assert_eq!(
+            Database::of_url("sqlite://storage/app.db"),
+            Database::Sqlite
+        );
+        assert_eq!(Database::of_url(""), Database::Sqlite);
+    }
+
+    #[test]
+    fn key_types_have_their_columns() {
+        assert_eq!(KeyType::Uuid.rust_type(), "Uuid");
+        assert_eq!(
+            KeyType::Uuid.column(Database::Postgres),
+            "id UUID PRIMARY KEY"
+        );
+        assert_eq!(
+            KeyType::Uuid.column(Database::Sqlite),
+            "id BLOB PRIMARY KEY"
+        );
+        assert_eq!(
+            KeyType::String.column(Database::Sqlite),
+            "id TEXT PRIMARY KEY"
+        );
+        assert!(
+            KeyType::Integer
+                .column(Database::Sqlite)
+                .contains("AUTOINCREMENT")
+        );
+    }
+
+    #[test]
+    fn generated_keys_are_32_random_bytes() {
+        let key = generate_key();
+        let bytes = STANDARD
+            .decode(key.strip_prefix("base64:").unwrap())
+            .unwrap();
+        assert_eq!(bytes.len(), 32);
+        assert_ne!(key, generate_key());
+    }
+
+    #[test]
+    fn the_key_goes_into_env() {
+        assert_eq!(with_key("", "k"), "APP_KEY=k\n");
+        assert_eq!(
+            with_key("APP_NAME=Toko\nAPP_KEY=\nAPP_DEBUG=true", "k"),
+            "APP_NAME=Toko\nAPP_KEY=k\nAPP_DEBUG=true\n"
+        );
+        assert_eq!(
+            with_key("export APP_KEY=old\nAPP_KEY=other", "k"),
+            "export APP_KEY=k\n# APP_KEY=other\n"
+        );
+    }
 }

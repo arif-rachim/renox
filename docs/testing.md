@@ -74,6 +74,8 @@ writes the tests of a whole resource (create, list, show, edit, update, delete, 
 | `app.sent_mail()`, `app.assert_mail_sent(to, subject)` | The mail sent so far (the test mailer keeps it). |
 | `app.fake_http()` | Answers `state.http` requests with fakes and records them. A request without a fake is an error, so nothing reaches the network. |
 | `app.kernel().run_scheduled("report")` | Runs a scheduled task now. |
+| `app.kernel().call("products:import", ["a.csv"])` | Runs one of the app's own commands. |
+| `my_app::app().run_args(["migrate:status"]).await` | Runs any command the binary has, built-ins included (`migrate`, `queue:failed`, `down`…), as `my-app migrate:status` would. Give the app a file database: each call boots it anew. |
 
 ## Time
 
