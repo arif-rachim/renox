@@ -10,6 +10,26 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M26a · Key fixes, and examples for M22–M25
+
+- Fixed: `insert_many` and `upsert` left the key out for `Ulid`, `Uuid` and `String` keys (a
+  NULL key on SQLite, an error on PostgreSQL). They now make ULIDs and UUIDs, write `String`
+  keys (a missing one is an error), and `upsert` may use `id` as its conflict target for
+  such keys.
+- Fixed: `unique(…).ignore(id)` took only an `i64`; it takes any key now.
+- Fixed: a `Routes::fallback` answer became a 404 whenever the app had a `public/`
+  directory (tower-http's `not_found_service` overrides the status); a fallback's own
+  status (a redirect, a 200 page) is kept now.
+- examples/crud: the form derives `Validate` with a `prepare` hook; `products:import` imports
+  a CSV in one transaction with a savepoint per line; the seeder uses factory states and a
+  sequence.
+- examples/api: products are keyed by `Ulid` (public ids, and the list's cursors).
+- examples/shop: "recently viewed" with `session.push` and `{% break %}`, stock texts with
+  plural ranges, `class_names` on sold-out cards, `Redirect::route` after checkout and in the
+  admin.
+- examples/teams: each team's public page on its own host (`Routes::domain("{team}.localhost",
+  …)`, `DomainParams`, a domain fallback), with a `slug` column (a new migration).
+
 ### M25 · Derived validation and the browser's language
 
 - `#[derive(Validate)]`: rules as attributes on the form's fields,

@@ -73,7 +73,7 @@ pub async fn store(
     state.cache.forget(FEATURED).await?;
     Ok((
         Toast::success(format!("“{}” created.", product.name)),
-        Redirect::to("/admin/products"),
+        Redirect::route("admin.products.index", &[])?,
     ))
 }
 
@@ -97,7 +97,7 @@ pub async fn update(
     state.cache.forget(FEATURED).await?;
     Ok((
         Toast::success(format!("“{}” saved.", product.name)),
-        Redirect::to("/admin/products"),
+        Redirect::route("admin.products.index", &[])?,
     ))
 }
 
@@ -113,7 +113,7 @@ pub async fn destroy(
     state.cache.forget(FEATURED).await?;
     Ok((
         Toast::success(format!("“{}” deleted.", product.name)),
-        Redirect::to("/admin/products"),
+        Redirect::route("admin.products.index", &[])?,
     ))
 }
 

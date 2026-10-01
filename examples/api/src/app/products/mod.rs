@@ -1,13 +1,16 @@
 //! Made with `rnx make:module products` and `rnx make:model Product --module products -m`.
 
-use renox::db::CursorPage;
+use renox::db::{CursorPage, Ulid};
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Model, Serialize, Deserialize, Default, Debug, Clone)]
 #[model(table = "products")]
 pub struct Product {
-    pub id: i64,
+    /// A ULID (`01J9Z3…`), made on insert: a public id that sorts by
+    /// creation time and doesn't reveal how many products there are. It's
+    /// also what the list's cursors are made of.
+    pub id: Ulid,
     pub name: String,
     pub price: i64,
     pub created_at: Option<DateTime>,
@@ -142,7 +145,8 @@ async fn index(
     ))
 }
 
-async fn show(State(db): State<Db>, Path(id): Path<i64>) -> Result<Json<Product>> {
+/// A malformed id in the path is a 404, like an unknown one.
+async fn show(State(db): State<Db>, Path(id): Path<Ulid>) -> Result<Json<Product>> {
     Ok(Json(Product::find_or_404(&db, id).await?))
 }
 
@@ -178,7 +182,7 @@ async fn store(
     ))
 }
 
-async fn destroy(State(db): State<Db>, Path(id): Path<i64>) -> Result<StatusCode> {
+async fn destroy(State(db): State<Db>, Path(id): Path<Ulid>) -> Result<StatusCode> {
     Product::find_or_404(&db, id).await?.delete(&db).await?;
     Ok(StatusCode::NO_CONTENT)
 }

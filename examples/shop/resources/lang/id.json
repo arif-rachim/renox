@@ -6,7 +6,8 @@
   "home": {
     "title": "Segar dari sangrai",
     "description": "Kopi, teh dan camilan, diantar ke rumahmu.",
-    "new": "Baru di toko"
+    "new": "Baru di toko",
+    "recent": "Baru dilihat"
   },
   "products": {
     "none": "Belum ada produk.",
@@ -16,7 +17,7 @@
     "all_categories": "Semua kategori",
     "sort": { "newest": "Terbaru", "price_asc": "Termurah", "price_desc": "Termahal", "name": "Nama" },
     "found": "Satu produk ditemukan|:count produk ditemukan",
-    "in_stock": "Tinggal satu|Stok :count"
+    "in_stock": "{0} Habis|{1} Tinggal satu|[2,5] Tinggal :count lagi|[6,*] Stok :count"
   },
   "cart": {
     "added": ":name masuk keranjang.",

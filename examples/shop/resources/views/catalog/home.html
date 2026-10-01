@@ -15,6 +15,15 @@
   {% endfor %}
 </ul>
 
+{% if recent %}
+<h2 class="rx-card__title">{{ t('home.recent') }}</h2>
+<div class="grid">
+  {% for product in recent %}
+  {% if loop.index > 4 %}{% break %}{% endif %}{% include "catalog/_card.html" %}
+  {% endfor %}
+</div>
+{% endif %}
+
 <h2 class="rx-card__title">{{ t('home.new') }}</h2>
 {% if featured %}
 <div class="grid">

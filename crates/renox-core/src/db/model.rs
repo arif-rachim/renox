@@ -153,8 +153,9 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
     }
 
     /// Inserts many new models with a few statements (ids aren't returned;
-    /// use `create` when you need them). Timestamps are set. Returns the
-    /// number of rows inserted.
+    /// use `create` when you need them). Timestamps are set; unsaved ULID
+    /// and UUID keys are made, `String` keys must be set, `i64` keys come
+    /// from the database. Returns the number of rows inserted.
     fn insert_many<'c, E: Executor<'c>>(
         db: E,
         models: Vec<Self>,
@@ -184,8 +185,13 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
         let unique_by: Vec<String> = unique_by.iter().map(|c| (*c).to_owned()).collect();
         let update: Vec<String> = update.iter().map(|c| (*c).to_owned()).collect();
         async move {
+            // Keys the app writes (ULID, UUID, String) may be the conflict
+            // target; an `i64` id isn't written, and no key is ever updated.
+            let key_target = !<Self::Key as ModelKey>::AUTO_INCREMENT;
             for column in unique_by.iter().chain(&update) {
-                if !Self::COLUMNS.contains(&column.as_str()) || column == "id" {
+                let id_allowed =
+                    key_target && unique_by.contains(column) && !update.contains(column);
+                if !Self::COLUMNS.contains(&column.as_str()) || (column == "id" && !id_allowed) {
                     return Err(
                         anyhow!("`{}` has no column `{column}` to upsert", Self::TABLE).into(),
                     );
@@ -531,10 +537,28 @@ async fn write_many<M: Model>(
     upsert: Option<(Vec<String>, Vec<String>)>,
 ) -> Result<u64> {
     let at = now();
+    // `i64` keys come from the database; other keys are written, made here
+    // (ULID, UUID) when unsaved.
+    let with_keys = !<M::Key as super::ModelKey>::AUTO_INCREMENT;
     for model in &mut models {
         model.touch(at, true);
+        if with_keys && model.id().is_unsaved() {
+            match <M::Key as super::ModelKey>::generate() {
+                Some(key) => model.set_id(key),
+                None => {
+                    return Err(anyhow!(
+                        "set the `id` of every new {} row before inserting them",
+                        M::TABLE
+                    )
+                    .into());
+                }
+            }
+        }
     }
-    let columns: Vec<&str> = M::COLUMNS.iter().copied().filter(|c| *c != "id").collect();
+    let mut columns: Vec<&str> = M::COLUMNS.iter().copied().filter(|c| *c != "id").collect();
+    if with_keys {
+        columns.insert(0, "id");
+    }
     if columns.is_empty() || models.is_empty() {
         return Ok(0);
     }
@@ -569,8 +593,12 @@ async fn write_many<M: Model>(
             quoted.join(", "),
             conflict.as_deref().unwrap_or_default()
         );
+        let values = chunk.iter().flat_map(|model| {
+            let key = with_keys.then(|| model.id().to_db_value());
+            key.into_iter().chain(model.values())
+        });
         written += sql(statement)
-            .bind_all(chunk.iter().flat_map(Model::values))
+            .bind_all(values)
             .execute(conn.reborrow())
             .await?;
     }

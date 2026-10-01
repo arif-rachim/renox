@@ -448,3 +448,36 @@ async fn the_secret_is_encrypted_and_needs_the_password() {
         .assert_status(303);
     w.app.get("/team/secret").await.assert_forbidden();
 }
+
+#[renox::test]
+async fn every_team_has_a_public_page_on_its_own_host() {
+    let w = world().await;
+    assert_eq!(
+        (w.acme.slug.as_str(), w.globex.slug.as_str()),
+        ("acme", "globex")
+    );
+    let on = |host: &'static str, path: &'static str| {
+        let app = &w.app;
+        async move { app.request().header("host", host).get(path).await }
+    };
+    // Anyone, logged in or not: the name and the counts, no project names.
+    on("acme.localhost:3000", "/")
+        .await
+        .assert_ok()
+        .assert_view("teams/public.html")
+        .assert_see("<h1 class=\"rx-title\">Acme</h1>")
+        .assert_see("1 member · 2 projects")
+        .assert_dont_see("Rocket skates");
+    on("globex.localhost", "/")
+        .await
+        .assert_see("1 member · 1 project");
+    on("nobody.localhost", "/").await.assert_not_found();
+    // The domain's fallback: any other path goes to the team's page.
+    on("acme.localhost", "/projects").await.assert_redirect("/");
+    // The app itself is on the plain host.
+    w.app.get("/").await.assert_redirect("/login");
+
+    // A second team with the same name gets its own host.
+    let clone = Team::found(w.app.db(), "Acme", &w.bob).await.unwrap();
+    assert_eq!(clone.slug, "acme-2");
+}

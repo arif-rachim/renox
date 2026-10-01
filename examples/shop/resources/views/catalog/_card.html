@@ -1,4 +1,5 @@
-<article class="product-card">
+{#- `class_names`: the classes whose condition holds (Blade's @class). -#}
+<article class="{{ class_names('product-card', {'product-card--sold-out': product.stock == 0}) }}">
   <a href="{{ route('products.show', product.slug) }}">
     {% if product.photo %}<img src="{{ storage_url(product.photo) }}" alt="" width="240" height="160" loading="lazy">{% else %}<div class="no-photo"></div>{% endif %}
     <div class="product-card__body">

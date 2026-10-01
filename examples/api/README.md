@@ -57,6 +57,9 @@ with `products:write`: `POST /api/products`, `DELETE /api/products/{id}`; any va
   `renox::auth::prune_expired_tokens`.
 - **JSON bodies are validated like forms.** `Valid<T>` works on JSON too; bad input gets
   `422 {"message", "errors"}`. The product name is checked with `.unique("products", "name")`.
+- **ULIDs as public ids.** `Product::id` is a `Ulid` (`01J9Z3…`, a `TEXT PRIMARY KEY`), made
+  when the product is saved. Clients see ids that sort by creation time but don't reveal how
+  many products there are, and `Path<Ulid>` answers 404 for a malformed one.
 - **Cursor pagination for the list.** `Product::query().cursor_paginate(&db, cursor, 20)` returns
   `Json<CursorPage<Product>>`: `{"items", "per_page", "next_cursor"}`, newest first. The client
   sends `next_cursor` back as `?cursor=…` until it is `null`. Unlike page numbers, rows added in
@@ -75,5 +78,6 @@ cargo test -p api
 
 [tests/api.rs](tests/api.rs) logs in through the API and checks the JSON with
 `assert_json_path("items", json!([]))`, `json_path("errors.name.0")` and `assert_json`
-(the listed keys only). Time is moved, not waited for: `app.travel(29 * DAY)` keeps a token
+(the listed keys only), including that ids are 26-character ULIDs and a malformed one is a
+404. Time is moved, not waited for: `app.travel(29 * DAY)` keeps a token
 working and two more days expire it, and `app.travel(61 s)` lets a rate-limited guest try again.

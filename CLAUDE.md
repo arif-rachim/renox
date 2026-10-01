@@ -861,6 +861,10 @@ picks the build, not the terminal.
 - **M25** (D: `#[derive(Validate)]` + `ValidateHooks`, `App::detect_locale` for
   `Accept-Language` with `Vary`; hello and `make:module --resource` use the derive): branch
   `m25-derive-validate`.
+- **M26** (completeness before 1.0, three PRs): M26a (key bugs in `insert_many`/`upsert` and
+  `unique().ignore()`, the fallback status bug, examples for M22–M25) on branch
+  `m26a-keys-and-examples`; then M26b (docs, every public item documented, `missing_docs`)
+  and M26c (tests for `renox-cli` and weak core files).
 - **M21 is complete.** Next is the owner's call; **v1.0 is on hold** until the owner says to
   start it (docs site, starter kit, semver checks, real crates.io releases; the owner runs
   `cargo login`). Small M21 items that weren't built are listed in ROADMAP ("Deferred from
