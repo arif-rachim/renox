@@ -41,6 +41,10 @@ cargo run               # http://127.0.0.1:3000
 - **Merged cells.** *By region* sorts by region and city: equal neighbours share
   one cell, cities nested in their region; a row's details fit between them.
 
+- **Export.** The download button (top right) exports every row the filters
+  match: CSV, Excel (this example turns on renox's `xlsx` feature) or a page to
+  print or save as PDF.
+
 ## Files
 
 - `src/app/orders/mod.rs`: the grids (`orders_grid`, `regions_grid`), the page

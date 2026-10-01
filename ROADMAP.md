@@ -1268,7 +1268,7 @@ cells, exports on the server (CSV, Excel, PDF through a print page). Three PRs:
 - [x] M27b: row details with audit fields (created/updated by and at), cell and row edit
       modes (validated, saved per cell or per row), drag-and-drop row order, merged cells
       (same values in a row of cells, hierarchical between columns)
-- [ ] M27c: exports of every filtered row: CSV, Excel (`rust_xlsxwriter`, headings merged
+- [x] M27c: exports of every filtered row: CSV, Excel (`rust_xlsxwriter`, headings merged
       as on screen) and a print page for PDF
 
 Notes from M27a:
@@ -1294,6 +1294,15 @@ Notes from M27b:
 - Merged columns need the rows sorted by them; with a user's own sort they still merge equal
   neighbours, by value. The tools column (drag, details, edit) is frozen at the left edge,
   before the user's frozen columns.
+
+Notes from M27c:
+- Excel is the opt-in `xlsx` feature, not a default: `rust_xlsxwriter` (pure Rust, MIT/Apache)
+  and its zip dependency would otherwise build in every app. CSV and the print page need
+  nothing.
+- PDF is the browser's: the print page is plain HTML with print CSS (landscape, headings
+  repeated per page), as agreed with the owner, so no PDF crate or fonts.
+- Exports use the columns the user shows on wide screens, in their order, and leave custom
+  columns out (they're drawn by templates); CSV guards against formula injection.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

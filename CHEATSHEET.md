@@ -685,7 +685,8 @@ async fn index(request: GridRequest) -> Result<View> {
 inside `<main class="rx-grid-fill">`; `{{ sparkline(row.trend) }}` draws a small chart.
 More: `.audit()` (who changed a row, under it), `Column::editable()` + `.edit_url("/orders/{id}")`
 (PATCH, `Valid<T>` with `Option` fields), `.reorder("position", url)` + `RowOrder::save`,
-`Column::merge()` with `sort_by("region,city")`.
+`Column::merge()` with `sort_by("region,city")`, `.exports()` + `grid.export(query, &request)`
+(CSV, Excel with the `xlsx` feature, a print page).
 
 ## Seeders and factories
 

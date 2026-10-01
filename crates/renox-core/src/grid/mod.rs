@@ -56,6 +56,10 @@ use chrono::{Duration, NaiveDate};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
+mod export;
+
+pub use export::MAX_EXPORT_ROWS;
+
 use crate::auth::AuthUser;
 use crate::db::{Db, Model, Paginated, Query};
 use crate::{AppState, Error, Result, Session};
@@ -312,6 +316,7 @@ pub struct Grid {
     details: bool,
     edit_url: Option<String>,
     reorder: Option<(String, String)>,
+    exports: bool,
 }
 
 impl Grid {
@@ -329,7 +334,17 @@ impl Grid {
             details: false,
             edit_url: None,
             reorder: None,
+            exports: false,
         }
+    }
+
+    /// An export menu in the toolbar: CSV, Excel (with the `xlsx` feature)
+    /// and a page to print or save as PDF, each of every row the filters
+    /// match (not just the page), in the user's columns. The handler answers
+    /// them with [`Grid::export`].
+    pub fn exports(mut self) -> Self {
+        self.exports = true;
+        self
     }
 
     /// A click on a row (or its chevron) opens details under it: who
@@ -902,6 +917,8 @@ pub struct GridRequest {
     db: Db,
     session: Option<Session>,
     user_id: Option<i64>,
+    lang: Option<crate::Lang>,
+    zone: crate::timezone::Zone,
 }
 
 impl GridRequest {
@@ -917,6 +934,8 @@ impl GridRequest {
             db: db.clone(),
             session: None,
             user_id: None,
+            lang: None,
+            zone: crate::timezone::Zone::Fixed(0),
         }
     }
 
@@ -954,12 +973,19 @@ impl<S: Send + Sync> FromRequestParts<S> for GridRequest {
         .await
         .ok()
         .flatten();
+        let lang = crate::Lang::from_request_parts(parts, state).await.ok();
         Ok(Self {
             params,
             path: parts.uri.path().to_owned(),
             db: app.db.clone(),
             session,
             user_id: user.map(|u| u.id),
+            lang,
+            zone: app
+                .config
+                .timezone
+                .parse()
+                .unwrap_or(crate::timezone::Zone::Fixed(0)),
         })
     }
 }
@@ -1098,6 +1124,7 @@ impl<M: Serialize> GridPage<M> {
             .collect();
         let editable = self.grid.edit_url.is_some() && self.grid.columns.iter().any(|c| c.editable);
         let query = self.state.query_string();
+        let query = &query;
         let config = json!({
             "id": self.grid.id,
             "prefs": format!("/_renox/grid/{}/prefs", self.grid.id),
@@ -1151,6 +1178,7 @@ impl<M: Serialize> GridPage<M> {
                 "active": dragging,
             })),
             "tools": self.grid.audit || self.grid.details || editable || self.grid.reorder.is_some(),
+            "exports": self.grid.exports.then(|| export::urls(&self.path, query)),
         })
     }
 }

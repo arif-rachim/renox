@@ -263,6 +263,12 @@ tr[aria-busy="true"] > td { opacity: 0.6; }
 .rx-grid__choice { display: flex; align-items: center; gap: 10px; min-height: 36px; cursor: pointer; }
 .rx-grid__choice input { width: 18px; height: 18px; accent-color: var(--rx-accent); }
 .rx-grid__columns { width: min(400px, calc(100vw - 16px)); }
+.rx-grid__menu { width: min(260px, calc(100vw - 16px)); }
+.rx-grid__menu-item {
+  display: flex; align-items: center; min-height: 40px; padding: 0 10px; margin: 0 -6px;
+  border-radius: var(--rx-radius-s); color: var(--rx-label); text-decoration: none;
+}
+.rx-grid__menu-item:hover { background: var(--rx-fill); }
 .rx-grid__pop--dates { width: min(620px, calc(100vw - 16px)); }
 .rx-grid__picker { list-style: none; margin: 8px 0 0; padding: 0; }
 .rx-grid__picker li { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--rx-separator); }

@@ -146,7 +146,8 @@ impl Module for Guestbook {
 - A data grid for dashboards (`renox::grid`): filters per column by kind (a date range
   calendar for dates), server pages and sorting in the URL, grouped headings, frozen columns,
   different columns on phones and desktops kept per user, and cells drawn by the page
-  (`{{ sparkline(…) }}` charts, buttons).
+  (`{{ sparkline(…) }}` charts, buttons); details with audit fields, editing in place, rows
+  dragged into order, merged cells, and CSV/Excel/print exports.
 - `.also("block")` sends out-of-band blocks with a fragment; `HxRetarget`, `HxReswap` and
   `HxPushUrl` set the other htmx headers.
 </details>

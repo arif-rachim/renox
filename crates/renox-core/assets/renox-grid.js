@@ -687,6 +687,11 @@
     }
   });
 
+  // The print page's button (no inline handlers under a strict CSP).
+  document.addEventListener("click", function (event) {
+    if (event.target.closest && event.target.closest("[data-grid-print]")) window.print();
+  });
+
   // ---------- Setup ----------
 
   function setup(grid) {

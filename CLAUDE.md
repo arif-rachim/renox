@@ -82,7 +82,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/clock.rs             the current time with a test offset (TestApp::travel); Stamp for
                            in-memory windows (rate limits, login lock), never Instant
   views/ui.html            the UI kit (renox/ui.html); assets/renox-ui.css|js its styles and script
-  views/grid.html          the data grid macro (renox/grid.html); assets/renox-grid.css|js, and
+  views/grid.html          the data grid macro (renox/grid.html), grid_print.html (its print
+                           export); assets/renox-grid.css|js, and
                            assets/cally.js (Cally 0.9.2, MIT: the date range calendar)
   src/view_stack.rs        push/prepend/stack: markers filled in after the page renders (Scope)
   src/view_filters.rs      built-in template filters `number` and `date`; pub format_number
@@ -125,9 +126,10 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/schedule.rs          Schedule + runner, ScheduledTask builder, own cron parser, run claims
   src/timezone.rs          Zone (UTC / fixed offset / IANA via chrono-tz) for APP_TIMEZONE
   src/events.rs            Event, listeners, AppState::emit
-  src/grid/mod.rs          renox::grid: Grid/Column, GridRequest, filters from the query string,
+  src/grid/                mod.rs: renox::grid: Grid/Column, GridRequest, filters from the query string,
                            header rows, GridPage (serialized for renox/grid.html), preferences
-                           (grid_preferences / session) and their /_renox/grid/{grid}/prefs route
+                           (grid_preferences / session) and their /_renox/grid/{grid}/prefs route,
+                           merged cells, RowOrder; export.rs: CSV, Excel (`xlsx`), print page
   src/mail.rs              Mail (recipients, cc/bcc/reply_to/from, attachments), Mailer
                            (smtp/log/memory), mail_view, queue_mail, /_renox/mail preview
   src/cache.rs             Cache (memory / database store), remember(), add/pull/increment,
@@ -275,7 +277,7 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
 - **One runtime crate (`renox-core`)**, not renox-http/-db/-view: those would all need `AppState`
   and `App` would need all of them (circular). `renox` is a thin facade.
 - **Cargo features:** `renox` defaults to `fake` and `server-events`; optional `postgres`, `s3`,
-  `uuid`. renox-core is `default-features = false` in the workspace deps; the `renox` crate owns
+  `uuid`, `xlsx` (Excel exports of data grids). renox-core is `default-features = false` in the workspace deps; the `renox` crate owns
   the defaults.
 - **Sessions are an encrypted, signed cookie by default** (`cookie` PrivateJar, key derived from
   `APP_KEY`), so no DB is needed; keep that small (a warning is logged over 4 KB).
@@ -891,7 +893,8 @@ picks the build, not the terminal.
 - **M27** (a data grid, asked by the owner before v1.0; three PRs): M27a (`renox::grid` +
   `renox/grid.html`, Cally, `grid_preferences`, `sparkline`, examples/grid): merged (#76). M27b
   (`audit`/`details`, `editable` + `edit_url`, `reorder` + `RowOrder`, `merge`, several
-  default sort keys): branch `m27b-grid-edit`. M27c (CSV/Excel/print exports) follows.
+  default sort keys): merged (#77). M27c (`exports`/`export`: CSV, Excel behind
+  the `xlsx` feature, a print page): branch `m27c-grid-export`.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.

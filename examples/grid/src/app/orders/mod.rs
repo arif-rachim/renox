@@ -86,6 +86,8 @@ pub fn orders_grid() -> Grid {
         .column(Column::custom("actions", "Actions").frozen_right())
         .sort_by("-ordered_on")
         .audit()
+        // CSV, Excel and a print page of every filtered row (`export` below).
+        .exports()
         .edit_url("/orders/{id}")
         // Sorted by # (ascending), rows can be dragged into order.
         .reorder("position", "/orders/reorder")
@@ -111,9 +113,14 @@ pub fn regions_grid() -> Grid {
         .sort_by("region,city,-total")
         .audit()
         .details()
+        .exports()
 }
 
-async fn index(request: GridRequest) -> Result<View> {
+async fn index(request: GridRequest) -> Result<Response> {
+    // `?export=csv|xlsx|print`: the file, not the page.
+    if let Some(file) = orders_grid().export(Order::query(), &request).await? {
+        return Ok(file);
+    }
     let page = orders_grid()
         .page(Order::query(), &request)
         .await?
@@ -123,12 +130,15 @@ async fn index(request: GridRequest) -> Result<View> {
             let up = trend.last() >= trend.first();
             json!({ "up": up })
         });
-    Ok(view("orders/index.html", context! { orders => page }))
+    Ok(view("orders/index.html", context! { orders => page }).into_response())
 }
 
-async fn regions(request: GridRequest) -> Result<View> {
+async fn regions(request: GridRequest) -> Result<Response> {
+    if let Some(file) = regions_grid().export(Order::query(), &request).await? {
+        return Ok(file);
+    }
     let page = regions_grid().page(Order::query(), &request).await?;
-    Ok(view("orders/regions.html", context! { orders => page }))
+    Ok(view("orders/regions.html", context! { orders => page }).into_response())
 }
 
 async fn show(State(state): State<AppState>, Path(id): Path<i64>) -> Result<View> {
