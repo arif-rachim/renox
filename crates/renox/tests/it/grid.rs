@@ -888,3 +888,110 @@ async fn two_grids_on_a_page_keep_their_own_values() {
     assert!(second.contains(r#"<input type="hidden" name="a.search" value="SO-002">"#));
     assert!(first.contains(r#"name="a.page""#) && second.contains(r#"name="b.page""#));
 }
+
+// ---------- M28b: selection, bulk and row actions ----------
+
+fn action_grid() -> Grid {
+    use renox::grid::Action;
+    Grid::new("orders")
+        .column(Column::text("number", "Order"))
+        .column(Column::select(
+            "status",
+            "Status",
+            [("new", "New"), ("paid", "Paid")],
+        ))
+        .sort_by("number")
+        .bulk_action(Action::new("Mark paid", "/bulk/paid"))
+        .bulk_action(
+            Action::new("Delete", "/bulk/delete")
+                .confirm("Sure?")
+                .danger(),
+        )
+        .row_action(Action::link("Open", "/orders/{id}"))
+        .row_action(
+            Action::new("Remove", "/orders/{id}")
+                .method("delete")
+                .confirm("Remove it?"),
+        )
+}
+
+struct Acting;
+
+impl Module for Acting {
+    fn name(&self) -> &'static str {
+        "acting"
+    }
+
+    fn routes(&self) -> Routes {
+        use renox::grid::Selection;
+        Routes::new()
+            .get("/acts", |request: GridRequest| async move {
+                let page = action_grid().page(GridOrder::query(), &request).await?;
+                Ok::<_, Error>(view("orders.html", context! { orders => page }))
+            })
+            .post(
+                "/bulk/paid",
+                |State(db): State<Db>, request: GridRequest, Form(selection): Form<Selection>| async move {
+                    let n = action_grid()
+                        .selected(GridOrder::query(), &request, &selection)?
+                        .update(&db, &[("status", &"paid")])
+                        .await?;
+                    Ok::<_, Error>(n.to_string())
+                },
+            )
+    }
+}
+
+#[renox::test]
+async fn bulk_actions_take_the_selection_or_all_matching() {
+    let (_, views) = app().await; // for its views
+    let app = TestApp::with_config(App::new().migrations(&[SCHEMA]).module(Acting), |c| {
+        c.views_path = views.path().to_path_buf()
+    })
+    .await;
+    let mut ids = Vec::new();
+    for (number, status) in [("A1", "new"), ("A2", "new"), ("B1", "new"), ("B2", "paid")] {
+        let order = GridOrder::create(
+            app.db(),
+            GridOrder {
+                number: number.into(),
+                status: status.into(),
+                ordered_on: NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        ids.push(order.id);
+    }
+    let html = app.get("/acts").await.text();
+    assert!(html.contains("data-grid-select-all"));
+    assert!(html.contains(&format!(r#"data-grid-select value="{}""#, ids[0])));
+    assert!(html.contains(
+        r#"data-url="/bulk/delete" data-method="POST" data-confirm="Sure?" data-danger"#
+    ));
+    assert!(html.contains(&format!(r#"href="/orders/{}">Open</a>"#, ids[0])));
+    assert!(html.contains(&format!(
+        r#"data-url="/orders/{}" data-method="DELETE" data-confirm="Remove it?""#,
+        ids[0]
+    )));
+    assert!(html.contains("<dialog class=\"rx-grid__dialog\""));
+
+    // The selected ids only.
+    let picked = format!("{},{}", ids[0], ids[2]);
+    app.post("/bulk/paid", &[("ids", picked.as_str()), ("all", "false")])
+        .await
+        .assert_see("2");
+    // Every row the grid's filters (in the query string) match.
+    app.post("/bulk/paid?q.number=A", &[("ids", ""), ("all", "true")])
+        .await
+        .assert_see("2");
+    let paid = GridOrder::where_eq("status", "paid")
+        .count(app.db())
+        .await
+        .unwrap();
+    assert_eq!(paid, 4);
+    app.post("/bulk/paid", &[("ids", "x"), ("all", "false")])
+        .await
+        .assert_status(400);
+}

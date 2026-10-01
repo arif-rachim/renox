@@ -316,6 +316,15 @@ and drawn with the `grid` macro; a call block draws the `custom` columns:
 - **Several grids on a page.** `.prefix("orders")` names the grid's values `orders.page`,
   `orders.q.number`, …; each grid keeps the page's other query string values (another grid's,
   a tab) in its own links.
+- **Selecting rows and acting on them.** `.bulk_action(Action::new("Mark paid", "/orders/paid"))`
+  puts a checkbox at the start of each row (and one for the page in the heading); selecting
+  rows shows the actions over the grid, with "Select all N matching" once the whole page is
+  picked. The action `POST`s `ids=4,7` and `all=true|false` (read with `Form<Selection>`) to its
+  URL with the grid's query string, and `grid.selected(query, &request, &selection)?` is the
+  query for exactly those rows, or for every row the filters match. `.row_action(…)` puts
+  actions in each row's ⋯ menu (`{id}` in the URL; `Action::link` for a plain link).
+  `.confirm("…")` asks first in a dialog, `.danger()` shows the action in red, `.method("DELETE")`
+  picks the method. After a 2xx (a `Toast` shows) the grid reloads its page.
 - **Moving and resizing columns.** Drag a heading (with a mouse) to move its column, or move it
   in the column menu (on touch screens too); drag the edge of a heading to resize the column,
   double-click the edge for the automatic width, or focus it and use the arrow keys. Widths

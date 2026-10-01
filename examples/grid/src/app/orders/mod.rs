@@ -7,7 +7,7 @@ pub mod model;
 
 use renox::Toast;
 use renox::chrono::NaiveDate;
-use renox::grid::{Column, Grid, GridRequest, RowOrder};
+use renox::grid::{Action, Column, Grid, GridRequest, RowOrder, Selection};
 use renox::prelude::*;
 use serde::Deserialize;
 
@@ -33,6 +33,12 @@ impl Module for Orders {
             .name("orders.update")
             .post("/orders/reorder", reorder)
             .name("orders.reorder")
+            .delete("/orders/{id}", destroy)
+            .name("orders.destroy")
+            .post("/orders/bulk/status/{status}", bulk_status)
+            .name("orders.bulk_status")
+            .post("/orders/bulk/delete", bulk_delete)
+            .name("orders.bulk_delete")
     }
 }
 
@@ -113,6 +119,22 @@ pub fn orders_grid() -> Grid {
         .edit_url("/orders/{id}")
         // Sorted by # (ascending), rows can be dragged into order.
         .reorder("position", "/orders/reorder")
+        // Checkboxes, and these over the selected rows (or all matching).
+        .bulk_action(Action::new("Mark paid", "/orders/bulk/status/paid"))
+        .bulk_action(Action::new("Mark shipped", "/orders/bulk/status/shipped"))
+        .bulk_action(
+            Action::new("Delete", "/orders/bulk/delete")
+                .confirm("Delete the selected orders? This can't be undone.")
+                .danger(),
+        )
+        // Each row's ⋯ menu.
+        .row_action(Action::link("Open", "/orders/{id}"))
+        .row_action(
+            Action::new("Delete", "/orders/{id}")
+                .method("DELETE")
+                .confirm("Delete this order?")
+                .danger(),
+        )
 }
 
 /// The same orders by region and city: equal neighbours share one cell
@@ -223,6 +245,43 @@ async fn update(
     order.updated_by = user.map_or_else(|| "Guest".to_owned(), |u| u.name.clone());
     order.save(&state.db).await?;
     Ok(Toast::success(format!("{} saved.", order.number)))
+}
+
+async fn destroy(State(state): State<AppState>, Path(id): Path<i64>) -> Result<Toast> {
+    let mut order = Order::find_or_404(&state.db, id).await?;
+    order.delete(&state.db).await?;
+    Ok(Toast::success(format!("{} deleted.", order.number)))
+}
+
+/// A bulk action: the selected orders, or all the filters match.
+async fn bulk_status(
+    State(state): State<AppState>,
+    user: Option<AuthUser>,
+    Path(status): Path<String>,
+    request: GridRequest,
+    Form(selection): Form<Selection>,
+) -> Result<Toast> {
+    if !STATUSES.iter().any(|(s, _)| *s == status) {
+        return Err(Error::NotFound);
+    }
+    let by = user.map_or_else(|| "Guest".to_owned(), |u| u.name.clone());
+    let changed = orders_grid()
+        .selected(Order::query(), &request, &selection)?
+        .update(&state.db, &[("status", &status), ("updated_by", &by)])
+        .await?;
+    Ok(Toast::success(format!("{changed} orders marked {status}.")))
+}
+
+async fn bulk_delete(
+    State(state): State<AppState>,
+    request: GridRequest,
+    Form(selection): Form<Selection>,
+) -> Result<Toast> {
+    let deleted = orders_grid()
+        .selected(Order::query(), &request, &selection)?
+        .delete(&state.db)
+        .await?;
+    Ok(Toast::success(format!("{deleted} orders deleted.")))
 }
 
 async fn reorder(State(state): State<AppState>, Form(order): Form<RowOrder>) -> Result<StatusCode> {

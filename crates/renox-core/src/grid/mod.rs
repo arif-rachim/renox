@@ -330,6 +330,8 @@ pub struct Grid {
     prefix: Option<String>,
     row_url: Option<String>,
     empty: Option<(String, Option<String>)>,
+    bulk: Vec<Action>,
+    row_actions: Vec<Action>,
 }
 
 impl Grid {
@@ -351,7 +353,65 @@ impl Grid {
             prefix: None,
             row_url: None,
             empty: None,
+            bulk: Vec::new(),
+            row_actions: Vec::new(),
         }
+    }
+
+    /// An action on the selected rows: a checkbox starts each row, and
+    /// selecting some shows the actions over the grid. The action is sent
+    /// to its URL (with the grid's query string, for "all matching") as
+    /// [`Selection`]; the grid reloads after a 2xx.
+    pub fn bulk_action(mut self, action: Action) -> Self {
+        self.bulk.push(action);
+        self
+    }
+
+    /// An action in each row's menu (`⋯`); `{id}` in its URL is the row's id.
+    pub fn row_action(mut self, action: Action) -> Self {
+        self.row_actions.push(action);
+        self
+    }
+
+    /// `query` narrowed to what a bulk action was sent for: the selected
+    /// ids, or every row the grid's filters match when the user chose
+    /// "all matching".
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// use renox::grid::{Action, Column, Grid, GridRequest, Selection};
+    /// # #[derive(Model, serde::Serialize, Default)] struct Order { id: i64, status: String }
+    /// fn orders() -> Grid {
+    ///     Grid::new("orders")
+    ///         .column(Column::text("status", "Status"))
+    ///         .bulk_action(Action::new("Mark paid", "/orders/paid"))
+    /// }
+    ///
+    /// async fn mark_paid(State(db): State<Db>, request: GridRequest, Form(selection): Form<Selection>) -> Result<String> {
+    ///     let changed = orders()
+    ///         .selected(Order::query(), &request, &selection)?
+    ///         .update(&db, &[("status", &"paid")])
+    ///         .await?;
+    ///     Ok(format!("{changed} orders paid"))
+    /// }
+    /// ```
+    pub fn selected<M: Model>(
+        &self,
+        query: Query<M>,
+        request: &GridRequest,
+        selection: &Selection,
+    ) -> Result<Query<M>> {
+        if selection.all {
+            return Ok(self.filter(query, request));
+        }
+        let mut keys = Vec::with_capacity(selection.ids.len());
+        for id in selection.ids.iter().take(10_000) {
+            let key: M::Key = id
+                .parse()
+                .map_err(|_| Error::BadRequest(format!("`{id}` is not an id")))?;
+            keys.push(key);
+        }
+        Ok(query.where_in("id", keys))
     }
 
     /// Prefixes the grid's query string names (`orders.page=2`,
@@ -1236,6 +1296,7 @@ impl<M: Serialize> GridPage<M> {
                             "groups": merge.groups,
                             "edit": self.grid.edit_url.as_ref().zip(id.as_ref()).map(|(url, id)| url.replace("{id}", id)),
                             "href": self.grid.row_url.as_ref().zip(id.as_ref()).map(|(url, id)| url.replace("{id}", id)),
+                            "actions": self.grid.row_actions.iter().map(|a| a.to_value(id.as_deref())).collect::<Vec<_>>(),
                         }),
                     );
                 }
@@ -1306,7 +1367,10 @@ impl<M: Serialize> GridPage<M> {
                 "column": column,
                 "active": dragging,
             })),
-            "tools": self.grid.audit || self.grid.details || editable || self.grid.reorder.is_some(),
+            "tools": self.grid.audit || self.grid.details || editable || self.grid.reorder.is_some()
+                || !self.grid.bulk.is_empty() || !self.grid.row_actions.is_empty(),
+            "bulk": self.grid.bulk.iter().map(|a| a.to_value(None)).collect::<Vec<_>>(),
+            "row_actions": !self.grid.row_actions.is_empty(),
             "exports": self.grid.exports.then(|| export::urls(&self.path, query, &self.grid.name("per_page"), &self.grid.name("export"))),
             // Field names: `p` before each (`orders.` with a prefix).
             "p": self.grid.prefix.as_ref().map(|p| format!("{p}.")).unwrap_or_default(),
@@ -1331,6 +1395,86 @@ impl<M: Serialize> Serialize for GridPage<M> {
     ) -> std::result::Result<S::Ok, S::Error> {
         self.to_value().serialize(serializer)
     }
+}
+
+/// A button that sends a request: in each row's menu ([`Grid::row_action`])
+/// or over the selected rows ([`Grid::bulk_action`]).
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct Action {
+    label: String,
+    url: String,
+    method: String,
+    confirm: Option<String>,
+    danger: bool,
+    link: bool,
+}
+
+impl Action {
+    /// An action that `POST`s to `url` (`{id}` is the row's id in row
+    /// actions).
+    pub fn new(label: &str, url: &str) -> Self {
+        Self {
+            label: label.to_owned(),
+            url: url.to_owned(),
+            method: "POST".into(),
+            confirm: None,
+            danger: false,
+            link: false,
+        }
+    }
+
+    /// A link to `url` instead of a request (row actions: `Edit`, `Open`).
+    pub fn link(label: &str, url: &str) -> Self {
+        Self {
+            link: true,
+            ..Self::new(label, url)
+        }
+    }
+
+    /// The request's method: `POST` (the default), `PATCH`, `PUT` or
+    /// `DELETE`.
+    pub fn method(mut self, method: &str) -> Self {
+        self.method = method.to_ascii_uppercase();
+        self
+    }
+
+    /// Asks first, in a dialog with this question.
+    pub fn confirm(mut self, question: &str) -> Self {
+        self.confirm = Some(question.to_owned());
+        self
+    }
+
+    /// Shown in red, for actions that delete or can't be undone.
+    pub fn danger(mut self) -> Self {
+        self.danger = true;
+        self
+    }
+
+    fn to_value(&self, id: Option<&str>) -> Value {
+        json!({
+            "label": self.label,
+            "url": id.map_or_else(|| self.url.clone(), |id| self.url.replace("{id}", id)),
+            "method": self.method,
+            "confirm": self.confirm,
+            "danger": self.danger,
+            "link": self.link,
+        })
+    }
+}
+
+/// What a bulk action was sent for (read with axum's `Form`): the selected
+/// rows' `ids` (separated by commas), or `all=true` for every row the
+/// grid's filters match. See [`Grid::selected`].
+#[derive(Debug, Clone, Default, Deserialize)]
+#[non_exhaustive]
+pub struct Selection {
+    /// The selected rows' ids.
+    #[serde(default, deserialize_with = "comma_list")]
+    pub ids: Vec<String>,
+    /// Every row the filters match, not just the selected ones.
+    #[serde(default)]
+    pub all: bool,
 }
 
 /// Where a row sits in the merged columns' groups.
