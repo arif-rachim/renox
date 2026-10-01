@@ -470,6 +470,20 @@ async fn factories(State(db): State<Db>, session: Session) -> Result<String> {
 
 struct Handlers;
 
+/// M27a: a data grid's page and its filtered query.
+async fn grid(request: renox::grid::GridRequest, State(db): State<Db>) -> Result<String> {
+    use renox::grid::{Column, Grid};
+    let grid = Grid::new("notes")
+        .column(Column::text("body", "Body"))
+        .column(Column::number("stars", "Stars"));
+    let page = grid
+        .page(Note::query(), &request)
+        .await?
+        .extend(|note| json!({ "double": note.stars * 2 }));
+    let all = grid.filter(Note::query(), &request).count(&db).await?;
+    Ok(format!("{} {all}", page.total()))
+}
+
 impl Module for Handlers {
     fn name(&self) -> &'static str {
         "handlers"
@@ -489,6 +503,7 @@ impl Module for Handlers {
             .get("/keyed", keyed)
             .get("/sealed", sealed)
             .get("/factories", factories)
+            .get("/grid", grid)
     }
 }
 
@@ -536,4 +551,5 @@ async fn data_apis_work_in_routed_handlers() {
         .assert_ok()
         .assert_see("borrowed s3cret");
     app.get("/factories").await.assert_ok().assert_see("2 1");
+    app.get("/grid?min.stars=0").await.assert_ok();
 }

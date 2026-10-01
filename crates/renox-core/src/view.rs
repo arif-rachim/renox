@@ -59,6 +59,7 @@ const BUILTIN: &[(&str, &str)] = &[
         include_str!("../views/mail/button.html"),
     ),
     ("renox/ui.html", include_str!("../views/ui.html")),
+    ("renox/grid.html", include_str!("../views/grid.html")),
     ("renox/debug.html", include_str!("../views/debug.html")),
     (
         "renox/queue/dashboard.html",
@@ -256,6 +257,10 @@ impl Views {
                     styles.unwrap_or(true),
                 )))
             });
+            env.add_function("renox_grid", || {
+                Value::from_safe_string(crate::assets::grid_tags())
+            });
+            env.add_function("sparkline", crate::view_filters::sparkline);
             env.add_filter("number", crate::view_filters::number);
             env.add_filter("date", crate::view_filters::date(zone));
             env.add_function("class_names", crate::view_filters::class_names);

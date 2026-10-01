@@ -459,6 +459,7 @@ impl App {
         let mut migrations = crate::queue::MIGRATIONS.to_vec();
         migrations.push(crate::cache::MIGRATION);
         migrations.push(crate::session::MIGRATION);
+        migrations.push(crate::grid::MIGRATION);
         migrations.extend(crate::webhook::MIGRATIONS);
         migrations.extend(self.migrations);
         for module in &self.modules {
@@ -1260,6 +1261,8 @@ fn framework_routes(config: &Config) -> Vec<RouteInfo> {
         route("GET", "/favicon.ico"),
         route("GET", "/_renox/{asset}"),
         route("GET", "/_renox/files/{*key}"),
+        route("POST", "/_renox/grid/{grid}/prefs"),
+        route("DELETE", "/_renox/grid/{grid}/prefs"),
         route("GET", "/storage/{*path}"),
     ];
     if config.debug {
@@ -1426,7 +1429,9 @@ fn build_router(
             }
         }
     };
-    let router = router.merge(crate::storage::router());
+    let router = router
+        .merge(crate::storage::router())
+        .merge(crate::grid::router());
     let router = if state.config.debug {
         router
             .merge(crate::mail::preview_router())

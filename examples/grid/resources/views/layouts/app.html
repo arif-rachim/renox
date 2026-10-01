@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="{{ app.locale }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  {% block seo %}{{ seo(title="Sales dashboard") }}{% endblock %}
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
+  {{ renox_head() }}
+  {{ renox_ui() }}
+</head>
+<body class="dashboard">
+  <header class="topbar">
+    <a class="brand" href="{{ route('orders.index') }}">Sales</a>
+    <nav class="topbar__nav">
+      {%- if auth.check %}
+      <span class="topbar__user">{{ auth.user.name }}</span>
+      <form method="post" action="{{ route('logout') }}">{{ csrf_field() }}<button class="rx-button rx-button--plain rx-button--small">Log out</button></form>
+      {%- else %}
+      <a class="rx-button rx-button--plain rx-button--small" href="{{ route('login') }}">Log in</a>
+      {%- endif %}
+    </nav>
+  </header>
+  {% block content %}{% endblock %}
+  {{ toasts() }}
+</body>
+</html>

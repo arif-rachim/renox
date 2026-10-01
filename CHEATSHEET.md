@@ -656,6 +656,34 @@ async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
 }
 ```
 
+## Data grid (details in docs/ui.md, example in examples/grid)
+
+```rust
+use renox::grid::{Column, Grid, GridRequest};
+use renox::prelude::*;
+#[derive(Model, serde::Serialize, Default)]
+#[model(table = "orders")]
+struct Order { id: i64, number: String, status: String, total: i64 }
+
+fn orders_grid() -> Grid {
+    Grid::new("orders")
+        .title("Orders")
+        .column(Column::text("number", "Order").frozen().mobile()) // shown on phones, stuck left
+        .column(Column::select("status", "Status", [("new", "New"), ("paid", "Paid")]).mobile())
+        .column(Column::money("total", "Total").under(["Amounts"])) // a grouped heading
+        .column(Column::custom("actions", "").frozen_right())        // drawn by the template
+        .sort_by("-total")
+}
+
+async fn index(request: GridRequest) -> Result<View> {
+    let page = orders_grid().page(Order::query(), &request).await?; // filters, sort, page from ?query
+    Ok(view("orders/index.html", context! { orders => page }))
+}
+```
+
+`{% from "renox/grid.html" import grid %}` then `{% call(row, column) grid(orders) %}…{% endcall %}`
+inside `<main class="rx-grid-fill">`; `{{ sparkline(row.trend) }}` draws a small chart.
+
 ## Seeders and factories
 
 ```rust

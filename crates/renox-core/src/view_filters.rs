@@ -128,9 +128,129 @@ pub(crate) fn class_names(parts: minijinja::value::Rest<minijinja::Value>) -> St
     classes.join(" ")
 }
 
+/// `{{ sparkline(values) }}`: a small chart of numbers as inline SVG, for a
+/// grid cell or a card. `kind="bars"` draws bars instead of a line;
+/// `width`/`height` in pixels (96×28). It takes the text color, so a
+/// `class="rx-up"` around it colors it.
+///
+/// ```text
+/// {{ sparkline(row.trend) }}  {{ sparkline([3, 5, 2, 8], kind="bars", width=60) }}
+/// ```
+pub(crate) fn sparkline(
+    values: minijinja::Value,
+    kwargs: minijinja::value::Kwargs,
+) -> Result<minijinja::Value, minijinja::Error> {
+    let kind: Option<String> = kwargs.get("kind")?;
+    let width: Option<f64> = kwargs.get("width")?;
+    let height: Option<f64> = kwargs.get("height")?;
+    let label: Option<String> = kwargs.get("label")?;
+    kwargs.assert_all_used()?;
+    let (w, h) = (
+        width.unwrap_or(96.0).max(8.0),
+        height.unwrap_or(28.0).max(8.0),
+    );
+    let points: Vec<f64> = match values.try_iter() {
+        Ok(iter) => iter.filter_map(|v| f64::try_from(v).ok()).collect(),
+        Err(_) => Vec::new(),
+    };
+    Ok(minijinja::Value::from_safe_string(spark_svg(
+        &points,
+        kind.as_deref() == Some("bars"),
+        w,
+        h,
+        label.as_deref(),
+    )))
+}
+
+fn spark_svg(points: &[f64], bars: bool, w: f64, h: f64, label: Option<&str>) -> String {
+    let fmt = |v: f64| format!("{:.1}", v);
+    let aria = match (label, points.first(), points.last()) {
+        (Some(label), ..) => label.to_owned(),
+        (None, Some(first), Some(last)) => format!("{} → {}", trim(*first), trim(*last)),
+        _ => String::new(),
+    };
+    let aria = aria
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('"', "&quot;");
+    let mut svg = format!(
+        "<svg class=\"rx-spark\" viewBox=\"0 0 {w} {h}\" width=\"{w}\" height=\"{h}\" role=\"img\" aria-label=\"{aria}\">"
+    );
+    if !points.is_empty() {
+        let (lo, hi) = points
+            .iter()
+            .fold((f64::MAX, f64::MIN), |(lo, hi), v| (lo.min(*v), hi.max(*v)));
+        let span = if hi > lo { hi - lo } else { 1.0 };
+        let pad = 2.0;
+        let y = |v: f64| h - pad - (v - lo) / span * (h - 2.0 * pad);
+        if bars {
+            let step = w / points.len() as f64;
+            let base = if lo < 0.0 {
+                y(0.0_f64.clamp(lo, hi))
+            } else {
+                h - pad
+            };
+            for (i, v) in points.iter().enumerate() {
+                let top = if lo >= 0.0 && hi == lo { pad } else { y(*v) };
+                let (top, bottom) = if top < base { (top, base) } else { (base, top) };
+                svg.push_str(&format!(
+                    "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" rx=\"1\" fill=\"currentColor\"/>",
+                    fmt(i as f64 * step + step * 0.15),
+                    fmt(top),
+                    fmt(step * 0.7),
+                    fmt((bottom - top).max(1.0)),
+                ));
+            }
+        } else {
+            let step = if points.len() > 1 {
+                (w - 2.0 * pad) / (points.len() - 1) as f64
+            } else {
+                0.0
+            };
+            let coords: Vec<String> = points
+                .iter()
+                .enumerate()
+                .map(|(i, v)| format!("{},{}", fmt(pad + i as f64 * step), fmt(y(*v))))
+                .collect();
+            svg.push_str(&format!(
+                "<polyline points=\"{}\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
+                coords.join(" ")
+            ));
+            if let Some(last) = coords.last() {
+                let (cx, cy) = last.split_once(',').unwrap_or(("0", "0"));
+                svg.push_str(&format!(
+                    "<circle cx=\"{cx}\" cy=\"{cy}\" r=\"2\" fill=\"currentColor\"/>"
+                ));
+            }
+        }
+    }
+    svg.push_str("</svg>");
+    svg
+}
+
+fn trim(v: f64) -> String {
+    if v.fract() == 0.0 {
+        format!("{v:.0}")
+    } else {
+        format!("{v}")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sparklines_draw_lines_and_bars() {
+        let line = spark_svg(&[1.0, 3.0, 2.0], false, 96.0, 28.0, None);
+        assert!(line.contains("<polyline points=\"2.0,"), "{line}");
+        assert!(line.contains("aria-label=\"1 → 2\""));
+        let bars = spark_svg(&[1.0, -2.0, 4.0], true, 60.0, 20.0, Some("Sales <q1>"));
+        assert_eq!(bars.matches("<rect").count(), 3);
+        assert!(bars.contains("aria-label=\"Sales &lt;q1>\""));
+        assert!(spark_svg(&[], false, 96.0, 28.0, None).ends_with("></svg>"));
+        assert!(spark_svg(&[5.0], false, 96.0, 28.0, None).contains("<circle"));
+    }
 
     #[test]
     fn formats_numbers_per_locale() {

@@ -1,0 +1,21 @@
+{% extends "layouts/app.html" %}
+{% from "renox/grid.html" import grid %}
+{% from "renox/ui.html" import link_button %}
+
+{% block content %}
+<main class="rx-grid-fill board">
+  {#- The `custom` columns: drawn here, with the row and the column. -#}
+  {% call(row, column) grid(orders) %}
+    {%- if column.key == "trend" -%}
+      <span class="{{ 'rx-up' if row.up else 'rx-down' }}">{{ sparkline(row.trend, label="Units, last 7 days") }}</span>
+    {%- elif column.key == "fulfilled" -%}
+      <span class="progress" role="meter" aria-valuenow="{{ row.fulfilled }}" aria-valuemin="0" aria-valuemax="100" aria-label="Shipped">
+        <span class="progress__bar" style="width: {{ row.fulfilled }}%"></span>
+      </span>
+      <span class="progress__text">{{ row.fulfilled }}%</span>
+    {%- elif column.key == "actions" -%}
+      {{ link_button(route('orders.show', {'id': row.id}), "Open", size="small") }}
+    {%- endif -%}
+  {% endcall %}
+</main>
+{% endblock %}

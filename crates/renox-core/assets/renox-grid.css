@@ -1,0 +1,263 @@
+/* Renox data grid (renox/grid.html). Built on the UI kit's tokens
+   (renox-ui.css), so it follows its light and dark themes and accent. */
+
+/* A page area the grid fills: the rest of the screen below the page's
+   header, with only the grid's rows scrolling. */
+.rx-grid-fill {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+}
+
+.rx-grid, .rx-grid *, .rx-grid *::before, .rx-grid *::after { box-sizing: border-box; }
+
+.rx-grid {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  background: var(--rx-surface);
+  border: 1px solid var(--rx-separator);
+  border-radius: var(--rx-radius);
+  overflow: hidden;
+  font-size: var(--rx-text-subhead);
+  color: var(--rx-label);
+}
+.rx-grid.htmx-request .rx-grid__scroll { opacity: 0.55; transition: opacity 0.15s 0.1s; }
+
+/* Toolbar */
+.rx-grid__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px 10px 16px;
+  border-bottom: 1px solid var(--rx-separator);
+  flex: none;
+}
+.rx-grid__heading { min-width: 0; }
+.rx-grid__title { margin: 0; font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.01em; }
+.rx-grid__count { margin: 2px 0 0; color: var(--rx-secondary-label); font-size: var(--rx-text-footnote); }
+.rx-grid__tools { display: flex; align-items: center; gap: 8px; flex: none; }
+.rx-grid__link {
+  border: 0; background: none; padding: 0; font: inherit;
+  color: var(--rx-accent-text); cursor: pointer;
+}
+.rx-grid__link:hover { text-decoration: underline; }
+
+.rx-grid__icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; padding: 0;
+  border: 0; border-radius: var(--rx-radius-s);
+  background: var(--rx-fill); color: var(--rx-label);
+  cursor: pointer;
+}
+.rx-grid__icon:hover:not(:disabled) { background: var(--rx-fill-strong); }
+.rx-grid__icon:disabled { opacity: 0.35; cursor: default; }
+.rx-grid__icon--small { width: 30px; height: 30px; background: transparent; }
+.rx-grid :focus-visible { outline: 3px solid var(--rx-focus); outline-offset: 1px; }
+
+/* The scrolling area: both directions, the headings stick to its top. */
+.rx-grid__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: var(--rx-fill-strong) transparent;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+.rx-grid__table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: max-content;
+  min-width: 100%;
+}
+.rx-grid__table th,
+.rx-grid__table td {
+  padding: 9px 14px;
+  text-align: start;
+  vertical-align: middle;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--rx-separator);
+  background: var(--rx-surface);
+}
+.rx-grid__table thead { position: sticky; top: 0; z-index: 3; }
+.rx-grid__table thead th {
+  /* Opaque, so frozen headings hide what scrolls under them. */
+  background: linear-gradient(var(--rx-fill), var(--rx-fill)) var(--rx-surface);
+  font-weight: 600;
+  font-size: var(--rx-text-footnote);
+  color: var(--rx-secondary-label);
+  padding-top: 7px; padding-bottom: 7px;
+}
+.rx-grid__group {
+  text-align: center !important;
+  border-inline-start: 1px solid var(--rx-separator);
+  border-inline-end: 1px solid var(--rx-separator);
+  color: var(--rx-label) !important;
+}
+.rx-grid__table tbody tr:hover td { background: linear-gradient(var(--rx-fill), var(--rx-fill)) var(--rx-surface); }
+/* Buttons and links in cells keep rows compact. */
+.rx-grid__table td .rx-button { min-height: 30px; padding: 4px 12px; font-size: var(--rx-text-footnote); }
+.rx-grid__table tbody tr:last-child td { border-bottom: 0; }
+.rx-grid__num { text-align: end !important; font-variant-numeric: tabular-nums; }
+.rx-grid__num .rx-grid__head { justify-content: flex-end; }
+.rx-grid__off { display: none !important; }
+.rx-grid__none::before { content: "—"; color: var(--rx-tertiary-label); }
+.rx-grid__empty { text-align: center !important; padding: 48px 16px !important; color: var(--rx-secondary-label); white-space: normal !important; }
+
+.rx-grid__head { display: flex; align-items: center; gap: 4px; }
+.rx-grid__sort {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 0; background: none; padding: 4px 6px; margin: -4px -6px;
+  font: inherit; color: inherit; cursor: pointer; border-radius: 6px;
+}
+.rx-grid__sort:hover { background: var(--rx-fill); color: var(--rx-label); }
+th[aria-sort] .rx-grid__sort { color: var(--rx-accent-text); }
+.rx-grid__filter {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0; margin-inline-start: auto;
+  border: 0; border-radius: 6px; background: none;
+  color: var(--rx-tertiary-label); cursor: pointer;
+}
+.rx-grid__num .rx-grid__filter { margin-inline-start: 0; }
+.rx-grid__filter:hover { background: var(--rx-fill); color: var(--rx-label); }
+.rx-grid__filter--on { color: var(--rx-on-accent); background: var(--rx-accent); }
+.rx-grid__filter--on:hover { background: var(--rx-accent-hover); color: var(--rx-on-accent); }
+
+/* Frozen columns: sticky, with a shadow on the edge once content passes under. */
+.rx-grid__table [data-pin] { position: sticky; z-index: 1; }
+.rx-grid__table thead [data-pin] { z-index: 4; }
+.rx-grid__edge-left { box-shadow: inset -1px 0 0 var(--rx-separator); }
+.rx-grid__edge-right { box-shadow: inset 1px 0 0 var(--rx-separator); }
+.rx-grid--scrolled-left .rx-grid__edge-left { box-shadow: inset -1px 0 0 var(--rx-separator), 6px 0 8px -6px rgba(0, 0, 0, 0.18); }
+.rx-grid--scrolled-right .rx-grid__edge-right { box-shadow: inset 1px 0 0 var(--rx-separator), -6px 0 8px -6px rgba(0, 0, 0, 0.18); }
+
+/* Cells */
+.rx-grid__tag {
+  display: inline-block; padding: 1px 8px; margin-inline-end: 4px;
+  border-radius: 999px; background: var(--rx-fill); font-size: var(--rx-text-footnote);
+}
+.rx-grid__yes { color: var(--rx-success); font-weight: 500; }
+.rx-grid__no { color: var(--rx-secondary-label); }
+.rx-spark { display: block; color: var(--rx-accent); overflow: visible; }
+.rx-up, .rx-up .rx-spark { color: var(--rx-success); }
+.rx-down, .rx-down .rx-spark { color: var(--rx-danger-text); }
+
+/* Footer: always at the bottom of the grid, never scrolled away. */
+.rx-grid__foot {
+  display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap;
+  padding: 8px 12px 8px 16px;
+  border-top: 1px solid var(--rx-separator);
+  background: var(--rx-material-thick);
+  flex: none;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+.rx-grid__range { margin: 0; color: var(--rx-secondary-label); font-size: var(--rx-text-footnote); font-variant-numeric: tabular-nums; }
+.rx-grid__per { display: inline-flex; align-items: center; gap: 8px; color: var(--rx-secondary-label); font-size: var(--rx-text-footnote); }
+.rx-grid__pager { display: flex; align-items: center; gap: 4px; margin-inline-start: auto; }
+.rx-grid__pages { display: flex; gap: 2px; }
+.rx-grid__page {
+  min-width: 36px; height: 36px; padding: 0 8px;
+  border: 0; border-radius: var(--rx-radius-s); background: none;
+  font: inherit; color: var(--rx-label); cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.rx-grid__page:hover { background: var(--rx-fill); }
+.rx-grid__page[aria-current] { background: var(--rx-accent); color: var(--rx-on-accent); font-weight: 600; }
+.rx-grid__gap { align-self: center; padding: 0 4px; color: var(--rx-tertiary-label); }
+.rx-grid__page-of { display: none; padding: 0 8px; font-variant-numeric: tabular-nums; color: var(--rx-secondary-label); }
+
+/* Controls inside the grid */
+.rx-grid__control {
+  min-height: 36px; padding: 6px 10px;
+  border: 1px solid var(--rx-border); border-radius: var(--rx-radius-s);
+  background: var(--rx-surface); color: var(--rx-label);
+  font: inherit; font-size: var(--rx-text-subhead);
+  min-width: 0;
+}
+.rx-grid__control--small { min-height: 30px; padding: 3px 8px; font-size: var(--rx-text-footnote); }
+
+/* Popovers: filters and the column menu. Placed by the script next to
+   their button; on small screens they're sheets at the bottom. */
+.rx-grid__pop {
+  position: fixed; inset: auto; margin: 0;
+  width: min(340px, calc(100vw - 16px));
+  max-height: min(70vh, 560px); overflow: auto;
+  padding: 14px;
+  border: 1px solid var(--rx-separator); border-radius: var(--rx-radius);
+  background: var(--rx-surface-raised); color: var(--rx-label);
+  box-shadow: var(--rx-shadow-raised);
+  font-weight: 400; font-size: var(--rx-text-subhead); text-align: start; white-space: normal;
+}
+.rx-grid__pop::backdrop { background: transparent; }
+.rx-grid__pop-title { margin: 0 0 10px; font-weight: 600; color: var(--rx-label); }
+.rx-grid__pop-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.rx-grid__row { display: flex; gap: 8px; }
+.rx-grid__row > * { flex: 1 1 0; }
+.rx-grid__field { display: flex; flex-direction: column; gap: 4px; font-size: var(--rx-text-footnote); color: var(--rx-secondary-label); }
+.rx-grid__hint { margin: 8px 0 0; font-size: var(--rx-text-footnote); color: var(--rx-secondary-label); }
+.rx-grid__choices { border: 0; margin: 0; padding: 0; display: grid; gap: 2px; }
+.rx-grid__choice { display: flex; align-items: center; gap: 10px; min-height: 36px; cursor: pointer; }
+.rx-grid__choice input { width: 18px; height: 18px; accent-color: var(--rx-accent); }
+.rx-grid__columns { width: min(400px, calc(100vw - 16px)); }
+.rx-grid__pop--dates { width: min(620px, calc(100vw - 16px)); }
+.rx-grid__picker { list-style: none; margin: 8px 0 0; padding: 0; }
+.rx-grid__picker li { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--rx-separator); }
+.rx-grid__picker li:last-child { border-bottom: 0; }
+.rx-grid__picker .rx-grid__choice { flex: 1 1 auto; min-width: 0; }
+.rx-grid__pick-tools { display: flex; align-items: center; gap: 2px; flex: none; }
+
+/* The date range calendar (Cally), in the kit's colors. */
+.rx-grid__calendar { display: block; width: fit-content; margin: 12px auto 0; }
+.rx-grid__months { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+.rx-grid__calendar svg { display: block; }
+.rx-grid__calendar::part(header) { margin-bottom: 4px; }
+.rx-grid__calendar::part(button) {
+  border: 0; border-radius: var(--rx-radius-s); background: var(--rx-fill);
+  color: var(--rx-label); padding: 6px; cursor: pointer;
+}
+.rx-grid__calendar::part(heading) { font-weight: 600; font-size: var(--rx-text-subhead); }
+calendar-month { --color-accent: var(--rx-accent); --color-text-on-accent: var(--rx-on-accent); font-size: var(--rx-text-footnote); }
+calendar-month::part(day) { border-radius: 8px; width: 36px; height: 34px; }
+calendar-month::part(today) { font-weight: 700; color: var(--rx-accent-text); }
+calendar-month::part(selected) { color: var(--rx-on-accent); }
+calendar-month::part(range-inner) { border-radius: 0; background: color-mix(in srgb, var(--rx-accent) 16%, transparent); color: var(--rx-label); }
+calendar-month::part(range-start) { border-start-end-radius: 0; border-end-end-radius: 0; }
+calendar-month::part(range-end) { border-start-start-radius: 0; border-end-start-radius: 0; }
+calendar-month::part(range-start range-end) { border-radius: 8px; }
+calendar-month::part(outside) { color: var(--rx-tertiary-label); }
+
+@media (max-width: 767px) {
+  .rx-grid { border-radius: 0; border-inline: 0; }
+  .rx-grid__bar { padding: 8px 8px 8px 12px; }
+  .rx-grid__table th, .rx-grid__table td { padding: 9px 10px; }
+  .rx-grid__foot { gap: 8px; padding-inline: 8px 8px; }
+  .rx-grid__range { display: none; }
+  .rx-grid__pages { display: none; }
+  .rx-grid__page-of { display: inline; }
+  .rx-grid__pop,
+  .rx-grid__columns {
+    inset: auto 0 0 0 !important;
+    width: 100%; max-width: none; max-height: 85vh;
+    border-radius: var(--rx-radius-l) var(--rx-radius-l) 0 0;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+  .rx-grid__pop::backdrop { background: var(--rx-scrim); }
+  .rx-grid__months calendar-month + calendar-month { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rx-grid.htmx-request .rx-grid__scroll { transition: none; }
+}
+
+@media print {
+  .rx-grid { height: auto; border: 0; }
+  .rx-grid__scroll { overflow: visible; }
+  .rx-grid__tools, .rx-grid__filter, .rx-grid__foot, .rx-grid__pop { display: none !important; }
+  .rx-grid__table thead { position: static; }
+  .rx-grid__table [data-pin] { position: static; }
+}

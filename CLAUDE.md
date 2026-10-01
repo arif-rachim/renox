@@ -82,6 +82,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/clock.rs             the current time with a test offset (TestApp::travel); Stamp for
                            in-memory windows (rate limits, login lock), never Instant
   views/ui.html            the UI kit (renox/ui.html); assets/renox-ui.css|js its styles and script
+  views/grid.html          the data grid macro (renox/grid.html); assets/renox-grid.css|js, and
+                           assets/cally.js (Cally 0.9.2, MIT: the date range calendar)
   src/view_stack.rs        push/prepend/stack: markers filled in after the page renders (Scope)
   src/view_filters.rs      built-in template filters `number` and `date`; pub format_number
   src/htmx.rs              Htmx extractor, HxRedirect/HxRefresh/HxTrigger/HxRetarget/HxReswap/
@@ -123,6 +125,9 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/schedule.rs          Schedule + runner, ScheduledTask builder, own cron parser, run claims
   src/timezone.rs          Zone (UTC / fixed offset / IANA via chrono-tz) for APP_TIMEZONE
   src/events.rs            Event, listeners, AppState::emit
+  src/grid/mod.rs          renox::grid: Grid/Column, GridRequest, filters from the query string,
+                           header rows, GridPage (serialized for renox/grid.html), preferences
+                           (grid_preferences / session) and their /_renox/grid/{grid}/prefs route
   src/mail.rs              Mail (recipients, cc/bcc/reply_to/from, attachments), Mailer
                            (smtp/log/memory), mail_view, queue_mail, /_renox/mail preview
   src/cache.rs             Cache (memory / database store), remember(), add/pull/increment,
@@ -160,11 +165,12 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/security.rs          security headers + CSP (+ nonce), csrf-exempt and webhook route sets
   src/method.rs            method spoofing layer (in front of the router)
   src/embedded.rs          Embedded (views/lang/public compiled in), public-file serving + content types
-  assets/                  vendored htmx.min.js (2.0.11), alpine.min.js (3.17.4) + Alpine CSP build
+  assets/                  vendored htmx.min.js (2.0.11), alpine.min.js (3.17.4) + Alpine CSP build,
+                           cally.js (0.9.2)
   views/                   built-in templates (error, pagination, auth/*, mail/*, ui.html (the kit),
                            debug.html (/_renox/debug), queue/dashboard.html); see §4.3
   migrations/              framework-owned migrations (auth/, permissions/, audit/, queue/,
-                           cache/, session/, webhook/); see §4.5
+                           cache/, session/, grid/, webhook/); see §4.5
   tests/                   core-only integration tests (support/mod.rs has a small TestApp)
 crates/renox-macros/       proc macros: derive Model, FromRow, DbEnum, Validate (validate.rs);
                            embedded!(), migrations!(), #[renox::test]
@@ -196,6 +202,8 @@ examples/                  workspace members, each with a README.md and its own 
   htmx-recipes/            modal form, inline edit, infinite scroll, tabs, HxRefresh/HxRedirect,
                            an out-of-band count (.also), HxRetarget/HxReswap, toasts
   relations/               belongs to, has many, many to many (pivot columns), Morph, no N+1
+  grid/                    a sales dashboard on one data grid (renox::grid): phone and desktop
+                           columns, filters by kind, frozen columns, grouped headings, sparklines
   teams/                   multi-tenant SaaS on the UI kit: default scopes, renox::context,
                            gate_before, Encrypted<String>, a form request checked live, public
                            team pages on their own host (Routes::domain)
@@ -435,7 +443,7 @@ to the config tests there, give it a test-friendly value in `Default`, and docum
 App-specific settings need no field: `config.var(name)` reads `config.vars`, then the environment.
 
 ### 4.5 Migrations owned by the framework
-Names start with `0001…` so they sort before app migrations (`2026…`). There are sixteen:
+Names start with `0001…` so they sort before app migrations (`2026…`). There are seventeen:
 - Auth module (`auth/module.rs` `MIGRATIONS`): `00010101000000_create_users_table`,
   `…000001_create_password_reset_tokens_table`, `…000002_create_personal_access_tokens_table`,
   `…000003_create_notifications_table`, `…000004_add_sessions_revoked_at_to_users`,
@@ -443,10 +451,11 @@ Names start with `0001…` so they sort before app migrations (`2026…`). There
 - Permissions module (`auth/permissions.rs`): `00010101000500_create_roles_and_permissions_tables`
   (roles, permissions, permission_role, role_user).
 - Audit module (`audit.rs`): `00010101000600_create_audit_logs_table`.
-- Every app (registered in `App::boot`; seven, which tests/it/database.rs lists):
+- Every app (registered in `App::boot`; eight, which tests/it/database.rs lists):
   `00010101000100_create_jobs_table`, `00010101000110_add_chains_and_batches_to_jobs` and
   `00010101000120_add_callback_of_to_jobs` (queue), `00010101000200_create_cache_table` (cache),
   `00010101000210_create_sessions_table` (session.rs, installed whatever `SESSION_DRIVER` is),
+  `00010101000220_create_grid_preferences_table` (grid/mod.rs),
   `00010101000300_create_webhook_calls_table` and
   `00010101000301_store_webhook_payloads_as_bytes` (webhook.rs `MIGRATIONS`).
 
@@ -787,7 +796,7 @@ picks the build, not the terminal.
 
 ## 7. Where things stand (update this section when it changes)
 
-- **All milestones M0–M25 are merged to `main`**, then M26a (#73) and M26b (#74); the owner's B/C/D before
+- **All milestones M0–M26 are merged to `main`** (M26c: #75); the owner's B/C/D before
   1.0 were M23–M25. History:
   `CHANGELOG.md` (per milestone) and `ROADMAP.md` (per-milestone notes and decisions).
 - After M17: a docs refresh (#45) and the Laravel parity review with M18–M21 planned (#46).
@@ -878,7 +887,11 @@ picks the build, not the terminal.
   `unique().ignore()`, the fallback status bug, examples for M22–M25): merged (#73). M26b (docs
   brought up to date, the 380 undocumented public items documented, `missing_docs` enforced,
   `RedirectExt` sealed, `InvalidUlid` non-exhaustive): merged (#74). M26c (tests for `renox-cli` and weak core files, `App::run_args`,
-  `renox::Path` answers 500 for a parameter the route lacks): branch `m26c-tests`.
+  `renox::Path` answers 500 for a parameter the route lacks): merged (#75). M26 is done.
+- **M27** (a data grid, asked by the owner before v1.0; three PRs): M27a (`renox::grid` +
+  `renox/grid.html`, Cally, `grid_preferences`, `sparkline`, examples/grid): branch
+  `m27a-grid`. M27b (row details with audit fields, cell/row editing, row drag, merged cells)
+  and M27c (CSV/Excel/print exports) follow.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.

@@ -1251,6 +1251,37 @@ Notes from M26c:
   asking for a parameter its route doesn't have (axum's `WrongNumberOfParameters`) and an
   unsupported type. Those are the app's bugs and now answer 500.
 
+### M27 · Data grid
+Asked by the owner before v1.0: an enterprise-style data grid as a showcase of what Renox can
+do, responsive and dashboard-like. Agreed with the owner (2026-10-01): a framework component
+(`renox::grid` + `renox/grid.html`, in every app), built on htmx and Alpine-free plain JS rather
+than wrapping a JS grid (Tabulator lacks row spans and brings ~400 KB; AG Grid's column groups
+and Excel export are Enterprise-only), Cally for date ranges (MIT, accessible web components),
+preferences per user in the database, cell and row editing both, automatic hierarchical merged
+cells, exports on the server (CSV, Excel, PDF through a print page). Three PRs:
+- [x] M27a: the grid: `Grid`/`Column` (text, number, money, date, datetime, bool, select, tags,
+      custom), `GridRequest`, filters per kind from the query string, sorting, server pages,
+      grouped headings (`Column::under`), columns per screen size (`mobile`, `hidden`) with
+      the column menu, frozen columns left and right, `grid_preferences` (users) or the
+      session (guests), Cally's date range calendar, custom cells (`caller(row, column)`,
+      `GridPage::extend`, `sparkline`), the dashboard layout (`rx-grid-fill`), examples/grid
+- [ ] M27b: row details with audit fields (created/updated by and at), cell and row edit
+      modes (validated, saved per cell or per row), drag-and-drop row order, merged cells
+      (same values in a row of cells, hierarchical between columns)
+- [ ] M27c: exports of every filtered row: CSV, Excel (`rust_xlsxwriter`, headings merged
+      as on screen) and a print page for PDF
+
+Notes from M27a:
+- Columns per screen size are applied by the script (classes on the cells), so the server
+  renders every column and a resize needs no request; order and frozen columns change the
+  markup, so they're saved first and the grid reloads.
+- Guests keep their columns in the session instead of localStorage (the owner's choice was
+  localStorage for guests): the server needs the order and frozen columns to draw the grid.
+- The grid is a GET form swapped by htmx (`hx-select` of its own id), so a page needs no
+  fragment handling, and without htmx it still works as a plain form.
+- Tags filter with `CAST(column AS TEXT) LIKE '%"value"%'`, which works on SQLite's TEXT and
+  PostgreSQL's JSONB alike.
+
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`
       (resource tables and forms); billing later

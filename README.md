@@ -143,6 +143,10 @@ impl Module for Guestbook {
   - form fields, buttons, cards, alerts, sheets, menus, tabs and tables, with dark mode;
   - keyboard support and WCAG AA contrast;
   - toasts (`Toast::success(…)`) and live validation.
+- A data grid for dashboards (`renox::grid`): filters per column by kind (a date range
+  calendar for dates), server pages and sorting in the URL, grouped headings, frozen columns,
+  different columns on phones and desktops kept per user, and cells drawn by the page
+  (`{{ sparkline(…) }}` charts, buttons).
 - `.also("block")` sends out-of-band blocks with a fragment; `HxRetarget`, `HxReswap` and
   `HxPushUrl` set the other htmx headers.
 </details>
@@ -326,6 +330,7 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 - [`examples/teams`](examples/teams): a multi-tenant SaaS: teams and members, a default scope
   that keeps each team's projects apart, a super-admin, an encrypted team secret, and a form
   request (`prepare`, `authorize`, `after`) for adding members.
+- [`examples/grid`](examples/grid): a sales dashboard on one data grid, on a phone and a desktop.
 - [`examples/crud`](examples/crud): one resource end to end on the UI kit, with pagination, live
   validation, toasts, owner-only edit and delete through a policy (behind a confirmation sheet),
   soft deletes with a trash, model hooks, an error page in the layout, and tests.
