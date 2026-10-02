@@ -389,6 +389,7 @@ const REQUEST_GLOBALS: &[&str] = &[
     "errors",
     "error",
     "old",
+    "has_old",
     "renox_head",
     "seo",
     "csp_nonce",
@@ -978,6 +979,7 @@ fn globals(
         crate::csrf::CSRF_FIELD
     ));
     let old_input = session.cloned();
+    let has_old = session.is_some_and(Session::has_old_input);
     let toast_session = session.cloned();
     let dismiss_label = state
         .translator
@@ -1080,6 +1082,9 @@ fn globals(
         once => Value::from_function(move |key: String| {
             seen.lock().unwrap_or_else(|e| e.into_inner()).insert(key)
         }),
+        // `has_old()`: the previous request was a failed submit, so a field
+        // missing from `old()` was sent empty (an unticked checkbox).
+        has_old => Value::from_function(move || has_old),
         old => Value::from_function(move |field: String, default: Option<Value>| {
             old_input
                 .as_ref()

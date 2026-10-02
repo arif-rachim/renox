@@ -17,7 +17,7 @@ covers:
 A component is a MiniJinja macro in a file of its own, imported where it's used. Inside it,
 the same request helpers work as in the page itself:
 
-- `old()`, `error()`, `errors`;
+- `old()`, `has_old()`, `error()`, `errors`;
 - `t()`, `can()`, `auth`, `request`;
 - `csrf_field()`, `flash`;
 - `once()`.
@@ -79,9 +79,30 @@ Then import what a page needs:
 
 | Component | What it is |
 |---|---|
-| `input(name, label, type=…, value=…, hint=…, required=…, autocomplete=…, placeholder=…, attrs={…}, id=…)` | A labelled text field with its hint and error. It is refilled after a failed submit, except for passwords. `id` tells apart two fields of the same name on one page. |
+| `input(name, label, type=…, value=…, hint=…, required=…, autocomplete=…, placeholder=…, attrs={…}, id=…, prefix=…, suffix=…, datalist=[…], disabled=…, readonly=…, span=…)` | A labelled text field with its hint and error. It is refilled after a failed submit, except for passwords. `id` tells apart two fields of the same name on one page. `prefix`/`suffix` join a text to the field ("Rp", "kg"); `datalist` suggests values while accepting any. |
 | `textarea`, `select(name, label, options, selected=…, placeholder=…)` | The same for longer text and for a choice. `options` are values or `[value, label]` pairs. |
-| `checkbox(name, label, checked=…, switch=…)` | A checkbox, or an iOS-style switch for settings. The whole row is the target. |
+| `checkbox(name, label, checked=…, switch=…)` | A checkbox, or an iOS-style switch for settings. The whole row is the target. After a failed submit it shows what was sent, so an unticked box stays unticked. |
+| `radio(name, label, options, selected=…, inline=…, columns=…)` | One choice out of a few, all visible, in a `fieldset` with the label as its legend. An option is a value, `[value, label]` or `[value, label, description]`. |
+| `checkbox_list(name, label, options, selected=[…], inline=…, columns=…)` | Several choices: each ticked option sends `name` once, so the form field is a `Vec` with `#[serde(default)]` (nothing ticked sends nothing). |
+| `form_grid(columns=2)`, `fieldset(legend, hint=…, columns=…)` | Fields side by side from tablet width up (one column on phones), and a titled group of fields in a long form. A field's `span=2` or `span="full"` makes it wider. |
+
+Every field also takes `id`, `disabled` (the field isn't sent) and `span`; `input` and
+`textarea` take `readonly` (shaded, but sent and readable). The error summary links to each
+field by its name, so a field with its own `id` and a radio group are found too.
+
+```html
+{% from "renox/ui.html" import input, radio, checkbox_list, form_grid, fieldset %}
+{% call form_grid(2) %}
+  {{ input("price", "Price", type="number", prefix="Rp", required=true) }}
+  {{ input("weight", "Weight", type="number", suffix="kg") }}
+  {{ input("city", "City", datalist=["Jakarta", "Bandung", "Surabaya"], span="full") }}
+{% endcall %}
+{% call fieldset("Delivery") %}
+  {{ radio("speed", "Speed", [["regular", "Regular", "2–3 days"], ["express", "Express", "Tomorrow"]],
+           selected="regular", required=true) }}
+  {{ checkbox_list("extras", "Extras", [["gift", "Gift wrap"], ["note", "Card"]], inline=true) }}
+{% endcall %}
+```
 | `button(label, variant=…, size=…, block=…)` | Variants: `primary`, `secondary`, `plain`, `danger` and `plain-danger`. The button shows a spinner while its form or htmx request is being sent. |
 | `link_button(href, label, …)` | A link that looks like a button. |
 | `card(title=…, subtitle=…)`, `group(title=…, footer=…)` | A surface, and an inset grouped list like Settings. |

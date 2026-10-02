@@ -51,11 +51,11 @@ async fn a_product_round_trips_from_the_form_to_the_database_and_back() {
     app.get(&edit)
         .await
         .assert_ok()
-        .assert_see(r#"name="name" value="Kopi Gayo""#)
+        .assert_see(r#"name="name" type="text" value="Kopi Gayo""#)
         .assert_see(">Arabica</textarea>")
         .assert_see(r#"value="0.25""#)
-        .assert_see(r#"name="available" checked"#)
-        .assert_see(r#"<option value="large" selected>"#)
+        .assert_see(r#"name="available" value="on" checked"#)
+        .assert_see(r#"name="size" value="large" checked"#)
         .assert_see(r#"value="black" checked"#)
         .assert_see(r#"value="red" checked"#)
         .assert_see(r#"value="07:30:00""#)
@@ -147,6 +147,9 @@ async fn each_color_is_checked_and_repeats_are_refused() {
         .assert_redirect("/products/new");
     app.get("/products/new")
         .await
-        .assert_see(r#"data-error-for="colors">"#)
-        .assert_see("The selected colors #1 is invalid.");
+        .assert_see(
+            r#"data-error-for="colors" aria-live="polite">The selected colors #1 is invalid."#,
+        )
+        // Only what was sent is ticked: no listed color.
+        .assert_dont_see(r#"name="colors" value="black" checked"#);
 }

@@ -153,11 +153,33 @@
     if (focus) tab.focus();
   }
 
+  // The first input sent as `name`: "photos.1" (an item's error) falls back
+  // to "photos". In `scope` (the summary's form) first, else on the page.
+  function fieldNamed(name, scope) {
+    var names = [name];
+    if (name.indexOf(".") > 0) names.push(name.slice(0, name.indexOf(".")));
+    for (var i = 0; i < names.length; i++) {
+      var selector = '[name="' + CSS.escape(names[i]) + '"]:not([type="hidden"])';
+      var found = (scope && scope.querySelector(selector)) || document.querySelector(selector);
+      if (found) return found;
+    }
+    return null;
+  }
+
   // ---------- Clicks ----------
 
   document.addEventListener("click", function (event) {
     var target = event.target.closest ? event.target : event.target.parentElement;
     if (!target) return;
+
+    // The error summary's links go to the field by name, so a field with
+    // its own `id` (or a radio group) is found too.
+    var summaryLink = target.closest("[data-rx-error-summary] [data-rx-field]");
+    if (summaryLink) {
+      var field = fieldNamed(summaryLink.getAttribute("data-rx-field"), summaryLink.closest("form"));
+      if (field) { event.preventDefault(); field.focus(); field.scrollIntoView({ block: "center", behavior: reduceMotion ? "auto" : "smooth" }); }
+      return;
+    }
 
     var dismisser = target.closest("[data-renox-dismiss]");
     if (dismisser) { dismiss(dismisser.closest("[data-renox-toast]")); return; }

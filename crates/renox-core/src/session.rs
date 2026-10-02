@@ -222,6 +222,13 @@ impl Session {
             .cloned()
     }
 
+    /// Whether the previous request flashed its input (a failed submit), even
+    /// with no field in it: an unticked checkbox sends nothing, so `old()`
+    /// alone can't tell "unticked" from "not submitted yet".
+    pub fn has_old_input(&self) -> bool {
+        self.lock().flashed.contains_key(OLD_INPUT)
+    }
+
     /// Flashes validation errors, keyed by field, for the next request.
     pub fn flash_errors(&self, errors: &impl Serialize) -> Result {
         self.flash(ERRORS, errors)

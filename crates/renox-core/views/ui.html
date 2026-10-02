@@ -30,32 +30,65 @@
 <p class="rx-error" id="{{ id }}-error" data-error-for="{{ caller() }}" aria-live="polite">{{ message }}</p>
 {%- endmacro -%}
 
-{#- A text field: text, email, password, number, date, url, tel, search… -#}
-{#- `id`: when a page has two fields of the same name (in separate forms). -#}
-{% macro input(name, label, type="text", value=none, hint=none, required=false, autocomplete=none, placeholder=none, attrs={}, id=none) -%}
+{%- macro _field_class(span) -%}
+rx-field{% if span %} rx-span-{{ span }}{% endif %}
+{%- endmacro -%}
+
+{%- macro _choices_class(inline, columns) -%}
+rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ columns }}{% endif %}
+{%- endmacro -%}
+
+{#- A text field: text, email, password, number, date, url, tel, search…
+    `id`: when a page has two fields of the same name (in separate forms).
+    `prefix`/`suffix`: text joined to the field ("Rp", "kg", ".com").
+    `datalist`: suggestions (values, or [value, label] pairs) the field
+    still accepts anything besides. `span`: columns taken in a `form_grid`.
+    A disabled field isn't sent with the form; a readonly one is. -#}
+{% macro input(name, label, type="text", value=none, hint=none, required=false, autocomplete=none, placeholder=none, attrs={}, id=none, prefix=none, suffix=none, datalist=none, disabled=false, readonly=false, span=none) -%}
 {%- set id = id or _id(name) %}
 {%- set message = error(name) %}
-<div class="rx-field">
+<div class="{{ _field_class(span) }}">
   {{ _label(id, label, required) }}
+  {%- if prefix or suffix %}
+  <div class="rx-affix">
+    {%- if prefix %}<span class="rx-affix__text" id="{{ id }}-prefix">{{ prefix }}</span>{% endif %}
+  {%- endif %}
   <input class="rx-input" id="{{ id }}" name="{{ name }}" type="{{ type }}"
     {%- if type != "password" %} value="{{ old(name, value if value is not none else "") }}"{% endif %}
     {%- if required %} required aria-required="true"{% endif %}
     {%- if autocomplete %} autocomplete="{{ autocomplete }}"{% endif %}
     {%- if placeholder %} placeholder="{{ placeholder }}"{% endif %}
+    {%- if datalist %} list="{{ id }}-list"{% endif %}
+    {%- if disabled %} disabled{% endif %}
+    {%- if readonly %} readonly{% endif %}
     {%- if message %} aria-invalid="true"{% endif %}
-    aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>
+    aria-describedby="{% if prefix %}{{ id }}-prefix {% endif %}{% if suffix %}{{ id }}-suffix {% endif %}{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>
+  {%- if prefix or suffix %}
+    {%- if suffix %}<span class="rx-affix__text" id="{{ id }}-suffix">{{ suffix }}</span>{% endif %}
+  </div>
+  {%- endif %}
+  {%- if datalist %}
+  <datalist id="{{ id }}-list">
+    {%- for option in datalist %}
+      {%- if option is string or option is number %}<option value="{{ option }}"></option>
+      {%- else %}<option value="{{ option[0] }}">{{ option[1] }}</option>{% endif %}
+    {%- endfor %}
+  </datalist>
+  {%- endif %}
   {% call _describe(id, hint, message) %}{{ name }}{% endcall %}
 </div>
 {%- endmacro %}
 
-{% macro textarea(name, label, value=none, rows=4, hint=none, required=false, placeholder=none, attrs={}) -%}
-{%- set id = _id(name) %}
+{% macro textarea(name, label, value=none, rows=4, hint=none, required=false, placeholder=none, attrs={}, id=none, disabled=false, readonly=false, span=none) -%}
+{%- set id = id or _id(name) %}
 {%- set message = error(name) %}
-<div class="rx-field">
+<div class="{{ _field_class(span) }}">
   {{ _label(id, label, required) }}
   <textarea class="rx-textarea" id="{{ id }}" name="{{ name }}" rows="{{ rows }}"
     {%- if required %} required aria-required="true"{% endif %}
     {%- if placeholder %} placeholder="{{ placeholder }}"{% endif %}
+    {%- if disabled %} disabled{% endif %}
+    {%- if readonly %} readonly{% endif %}
     {%- if message %} aria-invalid="true"{% endif %}
     aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>{{ old(name, value if value is not none else "") }}</textarea>
   {% call _describe(id, hint, message) %}{{ name }}{% endcall %}
@@ -63,14 +96,15 @@
 {%- endmacro %}
 
 {#- `options`: a list of values, or of [value, label] pairs. -#}
-{% macro select(name, label, options, selected=none, hint=none, required=false, placeholder=none, attrs={}) -%}
-{%- set id = _id(name) %}
+{% macro select(name, label, options, selected=none, hint=none, required=false, placeholder=none, attrs={}, id=none, disabled=false, span=none) -%}
+{%- set id = id or _id(name) %}
 {%- set message = error(name) %}
 {%- set current = old(name, selected if selected is not none else "") | string %}
-<div class="rx-field">
+<div class="{{ _field_class(span) }}">
   {{ _label(id, label, required) }}
   <select class="rx-select" id="{{ id }}" name="{{ name }}"
     {%- if required %} required aria-required="true"{% endif %}
+    {%- if disabled %} disabled{% endif %}
     {%- if message %} aria-invalid="true"{% endif %}
     aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>
     {%- if placeholder %}<option value="">{{ placeholder }}</option>{% endif %}
@@ -85,20 +119,96 @@
 {%- endmacro %}
 
 {#- A checkbox for a yes/no choice; `switch` looks like iOS' toggle, for
-    settings that take effect as a whole ("Email me updates"). -#}
-{% macro checkbox(name, label, checked=false, hint=none, value="on", switch=false, attrs={}) -%}
-{%- set id = _id(name) %}
+    settings that take effect as a whole ("Email me updates"). After a failed
+    submit it shows what was sent: an unticked box stays unticked. -#}
+{% macro checkbox(name, label, checked=false, hint=none, value="on", switch=false, attrs={}, id=none, disabled=false, span=none) -%}
+{%- set id = id or _id(name) %}
 {%- set message = error(name) %}
-{%- set previous = old(name, none) %}
-{%- set on = (previous == value) if previous else checked %}
-<div class="rx-field">
+{%- set on = (old(name, none) | string == value | string) if has_old() else checked %}
+<div class="{{ _field_class(span) }}">
   <label class="rx-check{% if switch %} rx-check--switch{% endif %}" for="{{ id }}">
-    {%- if not switch %}<input class="rx-checkbox" type="checkbox" id="{{ id }}" name="{{ name }}" value="{{ value }}"{% if on %} checked{% endif %}{% if message %} aria-invalid="true"{% endif %} aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>{% endif %}
+    {%- if not switch %}<input class="rx-checkbox" type="checkbox" id="{{ id }}" name="{{ name }}" value="{{ value }}"{% if on %} checked{% endif %}{% if disabled %} disabled{% endif %}{% if message %} aria-invalid="true"{% endif %} aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>{% endif %}
     <span class="rx-check__text"><span>{{ label }}</span>{% if hint %}<span class="rx-hint" id="{{ id }}-hint">{{ hint }}</span>{% endif %}</span>
-    {%- if switch %}<input class="rx-switch" type="checkbox" role="switch" id="{{ id }}" name="{{ name }}" value="{{ value }}"{% if on %} checked{% endif %}{% if message %} aria-invalid="true"{% endif %} aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>{% endif %}
+    {%- if switch %}<input class="rx-switch" type="checkbox" role="switch" id="{{ id }}" name="{{ name }}" value="{{ value }}"{% if on %} checked{% endif %}{% if disabled %} disabled{% endif %}{% if message %} aria-invalid="true"{% endif %} aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>{% endif %}
   </label>
   <p class="rx-error" id="{{ id }}-error" data-error-for="{{ name }}" aria-live="polite">{{ message }}</p>
 </div>
+{%- endmacro %}
+
+{#- One choice out of a few, all visible: `radio("plan", "Plan",
+    [["free", "Free"], ["pro", "Pro", "For teams"]])`. An option is a value,
+    a [value, label] pair, or [value, label, description]. `inline` puts
+    short options on one line, `columns` (2 or 3) lays long lists out in
+    columns. After a failed submit with none picked, none is checked. More
+    than about seven options read better as a `select`. -#}
+{% macro radio(name, label, options, selected=none, hint=none, required=false, inline=false, columns=none, attrs={}, id=none, disabled=false, span=none) -%}
+{%- set id = id or _id(name) %}
+{%- set message = error(name) %}
+{%- set current = (old(name, "") if has_old() else (selected if selected is not none else "")) | string %}
+<fieldset class="{{ _field_class(span) }} rx-fieldset" aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{% if disabled %} disabled{% endif %}>
+  <legend class="rx-label">{{ label }}{% if not required %} <span class="rx-required">({{ t('ui.optional') }})</span>{% endif %}</legend>
+  {%- if hint %}<p class="rx-hint" id="{{ id }}-hint">{{ hint }}</p>{% endif %}
+  <div class="{{ _choices_class(inline, columns) }}">
+    {%- for option in options %}
+      {%- if option is string or option is number %}{% set value = option %}{% set text = option %}{% set detail = none %}
+      {%- else %}{% set value = option[0] %}{% set text = option[1] %}{% set detail = option[2] if option | length > 2 else none %}{% endif %}
+      {%- set option_id = id if loop.first else id ~ "-" ~ loop.index %}
+    <label class="rx-check" for="{{ option_id }}"><input class="rx-radio" type="radio" id="{{ option_id }}" name="{{ name }}" value="{{ value }}"
+      {%- if value | string == current %} checked{% endif %}
+      {%- if required %} required{% endif %}
+      {%- if message %} aria-invalid="true"{% endif %}
+      {%- if detail %} aria-describedby="{{ option_id }}-detail"{% endif %}{{ _attrs(attrs) }}>
+      <span class="rx-check__text"><span>{{ text }}</span>{% if detail %}<span class="rx-hint" id="{{ option_id }}-detail">{{ detail }}</span>{% endif %}</span></label>
+    {%- endfor %}
+  </div>
+  <p class="rx-error" id="{{ id }}-error" data-error-for="{{ name }}" aria-live="polite">{{ message }}</p>
+</fieldset>
+{%- endmacro %}
+
+{#- Several choices out of a list: each ticked option sends `name` once,
+    so the form field is a `Vec` (give it `#[serde(default)]`: nothing
+    ticked sends nothing). `selected`: the values ticked at first. Options,
+    `inline` and `columns` as for `radio`. -#}
+{% macro checkbox_list(name, label, options, selected=[], hint=none, required=false, inline=false, columns=none, attrs={}, id=none, disabled=false, span=none) -%}
+{%- set id = id or _id(name) %}
+{%- set message = error(name) %}
+{%- set current = old(name, []) if has_old() else selected %}
+{%- if current is none %}{% set current = [] %}{% elif current is string or current is number %}{% set current = [current] %}{% endif %}
+{%- set current = current | map("string") | list %}
+<fieldset class="{{ _field_class(span) }} rx-fieldset" aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{% if disabled %} disabled{% endif %}>
+  <legend class="rx-label">{{ label }}{% if not required %} <span class="rx-required">({{ t('ui.optional') }})</span>{% endif %}</legend>
+  {%- if hint %}<p class="rx-hint" id="{{ id }}-hint">{{ hint }}</p>{% endif %}
+  <div class="{{ _choices_class(inline, columns) }}">
+    {%- for option in options %}
+      {%- if option is string or option is number %}{% set value = option %}{% set text = option %}{% set detail = none %}
+      {%- else %}{% set value = option[0] %}{% set text = option[1] %}{% set detail = option[2] if option | length > 2 else none %}{% endif %}
+      {%- set option_id = id if loop.first else id ~ "-" ~ loop.index %}
+    <label class="rx-check" for="{{ option_id }}"><input class="rx-checkbox" type="checkbox" id="{{ option_id }}" name="{{ name }}" value="{{ value }}"
+      {%- if value | string in current %} checked{% endif %}
+      {%- if message %} aria-invalid="true"{% endif %}
+      {%- if detail %} aria-describedby="{{ option_id }}-detail"{% endif %}{{ _attrs(attrs) }}>
+      <span class="rx-check__text"><span>{{ text }}</span>{% if detail %}<span class="rx-hint" id="{{ option_id }}-detail">{{ detail }}</span>{% endif %}</span></label>
+    {%- endfor %}
+  </div>
+  <p class="rx-error" id="{{ id }}-error" data-error-for="{{ name }}" aria-live="polite">{{ message }}</p>
+</fieldset>
+{%- endmacro %}
+
+{#- Fields side by side on wider screens, one column on phones:
+    `{% call form_grid(2) %}{{ input("city", "City") }}{{ input("zip", "ZIP") }}{% endcall %}`.
+    A field's `span=2` (or "full") makes it wider. -#}
+{% macro form_grid(columns=2) -%}
+<div class="rx-form-grid rx-cols-{{ columns }}">{{ caller() }}</div>
+{%- endmacro %}
+
+{#- A titled group of fields inside a long form ("Shipping address"), in
+    a `form_grid` of `columns`. -#}
+{% macro fieldset(legend, hint=none, columns=1) -%}
+<fieldset class="rx-fieldset rx-fieldset--boxed">
+  <legend class="rx-fieldset__legend">{{ legend }}</legend>
+  {%- if hint %}<p class="rx-hint">{{ hint }}</p>{% endif %}
+  <div class="rx-form-grid rx-cols-{{ columns }}">{{ caller() }}</div>
+</fieldset>
 {%- endmacro %}
 
 {#- One primary button per form: the action people came to take. Variants:
@@ -156,7 +266,7 @@
     <p class="rx-alert__title">{{ title or t('ui.errors_title') }}</p>
     <ul class="rx-alert__list">
       {%- for field, messages in errors | items %}
-      <li><a class="rx-link" href="#{{ _id(field) }}">{{ messages[0] }}</a></li>
+      <li><a class="rx-link" href="#{{ _id(field) }}" data-rx-field="{{ field }}">{{ messages[0] }}</a></li>
       {%- endfor %}
     </ul>
   </div>

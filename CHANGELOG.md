@@ -10,6 +10,23 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### UI kit: more form fields
+
+Closer to Filament's form fields, on the kit's own rules (labels, errors, keyboard, no
+JavaScript needed).
+
+- New: `radio` (a radio group in a `fieldset`, options with descriptions) and
+  `checkbox_list` (ticked values sent as a list), both `inline` or in `columns`.
+- New: `form_grid(columns)` and `fieldset(legend)` for form layout; every field takes `span`.
+- New: `input` takes `prefix`, `suffix` and `datalist`; `input`/`textarea` take `readonly`;
+  every field takes `disabled`; `textarea`, `select` and `checkbox` take `id`.
+- New: the template helper `has_old()` (the previous request was a failed submit) and
+  `Session::has_old_input`.
+- Fixed: after a failed submit, a checkbox the user unticked came back ticked when its
+  default was `checked=true`.
+- Fixed: the error summary's links missed a field given its own `id`; they now find the
+  field by its name.
+
 ### M28d · Data grid: cards on phones, more kinds of cells
 
 - New: `Grid::cards_on_mobile()`: rows as cards on phones, with sorting and filters in the

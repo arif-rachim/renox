@@ -18,6 +18,23 @@ impl Validate for Signup {
     }
 }
 
+#[derive(serde::Deserialize)]
+struct Profile {
+    name: String,
+    plan: Option<String>,
+    #[serde(default)]
+    tags: Vec<String>,
+    news: Option<String>,
+}
+
+impl Validate for Profile {
+    fn rules(&self, v: &mut Validator) {
+        v.field("name", &self.name).required();
+        v.field("plan", &self.plan).required();
+        let _ = (&self.tags, &self.news);
+    }
+}
+
 struct Pages;
 
 impl Module for Pages {
@@ -52,6 +69,10 @@ impl Module for Pages {
                     .fragment("rows")
                     .also("count")
             })
+            .get("/fields", || async { view("fields.html", context! {}) })
+            .post("/profile", |Valid(_): Valid<Profile>| async {
+                Redirect::to("/fields")
+            })
             .get("/components", || async {
                 view("components.html", context! { note => "hi" })
             })
@@ -69,6 +90,24 @@ fn views() -> tempfile::TempDir {
 {{ input("name", "Name", required=true, hint="Up to 10 letters") }}
 {{ input("email", "Email", type="email", required=true) }}
 {{ input("nickname", "Nickname") }}{{ button("Sign up") }}</form>{{ toasts() }}"#,
+    );
+    write(
+        "fields.html",
+        r#"{% from "renox/ui.html" import input, textarea, select, checkbox, radio, checkbox_list, form_grid, fieldset, form_errors %}
+<form method="post" action="/profile">{{ csrf_field() }}{{ form_errors() }}
+{% call form_grid(2) %}
+{{ input("name", "Name", id="profile-name", required=true) }}
+{{ input("price", "Price", type="number", prefix="Rp", suffix=".00", span=2) }}
+{{ input("code", "Code", value="X1", readonly=true, datalist=["X1", ["X2", "Second"]]) }}
+{{ textarea("bio", "Bio", id="profile-bio", disabled=true, span="full") }}
+{{ select("size", "Size", ["s", "m"], id="profile-size", span=2) }}
+{% endcall %}
+{% call fieldset("Preferences", columns=2) %}
+{{ radio("plan", "Plan", [["free", "Free"], ["pro", "Pro", "For teams"]], selected="free", required=true, inline=true) }}
+{{ checkbox_list("tags", "Tags", [["a", "Alpha"], ["b", "Beta"], ["c", "Gamma"]], selected=["b"], columns=2) }}
+{{ checkbox("news", "Email me news", checked=true) }}
+{% endcall %}
+</form>"#,
     );
     write(
         "list.html",
@@ -245,4 +284,71 @@ async fn kit_texts_follow_the_locale() {
     .await;
     app.get("/form").await.assert_see("(opsional)");
     app.get("/components").await.assert_see("Batal|");
+}
+
+#[renox::test]
+async fn form_fields_choices_affixes_and_layout() {
+    let (app, _dir) = app().await;
+    let page = app.get("/fields").await;
+    page.assert_ok()
+        // Layout: a two-column grid, a field spanning both, a titled group.
+        .assert_see(r#"<div class="rx-form-grid rx-cols-2">"#)
+        .assert_see(r#"<div class="rx-field rx-span-2">"#)
+        .assert_see(r#"<div class="rx-field rx-span-full">"#)
+        .assert_see(r#"<legend class="rx-fieldset__legend">Preferences</legend>"#)
+        // Every field takes its own id.
+        .assert_see(r#"<label class="rx-label" for="profile-name">"#)
+        .assert_see(r#"id="profile-bio""#)
+        .assert_see(r#"id="profile-size""#)
+        // Prefix and suffix are joined to the input and described by it.
+        .assert_see(r#"<span class="rx-affix__text" id="rx-price-prefix">Rp</span>"#)
+        .assert_see(r#"aria-describedby="rx-price-prefix rx-price-suffix rx-price-error""#)
+        // Read-only, disabled, suggestions.
+        .assert_see(r#"value="X1" list="rx-code-list" readonly"#)
+        .assert_see(r#"<option value="X2">Second</option>"#)
+        .assert_see(r#"id="profile-bio" name="bio" rows="4" disabled"#)
+        // A radio group in a fieldset: the first option carries the group's id
+        // (the error summary links to it), the others are numbered.
+        .assert_see(r#"<legend class="rx-label">Plan</legend>"#)
+        .assert_see(r#"<div class="rx-choices rx-choices--inline">"#)
+        .assert_see(r#"id="rx-plan" name="plan" value="free" checked required"#)
+        .assert_see(r#"id="rx-plan-2" name="plan" value="pro" required aria-describedby="rx-plan-2-detail""#)
+        .assert_see(r#"<span class="rx-hint" id="rx-plan-2-detail">For teams</span>"#)
+        // A checkbox list, ticked from `selected`.
+        .assert_see(r#"<div class="rx-choices rx-cols-2">"#)
+        .assert_see(r#"name="tags" value="a">"#)
+        .assert_see(r#"name="tags" value="b" checked>"#)
+        .assert_see(r#"id="rx-news" name="news" value="on" checked"#);
+
+    // A failed submit refills what was sent: the other plan, two tags, and
+    // the checkbox left unticked (which sends nothing) stays unticked.
+    app.request()
+        .header("referer", "/fields")
+        .post(
+            "/profile",
+            &[("name", ""), ("plan", "pro"), ("tags", "a"), ("tags", "c")],
+        )
+        .await
+        .assert_redirect("/fields");
+    let page = app.get("/fields").await;
+    page.assert_see(r#"name="plan" value="pro" checked"#)
+        .assert_dont_see(r#"value="free" checked"#)
+        .assert_see(r#"name="tags" value="a" checked>"#)
+        .assert_dont_see(r#"name="tags" value="b" checked>"#)
+        .assert_see(r#"name="tags" value="c" checked>"#)
+        .assert_see(r#"id="rx-news" name="news" value="on" aria-describedby"#)
+        // The summary links to the field by its name, whatever its id.
+        .assert_see(r##"href="#rx-name" data-rx-field="name""##)
+        .assert_see(r#"id="profile-name" name="name" type="text" value="" required aria-required="true" aria-invalid="true""#);
+
+    // One tag only comes back as a string, not a list.
+    app.request()
+        .header("referer", "/fields")
+        .post("/profile", &[("name", ""), ("tags", "b"), ("news", "on")])
+        .await;
+    let page = app.get("/fields").await;
+    page.assert_see(r#"name="tags" value="b" checked>"#)
+        .assert_dont_see(r#"name="tags" value="a" checked>"#)
+        .assert_see(r#"id="rx-news" name="news" value="on" checked"#)
+        .assert_see(r#"id="rx-plan" name="plan" value="free" required aria-invalid="true""#);
 }

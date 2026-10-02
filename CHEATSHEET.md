@@ -234,13 +234,18 @@ fn view_extras(app: App) -> App {
 
 ```html
 {# layout: {{ renox_head() }}{{ renox_ui() }} in <head>, <body class="rx-page">, {{ toasts() }} #}
-{% from "renox/ui.html" import card, input, select, checkbox, button, confirm, table, form_errors %}
+{% from "renox/ui.html" import card, input, select, checkbox, radio, checkbox_list, form_grid, button, confirm, table, form_errors %}
 <form method="post" action="/products" data-live-validate novalidate>{{ csrf_field() }}
   {% call card(title="New product") %}
     {{ form_errors() }}
     {{ input("name", "Name", required=true, hint="Shown on the list") }}
     {{ select("size", "Size", [["s", "Small"], ["m", "Medium"]]) }}
     {{ checkbox("featured", "Featured", switch=true) }}
+    {% call form_grid(2) %}
+      {{ input("price", "Price", type="number", prefix="Rp") }}
+      {{ radio("unit", "Unit", ["pcs", "kg"], selected="pcs", inline=true) }}
+    {% endcall %}
+    {{ checkbox_list("tags", "Tags", [["new", "New"], ["sale", "On sale"]]) }} {# Vec + #[serde(default)] #}
     {{ button("Create product") }}
   {% endcall %}
 </form>

@@ -149,7 +149,8 @@ Every example has a README.md that walks through it.
   [src/app/tasks/mod.rs](examples/postgres/src/app/tasks/mod.rs),
   [migrations/](examples/postgres/migrations)
 - [examples/fields](examples/fields) ([README](examples/fields/README.md)): every form field type (text, textarea, number, money,
-  checkbox, select → `DbEnum`, multi-select → `Json<Vec<String>>`, time, datetime-local, date)
+  switch, radio → `DbEnum`, checkbox list → `Json<Vec<String>>`, time, datetime-local, date)
+  on the UI kit (`prefix`/`suffix`, `radio`, `checkbox_list`, `form_grid`, `fieldset`)
   saved and shown back in the edit form, on SQLite and PostgreSQL; list items checked
   with `each` + `one_of` and `distinct`; products keyed by `id: Uuid` (a model key other than
   an integer, M22). The mapping table is

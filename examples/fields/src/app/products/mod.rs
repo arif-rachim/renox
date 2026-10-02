@@ -48,7 +48,7 @@ struct ProductForm {
     weight_kg: f64,              // <input type="number" step="0.01">
     price: i64,                  // <input type="number" step="1">
     available: bool,             // <input type="checkbox">: "on", or nothing → false
-    size: Size,                  // <select>
+    size: Size,                  // radio buttons, or a <select>
     #[serde(default)]
     colors: Vec<String>, // <select multiple> or checkboxes named "colors"
     opens_at: Option<NaiveTime>, // <input type="time">

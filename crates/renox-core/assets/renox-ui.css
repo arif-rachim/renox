@@ -66,6 +66,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    --rx-scheme: dark;
     --rx-accent: #0071e3;
     --rx-accent-hover: #0a84ff;
     --rx-accent-pressed: #0062c4;
@@ -95,6 +96,7 @@
   }
 }
 :root[data-theme="dark"] {
+  --rx-scheme: dark;
   --rx-accent-text: #409cff; --rx-danger-text: #ff6961; --rx-success: #30d158; --rx-warning: #ff9f0a;
   --rx-info: #409cff; --rx-label: #f5f5f7; --rx-secondary-label: #aeaeb2; --rx-tertiary-label: #8e8e93;
   --rx-bg: #000000; --rx-surface: #1c1c1e; --rx-surface-raised: #2c2c2e; --rx-fill: rgba(120, 120, 128, 0.24);
@@ -178,7 +180,7 @@
 
 /* ---------- Form fields ---------- */
 
-.rx-field { display: grid; gap: 6px; }
+.rx-field { display: grid; gap: 6px; min-width: 0; }
 .rx-label { font-size: var(--rx-text-subhead); font-weight: 600; color: var(--rx-label); }
 .rx-required { color: var(--rx-secondary-label); font-weight: 400; }
 .rx-hint { font-size: var(--rx-text-footnote); color: var(--rx-secondary-label); margin: 0; }
@@ -196,6 +198,9 @@
   min-height: var(--rx-target);
   padding: 10px 12px;
   width: 100%;
+  min-width: 0;
+  /* Native pickers (date, time, color) and the datalist follow the theme. */
+  color-scheme: var(--rx-scheme, light);
   transition: border-color var(--rx-duration) var(--rx-ease), box-shadow var(--rx-duration) var(--rx-ease);
   -webkit-appearance: none;
   appearance: none;
@@ -221,6 +226,29 @@
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--rx-danger) 30%, transparent);
 }
 .rx-input:disabled, .rx-select:disabled, .rx-textarea:disabled { background: var(--rx-fill); color: var(--rx-tertiary-label); cursor: not-allowed; }
+/* Read-only: shaded like disabled, but the text keeps full contrast (it is
+   read, copied and sent with the form). */
+.rx-input[readonly], .rx-textarea[readonly] { background: var(--rx-fill); }
+
+/* Prefix and suffix ("Rp", "kg"): one box around the text and the input. */
+.rx-affix {
+  display: flex; align-items: stretch; min-height: var(--rx-target);
+  background: var(--rx-surface); border: 1px solid var(--rx-border); border-radius: var(--rx-radius-s);
+  overflow: hidden; transition: border-color var(--rx-duration) var(--rx-ease), box-shadow var(--rx-duration) var(--rx-ease);
+}
+.rx-affix:hover { border-color: var(--rx-tertiary-label); }
+.rx-affix:focus-within { border-color: var(--rx-accent); box-shadow: 0 0 0 4px var(--rx-focus); }
+.rx-affix:has(> [aria-invalid="true"]) { border-color: var(--rx-danger-text); }
+.rx-affix:has(> [aria-invalid="true"]):focus-within { box-shadow: 0 0 0 4px color-mix(in srgb, var(--rx-danger) 30%, transparent); }
+.rx-affix > .rx-input { flex: 1; min-width: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+.rx-affix > .rx-input:focus-visible { box-shadow: none; }
+.rx-affix:has(> .rx-input:disabled), .rx-affix:has(> .rx-input[readonly]) { background: var(--rx-fill); }
+.rx-affix__text {
+  display: flex; align-items: center; flex: none; padding-inline: 12px; white-space: nowrap;
+  color: var(--rx-secondary-label); font-size: var(--rx-text-body); background: var(--rx-fill);
+}
+.rx-affix__text:first-child { border-right: 1px solid var(--rx-separator); }
+.rx-affix__text:last-child { border-left: 1px solid var(--rx-separator); }
 
 /* Checkbox and switch: the whole row is the target. */
 .rx-check { display: flex; align-items: flex-start; gap: var(--rx-space-3); min-height: var(--rx-target); padding-block: 10px; cursor: pointer; }
@@ -250,6 +278,42 @@
 .rx-switch:checked { background: var(--rx-success); }
 .rx-switch:checked::after { transform: translateX(20px); }
 .rx-check--switch { align-items: center; justify-content: space-between; }
+
+.rx-radio {
+  flex: none; margin: 2px 0 0; width: 22px; height: 22px; border-radius: 50%;
+  border: 1.5px solid var(--rx-border); background: var(--rx-surface);
+  -webkit-appearance: none; appearance: none; display: grid; place-content: center; cursor: pointer;
+  transition: background var(--rx-duration) var(--rx-ease), border-color var(--rx-duration) var(--rx-ease);
+}
+.rx-radio::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--rx-on-accent); transform: scale(0); transition: transform var(--rx-duration) var(--rx-spring); }
+.rx-radio:checked { background: var(--rx-accent); border-color: var(--rx-accent); }
+.rx-radio:checked::after { transform: scale(1); }
+.rx-checkbox[aria-invalid="true"], .rx-radio[aria-invalid="true"] { border-color: var(--rx-danger-text); }
+.rx-check:has(input:disabled) { cursor: not-allowed; color: var(--rx-tertiary-label); }
+.rx-checkbox:disabled, .rx-radio:disabled, .rx-switch:disabled { cursor: not-allowed; background-color: var(--rx-fill); border-color: var(--rx-separator); }
+.rx-checkbox:checked:disabled, .rx-radio:checked:disabled, .rx-switch:checked:disabled { opacity: 0.5; }
+
+/* Radio groups and checkbox lists: a fieldset whose legend looks like a label. */
+.rx-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.rx-fieldset > legend { padding: 0; margin-bottom: 6px; }
+.rx-choices { display: grid; column-gap: var(--rx-space-5); }
+.rx-choices > .rx-check { padding-block: 8px; min-height: var(--rx-target); }
+.rx-choices--inline { display: flex; flex-wrap: wrap; }
+
+/* A titled group of fields in a long form. */
+.rx-fieldset--boxed { border: 1px solid var(--rx-separator); border-radius: var(--rx-radius); padding: var(--rx-space-2) var(--rx-space-4) var(--rx-space-4); display: grid; gap: var(--rx-space-3); }
+.rx-fieldset__legend { font-size: var(--rx-text-callout); font-weight: 600; padding: 0 var(--rx-space-1); margin-left: calc(-1 * var(--rx-space-1)); }
+
+/* Fields side by side: one column on phones, `rx-cols-N` from there. */
+.rx-form-grid { display: grid; gap: var(--rx-space-4) var(--rx-space-5); grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 36.0625rem) {
+  .rx-form-grid.rx-cols-2, .rx-choices.rx-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rx-form-grid.rx-cols-3, .rx-choices.rx-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .rx-form-grid.rx-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .rx-form-grid > .rx-span-2 { grid-column: span 2; }
+  .rx-form-grid > .rx-span-3 { grid-column: span 3; }
+  .rx-form-grid > .rx-span-full { grid-column: 1 / -1; }
+}
 
 /* ---------- Buttons ---------- */
 
@@ -469,6 +533,7 @@
   .rx-toast, .rx-menu__list { background: var(--rx-surface-raised); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 @media (forced-colors: active) {
-  .rx-button, .rx-input, .rx-select, .rx-textarea, .rx-toast, .rx-card { border: 1px solid CanvasText; }
+  .rx-button, .rx-input, .rx-select, .rx-textarea, .rx-toast, .rx-card, .rx-affix { border: 1px solid CanvasText; }
+  .rx-affix > .rx-input { border: 0; }
   .rx-switch::after { background: CanvasText; }
 }

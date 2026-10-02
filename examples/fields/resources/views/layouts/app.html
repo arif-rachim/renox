@@ -8,8 +8,9 @@
   {% block seo %}{{ seo() }}{% endblock %}
   <link rel="stylesheet" href="{{ asset('app.css') }}">
   {{ renox_head() }}
+  {{ renox_ui() }}
 </head>
-<body>
+<body class="rx-page">
   <nav>
     <a href="{{ route("home") }}"><strong>{{ app.name }}</strong></a>
   </nav>

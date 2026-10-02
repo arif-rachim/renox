@@ -899,7 +899,13 @@ picks the build, not the terminal.
 - **M28** (the grid next to Filament's tables, five PRs, the owner asked for all): M28a
   (`prefix`, `searchable` + search box, filter chips, `row_url`, `empty_state`): merged (#80). M28b (`bulk_action`/`row_action`, `Action`, `Selection`, `selected`):
   merged (#81). M28c (`Column::summary`/`Summary`, `groups`/`group_by`): merged (#82). M28d (`cards_on_mobile`, image/color columns, badges, icons,
-  description, tooltip, wrap, limit, link, copyable): branch `m28d-grid-cards`. Then M28e relationships, advanced filter, polling, session state.
+  description, tooltip, wrap, limit, link, copyable): merged (#83). Then M28e relationships, advanced filter, polling, session state.
+- **UI kit form fields** (Filament's forms as the yardstick; stage 1 of 3): `radio`,
+  `checkbox_list`, `form_grid`/`fieldset`, `span`, `prefix`/`suffix`, `datalist`,
+  `disabled`/`readonly`, `has_old()` (a checkbox or radio missing from `old()` after a
+  failed submit was sent empty); examples/fields on the kit: branch `ui-form`. Stage 2:
+  revealable password, copyable, toggle buttons, file upload, Cally date field, `visible_when`;
+  stage 3: tags, key-value, repeater, searchable/multiple select, wizard.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.
