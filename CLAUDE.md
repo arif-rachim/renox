@@ -961,7 +961,7 @@ picks the build, not the terminal.
   Then infolists (Filament's as the yardstick): `infolist`/`entry`/`repeatable` in the kit,
   the filters `money` (`APP_CURRENCY`, default `IDR`), `since`, `words`, `markdown`
   (pulldown-cmark, raw HTML shown as text); shop's order page and fields' product page use
-  them. Branch `ccr-0db862ed-uol6i8`.
+  them. Merged (#94).
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.
@@ -971,5 +971,6 @@ picks the build, not the terminal.
   login, then small adds (validation rules like `json`/`gt`/`decimal`/`dimensions`, several
   storage disks, route model binding), then admin, search, realtime (SSE) and billing.
 - As of M28: ~60k lines of Rust in `crates/` (stubs excluded), ~650 `#[test]`/`#[renox::test]`/
-  `#[tokio::test]` functions in `crates/` and `examples/` (plus doctests), and 43 direct
-  dependencies in renox-core (6 optional). Keep dependencies lean and remove unused ones.
+  `#[tokio::test]` functions in `crates/` and `examples/` (plus doctests), and 44 direct
+  dependencies in renox-core (6 optional; pulldown-cmark came with the `markdown` filter, #94).
+  Keep dependencies lean and remove unused ones.
