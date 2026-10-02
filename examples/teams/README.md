@@ -9,6 +9,7 @@ after the password is confirmed, and the account pages from `Auth::new().account
 ```bash
 cd examples/teams
 rnx key:generate                 # keeps logins (and the encrypted secrets) across restarts
+cp .env.example .env    # optional: the settings this example reads
 cargo run -- migrate
 cargo run -- db:seed             # alice@, bob@ and carol@example.com / password123
 SUPER_ADMINS=alice@example.com cargo run   # http://127.0.0.1:3000

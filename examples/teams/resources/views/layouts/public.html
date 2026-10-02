@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="{{ app.locale }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  {% block seo %}{{ seo() }}{% endblock %}
+  {{ renox_head() }}
+  {{ renox_ui() }}
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
+</head>
+{#- The layout of a team's public page, on the team's own host. That host
+    has only the public routes (Routes::domain), so every link to the app
+    is absolute, to APP_URL. -#}
+<body class="rx-page">
+  {% from "renox/ui.html" import link_button %}
+  <header class="bar">
+    <nav class="bar__inner" aria-label="Main">
+      <a class="bar__brand" href="{{ app.url }}">{{ app.name }}</a>
+      <span class="rx-spacer"></span>
+      {{ link_button(app.url ~ route('login'), "Log in", variant="plain", size="small") }}
+    </nav>
+  </header>
+  <main class="rx-container" id="main">
+    <div class="rx-stack">{% block content %}{% endblock %}</div>
+  </main>
+</body>
+</html>

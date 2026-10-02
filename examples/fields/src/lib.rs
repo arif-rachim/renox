@@ -13,4 +13,28 @@ pub fn app() -> App {
         .embed(renox::embedded!())
         .migrations(renox::migrations!())
         .module(app::products::Products)
+        // `cargo run -- db:seed`: two products to open and edit.
+        .seeder(|db| async move {
+            if Product::query().exists(&db).await? {
+                return Ok(()); // seeded already
+            }
+            for (name, price, stock, size) in [
+                ("Kopi Gayo", 85_000, 12, Size::Medium),
+                ("Teh Melati", 25_000, 40, Size::Small),
+            ] {
+                let product = Product {
+                    name: name.into(),
+                    price,
+                    stock,
+                    size,
+                    available: true,
+                    weight_kg: 0.25,
+                    colors: renox::db::Json(vec!["black".into()]),
+                    released_on: renox::chrono::NaiveDate::from_ymd_opt(2026, 1, 15),
+                    ..Default::default()
+                };
+                Product::create(&db, product).await?;
+            }
+            Ok(())
+        })
 }

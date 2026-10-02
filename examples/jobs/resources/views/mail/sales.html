@@ -1,4 +1,4 @@
 {% extends "renox/mail/layout.html" %}
 {% block content %}
-<p>{{ count }} order(s) {{ period }}, Rp {{ total }} in all.</p>
+<p>{{ count }} order(s) {{ period }}, {{ total | money }} in all.</p>
 {% endblock %}

@@ -1,11 +1,43 @@
 {% extends "layouts/app.html" %}
+{% from "renox/ui.html" import table, link_button, confirm, badge, empty %}
 
 {% block content %}
-<h1>Products</h1>
-<p><a href="{{ route('products.create') }}">New product</a></p>
-<ul>
-  {% for p in products %}
-  <li><a href="{{ route('products.show', p.id) }}">{{ p.name }}</a> ({{ p.size }}, {{ p.colors | join(", ") }})</li>
-  {% endfor %}
-</ul>
+<div class="rx-stack">
+  <div class="rx-row">
+    <div>
+      <h1 class="rx-title">Products</h1>
+      <p class="rx-subtitle">Each field of a product is one kind of form input.</p>
+    </div>
+    <span class="rx-spacer"></span>
+    {{ link_button(route('products.create'), "New product", variant="primary") }}
+  </div>
+
+  {% if products %}
+  {% call table(["Name", ["Price", "num"], ["Stock", "num"], ["Size", "hide-narrow"], ["Available", "hide-narrow"], ["", "num"]], caption="Products") %}
+    {% for product in products %}
+    <tr>
+      <td><a class="rx-link" href="{{ route('products.show', product.id) }}"><strong>{{ product.name }}</strong></a></td>
+      <td class="rx-num">{{ product.price | money }}</td>
+      <td class="rx-num">{{ product.stock | number }}</td>
+      <td class="rx-hide-narrow">{{ badge(product.size | capitalize, kind="info") }}</td>
+      <td class="rx-hide-narrow">{{ badge("Available", kind="success") if product.available else badge("Unavailable") }}</td>
+      <td class="rx-num">
+        <div class="rx-row rx-row--end">
+          {{ link_button(route('products.edit', product.id), "Edit", variant="plain", size="small") }}
+          {{ confirm("delete-" ~ product.id, "Delete", route('products.destroy', product.id),
+                     "Delete “" ~ product.name ~ "”?",
+                     "The product is removed for good.",
+                     confirm_label="Delete product", size="small") }}
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+  {% endcall %}
+  {% else %}
+  <div class="rx-card">
+    {{ empty("No products yet", "Add one to try every kind of field, or seed two with db:seed.",
+             route('products.create'), "Add the first product") }}
+  </div>
+  {% endif %}
+</div>
 {% endblock %}

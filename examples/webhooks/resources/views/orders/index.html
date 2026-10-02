@@ -1,13 +1,29 @@
 {% extends "layouts/app.html" %}
+{% from "renox/ui.html" import table, badge, empty %}
 
 {% block content %}
-<h1>Orders</h1>
-<table>
-  <tr><th>Order</th><th>Amount</th><th>Status</th><th>Paid via</th></tr>
-  {% for order in orders %}
-  <tr><td>{{ order.code }}</td><td>{{ order.amount }}</td><td>{{ order.status }}</td><td>{{ order.paid_via or "" }}</td></tr>
+<div class="rx-stack">
+  <div>
+    <h1 class="rx-title">Orders</h1>
+    <p class="rx-subtitle">An order turns paid when a provider's webhook says so.</p>
+  </div>
+
+  {% if orders %}
+  {% call table(["Order", ["Amount", "num"], "Status", ["Paid via", "hide-narrow"]], caption="Orders") %}
+    {% for order in orders %}
+    <tr>
+      <td><strong>{{ order.code }}</strong></td>
+      <td class="rx-num">{{ order.amount | money }}</td>
+      {#- The badge's text carries the meaning, its color only repeats it. -#}
+      <td>{{ badge("Paid", kind="success") if order.status == "paid" else badge("Pending", kind="warning") }}</td>
+      <td class="rx-hide-narrow">{{ order.paid_via | capitalize if order.paid_via else "—" }}</td>
+    </tr>
+    {% endfor %}
+  {% endcall %}
   {% else %}
-  <tr><td colspan="4">No orders yet (cargo run -- db:seed).</td></tr>
-  {% endfor %}
-</table>
+  <div class="rx-card">
+    {{ empty("No orders yet", "Seed three pending orders with: cargo run -- db:seed") }}
+  </div>
+  {% endif %}
+</div>
 {% endblock %}

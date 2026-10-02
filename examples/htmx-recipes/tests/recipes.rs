@@ -30,17 +30,56 @@ async fn the_page_loads_more_rows_as_you_scroll() {
         .assert_see("<html")
         .assert_see(">Task 20<") // newest first
         .assert_dont_see(">Task 5<")
-        .assert_see(r#"hx-get="/?page=2" hx-trigger="revealed""#)
+        .assert_see(r#"hx-get="/?before=6" hx-trigger="revealed""#)
         .assert_see("20 open");
 
+    // A task added meanwhile doesn't shift the next batch (it goes by id,
+    // not page number), so no row repeats.
+    app.htmx()
+        .post("/tasks", &[("title", "Late arrival")])
+        .await;
     // The loader asks with htmx and gets only the next rows, and no loader
-    // after the last page.
-    let more = app.htmx().get("/?page=2").await;
+    // after the last ones.
+    let more = app.htmx().get("/?before=6").await;
     more.assert_ok()
+        .assert_dont_see(">Task 6<")
         .assert_see(">Task 5<")
         .assert_see(">Task 1<")
         .assert_dont_see("<html")
-        .assert_dont_see("page=3");
+        .assert_dont_see("before=");
+}
+
+#[renox::test]
+async fn plain_forms_skip_duplicates_too_and_the_empty_note_follows_the_list() {
+    let app = with_tasks(0).await;
+    app.get("/")
+        .await
+        .assert_see(r#"<p id="empty" class="muted" hx-swap-oob="true">"#);
+    // The first task hides the note (out of band); deleting it shows it again.
+    app.htmx()
+        .post("/tasks", &[("title", "Buy coffee")])
+        .await
+        .assert_see(r#"<p id="empty" class="muted" hidden hx-swap-oob="true">"#);
+    // Without htmx: a redirect and a toast, still no copy.
+    app.post("/tasks", &[("title", "  Buy coffee ")])
+        .await
+        .assert_redirect("/");
+    assert_eq!(Task::query().count(app.db()).await.unwrap(), 1);
+    // Edits are trimmed like new tasks.
+    let task = Task::query().first(app.db()).await.unwrap().unwrap();
+    app.patch(
+        &format!("/tasks/{}", task.id),
+        &[("title", "  Grind beans  ")],
+    )
+    .await;
+    assert_eq!(
+        Task::find_or_404(app.db(), task.id).await.unwrap().title,
+        "Grind beans"
+    );
+    app.htmx()
+        .delete(&format!("/tasks/{}", task.id))
+        .await
+        .assert_see(r#"<p id="empty" class="muted" hx-swap-oob="true">"#);
 }
 
 #[renox::test]
@@ -130,7 +169,7 @@ async fn checkboxes_toggle_and_rows_delete_in_place() {
     res.assert_ok();
     assert_eq!(
         res.text(),
-        r#"<small id="open-count" hx-swap-oob="true">1 open</small>"#
+        r#"<small id="open-count" hx-swap-oob="true">1 open</small><p id="empty" class="muted" hidden hx-swap-oob="true">Nothing to do. Add a task.</p>"#
     );
     let trigger: renox::serde_json::Value =
         renox::serde_json::from_str(res.header("hx-trigger").unwrap()).unwrap();
@@ -164,7 +203,7 @@ async fn bulk_actions_refresh_or_redirect() {
         .assert_hx_redirect("/summary");
     app.get("/summary")
         .await
-        .assert_see("1 tasks archived.")
+        .assert_see("1 task archived.")
         .assert_see("0 tasks still open.");
     app.post("/tasks/archive", &[])
         .await

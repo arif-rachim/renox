@@ -168,10 +168,25 @@ async fn sitemap(State(state): State<AppState>) -> Result<Sitemap> {
     Ok(map)
 }
 
-/// Remembers the visitor's language and goes back to where they were.
-async fn language(session: Session, back: Back, Path(locale): Path<String>) -> Result<Back> {
+/// Remembers the visitor's language and goes back to where they were. A
+/// logged-in user's is saved too: their mail and notifications are written
+/// in it (`users.locale`, which `Recipient::locale` reads).
+async fn language(
+    State(state): State<AppState>,
+    session: Session,
+    user: Option<AuthUser>,
+    back: Back,
+    Path(locale): Path<String>,
+) -> Result<Back> {
     if ["en", "id"].contains(&locale.as_str()) {
         renox::i18n::set_locale(&session, &locale)?;
+        if let Some(user) = user {
+            renox::db::sql("UPDATE users SET locale = ? WHERE id = ?")
+                .bind(&locale)
+                .bind(user.id)
+                .execute(&state.db)
+                .await?;
+        }
     }
     Ok(back)
 }

@@ -41,7 +41,9 @@ impl Module for Teams {
             .require_password_confirmed();
         // Every team's public page on its own host: acme.localhost:3000 in
         // development (browsers send *.localhost to this machine), set
-        // TEAM_DOMAIN=example.com for acme.example.com.
+        // TEAM_DOMAIN=example.com for acme.example.com. Read from the
+        // environment, not `config.var`: routes are built before the app
+        // (and its config) exists.
         let domain = std::env::var("TEAM_DOMAIN").unwrap_or_else(|_| "localhost".into());
         let public = Routes::new()
             .get("/", public_page)
@@ -199,7 +201,10 @@ async fn store(
         1 => format!("Team {} created, with one member.", team.name),
         n => format!("Team {} created, with {n} members.", team.name),
     };
-    Ok((Toast::success(message), Redirect::to("/projects")))
+    Ok((
+        Toast::success(message),
+        Redirect::route("projects.index", &[])?,
+    ))
 }
 
 /// Makes another of the user's teams the current one.
@@ -217,7 +222,7 @@ async fn switch(
     session.put(SESSION_KEY, team.id)?;
     Ok((
         Toast::success(format!("Switched to {}.", team.name)),
-        Redirect::to("/projects"),
+        Redirect::route("projects.index", &[])?,
     ))
 }
 
@@ -259,7 +264,7 @@ async fn add_member(
     } else {
         Toast::info(format!("{} is already in {}.", member.name, team.name))
     };
-    Ok((toast, Redirect::to("/team")))
+    Ok((toast, Redirect::route("team.settings", &[])?))
 }
 
 /// The secret in full, after the password was confirmed.
@@ -287,6 +292,6 @@ async fn rotate_secret(
     row.save_only(&state.db, &["webhook_secret"]).await?;
     Ok((
         Toast::success("A new secret was made. Update your webhook sender."),
-        Redirect::to("/team/secret"),
+        Redirect::route("team.secret", &[])?,
     ))
 }

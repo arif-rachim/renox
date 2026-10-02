@@ -12,7 +12,6 @@
 </head>
 <body>
   <main>
-    {% if flash.status %}<p class="flash">{{ flash.status }}</p>{% endif %}
     {% block content %}{% endblock %}
   </main>
   {#- Toasts: after a redirect or a refresh from the session, over htmx from HX-Trigger. -#}

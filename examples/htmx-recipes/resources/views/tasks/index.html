@@ -20,7 +20,7 @@
   <ul id="tasks">
     {% include "tasks/_rows.html" %}
   </ul>
-  {% if tasks.total == 0 %}<p class="muted">Nothing to do. Add a task.</p>{% endif %}
+  {% include "tasks/_empty.html" %}
 
   <div class="actions">
     {# Plain forms that htmx takes over: HX-Refresh reloads this page,

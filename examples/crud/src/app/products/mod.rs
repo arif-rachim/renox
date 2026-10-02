@@ -8,9 +8,9 @@ pub mod import;
 pub mod model;
 pub mod policy;
 
-use renox::Toast;
 use renox::prelude::*;
 use renox::validation::ValidateHooks;
+use renox::{Resource, Toast};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -24,25 +24,27 @@ impl Module for Products {
     }
 
     fn routes(&self) -> Routes {
-        let public = Routes::new()
-            .get("/", home)
-            .name("home")
-            .get("/products", index)
-            .name("products.index");
+        // `resource` names the routes `products.index`, `products.create`…
+        // (Laravel's `Route::resource`): the list for everyone, the rest for
+        // members. Forms send PUT and DELETE as POST with `method_field`.
+        let public = Routes::new().get("/", home).name("home").resource(
+            "/products",
+            "products",
+            Resource::new().index(index),
+        );
         let members = Routes::new()
-            .get("/products/new", create)
-            .name("products.create")
-            .post("/products", store)
-            .name("products.store")
             .get("/products/trash", trash)
             .name("products.trash")
-            .get("/products/{id}/edit", edit)
-            .name("products.edit")
-            // Forms send these as POST with `{{ method_field('PUT') }}` etc.
-            .put("/products/{id}", update)
-            .name("products.update")
-            .delete("/products/{id}", destroy)
-            .name("products.destroy")
+            .resource(
+                "/products",
+                "products",
+                Resource::new()
+                    .create(create)
+                    .store(store)
+                    .edit(edit)
+                    .update(update)
+                    .destroy(destroy),
+            )
             .post("/products/{id}/restore", restore)
             .name("products.restore")
             .require_auth();
@@ -73,8 +75,8 @@ impl ValidateHooks for ProductForm {
     }
 }
 
-async fn home() -> Redirect {
-    Redirect::to("/products")
+async fn home() -> Result<Redirect> {
+    Redirect::route("products.index", &[])
 }
 
 async fn index(
@@ -119,7 +121,7 @@ async fn store(
     // Shown on the next page (or at once for an htmx request).
     Ok((
         Toast::success("Product created."),
-        Redirect::to("/products"),
+        Redirect::route("products.index", &[])?,
     ))
 }
 
@@ -150,7 +152,7 @@ async fn update(
     } else {
         Toast::info("Nothing changed.")
     };
-    Ok((toast, Redirect::to("/products")))
+    Ok((toast, Redirect::route("products.index", &[])?))
 }
 
 async fn destroy(
@@ -163,7 +165,7 @@ async fn destroy(
     product.delete(&db).await?; // soft: sets deleted_at
     Ok((
         Toast::success(format!("“{}” moved to the trash.", product.name)),
-        Redirect::to("/products"),
+        Redirect::route("products.index", &[])?,
     ))
 }
 
@@ -193,6 +195,6 @@ async fn restore(
     model::forget_count().await?; // `restore` runs no hooks
     Ok((
         Toast::success("Product restored."),
-        Redirect::to("/products"),
+        Redirect::route("products.index", &[])?,
     ))
 }

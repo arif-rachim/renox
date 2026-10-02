@@ -7,6 +7,7 @@ be restored. Read it before writing your first resource module.
 ```bash
 cd examples/crud
 rnx key:generate                 # optional: keeps logins across restarts
+cp .env.example .env    # optional: the settings this example reads
 cargo run -- migrate
 cargo run -- db:seed             # demo@example.com / password123 and 25 fake products
 cargo run                        # http://127.0.0.1:3000

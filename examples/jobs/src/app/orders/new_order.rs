@@ -17,14 +17,16 @@ impl Notification for NewOrder {
         vec![Channel::Mail, Channel::Database]
     }
 
-    fn to_mail(&self, to: &Recipient, _: &AppState) -> Result<Mail> {
+    fn to_mail(&self, to: &Recipient, state: &AppState) -> Result<Mail> {
         let order = &self.0;
         Ok(Mail::new(
             to.email().unwrap_or_default(),
             format!("New order #{}", order.id),
             format!(
-                "{} ordered {} (Rp {}).",
-                order.customer_email, order.item, order.total
+                "{} ordered {} ({}).",
+                order.customer_email,
+                order.item,
+                super::money(state, order.total)
             ),
         ))
     }
@@ -35,7 +37,9 @@ impl Notification for NewOrder {
         DatabaseMessage::info(format!("New order #{}", self.0.id))
             .body(format!(
                 "Total: {}",
-                renox::format_money(self.0.total as f64, "IDR", None, "id")
+                renox::context::app()
+                    .map(|state| super::money(&state, self.0.total))
+                    .unwrap_or_else(|| self.0.total.to_string())
             ))
             .with("order_id", self.0.id)
             .with("total", self.0.total)

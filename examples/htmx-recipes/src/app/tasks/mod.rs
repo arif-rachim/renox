@@ -66,25 +66,42 @@ impl Module for Tasks {
     }
 }
 
-/// The page, or (for the infinite scroll's `?page=2…`) just the next rows.
-async fn index(State(db): State<Db>, htmx: Htmx, Page(page): Page) -> Result<View> {
-    let tasks = Task::query().latest().paginate(&db, page, PER_PAGE).await?;
+#[derive(Deserialize)]
+struct ListParams {
+    /// The infinite scroll's cursor: rows older than this id.
+    before: Option<i64>,
+}
+
+/// The page, or (for the infinite scroll's `?before=…`) just the next rows.
+/// The scroll goes by id, not page number: a task added meanwhile at the
+/// top would shift the pages and repeat a row.
+async fn index(State(db): State<Db>, htmx: Htmx, Query(params): Query<ListParams>) -> Result<View> {
+    let mut rows = Task::query()
+        .when(params.before.is_some(), |q| {
+            q.where_op("id", "<", params.before.unwrap_or_default())
+        })
+        .order_by_desc("id")
+        .limit(u64::from(PER_PAGE) + 1)
+        .get(&db)
+        .await?;
+    let more = rows.len() > PER_PAGE as usize;
+    rows.truncate(PER_PAGE as usize);
+    let next = more.then(|| rows.last().map(|t| t.id)).flatten();
     if htmx.wants_fragment() {
-        return Ok(view("tasks/_rows.html", context! { tasks }));
+        return Ok(view("tasks/_rows.html", context! { rows, next }));
     }
     let open = Task::where_eq("done", false).count(&db).await?;
-    Ok(view("tasks/index.html", context! { tasks, open }))
+    let total = Task::query().count(&db).await?;
+    Ok(view(
+        "tasks/index.html",
+        context! { rows, next, open, total },
+    ))
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Validate)]
 struct TaskForm {
+    #[validate(required, max = 100)]
     title: String,
-}
-
-impl Validate for TaskForm {
-    fn rules(&self, v: &mut Validator) {
-        v.field("title", &self.title).required().max(100);
-    }
 }
 
 /// From the modal: the new row (and the open count, out of band), and an
@@ -93,12 +110,17 @@ impl Validate for TaskForm {
 ///
 /// A task that's already on the list isn't added twice: the server changes
 /// where the answer goes (`HX-Retarget` to that row, `HX-Reswap: outerHTML`)
-/// and says so in a toast.
+/// and says so in a toast. (When that row hasn't been scrolled into the
+/// page yet, htmx finds no target and swaps nothing; the toast still shows.)
 async fn store(State(db): State<Db>, htmx: Htmx, Valid(form): Valid<TaskForm>) -> Result<Response> {
     let title = form.title.trim().to_owned();
-    if let Some(task) = Task::where_eq("title", &title).first(&db).await?
-        && htmx.request
-    {
+    let existing = Task::where_eq("title", &title).first(&db).await?;
+    if existing.is_some() && !htmx.request {
+        // A plain form: back to the list, with the same toast.
+        let toast = Toast::info("That task is already on the list.");
+        return Ok((toast, Redirect::to("/")).into_response());
+    }
+    if let Some(task) = existing {
         let target = format!("#task-{}", task.id);
         return Ok((
             HxRetarget(target),
@@ -146,7 +168,7 @@ async fn update(
     Valid(form): Valid<TaskForm>,
 ) -> Result<Response> {
     let mut task = Task::find_or_404(&db, id).await?;
-    task.title = form.title;
+    task.title = form.title.trim().to_owned();
     task.save(&db).await?;
     row_or_home(&db, htmx, task).await
 }
@@ -186,7 +208,10 @@ async fn clear_done(State(db): State<Db>, htmx: Htmx) -> Result<Response> {
 async fn archive(State(db): State<Db>, htmx: Htmx) -> Result<Response> {
     let done = Task::where_eq("done", true).count(&db).await?;
     Task::where_eq("done", true).delete(&db).await?;
-    let toast = Toast::success(format!("{done} tasks archived."));
+    let toast = Toast::success(match done {
+        1 => "1 task archived.".to_owned(),
+        n => format!("{n} tasks archived."),
+    });
     Ok((toast, htmx.redirect("/summary")).into_response())
 }
 
@@ -202,10 +227,13 @@ async fn row_or_home(db: &Db, htmx: Htmx, task: Task) -> Result<Response> {
     Ok(Redirect::to("/").into_response())
 }
 
-/// The row (or nothing) and the open count, out of band (tasks/answer.html).
+/// The row (or nothing), and out of band the open count and the empty
+/// list's message (shown or hidden) (tasks/answer.html).
 async fn answer(db: &Db, task: Option<Task>) -> Result<View> {
     let open = Task::where_eq("done", false).count(db).await?;
-    Ok(view("tasks/answer.html", context! { task, open })
+    let total = Task::query().count(db).await?;
+    Ok(view("tasks/answer.html", context! { task, open, total })
         .fragment("row")
-        .also("count"))
+        .also("count")
+        .also("empty"))
 }

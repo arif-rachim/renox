@@ -21,7 +21,7 @@ pub enum Checkout {
 /// transaction; running out of stock rolls it back and still answers
 /// `Checkout::OutOfStock`. Each attempt starts from the cart as read before
 /// the transaction, so running it again is safe.
-pub async fn place(db: &Db, user_id: i64, address: &str) -> Result<Checkout> {
+pub async fn place(db: &Db, user_id: i64, address: &str, pickup: bool) -> Result<Checkout> {
     let lines = cart::lines(db, user_id).await?;
     if lines.is_empty() {
         return Ok(Checkout::EmptyCart);
@@ -59,6 +59,7 @@ pub async fn place(db: &Db, user_id: i64, address: &str) -> Result<Checkout> {
                 status: OrderStatus::Pending,
                 total: lines.iter().map(|l| l.subtotal).sum(),
                 address: address.to_owned(),
+                pickup,
                 ..Default::default()
             },
         )

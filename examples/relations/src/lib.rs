@@ -40,6 +40,10 @@ pub fn app() -> App {
 }
 
 async fn seed(db: Db) -> Result {
+    // Seeding twice is harmless: a seeded database stays as it is.
+    if Category::query().exists(&db).await? {
+        return Ok(());
+    }
     let mut categories = Vec::new();
     for name in ["Coffee", "Travel", "Rust"] {
         let category = Category {

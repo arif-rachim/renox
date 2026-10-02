@@ -360,3 +360,58 @@ async fn guests_are_limited_per_ip_and_users_per_account() {
         .await
         .assert_status(422);
 }
+
+#[renox::test]
+async fn the_app_on_another_origin_is_allowed() {
+    let app = app().await;
+    let token = bearer(&app).await;
+    let res = app
+        .request()
+        .json()
+        .header("authorization", &token)
+        .header("origin", "https://app.example.com")
+        .get("/api/products")
+        .await;
+    res.assert_ok()
+        .assert_header("access-control-allow-origin", "https://app.example.com");
+    // Any other site gets no CORS header, so browsers keep its pages out.
+    let res = app
+        .request()
+        .json()
+        .header("authorization", &token)
+        .header("origin", "https://evil.example")
+        .get("/api/products")
+        .await;
+    assert!(res.header("access-control-allow-origin").is_none());
+}
+
+#[renox::test]
+async fn expired_tokens_are_pruned_every_night() {
+    let app = app().await;
+    let user = User::find_by_email(app.db(), "arif@example.com")
+        .await
+        .unwrap()
+        .unwrap();
+    let long_ago = renox::db::now() - renox::chrono::TimeDelta::days(3);
+    user.create_token_with(app.db(), "old", &["products:read"], Some(long_ago))
+        .await
+        .unwrap();
+    bearer(&app).await; // a live one
+    app.assert_database_count("personal_access_tokens", 2).await;
+    app.kernel()
+        .run_scheduled("prune-expired-tokens")
+        .await
+        .unwrap();
+    app.assert_database_count("personal_access_tokens", 1).await;
+}
+
+#[renox::test]
+async fn the_seeder_fills_the_app_and_can_run_again() {
+    let app = TestApp::new(api::app()).await;
+    app.kernel().seed().await.unwrap();
+    let seeded = api::Product::query().count(app.db()).await.unwrap();
+    assert!(seeded > 0);
+    // A second `db:seed` leaves a seeded database as it is.
+    app.kernel().seed().await.unwrap();
+    assert_eq!(api::Product::query().count(app.db()).await.unwrap(), seeded);
+}

@@ -157,11 +157,12 @@ Every example has a README.md that walks through it.
   [teams/mod.rs](examples/teams/src/app/teams/mod.rs),
   [tests/teams.rs](examples/teams/tests/teams.rs)
 - [examples/uploads](examples/uploads) ([README](examples/uploads/README.md)): public photos checked by content, private invoices behind
-  expiring signed links, `post_multipart` in tests; both forms on the kit's `file` field.
+  expiring signed links, `post_multipart` in tests; both forms on the kit's `file` field, a kit
+  table with delete (the stored file goes too), toasts after uploads.
   [src/app/documents/mod.rs](examples/uploads/src/app/documents/mod.rs),
   [tests/documents.rs](examples/uploads/tests/documents.rs)
 - [examples/postgres](examples/postgres) ([README](examples/postgres/README.md)): one app on PostgreSQL and SQLite (BOOLEAN and DATE
-  columns, per-database migrations, case-insensitive search), tested on both.
+  columns, per-database migrations, case-insensitive search, NULLs last on both), tested on both.
   [src/app/tasks/mod.rs](examples/postgres/src/app/tasks/mod.rs),
   [migrations/](examples/postgres/migrations)
 - [examples/fields](examples/fields) ([README](examples/fields/README.md)): every form field type (text, textarea, number, money,

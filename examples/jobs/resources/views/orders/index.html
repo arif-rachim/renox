@@ -17,7 +17,7 @@
 <ul class="orders">
   {% for order in orders %}
   <li>
-    #{{ order.id }} {{ order.item }}: Rp {{ order.total }} <em>{{ order.status }}</em>
+    #{{ order.id }} {{ order.item }}: {{ order.total | money }} <em>{{ order.status }}</em>
     {% if order.status == "unpaid" %}
     {#- The card token would come from the payment provider's script; these are its test tokens. #}
     <form method="post" action="{{ route('orders.pay', order.id) }}">

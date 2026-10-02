@@ -10,6 +10,39 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M29a · The examples checked and fixed
+
+An audit of the 13 examples (README against code, tests, seeders, patterns) found bugs and
+gaps; this fixes them. No framework API changed.
+- Fixed in the examples:
+  - grid: guests could edit, reorder, bulk-change and delete orders; those routes need a
+    login now and the tools show only then (`orders_grid(can_edit)`). "Mark paid" and a
+    status edit now set `paid` too.
+  - jobs: anyone could register and then get the admin mail; registration is off.
+  - shop: mail subjects and texts, and the admin's "new order" notification, were English
+    only; they follow the recipient's `users.locale` (set by the language switch) now. A
+    pickup order's mail no longer says "We'll send it to: Pick up at the store"
+    (`orders.pickup`). `shop:make-admin` finds an email in any case; an admin's cancel that
+    lost a race is a 409, not an audited no-op.
+  - teams: the public team page linked to app pages its host doesn't serve; it has its own
+    layout with absolute links.
+  - htmx-recipes: a duplicate task was added by a plain form post; edits weren't trimmed;
+    the "nothing to do" note stayed after the first add; infinite scroll repeated a row
+    after an add (it goes by id now, `?before=`).
+- Tests for what READMEs claimed but nothing tested: webhook repeats for every provider,
+  missing secrets and unknown orders; the blog index's query count; hello's photo
+  sniffing; expiring invoice links and upload limits; crud's live validation, "Nothing
+  changed" and restore by a non-owner; api's CORS and nightly token pruning; postgres'
+  validation, overdue boundary and NULL ordering.
+- Every seeder can run twice (a seeded database is left as it is), each example tests it,
+  and fields and postgres have seeders now. Every example has a `.env.example`.
+- fields, webhooks and uploads are on the UI kit (tables, empty states, toasts); fields and
+  uploads can delete (uploads removes the stored file too).
+- Current patterns: `Routes::resource` in crud, `Redirect::route` where a route has a name,
+  `#[derive(Validate)]` for plain forms, the `money` filter (and `APP_CURRENCY` in Rust
+  mail) instead of hand-written "Rp", the infolist on grid's order page, dead flash lines
+  and CSS gone; module docs name the generators that match the code.
+
 ### Actions: forms in sheets, icon buttons, shortcuts
 
 - New kit component `action_sheet(id, label, action, title, …)` (Filament's actions as the

@@ -20,6 +20,10 @@ pub fn app() -> App {
         .migrations(renox::migrations!())
         .module(app::payments::Payments)
         .seeder(|db| async move {
+            // Seeding twice is harmless: a seeded database stays as it is.
+            if Order::query().exists(&db).await? {
+                return Ok(());
+            }
             for (code, amount) in [("INV-1", 150_000), ("INV-2", 75_000), ("INV-3", 20_000)] {
                 Order::create(&db, Order::new(code, amount)).await?;
             }

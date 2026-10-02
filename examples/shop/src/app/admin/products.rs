@@ -1,3 +1,9 @@
+//! The admin's products: a list with the stock adjusted in place, the
+//! create and edit forms (photo, category from the server-backed select),
+//! and delete behind a confirmation. Made with
+//! `rnx make:module admin --resource`-style handlers written by hand under
+//! the admin group (`super::routes`).
+
 use renox::Toast;
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};

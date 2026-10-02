@@ -14,7 +14,6 @@
     <a href="{{ route("home") }}"><strong>{{ app.name }}</strong></a>
   </nav>
   <main>
-    {% if flash.status %}<p class="flash">{{ flash.status }}</p>{% endif %}
     {% block content %}{% endblock %}
   </main>
 </body>

@@ -6,6 +6,7 @@ page to feel like an app without writing JavaScript.
 
 ```bash
 cd examples/htmx-recipes
+cp .env.example .env    # optional: the settings this example reads
 cargo run -- migrate
 cargo run -- db:seed             # 40 tasks, to see infinite scroll
 cargo run                        # http://127.0.0.1:3000
@@ -22,7 +23,7 @@ cargo run                        # http://127.0.0.1:3000
 | Inline edit | double-click the title (`hx-trigger="dblclick"`) in [_row.html](resources/views/tasks/_row.html); Save is `hx-patch`, Escape (`keyup[key=='Escape']`) asks for the row again, in [_edit.html](resources/views/tasks/_edit.html) | the form, then the updated row |
 | Toggle in place | a checkbox with `hx-patch` | the row |
 | Dropdown menu (Alpine) with delete | `x-data="{ menu: false }"`, `@click.outside`, `hx-delete` + `hx-confirm` | an empty row part, so the row is swapped for nothing, with the open count out of band and a toast |
-| Infinite scroll | the last item has `hx-trigger="revealed"` and `hx-swap="outerHTML"`, in [_rows.html](resources/views/tasks/_rows.html); its URL is `route('tasks.index', page=…)` | the next page of rows (and the next loader) |
+| Infinite scroll | the last item has `hx-trigger="revealed"` and `hx-swap="outerHTML"`, in [_rows.html](resources/views/tasks/_rows.html); its URL is `route('tasks.index', before=…)`, the oldest row shown (by id, so a task added meanwhile doesn't repeat a row) | the next rows (and the next loader) |
 | Tabs (Alpine) | `x-data="{ tab: 'all' }"` and an `x-show` on each row; no request | — |
 | Reload after a bulk change | "Clear done" | `HX-Refresh: true` (`HxRefresh`) |
 | Go elsewhere after an action | "Archive done" | `HX-Redirect: /summary` (`htmx.redirect`, a 303 for plain forms) |
