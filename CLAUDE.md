@@ -980,7 +980,7 @@ picks the build, not the terminal.
   sheets, `icon_button`, `icon`/`badge`/`key`/`disabled_reason` on buttons, keyboard
   shortcuts (`data-rx-key`), tooltips (`data-rx-tip`, one element placed by renox-ui.js:
   a CSS `::before` was dimmed by disabled buttons and widened phone tables while hidden);
-  shop's admin products use them. Branch `ccr-0db862ed-uol6i8`.
+  shop's admin products use them. Merged (#99).
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.

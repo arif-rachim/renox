@@ -249,6 +249,7 @@ impl Validate for Checkout {
 | `tabs(id, items, selected=…, label=…)` + `tab_panel(id, key, selected=…)` | A segmented control; the arrow keys, Home and End move between tabs. |
 | `table(head, caption=…)` | A table in a card. A heading `["Total", "num"]` right-aligns its column, and `["Slug", "hide-narrow"]` hides it on phones. |
 | `empty(title, message, action_href, action_label)` | What an empty list says, with the way to add the first item. |
+| `notification_bell(count=none, id="rx-notifications")` | The signed-in user's notifications in the navigation bar: a badge with the unread count, a panel, new ones live as toasts. Needs `Auth::new().notifications()`; pass `unread_notifications`. See [docs/mail.md](mail.md#the-bell). |
 
 Renox's own pages use the kit too: the sign-in pages (`renox/auth/*`: login, registration,
 password reset, email verification, password confirmation, the account page) and the error
