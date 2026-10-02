@@ -21,7 +21,8 @@ commit that `rnx` was built from.
     `rate_limit::LimitRequest`, `SentNotification`, `db::InvalidUlid`, `grid::Grid`,
     `grid::Column`, `grid::GridPrefs`, `grid::RowOrder`,
     `grid::Action`, `grid::Selection`, `storage::FileInfo`, `queue::BatchStatus`,
-    `queue::QueueCounts`, `queue::QueueStats` (the dashboard's), `http::SentRequest`
+    `queue::QueueCounts`, `queue::QueueStats` (the dashboard's), `http::SentRequest`,
+    `select::SelectOption` (use `SelectOption::new`), `select::OptionQuery`
 - **New variants on these enums.** A `match` on them needs a `_` arm:
   - `Error`, `Environment`, `CspMode`, `Channel`, `Locale`, `DbValue`, `Inspected` (a `Rule`
     matching on `Inspected` needs a `_` arm), `ToastKind`, `report::ReportKind`, `grid::Kind`, `grid::Summary`

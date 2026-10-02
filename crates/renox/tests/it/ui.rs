@@ -124,6 +124,12 @@ impl Module for Pages {
             .get("/fields", || async { view("fields.html", context! {}) })
             .get("/more", || async { view("more.html", context! {}) })
             .get("/stage3", || async { view("stage3.html", context! {}) })
+            .get("/remote", || async {
+                view(
+                    "remote.html",
+                    context! { chosen => vec![renox::select::SelectOption::new(7, "Kopi")] },
+                )
+            })
             .post("/order", |Valid(order): Valid<Order>| async move {
                 renox::axum::Json(renox::serde_json::json!({
                     "tags": order.tags,
@@ -207,6 +213,14 @@ fn views() -> tempfile::TempDir {
 {{ select("sizes", "Sizes", [["s", "Small"], ["m", "Medium"], ["l", "Large"]], selected=["m"], multiple=true, searchable=true) }}
 {% endcall %}
 {% endcall %}
+</form>"#,
+    );
+    write(
+        "remote.html",
+        r#"{% from "renox/ui.html" import select %}
+<form method="post" action="/order">{{ csrf_field() }}
+{{ select("category", "Category", chosen, selected=7, options_url="/options", editable=true, placeholder="None") }}
+{{ select("sizes", "Sizes", [], multiple=true, options_url="/options") }}
 </form>"#,
     );
     write(
@@ -675,4 +689,35 @@ async fn repeaters_tags_key_values_and_wizards() {
     let body: renox::serde_json::Value = res.json();
     assert_eq!(body["field"], "lines[0][name]");
     assert_eq!(body["errors"][0], "The name field is required.");
+}
+
+#[renox::test]
+async fn selects_ask_the_server_for_options() {
+    let (app, _dir) = app().await;
+    let page = app.get("/remote").await;
+    page.assert_ok()
+        // Options as `SelectOption`s; the URL and texts for the script.
+        .assert_see(r#"<option value="7" selected>Kopi</option>"#)
+        .assert_see(r#"data-rx-options-url="/options""#)
+        .assert_see(r#"data-rx-editable data-add="Add “:value”""#)
+        .assert_see(r#"data-editing="Editing “:value”: Enter saves, Esc cancels.""#)
+        .assert_see(r#"data-searching="Searching…""#);
+    // `editable` only with an options URL.
+    let html = page.text();
+    assert_eq!(html.matches("data-rx-editable").count(), 1);
+
+    // After a failed submit, values the page has no label for are kept, to
+    // be looked up.
+    app.request()
+        .header("referer", "/remote")
+        .post(
+            "/order",
+            &[("category", "9"), ("sizes", "s"), ("sizes", "l")],
+        )
+        .await;
+    app.get("/remote")
+        .await
+        .assert_see(r#"<option value="7">Kopi</option>"#)
+        .assert_see(r#"<option value="9" selected data-rx-unresolved>9</option>"#)
+        .assert_see(r#"<option value="l" selected data-rx-unresolved>l</option>"#);
 }

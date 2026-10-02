@@ -45,8 +45,12 @@ them to the `sessions` table (tests/shop.rs runs a customer with it). `deploy/` 
   it and it as link text keep WCAG AA contrast in light and dark mode. Actions answer with a
   toast (`(Toast::success(…), Redirect)`, an error toast for an out-of-stock checkout), and
   links with filters use `route('products.index', category=…)`.
-- **A searchable select.** The admin's category is the kit's `select(…, searchable=true)`:
-  type to filter, "None" clears it; the native select stays underneath.
+- **A select that asks the server.** The admin's category is the kit's
+  `select(…, options_url=route('admin.categories.options'), editable=true)`: the categories
+  come from [admin/categories.rs](src/app/admin/categories.rs) as the admin types
+  (`OptionQuery`, `SelectOption`), one that isn't there yet is added from what was typed and
+  chosen at once, and the chosen one can be renamed (its slug stays, so links keep working).
+  The product form loads only the current category.
 - **Destructive actions ask first.** Deleting a product and cancelling an order open a sheet
   with the safe choice focused; the checkout address is checked as it's typed
   (`data-live-validate`).

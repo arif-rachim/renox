@@ -46,7 +46,8 @@ Every example has a README.md that walks through it.
   checkout in `db.retrying`; en/id with plurals; the `make:deploy` files (with the systemd
   socket); every page on the UI kit with a rebranded accent, toasts and confirmation sheets
   (checkout: `toggle_buttons` + `show_when` + `required_if` for courier or pickup; the admin's
-  category in a searchable `select`; its dashboard on the kit's `tabs`/`tab_panel`); a
+  category in a `select` whose options come from the server, added and renamed in place
+  (`renox::select`, admin/categories.rs); its dashboard on the kit's `tabs`/`tab_panel`); a
   typed `shop:make-admin` command with a prompt; an admin nav marked with `route_is`; recently
   viewed products (`session.push`, `{% break %}`), stock texts with plural ranges,
   `class_names`, `Redirect::route`; tests with time travel (unpaid orders cancelled

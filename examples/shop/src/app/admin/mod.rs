@@ -7,6 +7,7 @@
 //!
 //! Made with `rnx make:module admin`.
 
+mod categories;
 mod orders;
 mod products;
 
@@ -40,6 +41,11 @@ impl Module for AdminPanel {
                 .name("products.edit")
                 .put("/products/{id}", products::update)
                 .name("products.update")
+                // The category select's options: searched, added, renamed.
+                .get("/categories/options", categories::options)
+                .name("categories.options")
+                .post("/categories/options", categories::create_option)
+                .put("/categories/options", categories::update_option)
                 .get("/orders", orders::index)
                 .name("orders.index")
                 .put("/orders/{id}/status", orders::update_status)

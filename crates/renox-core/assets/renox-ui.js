@@ -719,6 +719,34 @@
   // ---------- Searchable select (combobox) ----------
 
   var comboCount = 0;
+  var EDIT = '<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M4 13.5V16h2.5l7.4-7.4-2.5-2.5L4 13.5zM15.7 6.8a.7.7 0 000-1L14.2 4.3a.7.7 0 00-1 0l-1.2 1.2 2.5 2.5 1.2-1.2z" fill="currentColor"/></svg>';
+
+  function fill(text, value) {
+    return (text || "").split(":value").join(value);
+  }
+
+  // A form-encoded request to the options URL, with the CSRF token; resolves
+  // with the status and the JSON answer (or null).
+  function optionsRequest(url, method, fields) {
+    var body = new URLSearchParams();
+    Object.keys(fields).forEach(function (k) { body.append(k, fields[k]); });
+    if (method !== "POST") body.append("_method", method);
+    return fetch(url, {
+      method: "POST",
+      body: body,
+      credentials: "same-origin",
+      headers: { "X-CSRF-Token": csrf(), "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" }
+    }).then(function (res) {
+      return res.json().catch(function () { return null; }).then(function (data) { return { status: res.status, data: data }; });
+    });
+  }
+
+  function firstMessage(data) {
+    if (!data) return "";
+    var errors = data.errors || {};
+    var key = Object.keys(errors)[0];
+    return (key && errors[key] && errors[key][0]) || data.message || "";
+  }
 
   function enhanceSelect(select) {
     if (select.hasAttribute("data-rx-enhanced")) return;
@@ -726,6 +754,8 @@
     select.setAttribute("tabindex", "-1");
     select.setAttribute("aria-hidden", "true");
     var multiple = select.multiple;
+    var url = select.getAttribute("data-rx-options-url");
+    var editable = !!url && select.hasAttribute("data-rx-editable");
     var base = select.id || "rx-combobox-" + (++comboCount);
     var wrap = document.createElement("div");
     wrap.className = "rx-combobox";
@@ -742,40 +772,115 @@
     input.setAttribute("aria-expanded", "false");
     input.setAttribute("aria-controls", base + "-listbox");
     ["aria-describedby", "aria-invalid", "aria-required"].forEach(function (a) { if (select.hasAttribute(a)) input.setAttribute(a, select.getAttribute(a)); });
-    input.placeholder = select.getAttribute("data-placeholder") || "";
+    var placeholder = select.getAttribute("data-placeholder") || "";
+    input.placeholder = placeholder;
     input.disabled = select.disabled;
     var chips = document.createElement("ul");
     chips.className = "rx-tags__list";
     chips.setAttribute("role", "list");
     if (multiple) box.append(chips);
     box.append(input);
+    // Single + editable: a button to rename the chosen option.
+    var editButton = null;
+    if (editable && !multiple) {
+      editButton = document.createElement("button");
+      editButton.type = "button";
+      editButton.className = "rx-combobox__edit";
+      editButton.innerHTML = EDIT;
+      editButton.addEventListener("click", function () {
+        var chosen = select.options[select.selectedIndex];
+        if (chosen && chosen.value !== "") startEdit(chosen);
+      });
+      box.append(editButton);
+      box.classList.add("rx-combobox__box--editable");
+    }
     var list = document.createElement("ul");
     list.className = "rx-combobox__list";
     list.id = base + "-listbox";
     list.setAttribute("role", "listbox");
     if (multiple) list.setAttribute("aria-multiselectable", "true");
     list.hidden = true;
-    wrap.append(box, list, select);
+    // What's going on (searching, editing, an error), read out politely.
+    var status = document.createElement("p");
+    status.className = "rx-combobox__status";
+    status.id = base + "-status";
+    status.setAttribute("aria-live", "polite");
+    wrap.append(box, list, status, select);
+    input.setAttribute("aria-describedby", ((input.getAttribute("aria-describedby") || "") + " " + status.id).trim());
     var label = select.id && document.querySelector('label[for="' + CSS.escape(select.id) + '"]');
     if (label) { label.htmlFor = input.id; list.setAttribute("aria-labelledby", label.id || (label.id = base + "-label")); }
 
-    // A single select's empty option ("None") stays choosable, to clear it.
-    var options = Array.prototype.filter.call(select.options, function (o) { return o.value !== "" || !multiple; });
+    // Local: the select's own options (a single select's empty "None" stays
+    // choosable, to clear it). Remote: what the server last answered.
+    var results = null;
+    var loading = false, failed = false;
+    var editing = null;
+    var timer = null, controller = null;
+
+    function localItems() {
+      return Array.prototype.filter.call(select.options, function (o) { return o.value !== "" || !multiple; })
+        .map(function (o) { return { value: o.value, label: o.textContent }; });
+    }
+
+    function optionFor(value) {
+      return Array.prototype.find.call(select.options, function (o) { return o.value === value; });
+    }
+
+    // The native option for a value, made when the server's list had it.
+    function ensureOption(value, text) {
+      var option = optionFor(value);
+      if (!option) {
+        option = new Option(text, value);
+        select.appendChild(option);
+      } else if (text) {
+        option.textContent = text;
+        option.removeAttribute("data-rx-unresolved");
+      }
+      return option;
+    }
+
+    function isSelected(value) {
+      var option = optionFor(value);
+      return !!option && option.selected && (value !== "" || !multiple);
+    }
 
     function selectedText() {
       var chosen = select.options[select.selectedIndex];
       return chosen && chosen.value !== "" ? chosen.textContent : "";
     }
 
+    function say(text, alert) {
+      status.textContent = text || "";
+      status.classList.toggle("rx-combobox__status--error", !!alert);
+    }
+
     function renderChips() {
-      if (!multiple) { input.value = selectedText(); return; }
+      if (editButton) {
+        var chosen = select.options[select.selectedIndex];
+        var has = !!chosen && chosen.value !== "";
+        editButton.hidden = !has;
+        editButton.disabled = select.disabled;
+        if (has) editButton.setAttribute("aria-label", (select.getAttribute("data-edit") || "Edit") + " " + chosen.textContent);
+      }
+      if (!multiple) { if (!editing) input.value = selectedText(); return; }
       chips.textContent = "";
-      options.filter(function (o) { return o.selected; }).forEach(function (o) {
+      Array.prototype.filter.call(select.options, function (o) { return o.selected && o.value !== ""; }).forEach(function (o) {
         var li = document.createElement("li");
         li.className = "rx-tag";
         var text = document.createElement("span");
         text.className = "rx-tag__text";
         text.textContent = o.textContent;
+        li.append(text);
+        if (editable) {
+          var edit = document.createElement("button");
+          edit.type = "button";
+          edit.className = "rx-tag__remove";
+          edit.setAttribute("aria-label", (select.getAttribute("data-edit") || "Edit") + " " + o.textContent);
+          edit.innerHTML = EDIT;
+          edit.disabled = select.disabled;
+          edit.addEventListener("click", function () { startEdit(o); });
+          li.append(edit);
+        }
         var remove = document.createElement("button");
         remove.type = "button";
         remove.className = "rx-tag__remove";
@@ -783,37 +888,77 @@
         remove.innerHTML = CLOSE;
         remove.disabled = select.disabled;
         remove.addEventListener("click", function () { o.selected = false; changed(); input.focus(); });
-        li.append(text, remove);
+        li.append(remove);
         chips.appendChild(li);
       });
+    }
+
+    function addRow(text, className) {
+      var li = document.createElement("li");
+      li.className = className;
+      li.setAttribute("role", "presentation");
+      li.textContent = text;
+      list.appendChild(li);
+    }
+
+    function optionRow(item, i) {
+      var li = document.createElement("li");
+      li.className = "rx-combobox__option" + (item.create ? " rx-combobox__option--create" : "");
+      li.id = base + "-option-" + i;
+      li.setAttribute("role", "option");
+      li.setAttribute("aria-selected", !item.create && isSelected(item.value) ? "true" : "false");
+      li.textContent = item.create ? fill(select.getAttribute("data-add") || "Add “:value”", item.create) : item.label;
+      li.addEventListener("mousedown", function (e) { e.preventDefault(); });
+      li.addEventListener("click", function () { choose(item); });
+      li._item = item;
+      list.appendChild(li);
     }
 
     function render(filter) {
       var needle = (filter || "").trim().toLowerCase();
       list.textContent = "";
-      var shown = 0;
-      options.forEach(function (o, i) {
-        if (needle && o.textContent.toLowerCase().indexOf(needle) < 0) return;
-        var li = document.createElement("li");
-        li.className = "rx-combobox__option";
-        li.id = base + "-option-" + i;
-        li.setAttribute("role", "option");
-        li.setAttribute("aria-selected", o.selected ? "true" : "false");
-        li.textContent = o.textContent;
-        li.addEventListener("mousedown", function (e) { e.preventDefault(); });
-        li.addEventListener("click", function () { choose(o); });
-        li._option = o;
-        list.appendChild(li);
-        shown++;
+      var items = url ? (results || []) : localItems().filter(function (it) {
+        return !needle || it.label.toLowerCase().indexOf(needle) >= 0;
       });
-      if (!shown) {
-        var empty = document.createElement("li");
-        empty.className = "rx-combobox__empty";
-        empty.setAttribute("role", "presentation");
-        empty.textContent = select.getAttribute("data-empty") || "No matches";
-        list.appendChild(empty);
+      if (url && loading && !results) addRow(select.getAttribute("data-searching") || "Searching…", "rx-combobox__empty");
+      else if (url && failed) addRow(select.getAttribute("data-load-failed") || "Couldn't load the options.", "rx-combobox__empty");
+      items.forEach(optionRow);
+      // "Add “…”" when what was typed isn't an option yet.
+      var typed = (filter || "").trim();
+      var exact = items.some(function (it) { return it.label.trim().toLowerCase() === typed.toLowerCase(); });
+      if (editable && typed && !exact && !loading) optionRow({ create: typed }, "new");
+      if (!list.querySelector("[role=option]") && !(url && (loading || failed))) {
+        addRow(select.getAttribute("data-empty") || "No matches", "rx-combobox__empty");
       }
       activate(list.querySelector('[aria-selected="true"]') || list.querySelector("[role=option]"));
+    }
+
+    function search(q) {
+      if (controller) controller.abort();
+      controller = window.AbortController ? new AbortController() : null;
+      loading = true;
+      failed = false;
+      if (!list.hidden) render(q);
+      var sep = url.indexOf("?") < 0 ? "?" : "&";
+      fetch(url + sep + "q=" + encodeURIComponent(q.trim()), {
+        credentials: "same-origin",
+        headers: { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        signal: controller ? controller.signal : undefined
+      })
+        .then(function (res) { if (!res.ok) throw new Error(res.status); return res.json(); })
+        .then(function (data) {
+          results = (Array.isArray(data) ? data : (data && data.options) || []).map(function (o) {
+            return { value: String(o.value), label: String(o.label) };
+          });
+          loading = false;
+          if (!list.hidden) render(q);
+        })
+        .catch(function (err) {
+          if (err && err.name === "AbortError") return;
+          loading = false;
+          failed = true;
+          if (!list.hidden) render(q);
+        });
     }
 
     function activate(li) {
@@ -825,17 +970,19 @@
     }
 
     function open() {
-      if (input.disabled || !list.hidden) return;
+      if (input.disabled || editing || !list.hidden) return;
       list.hidden = false;
       input.setAttribute("aria-expanded", "true");
-      render(multiple ? input.value : "");
+      var q = multiple ? input.value : "";
+      if (url) search(q);
+      render(q);
     }
 
     function close() {
       list.hidden = true;
       input.setAttribute("aria-expanded", "false");
       input.removeAttribute("aria-activedescendant");
-      if (!multiple) input.value = selectedText();
+      if (!multiple && !editing) input.value = selectedText();
     }
 
     function changed() {
@@ -844,11 +991,13 @@
       select.dispatchEvent(new Event("change", { bubbles: true }));
     }
 
-    function choose(option) {
+    function pick(option) {
       if (multiple) {
         option.selected = !option.selected;
         input.value = "";
+        if (url) results = null;
         changed();
+        if (url && !list.hidden) search("");
       } else {
         select.value = option.value;
         changed();
@@ -856,11 +1005,98 @@
       }
     }
 
-    input.addEventListener("focus", open);
-    input.addEventListener("click", open);
-    input.addEventListener("input", function () { if (list.hidden) open(); render(input.value); });
-    input.addEventListener("blur", function () { setTimeout(close, 0); });
+    // A new option from what was typed: saved on the server, then chosen.
+    function create(text) {
+      input.setAttribute("aria-busy", "true");
+      say("");
+      optionsRequest(url, "POST", { label: text }).then(function (res) {
+        input.removeAttribute("aria-busy");
+        if (res.status >= 200 && res.status < 300 && res.data && res.data.value !== undefined) {
+          var option = ensureOption(String(res.data.value), String(res.data.label));
+          if (multiple) option.selected = false;
+          pick(option);
+          results = null;
+        } else {
+          say(firstMessage(res.data) || select.getAttribute("data-save-failed") || "Couldn't save it.", true);
+        }
+      }).catch(function () {
+        input.removeAttribute("aria-busy");
+        say(select.getAttribute("data-save-failed") || "Couldn't save it.", true);
+      });
+    }
+
+    function choose(item) {
+      if (item.create) { create(item.create); return; }
+      pick(ensureOption(item.value, item.label));
+    }
+
+    // Renaming the chosen option: the box holds its name until Enter saves
+    // it or Escape gives up.
+    function startEdit(option) {
+      close();
+      editing = option;
+      wrap.setAttribute("data-rx-editing", "");
+      input.value = option.textContent;
+      say(fill(select.getAttribute("data-editing") || "Editing “:value”: Enter saves, Esc cancels.", option.textContent));
+      input.focus();
+      input.select();
+    }
+
+    function stopEdit() {
+      editing = null;
+      wrap.removeAttribute("data-rx-editing");
+      input.value = multiple ? "" : selectedText();
+    }
+
+    function saveEdit() {
+      var option = editing;
+      var text = input.value.trim();
+      if (!text || text === option.textContent) { stopEdit(); say(""); return; }
+      input.setAttribute("aria-busy", "true");
+      optionsRequest(url, "PUT", { value: option.value, label: text }).then(function (res) {
+        input.removeAttribute("aria-busy");
+        if (res.status >= 200 && res.status < 300) {
+          option.textContent = res.data && res.data.label !== undefined ? String(res.data.label) : text;
+          results = null;
+          stopEdit();
+          say("");
+          renderChips();
+          select.dispatchEvent(new Event("change", { bubbles: true }));
+        } else {
+          say(firstMessage(res.data) || select.getAttribute("data-save-failed") || "Couldn't save it.", true);
+        }
+      }).catch(function () {
+        input.removeAttribute("aria-busy");
+        say(select.getAttribute("data-save-failed") || "Couldn't save it.", true);
+      });
+    }
+
+    input.addEventListener("focus", function () { if (!editing) open(); });
+    input.addEventListener("click", function () { if (!editing) open(); });
+    input.addEventListener("input", function () {
+      if (editing) return;
+      if (list.hidden) open();
+      if (url) {
+        clearTimeout(timer);
+        var q = input.value;
+        timer = setTimeout(function () { search(q); }, 250);
+        render(q);
+      } else {
+        render(input.value);
+      }
+    });
+    input.addEventListener("blur", function () {
+      setTimeout(function () {
+        if (editing && document.activeElement !== input) { stopEdit(); say(""); }
+        close();
+      }, 0);
+    });
     input.addEventListener("keydown", function (e) {
+      if (editing) {
+        if (e.key === "Enter") { e.preventDefault(); saveEdit(); }
+        else if (e.key === "Escape") { e.preventDefault(); stopEdit(); say(""); }
+        return;
+      }
       var items = Array.prototype.slice.call(list.querySelectorAll("[role=option]"));
       var current = list.querySelector("[data-active]");
       var i = items.indexOf(current);
@@ -868,10 +1104,10 @@
       else if (e.key === "ArrowUp") { e.preventDefault(); activate(items[Math.max(i - 1, 0)]); }
       else if (e.key === "Home" && !list.hidden) { e.preventDefault(); activate(items[0]); }
       else if (e.key === "End" && !list.hidden) { e.preventDefault(); activate(items[items.length - 1]); }
-      else if (e.key === "Enter") { if (!list.hidden && current) { e.preventDefault(); choose(current._option); } }
+      else if (e.key === "Enter") { if (!list.hidden && current) { e.preventDefault(); choose(current._item); } }
       else if (e.key === "Escape") { if (!list.hidden) { e.preventDefault(); close(); } }
       else if (e.key === "Backspace" && multiple && !input.value) {
-        var last = options.filter(function (o) { return o.selected; }).pop();
+        var last = Array.prototype.filter.call(select.options, function (o) { return o.selected && o.value !== ""; }).pop();
         if (last) { last.selected = false; changed(); }
       }
     });
@@ -879,6 +1115,20 @@
     // The browser checks the hidden select for `required`: point at the box.
     select.addEventListener("invalid", function () { input.focus(); });
     select.addEventListener("rx:refresh", renderChips);
+
+    // Values sent back without a label (after a failed submit): ask for them.
+    var unresolved = Array.prototype.filter.call(select.options, function (o) { return o.hasAttribute("data-rx-unresolved"); });
+    if (url && unresolved.length) {
+      var sep = url.indexOf("?") < 0 ? "?" : "&";
+      var query = unresolved.map(function (o) { return "values=" + encodeURIComponent(o.value); }).join("&");
+      fetch(url + sep + query, { credentials: "same-origin", headers: { "Accept": "application/json" } })
+        .then(function (res) { return res.ok ? res.json() : []; })
+        .then(function (data) {
+          (Array.isArray(data) ? data : (data && data.options) || []).forEach(function (o) { ensureOption(String(o.value), String(o.label)); });
+          renderChips();
+        })
+        .catch(function () {});
+    }
     renderChips();
   }
 

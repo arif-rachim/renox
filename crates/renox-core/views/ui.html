@@ -112,8 +112,14 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     is then a list). `searchable`: a box to type in that filters the
     options, with the chosen ones as removable chips when `multiple`; the
     native select stays underneath, so the form sends the same thing and
-    works without JavaScript. -#}
-{% macro select(name, label, options, selected=none, hint=none, required=false, placeholder=none, attrs={}, id=none, disabled=false, span=none, multiple=false, searchable=false) -%}
+    works without JavaScript.
+    `options_url`: the options come from the server as you type (`GET
+    ?q=…`, a JSON list of `{value, label}`; `renox::select`); `options`
+    then only needs the chosen ones, and a value without a label (after a
+    failed submit) is looked up (`GET ?values=…`). `editable`: what was
+    typed can be added ("Add “…”", `POST label=…`) and is chosen at once,
+    and a chosen option can be renamed (`POST _method=PUT value=…&label=…`). -#}
+{% macro select(name, label, options, selected=none, hint=none, required=false, placeholder=none, attrs={}, id=none, disabled=false, span=none, multiple=false, searchable=false, options_url=none, editable=false) -%}
 {%- set id = id or _id(name) %}
 {%- set message = error(name) %}
 {%- if multiple %}
@@ -123,11 +129,14 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 {%- else %}
 {%- set current = [old(name, selected if selected is defined and selected is not none else "") | string] %}
 {%- endif %}
+{%- set ns = namespace(known=[]) %}
 <div class="{{ _field_class(span) }}">
   {{ _label(id, label, required) }}
   <select class="rx-select{% if multiple %} rx-select--multiple{% endif %}" id="{{ id }}" name="{{ name }}"
     {%- if multiple %} multiple{% endif %}
-    {%- if searchable %} data-rx-combobox data-placeholder="{{ placeholder or t('ui.search') }}" data-empty="{{ t('ui.no_results') }}" data-remove="{{ t('ui.remove') }}"{% endif %}
+    {%- if searchable or options_url %} data-rx-combobox data-placeholder="{{ placeholder or t('ui.search') }}" data-empty="{{ t('ui.no_results') }}" data-remove="{{ t('ui.remove') }}"{% endif %}
+    {%- if options_url %} data-rx-options-url="{{ options_url }}" data-searching="{{ t('ui.searching') }}" data-load-failed="{{ t('ui.load_failed') }}"{% endif %}
+    {%- if options_url and editable %} data-rx-editable data-add="{{ t('ui.add_option') }}" data-edit="{{ t('ui.edit') }}" data-editing="{{ t('ui.editing') }}" data-save-failed="{{ t('ui.save_failed') }}"{% endif %}
     {%- if required %} required aria-required="true"{% endif %}
     {%- if disabled %} disabled{% endif %}
     {%- if message %} aria-invalid="true"{% endif %}
@@ -135,9 +144,16 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     {%- if placeholder and not multiple %}<option value="">{{ placeholder }}</option>{% endif %}
     {%- for option in options %}
       {%- if option is string or option is number %}{% set value = option %}{% set text = option %}
+      {%- elif option is mapping %}{% set value = option.value %}{% set text = option.label %}
       {%- else %}{% set value = option[0] %}{% set text = option[1] %}{% endif %}
+      {%- set ns.known = ns.known + [value | string] %}
     <option value="{{ value }}"{% if value | string in current %} selected{% endif %}>{{ text }}</option>
     {%- endfor %}
+    {#- A value sent back without its option (from the server's list): kept,
+        and its label looked up. #}
+    {%- if options_url %}{% for value in current if value and value not in ns.known %}
+    <option value="{{ value }}" selected data-rx-unresolved>{{ value }}</option>
+    {%- endfor %}{% endif %}
   </select>
   {% call _describe(id, hint, message) %}{{ name }}{% endcall %}
 </div>
