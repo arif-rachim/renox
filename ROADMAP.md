@@ -6,10 +6,11 @@ framework where a new app works out of the box.
 ## Principles
 
 1. **Convention over configuration.** Folder layout, naming and defaults are decided for you.
-2. **One dependency, every battery.** `renox = "x.y"` and `use renox::prelude::*`. Internally split
-   into `renox-*` crates; unused batteries can be switched off with cargo features.
+2. **One dependency, every battery.** `renox = "x.y"` and `use renox::prelude::*`. Behind it:
+   the `renox` facade, one runtime crate `renox-core` (see Decisions), `renox-macros` and the
+   `rnx` CLI (`renox-cli`); heavy batteries are switched on with cargo features.
 3. **Stand on mature crates.** Renox is the glue, conventions and developer experience on top of
-   axum, sqlx, minijinja, apalis, lettre and friends.
+   axum, sqlx, minijinja, lettre and friends (the queue is Renox's own, see Decisions).
 4. **HTMX-first.** Response helpers know whether a request wants a full page or a fragment.
 5. **Single-binary deploys.** SQLite, templates and htmx/Alpine assets ship inside the binary.
 6. **Dogfooded.** Every feature is exercised by an app in `examples/`.
@@ -18,10 +19,12 @@ framework where a new app works out of the box.
 
 ```
 my-app/
-├── Cargo.toml              # renox = "0.x"
+├── Cargo.toml              # renox pinned to a git rev (until real crates.io releases)
 ├── .env
+├── build.rs                # rerun when migrations/ changes
 ├── src/
-│   ├── main.rs             # App::new().module(...).run()
+│   ├── lib.rs              # pub fn app() -> App { App::new().module(...) }
+│   ├── main.rs             # my_app::app().run()
 │   └── app/
 │       └── products/       # one module per folder
 │           ├── mod.rs      # impl Module
@@ -33,7 +36,7 @@ my-app/
 ├── migrations/
 ├── resources/
 │   ├── views/              # layouts/, components/, products/
-│   └── lang/               # id/, en/
+│   └── lang/               # en.json, id.json
 ├── public/
 ├── storage/                # app.db, uploads/, logs/
 └── tests/
@@ -176,7 +179,8 @@ M6c (done):
 - [x] Choosing the language from `Accept-Language` (opt-in): `App::detect_locale()` (M25)
 
 ### M7 · v0.8: CLI and developer experience
-- [x] Generators: `rnx make:module` (routes, view, `pub mod` and `.module(..)` in main.rs),
+- [x] Generators: `rnx make:module` (routes, view, `pub mod` and `.module(..)` in src/lib.rs,
+      or main.rs for older apps),
       `make:model [-m]`, `make:migration`, `make:job`, `make:policy`, `make:mail`; they never
       overwrite files
 - [x] `route:list`: method, path, name, module and guards (`auth`, `guest`, `throttle:…`) of every
@@ -613,14 +617,15 @@ Notes from M17b:
 From the Laravel parity review (docs/audit/2026-09-laravel-parity.md). What a typical SaaS needs
 before it can start: tenants, roles, accounts.
 
-- [x] Tenancy: a default scope on models (`fn default_scope(q) -> Query<Self>`, bypassed with
-      `.without_default_scope()`), e.g. filtering by a task-local current team
+- [x] Tenancy: a default scope on models (`#[model(default_scope = "…")]` naming a
+      `fn(Query<Self>) -> Query<Self>`, bypassed with `Model::unscoped()`), e.g. filtering by a
+      task-local current team
 - [x] Scoped `unique`/`exists`: `.unique("products", "sku").ignore(id).where_eq("team_id", t)`,
       `.where_null("deleted_at")`
 - [x] Roles and permissions (opt-in module): tables, `user.has_role`, `user.has_permission`,
       `Routes::require_role` / `require_permission`, permissions usable as gates
 - [x] `Routes::require_gate("admin")` (async gates too, shown in `route:list`) and
-      `App::gate_before(|user| Option<bool>)` for super-admins
+      `App::gate_before(|user, ability| -> Option<bool>)` for super-admins
 - [x] Account pages in `Auth`: profile (name, email with re-verification), password (checks the
       current one and keeps this session logged in), delete account; `auth::change_password`
 - [x] Password rules (`Password::min(12).mixed_case().numbers().symbols()`) used by
@@ -1102,8 +1107,9 @@ Notes from M22:
 - Not changed: `User` keeps `i64` ids; `audit_logs.subject_id`, `notifications` and
   `personal_access_tokens` refer to users or integer subjects (`audit::record` takes an `i64`).
   Audit subjects with other keys would need a text column; not asked for yet.
-- The workspace dev profile uses `debug = "line-tables-only"` since this milestone (separate
-  PR): full debug info ran a 15 GB machine out of memory during workspace builds.
+- The workspace dev profile uses `debug = "line-tables-only"` since a separate PR (#68) merged
+  just before this milestone: full debug info ran a 15 GB machine out of memory during
+  workspace builds.
 
 ### M23 · Savepoints and encrypted fields
 The first of three follow-ups the owner asked for before 1.0 (B: this; C: the rest of M21's
@@ -1258,7 +1264,8 @@ do, responsive and dashboard-like. Agreed with the owner (2026-10-01): a framewo
 than wrapping a JS grid (Tabulator lacks row spans and brings ~400 KB; AG Grid's column groups
 and Excel export are Enterprise-only), Cally for date ranges (MIT, accessible web components),
 preferences per user in the database, cell and row editing both, automatic hierarchical merged
-cells, exports on the server (CSV, Excel, PDF through a print page). Three PRs:
+cells, exports on the server (CSV, Excel, PDF through a print page). Three PRs were planned;
+a fourth (M27d) was added after M27c:
 - [x] M27a: the grid: `Grid`/`Column` (text, number, money, date, datetime, bool, select, tags,
       custom), `GridRequest`, filters per kind from the query string, sorting, server pages,
       grouped headings (`Column::under`), columns per screen size (`mobile`, `hidden`) with
@@ -1323,7 +1330,7 @@ missing pieces, in this order:
       own summaries
 - [x] M28d: a card layout on phones, more column kinds (badges with colors, icons, images,
       descriptions, tooltips)
-- [ ] M28e: relationship columns, an advanced filter (and/or, operators), polling, filters
+- [x] M28e: relationship columns, an advanced filter (and/or, operators), polling, filters
       and sort kept in the session
 
 Notes from M28a:
@@ -1354,12 +1361,36 @@ Notes from M28d:
   column menu's phone choice decides what a card shows. The headings are hidden there, so the
   toolbar gets a sort choice and a list that opens each column's filter.
 
+Notes from M28e:
+- Related values are correlated subqueries (`{T}` stands for the model's table, names
+  checked as plain identifiers), so filtering, sorting and searching need no join and the
+  model stays as it is; the page fetches the values with `id IN (…)`, one query per column.
+- The advanced filter's rules become one `where_raw` with the rules' SQL joined by AND/OR;
+  their values are bound typed (numbers, dates, booleans), so PostgreSQL accepts them.
+- `remember` needs a marker (`state=1`, a hidden field) to tell "the user cleared every
+  filter" from "a fresh visit": without it, a cleared grid came back with the old filters.
+  Bulk "all matching" and exports go through the same remembered state.
+- Sorting adds `(column IS NULL)` before each key: PostgreSQL puts NULLs first when
+  descending and SQLite last; the grid now puts them last on both.
+
+Notes from the docs audit after M28:
+- Every guide, the README, CHEATSHEET, llms.txt, the examples' READMEs and module docs, and
+  the stubs (`AGENTS.md.stub`, `env.stub`) were checked against the code after M28 and
+  fixed where they had drifted. `docs/grid.md` is new: a guide for `renox::grid`, compiled
+  as the `GridGuide` doctest.
+- Three code issues found by the audit were fixed on the same branch: the grid's date-time
+  filters (`from.`/`to.` and the advanced filter's `on`/`before`/`after`) took UTC days and
+  now take days of `APP_TIMEZONE`, like the cells; `User::delete_account` also deletes the
+  user's `grid_preferences` rows (the table can't have a foreign key: not every app has
+  `users`); and the Auth module's `notifications:prune [--days 30]` /
+  `auth::prune_read_notifications` delete notifications read long ago.
+
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`
       (resource tables and forms); billing later
 
 ### v1.0
-On hold until the owner starts it; M18–M21 come first.
+On hold until the owner starts it (M18–M28, which came first, are merged).
 - [ ] Documentation site built with Renox: a tutorial, a "Laravel → Renox" guide, the API
       reference; a starter kit; the semver stability guarantee
 - [ ] cargo-semver-checks in CI against the last release (moved from M16b)
@@ -1367,8 +1398,52 @@ On hold until the owner starts it; M18–M21 come first.
       only 0.0.1 placeholders exist), then crates.io/docs.rs badges and `cargo install renox-cli`
       in the README
 
+### UI kit · Form fields next to Filament's forms
+
+Filament's form fields (https://filamentphp.com/docs/5.x/forms/overview) as the yardstick,
+asked by the owner; three stages on branch `ui-form`, one PR.
+
+- [x] Stage 1: `radio`, `checkbox_list`, `form_grid` / `fieldset` with `span`, `input`'s
+  `prefix` / `suffix` / `datalist`, `disabled` / `readonly`, `id` on every field,
+  `has_old()`; fixed: an unticked checkbox (and an unpicked radio) came back with its default
+  after a failed submit, and the error summary missed fields with their own `id`.
+- [x] Stage 2: `input(…, revealable=true)` (Renox's sign-in pages use it) and
+  `copyable=true`, `toggle_buttons`, `file` (drop zone, previews, `current`), `date_picker`
+  (Cally in a popover, `renox_calendar()`), `show_when` / `hide_when`.
+- [x] Stage 3: nested form names in `Valid` (`lines[0][name]` → `Vec<Line>`), `KeyValues`,
+  `tags_input`, `select(…, multiple=true, searchable=true)`, `repeater`, `key_value`,
+  `wizard` + `wizard_step`.
+- [x] Examples: fields (every kind, tags and specifications), shop (checkout courier or
+  pickup, the admin's searchable category), uploads (`file`), teams ("New team" wizard with a
+  repeater of members).
+- [ ] Later: a select whose options come from the server as you type (htmx), and rich text,
+  Markdown and code editors (large JavaScript: plugins rather than the kit).
+
+Notes:
+- Cally's `calendar-date` dispatches a `change` that doesn't bubble: the kit listens in the
+  capture phase. Its header shows the year and each month its own name (made for several
+  months); for one month the kit hides the month's name and fills the header's slot with
+  "October 2026" from `Intl.DateTimeFormat`, updated on `focusday` (whose detail is a `Date`).
+- `show_when` disables a `<fieldset>` rather than each input, so a field disabled on purpose
+  stays disabled when its group shows; without JavaScript the group stays visible.
+- The searchable select keeps the native select, visually hidden rather than `display: none`,
+  so the browser can still check `required` (its `invalid` event moves focus to the box).
+- The repeater renumbers a row by rewriting every attribute that holds `lines[2]`,
+  `lines.2.` or `rx-lines-2-`, so any field inside (date pickers, combobox, show_when) follows.
+- A repeater's own error slot shows only the list's error: `error()` falls back to `name.*`,
+  which showed a row's error twice.
+- Found by tests: PostgreSQL's `JSONB` reorders object keys, so `KeyValues` is stored as a list
+  of pairs; and the audit probe `validation_array_where_scalar_expected` caught `name[]=a`
+  filling a text field once `[]` was read as nested, so a `[]` name is always a list.
+
 ## Decisions
 
+- **Nested forms:** a form whose names have a `[` is read by Renox's own small deserializer
+  (`validation/nested.rs`) instead of `serde_html_form`, which has no nesting: a tree of text,
+  parsed when the target type asks, empty values kept so rows keep their numbers. Errors are
+  keyed with dots (`lines.0.name`, as `v.nested` already did), and templates accept either
+  spelling. Plain forms keep `serde_html_form`, so nothing changes for them. Names deeper than
+  32 levels are ignored.
 - **Crates:** runtime code lives in one crate, `renox-core`, organised in modules and gated by cargo
   features where dependencies are heavy. Separate `renox-http`/`-db`/`-view` crates would all need
   `AppState` and `App` would need all of them, so splitting now only adds indirection. Revisit if
@@ -1408,8 +1483,8 @@ On hold until the owner starts it; M18–M21 come first.
   `DATABASE_URL`. sqlx's `Any` driver was not chosen as the plan because
   it supports fewer types (e.g. chrono timestamps) than the typed pools.
 - **Named routes:** implemented in Renox; axum does not provide them.
-- **Queue:** Renox's own queue in the app's database (tables `jobs` and `failed_jobs`, SQLite or
-  PostgreSQL with `FOR UPDATE SKIP LOCKED`), so no Redis is required.
+- **Queue:** Renox's own queue in the app's database (tables `jobs`, `failed_jobs` and
+  `job_batches`, SQLite or PostgreSQL with `FOR UPDATE SKIP LOCKED`), so no Redis is required.
   apalis was the plan, but its stable SQL backend needs sqlx 0.8 (which can't link next to our 0.9)
   and the 0.9 backend is still a release candidate; a small queue on our own pool also keeps
   dispatch, retries and the `queue:*` commands Laravel-like.
@@ -1418,8 +1493,9 @@ On hold until the owner starts it; M18–M21 come first.
   so only one instance runs it (since M9b), and queue workers are safe to run anywhere.
 - **Relations:** Rust has no runtime reflection, so there is no full Eloquent. `derive(Model)` covers
   CRUD; relations are explicit methods for one row and loaders for a page of rows
-  (`relations::belongs_to`, `has_many`, `Pivot`, one query each, M15a); joins and reports use
-  `renox::db::sql(…).fetch_as` (portable) or sqlx directly through `db.sqlite()` / `db.postgres()`.
+  (`relations::belongs_to`, `has_many`, `Pivot`, M15a; `Morph`, M19b; `count_many`/`sum_many`;
+  one query each); joins and reports use `renox::db::sql(…).fetch_as` (portable) or sqlx
+  directly through `db.sqlite()` / `db.postgres()`.
 - **Service container:** replaced by typed `AppState` and extractors.
 - **No REPL:** `rnx db:shell`, and app commands (`App::command`, M14a) instead of Tinker.
 

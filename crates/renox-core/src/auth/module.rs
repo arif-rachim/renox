@@ -237,6 +237,21 @@ impl Module for Auth {
                 Ok(())
             },
         );
+        app.command(
+            "notifications:prune",
+            "Delete notifications read more than --days ago (default 30)",
+            |state, args| async move {
+                let days: u64 = args
+                    .value("--days")
+                    .unwrap_or("30")
+                    .parse()
+                    .map_err(|_| crate::Error::BadRequest("--days must be a number".into()))?;
+                let age = std::time::Duration::from_secs(days * 24 * 60 * 60);
+                let pruned = super::prune_read_notifications(&state.db, age).await?;
+                println!("Deleted {pruned} notifications read more than {days} days ago.");
+                Ok(())
+            },
+        );
     }
 
     fn routes(&self) -> Routes {

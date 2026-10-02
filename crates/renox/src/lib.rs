@@ -82,6 +82,31 @@ pub struct QueueGuide;
 #[doc = include_str!("../../../docs/ui.md")]
 pub struct UiGuide;
 
+/// Compiles the Rust in docs/grid.md as a doctest.
+#[cfg(doctest)]
+#[doc = include_str!("../../../docs/grid.md")]
+pub struct GridGuide;
+
+/// Compiles the Rust in docs/validation.md as a doctest.
+#[cfg(doctest)]
+#[doc = include_str!("../../../docs/validation.md")]
+pub struct ValidationGuide;
+
+/// Compiles the Rust in docs/routing.md as a doctest.
+#[cfg(doctest)]
+#[doc = include_str!("../../../docs/routing.md")]
+pub struct RoutingGuide;
+
+/// Compiles the Rust in docs/mail.md as a doctest.
+#[cfg(doctest)]
+#[doc = include_str!("../../../docs/mail.md")]
+pub struct MailGuide;
+
+/// Compiles the Rust in docs/scheduling.md as a doctest.
+#[cfg(doctest)]
+#[doc = include_str!("../../../docs/scheduling.md")]
+pub struct SchedulingGuide;
+
 /// Compiles the Rust in docs/testing.md as a doctest.
 #[cfg(doctest)]
 #[doc = include_str!("../../../docs/testing.md")]

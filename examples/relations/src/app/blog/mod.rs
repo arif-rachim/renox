@@ -5,6 +5,11 @@
 //! Pages load the related rows of a whole page in one query per relation
 //! (counts included); reports use the query builder's `group_by` and SQL
 //! joins read into structs.
+//!
+//! Made with `rnx make:module blog`, `rnx make:model Post --module blog` (and
+//! `Category`, `Comment`, `Tag`, `Like`) and `rnx make:migration` for each
+//! migration (the blog tables, the pivot columns, the likes table), then
+//! filled in.
 
 pub mod model;
 

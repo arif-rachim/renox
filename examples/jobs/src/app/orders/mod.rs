@@ -1,6 +1,8 @@
 //! Made with `rnx make:module orders`, `rnx make:model Order --module orders -m`,
 //! `rnx make:job SendReceipt --module orders` (and `ChargePayment`,
 //! `NotifyWarehouse`, `RemindUnpaid`, `SendStatement`, `StatementsSent`),
+//! `rnx make:event OrderPlaced --module orders`,
+//! `rnx make:notification NewOrder --module orders`,
 //! `rnx make:migration add_status_to_orders` and `rnx make:mail receipt`.
 
 mod new_order;

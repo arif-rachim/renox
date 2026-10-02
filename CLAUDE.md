@@ -8,7 +8,7 @@ repo, and every trap hit so far, so you don't have to rediscover them.
 - `CHANGELOG.md`: what changed, milestone by milestone.
 - `CONTRIBUTING.md`: the checks every change needs. `SECURITY.md`: how vulnerabilities are reported.
 - `CHEATSHEET.md` and `llms.txt`: the app author's view (patterns, and which example shows what).
-- `docs/*.md`: guides (types, relations, authorization, queue, ui, testing, PostgreSQL, operations, development, stability).
+- `docs/*.md`: guides (routing, validation, types, relations, authorization, queue, mail, scheduling, ui, grid, testing, PostgreSQL, operations, development, stability).
 - `docs/audit/`: the pre-1.0 audit (finding IDs W*, D*, A* used in ROADMAP M13/M14).
 
 ## 1. What Renox is
@@ -45,7 +45,9 @@ crates/renox/              facade crate apps depend on: re-exports renox-core, t
   src/lib.rs               `pub use renox_core::*`, macros (DbEnum, FromRow, Model, Validate, embedded!,
                            migrations!, #[renox::test]), prelude, and cfg(doctest) holders:
                            ReadMe, CheatSheet, TypesGuide, RelationsGuide, AuthorizationGuide,
-                           QueueGuide, UiGuide, TestingGuide, OperationsGuide, MacroCompileErrors
+                           QueueGuide, UiGuide, GridGuide, ValidationGuide, RoutingGuide,
+                           MailGuide, SchedulingGuide, TestingGuide, OperationsGuide,
+                           MacroCompileErrors
   tests/it/                ONE integration-test binary (main.rs + a module per area); add new areas
                            as `mod x;` in main.rs. Notable modules: send_handlers.rs (every data
                            API in a routed handler), web_security.rs, data_resilience.rs,
@@ -129,7 +131,12 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/grid/                mod.rs: renox::grid: Grid/Column, GridRequest, filters from the query string,
                            header rows, GridPage (serialized for renox/grid.html), preferences
                            (grid_preferences / session) and their /_renox/grid/{grid}/prefs route,
-                           merged cells, RowOrder; export.rs: CSV, Excel (`xlsx`), print page
+                           merged cells, RowOrder; searchable/prefix/row_url/empty_state;
+                           Action/Selection (bulk_action, row_action, selected); Summary
+                           (Column::summary), groups/group_by; cards_on_mobile and cell kinds
+                           (image, color, badges, icons, description, tooltip, wrap, limit,
+                           link, copyable); related/count_of/sum_of, advanced_filter,
+                           remember, poll; export.rs: CSV, Excel (`xlsx`), print page
   src/mail.rs              Mail (recipients, cc/bcc/reply_to/from, attachments), Mailer
                            (smtp/log/memory), mail_view, queue_mail, /_renox/mail preview
   src/cache.rs             Cache (memory / database store), remember(), add/pull/increment,
@@ -214,6 +221,15 @@ tests/chaos/               app + run.sh (postgres|sqlite) that the `chaos` CI jo
 tests/cli/run.sh           `rnx new` + every `make:*`, then build and test the app (CI `cli`/`docker`)
 docs/ui.md                 components, the UI kit, toasts, fragments, htmx headers, live
                            validation, stacks, Tailwind (doctest `UiGuide`)
+docs/grid.md               the data grid (renox::grid): columns, filters, actions, summaries,
+                           exports (doctest `GridGuide`)
+docs/routing.md            routes, groups, domains, extractors, middleware, guards, sessions,
+                           CSRF, cookies, signed URLs (doctest `RoutingGuide`)
+docs/validation.md         Valid<T>, rules, derive Validate, hooks, messages (doctest
+                           `ValidationGuide`)
+docs/mail.md               mail and notifications (doctest `MailGuide`)
+docs/scheduling.md         scheduler, events, cache and locks, app commands (doctest
+                           `SchedulingGuide`)
 docs/testing.md            TestApp: requests, assertions, fakes, time travel, browser tests
                            (doctest `TestingGuide`)
 docs/types.md              HTML input ↔ Rust ↔ SQLite ↔ PostgreSQL (doctest `TypesGuide`)
@@ -264,7 +280,8 @@ docs/assets/demo.gif       the README's demo (see §4.10)
    `storage/framework/down` exists; inside `view` so the 503 uses the error template) → `guard`
    (a handler panic or a run past `REQUEST_TIMEOUT` becomes a 500 with the error page).
 7. `App::layer` layers (first added = outermost), around the modules' routes only.
-8. Routes. Also inside the layers: `/_renox/files` (storage), `/_renox/mail` and
+8. Routes. Also inside the layers: `/_renox/files` (storage), `/_renox/grid/{grid}/prefs` (data
+   grid preferences), `/_renox/mail` and
    `/_renox/debug` (only with `APP_DEBUG`; the inspector answers 404 unless also local), and the fallback: `public/` (`ServeDir`, or the embedded files) with a 404.
 
 With `Routes::domain`, `build_router` runs once per domain pattern (each with the whole stack
@@ -276,15 +293,18 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
 ### 3.2 Key decisions (also in ROADMAP "Decisions")
 - **One runtime crate (`renox-core`)**, not renox-http/-db/-view: those would all need `AppState`
   and `App` would need all of them (circular). `renox` is a thin facade.
-- **Cargo features:** `renox` defaults to `fake` and `server-events`; optional `postgres`, `s3`,
-  `uuid`, `xlsx` (Excel exports of data grids). renox-core is `default-features = false` in the workspace deps; the `renox` crate owns
+- **Cargo features:** `renox` defaults to `fake`, `http` (`renox::http` sends real requests
+  through reqwest; the test fake works without it) and `server-events` (needs `http`); optional
+  `postgres`, `s3`, `uuid`, `xlsx` (Excel exports of data grids). renox-core is `default-features = false` in the workspace deps; the `renox` crate owns
   the defaults.
 - **Sessions are an encrypted, signed cookie by default** (`cookie` PrivateJar, key derived from
   `APP_KEY`), so no DB is needed; keep that small (a warning is logged over 4 KB).
   `SESSION_DRIVER=database` (M21g) puts only an id in the cookie and the session in `sessions`
   (keyed by sha256(id), a new id at each login and logout). Flash data lives
-  one request. A per-session lifetime override powers "remember me". Logout bumps
-  `users.sessions_revoked_at`, checked on every request, so it ends every session of the user.
+  one request. A per-session lifetime override powers "remember me". Logout ends this device
+  only (its session id goes to the `revoked_sessions` denylist, so a copied cookie dies too);
+  `logout_other_devices` / `User::revoke_sessions` bump `users.sessions_revoked_at`, checked on
+  every request, to end the user's other sessions.
 - **Auth sessions store the user id + a fingerprint of the password hash** (no remember-token
   column): changing the password logs out other sessions.
 - **Views: MiniJinja** (runtime, overridable, autoreload in debug via `minijinja-autoreload`).
@@ -295,7 +315,7 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
   migrate:status|db:seed|queue:work|queue:failed|queue:retry|queue:flush|queue:forget|
   queue:prune-failed|queue:prune-batches|webhook:failed|webhook:retry|cache:prune|session:prune|
   ui:publish|schedule:list|schedule:run|schedule:work|route:list|db:shell|down|
-  up|help`, default `serve` (modules add more: `tokens:prune` from Auth, `audit:prune` from Audit),
+  up|help`, default `serve` (modules add more: `tokens:prune` and `notifications:prune` from Auth, `audit:prune` from Audit),
   plus the app's own commands (`App::command`, or `App::typed_command` for a clap `AppCommand`;
   names can't clash with built-ins). Migrations and
   jobs are compiled into the app, so only the app can run them. `rnx <anything unknown>` forwards
@@ -335,7 +355,7 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
 - **Workers and scheduler run inside `serve`** by default (single-process deploys). Several
   instances may share one database: every scheduled run is claimed first (`schedule::claim`:
   insert `renox:schedule:<task>:<slot>` into `cache` with `ON CONFLICT DO NOTHING`, kept for the
-  interval + 1 min (a day for daily tasks); expired claims are pruned at most once a minute).
+  interval + 1 min, or an hour for cron-style tasks such as `daily_at`; expired claims are pruned at most once a minute).
 - **Single-file deploys:** `App::embed(renox::embedded!())` bakes views, lang files and `public/`
   into the binary; they're used only when `APP_DEBUG` is off (debug keeps disk + live reload).
   New built-in behaviour that reads `VIEWS_PATH`/`LANG_PATH`/`PUBLIC_PATH` must also handle the
@@ -347,8 +367,8 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
   sniff the content; stored names are random with an extension from the content.
 - **S3 is the opt-in `s3` feature** (object_store pulls reqwest + aws-lc-rs). It is tested against
   SeaweedFS in the `s3` CI job (`crates/renox/tests/it/s3.rs`).
-- **No C crypto in default builds:** reqwest uses `rustls-no-provider` and `analytics` installs
-  the ring provider, which lettre uses too. CI checks `cargo tree -p hello -e normal -i aws-lc-rs` is
+- **No C crypto in default builds:** reqwest uses `rustls-no-provider` and `http.rs` installs
+  rustls' ring provider when it builds the client, which lettre uses too. CI checks `cargo tree -p hello -e normal -i aws-lc-rs` is
   empty. `deny.toml` doesn't ban aws-lc, since the `s3` feature brings it.
 
 ### 3.3 The database layer (SQLite and PostgreSQL)
@@ -644,7 +664,8 @@ Parsed in `crates/renox-core/src/config.rs`; defaults in parentheses.
 - **Requests:** `REQUEST_TIMEOUT` (seconds, 60; 0 = none), `UPLOAD_MAX_SIZE` (MB, 10),
   `TRUSTED_PROXIES` (addresses, CIDR ranges or `*`), `CSP` (relaxed|strict|off, also `false`/`none`
   for off; relaxed is the owner's chosen default).
-- **Logs:** `RUST_LOG` (info), `LOG_FORMAT` (text|json; anything else fails at boot),
+- **Logs:** `RUST_LOG` (default by command: `info,renox=debug` for `serve`/`queue:work`/
+  `schedule:work` with debug on, `info` for them without, `warn` for every other command), `LOG_FORMAT` (text|json; anything else fails at boot),
   `LOG_FILE` (append there instead of stdout, no ANSI colors; falls back to stdout if it can't
   be opened).
 - **Mail:** `MAIL_MAILER` (log; smtp|log|memory), `MAIL_HOST`, `MAIL_PORT`, `MAIL_ENCRYPTION`
@@ -800,7 +821,7 @@ picks the build, not the terminal.
 
 ## 7. Where things stand (update this section when it changes)
 
-- **All milestones M0–M26 are merged to `main`** (M26c: #75); the owner's B/C/D before
+- **All milestones M0–M28 are merged to `main`** (M28e: #84); the owner's B/C/D before
   1.0 were M23–M25. History:
   `CHANGELOG.md` (per milestone) and `ROADMAP.md` (per-milestone notes and decisions).
 - After M17: a docs refresh (#45) and the Laravel parity review with M18–M21 planned (#46).
@@ -901,7 +922,16 @@ picks the build, not the terminal.
 - **M28** (the grid next to Filament's tables, five PRs, the owner asked for all): M28a
   (`prefix`, `searchable` + search box, filter chips, `row_url`, `empty_state`): merged (#80). M28b (`bulk_action`/`row_action`, `Action`, `Selection`, `selected`):
   merged (#81). M28c (`Column::summary`/`Summary`, `groups`/`group_by`): merged (#82). M28d (`cards_on_mobile`, image/color columns, badges, icons,
-  description, tooltip, wrap, limit, link, copyable): merged (#83). Then M28e relationships, advanced filter, polling, session state.
+  description, tooltip, wrap, limit, link, copyable): merged (#83). M28e
+  (`related`/`count_of`/`sum_of`, `advanced_filter`, `remember`, `poll`, NULLs last): merged
+  (#84). M28 is done (#80–#84).
+- **Docs audit after M28** (merged, #85): every doc checked against the code,
+  `docs/grid.md` added (doctest `GridGuide`). Three fixes it found: grid date-time filters take
+  `APP_TIMEZONE` days (`day_start` in grid/mod.rs), `delete_account` also deletes
+  `grid_preferences` rows, and `notifications:prune` / `auth::prune_read_notifications`.
+- **Guides for the remaining areas** (branch `documentation`): docs/routing.md,
+  docs/validation.md, docs/mail.md and docs/scheduling.md, which before lived only in
+  CHEATSHEET.md.
 - **UI kit form fields** (Filament's forms as the yardstick; stage 1 of 3): `radio`,
   `checkbox_list`, `form_grid`/`fieldset`, `span`, `prefix`/`suffix`, `datalist`,
   `disabled`/`readonly`, `has_old()` (a checkbox or radio missing from `old()` after a
@@ -915,7 +945,7 @@ picks the build, not the terminal.
   `tags_input`, searchable/multiple `select` (a combobox over the native select, kept
   visually hidden so `required` still works), `repeater` (`{% call(row, prefix) %}`,
   renumbered by rewriting attributes), `key_value`, `wizard`; teams, fields and shop use
-  them. Branch `ui-form`.
+  them. Branch `ui-form` (one PR for the three stages).
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.
@@ -924,6 +954,6 @@ picks the build, not the terminal.
   conversation that planned M26) ranked them: release and docs first, then 2FA and social
   login, then small adds (validation rules like `json`/`gt`/`decimal`/`dimensions`, several
   storage disks, route model binding), then admin, search, realtime (SSE) and billing.
-- As of M26a: ~54k lines of Rust in `crates/` (stubs excluded), ~578 `#[test]`/`#[renox::test]`/
-  `#[tokio::test]` functions in `crates/` and `examples/` (plus doctests), and 42 direct
-  dependencies in renox-core (5 optional). Keep dependencies lean and remove unused ones.
+- As of M28: ~60k lines of Rust in `crates/` (stubs excluded), ~650 `#[test]`/`#[renox::test]`/
+  `#[tokio::test]` functions in `crates/` and `examples/` (plus doctests), and 43 direct
+  dependencies in renox-core (6 optional). Keep dependencies lean and remove unused ones.

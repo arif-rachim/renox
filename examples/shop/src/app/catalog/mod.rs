@@ -1,5 +1,9 @@
 //! The shop front: the home page, the product list with search, filters,
 //! sorting and pagination, a product page with SEO tags, and the sitemap.
+//!
+//! Made with `rnx make:module catalog`, `rnx make:model Category --module
+//! catalog -m`, `rnx make:model Product --module catalog -m` and
+//! `rnx make:factory Product --module catalog`, then filled in.
 
 pub mod model;
 

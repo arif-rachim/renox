@@ -16,7 +16,23 @@
 //!   `Valid<OrderEdit>` (`edit_url`);
 //! - rows dragged into order while sorted by # (`reorder`);
 //! - a second grid (`/regions`) where equal regions and cities share one cell
-//!   (`merge`), with details of the page's own under each row.
+//!   (`merge`), with details of the page's own under each row;
+//! - exports of every filtered row: CSV, Excel (the `xlsx` feature) and a
+//!   print page (`exports`);
+//! - a search box (`searchable`), filter chips, rows that open their order
+//!   (`row_url`) and an empty state (`empty_state`);
+//! - bulk actions on the selected (or all matching) orders and a row menu
+//!   (`bulk_action`, `row_action`);
+//! - totals in the footer (`Column::summary`) and grouping by region, status
+//!   or paid with subtotals (`groups`);
+//! - cards on phones (`cards_on_mobile`), badges, avatars, descriptions and
+//!   copy buttons;
+//! - columns from other tables (`Column::related`, `Column::count_of`), an
+//!   advanced filter (`advanced_filter`), remembered filters (`remember`) and
+//!   polling every 30 seconds (`poll`);
+//! - two grids on one page (`/follow-up`) that page and filter apart
+//!   (`prefix`), with links, tooltips, wrapping and cut text, columns that
+//!   can't be sorted or filtered, and a numeric related column.
 //!
 //! ```text
 //! cargo run -- migrate
@@ -43,6 +59,28 @@ pub fn app() -> App {
             renox::db::sql("UPDATE orders SET position = id")
                 .execute(&db)
                 .await?;
+            // Customers in tiers, and a few notes per order, for the grid's
+            // relationship columns.
+            for i in 0..60 {
+                let tier = ["gold", "silver", "bronze", "bronze"][i % 4];
+                renox::db::sql("INSERT INTO customers (name, tier) VALUES (?, ?)")
+                    .bind(format!("Customer {i}"))
+                    .bind(tier)
+                    .execute(&db)
+                    .await?;
+            }
+            renox::db::sql("UPDATE orders SET customer_id = (id % 60) + 1")
+                .execute(&db)
+                .await?;
+            for order in 1..=480_i64 {
+                for n in 0..(order * 7 % 4) {
+                    renox::db::sql("INSERT INTO order_notes (order_id, body) VALUES (?, ?)")
+                        .bind(order)
+                        .bind(format!("Note {n}"))
+                        .execute(&db)
+                        .await?;
+                }
+            }
             Ok(())
         })
 }

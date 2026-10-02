@@ -149,6 +149,15 @@ async fn resend(State(state): State<AppState>) -> Result {
 }
 ```
 
+The workers `serve` runs (`QUEUE_WORKERS`) take every queue, oldest job first, with no queue
+before another; so does `queue:work` without `--queue`. For priority, set `QUEUE_WORKERS=0` and
+run `queue:work --queue high,default` beside `serve`, or give the urgent queue workers of its
+own. `queue:work` takes:
+
+- `--queue a,b`: only these queues, the first listed drained first;
+- `--workers N`: how many jobs run at once (1 by default);
+- `--once`: run the jobs available now, then exit (e.g. from cron or a test script).
+
 ## Unique jobs, rate limits and overlapping
 
 - **Unique:** with `UNIQUE_FOR`, a second dispatch while one with the same `unique_id` is queued

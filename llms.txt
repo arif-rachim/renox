@@ -61,7 +61,8 @@ Every example has a README.md that walks through it.
     [tests/shop.rs](examples/shop/tests/shop.rs)
 - [examples/htmx-recipes](examples/htmx-recipes) ([README](examples/htmx-recipes/README.md)): htmx + Alpine recipes, each a few attributes and
   a handler that answers with a fragment: modal form (HX-Trigger closes it), inline edit
-  (`hx-patch`, Escape cancels), toggle, dropdown with delete (empty 200), infinite scroll
+  (`hx-patch`, Escape cancels), toggle, dropdown with delete (an empty row part, the open count out of band and a
+  toast), infinite scroll
   (`revealed`), client-side tabs, `HxRefresh`, `HxRedirect`; an out-of-band count
   (`.fragment("row").also("count")`), `HxRetarget`/`HxReswap` for a duplicate, toasts over htmx.
   [src/app/tasks/mod.rs](examples/htmx-recipes/src/app/tasks/mod.rs),
@@ -78,7 +79,10 @@ Every example has a README.md that walks through it.
   Excel with the `xlsx` feature, a print page for PDF), a search box, filter chips and rows
   that open their order, bulk actions on selected (or all matching) orders and a row menu,
   totals in the footer and grouping by region, status or paid with subtotals, cards on
-  phones, badges, avatars, descriptions and copy buttons.
+  phones, badges, avatars, descriptions and copy buttons, the customer's tier and a notes
+  count from other tables, an advanced filter, remembered filters and polling; `/follow-up`
+  with two grids paging apart on one page (`prefix`), plus `link`, `tooltip`, `wrap`, `limit`,
+  `sortable(false)`/`filterable(false)`, `per_page` and a `numeric()` related column.
   [src/app/orders/mod.rs](examples/grid/src/app/orders/mod.rs),
   [views](examples/grid/resources/views/orders),
   [tests/grid.rs](examples/grid/tests/grid.rs)
@@ -198,8 +202,22 @@ Every example has a README.md that walks through it.
   counting queries, a browser-test recipe.
 - [docs/ui.md](docs/ui.md): components that see the request, the UI kit (`renox/ui.html`: fields,
   buttons, cards, sheets, menus, tabs, tables) and its design rules, toasts, out-of-band
-  fragments, htmx headers, live validation, data grids (`renox::grid`: columns, filters,
-  preferences, `sparkline`).
+  fragments, htmx headers, live validation.
+- [docs/grid.md](docs/grid.md): data grids (`renox::grid` + `renox/grid.html`): columns and their
+  kinds, filters per heading, search, filter chips, the advanced filter, preferences (per user
+  or in the session), details under a row, editing in place, reordering rows, merged cells,
+  bulk and row actions, summaries and groups, cards on phones, columns from related tables,
+  exports (CSV, Excel with `xlsx`, print), polling.
+- [docs/validation.md](docs/validation.md): forms and validation: `Valid<T>` (form, JSON,
+  query), `impl Validate` and `#[derive(Validate)]`, every rule, `unique`/`exists`, password
+  policy, hooks (`prepare`/`authorize`/`after`), messages and translations, uploads as fields.
+- [docs/routing.md](docs/routing.md): routes, groups, resources, domains, extractors and
+  responses, middleware and guards, rate limits, sessions, CSRF, cookies, signed URLs,
+  maintenance mode.
+- [docs/mail.md](docs/mail.md): mail (drivers, views, attachments, queued mail, the preview) and
+  notifications (mail, database, custom channels, the in-app inbox, pruning, testing).
+- [docs/scheduling.md](docs/scheduling.md): the scheduler (cron, time zones, several servers,
+  housekeeping tasks), events and listeners, the cache and locks, app commands and prompts.
 - [docs/queue.md](docs/queue.md): jobs, retries and `failed`, `dispatch_in`, priority, unique
   jobs, middleware (overlap, rate limits), encrypted payloads, chains and batches with
   progress, the dashboard, testing jobs; mapped to Laravel's.
@@ -223,5 +241,5 @@ Every example has a README.md that walks through it.
 - `crates/renox-core/src`: the runtime. `db/` (Db, models, queries, relations, migrations),
   `validation/`, `auth/` (incl. `permissions.rs`, `account.rs`, `events.rs`, `tokens.rs`),
   `audit.rs`, `context.rs`, `queue/`, `schedule.rs` + `timezone.rs`, `cache.rs`, `view.rs`,
-  `testing.rs`.
+  `grid/` (the data grid and its exports), `testing.rs`.
 - `crates/renox-cli`: `rnx`; `stubs/` holds the files `rnx new` writes.

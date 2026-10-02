@@ -240,7 +240,7 @@ impl<'de> de::Deserializer<'de> for Node {
     fn deserialize_bool<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, DeError> {
         match self {
             Node::Leaf(text) => match text.trim().to_ascii_lowercase().as_str() {
-                "true" | "on" | "1" | "yes" => visitor.visit_bool(true),
+                "true" | "on" | "1" | "yes" | "checked" => visitor.visit_bool(true),
                 "false" | "off" | "0" | "no" | "" => visitor.visit_bool(false),
                 _ => Err(DeError("provided string was not `true` or `false`".into())),
             },

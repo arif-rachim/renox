@@ -1,5 +1,8 @@
 //! The cart, kept in the database per user so it survives logins on other
 //! devices. Every route needs a login.
+//!
+//! Made with `rnx make:module cart` and `rnx make:model CartItem --module cart -m`,
+//! then filled in.
 
 use renox::Toast;
 use renox::db::relations::belongs_to;

@@ -23,6 +23,13 @@ All timeouts are in seconds and are set in `.env`:
 A job's own limit is its `Job::TIMEOUT` (60 s by default). A job that goes over it is stopped
 and retried.
 
+Two more settings size the app:
+
+| Setting | Default | What it limits |
+|---|---|---|
+| `UPLOAD_MAX_SIZE` | 10 | The largest request body, in MB (uploads, forms, JSON). A larger request answers 413. A proxy in front has its own limit (nginx's `client_max_body_size` is 1 MB by default). |
+| `DATABASE_POOL_SIZE` | 8 | How many database connections the app keeps open, shared by requests, queue workers and the scheduler (at least 1). With PostgreSQL, keep the total over all servers below the server's `max_connections`. |
+
 ## Behind a reverse proxy
 
 Run the app on `127.0.0.1` (`APP_HOST=127.0.0.1`) behind Caddy or nginx, which handle TLS:
@@ -56,8 +63,10 @@ header, so the proxy must pass it on: Caddy does; with nginx, `proxy_set_header 
 An app with `App::detect_locale()` answers `Vary: Accept-Language`: a CDN or caching proxy in
 front must keep that header, or it would serve one visitor's language to another.
 
-Also set `APP_URL` to the public `https://` address. Cookies are then marked `Secure`, HSTS is
-sent, and links in mails point to the right place.
+Also set `APP_URL` to the public `https://` address, so links in mails point to the right
+place. An `https://` `APP_URL` also marks cookies `Secure` (the session, the app's `SetCookie`s,
+the maintenance bypass), and with `APP_ENV=production` as well, every response sends HSTS
+(`Strict-Transport-Security`).
 
 ## Several servers
 
@@ -106,7 +115,7 @@ and has no automated test yet.
 | A handler panics | That request gets a 500 error page, and the app keeps serving. |
 | A job panics | The attempt counts as failed and is retried, then the job goes to `failed_jobs`. The worker keeps running. |
 | A scheduled task or event listener panics | It's logged. The task runs again on schedule, and the other listeners still run. |
-| The SMTP server is down or silent | A direct `mailer.send` fails within `MAIL_TIMEOUT`. Queued mail (`queue_mail`) is retried five times, then goes to `failed_jobs`. |
+| The SMTP server is down or silent | A direct `mailer.send` fails within `MAIL_TIMEOUT`. Queued mail (`queue_mail`) and queued notifications get five attempts, then go to `failed_jobs`. |
 | The process is killed (`SIGKILL`, out of memory) | Jobs it was running are retried after 15 minutes, or at `TIMEOUT` + 1 minute for longer jobs. If that was their last attempt, they go to `failed_jobs`. |
 | The process gets `SIGTERM` (deploy, restart) | It stops taking requests and waits up to 30 s for running jobs. |
 
@@ -133,8 +142,13 @@ my-app queue:prune-batches --hours 24    # delete finished batches
 
 Fix the cause first, then retry. `queue:retry` runs the same payload again; a job of a chain
 resumes the chain, and a job of a batch counts in its batch again. A job's `failed` hook runs
-once it fails for good (not on `queue:retry`). Schedule the prune commands, e.g.
-`s.daily_at("03:00", "prune-failed", |state| async move { state.queue.prune_failed(week).await.map(drop) })`.
+once it fails for good (not on `queue:retry`). To prune on a schedule, call the functions behind
+the prune commands from a task (see Scheduled tasks and housekeeping).
+
+To run workers in a process of their own, start `my-app queue:work` and set `QUEUE_WORKERS=0`
+for `serve`. `queue:work` takes `--queue a,b` (only these queues, the first listed drained first;
+without it, every queue in arrival order), `--workers N` (jobs run at once, 1 by default) and
+`--once` (run what is waiting now, then exit). See [queue.md](queue.md#queues-and-priority).
 
 ## Failed webhook calls
 
@@ -147,7 +161,9 @@ my-app webhook:retry 7       # process one again, e.g. after a fix
 ```
 
 A call is `received` until its handler succeeds (`processed`) or fails (`failed`). A handler
-that panics also marks its call `failed`. The stored payload is the exact body the provider
+that panics also marks its call `failed`. The handler runs as a queued job with five attempts
+(each 30 s × the attempt number after the last), so a `failed` call may still succeed on a later
+attempt; after the fifth it stays failed until `webhook:retry`. The stored payload is the exact body the provider
 sent, so signatures can be checked again.
 
 ## Backups
@@ -161,8 +177,10 @@ sent, so signatures can be checked again.
 
 **Files.** Uploads live in `STORAGE_PATH/app` (or the S3 bucket). Back that directory up too.
 
-**Keys.** Keep `.env`'s `APP_KEY` with the backups. Without it, sessions end and signed links
-stop working. `Encrypted<T>` model fields, values the app sealed with `state.encrypt`, and
+**Keys.** Keep `.env`'s `APP_KEY` with the backups. Without it, sessions end, signed links
+stop working, the app's encrypted cookies (`SetCookie::encrypted`, read with
+`Cookies::get_encrypted`) read as missing, and maintenance bypass cookies stop letting people
+through. `Encrypted<T>` model fields, values the app sealed with `state.encrypt`, and
 queued jobs with encrypted
 payloads (`const ENCRYPTED`), can't be read any more: that data is lost unless you still have
 the old key. Rotating the key has the same effect, so decrypt and
@@ -250,19 +268,25 @@ my-app schedule:list          # each task's next run, in its time zone
 my-app schedule:run backup    # run one task now, e.g. to check it after a deploy
 ```
 
-Some tables grow until something prunes them. Schedule the commands (e.g. daily) or run them by
-hand:
+Some tables grow until something prunes them. Run the commands by hand, or call the functions
+behind them from a scheduled task (a task runs Rust code, not commands):
 
 | Table | Grows with | Pruned by |
 |---|---|---|
-| `cache` (database store) | expired entries | itself, at most once an hour per process; `cache:prune` on demand |
-| `personal_access_tokens` | expired API tokens | `tokens:prune` (Auth module): tokens expired more than a day ago |
-| `audit_logs` | every audited action (Audit module) | `audit:prune --days 365` |
+| `cache` (database store) | expired entries | itself, at most once an hour per process; `cache:prune` (`state.cache.prune()`) on demand |
+| `personal_access_tokens` | expired API tokens | `tokens:prune` (Auth module): tokens expired more than a day ago (`renox::auth::prune_expired_tokens(&state.db, grace)`) |
+| `audit_logs` | every audited action (Audit module) | `audit:prune --days 365` (`renox::audit::prune(&state.db, age)`) |
 | `revoked_sessions` | logouts | itself, on each logout |
-| `sessions` (`SESSION_DRIVER=database`) | visits | itself, now and then; `session:prune` on demand |
-| `failed_jobs` | jobs that failed for good | `queue:prune-failed --hours 168`, `queue:flush` (see Failed jobs) |
-| `job_batches` | every dispatched batch | `queue:prune-batches --hours 24` (finished batches) |
+| `sessions` (`SESSION_DRIVER=database`) | visits | itself, now and then; `session:prune` (`Session::prune_expired(&state.db)`) on demand |
+| `failed_jobs` | jobs that failed for good | `queue:prune-failed --hours 168` (`state.queue.prune_failed(age)`), `queue:flush` (see Failed jobs) |
+| `job_batches` | every dispatched batch | `queue:prune-batches --hours 24` (`state.queue.prune_batches(age)`, finished batches) |
 | `webhook_calls` | every received webhook | nothing yet: delete old `processed` rows yourself if it matters |
+| `notifications` | every database notification | `notifications:prune --days 30` (Auth module): notifications read more than that ago; unread ones stay (`renox::auth::prune_read_notifications(&state.db, age)`). A user's rows also go with the user (`ON DELETE CASCADE`) |
+| `grid_preferences` | one small row per user and data grid | `User::delete_account` (the account page's "delete account") deletes the user's rows. The table has no foreign key to `users` (every app has it, not every app has `users`), so an app that deletes users another way deletes these rows too |
+
+Each function returns how many rows it deleted, and takes a `std::time::Duration` where the
+command takes `--hours` or `--days`. A daily task, e.g.
+`s.daily_at("03:00", "prune-failed", |state| async move { state.queue.prune_failed(Duration::from_secs(7 * 86_400)).await.map(drop) })`.
 
 ## Maintenance mode
 
@@ -285,8 +309,10 @@ The flag file lives in `STORAGE_PATH`, so every process that shares that directo
    "target":"renox_core::error","span":{"id":"k3J9x2mQpL0aB7cDe4Fg","ip":"203.0.113.9","method":"POST","uri":"/checkout","name":"request"}}
   ```
 
-- `LOG_FILE=storage/logs/app.log` appends to that file instead (without colors). Rotate it
-  with logrotate's `copytruncate`, or leave logs on stdout for journald or Docker.
+- `LOG_FILE=storage/logs/app.log` appends to that file instead (without colors). If the file
+  can't be opened (a missing directory, no permission), the app says so on stderr and logs to
+  stdout. Rotate it with logrotate's `copytruncate`, or leave logs on stdout for journald or
+  Docker.
 - Each request has an id: the `X-Request-Id` a proxy sent (kept when it's 8–64 characters of
   `A-Z a-z 0-9 . _ -`), or a new one. It's in every log line of the request, in the response's
   `X-Request-Id`, in error reports, and in handlers as the `RequestId` extractor. A visitor

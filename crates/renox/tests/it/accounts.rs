@@ -230,7 +230,20 @@ async fn the_account_page_changes_profile_password_and_deletes() {
     log_in(&app, "ana.b@example.com", "longenough1").await;
     app.get("/me").await.assert_ok();
 
-    // Deleting asks for the password.
+    // Deleting asks for the password, and takes the user's grid choices.
+    let id = User::find_by_email(app.db(), "ana.b@example.com")
+        .await
+        .unwrap()
+        .unwrap()
+        .id;
+    renox::db::sql(
+        "INSERT INTO grid_preferences (user_id, grid, data, updated_at) VALUES (?, 'orders', '{}', ?)",
+    )
+    .bind(id)
+    .bind(renox::db::now())
+    .execute(app.db())
+    .await
+    .unwrap();
     app.htmx()
         .post("/account", &[("_method", "DELETE"), ("password", "nope")])
         .await
@@ -248,6 +261,12 @@ async fn the_account_page_changes_profile_password_and_deletes() {
             .unwrap()
             .is_none()
     );
+    let left: i64 = renox::db::sql("SELECT COUNT(*) FROM grid_preferences WHERE user_id = ?")
+        .bind(id)
+        .scalar(app.db())
+        .await
+        .unwrap();
+    assert_eq!(left, 0);
     app.get("/me").await.assert_redirect("/login");
 }
 
@@ -419,4 +438,46 @@ async fn password_policy_messages_are_translated() {
             .contains("simbol")
     );
     assert!(message("Ab1!", Locale::Id).await.unwrap().contains("8"));
+}
+
+#[renox::test]
+async fn read_notifications_are_pruned_after_a_while() {
+    let app = boot().await;
+    let ana = user(&app, "ana@example.com").await;
+    let ago = |days: i64| renox::db::now() - renox::chrono::TimeDelta::days(days);
+    for (kind, read_at) in [
+        ("old", Some(ago(40))),
+        ("recent", Some(ago(2))),
+        ("unread", None),
+    ] {
+        renox::db::sql(
+            "INSERT INTO notifications (user_id, kind, data, read_at, created_at) VALUES (?, ?, '{}', ?, ?)",
+        )
+        .bind(ana.id)
+        .bind(kind)
+        .bind(read_at)
+        .bind(ago(60))
+        .execute(app.db())
+        .await
+        .unwrap();
+    }
+    let kinds = || async {
+        renox::db::sql("SELECT kind FROM notifications ORDER BY id")
+            .scalars::<String>(app.db())
+            .await
+            .unwrap()
+    };
+    app.kernel()
+        .call("notifications:prune", Vec::<String>::new())
+        .await
+        .unwrap();
+    assert_eq!(kinds().await, ["recent", "unread"], "read over 30 days ago");
+    let pruned = renox::auth::prune_read_notifications(
+        app.db(),
+        std::time::Duration::from_secs(24 * 60 * 60),
+    )
+    .await
+    .unwrap();
+    assert_eq!(pruned, 1);
+    assert_eq!(kinds().await, ["unread"], "unread ones stay");
 }

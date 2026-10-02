@@ -1,6 +1,13 @@
 //! Checkout and the customer's orders. Placing an order emits `OrderPlaced`;
 //! its listener queues the confirmation mail and tells the admins. A daily
 //! task cancels orders nobody paid for.
+//!
+//! Made with `rnx make:module orders`, `rnx make:model Order --module orders -m`
+//! (and `OrderItem`, whose table shares that migration), `rnx make:policy Order --module orders`,
+//! `rnx make:event OrderPlaced --module orders`,
+//! `rnx make:notification OrderConfirmation --module orders` (and `NewOrder`,
+//! `OrderShipped`) and `rnx make:mail order_confirmation` (and
+//! `order_shipped`), then filled in.
 
 pub mod checkout;
 pub mod model;

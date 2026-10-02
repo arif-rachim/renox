@@ -64,6 +64,56 @@ Stage 1:
 - Fixed: the error summary's links missed a field given its own `id`; they now find the
   field by its name.
 
+### Examples: the rest of docs/grid.md
+
+examples/grid gets `/follow-up`: two grids on one page with their own query string prefixes
+(`prefix`), and the column options docs/grid.md describes that no example used yet: `link`,
+`tooltip`, `wrap`, `limit`, `sortable(false)`, `filterable(false)`, `per_page` and
+`Column::related(…).numeric()`.
+
+### Guides for routing, validation, mail and scheduling
+
+- New guides, each compiled as a doctest: docs/routing.md (`RoutingGuide`: routes, groups,
+  domains, extractors and responses, middleware and guards, sessions, CSRF, cookies, signed
+  URLs), docs/validation.md (`ValidationGuide`: `Valid<T>`, every rule, `#[derive(Validate)]`,
+  hooks, messages), docs/mail.md (`MailGuide`: mail and notifications) and docs/scheduling.md
+  (`SchedulingGuide`: the scheduler, events, the cache and locks, app commands). Before, these
+  areas were only in CHEATSHEET.md.
+- README, llms.txt and CLAUDE.md list the new guides.
+
+### Docs audit after M28
+
+Fixes found by the audit:
+- Data grid: date-time filters (the date range and the advanced filter's `on`/`before`/`after`)
+  take whole days of `APP_TIMEZONE`, the zone the cells are shown in. They took UTC days, so
+  with `Asia/Jakarta` a filtered day was off by seven hours.
+- `User::delete_account` (the account page's "delete account") also deletes the user's
+  `grid_preferences` rows, which used to stay behind.
+- New: `notifications:prune [--days 30]` (Auth module) and
+  `renox::auth::prune_read_notifications(db, age)` delete notifications read more than that
+  ago; unread ones stay. Nothing pruned them before.
+
+Docs:
+- New guide: docs/grid.md for `renox::grid` (compiled as the `GridGuide` doctest).
+- CHEATSHEET: the missing patterns filled in (queries, the UI kit's macros, the data grid,
+  commands, config).
+- docs/postgresql.md: an unknown `DATABASE_URL` scheme is refused at boot.
+  docs/operations.md: when HSTS is sent, housekeeping for `notifications` and
+  `grid_preferences`, the prune functions. docs/authorization.md: async gates and `can()`.
+  docs/stability.md: the `#[non_exhaustive]` list.
+- README and CLAUDE.md: the `renox` crate's default features include `http`.
+- ROADMAP: the default scope API (`#[model(default_scope = "…")]`, `Model::unscoped()`),
+  `gate_before`'s closure, the principles and app layout, and the audit's open issues.
+- The examples' READMEs and module docs, llms.txt, and the new-app `AGENTS.md.stub` and
+  `env.stub` brought in line with the code.
+
+### M28e · Data grid: related columns, an advanced filter, remembered state, polling
+
+- New: `Column::related`, `Column::count_of`, `Column::sum_of` (values from other tables,
+  sorted, filtered and searched), `Grid::advanced_filter` (rules with operators per kind, all
+  or any), `Grid::remember` (the grid's state in the session) and `Grid::poll`.
+- Changed: grid sorting puts empty values last in either direction, on both databases.
+
 ### M28d · Data grid: cards on phones, more kinds of cells
 
 - New: `Grid::cards_on_mobile()`: rows as cards on phones, with sorting and filters in the
@@ -247,6 +297,8 @@ Stage 1:
 - `/favicon.ico` answers `204 No Content` (cached for a day) unless the app has
   `public/favicon.ico`. Browsers ask for it on every site; the 404 it got before ran the
   whole middleware stack, rendered the error page and logged a console error each time.
+- The workspace dev profile uses `debug = "line-tables-only"` (#68): full debug info made the
+  test binary 415 MB and workspace builds ran out of memory.
 
 ### M21i · The examples' tests, typed commands and the stubs
 
@@ -284,6 +336,15 @@ Stage 1:
 - Fixed: error pages didn't get `App::share` values, so a layout using one (a cart count)
   failed to render them with `APP_DEBUG` (Renox's page showed instead).
 
+### Docs and examples checked against M21 (#63)
+
+- The socket recipe stops the service before enabling the socket (systemd can't listen while
+  the app holds the port); the shop admin's product delete asks in the kit's confirmation
+  sheet (its `hx-confirm` never ran); the shop's order policy checks the admin role itself and
+  uses `users_with_role`; crud's layout shows flashed messages; `rnx make:mail` prints how to
+  actually send the mail; authorization.md, stability.md, the README, llms.txt and the ROADMAP
+  no longer describe pre-M21 limits.
+
 ### M21g · Database sessions and deploys without refused connections
 
 - `SESSION_DRIVER=database`: sessions in a `sessions` table (new framework migration
@@ -296,12 +357,6 @@ Stage 1:
   that old and new code both accept, and two copies behind Caddy.
 - `Toast` and `ToastKind` are `#[non_exhaustive]` (build toasts with `Toast::success(…)` and
   friends).
-- Docs and examples checked against M21: the socket recipe stops the service before enabling
-  the socket (systemd can't listen while the app holds the port); the shop admin's product delete
-  asks in the kit's confirmation sheet (its `hx-confirm` never ran); the shop's order policy
-  checks the admin role itself and uses `users_with_role`; crud's layout shows flashed messages;
-  `rnx make:mail` prints how to actually send the mail; authorization.md, stability.md, the README,
-  llms.txt and the ROADMAP no longer describe pre-M21 limits.
 
 ### M21f · Form requests, more rules, auth pages on the kit
 

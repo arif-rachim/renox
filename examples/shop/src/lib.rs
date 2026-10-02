@@ -5,6 +5,10 @@
 //! the users with the `admin` role (the `Permissions` module), and what they
 //! do to orders goes into the audit log (the `Audit` module).
 //!
+//! The modules name the `rnx make:*` commands that made them. The
+//! `shop:make-admin` command below is the kind `rnx make:command
+//! shop:make-admin --module admin` writes; it sits here next to the roles.
+//!
 //! Run it from this directory:
 //!
 //! ```text

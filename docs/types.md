@@ -9,15 +9,18 @@ every row by Renox's own tests, on SQLite and PostgreSQL.
 | `<input>`, `type=email/url/tel/search/password` | `String` | `TEXT` | `TEXT` |
 | `<textarea>` | `String`, or `Option<String>` (empty → `None`) | `TEXT` | `TEXT` |
 | `type=number` | `i64` (use `i64` for whole numbers; PostgreSQL has no unsigned types) | `INTEGER` | `BIGINT` |
+| `type=number`, smaller ranges | `i16`, `i32` (also `i8`, `u8`, `u16`, `u32` on SQLite only: PostgreSQL has no unsigned columns) | `INTEGER` | `SMALLINT`, `INTEGER` |
 | `type=number step=0.01` (measures) | `f64` | `REAL` | `DOUBLE PRECISION` |
+| `type=number step=0.01`, single precision | `f32` | `REAL` | `REAL` |
 | money | `i64` in the smallest unit (rupiah, cents), never `f64` | `INTEGER` | `BIGINT` |
-| `type=checkbox` (one) | `bool`: `on` → `true`, unchecked (nothing sent) → `false` | `INTEGER` 0/1 | `BOOLEAN` |
+| `type=checkbox` (one) | `bool`: `on` (or `1`, `yes`, `checked`) → `true`, unchecked (nothing sent; or `off`, `0`, `no`) → `false` | `INTEGER` 0/1 | `BOOLEAN` |
 | `<select>` | an enum with `#[derive(DbEnum)]` | `TEXT` | `TEXT` |
 | `<select multiple>`, checkboxes sharing a name | `Vec<String>` with `#[serde(default)]`; stored as `Json<Vec<String>>` | `TEXT` | `JSONB` |
 | `type=date` | `NaiveDate` | `TEXT` | `DATE` |
 | `type=time` | `NaiveTime` | `TEXT` | `TIME` |
 | `type=datetime-local` (no seconds needed) | `NaiveDateTime` | `TEXT` | `TIMESTAMP` |
-| (set by Renox) `created_at`, `updated_at` | `Option<DateTime>` (UTC) | `TEXT` | `TIMESTAMPTZ` |
+| (set by Renox) `created_at`, `updated_at` | `Option<DateTime>` (UTC), or a plain `DateTime` | `TEXT` | `TIMESTAMPTZ` |
+| (set by Renox) `deleted_at`, with `#[model(soft_deletes)]` | `Option<DateTime>` (`None` = not deleted) | `TEXT` | `TIMESTAMPTZ` |
 | `type=file` | `Upload`; store it and keep its key as `String` | `TEXT` | `TEXT` |
 | the kit's `tags_input` | `Vec<String>` with `#[serde(default)]`; stored as `Json<Vec<String>>` | `TEXT` | `JSONB` |
 | the kit's `key_value` (`meta[0][key]`, `meta[0][value]`) | `KeyValues` with `#[serde(default)]`; stored as `Json<KeyValues>` (a list of pairs, so the order holds) | `TEXT` | `JSONB` |
@@ -51,7 +54,9 @@ validation error.
 ## Forms
 
 - Browsers send only checked checkboxes, and send them as `on`. Renox reads that as `true`, and
-  a missing one as `false`.
+  a missing one as `false`. A `bool` field also accepts `1`, `yes`, `checked` and `true` (and `off`,
+  `0`, `no`, `false` or an empty value for `false`), so a hidden input or an API client can send
+  either.
 - A multi-select or checkbox group repeats its name (`colors=black&colors=red`). Declare the
   field as `Vec<T>` with `#[serde(default)]`, so that nothing chosen becomes an empty list.
 - `datetime-local` sends `2026-10-01T10:30`, without seconds. Renox accepts it as a
@@ -83,5 +88,9 @@ validation error.
   both made on insert and sortable by creation time, or `String` (`TEXT PRIMARY KEY`), set by
   the app. Pick a ULID or UUID when ids show up in URLs or APIs and shouldn't reveal how many
   rows there are; examples/fields keys its products by `Uuid`.
+- **Soft deletes:** `#[model(table = "products", soft_deletes)]` with a `deleted_at:
+  Option<DateTime>` field (the derive refuses `soft_deletes` without it). `delete` then sets it,
+  queries skip those rows (`with_trashed()` / `only_trashed()` to see them), `restore` clears it
+  and `force_delete` removes the row.
 - **PostgreSQL:** use `BIGINT` for `i64` columns. A plain `INTEGER` is 32-bit and won't read into
   an `i64`.

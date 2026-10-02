@@ -61,7 +61,7 @@ mod export;
 pub use export::MAX_EXPORT_ROWS;
 
 use crate::auth::AuthUser;
-use crate::db::{Db, Model, Paginated, Query};
+use crate::db::{Db, DbValue, Model, Paginated, Query, ToDbValue};
 use crate::{AppState, Error, Result, Session};
 
 /// The framework migration creating `grid_preferences` (every app gets it).
@@ -159,6 +159,8 @@ pub struct Column {
     link: Option<String>,
     copyable: bool,
     round: bool,
+    /// A value from another table: SQL with `{T}` for this model's table.
+    expr: Option<String>,
 }
 
 impl Column {
@@ -190,6 +192,63 @@ impl Column {
             link: None,
             copyable: false,
             round: false,
+            expr: None,
+        }
+    }
+
+    /// A value of the row this one belongs to: `table`'s `column` where its
+    /// `id` is this row's `foreign_key`
+    /// (`Column::related("customer", "Customer", "customers", "customer_id", "name")`).
+    /// Shown, sorted, filtered and searched like a text column (`.numeric()`
+    /// for a number), in one query per page.
+    pub fn related(key: &str, label: &str, table: &str, foreign_key: &str, column: &str) -> Self {
+        let mut c = Self::new(key, label, Kind::Text);
+        if [table, foreign_key, column].iter().all(|n| plain_name(n)) {
+            c.expr = Some(format!(
+                "(SELECT \"{table}\".\"{column}\" FROM \"{table}\" WHERE \"{table}\".\"id\" = {{T}}.\"{foreign_key}\")"
+            ));
+        }
+        c
+    }
+
+    /// How many rows of `table` point at this row through `foreign_key`
+    /// (`Column::count_of("notes", "Notes", "order_notes", "order_id")`).
+    pub fn count_of(key: &str, label: &str, table: &str, foreign_key: &str) -> Self {
+        let mut c = Self::new(key, label, Kind::Number);
+        if [table, foreign_key].iter().all(|n| plain_name(n)) {
+            c.expr = Some(format!(
+                "(SELECT COUNT(*) FROM \"{table}\" WHERE \"{table}\".\"{foreign_key}\" = {{T}}.\"id\")"
+            ));
+        }
+        c
+    }
+
+    /// The total of `column` over the rows of `table` that point at this
+    /// row through `foreign_key`.
+    pub fn sum_of(key: &str, label: &str, table: &str, foreign_key: &str, column: &str) -> Self {
+        let mut c = Self::new(key, label, Kind::Number);
+        if [table, foreign_key, column].iter().all(|n| plain_name(n)) {
+            c.expr = Some(format!(
+                "(SELECT COALESCE(SUM(\"{table}\".\"{column}\"), 0) FROM \"{table}\" WHERE \"{table}\".\"{foreign_key}\" = {{T}}.\"id\")"
+            ));
+        }
+        c
+    }
+
+    /// Shows a related value as a number (filtered with a range).
+    pub fn numeric(mut self) -> Self {
+        if self.expr.is_some() {
+            self.kind = Kind::Number;
+        }
+        self
+    }
+
+    /// The SQL this column reads, for `M`'s table: its own column or the
+    /// related value.
+    fn target<M: Model>(&self) -> Target {
+        match &self.expr {
+            Some(expr) => Target::Expr(expr.replace("{T}", &format!("\"{}\"", M::TABLE))),
+            None => Target::Column(self.key.clone()),
         }
     }
 
@@ -464,6 +523,9 @@ pub struct Grid {
     groups: Vec<String>,
     group: Option<String>,
     cards: bool,
+    advanced: bool,
+    poll: Option<u32>,
+    remember: bool,
 }
 
 impl Grid {
@@ -490,7 +552,59 @@ impl Grid {
             groups: Vec::new(),
             group: None,
             cards: false,
+            advanced: false,
+            poll: None,
+            remember: false,
         }
+    }
+
+    /// Reloads the grid's page every `seconds` (at least 5) while the tab is
+    /// visible and nobody is editing, selecting or filtering in it.
+    pub fn poll(mut self, seconds: u32) -> Self {
+        self.poll = Some(seconds.max(5));
+        self
+    }
+
+    /// Keeps the user's filters, search, sort, group and page size in the
+    /// session: coming back to the page shows the grid as they left it.
+    pub fn remember(mut self) -> Self {
+        self.remember = true;
+        self
+    }
+
+    /// The request's values for this grid (without the prefix); with
+    /// [`Grid::remember`], the session's when the request has none of its
+    /// own (a fresh visit), and saved when it does.
+    fn effective_params(&self, request: &GridRequest) -> Vec<(String, String)> {
+        let own = self.own_params(&request.params);
+        if !self.remember {
+            return own;
+        }
+        let key = format!("_grid_q.{}", self.id);
+        let Some(session) = &request.session else {
+            return own;
+        };
+        if own.iter().any(|(k, _)| k == "state") {
+            let kept: Vec<(String, String)> = own
+                .iter()
+                .filter(|(k, _)| !matches!(k.as_str(), "state" | "export" | "page"))
+                .cloned()
+                .collect();
+            let _ = session.put(&key, &kept);
+            own
+        } else {
+            session.get::<Vec<(String, String)>>(&key).unwrap_or(own)
+        }
+    }
+
+    /// An advanced filter in the toolbar: rules on any filterable column
+    /// ("Total is greater than 1,000,000", "Name doesn't contain kopi",
+    /// "Ordered before 2026-03-01", "Email is empty"), all or any of them
+    /// holding. They travel in the query string (`match=any&r.0.c=total&
+    /// r.0.o=gt&r.0.v=1000000`), next to the headings' filters.
+    pub fn advanced_filter(mut self) -> Self {
+        self.advanced = true;
+        self
     }
 
     /// On phones (under 768 px) each row is a card: the columns picked for
@@ -610,9 +724,9 @@ impl Grid {
         };
         let known = matches!(
             name,
-            "page" | "per_page" | "sort" | "search" | "export" | "group"
+            "page" | "per_page" | "sort" | "search" | "export" | "group" | "match" | "state"
         ) || name.split_once('.').is_some_and(|(part, _)| {
-            matches!(part, "q" | "m" | "min" | "max" | "from" | "to" | "in")
+            matches!(part, "q" | "m" | "min" | "max" | "from" | "to" | "in" | "r")
         });
         known.then_some(name)
     }
@@ -736,13 +850,14 @@ impl Grid {
             )));
         }
         let prefs = load_prefs(request, &self.id).await;
-        let state = State_::parse(self, &self.own_params(&request.params));
-        let query = self.filtered(query, &state);
+        let state = State_::parse(self, &self.effective_params(request));
+        let query = self.filtered(query, &state, &request.zone);
         let unsorted = query.clone();
         let query = self.sorted(query, &state);
         let rows = query
             .paginate(&request.db, state.page, state.per_page)
             .await?;
+        let related = self.related_values(&request.db, &rows.items).await?;
         let summaries = self.summarize(&unsorted, &request.db, None).await?;
         let group_summaries = match &state.group {
             Some(group) if self.find(group).is_some() => {
@@ -764,6 +879,7 @@ impl Grid {
             keep,
             rows,
             extra: Vec::new(),
+            related,
             summaries,
             group_summaries,
         })
@@ -842,27 +958,132 @@ impl Grid {
         Ok(out)
     }
 
+    /// The related columns' values for `items`, one query per column.
+    async fn related_values<M: Model + Serialize>(
+        &self,
+        db: &Db,
+        items: &[M],
+    ) -> Result<Vec<Map<String, Value>>> {
+        let mut out = vec![Map::new(); items.len()];
+        let columns: Vec<&Column> = self.columns.iter().filter(|c| c.expr.is_some()).collect();
+        if columns.is_empty() || items.is_empty() {
+            return Ok(out);
+        }
+        let ids: Vec<String> = items
+            .iter()
+            .map(|item| {
+                match serde_json::to_value(item)
+                    .ok()
+                    .and_then(|v| v.get("id").cloned())
+                {
+                    Some(Value::String(id)) => id,
+                    Some(other) => other.to_string(),
+                    None => String::new(),
+                }
+            })
+            .collect();
+        let keys: Vec<M::Key> = ids.iter().filter_map(|id| id.parse().ok()).collect();
+        for column in columns {
+            let Target::Expr(expr) = column.target::<M>() else {
+                continue;
+            };
+            let numeric = matches!(column.kind, Kind::Number | Kind::Money);
+            let values: BTreeMap<String, Value> = if numeric {
+                M::query()
+                    .where_in("id", keys.clone())
+                    .select_as::<(String, Option<f64>), _>(
+                        db,
+                        &format!("CAST(\"id\" AS TEXT), CAST({expr} AS DOUBLE PRECISION)"),
+                    )
+                    .await?
+                    .into_iter()
+                    .map(|(id, v)| {
+                        let v = match v {
+                            Some(f) if f.fract() == 0.0 && f.abs() < 9e15 => Value::from(f as i64),
+                            Some(f) => Value::from(f),
+                            None => Value::Null,
+                        };
+                        (id, v)
+                    })
+                    .collect()
+            } else {
+                M::query()
+                    .where_in("id", keys.clone())
+                    .select_as::<(String, Option<String>), _>(
+                        db,
+                        &format!("CAST(\"id\" AS TEXT), CAST({expr} AS TEXT)"),
+                    )
+                    .await?
+                    .into_iter()
+                    .map(|(id, v)| (id, v.map_or(Value::Null, Value::from)))
+                    .collect()
+            };
+            for (i, id) in ids.iter().enumerate() {
+                out[i].insert(
+                    column.key.clone(),
+                    values.get(id).cloned().unwrap_or(Value::Null),
+                );
+            }
+        }
+        Ok(out)
+    }
+
     /// `query` with the request's filters applied (also used by `page`):
     /// for exports or totals over every filtered row.
     pub fn filter<M: Model>(&self, query: Query<M>, request: &GridRequest) -> Query<M> {
-        let state = State_::parse(self, &self.own_params(&request.params));
-        let query = self.filtered(query, &state);
+        let state = State_::parse(self, &self.effective_params(request));
+        let query = self.filtered(query, &state, &request.zone);
         self.sorted(query, &state)
     }
 
-    fn filtered<M: Model>(&self, mut query: Query<M>, state: &State_) -> Query<M> {
+    fn filtered<M: Model>(
+        &self,
+        mut query: Query<M>,
+        state: &State_,
+        zone: &crate::timezone::Zone,
+    ) -> Query<M> {
         for (key, filter) in &state.filters {
             let Some(column) = self.find(key) else {
                 continue;
             };
-            query = filter.apply(query, column);
+            query = filter.apply(query, column, zone);
+        }
+        if !state.rules.is_empty() {
+            let mut parts = Vec::new();
+            let mut binds: Vec<DbValue> = Vec::new();
+            for rule in &state.rules {
+                let Some(column) = self.find(&rule.column) else {
+                    continue;
+                };
+                let target = match column.target::<M>() {
+                    Target::Expr(expr) => expr,
+                    Target::Column(key) if M::COLUMNS.contains(&key.as_str()) => {
+                        format!("\"{key}\"")
+                    }
+                    Target::Column(_) => continue,
+                };
+                if let Some((sql, values)) = rule.sql(&target, column.kind, zone) {
+                    parts.push(format!("({sql})"));
+                    binds.extend(values);
+                }
+            }
+            if !parts.is_empty() {
+                let joined = parts.join(if state.any { " OR " } else { " AND " });
+                query = query.where_raw(&joined, binds);
+            }
         }
         if let Some(search) = &state.search {
-            let columns: Vec<&str> = self
+            let columns: Vec<String> = self
                 .columns
                 .iter()
-                .filter(|c| c.searchable && M::COLUMNS.contains(&c.key.as_str()))
-                .map(|c| c.key.as_str())
+                .filter(|c| c.searchable)
+                .filter_map(|c| match c.target::<M>() {
+                    Target::Expr(expr) => Some(expr),
+                    Target::Column(key) if M::COLUMNS.contains(&key.as_str()) => {
+                        Some(format!("\"{key}\""))
+                    }
+                    Target::Column(_) => None,
+                })
                 .collect();
             if !columns.is_empty() {
                 // Every word somewhere in the searchable columns.
@@ -870,7 +1091,7 @@ impl Grid {
                     let pattern = format!("%{}%", word.to_lowercase());
                     let sql = columns
                         .iter()
-                        .map(|key| format!("LOWER(CAST(\"{key}\" AS TEXT)) LIKE ?"))
+                        .map(|target| format!("LOWER(CAST({target} AS TEXT)) LIKE ?"))
                         .collect::<Vec<_>>()
                         .join(" OR ");
                     query = query.where_raw(&sql, vec![pattern; columns.len()]);
@@ -898,10 +1119,18 @@ impl Grid {
             keys.insert(0, (group.clone(), desc));
         }
         for (key, desc) in &keys {
-            query = if *desc {
-                query.order_by_desc(key)
-            } else {
-                query.order_by(key)
+            let dir = if *desc { "DESC" } else { "ASC" };
+            // Empty values last either way, on both databases (PostgreSQL
+            // puts NULLs first when descending, SQLite last).
+            query = match self.find(key).map(Column::target::<M>) {
+                Some(Target::Expr(expr)) => {
+                    query.order_by_raw(&format!("({expr} IS NULL), {expr} {dir}"))
+                }
+                _ if M::COLUMNS.contains(&key.as_str()) => {
+                    query.order_by_raw(&format!("(\"{key}\" IS NULL), \"{key}\" {dir}"))
+                }
+                _ if *desc => query.order_by_desc(key),
+                _ => query.order_by(key),
             };
         }
         if keys.iter().any(|(key, _)| key == "id") {
@@ -984,6 +1213,46 @@ impl Grid {
     }
 }
 
+/// A table or column name: letters, digits and `_`.
+fn plain_name(name: &str) -> bool {
+    !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+/// Where a filter or sort looks: the model's column, or a related value.
+enum Target {
+    Column(String),
+    Expr(String),
+}
+
+impl Target {
+    fn compare<M: Model>(&self, query: Query<M>, op: &str, value: impl ToDbValue) -> Query<M> {
+        match self {
+            Target::Column(key) => query.where_op(key, op, value),
+            Target::Expr(expr) => query.where_raw(&format!("{expr} {op} ?"), [value]),
+        }
+    }
+
+    fn like<M: Model>(&self, query: Query<M>, pattern: String) -> Query<M> {
+        match self {
+            Target::Column(key) => query.where_like(key, pattern),
+            Target::Expr(expr) => query.where_raw(
+                &format!("LOWER(CAST({expr} AS TEXT)) LIKE ?"),
+                [pattern.to_lowercase()],
+            ),
+        }
+    }
+
+    fn among<M: Model, V: ToDbValue>(&self, query: Query<M>, values: Vec<V>) -> Query<M> {
+        match self {
+            Target::Column(key) => query.where_in(key, values),
+            Target::Expr(expr) => {
+                let marks = vec!["?"; values.len()].join(", ");
+                query.where_raw(&format!("{expr} IN ({marks})"), values)
+            }
+        }
+    }
+}
+
 fn valid_key(key: &str) -> bool {
     !key.is_empty()
         && key.len() <= 64
@@ -1026,46 +1295,52 @@ impl Filter {
         })
     }
 
-    fn apply<M: Model>(&self, mut query: Query<M>, column: &Column) -> Query<M> {
+    fn apply<M: Model>(
+        &self,
+        mut query: Query<M>,
+        column: &Column,
+        zone: &crate::timezone::Zone,
+    ) -> Query<M> {
         let key = column.key.as_str();
+        let target = column.target::<M>();
         match column.kind {
             Kind::Text | Kind::Color => {
                 if let Some(pattern) = self.pattern() {
-                    query = query.where_like(key, pattern);
+                    query = target.like(query, pattern);
                 }
             }
             Kind::Number | Kind::Money => {
                 for (value, op) in [(self.min, ">="), (self.max, "<=")] {
                     let Some(value) = value else { continue };
                     query = if value.fract() == 0.0 && value.abs() < 9e15 {
-                        query.where_op(key, op, value as i64)
+                        target.compare(query, op, value as i64)
                     } else {
-                        query.where_op(key, op, value)
+                        target.compare(query, op, value)
                     };
                 }
             }
             Kind::Date => {
                 if let Some(from) = self.from {
-                    query = query.where_op(key, ">=", from);
+                    query = target.compare(query, ">=", from);
                 }
                 if let Some(to) = self
                     .to
                     .and_then(|d| d.checked_add_signed(Duration::days(1)))
                 {
-                    query = query.where_op(key, "<", to);
+                    query = target.compare(query, "<", to);
                 }
             }
             Kind::DateTime => {
-                let at = |d: NaiveDate| d.and_hms_opt(0, 0, 0).map(|t| t.and_utc());
+                let at = |d: NaiveDate| day_start(zone, d);
                 if let Some(from) = self.from.and_then(at) {
-                    query = query.where_op(key, ">=", from);
+                    query = target.compare(query, ">=", from);
                 }
                 if let Some(to) = self
                     .to
                     .and_then(|d| d.checked_add_signed(Duration::days(1)))
                     .and_then(at)
                 {
-                    query = query.where_op(key, "<", to);
+                    query = target.compare(query, "<", to);
                 }
             }
             Kind::Bool => {
@@ -1079,7 +1354,7 @@ impl Filter {
                     })
                     .collect();
                 if !picked.is_empty() {
-                    query = query.where_in(key, picked);
+                    query = target.among(query, picked);
                 }
             }
             Kind::Select => {
@@ -1089,7 +1364,7 @@ impl Filter {
                     .filter(|v| column.options.iter().any(|(o, _)| o == *v))
                     .collect();
                 if !picked.is_empty() {
-                    query = query.where_in(key, picked.into_iter().cloned());
+                    query = target.among(query, picked.into_iter().cloned().collect());
                 }
             }
             Kind::Tags => {
@@ -1130,6 +1405,9 @@ struct State_ {
     filters: BTreeMap<String, Filter>,
     /// The toolbar's search.
     search: Option<String>,
+    /// The advanced filter's rules, and whether any (not all) must hold.
+    rules: Vec<Rule>,
+    any: bool,
     /// The column rows are grouped by.
     group: Option<String>,
     /// The grid's own default group (the query string says when it differs).
@@ -1147,6 +1425,8 @@ impl State_ {
         let mut sort = None;
         let mut search = None;
         let mut group = grid.group.clone();
+        let mut rules: BTreeMap<u32, Rule> = BTreeMap::new();
+        let mut any = false;
         let mut page = 1;
         let mut per_page = grid.per_page;
         for (name, value) in params {
@@ -1155,6 +1435,25 @@ impl State_ {
                 "page" => page = value.parse().unwrap_or(1).max(1),
                 "group" => {
                     group = grid.groups.iter().find(|g| *g == value).cloned();
+                }
+                "match" => any = value == "any",
+                _ if name.starts_with("r.") => {
+                    // r.<n>.c (column), r.<n>.o (operator), r.<n>.v (value).
+                    let mut parts = name.splitn(3, '.').skip(1);
+                    let (Some(n), Some(field)) = (parts.next(), parts.next()) else {
+                        continue;
+                    };
+                    let Ok(n) = n.parse::<u32>() else { continue };
+                    if n >= 20 {
+                        continue;
+                    }
+                    let rule = rules.entry(n).or_default();
+                    match field {
+                        "c" => rule.column = value.to_owned(),
+                        "o" => rule.op = value.to_owned(),
+                        "v" => rule.value = value.chars().take(200).collect(),
+                        _ => {}
+                    }
                 }
                 "search" if !value.is_empty() && grid.columns.iter().any(|c| c.searchable) => {
                     search = Some(value.chars().take(200).collect());
@@ -1215,9 +1514,19 @@ impl State_ {
         if defaulted {
             sort = grid.default_sort().into_iter().next();
         }
+        let rules: Vec<Rule> = rules
+            .into_values()
+            .filter(|r| {
+                grid.find(&r.column)
+                    .is_some_and(|c| c.filterable && ops_for(c.kind).contains(&r.op.as_str()))
+                    && (!op_takes_value(&r.op) || !r.value.is_empty())
+            })
+            .collect();
         Self {
             filters,
             search,
+            rules,
+            any,
             grid_group: grid.group.clone(),
             group,
             sort,
@@ -1232,6 +1541,16 @@ impl State_ {
         let mut out = Vec::new();
         if let Some(search) = &self.search {
             out.push(("search".into(), search.clone()));
+        }
+        if !self.rules.is_empty() {
+            out.push(("match".into(), if self.any { "any" } else { "all" }.into()));
+            for (n, rule) in self.rules.iter().enumerate() {
+                out.push((format!("r.{n}.c"), rule.column.clone()));
+                out.push((format!("r.{n}.o"), rule.op.clone()));
+                if op_takes_value(&rule.op) {
+                    out.push((format!("r.{n}.v"), rule.value.clone()));
+                }
+            }
         }
         if self.group != self.grid_group {
             out.push(("group".into(), self.group.clone().unwrap_or_default()));
@@ -1265,6 +1584,140 @@ impl State_ {
         }
         out.push(("per_page".into(), self.per_page.to_string()));
         out
+    }
+}
+
+/// The moment the day `day` starts in `zone`: date-time filters take whole
+/// days of `APP_TIMEZONE`, the zone their cells are shown in. When a clock
+/// change skips midnight, the day starts at its first wall-clock time.
+fn day_start(
+    zone: &crate::timezone::Zone,
+    day: NaiveDate,
+) -> Option<chrono::DateTime<chrono::Utc>> {
+    let midnight = day.and_hms_opt(0, 0, 0)?;
+    let at = (0..=2).find_map(|h| zone.resolve(midnight + Duration::hours(h)))?;
+    chrono::DateTime::from_timestamp(at, 0)
+}
+
+/// One rule of the advanced filter.
+#[derive(Debug, Clone, Default, PartialEq)]
+struct Rule {
+    column: String,
+    op: String,
+    value: String,
+}
+
+/// The advanced filter's operators for a kind of column.
+fn ops_for(kind: Kind) -> &'static [&'static str] {
+    match kind {
+        Kind::Text | Kind::Color | Kind::Tags => &[
+            "contains",
+            "not_contains",
+            "equals",
+            "not_equals",
+            "starts",
+            "ends",
+            "empty",
+            "not_empty",
+        ],
+        Kind::Number | Kind::Money => &["eq", "ne", "gt", "gte", "lt", "lte", "empty", "not_empty"],
+        Kind::Date | Kind::DateTime => &["on", "before", "after", "empty", "not_empty"],
+        Kind::Bool => &["is_true", "is_false"],
+        Kind::Select => &["is", "is_not", "empty", "not_empty"],
+        Kind::Custom | Kind::Image => &[],
+    }
+}
+
+fn op_takes_value(op: &str) -> bool {
+    !matches!(op, "empty" | "not_empty" | "is_true" | "is_false")
+}
+
+impl Rule {
+    /// The rule as SQL on `target` (a quoted column or a related value),
+    /// with its values; `None` when the value doesn't fit the column.
+    fn sql(
+        &self,
+        target: &str,
+        kind: Kind,
+        zone: &crate::timezone::Zone,
+    ) -> Option<(String, Vec<DbValue>)> {
+        let text = format!("LOWER(CAST({target} AS TEXT))");
+        let lower = self.value.to_lowercase();
+        let like = |pattern: String| (format!("{text} LIKE ?"), vec![pattern.to_db_value()]);
+        Some(match self.op.as_str() {
+            "empty" => (
+                format!("{target} IS NULL OR CAST({target} AS TEXT) = ''"),
+                vec![],
+            ),
+            "not_empty" => (
+                format!("{target} IS NOT NULL AND CAST({target} AS TEXT) <> ''"),
+                vec![],
+            ),
+            "is_true" => (format!("{target} = ?"), vec![true.to_db_value()]),
+            "is_false" => (
+                format!("{target} = ? OR {target} IS NULL"),
+                vec![false.to_db_value()],
+            ),
+            "contains" => like(format!("%{lower}%")),
+            "not_contains" => (
+                format!("{target} IS NULL OR {text} NOT LIKE ?"),
+                vec![format!("%{lower}%").to_db_value()],
+            ),
+            "equals" => like(lower),
+            "not_equals" => (
+                format!("{target} IS NULL OR {text} <> ?"),
+                vec![lower.to_db_value()],
+            ),
+            "starts" => like(format!("{lower}%")),
+            "ends" => like(format!("%{lower}")),
+            "is" => (format!("{target} = ?"), vec![self.value.to_db_value()]),
+            "is_not" => (
+                format!("{target} IS NULL OR {target} <> ?"),
+                vec![self.value.to_db_value()],
+            ),
+            "eq" | "ne" | "gt" | "gte" | "lt" | "lte" => {
+                let n: f64 = self
+                    .value
+                    .trim()
+                    .parse()
+                    .ok()
+                    .filter(|n: &f64| n.is_finite())?;
+                let op = match self.op.as_str() {
+                    "eq" => "=",
+                    "ne" => "<>",
+                    "gt" => ">",
+                    "gte" => ">=",
+                    "lt" => "<",
+                    _ => "<=",
+                };
+                let value = if n.fract() == 0.0 && n.abs() < 9e15 {
+                    (n as i64).to_db_value()
+                } else {
+                    n.to_db_value()
+                };
+                (format!("{target} {op} ?"), vec![value])
+            }
+            "on" | "before" | "after" => {
+                let day: NaiveDate = self.value.trim().parse().ok()?;
+                let next = day.checked_add_signed(Duration::days(1))?;
+                let bound = |d: NaiveDate| -> DbValue {
+                    if kind == Kind::DateTime {
+                        day_start(zone, d).to_db_value()
+                    } else {
+                        d.to_db_value()
+                    }
+                };
+                match self.op.as_str() {
+                    "on" => (
+                        format!("{target} >= ? AND {target} < ?"),
+                        vec![bound(day), bound(next)],
+                    ),
+                    "before" => (format!("{target} < ?"), vec![bound(day)]),
+                    _ => (format!("{target} >= ?"), vec![bound(next)]),
+                }
+            }
+            _ => return None,
+        })
     }
 }
 
@@ -1450,6 +1903,8 @@ pub struct GridPage<M> {
     keep: Vec<(String, String)>,
     rows: Paginated<M>,
     extra: Vec<Map<String, Value>>,
+    /// The related columns' values, per row.
+    related: Vec<Map<String, Value>>,
     summaries: BTreeMap<String, Map<String, Value>>,
     group_summaries: BTreeMap<String, Map<String, Value>>,
 }
@@ -1551,6 +2006,9 @@ impl<M: Serialize> GridPage<M> {
                     Ok(Value::Object(map)) => map,
                     _ => Map::new(),
                 };
+                if let Some(related) = self.related.get(i) {
+                    row.extend(related.clone());
+                }
                 if let Some(extra) = self.extra.get(i) {
                     row.extend(extra.clone());
                 }
@@ -1657,6 +2115,7 @@ impl<M: Serialize> GridPage<M> {
         let config = json!({
             "id": self.grid.id,
             "prefix": self.grid.prefix.as_ref().map(|p| format!("{p}.")).unwrap_or_default(),
+            "poll": self.grid.poll,
             "prefs": format!("/_renox/grid/{}/prefs", self.grid.id),
             "order": ordered.iter().map(|(c, _)| c.key.clone()).collect::<Vec<_>>(),
             "left": ordered.iter().filter(|(_, p)| *p == Some(Pin::Left)).map(|(c, _)| c.key.clone()).collect::<Vec<_>>(),
@@ -1698,7 +2157,7 @@ impl<M: Serialize> GridPage<M> {
             "per_page_options": self.grid.per_page_options,
             "sort": sort.filter(|_| !self.state.defaulted).map(|(key, desc)| format!("{}{key}", if desc { "-" } else { "" })),
             "query": query,
-            "filtered": self.state.filters.len(),
+            "filtered": self.state.filters.len() + usize::from(!self.state.rules.is_empty()),
             "config": config.to_string(),
             "audit": self.grid.audit,
             "details": self.grid.audit || self.grid.details,
@@ -1713,6 +2172,19 @@ impl<M: Serialize> GridPage<M> {
             "bulk": self.grid.bulk.iter().map(|a| a.to_value(None)).collect::<Vec<_>>(),
             "row_actions": !self.grid.row_actions.is_empty(),
             "cards": self.grid.cards,
+            "remember": self.grid.remember,
+            "advanced": {
+                "on": self.grid.advanced,
+                "any": self.state.any,
+                "rules": self.state.rules.iter().map(|r| json!({"column": r.column, "op": r.op, "value": r.value})).collect::<Vec<_>>(),
+                "columns": ordered.iter().filter(|(c, _)| c.filterable && !ops_for(c.kind).is_empty()).map(|(c, _)| json!({
+                    "key": c.key,
+                    "label": c.label,
+                    "kind": c.kind,
+                    "ops": ops_for(c.kind),
+                    "options": c.options.iter().map(|(v, l)| json!({"value": v, "label": l})).collect::<Vec<_>>(),
+                })).collect::<Vec<_>>(),
+            },
             "summary": self.summaries.get("").filter(|_| self.grid.columns.iter().any(|c| !c.summaries.is_empty())),
             "grouping": (!self.grid.groups.is_empty()).then(|| json!({
                 "options": self.grid.groups.iter().filter_map(|g| self.grid.find(g)).map(|c| json!({"key": c.key, "label": c.label})).collect::<Vec<_>>(),

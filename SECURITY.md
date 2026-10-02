@@ -37,7 +37,8 @@ it in an unsafe way, or its defaults expose apps, report it here too.
 So you can tell a new problem from a known limit, `docs/audit/2026-09-pre-1.0.md` lists
 what was audited before 1.0 and how each finding was fixed. In short:
 
-- CSRF tokens on every unsafe request, sessions in an encrypted and signed cookie,
+- CSRF tokens on every unsafe request, sessions in an encrypted and signed cookie (with
+  `SESSION_DRIVER=database` the cookie holds only an id, and the session is in the database),
   `SameSite=Lax`, `Secure` behind `https://`;
 - a Content-Security-Policy with nonces, security headers and HSTS;
 - Argon2id passwords (imported bcrypt hashes are rehashed at login), a password policy,
