@@ -1,5 +1,6 @@
 //! Made with `rnx make:module products`,
 //! `rnx make:model Product --module products --migration`,
+//! `rnx make:factory Product --module products`,
 //! `rnx make:policy Product --module products` and
 //! `rnx make:command products:import --module products`, then filled in.
 

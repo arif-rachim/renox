@@ -324,12 +324,21 @@ async fn destroy(
 
 impl User {
     /// Deletes the user (their tokens, notifications and sessions go with
-    /// the row). The account page's "delete account" does this.
+    /// the row) and their data grid preferences. The account page's "delete
+    /// account" does this.
     pub async fn delete_account(&self, db: &crate::db::Db) -> Result {
+        let mut tx = db.begin().await?;
+        // Every app has this table, and not every app has `users`, so it has
+        // no foreign key to cascade from.
+        crate::db::sql("DELETE FROM grid_preferences WHERE user_id = ?")
+            .bind(self.id)
+            .execute(&mut tx)
+            .await?;
         crate::db::sql("DELETE FROM users WHERE id = ?")
             .bind(self.id)
-            .execute(db)
+            .execute(&mut tx)
             .await?;
+        tx.commit().await?;
         Ok(())
     }
 }

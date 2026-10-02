@@ -122,8 +122,8 @@ needs the same key type.
 # use renox::db::relations::Pivot;
 # const PRODUCT_TAGS: Pivot = Pivot::new("product_tags", "product_id", "tag_id");
 # async fn demo(db: Db, product_id: i64, checked: Vec<i64>) -> Result {
-PRODUCT_TAGS.attach(&db, product_id, [1, 2]).await?; // adds links that aren't there yet
-PRODUCT_TAGS.detach(&db, product_id, [2]).await?;
+PRODUCT_TAGS.attach(&db, product_id, [1, 2]).await?; // adds links that aren't there yet; returns how many
+PRODUCT_TAGS.detach(&db, product_id, [2]).await?; // returns how many links were removed
 PRODUCT_TAGS.sync(&db, product_id, checked).await?;  // exactly these (a form's checkboxes), in a transaction
 let tag_ids = PRODUCT_TAGS.ids(&db, product_id).await?;
 # let _ = tag_ids; Ok(()) }
@@ -145,7 +145,7 @@ struct Membership { role: String, created_at: Option<DateTime> }
 
 # async fn demo(db: Db, team_id: i64) -> Result {
 MEMBERS.attach_with(&db, team_id, 7, &[("role", &"admin")]).await?; // false if already linked
-MEMBERS.update_pivot(&db, team_id, 7, &[("role", &"member")]).await?;
+MEMBERS.update_pivot(&db, team_id, 7, &[("role", &"member")]).await?; // false if not linked
 let (added, removed) = MEMBERS.toggle(&db, team_id, [7, 8]).await?; // flips each link
 let members = MEMBERS.load_with_pivot::<User, Membership>(&db, [team_id]).await?;
 for (user, membership) in members.get(&team_id).map_or(&[][..], Vec::as_slice) {
@@ -259,11 +259,14 @@ let products = Product::query()
 | `update([...])` | `.update(&db, &[("status", &"paid")])`, which sets `updated_at` too |
 | `increment` / `decrement` | `.increment(&db, "stock", -1)` |
 | `firstOrFail`, `firstOrCreate` | `.first_or_404(&db)`, `.first_or_create(&db, \|\| new)` |
-| `chunk` | `.chunk(&db, 1000, \|rows\| async { … })` (by id) |
+| `chunk` | `.chunk(&db, 1000, \|rows\| async { … })` (in id order; the query's own order and limit are ignored) |
 | `insert([...])`, `upsert` | `Model::insert_many(&db, rows)`, `Model::upsert(&db, rows, &["sku"], &["qty"])` |
 | `with('category')` | `relations::belongs_to` / `has_many` / `Pivot::load_for` (above) |
 | pivot `withPivot`, `withTimestamps`, `toggle`, `updateExistingPivot` | `Pivot::with_timestamps()`, `attach_with`, `load_with_pivot::<T, Row>`, `toggle`, `update_pivot` |
-| `morphMany`, `morphTo`, `withCount` on one | `Morph::load_many`, `Morph::of`, `Morph::parents::<P, _>`, `Morph::count_many` |
+| `morphMany` (eager, for a page of parents) | `Morph::load_many` |
+| `$post->comments()` (one parent's children, as a query) | `COMMENTABLE.of(&post, Comment::query())` (`Morph::of`) |
+| `morphTo` | `Morph::parents::<P, _>` (one query per parent type) |
+| `withCount` on a morph relation | `Morph::count_many` |
 | model events / observers | `#[model(hooks)]` + `impl ModelHooks` (`saving`, `saved`, `deleting`, `deleted`) |
 | `save()` of dirty columns, `update([...])` on a model | `model.save_changes(&db, &original)`, `model.save_only(&db, &["price"])` |
 | `withCount`, `withSum` | `relations::count_many(&db, &posts, Comment::query(), "post_id")`, `sum_many::<i64, _, _>(…, "total")` (0 for rows without children) |
@@ -277,6 +280,6 @@ let products = Product::query()
 | `insert()` of one model with its key | `model.insert(&db)` (always an INSERT; `Model::insert_many` for many rows) |
 | `encrypted` cast | `Encrypted<T>` fields |
 | `DB::transaction` inside a transaction | `tx.savepoint(\|tx\| Box::pin(async move { … }))` |
-| `simplePaginate`, `cursorPaginate` | `.simple_paginate(&db, page, per)` (`simple_pagination` macro), `.cursor_paginate(&db, cursor, per)` |
+| `simplePaginate`, `cursorPaginate` | `.simple_paginate(&db, page, per)` (`simple_pagination` macro), `.cursor_paginate(&db, cursor, per)` (newest id first; the query's own order is ignored) |
 | `DB::transaction(fn, 3)` | `db.retrying(3, \|\| async { let mut tx = db.begin().await?; … })` (borrows from the caller), `db.transaction_retrying(…)`, `db.transaction(…)` |
 | `toSql` | `.to_sql(db.dialect())` |

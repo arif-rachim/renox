@@ -64,8 +64,9 @@ impl FromRef<AppState> for Db {
     }
 }
 
-/// Opens the pool for `DATABASE_URL`. `postgres://` URLs need the `postgres`
-/// feature; anything else is SQLite.
+/// Opens the pool for `DATABASE_URL`. `postgres://` and `postgresql://` URLs
+/// need the `postgres` feature, `sqlite:` URLs open SQLite, and any other
+/// scheme is refused (so a typo doesn't become a SQLite file).
 ///
 /// An in-memory SQLite database (what tests use) is swapped for a fresh
 /// schema in `TEST_DATABASE_URL` when that is set to a PostgreSQL URL (in the
