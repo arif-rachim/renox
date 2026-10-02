@@ -1,5 +1,5 @@
 {% extends "layouts/app.html" %}
-{% from "renox/ui.html" import card, input, textarea, checkbox, radio, checkbox_list, form_grid, fieldset, form_errors, button, link_button %}
+{% from "renox/ui.html" import card, input, textarea, checkbox, radio, checkbox_list, date_picker, form_grid, fieldset, form_errors, button, link_button %}
 
 {#- The kit's fields show the old input after a failed save, else the value
     given here (the stored one). The value formats match what the inputs
@@ -13,6 +13,10 @@
   {% call card(title=("Edit " ~ product.name) if product else "New product") %}
     {{ form_errors() }}
     {% call form_grid(2) %}
+      {%- if product %}
+      {#- Read-only with a copy button; the form struct ignores the extra field. -#}
+      {{ input("key", "Product ID", value=product.id, readonly=true, copyable=true, span="full", hint="A UUID v7, made on insert.") }}
+      {%- endif %}
       {{ input("name", "Name", value=value('name'), required=true, span="full") }}
       {{ textarea("description", "Description", value=value('description'), span="full") }}
       {{ input("stock", "Stock", type="number", value=value('stock'), required=true, attrs={"min": 0}) }}
@@ -31,7 +35,8 @@
     {% call fieldset("Dates", columns=2) %}
       {{ input("opens_at", "Opens at", type="time", value=value('opens_at')) }}
       {{ input("launch_at", "Launch", type="datetime-local", value=value('launch_at')) }}
-      {{ input("released_on", "Released on", type="date", value=value('released_on')) }}
+      {#- The kit's calendar (Cally) instead of the browser's: sent as YYYY-MM-DD all the same. -#}
+      {{ date_picker("released_on", "Released on", value=value('released_on')) }}
     {% endcall %}
 
     <div class="rx-card__footer">

@@ -60,7 +60,11 @@ async fn a_product_round_trips_from_the_form_to_the_database_and_back() {
         .assert_see(r#"value="red" checked"#)
         .assert_see(r#"value="07:30:00""#)
         .assert_see(r#"value="2026-10-01T10:30:00""#)
-        .assert_see(r#"value="2026-09-27""#);
+        .assert_see(r#"value="2026-09-27""#)
+        // The key, read-only with a copy button; the date in the kit's picker.
+        .assert_see(&format!(r#"value="{}" readonly"#, product.id))
+        .assert_see(r#"data-rx-copy="rx-key""#)
+        .assert_see(r#"popovertarget="rx-released_on-calendar""#);
 }
 
 #[renox::test]

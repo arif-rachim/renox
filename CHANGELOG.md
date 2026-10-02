@@ -15,6 +15,25 @@ changes by milestone (each one pull request; details in its description and in
 Closer to Filament's form fields, on the kit's own rules (labels, errors, keyboard, no
 JavaScript needed).
 
+Stage 2:
+
+- New: `toggle_buttons` (one or, with `multiple`, several choices as a row of buttons).
+- New: `file`: a drop zone listing the chosen files, with image previews (`preview`) and the
+  stored file (`current`).
+- New: `date_picker`: a date typed or picked in a Cally calendar in a popover, sent as
+  `YYYY-MM-DD`; the template function `renox_calendar()` loads Cally (the picker does, once).
+- New: `show_when` / `hide_when`: fields shown while another field has a value; hidden ones
+  are disabled, so they aren't sent.
+- New: `input(…, revealable=true)` (show the password) and `copyable=true` (copy the value).
+  Renox's own sign-in, registration, reset, confirmation and account pages use `revealable`.
+- New kit texts (en/id): `ui.show_password`, `ui.hide_password`, `ui.copy`, `ui.copied`,
+  `ui.choose_file`, `ui.choose_files`, `ui.current_file`, `ui.choose_date`,
+  `ui.previous_month`, `ui.next_month`.
+- Examples: shop's checkout asks courier or pickup (`toggle_buttons` + `show_when` +
+  `required_if`); uploads on the kit's `file`; fields with `date_picker` and a copyable key.
+
+Stage 1:
+
 - New: `radio` (a radio group in a `fieldset`, options with descriptions) and
   `checkbox_list` (ticked values sent as a list), both `inline` or in `columns`.
 - New: `form_grid(columns)` and `fieldset(legend)` for form layout; every field takes `span`.

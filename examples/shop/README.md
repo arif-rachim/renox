@@ -48,6 +48,10 @@ them to the `sessions` table (tests/shop.rs runs a customer with it). `deploy/` 
 - **Destructive actions ask first.** Deleting a product and cancelling an order open a sheet
   with the safe choice focused; the checkout address is checked as it's typed
   (`data-live-validate`).
+- **Fields that depend on another.** Checkout asks courier or pickup (`toggle_buttons`); the
+  address shows only for the courier (`show_when`, which also keeps a hidden field from being
+  sent) and is required only then (`required_if`); a pickup puts the store's address on the
+  order.
 
 - **Stock is taken in the database, not in Rust.** `UPDATE products SET stock = stock - ?
   WHERE id = ? AND stock >= ?` checks and takes in one statement, so two customers can't buy the

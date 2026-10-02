@@ -30,6 +30,8 @@
     "order": "Pesanan",
     "placed": "Terima kasih! Pesanan #:id sudah dibuat.",
     "out_of_stock": "Stok tidak cukup untuk: :names. Silakan ubah keranjangmu.",
+    "delivery": "Pengiriman", "courier": "Kurir", "pickup": "Ambil di toko",
+    "pickup_address": "Ambil di toko: Jl. Braga 12, Bandung",
     "address": "Alamat pengiriman",
     "pay_by_transfer": "Bayar lewat transfer bank dalam :days hari; pesanan yang belum dibayar dibatalkan.",
     "place": "Buat pesanan",

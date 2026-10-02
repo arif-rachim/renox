@@ -234,7 +234,7 @@ fn view_extras(app: App) -> App {
 
 ```html
 {# layout: {{ renox_head() }}{{ renox_ui() }} in <head>, <body class="rx-page">, {{ toasts() }} #}
-{% from "renox/ui.html" import card, input, select, checkbox, radio, checkbox_list, form_grid, button, confirm, table, form_errors %}
+{% from "renox/ui.html" import card, input, select, checkbox, radio, checkbox_list, toggle_buttons, show_when, date_picker, file, form_grid, button, confirm, table, form_errors %}
 <form method="post" action="/products" data-live-validate novalidate>{{ csrf_field() }}
   {% call card(title="New product") %}
     {{ form_errors() }}
@@ -246,6 +246,11 @@ fn view_extras(app: App) -> App {
       {{ radio("unit", "Unit", ["pcs", "kg"], selected="pcs", inline=true) }}
     {% endcall %}
     {{ checkbox_list("tags", "Tags", [["new", "New"], ["sale", "On sale"]]) }} {# Vec + #[serde(default)] #}
+    {{ toggle_buttons("delivery", "Delivery", [["courier", "Courier"], ["pickup", "Pickup"]], selected="courier") }}
+    {% call show_when("delivery", "courier") %}{{ input("address", "Address") }}{% endcall %} {# required_if #}
+    {{ date_picker("ships_on", "Ships on") }} {# NaiveDate #}
+    {{ file("photo", "Photo", accept="image/*", preview=true) }} {# enctype="multipart/form-data" #}
+    {{ input("api_key", "API key", value=key, readonly=true, copyable=true) }}
     {{ button("Create product") }}
   {% endcall %}
 </form>

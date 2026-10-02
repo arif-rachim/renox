@@ -261,6 +261,9 @@ impl Views {
                     styles.unwrap_or(true),
                 )))
             });
+            env.add_function("renox_calendar", || {
+                Value::from_safe_string(crate::assets::calendar_tags())
+            });
             env.add_function("renox_grid", || {
                 Value::from_safe_string(crate::assets::grid_tags())
             });

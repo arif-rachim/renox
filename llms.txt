@@ -44,7 +44,8 @@ Every example has a README.md that walks through it.
   `admin` role (the `Permissions` module, `require_role`) with photo uploads and an audit trail
   of order status changes (the `Audit` module), product delete behind password confirmation;
   checkout in `db.retrying`; en/id with plurals; the `make:deploy` files (with the systemd
-  socket); every page on the UI kit with a rebranded accent, toasts and confirmation sheets; a
+  socket); every page on the UI kit with a rebranded accent, toasts and confirmation sheets
+  (checkout: `toggle_buttons` + `show_when` + `required_if` for courier or pickup); a
   typed `shop:make-admin` command with a prompt; an admin nav marked with `route_is`; recently
   viewed products (`session.push`, `{% break %}`), stock texts with plural ranges,
   `class_names`, `Redirect::route`; tests with time travel (unpaid orders cancelled
@@ -141,7 +142,7 @@ Every example has a README.md that walks through it.
   [teams/mod.rs](examples/teams/src/app/teams/mod.rs),
   [tests/teams.rs](examples/teams/tests/teams.rs)
 - [examples/uploads](examples/uploads) ([README](examples/uploads/README.md)): public photos checked by content, private invoices behind
-  expiring signed links, `post_multipart` in tests.
+  expiring signed links, `post_multipart` in tests; both forms on the kit's `file` field.
   [src/app/documents/mod.rs](examples/uploads/src/app/documents/mod.rs),
   [tests/documents.rs](examples/uploads/tests/documents.rs)
 - [examples/postgres](examples/postgres) ([README](examples/postgres/README.md)): one app on PostgreSQL and SQLite (BOOLEAN and DATE
@@ -150,7 +151,8 @@ Every example has a README.md that walks through it.
   [migrations/](examples/postgres/migrations)
 - [examples/fields](examples/fields) ([README](examples/fields/README.md)): every form field type (text, textarea, number, money,
   switch, radio → `DbEnum`, checkbox list → `Json<Vec<String>>`, time, datetime-local, date)
-  on the UI kit (`prefix`/`suffix`, `radio`, `checkbox_list`, `form_grid`, `fieldset`)
+  on the UI kit (`prefix`/`suffix`, `radio`, `checkbox_list`, `date_picker`, a `copyable` key,
+  `form_grid`, `fieldset`)
   saved and shown back in the edit form, on SQLite and PostgreSQL; list items checked
   with `each` + `one_of` and `distinct`; products keyed by `id: Uuid` (a model key other than
   an integer, M22). The mapping table is

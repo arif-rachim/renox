@@ -84,10 +84,16 @@ Then import what a page needs:
 | `checkbox(name, label, checked=…, switch=…)` | A checkbox, or an iOS-style switch for settings. The whole row is the target. After a failed submit it shows what was sent, so an unticked box stays unticked. |
 | `radio(name, label, options, selected=…, inline=…, columns=…)` | One choice out of a few, all visible, in a `fieldset` with the label as its legend. An option is a value, `[value, label]` or `[value, label, description]`. |
 | `checkbox_list(name, label, options, selected=[…], inline=…, columns=…)` | Several choices: each ticked option sends `name` once, so the form field is a `Vec` with `#[serde(default)]` (nothing ticked sends nothing). |
+| `toggle_buttons(name, label, options, selected=…, multiple=…)` | The options as a row of buttons, the pressed ones filled and checked: one choice (a radio group underneath) or, with `multiple`, several (checkboxes). |
+| `file(name, label, accept=…, multiple=…, preview=…, current=…)` | A drop zone that is also the button; the chosen files are listed under it, images with a thumbnail when `preview`. `current` is the URL of the file stored now. The form needs `enctype="multipart/form-data"`, the field is an `Upload` (`Vec<Upload>` with `multiple`). |
+| `date_picker(name, label, value=…, min=…, max=…)` | A date typed as `2026-10-02` or picked in a calendar (Cally, in a popover under the field, its month named in the page's language). Sent as `YYYY-MM-DD`, like `<input type="date">`: a `NaiveDate`. Without JavaScript it is a text field. |
+| `show_when(field, values)` + `hide_when(field, values)` | Fields shown (or hidden) while another field has one of `values`. Hidden fields are disabled, so the form doesn't send them; check them on the server with `required_if`. Without JavaScript they stay visible. |
 | `form_grid(columns=2)`, `fieldset(legend, hint=…, columns=…)` | Fields side by side from tablet width up (one column on phones), and a titled group of fields in a long form. A field's `span=2` or `span="full"` makes it wider. |
 
 Every field also takes `id`, `disabled` (the field isn't sent) and `span`; `input` and
-`textarea` take `readonly` (shaded, but sent and readable). The error summary links to each
+`textarea` take `readonly` (shaded, but sent and readable). `input` takes `revealable=true` (a
+button that shows the password; Renox's own sign-in pages use it) and `copyable=true` (a button
+that copies the value, for keys and links). The error summary links to each
 field by its name, so a field with its own `id` and a radio group are found too.
 
 ```html
@@ -102,6 +108,30 @@ field by its name, so a field with its own `id` and a radio group are found too.
            selected="regular", required=true) }}
   {{ checkbox_list("extras", "Extras", [["gift", "Gift wrap"], ["note", "Card"]], inline=true) }}
 {% endcall %}
+```
+
+A field that depends on another, as in examples/shop's checkout: the address only for the
+courier, required only then.
+
+```html
+{% from "renox/ui.html" import toggle_buttons, show_when, textarea, date_picker %}
+{{ toggle_buttons("delivery", "Delivery", [["courier", "Courier"], ["pickup", "Pick up"]],
+                  selected="courier", required=true) }}
+{% call show_when("delivery", "courier") %}
+  {{ textarea("address", "Address", required=true) }}
+  {{ date_picker("deliver_on", "Deliver on", min="2026-10-03") }}
+{% endcall %}
+```
+
+```rust
+# use renox::prelude::*;
+# struct Checkout { delivery: String, address: String }
+impl Validate for Checkout {
+    fn rules(&self, v: &mut Validator) {
+        // A pickup sends no address at all: the hidden group is disabled.
+        v.field("address", &self.address).required_if(self.delivery == "courier");
+    }
+}
 ```
 | `button(label, variant=…, size=…, block=…)` | Variants: `primary`, `secondary`, `plain`, `danger` and `plain-danger`. The button shows a spinner while its form or htmx request is being sent. |
 | `link_button(href, label, …)` | A link that looks like a button. |

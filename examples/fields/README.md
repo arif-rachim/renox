@@ -19,7 +19,7 @@ package already enables renox's `postgres` and `uuid` features.
 | Feature | Where |
 |---|---|
 | The model, the form struct with one comment per input, validation, routes | [src/app/products/mod.rs](src/app/products/mod.rs) |
-| The form on the UI kit: text, textarea, number with a prefix or suffix, a switch, a radio group, a checkbox list, time, datetime-local, date, in a `form_grid` and `fieldset`s | [resources/views/products/form.html](resources/views/products/form.html) |
+| The form on the UI kit: text, textarea, number with a prefix or suffix, a switch, a radio group, a checkbox list, time, datetime-local, a date in the kit's calendar (`date_picker`), the key read-only with a copy button, in a `form_grid` and `fieldset`s | [resources/views/products/form.html](resources/views/products/form.html) |
 | Column types on SQLite and on PostgreSQL | [.up.sql](migrations/20260101000000_create_products_table.up.sql), [.postgres.up.sql](migrations/20260101000000_create_products_table.postgres.up.sql) |
 
 ## Things worth copying

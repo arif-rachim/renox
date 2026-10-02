@@ -903,9 +903,11 @@ picks the build, not the terminal.
 - **UI kit form fields** (Filament's forms as the yardstick; stage 1 of 3): `radio`,
   `checkbox_list`, `form_grid`/`fieldset`, `span`, `prefix`/`suffix`, `datalist`,
   `disabled`/`readonly`, `has_old()` (a checkbox or radio missing from `old()` after a
-  failed submit was sent empty); examples/fields on the kit: branch `ui-form`. Stage 2:
-  revealable password, copyable, toggle buttons, file upload, Cally date field, `visible_when`;
-  stage 3: tags, key-value, repeater, searchable/multiple select, wizard.
+  failed submit was sent empty); examples/fields on the kit. Stage 2: `revealable`/`copyable`
+  inputs (auth pages reveal passwords), `toggle_buttons`, `file`, `date_picker` (Cally in a
+  popover; its `change` doesn't bubble, so listen in the capture phase), `show_when`/
+  `hide_when` (hidden groups are disabled fieldsets); shop checkout, uploads and fields use
+  them. Branch `ui-form`. Stage 3: tags, key-value, repeater, searchable/multiple select, wizard.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.

@@ -45,6 +45,13 @@ pub(crate) fn grid_tags() -> String {
     )
 }
 
+/// `{{ renox_calendar() }}` (the kit's `date_picker` calls it once per
+/// page): the calendar web components, the same file the grid loads.
+pub(crate) fn calendar_tags() -> String {
+    let [_, _, cally] = &*GRID_URLS;
+    format!("<script type=\"module\" src=\"{cally}\"></script>")
+}
+
 static UI_URLS: LazyLock<[String; 2]> = LazyLock::new(|| {
     [
         format!("/_renox/ui-{:016x}.css", fnv1a(UI_CSS)),

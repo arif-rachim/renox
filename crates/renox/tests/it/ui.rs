@@ -35,6 +35,24 @@ impl Validate for Profile {
     }
 }
 
+#[derive(serde::Deserialize)]
+struct Delivery {
+    method: Option<String>,
+    #[serde(default)]
+    extras: Vec<String>,
+    address: Option<String>,
+    on: Option<renox::chrono::NaiveDate>,
+}
+
+impl Validate for Delivery {
+    fn rules(&self, v: &mut Validator) {
+        let courier = self.method.as_deref() == Some("courier");
+        v.field("method", &self.method).required();
+        v.field("address", &self.address).required_if(courier);
+        let _ = (&self.extras, &self.on);
+    }
+}
+
 struct Pages;
 
 impl Module for Pages {
@@ -70,6 +88,10 @@ impl Module for Pages {
                     .also("count")
             })
             .get("/fields", || async { view("fields.html", context! {}) })
+            .get("/more", || async { view("more.html", context! {}) })
+            .post("/delivery", |Valid(_): Valid<Delivery>| async {
+                Redirect::to("/more")
+            })
             .post("/profile", |Valid(_): Valid<Profile>| async {
                 Redirect::to("/fields")
             })
@@ -107,6 +129,22 @@ fn views() -> tempfile::TempDir {
 {{ checkbox_list("tags", "Tags", [["a", "Alpha"], ["b", "Beta"], ["c", "Gamma"]], selected=["b"], columns=2) }}
 {{ checkbox("news", "Email me news", checked=true) }}
 {% endcall %}
+</form>"#,
+    );
+    write(
+        "more.html",
+        r#"{% from "renox/ui.html" import input, toggle_buttons, file, date_picker, show_when, hide_when %}
+<form method="post" action="/delivery" enctype="multipart/form-data">{{ csrf_field() }}
+{{ input("password", "Password", type="password", value="secret", revealable=true) }}
+{{ input("token", "Token", value="abc&1", readonly=true, copyable=true) }}
+{{ toggle_buttons("method", "Method", [["pickup", "Pickup"], ["courier", "Courier", "Next day"]], selected="pickup", required=true) }}
+{{ toggle_buttons("extras", "Extras", [["gift", "Gift wrap"], ["card", "Card"]], selected=["card"], multiple=true) }}
+{% call show_when("method", "courier") %}{{ input("address", "Address") }}{% endcall %}
+{% call hide_when("extras", ["gift", "card"]) %}<p>no extras</p>{% endcall %}
+{{ file("photo", "Photo", accept="image/*", preview=true, current="/storage/photos/a.png", hint="PNG or JPEG") }}
+{{ file("docs", "Documents", multiple=true, required=true) }}
+{{ date_picker("on", "Delivery date", value="2026-10-02", min="2026-10-01", max="2026-12-31") }}
+{{ date_picker("back", "Return date") }}
 </form>"#,
     );
     write(
@@ -351,4 +389,76 @@ async fn form_fields_choices_affixes_and_layout() {
         .assert_dont_see(r#"name="tags" value="a" checked>"#)
         .assert_see(r#"id="rx-news" name="news" value="on" checked"#)
         .assert_see(r#"id="rx-plan" name="plan" value="free" required aria-invalid="true""#);
+}
+
+#[renox::test]
+async fn form_fields_buttons_files_dates_and_conditions() {
+    let (app, _dir) = app().await;
+    let page = app.get("/more").await;
+    let html = page.text();
+    page.assert_ok()
+        // A password is never printed, even with the reveal button.
+        .assert_dont_see("secret")
+        .assert_see(r#"data-rx-reveal="rx-password" aria-controls="rx-password" aria-pressed="false" aria-label="Show password" data-label-hide="Hide password""#)
+        // Copy: the button copies the field's value, escaped in the page.
+        .assert_see(r#"value="abc&amp;1""#)
+        .assert_see(r#"data-rx-copy="rx-token" aria-label="Copy" data-label-done="Copied""#)
+        // Toggle buttons: radios (or checkboxes) drawn as buttons.
+        .assert_see(r#"<div class="rx-toggles">"#)
+        .assert_see(r#"class="rx-toggle__input" type="radio" id="rx-method" name="method" value="pickup" checked required"#)
+        .assert_see(r#"<span class="rx-visually-hidden" id="rx-method-2-detail">Next day</span>"#)
+        .assert_see(r#"type="checkbox" id="rx-extras-2" name="extras" value="card" checked>"#)
+        // Conditional groups carry the field and the values as JSON.
+        .assert_see(r#"data-rx-show-when="method" data-rx-values='["courier"]'>"#)
+        .assert_see(r#"data-rx-hide-when="extras" data-rx-values='["gift","card"]'>"#)
+        // Files: the drop zone, the current file, required only without one.
+        .assert_see(r#"<div class="rx-file" data-rx-file data-rx-preview>"#)
+        .assert_see(r#"name="photo" type="file" accept="image/*""#)
+        .assert_see(r#"<img class="rx-file__thumb" src="/storage/photos/a.png" alt="">"#)
+        .assert_see(r#">a.png</a>"#)
+        .assert_see("Choose a file or drop it here")
+        .assert_see(r#"name="docs" type="file" multiple required"#)
+        .assert_see("Choose files or drop them here")
+        // The date picker: a text field, a button and a calendar in a popover.
+        .assert_see(r#"name="on" type="text" inputmode="numeric" autocomplete="off" value="2026-10-02""#)
+        .assert_see(r#"popovertarget="rx-on-calendar""#)
+        .assert_see(r#"value="2026-10-02" min="2026-10-01" max="2026-12-31">"#)
+        .assert_see(r#"<calendar-date class="rx-calendar" locale="en" first-day-of-week="1">"#);
+    // The calendar's script once per page, however many pickers.
+    assert_eq!(html.matches("/_renox/cally-").count(), 1, "{html}");
+    let tail = html.split("src=\"/_renox/cally-").nth(1).unwrap();
+    let url = format!("/_renox/cally-{}", tail.split('"').next().unwrap());
+    app.get(&url).await.assert_ok();
+
+    // A failed submit: the courier pressed, no extras, the date kept.
+    app.request()
+        .header("referer", "/more")
+        .post("/delivery", &[("method", "courier"), ("on", "2026-11-05")])
+        .await
+        .assert_redirect("/more");
+    let page = app.get("/more").await;
+    page.assert_see(r#"name="method" value="courier" checked"#)
+        .assert_dont_see(r#"value="pickup" checked"#)
+        .assert_dont_see(r#"name="extras" value="card" checked"#)
+        .assert_see(r#"value="2026-11-05""#)
+        .assert_see("The address field is required.");
+}
+
+#[renox::test]
+async fn stage_two_texts_follow_the_locale() {
+    let dir = views();
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new().module(Auth::new()).module(Pages), move |c| {
+        c.views_path = path;
+        c.locale = "id".into();
+    })
+    .await;
+    app.get("/more")
+        .await
+        .assert_see("Tampilkan kata sandi")
+        .assert_see(r#"aria-label="Salin""#)
+        .assert_see("Pilih berkas atau tarik ke sini")
+        .assert_see("Berkas saat ini")
+        .assert_see(r#"aria-label="Pilih tanggal""#)
+        .assert_see(r#"locale="id""#);
 }

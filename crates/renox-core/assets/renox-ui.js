@@ -324,10 +324,204 @@
     timers.set(input, setTimeout(function () { validate(form, input); }, 400));
   });
 
-  // Toasts rendered with the page leave on their own too.
+  // ---------- Field buttons: show the password, copy ----------
+
+  document.addEventListener("click", function (event) {
+    var target = event.target.closest ? event.target : event.target.parentElement;
+    if (!target) return;
+    var reveal = target.closest("[data-rx-reveal]");
+    if (reveal) {
+      var field = document.getElementById(reveal.getAttribute("data-rx-reveal"));
+      if (!field) return;
+      var shown = field.type === "password";
+      field.type = shown ? "text" : "password";
+      reveal.setAttribute("aria-pressed", shown ? "true" : "false");
+      // The label says what a press does next.
+      var next = reveal.getAttribute("data-label-hide");
+      reveal.setAttribute("data-label-hide", reveal.getAttribute("aria-label"));
+      reveal.setAttribute("aria-label", next);
+      return;
+    }
+    var copy = target.closest("[data-rx-copy]");
+    if (copy) {
+      var source = document.getElementById(copy.getAttribute("data-rx-copy"));
+      if (!source || !navigator.clipboard) return;
+      navigator.clipboard.writeText(source.value).then(function () {
+        var said = copy.querySelector("[aria-live]");
+        copy.setAttribute("data-rx-done", "");
+        if (said) said.textContent = copy.getAttribute("data-label-done");
+        setTimeout(function () {
+          copy.removeAttribute("data-rx-done");
+          if (said) said.textContent = "";
+        }, 1500);
+      }, function () {});
+    }
+  });
+
+  // ---------- File fields ----------
+
+  function fileSize(bytes) {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + " KB";
+    return (bytes / 1024 / 1024).toFixed(1) + " MB";
+  }
+
+  function listFiles(input) {
+    var box = input.closest("[data-rx-file]");
+    var list = box && box.parentElement.querySelector("[data-rx-file-list]");
+    if (!list) return;
+    list.querySelectorAll("img").forEach(function (img) { URL.revokeObjectURL(img.src); });
+    list.textContent = "";
+    Array.prototype.forEach.call(input.files || [], function (file) {
+      var item = document.createElement("li");
+      item.className = "rx-file__item";
+      if (box.hasAttribute("data-rx-preview") && /^image\//.test(file.type)) {
+        var img = document.createElement("img");
+        img.className = "rx-file__thumb";
+        img.alt = "";
+        img.src = URL.createObjectURL(file);
+        item.appendChild(img);
+      }
+      var name = document.createElement("span");
+      name.className = "rx-file__name";
+      name.textContent = file.name;
+      var size = document.createElement("span");
+      size.className = "rx-file__size";
+      size.textContent = fileSize(file.size);
+      item.append(name, size);
+      list.appendChild(item);
+    });
+  }
+
+  document.addEventListener("change", function (event) {
+    var input = event.target;
+    if (input.classList && input.classList.contains("rx-file__input")) listFiles(input);
+  });
+  ["dragenter", "dragover"].forEach(function (type) {
+    document.addEventListener(type, function (event) {
+      var box = event.target.closest && event.target.closest("[data-rx-file]");
+      if (box) box.setAttribute("data-rx-dragging", "");
+    });
+  });
+  ["dragleave", "drop"].forEach(function (type) {
+    document.addEventListener(type, function (event) {
+      var box = event.target.closest && event.target.closest("[data-rx-file]");
+      if (box) box.removeAttribute("data-rx-dragging");
+    });
+  });
+
+  // ---------- Date picker ----------
+
+  var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+  function today() {
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  // The header names the month shown, in the page's language.
+  function calendarHeading(cal, iso) {
+    var slot = cal.querySelector(".rx-calendar__heading");
+    if (!slot) return;
+    // A YYYY-MM-DD string, or the Date Cally's focusday event carries.
+    var day = new Date();
+    if (iso instanceof Date) day = iso;
+    else if (typeof iso === "string" && ISO_DATE.test(iso)) day = new Date(+iso.slice(0, 4), +iso.slice(5, 7) - 1, 1);
+    try {
+      slot.textContent = new Intl.DateTimeFormat(cal.getAttribute("locale") || undefined, { month: "long", year: "numeric" }).format(day);
+    } catch (e) {
+      slot.textContent = day.getFullYear() + "-" + String(day.getMonth() + 1).padStart(2, "0");
+    }
+  }
+  // Moving the focus (arrows, the month buttons) changes the month shown.
+  document.addEventListener("focusday", function (event) {
+    var cal = event.target;
+    if (cal.classList && cal.classList.contains("rx-calendar")) calendarHeading(cal, event.detail);
+  }, true);
+
+  // The calendar opens under its field (above it when there's no room),
+  // showing the field's date, and focuses that day.
+  document.addEventListener("toggle", function (event) {
+    var pop = event.target;
+    if (!pop.hasAttribute || !pop.hasAttribute("data-rx-calendar-for") || event.newState !== "open") return;
+    var input = document.getElementById(pop.getAttribute("data-rx-calendar-for"));
+    var cal = pop.querySelector("calendar-date");
+    if (!input || !cal) return;
+    if (ISO_DATE.test(input.value)) { cal.value = input.value; cal.focusedDate = input.value; }
+    calendarHeading(cal, ISO_DATE.test(input.value) ? input.value : cal.getAttribute("min") > today() ? cal.getAttribute("min") : null);
+    var box = (input.closest(".rx-affix") || input).getBoundingClientRect();
+    var height = pop.offsetHeight, width = pop.offsetWidth;
+    var top = box.bottom + 6;
+    if (top + height > window.innerHeight - 8 && box.top - height - 6 > 8) top = box.top - height - 6;
+    var left = Math.min(box.right - width, window.innerWidth - width - 8);
+    pop.style.top = Math.max(8, top) + "px";
+    pop.style.left = Math.max(8, left) + "px";
+    requestAnimationFrame(function () { if (cal.focus) cal.focus(); });
+  }, true);
+
+  document.addEventListener("change", function (event) {
+    var el = event.target;
+    if (el.tagName === "CALENDAR-DATE" && el.closest("[data-rx-calendar-for]")) {
+      var pop = el.closest("[data-rx-calendar-for]");
+      var input = document.getElementById(pop.getAttribute("data-rx-calendar-for"));
+      if (!input) return;
+      input.value = el.value;
+      if (pop.hidePopover) pop.hidePopover();
+      input.focus();
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  }, true); // Cally's change event doesn't bubble: catch it on the way down.
+
+  // ---------- show_when / hide_when ----------
+
+  // The values `name` has in `form` now: the ticked radio or checkboxes, a
+  // select's choices, or a field's text.
+  function valuesOf(form, name) {
+    var values = [];
+    (form ? form.querySelectorAll('[name="' + CSS.escape(name) + '"]') : []).forEach(function (el) {
+      if (el.disabled) return;
+      if (el.type === "radio" || el.type === "checkbox") { if (el.checked) values.push(el.value); }
+      else if (el.tagName === "SELECT") Array.prototype.forEach.call(el.selectedOptions, function (o) { values.push(o.value); });
+      else values.push(el.value);
+    });
+    return values;
+  }
+
+  function applyWhen(group) {
+    var show = group.hasAttribute("data-rx-show-when");
+    var name = group.getAttribute(show ? "data-rx-show-when" : "data-rx-hide-when");
+    var wanted;
+    try { wanted = JSON.parse(group.getAttribute("data-rx-values") || "[]"); } catch (e) { wanted = []; }
+    var matches = valuesOf(group.form || group.closest("form"), name).some(function (v) { return wanted.indexOf(v) >= 0; });
+    var visible = show ? matches : !matches;
+    // Hidden fields are disabled too, so the form doesn't send them.
+    group.hidden = !visible;
+    group.disabled = !visible;
+  }
+
+  function applyAllWhen(root) {
+    (root || document).querySelectorAll("[data-rx-show-when], [data-rx-hide-when]").forEach(applyWhen);
+  }
+
+  ["change", "input"].forEach(function (type) {
+    document.addEventListener(type, function (event) {
+      var el = event.target;
+      if (!el.name || !el.form) return;
+      el.form.querySelectorAll("[data-rx-show-when], [data-rx-hide-when]").forEach(function (group) {
+        var name = group.getAttribute("data-rx-show-when") || group.getAttribute("data-rx-hide-when");
+        if (name === el.name) applyWhen(group);
+      });
+    });
+  });
+
+  // Toasts rendered with the page leave on their own too; conditional
+  // groups take their state from the fields, here and in htmx swaps.
   function armAll() {
     document.querySelectorAll("[data-renox-toast]").forEach(arm);
+    applyAllWhen(document);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", armAll);
   else armAll();
+  document.addEventListener("htmx:load", function (event) { applyAllWhen(event.target); });
 })();
