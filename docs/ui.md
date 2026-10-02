@@ -233,6 +233,9 @@ impl Validate for Checkout {
     }
 }
 ```
+
+| Component | What it is |
+|---|---|
 | `button(label, variant="primary", type="submit", name=…, value=…, size=…, block=…, attrs={…})` | Variants: `primary`, `secondary`, `plain`, `danger` and `plain-danger`. The button shows a spinner while its form or htmx request is being sent. |
 | `link_button(href, label, variant="secondary", size=…, attrs={…})` | A link that looks like a button. |
 | `card(title=…, subtitle=…)`, `group(title=…, footer=…)` | A surface, and an inset grouped list like Settings. |
@@ -253,7 +256,9 @@ page has no stacks); to change one of those pages, put a file with the same name
 
 The kit's own texts ("optional", "Cancel", the error summary's title) come in English and
 Indonesian. An app can change them in `lang/*.json`, under the keys `ui.optional`,
-`ui.cancel`, `ui.close`, `ui.dismiss`, `ui.more` and `ui.errors_title`. The data grid's texts
+`ui.cancel`, `ui.close`, `ui.dismiss`, `ui.more` and `ui.errors_title`; the infolist's under
+`ui.yes`, `ui.no`, `ui.show_more` and `ui.since.*` (`now`, `past`, `future`, `minutes`,
+`hours`, `days`, `months`, `years`). The data grid's texts
 are under `ui.grid.*` ([docs/grid.md](grid.md#translations)).
 
 To change the markup or the styles, copy the kit into the app:
@@ -273,6 +278,60 @@ the kit's script, so the styles aren't loaded twice:
 Every class starts with `rx-`, and nothing in the kit styles bare elements, so it sits next
 to an app's own CSS. To rebrand it, override the tokens on `:root`, e.g.
 `--rx-accent: #0a7d5a;`.
+
+### Infolists: read-only details
+
+A record's page (an order, a customer) is labels and values: an infolist, Filament's name for
+it. `infolist` lays the entries out in a grid (one column on phones, `columns` from tablet
+width up), and `entry` formats each value by its kind, so a page doesn't hand-roll its markup:
+
+```html
+{% from "renox/ui.html" import card, infolist, entry, repeatable %}
+{% call card(title="Order #" ~ order.id) %}
+  {% call infolist(columns=2) %}
+    {{ entry("Status", order.status, badge={"paid": "success", "pending": "warning"},
+             labels={"paid": "Paid", "pending": "Waiting for payment"}) }}
+    {{ entry("Placed", order.created_at, format="since") }}
+    {{ entry("Total", order.total, format="money") }}
+    {{ entry("Invoice", order.invoice, copyable=true, url=route('invoices.show', order.id)) }}
+    {{ entry("Tags", order.tags, badge=true, limit_list=3) }}
+    {{ entry("Note", order.note, format="markdown", span="full", placeholder="No note") }}
+    {% call entry("Customer") %}<a class="rx-link" href="/customers/{{ order.customer_id }}">{{ order.customer }}</a>{% endcall %}
+    {% call(line) repeatable("Items", order.lines, columns=3) %}
+      {{ entry("Product", line.name) }}
+      {{ entry("Quantity", line.quantity, format="number") }}
+      {{ entry("Subtotal", line.price * line.quantity, format="money") }}
+    {% endcall %}
+  {% endcall %}
+{% endcall %}
+```
+
+| | |
+|---|---|
+| `infolist(columns=1, inline=false)` | The `<dl>` around the entries. `inline=true` puts each label beside its value (from tablet width up). |
+| `entry(label, value, format=…, …)` | A label and its value. With `{% call entry(label) %}…{% endcall %}` the block is the value. `span=2` or `"full"` makes it wider, `inline=true` puts this label beside its value, `hide_label=true` keeps the label for screen readers only, `hint` adds a line under the value, `tooltip` a title. |
+| `format` | `"date"`, `"datetime"` (with `date_format`, chrono's codes; in `APP_TIMEZONE`), `"since"` ("3 hours ago", the date as its tooltip), `"money"` (`APP_CURRENCY`, or `currency="USD"`), `"number"` (`decimals`), `"markdown"`, `"bool"` (a check and "Yes", or a cross and "No"), `"color"` (a swatch and the code), `"image"` (a URL; `image_size`, `circular`), `"key_value"` (pairs or a map, such as `KeyValues`, as a table). |
+| `badge`, `labels` | `badge=true`, a kind (`"success"`) or kinds by value (`{"paid": "success"}`); `labels` names raw values (`{"paid": "Paid"}`), with or without a badge. |
+| `url`, `new_tab`, `copyable` | A link; a copy button (it copies the raw value). |
+| `prefix`, `suffix`, `limit`, `words`, `placeholder` | Text around the value; at most `limit` letters or `words` words, then "…"; what an empty value (none, `""`, an empty list) shows instead (`—`). |
+| A list as `value` | Each item is formatted the same way: joined with commas, `list="lines"`, or `list="bullets"`; badges, swatches and images sit in a row. `limit_list=3` shows three and folds the rest behind "Show 2 more" (a `<details>`, no script). |
+| `repeatable(label, items, columns=1)` with `{% call(item) %}` | A list of records inside the record (an order's lines): each item a small bordered infolist of the call block's entries. |
+
+Sections and tabs are the kit's own `card`, `fieldset` and `tabs`: put an infolist in each.
+examples/shop's order page and examples/fields' product page are built this way.
+
+### Formatting values
+
+Every template gets these filters, which the infolist uses too:
+
+| Filter | Gives |
+|---|---|
+| `number`, `number(2)` | `75,000` in `en`, `75.000` in `id`: the page's locale picks the separators. |
+| `money` | The amount in `APP_CURRENCY` (default `IDR`): `Rp 75.000` (id), `Rp 75,000` (en), `$1,250.50` with `USD`. Keywords: `currency="USD"` for another currency, `decimals=0`, `divide_by=100` for amounts kept in cents. `renox::format_money` does the same in Rust. |
+| `date`, `date('%d/%m/%Y %H:%M')` | A date with chrono's format codes; a moment (`created_at`) in `APP_TIMEZONE`. |
+| `since` | "3 hours ago", "in 2 days", "just now" ("3 jam yang lalu" in `id`), from the clock `TestApp::travel` moves. |
+| `words(20)` | The first 20 words, then "…" (`end="…"`). |
+| `markdown` | Markdown (CommonMark, tables, strikethrough, task lists) as HTML. HTML in the text is shown as text, and a link or image to anything but `http(s)`, `mailto`, `tel` or a relative URL points nowhere, so it is safe for what people typed. |
 
 ### Design principles
 

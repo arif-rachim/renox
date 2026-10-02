@@ -183,6 +183,10 @@ and is still alive across an `.await`. Collect into a `Vec` first, then await. A
 {% if can('admin') %}<a href="/admin">Admin</a>{% endif %}    {# gate #}
 <p>{{ product.price | number }}</p>                            {# 75.000 (id) / 75,000 (en); number(2) #}
 <p>{{ order.created_at | date('%d/%m/%Y %H:%M') }}</p>        {# in APP_TIMEZONE; default %Y-%m-%d #}
+<p>{{ order.total | money }}</p>                               {# APP_CURRENCY: Rp 75.000; money(currency='USD', divide_by=100) #}
+<p>{{ order.created_at | since }}</p>                          {# 3 hours ago / 3 jam yang lalu #}
+<p>{{ post.body | words(30) }}</p>                             {# the first 30 words… #}
+<div>{{ post.body | markdown }}</div>                          {# HTML typed in is shown as text #}
 <span>{{ cart_count }}</span>                                  {# from App::share #}
 <a class="{{ class_names('tab', {'tab-active': route_is('products.*')}) }}">Products</a> {# @class #}
 {% for p in products %}{% if loop.index > 3 %}{% break %}{% endif %}{{ p.name }}{% endfor %} {# also continue #}
@@ -223,7 +227,9 @@ use renox::view::ViewContext;
 fn view_extras(app: App) -> App {
     app.templates(|env| {
         // Your own filters and functions (MiniJinja's API).
-        env.add_filter("rupiah", |n: i64| format!("Rp {}", renox::format_number(n as f64, 0, "id")));
+        env.add_filter("initials", |name: String| {
+            name.split_whitespace().filter_map(|w| w.chars().next()).collect::<String>()
+        });
     })
     // In every view, computed per request (cache what doesn't change per request).
     .share("cart_count", |ctx: ViewContext| async move {
@@ -270,6 +276,18 @@ fn view_extras(app: App) -> App {
   {% endcall %}
 </form>
 {{ confirm("del-7", "Delete", "/products/7", "Delete “Kopi”?", "It goes to the trash.") }}
+
+{# Read-only details (an infolist): labels and values, formatted #}
+{% from "renox/ui.html" import infolist, entry, repeatable %}
+{% call infolist(columns=2) %}
+  {{ entry("Number", order.number, copyable=true) }}
+  {{ entry("Status", order.status, badge={"paid": "success", "pending": "warning"}, labels={"paid": "Paid"}) }}
+  {{ entry("Placed", order.created_at, format="since") }} {# date, datetime, money, number, bool, color, image, markdown, key_value #}
+  {{ entry("Total", order.total, format="money") }}
+  {{ entry("Tags", order.tags, badge=true, limit_list=3) }} {# lists: list="lines" / "bullets" #}
+  {% call entry("Customer") %}<a href="{{ route('customers.show', order.customer_id) }}">{{ order.customer }}</a>{% endcall %}
+  {% call(line) repeatable("Items", order.lines, columns=3) %}{{ entry("Product", line.name) }}{% endcall %}
+{% endcall %}
 {# Your own: rnx make:component price_tag -> components/price_tag.html, a macro that can use
    old(), error(), t(), can(), auth, csrf_field() like the page. rnx make:component --ui copies
    the kit into the app. {% if once('x') %} renders once per page.
@@ -1728,7 +1746,7 @@ fn app() -> App {
 value, such as `staging`, stops the app at boot), `APP_KEY` (`rnx key:generate`; required in
 production), `APP_DEBUG` (on by default in `local`), `APP_NAME`, `APP_URL`, `APP_HOST` (an IP
 address, `127.0.0.1`; `0.0.0.0` in a container) and `APP_PORT` (3000), `APP_LOCALE`,
-`APP_FALLBACK_LOCALE`, `APP_TIMEZONE` (`Asia/Jakarta`, `+07:00` or `UTC`),
+`APP_FALLBACK_LOCALE`, `APP_TIMEZONE` (`Asia/Jakarta`, `+07:00` or `UTC`), `APP_CURRENCY` (`IDR`; the `money` filter),
 `SESSION_LIFETIME` (minutes, 120), `REMEMBER_LIFETIME` (minutes, 43200 = 30 days),
 `SESSION_COOKIE` (`renox_session`), `SESSION_DRIVER` (`cookie` | `database`: the `sessions`
 table, no 4 KB limit, a new id at each login/logout), `MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME` (defaults to `APP_NAME`),

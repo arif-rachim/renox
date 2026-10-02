@@ -88,7 +88,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            export); assets/renox-grid.css|js, and
                            assets/cally.js (Cally 0.9.2, MIT: the date range calendar)
   src/view_stack.rs        push/prepend/stack: markers filled in after the page renders (Scope)
-  src/view_filters.rs      built-in template filters `number` and `date`; pub format_number
+  src/view_filters.rs      built-in template filters `number`, `money`, `date`, `since`, `words`,
+                           `markdown`; pub format_number, format_money
   src/htmx.rs              Htmx extractor, HxRedirect/HxRefresh/HxTrigger/HxRetarget/HxReswap/
                            HxPushUrl, Back; add_trigger (JSON HX-Trigger, non-ASCII \u-escaped)
   src/assets.rs            embedded htmx/Alpine/renox.js with hashed URLs; renox.js source lives here
@@ -654,7 +655,7 @@ Parsed in `crates/renox-core/src/config.rs`; defaults in parentheses.
   testing|test, production|prod; anything else fails at boot), `APP_DEBUG` (on in local),
   `APP_URL`, `APP_KEY` (required in production; `base64:…`, `rnx key:generate`), `APP_HOST`
   (127.0.0.1, an IP), `APP_PORT` (3000), `APP_LOCALE` (en; built-ins for en|id),
-  `APP_FALLBACK_LOCALE` (en), `APP_TIMEZONE` (`UTC`, an offset like `+07:00`, or an IANA name like
+  `APP_FALLBACK_LOCALE` (en), `APP_CURRENCY` (IDR; the `money` filter), `APP_TIMEZONE` (`UTC`, an offset like `+07:00`, or an IANA name like
   `Asia/Jakarta`, with DST).
 - **Paths:** `VIEWS_PATH` (resources/views), `LANG_PATH` (resources/lang), `PUBLIC_PATH`
   (public), `STORAGE_PATH` (storage; holds `framework/down` for maintenance mode and `app/` for the
@@ -955,8 +956,11 @@ picks the build, not the terminal.
   `hide_when` has none, as it mirrors `show_when`). Then options from the server:
   `select(…, options_url=…, editable=true)` with `renox::select` (`SelectOption`,
   `OptionQuery`), one URL for search/lookup/add/rename; the combobox adds fetched options to
-  the native select as they're chosen; shop's admin categories use it. Branch
-  `ui-select-remote`.
+  the native select as they're chosen; shop's admin categories use it. Merged (#92).
+  Then infolists (Filament's as the yardstick): `infolist`/`entry`/`repeatable` in the kit,
+  the filters `money` (`APP_CURRENCY`, default `IDR`), `since`, `words`, `markdown`
+  (pulldown-cmark, raw HTML shown as text); shop's order page and fields' product page use
+  them. Branch `ccr-0db862ed-uol6i8`.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.

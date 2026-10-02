@@ -162,6 +162,7 @@ impl Views {
         let dir = config.views_path.clone();
         let watch = config.debug && embedded.is_none() && dir.is_dir();
         let debug = config.debug;
+        let currency = config.currency.clone();
         let reloader = AutoReloader::new(move |notifier| {
             let mut env = Environment::new();
             env.set_formatter(format_value);
@@ -270,6 +271,10 @@ impl Views {
             env.add_function("sparkline", crate::view_filters::sparkline);
             env.add_filter("number", crate::view_filters::number);
             env.add_filter("date", crate::view_filters::date(zone));
+            env.add_filter("since", crate::view_filters::since(zone));
+            env.add_filter("money", crate::view_filters::money(currency.clone()));
+            env.add_filter("words", crate::view_filters::words);
+            env.add_filter("markdown", crate::view_filters::markdown);
             env.add_function("class_names", crate::view_filters::class_names);
             // The app's own functions and filters (`App::templates`).
             for hook in hooks.iter() {

@@ -82,7 +82,7 @@ async fn customers_browse_search_filter_and_sort() {
         .assert_ok()
         .assert_view("catalog/home.html")
         .assert_see("Kopi Susu")
-        .assert_see("Rp 25.000")
+        .assert_see("Rp 25,000")
         .assert_dont_see("Kopi Hitam")
         .assert_dont_see("Kopi Rahasia");
 
@@ -152,7 +152,7 @@ async fn the_cart_adds_up_and_stays_private() {
     app.get("/cart")
         .await
         .assert_see("Cart (3)")
-        .assert_see("Rp 75.000");
+        .assert_see("Rp 75,000");
     app.htmx()
         .post("/cart", &[("product_id", &id), ("quantity", "0")])
         .await
@@ -209,7 +209,7 @@ async fn checkout_takes_the_stock_and_confirms_by_mail() {
         .await
         .assert_ok()
         .assert_view("orders/checkout.html")
-        .assert_see("Rp 68.000");
+        .assert_see("Rp 68,000");
     app.htmx()
         .post("/checkout", &[("address", "short")])
         .await
@@ -233,7 +233,8 @@ async fn checkout_takes_the_stock_and_confirms_by_mail() {
         .await
         .assert_view("orders/show.html")
         .assert_see("Thank you! Order #")
-        .assert_see("2 × Kopi Susu")
+        .assert_see(">Kopi Susu</dd>")
+        .assert_see("2<span class=\"rx-entry__affix\">× Rp 25,000</span>")
         .assert_see("Waiting for payment");
 
     // The confirmation goes through the queue; the admin is told at once.

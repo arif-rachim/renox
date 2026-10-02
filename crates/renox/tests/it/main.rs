@@ -21,6 +21,7 @@ mod extension_points;
 mod forms;
 mod grid;
 mod i18n;
+mod infolist;
 mod infra;
 mod jobs;
 mod leftovers;

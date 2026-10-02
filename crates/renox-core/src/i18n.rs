@@ -219,6 +219,14 @@ impl Translator {
     }
 }
 
+/// A built-in text of `locale` (English when it has none), else the key.
+pub(crate) fn builtin_text(locale: &str, key: &str) -> String {
+    builtin(locale)
+        .and_then(|texts| texts.get(key))
+        .or_else(|| builtin("en")?.get(key))
+        .map_or_else(|| key.to_owned(), |t| (*t).to_owned())
+}
+
 /// Texts Renox's own templates use (the UI kit), for English and Indonesian;
 /// an app's `lang/*.json` can change them.
 fn builtin(locale: &str) -> Option<&'static HashMap<&'static str, &'static str>> {
@@ -250,6 +258,17 @@ fn builtin(locale: &str) -> Option<&'static HashMap<&'static str, &'static str>>
             ("ui.value", "Value"),
             ("ui.back", "Back"),
             ("ui.next", "Next"),
+            ("ui.since.now", "just now"),
+            ("ui.since.past", ":time ago"),
+            ("ui.since.future", "in :time"),
+            ("ui.since.minutes", "a minute|:count minutes"),
+            ("ui.since.hours", "an hour|:count hours"),
+            ("ui.since.days", "a day|:count days"),
+            ("ui.since.months", "a month|:count months"),
+            ("ui.since.years", "a year|:count years"),
+            ("ui.show_more", "Show :count more"),
+            ("ui.yes", "Yes"),
+            ("ui.no", "No"),
             ("ui.searching", "Searching…"),
             ("ui.load_failed", "Couldn't load the options."),
             ("ui.add_option", "Add “:value”"),
@@ -397,6 +416,17 @@ fn builtin(locale: &str) -> Option<&'static HashMap<&'static str, &'static str>>
             ("ui.value", "Nilai"),
             ("ui.back", "Kembali"),
             ("ui.next", "Lanjut"),
+            ("ui.since.now", "baru saja"),
+            ("ui.since.past", ":time yang lalu"),
+            ("ui.since.future", ":time lagi"),
+            ("ui.since.minutes", ":count menit"),
+            ("ui.since.hours", ":count jam"),
+            ("ui.since.days", ":count hari"),
+            ("ui.since.months", ":count bulan"),
+            ("ui.since.years", ":count tahun"),
+            ("ui.show_more", "Tampilkan :count lagi"),
+            ("ui.yes", "Ya"),
+            ("ui.no", "Tidak"),
             ("ui.searching", "Mencari…"),
             ("ui.load_failed", "Gagal memuat pilihan."),
             ("ui.add_option", "Tambah “:value”"),

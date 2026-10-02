@@ -10,6 +10,29 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### UI kit: infolists, and the money, since, words and markdown filters
+
+- New: `infolist(columns=…, inline=…)` and `entry(label, value, …)` in `renox/ui.html`
+  (Filament's infolists): read-only labels and values in a grid. `format` is `date`,
+  `datetime`, `since`, `money`, `number`, `markdown`, `bool`, `color`, `image` or `key_value`;
+  `badge` (a kind, or kinds by value) and `labels`; `url`, `copyable`, `tooltip`, `hint`,
+  `prefix`/`suffix`, `limit`/`words`, `placeholder`; lists as commas, lines or bullets, with
+  `limit_list` folding the rest behind "Show N more"; `{% call entry(label) %}` for any
+  markup. `repeatable(label, items, columns=…)` shows a list of records, each a small infolist.
+- New template filters: `money` (with `currency`, `decimals`, `divide_by`), `since` ("3 hours
+  ago", following `TestApp::travel`), `words(n)` and `markdown` (pulldown-cmark; HTML typed in
+  is shown as text and only http(s), mailto, tel and relative links are kept).
+  `renox::format_money` formats an amount in Rust.
+- New setting: `APP_CURRENCY` (an ISO 4217 code, `IDR` by default; anything else fails at
+  boot), `Config::currency`.
+- New kit texts (en/id): `ui.yes`, `ui.no`, `ui.show_more`, `ui.since.*`. The kit's copy button
+  also copies a `data-rx-copy-text`.
+- New dependency: `pulldown-cmark` (pure Rust, without its default features).
+- examples/shop: the order page is an infolist with a `repeatable` of its lines, and every
+  price uses `money` (the app's `rupiah` filter is gone, so English pages show `Rp 75,000`
+  and Indonesian ones `Rp 75.000`). examples/fields: a read-only product page
+  (`/products/{id}`) showing every field kind.
+
 ### UI kit: options from the server, added and renamed in the select
 
 - New: `select(…, options_url=…)`: the options come from the server as you type (`GET ?q=…`,

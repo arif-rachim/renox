@@ -1,0 +1,165 @@
+//! The UI kit's infolists (`infolist`, `entry`, `repeatable`) and the
+//! filters behind them: `money`, `since`, `words`, `markdown`.
+
+use renox::prelude::*;
+use renox::testing::TestApp;
+
+struct Pages;
+
+impl Module for Pages {
+    fn name(&self) -> &'static str {
+        "infolist-pages"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new().get("/order", || async {
+            let placed =
+                (renox::chrono::Utc::now() - renox::chrono::TimeDelta::hours(3)).to_rfc3339();
+            let meta: renox::KeyValues = [("Origin", "Aceh"), ("Roast", "Medium")]
+                .into_iter()
+                .collect();
+            view(
+                "order.html",
+                context! {
+                    placed => placed,
+                    meta => meta,
+                    lines => vec![
+                        context! { name => "Kopi", qty => 2 },
+                        context! { name => "Teh", qty => 1 },
+                    ],
+                },
+            )
+        })
+    }
+}
+
+const ORDER: &str = r##"{% from "renox/ui.html" import infolist, entry, repeatable %}
+{% call infolist(columns=2) %}
+{{ entry("Number", "INV-<1>", copyable=true) }}
+{{ entry("Status", "paid", badge={"paid": "success"}, labels={"paid": "Paid"}) }}
+{{ entry("Placed", placed, format="since") }}
+{{ entry("Day", "2026-10-02", format="date", date_format="%d/%m/%Y") }}
+{{ entry("Total", 75000, format="money") }}
+{{ entry("Price", 1250.5, format="money", currency="usd") }}
+{{ entry("Weight", 1234.5, format="number", decimals=1, suffix="kg") }}
+{{ entry("Note", "**Hi** <b>x</b>", format="markdown", span="full") }}
+{{ entry("Nothing", none) }}
+{{ entry("Blank", "", placeholder="Not set") }}
+{{ entry("Tags", ["a", "b", "c", "d"], badge=true, limit_list=2) }}
+{{ entry("Steps", ["x", "y"], list="bullets") }}
+{{ entry("Names", ["Ana", "Budi"]) }}
+{{ entry("Active", true, format="bool") }}
+{{ entry("Archived", false, format="bool") }}
+{{ entry("Color", "#ff0000", format="color") }}
+{{ entry("Avatar", "/a.png", format="image", circular=true) }}
+{{ entry("Meta", meta, format="key_value") }}
+{{ entry("Site", "renox.dev", url="https://renox.dev", new_tab=true, hint="The docs") }}
+{{ entry("Summary", "one two three four", words=2) }}
+{{ entry("Long", "abcdefghij", limit=4, tooltip="abcdefghij") }}
+{% call entry("Custom") %}<em>custom</em>{% endcall %}
+{% call(line) repeatable("Items", lines, columns=2) %}{{ entry("Product", line.name) }}{{ entry("Qty", line.qty) }}{% endcall %}
+{% call(line) repeatable("Refunds", []) %}{{ entry("Product", line.name) }}{% endcall %}
+{% endcall %}
+{% call infolist(inline=true) %}{{ entry("Inline", "yes", hide_label=true) }}{% endcall %}"##;
+
+async fn app(locale: &str) -> (TestApp, tempfile::TempDir) {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("order.html"), ORDER).unwrap();
+    let (path, locale) = (dir.path().to_path_buf(), locale.to_owned());
+    let app = TestApp::with_config(App::new().module(Pages), move |c| {
+        c.views_path = path;
+        c.locale = locale;
+    })
+    .await;
+    (app, dir)
+}
+
+#[renox::test]
+async fn entries_format_their_values() {
+    let (app, _dir) = app("en").await;
+    let page = app.get("/order").await;
+    let html = page.assert_ok().text();
+    let has = |needle: &str| assert!(html.contains(needle), "missing {needle}\n{html}");
+    has(r#"<dl class="rx-infolist rx-cols-2">"#);
+    has(r#"<dt class="rx-entry__label">Number</dt>"#);
+    has("INV-&lt;1&gt;");
+    has(r#"data-rx-copy-text="INV-&lt;1&gt;""#);
+    has(r#"<span class="rx-badge rx-badge--success">Paid</span>"#);
+    has(">3 hours ago</time>");
+    has(">02/10/2026<");
+    has("Rp 75,000");
+    has("$1,250.50");
+    has("1,234.5<span class=\"rx-entry__affix\">kg</span>");
+    has("<strong>Hi</strong> &lt;b&gt;x&lt;/b&gt;");
+    has(r#"<span class="rx-entry__empty">—</span>"#);
+    has(r#"<span class="rx-entry__empty">Not set</span>"#);
+    has(r#"<span class="rx-badge">a</span><span class="rx-badge">b</span>"#);
+    has("Show 2 more</summary>");
+    has(r#"<span class="rx-badge">c</span><span class="rx-badge">d</span>"#);
+    has(r#"<ul class="rx-entry__list rx-entry__list--bullets"><li>x</li><li>y</li></ul>"#);
+    has("Ana, Budi");
+    has("rx-entry__bool--yes");
+    has("</svg>Yes</span>");
+    has("</svg>No</span>");
+    has(r#"style="background: #ff0000""#);
+    has(r#"class="rx-entry__image rx-entry__image--circular" src="/a.png""#);
+    has(r#"<tr><th scope="row">Origin</th><td>Aceh</td></tr>"#);
+    has(
+        r#"<a class="rx-link" href="https://renox.dev" target="_blank" rel="noopener">renox.dev</a>"#,
+    );
+    has(r#"<dd class="rx-hint rx-entry__hint">The docs</dd>"#);
+    has("one two…");
+    has(r#"title="abcdefghij">abcd…"#);
+    has("<em>custom</em>");
+    has(r#"<li class="rx-repeatable__item"><dl class="rx-infolist rx-cols-2">"#);
+    has("Kopi");
+    has("Teh");
+    has(r#"<dl class="rx-infolist rx-cols-1 rx-infolist--inline">"#);
+    has(r#"<dt class="rx-entry__label rx-visually-hidden">Inline</dt>"#);
+    assert_eq!(html.matches("rx-repeatable__item").count(), 2);
+
+    // `since` reads the clock tests move.
+    app.travel(std::time::Duration::from_secs(2 * 86_400));
+    app.get("/order").await.assert_see(">2 days ago</time>");
+}
+
+#[renox::test]
+async fn entries_follow_the_locale() {
+    let (app, _dir) = app("id").await;
+    app.get("/order")
+        .await
+        .assert_see(">3 jam yang lalu</time>")
+        .assert_see("Rp 75.000")
+        .assert_see("1.234,5")
+        .assert_see("</svg>Ya</span>")
+        .assert_see("</svg>Tidak</span>")
+        .assert_see("Tampilkan 2 lagi");
+}
+
+#[renox::test]
+async fn the_currency_comes_from_the_config() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("price.html"),
+        "{{ 1250 | money }}|{{ 1250 | money(currency='IDR') }}|{{ 125050 | money(divide_by=100) }}|{{ 3 | money(decimals=0) }}",
+    )
+    .unwrap();
+    struct Price;
+    impl Module for Price {
+        fn name(&self) -> &'static str {
+            "price"
+        }
+        fn routes(&self) -> Routes {
+            Routes::new().get("/price", || async { view("price.html", context! {}) })
+        }
+    }
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new().module(Price), move |c| {
+        c.views_path = path;
+        c.currency = "EUR".into();
+    })
+    .await;
+    app.get("/price")
+        .await
+        .assert_see("€1,250.00|Rp 1,250|€1,250.50|€3");
+}

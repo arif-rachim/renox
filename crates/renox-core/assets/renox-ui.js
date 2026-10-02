@@ -356,9 +356,14 @@
     }
     var copy = target.closest("[data-rx-copy]");
     if (copy) {
-      var source = document.getElementById(copy.getAttribute("data-rx-copy"));
-      if (!source || !navigator.clipboard) return;
-      navigator.clipboard.writeText(source.value).then(function () {
+      // A field's value, or the text an infolist entry carries.
+      var text = copy.getAttribute("data-rx-copy-text");
+      if (text === null) {
+        var source = document.getElementById(copy.getAttribute("data-rx-copy"));
+        text = source ? source.value : null;
+      }
+      if (text === null || !navigator.clipboard) return;
+      navigator.clipboard.writeText(text).then(function () {
         var said = copy.querySelector("[aria-live]");
         copy.setAttribute("data-rx-done", "");
         if (said) said.textContent = copy.getAttribute("data-label-done");

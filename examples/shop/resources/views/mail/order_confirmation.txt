@@ -1,8 +1,8 @@
 Thank you for your order #{{ order.id }}.
 
-{% for item in items %}{{ item.quantity }} x {{ item.name }}: {{ (item.price * item.quantity) | rupiah }}
+{% for item in items %}{{ item.quantity }} x {{ item.name }}: {{ (item.price * item.quantity) | money }}
 {% endfor %}
-Total: {{ order.total | rupiah }}
+Total: {{ order.total | money }}
 
-Please transfer {{ order.total | rupiah }} within 3 days, mentioning order #{{ order.id }}.
+Please transfer {{ order.total | money }} within 3 days, mentioning order #{{ order.id }}.
 We'll send it to: {{ order.address }}

@@ -25,7 +25,7 @@
 {% call group() %}
   {% for n in notifications %}
   <div class="{{ 'unread' if not n.read_at }}">
-    {% if n.kind == 'new-order' %}New order <a class="rx-link" href="{{ route('orders.show', n.data.order_id) }}">#{{ n.data.order_id }}</a>: {{ n.data.total | rupiah }}
+    {% if n.kind == 'new-order' %}New order <a class="rx-link" href="{{ route('orders.show', n.data.order_id) }}">#{{ n.data.order_id }}</a>: {{ n.data.total | money }}
     {% else %}{{ n.kind }}{% endif %}
     <span class="rx-subtitle">{{ n.created_at | date('%d/%m %H:%M') }}</span>
   </div>

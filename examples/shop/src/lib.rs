@@ -43,11 +43,6 @@ pub fn app() -> App {
         .module(app::cart::Cart)
         .module(app::orders::Orders)
         .module(app::admin::AdminPanel)
-        .templates(|env| {
-            env.add_filter("rupiah", |n: i64| {
-                format!("Rp {}", renox::format_number(n as f64, 0, "id"))
-            });
-        })
         // The number in the cart link, on every page.
         .share("cart_count", |ctx| async move {
             let Some(user) = ctx.user else { return Ok(0) };

@@ -118,6 +118,8 @@ impl Module for Products {
             .name("products.create")
             .post("/products", store)
             .name("products.store")
+            .get("/products/{id}", show)
+            .name("products.show")
             .get("/products/{id}/edit", edit)
             .name("products.edit")
             .put("/products/{id}", update)
@@ -146,6 +148,12 @@ async fn store(State(db): State<Db>, Valid(form): Valid<ProductForm>) -> Result<
     form.apply(&mut product);
     let product = Product::create(&db, product).await?;
     Ok(Redirect::to(&format!("/products/{}/edit", product.id)))
+}
+
+/// The product read-only, on the kit's infolist.
+async fn show(State(db): State<Db>, Path(id): Path<Uuid>) -> Result<View> {
+    let product = Product::find_or_404(&db, id).await?;
+    Ok(view("products/show.html", context! { product }))
 }
 
 async fn edit(State(db): State<Db>, Path(id): Path<Uuid>) -> Result<View> {

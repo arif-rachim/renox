@@ -207,3 +207,50 @@ async fn tags_and_specifications_ride_a_nested_form() {
         .await
         .assert_invalid("tags");
 }
+
+#[renox::test]
+async fn the_show_page_formats_every_field() {
+    let app = TestApp::new(fields::app()).await;
+    let mut form: Vec<(&str, &str)> = FULL
+        .iter()
+        .map(|&(k, v)| {
+            (
+                k,
+                if k == "description" {
+                    "**Single** origin <b>beans</b>"
+                } else {
+                    v
+                },
+            )
+        })
+        .collect();
+    form.extend([
+        ("tags", "organic"),
+        ("tags", "decaf"),
+        ("specs[0][key]", "Origin"),
+        ("specs[0][value]", "Aceh"),
+    ]);
+    app.post("/products", &form).await.assert_status(303);
+    let product = Product::query().first(app.db()).await.unwrap().unwrap();
+    app.get("/")
+        .await
+        .assert_see(&format!(r#"href="/products/{}">Kopi Gayo"#, product.id));
+    app.get(&format!("/products/{}", product.id))
+        .await
+        .assert_ok()
+        .assert_view("products/show.html")
+        .assert_see(&format!(r#"data-rx-copy-text="{}""#, product.id))
+        // Markdown, with the HTML typed in shown as text.
+        .assert_see("<strong>Single</strong> origin &lt;b&gt;beans&lt;/b&gt;")
+        .assert_see("Rp 85,000")
+        .assert_see("0.25<span class=\"rx-entry__affix\">kg</span>")
+        .assert_see("</svg>Yes</span>")
+        .assert_see(r#"<span class="rx-badge rx-badge--info">Large</span>"#)
+        .assert_see(r#"style="background: black""#)
+        .assert_see(r#"<span class="rx-badge">organic</span>"#)
+        .assert_see(r#"<th scope="row">Origin</th><td>Aceh</td>"#)
+        .assert_see(">07:30:00<")
+        .assert_see(">01 Oct 2026, 10:30<")
+        .assert_see(">27 Sep 2026<")
+        .assert_see(">just now</time>");
+}

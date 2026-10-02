@@ -8,7 +8,7 @@
   {% for line in lines %}
   <tr>
     <td><a class="rx-link" href="{{ route('products.show', line.product.slug) }}">{{ line.product.name }}</a></td>
-    <td class="rx-num">{{ line.product.price | rupiah }}</td>
+    <td class="rx-num">{{ line.product.price | money }}</td>
     <td>
       <form method="post" action="{{ route('cart.update', line.item.id) }}" class="qty">
         {{ csrf_field() }}{{ method_field('PATCH') }}
@@ -17,7 +17,7 @@
         {{ button(t('cart.update'), variant="secondary", size="small") }}
       </form>
     </td>
-    <td class="rx-num">{{ line.subtotal | rupiah }}</td>
+    <td class="rx-num">{{ line.subtotal | money }}</td>
     <td>
       {#- Taking a line out is easy to undo (add it again), so it asks nothing: red text only. -#}
       <form method="post" action="{{ route('cart.remove', line.item.id) }}">
@@ -26,7 +26,7 @@
     </td>
   </tr>
   {% endfor %}
-  <tr><td colspan="3"><strong>{{ t('cart.total') }}</strong></td><td class="rx-num"><strong>{{ total | rupiah }}</strong></td><td></td></tr>
+  <tr><td colspan="3"><strong>{{ t('cart.total') }}</strong></td><td class="rx-num"><strong>{{ total | money }}</strong></td><td></td></tr>
 {% endcall %}
 <div class="rx-card__footer">{{ link_button(route('checkout'), t('cart.checkout'), variant="primary") }}</div>
 {% else %}
