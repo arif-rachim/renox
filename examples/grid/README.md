@@ -33,6 +33,10 @@ cargo run               # http://127.0.0.1:3000
 - **Totals and groups.** The footer adds up Items and Total and shows the
   discount range over every filtered order; "Group" in the toolbar groups the
   orders by region, status or paid, each group with its own subtotal.
+- **Cards on a phone.** Under 768 px each order is a card; sort and filters
+  move to the toolbar. Status shows as colored badges, Paid as ✓/✗, the
+  customer with an avatar and the email under the name, and the order number
+  with a copy button.
 - **Filters by kind.** Text (contains, starts with, ends with, equals, or a
   `%` pattern), number ranges, the Ordered column's date range calendar,
   choices for Region, Status and Paid, and any-of for Tags. The URL keeps

@@ -995,6 +995,26 @@
     });
   });
 
+  // Cards: the toolbar's sort choice; any grid: copy buttons.
+  document.addEventListener("change", function (event) {
+    var pick = event.target.closest && event.target.closest("[data-grid-sort-pick]");
+    if (!pick) return;
+    var grid = pick.closest("form.rx-grid");
+    setState(grid, "sort", pick.value);
+    submit(grid);
+  });
+
+  document.addEventListener("click", function (event) {
+    var copy = event.target.closest && event.target.closest("[data-grid-copy]");
+    if (!copy) return;
+    var text = copy.getAttribute("data-grid-copy");
+    var done = function () {
+      copy.classList.add("rx-grid__copy--done");
+      setTimeout(function () { copy.classList.remove("rx-grid__copy--done"); }, 1200);
+    };
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, function () {});
+  });
+
   // ---------- Setup ----------
 
   function setup(grid) {

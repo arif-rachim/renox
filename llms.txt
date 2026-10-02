@@ -75,7 +75,8 @@ Every example has a README.md that walks through it.
   into order (`RowOrder`), `/regions` with merged region and city cells, and exports (CSV,
   Excel with the `xlsx` feature, a print page for PDF), a search box, filter chips and rows
   that open their order, bulk actions on selected (or all matching) orders and a row menu,
-  totals in the footer and grouping by region, status or paid with subtotals.
+  totals in the footer and grouping by region, status or paid with subtotals, cards on
+  phones, badges, avatars, descriptions and copy buttons.
   [src/app/orders/mod.rs](examples/grid/src/app/orders/mod.rs),
   [views](examples/grid/resources/views/orders),
   [tests/grid.rs](examples/grid/tests/grid.rs)

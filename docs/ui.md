@@ -331,6 +331,14 @@ and drawn with the `grid` macro; a call block draws the `custom` columns:
   (`.group_by("region")` starts grouped): rows come group by group, each with a heading (its
   value and row count, a click folds it) and a subtotal row with the group's own summaries.
   Merged cells and dragging rows are off while grouped.
+- **Cards on phones.** `.cards_on_mobile()` turns each row into a card under 768 px: the
+  columns picked for small screens as label and value, the row tools underneath, and sorting
+  and the column filters in the toolbar (the headings are hidden there).
+- **Kinds of cells.** `Column::image` (a URL; `.round()` for avatars), `Column::color` (a swatch),
+  and on any column: `.badges(&[("paid", "success"), ("cancelled", "danger")])` (tones `success`,
+  `warning`, `danger`, `info`, `neutral`), `.icons()` (yes/no as ✓/✗), `.description("email")`
+  (another value under this one), `.tooltip("email")`, `.wrap()`, `.limit(40)` (cut with `…`,
+  the whole text on hover), `.link("/orders/{id}")` and `.copyable()`.
 - **Moving and resizing columns.** Drag a heading (with a mouse) to move its column, or move it
   in the column menu (on touch screens too); drag the edge of a heading to resize the column,
   double-click the edge for the automatic width, or focus it and use the arrow keys. Widths

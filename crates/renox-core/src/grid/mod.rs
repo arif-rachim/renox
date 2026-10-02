@@ -98,6 +98,10 @@ pub enum Kind {
     /// Drawn by the page's template (`caller(row, column)`): charts, buttons,
     /// links. Not sorted or filtered.
     Custom,
+    /// An image whose URL is the value (an avatar, a product photo).
+    Image,
+    /// A CSS color (`#0a7d5a`) shown as a swatch with its code.
+    Color,
 }
 
 /// Which edge a frozen column sticks to while the grid scrolls sideways.
@@ -146,6 +150,15 @@ pub struct Column {
     merge: bool,
     searchable: bool,
     summaries: Vec<Summary>,
+    badges: Option<Vec<(String, String)>>,
+    icons: bool,
+    description: Option<String>,
+    tooltip: Option<String>,
+    wrap: bool,
+    limit: Option<usize>,
+    link: Option<String>,
+    copyable: bool,
+    round: bool,
 }
 
 impl Column {
@@ -168,7 +181,93 @@ impl Column {
             merge: false,
             searchable: false,
             summaries: Vec::new(),
+            badges: None,
+            icons: false,
+            description: None,
+            tooltip: None,
+            wrap: false,
+            limit: None,
+            link: None,
+            copyable: false,
+            round: false,
         }
+    }
+
+    /// An image column: the value is the image's URL (`.round()` for
+    /// avatars).
+    pub fn image(key: &str, label: &str) -> Self {
+        let mut column = Self::new(key, label, Kind::Image);
+        column.sortable = false;
+        column.filterable = false;
+        column
+    }
+
+    /// A color column: a swatch of the CSS color in the value, with its code.
+    pub fn color(key: &str, label: &str) -> Self {
+        Self::new(key, label, Kind::Color)
+    }
+
+    /// Values as colored badges: `(value, tone)` pairs, the tone one of
+    /// `success`, `warning`, `danger`, `info` or `neutral`. Values not
+    /// listed get a neutral badge; `.badges(&[])` makes every value one.
+    pub fn badges(mut self, tones: &[(&str, &str)]) -> Self {
+        self.badges = Some(
+            tones
+                .iter()
+                .map(|(v, t)| ((*v).to_owned(), (*t).to_owned()))
+                .collect(),
+        );
+        self
+    }
+
+    /// Yes/no columns as a check and a cross instead of words.
+    pub fn icons(mut self) -> Self {
+        self.icons = true;
+        self
+    }
+
+    /// Another of the row's values, small under this one (an email under a
+    /// name).
+    pub fn description(mut self, key: &str) -> Self {
+        self.description = Some(key.to_owned());
+        self
+    }
+
+    /// Another of the row's values, shown when the cell is hovered.
+    pub fn tooltip(mut self, key: &str) -> Self {
+        self.tooltip = Some(key.to_owned());
+        self
+    }
+
+    /// Long text wraps instead of widening the column.
+    pub fn wrap(mut self) -> Self {
+        self.wrap = true;
+        self
+    }
+
+    /// Text past `chars` characters is cut with `…` (the whole text shows on
+    /// hover).
+    pub fn limit(mut self, chars: usize) -> Self {
+        self.limit = Some(chars);
+        self
+    }
+
+    /// The value links to this URL (`{id}` is the row's id).
+    pub fn link(mut self, url: &str) -> Self {
+        self.link = Some(url.to_owned());
+        self
+    }
+
+    /// A button next to the value copies it.
+    pub fn copyable(mut self) -> Self {
+        self.copyable = true;
+        self
+    }
+
+    /// Images round (avatars).
+    pub fn round(mut self) -> Self {
+        self.round = true;
+        self
     }
 
     /// A text column; `key` is the model's column.
@@ -364,6 +463,7 @@ pub struct Grid {
     row_actions: Vec<Action>,
     groups: Vec<String>,
     group: Option<String>,
+    cards: bool,
 }
 
 impl Grid {
@@ -389,7 +489,16 @@ impl Grid {
             row_actions: Vec::new(),
             groups: Vec::new(),
             group: None,
+            cards: false,
         }
+    }
+
+    /// On phones (under 768 px) each row is a card: the columns picked for
+    /// small screens stacked as label and value, with sorting and filters
+    /// in the toolbar. Wider screens keep the table.
+    pub fn cards_on_mobile(mut self) -> Self {
+        self.cards = true;
+        self
     }
 
     /// Columns the user may group rows by (a "Group" choice in the
@@ -920,7 +1029,7 @@ impl Filter {
     fn apply<M: Model>(&self, mut query: Query<M>, column: &Column) -> Query<M> {
         let key = column.key.as_str();
         match column.kind {
-            Kind::Text => {
+            Kind::Text | Kind::Color => {
                 if let Some(pattern) = self.pattern() {
                     query = query.where_like(key, pattern);
                 }
@@ -997,7 +1106,7 @@ impl Filter {
                     query = query.where_raw(&sql, picked);
                 }
             }
-            Kind::Custom => {}
+            Kind::Custom | Kind::Image => {}
         }
         query
     }
@@ -1420,6 +1529,15 @@ impl<M: Serialize> GridPage<M> {
                     "editable": c.editable && self.grid.edit_url.is_some(),
                     "merge": c.merge && !dragging && grouped.is_none(),
                     "summaries": c.summaries,
+                    "badges": c.badges.as_ref().map(|b| b.iter().map(|(v, t)| (v.clone(), Value::from(t.clone()))).collect::<Map<_, _>>()),
+                    "icons": c.icons,
+                    "description": c.description,
+                    "tooltip": c.tooltip,
+                    "wrap": c.wrap,
+                    "limit": c.limit,
+                    "link": c.link,
+                    "copyable": c.copyable,
+                    "round": c.round,
                 })
             })
             .collect();
@@ -1594,6 +1712,7 @@ impl<M: Serialize> GridPage<M> {
                 || !self.grid.bulk.is_empty() || !self.grid.row_actions.is_empty(),
             "bulk": self.grid.bulk.iter().map(|a| a.to_value(None)).collect::<Vec<_>>(),
             "row_actions": !self.grid.row_actions.is_empty(),
+            "cards": self.grid.cards,
             "summary": self.summaries.get("").filter(|_| self.grid.columns.iter().any(|c| !c.summaries.is_empty())),
             "grouping": (!self.grid.groups.is_empty()).then(|| json!({
                 "options": self.grid.groups.iter().filter_map(|g| self.grid.find(g)).map(|c| json!({"key": c.key, "label": c.label})).collect::<Vec<_>>(),
