@@ -109,7 +109,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            (a parameter the route lacks is a 500)
   src/validation/          Validator/rules (mod.rs, ValidateHooks for the derive), Valid<T>
                            (extract.rs: prepare → authorize → rules → after, FormContext), en/id
-                           messages
+                           messages, nested.rs (form names like `lines[0][qty]` read as a
+                           tree), key_values.rs (KeyValues)
   src/auth/                User, hashing (Argon2id + bcrypt import), login/logout (per device),
                            change_password, CurrentUser middleware, AuthUser, guards, Access::check,
                            Policy/gates (mod.rs), Auth module + pages (module.rs), account.rs
@@ -929,9 +930,10 @@ picks the build, not the terminal.
   `docs/grid.md` added (doctest `GridGuide`). Three fixes it found: grid date-time filters take
   `APP_TIMEZONE` days (`day_start` in grid/mod.rs), `delete_account` also deletes
   `grid_preferences` rows, and `notifications:prune` / `auth::prune_read_notifications`.
-- **Guides for the remaining areas** (branch `documentation`): docs/routing.md,
-  docs/validation.md, docs/mail.md and docs/scheduling.md, which before lived only in
-  CHEATSHEET.md.
+- **Guides for the remaining areas**: docs/routing.md, docs/validation.md, docs/mail.md and
+  docs/scheduling.md, which before lived only in CHEATSHEET.md: merged (#86). examples/grid's
+  `/follow-up` page (two prefixed grids, the rest of docs/grid.md's column options): merged
+  (#87).
 - **UI kit form fields** (Filament's forms as the yardstick; stage 1 of 3): `radio`,
   `checkbox_list`, `form_grid`/`fieldset`, `span`, `prefix`/`suffix`, `datalist`,
   `disabled`/`readonly`, `has_old()` (a checkbox or radio missing from `old()` after a
@@ -945,7 +947,7 @@ picks the build, not the terminal.
   `tags_input`, searchable/multiple `select` (a combobox over the native select, kept
   visually hidden so `required` still works), `repeater` (`{% call(row, prefix) %}`,
   renumbered by rewriting attributes), `key_value`, `wizard`; teams, fields and shop use
-  them. Branch `ui-form` (one PR for the three stages).
+  them. Merged (#88, one PR for the three stages).
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.

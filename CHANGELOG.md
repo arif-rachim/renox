@@ -10,6 +10,11 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### Docs: catch-up after the UI kit form fields
+
+- `has_old()` in docs/validation.md and CHEATSHEET.md, `Session::has_old_input` in
+  docs/routing.md, `renox_calendar()` in CHEATSHEET.md's template functions.
+
 ### UI kit: more form fields
 
 Closer to Filament's form fields, on the kit's own rules (labels, errors, keyboard, no
