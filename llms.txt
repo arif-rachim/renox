@@ -47,7 +47,9 @@ Every example has a README.md that walks through it.
   socket); every page on the UI kit with a rebranded accent, toasts and confirmation sheets
   (checkout: `toggle_buttons` + `show_when` + `required_if` for courier or pickup; the admin's
   category in a `select` whose options come from the server, added and renamed in place
-  (`renox::select`, admin/categories.rs); its dashboard on the kit's `tabs`/`tab_panel`; the
+  (`renox::select`, admin/categories.rs); its dashboard with `renox::chart` (`Period`,
+  `Trend`), `period_filter`, `stats`/`stat`, `chart` line/bar/doughnut and a lazy, polled
+  `widget`, then the kit's `tabs`/`tab_panel`; the
   order page an infolist with a `repeatable` of its lines; prices with the `money` filter; the
   `notification_bell` in its bar with `Auth::new().notifications()`, its notifications as
   `DatabaseMessage`s that arrive live over Server-Sent Events); a
@@ -209,7 +211,9 @@ Every example has a README.md that walks through it.
   counting queries, a browser-test recipe.
 - [docs/ui.md](docs/ui.md): components that see the request, the UI kit (`renox/ui.html`: fields,
   buttons, cards, sheets, menus, tabs, tables, infolists: `infolist`/`entry`/`repeatable`),
-  the filters `number`, `money` (`APP_CURRENCY`), `date`, `since`, `words`, `markdown`, and its
+  the filters `number`, `money` (`APP_CURRENCY`), `date`, `since`, `words`, `markdown`,
+  dashboards (`renox::chart`: `Period`, `Trend`, `Series`; `chart(…)`, `stat`, `stats`,
+  `dashboard`, `widget`, `period_filter`), and its
   design rules, toasts (a body, links, a duration, an id, a position, `Renox.toast`), out-of-band
   fragments, htmx headers, live validation.
 - [docs/grid.md](docs/grid.md): data grids (`renox::grid` + `renox/grid.html`): columns and their

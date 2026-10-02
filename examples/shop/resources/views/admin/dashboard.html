@@ -1,10 +1,33 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-{% from "renox/ui.html" import group, link_button, tabs, tab_panel %}
+{% from "renox/ui.html" import group, link_button, tabs, tab_panel, stats, stat, dashboard, widget, period_filter %}
 <h1 class="rx-title">Admin</h1>
 {% include "admin/_nav.html" %}
-<p>{{ link_button(route('admin.orders.index', status='pending'), pending ~ " pending order" ~ ("" if pending == 1 else "s"), size="small") }}</p>
+<div class="rx-row">
+  {#- One period for every figure and chart below (`?period=`, renox::chart::Period). -#}
+  {{ period_filter(period) }}
+  {{ link_button(route('admin.orders.index', status='pending'), pending ~ " pending order" ~ ("" if pending == 1 else "s"), size="small") }}
+</div>
+
+{#- Figures with their change from the period before, and a sparkline. -#}
+{% call stats(4) %}
+  {{ stat("Revenue", revenue_total | money, delta=revenue_change, trend=revenue.values) }}
+  {{ stat("Orders", orders_total | number, delta=orders_change, trend=orders.values, url=route('admin.orders.index')) }}
+  {{ stat("Average order", average | money, hint="Paid and shipped orders") }}
+  {{ stat("New customers", customers_total | number, delta=customers_change) }}
+{% endcall %}
+
+{% call dashboard(3) %}
+  {% call widget("Revenue", description="This period against the one before", span=2) %}
+    {{ chart("line", labels=revenue_labels, series=revenue_series, format="money", title="Revenue") }}
+  {% endcall %}
+  {#- Loaded after the page, then every minute: admin/_statuses.html. -#}
+  {{ widget("Orders by status", url=route('admin.widgets.statuses'), poll=60, id="order-statuses") }}
+  {% call widget("Orders", description="Paid and shipped", span="full") %}
+    {{ chart("bar", orders, name="Orders", title="Orders", height=180) }}
+  {% endcall %}
+{% endcall %}
 
 {#- The kit's tabs: a segmented control over panels already on the page
     (switched in the browser, no request); the arrow keys, Home and End move

@@ -10,6 +10,26 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### Dashboards: figures, charts and periods (renox::chart)
+
+- New module `renox::chart` (Filament's widgets as the yardstick): `Period` (an extractor
+  for `?period=7d|30d|90d|12m|mtd|ytd`, 30 days by default; `previous()`, `range`,
+  `labels`, `bucket`), `Trend::of(query, column).over(period)` with `count`, `sum` and
+  `average` (grouped per day or month in SQL, in `APP_TIMEZONE`, empty buckets at 0), and
+  `Series` (`labels`, `values`, `total`, `change_from`, `named`).
+- New template function `chart(kind, data, …)`: line, area, bar (grouped or stacked), pie
+  and doughnut, drawn on the server as HTML and SVG with no JavaScript library: clean
+  ticks, legends, a crosshair tooltip and keyboard navigation (in renox-ui.js), a "Show the
+  data" table, six series colours validated for colour blindness in light and dark
+  (`--rx-chart-1` … `--rx-chart-6`).
+- New kit components: `stats` + `stat` (a figure, its change with an arrow, a sparkline, a
+  link), `dashboard` + `widget` (cards in a grid; lazy `url` and `poll`), `period_filter`.
+  New template function `query_with(key=value)` (the query string with keys set, `page`
+  dropped). Kit texts `ui.chart.*`, `ui.period.*`, `ui.stat.vs_previous`, `ui.loading`.
+- `.rx-segmented__item` also styles links with `aria-current="page"`.
+- examples/shop: the admin dashboard has a period filter, four figures, revenue against the
+  period before, orders per day and orders by status (loaded on their own, every minute).
+
 ### Notifications: richer toasts, and a live notification bell
 
 - Toasts (Filament's notifications as the yardstick): `Toast::body`, `Toast::link`,

@@ -786,6 +786,80 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 {%- endif %}
 {%- endmacro %}
 
+{#- Dashboards (docs/ui.md "Dashboards"): figures, charts, a period. The
+    charts themselves come from the `chart(kind, data, …)` function. -#}
+
+{#- Figures side by side: two per row on phones, `columns` from tablet width. -#}
+{% macro stats(columns=4) -%}
+<div class="rx-stats rx-cols-{{ columns }}">{{ caller() }}</div>
+{%- endmacro %}
+
+{#- One figure: `stat("Revenue", total | money, delta=12.5, trend=sales.values)`.
+    `delta` is a change in percent, shown with an arrow and its sign, green
+    when it goes the `good` way ("up", "down", or "none" for neither) and red
+    when not, against `delta_label` ("vs previous period"). `trend` draws a
+    sparkline; `url` makes the figure a link; `hint` is a line without a
+    delta. -#}
+{% macro stat(label, value, delta=none, delta_label=none, good="up", trend=none, url=none, hint=none, decimals=1) -%}
+{%- set up = delta is not none and delta > 0 %}
+{%- set down = delta is not none and delta < 0 %}
+{%- set tone = "flat" if not (up or down) or good == "none" else ("good" if (up and good == "up") or (down and good == "down") else "bad") %}
+{%- if url %}<a class="rx-stat rx-stat--link" href="{{ url }}">{% else %}<div class="rx-stat">{% endif %}
+  <p class="rx-stat__label">{{ label }}</p>
+  <p class="rx-stat__value">{{ value }}</p>
+  {%- if delta is not none %}
+  <p class="rx-stat__delta rx-stat__delta--{{ tone }}"><svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+    {%- if up %}<path d="M6 10V2.5M2.5 6L6 2.5 9.5 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+    {%- elif down %}<path d="M6 2v7.5M2.5 6L6 9.5 9.5 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+    {%- else %}<path d="M2.5 6h7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>{% endif -%}
+  </svg><span class="rx-stat__change">{% if up %}+{% endif %}{{ delta | number(decimals) }}%</span> <span class="rx-stat__vs">{{ delta_label or t('ui.stat.vs_previous') }}</span></p>
+  {%- elif hint %}
+  <p class="rx-stat__vs">{{ hint }}</p>
+  {%- endif %}
+  {%- if trend %}<span class="rx-stat__trend">{{ sparkline(trend, width=120, height=32, label=label) }}</span>{% endif %}
+{%- if url %}</a>{% else %}</div>{% endif %}
+{%- endmacro %}
+
+{#- Widgets in a grid: `columns` from tablet width up, one on phones. -#}
+{% macro dashboard(columns=2) -%}
+<div class="rx-dashboard rx-cols-{{ columns }}">{{ caller() }}</div>
+{%- endmacro %}
+
+{#- A card on a dashboard. Its content is the call block, or what `url`
+    answers (loaded once the page is shown: a View fragment), reloaded every
+    `poll` seconds; a reload keeps the old content until the new one comes.
+    `span`: columns taken (2, 3 or "full"). -#}
+{% macro widget(title=none, description=none, span=none, url=none, poll=none, id=none) -%}
+{%- set wid = id or (_id("widget-" ~ (title or "x") | lower | replace(" ", "-"))) %}
+<section class="rx-widget{% if span %} rx-span-{{ span }}{% endif %}"{% if title %} aria-labelledby="{{ wid }}-title"{% endif %}>
+  {%- if title %}
+  <header class="rx-widget__header">
+    <h2 class="rx-widget__title" id="{{ wid }}-title">{{ title }}</h2>
+    {%- if description %}<p class="rx-widget__description">{{ description }}</p>{% endif %}
+  </header>
+  {%- endif %}
+  {%- set triggers = ([] if caller is defined else ["load"]) + (["every " ~ poll ~ "s"] if poll else []) %}
+  <div class="rx-widget__body" id="{{ wid }}"{% if url %} hx-get="{{ url }}" hx-trigger="{{ triggers | join(', ') }}" hx-swap="innerHTML"{% endif %} aria-live="polite">
+    {%- if caller is defined %}{{ caller() }}{% elif url %}<p class="rx-widget__loading">{{ t('ui.loading') }}</p>{% endif -%}
+  </div>
+</section>
+{%- endmacro %}
+
+{#- The period every figure and chart below it shows: links that set
+    `?period=` (the `renox::chart::Period` extractor) and keep the rest of
+    the query. `selected` is the handler's `Period`; `options` are [key,
+    label] pairs (7d, 30d, 90d, 12m, ytd by default). -#}
+{% macro period_filter(selected, options=none, label=none) -%}
+{%- set options = options or [["7d", t('ui.period.7d')], ["30d", t('ui.period.30d')], ["90d", t('ui.period.90d')], ["12m", t('ui.period.12m')], ["ytd", t('ui.period.ytd')]] %}
+<nav class="rx-period" aria-label="{{ label or t('ui.period.label') }}">
+  <div class="rx-segmented">
+    {%- for option in options %}
+    <a class="rx-segmented__item" href="{{ query_with(period=option[0]) }}"{% if option[0] == selected %} aria-current="page"{% endif %}>{{ option[1] }}</a>
+    {%- endfor %}
+  </div>
+</nav>
+{%- endmacro %}
+
 {#- What an empty list says: what goes here, and the way to add the first. -#}
 {% macro empty(title, message=none, action_href=none, action_label=none) -%}
 <div class="rx-empty">

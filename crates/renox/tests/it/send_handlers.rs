@@ -151,6 +151,28 @@ struct Ping;
 
 impl Event for Ping {}
 
+/// Dashboards' time series (routed for `Send`; not called: notes have
+/// no dates).
+async fn trends(State(state): State<AppState>, period: renox::chart::Period) -> Result<String> {
+    use renox::chart::Trend;
+    let count = Trend::of(Note::query(), "created_at")
+        .over(period)
+        .count(&state)
+        .await?;
+    let sum = Trend::of(Note::query(), "created_at")
+        .sum(&state, "stars")
+        .await?;
+    let average = Trend::of(Note::query(), "created_at")
+        .average(&state, "stars")
+        .await?;
+    Ok(format!(
+        "{} {} {}",
+        count.total(),
+        sum.total(),
+        average.total()
+    ))
+}
+
 /// Roles, permissions, token abilities and scoped rules (routed so the
 /// futures are checked for `Send`; the tables aren't created here).
 async fn access(State(db): State<Db>, user: AuthUser, session: Session) -> Result<String> {
@@ -501,6 +523,7 @@ impl Module for Handlers {
             .get("/queries", queries)
             .get("/more", more)
             .get("/access", access)
+            .get("/trends", trends)
             .get("/builder", builder)
             .get("/models", models)
             .get("/cache", cache)

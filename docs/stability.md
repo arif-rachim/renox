@@ -17,7 +17,7 @@ commit that `rnx` was built from.
   - `DatabaseNotification`, `AccessToken`, `NewToken`
   - `WebhookRequest`, `WebhookCall`, `JobContext`, `Htmx`, `Down`, `analytics::Event`
   - `view::ViewContext`, `auth::Registration`, `auth::Recipient`, `mail::Attachment`
-  - `Toast`, `ToastAction`, `auth::DatabaseMessage`, `report::ErrorReport`, `report::RequestReport`, `validation::FormContext`,
+  - `Toast`, `ToastAction`, `auth::DatabaseMessage`, `chart::Series`, `report::ErrorReport`, `report::RequestReport`, `validation::FormContext`,
     `rate_limit::LimitRequest`, `SentNotification`, `db::InvalidUlid`, `grid::Grid`,
     `grid::Column`, `grid::GridPrefs`, `grid::RowOrder`,
     `grid::Action`, `grid::Selection`, `storage::FileInfo`, `queue::BatchStatus`,
@@ -25,7 +25,7 @@ commit that `rnx` was built from.
     `select::SelectOption` (use `SelectOption::new`), `select::OptionQuery`
 - **New variants on these enums.** A `match` on them needs a `_` arm:
   - `Error`, `Environment`, `CspMode`, `Channel`, `Locale`, `DbValue`, `Inspected` (a `Rule`
-    matching on `Inspected` needs a `_` arm), `ToastKind`, `report::ReportKind`, `grid::Kind`, `grid::Summary`
+    matching on `Inspected` needs a `_` arm), `ToastKind`, `chart::Bucket`, `report::ReportKind`, `grid::Kind`, `grid::Summary`
 - New methods, functions, modules, template functions, validation rules, CLI commands and `.env`
   settings (always with defaults).
 - New provided methods on traits you implement (`Model`, `Notification`, `ModelHooks`,

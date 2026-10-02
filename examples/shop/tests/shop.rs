@@ -504,7 +504,10 @@ async fn admins_manage_products_with_photos() {
         let html = app.get(page).await.text();
         let current: Vec<&str> = html
             .split("<a ")
-            .filter(|link| link.contains(r#"aria-current="page""#))
+            // The admin's nav, not the dashboard's period filter.
+            .filter(|link| {
+                link.contains(r#"aria-current="page""#) && !link.contains("rx-segmented__item")
+            })
             .collect();
         assert_eq!(current.len(), 1, "{page}");
         assert!(
@@ -696,6 +699,55 @@ async fn the_bell_tells_customers_and_admins_about_orders() {
         .assert_see(&format!(">New order #{}</button>", order.id))
         .assert_see("Rp 50,000, to Jl. Merdeka 1, Bandung 40111")
         .assert_see(r#"href="/admin/orders?status=pending">All orders</a>"#);
+}
+
+#[renox::test]
+async fn the_dashboard_shows_figures_and_charts_for_a_period() {
+    let app = shop().await;
+    let boss = admin(&app).await;
+    let kopi = product(&app, "Kopi Susu", 25_000, 9).await;
+    let budi = customer(&app, "budi@example.com").await;
+    let paid = placed_order(&app, &budi, &kopi, 2).await;
+    placed_order(&app, &budi, &kopi, 1).await; // stays pending: not revenue
+
+    app.acting_as(&boss);
+    app.put(
+        &format!("/admin/orders/{}/status", paid.id),
+        &[("status", "paid")],
+    )
+    .await
+    .assert_status(303);
+    app.get("/admin?period=7d")
+        .await
+        .assert_ok()
+        .assert_see(r#"href="?period=7d" aria-current="page">7 days</a>"#)
+        .assert_see(r#"<p class="rx-stat__label">Revenue</p>"#)
+        .assert_see(r#"<p class="rx-stat__value">Rp 50,000</p>"#)
+        .assert_see(r#"<p class="rx-stat__value">1</p>"#)
+        // Nothing the week before: no delta, only the figure.
+        .assert_dont_see("rx-stat__change")
+        .assert_see(r#"<figure class="rx-chart rx-chart--line""#)
+        .assert_see("This period")
+        .assert_see(r#"<figure class="rx-chart rx-chart--bar""#)
+        .assert_see(r#"hx-get="/admin/widgets/statuses" hx-trigger="load, every 60s""#);
+    app.htmx()
+        .get("/admin/widgets/statuses")
+        .await
+        .assert_see(r#"<figure class="rx-chart rx-chart--doughnut""#)
+        .assert_see(r#"<span class="rx-chart__name">pending</span><span class="rx-chart__value">1 <span class="rx-chart__share">50.0%</span>"#);
+
+    // A month later the week is empty; the 90 days still hold it.
+    app.travel(std::time::Duration::from_secs(30 * 86_400));
+    app.acting_as(&boss); // the session ran out meanwhile
+    app.get("/admin?period=7d")
+        .await
+        .assert_see(r#"<p class="rx-stat__value">Rp 0</p>"#);
+    app.get("/admin?period=90d")
+        .await
+        .assert_see(r#"<p class="rx-stat__value">Rp 50,000</p>"#);
+
+    app.acting_as(&budi);
+    app.get("/admin/widgets/statuses").await.assert_forbidden();
 }
 
 async fn status(app: &TestApp, order_id: i64) -> OrderStatus {

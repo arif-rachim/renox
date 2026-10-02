@@ -742,6 +742,44 @@ async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
 }
 ```
 
+## Dashboards: figures and charts (details in docs/ui.md "Dashboards")
+
+```rust
+use renox::prelude::*;
+use renox::chart::{Period, Trend};
+
+#[derive(Model, serde::Serialize, Default)]
+struct Order { id: i64, total: i64, status: String, created_at: Option<renox::db::DateTime> }
+
+// ?period=7d|30d|90d|12m|mtd|ytd (Period: 30 days by default; serializes as "30d").
+async fn dashboard(State(state): State<AppState>, period: Period) -> Result<View> {
+    let paid = || Order::where_eq("status", "paid");
+    let sales = Trend::of(paid(), "created_at").over(period).sum(&state, "total").await?; // or count / average
+    let before = Trend::of(paid(), "created_at").over(period.previous()).sum(&state, "total").await?;
+    Ok(view("dashboard.html", context! {
+        period,
+        revenue => sales.total(),
+        change => sales.change_from(&before), // percent, or None
+        sales => sales.named("Sales"),         // {name, labels (2026-10-02 / 2026-10), values}
+    }))
+}
+```
+
+```html
+{% from "renox/ui.html" import period_filter, stats, stat, dashboard, widget %}
+{{ period_filter(period) }}                   {# links to ?period=…, keeping the query #}
+{% call stats(4) %}
+  {{ stat("Revenue", revenue | money, delta=change, trend=sales.values, url="/orders") }} {# good="down" for costs #}
+{% endcall %}
+{% call dashboard(3) %}
+  {% call widget("Sales", description="Paid orders", span=2) %}
+    {{ chart("area", sales, format="money") }} {# line, area, bar (stacked=true), pie, doughnut #}
+  {% endcall %}
+  {{ widget("By status", url=route('dashboard.statuses'), poll=60) }} {# loaded after the page, every 60 s #}
+{% endcall %}
+{{ chart("bar", labels=["Kopi", "Teh"], series=[{"name": "2025", "values": [3, 5]}, {"name": "2026", "values": [4, 6]}]) }}
+```
+
 ## Data grid (details in [docs/grid.md](docs/grid.md), example in examples/grid)
 
 ```rust

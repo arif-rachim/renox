@@ -506,6 +506,88 @@ n, `[a,b]` for a range and `*` for no end: `"{0} Sold out|{1} Only one left|[2,5
 left|[6,*] :count in stock"`, printed with `{{ t('products.in_stock', count=product.stock) }}`
 (examples/shop).
 
+## Dashboards
+
+Figures, charts and the period they cover, like Filament's widgets, drawn on the server as
+plain HTML and SVG (no chart library, nothing to load):
+
+```rust
+use renox::prelude::*;
+use renox::chart::{Period, Trend};
+
+#[derive(Model, serde::Serialize, Default)]
+struct Order { id: i64, total: i64, status: String, created_at: Option<renox::db::DateTime> }
+
+// `?period=30d`: 7d, 30d, 90d (any number of days up to 366), 12m (months up
+// to 36), mtd, ytd; 30 days without one.
+async fn dashboard(State(state): State<AppState>, period: Period) -> Result<View> {
+    let paid = || Order::where_eq("status", "paid");
+    let sales = Trend::of(paid(), "created_at").over(period).sum(&state, "total").await?;
+    let before = Trend::of(paid(), "created_at").over(period.previous()).sum(&state, "total").await?;
+    let orders = Trend::of(paid(), "created_at").over(period).count(&state).await?;
+    Ok(view("dashboard.html", context! {
+        period,
+        revenue => sales.total(),
+        change => sales.change_from(&before), // percent; None when the period before was 0
+        sales => sales.named("Sales"),
+        orders,
+    }))
+}
+```
+
+```html
+{% from "renox/ui.html" import period_filter, stats, stat, dashboard, widget %}
+{{ period_filter(period) }}
+{% call stats(4) %}
+  {{ stat("Revenue", revenue | money, delta=change, trend=sales.values) }}
+  {{ stat("Refunds", refunds, delta=refund_change, good="down") }}
+{% endcall %}
+{% call dashboard(3) %}
+  {% call widget("Sales", description="Paid orders", span=2) %}
+    {{ chart("area", sales, format="money") }}
+  {% endcall %}
+  {{ widget("By status", url=route('dashboard.statuses'), poll=60) }}
+  {% call widget("Orders", span="full") %}{{ chart("bar", orders, name="Orders") }}{% endcall %}
+{% endcall %}
+```
+
+- **`Trend::of(query, column)`** places a model's rows in time by a date-time column and
+  gives a `Series` per day (up to 92 days, and `mtd`) or per month: `count`, `sum(column)`
+  or `average(column)`. The query's conditions apply; days are cut in `APP_TIMEZONE` (at its
+  offset at the end of the period); empty days are 0. `Period::previous()` is the period
+  just before, as long, for `Series::change_from` (a percent). A `Series` is `labels`
+  (`2026-10-02`, or `2026-10` per month), `values`, `total()` and `named(…)`; build one by
+  hand with `Series::new(labels, values)`.
+- **`chart(kind, data, …)`**: `line`, `area`, `bar` (`stacked=true`) or `pie`/`doughnut`.
+  `data` is a `Series`, a list of numbers, or a list of series (`{name, values}` maps);
+  or pass `labels=…` with `series=[…]` or `values=[…]`. Options: `format` (`number`,
+  `money` in `APP_CURRENCY` or `currency=…`, `percent`), `decimals`, `height` (240 px),
+  `title` (for screen readers), `name` (one series' name), `x_format` (chrono's codes for
+  date labels; else `Oct 2` / `2 Okt`, `Oct 2026`), `legend=false`, `table=false`, `id`.
+- **How they read.** One axis that starts at 0 with clean ticks (`12.5K`, `2,5 jt` in
+  Indonesian); a legend for two series or more; hairline grid; 2 px lines with a dot at the
+  end; bars at most 24 px wide with rounded ends; a doughnut keeps six slices and folds the
+  rest into "Other". The six series colours come in a fixed order checked for colour
+  blindness in both appearances (`--rx-chart-1` … `--rx-chart-6`; a seventh series is grey).
+- **Hover and keyboard.** A crosshair and one tooltip with every series at the nearest date
+  (line, area), or per bar and per slice; the chart takes focus and the arrow keys, Home and
+  End move along it. Every chart also has a "Show the data" table, so no value is only in a
+  colour or a tooltip.
+- **`stat(label, value, delta=…, delta_label=…, good="up", trend=…, url=…, hint=…)`**: a
+  figure (`value` as it should read: `total | money`), its change in percent with an arrow
+  and its sign (green when it goes the `good` way, "up", "down" or "none"), a sparkline of
+  `trend`, a link. `stats(columns)` sets them side by side (two per row on phones).
+- **`dashboard(columns)` + `widget(title, description=…, span=…, url=…, poll=…)`**: cards in
+  a grid (one column on phones; `span=2` or `"full"`). A widget's content is its call block,
+  or what `url` answers (a small template, or a `View` fragment), loaded after the page and
+  again every `poll` seconds; the old content stays, dimmed, until the new one arrives.
+- **`period_filter(period, options=…)`**: one row of presets over everything it scopes
+  (`?period=`, keeping the rest of the query: `query_with(period="7d")` builds such links
+  in any template).
+
+examples/shop's admin dashboard uses all of it: the period, four figures, revenue against
+the period before, orders per day, and orders by status loaded on their own every minute.
+
 ## Data grids
 
 `renox::grid` is a server-side data grid for dashboards and back offices: a table that fills

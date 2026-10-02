@@ -241,6 +241,123 @@
     window.addEventListener("pagehide", function () { stream.close(); });
   }
 
+  // ---------- Charts (chart(…)) ----------
+
+  // A crosshair and one tooltip for every series at the nearest label (line,
+  // area), or per band (bar) and slice (pie); arrow keys move it too.
+  function setupChart(figure) {
+    if (figure._rxChart) return;
+    figure._rxChart = true;
+    var data;
+    try { data = JSON.parse(figure.getAttribute("data-rx-chart")); } catch (e) { return; }
+    var plot = figure.querySelector(".rx-chart__plot");
+    var tip = figure.querySelector(".rx-chart__tip");
+    var cross = figure.querySelector(".rx-chart__cross");
+    if (!plot || !tip || !data.labels || !data.labels.length) return;
+    var n = data.labels.length;
+    var pie = data.kind === "pie" || data.kind === "doughnut";
+    var bar = data.kind === "bar";
+    var current = -1;
+
+    function position(i) {
+      if (bar) return (i + 0.5) / n * 100;
+      return n > 1 ? i / (n - 1) * 100 : 50;
+    }
+
+    function row(key, value, name) {
+      var line = document.createElement("p");
+      line.className = "rx-chart__tip-row";
+      if (key) {
+        var mark = document.createElement("span");
+        mark.className = "rx-chart__key rx-chart__key--line " + key;
+        line.appendChild(mark);
+      }
+      var strong = document.createElement("span");
+      strong.className = "rx-chart__tip-value";
+      strong.textContent = value;
+      line.appendChild(strong);
+      if (name) {
+        var label = document.createElement("span");
+        label.className = "rx-chart__tip-name";
+        label.textContent = name;
+        line.appendChild(label);
+      }
+      return line;
+    }
+
+    function show(i, pointX) {
+      current = i;
+      tip.textContent = "";
+      var title = document.createElement("p");
+      title.className = "rx-chart__tip-label";
+      title.textContent = data.labels[i];
+      tip.appendChild(title);
+      data.series.forEach(function (series) {
+        var value = series.values[i];
+        if (value === null || value === undefined) return;
+        tip.appendChild(row(pie ? "" : series.slot, value, pie || data.series.length < 2 ? "" : series.name));
+      });
+      tip.hidden = false;
+      var width = plot.clientWidth;
+      if (pie) {
+        figure.querySelectorAll(".rx-chart__slice").forEach(function (s) {
+          if (s.getAttribute("data-index") === String(i)) s.setAttribute("data-on", ""); else s.removeAttribute("data-on");
+        });
+        var x = pointX === undefined ? width / 2 : pointX;
+        tip.style.left = Math.min(Math.max(x - tip.offsetWidth / 2, 0), Math.max(width - tip.offsetWidth, 0)) + "px";
+        return;
+      }
+      var left = position(i) / 100 * width;
+      if (cross && !bar) { cross.hidden = false; cross.style.left = left + "px"; }
+      if (bar) {
+        figure.querySelectorAll(".rx-chart__band").forEach(function (b) {
+          if (b.getAttribute("data-index") === String(i)) b.setAttribute("data-on", ""); else b.removeAttribute("data-on");
+        });
+      }
+      var tipLeft = left + 12;
+      if (tipLeft + tip.offsetWidth > width) tipLeft = left - 12 - tip.offsetWidth;
+      tip.style.left = Math.max(tipLeft, 0) + "px";
+    }
+
+    function hide() {
+      current = -1;
+      tip.hidden = true;
+      if (cross) cross.hidden = true;
+      figure.querySelectorAll("[data-on]").forEach(function (el) { el.removeAttribute("data-on"); });
+    }
+
+    function indexAt(clientX) {
+      var rect = plot.getBoundingClientRect();
+      var x = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1);
+      return bar ? Math.min(Math.floor(x * n), n - 1) : Math.round(x * (n - 1));
+    }
+
+    plot.addEventListener("pointermove", function (event) {
+      if (pie) {
+        var slice = event.target.closest && event.target.closest(".rx-chart__slice");
+        if (!slice) { hide(); return; }
+        var rect = plot.getBoundingClientRect();
+        show(parseInt(slice.getAttribute("data-index"), 10), event.clientX - rect.left);
+        return;
+      }
+      show(indexAt(event.clientX));
+    });
+    plot.addEventListener("pointerleave", hide);
+    plot.addEventListener("blur", hide);
+    plot.addEventListener("focus", function () { show(current < 0 ? n - 1 : current); });
+    plot.addEventListener("keydown", function (event) {
+      var next = current < 0 ? n - 1 : current;
+      if (event.key === "ArrowLeft") next = Math.max(next - 1, 0);
+      else if (event.key === "ArrowRight") next = Math.min(next + 1, n - 1);
+      else if (event.key === "Home") next = 0;
+      else if (event.key === "End") next = n - 1;
+      else if (event.key === "Escape") { hide(); return; }
+      else return;
+      event.preventDefault();
+      show(next);
+    });
+  }
+
   // ---------- Sheets (dialogs) ----------
 
   function openSheet(id, opener) {
@@ -1421,6 +1538,8 @@
     scope.querySelectorAll("[data-rx-repeater]").forEach(limits);
     scope.querySelectorAll("[data-rx-wizard]").forEach(setupWizard);
     scope.querySelectorAll("[data-rx-bell]").forEach(setupBell);
+    if (root.matches && root.matches("[data-rx-chart]")) setupChart(root);
+    scope.querySelectorAll("[data-rx-chart]").forEach(setupChart);
     applyAllWhen(scope);
   }
 

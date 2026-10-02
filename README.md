@@ -151,6 +151,11 @@ impl Module for Guestbook {
   - keyboard support and WCAG AA contrast;
   - toasts (`Toast::success(…)`, with a body, links, a duration and a position) and live
     validation.
+- Dashboards without a chart library (`renox::chart`): figures with their change and a
+  sparkline, line, area, bar, pie and doughnut charts drawn on the server as HTML and SVG
+  (crosshair tooltips, keyboard, a data table, colours checked for colour blindness), values
+  per day or month from a query (`Trend::of(query, "created_at").over(period).sum(…)`), a
+  period filter, and widgets that load on their own and refresh.
 - A data grid for dashboards (`renox::grid`): filters per column by kind (a date range
   calendar for dates), server pages and sorting in the URL, grouped headings, frozen columns,
   different columns on phones and desktops kept per user, and cells drawn by the page
