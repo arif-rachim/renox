@@ -210,7 +210,7 @@ examples/                  workspace members, each with a README.md and its own 
   webhooks/                Midtrans / Xendit / Stripe webhooks
   shop/                    a whole online shop on the UI kit (auth, admin, checkout, mail, queue,
                            i18n, deploy with the systemd socket, a rebranded accent, route_is,
-                           recently viewed, plural ranges)
+                           recently viewed, plural ranges, the kit's tabs on the admin dashboard)
   htmx-recipes/            modal form, inline edit, infinite scroll, tabs, HxRefresh/HxRedirect,
                            an out-of-band count (.also), HxRetarget/HxReswap, toasts
   relations/               belongs to, has many, many to many (pivot columns), Morph, no N+1
@@ -218,7 +218,8 @@ examples/                  workspace members, each with a README.md and its own 
                            columns, filters by kind, frozen columns, grouped headings, sparklines
   teams/                   multi-tenant SaaS on the UI kit: default scopes, renox::context,
                            gate_before, Encrypted<String>, a form request checked live, public
-                           team pages on their own host (Routes::domain)
+                           team pages on their own host (Routes::domain), a wizard with a
+                           repeater, a datalist
 tests/chaos/               app + run.sh (postgres|sqlite) that the `chaos` CI job injects faults
                            into (docker pause/stop/restart, python3 holding SQLite's lock)
 tests/cli/run.sh           `rnx new` + every `make:*`, then build and test the app (CI `cli`/`docker`)
@@ -949,7 +950,9 @@ picks the build, not the terminal.
   `tags_input`, searchable/multiple `select` (a combobox over the native select, kept
   visually hidden so `required` still works), `repeater` (`{% call(row, prefix) %}`,
   renumbered by rewriting attributes), `key_value`, `wizard`; teams, fields and shop use
-  them. Merged (#88, one PR for the three stages). Then options from the server:
+  them. Merged (#88, one PR for the three stages). Then the kit's `tabs` in shop's admin
+  dashboard and `datalist` in teams, the two kit parts no example used yet (#90;
+  `hide_when` has none, as it mirrors `show_when`). Then options from the server:
   `select(…, options_url=…, editable=true)` with `renox::select` (`SelectOption`,
   `OptionQuery`), one URL for search/lookup/add/rename; the combobox adds fetched options to
   the native select as they're chosen; shop's admin categories use it. Branch

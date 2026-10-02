@@ -27,6 +27,12 @@ changes by milestone (each one pull request; details in its description and in
 - examples/shop: the admin's category select asks the server, adds categories and renames
   them (`admin/categories.rs`); the product form no longer loads every category.
 
+### Examples: the kit's tabs and datalist
+
+- examples/shop's admin dashboard puts low stock, notifications and recent activity on the
+  kit's `tabs` + `tab_panel`; examples/teams' project name suggests common names with
+  `input(…, datalist=…)` (#90).
+
 ### Docs: catch-up after the UI kit form fields
 
 - `has_old()` in docs/validation.md and CHEATSHEET.md, `Session::has_old_input` in
