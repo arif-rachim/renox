@@ -406,9 +406,14 @@
 
 /* A small square button with an icon (rows' tools). */
 .rx-icon-button {
-  display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; margin: 0;
+  display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; margin: 0; position: relative;
   border: 0; border-radius: var(--rx-radius-s); background: transparent; color: var(--rx-secondary-label); cursor: pointer;
+  text-decoration: none; font: inherit;
 }
+.rx-icon-button--small { width: 28px; height: 28px; }
+.rx-icon-button--primary { color: var(--rx-accent-text); }
+.rx-icon-button[aria-disabled="true"] { opacity: 0.35; cursor: not-allowed; background: transparent; }
+.rx-icon-button > .rx-button__badge { position: absolute; top: -2px; right: -2px; }
 .rx-icon-button:hover { background: var(--rx-fill); color: var(--rx-label); }
 .rx-icon-button--danger { color: var(--rx-danger-text); }
 .rx-icon-button--danger:hover { color: var(--rx-danger-text); background: color-mix(in srgb, var(--rx-danger) 10%, transparent); }
@@ -603,13 +608,33 @@
 .rx-button:disabled, .rx-button[aria-disabled="true"] { opacity: 0.4; cursor: not-allowed; transform: none; }
 /* Busy (a form being sent, an htmx request): a spinner, the label kept. */
 .rx-button[aria-busy="true"], .rx-button.htmx-request { cursor: progress; }
-.rx-button[aria-busy="true"] > .rx-button__label, .rx-button.htmx-request > .rx-button__label { opacity: 0; }
+.rx-button[aria-busy="true"] > :is(.rx-button__label, .rx-button__icon, .rx-button__badge),
+.rx-button.htmx-request > :is(.rx-button__label, .rx-button__icon, .rx-button__badge) { opacity: 0; }
 .rx-button[aria-busy="true"]::after, .rx-button.htmx-request::after {
   content: ""; position: absolute; inset: 0; margin: auto; width: 18px; height: 18px;
   border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
   animation: rx-spin 0.8s linear infinite;
 }
 @keyframes rx-spin { to { transform: rotate(360deg); } }
+.rx-button__icon { display: inline-flex; margin-inline-start: -4px; }
+/* A count on a button: unread, waiting, in the cart. */
+.rx-button__badge {
+  display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
+  border-radius: 9px; background: var(--rx-danger); color: #fff; font-size: 11px; font-weight: 700; line-height: 1;
+  font-variant-numeric: tabular-nums; letter-spacing: 0;
+}
+.rx-button--primary > .rx-button__badge { background: var(--rx-on-accent); color: var(--rx-accent); }
+
+/* The tooltip of anything with data-rx-tip (icon buttons' labels, why a
+   button is disabled, keyboard shortcuts): one element placed by
+   renox-ui.js, so a table's scroll box doesn't clip it. */
+.rx-tip {
+  position: fixed; z-index: 1000; margin: 0; max-width: min(16rem, 100vw - 16px); padding: 5px 8px; border-radius: 6px;
+  background: var(--rx-label); color: var(--rx-surface); font-family: var(--rx-font); font-size: var(--rx-text-footnote);
+  font-weight: 500; line-height: 1.3; letter-spacing: 0; text-align: center; pointer-events: none;
+  animation: rx-tip-in var(--rx-duration) var(--rx-ease);
+}
+@keyframes rx-tip-in { from { opacity: 0; transform: translateY(2px); } }
 
 /* ---------- Alerts and badges ---------- */
 
@@ -905,10 +930,31 @@ a.rx-stat:focus-visible { outline: 2px solid var(--rx-accent); outline-offset: 2
 .rx-sheet__message { margin: 0; color: var(--rx-secondary-label); }
 .rx-sheet__actions { display: flex; flex-wrap: wrap-reverse; justify-content: flex-end; gap: var(--rx-space-3); padding-top: var(--rx-space-2); }
 .rx-sheet__actions form { margin: 0; display: contents; }
+.rx-sheet__body { display: grid; gap: var(--rx-space-4); }
+.rx-sheet__icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; color: var(--rx-accent-text); background: color-mix(in srgb, var(--rx-accent) 14%, transparent); }
+.rx-sheet__icon svg { width: 22px; height: 22px; }
+.rx-sheet__icon--success { color: var(--rx-success); background: color-mix(in srgb, var(--rx-success) 14%, transparent); }
+.rx-sheet__icon--warning { color: var(--rx-warning); background: color-mix(in srgb, var(--rx-warning) 14%, transparent); }
+.rx-sheet__icon--error, .rx-sheet__icon--danger, .rx-sheet__icon--trash { color: var(--rx-danger-text); background: color-mix(in srgb, var(--rx-danger) 12%, transparent); }
+.rx-sheet--sm { width: min(100% - 2 * var(--rx-space-4), 24rem); }
+.rx-sheet--lg { width: min(100% - 2 * var(--rx-space-4), 40rem); }
+.rx-sheet--xl { width: min(100% - 2 * var(--rx-space-4), 56rem); }
+/* A slide-over: the sheet at the side, full height, its buttons at the
+   bottom. */
+.rx-sheet--side { margin: 0 0 0 auto; height: 100dvh; max-height: 100dvh; width: min(100% - 3rem, 28rem); border-radius: var(--rx-radius-l) 0 0 var(--rx-radius-l); }
+.rx-sheet--side.rx-sheet--sm { width: min(100% - 3rem, 22rem); }
+.rx-sheet--side.rx-sheet--lg { width: min(100% - 3rem, 40rem); }
+.rx-sheet--side.rx-sheet--xl { width: min(100% - 3rem, 56rem); }
+.rx-sheet--side[open] { animation-name: rx-sheet-side; }
+.rx-sheet--side > .rx-sheet__inner { display: flex; flex-direction: column; min-height: 100%; box-sizing: border-box; }
+.rx-sheet--side .rx-sheet__actions { margin-top: auto; }
+[dir="rtl"] .rx-sheet--side { margin: 0 auto 0 0; border-radius: 0 var(--rx-radius-l) var(--rx-radius-l) 0; }
 @media (max-width: 36rem) {
   /* On phones a sheet rises from the bottom edge, within thumb reach. */
   .rx-sheet { width: 100%; max-width: 100%; margin: auto 0 0; border-radius: var(--rx-radius-l) var(--rx-radius-l) 0 0; padding-bottom: env(safe-area-inset-bottom); }
   .rx-sheet[open] { animation-name: rx-sheet-up; }
+  .rx-sheet.rx-sheet--side { width: 100%; height: auto; max-height: calc(100dvh - 2rem); margin: auto 0 0; border-radius: var(--rx-radius-l) var(--rx-radius-l) 0 0; }
+  .rx-sheet.rx-sheet--side[open] { animation-name: rx-sheet-up; }
   .rx-sheet__actions { flex-direction: column-reverse; }
   .rx-sheet__actions .rx-button { width: 100%; }
 }
@@ -1039,11 +1085,12 @@ a.rx-stat:focus-visible { outline: 2px solid var(--rx-accent); outline-offset: 2
 @keyframes rx-pop { from { opacity: 0; transform: scale(0.94); } }
 @keyframes rx-sheet-in { from { opacity: 0; transform: translateY(12px) scale(0.97); } }
 @keyframes rx-sheet-up { from { transform: translateY(100%); } }
+@keyframes rx-sheet-side { from { transform: translateX(100%); } }
 @keyframes rx-toast-in { from { opacity: 0; transform: translateY(var(--rx-toast-from, -16px)) scale(0.96); } }
 @keyframes rx-toast-out { to { opacity: 0; transform: translateY(calc(var(--rx-toast-from, -16px) / 2)) scale(0.98); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .rx-page *, .rx-page *::before, .rx-page *::after, .rx-sheet, .rx-sheet::backdrop, .rx-toast, .rx-menu__list {
+  .rx-page *, .rx-page *::before, .rx-page *::after, .rx-sheet, .rx-sheet::backdrop, .rx-toast, .rx-menu__list, .rx-tip {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }

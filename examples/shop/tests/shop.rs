@@ -1042,3 +1042,40 @@ async fn the_category_select_searches_adds_and_renames() {
         .await
         .assert_status(422);
 }
+
+#[renox::test]
+async fn admins_adjust_stock_from_the_list() {
+    let app = shop().await;
+    let boss = admin(&app).await;
+    let kopi = product(&app, "Kopi", 20000, 3).await;
+    app.acting_as(&boss);
+    // The list has the action's button and its sheet, with a field per row.
+    app.get("/admin/products")
+        .await
+        .assert_see(&format!(r#"data-rx-open="stock-{}""#, kopi.id))
+        .assert_see(&format!(r#"id="stock-change-{}""#, kopi.id))
+        .assert_see(r#"aria-label="Edit Kopi""#);
+    let url = format!("/admin/products/{}/stock", kopi.id);
+    // Sent from the sheet with htmx: a 422 keeps it open with the message.
+    app.htmx()
+        .put(&url, &[("change", "-5")])
+        .await
+        .assert_status(422)
+        .assert_json_path("errors.change.0", "Only 3 in stock to take away.");
+    app.htmx()
+        .put(&url, &[("change", "0")])
+        .await
+        .assert_status(422);
+    assert_eq!(stock(&app, kopi.id).await, 3);
+    // A success reloads the page (closing the sheet) with a toast.
+    app.htmx()
+        .put(&url, &[("change", "7"), ("reason", "Delivery")])
+        .await
+        .assert_ok()
+        .assert_header("hx-refresh", "true");
+    assert_eq!(stock(&app, kopi.id).await, 10);
+    app.get("/admin/products")
+        .await
+        .assert_see("“Kopi”: 10 in stock.")
+        .assert_see("Delivery");
+}

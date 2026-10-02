@@ -1,5 +1,5 @@
 {% extends "layouts/app.html" %}
-{% from "renox/ui.html" import confirm, table, link_button, button, badge, empty %}
+{% from "renox/ui.html" import confirm, table, link_button, button, badge, empty, action_sheet, icon_button, input %}
 
 {% block content %}
 <h1 class="rx-title">Products</h1>
@@ -20,22 +20,41 @@
   </div>
   {{ button("Filter", variant="secondary") }}
   <span class="rx-spacer"></span>
-  {{ link_button(route('admin.products.create'), "New product", variant="primary") }}
+  {#- "n" (when not typing in a field) opens the new product form. -#}
+  {{ link_button(route('admin.products.create'), "New product", variant="primary", icon="plus", key="n") }}
 </form>
 
 {% if products.items %}
-{% call table(["Name", ["Price", "num"], ["Stock", "num"], ["Shown", "hide-narrow"], ""], caption="Products") %}
+{% call table(["Name", ["Price", "num rx-hide-narrow"], ["Stock", "num"], ["Shown", "hide-narrow"], ""], caption="Products") %}
   {% for product in products.items %}
   <tr>
     <td><a class="rx-link" href="{{ route('admin.products.edit', product.id) }}">{{ product.name }}</a></td>
-    <td class="rx-num">{{ product.price | money }}</td>
+    <td class="rx-num rx-hide-narrow">{{ product.price | money }}</td>
     <td class="rx-num">{% if product.stock < 5 %}{{ badge(product.stock, kind="warning") }}{% else %}{{ product.stock }}{% endif %}</td>
     <td class="rx-hide-narrow">{{ "Yes" if product.active else "No" }}</td>
     <td>
+      <div class="row-actions">
+      {{ icon_button("edit", "Edit " ~ product.name, href=route('admin.products.edit', product.id)) }}
+      {#- Disabled with a reason: still focusable, the reason is its tooltip. -#}
+      {%- if product.active %}
+      {{ icon_button("external", "View " ~ product.name ~ " in the shop", href=route('products.show', product.slug), new_tab=true) }}
+      {%- else %}
+      {{ icon_button("external", "View " ~ product.name ~ " in the shop", disabled_reason="Hidden from the shop: mark it as shown first.") }}
+      {%- endif %}
+      {#- An action with a form in a sheet: sent with htmx; a 422 keeps it
+          open with the message under the field. Field ids are per row. -#}
+      {% call action_sheet("stock-" ~ product.id, "Stock", route('admin.products.stock', product.id),
+                           "Adjust stock of " ~ product.name,
+                           description="Now " ~ product.stock ~ " in stock. A negative number takes away.",
+                           submit_label="Adjust stock", method="PUT", variant="plain", size="small", icon="box") %}
+        {{ input("change", "Change", type="number", required=true, id="stock-change-" ~ product.id, hint="For example 10, or -2 for broken ones.") }}
+        {{ input("reason", "Reason", id="stock-reason-" ~ product.id, placeholder="Delivery from the roaster") }}
+      {% endcall %}
       {#- A sheet asks first (Cancel focused); only its button sends the DELETE. -#}
       {{ confirm("delete-" ~ product.id, "Delete", route('admin.products.destroy', product.id),
                  "Delete " ~ product.name ~ "?", "It disappears from the shop. Orders already placed keep its name and price.",
-                 size="small") }}
+                 size="small", icon="trash") }}
+      </div>
     </td>
   </tr>
   {% endfor %}

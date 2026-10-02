@@ -236,13 +236,15 @@ impl Validate for Checkout {
 
 | Component | What it is |
 |---|---|
-| `button(label, variant="primary", type="submit", name=…, value=…, size=…, block=…, attrs={…})` | Variants: `primary`, `secondary`, `plain`, `danger` and `plain-danger`. The button shows a spinner while its form or htmx request is being sent. |
-| `link_button(href, label, variant="secondary", size=…, attrs={…})` | A link that looks like a button. |
+| `button(label, variant="primary", type="submit", name=…, value=…, size=…, block=…, attrs={…}, icon=…, badge=…, key=…, disabled=…, disabled_reason=…)` | Variants: `primary`, `secondary`, `plain`, `danger` and `plain-danger`. The button shows a spinner while its form or htmx request is being sent. For `icon`, `badge`, `key` and `disabled_reason` see [Actions](#actions). |
+| `link_button(href, label, variant="secondary", size=…, attrs={…}, icon=…, badge=…, key=…, new_tab=…)` | A link that looks like a button. |
+| `icon_button(icon, label, href=…, variant="plain", type="button", size=…, attrs={…}, key=…, badge=…, disabled=…, disabled_reason=…, new_tab=…)` | A button (or, with `href`, a link) showing only an icon; `label` is its accessible name and its tooltip. Variants: `plain`, `primary`, `danger`; `size="small"`. |
 | `card(title=…, subtitle=…)`, `group(title=…, footer=…)` | A surface, and an inset grouped list like Settings. |
 | `alert(message, kind=…, title=…)`, `badge(text, kind=…)` | Kinds: `info`, `success`, `warning`, `error`. An alert has an icon per kind, so color is never the only signal. A badge is color only, so its text must carry the meaning ("Paid", not "●"). |
 | `form_errors(title=…)` | Every error of the last submit, above the form, each linking to its field. |
-| `sheet(id, title, message=…)` + `open_button(id, label)` | A modal dialog. It closes on Esc and on a click on the backdrop, and focus returns to the button that opened it. On phones it rises from the bottom edge. |
-| `confirm(id, label, action, title, message, confirm_label=…, method="DELETE", size=…)` | A destructive action behind a confirmation sheet, with Cancel focused first. |
+| `sheet(id, title, message=…, slide_over=…, width=…, icon=…)` + `open_button(id, label, icon=…, key=…, badge=…)` | A modal dialog. It closes on Esc and on a click on the backdrop, and focus returns to the button that opened it. On phones it rises from the bottom edge. `slide_over=true` puts it at the side, full height; `width` is `sm`, `md` (default), `lg` or `xl`; `icon` (`info`, `success`, `warning`, `error`) shows over the title. |
+| `action_sheet(id, label, action, title, …)` | A button that opens a sheet with a form sent by htmx: see [Actions](#actions). |
+| `confirm(id, label, action, title, message, confirm_label=…, method="DELETE", size=…, icon=…, modal_icon="warning", key=…)` | A destructive action behind a confirmation sheet, with Cancel focused first. `icon` goes on the button, `modal_icon` over the title (`none` for no icon). |
 | `menu(label, id=…, variant="secondary", size="small")` + `menu_link(href, label)`, `menu_action(action, label, method="POST", danger=…)`, `menu_separator()` | A menu of actions: arrow keys move, Esc closes. `menu_action` sends a form (with `_method` for other methods). |
 | `tabs(id, items, selected=…, label=…)` + `tab_panel(id, key, selected=…)` | A segmented control; the arrow keys, Home and End move between tabs. |
 | `table(head, caption=…)` | A table in a card. A heading `["Total", "num"]` right-aligns its column, and `["Slug", "hide-narrow"]` hides it on phones. |
@@ -505,6 +507,81 @@ A text that depends on a count uses Laravel's plural ranges in the lang file, `{
 n, `[a,b]` for a range and `*` for no end: `"{0} Sold out|{1} Only one left|[2,5] Only :count
 left|[6,*] :count in stock"`, printed with `{{ t('products.in_stock', count=product.stock) }}`
 (examples/shop).
+
+## Actions
+
+Filament's actions as the kit has them: a button that does one thing, often after asking
+for a few values. `action_sheet` is the button, a sheet and the form inside it; the fields
+go in its call block:
+
+```html
+{% from "renox/ui.html" import action_sheet, input %}
+{% call action_sheet("stock-" ~ product.id, "Stock", route('admin.products.stock', product.id),
+                     "Adjust stock of " ~ product.name, description="A negative number takes away.",
+                     submit_label="Adjust stock", method="PUT", icon="box", size="small") %}
+  {{ input("change", "Change", type="number", required=true, id="stock-change-" ~ product.id) }}
+{% endcall %}
+```
+
+The form is sent with htmx (`PUT`, `PATCH` and `DELETE` through `_method`). A 422 shows its
+messages under the fields, inside the sheet, which stays open; any other success closes the
+sheet and resets the form (so does Cancel or Esc). The handler is an ordinary one: a `Toast`
+says what happened, and `HxRefresh` reloads the page (the toast waits in the session), or
+`HxTrigger` tells other parts of the page, or, with `target` and `swap`, the response replaces
+part of the page. A check the rules can't make answers with a `ValidationError`, which shows
+up under its field the same way:
+
+```rust
+use renox::prelude::*;
+use renox::{HxRefresh, Toast};
+
+#[derive(serde::Deserialize, serde::Serialize)]
+struct StockForm { change: i64 }
+
+impl Validate for StockForm {
+    fn rules(&self, v: &mut Validator) {
+        v.field("change", &self.change).required().rule(self.change != 0, "Type how many.");
+    }
+}
+
+async fn adjust_stock(Path(id): Path<i64>, Valid(form): Valid<StockForm>) -> Result<(Toast, HxRefresh)> {
+    let stock = 3; // the product's, from the database
+    if stock + form.change < 0 {
+        let mut errors = Errors::new();
+        errors.add("change", format!("Only {stock} in stock to take away."));
+        return Err(ValidationError::new(errors).with_input(&form).into());
+    }
+    Ok((Toast::success(format!("Product {id}: {} in stock.", stock + form.change)), HxRefresh))
+}
+```
+
+Its other options: `variant`, `size`, `icon` and `key` for the button; `slide_over`,
+`width` and `modal_icon` for the sheet; `danger=true` for a red submit button;
+`target`/`swap` for htmx; `enctype="multipart/form-data"` for a file field. When the page
+has one per row, give each its own `id` and its fields their own `id=`, as above.
+
+What every button (`button`, `link_button`, `open_button`, `icon_button`) can carry:
+
+- **An icon** before the label, by name: `icon="plus"`. The kit's icons: `plus`, `edit`,
+  `trash`, `check`, `close`, `copy`, `download`, `upload`, `external`, `refresh`, `search`,
+  `settings`, `more`, `box`, `calendar`, `eye`, `up`, `down`, `prev`, `next`, and the
+  status icons `info`, `success`, `warning`, `error`.
+- **A count**: `badge=3` (0 is shown, an empty string or `none` isn't).
+- **A keyboard shortcut**: `key="mod+s"` (`mod` is ⌘ on a Mac and Ctrl elsewhere; also
+  `ctrl`, `alt`, `shift`, and keys like `enter`, `esc`, `backspace`). It clicks the first
+  visible element with that key (inside the open sheet when there is one); a key without
+  `mod`, `ctrl` or `alt` doesn't fire while typing in a field. The button gets
+  `aria-keyshortcuts`, and its tooltip (or `title`) names the shortcut.
+- **A reason it's disabled**: `disabled_reason="Add a photo first."` keeps it focusable and
+  shows the reason as its tooltip (on a tap too), while a click does nothing; plain
+  `disabled=true` takes it out of the tab order.
+
+An `icon_button`'s `label` is said by screen readers and shown as a tooltip after a short
+hover or at once on keyboard focus. Any element can have a tooltip with `data-rx-tip="…"`.
+
+examples/shop's admin product list has all of these: an "Adjust stock" action per row, an
+edit `icon_button`, a "view in the shop" one disabled with a reason for hidden products, and
+the "New product" button on the `n` key; its product form saves on ⌘S / Ctrl+S.
 
 ## Dashboards
 

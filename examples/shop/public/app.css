@@ -42,3 +42,13 @@
 .unread { font-weight: 600; }
 .plain-list { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
 .pagination { display: flex; gap: 8px; justify-content: center; }
+/* A table row's tools: edit, stock, delete. */
+.row-actions { display: flex; flex-wrap: wrap; gap: var(--rx-space-1); align-items: center; justify-content: flex-end; white-space: nowrap; }
+/* On phones only their icons, two by two (the labels stay for screen
+   readers). */
+@media (max-width: 36rem) {
+  .row-actions { display: grid; grid-template-columns: repeat(2, auto); justify-content: end; }
+  .row-actions .rx-button { padding-inline: 10px; }
+  .row-actions .rx-button__icon { margin: 0; }
+  .row-actions .rx-button__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}

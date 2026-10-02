@@ -365,9 +365,31 @@
     if (!dialog || typeof dialog.showModal !== "function" || dialog.open) return;
     dialog._opener = opener;
     dialog.showModal();
-    var first = dialog.querySelector("[autofocus]") || dialog.querySelector("[data-rx-initial-focus]");
+    var first = dialog.querySelector("[autofocus]") || dialog.querySelector("[data-rx-initial-focus]") ||
+      dialog.querySelector("form[data-rx-action] .rx-sheet__body :is(input:not([type=hidden]), select, textarea, button):not([disabled])");
     if (first) first.focus();
   }
+
+  // An action sheet's form: a success closes the sheet (a 422 isn't one:
+  // renox.js shows its errors in the form); closing it any way resets the
+  // form and clears its errors, so the next open starts fresh.
+  function clearActionForm(form) {
+    form.reset();
+    form.querySelectorAll("[data-renox-error]").forEach(function (el) { el.remove(); });
+    form.querySelectorAll("[data-error-for]").forEach(function (el) { el.textContent = ""; });
+    form.querySelectorAll("[aria-invalid]").forEach(function (el) { el.removeAttribute("aria-invalid"); });
+  }
+  document.addEventListener("htmx:afterRequest", function (event) {
+    var form = event.target;
+    if (!form.matches || !form.matches("form[data-rx-action]") || !event.detail.successful) return;
+    var dialog = form.closest("dialog");
+    if (dialog && dialog.open) dialog.close();
+    else clearActionForm(form);
+  });
+  document.addEventListener("close", function (event) {
+    var form = event.target.querySelector && event.target.querySelector("form[data-rx-action]");
+    if (form) clearActionForm(form);
+  }, true);
 
   document.addEventListener("close", function (event) {
     var dialog = event.target;
@@ -1528,6 +1550,152 @@
     if (wizard && stepIndex(wizard) < wizardParts(wizard).panels.length - 1) { event.preventDefault(); event.stopImmediatePropagation(); nextStep(wizard); }
   }, true);
 
+  // ---------- Disabled with a reason, keyboard shortcuts ----------
+
+  // `aria-disabled` keeps a button focusable (its reason shows as a
+  // tooltip) but nothing it would do happens: this runs before htmx's and
+  // the kit's own click handlers.
+  document.addEventListener("click", function (event) {
+    var target = event.target.closest ? event.target : event.target.parentElement;
+    var off = target && target.closest('[aria-disabled="true"]');
+    if (off && off.matches("button, a, [role='button'], [data-rx-open]")) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      // A tap shows why (touch screens have no hover).
+      if (off.hasAttribute("data-rx-tip")) showTip(off);
+    }
+  }, true);
+
+  // Tooltips: after a short hover, at once on keyboard focus; above the
+  // element (below when there's no room), kept inside the window, in the
+  // open sheet when the element is in one (dialogs sit on the top layer).
+  var tip = null, tipFor = null, tipTimer = null;
+  var canHover = window.matchMedia && window.matchMedia("(hover: hover)").matches;
+
+  function showTip(el) {
+    clearTimeout(tipTimer);
+    hideTip();
+    var text = el.getAttribute("data-rx-tip");
+    if (!text || !el.isConnected) return;
+    tip = document.createElement("div");
+    tip.className = "rx-tip";
+    tip.id = "rx-tip";
+    tip.setAttribute("role", "tooltip");
+    tip.textContent = text;
+    (el.closest("dialog[open]") || document.body).appendChild(tip);
+    var box = el.getBoundingClientRect();
+    var width = tip.offsetWidth, height = tip.offsetHeight;
+    var top = box.top - height - 6;
+    if (top < 4) top = box.bottom + 6;
+    var left = Math.min(Math.max(box.left + box.width / 2 - width / 2, 4), window.innerWidth - width - 4);
+    tip.style.top = top + "px";
+    tip.style.left = left + "px";
+    tipFor = el;
+    // Said by screen readers when it isn't already the element's name.
+    if (text !== el.getAttribute("aria-label")) el.setAttribute("aria-describedby", "rx-tip");
+  }
+
+  function hideTip() {
+    clearTimeout(tipTimer);
+    if (tipFor && tipFor.getAttribute("aria-describedby") === "rx-tip") tipFor.removeAttribute("aria-describedby");
+    if (tip) tip.remove();
+    tip = null;
+    tipFor = null;
+  }
+
+  document.addEventListener("mouseover", function (event) {
+    if (!canHover) return;
+    var el = event.target.closest && event.target.closest("[data-rx-tip]");
+    if (el === tipFor) return;
+    hideTip();
+    if (el) tipTimer = setTimeout(function () { showTip(el); }, 400);
+  });
+  document.addEventListener("mouseout", function (event) {
+    var el = event.target.closest && event.target.closest("[data-rx-tip]");
+    if (el && !(event.relatedTarget && el.contains(event.relatedTarget))) { if (el === tipFor || !tip) hideTip(); }
+  });
+  document.addEventListener("focusin", function (event) {
+    var el = event.target.closest && event.target.closest("[data-rx-tip]");
+    if (el && el.matches(":focus-visible")) showTip(el);
+  });
+  document.addEventListener("focusout", function (event) {
+    if (tipFor && tipFor.contains(event.target)) hideTip();
+  });
+  document.addEventListener("keydown", function (event) { if (event.key === "Escape" && tip) hideTip(); }, true);
+  window.addEventListener("scroll", function () { if (tip) hideTip(); }, true);
+
+  var isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || "");
+  var KEY_NAMES = { esc: "escape", del: "delete", space: " ", plus: "+", up: "arrowup", down: "arrowdown", left: "arrowleft", right: "arrowright" };
+
+  // "mod+shift+s" → { mod, ctrl, meta, alt, shift, key }. `mod` is ⌘ on a
+  // Mac and Ctrl elsewhere.
+  function parseKey(text) {
+    var parts = String(text).toLowerCase().split("+");
+    var combo = { ctrl: false, meta: false, alt: false, shift: false, key: "" };
+    parts.forEach(function (part, i) {
+      if (i === parts.length - 1) { combo.key = KEY_NAMES[part] || part; return; }
+      if (part === "mod") { if (isMac) combo.meta = true; else combo.ctrl = true; }
+      else if (part === "ctrl" || part === "control") combo.ctrl = true;
+      else if (part === "cmd" || part === "meta") combo.meta = true;
+      else if (part === "alt" || part === "option") combo.alt = true;
+      else if (part === "shift") combo.shift = true;
+    });
+    return combo;
+  }
+
+  // For aria-keyshortcuts and the tooltip.
+  function keyLabel(combo, aria) {
+    var names = [];
+    if (combo.ctrl) names.push(aria ? "Control" : (isMac ? "⌃" : "Ctrl"));
+    if (combo.alt) names.push(aria ? "Alt" : (isMac ? "⌥" : "Alt"));
+    if (combo.shift) names.push(aria ? "Shift" : (isMac ? "⇧" : "Shift"));
+    if (combo.meta) names.push(aria ? "Meta" : "⌘");
+    var key = combo.key === " " ? "Space" : combo.key.length === 1 ? combo.key.toUpperCase() : combo.key.charAt(0).toUpperCase() + combo.key.slice(1);
+    names.push(key);
+    return names.join(aria || !isMac ? "+" : "");
+  }
+
+  function setupKey(el) {
+    if (el.hasAttribute("data-rx-key-ready")) return;
+    el.setAttribute("data-rx-key-ready", "");
+    var combo = parseKey(el.getAttribute("data-rx-key"));
+    el.setAttribute("aria-keyshortcuts", keyLabel(combo, true));
+    var tip = el.getAttribute("data-rx-tip");
+    if (tip) el.setAttribute("data-rx-tip", tip + " (" + keyLabel(combo, false) + ")");
+    else if (!el.title) el.title = keyLabel(combo, false);
+  }
+
+  function typing(el) {
+    return el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
+  }
+
+  function shown(el) {
+    return el.getClientRects().length > 0 && !el.closest("[hidden], dialog:not([open])");
+  }
+
+  // A key fires the first visible element bound to it, in the open sheet
+  // when there is one. Plain keys don't fire while typing in a field.
+  document.addEventListener("keydown", function (event) {
+    if (event.defaultPrevented || event.isComposing || event.repeat) return;
+    var modified = event.ctrlKey || event.metaKey || event.altKey;
+    if (!modified && typing(event.target)) return;
+    var dialogs = document.querySelectorAll("dialog[open]");
+    var scope = dialogs.length ? dialogs[dialogs.length - 1] : document;
+    var key = (event.key || "").toLowerCase();
+    var els = scope.querySelectorAll("[data-rx-key]");
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      var combo = parseKey(el.getAttribute("data-rx-key"));
+      if (combo.key !== key || combo.ctrl !== event.ctrlKey || combo.meta !== event.metaKey ||
+          combo.alt !== event.altKey || (combo.shift !== event.shiftKey && key.length > 1)) continue;
+      if (combo.key.length === 1 && /[a-z0-9]/.test(combo.key) && combo.shift !== event.shiftKey) continue;
+      if (!shown(el) || el.disabled || el.getAttribute("aria-disabled") === "true") continue;
+      event.preventDefault();
+      el.click();
+      return;
+    }
+  });
+
   // Everything that sets itself up from the markup, on the page and in
   // what htmx swaps in.
   function setup(root) {
@@ -1540,6 +1708,8 @@
     scope.querySelectorAll("[data-rx-bell]").forEach(setupBell);
     if (root.matches && root.matches("[data-rx-chart]")) setupChart(root);
     scope.querySelectorAll("[data-rx-chart]").forEach(setupChart);
+    if (root.matches && root.matches("[data-rx-key]")) setupKey(root);
+    scope.querySelectorAll("[data-rx-key]").forEach(setupKey);
     applyAllWhen(scope);
   }
 

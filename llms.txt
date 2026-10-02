@@ -49,7 +49,10 @@ Every example has a README.md that walks through it.
   category in a `select` whose options come from the server, added and renamed in place
   (`renox::select`, admin/categories.rs); its dashboard with `renox::chart` (`Period`,
   `Trend`), `period_filter`, `stats`/`stat`, `chart` line/bar/doughnut and a lazy, polled
-  `widget`, then the kit's `tabs`/`tab_panel`; the
+  `widget`, then the kit's `tabs`/`tab_panel`; its product list with an "Adjust stock"
+  `action_sheet` per row (admin/products.rs `adjust_stock`: `Toast` + `HxRefresh`, a
+  `ValidationError` for its own check), `icon_button`s (one disabled with a reason), `n`
+  for a new product and ⌘S / Ctrl+S on the form (`key=`); the
   order page an infolist with a `repeatable` of its lines; prices with the `money` filter; the
   `notification_bell` in its bar with `Auth::new().notifications()`, its notifications as
   `DatabaseMessage`s that arrive live over Server-Sent Events); a

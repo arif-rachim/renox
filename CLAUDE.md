@@ -974,7 +974,13 @@ picks the build, not the terminal.
   jobs use them. Merged (#96). Then dashboards (Filament's widgets as the yardstick, B before
   A): `renox::chart` (`Period`, `Trend`, `Series`), the `chart(…)` template function (SVG +
   HTML, no library), the kit's `stat`/`stats`/`dashboard`/`widget`/`period_filter`,
-  `query_with`; shop's admin dashboard uses them. Merged (#97).
+  `query_with`; shop's admin dashboard uses them. Merged (#97). Then actions (Filament's
+  as the yardstick, the "A" after the widgets): `action_sheet` (a form in a sheet sent with
+  htmx; a 422 stays in the sheet, a success closes it), `slide_over`/`width`/`icon` on
+  sheets, `icon_button`, `icon`/`badge`/`key`/`disabled_reason` on buttons, keyboard
+  shortcuts (`data-rx-key`), tooltips (`data-rx-tip`, one element placed by renox-ui.js:
+  a CSS `::before` was dimmed by disabled buttons and widened phone tables while hidden);
+  shop's admin products use them. Branch `ccr-0db862ed-uol6i8`.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.
