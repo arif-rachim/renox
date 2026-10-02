@@ -10,6 +10,13 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M28a · Data grid: search, filter chips, row links, several grids on a page
+
+- New: `Column::searchable()` and the toolbar's search box (every word, any searchable column,
+  as you type); the active filters as chips that clear one at a time.
+- New: `Grid::row_url` (a click on a row opens it), `Grid::empty_state`, and `Grid::prefix`
+  for several grids on one page; a grid keeps the page's other query string values.
+
 ### M27d · Data grid: moving and resizing columns
 
 - New: drag a heading to move its column; drag a heading's edge to resize it (double-click for

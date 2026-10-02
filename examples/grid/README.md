@@ -24,6 +24,9 @@ cargo run               # http://127.0.0.1:3000
 - **Freeze and reorder.** In the column menu, pick Left or Right for a column,
   or move it up and down. Logged in, your choices are saved for you
   (`grid_preferences`); as a guest, in the session.
+- **Search.** Type in the box at the top: every word must be in the order
+  number, name, email or city. Active filters and the search show as chips;
+  × removes one.
 - **Filters by kind.** Text (contains, starts with, ends with, equals, or a
   `%` pattern), number ranges, the Ordered column's date range calendar,
   choices for Region, Status and Paid, and any-of for Tags. The URL keeps

@@ -304,6 +304,18 @@ and drawn with the `grid` macro; a call block draws the `custom` columns:
   shows and hides columns for the current screen size, moves them and freezes them left or
   right; a logged-in user's choices are kept in `grid_preferences` (every app has the table),
   a guest's in the session.
+- **Search and active filters.** Columns marked `.searchable()` put a search box in the toolbar:
+  every word typed must appear in one of them (as text, any case), and it asks as you type. The
+  active filters and the search show as chips under the toolbar; × clears one.
+- **Rows that open something.** `.row_url("/orders/{id}")` makes a click on a row open it
+  (Ctrl/Cmd-click: a new tab; Enter on a focused row). With row details the click opens those
+  and the row tools get a link instead.
+- **Empty grids.** `.empty_state("No orders yet", Some("…"))` says what goes here; the call block
+  can add buttons for `column.key == "_empty"`. A filtered grid with no rows offers to clear the
+  filters.
+- **Several grids on a page.** `.prefix("orders")` names the grid's values `orders.page`,
+  `orders.q.number`, …; each grid keeps the page's other query string values (another grid's,
+  a tab) in its own links.
 - **Moving and resizing columns.** Drag a heading (with a mouse) to move its column, or move it
   in the column menu (on touch screens too); drag the edge of a heading to resize the column,
   double-click the edge for the automatic width, or focus it and use the arrow keys. Widths

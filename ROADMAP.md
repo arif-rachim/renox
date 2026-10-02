@@ -1313,6 +1313,26 @@ Notes from M27d:
   works with touch (the handle takes the pointer).
 - A drag that ends on a heading isn't a click, so it doesn't sort.
 
+### M28 · The data grid next to Filament's tables
+The owner compared the grid with Filament 5's tables (2026-10-02) and asked for all of the
+missing pieces, in this order:
+- [x] M28a: query string names per grid (`prefix`) and keeping the page's other values, the
+      search box (`Column::searchable`), active filter chips, `row_url`, `empty_state`
+- [ ] M28b: selecting rows and bulk actions, row actions with a confirmation
+- [ ] M28c: summaries (sum, average, count, range) in the footer, grouped rows with their
+      own summaries
+- [ ] M28d: a card layout on phones, more column kinds (badges with colors, icons, images,
+      descriptions, tooltips)
+- [ ] M28e: relationship columns, an advanced filter (and/or, operators), polling, filters
+      and sort kept in the session
+
+Notes from M28a:
+- Before `prefix`, two grids on a page shared `page`, `sort` and `q.*`, and a grid's request
+  dropped every query string value that wasn't its own (a tab, the other grid). Each grid now
+  writes the others' values as hidden fields, so both survive either grid's requests.
+- The search matches every word in any searchable column with
+  `LOWER(CAST(column AS TEXT)) LIKE`, the same on SQLite and PostgreSQL.
+
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`
       (resource tables and forms); billing later

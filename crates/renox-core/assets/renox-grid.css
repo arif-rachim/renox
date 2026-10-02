@@ -60,6 +60,38 @@
 .rx-grid__icon--small { width: 30px; height: 30px; background: transparent; }
 .rx-grid :focus-visible { outline: 3px solid var(--rx-focus); outline-offset: 1px; }
 
+/* Search and active filters. */
+.rx-grid__search {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 36px; padding: 0 10px; border-radius: var(--rx-radius-s);
+  background: var(--rx-fill); color: var(--rx-secondary-label);
+}
+.rx-grid__search input {
+  border: 0; background: transparent; color: var(--rx-label); font: inherit;
+  width: 14rem; min-width: 0; outline: none;
+}
+.rx-grid__search:focus-within { box-shadow: 0 0 0 3px var(--rx-focus); }
+.rx-grid__chips {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  padding: 8px 16px; border-bottom: 1px solid var(--rx-separator); flex: none;
+}
+.rx-grid__chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 4px 3px 10px; border-radius: 999px;
+  background: color-mix(in srgb, var(--rx-accent) 14%, transparent);
+  color: var(--rx-label); font-size: var(--rx-text-footnote);
+}
+.rx-grid__chip-x {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; padding: 0; border: 0; border-radius: 999px;
+  background: none; color: var(--rx-secondary-label); cursor: pointer;
+}
+.rx-grid__chip-x:hover { background: var(--rx-fill-strong); color: var(--rx-label); }
+tr[data-href] { cursor: pointer; }
+.rx-grid__empty-title { margin: 0 0 6px; font-weight: 600; color: var(--rx-label); }
+.rx-grid__empty-text { margin: 0 0 12px; }
+.rx-grid__empty-actions { display: flex; justify-content: center; gap: 8px; margin-top: 8px; }
+
 /* The scrolling area: both directions, the headings stick to its top. */
 .rx-grid__scroll {
   flex: 1 1 auto;
@@ -321,6 +353,10 @@ calendar-month::part(outside) { color: var(--rx-tertiary-label); }
   .rx-grid__table th, .rx-grid__table td { padding: 9px 10px; }
   .rx-grid__foot { gap: 8px; padding-inline: 8px 8px; }
   .rx-grid__range { display: none; }
+  .rx-grid__bar { flex-wrap: wrap; }
+  .rx-grid__tools { flex: 1 1 100%; }
+  .rx-grid__search { flex: 1 1 auto; }
+  .rx-grid__search input { width: 100%; }
   .rx-grid__pages { display: none; }
   .rx-grid__page-of { display: inline; }
   .rx-grid__pop,

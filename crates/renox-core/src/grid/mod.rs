@@ -128,6 +128,7 @@ pub struct Column {
     width: Option<String>,
     editable: bool,
     merge: bool,
+    searchable: bool,
 }
 
 impl Column {
@@ -148,6 +149,7 @@ impl Column {
             width: None,
             editable: false,
             merge: false,
+            searchable: false,
         }
     }
 
@@ -290,6 +292,14 @@ impl Column {
         self
     }
 
+    /// The toolbar's search box looks in this column (as text, ignoring
+    /// case). The box shows when a column is searchable. Not for custom
+    /// columns.
+    pub fn searchable(mut self) -> Self {
+        self.searchable = self.kind != Kind::Custom;
+        self
+    }
+
     /// The column's key.
     pub fn key(&self) -> &str {
         &self.key
@@ -317,6 +327,9 @@ pub struct Grid {
     edit_url: Option<String>,
     reorder: Option<(String, String)>,
     exports: bool,
+    prefix: Option<String>,
+    row_url: Option<String>,
+    empty: Option<(String, Option<String>)>,
 }
 
 impl Grid {
@@ -335,6 +348,64 @@ impl Grid {
             edit_url: None,
             reorder: None,
             exports: false,
+            prefix: None,
+            row_url: None,
+            empty: None,
+        }
+    }
+
+    /// Prefixes the grid's query string names (`orders.page=2`,
+    /// `orders.q.number=…`), for pages with more than one grid. Without
+    /// it the names are plain (`page=2`). Either way a grid keeps the query
+    /// string values that aren't its own.
+    pub fn prefix(mut self, prefix: &str) -> Self {
+        self.prefix = Some(prefix.to_owned());
+        self
+    }
+
+    /// A click on a row (outside its buttons and links) opens this URL,
+    /// `{id}` replaced by the row's id; Ctrl/Cmd-click opens it in a new tab.
+    /// With row details ([`Grid::audit`], [`Grid::details`]) a click opens
+    /// those instead and the row tools get a link.
+    pub fn row_url(mut self, url: &str) -> Self {
+        self.row_url = Some(url.to_owned());
+        self
+    }
+
+    /// What an empty grid (before any filter) says; the page's call block
+    /// can add buttons for `column.key == "_empty"`.
+    pub fn empty_state(mut self, heading: &str, description: Option<&str>) -> Self {
+        self.empty = Some((heading.to_owned(), description.map(str::to_owned)));
+        self
+    }
+
+    /// Whether a query string name belongs to this grid, and its name
+    /// without the prefix.
+    fn own<'a>(&self, name: &'a str) -> Option<&'a str> {
+        let name = match &self.prefix {
+            Some(prefix) => name.strip_prefix(prefix.as_str())?.strip_prefix('.')?,
+            None => name,
+        };
+        let known = matches!(name, "page" | "per_page" | "sort" | "search" | "export")
+            || name.split_once('.').is_some_and(|(part, _)| {
+                matches!(part, "q" | "m" | "min" | "max" | "from" | "to" | "in")
+            });
+        known.then_some(name)
+    }
+
+    /// The request's values for this grid, without the prefix.
+    fn own_params(&self, params: &[(String, String)]) -> Vec<(String, String)> {
+        params
+            .iter()
+            .filter_map(|(k, v)| self.own(k).map(|k| (k.to_owned(), v.clone())))
+            .collect()
+    }
+
+    /// A name of this grid's, with the prefix.
+    fn name(&self, name: &str) -> String {
+        match &self.prefix {
+            Some(prefix) => format!("{prefix}.{name}"),
+            None => name.to_owned(),
         }
     }
 
@@ -441,17 +512,24 @@ impl Grid {
             )));
         }
         let prefs = load_prefs(request, &self.id).await;
-        let state = State_::parse(self, &request.params);
+        let state = State_::parse(self, &self.own_params(&request.params));
         let query = self.filtered(query, &state);
         let query = self.sorted(query, &state);
         let rows = query
             .paginate(&request.db, state.page, state.per_page)
             .await?;
+        let keep = request
+            .params
+            .iter()
+            .filter(|(k, _)| self.own(k).is_none())
+            .cloned()
+            .collect();
         Ok(GridPage {
             grid: self.clone(),
             prefs,
             state,
             path: request.path.clone(),
+            keep,
             rows,
             extra: Vec::new(),
         })
@@ -460,7 +538,7 @@ impl Grid {
     /// `query` with the request's filters applied (also used by `page`):
     /// for exports or totals over every filtered row.
     pub fn filter<M: Model>(&self, query: Query<M>, request: &GridRequest) -> Query<M> {
-        let state = State_::parse(self, &request.params);
+        let state = State_::parse(self, &self.own_params(&request.params));
         let query = self.filtered(query, &state);
         self.sorted(query, &state)
     }
@@ -471,6 +549,26 @@ impl Grid {
                 continue;
             };
             query = filter.apply(query, column);
+        }
+        if let Some(search) = &state.search {
+            let columns: Vec<&str> = self
+                .columns
+                .iter()
+                .filter(|c| c.searchable && M::COLUMNS.contains(&c.key.as_str()))
+                .map(|c| c.key.as_str())
+                .collect();
+            if !columns.is_empty() {
+                // Every word somewhere in the searchable columns.
+                for word in search.split_whitespace().take(8) {
+                    let pattern = format!("%{}%", word.to_lowercase());
+                    let sql = columns
+                        .iter()
+                        .map(|key| format!("LOWER(CAST(\"{key}\" AS TEXT)) LIKE ?"))
+                        .collect::<Vec<_>>()
+                        .join(" OR ");
+                    query = query.where_raw(&sql, vec![pattern; columns.len()]);
+                }
+            }
         }
         query
     }
@@ -712,6 +810,8 @@ impl Filter {
 #[derive(Debug, Clone)]
 struct State_ {
     filters: BTreeMap<String, Filter>,
+    /// The toolbar's search.
+    search: Option<String>,
     sort: Option<(String, bool)>,
     /// `sort` is the grid's default, not in the query string.
     defaulted: bool,
@@ -723,12 +823,16 @@ impl State_ {
     fn parse(grid: &Grid, params: &[(String, String)]) -> Self {
         let mut filters: BTreeMap<String, Filter> = BTreeMap::new();
         let mut sort = None;
+        let mut search = None;
         let mut page = 1;
         let mut per_page = grid.per_page;
         for (name, value) in params {
             let value = value.trim();
             match name.as_str() {
                 "page" => page = value.parse().unwrap_or(1).max(1),
+                "search" if !value.is_empty() && grid.columns.iter().any(|c| c.searchable) => {
+                    search = Some(value.chars().take(200).collect());
+                }
                 "per_page" => {
                     if let Ok(n) = value.parse::<u32>()
                         && grid.per_page_options.contains(&n)
@@ -787,6 +891,7 @@ impl State_ {
         }
         Self {
             filters,
+            search,
             sort,
             defaulted,
             page,
@@ -797,6 +902,9 @@ impl State_ {
     /// The query string for this state, without `page` (links set it).
     fn query_string(&self) -> Vec<(String, String)> {
         let mut out = Vec::new();
+        if let Some(search) = &self.search {
+            out.push(("search".into(), search.clone()));
+        }
         for (key, f) in &self.filters {
             if let Some(text) = &f.text {
                 out.push((format!("q.{key}"), text.clone()));
@@ -1007,6 +1115,8 @@ pub struct GridPage<M> {
     prefs: GridPrefs,
     state: State_,
     path: String,
+    /// Query string values that aren't this grid's, kept in its links.
+    keep: Vec<(String, String)>,
     rows: Paginated<M>,
     extra: Vec<Map<String, Value>>,
 }
@@ -1125,6 +1235,7 @@ impl<M: Serialize> GridPage<M> {
                             "covered": merge.covered,
                             "groups": merge.groups,
                             "edit": self.grid.edit_url.as_ref().zip(id.as_ref()).map(|(url, id)| url.replace("{id}", id)),
+                            "href": self.grid.row_url.as_ref().zip(id.as_ref()).map(|(url, id)| url.replace("{id}", id)),
                         }),
                     );
                 }
@@ -1132,10 +1243,18 @@ impl<M: Serialize> GridPage<M> {
             })
             .collect();
         let editable = self.grid.edit_url.is_some() && self.grid.columns.iter().any(|c| c.editable);
-        let query = self.state.query_string();
+        // This grid's values (prefixed) after the others the page had.
+        let own: Vec<(String, String)> = self
+            .state
+            .query_string()
+            .into_iter()
+            .map(|(k, v)| (self.grid.name(&k), v))
+            .collect();
+        let query: Vec<(String, String)> = self.keep.iter().cloned().chain(own).collect();
         let query = &query;
         let config = json!({
             "id": self.grid.id,
+            "prefix": self.grid.prefix.as_ref().map(|p| format!("{p}.")).unwrap_or_default(),
             "prefs": format!("/_renox/grid/{}/prefs", self.grid.id),
             "order": ordered.iter().map(|(c, _)| c.key.clone()).collect::<Vec<_>>(),
             "left": ordered.iter().filter(|(_, p)| *p == Some(Pin::Left)).map(|(c, _)| c.key.clone()).collect::<Vec<_>>(),
@@ -1188,7 +1307,19 @@ impl<M: Serialize> GridPage<M> {
                 "active": dragging,
             })),
             "tools": self.grid.audit || self.grid.details || editable || self.grid.reorder.is_some(),
-            "exports": self.grid.exports.then(|| export::urls(&self.path, query)),
+            "exports": self.grid.exports.then(|| export::urls(&self.path, query, &self.grid.name("per_page"), &self.grid.name("export"))),
+            // Field names: `p` before each (`orders.` with a prefix).
+            "p": self.grid.prefix.as_ref().map(|p| format!("{p}.")).unwrap_or_default(),
+            "keep": self.keep,
+            "search": {
+                "on": self.grid.columns.iter().any(|c| c.searchable),
+                "value": self.state.search,
+            },
+            "empty": self.grid.empty.as_ref().map(|(heading, description)| json!({
+                "heading": heading,
+                "description": description,
+            })),
+            "row_links": self.grid.row_url.is_some(),
         })
     }
 }
