@@ -44,8 +44,10 @@
       th.colSpan = Math.max(n, 1);
       th.classList.toggle("rx-grid__off", n === 0);
     });
-    var span = grid.querySelector("[data-grid-span]");
-    if (span) span.colSpan = Math.max(shown.size, 1) + (grid.querySelector("thead th[data-tools]") ? 1 : 0);
+    var extra = grid.querySelector("thead th[data-tools]") ? 1 : 0;
+    grid.querySelectorAll("[data-grid-span]").forEach(function (span) {
+      span.colSpan = Math.max(shown.size, 1) + extra;
+    });
     // Open details are rebuilt for the new columns.
     rowsOf(grid).forEach(function (row) {
       if (row._rxDetail) { closeDetails(grid, row); openDetails(grid, row); }
@@ -213,7 +215,7 @@
     var el = event.target;
     var grid = el.closest && el.closest("form.rx-grid");
     if (!grid) return;
-    if (el.hasAttribute("data-grid-per-page")) {
+    if (el.hasAttribute("data-grid-per-page") || el.hasAttribute("data-grid-autosubmit")) {
       submit(grid);
     } else if (el.hasAttribute("data-grid-toggle")) {
       toggle(grid, el.getAttribute("data-grid-toggle"), el.checked);
@@ -977,6 +979,20 @@
         if (ok) send(grid, t, t.getAttribute("data-method") || "POST", t.getAttribute("data-url"));
       });
     }
+  });
+
+  // Folding a group hides its rows (and their open details).
+  document.addEventListener("click", function (event) {
+    var fold = event.target.closest && event.target.closest("[data-grid-fold]");
+    if (!fold) return;
+    var grid = fold.closest("form.rx-grid");
+    var id = fold.closest("tr").getAttribute("data-grid-group");
+    var open = fold.getAttribute("aria-expanded") === "true";
+    fold.setAttribute("aria-expanded", open ? "false" : "true");
+    grid.querySelectorAll('[data-in-group="' + CSS.escape(id) + '"]').forEach(function (row) {
+      if (open && row._rxDetail) closeDetails(grid, row);
+      row.hidden = open;
+    });
   });
 
   // ---------- Setup ----------

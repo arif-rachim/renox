@@ -10,6 +10,14 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M28c · Data grid: summaries and groups
+
+- New: `Column::summary` (`grid::Summary`: sum, average, range, count) in a footer that stays
+  at the bottom, over every filtered row; `Grid::groups` / `Grid::group_by`: rows grouped with
+  a folding heading and the group's own summaries.
+- Fixed: a grid column whose value the row doesn't have shows empty instead of failing the
+  page.
+
 ### M28b · Data grid: selecting rows, bulk and row actions
 
 - New: `Grid::bulk_action` with row checkboxes, a "select all matching" choice and

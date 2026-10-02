@@ -38,7 +38,7 @@
 
 {#- A cell's value by the column's kind. -#}
 {%- macro _value(column, value) -%}
-{%- if value is none or value == "" -%}<span class="rx-grid__none" aria-label="—"></span>
+{%- if value is not defined or value is none or value == "" -%}<span class="rx-grid__none" aria-label="—"></span>
 {%- elif column.kind == "number" -%}{{ value | number(column.decimals or 0) }}
 {%- elif column.kind == "money" -%}{{ value | number }}
 {%- elif column.kind == "date" -%}{{ value | date }}
@@ -104,6 +104,20 @@
 </div>
 {%- endmacro -%}
 
+{#- A column's summaries (`Column::summary`) from their figures. -#}
+{%- macro _figures(column, figures) -%}
+{%- if figures and column.summaries %}
+{%- set d = column.decimals or 0 %}
+{%- for kind in column.summaries %}
+<span class="rx-grid__figure"><span class="rx-grid__figure-label">{{ t('ui.grid.' ~ kind) }}</span>
+{%- if kind == "sum" %}{{ figures.sum | number(d) if figures.sum is not none else "—" }}
+{%- elif kind == "average" %}{{ figures.average | number(d if d > 0 or column.kind == "money" else 1) if figures.average is not none else "—" }}
+{%- elif kind == "range" %}{% if figures.min is not none %}{{ figures.min | number(d) }} – {{ figures.max | number(d) }}{% else %}—{% endif %}
+{%- else %}{{ figures.count | number }}{% endif %}</span>
+{%- endfor %}
+{%- endif %}
+{%- endmacro -%}
+
 {#- What opens under a row: the audit fields, then the page's own details. -#}
 {%- macro _details(page, row, caller_fn) -%}
 <div class="rx-grid__details">
@@ -144,6 +158,14 @@
         <span class="rx-visually-hidden">{{ t('ui.grid.search') }}</span>
         {{ _icon("search") }}
         <input type="search" name="{{ page.p }}search" value="{{ page.search.value or '' }}" placeholder="{{ t('ui.grid.search') }}" autocomplete="off" data-grid-search>
+      </label>
+      {%- endif %}
+      {%- if page.grouping %}
+      <label class="rx-grid__group-pick"><span class="rx-visually-hidden">{{ t('ui.grid.group_by') }}</span>
+        <select class="rx-grid__control rx-grid__control--small" name="{{ page.p }}group" data-grid-autosubmit aria-label="{{ t('ui.grid.group_by') }}">
+          <option value="">{{ t('ui.grid.no_groups') }}</option>
+          {%- for option in page.grouping.options %}<option value="{{ option.key }}"{% if option.key == page.grouping.current %} selected{% endif %}>{{ t('ui.grid.group_by') }}: {{ option.label }}</option>{% endfor %}
+        </select>
       </label>
       {%- endif %}
       {%- if tools %}{{ tools }}{% endif %}
@@ -264,7 +286,19 @@
       <tbody>
         {%- set caller_fn = caller if caller is defined else none %}
         {%- for row in page.rows %}
-        <tr data-id="{{ row._rx.id }}"{% if row._rx.covered %} data-covered="{{ row._rx.covered | join(' ') }}"{% endif %}{% if row._rx.edit %} data-edit="{{ row._rx.edit }}"{% endif %}{% if page.details %} data-grid-row{% elif row._rx.href %} data-href="{{ row._rx.href }}" tabindex="0"{% endif %}>
+        {%- set g = row._rx.group %}
+        {%- if g and g.starts %}
+        {%- set gcol = page.columns[page.grouping.column] %}
+        <tr class="rx-grid__group-row" data-grid-group="{{ g.id }}">
+          <td colspan="{{ shown + (1 if page.tools else 0) }}" data-grid-span>
+            <span class="rx-grid__group-head">
+              <button type="button" class="rx-grid__fold" data-grid-fold aria-expanded="true">{{ _icon("chevron") }}<span class="rx-grid__group-label">{{ gcol.label }}:</span> {{ _value(gcol, g.value) }}</button>
+              {%- if g.rows is not none %}<span class="rx-grid__group-count">{{ g.rows | number }} {{ t('ui.grid.row_word', count=g.rows) }}</span>{% endif %}
+            </span>
+          </td>
+        </tr>
+        {%- endif %}
+        <tr{% if g %} data-in-group="{{ g.id }}"{% endif %} data-id="{{ row._rx.id }}"{% if row._rx.covered %} data-covered="{{ row._rx.covered | join(' ') }}"{% endif %}{% if row._rx.edit %} data-edit="{{ row._rx.edit }}"{% endif %}{% if page.details %} data-grid-row{% elif row._rx.href %} data-href="{{ row._rx.href }}" tabindex="0"{% endif %}>
           {%- if page.tools %}
           <td class="rx-grid__tools-col" data-tools data-pin="left">
             <span class="rx-grid__row-tools">
@@ -309,6 +343,16 @@
           {%- endif %}
           {%- endfor %}
         </tr>
+        {%- if g and g.ends and page.summary %}
+        <tr class="rx-grid__subtotal" data-in-group="{{ g.id }}">
+          {%- if page.tools %}<td class="rx-grid__tools-col" data-tools data-pin="left"><span class="rx-grid__figure-label">{{ t('ui.grid.group_rows') }}</span></td>{% endif %}
+          {%- for column in page.columns %}
+          <td data-col="{{ column.key }}"{% if column.pin %} data-pin="{{ column.pin }}"{% endif %}{% if column.numeric %} class="rx-grid__num"{% endif %}>
+            {%- if loop.first and not page.tools and not column.summaries %}<span class="rx-grid__figure-label">{{ t('ui.grid.group_rows') }}</span>{% endif -%}
+            {{ _figures(column, g.figures[column.key] if g.figures else none) }}</td>
+          {%- endfor %}
+        </tr>
+        {%- endif %}
         {%- else %}
         <tr><td class="rx-grid__empty" colspan="{{ shown }}" data-grid-span>
           {%- if page.filtered or page.search.value %}
@@ -324,6 +368,18 @@
         </td></tr>
         {%- endfor %}
       </tbody>
+      {%- if page.summary and page.rows %}
+      <tfoot>
+        <tr>
+          {%- if page.tools %}<td class="rx-grid__tools-col" data-tools data-pin="left"><span class="rx-grid__figure-label">{{ t('ui.grid.all_rows') }}</span></td>{% endif %}
+          {%- for column in page.columns %}
+          <td data-col="{{ column.key }}"{% if column.pin %} data-pin="{{ column.pin }}"{% endif %}{% if column.numeric %} class="rx-grid__num"{% endif %}>
+            {%- if loop.first and not page.tools and not column.summaries %}<span class="rx-grid__figure-label">{{ t('ui.grid.all_rows') }}</span>{% endif -%}
+            {{ _figures(column, page.summary[column.key]) }}</td>
+          {%- endfor %}
+        </tr>
+      </tfoot>
+      {%- endif %}
     </table>
   </div>
   <div class="rx-grid__foot">

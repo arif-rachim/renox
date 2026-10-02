@@ -689,7 +689,8 @@ More: `.audit()` (who changed a row, under it), `Column::editable()` + `.edit_ur
 (CSV, Excel with the `xlsx` feature, a print page), `Column::searchable()` (the search box),
 `.row_url("/orders/{id}")`, `.empty_state(…)`, `.prefix("orders")` for two grids on a page,
 `.bulk_action(Action::new("Delete", url).confirm("Sure?").danger())` +
-`grid.selected(query, &request, &selection)?` (`Form<Selection>`), `.row_action(…)`.
+`grid.selected(query, &request, &selection)?` (`Form<Selection>`), `.row_action(…)`,
+`Column::summary(Summary::Sum)` (footer and group subtotals), `.groups(&["region"])`.
 
 ## Seeders and factories
 

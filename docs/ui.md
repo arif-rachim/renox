@@ -325,6 +325,12 @@ and drawn with the `grid` macro; a call block draws the `custom` columns:
   actions in each row's ⋯ menu (`{id}` in the URL; `Action::link` for a plain link).
   `.confirm("…")` asks first in a dialog, `.danger()` shows the action in red, `.method("DELETE")`
   picks the method. After a 2xx (a `Toast` shows) the grid reloads its page.
+- **Summaries and groups.** `Column::summary(Summary::Sum)` (also `Average`, `Range`, and `Count`
+  for any column) puts the figure in a footer that stays at the bottom of the grid, over every
+  row the filters match. `.groups(&["region", "status"])` adds a "Group" choice to the toolbar
+  (`.group_by("region")` starts grouped): rows come group by group, each with a heading (its
+  value and row count, a click folds it) and a subtotal row with the group's own summaries.
+  Merged cells and dragging rows are off while grouped.
 - **Moving and resizing columns.** Drag a heading (with a mouse) to move its column, or move it
   in the column menu (on touch screens too); drag the edge of a heading to resize the column,
   double-click the edge for the automatic width, or focus it and use the arrow keys. Widths

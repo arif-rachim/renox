@@ -995,3 +995,117 @@ async fn bulk_actions_take_the_selection_or_all_matching() {
         .await
         .assert_status(400);
 }
+
+// ---------- M28c: summaries and groups ----------
+
+fn summary_grid() -> Grid {
+    use renox::grid::Summary;
+    Grid::new("orders")
+        .column(Column::text("number", "Order"))
+        .column(Column::select(
+            "status",
+            "Status",
+            [("new", "New"), ("paid", "Paid")],
+        ))
+        .column(Column::bool("paid", "Paid"))
+        .column(
+            Column::money("total", "Total")
+                .summary(Summary::Sum)
+                .summary(Summary::Average),
+        )
+        .column(Column::text("number2", "Count").summary(Summary::Sum)) // not numeric: ignored
+        .column(
+            Column::date("ordered_on", "Ordered")
+                .summary(Summary::Count)
+                .summary(Summary::Range),
+        )
+        .sort_by("number")
+        .groups(&["status", "paid"])
+}
+
+struct Summing;
+
+impl Module for Summing {
+    fn name(&self) -> &'static str {
+        "summing"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new().get("/sums", |request: GridRequest| async move {
+            let page = summary_grid().page(GridOrder::query(), &request).await?;
+            Ok::<_, Error>(view("orders.html", context! { orders => page }))
+        })
+    }
+}
+
+#[renox::test]
+async fn summaries_cover_every_filtered_row_and_each_group() {
+    let (app, views) = app().await;
+    drop(app);
+    let app = TestApp::with_config(App::new().migrations(&[SCHEMA]).module(Summing), |c| {
+        c.views_path = views.path().to_path_buf()
+    })
+    .await;
+    for (number, status, total, paid) in [
+        ("A", "new", 100, false),
+        ("B", "paid", 300, true),
+        ("C", "paid", 500, true),
+        ("D", "new", 1_000, false),
+    ] {
+        GridOrder::create(
+            app.db(),
+            GridOrder {
+                number: number.into(),
+                status: status.into(),
+                total,
+                paid,
+                ordered_on: NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    }
+    // The footer: every row the filters match, not just the page.
+    let html = app.get("/sums?per_page=10").await.text();
+    assert!(
+        html.contains("<tfoot>"),
+        "{}",
+        &html[html.len().saturating_sub(3000)..]
+    );
+    let foot = html.split("<tfoot>").nth(1).unwrap();
+    assert!(foot.contains("1,900"), "{foot}");
+    assert!(foot.contains("475"), "the average");
+    assert!(foot.contains("Count</span>4"), "{foot}");
+    assert!(
+        !html.contains("rx-grid__group-row"),
+        "no groups until picked"
+    );
+    let filtered = app.get("/sums?in.status=paid").await.text();
+    assert!(filtered.split("<tfoot>").nth(1).unwrap().contains("800"));
+
+    // Grouped by status: a heading and a subtotal per group, sorted by it.
+    let grouped = app.get("/sums?group=status").await.text();
+    assert_eq!(grouped.matches("rx-grid__group-row").count(), 2);
+    assert_eq!(grouped.matches("rx-grid__subtotal").count(), 2);
+    assert!(
+        grouped.contains("Status:</span> New</button><span class=\"rx-grid__group-count\">2 rows")
+    );
+    let rows: Vec<String> = numbers(&grouped)
+        .into_iter()
+        .filter(|n| !n.starts_with('<'))
+        .collect();
+    assert_eq!(rows, ["A", "D", "B", "C"]);
+    let subtotals: Vec<&str> = grouped.split("rx-grid__subtotal").skip(1).collect();
+    assert!(subtotals[0].contains("1,100") && subtotals[1].contains("800"));
+    // Booleans group too; an unknown group is no group.
+    let by_paid = app.get("/sums?group=paid").await.text();
+    assert_eq!(by_paid.matches("rx-grid__group-row").count(), 2);
+    assert!(by_paid.contains("Paid:</span> <span class=\"rx-grid__no\">No</span>"));
+    assert!(
+        !app.get("/sums?group=number")
+            .await
+            .text()
+            .contains("rx-grid__group-row")
+    );
+}
