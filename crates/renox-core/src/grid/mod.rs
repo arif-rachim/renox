@@ -851,7 +851,7 @@ impl Grid {
         }
         let prefs = load_prefs(request, &self.id).await;
         let state = State_::parse(self, &self.effective_params(request));
-        let query = self.filtered(query, &state);
+        let query = self.filtered(query, &state, &request.zone);
         let unsorted = query.clone();
         let query = self.sorted(query, &state);
         let rows = query
@@ -1032,16 +1032,21 @@ impl Grid {
     /// for exports or totals over every filtered row.
     pub fn filter<M: Model>(&self, query: Query<M>, request: &GridRequest) -> Query<M> {
         let state = State_::parse(self, &self.effective_params(request));
-        let query = self.filtered(query, &state);
+        let query = self.filtered(query, &state, &request.zone);
         self.sorted(query, &state)
     }
 
-    fn filtered<M: Model>(&self, mut query: Query<M>, state: &State_) -> Query<M> {
+    fn filtered<M: Model>(
+        &self,
+        mut query: Query<M>,
+        state: &State_,
+        zone: &crate::timezone::Zone,
+    ) -> Query<M> {
         for (key, filter) in &state.filters {
             let Some(column) = self.find(key) else {
                 continue;
             };
-            query = filter.apply(query, column);
+            query = filter.apply(query, column, zone);
         }
         if !state.rules.is_empty() {
             let mut parts = Vec::new();
@@ -1057,7 +1062,7 @@ impl Grid {
                     }
                     Target::Column(_) => continue,
                 };
-                if let Some((sql, values)) = rule.sql(&target, column.kind) {
+                if let Some((sql, values)) = rule.sql(&target, column.kind, zone) {
                     parts.push(format!("({sql})"));
                     binds.extend(values);
                 }
@@ -1290,7 +1295,12 @@ impl Filter {
         })
     }
 
-    fn apply<M: Model>(&self, mut query: Query<M>, column: &Column) -> Query<M> {
+    fn apply<M: Model>(
+        &self,
+        mut query: Query<M>,
+        column: &Column,
+        zone: &crate::timezone::Zone,
+    ) -> Query<M> {
         let key = column.key.as_str();
         let target = column.target::<M>();
         match column.kind {
@@ -1321,7 +1331,7 @@ impl Filter {
                 }
             }
             Kind::DateTime => {
-                let at = |d: NaiveDate| d.and_hms_opt(0, 0, 0).map(|t| t.and_utc());
+                let at = |d: NaiveDate| day_start(zone, d);
                 if let Some(from) = self.from.and_then(at) {
                     query = target.compare(query, ">=", from);
                 }
@@ -1577,6 +1587,18 @@ impl State_ {
     }
 }
 
+/// The moment the day `day` starts in `zone`: date-time filters take whole
+/// days of `APP_TIMEZONE`, the zone their cells are shown in. When a clock
+/// change skips midnight, the day starts at its first wall-clock time.
+fn day_start(
+    zone: &crate::timezone::Zone,
+    day: NaiveDate,
+) -> Option<chrono::DateTime<chrono::Utc>> {
+    let midnight = day.and_hms_opt(0, 0, 0)?;
+    let at = (0..=2).find_map(|h| zone.resolve(midnight + Duration::hours(h)))?;
+    chrono::DateTime::from_timestamp(at, 0)
+}
+
 /// One rule of the advanced filter.
 #[derive(Debug, Clone, Default, PartialEq)]
 struct Rule {
@@ -1613,7 +1635,12 @@ fn op_takes_value(op: &str) -> bool {
 impl Rule {
     /// The rule as SQL on `target` (a quoted column or a related value),
     /// with its values; `None` when the value doesn't fit the column.
-    fn sql(&self, target: &str, kind: Kind) -> Option<(String, Vec<DbValue>)> {
+    fn sql(
+        &self,
+        target: &str,
+        kind: Kind,
+        zone: &crate::timezone::Zone,
+    ) -> Option<(String, Vec<DbValue>)> {
         let text = format!("LOWER(CAST({target} AS TEXT))");
         let lower = self.value.to_lowercase();
         let like = |pattern: String| (format!("{text} LIKE ?"), vec![pattern.to_db_value()]);
@@ -1675,7 +1702,7 @@ impl Rule {
                 let next = day.checked_add_signed(Duration::days(1))?;
                 let bound = |d: NaiveDate| -> DbValue {
                     if kind == Kind::DateTime {
-                        d.and_hms_opt(0, 0, 0).map(|t| t.and_utc()).to_db_value()
+                        day_start(zone, d).to_db_value()
                     } else {
                         d.to_db_value()
                     }

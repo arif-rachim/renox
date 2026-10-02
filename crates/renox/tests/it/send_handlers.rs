@@ -161,6 +161,7 @@ async fn access(State(db): State<Db>, user: AuthUser, session: Session) -> Resul
     permissions::delete_role(&db, "editor").await?;
     user.create_token_with(&db, "t", &["a"], None).await?;
     renox::auth::prune_expired_tokens(&db, Duration::from_secs(60)).await?;
+    renox::auth::prune_read_notifications(&db, Duration::from_secs(60)).await?;
     let scoped = Note::unscoped().none().count(&db).await?;
     let mut me = user.user().clone();
     renox::auth::change_password(&db, &session, &mut me, "a new password").await?;

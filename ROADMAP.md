@@ -1378,9 +1378,12 @@ Notes from the docs audit after M28:
   the stubs (`AGENTS.md.stub`, `env.stub`) were checked against the code after M28 and
   fixed where they had drifted. `docs/grid.md` is new: a guide for `renox::grid`, compiled
   as the `GridGuide` doctest.
-- Three code issues were found and left for a fix PR: the grid's date filters use UTC days
-  instead of `APP_TIMEZONE`; `grid_preferences` rows survive account deletion (no foreign
-  key); notifications have no prune command.
+- Three code issues found by the audit were fixed on the same branch: the grid's date-time
+  filters (`from.`/`to.` and the advanced filter's `on`/`before`/`after`) took UTC days and
+  now take days of `APP_TIMEZONE`, like the cells; `User::delete_account` also deletes the
+  user's `grid_preferences` rows (the table can't have a foreign key: not every app has
+  `users`); and the Auth module's `notifications:prune [--days 30]` /
+  `auth::prune_read_notifications` delete notifications read long ago.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

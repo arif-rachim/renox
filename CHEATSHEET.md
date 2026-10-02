@@ -1045,7 +1045,8 @@ impl Validate for ProjectForm {
 ```
 
 In templates: `{% if can('posts.publish') %}` (a gate or a permission) and `auth.roles`.
-`rnx tokens:prune` deletes API tokens that expired more than a day ago.
+`rnx tokens:prune` deletes API tokens that expired more than a day ago, and
+`rnx notifications:prune --days 30` notifications read more than 30 days ago (unread ones stay).
 
 ## HTMX
 

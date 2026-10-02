@@ -12,6 +12,17 @@ changes by milestone (each one pull request; details in its description and in
 
 ### Docs audit after M28
 
+Fixes found by the audit:
+- Data grid: date-time filters (the date range and the advanced filter's `on`/`before`/`after`)
+  take whole days of `APP_TIMEZONE`, the zone the cells are shown in. They took UTC days, so
+  with `Asia/Jakarta` a filtered day was off by seven hours.
+- `User::delete_account` (the account page's "delete account") also deletes the user's
+  `grid_preferences` rows, which used to stay behind.
+- New: `notifications:prune [--days 30]` (Auth module) and
+  `renox::auth::prune_read_notifications(db, age)` delete notifications read more than that
+  ago; unread ones stay. Nothing pruned them before.
+
+Docs:
 - New guide: docs/grid.md for `renox::grid` (compiled as the `GridGuide` doctest).
 - CHEATSHEET: the missing patterns filled in (queries, the UI kit's macros, the data grid,
   commands, config).

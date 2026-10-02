@@ -57,7 +57,9 @@ use axum::response::{IntoResponse, Redirect, Response};
 
 pub(crate) use account::require_password_confirmed;
 pub use module::{Auth, Registration};
-pub use notifications::{Channel, DatabaseNotification, Notification, Recipient};
+pub use notifications::{
+    Channel, DatabaseNotification, Notification, Recipient, prune_read_notifications,
+};
 pub use permissions::Permissions;
 pub(crate) use throttle::LoginThrottle;
 pub use tokens::{AccessToken, NewToken, prune_expired_tokens};

@@ -103,6 +103,11 @@ async fn totals(State(state): State<AppState>, request: GridRequest) -> Result<S
 }
 
 async fn app() -> (TestApp, tempfile::TempDir) {
+    app_in("UTC").await
+}
+
+/// The orders app with `APP_TIMEZONE` set to `timezone`.
+async fn app_in(timezone: &str) -> (TestApp, tempfile::TempDir) {
     let views = tempfile::tempdir().unwrap();
     std::fs::write(
         views.path().join("orders.html"),
@@ -115,7 +120,10 @@ async fn app() -> (TestApp, tempfile::TempDir) {
             .migrations(&[SCHEMA])
             .module(Auth::new())
             .module(Orders),
-        |c| c.views_path = views.path().to_path_buf(),
+        |c| {
+            c.views_path = views.path().to_path_buf();
+            c.timezone = timezone.into();
+        },
     )
     .await;
     let day = |d: u32| NaiveDate::from_ymd_opt(2026, 3, d).unwrap();
@@ -267,6 +275,32 @@ async fn filters_by_each_kind_of_column() {
     }
     // Totals over every filtered row, not just a page.
     app.get("/totals?in.status=paid").await.assert_see("87000");
+}
+
+#[renox::test]
+async fn date_time_filters_take_days_of_the_app_timezone() {
+    // XX-105 was placed at 09:00 UTC on 31 March: 23:00 on 30 March in
+    // UTC-10, where the cells show it.
+    let (app, _views) = app_in("-10:00").await;
+    assert_eq!(
+        rows(&app, "from.placed_at=2026-03-31").await,
+        Vec::<String>::new()
+    );
+    assert_eq!(
+        rows(&app, "from.placed_at=2026-03-30&to.placed_at=2026-03-30").await,
+        ["XX-105"]
+    );
+    assert_eq!(
+        rows(&app, "r.0.c=placed_at&r.0.o=on&r.0.v=2026-03-30").await,
+        ["XX-105"],
+        "the advanced filter too"
+    );
+    assert_eq!(
+        rows(&app, "r.0.c=placed_at&r.0.o=after&r.0.v=2026-03-30").await,
+        Vec::<String>::new()
+    );
+    // A date column has no time, so the zone doesn't move it.
+    assert_eq!(rows(&app, "from.ordered_on=2026-03-31").await, ["XX-105"]);
 }
 
 #[renox::test]

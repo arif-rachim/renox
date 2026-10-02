@@ -305,7 +305,7 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
   migrate:status|db:seed|queue:work|queue:failed|queue:retry|queue:flush|queue:forget|
   queue:prune-failed|queue:prune-batches|webhook:failed|webhook:retry|cache:prune|session:prune|
   ui:publish|schedule:list|schedule:run|schedule:work|route:list|db:shell|down|
-  up|help`, default `serve` (modules add more: `tokens:prune` from Auth, `audit:prune` from Audit),
+  up|help`, default `serve` (modules add more: `tokens:prune` and `notifications:prune` from Auth, `audit:prune` from Audit),
   plus the app's own commands (`App::command`, or `App::typed_command` for a clap `AppCommand`;
   names can't clash with built-ins). Migrations and
   jobs are compiled into the app, so only the app can run them. `rnx <anything unknown>` forwards
@@ -914,7 +914,9 @@ picks the build, not the terminal.
   (`related`/`count_of`/`sum_of`, `advanced_filter`, `remember`, `poll`, NULLs last): merged
   (#84). M28 is done (#80–#84).
 - **Docs audit after M28** (branch `documentation`): every doc checked against the code,
-  `docs/grid.md` added (doctest `GridGuide`).
+  `docs/grid.md` added (doctest `GridGuide`). Three fixes it found: grid date-time filters take
+  `APP_TIMEZONE` days (`day_start` in grid/mod.rs), `delete_account` also deletes
+  `grid_preferences` rows, and `notifications:prune` / `auth::prune_read_notifications`.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.

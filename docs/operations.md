@@ -281,8 +281,8 @@ behind them from a scheduled task (a task runs Rust code, not commands):
 | `failed_jobs` | jobs that failed for good | `queue:prune-failed --hours 168` (`state.queue.prune_failed(age)`), `queue:flush` (see Failed jobs) |
 | `job_batches` | every dispatched batch | `queue:prune-batches --hours 24` (`state.queue.prune_batches(age)`, finished batches) |
 | `webhook_calls` | every received webhook | nothing yet: delete old `processed` rows yourself if it matters |
-| `notifications` | every database notification | nothing: rows go only with their user (`ON DELETE CASCADE`). If it matters, delete old read ones from a task, e.g. `DELETE FROM notifications WHERE read_at < ?` |
-| `grid_preferences` | one small row per user and data grid | nothing; it has no foreign key to `users`, so a deleted user's rows stay: delete them with the account if it matters |
+| `notifications` | every database notification | `notifications:prune --days 30` (Auth module): notifications read more than that ago; unread ones stay (`renox::auth::prune_read_notifications(&state.db, age)`). A user's rows also go with the user (`ON DELETE CASCADE`) |
+| `grid_preferences` | one small row per user and data grid | `User::delete_account` (the account page's "delete account") deletes the user's rows. The table has no foreign key to `users` (every app has it, not every app has `users`), so an app that deletes users another way deletes these rows too |
 
 Each function returns how many rows it deleted, and takes a `std::time::Duration` where the
 command takes `--hours` or `--days`. A daily task, e.g.

@@ -423,3 +423,17 @@ impl User {
         Ok(done)
     }
 }
+
+/// Deletes notifications read more than `age` ago; returns how many. Unread
+/// ones stay, however old. `rnx notifications:prune` (from the `Auth` module)
+/// runs it with `--days` (30 by default); schedule it, e.g. daily, since
+/// nothing else removes read notifications while their user exists.
+pub async fn prune_read_notifications(db: &Db, age: std::time::Duration) -> Result<u64> {
+    let before = now() - chrono::Duration::from_std(age).unwrap_or_default();
+    Ok(
+        crate::db::sql("DELETE FROM notifications WHERE read_at < ?")
+            .bind(before)
+            .execute(db)
+            .await?,
+    )
+}
