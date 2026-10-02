@@ -145,7 +145,7 @@ Each constructor takes the model's column key and the heading's label.
 | Column | Shows | Heading filter |
 |---|---|---|
 | `text` | the text | contains / starts with / ends with / equals, or a pattern with `%` (`kop%`) |
-| `number` (`.decimals(n)`), `money` | right-aligned, with the locale's separators; `money` is an amount in the smallest unit | from–to |
+| `number` (`.decimals(n)`), `money` | right-aligned, with the locale's separators; `money` is an amount in the smallest unit, shown with the `number` filter (no currency symbol, unlike the template filter `money`) | from–to |
 | `date`, `datetime` | `2026-03-05`; `datetime` adds the time, shown in `APP_TIMEZONE` | a date range: two date fields and a calendar ([Cally](https://wicky.nillia.ms/cally/), bundled); a `datetime` range takes whole days of `APP_TIMEZONE` |
 | `bool` | Yes / No (`.icons()`: ✓ / ✗) | yes, no |
 | `select(key, label, options)` | the option's label | pick some |

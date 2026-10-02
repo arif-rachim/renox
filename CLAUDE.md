@@ -969,7 +969,7 @@ picks the build, not the terminal.
   `Auth::new().notifications()` with the kit's `notification_bell`, `renox/notifications.html`
   and `/notifications/stream` (SSE woken by `auth::notifications::Hub` in-process, polling the
   table every 15 s for other processes, five-minute streams, stopped at shutdown); shop and
-  jobs use them. Branch `ccr-0db862ed-uol6i8`.
+  jobs use them. Merged (#96).
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.
@@ -979,5 +979,6 @@ picks the build, not the terminal.
   login, then small adds (validation rules like `json`/`gt`/`decimal`/`dimensions`, several
   storage disks, route model binding), then admin, search, realtime (SSE) and billing.
 - As of M28: ~60k lines of Rust in `crates/` (stubs excluded), ~650 `#[test]`/`#[renox::test]`/
-  `#[tokio::test]` functions in `crates/` and `examples/` (plus doctests), and 43 direct
-  dependencies in renox-core (6 optional). Keep dependencies lean and remove unused ones.
+  `#[tokio::test]` functions in `crates/` and `examples/` (plus doctests), and 44 direct
+  dependencies in renox-core (6 optional; pulldown-cmark came with the `markdown` filter, #94).
+  Keep dependencies lean and remove unused ones.
