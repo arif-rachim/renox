@@ -28,6 +28,8 @@ body.dashboard {
 .topbar__nav form { margin: 0; }
 .topbar__user { color: var(--rx-secondary-label); font-size: var(--rx-text-footnote); }
 .board { padding: 16px 20px 20px; }
+/* `/follow-up`: two grids, one under the other, the page scrolling. */
+.follow-up { display: grid; gap: 24px; overflow-y: auto; }
 .page { padding: 24px 20px; max-width: 640px; }
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; margin: 0; }
 .facts dt { color: var(--rx-secondary-label); }

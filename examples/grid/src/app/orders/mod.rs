@@ -27,6 +27,8 @@ impl Module for Orders {
             .name("orders.index")
             .get("/regions", regions)
             .name("orders.regions")
+            .get("/follow-up", follow_up)
+            .name("orders.follow_up")
             .get("/orders/{id}", show)
             .name("orders.show")
             .patch("/orders/{id}", update)
@@ -202,6 +204,71 @@ pub fn regions_grid() -> Grid {
         .audit()
         .details()
         .exports()
+}
+
+/// Unpaid orders, the first of two grids on `/follow-up`. `prefix` gives its
+/// query string names their own start (`unpaid.page`, `unpaid.q.city`), so
+/// it pages and filters apart from the grid next to it.
+pub fn unpaid_grid() -> Grid {
+    Grid::new("unpaid")
+        .prefix("unpaid")
+        .title("Unpaid")
+        .per_page(10)
+        // The number opens the order; the email shows on hover.
+        .column(
+            Column::text("number", "Order")
+                .link("/orders/{id}")
+                .mobile(),
+        )
+        .column(
+            Column::text("customer", "Customer")
+                .tooltip("email")
+                .limit(16)
+                .mobile(),
+        )
+        .column(Column::text("city", "City"))
+        .column(Column::money("total", "Total (Rp)").mobile())
+        .column(Column::date("ordered_on", "Ordered"))
+        .sort_by("ordered_on")
+}
+
+/// The largest orders, the second grid on `/follow-up` (prefix `largest`).
+pub fn largest_grid() -> Grid {
+    Grid::new("largest")
+        .prefix("largest")
+        .title("Largest orders")
+        .per_page(10)
+        .column(
+            Column::text("number", "Order")
+                .link("/orders/{id}")
+                .mobile(),
+        )
+        // Long names wrap instead of widening the column.
+        .column(Column::text("customer", "Customer").wrap().width("8rem"))
+        // Shown, but neither sorted nor filtered from its heading.
+        .column(
+            Column::text("email", "Email")
+                .sortable(false)
+                .filterable(false),
+        )
+        // A value of the order's `customers` row; `numeric` filters it with a
+        // range instead of text.
+        .column(Column::related("account", "Account #", "customers", "customer_id", "id").numeric())
+        .column(
+            Column::money("total", "Total (Rp)")
+                .filterable(false)
+                .mobile(),
+        )
+        .sort_by("-total")
+}
+
+/// Two grids on one page, each with its own page, sort and filters.
+async fn follow_up(request: GridRequest) -> Result<View> {
+    let unpaid = unpaid_grid()
+        .page(Order::where_eq("paid", false), &request)
+        .await?;
+    let largest = largest_grid().page(Order::query(), &request).await?;
+    Ok(view("orders/follow_up.html", context! { unpaid, largest }))
 }
 
 async fn index(request: GridRequest) -> Result<Response> {

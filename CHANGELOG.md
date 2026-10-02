@@ -10,6 +10,13 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### Examples: the rest of docs/grid.md
+
+examples/grid gets `/follow-up`: two grids on one page with their own query string prefixes
+(`prefix`), and the column options docs/grid.md describes that no example used yet: `link`,
+`tooltip`, `wrap`, `limit`, `sortable(false)`, `filterable(false)`, `per_page` and
+`Column::related(…).numeric()`.
+
 ### Docs audit after M28
 
 Fixes found by the audit:

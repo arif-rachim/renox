@@ -62,18 +62,30 @@ cargo run               # http://127.0.0.1:3000
 - **Merged cells.** *By region* sorts by region and city: equal neighbours share
   one cell, cities nested in their region; a row's details fit between them.
 
+- **Two grids on one page.** *Follow up* shows unpaid orders and the largest
+  orders. Each grid's query string names start with its prefix
+  (`unpaid.page`, `largest.max.account`), so paging or filtering one leaves
+  the other where it was. The order number is a link (`.link`), the
+  customer's email shows on hover (`.tooltip`), long names are cut
+  (`.limit`) or wrap (`.wrap`), Email and Total can't be filtered (and Email
+  not sorted) from their headings, and Account # is a related column filtered
+  as a number range (`.numeric()`). Ten rows a page (`.per_page(10)`).
+
 - **Export.** The download button (top right) exports every row the filters
   match: CSV, Excel (this example turns on renox's `xlsx` feature) or a page to
   print or save as PDF.
 
 ## Files
 
-- `src/app/orders/mod.rs`: the grids (`orders_grid`, `regions_grid`), the page
-  handlers (`index`, `regions`, `show`), `update` (edits), `reorder`, `destroy`
+- `src/app/orders/mod.rs`: the grids (`orders_grid`, `regions_grid`,
+  `unpaid_grid`, `largest_grid`), the page handlers (`index`, `regions`,
+  `follow_up`, `show`), `update` (edits), `reorder`, `destroy`
   (the row menu's delete) and the bulk actions (`bulk_status`, `bulk_delete`).
 - `src/app/orders/model.rs`: the `Order` model and its factory.
 - `resources/views/orders/index.html`: the page and its custom cells.
 - `resources/views/orders/regions.html`: the `/regions` grid with merged cells.
+- `resources/views/orders/follow_up.html`: `/follow-up`, two prefixed grids
+  (`unpaid_grid`, `largest_grid`) on one page.
 - `resources/views/orders/show.html`: one order, opened from its row.
 - `migrations/20260103000000_add_customers_and_notes.up.sql`: the `customers` and
   `order_notes` tables behind the Tier and Notes columns.
@@ -89,4 +101,4 @@ cargo test -p grid
 [tests/grid.rs](tests/grid.rs) covers pages and the custom cells, filters, rows that open their order, saved
 columns, edits in place (and their errors), rows dragged into order, merged regions, exports
 of every filtered row, bulk and row actions, totals and groups, and the related columns with
-the advanced filter.
+the advanced filter, and two prefixed grids paging apart on one page.
