@@ -199,6 +199,33 @@ th[aria-sort] .rx-grid__sort { color: var(--rx-accent-text); }
 .rx-grid__table th.rx-grid__drop-before { box-shadow: inset 3px 0 0 var(--rx-accent); }
 .rx-grid__table th.rx-grid__drop-after { box-shadow: inset -3px 0 0 var(--rx-accent); }
 
+/* Summaries and groups. */
+.rx-grid__table tfoot { position: sticky; bottom: 0; z-index: 3; }
+.rx-grid__table tfoot td {
+  background: linear-gradient(var(--rx-fill), var(--rx-fill)) var(--rx-surface);
+  border-top: 1px solid var(--rx-separator); border-bottom: 0; font-weight: 600;
+  vertical-align: top;
+}
+.rx-grid__table tfoot [data-pin] { z-index: 4; }
+.rx-grid__figure { display: block; font-variant-numeric: tabular-nums; }
+.rx-grid__figure-label { display: block; font-size: 11px; font-weight: 500; color: var(--rx-secondary-label); text-transform: uppercase; letter-spacing: 0.02em; }
+.rx-grid__group-row > td {
+  background: linear-gradient(var(--rx-fill-strong), var(--rx-fill-strong)) var(--rx-surface) !important;
+  padding-top: 6px !important; padding-bottom: 6px !important; font-weight: 600;
+}
+.rx-grid__group-head { display: inline-flex; align-items: center; gap: 10px; position: sticky; left: 12px; }
+.rx-grid__fold {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 0; background: none; padding: 2px 4px; font: inherit; color: var(--rx-label); cursor: pointer; border-radius: 6px;
+}
+.rx-grid__fold:hover { background: var(--rx-fill); }
+.rx-grid__fold svg { transform: rotate(90deg); transition: transform var(--rx-duration) var(--rx-ease); }
+.rx-grid__fold[aria-expanded="false"] svg { transform: none; }
+.rx-grid__group-label { color: var(--rx-secondary-label); font-weight: 500; }
+.rx-grid__group-count { color: var(--rx-secondary-label); font-weight: 400; font-size: var(--rx-text-footnote); }
+.rx-grid__subtotal > td { background: linear-gradient(var(--rx-fill), var(--rx-fill)) var(--rx-surface) !important; font-weight: 600; vertical-align: top; }
+tr.rx-grid__group-row[hidden], tr[data-in-group][hidden] { display: none; }
+
 /* Selection and actions. */
 .rx-grid__check { width: 18px; height: 18px; margin: 0 6px; accent-color: var(--rx-accent); cursor: pointer; vertical-align: middle; }
 .rx-grid__bulk {

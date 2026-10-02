@@ -110,6 +110,22 @@ pub enum Pin {
     Right,
 }
 
+/// A figure a column shows in the footer and under each group
+/// ([`Column::summary`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum Summary {
+    /// The total.
+    Sum,
+    /// The average.
+    Average,
+    /// The smallest and the largest value.
+    Range,
+    /// How many rows have a value.
+    Count,
+}
+
 /// One column of a [`Grid`]; build it with a constructor per [`Kind`].
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -129,6 +145,7 @@ pub struct Column {
     editable: bool,
     merge: bool,
     searchable: bool,
+    summaries: Vec<Summary>,
 }
 
 impl Column {
@@ -150,6 +167,7 @@ impl Column {
             editable: false,
             merge: false,
             searchable: false,
+            summaries: Vec::new(),
         }
     }
 
@@ -300,6 +318,18 @@ impl Column {
         self
     }
 
+    /// A figure over every row the filters match, in the grid's footer and
+    /// under each group: `.summary(Summary::Sum)`, several in a row
+    /// (`.summary(Summary::Sum).summary(Summary::Average)`). Sum, average
+    /// and range are for number and money columns; count for any.
+    pub fn summary(mut self, summary: Summary) -> Self {
+        let numeric = matches!(self.kind, Kind::Number | Kind::Money);
+        if (numeric || summary == Summary::Count) && !self.summaries.contains(&summary) {
+            self.summaries.push(summary);
+        }
+        self
+    }
+
     /// The column's key.
     pub fn key(&self) -> &str {
         &self.key
@@ -332,6 +362,8 @@ pub struct Grid {
     empty: Option<(String, Option<String>)>,
     bulk: Vec<Action>,
     row_actions: Vec<Action>,
+    groups: Vec<String>,
+    group: Option<String>,
 }
 
 impl Grid {
@@ -355,7 +387,28 @@ impl Grid {
             empty: None,
             bulk: Vec::new(),
             row_actions: Vec::new(),
+            groups: Vec::new(),
+            group: None,
         }
+    }
+
+    /// Columns the user may group rows by (a "Group" choice in the
+    /// toolbar): each group starts with a heading (its value and how many
+    /// rows it has, folding its rows away on a click) and ends with its own
+    /// summaries. Rows are sorted by the group first.
+    pub fn groups(mut self, keys: &[&str]) -> Self {
+        self.groups = keys.iter().map(|k| (*k).to_owned()).collect();
+        self
+    }
+
+    /// Groups rows by `key` until the user picks otherwise (it joins
+    /// [`Grid::groups`]).
+    pub fn group_by(mut self, key: &str) -> Self {
+        if !self.groups.iter().any(|g| g == key) {
+            self.groups.insert(0, key.to_owned());
+        }
+        self.group = Some(key.to_owned());
+        self
     }
 
     /// An action on the selected rows: a checkbox starts each row, and
@@ -446,10 +499,12 @@ impl Grid {
             Some(prefix) => name.strip_prefix(prefix.as_str())?.strip_prefix('.')?,
             None => name,
         };
-        let known = matches!(name, "page" | "per_page" | "sort" | "search" | "export")
-            || name.split_once('.').is_some_and(|(part, _)| {
-                matches!(part, "q" | "m" | "min" | "max" | "from" | "to" | "in")
-            });
+        let known = matches!(
+            name,
+            "page" | "per_page" | "sort" | "search" | "export" | "group"
+        ) || name.split_once('.').is_some_and(|(part, _)| {
+            matches!(part, "q" | "m" | "min" | "max" | "from" | "to" | "in")
+        });
         known.then_some(name)
     }
 
@@ -574,10 +629,18 @@ impl Grid {
         let prefs = load_prefs(request, &self.id).await;
         let state = State_::parse(self, &self.own_params(&request.params));
         let query = self.filtered(query, &state);
+        let unsorted = query.clone();
         let query = self.sorted(query, &state);
         let rows = query
             .paginate(&request.db, state.page, state.per_page)
             .await?;
+        let summaries = self.summarize(&unsorted, &request.db, None).await?;
+        let group_summaries = match &state.group {
+            Some(group) if self.find(group).is_some() => {
+                self.summarize(&unsorted, &request.db, Some(group)).await?
+            }
+            _ => BTreeMap::new(),
+        };
         let keep = request
             .params
             .iter()
@@ -592,7 +655,82 @@ impl Grid {
             keep,
             rows,
             extra: Vec::new(),
+            summaries,
+            group_summaries,
         })
+    }
+
+    /// The summaries of every row `query` matches: per group value (as
+    /// text) when `group` is set, else under the key `""`. Each value maps
+    /// column keys to `{sum, average, min, max, count}`; groups also get
+    /// `_rows`.
+    async fn summarize<M: Model>(
+        &self,
+        query: &Query<M>,
+        db: &Db,
+        group: Option<&String>,
+    ) -> Result<BTreeMap<String, Map<String, Value>>> {
+        let mut out: BTreeMap<String, Map<String, Value>> = BTreeMap::new();
+        let group_sql = group.map(|g| format!("CAST(\"{g}\" AS TEXT)"));
+        if let Some(group_sql) = &group_sql {
+            let counts: Vec<(Option<String>, i64)> = query
+                .clone()
+                .group_by(group.map(String::as_str).unwrap_or_default())
+                .select_as(db, &format!("{group_sql}, COUNT(*)"))
+                .await?;
+            for (value, count) in counts {
+                out.entry(value.unwrap_or_default())
+                    .or_default()
+                    .insert("_rows".into(), count.into());
+            }
+        }
+        for column in self.columns.iter().filter(|c| !c.summaries.is_empty()) {
+            if !M::COLUMNS.contains(&column.key.as_str()) {
+                continue;
+            }
+            let key = &column.key;
+            let numeric = matches!(column.kind, Kind::Number | Kind::Money);
+            let figures = if numeric {
+                format!(
+                    "CAST(SUM(\"{key}\") AS DOUBLE PRECISION), CAST(AVG(\"{key}\") AS DOUBLE PRECISION), \
+                     CAST(MIN(\"{key}\") AS DOUBLE PRECISION), CAST(MAX(\"{key}\") AS DOUBLE PRECISION), COUNT(\"{key}\")"
+                )
+            } else {
+                format!("NULL, NULL, NULL, NULL, COUNT(\"{key}\")")
+            };
+            type Figures = (Option<f64>, Option<f64>, Option<f64>, Option<f64>, i64);
+            let rows: Vec<(String, Figures)> = match (&group_sql, group) {
+                (Some(group_sql), Some(group)) => query
+                    .clone()
+                    .group_by(group)
+                    .select_as::<(
+                        Option<String>,
+                        Option<f64>,
+                        Option<f64>,
+                        Option<f64>,
+                        Option<f64>,
+                        i64,
+                    ), _>(db, &format!("{group_sql}, {figures}"))
+                    .await?
+                    .into_iter()
+                    .map(|(g, a, b, c, d, e)| (g.unwrap_or_default(), (a, b, c, d, e)))
+                    .collect(),
+                _ => query
+                    .clone()
+                    .select_as::<Figures, _>(db, &figures)
+                    .await?
+                    .into_iter()
+                    .map(|f| (String::new(), f))
+                    .collect(),
+            };
+            for (value, (sum, average, min, max, count)) in rows {
+                out.entry(value).or_default().insert(
+                    key.clone(),
+                    json!({ "sum": sum, "average": average, "min": min, "max": max, "count": count }),
+                );
+            }
+        }
+        Ok(out)
     }
 
     /// `query` with the request's filters applied (also used by `page`):
@@ -634,11 +772,22 @@ impl Grid {
     }
 
     fn sorted<M: Model>(&self, mut query: Query<M>, state: &State_) -> Query<M> {
-        let keys: Vec<(String, bool)> = if state.defaulted {
+        let mut keys: Vec<(String, bool)> = if state.defaulted {
             self.default_sort()
         } else {
             state.sort.iter().cloned().collect()
         };
+        // Grouped rows come group by group.
+        if let Some(group) = &state.group
+            && keys.first().is_none_or(|(k, _)| k != group)
+        {
+            let desc = keys
+                .iter()
+                .find(|(k, _)| k == group)
+                .is_some_and(|(_, d)| *d);
+            keys.retain(|(k, _)| k != group);
+            keys.insert(0, (group.clone(), desc));
+        }
         for (key, desc) in &keys {
             query = if *desc {
                 query.order_by_desc(key)
@@ -872,6 +1021,10 @@ struct State_ {
     filters: BTreeMap<String, Filter>,
     /// The toolbar's search.
     search: Option<String>,
+    /// The column rows are grouped by.
+    group: Option<String>,
+    /// The grid's own default group (the query string says when it differs).
+    grid_group: Option<String>,
     sort: Option<(String, bool)>,
     /// `sort` is the grid's default, not in the query string.
     defaulted: bool,
@@ -884,12 +1037,16 @@ impl State_ {
         let mut filters: BTreeMap<String, Filter> = BTreeMap::new();
         let mut sort = None;
         let mut search = None;
+        let mut group = grid.group.clone();
         let mut page = 1;
         let mut per_page = grid.per_page;
         for (name, value) in params {
             let value = value.trim();
             match name.as_str() {
                 "page" => page = value.parse().unwrap_or(1).max(1),
+                "group" => {
+                    group = grid.groups.iter().find(|g| *g == value).cloned();
+                }
                 "search" if !value.is_empty() && grid.columns.iter().any(|c| c.searchable) => {
                     search = Some(value.chars().take(200).collect());
                 }
@@ -952,6 +1109,8 @@ impl State_ {
         Self {
             filters,
             search,
+            grid_group: grid.group.clone(),
+            group,
             sort,
             defaulted,
             page,
@@ -964,6 +1123,9 @@ impl State_ {
         let mut out = Vec::new();
         if let Some(search) = &self.search {
             out.push(("search".into(), search.clone()));
+        }
+        if self.group != self.grid_group {
+            out.push(("group".into(), self.group.clone().unwrap_or_default()));
         }
         for (key, f) in &self.filters {
             if let Some(text) = &f.text {
@@ -1179,6 +1341,8 @@ pub struct GridPage<M> {
     keep: Vec<(String, String)>,
     rows: Paginated<M>,
     extra: Vec<Map<String, Value>>,
+    summaries: BTreeMap<String, Map<String, Value>>,
+    group_summaries: BTreeMap<String, Map<String, Value>>,
 }
 
 impl<M: Serialize> GridPage<M> {
@@ -1222,7 +1386,13 @@ impl<M: Serialize> GridPage<M> {
             .unwrap_or_else(|| self.grid.default_visible(false));
         let sort = self.state.sort.clone();
         // Rows can be dragged while sorted by the order column, ascending.
-        let dragging = matches!((&self.grid.reorder, &sort), (Some((column, _)), Some((key, false))) if column == key);
+        let grouped = self
+            .state
+            .group
+            .clone()
+            .filter(|g| self.grid.find(g).is_some());
+        let dragging = grouped.is_none()
+            && matches!((&self.grid.reorder, &sort), (Some((column, _)), Some((key, false))) if column == key);
         let columns: Vec<Value> = ordered
             .iter()
             .map(|(c, pin)| {
@@ -1248,7 +1418,8 @@ impl<M: Serialize> GridPage<M> {
                     "compact": compact.contains(&c.key),
                     "wide": wide.contains(&c.key),
                     "editable": c.editable && self.grid.edit_url.is_some(),
-                    "merge": c.merge && !dragging,
+                    "merge": c.merge && !dragging && grouped.is_none(),
+                    "summaries": c.summaries,
                 })
             })
             .collect();
@@ -1268,7 +1439,7 @@ impl<M: Serialize> GridPage<M> {
                 Value::Object(row)
             })
             .collect();
-        let merged: Vec<&str> = if dragging {
+        let merged: Vec<&str> = if dragging || grouped.is_some() {
             Vec::new()
         } else {
             ordered
@@ -1278,10 +1449,61 @@ impl<M: Serialize> GridPage<M> {
                 .collect()
         };
         let spans = merge_spans(&rows, &merged);
+        // Where groups start and end on this page.
+        let group_text = |row: &Value| -> Option<String> {
+            let key = grouped.as_ref()?;
+            Some(match row.get(key) {
+                Some(Value::String(s)) => s.clone(),
+                Some(Value::Null) | None => String::new(),
+                Some(Value::Bool(b)) => {
+                    if *b {
+                        "1".into()
+                    } else {
+                        "0".into()
+                    }
+                }
+                Some(other) => other.to_string(),
+            })
+        };
+        let texts: Vec<Option<String>> = rows.iter().map(group_text).collect();
+        // The row each group's run on this page starts at.
+        let mut run_start = vec![0; texts.len()];
+        for i in 1..texts.len() {
+            run_start[i] = if texts[i] == texts[i - 1] {
+                run_start[i - 1]
+            } else {
+                i
+            };
+        }
+        let group_figures = |text: &str| -> Option<&Map<String, Value>> {
+            self.group_summaries.get(text).or_else(|| {
+                // Booleans read back as `true`/`false` on PostgreSQL.
+                let alt = match text {
+                    "1" => "true",
+                    "0" => "false",
+                    _ => return None,
+                };
+                self.group_summaries.get(alt)
+            })
+        };
         let rows: Vec<Value> = rows
             .into_iter()
             .zip(spans)
-            .map(|(mut row, merge)| {
+            .enumerate()
+            .map(|(i, (mut row, merge))| {
+                let text = texts[i].clone();
+                let starts = text.is_some() && (i == 0 || texts[i - 1] != text);
+                let ends = text.is_some() && texts.get(i + 1).is_none_or(|next| *next != text);
+                let group = text.as_ref().map(|t| {
+                    json!({
+                        "id": format!("g{}", run_start[i]),
+                        "value": row.get(grouped.as_deref().unwrap_or_default()).cloned(),
+                        "rows": group_figures(t).and_then(|f| f.get("_rows").cloned()),
+                        "figures": group_figures(t),
+                        "starts": starts,
+                        "ends": ends,
+                    })
+                });
                 let id = row.get("id").map(|id| match id {
                     Value::String(s) => s.clone(),
                     other => other.to_string(),
@@ -1297,6 +1519,7 @@ impl<M: Serialize> GridPage<M> {
                             "edit": self.grid.edit_url.as_ref().zip(id.as_ref()).map(|(url, id)| url.replace("{id}", id)),
                             "href": self.grid.row_url.as_ref().zip(id.as_ref()).map(|(url, id)| url.replace("{id}", id)),
                             "actions": self.grid.row_actions.iter().map(|a| a.to_value(id.as_deref())).collect::<Vec<_>>(),
+                            "group": group,
                         }),
                     );
                 }
@@ -1371,6 +1594,12 @@ impl<M: Serialize> GridPage<M> {
                 || !self.grid.bulk.is_empty() || !self.grid.row_actions.is_empty(),
             "bulk": self.grid.bulk.iter().map(|a| a.to_value(None)).collect::<Vec<_>>(),
             "row_actions": !self.grid.row_actions.is_empty(),
+            "summary": self.summaries.get("").filter(|_| self.grid.columns.iter().any(|c| !c.summaries.is_empty())),
+            "grouping": (!self.grid.groups.is_empty()).then(|| json!({
+                "options": self.grid.groups.iter().filter_map(|g| self.grid.find(g)).map(|c| json!({"key": c.key, "label": c.label})).collect::<Vec<_>>(),
+                "current": grouped,
+                "column": grouped.as_ref().and_then(|g| ordered.iter().position(|(c, _)| c.key == *g)),
+            })),
             "exports": self.grid.exports.then(|| export::urls(&self.path, query, &self.grid.name("per_page"), &self.grid.name("export"))),
             // Field names: `p` before each (`orders.` with a prefix).
             "p": self.grid.prefix.as_ref().map(|p| format!("{p}.")).unwrap_or_default(),

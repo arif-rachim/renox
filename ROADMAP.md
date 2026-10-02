@@ -1319,7 +1319,7 @@ missing pieces, in this order:
 - [x] M28a: query string names per grid (`prefix`) and keeping the page's other values, the
       search box (`Column::searchable`), active filter chips, `row_url`, `empty_state`
 - [x] M28b: selecting rows and bulk actions, row actions with a confirmation
-- [ ] M28c: summaries (sum, average, count, range) in the footer, grouped rows with their
+- [x] M28c: summaries (sum, average, count, range) in the footer, grouped rows with their
       own summaries
 - [ ] M28d: a card layout on phones, more column kinds (badges with colors, icons, images,
       descriptions, tooltips)
@@ -1339,6 +1339,14 @@ Notes from M28b:
   the model's key are a 400.
 - The confirmation is the grid's own `<dialog>` (focus on Continue, Escape cancels), not
   `window.confirm`, and the Continue button turns red for `danger()` actions.
+
+Notes from M28c:
+- Summaries are SQL aggregates over the filtered query without its order (PostgreSQL refuses
+  an `ORDER BY` next to aggregates), cast to `DOUBLE PRECISION` so integer and decimal columns
+  decode alike on both databases. Group figures are one `GROUP BY` query per summarized column,
+  so a group's subtotal covers all its rows, also those on other pages.
+- A group's values are compared as text (`CAST(column AS TEXT)`); booleans read back as `1`/`0`
+  on SQLite and `true`/`false` on PostgreSQL, so both are looked up.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

@@ -898,7 +898,8 @@ picks the build, not the terminal.
   heading, resize by its edge, `GridPrefs::widths`): merged (#79).
 - **M28** (the grid next to Filament's tables, five PRs, the owner asked for all): M28a
   (`prefix`, `searchable` + search box, filter chips, `row_url`, `empty_state`): merged (#80). M28b (`bulk_action`/`row_action`, `Action`, `Selection`, `selected`):
-  branch `m28b-grid-actions`. Then M28c summaries and grouping, M28d phone
+  merged (#81). M28c (`Column::summary`/`Summary`, `groups`/`group_by`): branch
+  `m28c-grid-summaries`. Then M28d phone
   cards and column kinds, M28e relationships, advanced filter, polling, session state.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a

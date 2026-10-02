@@ -7,7 +7,7 @@ pub mod model;
 
 use renox::Toast;
 use renox::chrono::NaiveDate;
-use renox::grid::{Action, Column, Grid, GridRequest, RowOrder, Selection};
+use renox::grid::{Action, Column, Grid, GridRequest, RowOrder, Selection, Summary};
 use renox::prelude::*;
 use serde::Deserialize;
 
@@ -84,18 +84,23 @@ pub fn orders_grid() -> Grid {
         .column(
             Column::number("items", "Items")
                 .under(["Amounts"])
-                .editable(),
+                .editable()
+                .summary(Summary::Sum),
         )
         .column(
             Column::money("total", "Total (Rp)")
                 .under(["Amounts"])
-                .editable(),
+                .editable()
+                // In the footer (every filtered row) and under each group.
+                .summary(Summary::Sum)
+                .summary(Summary::Average),
         )
         .column(
             Column::number("discount", "Discount %")
                 .decimals(1)
                 .under(["Amounts"])
-                .editable(),
+                .editable()
+                .summary(Summary::Range),
         )
         .column(Column::date("ordered_on", "Ordered").editable())
         .column(Column::bool("paid", "Paid").editable())
@@ -107,6 +112,8 @@ pub fn orders_grid() -> Grid {
         )
         .column(Column::custom("actions", "Actions").frozen_right())
         .sort_by("-ordered_on")
+        // A "Group" choice in the toolbar.
+        .groups(&["region", "status", "paid"])
         // The chevron opens the audit details; the link icon opens the order.
         .row_url("/orders/{id}")
         .empty_state(

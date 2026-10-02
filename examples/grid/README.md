@@ -30,6 +30,9 @@ cargo run               # http://127.0.0.1:3000
 - **Select and act.** Tick rows (or the heading's box for the page, then
   "Select all … matching") and mark them paid or shipped, or delete them
   after a confirmation; each row's ⋯ menu opens or deletes that order.
+- **Totals and groups.** The footer adds up Items and Total and shows the
+  discount range over every filtered order; "Group" in the toolbar groups the
+  orders by region, status or paid, each group with its own subtotal.
 - **Filters by kind.** Text (contains, starts with, ends with, equals, or a
   `%` pattern), number ranges, the Ordered column's date range calendar,
   choices for Region, Status and Paid, and any-of for Tags. The URL keeps

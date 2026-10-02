@@ -246,3 +246,18 @@ async fn bulk_and_row_actions_change_orders() {
         .await
         .assert_not_found();
 }
+
+#[renox::test]
+async fn totals_and_groups() {
+    let app = with_orders(40).await;
+    let total: i64 = Order::query().sum(app.db(), "total").await.unwrap();
+    let html = app.get("/").await.text();
+    let foot = html.split("<tfoot>").nth(1).expect("a footer");
+    assert!(
+        foot.contains(&renox::format_number(total as f64, 0, "en")),
+        "{foot}"
+    );
+    let grouped = app.get("/?group=region&per_page=100").await.text();
+    assert!(grouped.matches("rx-grid__group-row").count() >= 2);
+    assert!(grouped.contains("rx-grid__subtotal"));
+}

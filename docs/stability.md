@@ -23,7 +23,7 @@ commit that `rnx` was built from.
     `grid::Action`, `grid::Selection`
 - **New variants on these enums.** A `match` on them needs a `_` arm:
   - `Error`, `Environment`, `CspMode`, `Channel`, `Locale`, `DbValue`, `Inspected` (a `Rule`
-    matching on `Inspected` needs a `_` arm), `ToastKind`, `report::ReportKind`, `grid::Kind`
+    matching on `Inspected` needs a `_` arm), `ToastKind`, `report::ReportKind`, `grid::Kind`, `grid::Summary`
 - New methods, functions, modules, template functions, validation rules, CLI commands and `.env`
   settings (always with defaults).
 - New provided methods on traits you implement (`Model`, `Notification`, `ModelHooks`,
