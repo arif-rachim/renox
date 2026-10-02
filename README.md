@@ -394,7 +394,9 @@ Not planned: runtime-reflected Eloquent-style models, Redis, and a REPL.
 ## Documentation
 
 - [CHEATSHEET.md](CHEATSHEET.md): one short, compiled example per task.
-- Guides: [views and the UI kit](docs/ui.md), [the data grid](docs/grid.md), [testing](docs/testing.md),
+- Guides: [routing and middleware](docs/routing.md), [validation](docs/validation.md),
+  [views and the UI kit](docs/ui.md), [the data grid](docs/grid.md), [mail and notifications](docs/mail.md),
+  [scheduler, events, cache and commands](docs/scheduling.md), [testing](docs/testing.md),
   [relations](docs/relations.md), [authorization and tenants](docs/authorization.md),
   [the queue](docs/queue.md), [field types](docs/types.md),
   [PostgreSQL](docs/postgresql.md), [production](docs/operations.md),

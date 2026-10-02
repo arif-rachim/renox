@@ -8,7 +8,7 @@ repo, and every trap hit so far, so you don't have to rediscover them.
 - `CHANGELOG.md`: what changed, milestone by milestone.
 - `CONTRIBUTING.md`: the checks every change needs. `SECURITY.md`: how vulnerabilities are reported.
 - `CHEATSHEET.md` and `llms.txt`: the app author's view (patterns, and which example shows what).
-- `docs/*.md`: guides (types, relations, authorization, queue, ui, grid, testing, PostgreSQL, operations, development, stability).
+- `docs/*.md`: guides (routing, validation, types, relations, authorization, queue, mail, scheduling, ui, grid, testing, PostgreSQL, operations, development, stability).
 - `docs/audit/`: the pre-1.0 audit (finding IDs W*, D*, A* used in ROADMAP M13/M14).
 
 ## 1. What Renox is
@@ -45,7 +45,8 @@ crates/renox/              facade crate apps depend on: re-exports renox-core, t
   src/lib.rs               `pub use renox_core::*`, macros (DbEnum, FromRow, Model, Validate, embedded!,
                            migrations!, #[renox::test]), prelude, and cfg(doctest) holders:
                            ReadMe, CheatSheet, TypesGuide, RelationsGuide, AuthorizationGuide,
-                           QueueGuide, UiGuide, GridGuide, TestingGuide, OperationsGuide,
+                           QueueGuide, UiGuide, GridGuide, ValidationGuide, RoutingGuide,
+                           MailGuide, SchedulingGuide, TestingGuide, OperationsGuide,
                            MacroCompileErrors
   tests/it/                ONE integration-test binary (main.rs + a module per area); add new areas
                            as `mod x;` in main.rs. Notable modules: send_handlers.rs (every data
@@ -222,6 +223,13 @@ docs/ui.md                 components, the UI kit, toasts, fragments, htmx heade
                            validation, stacks, Tailwind (doctest `UiGuide`)
 docs/grid.md               the data grid (renox::grid): columns, filters, actions, summaries,
                            exports (doctest `GridGuide`)
+docs/routing.md            routes, groups, domains, extractors, middleware, guards, sessions,
+                           CSRF, cookies, signed URLs (doctest `RoutingGuide`)
+docs/validation.md         Valid<T>, rules, derive Validate, hooks, messages (doctest
+                           `ValidationGuide`)
+docs/mail.md               mail and notifications (doctest `MailGuide`)
+docs/scheduling.md         scheduler, events, cache and locks, app commands (doctest
+                           `SchedulingGuide`)
 docs/testing.md            TestApp: requests, assertions, fakes, time travel, browser tests
                            (doctest `TestingGuide`)
 docs/types.md              HTML input ↔ Rust ↔ SQLite ↔ PostgreSQL (doctest `TypesGuide`)
@@ -293,8 +301,10 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
   `APP_KEY`), so no DB is needed; keep that small (a warning is logged over 4 KB).
   `SESSION_DRIVER=database` (M21g) puts only an id in the cookie and the session in `sessions`
   (keyed by sha256(id), a new id at each login and logout). Flash data lives
-  one request. A per-session lifetime override powers "remember me". Logout bumps
-  `users.sessions_revoked_at`, checked on every request, so it ends every session of the user.
+  one request. A per-session lifetime override powers "remember me". Logout ends this device
+  only (its session id goes to the `revoked_sessions` denylist, so a copied cookie dies too);
+  `logout_other_devices` / `User::revoke_sessions` bump `users.sessions_revoked_at`, checked on
+  every request, to end the user's other sessions.
 - **Auth sessions store the user id + a fingerprint of the password hash** (no remember-token
   column): changing the password logs out other sessions.
 - **Views: MiniJinja** (runtime, overridable, autoreload in debug via `minijinja-autoreload`).
@@ -345,7 +355,7 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
 - **Workers and scheduler run inside `serve`** by default (single-process deploys). Several
   instances may share one database: every scheduled run is claimed first (`schedule::claim`:
   insert `renox:schedule:<task>:<slot>` into `cache` with `ON CONFLICT DO NOTHING`, kept for the
-  interval + 1 min (a day for daily tasks); expired claims are pruned at most once a minute).
+  interval + 1 min, or an hour for cron-style tasks such as `daily_at`; expired claims are pruned at most once a minute).
 - **Single-file deploys:** `App::embed(renox::embedded!())` bakes views, lang files and `public/`
   into the binary; they're used only when `APP_DEBUG` is off (debug keeps disk + live reload).
   New built-in behaviour that reads `VIEWS_PATH`/`LANG_PATH`/`PUBLIC_PATH` must also handle the
@@ -913,10 +923,13 @@ picks the build, not the terminal.
   description, tooltip, wrap, limit, link, copyable): merged (#83). M28e
   (`related`/`count_of`/`sum_of`, `advanced_filter`, `remember`, `poll`, NULLs last): merged
   (#84). M28 is done (#80–#84).
-- **Docs audit after M28** (branch `documentation`): every doc checked against the code,
+- **Docs audit after M28** (merged, #85): every doc checked against the code,
   `docs/grid.md` added (doctest `GridGuide`). Three fixes it found: grid date-time filters take
   `APP_TIMEZONE` days (`day_start` in grid/mod.rs), `delete_account` also deletes
   `grid_preferences` rows, and `notifications:prune` / `auth::prune_read_notifications`.
+- **Guides for the remaining areas** (branch `documentation`): docs/routing.md,
+  docs/validation.md, docs/mail.md and docs/scheduling.md, which before lived only in
+  CHEATSHEET.md.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.

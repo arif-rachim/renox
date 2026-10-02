@@ -10,6 +10,16 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### Guides for routing, validation, mail and scheduling
+
+- New guides, each compiled as a doctest: docs/routing.md (`RoutingGuide`: routes, groups,
+  domains, extractors and responses, middleware and guards, sessions, CSRF, cookies, signed
+  URLs), docs/validation.md (`ValidationGuide`: `Valid<T>`, every rule, `#[derive(Validate)]`,
+  hooks, messages), docs/mail.md (`MailGuide`: mail and notifications) and docs/scheduling.md
+  (`SchedulingGuide`: the scheduler, events, the cache and locks, app commands). Before, these
+  areas were only in CHEATSHEET.md.
+- README, llms.txt and CLAUDE.md list the new guides.
+
 ### Docs audit after M28
 
 Fixes found by the audit:
