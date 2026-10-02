@@ -95,7 +95,7 @@ pub use routing::{CurrentRoute, RouteInfo, RouteTable, Routes};
 pub use session::Session;
 pub use state::AppState;
 pub use state::SentNotification;
-pub use toast::Toast;
+pub use toast::{Toast, ToastAction, ToastKind};
 pub use upload::Upload;
 pub use validation::{Errors, KeyValues, Valid, Validate, ValidationError, Validator};
 pub use view::{View, Views, view};

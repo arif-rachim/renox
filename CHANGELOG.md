@@ -10,6 +10,33 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### Notifications: richer toasts, and a live notification bell
+
+- Toasts (Filament's notifications as the yardstick): `Toast::body`, `Toast::link`,
+  `Toast::action` with `ToastAction::link` / `ToastAction::event` (`new_tab`), `seconds`,
+  `persistent` and `id` (a new toast with the same id replaces it). `toasts(position=…)`:
+  `top` (default), `top-start`, `top-end`, `bottom`, `bottom-start`, `bottom-end`. In the
+  browser, `Renox.toast({…})` and `Renox.dismissToast(id)`. `ToastAction` and `ToastKind` are
+  exported. Toasts already in a session still read; the JSON of a plain toast is unchanged.
+- New: `DatabaseMessage` (`success`/`info`/`warning`/`error`, `body`, `url`, `link`,
+  `action`, `with` for the app's own keys) to return from `Notification::to_database`, and
+  `DatabaseNotification::message()`. `to_database` now runs in the recipient's language,
+  like `to_mail`.
+- New: `Auth::new().notifications()`: `unread_notifications` in every view, the
+  `notifications.*` routes (a page that is also the bell's panel, read/unread/open/delete,
+  read all, clear) and `/notifications/stream`, a Server-Sent Events stream that pushes the
+  unread count and new notifications (woken at once in the same process, and looking at the
+  table every 15 s for other servers; each stream lasts five minutes; all end at shutdown).
+- New kit component `notification_bell(unread_notifications)`: a badge, a panel loaded on
+  open, new notifications as toasts with an "Open" link; a link to the page without
+  JavaScript. Built-in view `renox/notifications.html` (in `layouts/app.html` when the app has
+  it). Kit texts `ui.notifications.*` (en/id).
+- New `User` methods: `notifications_before`, `notification`, `mark_notification_unread`,
+  `delete_notification`, `delete_notifications`.
+- examples/shop: the bell in its bar, its three notifications as `DatabaseMessage`s in the
+  recipient's language, a toast with a link after creating a product. examples/jobs: its admin
+  notification as a `DatabaseMessage`.
+
 ### UI kit: infolists, and the money, since, words and markdown filters
 
 - New: `infolist(columns=…, inline=…)` and `entry(label, value, …)` in `renox/ui.html`

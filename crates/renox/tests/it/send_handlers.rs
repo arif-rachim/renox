@@ -130,6 +130,11 @@ async fn more(State(state): State<AppState>, user: Option<AuthUser>) -> Result<S
         .await?;
     if let Some(user) = user {
         user.notifications(db, 5).await?;
+        user.notifications_before(db, 10, 5).await?;
+        user.notification(db, 1).await?;
+        user.mark_notification_unread(db, 1).await?;
+        user.delete_notification(db, 1).await?;
+        user.delete_notifications(db).await?;
     }
     state.emit(Ping).await?;
     Ok(format!(

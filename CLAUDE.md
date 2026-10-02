@@ -80,7 +80,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/view.rs              MiniJinja env, View response (fragment/also), render middleware, globals
                            (request.route, route_is, loop controls), RequestGlobal (request globals
                            inside imported macros), BUILTIN views
-  src/toast.rs             Toast response part, the toast region markup
+  src/toast.rs             Toast (body, ToastAction, duration, id) response part, the toast
+                           region markup (positions), safe_url for links built from data
   src/clock.rs             the current time with a test offset (TestApp::travel); Stamp for
                            in-memory windows (rate limits, login lock), never Instant
   views/ui.html            the UI kit (renox/ui.html); assets/renox-ui.css|js its styles and script
@@ -120,7 +121,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            (LoggedIn, LoginFailed, …), verification, tokens.rs (API tokens,
                            abilities, prune), LoginThrottle (pair/account/IP), notifications
                            (Recipient, Channel::Custom, notify/notify_to/notify_later,
-                           SendToChannel job)
+                           SendToChannel job, DatabaseMessage, Hub), inbox.rs (the
+                           notifications.* routes and the SSE stream of `.notifications()`)
   src/audit.rs             Audit module (audit_logs table, records auth events), audit::record,
                            audit:prune
   src/context.rs           renox::context: task-local values per request/job/task/command
@@ -181,7 +183,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   assets/                  vendored htmx.min.js (2.0.11), alpine.min.js (3.17.4) + Alpine CSP build,
                            cally.js (0.9.2)
   views/                   built-in templates (error, pagination, auth/*, mail/*, ui.html (the kit),
-                           debug.html (/_renox/debug), queue/dashboard.html); see §4.3
+                           debug.html (/_renox/debug), queue/dashboard.html,
+                           notifications.html (the bell's page and panel)); see §4.3
   migrations/              framework-owned migrations (auth/, permissions/, audit/, queue/,
                            cache/, session/, grid/, webhook/); see §4.5
   tests/                   core-only integration tests (support/mod.rs has a small TestApp)
@@ -961,7 +964,12 @@ picks the build, not the terminal.
   Then infolists (Filament's as the yardstick): `infolist`/`entry`/`repeatable` in the kit,
   the filters `money` (`APP_CURRENCY`, default `IDR`), `since`, `words`, `markdown`
   (pulldown-cmark, raw HTML shown as text); shop's order page and fields' product page use
-  them. Branch `ccr-0db862ed-uol6i8`.
+  them. Merged (#94). Then notifications (Filament's as the yardstick): toasts with a body,
+  actions, a duration, an id and a position (`Renox.toast`), `DatabaseMessage`,
+  `Auth::new().notifications()` with the kit's `notification_bell`, `renox/notifications.html`
+  and `/notifications/stream` (SSE woken by `auth::notifications::Hub` in-process, polling the
+  table every 15 s for other processes, five-minute streams, stopped at shutdown); shop and
+  jobs use them. Branch `ccr-0db862ed-uol6i8`.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.

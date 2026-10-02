@@ -1113,7 +1113,11 @@ async fn after_toggle() -> (Toast, HxRetarget, HxReswap, HxPushUrl, View) {
     // A toast (HX-Trigger for htmx; the next page otherwise), and several blocks at once:
     // blocks after the first need an id and hx-swap-oob="true".
     (
-        Toast::success("Order updated"), // also info, warning, error (errors stay until dismissed)
+        // Also info, warning, error (errors stay until dismissed); .body("…"),
+        // .link("View", "/orders/7"), .action(ToastAction::event("Undo", "undo")),
+        // .seconds(8) / .persistent(), .id("x"). Layout: toasts(position="bottom-end").
+        // In page scripts: Renox.toast({kind, message, body, actions}), Renox.dismissToast(id).
+        Toast::success("Order updated"),
         HxRetarget("#orders".into()),
         HxReswap("outerHTML".into()),
         HxPushUrl("/orders?status=open".into()),
@@ -1306,7 +1310,7 @@ task or listener doesn't stop the others.
 
 ```rust
 use renox::prelude::*;
-use renox::auth::{Channel, Notification, Recipient};
+use renox::auth::{Channel, DatabaseMessage, Notification, Recipient};
 use renox::mail::Mail;
 
 async fn send_invoice(state: &AppState, pdf: Vec<u8>) -> Result {
@@ -1344,7 +1348,12 @@ impl Notification for OrderShipped {
         Ok(Mail::new(to.email().unwrap_or_default(), subject, "On its way."))
     }
     fn to_database(&self, _: &Recipient) -> renox::serde_json::Value {
-        json!({ "order_id": self.order_id }) // user.unread_notifications(&db)
+        // What the kit's notification_bell shows; any JSON works for your own list.
+        DatabaseMessage::success(format!("Order #{} shipped", self.order_id))
+            .body("It arrives in 2–3 days.")
+            .url(format!("/orders/{}", self.order_id))
+            .with("order_id", self.order_id) // n.data.order_id; n.message() reads it back
+            .into()
     }
     fn to_channel(&self, _: &str, _: &Recipient) -> Result<renox::serde_json::Value> {
         Ok(json!({ "text": format!("Order #{} shipped", self.order_id) }))
@@ -1367,6 +1376,13 @@ async fn ship(state: &AppState, user: &User) -> Result {
     state.notify_to(&guest, &OrderShipped { order_id: 7 }).await   // no account: no database row
 }
 ```
+
+The bell: `App::new().module(Auth::new().notifications())`, then in the layout's bar
+`{% from "renox/ui.html" import notification_bell %}{{ notification_bell(unread_notifications) }}`:
+a badge, a panel of the latest (mark read/unread, delete, mark all read, clear, open = read +
+follow `url`), new ones live over Server-Sent Events (a toast + the badge), and the page
+`notifications.index` without JavaScript. Behind nginx: `proxy_buffering off` for
+`/notifications/stream`.
 
 Mail views can `{% from "renox/mail/components.html" import button, panel, table, divider %}`:
 `{{ button(url, t('mail.track')) }}`, `{% call panel() %}…{% endcall %}`,

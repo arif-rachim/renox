@@ -26,6 +26,11 @@
     "update": "Ubah", "remove": "Hapus", "total": "Total",
     "checkout": "Bayar", "empty": "Keranjangmu kosong."
   },
+  "notifications": {
+    "placed": "Pesanan #:id diterima",
+    "pay": "Bayar :total lewat transfer bank dalam :days hari.",
+    "shipped": "Pesanan #:id sedang dikirim"
+  },
   "orders": {
     "order": "Pesanan",
     "placed": "Terima kasih! Pesanan #:id sudah dibuat.",

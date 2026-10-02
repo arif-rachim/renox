@@ -66,6 +66,9 @@ async fn an_order_notifies_admins() {
     let unread = admin.unread_notifications(app.db()).await.unwrap();
     assert_eq!(unread[0].kind, "new-order");
     assert_eq!(unread[0].data["total"], 18000);
+    let message = unread[0].message().unwrap(); // a DatabaseMessage
+    assert_eq!(message.title, "New order #1");
+    assert_eq!(message.body.as_deref(), Some("Total: Rp 18.000"));
     assert_eq!(order(&app, 1).await.status, OrderStatus::Unpaid);
     app.get("/")
         .await

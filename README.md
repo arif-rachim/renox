@@ -149,7 +149,8 @@ impl Module for Guestbook {
   - infolists for a record's page: labels and values formatted as money (`APP_CURRENCY`),
     dates, "3 hours ago", badges, Yes/No, swatches, pairs or Markdown;
   - keyboard support and WCAG AA contrast;
-  - toasts (`Toast::success(…)`) and live validation.
+  - toasts (`Toast::success(…)`, with a body, links, a duration and a position) and live
+    validation.
 - A data grid for dashboards (`renox::grid`): filters per column by kind (a date range
   calendar for dates), server pages and sorting in the URL, grouped headings, frozen columns,
   different columns on phones and desktops kept per user, and cells drawn by the page
@@ -232,6 +233,8 @@ impl Module for Guestbook {
 - Notifications go by mail, to the database and through your own channels (WhatsApp, SMS…), now
   or through the queue, to users or to plain addresses, each in the recipient's language, with
   channels chosen per recipient. Mail views have `t()` and components (button, panel, table).
+  `Auth::new().notifications()` adds a bell for the navigation bar: unread badge, a panel to
+  read, mark and delete them, and new ones arriving live over Server-Sent Events.
 - A queue dashboard at `/_renox/queue` (behind a gate) shows waiting jobs, throughput, failed
   jobs to retry or forget, and batch progress.
 - `state.http` calls other services with timeouts and retries; in tests, `app.fake_http()`
