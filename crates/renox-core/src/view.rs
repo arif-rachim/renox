@@ -261,6 +261,9 @@ impl Views {
                     styles.unwrap_or(true),
                 )))
             });
+            env.add_function("renox_calendar", || {
+                Value::from_safe_string(crate::assets::calendar_tags())
+            });
             env.add_function("renox_grid", || {
                 Value::from_safe_string(crate::assets::grid_tags())
             });
@@ -389,6 +392,7 @@ const REQUEST_GLOBALS: &[&str] = &[
     "errors",
     "error",
     "old",
+    "has_old",
     "renox_head",
     "seo",
     "csp_nonce",
@@ -978,6 +982,7 @@ fn globals(
         crate::csrf::CSRF_FIELD
     ));
     let old_input = session.cloned();
+    let has_old = session.is_some_and(Session::has_old_input);
     let toast_session = session.cloned();
     let dismiss_label = state
         .translator
@@ -1050,6 +1055,8 @@ fn globals(
         errors => errors,
         // `error('photos')` also shows the first error of an item (`photos.1`).
         error => Value::from_function(move |field: String| {
+            // `items[0][name]`'s errors are keyed `items.0.name`.
+            let field = crate::validation::nested::normalize(&field);
             first_errors
                 .get(&field)
                 .or_else(|| {
@@ -1080,6 +1087,9 @@ fn globals(
         once => Value::from_function(move |key: String| {
             seen.lock().unwrap_or_else(|e| e.into_inner()).insert(key)
         }),
+        // `has_old()`: the previous request was a failed submit, so a field
+        // missing from `old()` was sent empty (an unticked checkbox).
+        has_old => Value::from_function(move || has_old),
         old => Value::from_function(move |field: String, default: Option<Value>| {
             old_input
                 .as_ref()

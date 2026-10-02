@@ -278,6 +278,74 @@ async fn without_a_team_there_are_no_rows() {
 }
 
 #[renox::test]
+async fn a_new_team_adds_the_people_invited_in_the_wizard() {
+    let w = world().await;
+    w.app.acting_as(&w.alice);
+    w.app
+        .get("/teams")
+        .await
+        .assert_see(r#"data-rx-wizard"#)
+        .assert_see(r#"name="invites[__INDEX__][email]""#);
+    // Each row is checked: here the second email is nobody's.
+    let res = w
+        .app
+        .htmx()
+        .post(
+            "/teams",
+            &[
+                ("name", "Initech"),
+                ("invites[0][email]", "BOB@example.com"),
+                ("invites[1][email]", "nobody@example.com"),
+            ],
+        )
+        .await;
+    res.assert_status(422);
+    let body: renox::serde_json::Value = res.json();
+    assert_eq!(
+        body["errors"]["invites.1.email"][0],
+        "Nobody has signed up with this email address yet."
+    );
+    assert!(body["errors"].get("invites.0.email").is_none());
+    // A plain post goes back with the rows refilled.
+    w.app
+        .request()
+        .header("referer", "/teams")
+        .post(
+            "/teams",
+            &[("name", "Initech"), ("invites[0][email]", "not an email")],
+        )
+        .await
+        .assert_redirect("/teams");
+    w.app
+        .get("/teams")
+        .await
+        .assert_see(r#"name="invites[0][email]" type="email" value="not an email""#)
+        .assert_see("The email must be a valid email address.");
+
+    w.app
+        .post(
+            "/teams",
+            &[
+                ("name", "Initech"),
+                ("invites[0][email]", "bob@example.com"),
+            ],
+        )
+        .await
+        .assert_redirect("/projects");
+    let initech = Team::where_eq("name", "Initech")
+        .first_or_404(w.app.db())
+        .await
+        .unwrap();
+    assert_eq!(
+        Team::role_of(w.app.db(), initech.id, w.bob.id)
+            .await
+            .unwrap()
+            .as_deref(),
+        Some("member")
+    );
+}
+
+#[renox::test]
 async fn unscoped_counts_see_every_team() {
     let w = world().await;
     let counts: Vec<(String, i64)> = teams::app::admin::project_counts(w.app.db())

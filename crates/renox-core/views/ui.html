@@ -17,6 +17,9 @@
 
 {%- macro _id(name) -%}rx-{{ name | replace(".", "-") | replace("[", "-") | replace("]", "") }}{%- endmacro -%}
 
+{#- How a field's errors are keyed: `items[0][name]` → `items.0.name`. -#}
+{%- macro _key(name) -%}{{ name | replace("][", ".") | replace("[", ".") | replace("]", "") | trim(".") }}{%- endmacro -%}
+
 {%- macro _attrs(attrs) -%}
 {%- for key, value in attrs | items %} {{ key }}{% if value is not true %}="{{ value }}"{% endif %}{% endfor -%}
 {%- endmacro -%}
@@ -27,57 +30,113 @@
 
 {%- macro _describe(id, hint, message) -%}
 {%- if hint %}<p class="rx-hint" id="{{ id }}-hint">{{ hint }}</p>{% endif %}
-<p class="rx-error" id="{{ id }}-error" data-error-for="{{ caller() }}" aria-live="polite">{{ message }}</p>
+<p class="rx-error" id="{{ id }}-error" data-error-for="{{ _key(caller()) }}" aria-live="polite">{{ message }}</p>
 {%- endmacro -%}
 
-{#- A text field: text, email, password, number, date, url, tel, search… -#}
-{#- `id`: when a page has two fields of the same name (in separate forms). -#}
-{% macro input(name, label, type="text", value=none, hint=none, required=false, autocomplete=none, placeholder=none, attrs={}, id=none) -%}
+{%- macro _field_class(span) -%}
+rx-field{% if span %} rx-span-{{ span }}{% endif %}
+{%- endmacro -%}
+
+{%- macro _choices_class(inline, columns) -%}
+rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ columns }}{% endif %}
+{%- endmacro -%}
+
+{#- A text field: text, email, password, number, date, url, tel, search…
+    `id`: when a page has two fields of the same name (in separate forms).
+    `prefix`/`suffix`: text joined to the field ("Rp", "kg", ".com").
+    `datalist`: suggestions (values, or [value, label] pairs) the field
+    still accepts anything besides. `span`: columns taken in a `form_grid`.
+    `revealable`: a button that shows the password; `copyable`: a button
+    that copies the value. A disabled field isn't sent with the form; a
+    readonly one is. -#}
+{% macro input(name, label, type="text", value=none, hint=none, required=false, autocomplete=none, placeholder=none, attrs={}, id=none, prefix=none, suffix=none, datalist=none, disabled=false, readonly=false, span=none, revealable=false, copyable=false) -%}
 {%- set id = id or _id(name) %}
 {%- set message = error(name) %}
-<div class="rx-field">
+{%- set affixed = prefix or suffix or revealable or copyable %}
+<div class="{{ _field_class(span) }}">
   {{ _label(id, label, required) }}
+  {%- if affixed %}
+  <div class="rx-affix">
+    {%- if prefix %}<span class="rx-affix__text" id="{{ id }}-prefix">{{ prefix }}</span>{% endif %}
+  {%- endif %}
   <input class="rx-input" id="{{ id }}" name="{{ name }}" type="{{ type }}"
-    {%- if type != "password" %} value="{{ old(name, value if value is not none else "") }}"{% endif %}
+    {%- if type != "password" %} value="{{ old(name, value if value is defined and value is not none else "") }}"{% endif %}
     {%- if required %} required aria-required="true"{% endif %}
     {%- if autocomplete %} autocomplete="{{ autocomplete }}"{% endif %}
     {%- if placeholder %} placeholder="{{ placeholder }}"{% endif %}
+    {%- if datalist %} list="{{ id }}-list"{% endif %}
+    {%- if disabled %} disabled{% endif %}
+    {%- if readonly %} readonly{% endif %}
     {%- if message %} aria-invalid="true"{% endif %}
-    aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>
+    aria-describedby="{% if prefix %}{{ id }}-prefix {% endif %}{% if suffix %}{{ id }}-suffix {% endif %}{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>
+  {%- if affixed %}
+    {%- if suffix %}<span class="rx-affix__text" id="{{ id }}-suffix">{{ suffix }}</span>{% endif %}
+    {%- if revealable %}
+    <button class="rx-affix__button" type="button" data-rx-reveal="{{ id }}" aria-controls="{{ id }}" aria-pressed="false" aria-label="{{ t('ui.show_password') }}" data-label-hide="{{ t('ui.hide_password') }}"{% if disabled %} disabled{% endif %}>{{ _icon("eye") }}{{ _icon("eye-off") }}</button>
+    {%- endif %}
+    {%- if copyable %}
+    <button class="rx-affix__button" type="button" data-rx-copy="{{ id }}" aria-label="{{ t('ui.copy') }}" data-label-done="{{ t('ui.copied') }}">{{ _icon("copy") }}{{ _icon("check") }}<span class="rx-visually-hidden" aria-live="polite"></span></button>
+    {%- endif %}
+  </div>
+  {%- endif %}
+  {%- if datalist %}
+  <datalist id="{{ id }}-list">
+    {%- for option in datalist %}
+      {%- if option is string or option is number %}<option value="{{ option }}"></option>
+      {%- else %}<option value="{{ option[0] }}">{{ option[1] }}</option>{% endif %}
+    {%- endfor %}
+  </datalist>
+  {%- endif %}
   {% call _describe(id, hint, message) %}{{ name }}{% endcall %}
 </div>
 {%- endmacro %}
 
-{% macro textarea(name, label, value=none, rows=4, hint=none, required=false, placeholder=none, attrs={}) -%}
-{%- set id = _id(name) %}
+{% macro textarea(name, label, value=none, rows=4, hint=none, required=false, placeholder=none, attrs={}, id=none, disabled=false, readonly=false, span=none) -%}
+{%- set id = id or _id(name) %}
 {%- set message = error(name) %}
-<div class="rx-field">
+<div class="{{ _field_class(span) }}">
   {{ _label(id, label, required) }}
   <textarea class="rx-textarea" id="{{ id }}" name="{{ name }}" rows="{{ rows }}"
     {%- if required %} required aria-required="true"{% endif %}
     {%- if placeholder %} placeholder="{{ placeholder }}"{% endif %}
+    {%- if disabled %} disabled{% endif %}
+    {%- if readonly %} readonly{% endif %}
     {%- if message %} aria-invalid="true"{% endif %}
-    aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>{{ old(name, value if value is not none else "") }}</textarea>
+    aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>{{ old(name, value if value is defined and value is not none else "") }}</textarea>
   {% call _describe(id, hint, message) %}{{ name }}{% endcall %}
 </div>
 {%- endmacro %}
 
-{#- `options`: a list of values, or of [value, label] pairs. -#}
-{% macro select(name, label, options, selected=none, hint=none, required=false, placeholder=none, attrs={}) -%}
-{%- set id = _id(name) %}
+{#- `options`: a list of values, or of [value, label] pairs.
+    `multiple`: several values (a `Vec` with `#[serde(default)]`; `selected`
+    is then a list). `searchable`: a box to type in that filters the
+    options, with the chosen ones as removable chips when `multiple`; the
+    native select stays underneath, so the form sends the same thing and
+    works without JavaScript. -#}
+{% macro select(name, label, options, selected=none, hint=none, required=false, placeholder=none, attrs={}, id=none, disabled=false, span=none, multiple=false, searchable=false) -%}
+{%- set id = id or _id(name) %}
 {%- set message = error(name) %}
-{%- set current = old(name, selected if selected is not none else "") | string %}
-<div class="rx-field">
+{%- if multiple %}
+{%- set current = old(name, []) if has_old() else (selected if selected is defined and selected is not none else []) %}
+{%- if current is string or current is number %}{% set current = [current] %}{% endif %}
+{%- set current = current | map("string") | list %}
+{%- else %}
+{%- set current = [old(name, selected if selected is defined and selected is not none else "") | string] %}
+{%- endif %}
+<div class="{{ _field_class(span) }}">
   {{ _label(id, label, required) }}
-  <select class="rx-select" id="{{ id }}" name="{{ name }}"
+  <select class="rx-select{% if multiple %} rx-select--multiple{% endif %}" id="{{ id }}" name="{{ name }}"
+    {%- if multiple %} multiple{% endif %}
+    {%- if searchable %} data-rx-combobox data-placeholder="{{ placeholder or t('ui.search') }}" data-empty="{{ t('ui.no_results') }}" data-remove="{{ t('ui.remove') }}"{% endif %}
     {%- if required %} required aria-required="true"{% endif %}
+    {%- if disabled %} disabled{% endif %}
     {%- if message %} aria-invalid="true"{% endif %}
     aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>
-    {%- if placeholder %}<option value="">{{ placeholder }}</option>{% endif %}
+    {%- if placeholder and not multiple %}<option value="">{{ placeholder }}</option>{% endif %}
     {%- for option in options %}
       {%- if option is string or option is number %}{% set value = option %}{% set text = option %}
       {%- else %}{% set value = option[0] %}{% set text = option[1] %}{% endif %}
-    <option value="{{ value }}"{% if value | string == current %} selected{% endif %}>{{ text }}</option>
+    <option value="{{ value }}"{% if value | string in current %} selected{% endif %}>{{ text }}</option>
     {%- endfor %}
   </select>
   {% call _describe(id, hint, message) %}{{ name }}{% endcall %}
@@ -85,20 +144,314 @@
 {%- endmacro %}
 
 {#- A checkbox for a yes/no choice; `switch` looks like iOS' toggle, for
-    settings that take effect as a whole ("Email me updates"). -#}
-{% macro checkbox(name, label, checked=false, hint=none, value="on", switch=false, attrs={}) -%}
-{%- set id = _id(name) %}
+    settings that take effect as a whole ("Email me updates"). After a failed
+    submit it shows what was sent: an unticked box stays unticked. -#}
+{% macro checkbox(name, label, checked=false, hint=none, value="on", switch=false, attrs={}, id=none, disabled=false, span=none) -%}
+{%- set id = id or _id(name) %}
 {%- set message = error(name) %}
-{%- set previous = old(name, none) %}
-{%- set on = (previous == value) if previous else checked %}
-<div class="rx-field">
+{%- set on = (old(name, none) | string == value | string) if has_old() else checked %}
+<div class="{{ _field_class(span) }}">
   <label class="rx-check{% if switch %} rx-check--switch{% endif %}" for="{{ id }}">
-    {%- if not switch %}<input class="rx-checkbox" type="checkbox" id="{{ id }}" name="{{ name }}" value="{{ value }}"{% if on %} checked{% endif %}{% if message %} aria-invalid="true"{% endif %} aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>{% endif %}
+    {%- if not switch %}<input class="rx-checkbox" type="checkbox" id="{{ id }}" name="{{ name }}" value="{{ value }}"{% if on %} checked{% endif %}{% if disabled %} disabled{% endif %}{% if message %} aria-invalid="true"{% endif %} aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>{% endif %}
     <span class="rx-check__text"><span>{{ label }}</span>{% if hint %}<span class="rx-hint" id="{{ id }}-hint">{{ hint }}</span>{% endif %}</span>
-    {%- if switch %}<input class="rx-switch" type="checkbox" role="switch" id="{{ id }}" name="{{ name }}" value="{{ value }}"{% if on %} checked{% endif %}{% if message %} aria-invalid="true"{% endif %} aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>{% endif %}
+    {%- if switch %}<input class="rx-switch" type="checkbox" role="switch" id="{{ id }}" name="{{ name }}" value="{{ value }}"{% if on %} checked{% endif %}{% if disabled %} disabled{% endif %}{% if message %} aria-invalid="true"{% endif %} aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>{% endif %}
   </label>
-  <p class="rx-error" id="{{ id }}-error" data-error-for="{{ name }}" aria-live="polite">{{ message }}</p>
+  <p class="rx-error" id="{{ id }}-error" data-error-for="{{ _key(name) }}" aria-live="polite">{{ message }}</p>
 </div>
+{%- endmacro %}
+
+{#- Radio groups, checkbox lists and toggle buttons share this: a fieldset
+    whose legend is the label, one input per option. `current` is the list
+    of values (as strings) to show ticked. -#}
+{%- macro _choice_group(kind, name, label, options, current, hint, required, inline, columns, attrs, id, disabled, span) -%}
+{%- set id = id or _id(name) %}
+{%- set message = error(name) %}
+{%- set type = "radio" if kind in ["radio", "toggle"] else "checkbox" %}
+{%- set toggles = kind in ["toggle", "toggles"] %}
+<fieldset class="{{ _field_class(span) }} rx-fieldset" aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{% if disabled %} disabled{% endif %}>
+  <legend class="rx-label">{{ label }}{% if not required %} <span class="rx-required">({{ t('ui.optional') }})</span>{% endif %}</legend>
+  {%- if hint %}<p class="rx-hint" id="{{ id }}-hint">{{ hint }}</p>{% endif %}
+  <div class="{% if toggles %}rx-toggles{% else %}{{ _choices_class(inline, columns) }}{% endif %}">
+    {%- for option in options %}
+      {%- if option is string or option is number %}{% set value = option %}{% set text = option %}{% set detail = none %}
+      {%- else %}{% set value = option[0] %}{% set text = option[1] %}{% set detail = option[2] if option | length > 2 else none %}{% endif %}
+      {%- set option_id = id if loop.first else id ~ "-" ~ loop.index %}
+      {%- set checked = value | string in current %}
+      {%- if toggles %}
+    <label class="rx-toggle" for="{{ option_id }}"><input class="rx-toggle__input" type="{{ type }}" id="{{ option_id }}" name="{{ name }}" value="{{ value }}"
+      {%- if checked %} checked{% endif %}
+      {%- if required and type == "radio" %} required{% endif %}
+      {%- if message %} aria-invalid="true"{% endif %}
+      {%- if detail %} aria-describedby="{{ option_id }}-detail"{% endif %}{{ _attrs(attrs) }}><span class="rx-toggle__label">{{ text }}</span>{% if detail %}<span class="rx-visually-hidden" id="{{ option_id }}-detail">{{ detail }}</span>{% endif %}</label>
+      {%- else %}
+    <label class="rx-check" for="{{ option_id }}"><input class="{{ 'rx-radio' if type == 'radio' else 'rx-checkbox' }}" type="{{ type }}" id="{{ option_id }}" name="{{ name }}" value="{{ value }}"
+      {%- if checked %} checked{% endif %}
+      {%- if required and type == "radio" %} required{% endif %}
+      {%- if message %} aria-invalid="true"{% endif %}
+      {%- if detail %} aria-describedby="{{ option_id }}-detail"{% endif %}{{ _attrs(attrs) }}>
+      <span class="rx-check__text"><span>{{ text }}</span>{% if detail %}<span class="rx-hint" id="{{ option_id }}-detail">{{ detail }}</span>{% endif %}</span></label>
+      {%- endif %}
+    {%- endfor %}
+  </div>
+  <p class="rx-error" id="{{ id }}-error" data-error-for="{{ _key(name) }}" aria-live="polite">{{ message }}</p>
+</fieldset>
+{%- endmacro -%}
+
+{#- One choice out of a few, all visible: `radio("plan", "Plan",
+    [["free", "Free"], ["pro", "Pro", "For teams"]])`. An option is a value,
+    a [value, label] pair, or [value, label, description]. `inline` puts
+    short options on one line, `columns` (2 or 3) lays long lists out in
+    columns. After a failed submit with none picked, none is checked. More
+    than about seven options read better as a `select`. -#}
+{% macro radio(name, label, options, selected=none, hint=none, required=false, inline=false, columns=none, attrs={}, id=none, disabled=false, span=none) -%}
+{%- set current = old(name, "") if has_old() else (selected if selected is defined and selected is not none else "") %}
+{{ _choice_group("radio", name, label, options, [current | string], hint, required, inline, columns, attrs, id, disabled, span) }}
+{%- endmacro %}
+
+{#- Several choices out of a list: each ticked option sends `name` once,
+    so the form field is a `Vec` (give it `#[serde(default)]`: nothing
+    ticked sends nothing). `selected`: the values ticked at first. Options,
+    `inline` and `columns` as for `radio`. -#}
+{% macro checkbox_list(name, label, options, selected=[], hint=none, required=false, inline=false, columns=none, attrs={}, id=none, disabled=false, span=none) -%}
+{%- set current = old(name, []) if has_old() else selected %}
+{%- if current is none %}{% set current = [] %}{% elif current is string or current is number %}{% set current = [current] %}{% endif %}
+{{ _choice_group("checkbox", name, label, options, current | map("string") | list, hint, required, inline, columns, attrs, id, disabled, span) }}
+{%- endmacro %}
+
+{#- The options as a row of buttons, one pressed: for a few short choices
+    that read better side by side ("Pickup", "Courier"). `multiple`: any
+    number pressed, sent like a `checkbox_list` (`selected` is then a list). -#}
+{% macro toggle_buttons(name, label, options, selected=none, multiple=false, hint=none, required=false, attrs={}, id=none, disabled=false, span=none) -%}
+{%- if multiple %}
+{%- set current = old(name, []) if has_old() else (selected or []) %}
+{%- if current is string or current is number %}{% set current = [current] %}{% endif %}
+{{ _choice_group("toggles", name, label, options, current | map("string") | list, hint, required, false, none, attrs, id, disabled, span) }}
+{%- else %}
+{%- set current = old(name, "") if has_old() else (selected if selected is defined and selected is not none else "") %}
+{{ _choice_group("toggle", name, label, options, [current | string], hint, required, false, none, attrs, id, disabled, span) }}
+{%- endif %}
+{%- endmacro %}
+
+{#- A file field: a drop zone that is also the button, the chosen files
+    listed under it (`preview` shows images). `current`: the URL of the file
+    stored now, shown above. The form needs enctype="multipart/form-data";
+    the form field is an `Option<Upload>` (or `Vec<Upload>` with
+    `multiple`). A file is never refilled after a failed submit. -#}
+{% macro file(name, label, accept=none, multiple=false, hint=none, required=false, current=none, current_name=none, preview=false, attrs={}, id=none, disabled=false, span=none) -%}
+{%- set id = id or _id(name) %}
+{%- set message = error(name) %}
+<div class="{{ _field_class(span) }}">
+  {{ _label(id, label, required) }}
+  {%- if current %}
+  <p class="rx-file__current">
+    {%- if preview %}<img class="rx-file__thumb" src="{{ current }}" alt="">{% endif %}
+    <span>{{ t('ui.current_file') }}: <a class="rx-link" href="{{ current }}">{{ current_name or (current | split("/") | last) }}</a></span>
+  </p>
+  {%- endif %}
+  <div class="rx-file" data-rx-file{% if preview %} data-rx-preview{% endif %}>
+    <input class="rx-file__input" id="{{ id }}" name="{{ name }}" type="file"
+      {%- if accept %} accept="{{ accept }}"{% endif %}
+      {%- if multiple %} multiple{% endif %}
+      {%- if required and not current %} required aria-required="true"{% endif %}
+      {%- if disabled %} disabled{% endif %}
+      {%- if message %} aria-invalid="true"{% endif %}
+      aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>
+    <div class="rx-file__zone" aria-hidden="true">{{ _icon("upload") }}<span>{{ t('ui.choose_files') if multiple else t('ui.choose_file') }}</span></div>
+  </div>
+  <ul class="rx-file__list" data-rx-file-list aria-live="polite"></ul>
+  {% call _describe(id, hint, message) %}{{ name }}{% endcall %}
+</div>
+{%- endmacro %}
+
+{#- A date field with a calendar beside it: type 2026-10-02, or pick a day.
+    Sent as YYYY-MM-DD, like <input type="date"> (a `NaiveDate`). `min` and
+    `max` limit the calendar. Without JavaScript it is a plain text field. -#}
+{% macro date_picker(name, label, value=none, min=none, max=none, hint=none, required=false, placeholder="YYYY-MM-DD", attrs={}, id=none, disabled=false, readonly=false, span=none) -%}
+{%- set id = id or _id(name) %}
+{%- set message = error(name) %}
+{%- set current = old(name, value if value is defined and value is not none else "") | string %}
+{%- if once('rx-calendar') %}{{ renox_calendar() }}{% endif %}
+<div class="{{ _field_class(span) }}">
+  {{ _label(id, label, required) }}
+  <div class="rx-affix">
+    <input class="rx-input" id="{{ id }}" name="{{ name }}" type="text" inputmode="numeric" autocomplete="off" value="{{ current }}" placeholder="{{ placeholder }}" pattern="\d{4}-\d{2}-\d{2}" data-rx-date
+      {%- if min %} data-min="{{ min }}"{% endif %}
+      {%- if max %} data-max="{{ max }}"{% endif %}
+      {%- if required %} required aria-required="true"{% endif %}
+      {%- if disabled %} disabled{% endif %}
+      {%- if readonly %} readonly{% endif %}
+      {%- if message %} aria-invalid="true"{% endif %}
+      aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>
+    <button class="rx-affix__button" type="button" popovertarget="{{ id }}-calendar" aria-label="{{ t('ui.choose_date') }}" aria-haspopup="dialog"{% if disabled or readonly %} disabled{% endif %}>{{ _icon("calendar") }}</button>
+  </div>
+  <div class="rx-popover" id="{{ id }}-calendar" popover data-rx-calendar-for="{{ id }}" role="dialog" aria-label="{{ label }}">
+    <calendar-date class="rx-calendar" locale="{{ app.locale }}" first-day-of-week="1"
+      {%- if current %} value="{{ current }}"{% endif %}{% if min %} min="{{ min }}"{% endif %}{% if max %} max="{{ max }}"{% endif %}>
+      <span slot="previous" aria-label="{{ t('ui.previous_month') }}">{{ _icon("prev") }}</span>
+      <span slot="next" aria-label="{{ t('ui.next_month') }}">{{ _icon("next") }}</span>
+      <span slot="heading" class="rx-calendar__heading" aria-hidden="true"></span>
+      <calendar-month></calendar-month>
+    </calendar-date>
+  </div>
+  {% call _describe(id, hint, message) %}{{ name }}{% endcall %}
+</div>
+{%- endmacro %}
+
+{#- Fields shown only while another field has one of `values`:
+    `{% call show_when("delivery", "courier") %}{{ input("address", …) }}{% endcall %}`.
+    While hidden they are disabled, so they aren't sent; check them on the
+    server with `required_if`. `values`: one value or a list; a checkbox
+    counts as its value ("on") when ticked. Without JavaScript they show. -#}
+{% macro show_when(field, values) -%}
+<fieldset class="rx-fieldset rx-when" data-rx-show-when="{{ field }}" data-rx-values='{{ ([values] if values is string or values is number else values) | map("string") | list | tojson }}'>{{ caller() }}</fieldset>
+{%- endmacro %}
+
+{#- The reverse of `show_when`: hidden while `field` has one of `values`. -#}
+{% macro hide_when(field, values) -%}
+<fieldset class="rx-fieldset rx-when" data-rx-hide-when="{{ field }}" data-rx-values='{{ ([values] if values is string or values is number else values) | map("string") | list | tojson }}'>{{ caller() }}</fieldset>
+{%- endmacro %}
+
+{#- Free text as chips: type and press Enter (or a comma) to add one,
+    Backspace in the empty box to remove the last. Each tag is sent as
+    `name`, so the field is a `Vec<String>` (with `#[serde(default)]`).
+    `suggestions`: values offered while typing. Without JavaScript the box
+    sends what's typed as one more tag. -#}
+{% macro tags_input(name, label, value=[], suggestions=none, hint=none, required=false, placeholder=none, attrs={}, id=none, disabled=false, span=none) -%}
+{%- set id = id or _id(name) %}
+{%- set message = error(name) %}
+{%- set current = old(name, []) if has_old() else (value if value is defined and value is not none else []) %}
+{%- if current is string or current is number %}{% set current = [current] %}{% endif %}
+<div class="{{ _field_class(span) }}">
+  {{ _label(id, label, required) }}
+  <div class="rx-tags{% if message %} rx-tags--invalid{% endif %}" data-rx-tags="{{ name }}" data-remove="{{ t('ui.remove') }}">
+    <ul class="rx-tags__list" role="list">
+      {%- for tag in current if tag | string | trim %}
+      <li class="rx-tag"><span class="rx-tag__text">{{ tag }}</span><button class="rx-tag__remove" type="button" data-rx-tag-remove aria-label="{{ t('ui.remove') }} {{ tag }}"{% if disabled %} disabled{% endif %}>{{ _icon("close") }}</button><input type="hidden" name="{{ name }}" value="{{ tag }}"{% if disabled %} disabled{% endif %}></li>
+      {%- endfor %}
+    </ul>
+    <input class="rx-tags__entry" id="{{ id }}" name="{{ name }}" type="text" autocomplete="off" data-rx-tags-entry
+      {%- if suggestions %} list="{{ id }}-list"{% endif %}
+      {%- if placeholder %} placeholder="{{ placeholder }}"{% endif %}
+      {%- if disabled %} disabled{% endif %}
+      {%- if message %} aria-invalid="true"{% endif %}
+      aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>
+  </div>
+  {%- if suggestions %}
+  <datalist id="{{ id }}-list">{% for option in suggestions %}<option value="{{ option }}"></option>{% endfor %}</datalist>
+  {%- endif %}
+  {% call _describe(id, hint, message) %}{{ name }}{% endcall %}
+</div>
+{%- endmacro %}
+
+{#- Rows the user adds, removes and orders, each with the same fields:
+    `{% call(row, prefix) repeater("lines", "Lines", rows=order.lines) %}
+       {{ input(prefix ~ "[name]", "Name", value=row.name) }}
+     {% endcall %}`. Fields are named `lines[0][name]`, `lines[1][name]`…
+    (renumbered as rows move), so the form field is a `Vec` of a struct;
+    validate the rows with `v.nested("lines", &self.lines)`. `rows`: the
+    rows shown at first (maps or models); after a failed submit, the ones
+    sent. `min`/`max` limit the count; adding needs JavaScript. -#}
+{% macro repeater(name, label, rows=[], add_label=none, item_label=none, min=0, max=none, reorderable=true, hint=none, id=none, span=none) -%}
+{%- set id = id or _id(name) %}
+{#- Only the list's own error (e.g. too many rows): each row's errors show
+    in the row. -#}
+{%- set own = errors[_key(name)] if errors else none %}
+{%- set message = own[0] if own else "" %}
+{%- set current = old(name, []) if has_old() else (rows if rows is defined and rows is not none else []) %}
+{%- set item = item_label or label %}
+<fieldset class="{{ _field_class(span) }} rx-fieldset rx-repeater" id="{{ id }}" data-rx-repeater="{{ name }}" data-rx-min="{{ min }}"{% if max %} data-rx-max="{{ max }}"{% endif %} aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error">
+  <legend class="rx-label">{{ label }}</legend>
+  {%- if hint %}<p class="rx-hint" id="{{ id }}-hint">{{ hint }}</p>{% endif %}
+  <div class="rx-repeater__rows" data-rx-rows>
+    {%- for row in current %}
+    {{ _repeater_row(name, loop.index0, item, reorderable, caller, row) }}
+    {%- endfor %}
+  </div>
+  <template data-rx-row-template>{{ _repeater_row(name, "__INDEX__", item, reorderable, caller, {}) }}</template>
+  <p class="rx-error" id="{{ id }}-error" data-error-for="{{ _key(name) }}" aria-live="polite">{{ message }}</p>
+  <div><button class="rx-button rx-button--secondary rx-button--small" type="button" data-rx-row-add>{{ _icon("plus") }}<span class="rx-button__label">{{ add_label or t('ui.add_row') }}</span></button></div>
+</fieldset>
+{%- endmacro %}
+
+{%- macro _repeater_row(name, index, item, reorderable, fields, row) -%}
+<fieldset class="rx-repeater__row" data-rx-row data-rx-index="{{ index }}">
+  <legend class="rx-repeater__title"><span>{{ item }}</span> <span data-rx-row-number>{{ index + 1 if index is number else "" }}</span></legend>
+  <div class="rx-repeater__tools">
+    {%- if reorderable %}
+    <button class="rx-icon-button" type="button" data-rx-row-up aria-label="{{ t('ui.move_up') }}">{{ _icon("up") }}</button>
+    <button class="rx-icon-button" type="button" data-rx-row-down aria-label="{{ t('ui.move_down') }}">{{ _icon("down") }}</button>
+    {%- endif %}
+    <button class="rx-icon-button rx-icon-button--danger" type="button" data-rx-row-remove aria-label="{{ t('ui.remove') }}">{{ _icon("trash") }}</button>
+  </div>
+  <div class="rx-repeater__fields">{{ fields(row, name ~ "[" ~ index ~ "]") }}</div>
+</fieldset>
+{%- endmacro -%}
+
+{#- Pairs of text, like headers or settings: a repeater with a key and a
+    value per row. The form field is a `renox::KeyValues` (rows without a
+    key are skipped); `value` may be a map, `KeyValues` or a list of pairs. -#}
+{% macro key_value(name, label, value=none, key_label=none, value_label=none, add_label=none, hint=none, id=none, span=none) -%}
+{%- if value is mapping %}{% set pairs = value | items | list %}{% else %}{% set pairs = value or [] %}{% endif %}
+{%- set ns = namespace(rows=[]) %}
+{%- for pair in pairs %}
+  {%- if pair is mapping %}{% set ns.rows = ns.rows + [pair] %}
+  {%- else %}{% set ns.rows = ns.rows + [{"key": pair[0], "value": pair[1]}] %}{% endif %}
+{%- endfor %}
+{%- set key_text = key_label or t('ui.key') %}
+{%- set value_text = value_label or t('ui.value') %}
+<div class="rx-kv">
+{%- call(row, prefix) repeater(name, label, rows=ns.rows, add_label=add_label, item_label=label, reorderable=true, hint=hint, id=id, span=span) %}
+  <div class="rx-kv__row">
+    {{ input(prefix ~ "[key]", key_text, value=row.key) }}
+    {{ input(prefix ~ "[value]", value_text, value=row.value) }}
+  </div>
+{%- endcall %}
+</div>
+{%- endmacro %}
+
+{#- A multi-step form: `{% call wizard("signup", [["account", "Account"],
+    ["profile", "Profile"]], submit_label="Create account") %}` with one
+    `{% call wizard_step("signup", "account") %}…{% endcall %}` per step.
+    Next checks the step's fields (the browser's rules, then the server's
+    when the form has data-live-validate) before moving on; after a failed
+    submit the first step with an error opens. Without JavaScript every
+    step shows at once, with the submit button at the end. -#}
+{% macro wizard(id, steps, submit_label, back_label=none, next_label=none) -%}
+<div class="rx-wizard" id="{{ id }}" data-rx-wizard>
+  <ol class="rx-wizard__steps">
+    {%- for step in steps %}
+    <li class="rx-wizard__step" data-rx-step-tab="{{ step[0] }}"><span class="rx-wizard__number" aria-hidden="true">{{ loop.index }}</span><span class="rx-wizard__name">{{ step[1] }}</span></li>
+    {%- endfor %}
+  </ol>
+  <div class="rx-wizard__panels">{{ caller() }}</div>
+  <div class="rx-wizard__nav">
+    <button class="rx-button rx-button--secondary" type="button" data-rx-wizard-back><span class="rx-button__label">{{ back_label or t('ui.back') }}</span></button>
+    <span class="rx-spacer"></span>
+    <button class="rx-button rx-button--primary" type="button" data-rx-wizard-next><span class="rx-button__label">{{ next_label or t('ui.next') }}</span></button>
+    <button class="rx-button rx-button--primary" type="submit" data-rx-wizard-submit><span class="rx-button__label">{{ submit_label }}</span></button>
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro wizard_step(id, key, title=none) -%}
+<section class="rx-wizard__panel" id="{{ id }}-step-{{ key }}" data-rx-step="{{ key }}"{% if title %} aria-label="{{ title }}"{% endif %}>{{ caller() }}</section>
+{%- endmacro %}
+
+{#- Fields side by side on wider screens, one column on phones:
+    `{% call form_grid(2) %}{{ input("city", "City") }}{{ input("zip", "ZIP") }}{% endcall %}`.
+    A field's `span=2` (or "full") makes it wider. -#}
+{% macro form_grid(columns=2) -%}
+<div class="rx-form-grid rx-cols-{{ columns }}">{{ caller() }}</div>
+{%- endmacro %}
+
+{#- A titled group of fields inside a long form ("Shipping address"), in
+    a `form_grid` of `columns`. -#}
+{% macro fieldset(legend, hint=none, columns=1) -%}
+<fieldset class="rx-fieldset rx-fieldset--boxed">
+  <legend class="rx-fieldset__legend">{{ legend }}</legend>
+  {%- if hint %}<p class="rx-hint">{{ hint }}</p>{% endif %}
+  <div class="rx-form-grid rx-cols-{{ columns }}">{{ caller() }}</div>
+</fieldset>
 {%- endmacro %}
 
 {#- One primary button per form: the action people came to take. Variants:
@@ -156,7 +509,7 @@
     <p class="rx-alert__title">{{ title or t('ui.errors_title') }}</p>
     <ul class="rx-alert__list">
       {%- for field, messages in errors | items %}
-      <li><a class="rx-link" href="#{{ _id(field) }}">{{ messages[0] }}</a></li>
+      <li><a class="rx-link" href="#{{ _id(field) }}" data-rx-field="{{ field }}">{{ messages[0] }}</a></li>
       {%- endfor %}
     </ul>
   </div>
@@ -269,6 +622,19 @@
 {%- if kind == "success" -%}<svg viewBox="0 0 20 20" width="20" height="20"><circle cx="10" cy="10" r="9" fill="currentColor"/><path d="M6 10.5l2.5 2.5L14 7.5" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
 {%- elif kind == "warning" -%}<svg viewBox="0 0 20 20" width="20" height="20"><path d="M10 2l8.5 15h-17z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8v4M10 14.5h.01" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
 {%- elif kind == "error" -%}<svg viewBox="0 0 20 20" width="20" height="20"><circle cx="10" cy="10" r="9" fill="currentColor"/><path d="M7 7l6 6M13 7l-6 6" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+{%- elif kind == "eye" -%}<svg class="rx-icon-off" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M1.5 10S4.5 4 10 4s8.5 6 8.5 6-3 6-8.5 6-8.5-6-8.5-6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+{%- elif kind == "eye-off" -%}<svg class="rx-icon-on" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M1.5 10S4.5 4 10 4s8.5 6 8.5 6-3 6-8.5 6-8.5-6-8.5-6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3 17L17 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+{%- elif kind == "copy" -%}<svg class="rx-icon-off" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><rect x="6.5" y="6.5" width="10" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M13.5 6.5V5a1.5 1.5 0 00-1.5-1.5H5A1.5 1.5 0 003.5 5v7A1.5 1.5 0 005 13.5h1.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+{%- elif kind == "check" -%}<svg class="rx-icon-on" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M4.5 10.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+{%- elif kind == "calendar" -%}<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><rect x="3" y="4.5" width="14" height="12.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3 8.5h14M7 2.5v4M13 2.5v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+{%- elif kind == "upload" -%}<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path d="M12 15V4m0 0l-4.5 4.5M12 4l4.5 4.5M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+{%- elif kind == "close" -%}<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+{%- elif kind == "plus" -%}<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+{%- elif kind == "up" -%}<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M5 12.5L10 7.5l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+{%- elif kind == "down" -%}<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M5 7.5l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+{%- elif kind == "trash" -%}<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M4 6h12M8 6V4.5h4V6M6 6l.7 9.5a1 1 0 001 .9h4.6a1 1 0 001-.9L14 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+{%- elif kind == "prev" -%}<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M12.5 4.5L7 10l5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+{%- elif kind == "next" -%}<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M7.5 4.5L13 10l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
 {%- else -%}<svg viewBox="0 0 20 20" width="20" height="20"><circle cx="10" cy="10" r="9" fill="currentColor"/><path d="M10 9v5M10 6h.01" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
 {%- endif -%}
 {%- endmacro -%}

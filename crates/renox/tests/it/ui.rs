@@ -18,6 +18,75 @@ impl Validate for Signup {
     }
 }
 
+#[derive(serde::Deserialize)]
+struct Profile {
+    name: String,
+    plan: Option<String>,
+    #[serde(default)]
+    tags: Vec<String>,
+    news: Option<String>,
+}
+
+impl Validate for Profile {
+    fn rules(&self, v: &mut Validator) {
+        v.field("name", &self.name).required();
+        v.field("plan", &self.plan).required();
+        let _ = (&self.tags, &self.news);
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct Delivery {
+    method: Option<String>,
+    #[serde(default)]
+    extras: Vec<String>,
+    address: Option<String>,
+    on: Option<renox::chrono::NaiveDate>,
+}
+
+impl Validate for Delivery {
+    fn rules(&self, v: &mut Validator) {
+        let courier = self.method.as_deref() == Some("courier");
+        v.field("method", &self.method).required();
+        v.field("address", &self.address).required_if(courier);
+        let _ = (&self.extras, &self.on);
+    }
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+struct Line {
+    name: String,
+    qty: i64,
+}
+
+impl Validate for Line {
+    fn rules(&self, v: &mut Validator) {
+        v.field("name", &self.name).required();
+        v.field("qty", &self.qty).min(1);
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct Order {
+    #[serde(default)]
+    tags: Vec<String>,
+    #[serde(default)]
+    lines: Vec<Line>,
+    #[serde(default)]
+    meta: renox::KeyValues,
+    #[serde(default)]
+    sizes: Vec<String>,
+}
+
+impl Validate for Order {
+    fn rules(&self, v: &mut Validator) {
+        v.field("tags", &self.tags).max(3);
+        v.field("lines", &self.lines).required();
+        v.nested("lines", &self.lines);
+        v.field("meta", &self.meta).max(2);
+    }
+}
+
 struct Pages;
 
 impl Module for Pages {
@@ -52,6 +121,23 @@ impl Module for Pages {
                     .fragment("rows")
                     .also("count")
             })
+            .get("/fields", || async { view("fields.html", context! {}) })
+            .get("/more", || async { view("more.html", context! {}) })
+            .get("/stage3", || async { view("stage3.html", context! {}) })
+            .post("/order", |Valid(order): Valid<Order>| async move {
+                renox::axum::Json(renox::serde_json::json!({
+                    "tags": order.tags,
+                    "lines": order.lines,
+                    "meta": order.meta,
+                    "sizes": order.sizes,
+                }))
+            })
+            .post("/delivery", |Valid(_): Valid<Delivery>| async {
+                Redirect::to("/more")
+            })
+            .post("/profile", |Valid(_): Valid<Profile>| async {
+                Redirect::to("/fields")
+            })
             .get("/components", || async {
                 view("components.html", context! { note => "hi" })
             })
@@ -69,6 +155,59 @@ fn views() -> tempfile::TempDir {
 {{ input("name", "Name", required=true, hint="Up to 10 letters") }}
 {{ input("email", "Email", type="email", required=true) }}
 {{ input("nickname", "Nickname") }}{{ button("Sign up") }}</form>{{ toasts() }}"#,
+    );
+    write(
+        "fields.html",
+        r#"{% from "renox/ui.html" import input, textarea, select, checkbox, radio, checkbox_list, form_grid, fieldset, form_errors %}
+<form method="post" action="/profile">{{ csrf_field() }}{{ form_errors() }}
+{% call form_grid(2) %}
+{{ input("name", "Name", id="profile-name", required=true) }}
+{{ input("price", "Price", type="number", prefix="Rp", suffix=".00", span=2) }}
+{{ input("code", "Code", value="X1", readonly=true, datalist=["X1", ["X2", "Second"]]) }}
+{{ textarea("bio", "Bio", id="profile-bio", disabled=true, span="full") }}
+{{ select("size", "Size", ["s", "m"], id="profile-size", span=2) }}
+{% endcall %}
+{% call fieldset("Preferences", columns=2) %}
+{{ radio("plan", "Plan", [["free", "Free"], ["pro", "Pro", "For teams"]], selected="free", required=true, inline=true) }}
+{{ checkbox_list("tags", "Tags", [["a", "Alpha"], ["b", "Beta"], ["c", "Gamma"]], selected=["b"], columns=2) }}
+{{ checkbox("news", "Email me news", checked=true) }}
+{% endcall %}
+</form>"#,
+    );
+    write(
+        "more.html",
+        r#"{% from "renox/ui.html" import input, toggle_buttons, file, date_picker, show_when, hide_when %}
+<form method="post" action="/delivery" enctype="multipart/form-data">{{ csrf_field() }}
+{{ input("password", "Password", type="password", value="secret", revealable=true) }}
+{{ input("token", "Token", value="abc&1", readonly=true, copyable=true) }}
+{{ toggle_buttons("method", "Method", [["pickup", "Pickup"], ["courier", "Courier", "Next day"]], selected="pickup", required=true) }}
+{{ toggle_buttons("extras", "Extras", [["gift", "Gift wrap"], ["card", "Card"]], selected=["card"], multiple=true) }}
+{% call show_when("method", "courier") %}{{ input("address", "Address") }}{% endcall %}
+{% call hide_when("extras", ["gift", "card"]) %}<p>no extras</p>{% endcall %}
+{{ file("photo", "Photo", accept="image/*", preview=true, current="/storage/photos/a.png", hint="PNG or JPEG") }}
+{{ file("docs", "Documents", multiple=true, required=true) }}
+{{ date_picker("on", "Delivery date", value="2026-10-02", min="2026-10-01", max="2026-12-31") }}
+{{ date_picker("back", "Return date") }}
+</form>"#,
+    );
+    write(
+        "stage3.html",
+        r#"{% from "renox/ui.html" import input, tags_input, repeater, key_value, select, wizard, wizard_step, form_errors %}
+<form method="post" action="/order" data-live-validate>{{ csrf_field() }}{{ form_errors() }}
+{% call wizard("w", [["items", "Items"], ["extra", "Extras"]], submit_label="Place order") %}
+{% call wizard_step("w", "items") %}
+{% call(row, prefix) repeater("lines", "Lines", rows=[{"name": "Kopi", "qty": 2}], item_label="Line", min=1, max=5) %}
+{{ input(prefix ~ "[name]", "Name", value=row.name, required=true) }}
+{{ input(prefix ~ "[qty]", "Quantity", type="number", value=row.qty) }}
+{% endcall %}
+{% endcall %}
+{% call wizard_step("w", "extra") %}
+{{ tags_input("tags", "Tags", value=["new", "sale"], suggestions=["gift"]) }}
+{{ key_value("meta", "Meta", value={"Color": "Red"}) }}
+{{ select("sizes", "Sizes", [["s", "Small"], ["m", "Medium"], ["l", "Large"]], selected=["m"], multiple=true, searchable=true) }}
+{% endcall %}
+{% endcall %}
+</form>"#,
     );
     write(
         "list.html",
@@ -245,4 +384,295 @@ async fn kit_texts_follow_the_locale() {
     .await;
     app.get("/form").await.assert_see("(opsional)");
     app.get("/components").await.assert_see("Batal|");
+}
+
+#[renox::test]
+async fn form_fields_choices_affixes_and_layout() {
+    let (app, _dir) = app().await;
+    let page = app.get("/fields").await;
+    page.assert_ok()
+        // Layout: a two-column grid, a field spanning both, a titled group.
+        .assert_see(r#"<div class="rx-form-grid rx-cols-2">"#)
+        .assert_see(r#"<div class="rx-field rx-span-2">"#)
+        .assert_see(r#"<div class="rx-field rx-span-full">"#)
+        .assert_see(r#"<legend class="rx-fieldset__legend">Preferences</legend>"#)
+        // Every field takes its own id.
+        .assert_see(r#"<label class="rx-label" for="profile-name">"#)
+        .assert_see(r#"id="profile-bio""#)
+        .assert_see(r#"id="profile-size""#)
+        // Prefix and suffix are joined to the input and described by it.
+        .assert_see(r#"<span class="rx-affix__text" id="rx-price-prefix">Rp</span>"#)
+        .assert_see(r#"aria-describedby="rx-price-prefix rx-price-suffix rx-price-error""#)
+        // Read-only, disabled, suggestions.
+        .assert_see(r#"value="X1" list="rx-code-list" readonly"#)
+        .assert_see(r#"<option value="X2">Second</option>"#)
+        .assert_see(r#"id="profile-bio" name="bio" rows="4" disabled"#)
+        // A radio group in a fieldset: the first option carries the group's id
+        // (the error summary links to it), the others are numbered.
+        .assert_see(r#"<legend class="rx-label">Plan</legend>"#)
+        .assert_see(r#"<div class="rx-choices rx-choices--inline">"#)
+        .assert_see(r#"id="rx-plan" name="plan" value="free" checked required"#)
+        .assert_see(r#"id="rx-plan-2" name="plan" value="pro" required aria-describedby="rx-plan-2-detail""#)
+        .assert_see(r#"<span class="rx-hint" id="rx-plan-2-detail">For teams</span>"#)
+        // A checkbox list, ticked from `selected`.
+        .assert_see(r#"<div class="rx-choices rx-cols-2">"#)
+        .assert_see(r#"name="tags" value="a">"#)
+        .assert_see(r#"name="tags" value="b" checked>"#)
+        .assert_see(r#"id="rx-news" name="news" value="on" checked"#);
+
+    // A failed submit refills what was sent: the other plan, two tags, and
+    // the checkbox left unticked (which sends nothing) stays unticked.
+    app.request()
+        .header("referer", "/fields")
+        .post(
+            "/profile",
+            &[("name", ""), ("plan", "pro"), ("tags", "a"), ("tags", "c")],
+        )
+        .await
+        .assert_redirect("/fields");
+    let page = app.get("/fields").await;
+    page.assert_see(r#"name="plan" value="pro" checked"#)
+        .assert_dont_see(r#"value="free" checked"#)
+        .assert_see(r#"name="tags" value="a" checked>"#)
+        .assert_dont_see(r#"name="tags" value="b" checked>"#)
+        .assert_see(r#"name="tags" value="c" checked>"#)
+        .assert_see(r#"id="rx-news" name="news" value="on" aria-describedby"#)
+        // The summary links to the field by its name, whatever its id.
+        .assert_see(r##"href="#rx-name" data-rx-field="name""##)
+        .assert_see(r#"id="profile-name" name="name" type="text" value="" required aria-required="true" aria-invalid="true""#);
+
+    // One tag only comes back as a string, not a list.
+    app.request()
+        .header("referer", "/fields")
+        .post("/profile", &[("name", ""), ("tags", "b"), ("news", "on")])
+        .await;
+    let page = app.get("/fields").await;
+    page.assert_see(r#"name="tags" value="b" checked>"#)
+        .assert_dont_see(r#"name="tags" value="a" checked>"#)
+        .assert_see(r#"id="rx-news" name="news" value="on" checked"#)
+        .assert_see(r#"id="rx-plan" name="plan" value="free" required aria-invalid="true""#);
+}
+
+#[renox::test]
+async fn form_fields_buttons_files_dates_and_conditions() {
+    let (app, _dir) = app().await;
+    let page = app.get("/more").await;
+    let html = page.text();
+    page.assert_ok()
+        // A password is never printed, even with the reveal button.
+        .assert_dont_see("secret")
+        .assert_see(r#"data-rx-reveal="rx-password" aria-controls="rx-password" aria-pressed="false" aria-label="Show password" data-label-hide="Hide password""#)
+        // Copy: the button copies the field's value, escaped in the page.
+        .assert_see(r#"value="abc&amp;1""#)
+        .assert_see(r#"data-rx-copy="rx-token" aria-label="Copy" data-label-done="Copied""#)
+        // Toggle buttons: radios (or checkboxes) drawn as buttons.
+        .assert_see(r#"<div class="rx-toggles">"#)
+        .assert_see(r#"class="rx-toggle__input" type="radio" id="rx-method" name="method" value="pickup" checked required"#)
+        .assert_see(r#"<span class="rx-visually-hidden" id="rx-method-2-detail">Next day</span>"#)
+        .assert_see(r#"type="checkbox" id="rx-extras-2" name="extras" value="card" checked>"#)
+        // Conditional groups carry the field and the values as JSON.
+        .assert_see(r#"data-rx-show-when="method" data-rx-values='["courier"]'>"#)
+        .assert_see(r#"data-rx-hide-when="extras" data-rx-values='["gift","card"]'>"#)
+        // Files: the drop zone, the current file, required only without one.
+        .assert_see(r#"<div class="rx-file" data-rx-file data-rx-preview>"#)
+        .assert_see(r#"name="photo" type="file" accept="image/*""#)
+        .assert_see(r#"<img class="rx-file__thumb" src="/storage/photos/a.png" alt="">"#)
+        .assert_see(r#">a.png</a>"#)
+        .assert_see("Choose a file or drop it here")
+        .assert_see(r#"name="docs" type="file" multiple required"#)
+        .assert_see("Choose files or drop them here")
+        // The date picker: a text field, a button and a calendar in a popover.
+        .assert_see(r#"name="on" type="text" inputmode="numeric" autocomplete="off" value="2026-10-02""#)
+        .assert_see(r#"popovertarget="rx-on-calendar""#)
+        .assert_see(r#"value="2026-10-02" min="2026-10-01" max="2026-12-31">"#)
+        .assert_see(r#"<calendar-date class="rx-calendar" locale="en" first-day-of-week="1">"#);
+    // The calendar's script once per page, however many pickers.
+    assert_eq!(html.matches("/_renox/cally-").count(), 1, "{html}");
+    let tail = html.split("src=\"/_renox/cally-").nth(1).unwrap();
+    let url = format!("/_renox/cally-{}", tail.split('"').next().unwrap());
+    app.get(&url).await.assert_ok();
+
+    // A failed submit: the courier pressed, no extras, the date kept.
+    app.request()
+        .header("referer", "/more")
+        .post("/delivery", &[("method", "courier"), ("on", "2026-11-05")])
+        .await
+        .assert_redirect("/more");
+    let page = app.get("/more").await;
+    page.assert_see(r#"name="method" value="courier" checked"#)
+        .assert_dont_see(r#"value="pickup" checked"#)
+        .assert_dont_see(r#"name="extras" value="card" checked"#)
+        .assert_see(r#"value="2026-11-05""#)
+        .assert_see("The address field is required.");
+}
+
+#[renox::test]
+async fn stage_two_texts_follow_the_locale() {
+    let dir = views();
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new().module(Auth::new()).module(Pages), move |c| {
+        c.views_path = path;
+        c.locale = "id".into();
+    })
+    .await;
+    app.get("/more")
+        .await
+        .assert_see("Tampilkan kata sandi")
+        .assert_see(r#"aria-label="Salin""#)
+        .assert_see("Pilih berkas atau tarik ke sini")
+        .assert_see("Berkas saat ini")
+        .assert_see(r#"aria-label="Pilih tanggal""#)
+        .assert_see(r#"locale="id""#);
+}
+
+#[renox::test]
+async fn repeaters_tags_key_values_and_wizards() {
+    let (app, _dir) = app().await;
+    let page = app.get("/stage3").await;
+    page.assert_ok()
+        // The repeater: a row from `rows`, numbered names, error slots keyed
+        // with dots, and a template row for the script to copy.
+        .assert_see(r#"data-rx-repeater="lines" data-rx-min="1" data-rx-max="5""#)
+        .assert_see(r#"data-rx-row data-rx-index="0""#)
+        .assert_see(r#"id="rx-lines-0-name" name="lines[0][name]" type="text" value="Kopi""#)
+        .assert_see(r#"name="lines[0][qty]" type="number" value="2""#)
+        .assert_see(r#"data-error-for="lines.0.name""#)
+        .assert_see(r#"name="lines[__INDEX__][name]""#)
+        .assert_see(r#"aria-label="Move up""#)
+        // Tags: a chip and a hidden input per tag, then the box to type in.
+        .assert_see(r#"<span class="rx-tag__text">new</span>"#)
+        .assert_see(r#"<input type="hidden" name="tags" value="sale">"#)
+        .assert_see(
+            r#"name="tags" type="text" autocomplete="off" data-rx-tags-entry list="rx-tags-list""#,
+        )
+        // Key-value: a repeater over the map's pairs.
+        .assert_see(r#"name="meta[0][key]" type="text" value="Color""#)
+        .assert_see(r#"name="meta[0][value]" type="text" value="Red""#)
+        // The searchable multiple select keeps a native select underneath.
+        .assert_see(r#"name="sizes" multiple data-rx-combobox"#)
+        .assert_see(r#"<option value="m" selected>Medium</option>"#)
+        // The wizard: steps, panels and the three buttons.
+        .assert_see(r#"data-rx-step-tab="extra""#)
+        .assert_see(r#"id="w-step-items" data-rx-step="items""#)
+        .assert_see("data-rx-wizard-next")
+        .assert_see("Place order");
+
+    // Nested names read into a Vec of structs, a KeyValues and lists.
+    let res = app
+        .post(
+            "/order",
+            &[
+                ("tags", "a"),
+                ("tags", "b"),
+                ("tags", ""),
+                ("lines[0][name]", "Kopi"),
+                ("lines[0][qty]", "2"),
+                ("lines[1][name]", "Teh"),
+                ("lines[1][qty]", " 1 "),
+                ("meta[0][key]", "Color"),
+                ("meta[0][value]", "Red"),
+                ("meta[1][key]", ""),
+                ("meta[1][value]", ""),
+                ("sizes", "s"),
+                ("sizes", "l"),
+            ],
+        )
+        .await;
+    res.assert_ok();
+    let body: renox::serde_json::Value = res.json();
+    assert_eq!(
+        body,
+        renox::serde_json::json!({
+            "tags": ["a", "b"],
+            "lines": [{"name": "Kopi", "qty": 2}, {"name": "Teh", "qty": 1}],
+            "meta": [["Color", "Red"]],
+            "sizes": ["s", "l"],
+        })
+    );
+
+    // Errors are keyed by the row: `lines.1.name`, labelled "name".
+    let res = app
+        .htmx()
+        .post(
+            "/order",
+            &[
+                ("lines[0][name]", "Kopi"),
+                ("lines[0][qty]", "abc"),
+                ("lines[1][name]", ""),
+                ("lines[1][qty]", "0"),
+            ],
+        )
+        .await;
+    res.assert_status(422);
+    let body: renox::serde_json::Value = res.json();
+    assert_eq!(
+        body["errors"]["lines.1.name"][0],
+        "The name field is required."
+    );
+    assert!(
+        body["errors"]["lines.0.qty"][0]
+            .as_str()
+            .unwrap()
+            .contains("qty")
+    );
+    assert!(
+        body["errors"]["lines.1.qty"][0]
+            .as_str()
+            .unwrap()
+            .contains("at least 1")
+    );
+
+    // A plain post goes back with the rows sent, refilled, and their errors.
+    app.request()
+        .header("referer", "/stage3")
+        .post(
+            "/order",
+            &[
+                ("lines[0][name]", "Kopi"),
+                ("lines[0][qty]", "2"),
+                ("lines[1][name]", ""),
+                ("lines[1][qty]", "3"),
+                ("lines[2][name]", "Susu"),
+                ("lines[2][qty]", "1"),
+                ("meta[0][key]", "a"),
+                ("meta[0][value]", "1"),
+                ("meta[1][key]", "b"),
+                ("meta[1][value]", "2"),
+                ("meta[2][key]", "c"),
+                ("meta[2][value]", "3"),
+            ],
+        )
+        .await
+        .assert_redirect("/stage3");
+    let page = app.get("/stage3").await;
+    page.assert_see(r#"name="lines[2][name]" type="text" value="Susu""#)
+        .assert_see(r#"name="lines[1][qty]" type="number" value="3""#)
+        .assert_see(r#"name="lines[1][name]" type="text" value="" required aria-required="true" aria-invalid="true""#)
+        .assert_see("The name field is required.")
+        .assert_see(r#"name="meta[2][key]" type="text" value="c""#)
+        // The tags left as they were sent: none.
+        .assert_dont_see(r#"<span class="rx-tag__text">new</span>"#)
+        // The summary links to the row's field.
+        .assert_see(r##"href="#rx-lines-1-name" data-rx-field="lines.1.name""##)
+        // A row's error shows in the row only, not again under the list.
+        .assert_see(r#"data-error-for="lines" aria-live="polite"></p>"#);
+    // The list's own error (no rows at all) shows under it.
+    app.request()
+        .header("referer", "/stage3")
+        .post("/order", &[("tags", "a")])
+        .await
+        .assert_redirect("/stage3");
+    app.get("/stage3").await.assert_see(
+        r#"data-error-for="lines" aria-live="polite">The lines field is required.</p>"#,
+    );
+
+    // Live validation names the row's field the way the page does.
+    let res = app
+        .request()
+        .header("x-renox-validate", "lines[0][name]")
+        .post("/order", &[("lines[0][name]", ""), ("lines[0][qty]", "1")])
+        .await;
+    let body: renox::serde_json::Value = res.json();
+    assert_eq!(body["field"], "lines[0][name]");
+    assert_eq!(body["errors"][0], "The name field is required.");
 }

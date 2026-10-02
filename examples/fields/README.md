@@ -19,18 +19,27 @@ package already enables renox's `postgres` and `uuid` features.
 | Feature | Where |
 |---|---|
 | The model, the form struct with one comment per input, validation, routes | [src/app/products/mod.rs](src/app/products/mod.rs) |
-| The form: text, textarea, number, checkbox, select, checkbox group, time, datetime-local, date | [resources/views/products/form.html](resources/views/products/form.html) |
+| The form on the UI kit: text, textarea, number with a prefix or suffix, a switch, a radio group, a checkbox list, time, datetime-local, a date in the kit's calendar (`date_picker`), the key read-only with a copy button, in a `form_grid` and `fieldset`s | [resources/views/products/form.html](resources/views/products/form.html) |
 | Column types on SQLite and on PostgreSQL | [.up.sql](migrations/20260101000000_create_products_table.up.sql), [.postgres.up.sql](migrations/20260101000000_create_products_table.postgres.up.sql) |
 
 ## Things worth copying
 
-- **A `<select>` is an enum.** `#[derive(DbEnum)] enum Size` is stored as text (`small`,
-  `medium`, `large`); the form lists `Size::ALL`, and an unknown value fails validation.
+- **Tags and pairs are JSON columns.** The kit's `tags_input` sends one `tags` value per tag (a
+  `Vec<String>`, stored as `Json<Vec<String>>`); its `key_value` sends `specs[0][key]`,
+  `specs[0][value]`… read into `renox::KeyValues` and stored as `Json<KeyValues>` (a list of
+  pairs, so the order holds in PostgreSQL's `JSONB`). Such a nested name makes `Valid` read
+  the whole form as a tree; every other field still parses from its text.
+
+- **A radio group (or a `<select>`) is an enum.** `#[derive(DbEnum)] enum Size` is stored as
+  text (`small`, `medium`, `large`); the form lists `Size::ALL` with the kit's `radio`, and an
+  unknown value fails validation.
 - **A list of checkboxes is a `Json<Vec<String>>`.** `JSONB` on PostgreSQL, `TEXT` on SQLite.
   The form field needs `#[serde(default)]`, since nothing is sent when no box is checked.
   Each item is checked with `v.each("colors", &self.colors, |c| c.one_of(COLORS))` and
   repeats are refused with `v.distinct("colors", &self.colors)`; errors are keyed `colors.1`,
   and `error('colors')` (or the `data-error-for="colors"` slot over htmx) shows the first.
+  The kit's `checkbox_list("colors", …, selected=product.colors)` ticks the stored colors, or
+  after a failed save exactly the ones sent.
 - **A checkbox is a `bool`.** Checked sends `on`; unchecked sends nothing, which becomes `false`.
 - **Empty inputs become `None`.** `Option<String>`, `Option<NaiveTime>`, `Option<NaiveDateTime>`
   and `Option<NaiveDate>` are `None` when the input is left empty.

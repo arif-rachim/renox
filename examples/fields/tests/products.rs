@@ -51,16 +51,20 @@ async fn a_product_round_trips_from_the_form_to_the_database_and_back() {
     app.get(&edit)
         .await
         .assert_ok()
-        .assert_see(r#"name="name" value="Kopi Gayo""#)
+        .assert_see(r#"name="name" type="text" value="Kopi Gayo""#)
         .assert_see(">Arabica</textarea>")
         .assert_see(r#"value="0.25""#)
-        .assert_see(r#"name="available" checked"#)
-        .assert_see(r#"<option value="large" selected>"#)
+        .assert_see(r#"name="available" value="on" checked"#)
+        .assert_see(r#"name="size" value="large" checked"#)
         .assert_see(r#"value="black" checked"#)
         .assert_see(r#"value="red" checked"#)
         .assert_see(r#"value="07:30:00""#)
         .assert_see(r#"value="2026-10-01T10:30:00""#)
-        .assert_see(r#"value="2026-09-27""#);
+        .assert_see(r#"value="2026-09-27""#)
+        // The key, read-only with a copy button; the date in the kit's picker.
+        .assert_see(&format!(r#"value="{}" readonly"#, product.id))
+        .assert_see(r#"data-rx-copy="rx-key""#)
+        .assert_see(r#"popovertarget="rx-released_on-calendar""#);
 }
 
 #[renox::test]
@@ -147,6 +151,59 @@ async fn each_color_is_checked_and_repeats_are_refused() {
         .assert_redirect("/products/new");
     app.get("/products/new")
         .await
-        .assert_see(r#"data-error-for="colors">"#)
-        .assert_see("The selected colors #1 is invalid.");
+        .assert_see(
+            r#"data-error-for="colors" aria-live="polite">The selected colors #1 is invalid."#,
+        )
+        // Only what was sent is ticked: no listed color.
+        .assert_dont_see(r#"name="colors" value="black" checked"#);
+}
+
+#[renox::test]
+async fn tags_and_specifications_ride_a_nested_form() {
+    let app = TestApp::new(fields::app()).await;
+    // `specs[0][key]` makes the whole form nested: every other field still
+    // parses from its text (numbers, the enum, the checkbox, dates, times).
+    let mut form = FULL.to_vec();
+    form.extend([
+        ("tags", "organic"),
+        ("tags", "decaf"),
+        ("tags", ""),
+        ("specs[0][key]", "Origin"),
+        ("specs[0][value]", "Aceh"),
+        ("specs[1][key]", ""),
+        ("specs[1][value]", ""),
+        ("specs[2][key]", "Roast"),
+        ("specs[2][value]", "Medium"),
+    ]);
+    let res = app.post("/products", &form).await;
+    res.assert_status(303);
+    let edit = res.header("location").unwrap().to_owned();
+    let product = Product::query().first(app.db()).await.unwrap().unwrap();
+    assert_eq!(*product.tags, ["organic", "decaf"]);
+    assert_eq!(
+        product.specs.iter().collect::<Vec<_>>(),
+        [("Origin", "Aceh"), ("Roast", "Medium")]
+    );
+    assert_eq!(product.size, Size::Large);
+    assert!(product.available);
+    assert_eq!(product.opens_at, NaiveTime::from_hms_opt(7, 30, 0));
+    assert_eq!(*product.colors, ["black", "red"]);
+
+    // The edit form shows them back: chips, and a row per pair.
+    app.get(&edit)
+        .await
+        .assert_see(r#"<input type="hidden" name="tags" value="decaf">"#)
+        .assert_see(r#"name="specs[1][key]" type="text" value="Roast""#)
+        .assert_see(r#"name="specs[1][value]" type="text" value="Medium""#);
+
+    // Too many tags: the error is the list's, the input kept.
+    let mut form = FULL.to_vec();
+    for tag in ["a", "b", "c", "d", "e", "f"] {
+        form.push(("tags", tag));
+    }
+    form.push(("specs[0][key]", "Origin"));
+    app.htmx()
+        .post("/products", &form)
+        .await
+        .assert_invalid("tags");
 }

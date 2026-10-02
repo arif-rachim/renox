@@ -66,6 +66,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    --rx-scheme: dark;
     --rx-accent: #0071e3;
     --rx-accent-hover: #0a84ff;
     --rx-accent-pressed: #0062c4;
@@ -95,6 +96,7 @@
   }
 }
 :root[data-theme="dark"] {
+  --rx-scheme: dark;
   --rx-accent-text: #409cff; --rx-danger-text: #ff6961; --rx-success: #30d158; --rx-warning: #ff9f0a;
   --rx-info: #409cff; --rx-label: #f5f5f7; --rx-secondary-label: #aeaeb2; --rx-tertiary-label: #8e8e93;
   --rx-bg: #000000; --rx-surface: #1c1c1e; --rx-surface-raised: #2c2c2e; --rx-fill: rgba(120, 120, 128, 0.24);
@@ -178,7 +180,7 @@
 
 /* ---------- Form fields ---------- */
 
-.rx-field { display: grid; gap: 6px; }
+.rx-field { display: grid; gap: 6px; min-width: 0; }
 .rx-label { font-size: var(--rx-text-subhead); font-weight: 600; color: var(--rx-label); }
 .rx-required { color: var(--rx-secondary-label); font-weight: 400; }
 .rx-hint { font-size: var(--rx-text-footnote); color: var(--rx-secondary-label); margin: 0; }
@@ -196,6 +198,9 @@
   min-height: var(--rx-target);
   padding: 10px 12px;
   width: 100%;
+  min-width: 0;
+  /* Native pickers (date, time, color) and the datalist follow the theme. */
+  color-scheme: var(--rx-scheme, light);
   transition: border-color var(--rx-duration) var(--rx-ease), box-shadow var(--rx-duration) var(--rx-ease);
   -webkit-appearance: none;
   appearance: none;
@@ -221,6 +226,42 @@
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--rx-danger) 30%, transparent);
 }
 .rx-input:disabled, .rx-select:disabled, .rx-textarea:disabled { background: var(--rx-fill); color: var(--rx-tertiary-label); cursor: not-allowed; }
+/* Read-only: shaded like disabled, but the text keeps full contrast (it is
+   read, copied and sent with the form). */
+.rx-input[readonly], .rx-textarea[readonly] { background: var(--rx-fill); }
+
+/* Prefix and suffix ("Rp", "kg"): one box around the text and the input. */
+.rx-affix {
+  display: flex; align-items: stretch; min-height: var(--rx-target);
+  background: var(--rx-surface); border: 1px solid var(--rx-border); border-radius: var(--rx-radius-s);
+  overflow: hidden; transition: border-color var(--rx-duration) var(--rx-ease), box-shadow var(--rx-duration) var(--rx-ease);
+}
+.rx-affix:hover { border-color: var(--rx-tertiary-label); }
+.rx-affix:focus-within { border-color: var(--rx-accent); box-shadow: 0 0 0 4px var(--rx-focus); }
+.rx-affix:has(> [aria-invalid="true"]) { border-color: var(--rx-danger-text); }
+.rx-affix:has(> [aria-invalid="true"]):focus-within { box-shadow: 0 0 0 4px color-mix(in srgb, var(--rx-danger) 30%, transparent); }
+.rx-affix > .rx-input { flex: 1; min-width: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+.rx-affix > .rx-input:focus-visible { box-shadow: none; }
+.rx-affix:has(> .rx-input:disabled), .rx-affix:has(> .rx-input[readonly]) { background: var(--rx-fill); }
+.rx-affix__text {
+  display: flex; align-items: center; flex: none; padding-inline: 12px; white-space: nowrap;
+  color: var(--rx-secondary-label); font-size: var(--rx-text-body); background: var(--rx-fill);
+}
+.rx-affix__text:first-child { border-right: 1px solid var(--rx-separator); }
+.rx-affix__text:last-child { border-left: 1px solid var(--rx-separator); }
+/* Buttons inside the box: show the password, copy, open the calendar. */
+.rx-affix__button {
+  flex: none; display: grid; place-items: center; width: var(--rx-target); padding: 0; margin: 0;
+  border: 0; border-left: 1px solid var(--rx-separator); background: transparent;
+  color: var(--rx-secondary-label); cursor: pointer; font: inherit;
+}
+.rx-affix__button:hover { background: var(--rx-fill); color: var(--rx-label); }
+.rx-affix__button:focus-visible { outline: 2px solid var(--rx-accent); outline-offset: -5px; border-radius: 10px; }
+.rx-affix__button:disabled { cursor: not-allowed; color: var(--rx-tertiary-label); background: transparent; }
+/* Two icons, one shown: the "on" one while pressed (or just copied). */
+.rx-affix__button .rx-icon-on, .rx-affix__button[aria-pressed="true"] .rx-icon-off, .rx-affix__button[data-rx-done] .rx-icon-off { display: none; }
+.rx-affix__button[aria-pressed="true"] .rx-icon-on, .rx-affix__button[data-rx-done] .rx-icon-on { display: block; }
+.rx-affix__button[data-rx-done] { color: var(--rx-success); }
 
 /* Checkbox and switch: the whole row is the target. */
 .rx-check { display: flex; align-items: flex-start; gap: var(--rx-space-3); min-height: var(--rx-target); padding-block: 10px; cursor: pointer; }
@@ -250,6 +291,235 @@
 .rx-switch:checked { background: var(--rx-success); }
 .rx-switch:checked::after { transform: translateX(20px); }
 .rx-check--switch { align-items: center; justify-content: space-between; }
+
+.rx-radio {
+  flex: none; margin: 2px 0 0; width: 22px; height: 22px; border-radius: 50%;
+  border: 1.5px solid var(--rx-border); background: var(--rx-surface);
+  -webkit-appearance: none; appearance: none; display: grid; place-content: center; cursor: pointer;
+  transition: background var(--rx-duration) var(--rx-ease), border-color var(--rx-duration) var(--rx-ease);
+}
+.rx-radio::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--rx-on-accent); transform: scale(0); transition: transform var(--rx-duration) var(--rx-spring); }
+.rx-radio:checked { background: var(--rx-accent); border-color: var(--rx-accent); }
+.rx-radio:checked::after { transform: scale(1); }
+.rx-checkbox[aria-invalid="true"], .rx-radio[aria-invalid="true"] { border-color: var(--rx-danger-text); }
+.rx-check:has(input:disabled) { cursor: not-allowed; color: var(--rx-tertiary-label); }
+.rx-checkbox:disabled, .rx-radio:disabled, .rx-switch:disabled { cursor: not-allowed; background-color: var(--rx-fill); border-color: var(--rx-separator); }
+.rx-checkbox:checked:disabled, .rx-radio:checked:disabled, .rx-switch:checked:disabled { opacity: 0.5; }
+
+/* Radio groups and checkbox lists: a fieldset whose legend looks like a label. */
+.rx-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.rx-fieldset > legend { padding: 0; margin-bottom: 6px; }
+.rx-choices { display: grid; column-gap: var(--rx-space-5); }
+.rx-choices > .rx-check { padding-block: 8px; min-height: var(--rx-target); }
+.rx-choices--inline { display: flex; flex-wrap: wrap; }
+
+/* Toggle buttons: the options as a row of buttons, the chosen ones filled. */
+.rx-toggles { display: flex; flex-wrap: wrap; gap: var(--rx-space-2); }
+.rx-toggle { position: relative; display: inline-flex; }
+.rx-toggle__input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.rx-toggle__label {
+  display: inline-flex; align-items: center; gap: 6px; min-height: var(--rx-target); padding: 0 var(--rx-space-4);
+  border: 1px solid var(--rx-border); border-radius: var(--rx-radius-s); background: var(--rx-surface);
+  color: var(--rx-label); font-size: var(--rx-text-callout); font-weight: 500;
+  transition: background var(--rx-duration) var(--rx-ease), border-color var(--rx-duration) var(--rx-ease);
+}
+.rx-toggle__input:hover + .rx-toggle__label { border-color: var(--rx-tertiary-label); }
+.rx-toggle__input:checked + .rx-toggle__label { background: var(--rx-accent); border-color: var(--rx-accent); color: var(--rx-on-accent); }
+/* Pressed is also a shape: a check before the label, not only a color. */
+.rx-toggle__input:checked + .rx-toggle__label::before {
+  content: ""; width: 12px; height: 12px; background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.5l2.6 2.6L10 3.5' stroke='%23000' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.5l2.6 2.6L10 3.5' stroke='%23000' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.rx-page .rx-toggle__input:focus-visible { outline: none; }
+.rx-toggle__input:focus-visible + .rx-toggle__label { outline: 3px solid var(--rx-focus); outline-offset: 2px; }
+.rx-toggle__input[aria-invalid="true"] + .rx-toggle__label { border-color: var(--rx-danger-text); }
+.rx-toggle__input:disabled { cursor: not-allowed; }
+.rx-toggle__input:disabled + .rx-toggle__label { background: var(--rx-fill); color: var(--rx-tertiary-label); border-color: var(--rx-separator); }
+.rx-toggle__input:checked:disabled + .rx-toggle__label { background: var(--rx-accent); color: var(--rx-on-accent); opacity: 0.5; }
+
+/* File field: the whole drop zone is the native input (clicks and drops
+   land on it), drawn over by the zone's text. */
+.rx-file { position: relative; }
+.rx-file__input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.rx-file__input:disabled { cursor: not-allowed; }
+.rx-file__zone {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--rx-space-1);
+  min-height: 6rem; padding: var(--rx-space-4); text-align: center;
+  border: 1.5px dashed var(--rx-border); border-radius: var(--rx-radius); background: var(--rx-surface);
+  color: var(--rx-secondary-label); font-size: var(--rx-text-subhead);
+  transition: border-color var(--rx-duration) var(--rx-ease), background var(--rx-duration) var(--rx-ease);
+}
+.rx-file:hover .rx-file__zone, .rx-file[data-rx-dragging] .rx-file__zone { border-color: var(--rx-accent); background: color-mix(in srgb, var(--rx-accent) 6%, var(--rx-surface)); }
+.rx-page .rx-file__input:focus-visible { outline: none; }
+.rx-file__input:focus-visible + .rx-file__zone { border-color: var(--rx-accent); box-shadow: 0 0 0 4px var(--rx-focus); }
+.rx-file__input[aria-invalid="true"] + .rx-file__zone { border-color: var(--rx-danger-text); }
+.rx-file__input:disabled + .rx-file__zone { background: var(--rx-fill); color: var(--rx-tertiary-label); }
+.rx-file__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--rx-space-2); }
+.rx-file__list:empty { display: none; }
+.rx-file__item { display: flex; align-items: center; gap: var(--rx-space-3); font-size: var(--rx-text-subhead); min-width: 0; }
+.rx-file__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rx-file__size { color: var(--rx-secondary-label); flex: none; }
+.rx-file__thumb { width: 44px; height: 44px; object-fit: cover; border-radius: var(--rx-radius-s); flex: none; background: var(--rx-fill); }
+.rx-file__current { display: flex; align-items: center; gap: var(--rx-space-3); margin: 0; font-size: var(--rx-text-subhead); color: var(--rx-secondary-label); }
+
+/* A popover (the date picker's calendar): placed under its field by the
+   script, in the top layer. */
+.rx-popover {
+  position: fixed; inset: auto; margin: 0; padding: var(--rx-space-3);
+  border: 0.5px solid var(--rx-separator); border-radius: var(--rx-radius);
+  background: var(--rx-surface-raised); color: var(--rx-label); box-shadow: var(--rx-shadow-raised);
+  color-scheme: var(--rx-scheme, light);
+}
+.rx-calendar { display: block; }
+.rx-calendar svg { display: block; }
+.rx-calendar::part(header) { margin-bottom: 4px; }
+.rx-calendar::part(button) {
+  display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--rx-label); cursor: pointer;
+}
+.rx-calendar::part(button):hover { background: var(--rx-fill); }
+.rx-calendar::part(heading) { font-weight: 600; font-size: var(--rx-text-callout); }
+/* One month: "October 2026" in the header (the script fills it) instead of
+   the year there and the month's own name under it. */
+.rx-calendar calendar-month::part(heading) { display: none; }
+.rx-calendar calendar-month { --color-accent: var(--rx-accent); --color-text-on-accent: var(--rx-on-accent); font-size: var(--rx-text-footnote); }
+.rx-calendar calendar-month::part(day) { border-radius: 8px; width: 40px; height: 38px; }
+.rx-calendar calendar-month::part(today) { font-weight: 700; color: var(--rx-accent-text); }
+.rx-calendar calendar-month::part(selected) { color: var(--rx-on-accent); }
+.rx-calendar calendar-month::part(outside) { color: var(--rx-tertiary-label); }
+.rx-calendar calendar-month::part(disallowed) { color: var(--rx-tertiary-label); opacity: 0.5; }
+
+/* A small square button with an icon (rows' tools). */
+.rx-icon-button {
+  display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; margin: 0;
+  border: 0; border-radius: var(--rx-radius-s); background: transparent; color: var(--rx-secondary-label); cursor: pointer;
+}
+.rx-icon-button:hover { background: var(--rx-fill); color: var(--rx-label); }
+.rx-icon-button--danger { color: var(--rx-danger-text); }
+.rx-icon-button--danger:hover { color: var(--rx-danger-text); background: color-mix(in srgb, var(--rx-danger) 10%, transparent); }
+.rx-icon-button:disabled { opacity: 0.35; cursor: not-allowed; background: transparent; }
+@media (pointer: coarse) { .rx-icon-button { width: var(--rx-target); height: var(--rx-target); } }
+.rx-button svg { flex: none; }
+.rx-button:has(> svg) { gap: 6px; }
+
+/* Tags: chips and the box to type the next one, all in one field. */
+.rx-tags {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: var(--rx-target); padding: 5px 8px;
+  border: 1px solid var(--rx-border); border-radius: var(--rx-radius-s); background: var(--rx-surface); cursor: text;
+  transition: border-color var(--rx-duration) var(--rx-ease), box-shadow var(--rx-duration) var(--rx-ease);
+}
+.rx-tags:hover { border-color: var(--rx-tertiary-label); }
+.rx-tags:focus-within { border-color: var(--rx-accent); box-shadow: 0 0 0 4px var(--rx-focus); }
+.rx-tags--invalid, .rx-tags:has([aria-invalid="true"]) { border-color: var(--rx-danger-text); }
+.rx-tags__list { display: contents; list-style: none; margin: 0; padding: 0; }
+.rx-tag {
+  display: inline-flex; align-items: center; gap: 2px; max-width: 100%; min-height: 30px; padding: 0 2px 0 10px;
+  border-radius: 999px; background: color-mix(in srgb, var(--rx-accent) 12%, var(--rx-surface)); color: var(--rx-label);
+  font-size: var(--rx-text-subhead);
+}
+.rx-tag__text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rx-tag__remove {
+  display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%;
+  background: transparent; color: var(--rx-secondary-label); cursor: pointer;
+}
+.rx-tag__remove:hover { background: var(--rx-fill-strong); color: var(--rx-label); }
+.rx-page .rx-tags__entry:focus-visible { outline: none; }
+.rx-tags__entry {
+  flex: 1 1 8rem; min-width: 6rem; min-height: 30px; padding: 0 4px; border: 0; background: transparent;
+  font: inherit; font-size: var(--rx-text-body); color: var(--rx-label); color-scheme: var(--rx-scheme, light);
+}
+.rx-tags__entry::placeholder { color: var(--rx-tertiary-label); }
+
+/* Repeater: one card-like block per row, its tools in the corner. */
+.rx-repeater__rows { display: grid; gap: var(--rx-space-3); }
+.rx-repeater__rows:empty { display: none; }
+.rx-repeater__row {
+  position: relative; margin: 0; min-width: 0; padding: var(--rx-space-3) var(--rx-space-4) var(--rx-space-4);
+  border: 1px solid var(--rx-separator); border-radius: var(--rx-radius); background: var(--rx-surface);
+  display: grid; gap: var(--rx-space-3);
+}
+.rx-repeater__title { float: left; padding: 0; font-size: var(--rx-text-footnote); font-weight: 600; color: var(--rx-secondary-label); text-transform: uppercase; letter-spacing: 0.02em; line-height: 36px; }
+.rx-repeater__tools { position: absolute; top: 6px; right: 8px; display: flex; gap: 2px; }
+.rx-repeater__fields { clear: both; display: grid; gap: var(--rx-space-4); min-width: 0; }
+.rx-repeater__row:first-child [data-rx-row-up], .rx-repeater__row:last-child [data-rx-row-down] { visibility: hidden; }
+
+/* Key-value: two fields side by side; their labels once, on the first row. */
+.rx-kv__row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: var(--rx-space-3); }
+.rx-kv .rx-repeater__row { padding-top: var(--rx-space-2); }
+.rx-kv .rx-repeater__title { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.rx-kv .rx-repeater__tools { position: static; order: 2; align-self: end; }
+.rx-kv .rx-repeater__row { grid-template-columns: minmax(0, 1fr) auto; align-items: end; padding: var(--rx-space-2) var(--rx-space-2) var(--rx-space-2) var(--rx-space-3); }
+.rx-kv .rx-repeater__fields { clear: none; }
+.rx-kv .rx-repeater__row + .rx-repeater__row .rx-label {
+  position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+/* Searchable select: a box to type in, chips for several, a listbox under it. */
+.rx-combobox { position: relative; }
+.rx-combobox__box { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rx-combobox__box.rx-tags { padding-right: 36px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' stroke='%2386868b' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
+.rx-combobox__list {
+  position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; right: 0; max-height: 16rem; overflow: auto;
+  margin: 0; padding: 6px; list-style: none; border: 0.5px solid var(--rx-separator); border-radius: var(--rx-radius);
+  background: var(--rx-surface-raised); box-shadow: var(--rx-shadow-raised);
+}
+.rx-combobox__option {
+  display: flex; align-items: center; gap: var(--rx-space-2); min-height: 40px; padding: 0 var(--rx-space-3);
+  border-radius: var(--rx-radius-s); cursor: pointer; color: var(--rx-label);
+}
+.rx-combobox__option::before { content: ""; flex: none; width: 14px; height: 14px; }
+.rx-combobox__option[aria-selected="true"]::before {
+  background: var(--rx-accent-text);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.5l2.6 2.6L10 3.5' stroke='%23000' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.5l2.6 2.6L10 3.5' stroke='%23000' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.rx-combobox__option[data-active] { background: var(--rx-fill); }
+.rx-combobox__option[aria-selected="true"] { font-weight: 600; }
+.rx-combobox__empty { padding: var(--rx-space-2) var(--rx-space-3); color: var(--rx-secondary-label); font-size: var(--rx-text-subhead); }
+/* The native select stays (it is what the form sends and what the browser
+   checks for `required`), out of sight under the box. */
+.rx-select[data-rx-enhanced] { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; min-height: 0; padding: 0; opacity: 0; pointer-events: none; }
+.rx-select--multiple { min-height: 7rem; padding-right: 12px; background-image: none; }
+
+/* Wizard: the steps on top, one panel at a time, Back and Next under it. */
+.rx-wizard { display: grid; gap: var(--rx-space-5); }
+.rx-wizard__steps { display: flex; gap: var(--rx-space-2); margin: 0; padding: 0; list-style: none; counter-reset: none; }
+.rx-wizard__step { flex: 1; display: flex; align-items: center; gap: var(--rx-space-2); min-width: 0; padding-bottom: var(--rx-space-2); border-bottom: 3px solid var(--rx-separator); color: var(--rx-secondary-label); font-size: var(--rx-text-subhead); }
+.rx-wizard__number { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--rx-fill-strong); color: var(--rx-label); font-size: var(--rx-text-footnote); font-weight: 700; }
+.rx-wizard__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rx-wizard__step[aria-current="step"] { color: var(--rx-label); font-weight: 600; border-color: var(--rx-accent); }
+.rx-wizard__step[aria-current="step"] .rx-wizard__number, .rx-wizard__step[data-done] .rx-wizard__number { background: var(--rx-accent); color: var(--rx-on-accent); }
+.rx-wizard__step[data-done] { border-color: var(--rx-accent); }
+.rx-wizard__panels, .rx-wizard__panel { display: grid; gap: var(--rx-space-4); min-width: 0; }
+.rx-wizard__panel[hidden] { display: none; }
+.rx-wizard__nav { display: flex; align-items: center; gap: var(--rx-space-3); }
+/* Without the script every step shows, and only the submit button. */
+.rx-wizard:not([data-rx-ready]) [data-rx-wizard-back], .rx-wizard:not([data-rx-ready]) [data-rx-wizard-next] { display: none; }
+@media (max-width: 36rem) {
+  .rx-wizard__step:not([aria-current="step"]) .rx-wizard__name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .rx-wizard__step { flex: 0 0 auto; }
+  .rx-wizard__step[aria-current="step"] { flex: 1; }
+}
+
+/* show_when / hide_when: a group with no box of its own. */
+.rx-when { display: grid; gap: var(--rx-space-4); }
+.rx-when[hidden] { display: none; }
+
+/* A titled group of fields in a long form. */
+.rx-fieldset--boxed { border: 1px solid var(--rx-separator); border-radius: var(--rx-radius); padding: var(--rx-space-2) var(--rx-space-4) var(--rx-space-4); display: grid; gap: var(--rx-space-3); }
+.rx-fieldset__legend { font-size: var(--rx-text-callout); font-weight: 600; padding: 0 var(--rx-space-1); margin-left: calc(-1 * var(--rx-space-1)); }
+
+/* Fields side by side: one column on phones, `rx-cols-N` from there. */
+.rx-form-grid { display: grid; gap: var(--rx-space-4) var(--rx-space-5); grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 36.0625rem) {
+  .rx-form-grid.rx-cols-2, .rx-choices.rx-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rx-form-grid.rx-cols-3, .rx-choices.rx-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .rx-form-grid.rx-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .rx-form-grid > .rx-span-2 { grid-column: span 2; }
+  .rx-form-grid > .rx-span-3 { grid-column: span 3; }
+  .rx-form-grid > .rx-span-full { grid-column: 1 / -1; }
+}
 
 /* ---------- Buttons ---------- */
 
@@ -288,6 +558,7 @@
 [aria-expanded="true"] > .rx-button__chevron { transform: rotate(180deg); }
 .rx-button--small { min-height: 32px; padding: 6px 14px; font-size: var(--rx-text-subhead); }
 .rx-button--block { width: 100%; }
+.rx-button[hidden] { display: none; }
 .rx-button:disabled, .rx-button[aria-disabled="true"] { opacity: 0.4; cursor: not-allowed; transform: none; }
 /* Busy (a form being sent, an htmx request): a spinner, the label kept. */
 .rx-button[aria-busy="true"], .rx-button.htmx-request { cursor: progress; }
@@ -469,6 +740,9 @@
   .rx-toast, .rx-menu__list { background: var(--rx-surface-raised); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 @media (forced-colors: active) {
-  .rx-button, .rx-input, .rx-select, .rx-textarea, .rx-toast, .rx-card { border: 1px solid CanvasText; }
+  .rx-button, .rx-input, .rx-select, .rx-textarea, .rx-toast, .rx-card, .rx-affix { border: 1px solid CanvasText; }
+  .rx-affix > .rx-input { border: 0; }
+  .rx-toggle__input:checked + .rx-toggle__label { border: 2px solid Highlight; }
+  .rx-file__zone { border-color: CanvasText; }
   .rx-switch::after { background: CanvasText; }
 }

@@ -45,6 +45,13 @@ pub(crate) fn grid_tags() -> String {
     )
 }
 
+/// `{{ renox_calendar() }}` (the kit's `date_picker` calls it once per
+/// page): the calendar web components, the same file the grid loads.
+pub(crate) fn calendar_tags() -> String {
+    let [_, _, cally] = &*GRID_URLS;
+    format!("<script type=\"module\" src=\"{cally}\"></script>")
+}
+
 static UI_URLS: LazyLock<[String; 2]> = LazyLock::new(|| {
     [
         format!("/_renox/ui-{:016x}.css", fnv1a(UI_CSS)),
@@ -120,6 +127,12 @@ const RENOX: &str = r#"(function () {
       if (!message) return;
       var name = CSS.escape(field);
       var input = form.querySelector('[name="' + name + '"]');
+      // `items.0.name`: the input of a nested form is named `items[0][name]`.
+      if (!input && field.indexOf(".") > 0) {
+        var parts0 = field.split(".");
+        var bracketed = parts0[0] + parts0.slice(1).map(function (p) { return "[" + p + "]"; }).join("");
+        input = form.querySelector('[name="' + CSS.escape(bracketed) + '"]');
+      }
       var slot = form.querySelector('[data-error-for="' + name + '"]');
       // `tags.1` / `photos.0`: an item of a list. Use the list's own input
       // (the item's one when there is one per item) and slot.

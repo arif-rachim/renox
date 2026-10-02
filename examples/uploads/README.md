@@ -20,7 +20,7 @@ variables; the code stays the same.
 |---|---|
 | Wiring | [src/lib.rs](src/lib.rs) |
 | The model, routes, upload validation, public and private storing, the expiring link, the inline download | [src/app/documents/mod.rs](src/app/documents/mod.rs) |
-| The page with both forms (the photo form posts with htmx) | [resources/views/documents/index.html](resources/views/documents/index.html) |
+| The page with both forms on the UI kit's `file` field (a drop zone listing the chosen files, photos previewed; the photo form posts with htmx) | [resources/views/documents/index.html](resources/views/documents/index.html) |
 | The table | [migrations](migrations) |
 
 ## Things worth copying

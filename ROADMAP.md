@@ -1398,8 +1398,52 @@ On hold until the owner starts it (M18–M28, which came first, are merged).
       only 0.0.1 placeholders exist), then crates.io/docs.rs badges and `cargo install renox-cli`
       in the README
 
+### UI kit · Form fields next to Filament's forms
+
+Filament's form fields (https://filamentphp.com/docs/5.x/forms/overview) as the yardstick,
+asked by the owner; three stages on branch `ui-form`, one PR.
+
+- [x] Stage 1: `radio`, `checkbox_list`, `form_grid` / `fieldset` with `span`, `input`'s
+  `prefix` / `suffix` / `datalist`, `disabled` / `readonly`, `id` on every field,
+  `has_old()`; fixed: an unticked checkbox (and an unpicked radio) came back with its default
+  after a failed submit, and the error summary missed fields with their own `id`.
+- [x] Stage 2: `input(…, revealable=true)` (Renox's sign-in pages use it) and
+  `copyable=true`, `toggle_buttons`, `file` (drop zone, previews, `current`), `date_picker`
+  (Cally in a popover, `renox_calendar()`), `show_when` / `hide_when`.
+- [x] Stage 3: nested form names in `Valid` (`lines[0][name]` → `Vec<Line>`), `KeyValues`,
+  `tags_input`, `select(…, multiple=true, searchable=true)`, `repeater`, `key_value`,
+  `wizard` + `wizard_step`.
+- [x] Examples: fields (every kind, tags and specifications), shop (checkout courier or
+  pickup, the admin's searchable category), uploads (`file`), teams ("New team" wizard with a
+  repeater of members).
+- [ ] Later: a select whose options come from the server as you type (htmx), and rich text,
+  Markdown and code editors (large JavaScript: plugins rather than the kit).
+
+Notes:
+- Cally's `calendar-date` dispatches a `change` that doesn't bubble: the kit listens in the
+  capture phase. Its header shows the year and each month its own name (made for several
+  months); for one month the kit hides the month's name and fills the header's slot with
+  "October 2026" from `Intl.DateTimeFormat`, updated on `focusday` (whose detail is a `Date`).
+- `show_when` disables a `<fieldset>` rather than each input, so a field disabled on purpose
+  stays disabled when its group shows; without JavaScript the group stays visible.
+- The searchable select keeps the native select, visually hidden rather than `display: none`,
+  so the browser can still check `required` (its `invalid` event moves focus to the box).
+- The repeater renumbers a row by rewriting every attribute that holds `lines[2]`,
+  `lines.2.` or `rx-lines-2-`, so any field inside (date pickers, combobox, show_when) follows.
+- A repeater's own error slot shows only the list's error: `error()` falls back to `name.*`,
+  which showed a row's error twice.
+- Found by tests: PostgreSQL's `JSONB` reorders object keys, so `KeyValues` is stored as a list
+  of pairs; and the audit probe `validation_array_where_scalar_expected` caught `name[]=a`
+  filling a text field once `[]` was read as nested, so a `[]` name is always a list.
+
 ## Decisions
 
+- **Nested forms:** a form whose names have a `[` is read by Renox's own small deserializer
+  (`validation/nested.rs`) instead of `serde_html_form`, which has no nesting: a tree of text,
+  parsed when the target type asks, empty values kept so rows keep their numbers. Errors are
+  keyed with dots (`lines.0.name`, as `v.nested` already did), and templates accept either
+  spelling. Plain forms keep `serde_html_form`, so nothing changes for them. Names deeper than
+  32 levels are ignored.
 - **Crates:** runtime code lives in one crate, `renox-core`, organised in modules and gated by cargo
   features where dependencies are heavy. Separate `renox-http`/`-db`/`-view` crates would all need
   `AppState` and `App` would need all of them, so splitting now only adds indirection. Revisit if

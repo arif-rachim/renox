@@ -1,7 +1,7 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-{% from "renox/ui.html" import card, input, textarea, checkbox, button, link_button, form_errors %}
+{% from "renox/ui.html" import card, input, textarea, select, checkbox, button, link_button, form_errors %}
 <div>
   <a class="rx-link" href="{{ route('admin.products.index') }}">‹ Products</a>
   <h1 class="rx-title">{{ "Edit " ~ product.name if product else "New product" }}</h1>
@@ -13,17 +13,11 @@
   {% call card() %}
     {{ form_errors() }}
     {{ input("name", "Name", value=product.name if product else none, required=true) }}
-    <div class="rx-field">
-      <label class="rx-label" for="rx-category_id">Category <span class="rx-required">({{ t('ui.optional') }})</span></label>
-      {% set chosen = old('category_id', product.category_id if product else '') | string %}
-      <select class="rx-select" id="rx-category_id" name="category_id" aria-describedby="rx-category_id-error">
-        <option value="">None</option>
-        {% for category in categories %}
-        <option value="{{ category.id }}" {% if chosen == category.id | string %}selected{% endif %}>{{ category.name }}</option>
-        {% endfor %}
-      </select>
-      <p class="rx-error" id="rx-category_id-error" data-error-for="category_id" aria-live="polite">{{ error('category_id') }}</p>
-    </div>
+    {#- A searchable select: type to filter the categories; "None" clears it. -#}
+    {%- set ns = namespace(options=[]) %}
+    {%- for category in categories %}{% set ns.options = ns.options + [[category.id, category.name]] %}{% endfor %}
+    {{ select("category_id", "Category", ns.options, selected=product.category_id if product else none,
+              placeholder="None", searchable=true) }}
     {{ textarea("description", "Description", value=product.description if product else none, rows=4) }}
     {{ input("price", "Price (Rp)", type="number", value=product.price if product else none, required=true,
              hint="In rupiah, without dots.", attrs={"min": 0, "inputmode": "numeric"}) }}

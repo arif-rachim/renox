@@ -1,7 +1,7 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-{% from "renox/ui.html" import card, textarea, button, group %}
+{% from "renox/ui.html" import card, textarea, toggle_buttons, show_when, button, group %}
 <h1 class="rx-title">{{ t('cart.checkout') }}</h1>
 {% call group(footer=t('cart.total') ~ ": " ~ (total | rupiah)) %}
   {% for line in lines %}<div>{{ line.item.quantity }} × {{ line.product.name }}: {{ line.subtotal | rupiah }}</div>{% endfor %}
@@ -11,7 +11,12 @@
 <form method="post" action="{{ route('checkout.place') }}" data-live-validate novalidate>
   {{ csrf_field() }}
   {% call card() %}
-    {{ textarea("address", t('orders.address'), rows=3, required=true, hint=t('orders.pay_by_transfer', days=3)) }}
+    {{ toggle_buttons("delivery", t('orders.delivery'), [["courier", t('orders.courier')], ["pickup", t('orders.pickup')]], selected="courier", required=true) }}
+    {#- The address only matters for the courier: hidden (and not sent) for a pickup. -#}
+    {% call show_when("delivery", "courier") %}
+      {{ textarea("address", t('orders.address'), rows=3, required=true) }}
+    {% endcall %}
+    <p class="rx-hint">{{ t('orders.pay_by_transfer', days=3) }}</p>
     <div class="rx-card__footer">{{ button(t('orders.place')) }}</div>
   {% endcall %}
 </form>

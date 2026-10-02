@@ -55,6 +55,9 @@ Rules run in order, and a field stops at its first failure. Every rule except `r
 
 Any other content type gets a 415, and malformed JSON a 400. Form bodies are read with
 `serde_html_form`, so a repeated name (a multi-select, a group of checkboxes) fills a `Vec<T>`.
+A form with a nested name (`lines[0][qty]`, as the UI kit's `repeater` and `key_value` send)
+is read as a tree instead: `lines` fills a `Vec` of a struct, and every field still parses from
+its text (see "Browser values").
 
 The steps, in order:
 
@@ -228,7 +231,8 @@ On the validator itself:
 - `v.distinct(name, &list)`: no repeated items (text compared trimmed and lowercased); each
   repeat gets the error.
 - `v.nested(name, &lines)`: each item's own `Validate` rules, for a list of structs (the lines
-  of an order sent as JSON); errors are keyed `lines.0.quantity`.
+  of an order sent as JSON, or a form's rows named `lines[0][quantity]`); errors are keyed
+  `lines.0.quantity` and labelled by the item's own field ("The quantity field is required.").
 - `v.error(field, message)`: an error no rule covers.
 - `v.locale()`: the request's language (`Locale::En` or `Locale::Id`), e.g. to pick a label.
 
@@ -481,7 +485,14 @@ smooths that over:
 - **`datetime-local`** sends `2026-10-01T10:30`, without seconds; a `NaiveDateTime` field
   accepts it.
 - **Lists:** a multi-select or checkbox group repeats its name. Declare the field as `Vec<T>`
-  with `#[serde(default)]`, so that nothing chosen is an empty list.
+  with `#[serde(default)]`, so that nothing chosen is an empty list. A name ending in `[]`
+  (`tags[]`) is a list even when sent once, so it never fills a text field.
+- **Rows:** `lines[0][name]=Kopi&lines[0][qty]=2&lines[1][name]=Teh…` reads into
+  `lines: Vec<Line>`; `meta[0][key]`/`meta[0][value]` into a `renox::KeyValues` (ordered pairs,
+  rows without a key skipped). Empty values stay, so rows keep their numbers and their errors
+  (`lines.1.name`); an `Option` reads "" as `None`. `error()` and `old()` in templates take
+  either spelling (`lines[1][name]` or `lines.1.name`). Names nested deeper than 32 levels are
+  ignored.
 - **Values that don't parse** (`price=abc` for an `i64`, `size=huge` for an enum) become an
   error on that field ("The price must be a number.", "The selected size is invalid.") instead
   of a 400. A stand-in value (an enum's first variant, `0`, `false`) is put in its place so the

@@ -108,15 +108,27 @@ async fn checkout_form(State(db): State<Db>, user: AuthUser) -> Result<Response>
     Ok(view("orders/checkout.html", context! { lines, total }).into_response())
 }
 
+/// How the order reaches the customer: the form's toggle buttons.
+#[derive(Deserialize, Serialize, Default, PartialEq)]
+#[serde(rename_all = "lowercase")]
+enum Delivery {
+    #[default]
+    Courier,
+    Pickup,
+}
+
 #[derive(Deserialize, Serialize)]
 struct CheckoutForm {
+    #[serde(default)]
+    delivery: Delivery,
+    /// Shown (and sent) only for the courier: `show_when` in the form.
     address: String,
 }
 
 impl Validate for CheckoutForm {
     fn rules(&self, v: &mut Validator) {
         v.field("address", &self.address)
-            .required()
+            .required_if(self.delivery == Delivery::Courier)
             .between(10, 500);
     }
 }
@@ -127,7 +139,11 @@ async fn place(
     lang: Lang,
     Valid(form): Valid<CheckoutForm>,
 ) -> Result<Response> {
-    match checkout::place(&state.db, user.id, form.address.trim()).await? {
+    let address = match form.delivery {
+        Delivery::Courier => form.address.trim().to_owned(),
+        Delivery::Pickup => lang.t("orders.pickup_address", &[]),
+    };
+    match checkout::place(&state.db, user.id, &address).await? {
         Checkout::Placed(order) => {
             state.emit(OrderPlaced { order_id: order.id }).await?;
             let toast = Toast::success(lang.t("orders.placed", &[("id", &order.id)]));

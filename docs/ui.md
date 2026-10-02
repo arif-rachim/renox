@@ -18,7 +18,7 @@ covers:
 A component is a MiniJinja macro in a file of its own, imported where it's used. Inside it,
 the same request helpers work as in the page itself:
 
-- `old()`, `error()`, `errors`;
+- `old()`, `has_old()`, `error()`, `errors`;
 - `t()`, `can()`, `auth`, `request`;
 - `csrf_field()`, `flash`;
 - `once()`.
@@ -80,10 +80,110 @@ Then import what a page needs:
 
 | Component | What it is |
 |---|---|
-| `input(name, label, type=…, value=…, hint=…, required=…, autocomplete=…, placeholder=…, attrs={…}, id=…)` | A labelled text field with its hint and error. It is refilled after a failed submit, except for passwords. `id` tells apart two fields of the same name on one page. |
+| `input(name, label, type=…, value=…, hint=…, required=…, autocomplete=…, placeholder=…, attrs={…}, id=…, prefix=…, suffix=…, datalist=[…], disabled=…, readonly=…, span=…)` | A labelled text field with its hint and error. It is refilled after a failed submit, except for passwords. `id` tells apart two fields of the same name on one page. `prefix`/`suffix` join a text to the field ("Rp", "kg"); `datalist` suggests values while accepting any. |
 | `textarea(name, label, value=…, rows=4, hint=…, required=…, placeholder=…, attrs={…})` | The same for longer text. |
 | `select(name, label, options, selected=…, hint=…, required=…, placeholder=…, attrs={…})` | The same for a choice. `options` are values or `[value, label]` pairs. |
-| `checkbox(name, label, checked=…, hint=…, value="on", switch=…, attrs={…})` | A checkbox, or an iOS-style switch for settings. The whole row is the target. |
+| `checkbox(name, label, checked=…, hint=…, value="on", switch=…, attrs={…})` | A checkbox, or an iOS-style switch for settings. The whole row is the target. After a failed submit it shows what was sent, so an unticked box stays unticked. |
+| `radio(name, label, options, selected=…, inline=…, columns=…)` | One choice out of a few, all visible, in a `fieldset` with the label as its legend. An option is a value, `[value, label]` or `[value, label, description]`. |
+| `checkbox_list(name, label, options, selected=[…], inline=…, columns=…)` | Several choices: each ticked option sends `name` once, so the form field is a `Vec` with `#[serde(default)]` (nothing ticked sends nothing). |
+| `toggle_buttons(name, label, options, selected=…, multiple=…)` | The options as a row of buttons, the pressed ones filled and checked: one choice (a radio group underneath) or, with `multiple`, several (checkboxes). |
+| `file(name, label, accept=…, multiple=…, preview=…, current=…)` | A drop zone that is also the button; the chosen files are listed under it, images with a thumbnail when `preview`. `current` is the URL of the file stored now. The form needs `enctype="multipart/form-data"`, the field is an `Upload` (`Vec<Upload>` with `multiple`). |
+| `date_picker(name, label, value=…, min=…, max=…)` | A date typed as `2026-10-02` or picked in a calendar (Cally, in a popover under the field, its month named in the page's language). Sent as `YYYY-MM-DD`, like `<input type="date">`: a `NaiveDate`. Without JavaScript it is a text field. |
+| `show_when(field, values)` + `hide_when(field, values)` | Fields shown (or hidden) while another field has one of `values`. Hidden fields are disabled, so the form doesn't send them; check them on the server with `required_if`. Without JavaScript they stay visible. |
+| `select(…, multiple=true, searchable=true)` | Several values (a `Vec`), and a box to type in that filters the options, with the chosen ones as chips. The native select stays underneath: the form sends the same thing, and it works without JavaScript. |
+| `tags_input(name, label, value=[…], suggestions=[…])` | Free text as chips: Enter or a comma adds one, Backspace in the empty box removes the last. A `Vec<String>`. |
+| `repeater(name, label, rows=[…], min=…, max=…)` with `{% call(row, prefix) %}` | Rows added, removed and moved by the user, each with the fields of the call block, named `name[0][field]` and renumbered as rows move. A `Vec` of a struct, checked with `v.nested`. Adding a row needs JavaScript. |
+| `key_value(name, label, value=…)` | Pairs of text (a repeater with a key and a value per row): `KeyValues`. |
+| `wizard(id, steps, submit_label)` + `wizard_step(id, key)` | A form in steps. Next checks the step (the browser's rules, then the server's with `data-live-validate`); after a failed submit the first step with an error opens. Without JavaScript all steps show. |
+| `form_grid(columns=2)`, `fieldset(legend, hint=…, columns=…)` | Fields side by side from tablet width up (one column on phones), and a titled group of fields in a long form. A field's `span=2` or `span="full"` makes it wider. |
+
+Every field also takes `id`, `disabled` (the field isn't sent) and `span`; `input` and
+`textarea` take `readonly` (shaded, but sent and readable). `input` takes `revealable=true` (a
+button that shows the password; Renox's own sign-in pages use it) and `copyable=true` (a button
+that copies the value, for keys and links). The error summary links to each
+field by its name, so a field with its own `id` and a radio group are found too.
+
+```html
+{% from "renox/ui.html" import input, radio, checkbox_list, form_grid, fieldset %}
+{% call form_grid(2) %}
+  {{ input("price", "Price", type="number", prefix="Rp", required=true) }}
+  {{ input("weight", "Weight", type="number", suffix="kg") }}
+  {{ input("city", "City", datalist=["Jakarta", "Bandung", "Surabaya"], span="full") }}
+{% endcall %}
+{% call fieldset("Delivery") %}
+  {{ radio("speed", "Speed", [["regular", "Regular", "2–3 days"], ["express", "Express", "Tomorrow"]],
+           selected="regular", required=true) }}
+  {{ checkbox_list("extras", "Extras", [["gift", "Gift wrap"], ["note", "Card"]], inline=true) }}
+{% endcall %}
+```
+
+Rows of fields, as in examples/teams' "New team" wizard: each row's inputs are named
+`invites[0][email]`, `invites[1][email]`…, and `Valid` reads them into a `Vec`.
+
+```html
+{% from "renox/ui.html" import wizard, wizard_step, repeater, input %}
+{% call wizard("new-team", [["name", "Name"], ["members", "Members"]], submit_label="Create team") %}
+  {% call wizard_step("new-team", "name") %}{{ input("name", "Name", required=true) }}{% endcall %}
+  {% call wizard_step("new-team", "members") %}
+    {% call(row, prefix) repeater("invites", "Members", item_label="Member", max=10) %}
+      {{ input(prefix ~ "[email]", "Email", type="email", value=row.email, required=true) }}
+    {% endcall %}
+  {% endcall %}
+{% endcall %}
+```
+
+```rust
+# use renox::prelude::*;
+#[derive(serde::Deserialize)]
+struct NewTeam {
+    name: String,
+    #[serde(default)]
+    invites: Vec<Invite>,
+}
+
+#[derive(serde::Deserialize)]
+struct Invite {
+    email: String,
+}
+
+impl Validate for Invite {
+    fn rules(&self, v: &mut Validator) {
+        v.field("email", &self.email).required().email();
+    }
+}
+
+impl Validate for NewTeam {
+    fn rules(&self, v: &mut Validator) {
+        v.field("name", &self.name).required();
+        // Each row's rules; errors keyed `invites.0.email`, shown in that row.
+        v.nested("invites", &self.invites);
+    }
+}
+```
+
+A field that depends on another, as in examples/shop's checkout: the address only for the
+courier, required only then.
+
+```html
+{% from "renox/ui.html" import toggle_buttons, show_when, textarea, date_picker %}
+{{ toggle_buttons("delivery", "Delivery", [["courier", "Courier"], ["pickup", "Pick up"]],
+                  selected="courier", required=true) }}
+{% call show_when("delivery", "courier") %}
+  {{ textarea("address", "Address", required=true) }}
+  {{ date_picker("deliver_on", "Deliver on", min="2026-10-03") }}
+{% endcall %}
+```
+
+```rust
+# use renox::prelude::*;
+# struct Checkout { delivery: String, address: String }
+impl Validate for Checkout {
+    fn rules(&self, v: &mut Validator) {
+        // A pickup sends no address at all: the hidden group is disabled.
+        v.field("address", &self.address).required_if(self.delivery == "courier");
+    }
+}
+```
 | `button(label, variant="primary", type="submit", name=…, value=…, size=…, block=…, attrs={…})` | Variants: `primary`, `secondary`, `plain`, `danger` and `plain-danger`. The button shows a spinner while its form or htmx request is being sent. |
 | `link_button(href, label, variant="secondary", size=…, attrs={…})` | A link that looks like a button. |
 | `card(title=…, subtitle=…)`, `group(title=…, footer=…)` | A surface, and an inset grouped list like Settings. |

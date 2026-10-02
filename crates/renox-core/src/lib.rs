@@ -96,7 +96,7 @@ pub use state::AppState;
 pub use state::SentNotification;
 pub use toast::Toast;
 pub use upload::Upload;
-pub use validation::{Errors, Valid, Validate, ValidationError, Validator};
+pub use validation::{Errors, KeyValues, Valid, Validate, ValidationError, Validator};
 pub use view::{View, Views, view};
 pub use view_filters::format_number;
 

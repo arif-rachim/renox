@@ -290,6 +290,38 @@ async fn checkout_never_oversells() {
         .assert_redirect("/cart");
 }
 
+#[renox::test]
+async fn a_pickup_needs_no_address() {
+    let app = shop().await;
+    let kopi = product(&app, "Kopi Susu", 25_000, 5).await;
+    let budi = customer(&app, "budi@example.com").await;
+    app.acting_as(&budi);
+    app.post(
+        "/cart",
+        &[("product_id", &kopi.id.to_string()), ("quantity", "1")],
+    )
+    .await;
+    // The form shows both choices, and the address only for the courier.
+    app.get("/checkout")
+        .await
+        .assert_see(r#"name="delivery" value="courier" checked required"#)
+        .assert_see(r#"data-rx-show-when="delivery""#);
+    // The courier still needs an address.
+    app.htmx()
+        .post("/checkout", &[("delivery", "courier")])
+        .await
+        .assert_invalid("address");
+    // A pickup sends none (the hidden field is disabled): the store's address
+    // goes on the order.
+    let res = app.post("/checkout", &[("delivery", "pickup")]).await;
+    let order = Order::where_eq("user_id", budi.id)
+        .first_or_404(app.db())
+        .await
+        .unwrap();
+    res.assert_redirect(&format!("/orders/{}", order.id));
+    assert_eq!(order.address, "Pick up at the store: Jl. Braga 12, Bandung");
+}
+
 async fn placed_order(app: &TestApp, buyer: &User, product: &Product, quantity: i64) -> Order {
     app.acting_as(buyer);
     app.post(

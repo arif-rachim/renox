@@ -90,6 +90,12 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   hand-written form markup: it refills fields, shows errors and handles accessibility. Keep one
   primary button per form; put destructive actions behind `confirm(…)`. Give feedback with
   `Toast::success(…)` returned next to the `Redirect`, and put `{{ toasts() }}` in the layout.
+  Fields inside `show_when`/`hide_when` are disabled while hidden, so they aren't sent: use
+  `required_if` (not `required`) for them, and `#[serde(default)]` on `Vec` fields of
+  `checkbox_list` or `toggle_buttons(multiple=true)`. Rows of fields (the kit's `repeater`,
+  `key_value`) are named `lines[0][name]`: the form struct takes `lines: Vec<Line>` (or
+  `KeyValues`) with `#[serde(default)]`, rows are checked with `v.nested("lines", &self.lines)`,
+  and errors are keyed `lines.0.name`.
 - `user.has_role("admin")` on a plain `User` (policies, `gate_before`) only knows the current
   request's user; in jobs and commands use `user.roles(&db).await`.
 - For a transaction that must be retried on conflicts and borrow locals, use

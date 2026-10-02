@@ -33,6 +33,10 @@ pub struct Product {
     pub available: bool,
     pub size: Size,
     pub colors: Json<Vec<String>>,
+    /// Free tags: a JSON list, like `colors`, typed instead of picked.
+    pub tags: Json<Vec<String>>,
+    /// Pairs typed by the user ("Origin": "Aceh"): a JSON object.
+    pub specs: Json<KeyValues>,
     pub opens_at: Option<NaiveTime>,
     pub launch_at: Option<NaiveDateTime>,
     pub released_on: Option<NaiveDate>,
@@ -48,12 +52,19 @@ struct ProductForm {
     weight_kg: f64,              // <input type="number" step="0.01">
     price: i64,                  // <input type="number" step="1">
     available: bool,             // <input type="checkbox">: "on", or nothing → false
-    size: Size,                  // <select>
+    size: Size,                  // radio buttons, or a <select>
     #[serde(default)]
     colors: Vec<String>, // <select multiple> or checkboxes named "colors"
     opens_at: Option<NaiveTime>, // <input type="time">
     launch_at: Option<NaiveDateTime>, // <input type="datetime-local">
     released_on: Option<NaiveDate>, // <input type="date">
+    #[serde(default)]
+    tags: Vec<String>, // the kit's tags_input: one hidden "tags" input per tag
+    // The kit's key_value: specs[0][key], specs[0][value]… A nested name
+    // makes `Valid` read the whole form as a tree; every type above still
+    // parses from its text.
+    #[serde(default)]
+    specs: KeyValues,
 }
 
 impl Validate for ProductForm {
@@ -68,6 +79,9 @@ impl Validate for ProductForm {
         // A color ticked twice (a crafted request, or two inputs for one
         // value): the repeat gets the error.
         v.distinct("colors", &self.colors);
+        v.field("tags", &self.tags).max(5);
+        v.each("tags", &self.tags, |tag| tag.max(20));
+        v.field("specs", &self.specs).max(8);
     }
 }
 
@@ -81,6 +95,8 @@ impl ProductForm {
         product.available = self.available;
         product.size = self.size;
         product.colors = Json(self.colors);
+        product.tags = Json(self.tags);
+        product.specs = Json(self.specs);
         product.opens_at = self.opens_at;
         product.launch_at = self.launch_at;
         product.released_on = self.released_on;
