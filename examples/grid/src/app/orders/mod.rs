@@ -92,6 +92,24 @@ pub fn orders_grid() -> Grid {
                 ]),
         )
         .column(Column::tags("tags", "Tags", TAGS).editable())
+        // From other tables: the customer's tier, and how many notes the
+        // order has (sorted, filtered and searched like the others).
+        .column(
+            Column::related("tier", "Tier", "customers", "customer_id", "tier")
+                .under(["Customer"])
+                .hidden()
+                .badges(&[
+                    ("gold", "warning"),
+                    ("silver", "info"),
+                    ("bronze", "neutral"),
+                ]),
+        )
+        .column(Column::count_of(
+            "notes",
+            "Notes",
+            "order_notes",
+            "order_id",
+        ))
         .column(
             Column::number("items", "Items")
                 .under(["Amounts"])
@@ -127,6 +145,11 @@ pub fn orders_grid() -> Grid {
         .groups(&["region", "status", "paid"])
         // On phones each order is a card.
         .cards_on_mobile()
+        // Rules on any column (and/or), the filters kept for the next visit,
+        // and a fresh page every 30 seconds while nobody's busy with it.
+        .advanced_filter()
+        .remember()
+        .poll(30)
         // The chevron opens the audit details; the link icon opens the order.
         .row_url("/orders/{id}")
         .empty_state(

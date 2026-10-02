@@ -245,6 +245,16 @@ th[aria-sort] .rx-grid__sort { color: var(--rx-accent-text); }
 .rx-grid__subtotal > td { background: linear-gradient(var(--rx-fill), var(--rx-fill)) var(--rx-surface) !important; font-weight: 600; vertical-align: top; }
 tr.rx-grid__group-row[hidden], tr[data-in-group][hidden] { display: none; }
 
+/* The advanced filter. */
+.rx-grid__advanced { width: min(560px, calc(100vw - 16px)); }
+.rx-grid__match { flex-direction: row; align-items: center; gap: 8px; }
+.rx-grid__rules { list-style: none; margin: 10px 0; padding: 0; display: grid; gap: 6px; }
+.rx-grid__rule { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.2fr) auto; gap: 6px; align-items: center; }
+.rx-grid__rule [hidden] { display: none; }
+.rx-grid__rule:has([data-grid-rule-value][hidden]) { grid-template-columns: minmax(0, 1.2fr) minmax(0, 2.2fr) auto; }
+.rx-grid__icon--on { background: var(--rx-accent); color: var(--rx-on-accent); }
+.rx-grid__icon--on:hover:not(:disabled) { background: var(--rx-accent-hover); }
+
 /* Selection and actions. */
 .rx-grid__check { width: 18px; height: 18px; margin: 0 6px; accent-color: var(--rx-accent); cursor: pointer; vertical-align: middle; }
 .rx-grid__bulk {

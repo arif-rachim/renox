@@ -1323,7 +1323,7 @@ missing pieces, in this order:
       own summaries
 - [x] M28d: a card layout on phones, more column kinds (badges with colors, icons, images,
       descriptions, tooltips)
-- [ ] M28e: relationship columns, an advanced filter (and/or, operators), polling, filters
+- [x] M28e: relationship columns, an advanced filter (and/or, operators), polling, filters
       and sort kept in the session
 
 Notes from M28a:
@@ -1353,6 +1353,18 @@ Notes from M28d:
   cell labelled from its `data-label`), so the server draws one page for every screen and the
   column menu's phone choice decides what a card shows. The headings are hidden there, so the
   toolbar gets a sort choice and a list that opens each column's filter.
+
+Notes from M28e:
+- Related values are correlated subqueries (`{T}` stands for the model's table, names
+  checked as plain identifiers), so filtering, sorting and searching need no join and the
+  model stays as it is; the page fetches the values with `id IN (…)`, one query per column.
+- The advanced filter's rules become one `where_raw` with the rules' SQL joined by AND/OR;
+  their values are bound typed (numbers, dates, booleans), so PostgreSQL accepts them.
+- `remember` needs a marker (`state=1`, a hidden field) to tell "the user cleared every
+  filter" from "a fresh visit": without it, a cleared grid came back with the old filters.
+  Bulk "all matching" and exports go through the same remembered state.
+- Sorting adds `(column IS NULL)` before each key: PostgreSQL puts NULLs first when
+  descending and SQLite last; the grid now puts them last on both.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

@@ -10,6 +10,13 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M28e · Data grid: related columns, an advanced filter, remembered state, polling
+
+- New: `Column::related`, `Column::count_of`, `Column::sum_of` (values from other tables,
+  sorted, filtered and searched), `Grid::advanced_filter` (rules with operators per kind, all
+  or any), `Grid::remember` (the grid's state in the session) and `Grid::poll`.
+- Changed: grid sorting puts empty values last in either direction, on both databases.
+
 ### M28d · Data grid: cards on phones, more kinds of cells
 
 - New: `Grid::cards_on_mobile()`: rows as cards on phones, with sorting and filters in the

@@ -339,6 +339,21 @@ and drawn with the `grid` macro; a call block draws the `custom` columns:
   `warning`, `danger`, `info`, `neutral`), `.icons()` (yes/no as ✓/✗), `.description("email")`
   (another value under this one), `.tooltip("email")`, `.wrap()`, `.limit(40)` (cut with `…`,
   the whole text on hover), `.link("/orders/{id}")` and `.copyable()`.
+- **Columns from other tables.** `Column::related("tier", "Tier", "customers", "customer_id",
+  "tier")` shows the value of the row this one belongs to; `Column::count_of("notes", "Notes",
+  "order_notes", "order_id")` counts the rows pointing at it, and `Column::sum_of(…, "weight")`
+  adds one of their columns. They're SQL subqueries, so they sort, filter and search like the
+  others, and a page fetches them in one query per column (`.numeric()` shows a related value
+  as a number).
+- **The advanced filter.** `.advanced_filter()` adds rules in the toolbar: a column, a
+  condition fitting its kind (contains, doesn't contain, is, starts/ends with, is empty, =, ≠,
+  >, ≥, <, ≤, on, before, after, yes/no) and a value, with all or any of them holding. They
+  live in the query string (`match=any&r.0.c=total&r.0.o=gt&r.0.v=1000`) and sit next to the
+  headings' filters; rules that don't fit their column are dropped.
+- **Remembered and refreshed.** `.remember()` keeps the filters, search, sort, group and page
+  size in the session, so coming back shows the grid as it was left (clearing is remembered
+  too). `.poll(30)` reloads the page every 30 seconds while the tab is visible and nobody is
+  editing, selecting or filtering. Empty values sort last in either direction.
 - **Moving and resizing columns.** Drag a heading (with a mouse) to move its column, or move it
   in the column menu (on touch screens too); drag the edge of a heading to resize the column,
   double-click the edge for the automatic width, or focus it and use the arrow keys. Widths
