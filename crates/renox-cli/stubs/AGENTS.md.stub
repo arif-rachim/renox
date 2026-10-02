@@ -108,6 +108,12 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   Dashboards: `renox::chart::Trend::of(query, "created_at").over(period).sum(&state, "total")`
   with the `Period` extractor, then `stat(…)`, `chart("line", series, format="money")`,
   `widget(…)` and `period_filter(period)` in the template; no chart library.
+  An action that asks for a few values is `{% call action_sheet(id, label, url, title,
+  method="PUT") %}…fields…{% endcall %}`, not a page of its own: the handler returns
+  `(Toast, HxRefresh)`, and a 422 stays in the sheet. With one per row, give each sheet and
+  its fields their own `id`. Icon-only buttons are `icon_button(icon, label, …)` (the label
+  is the accessible name); shortcuts are `key="mod+s"`; a button that can't be used yet
+  takes `disabled_reason="…"`.
   `Auth::new().notifications()` + `{{ notification_bell(unread_notifications) }}` in the
   layout gives the list, the badge and live updates (SSE: behind nginx, `proxy_buffering off`).
   Toasts can carry `.body(…)`, `.link(label, url)`, `.seconds(n)`/`.persistent()`.

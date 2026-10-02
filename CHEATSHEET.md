@@ -279,6 +279,16 @@ fn view_extras(app: App) -> App {
 </form>
 {{ confirm("del-7", "Delete", "/products/7", "Delete “Kopi”?", "It goes to the trash.") }}
 
+{# Actions: a form in a sheet, sent with htmx (422 → errors in the sheet, success → closes).
+   The handler answers (Toast, HxRefresh), or a ValidationError for its own checks. #}
+{% from "renox/ui.html" import action_sheet, icon_button %}
+{% call action_sheet("stock-7", "Stock", route('products.stock', 7), "Adjust stock", method="PUT", icon="box") %}
+  {{ input("change", "Change", type="number", id="stock-change-7") }} {# slide_over=true, width="lg" #}
+{% endcall %}
+{{ icon_button("edit", "Edit Kopi", href="/products/7/edit") }}       {# label = aria-label + tooltip #}
+{{ button("Save", key="mod+s", icon="check") }}                        {# ⌘S / Ctrl+S; also badge=3 #}
+{{ button("Publish", disabled_reason="Add a photo first.") }}          {# focusable, reason as tooltip #}
+
 {# Read-only details (an infolist): labels and values, formatted #}
 {% from "renox/ui.html" import infolist, entry, repeatable %}
 {% call infolist(columns=2) %}

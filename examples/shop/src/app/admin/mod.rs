@@ -47,6 +47,8 @@ impl Module for AdminPanel {
                 .name("products.edit")
                 .put("/products/{id}", products::update)
                 .name("products.update")
+                .put("/products/{id}/stock", products::adjust_stock)
+                .name("products.stock")
                 // The category select's options: searched, added, renamed.
                 .get("/categories/options", categories::options)
                 .name("categories.options")

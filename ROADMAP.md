@@ -1513,8 +1513,9 @@ rather than Chart.js.
 - [x] Kit: `stats`/`stat`, `dashboard`/`widget` (lazy `url`, `poll`), `period_filter`;
   `query_with`.
 - [x] Example: shop's admin dashboard.
-- [ ] Later: A, the actions (a form in a sheet, `icon_button`, key bindings); scatter and
-  bubble charts; a custom date range in `period_filter`; per-week buckets.
+- [x] A, the actions: see "Actions next to Filament's" below.
+- [ ] Later: scatter and bubble charts; a custom date range in `period_filter`; per-week
+  buckets.
 
 Notes:
 - Lines and areas are SVG stretched over the plot (`preserveAspectRatio="none"`,
@@ -1530,6 +1531,35 @@ Notes:
 - Found in the browser: percent padding on bar bands made a 30-bar chart 6,500 px wide, and
   the period filter's min-content width widened the phone layout (fixed with
   `contain: inline-size`).
+
+### Actions next to Filament's
+
+Filament's actions (https://filamentphp.com/docs/5.x/actions/overview) as the yardstick, the
+"A" after the widgets.
+
+- [x] `action_sheet`: a button, a sheet and a form sent with htmx; a 422 shows its errors in
+  the sheet, a success closes and resets it; `method`, `danger`, `target`/`swap`,
+  `enctype`, `modal_icon`.
+- [x] Sheets: `slide_over`, `width` (`sm`/`md`/`lg`/`xl`), `icon`; `confirm(icon=…,
+  modal_icon="warning")`.
+- [x] Buttons: `icon_button`; `icon`, `badge`, `key`, `disabled_reason` on `button`,
+  `link_button` (`new_tab`) and `open_button`; tooltips from `data-rx-tip`; eight new icons
+  (`edit`, `more`, `download`, `external`, `refresh`, `search`, `settings`, `box`).
+- [x] Keyboard shortcuts: `data-rx-key` (`mod` is ⌘ on a Mac, Ctrl elsewhere), with
+  `aria-keyshortcuts`.
+- [x] Example: shop's admin products (an "Adjust stock" action, edit and view icon buttons,
+  `n` for a new product, ⌘S / Ctrl+S on the form).
+- [ ] Later: action groups (a `menu` already holds links and forms), an action that opens a
+  wizard, and replicate/import/export actions (the grid has exports).
+
+Notes:
+- Tooltips are one element placed by renox-ui.js, not CSS `::before`: a pseudo-element was
+  dimmed by a disabled button's opacity, could be clipped by a table's scroll box, and
+  while hidden it still widened what scrolled (a phone table scrolled sideways).
+- A disabled button with a reason uses `aria-disabled` (still focusable, so the reason can be
+  read); a capture-phase click listener stops htmx and the kit from acting on it.
+- An action sheet's form doesn't show `form_errors`: with one sheet per row, a plain post's
+  errors would show in every sheet.
 
 ## Decisions
 

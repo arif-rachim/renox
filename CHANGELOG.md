@@ -10,6 +10,29 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### Actions: forms in sheets, icon buttons, shortcuts
+
+- New kit component `action_sheet(id, label, action, title, …)` (Filament's actions as the
+  yardstick): a button that opens a sheet with a form sent by htmx. A 422 shows its messages
+  under the fields inside the sheet; a success closes the sheet and resets the form (so do
+  Cancel and Esc); the handler answers with a `Toast` and `HxRefresh` (or `HxTrigger`, or a
+  fragment for `target`/`swap`).
+- Sheets: `slide_over=true` (at the side, full height), `width` (`sm`, `md`, `lg`, `xl`) and
+  `icon`. `confirm` takes `icon` (on its button) and `modal_icon` (over its title,
+  `"warning"` by default: confirmation sheets now show a warning icon).
+- New `icon_button(icon, label, href=…)`: only an icon, `label` as its accessible name and
+  tooltip. `button`, `link_button` and `open_button` take `icon`, `badge` (a count) and
+  `key`; `button` and `icon_button` take `disabled` and `disabled_reason` (focusable, the
+  reason as tooltip); `link_button` takes `new_tab`.
+- Keyboard shortcuts with `key="mod+s"` (`data-rx-key`; ⌘ on a Mac, Ctrl elsewhere; plain
+  keys don't fire while typing), with `aria-keyshortcuts`. Tooltips from any
+  `data-rx-tip`. New icons: `edit`, `more`, `download`, `external`, `refresh`, `search`,
+  `settings`, `box`.
+- examples/shop: the admin product list has an "Adjust stock" action per row
+  (`PUT /admin/products/{id}/stock`), edit and "view in the shop" icon buttons (disabled
+  with a reason for hidden products), "New product" on `n`; the product form saves on
+  ⌘S / Ctrl+S. On phones the row's actions show as icons and the price column is hidden.
+
 ### Dashboards: figures, charts and periods (renox::chart)
 
 - New module `renox::chart` (Filament's widgets as the yardstick): `Period` (an extractor

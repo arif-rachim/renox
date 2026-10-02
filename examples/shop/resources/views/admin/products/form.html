@@ -30,7 +30,7 @@
     {{ input("photo", "Photo", type="file", hint="An image up to 2 MB; it replaces the current one.", attrs={"accept": "image/*"}) }}
     <div class="rx-card__footer">
       {{ link_button(route('admin.products.index'), "Cancel", variant="plain") }}
-      {{ button("Save changes" if product else "Create product") }}
+      {{ button("Save changes" if product else "Create product", key="mod+s") }}
     </div>
   {% endcall %}
 </form>

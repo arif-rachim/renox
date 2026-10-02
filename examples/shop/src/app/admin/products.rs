@@ -125,6 +125,52 @@ pub async fn destroy(
     ))
 }
 
+/// The "Adjust stock" action on the list: a number to add (or, negative,
+/// to take away) and why, sent from the kit's `action_sheet`.
+#[derive(Deserialize, Serialize)]
+pub struct StockForm {
+    change: i64,
+    #[serde(default)]
+    reason: String,
+}
+
+impl Validate for StockForm {
+    fn rules(&self, v: &mut Validator) {
+        v.field("change", &self.change)
+            .required()
+            .between(-10_000, 10_000)
+            .rule(self.change != 0, "Type how many to add or take away.");
+        v.field("reason", &self.reason).max(200);
+    }
+}
+
+/// `PUT /admin/products/{id}/stock`. A 422 (as for a rule) keeps the sheet
+/// open with the message under the field; a success closes it, shows a
+/// toast and reloads the list.
+pub async fn adjust_stock(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Valid(form): Valid<StockForm>,
+) -> Result<(Toast, HxRefresh)> {
+    let mut product = Product::find_or_404(&state.db, id).await?;
+    if product.stock + form.change < 0 {
+        let mut errors = Errors::new();
+        errors.add(
+            "change",
+            format!("Only {} in stock to take away.", product.stock),
+        );
+        return Err(ValidationError::new(errors).with_input(&form).into());
+    }
+    product.stock += form.change;
+    product.save(&state.db).await?;
+    state.cache.forget(FEATURED).await?;
+    let mut toast = Toast::success(format!("“{}”: {} in stock.", product.name, product.stock));
+    if !form.reason.trim().is_empty() {
+        toast = toast.body(form.reason.trim().to_owned());
+    }
+    Ok((toast, HxRefresh))
+}
+
 /// Copies the form into the product; a new photo replaces the old one.
 async fn fill(state: &AppState, product: &mut Product, form: ProductForm) -> Result {
     if product.name != form.name || product.slug.is_empty() {

@@ -3,6 +3,7 @@
 //! Fixtures (`tests/migrations*`) are read relative to the crate root.
 
 mod accounts;
+mod actions;
 mod api_foundations;
 mod auth;
 mod auth_email;
