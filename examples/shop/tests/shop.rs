@@ -243,10 +243,16 @@ async fn checkout_takes_the_stock_and_confirms_by_mail() {
     assert_eq!(budi.unread_notification_count(app.db()).await.unwrap(), 1);
     assert_eq!(boss.unread_notification_count(app.db()).await.unwrap(), 1);
     app.acting_as(&boss);
-    app.get("/admin").await.assert_see(&format!(
-        "New order <a class=\"rx-link\" href=\"/orders/{}\">",
-        order.id
-    ));
+    // On the dashboard's second tab: every panel is on the page, the
+    // first one shown and the others hidden until their tab is picked.
+    app.get("/admin")
+        .await
+        .assert_see(r#"role="tablist" aria-label="Dashboard""#)
+        .assert_see(r#"id="dashboard-panel-notifications" aria-labelledby="dashboard-tab-notifications" tabindex="0" hidden"#)
+        .assert_see(&format!(
+            "New order <a class=\"rx-link\" href=\"/orders/{}\">",
+            order.id
+        ));
 }
 
 #[renox::test]

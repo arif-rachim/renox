@@ -1,20 +1,28 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-{% from "renox/ui.html" import group, link_button %}
+{% from "renox/ui.html" import group, link_button, tabs, tab_panel %}
 <h1 class="rx-title">Admin</h1>
 {% include "admin/_nav.html" %}
 <p>{{ link_button(route('admin.orders.index', status='pending'), pending ~ " pending order" ~ ("" if pending == 1 else "s"), size="small") }}</p>
 
-{% call group(title="Low stock") %}
+{#- The kit's tabs: a segmented control over panels already on the page
+    (switched in the browser, no request); the arrow keys, Home and End move
+    between them. -#}
+{{ tabs("dashboard", [["stock", "Low stock (" ~ (low_stock | length) ~ ")"], ["notifications", "Notifications"], ["activity", "Activity"]], label="Dashboard") }}
+
+{% call tab_panel("dashboard", "stock", selected=true) %}
+{% call group() %}
   {% for product in low_stock %}
   <div><a class="rx-link" href="{{ route('admin.products.edit', product.id) }}">{{ product.name }}</a>: {{ product.stock }} left</div>
   {% else %}
   <div class="rx-subtitle">Every product has 5 or more.</div>
   {% endfor %}
 {% endcall %}
+{% endcall %}
 
-{% call group(title="Notifications") %}
+{% call tab_panel("dashboard", "notifications") %}
+{% call group() %}
   {% for n in notifications %}
   <div class="{{ 'unread' if not n.read_at }}">
     {% if n.kind == 'new-order' %}New order <a class="rx-link" href="{{ route('orders.show', n.data.order_id) }}">#{{ n.data.order_id }}</a>: {{ n.data.total | rupiah }}
@@ -25,8 +33,10 @@
   <div class="rx-subtitle">Nothing new.</div>
   {% endfor %}
 {% endcall %}
+{% endcall %}
 
-{% call group(title="Recent activity") %}
+{% call tab_panel("dashboard", "activity") %}
+{% call group() %}
   {% for entry in activity %}
   <div>
     {% if entry.action == 'order.status_changed' %}User #{{ entry.user_id }} moved order <a class="rx-link" href="{{ route('orders.show', entry.subject_id) }}">#{{ entry.subject_id }}</a> from {{ entry.data.from }} to {{ entry.data.to }}
@@ -36,5 +46,6 @@
   {% else %}
   <div class="rx-subtitle">Nothing recorded yet.</div>
   {% endfor %}
+{% endcall %}
 {% endcall %}
 {% endblock %}

@@ -13,8 +13,10 @@
   {{ csrf_field() }}
   {% if project %}{{ method_field('PUT') }}<input type="hidden" name="id" value="{{ project.id }}">{% endif %}
   {% call card() %}
+    {#- `datalist`: names offered while typing; any other name is fine too. -#}
     {{ input("name", "Name", value=project.name if project else none, required=true,
-             hint="Unique within the team.") }}
+             hint="Unique within the team.",
+             datalist=["Website", "Mobile app", "Onboarding", "Marketing site"]) }}
     {{ textarea("description", "Description", value=project.description if project else none, rows=3) }}
     <div class="rx-card__footer">
       {{ link_button(route('projects.index'), "Cancel", variant="plain") }}

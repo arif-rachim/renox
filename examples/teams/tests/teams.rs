@@ -101,6 +101,12 @@ async fn new_projects_go_into_the_current_team() {
     let w = world().await;
     w.app.acting_as(&w.alice);
 
+    // The name field suggests common names (`datalist`) and accepts any.
+    w.app
+        .get("/projects/new")
+        .await
+        .assert_see(r#"list="rx-name-list""#)
+        .assert_see(r#"<option value="Mobile app">"#);
     w.app
         .post("/projects", &[("name", "Roadmap"), ("description", "Q4")])
         .await
