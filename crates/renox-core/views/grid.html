@@ -33,6 +33,7 @@
 {%- elif name == "open" -%}<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M8 4H5a1 1 0 00-1 1v10a1 1 0 001 1h10a1 1 0 001-1v-3M11 4h5v5M16 4l-7 7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
 {%- elif name == "more" -%}<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><g fill="currentColor"><circle cx="4.5" cy="10" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="15.5" cy="10" r="1.6"/></g></svg>
 {%- elif name == "copy" -%}<svg viewBox="0 0 20 20" width="13" height="13" aria-hidden="true"><rect x="7" y="7" width="9" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M13 7V5a2 2 0 00-2-2H6a2 2 0 00-2 2v7a2 2 0 002 2h1" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+{%- elif name == "sliders" -%}<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M3 6h8M15 6h2M3 14h2M9 14h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="13" cy="6" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="7" cy="14" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
 {%- elif name == "down" -%}<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M5 7.5L10 13l5-5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
 {%- endif -%}
 {%- endmacro -%}
@@ -154,16 +155,33 @@
 </div>
 {%- endmacro -%}
 
+{#- One rule of the advanced filter (`n` its number, `rule` none for a new one). -#}
+{%- macro _rule(page, n, rule) -%}
+{%- set first = page.advanced.columns[0] if page.advanced.columns else none -%}
+{%- set current = (page.advanced.columns | selectattr("key", "equalto", rule.column) | first) if rule else first -%}
+<li class="rx-grid__rule" data-grid-rule>
+  <select class="rx-grid__control rx-grid__control--small" name="{{ page.p }}r.{{ n }}.c" data-grid-rule-column aria-label="{{ t('ui.grid.rule_column') }}">
+    {%- for c in page.advanced.columns %}<option value="{{ c.key }}" data-kind="{{ c.kind }}"{% if current and c.key == current.key %} selected{% endif %}>{{ c.label }}</option>{% endfor %}
+  </select>
+  <select class="rx-grid__control rx-grid__control--small" name="{{ page.p }}r.{{ n }}.o" data-grid-rule-op aria-label="{{ t('ui.grid.rule_op') }}">
+    {%- if current %}{% for op in current.ops %}<option value="{{ op }}"{% if rule and rule.op == op %} selected{% endif %}>{{ t('ui.grid.op.' ~ op) }}</option>{% endfor %}{% endif %}
+  </select>
+  <input class="rx-grid__control rx-grid__control--small" name="{{ page.p }}r.{{ n }}.v" value="{{ rule.value if rule else '' }}" data-grid-rule-value aria-label="{{ t('ui.grid.rule_value') }}">
+  <button type="button" class="rx-grid__icon rx-grid__icon--small" data-grid-remove-rule aria-label="{{ t('ui.grid.remove_rule') }}">{{ _icon("close") }}</button>
+</li>
+{%- endmacro -%}
+
 {% macro grid(page, tools=none) -%}
 {{ renox_grid() }}
 {%- set id = "grid-" ~ page.id -%}
 {%- set shown = page.columns | length -%}
-<form class="{{ class_names('rx-grid', {'rx-grid--cards': page.cards}) }}" id="{{ id }}" data-rx-grid="{{ page.config }}" method="get" action="{{ page.path }}"
+<form class="{{ class_names('rx-grid', {'rx-grid--cards': page.cards}) }}" id="{{ id }}"{% if page.advanced.on %} data-grid-rule-columns='{{ page.advanced.columns | tojson }}'{% endif %} data-rx-grid="{{ page.config }}" method="get" action="{{ page.path }}"
       hx-get="{{ page.path }}" hx-target="this" hx-select="#{{ id }}" hx-swap="outerHTML" hx-push-url="true">
   {#- The page's other query string values stay in the grid's links. -#}
   {%- for name, value in page.keep %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
   <input type="hidden" name="{{ page.p }}sort" value="{{ page.sort or '' }}" data-grid-state="sort">
   <input type="hidden" name="{{ page.p }}page" value="{{ page.page.page }}" data-grid-state="page">
+  {%- if page.remember %}<input type="hidden" name="{{ page.p }}state" value="1">{% endif %}
   <div class="rx-grid__bar">
     <div class="rx-grid__heading">
       {%- if page.title %}<h2 class="rx-grid__title">{{ page.title }}</h2>{% endif %}
@@ -195,6 +213,30 @@
         {%- for column in page.columns if column.filterable %}
         <button type="button" class="rx-grid__menu-item" popovertarget="{{ id }}-f-{{ column.key }}">{{ column.label }}{% if column.filtered %} •{% endif %}</button>
         {%- endfor %}
+      </div>
+      {%- endif %}
+      {%- if page.advanced.on %}
+      <button type="button" class="{{ class_names('rx-grid__icon', {'rx-grid__icon--on': page.advanced.rules}) }}" popovertarget="{{ id }}-advanced" aria-label="{{ t('ui.grid.advanced') }}" title="{{ t('ui.grid.advanced') }}">{{ _icon("sliders") }}</button>
+      <div class="rx-grid__pop rx-grid__advanced" id="{{ id }}-advanced" popover data-grid-advanced data-prefix="{{ page.p }}">
+        <p class="rx-grid__pop-title">{{ t('ui.grid.advanced') }}</p>
+        <label class="rx-grid__field rx-grid__match">{{ t('ui.grid.match') }}
+          <select class="rx-grid__control rx-grid__control--small" name="{{ page.p }}match">
+            <option value="all"{% if not page.advanced.any %} selected{% endif %}>{{ t('ui.grid.match_all') }}</option>
+            <option value="any"{% if page.advanced.any %} selected{% endif %}>{{ t('ui.grid.match_any') }}</option>
+          </select>
+        </label>
+        <ol class="rx-grid__rules" data-grid-rules>
+          {%- for rule in page.advanced.rules %}{{ _rule(page, loop.index0, rule) }}{% endfor %}
+        </ol>
+        <template data-grid-rule-template>{{ _rule(page, "__n__", none) }}</template>
+        <select hidden data-grid-op-catalog aria-hidden="true" tabindex="-1">
+          {%- for op in ["contains", "not_contains", "equals", "not_equals", "starts", "ends", "empty", "not_empty", "eq", "ne", "gt", "gte", "lt", "lte", "on", "before", "after", "is_true", "is_false", "is", "is_not"] %}<option value="{{ op }}">{{ t('ui.grid.op.' ~ op) }}</option>{% endfor %}
+        </select>
+        <button type="button" class="rx-grid__link" data-grid-add-rule>+ {{ t('ui.grid.add_rule') }}</button>
+        <div class="rx-grid__pop-actions">
+          <button type="button" class="rx-button rx-button--secondary rx-button--small" data-grid-clear-rules>{{ t('ui.grid.clear') }}</button>
+          <button type="submit" class="rx-button rx-button--primary rx-button--small">{{ t('ui.grid.apply') }}</button>
+        </div>
       </div>
       {%- endif %}
       {%- if page.grouping %}
@@ -246,6 +288,9 @@
   <div class="rx-grid__chips" aria-label="{{ t('ui.grid.active_filters') }}">
     {%- if page.search.value %}
     <span class="rx-grid__chip">{{ t('ui.grid.search') }}: “{{ page.search.value }}”<button type="button" class="rx-grid__chip-x" data-grid-clear-search aria-label="{{ t('ui.grid.clear') }}: {{ t('ui.grid.search') }}">{{ _icon("close") }}</button></span>
+    {%- endif %}
+    {%- if page.advanced.rules %}
+    <span class="rx-grid__chip">{{ t('ui.grid.advanced') }}: {{ page.advanced.rules | length }} {{ t('ui.grid.rule_word', count=page.advanced.rules | length) }}<button type="button" class="rx-grid__chip-x" data-grid-clear-rules aria-label="{{ t('ui.grid.clear') }}: {{ t('ui.grid.advanced') }}">{{ _icon("close") }}</button></span>
     {%- endif %}
     {%- for column in page.columns if column.filtered %}
     {%- set f = column.filter %}

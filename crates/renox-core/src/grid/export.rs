@@ -80,11 +80,17 @@ impl Grid {
             .limit(MAX_EXPORT_ROWS)
             .get(&request.db)
             .await?;
+        let related = self.related_values(&request.db, &items).await?;
         let rows: Vec<Map<String, Value>> = items
             .iter()
-            .map(|item| match serde_json::to_value(item) {
-                Ok(Value::Object(map)) => map,
-                _ => Map::new(),
+            .zip(related)
+            .map(|(item, related)| {
+                let mut row = match serde_json::to_value(item) {
+                    Ok(Value::Object(map)) => map,
+                    _ => Map::new(),
+                };
+                row.extend(related);
+                row
             })
             .collect();
         let today = crate::db::now().format("%Y-%m-%d").to_string();

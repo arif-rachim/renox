@@ -899,7 +899,9 @@ picks the build, not the terminal.
 - **M28** (the grid next to Filament's tables, five PRs, the owner asked for all): M28a
   (`prefix`, `searchable` + search box, filter chips, `row_url`, `empty_state`): merged (#80). M28b (`bulk_action`/`row_action`, `Action`, `Selection`, `selected`):
   merged (#81). M28c (`Column::summary`/`Summary`, `groups`/`group_by`): merged (#82). M28d (`cards_on_mobile`, image/color columns, badges, icons,
-  description, tooltip, wrap, limit, link, copyable): branch `m28d-grid-cards`. Then M28e relationships, advanced filter, polling, session state.
+  description, tooltip, wrap, limit, link, copyable): merged (#83). M28e
+  (`related`/`count_of`/`sum_of`, `advanced_filter`, `remember`, `poll`, NULLs last): branch
+  `m28e-grid-advanced`.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.

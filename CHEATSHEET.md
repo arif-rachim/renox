@@ -692,7 +692,9 @@ More: `.audit()` (who changed a row, under it), `Column::editable()` + `.edit_ur
 `grid.selected(query, &request, &selection)?` (`Form<Selection>`), `.row_action(…)`,
 `Column::summary(Summary::Sum)` (footer and group subtotals), `.groups(&["region"])`,
 `.cards_on_mobile()`, `.badges(&[("paid", "success")])`, `.description("email")`, `.icons()`,
-`Column::image(…).round()`, `.copyable()`, `.link(url)`, `.tooltip(key)`, `.limit(n)`.
+`Column::image(…).round()`, `.copyable()`, `.link(url)`, `.tooltip(key)`, `.limit(n)`,
+`Column::related(key, label, table, foreign_key, column)`, `Column::count_of(…)`,
+`.advanced_filter()`, `.remember()`, `.poll(30)`.
 
 ## Seeders and factories
 

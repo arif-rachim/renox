@@ -37,6 +37,11 @@ cargo run               # http://127.0.0.1:3000
   move to the toolbar. Status shows as colored badges, Paid as ✓/✗, the
   customer with an avatar and the email under the name, and the order number
   with a copy button.
+- **Other tables, advanced rules.** Tier comes from `customers` and Notes counts
+  `order_notes` rows; both sort and filter. The sliders button builds rules
+  ("Total > 30,000,000", "Tier is gold", "Email is empty"), all or any. Leave
+  and come back: the grid remembers its filters; it also refreshes itself
+  every 30 seconds when nobody is busy with it.
 - **Filters by kind.** Text (contains, starts with, ends with, equals, or a
   `%` pattern), number ranges, the Ordered column's date range calendar,
   choices for Region, Status and Paid, and any-of for Tags. The URL keeps

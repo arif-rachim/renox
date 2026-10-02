@@ -43,6 +43,28 @@ pub fn app() -> App {
             renox::db::sql("UPDATE orders SET position = id")
                 .execute(&db)
                 .await?;
+            // Customers in tiers, and a few notes per order, for the grid's
+            // relationship columns.
+            for i in 0..60 {
+                let tier = ["gold", "silver", "bronze", "bronze"][i % 4];
+                renox::db::sql("INSERT INTO customers (name, tier) VALUES (?, ?)")
+                    .bind(format!("Customer {i}"))
+                    .bind(tier)
+                    .execute(&db)
+                    .await?;
+            }
+            renox::db::sql("UPDATE orders SET customer_id = (id % 60) + 1")
+                .execute(&db)
+                .await?;
+            for order in 1..=480_i64 {
+                for n in 0..(order * 7 % 4) {
+                    renox::db::sql("INSERT INTO order_notes (order_id, body) VALUES (?, ?)")
+                        .bind(order)
+                        .bind(format!("Note {n}"))
+                        .execute(&db)
+                        .await?;
+                }
+            }
             Ok(())
         })
 }

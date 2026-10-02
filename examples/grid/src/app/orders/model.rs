@@ -33,6 +33,8 @@ pub struct Order {
     pub fulfilled: i64,
     /// Where the row sits when sorted by hand (`Grid::reorder`).
     pub position: i64,
+    /// The `customers` row (its tier shows through `Column::related`).
+    pub customer_id: Option<i64>,
     pub created_by: String,
     pub updated_by: String,
     pub created_at: Option<DateTime>,

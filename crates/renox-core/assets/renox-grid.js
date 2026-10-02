@@ -190,6 +190,7 @@
       submit(grid);
     } else if (target.hasAttribute("data-grid-clear-all")) {
       grid.querySelectorAll("[data-grid-filter]").forEach(clearFields);
+      grid.querySelectorAll("[data-grid-rules] [data-grid-rule]").forEach(function (li) { li.remove(); });
       var box = grid.querySelector("[data-grid-search]");
       if (box) box.value = "";
       submit(grid);
@@ -1015,12 +1016,119 @@
     if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, function () {});
   });
 
+  // ---------- The advanced filter ----------
+
+  var NO_VALUE = ["empty", "not_empty", "is_true", "is_false"];
+
+  function ruleColumns(grid) {
+    if (!grid._rxRuleColumns) {
+      try { grid._rxRuleColumns = JSON.parse(grid.getAttribute("data-grid-rule-columns") || "[]"); } catch (_) { grid._rxRuleColumns = []; }
+    }
+    return grid._rxRuleColumns;
+  }
+
+  // The operator and value fields that fit the rule's column.
+  function fixRule(grid, li, keepOp) {
+    var columnPick = li.querySelector("[data-grid-rule-column]");
+    var opPick = li.querySelector("[data-grid-rule-op]");
+    var col = ruleColumns(grid).filter(function (c) { return c.key === columnPick.value; })[0];
+    if (!col) return;
+    var catalog = grid.querySelector("[data-grid-op-catalog]");
+    var current = opPick.value;
+    if (!keepOp || col.ops.indexOf(current) < 0) {
+      opPick.innerHTML = "";
+      col.ops.forEach(function (op) {
+        var label = catalog ? catalog.querySelector('option[value="' + op + '"]').textContent : op;
+        opPick.appendChild(new Option(label, op, false, op === current));
+      });
+    }
+    var value = li.querySelector("[data-grid-rule-value]");
+    var name = value.name, old = value.value, next;
+    if (col.kind === "select") {
+      next = document.createElement("select");
+      col.options.forEach(function (o) { next.appendChild(new Option(o.label, o.value, false, o.value === old)); });
+    } else {
+      next = document.createElement("input");
+      next.type = { number: "number", money: "number", date: "date", date_time: "date" }[col.kind] || "text";
+      if (next.type === "number") next.step = "any";
+      next.value = old;
+    }
+    next.className = value.className;
+    next.name = name;
+    next.setAttribute("data-grid-rule-value", "");
+    next.setAttribute("aria-label", value.getAttribute("aria-label") || "");
+    next.hidden = NO_VALUE.indexOf(opPick.value) >= 0;
+    if (next.hidden) next.value = "";
+    value.replaceWith(next);
+  }
+
+  function renumber(grid) {
+    var prefix = config(grid).prefix || "";
+    grid.querySelectorAll("[data-grid-rules] [data-grid-rule]").forEach(function (li, n) {
+      li.querySelectorAll("[name]").forEach(function (el) {
+        el.name = el.name.replace(/r\.(\d+|__n__)\./, "r." + n + ".");
+        if (el.name.indexOf(prefix) !== 0) el.name = prefix + el.name;
+      });
+    });
+  }
+
+  document.addEventListener("click", function (event) {
+    var t = event.target.closest && event.target.closest("[data-grid-add-rule], [data-grid-remove-rule], [data-grid-clear-rules]");
+    if (!t) return;
+    var grid = t.closest("form.rx-grid");
+    if (t.hasAttribute("data-grid-add-rule")) {
+      var list = grid.querySelector("[data-grid-rules]");
+      var template = grid.querySelector("[data-grid-rule-template]");
+      list.appendChild(template.content.cloneNode(true));
+      renumber(grid);
+      var li = list.lastElementChild;
+      fixRule(grid, li, false);
+      li.querySelector("select").focus();
+    } else if (t.hasAttribute("data-grid-remove-rule")) {
+      t.closest("[data-grid-rule]").remove();
+      renumber(grid);
+    } else {
+      grid.querySelectorAll("[data-grid-rules] [data-grid-rule]").forEach(function (li) { li.remove(); });
+      submit(grid);
+    }
+  });
+
+  document.addEventListener("change", function (event) {
+    var el = event.target;
+    var li = el.closest && el.closest("[data-grid-rule]");
+    if (!li) return;
+    var grid = li.closest("form.rx-grid");
+    if (el.hasAttribute("data-grid-rule-column")) fixRule(grid, li, false);
+    else if (el.hasAttribute("data-grid-rule-op")) fixRule(grid, li, true);
+  });
+
+  // ---------- Polling ----------
+
+  function busy(grid) {
+    return grid.querySelector(".rx-grid__editing, [popover]:popover-open, dialog[open], [data-grid-select]:checked, [aria-busy=true]") ||
+      grid.contains(document.activeElement) && document.activeElement.matches("input, select, textarea") ||
+      grid.classList.contains("htmx-request");
+  }
+
+  function startPolling(grid) {
+    var seconds = config(grid).poll;
+    if (!seconds || grid._rxPoll) return;
+    grid._rxPoll = setInterval(function () {
+      if (!document.body.contains(grid)) { clearInterval(grid._rxPoll); return; }
+      if (document.visibilityState !== "visible" || busy(grid)) return;
+      grid._rxKeepPage = true;
+      submit(grid, true);
+    }, seconds * 1000);
+  }
+
   // ---------- Setup ----------
 
   function setup(grid) {
     if (grid._rxReady) return;
     grid._rxReady = true;
     applyWidths(grid);
+    grid.querySelectorAll("[data-grid-rules] [data-grid-rule]").forEach(function (li) { fixRule(grid, li, true); });
+    startPolling(grid);
     syncSelection(grid);
     applyVisibility(grid);
     var scroll = grid.querySelector(".rx-grid__scroll");

@@ -261,3 +261,44 @@ async fn totals_and_groups() {
     assert!(grouped.matches("rx-grid__group-row").count() >= 2);
     assert!(grouped.contains("rx-grid__subtotal"));
 }
+
+#[renox::test]
+async fn related_columns_and_the_advanced_filter() {
+    let app = with_orders(20).await;
+    renox::db::sql("INSERT INTO customers (name, tier) VALUES ('Gold One', 'gold')")
+        .execute(app.db())
+        .await
+        .unwrap();
+    let first = Order::query()
+        .order_by("id")
+        .first(app.db())
+        .await
+        .unwrap()
+        .unwrap();
+    renox::db::sql("UPDATE orders SET customer_id = 1 WHERE id = ?")
+        .bind(first.id)
+        .execute(app.db())
+        .await
+        .unwrap();
+    for body in ["a", "b", "c"] {
+        renox::db::sql("INSERT INTO order_notes (order_id, body) VALUES (?, ?)")
+            .bind(first.id)
+            .bind(body)
+            .execute(app.db())
+            .await
+            .unwrap();
+    }
+    // The order with notes comes first when sorted by them.
+    let html = app.get("/?state=1&sort=-notes").await.text();
+    let top = html.split("<tr data-id=").nth(1).unwrap();
+    assert!(top.starts_with(&format!("\"{}\"", first.id)));
+    // Rules on a related column.
+    let gold = app
+        .get("/?state=1&r.0.c=tier&r.0.o=equals&r.0.v=gold")
+        .await
+        .text();
+    assert_eq!(gold.matches("<tr data-id=").count(), 1);
+    assert!(gold.contains("Advanced filter: 1 rule"));
+    // Remembered for the next visit.
+    assert_eq!(app.get("/").await.text().matches("<tr data-id=").count(), 1);
+}
