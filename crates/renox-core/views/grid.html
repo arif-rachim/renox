@@ -199,6 +199,7 @@
               <button type="button" class="{{ class_names('rx-grid__filter', {'rx-grid__filter--on': column.filtered}) }}" popovertarget="{{ id }}-f-{{ column.key }}" aria-label="{{ t('ui.grid.filter') }}: {{ column.label }}{% if column.filtered %} ({{ t('ui.grid.filtered') }}){% endif %}">{{ _icon("filter") }}</button>
               {%- endif %}
             </div>
+            <span class="rx-grid__resize" data-grid-resize role="separator" aria-orientation="vertical" tabindex="0" aria-label="{{ t('ui.grid.resize') }}: {{ column.label or column.key }}" title="{{ t('ui.grid.resize_hint') }}"></span>
             {%- if column.filterable %}{{ _filter(page, column) }}{% endif %}
           </th>
           {%- endif %}

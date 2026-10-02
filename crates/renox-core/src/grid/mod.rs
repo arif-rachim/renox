@@ -849,6 +849,9 @@ pub struct GridPrefs {
     /// Columns shown on wide screens.
     #[serde(default)]
     pub wide: Option<Vec<String>>,
+    /// Widths the user gave columns, in CSS pixels (40 to 2000).
+    #[serde(default)]
+    pub widths: Option<BTreeMap<String, u32>>,
 }
 
 impl GridPrefs {
@@ -863,6 +866,12 @@ impl GridPrefs {
         .into_iter()
         .flatten()
         .all(|keys| keys.len() <= 200 && keys.iter().all(|k| valid_key(k)))
+            && self.widths.as_ref().is_none_or(|widths| {
+                widths.len() <= 200
+                    && widths
+                        .iter()
+                        .all(|(k, w)| valid_key(k) && (40..=2000).contains(w))
+            })
     }
 }
 
@@ -1133,6 +1142,7 @@ impl<M: Serialize> GridPage<M> {
             "right": ordered.iter().filter(|(_, p)| *p == Some(Pin::Right)).map(|(c, _)| c.key.clone()).collect::<Vec<_>>(),
             "compact": compact,
             "wide": wide,
+            "widths": self.prefs.widths.clone().unwrap_or_default(),
             "defaults": {
                 "compact": self.grid.default_visible(true),
                 "wide": self.grid.default_visible(false),
@@ -1615,6 +1625,12 @@ mod tests {
     #[test]
     fn preferences_are_checked() {
         assert!(GridPrefs::default().is_valid());
+        let widths = |w: u32| GridPrefs {
+            widths: Some(BTreeMap::from([("total".to_owned(), w)])),
+            ..Default::default()
+        };
+        assert!(widths(180).is_valid());
+        assert!(!widths(10).is_valid() && !widths(5000).is_valid());
         let bad = GridPrefs {
             order: Some(vec!["a; DROP".into()]),
             ..Default::default()

@@ -1271,6 +1271,9 @@ cells, exports on the server (CSV, Excel, PDF through a print page). Three PRs:
 - [x] M27c: exports of every filtered row: CSV, Excel (`rust_xlsxwriter`, headings merged
       as on screen) and a print page for PDF
 
+- [x] M27d (asked for after M27c): columns moved by dragging their heading and resized by
+      dragging its edge, widths kept in `GridPrefs::widths`
+
 Notes from M27a:
 - Columns per screen size are applied by the script (classes on the cells), so the server
   renders every column and a resize needs no request; order and frozen columns change the
@@ -1303,6 +1306,12 @@ Notes from M27c:
   repeated per page), as agreed with the owner, so no PDF crate or fonts.
 - Exports use the columns the user shows on wide screens, in their order, and leave custom
   columns out (they're drawn by templates); CSV guards against formula injection.
+
+Notes from M27d:
+- Moving a column by its heading needs a mouse or pen: on a touch screen, dragging a heading
+  would fight the sideways scroll, so touch users move columns in the column menu. Resizing
+  works with touch (the handle takes the pointer).
+- A drag that ends on a heading isn't a click, so it doesn't sort.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

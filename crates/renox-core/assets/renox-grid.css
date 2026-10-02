@@ -148,6 +148,25 @@ th[aria-sort] .rx-grid__sort { color: var(--rx-accent-text); }
 .rx-up, .rx-up .rx-spark { color: var(--rx-success); }
 .rx-down, .rx-down .rx-spark { color: var(--rx-danger-text); }
 
+/* Column widths and moving columns. */
+.rx-grid__table thead th[data-col] { position: relative; }
+.rx-grid__table thead th[data-col][data-pin] { position: sticky; }
+.rx-grid__resize {
+  position: absolute; top: 0; bottom: 0; inset-inline-end: -4px; width: 9px; z-index: 2;
+  cursor: col-resize; touch-action: none;
+}
+.rx-grid__resize::after {
+  content: ""; position: absolute; top: 25%; bottom: 25%; left: 4px; width: 1px;
+  background: var(--rx-separator);
+}
+.rx-grid__resize:hover::after, .rx-grid__resize:focus-visible::after, .rx-grid--resizing .rx-grid__resize::after { background: var(--rx-accent); width: 2px; }
+.rx-grid--resizing, .rx-grid--resizing * { cursor: col-resize !important; user-select: none; }
+.rx-grid__table td.rx-grid__sized, .rx-grid__table th.rx-grid__sized { overflow: hidden; text-overflow: ellipsis; }
+.rx-grid--moving, .rx-grid--moving * { cursor: grabbing !important; user-select: none; }
+.rx-grid__table th.rx-grid__moving { opacity: 0.5; }
+.rx-grid__table th.rx-grid__drop-before { box-shadow: inset 3px 0 0 var(--rx-accent); }
+.rx-grid__table th.rx-grid__drop-after { box-shadow: inset -3px 0 0 var(--rx-accent); }
+
 /* Row tools: drag handle, details, edit. */
 .rx-grid__table .rx-grid__tools-col { padding: 0 4px; width: 1%; }
 .rx-grid__row-tools { display: inline-flex; align-items: center; gap: 0; }

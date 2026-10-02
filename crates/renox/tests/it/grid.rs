@@ -353,6 +353,28 @@ async fn guests_keep_their_columns_in_the_session() {
     assert!(html.contains(r#"data-col="total" data-pin="left""#));
     assert!(!html.contains(r#"data-col="number" data-pin"#), "unfrozen");
 
+    // Column widths come back in the config for the script.
+    app.post_json(
+        "/_renox/grid/orders/prefs",
+        &json!({ "order": ["total", "number", "status"], "widths": { "total": 180 } }),
+    )
+    .await
+    .assert_status(204);
+    assert_eq!(
+        config(app.get("/orders").await.text())["widths"],
+        json!({ "total": 180 })
+    );
+    app.post_json(
+        "/_renox/grid/orders/prefs",
+        &json!({ "widths": { "total": 5 } }),
+    )
+    .await
+    .assert_status(422);
+    assert!(
+        app.get("/orders").await.text().contains("data-grid-resize"),
+        "every heading has a resize handle"
+    );
+
     // Bad preferences are refused; DELETE goes back to the defaults.
     app.post_json("/_renox/grid/orders/prefs", &json!({ "order": ["x y"] }))
         .await

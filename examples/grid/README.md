@@ -18,6 +18,9 @@ cargo run               # http://127.0.0.1:3000
 - **Only the rows scroll.** The toolbar and the pagination stay where they are;
   the headings stick to the top, the frozen columns (Order on the left,
   Actions on the right) to the sides.
+- **Move and resize columns.** Drag a heading to move its column; drag the
+  edge of a heading to make it wider or narrower (double-click the edge for
+  the automatic width).
 - **Freeze and reorder.** In the column menu, pick Left or Right for a column,
   or move it up and down. Logged in, your choices are saved for you
   (`grid_preferences`); as a guest, in the session.
