@@ -211,7 +211,8 @@ examples/                  workspace members, each with a README.md and its own 
   webhooks/                Midtrans / Xendit / Stripe webhooks
   shop/                    a whole online shop on the UI kit (auth, admin, checkout, mail, queue,
                            i18n, deploy with the systemd socket, a rebranded accent, route_is,
-                           recently viewed, plural ranges, the kit's tabs on the admin dashboard)
+                           recently viewed, plural ranges, the kit's tabs on the admin dashboard,
+                           a category select answered by the server: admin/categories.rs)
   htmx-recipes/            modal form, inline edit, infinite scroll, tabs, HxRefresh/HxRedirect,
                            an out-of-band count (.also), HxRetarget/HxReswap, toasts
   relations/               belongs to, has many, many to many (pivot columns), Morph, no N+1
