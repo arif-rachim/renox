@@ -1321,7 +1321,7 @@ missing pieces, in this order:
 - [x] M28b: selecting rows and bulk actions, row actions with a confirmation
 - [x] M28c: summaries (sum, average, count, range) in the footer, grouped rows with their
       own summaries
-- [ ] M28d: a card layout on phones, more column kinds (badges with colors, icons, images,
+- [x] M28d: a card layout on phones, more column kinds (badges with colors, icons, images,
       descriptions, tooltips)
 - [ ] M28e: relationship columns, an advanced filter (and/or, operators), polling, filters
       and sort kept in the session
@@ -1347,6 +1347,12 @@ Notes from M28c:
   so a group's subtotal covers all its rows, also those on other pages.
 - A group's values are compared as text (`CAST(column AS TEXT)`); booleans read back as `1`/`0`
   on SQLite and `true`/`false` on PostgreSQL, so both are looked up.
+
+Notes from M28d:
+- Cards are CSS only (the table's rows and cells as blocks and flex rows under 768 px, each
+  cell labelled from its `data-label`), so the server draws one page for every screen and the
+  column menu's phone choice decides what a card shows. The headings are hidden there, so the
+  toolbar gets a sort choice and a list that opens each column's filter.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

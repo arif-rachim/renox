@@ -16,7 +16,7 @@ async fn the_dashboard_shows_a_page_of_orders() {
     let app = with_orders(60).await;
     let res = app.get("/").await;
     res.assert_ok()
-        .assert_see(r#"<form class="rx-grid" id="grid-orders""#)
+        .assert_see(r#"<form class="rx-grid rx-grid--cards" id="grid-orders""#)
         .assert_see("60 rows")
         .assert_see("1–25 of 60")
         // Grouped headings and the custom cells.

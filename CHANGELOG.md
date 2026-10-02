@@ -10,6 +10,13 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M28d · Data grid: cards on phones, more kinds of cells
+
+- New: `Grid::cards_on_mobile()`: rows as cards on phones, with sorting and filters in the
+  toolbar.
+- New: `Column::image`, `Column::color`, and `badges`, `icons`, `description`, `tooltip`,
+  `wrap`, `limit`, `link`, `copyable` and `round` on columns (`grid::Kind::Image`/`Color`).
+
 ### M28c · Data grid: summaries and groups
 
 - New: `Column::summary` (`grid::Summary`: sum, average, range, count) in a footer that stays

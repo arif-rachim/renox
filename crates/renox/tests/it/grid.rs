@@ -167,13 +167,28 @@ async fn app() -> (TestApp, tempfile::TempDir) {
     (app, views)
 }
 
+/// A cell's text without its markup.
+fn text_of(html: &str) -> String {
+    let mut out = String::new();
+    let mut tag = false;
+    for c in html.chars() {
+        match c {
+            '<' => tag = true,
+            '>' => tag = false,
+            c if !tag => out.push(c),
+            _ => {}
+        }
+    }
+    out.trim().to_owned()
+}
+
 /// The order numbers on the page, in order.
 fn numbers(html: &str) -> Vec<String> {
     html.split("<td data-col=\"number\"")
         .skip(1)
         .filter_map(|cell| {
             let text = cell.split_once('>')?.1.split_once("</td>")?.0;
-            Some(text.trim().to_owned())
+            Some(text_of(text))
         })
         .collect()
 }
@@ -557,20 +572,20 @@ async fn equal_neighbours_share_a_merged_cell() {
     let (app, _views) = tasks_app().await;
     let html = app.get("/tasks").await.text();
     // Sorted region, city, title (the default's several keys): Bali first.
-    let order: Vec<&str> = html
+    let order: Vec<String> = html
         .split("<td data-col=\"title\"")
         .skip(1)
         .filter_map(|c| {
             c.split_once("</td>")
-                .map(|(c, _)| c.rsplit('>').next().unwrap().trim())
+                .map(|(c, _)| text_of(c.split_once('>').map_or(c, |(_, rest)| rest)))
         })
         .collect();
     assert_eq!(order, ["d", "a", "b", "c"]);
     assert!(
-        html.contains(r#"data-col="region" rowspan="3" data-group="region-1""#),
+        html.contains(r#"data-col="region" data-label="Region" rowspan="3" data-group="region-1""#),
         "{html}"
     );
-    assert!(html.contains(r#"data-col="city" rowspan="2" data-group="city-1""#));
+    assert!(html.contains(r#"data-col="city" data-label="City" rowspan="2" data-group="city-1""#));
     assert!(html.contains(r#"data-covered="region city""#));
     assert!(html.contains(r#"data-covered="region""#));
     assert_eq!(
@@ -1093,7 +1108,7 @@ async fn summaries_cover_every_filtered_row_and_each_group() {
     );
     let rows: Vec<String> = numbers(&grouped)
         .into_iter()
-        .filter(|n| !n.starts_with('<'))
+        .filter(|n| n != "This group" && n != "All rows")
         .collect();
     assert_eq!(rows, ["A", "D", "B", "C"]);
     let subtotals: Vec<&str> = grouped.split("rx-grid__subtotal").skip(1).collect();
@@ -1108,4 +1123,72 @@ async fn summaries_cover_every_filtered_row_and_each_group() {
             .text()
             .contains("rx-grid__group-row")
     );
+}
+
+// ---------- M28d: cards on phones, more column kinds ----------
+
+#[renox::test]
+async fn column_kinds_draw_their_cells() {
+    let (_, views) = app().await; // for its views
+    struct Kinds;
+    impl Module for Kinds {
+        fn name(&self) -> &'static str {
+            "kinds"
+        }
+        fn routes(&self) -> Routes {
+            Routes::new().get("/kinds", |request: GridRequest| async move {
+                let grid = Grid::new("kinds")
+                    .column(Column::text("number", "Order").copyable().link("/orders/{id}"))
+                    .column(
+                        Column::select("status", "Status", [("new", "New"), ("paid", "Paid")])
+                            .badges(&[("paid", "success"), ("new", "danger")])
+                            .tooltip("number"),
+                    )
+                    .column(Column::bool("paid", "Paid").icons())
+                    .column(Column::image("photo", "Photo").round())
+                    .column(Column::color("shade", "Shade"))
+                    .column(Column::text("note", "Note").wrap().limit(12).description("number"))
+                    .cards_on_mobile();
+                let page = grid
+                    .page(GridOrder::query(), &request)
+                    .await?
+                    .extend(|o| json!({ "photo": "/p.png", "shade": "#0a7d5a", "note": format!("A long note about {}", o.number) }));
+                Ok::<_, Error>(view("orders.html", context! { orders => page }))
+            })
+        }
+    }
+    let app = TestApp::with_config(App::new().migrations(&[SCHEMA]).module(Kinds), |c| {
+        c.views_path = views.path().to_path_buf()
+    })
+    .await;
+    let order = GridOrder::create(
+        app.db(),
+        GridOrder {
+            number: "SO-9".into(),
+            status: "new".into(),
+            paid: true,
+            ordered_on: NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    app.get("/kinds")
+        .await
+        .assert_see(r#"<form class="rx-grid rx-grid--cards""#)
+        .assert_see(&format!(
+            r#"<a class="rx-grid__cell-link" href="/orders/{}">SO-9</a>"#,
+            order.id
+        ))
+        .assert_see(r#"data-grid-copy="SO-9""#)
+        .assert_see(r#"<span class="rx-badge rx-badge--error">New</span>"#)
+        .assert_see(r#"data-label="Status" title="SO-9""#)
+        .assert_see(r#"<span class="rx-grid__yes" role="img" aria-label="Yes">"#)
+        .assert_see(r#"<img class="rx-grid__img rx-grid__img--round" src="/p.png""#)
+        .assert_see(r#"<span class="rx-grid__swatch" style="background: #0a7d5a"></span>"#)
+        .assert_see(r#"style="max-width: 12ch""#)
+        .assert_see("rx-grid__wrap")
+        .assert_see("rx-grid__clip")
+        .assert_see(r#"<span class="rx-grid__desc">SO-9</span>"#)
+        .assert_see("data-grid-sort-pick");
 }

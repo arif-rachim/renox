@@ -54,14 +54,19 @@ pub fn orders_grid() -> Grid {
             Column::text("number", "Order")
                 .frozen()
                 .mobile()
-                .searchable(),
+                .searchable()
+                .copyable(),
         )
+        // Drawn from a value `extend` adds (an SVG with the initials).
+        .column(Column::image("avatar", "").round().under(["Customer"]))
         .column(
             Column::text("customer", "Name")
                 .under(["Customer"])
                 .mobile()
                 .editable()
-                .searchable(),
+                .searchable()
+                // The email, small under the name.
+                .description("email"),
         )
         .column(
             Column::text("email", "Email")
@@ -78,7 +83,13 @@ pub fn orders_grid() -> Grid {
         .column(
             Column::select("status", "Status", STATUSES)
                 .mobile()
-                .editable(),
+                .editable()
+                .badges(&[
+                    ("new", "info"),
+                    ("paid", "success"),
+                    ("shipped", "neutral"),
+                    ("cancelled", "danger"),
+                ]),
         )
         .column(Column::tags("tags", "Tags", TAGS).editable())
         .column(
@@ -103,7 +114,7 @@ pub fn orders_grid() -> Grid {
                 .summary(Summary::Range),
         )
         .column(Column::date("ordered_on", "Ordered").editable())
-        .column(Column::bool("paid", "Paid").editable())
+        .column(Column::bool("paid", "Paid").editable().icons())
         .column(Column::custom("trend", "Last 7 days").under(["Charts"]))
         .column(
             Column::custom("fulfilled", "Shipped")
@@ -114,6 +125,8 @@ pub fn orders_grid() -> Grid {
         .sort_by("-ordered_on")
         // A "Group" choice in the toolbar.
         .groups(&["region", "status", "paid"])
+        // On phones each order is a card.
+        .cards_on_mobile()
         // The chevron opens the audit details; the link icon opens the order.
         .row_url("/orders/{id}")
         .empty_state(
@@ -180,9 +193,32 @@ async fn index(request: GridRequest) -> Result<Response> {
         .extend(|order| {
             let trend = &order.trend.0;
             let up = trend.last() >= trend.first();
-            json!({ "up": up })
+            json!({ "up": up, "avatar": avatar(&order.customer) })
         });
     Ok(view("orders/index.html", context! { orders => page }).into_response())
+}
+
+/// A small SVG with the customer's initials, as a data URL.
+fn avatar(name: &str) -> String {
+    let initials: String = name
+        .split_whitespace()
+        .filter_map(|w| w.chars().next())
+        .take(2)
+        .collect();
+    let hue = name
+        .bytes()
+        .fold(0u32, |h, b| h.wrapping_mul(31).wrapping_add(u32::from(b)))
+        % 360;
+    let svg = format!(
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'><rect width='36' height='36' fill='hsl({hue},55%,55%)'/><text x='18' y='23' font-family='sans-serif' font-size='14' fill='white' text-anchor='middle'>{initials}</text></svg>"
+    );
+    let encoded = svg
+        .replace('%', "%25")
+        .replace('#', "%23")
+        .replace('<', "%3C")
+        .replace('>', "%3E")
+        .replace(' ', "%20");
+    format!("data:image/svg+xml,{encoded}")
 }
 
 async fn regions(request: GridRequest) -> Result<Response> {

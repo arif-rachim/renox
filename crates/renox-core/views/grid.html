@@ -32,6 +32,7 @@
 {%- elif name == "search" -%}<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12.7 12.7L17 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
 {%- elif name == "open" -%}<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M8 4H5a1 1 0 00-1 1v10a1 1 0 001 1h10a1 1 0 001-1v-3M11 4h5v5M16 4l-7 7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
 {%- elif name == "more" -%}<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><g fill="currentColor"><circle cx="4.5" cy="10" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="15.5" cy="10" r="1.6"/></g></svg>
+{%- elif name == "copy" -%}<svg viewBox="0 0 20 20" width="13" height="13" aria-hidden="true"><rect x="7" y="7" width="9" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M13 7V5a2 2 0 00-2-2H6a2 2 0 00-2 2v7a2 2 0 002 2h1" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
 {%- elif name == "down" -%}<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M5 7.5L10 13l5-5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
 {%- endif -%}
 {%- endmacro -%}
@@ -43,13 +44,31 @@
 {%- elif column.kind == "money" -%}{{ value | number }}
 {%- elif column.kind == "date" -%}{{ value | date }}
 {%- elif column.kind == "date_time" -%}{{ value | date("%Y-%m-%d %H:%M") }}
+{%- elif column.kind == "bool" and column.icons -%}
+{%- if value %}<span class="rx-grid__yes" role="img" aria-label="{{ t('ui.grid.yes') }}">{{ _icon("check") }}</span>{% else %}<span class="rx-grid__no" role="img" aria-label="{{ t('ui.grid.no') }}">{{ _icon("close") }}</span>{% endif -%}
 {%- elif column.kind == "bool" -%}
 {%- if value %}<span class="rx-grid__yes">{{ t('ui.grid.yes') }}</span>{% else %}<span class="rx-grid__no">{{ t('ui.grid.no') }}</span>{% endif -%}
+{%- elif column.badges is not none and column.kind in ["select", "text"] -%}{{ _badge(column, value) }}
 {%- elif column.kind == "select" -%}{{ column.labels[value] or value }}
 {%- elif column.kind == "tags" -%}
-{%- for tag in value %}<span class="rx-grid__tag">{{ column.labels[tag] or tag }}</span>{% endfor -%}
+{%- for tag in value %}{% if column.badges is not none %}{{ _badge(column, tag) }} {% else %}<span class="rx-grid__tag">{{ column.labels[tag] or tag }}</span>{% endif %}{% endfor -%}
+{%- elif column.kind == "image" -%}<img class="{{ class_names('rx-grid__img', {'rx-grid__img--round': column.round}) }}" src="{{ value }}" alt="" loading="lazy">
+{%- elif column.kind == "color" -%}<span class="rx-grid__swatch" style="background: {{ value }}"></span><code class="rx-grid__code">{{ value }}</code>
 {%- else -%}{{ value }}
 {%- endif -%}
+{%- endmacro -%}
+
+{%- macro _badge(column, value) -%}
+{%- set tone = column.badges[value] if column.badges[value] is defined else none -%}
+<span class="rx-badge{% if tone and tone != 'neutral' %} rx-badge--{{ 'error' if tone == 'danger' else tone }}{% endif %}">{{ column.labels[value] or value }}</span>
+{%- endmacro -%}
+
+{#- A cell: its value, with the column's link, description and copy button. -#}
+{%- macro _cell(column, row) -%}
+{%- set value = row[column.key] if row[column.key] is defined else none -%}
+{%- if column.link and value is not none %}<a class="rx-grid__cell-link" href="{{ column.link | replace('{id}', row._rx.id) }}">{{ _value(column, value) }}</a>{% else %}{{ _value(column, value) }}{% endif -%}
+{%- if column.copyable and value is not none %}<button type="button" class="rx-grid__copy" data-grid-copy="{{ value }}" aria-label="{{ t('ui.grid.copy') }}" title="{{ t('ui.grid.copy') }}">{{ _icon("copy") }}</button>{% endif -%}
+{%- if column.description and row[column.description] is defined and row[column.description] %}<span class="rx-grid__desc">{{ row[column.description] }}</span>{% endif -%}
 {%- endmacro -%}
 
 {#- The filter for one column, in its heading's popover. -#}
@@ -58,7 +77,7 @@
 {%- set id = "grid-" ~ grid.id ~ "-f-" ~ column.key -%}
 <div class="{{ class_names('rx-grid__pop', {'rx-grid__pop--dates': column.kind in ['date', 'date_time']}) }}" id="{{ id }}" popover data-grid-filter="{{ column.key }}">
   <p class="rx-grid__pop-title">{{ t('ui.grid.filter') }}: {{ column.label }}</p>
-  {%- if column.kind == "text" %}
+  {%- if column.kind in ["text", "color"] %}
   <div class="rx-grid__row">
     <select class="rx-grid__control" name="{{ grid.p }}m.{{ column.key }}" aria-label="{{ t('ui.grid.filter') }}">
       {%- for mode in ["contains", "starts", "ends", "equals"] %}
@@ -139,7 +158,7 @@
 {{ renox_grid() }}
 {%- set id = "grid-" ~ page.id -%}
 {%- set shown = page.columns | length -%}
-<form class="rx-grid" id="{{ id }}" data-rx-grid="{{ page.config }}" method="get" action="{{ page.path }}"
+<form class="{{ class_names('rx-grid', {'rx-grid--cards': page.cards}) }}" id="{{ id }}" data-rx-grid="{{ page.config }}" method="get" action="{{ page.path }}"
       hx-get="{{ page.path }}" hx-target="this" hx-select="#{{ id }}" hx-swap="outerHTML" hx-push-url="true">
   {#- The page's other query string values stay in the grid's links. -#}
   {%- for name, value in page.keep %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
@@ -159,6 +178,24 @@
         {{ _icon("search") }}
         <input type="search" name="{{ page.p }}search" value="{{ page.search.value or '' }}" placeholder="{{ t('ui.grid.search') }}" autocomplete="off" data-grid-search>
       </label>
+      {%- endif %}
+      {%- if page.cards %}
+      <span class="rx-grid__card-tools">
+        <select class="rx-grid__control rx-grid__control--small" data-grid-sort-pick aria-label="{{ t('ui.grid.sort') }}">
+          <option value="">{{ t('ui.grid.sort') }}</option>
+          {%- for column in page.columns if column.sortable %}
+          <option value="{{ column.key }}"{% if column.sort == "asc" %} selected{% endif %}>{{ column.label }} ↑</option>
+          <option value="-{{ column.key }}"{% if column.sort == "desc" %} selected{% endif %}>{{ column.label }} ↓</option>
+          {%- endfor %}
+        </select>
+        <button type="button" class="rx-grid__icon" popovertarget="{{ id }}-filters" aria-label="{{ t('ui.grid.filter') }}">{{ _icon("filter") }}</button>
+      </span>
+      <div class="rx-grid__pop rx-grid__menu" id="{{ id }}-filters" popover>
+        <p class="rx-grid__pop-title">{{ t('ui.grid.filter') }}</p>
+        {%- for column in page.columns if column.filterable %}
+        <button type="button" class="rx-grid__menu-item" popovertarget="{{ id }}-f-{{ column.key }}">{{ column.label }}{% if column.filtered %} •{% endif %}</button>
+        {%- endfor %}
+      </div>
       {%- endif %}
       {%- if page.grouping %}
       <label class="rx-grid__group-pick"><span class="rx-visually-hidden">{{ t('ui.grid.group_by') }}</span>
@@ -213,7 +250,7 @@
     {%- for column in page.columns if column.filtered %}
     {%- set f = column.filter %}
     <span class="rx-grid__chip">{{ column.label }}:
-      {%- if column.kind == "text" %} {{ t('ui.grid.' ~ f.mode) | lower }} “{{ f.text }}”
+      {%- if column.kind in ["text", "color"] %} {{ t('ui.grid.' ~ f.mode) | lower }} “{{ f.text }}”
       {%- elif column.numeric %} {% if f.min is not none and f.max is not none %}{{ f.min | number(column.decimals or 0) }} – {{ f.max | number(column.decimals or 0) }}{% elif f.min is not none %}≥ {{ f.min | number(column.decimals or 0) }}{% else %}≤ {{ f.max | number(column.decimals or 0) }}{% endif %}
       {%- elif column.kind in ["date", "date_time"] %} {{ f.from or "…" }} – {{ f.to or "…" }}
       {%- elif column.kind == "bool" %} {% for v in f.any_of %}{{ t('ui.grid.yes') if v in ["true", "1"] else t('ui.grid.no') }}{% if not loop.last %}, {% endif %}{% endfor %}
@@ -334,11 +371,13 @@
           {%- endif %}
           {%- for column in page.columns %}
           {%- if not (column.merge and column.key in row._rx.covered) %}
-          <td data-col="{{ column.key }}"{% if column.pin %} data-pin="{{ column.pin }}"{% endif %}
+          <td data-col="{{ column.key }}" data-label="{{ column.label }}"{% if column.pin %} data-pin="{{ column.pin }}"{% endif %}
+              {%- if column.tooltip and row[column.tooltip] is defined %} title="{{ row[column.tooltip] }}"{% elif column.limit and row[column.key] is string %} title="{{ row[column.key] }}"{% endif %}
+              {%- if column.limit %} style="max-width: {{ column.limit }}ch"{% endif %}
               {%- if column.merge and row._rx.spans[column.key] %} rowspan="{{ row._rx.spans[column.key] }}" data-group="{{ row._rx.groups[column.key] }}"{% endif %}
               {%- if column.editable and row._rx.edit %} data-editable tabindex="0" data-raw='{{ row[column.key] | tojson }}'{% endif %}
-              {%- if column.numeric or column.merge %} class="{{ class_names({'rx-grid__num': column.numeric, 'rx-grid__merged': column.merge}) }}"{% endif %}>
-            {%- if column.kind == "custom" %}{% if caller_fn %}{{ caller_fn(row, column) }}{% endif %}{% else %}{{ _value(column, row[column.key]) }}{% endif -%}
+              {%- if column.numeric or column.merge or column.wrap or column.limit %} class="{{ class_names({'rx-grid__num': column.numeric, 'rx-grid__merged': column.merge, 'rx-grid__wrap': column.wrap, 'rx-grid__clip': column.limit}) }}"{% endif %}>
+            <span class="rx-grid__val">{% if column.kind == "custom" %}{% if caller_fn %}{{ caller_fn(row, column) }}{% endif %}{% else %}{{ _cell(column, row) }}{% endif %}</span>
           </td>
           {%- endif %}
           {%- endfor %}
@@ -347,7 +386,7 @@
         <tr class="rx-grid__subtotal" data-in-group="{{ g.id }}">
           {%- if page.tools %}<td class="rx-grid__tools-col" data-tools data-pin="left"><span class="rx-grid__figure-label">{{ t('ui.grid.group_rows') }}</span></td>{% endif %}
           {%- for column in page.columns %}
-          <td data-col="{{ column.key }}"{% if column.pin %} data-pin="{{ column.pin }}"{% endif %}{% if column.numeric %} class="rx-grid__num"{% endif %}>
+          <td data-col="{{ column.key }}" data-label="{{ column.label }}"{% if column.pin %} data-pin="{{ column.pin }}"{% endif %}{% if column.numeric %} class="rx-grid__num"{% endif %}>
             {%- if loop.first and not page.tools and not column.summaries %}<span class="rx-grid__figure-label">{{ t('ui.grid.group_rows') }}</span>{% endif -%}
             {{ _figures(column, g.figures[column.key] if g.figures else none) }}</td>
           {%- endfor %}
@@ -373,7 +412,7 @@
         <tr>
           {%- if page.tools %}<td class="rx-grid__tools-col" data-tools data-pin="left"><span class="rx-grid__figure-label">{{ t('ui.grid.all_rows') }}</span></td>{% endif %}
           {%- for column in page.columns %}
-          <td data-col="{{ column.key }}"{% if column.pin %} data-pin="{{ column.pin }}"{% endif %}{% if column.numeric %} class="rx-grid__num"{% endif %}>
+          <td data-col="{{ column.key }}" data-label="{{ column.label }}"{% if column.pin %} data-pin="{{ column.pin }}"{% endif %}{% if column.numeric %} class="rx-grid__num"{% endif %}>
             {%- if loop.first and not page.tools and not column.summaries %}<span class="rx-grid__figure-label">{{ t('ui.grid.all_rows') }}</span>{% endif -%}
             {{ _figures(column, page.summary[column.key]) }}</td>
           {%- endfor %}
