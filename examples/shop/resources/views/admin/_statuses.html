@@ -1,0 +1,7 @@
+{#- The dashboard's orders-by-status widget: a fragment the kit's
+    widget(url=…, poll=60) loads after the page and every minute. -#}
+{% if values %}
+{{ chart("doughnut", labels=labels, values=values, title="Orders by status") }}
+{% else %}
+<p class="rx-subtitle">No orders yet.</p>
+{% endif %}

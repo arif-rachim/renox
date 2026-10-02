@@ -4,6 +4,9 @@
 //! written to the audit log, and the dashboard shows the latest entries.
 //! Deleting a product asks for the password again
 //! (`.require_password_confirmed()`, the `Auth` module's `/confirm-password`).
+//! The dashboard's figures and charts come from `renox::chart` (`Trend` over
+//! the `Period` in `?period=`); the orders-by-status chart loads on its own
+//! and refreshes every minute (the kit's `widget(url=…, poll=60)`).
 //!
 //! Made with `rnx make:module admin`.
 
@@ -12,6 +15,7 @@ mod orders;
 mod products;
 
 use renox::audit;
+use renox::chart::{Period, Series, Trend};
 use renox::prelude::*;
 
 use crate::app::catalog::model::Product;
@@ -31,6 +35,8 @@ impl Module for AdminPanel {
             Routes::new()
                 .get("/", dashboard)
                 .name("dashboard")
+                .get("/widgets/statuses", statuses)
+                .name("widgets.statuses")
                 .get("/products", products::index)
                 .name("products.index")
                 .get("/products/new", products::create)
@@ -65,7 +71,43 @@ impl Module for AdminPanel {
     }
 }
 
-async fn dashboard(State(db): State<Db>, user: AuthUser) -> Result<View> {
+/// Orders that brought money in: paid or shipped.
+fn sold() -> renox::db::Query<Order> {
+    Order::query().where_in("status", [OrderStatus::Paid, OrderStatus::Shipped])
+}
+
+async fn dashboard(State(state): State<AppState>, user: AuthUser, period: Period) -> Result<View> {
+    let db = state.db.clone();
+    // This period, and the one before it for the deltas.
+    let revenue = Trend::of(sold(), "created_at")
+        .over(period)
+        .sum(&state, "total")
+        .await?;
+    let revenue_before = Trend::of(sold(), "created_at")
+        .over(period.previous())
+        .sum(&state, "total")
+        .await?;
+    let orders = Trend::of(sold(), "created_at")
+        .over(period)
+        .count(&state)
+        .await?;
+    let orders_before = Trend::of(sold(), "created_at")
+        .over(period.previous())
+        .count(&state)
+        .await?;
+    let customers = Trend::of(User::query(), "created_at")
+        .over(period)
+        .count(&state)
+        .await?;
+    let customers_before = Trend::of(User::query(), "created_at")
+        .over(period.previous())
+        .count(&state)
+        .await?;
+    let average = if orders.total() > 0.0 {
+        revenue.total() / orders.total()
+    } else {
+        0.0
+    };
     let pending = Order::where_eq("status", OrderStatus::Pending)
         .count(&db)
         .await?;
@@ -83,6 +125,41 @@ async fn dashboard(State(db): State<Db>, user: AuthUser) -> Result<View> {
     let activity = audit::latest(&db, 10).await?;
     Ok(view(
         "admin/dashboard.html",
-        context! { pending, low_stock, notifications, activity },
+        context! {
+            period,
+            pending,
+            low_stock,
+            notifications,
+            activity,
+            revenue_total => revenue.total(),
+            revenue_change => revenue.change_from(&revenue_before),
+            orders_total => orders.total(),
+            orders_change => orders.change_from(&orders_before),
+            customers_total => customers.total(),
+            customers_change => customers.change_from(&customers_before),
+            average,
+            // Both periods on one axis, by day (or month) of the period.
+            revenue_series => [
+                revenue.clone().named("This period"),
+                Series::new(revenue.labels.clone(), revenue_before.values).named("The period before"),
+            ],
+            revenue_labels => revenue.labels.clone(),
+            revenue,
+            orders,
+        },
     ))
+}
+
+/// The orders-by-status widget, loaded after the page and every minute.
+async fn statuses(State(db): State<Db>) -> Result<View> {
+    let counts: Vec<(String, i64)> = Order::query()
+        .group_by("status")
+        .select_as(&db, "status, COUNT(*)")
+        .await?;
+    let order = ["pending", "paid", "shipped", "cancelled"];
+    let mut counts = counts;
+    counts.sort_by_key(|(status, _)| order.iter().position(|s| s == status));
+    let labels: Vec<String> = counts.iter().map(|(status, _)| status.clone()).collect();
+    let values: Vec<i64> = counts.iter().map(|(_, n)| *n).collect();
+    Ok(view("admin/_statuses.html", context! { labels, values }))
 }

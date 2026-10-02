@@ -229,6 +229,36 @@ impl Views {
                 url.append_pair("page", &page.to_string());
                 Value::from(format!("?{}", url.finish()))
             });
+            // The current URL's query string with some keys set (or removed
+            // with `none`), and `page` dropped: `query_with(period="7d")`
+            // for filters that keep the others.
+            env.add_function(
+                "query_with",
+                |state: &minijinja::State,
+                 kwargs: minijinja::value::Kwargs|
+                 -> Result<Value, minijinja::Error> {
+                    let query = state
+                        .lookup("request")
+                        .and_then(|request| request.get_attr("query").ok())
+                        .and_then(|query| query.as_str().map(str::to_owned))
+                        .unwrap_or_default();
+                    let keys: Vec<String> = kwargs.args().map(str::to_owned).collect();
+                    let mut url = form_urlencoded::Serializer::new(String::new());
+                    for (key, value) in form_urlencoded::parse(query.as_bytes()) {
+                        if key != "page" && !keys.iter().any(|k| *k == key) {
+                            url.append_pair(&key, &value);
+                        }
+                    }
+                    for key in &keys {
+                        let value: Value = kwargs.get(key)?;
+                        if !value.is_none() && !value.is_undefined() {
+                            url.append_pair(key, &value.to_string());
+                        }
+                    }
+                    kwargs.assert_all_used()?;
+                    Ok(Value::from(format!("?{}", url.finish())))
+                },
+            );
             env.add_function("method_field", |method: String| {
                 let method: String = method.chars().filter(char::is_ascii_alphabetic).collect();
                 Value::from_safe_string(format!(
@@ -279,6 +309,7 @@ impl Views {
             env.add_filter("money", crate::view_filters::money(currency.clone()));
             env.add_filter("words", crate::view_filters::words);
             env.add_filter("markdown", crate::view_filters::markdown);
+            env.add_function("chart", crate::chart::chart(currency.clone()));
             env.add_function("class_names", crate::view_filters::class_names);
             // The app's own functions and filters (`App::templates`).
             for hook in hooks.iter() {

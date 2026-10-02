@@ -13,6 +13,7 @@ mod assets;
 pub mod audit;
 pub mod auth;
 pub mod cache;
+pub mod chart;
 mod client_ip;
 mod clock;
 pub mod command;

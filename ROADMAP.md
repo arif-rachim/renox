@@ -1500,6 +1500,37 @@ Notes:
   `View::fragment`): one template for the page, the panel and the answers to its actions.
 - `to_database` now runs in the recipient's language (`with_locale`), as `to_mail` did.
 
+### Dashboards next to Filament's widgets
+
+Filament's widgets (https://filamentphp.com/docs/5.x/widgets/overview) as the yardstick,
+asked by the owner: "B first" (widgets before actions), with charts as Renox's own SVG
+rather than Chart.js.
+
+- [x] `renox::chart`: `Period` (extractor, `previous`), `Trend` (`count`/`sum`/`average`
+  per day or month, SQLite and PostgreSQL), `Series`.
+- [x] `chart(kind, data, …)`: line, area, bar (stacked), pie, doughnut; tooltips, keyboard,
+  data table, validated palette.
+- [x] Kit: `stats`/`stat`, `dashboard`/`widget` (lazy `url`, `poll`), `period_filter`;
+  `query_with`.
+- [x] Example: shop's admin dashboard.
+- [ ] Later: A, the actions (a form in a sheet, `icon_button`, key bindings); scatter and
+  bubble charts; a custom date range in `period_filter`; per-week buckets.
+
+Notes:
+- Lines and areas are SVG stretched over the plot (`preserveAspectRatio="none"`,
+  `vector-effect: non-scaling-stroke`), while bars, dots, labels and ticks are HTML placed
+  in percent, so text and round ends never stretch and the chart follows its container.
+- The palette is the dataviz reference's first six slots, checked with its validator on the
+  kit's surfaces (#ffffff, #1c1c1e): CVD ΔE ≥ 8.4 between neighbours; three light slots are
+  under 3:1 against white, so every chart has a legend (two series or more) and a table.
+- Buckets are made in SQL (`strftime` / `to_char`) at the zone's offset at the end of the
+  period, so a period that crosses a daylight-saving change is off by an hour at its edges.
+- A widget's `url` answer is its own small template (the page's template would need the whole
+  page's context to render one block).
+- Found in the browser: percent padding on bar bands made a 30-bar chart 6,500 px wide, and
+  the period filter's min-content width widened the phone layout (fixed with
+  `contain: inline-size`).
+
 ## Decisions
 
 - **Markdown in templates:** `pulldown-cmark` without its default features renders it; instead

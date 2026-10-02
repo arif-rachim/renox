@@ -105,6 +105,9 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   with `entry(label, value, format="money"|"date"|"since"|"bool"|…, badge=…)`; prices go
   through `| money` (`APP_CURRENCY`), never a hand-made "Rp" filter.
   In-app notifications: `to_database` returns a `DatabaseMessage` (title, body, url), and
+  Dashboards: `renox::chart::Trend::of(query, "created_at").over(period).sum(&state, "total")`
+  with the `Period` extractor, then `stat(…)`, `chart("line", series, format="money")`,
+  `widget(…)` and `period_filter(period)` in the template; no chart library.
   `Auth::new().notifications()` + `{{ notification_bell(unread_notifications) }}` in the
   layout gives the list, the badge and live updates (SSE: behind nginx, `proxy_buffering off`).
   Toasts can carry `.body(…)`, `.link(label, url)`, `.seconds(n)`/`.persistent()`.

@@ -176,6 +176,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            sent through `state.http`)
   src/webhook.rs           Webhook trait, receive route, webhook_calls store/retry, ProcessWebhook job
   src/security.rs          security headers + CSP (+ nonce), csrf-exempt and webhook route sets
+  src/chart.rs             renox::chart: Period (extractor), Trend (count/sum/average per day or
+                           month via Query::buckets), Series; the `chart(…)` template function
   src/select.rs            renox::select: SelectOption, OptionQuery (the kit's select with
                            options_url / editable)
   src/method.rs            method spoofing layer (in front of the router)
@@ -969,7 +971,10 @@ picks the build, not the terminal.
   `Auth::new().notifications()` with the kit's `notification_bell`, `renox/notifications.html`
   and `/notifications/stream` (SSE woken by `auth::notifications::Hub` in-process, polling the
   table every 15 s for other processes, five-minute streams, stopped at shutdown); shop and
-  jobs use them. Merged (#96).
+  jobs use them. Merged (#96). Then dashboards (Filament's widgets as the yardstick, B before
+  A): `renox::chart` (`Period`, `Trend`, `Series`), the `chart(…)` template function (SVG +
+  HTML, no library), the kit's `stat`/`stats`/`dashboard`/`widget`/`period_filter`,
+  `query_with`; shop's admin dashboard uses them. Branch `ccr-0db862ed-uol6i8`.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.

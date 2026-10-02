@@ -744,6 +744,35 @@ impl<M: Model> Query<M> {
             .await?)
     }
 
+    /// `bucket` and an aggregate per bucket (`chart::Trend`): the query's
+    /// conditions, grouped by the first column; its order, limit, groups
+    /// and lock don't apply.
+    pub(crate) async fn buckets<'c, E: Executor<'c>>(
+        mut self,
+        db: E,
+        bucket: &(dyn Fn(Dialect) -> String + Send + Sync),
+        aggregate: &str,
+    ) -> Result<Vec<(String, Option<f64>)>> {
+        self.check()?;
+        self.order.clear();
+        self.group = vec!["1".to_owned()];
+        self.having.clear();
+        self.having_binds.clear();
+        self.limit = None;
+        self.offset = None;
+        self.lock = None;
+        let db = db.into_conn();
+        let dialect = db.dialect();
+        let statement = self.select_columns_sql(
+            dialect,
+            &format!("{}, CAST({aggregate} AS DOUBLE PRECISION)", bucket(dialect)),
+        );
+        Ok(sql(statement)
+            .bind_all(self.all_binds())
+            .fetch_as(db)
+            .await?)
+    }
+
     /// One aggregate over the matching rows (order and limit don't apply).
     async fn aggregate<'c, T: FromDb, E: Executor<'c>>(
         self,
