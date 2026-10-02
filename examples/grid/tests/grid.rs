@@ -192,3 +192,57 @@ async fn every_filtered_row_exports() {
         .assert_see("Print or save as PDF")
         .assert_see("60 rows");
 }
+
+#[renox::test]
+async fn bulk_and_row_actions_change_orders() {
+    let app = with_orders(30).await;
+    let new = Order::where_eq("status", "new")
+        .count(app.db())
+        .await
+        .unwrap();
+    let res = app
+        .htmx()
+        .post(
+            "/orders/bulk/status/shipped?in.status=new",
+            &[("ids", ""), ("all", "true")],
+        )
+        .await;
+    res.assert_status(204);
+    assert!(
+        res.header("hx-trigger")
+            .is_some_and(|t| t.contains(&format!("{new} orders marked shipped")))
+    );
+    assert_eq!(
+        Order::where_eq("status", "new")
+            .count(app.db())
+            .await
+            .unwrap(),
+        0
+    );
+    let first = Order::query()
+        .order_by("id")
+        .first(app.db())
+        .await
+        .unwrap()
+        .unwrap();
+    app.post(
+        "/orders/bulk/delete",
+        &[("ids", first.id.to_string().as_str()), ("all", "false")],
+    )
+    .await
+    .assert_status(204);
+    assert_eq!(Order::query().count(app.db()).await.unwrap(), 29);
+    let second = Order::query()
+        .order_by("id")
+        .first(app.db())
+        .await
+        .unwrap()
+        .unwrap();
+    app.delete(&format!("/orders/{}", second.id))
+        .await
+        .assert_status(204);
+    assert_eq!(Order::query().count(app.db()).await.unwrap(), 28);
+    app.post("/orders/bulk/status/lost", &[("ids", "1")])
+        .await
+        .assert_not_found();
+}

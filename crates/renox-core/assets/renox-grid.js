@@ -864,12 +864,128 @@
     if (row && event.key === "Enter") window.location.assign(row.getAttribute("data-href"));
   });
 
+  // ---------- Selection, bulk and row actions ----------
+
+  function selectedBoxes(grid) {
+    return Array.prototype.slice.call(grid.querySelectorAll("[data-grid-select]:checked"));
+  }
+
+  function syncSelection(grid) {
+    var bar = grid.querySelector("[data-grid-bulk]");
+    if (!bar) return;
+    var boxes = grid.querySelectorAll("[data-grid-select]");
+    var picked = selectedBoxes(grid);
+    var all = grid.querySelector("[data-grid-select-all]");
+    if (all) {
+      all.checked = boxes.length > 0 && picked.length === boxes.length;
+      all.indeterminate = picked.length > 0 && picked.length < boxes.length;
+    }
+    if (!picked.length) grid._rxAllMatching = false;
+    bar.hidden = picked.length === 0;
+    var count = bar.querySelector("[data-grid-count]");
+    var matching = bar.querySelector("[data-grid-select-matching]");
+    var total = matching ? parseInt(matching.getAttribute("data-total"), 10) : 0;
+    count.textContent = grid._rxAllMatching ? String(total) : String(picked.length);
+    if (matching) matching.hidden = grid._rxAllMatching || picked.length !== boxes.length || total <= boxes.length;
+    rowsOf(grid).forEach(function (row) {
+      var box = row.querySelector("[data-grid-select]");
+      row.classList.toggle("rx-grid__row--selected", !!(box && box.checked));
+    });
+  }
+
+  // A question in the grid's dialog; resolves to true when confirmed.
+  function ask(grid, question, danger) {
+    var dialog = grid.querySelector("[data-grid-dialog]");
+    if (!question || !dialog || !dialog.showModal) return Promise.resolve(true);
+    dialog.querySelector("[data-grid-dialog-text]").textContent = question;
+    var okButton = dialog.querySelector("[data-grid-dialog-ok]");
+    okButton.classList.toggle("rx-button--danger", !!danger);
+    okButton.classList.toggle("rx-button--primary", !danger);
+    return new Promise(function (resolve) {
+      function done(answer) {
+        dialog.removeEventListener("close", onClose);
+        dialog._rxAnswer = null;
+        resolve(answer);
+      }
+      function onClose() { done(dialog.returnValue === "ok"); }
+      dialog.returnValue = "";
+      dialog.addEventListener("close", onClose);
+      dialog.showModal();
+      dialog.querySelector("[data-grid-dialog-ok]").focus();
+    });
+  }
+
+  function send(grid, source, method, url, values) {
+    if (!window.htmx) return;
+    source.setAttribute("aria-busy", "true");
+    window.htmx.ajax(method, url, { source: source, values: values || {}, swap: "none" }).then(function () {
+      source.removeAttribute("aria-busy");
+    });
+  }
+
+  document.addEventListener("htmx:afterRequest", function (event) {
+    var el = event.detail.elt;
+    if (!el || !el.matches || !el.matches("[data-grid-action], [data-grid-bulk-action]")) return;
+    el.removeAttribute("aria-busy");
+    var grid = el.closest("form.rx-grid");
+    if (event.detail.successful && grid) {
+      grid._rxKeepPage = true;
+      submit(grid, true);
+    }
+  });
+
+  document.addEventListener("change", function (event) {
+    var el = event.target;
+    var grid = el.closest && el.closest("form.rx-grid");
+    if (!grid) return;
+    if (el.hasAttribute("data-grid-select-all")) {
+      grid.querySelectorAll("[data-grid-select]").forEach(function (b) { b.checked = el.checked; });
+      grid._rxAllMatching = false;
+      syncSelection(grid);
+    } else if (el.hasAttribute("data-grid-select")) {
+      grid._rxAllMatching = false;
+      syncSelection(grid);
+    }
+  });
+
+  document.addEventListener("click", function (event) {
+    var t = event.target.closest && event.target.closest("[data-grid-select-matching], [data-grid-select-none], [data-grid-bulk-action], [data-grid-action], [data-grid-dialog-ok], [data-grid-dialog-cancel]");
+    if (!t) return;
+    var grid = t.closest("form.rx-grid");
+    if (t.hasAttribute("data-grid-dialog-ok") || t.hasAttribute("data-grid-dialog-cancel")) {
+      t.closest("dialog").close(t.hasAttribute("data-grid-dialog-ok") ? "ok" : "");
+      return;
+    }
+    if (t.hasAttribute("data-grid-select-matching")) {
+      grid._rxAllMatching = true;
+      syncSelection(grid);
+    } else if (t.hasAttribute("data-grid-select-none")) {
+      grid.querySelectorAll("[data-grid-select]").forEach(function (b) { b.checked = false; });
+      syncSelection(grid);
+    } else if (t.hasAttribute("data-grid-bulk-action")) {
+      var ids = selectedBoxes(grid).map(function (b) { return b.value; });
+      var all = !!grid._rxAllMatching;
+      // The grid's query string goes along, for "all matching".
+      var url = t.getAttribute("data-url") + window.location.search;
+      ask(grid, t.getAttribute("data-confirm"), t.hasAttribute("data-danger")).then(function (ok) {
+        if (ok) send(grid, t, t.getAttribute("data-method") || "POST", url, { ids: ids.join(","), all: all ? "true" : "false" });
+      });
+    } else if (t.hasAttribute("data-grid-action")) {
+      var pop = t.closest("[popover]");
+      if (pop && pop.hidePopover) pop.hidePopover();
+      ask(grid, t.getAttribute("data-confirm"), t.hasAttribute("data-danger")).then(function (ok) {
+        if (ok) send(grid, t, t.getAttribute("data-method") || "POST", t.getAttribute("data-url"));
+      });
+    }
+  });
+
   // ---------- Setup ----------
 
   function setup(grid) {
     if (grid._rxReady) return;
     grid._rxReady = true;
     applyWidths(grid);
+    syncSelection(grid);
     applyVisibility(grid);
     var scroll = grid.querySelector(".rx-grid__scroll");
     if (scroll) scroll.addEventListener("scroll", function () { edges(grid); }, { passive: true });

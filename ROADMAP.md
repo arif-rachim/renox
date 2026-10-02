@@ -1318,7 +1318,7 @@ The owner compared the grid with Filament 5's tables (2026-10-02) and asked for 
 missing pieces, in this order:
 - [x] M28a: query string names per grid (`prefix`) and keeping the page's other values, the
       search box (`Column::searchable`), active filter chips, `row_url`, `empty_state`
-- [ ] M28b: selecting rows and bulk actions, row actions with a confirmation
+- [x] M28b: selecting rows and bulk actions, row actions with a confirmation
 - [ ] M28c: summaries (sum, average, count, range) in the footer, grouped rows with their
       own summaries
 - [ ] M28d: a card layout on phones, more column kinds (badges with colors, icons, images,
@@ -1332,6 +1332,13 @@ Notes from M28a:
   writes the others' values as hidden fields, so both survive either grid's requests.
 - The search matches every word in any searchable column with
   `LOWER(CAST(column AS TEXT)) LIKE`, the same on SQLite and PostgreSQL.
+
+Notes from M28b:
+- "All matching" sends `all=true` with the grid's query string, so the handler's
+  `Grid::selected` applies the same filters as the page the user saw; ids that don't parse as
+  the model's key are a 400.
+- The confirmation is the grid's own `<dialog>` (focus on Continue, Escape cancels), not
+  `window.confirm`, and the Continue button turns red for `danger()` actions.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

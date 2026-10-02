@@ -10,6 +10,12 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M28b · Data grid: selecting rows, bulk and row actions
+
+- New: `Grid::bulk_action` with row checkboxes, a "select all matching" choice and
+  `Grid::selected` (`grid::Selection` from the form); `Grid::row_action` for each row's menu;
+  `grid::Action` (`new`, `link`, `method`, `confirm`, `danger`) with a confirmation dialog.
+
 ### M28a · Data grid: search, filter chips, row links, several grids on a page
 
 - New: `Column::searchable()` and the toolbar's search box (every word, any searchable column,
