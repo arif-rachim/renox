@@ -13,11 +13,13 @@ one Renox version (the `renox` line in `Cargo.toml`); the links below are for th
 - **llms.txt**, a map from every topic to a guide or an example file: {{renox_docs}}/llms.txt
 - **Whole apps:** `examples/shop` shows how everything fits (catalog, cart, checkout in a
   transaction, queued mail, admin); `examples/htmx-recipes` for interactive pages;
-  `examples/relations` for related tables. Every example has a README.
+  `examples/relations` for related tables; `examples/grid` for a data grid (filters, search,
+  editing in place, bulk actions, totals, exports). Every example has a README.
 - **Guides:** `docs/relations.md` (relations are explicit: load a page's relations with
   `relations::belongs_to` / `has_many` / `Pivot`, one query each, never one per row),
   `docs/types.md` (form field → Rust type → column), `docs/ui.md` (the UI kit, toasts,
-  fragments, live validation), `docs/testing.md` (TestApp, fakes, time travel),
+  fragments, live validation), `docs/grid.md` (data grids with `renox::grid`: columns,
+  filters, search, editing, actions, summaries, exports), `docs/testing.md` (TestApp, fakes, time travel),
   `docs/authorization.md` (gates, policies, roles, token abilities, tenants), `docs/queue.md`
   (jobs, retries, chains, batches), `docs/postgresql.md`, `docs/operations.md` (production).
 - Offline, the same files are in {{renox_source}}.
@@ -39,6 +41,10 @@ rnx make:migration add_stock_to_products
 rnx make:factory Product --module products             # also make:seeder, make:test
 rnx make:notification OrderShipped --module orders     # also make:event, make:rule
 rnx make:middleware StampRequests                      # also make:component
+rnx make:component --ui                                # copy the UI kit in to change it (same as rnx ui:publish)
+rnx make:deploy                                        # Dockerfile, systemd unit + socket, Litestream
+rnx build                                              # release binary in dist/ (Tailwind CSS minified first)
+rnx tailwind --watch                                   # rebuild public/css/app.css (rnx serve does it for you)
 ```
 
 ## Layout
@@ -124,6 +130,10 @@ rnx make:middleware StampRequests                      # also make:component
   `authorize` (403 before the rules), `after` (database checks, errors shown on the field).
   Rules include `alpha_dash`, `uuid`, `ip`, `size`, `starts_with`, `required_without`,
   `prohibited_if`, and `v.distinct(…)` for lists.
+- Lists of records with filters, sorting, search or exports: build a `renox::grid::Grid`
+  (docs/grid.md) and render it with `renox/grid.html` rather than a hand-made table. Excel
+  exports need the `xlsx` feature (`renox = { …, features = ["xlsx"] }`); CSV and the print
+  page work without it.
 - A script or `<meta>` a page or component needs goes through the layout's stacks:
   `{% call push('scripts', once='chart') %}…{% endcall %}` (`stack('head')`, `stack('scripts')`).
 - If `resources/css/app.css` exists, the app uses Tailwind: `rnx serve` rebuilds

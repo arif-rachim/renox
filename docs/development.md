@@ -41,8 +41,8 @@ renox = { git = "…", rev = "…", default-features = false }
 ```
 
 `postgres`, `s3`, `uuid` and `xlsx` (Excel exports of data grids) are off unless you turn them
-on. `s3` is the heaviest: it brings the
-AWS SDK's HTTP client and TLS stack.
+on. `s3` is the heaviest: it turns on object_store's `aws` feature, which brings reqwest and
+aws-lc-rs (a C crypto library); it is not the AWS SDK.
 
 TLS uses rustls with the `ring` provider, so no C crypto library (aws-lc) is compiled; only
 SQLite's C source is.

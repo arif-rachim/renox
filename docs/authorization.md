@@ -10,7 +10,7 @@ and [examples/teams](../examples/teams) (tenants).
 | Question | Tool | Where it's checked |
 |---|---|---|
 | Is someone logged in? | `AuthUser`, `.require_auth()` | extractor, route |
-| May this user do X at all? | a gate (`App::gate`, `gate_async`) | `.require_gate("x")`, `user.gate("x")?`, `can('x')` |
+| May this user do X at all? | a gate (`App::gate`, `gate_async`) | `.require_gate("x")`, `user.gate_async("x").await?`; sync gates only: `user.gate("x")?`, `can('x')` |
 | May this user do X to *this* row? | a policy (`impl Policy`) | `user.authorize("update", &row)?`, `can('update', row)` |
 | Which job does the user have? | roles and permissions (the `Permissions` module) | `.require_role`, `.require_permission`, `has_role` |
 | May this user send this form? | `Validate::authorize` (a form request) | the `Valid<T>` extractor: 403 before the rules |
@@ -57,6 +57,13 @@ async fn invoices(user: AuthUser) -> Result<String> {
 ```
 
 In templates, `{% if can('reports') %}` asks a gate (or a permission of that name).
+
+`can('x')` in templates and `user.gate("x")` / `user.allows("x")` are synchronous, so they answer
+only gates made with `App::gate` and permissions: for a gate made with `gate_async` they say no
+(unless `gate_before` answers first). Ask an async gate with `.require_gate("x")` on the route or
+`user.gate_async("x")` / `user.allows_async("x")` in the handler (these two answer plain gates
+too); to show something in a page by an async gate, ask it in the handler and pass the answer to
+the view.
 
 ## Policies: "may this user do X to this row?"
 

@@ -48,7 +48,7 @@ Other things to try: `/halo/<name>`, `/bahasa/en` and `/bahasa/id` to switch lan
   with errors and old input, and answers htmx posts with 422.
 - **Account pages for free.** `Auth::new().account()` adds `/account`: edit the profile,
   change the password, log out other devices, delete the account.
-- **An optional photo.** `photo: Option<Upload>` with `.image().max(2048)`, stored with
+- **An optional photo.** `photo: Option<Upload>` with `#[validate(image, max = 2048)]` (KB; the content is sniffed), stored with
   `store_public`.
 
 ## Tests

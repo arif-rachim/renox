@@ -82,6 +82,11 @@ pub struct QueueGuide;
 #[doc = include_str!("../../../docs/ui.md")]
 pub struct UiGuide;
 
+/// Compiles the Rust in docs/grid.md as a doctest.
+#[cfg(doctest)]
+#[doc = include_str!("../../../docs/grid.md")]
+pub struct GridGuide;
+
 /// Compiles the Rust in docs/testing.md as a doctest.
 #[cfg(doctest)]
 #[doc = include_str!("../../../docs/testing.md")]

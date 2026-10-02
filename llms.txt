@@ -59,7 +59,8 @@ Every example has a README.md that walks through it.
     [tests/shop.rs](examples/shop/tests/shop.rs)
 - [examples/htmx-recipes](examples/htmx-recipes) ([README](examples/htmx-recipes/README.md)): htmx + Alpine recipes, each a few attributes and
   a handler that answers with a fragment: modal form (HX-Trigger closes it), inline edit
-  (`hx-patch`, Escape cancels), toggle, dropdown with delete (empty 200), infinite scroll
+  (`hx-patch`, Escape cancels), toggle, dropdown with delete (an empty row part, the open count out of band and a
+  toast), infinite scroll
   (`revealed`), client-side tabs, `HxRefresh`, `HxRedirect`; an out-of-band count
   (`.fragment("row").also("count")`), `HxRetarget`/`HxReswap` for a duplicate, toasts over htmx.
   [src/app/tasks/mod.rs](examples/htmx-recipes/src/app/tasks/mod.rs),
@@ -193,8 +194,12 @@ Every example has a README.md that walks through it.
   counting queries, a browser-test recipe.
 - [docs/ui.md](docs/ui.md): components that see the request, the UI kit (`renox/ui.html`: fields,
   buttons, cards, sheets, menus, tabs, tables) and its design rules, toasts, out-of-band
-  fragments, htmx headers, live validation, data grids (`renox::grid`: columns, filters,
-  preferences, `sparkline`).
+  fragments, htmx headers, live validation.
+- [docs/grid.md](docs/grid.md): data grids (`renox::grid` + `renox/grid.html`): columns and their
+  kinds, filters per heading, search, filter chips, the advanced filter, preferences (per user
+  or in the session), details under a row, editing in place, reordering rows, merged cells,
+  bulk and row actions, summaries and groups, cards on phones, columns from related tables,
+  exports (CSV, Excel with `xlsx`, print), polling.
 - [docs/queue.md](docs/queue.md): jobs, retries and `failed`, `dispatch_in`, priority, unique
   jobs, middleware (overlap, rate limits), encrypted payloads, chains and batches with
   progress, the dashboard, testing jobs; mapped to Laravel's.
@@ -218,5 +223,5 @@ Every example has a README.md that walks through it.
 - `crates/renox-core/src`: the runtime. `db/` (Db, models, queries, relations, migrations),
   `validation/`, `auth/` (incl. `permissions.rs`, `account.rs`, `events.rs`, `tokens.rs`),
   `audit.rs`, `context.rs`, `queue/`, `schedule.rs` + `timezone.rs`, `cache.rs`, `view.rs`,
-  `testing.rs`.
+  `grid/` (the data grid and its exports), `testing.rs`.
 - `crates/renox-cli`: `rnx`; `stubs/` holds the files `rnx new` writes.

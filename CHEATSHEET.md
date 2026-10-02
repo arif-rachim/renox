@@ -8,7 +8,7 @@ date. For whole apps, see [`examples/`](examples) (the list is in [llms.txt](llm
 
 ```bash
 rnx new shop                         # or: --database postgres, --tailwind (Tailwind CSS, no Node)
-rnx key:generate                     # APP_KEY into .env (made from .env.example if missing)
+rnx key:generate                     # APP_KEY into .env (made from .env.example if missing); --show only prints it
 rnx serve                            # run, rebuild and reload on changes
 rnx make:module products             # routes + view, registered in src/lib.rs
 rnx make:module products --resource --fields "name:string price:money notes:text active:bool due_on:date"
@@ -28,11 +28,14 @@ rnx migrate:rollback --step 2        # the last 2 batches (default 1)
 rnx route:list                       # db:shell, schedule:list, schedule:run NAME, cache:prune, session:prune
 rnx queue:work --queue mail --workers 2  # --once: run what is queued, then stop
 rnx queue:failed                     # queue:retry <id|all>, queue:flush (deletes them)
+rnx queue:prune-failed --hours 168   # failed jobs older than that (the default); queue:prune-batches [--hours 24]
+rnx ui:publish                       # the UI kit (components/ui.html + its CSS) into the app; --force replaces
 rnx schedule:work                    # tasks in their own process (SCHEDULER=false for serve)
 rnx webhook:failed                   # webhook:retry <id>
 rnx down --secret s3cret --retry 60  # 503 for everyone but visitors of /s3cret; `rnx up` ends it
 rnx build                            # one release binary in dist/; rnx make:deploy
 rnx tailwind --watch                 # resources/css/app.css -> public/css/app.css (serve/build do it)
+rnx tailwind --minify                # one build; rnx tailwind:install downloads the pinned CLI
 ```
 
 `serve` already runs the queue workers and the scheduler. `queue:work` and `schedule:work` are for
@@ -191,12 +194,12 @@ page showing the request, the error and the template line; `{% if x %}` on a mis
 and so is `{{ flash.anything }}`.
 
 Every view also gets: `request.path`, `request.query`, `request.route` (the route's name),
-`request.htmx`, `app.name`, `app.env`,
-`app.debug`, `app.url`, `app.locale`, `auth.check`, `auth.user`, `flash`, `errors`, `csrf_token`,
+`request.htmx`, `request.boosted` (`hx-boost`), `app.name`, `app.env`,
+`app.debug`, `app.url`, `app.locale`, `auth.check`, `auth.user`, `auth.roles`, `flash`, `errors`, `csrf_token`,
 and the functions `old()`, `error()`, `csrf_field()`, `method_field()`, `route()`, `asset()`,
 `storage_url()`, `t()`, `can()`, `route_is(pattern, …)`, `class_names(…)`, `page_url(n)`,
 `renox_head()`, `csp_nonce()`, `seo()`,
-`renox_ui()` (the UI kit), `toasts()`, `once(key)`, `stack(name)` and, with `{% call %}`,
+`renox_ui()` (the UI kit), `renox_grid()` (the data grid's assets), `sparkline(values)`, `toasts()`, `once(key)`, `stack(name)` and, with `{% call %}`,
 `push(name)` / `prepend(name)`.
 
 Error pages are the app's own: `rnx new` writes `resources/views/errors/default.html`, which
@@ -205,9 +208,12 @@ extends the layout and gets every global above plus `status`, `reason` and `deta
 
 Renox's own pages are templates you can replace: create the same file under `resources/views/`,
 e.g. `renox/error.html`, `renox/auth/login.html` (also
-`register`, `forgot-password`, `reset-password`, `verify-email`, `layout`),
-`renox/mail/layout.html` and `renox/pagination.html`. The `pagination` macro must be imported:
-`{% from "renox/pagination.html" import pagination %}`.
+`register`, `forgot-password`, `reset-password`, `verify-email`, `account`, `confirm-password`,
+`layout`), `renox/mail/layout.html`, `renox/mail/button.html`, `renox/mail/components.html`,
+`renox/mail/auth/reset-password.html` / `.txt`, `renox/mail/auth/verify-email.html` / `.txt`,
+`renox/queue/dashboard.html` and `renox/pagination.html`. The pagination macros must be imported:
+`{% from "renox/pagination.html" import pagination, simple_pagination %}` (`simple_pagination`
+for a `simple_paginate` page).
 
 ```rust
 use renox::prelude::*;
@@ -247,7 +253,10 @@ fn view_extras(app: App) -> App {
 {{ confirm("del-7", "Delete", "/products/7", "Delete “Kopi”?", "It goes to the trash.") }}
 {# Your own: rnx make:component price_tag -> components/price_tag.html, a macro that can use
    old(), error(), t(), can(), auth, csrf_field() like the page. rnx make:component --ui copies
-   the kit into the app. {% if once('x') %} renders once per page. #}
+   the kit into the app. {% if once('x') %} renders once per page.
+   Also in the kit: textarea, link_button, group, alert, badge, sheet + open_button,
+   menu / menu_link / menu_action / menu_separator, tabs / tab_panel, empty.
+   renox_ui(styles=false) loads only the script (styles published with ui:publish). #}
 
 {# Stacks: the layout has {{ stack('head') }} in <head> and {{ stack('scripts') }} before
    </body>; any page, block or component adds to them, even after the head was rendered: #}
@@ -296,6 +305,11 @@ fn wiring(app: App) -> App {
     app.provide(Payments { api_key: "sk_test_123".into() })
         .layer(from_fn(stamp)) // every route of the app's modules
 }
+
+fn plan_routes() -> Routes {
+    // Only these routes: like require_auth, it wraps the routes added before it.
+    Routes::new().get("/plan", plan).route_layer(from_fn(stamp))
+}
 ```
 
 ## Form + validation
@@ -330,9 +344,9 @@ impl Validate for ProductForm {
         v.field("tags", &self.tags).max(5);
         v.each("tags", &self.tags, |tag| tag.required().max(20)); // errors on tags.0, tags.1, …
         v.each("photos", &self.photos, |photo| photo.image().max(2048));
-        // Also: digits(n), digits_between(a, b), date(), before…, one_of, same, different,
+        // Also: digits(n), digits_between(a, b), date(), before…, after_or_equal(d), one_of, same, different,
         // alpha, alpha_num, alpha_dash, lowercase, uppercase, starts_with(&["08"]), ends_with,
-        // uuid, ip, size(n), required_without(&other), prohibited_if(cond),
+        // uuid, ip, size(n), required_without(&other), prohibited_if(cond), mimes(&["pdf", "jpg"]) for an Upload,
         // v.distinct("tags", &self.tags), v.nested("lines", &self.lines) for a Vec of structs,
         // .apply(&MyRule) with `validation::Rule`.
     }
@@ -507,6 +521,41 @@ async fn more_queries(db: &Db) -> Result {
     let _ = (today, per_owner, page, feed, sql, values, moved);
     Ok(())
 }
+
+async fn even_more_queries(db: &Db) -> Result {
+    let picked = Product::query()
+        .where_in("id", [1, 2, 3]) // also where_not_in; an empty list matches nothing
+        .where_null("deleted_at")
+        .where_any(|any| any.where_eq("price", 0).where_all(|all| all.where_op("price", ">", 100).where_not_null("user_id")))
+        .order_by_desc("price") // also latest() (created_at desc)
+        .offset(20)
+        .limit(10)
+        .get(db)
+        .await?;
+    let of_big_sellers = Product::query() // also where_not_in_query
+        .where_in_query("user_id", Product::query().where_op("price", ">", 100_000), "user_id")
+        .get(db)
+        .await?;
+    let any_free = Product::where_eq("price", 0).exists(db).await?;
+    let some = Product::find_many(db, [1, 2, 3]).await?; // in id order; missing ids are skipped
+    let kopi = Product::where_eq("name", "Kopi")
+        .first_or_create(db, || Product { name: "Kopi".into(), ..Default::default() })
+        .await?;
+    Product::upsert(db, vec![kopi.clone()], &["name"], &["price"]).await?; // needs a unique index on name
+    let seen = Product::query() // 500 rows at a time, in id order (the query's order and limit don't apply)
+        .chunk(db, 500, |rows| async move {
+            let _ = rows;
+            Ok(())
+        })
+        .await?;
+    let mut tx = db.begin().await?;
+    let row = Product::where_eq("id", 1).shared_lock().first(&mut tx).await?; // FOR SHARE on PostgreSQL
+    tx.commit().await?;
+    let mut gone = Product::query().only_trashed().first_or_404(db).await?;
+    gone.restore(db).await?; // a soft-deleted row back
+    let _ = (picked, of_big_sellers, any_free, some, seen, row);
+    Ok(())
+}
 ```
 
 Keys other than numbers: the `id` field's type is the key (`rnx make:model Invoice --key ulid
@@ -656,7 +705,7 @@ async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
 }
 ```
 
-## Data grid (details in docs/ui.md, example in examples/grid)
+## Data grid (details in [docs/grid.md](docs/grid.md), example in examples/grid)
 
 ```rust
 use renox::grid::{Column, Grid, GridRequest};
@@ -682,18 +731,25 @@ async fn index(request: GridRequest) -> Result<View> {
 ```
 
 `{% from "renox/grid.html" import grid %}` then `{% call(row, column) grid(orders) %}…{% endcall %}`
-inside `<main class="rx-grid-fill">`; `{{ sparkline(row.trend) }}` draws a small chart.
-More: `.audit()` (who changed a row, under it), `Column::editable()` + `.edit_url("/orders/{id}")`
+inside `<main class="rx-grid-fill">` (`grid(orders, tools=…)` puts HTML such as a "New" button in
+the toolbar); `{{ sparkline(row.trend) }}` draws a small chart, fed by
+`page.extend(|order| json!({ "trend": … }))`. Column kinds: `text`, `number`, `money`, `date`,
+`datetime`, `bool`, `select`, `tags`, `image`, `color`, `custom`; each takes `.hidden()`,
+`.width("8rem")`, `.decimals(2)`, `.sortable(false)`, `.filterable(false)`, `.wrap()`.
+`Grid::per_page(50)`, `Grid::filter(query, &request)` (the user's filters on your own query).
+More: `.audit()` (who changed a row, under it), `.details()` (a row opens details drawn by
+the template, `column.key == "_details"`), `Column::editable()` + `.edit_url("/orders/{id}")`
 (PATCH, `Valid<T>` with `Option` fields), `.reorder("position", url)` + `RowOrder::save`,
 `Column::merge()` with `sort_by("region,city")`, `.exports()` + `grid.export(query, &request)`
 (CSV, Excel with the `xlsx` feature, a print page), `Column::searchable()` (the search box),
 `.row_url("/orders/{id}")`, `.empty_state(…)`, `.prefix("orders")` for two grids on a page,
 `.bulk_action(Action::new("Delete", url).confirm("Sure?").danger())` +
 `grid.selected(query, &request, &selection)?` (`Form<Selection>`), `.row_action(…)`,
-`Column::summary(Summary::Sum)` (footer and group subtotals), `.groups(&["region"])`,
+`Action::link(label, url)` / `.method("POST")`,
+`Column::summary(Summary::Sum)` (footer and group subtotals), `.groups(&["region"])` / `.group_by("region")`,
 `.cards_on_mobile()`, `.badges(&[("paid", "success")])`, `.description("email")`, `.icons()`,
 `Column::image(…).round()`, `.copyable()`, `.link(url)`, `.tooltip(key)`, `.limit(n)`,
-`Column::related(key, label, table, foreign_key, column)`, `Column::count_of(…)`,
+`Column::related(key, label, table, foreign_key, column)`, `Column::count_of(…)`, `Column::sum_of(…)`,
 `.advanced_filter()`, `.remember()`, `.poll(30)`.
 
 ## Seeders and factories
@@ -835,7 +891,7 @@ use renox::prelude::*;
 fn back_office() -> Auth {
     Auth::new()
         .account()                 // /account: profile, password, other devices, delete
-        .password_rules(renox::validation::Password::min(12).mixed_case().numbers())
+        .password_rules(renox::validation::Password::min(12).mixed_case().numbers()) // also letters(), symbols()
         .verify_email()            // mails a link; guard routes with .require_verified()
         .without_registration()    // no /register: an admin adds users
         .redirect_to("/dashboard") // after login, when no page asked for one
@@ -1602,7 +1658,10 @@ bytes, e.g. signed webhooks), `request().without_csrf()`, `logout()`, `csrf_toke
 `assert_not_found`, `assert_dont_see`, `assert_database_missing` / `assert_database_count`,
 `queued_jobs()`, `run_jobs()`, `run_all_jobs()` (retries and delayed jobs too), `sent_mail()` /
 `assert_mail_sent`, `session_cookie()` / `use_session_cookie(…)` (play a second device),
-`app.kernel().run_scheduled("task")`, `confirm_password()`, `fake_http()`, and
+`app.kernel().run_scheduled("task")`, `confirm_password()`, `fake_http()`,
+`assert_authenticated(Some(&user))` (`None`: as anyone), `assert_session_has("cart")`,
+`session_get::<T>("cart")`, `travel_back()`, `assert_notified_to("guest@example.com", "kind")`,
+`emitted::<E>()` / `notifications()` (what the fakes recorded), `mailer()`, and
 `let (res, queries) = renox::db::capture_queries(app.get("/posts")).await;` to count the SQL a
 request (or any future) runs.
 
@@ -1654,9 +1713,14 @@ address, `127.0.0.1`; `0.0.0.0` in a container) and `APP_PORT` (3000), `APP_LOCA
 `SESSION_COOKIE` (`renox_session`), `SESSION_DRIVER` (`cookie` | `database`: the `sessions`
 table, no 4 KB limit, a new id at each login/logout), `MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME` (defaults to `APP_NAME`),
 `VIEWS_PATH` (`resources/views`), `PUBLIC_PATH` (`public`), `LANG_PATH` (`resources/lang`),
+`STORAGE_PATH` (`storage`: the maintenance flag and the local disk),
 `DATABASE_URL` (`sqlite://storage/app.db` or `postgres://…` with the `postgres` feature),
-`TEST_DATABASE_URL`, `MAIL_MAILER` (`log` | `smtp`), `QUEUE_WORKERS`, `SCHEDULER`,
-`CACHE_STORE` (`memory` | `database`: with several servers, also shares rate limits and the login lock), `STORAGE_DISK` (`local` | `s3`), `UPLOAD_MAX_SIZE` (MB),
+`DATABASE_POOL_SIZE` (8), `TEST_DATABASE_URL`, `MAIL_MAILER` (`log` | `smtp` | `memory`),
+`MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_ENCRYPTION` (`starttls` |
+`tls` | `none`; default `starttls`), `QUEUE_WORKERS` (2; 0 = none in `serve`), `SCHEDULER` (`true`),
+`CACHE_STORE` (`memory` | `database`: with several servers, also shares rate limits and the login lock),
+`STORAGE_DISK` (`local` | `s3`, with `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`,
+`S3_SECRET_ACCESS_KEY`, and `STORAGE_URL` for the bucket's public URL), `UPLOAD_MAX_SIZE` (MB, 10),
 `LOG_FORMAT` (`text` | `json`), `LOG_FILE` (append to this file instead of stdout),
 `CSP` (`relaxed` | `strict` | `off`), `TRUSTED_PROXIES` (`127.0.0.1,10.0.0.0/8` or `*`: behind a
 proxy, rate limits, the login lock, logs and the `ClientIp` extractor use `X-Forwarded-For`).

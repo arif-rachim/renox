@@ -5,6 +5,13 @@
 //! queues a job, plus a scheduled task and an app command
 //! (`cargo run -- entries:prune --days 7`, a clap `AppCommand`).
 //!
+//! Written by hand in one file to show everything at a glance; in an app made
+//! with `rnx new`, the same pieces come from `rnx make:module guestbook`,
+//! `rnx make:model Entry --module guestbook -m`,
+//! `rnx make:event EntryPosted --module guestbook`,
+//! `rnx make:job ThankGuest --module guestbook` and
+//! `rnx make:command entries:prune --module guestbook`.
+//!
 //! The app lives in this library (`app()`), so `tests/` can boot it;
 //! `main.rs` only runs it. Run it from this directory:
 //!

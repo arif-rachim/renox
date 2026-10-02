@@ -69,8 +69,24 @@ cargo run               # http://127.0.0.1:3000
 ## Files
 
 - `src/app/orders/mod.rs`: the grids (`orders_grid`, `regions_grid`), the page
-  handlers, `update` (edits) and `reorder`.
+  handlers (`index`, `regions`, `show`), `update` (edits), `reorder`, `destroy`
+  (the row menu's delete) and the bulk actions (`bulk_status`, `bulk_delete`).
 - `src/app/orders/model.rs`: the `Order` model and its factory.
 - `resources/views/orders/index.html`: the page and its custom cells.
+- `resources/views/orders/regions.html`: the `/regions` grid with merged cells.
+- `resources/views/orders/show.html`: one order, opened from its row.
+- `migrations/20260103000000_add_customers_and_notes.up.sql`: the `customers` and
+  `order_notes` tables behind the Tier and Notes columns.
 - `public/app.css`: the dashboard shell (a bar on top, the grid filling the rest).
-- `tests/grid.rs`: pages, filters, the custom cells and saved columns.
+- `tests/grid.rs`: the tests (below).
+
+## Tests
+
+```bash
+cargo test -p grid
+```
+
+[tests/grid.rs](tests/grid.rs) covers pages and the custom cells, filters, rows that open their order, saved
+columns, edits in place (and their errors), rows dragged into order, merged regions, exports
+of every filtered row, bulk and row actions, totals and groups, and the related columns with
+the advanced filter.

@@ -31,17 +31,58 @@ writes the tests of a whole resource (create, list, show, edit, update, delete, 
 - **Requests:** `get`, `post(uri, &[(field, value)])`, `put`, `patch`, `delete`, `post_json`,
   `post_multipart`, `post_body`.
 - **Request options:** `app.htmx()` sends as htmx does; `app.request().header(…)` adds headers,
-  and `.without_csrf()` sends without the token.
+  `.json()` asks for JSON (`Accept: application/json`, so a guest gets a 401 and invalid input a
+  422 instead of redirects), and `.without_csrf()` sends without the token. `app.csrf_token()`
+  is the session's token, for a request you build yourself.
 - **Status:** `assert_ok`, `assert_status(n)`, `assert_redirect(to)`, `assert_hx_redirect(to)`,
   `assert_not_found`, `assert_forbidden`, `assert_unauthorized`.
-- **Body:** `assert_see` / `assert_dont_see` (HTML as sent, escaped), `assert_invalid("field")`
-  (a 422 with an error on that field), `assert_header`, `text()`, `json::<T>()`.
+- **Body:** `assert_see` / `assert_dont_see` (HTML as sent, escaped), `assert_invalid("field")`,
+  `assert_header`, `text()`, `json::<T>()`, `header(name)` (`Option<&str>`). The fields `status`,
+  `headers`, `body` and `view` are public too.
+- **Invalid input:** `assert_invalid("field")` expects a 422 with an error on that field, which
+  only htmx and JSON requests get: send with `app.htmx()` or `app.request().json()`. A plain form
+  post is answered with a 303 back to the form (errors and old input flashed), so for that one
+  check `assert_status(303)`, then `get` the form and `assert_see` the message.
 - **JSON:**
   - `assert_json_path("data.0.name", "Kopi")` checks the value at a path of keys and indexes;
   - `json_path(path)` reads it;
   - `assert_json(json!({ … }))` checks the body contains the expected keys (other keys may
     be there too).
 - **Views:** `assert_view("products/index.html")` checks the template a page was rendered from.
+
+## Configuration and the app's parts
+
+`TestApp::new` starts from `Config::default()` (in-memory database, the memory mailer, no
+workers or scheduler, debug on) and doesn't read `.env`. Change it with
+`TestApp::with_config(app, |c| …)`; `app.state()` is the `AppState` handlers get,
+`app.db()` its database and `app.mailer()` its mailer (`mailer().sent()` lists the mail).
+
+```rust
+use renox::prelude::*;
+use renox::http::FakeResponse;
+use renox::testing::TestApp;
+
+#[renox::test]
+async fn rates_come_from_the_api() {
+    let app = TestApp::with_config(App::new(), |c| {
+        c.vars.insert("RATES_KEY".into(), "test-key".into()); // what config.var reads
+        c.debug = false; // production error pages
+    })
+    .await;
+    assert_eq!(app.state().config.var("RATES_KEY").as_deref(), Some("test-key"));
+
+    let http = app.fake_http(); // `*` matches anything; "POST https://…" for one method
+    http.on("https://api.example.com/*", FakeResponse::json(200, json!({ "idr": 16000.0 })));
+    let res = app.state().http.get("https://api.example.com/rates").send().await.unwrap();
+    assert_eq!(res.status(), 200);
+    http.assert_sent(|r| r.method == "GET" && r.url.starts_with("https://api.example.com/rates"));
+    http.assert_not_sent(|r| r.method == "POST");
+    http.assert_sent_count(1); // http.sent() lists them: method, url, headers, body, json()
+}
+```
+
+Also `FakeResponse::text(status, body)`, `FakeResponse::status(n)`, `.header(…)`, and
+`FakeResponse::connection_error()`; several answers for one pattern are given in turn.
 
 ## Session and login
 
@@ -58,9 +99,10 @@ writes the tests of a whole resource (create, list, show, edit, update, delete, 
 - `renox::db::capture_queries(future)` returns what the future ran, requests included, so a
   test can catch an N+1:
   `let (res, queries) = capture_queries(app.get("/posts")).await; assert!(queries.len() <= 3);`
-- Factories fill tables: `Product::create_many(app.db(), 20).await`, or with states and
-  sequences: `Product::factory().count(3).state(sold_out).sequence(|i, p| p.name =
-  format!("Kopi {i}")).create(app.db()).await` (`make()` for unsaved models).
+- Factories fill tables: `Product::create_one(app.db()).await`, `Product::create_many(app.db(),
+  20).await`, or with states and sequences: `Product::factory().count(3).state(sold_out)
+  .sequence(|i, p| p.name = format!("Kopi {i}")).create(app.db()).await` (`make()` for unsaved
+  models; `factory().state(…).make_one()` / `.create_one(db)` for a single one).
 
 ## Jobs, events, notifications, mail, HTTP
 
@@ -75,6 +117,7 @@ writes the tests of a whole resource (create, list, show, edit, update, delete, 
 | `app.fake_http()` | Answers `state.http` requests with fakes and records them. A request without a fake is an error, so nothing reaches the network. |
 | `app.kernel().run_scheduled("report")` | Runs a scheduled task now. |
 | `app.kernel().call("products:import", ["a.csv"])` | Runs one of the app's own commands. |
+| `renox::prompt::answering(["a.csv", "yes"], app.kernel().call("products:import", [""; 0])).await` | Runs a command that asks questions (`renox::prompt::ask`, `confirm`, …), answering them in order. |
 | `my_app::app().run_args(["migrate:status"]).await` | Runs any command the binary has, built-ins included (`migrate`, `queue:failed`, `down`…), as `my-app migrate:status` would. Give the app a file database: each call boots it anew. |
 
 ## Time

@@ -1,6 +1,9 @@
 //! Each handler answers an htmx request with the smallest piece of HTML that
 //! changes (a row, some rows, nothing) and a plain request with a redirect,
 //! so the page works without JavaScript too.
+//!
+//! Made with `rnx make:module tasks`, `rnx make:model Task --module tasks -m`
+//! and `rnx make:factory Task --module tasks`, then filled in.
 
 use renox::fake::Fake;
 use renox::fake::faker::lorem::en::Sentence;

@@ -147,7 +147,10 @@ impl Module for Guestbook {
   calendar for dates), server pages and sorting in the URL, grouped headings, frozen columns,
   different columns on phones and desktops kept per user, and cells drawn by the page
   (`{{ sparkline(…) }}` charts, buttons); columns moved and resized by dragging, details with audit fields, editing in place, rows
-  dragged into order, merged cells, and CSV/Excel/print exports.
+  dragged into order, merged cells, and CSV/Excel/print exports. Also a search box, filter
+  chips, rows that link to a page, several grids on one page, bulk and row actions, summaries
+  and groups, cards on phones, image/badge/link/copyable cells, columns from related tables,
+  an advanced filter, state remembered in the session and polling ([guide](docs/grid.md)).
 - `.also("block")` sends out-of-band blocks with a fragment; `HxRetarget`, `HxReswap` and
   `HxPushUrl` set the other htmx headers.
 </details>
@@ -384,13 +387,14 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 | `@push` / `@stack` | `{% call push('scripts') %}…{% endcall %}` / `{{ stack('scripts') }}` |
 | Vite + Tailwind | `rnx new --tailwind` (the standalone CLI, no Node) |
 | Livewire | htmx and Alpine.js, with handlers that return fragments |
+| Filament tables | `renox::grid` with `renox/grid.html` ([docs/grid.md](docs/grid.md)) |
 
 Not planned: runtime-reflected Eloquent-style models, Redis, and a REPL.
 
 ## Documentation
 
 - [CHEATSHEET.md](CHEATSHEET.md): one short, compiled example per task.
-- Guides: [views and the UI kit](docs/ui.md), [testing](docs/testing.md),
+- Guides: [views and the UI kit](docs/ui.md), [the data grid](docs/grid.md), [testing](docs/testing.md),
   [relations](docs/relations.md), [authorization and tenants](docs/authorization.md),
   [the queue](docs/queue.md), [field types](docs/types.md),
   [PostgreSQL](docs/postgresql.md), [production](docs/operations.md),
@@ -407,7 +411,9 @@ HTTP client, queue dashboard, localized mail) and M21 (the UI kit, scaffolding, 
 error reports and logs, Tailwind, typed commands, form requests, database sessions, deploys
 without refused connections), M22 (model keys other than integers), M23 (savepoints,
 encrypted fields), M24 (domain and fallback routes, `route_is`, factory states, plural
-ranges) and M25 (`#[derive(Validate)]`, the browser's language) are done. Next is 1.0: a documentation site with a tutorial and a Laravel guide, semver checks, and the first
+ranges), M25 (`#[derive(Validate)]`, the browser's language), M26 (completeness: key bugs,
+docs for every public item, CLI tests), M27 (the data grid) and M28 (grid search, actions,
+summaries, groups, cards on phones, related columns, advanced filter) are done. Next is 1.0: a documentation site with a tutorial and a Laravel guide, semver checks, and the first
 real release on crates.io (today's crates there are placeholders, so install from Git as above).
 Until then the API may still change; breaking changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
@@ -418,7 +424,7 @@ changelog.
 Every change is tested in CI on Linux, macOS and Windows, on SQLite and PostgreSQL, against a
 real S3 server, with a chaos test, the minimum Rust version, every Cargo feature on its own, and
 a new app made with every generator and built into a Docker image. Optional Cargo features:
-`postgres`, `s3`, `uuid` (and `fake`, `server-events`, on by default).
+`postgres`, `s3`, `uuid`, `xlsx` (and `fake`, `http`, `server-events`, on by default).
 
 Issues and feedback are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md), and
 [SECURITY.md](SECURITY.md) to report a vulnerability.

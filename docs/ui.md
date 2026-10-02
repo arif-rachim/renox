@@ -8,6 +8,7 @@ covers:
 - toasts;
 - fragments and out-of-band swaps;
 - htmx response headers;
+- data grids (see [docs/grid.md](grid.md));
 - live validation;
 - stacks (`push` / `stack`);
 - Tailwind CSS.
@@ -80,33 +81,44 @@ Then import what a page needs:
 | Component | What it is |
 |---|---|
 | `input(name, label, type=…, value=…, hint=…, required=…, autocomplete=…, placeholder=…, attrs={…}, id=…)` | A labelled text field with its hint and error. It is refilled after a failed submit, except for passwords. `id` tells apart two fields of the same name on one page. |
-| `textarea`, `select(name, label, options, selected=…, placeholder=…)` | The same for longer text and for a choice. `options` are values or `[value, label]` pairs. |
-| `checkbox(name, label, checked=…, switch=…)` | A checkbox, or an iOS-style switch for settings. The whole row is the target. |
-| `button(label, variant=…, size=…, block=…)` | Variants: `primary`, `secondary`, `plain`, `danger` and `plain-danger`. The button shows a spinner while its form or htmx request is being sent. |
-| `link_button(href, label, …)` | A link that looks like a button. |
+| `textarea(name, label, value=…, rows=4, hint=…, required=…, placeholder=…, attrs={…})` | The same for longer text. |
+| `select(name, label, options, selected=…, hint=…, required=…, placeholder=…, attrs={…})` | The same for a choice. `options` are values or `[value, label]` pairs. |
+| `checkbox(name, label, checked=…, hint=…, value="on", switch=…, attrs={…})` | A checkbox, or an iOS-style switch for settings. The whole row is the target. |
+| `button(label, variant="primary", type="submit", name=…, value=…, size=…, block=…, attrs={…})` | Variants: `primary`, `secondary`, `plain`, `danger` and `plain-danger`. The button shows a spinner while its form or htmx request is being sent. |
+| `link_button(href, label, variant="secondary", size=…, attrs={…})` | A link that looks like a button. |
 | `card(title=…, subtitle=…)`, `group(title=…, footer=…)` | A surface, and an inset grouped list like Settings. |
-| `alert(message, kind=…, title=…)`, `badge(text, kind=…)` | Kinds: `info`, `success`, `warning`, `error`. Each kind has its own icon, so color is never the only signal. |
+| `alert(message, kind=…, title=…)`, `badge(text, kind=…)` | Kinds: `info`, `success`, `warning`, `error`. An alert has an icon per kind, so color is never the only signal. A badge is color only, so its text must carry the meaning ("Paid", not "●"). |
 | `form_errors(title=…)` | Every error of the last submit, above the form, each linking to its field. |
-| `sheet(id, title)` + `open_button(id, label)` | A modal dialog. It closes on Esc and on a click on the backdrop, and focus returns to the button that opened it. On phones it rises from the bottom edge. |
-| `confirm(id, label, action, title, message, confirm_label=…, method="DELETE")` | A destructive action behind a confirmation sheet, with Cancel focused first. |
-| `menu(label)` + `menu_link`, `menu_action`, `menu_separator` | A menu of actions: arrow keys move, Esc closes. |
-| `tabs(id, items, selected=…)` + `tab_panel(id, key, selected=…)` | A segmented control; the arrow keys, Home and End move between tabs. |
+| `sheet(id, title, message=…)` + `open_button(id, label)` | A modal dialog. It closes on Esc and on a click on the backdrop, and focus returns to the button that opened it. On phones it rises from the bottom edge. |
+| `confirm(id, label, action, title, message, confirm_label=…, method="DELETE", size=…)` | A destructive action behind a confirmation sheet, with Cancel focused first. |
+| `menu(label, id=…, variant="secondary", size="small")` + `menu_link(href, label)`, `menu_action(action, label, method="POST", danger=…)`, `menu_separator()` | A menu of actions: arrow keys move, Esc closes. `menu_action` sends a form (with `_method` for other methods). |
+| `tabs(id, items, selected=…, label=…)` + `tab_panel(id, key, selected=…)` | A segmented control; the arrow keys, Home and End move between tabs. |
 | `table(head, caption=…)` | A table in a card. A heading `["Total", "num"]` right-aligns its column, and `["Slug", "hide-narrow"]` hides it on phones. |
 | `empty(title, message, action_href, action_label)` | What an empty list says, with the way to add the first item. |
 
 Renox's own pages use the kit too: the sign-in pages (`renox/auth/*`: login, registration,
 password reset, email verification, password confirmation, the account page) and the error
-page. They have `stack('head')` and `stack('scripts')`; to change one, put a file with the same
-name under `resources/views/renox/auth/`.
+page. The sign-in pages' layout has `stack('head')` and `stack('scripts')` (Renox's own error
+page has no stacks); to change one of those pages, put a file with the same name under
+`resources/views/renox/auth/`.
 
 The kit's own texts ("optional", "Cancel", the error summary's title) come in English and
 Indonesian. An app can change them in `lang/*.json`, under the keys `ui.optional`,
-`ui.cancel`, `ui.close`, `ui.dismiss`, `ui.more` and `ui.errors_title`.
+`ui.cancel`, `ui.close`, `ui.dismiss`, `ui.more` and `ui.errors_title`. The data grid's texts
+are under `ui.grid.*` ([docs/grid.md](grid.md#translations)).
 
 To change the markup or the styles, copy the kit into the app:
 
 ```sh
 rnx make:component --ui   # my-app ui:publish: components/ui.html and public/css/renox-ui.css
+```
+
+Then import from `"components/ui.html"`, and in the layout load the copied stylesheet and only
+the kit's script, so the styles aren't loaded twice:
+
+```html
+<link rel="stylesheet" href="{{ asset('css/renox-ui.css') }}">
+{{ renox_ui(styles=false) }}
 ```
 
 Every class starts with `rx-`, and nothing in the kit styles bare elements, so it sits next
@@ -208,6 +220,18 @@ The following types are response parts; return them in a tuple with the response
 - `HxPushUrl("/orders?status=open")`: update the address bar;
 - `HxRedirect`, `HxRefresh` and `HxTrigger`.
 
+`Back` (in the prelude) is both an extractor and a response: it redirects to the previous page
+(the `Referer`), or to `/` when that is missing or on another site, so it can't be used as an
+open redirect.
+
+```rust
+# use renox::prelude::*;
+async fn store(back: Back, session: Session) -> Result<Back> {
+    session.flash("status", "Saved")?;
+    Ok(back)
+}
+```
+
 ## Live validation
 
 Add `data-live-validate` to a form that `Valid<T>` handles. The kit's script then sends a
@@ -243,208 +267,13 @@ left|[6,*] :count in stock"`, printed with `{{ t('products.in_stock', count=prod
 
 ## Data grids
 
-`renox::grid` is a table for dashboards and back offices: it fills its container (only the rows
-scroll, the toolbar and the pagination stay put, on a phone too), each heading has a filter
-that suits the column, and pages, sorting and filters come from the server and stay in the URL.
-A grid is defined in Rust:
-
-```rust
-# use renox::prelude::*;
-use renox::grid::{Column, Grid, GridRequest};
-# #[derive(Model, serde::Serialize, Default)]
-# struct Order { id: i64, number: String, customer: String, status: String, total: i64,
-#     ordered_on: renox::chrono::NaiveDate, trend: renox::db::Json<Vec<i64>> }
-
-fn orders_grid() -> Grid {
-    Grid::new("orders")
-        .title("Orders")
-        .column(Column::text("number", "Order").frozen().mobile())
-        .column(Column::text("customer", "Name").under(["Customer"]).mobile())
-        .column(Column::select("status", "Status", [("new", "New"), ("paid", "Paid")]).mobile())
-        .column(Column::money("total", "Total").under(["Amounts"]))
-        .column(Column::date("ordered_on", "Ordered"))
-        .column(Column::custom("trend", "Last 7 days"))
-        .column(Column::custom("actions", "").frozen_right())
-        .sort_by("-ordered_on")
-}
-
-async fn index(request: GridRequest) -> Result<View> {
-    let page = orders_grid()
-        .page(Order::query(), &request)
-        .await?
-        .extend(|order| json!({ "up": order.trend.last() >= order.trend.first() }));
-    Ok(view("orders/index.html", context! { orders => page }))
-}
-```
-
-and drawn with the `grid` macro; a call block draws the `custom` columns:
-
-```html
-{% from "renox/grid.html" import grid %}
-<main class="rx-grid-fill">
-  {% call(row, column) grid(orders) %}
-    {% if column.key == "trend" %}<span class="{{ 'rx-up' if row.up else 'rx-down' }}">{{ sparkline(row.trend) }}</span>
-    {% elif column.key == "actions" %}{{ link_button(route('orders.show', {'id': row.id}), "Open", size="small") }}{% endif %}
-  {% endcall %}
-</main>
-```
-
-| Column | Shows | Filter |
-|---|---|---|
-| `text` | the text | contains / starts with / ends with / equals, or a pattern with `%` (`kop%`) |
-| `number` (`.decimals(n)`), `money` | right-aligned, with the locale's separators | from–to |
-| `date`, `datetime` | `2026-03-05` (a moment in `APP_TIMEZONE`) | a date range: two date fields and a calendar ([Cally](https://wicky.nillia.ms/cally/), bundled) |
-| `bool` | Yes / No | yes, no |
-| `select(key, label, options)` | the option's label | pick some |
-| `tags(key, label, options)` | a JSON array (`Json<Vec<String>>`) as badges | rows with any of the picked |
-| `custom` | whatever the page draws | none |
-
-- **Columns per screen.** On a phone (under 768 px) the columns marked `.mobile()` show (the first
-  three when none are); on wider screens all but `.hidden()` ones. The column menu (top right)
-  shows and hides columns for the current screen size, moves them and freezes them left or
-  right; a logged-in user's choices are kept in `grid_preferences` (every app has the table),
-  a guest's in the session.
-- **Search and active filters.** Columns marked `.searchable()` put a search box in the toolbar:
-  every word typed must appear in one of them (as text, any case), and it asks as you type. The
-  active filters and the search show as chips under the toolbar; × clears one.
-- **Rows that open something.** `.row_url("/orders/{id}")` makes a click on a row open it
-  (Ctrl/Cmd-click: a new tab; Enter on a focused row). With row details the click opens those
-  and the row tools get a link instead.
-- **Empty grids.** `.empty_state("No orders yet", Some("…"))` says what goes here; the call block
-  can add buttons for `column.key == "_empty"`. A filtered grid with no rows offers to clear the
-  filters.
-- **Several grids on a page.** `.prefix("orders")` names the grid's values `orders.page`,
-  `orders.q.number`, …; each grid keeps the page's other query string values (another grid's,
-  a tab) in its own links.
-- **Selecting rows and acting on them.** `.bulk_action(Action::new("Mark paid", "/orders/paid"))`
-  puts a checkbox at the start of each row (and one for the page in the heading); selecting
-  rows shows the actions over the grid, with "Select all N matching" once the whole page is
-  picked. The action `POST`s `ids=4,7` and `all=true|false` (read with `Form<Selection>`) to its
-  URL with the grid's query string, and `grid.selected(query, &request, &selection)?` is the
-  query for exactly those rows, or for every row the filters match. `.row_action(…)` puts
-  actions in each row's ⋯ menu (`{id}` in the URL; `Action::link` for a plain link).
-  `.confirm("…")` asks first in a dialog, `.danger()` shows the action in red, `.method("DELETE")`
-  picks the method. After a 2xx (a `Toast` shows) the grid reloads its page.
-- **Summaries and groups.** `Column::summary(Summary::Sum)` (also `Average`, `Range`, and `Count`
-  for any column) puts the figure in a footer that stays at the bottom of the grid, over every
-  row the filters match. `.groups(&["region", "status"])` adds a "Group" choice to the toolbar
-  (`.group_by("region")` starts grouped): rows come group by group, each with a heading (its
-  value and row count, a click folds it) and a subtotal row with the group's own summaries.
-  Merged cells and dragging rows are off while grouped.
-- **Cards on phones.** `.cards_on_mobile()` turns each row into a card under 768 px: the
-  columns picked for small screens as label and value, the row tools underneath, and sorting
-  and the column filters in the toolbar (the headings are hidden there).
-- **Kinds of cells.** `Column::image` (a URL; `.round()` for avatars), `Column::color` (a swatch),
-  and on any column: `.badges(&[("paid", "success"), ("cancelled", "danger")])` (tones `success`,
-  `warning`, `danger`, `info`, `neutral`), `.icons()` (yes/no as ✓/✗), `.description("email")`
-  (another value under this one), `.tooltip("email")`, `.wrap()`, `.limit(40)` (cut with `…`,
-  the whole text on hover), `.link("/orders/{id}")` and `.copyable()`.
-- **Columns from other tables.** `Column::related("tier", "Tier", "customers", "customer_id",
-  "tier")` shows the value of the row this one belongs to; `Column::count_of("notes", "Notes",
-  "order_notes", "order_id")` counts the rows pointing at it, and `Column::sum_of(…, "weight")`
-  adds one of their columns. They're SQL subqueries, so they sort, filter and search like the
-  others, and a page fetches them in one query per column (`.numeric()` shows a related value
-  as a number).
-- **The advanced filter.** `.advanced_filter()` adds rules in the toolbar: a column, a
-  condition fitting its kind (contains, doesn't contain, is, starts/ends with, is empty, =, ≠,
-  >, ≥, <, ≤, on, before, after, yes/no) and a value, with all or any of them holding. They
-  live in the query string (`match=any&r.0.c=total&r.0.o=gt&r.0.v=1000`) and sit next to the
-  headings' filters; rules that don't fit their column are dropped.
-- **Remembered and refreshed.** `.remember()` keeps the filters, search, sort, group and page
-  size in the session, so coming back shows the grid as it was left (clearing is remembered
-  too). `.poll(30)` reloads the page every 30 seconds while the tab is visible and nobody is
-  editing, selecting or filtering. Empty values sort last in either direction.
-- **Moving and resizing columns.** Drag a heading (with a mouse) to move its column, or move it
-  in the column menu (on touch screens too); drag the edge of a heading to resize the column,
-  double-click the edge for the automatic width, or focus it and use the arrow keys. Widths
-  are kept with the other choices (`GridPrefs::widths`).
-- **Grouped headings.** `.under(["Amounts"])`, or deeper (`.under(["Sales", "Q1"])`); neighbours
-  under the same headings share them, and a heading never spans a frozen edge.
-- **The query string.** `q.number=A%`, `m.number=starts`, `min.total=1000`, `max.total=…`,
-  `from.ordered_on=2026-01-01`, `to.…`, `in.status=paid` (repeated), `sort=-total`, `page=2`,
-  `per_page=50` (only the sizes the grid offers: 10, 25, 50, 100 and its `.per_page(n)`). Only
-  columns of the grid filter or sort; anything else is ignored.
-- `grid.filter(query, &request)` is the same filters and sort as a `Query`, for totals or an
-  export over every filtered row. `GridRequest::new(&db, path, &params)` builds a request in
-  tests and commands.
-- `{{ sparkline(values) }}` draws a small line (or `kind="bars"`) chart as inline SVG; it takes
-  the text color, so `rx-up` / `rx-down` around it color it.
-- The grid needs only the page around it to have a height: `rx-grid-fill` is a flex child taking
-  the rest of a column-flex `body` (`height: 100dvh`), as examples/grid does.
-
-### Details, editing, row order and merged cells
-
-```rust
-# use renox::prelude::*;
-use renox::grid::{Column, Grid, RowOrder};
-# #[derive(Model, serde::Serialize, Default)]
-# struct Order { id: i64, region: String, city: String, customer: String, position: i64 }
-
-fn orders_grid() -> Grid {
-    Grid::new("orders")
-        .column(Column::text("region", "Region").merge()) // equal neighbours share a cell…
-        .column(Column::text("city", "City").merge())     // …nested in their region
-        .column(Column::text("customer", "Name").editable())
-        .column(Column::number("position", "#"))
-        .sort_by("region,city")
-        .audit()                       // a click on a row: created/updated by and at
-        .details()                     // …and the page's own `_details`
-        .edit_url("/orders/{id}")      // PATCH with the changed fields
-        .reorder("position", "/orders/reorder")
-}
-
-async fn reorder(State(db): State<Db>, Form(order): Form<RowOrder>) -> Result<StatusCode> {
-    order.save::<Order>(&db, "position").await?;
-    Ok(StatusCode::NO_CONTENT)
-}
-```
-
-- **Details.** A click on a row (or the chevron in the row tools) opens a row under it with the
-  audit fields the row has (`created_by`, `created_at`, `updated_by`, `updated_at`) and, with
-  `.details()`, what the page's call block draws for `column.key == "_details"`.
-- **Editing.** An editable cell opens an editor for its kind on a double-click, Enter or F2;
-  Enter or leaving the cell saves, Escape cancels. The pencil in the row tools edits all of the
-  row's editable cells at once (✓ saves, ✕ cancels). Saving sends `PATCH {edit_url}` with only
-  the edited fields as a form, so the handler reads them as `Valid<T>` with `Option` fields;
-  a 2xx (a `Toast` shows) reloads the grid's page, a 422 shows the errors in the cells.
-- **Row order.** While the grid is sorted by the order column ascending (`sort=position`), the
-  handle in the row tools drags a row (mouse or touch), and the arrow keys move it; the page's
-  new order is posted as `ids=4,2,9&offset=25`, which `RowOrder::save` writes in one transaction
-  (`updated_at` is left alone). Sorted any other way, the handle is off.
-- **Merged cells.** A merged column draws one cell for neighbouring rows with the same value,
-  within the groups of the merged columns before it. Sort by them (`sort_by("region,city")`).
-  Merging is off while rows can be dragged, and merged columns aren't editable.
-
-### Exports
-
-`.exports()` adds an export menu to the toolbar, and the handler answers its links first:
-
-```rust
-# use renox::prelude::*;
-# use renox::grid::{Column, Grid, GridRequest};
-# #[derive(Model, serde::Serialize, Default)] struct Order { id: i64, number: String }
-# fn orders_grid() -> Grid { Grid::new("orders").column(Column::text("number", "Order")).exports() }
-async fn index(request: GridRequest) -> Result<Response> {
-    if let Some(file) = orders_grid().export(Order::query(), &request).await? {
-        return Ok(file); // ?export=csv|xlsx|print
-    }
-    let page = orders_grid().page(Order::query(), &request).await?;
-    Ok(view("orders/index.html", context! { orders => page }).into_response())
-}
-```
-
-Each export holds every row the filters match (up to `grid::MAX_EXPORT_ROWS`), sorted as on
-screen, in the columns the user shows on wide screens (custom columns left out):
-
-- **CSV**: UTF-8 with a BOM (Excel reads it), headings like `Amounts / Total`, labels for
-  choices and tags, numbers without separators; text starting with `=`, `+`, `-` or `@` gets a
-  `'` so a spreadsheet doesn't run it.
-- **Excel** (the `xlsx` feature, `renox = { …, features = ["xlsx"] }`, through
-  `rust_xlsxwriter`): grouped headings merged as on screen, numbers and dates as numbers and
-  dates, the headings and frozen-left columns frozen. Without the feature the menu has no Excel
-  link and `export=xlsx` is a 400.
-- **Print**: a plain page (headings repeated on every printed page, landscape) with a button to
-  print or save as PDF.
+`renox::grid` is a server-side data grid for dashboards and back offices: a table that fills
+its container, with a filter in every heading, sorting, pagination, frozen columns, grouped
+headings, columns each user picks per screen size, editing in place, actions on selected rows,
+summaries, groups and exports. It is defined in Rust and drawn with the `grid` macro of
+`renox/grid.html`. [docs/grid.md](grid.md) is its guide, and examples/grid a dashboard built on
+it. `{{ sparkline(values) }}` (a small line or bar chart as inline SVG) works in any template,
+not only in a grid.
 
 ## Stacks
 
@@ -519,3 +348,5 @@ and link the output in the layout: `<link rel="stylesheet" href="{{ asset('css/a
 | `@class(['tab', 'active' => $on])` | `class_names('tab', {'active': on})` |
 | `request()->routeIs('admin.*')` | `route_is('admin.*')` (and `request.route`, the route's name) |
 | `@break` / `@continue` in `@foreach` | `{% break %}` / `{% continue %}` |
+| `back()` / `redirect()->back()` | the `Back` extractor, returned as the response |
+| Filament's tables | `renox::grid` ([docs/grid.md](grid.md)) |

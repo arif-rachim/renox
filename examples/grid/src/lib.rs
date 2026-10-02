@@ -16,7 +16,20 @@
 //!   `Valid<OrderEdit>` (`edit_url`);
 //! - rows dragged into order while sorted by # (`reorder`);
 //! - a second grid (`/regions`) where equal regions and cities share one cell
-//!   (`merge`), with details of the page's own under each row.
+//!   (`merge`), with details of the page's own under each row;
+//! - exports of every filtered row: CSV, Excel (the `xlsx` feature) and a
+//!   print page (`exports`);
+//! - a search box (`searchable`), filter chips, rows that open their order
+//!   (`row_url`) and an empty state (`empty_state`);
+//! - bulk actions on the selected (or all matching) orders and a row menu
+//!   (`bulk_action`, `row_action`);
+//! - totals in the footer (`Column::summary`) and grouping by region, status
+//!   or paid with subtotals (`groups`);
+//! - cards on phones (`cards_on_mobile`), badges, avatars, descriptions and
+//!   copy buttons;
+//! - columns from other tables (`Column::related`, `Column::count_of`), an
+//!   advanced filter (`advanced_filter`), remembered filters (`remember`) and
+//!   polling every 30 seconds (`poll`).
 //!
 //! ```text
 //! cargo run -- migrate

@@ -10,6 +10,21 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### Docs audit after M28
+
+- New guide: docs/grid.md for `renox::grid` (compiled as the `GridGuide` doctest).
+- CHEATSHEET: the missing patterns filled in (queries, the UI kit's macros, the data grid,
+  commands, config).
+- docs/postgresql.md: an unknown `DATABASE_URL` scheme is refused at boot.
+  docs/operations.md: when HSTS is sent, housekeeping for `notifications` and
+  `grid_preferences`, the prune functions. docs/authorization.md: async gates and `can()`.
+  docs/stability.md: the `#[non_exhaustive]` list.
+- README and CLAUDE.md: the `renox` crate's default features include `http`.
+- ROADMAP: the default scope API (`#[model(default_scope = "…")]`, `Model::unscoped()`),
+  `gate_before`'s closure, the principles and app layout, and the audit's open issues.
+- The examples' READMEs and module docs, llms.txt, and the new-app `AGENTS.md.stub` and
+  `env.stub` brought in line with the code.
+
 ### M28e · Data grid: related columns, an advanced filter, remembered state, polling
 
 - New: `Column::related`, `Column::count_of`, `Column::sum_of` (values from other tables,
@@ -200,6 +215,8 @@ changes by milestone (each one pull request; details in its description and in
 - `/favicon.ico` answers `204 No Content` (cached for a day) unless the app has
   `public/favicon.ico`. Browsers ask for it on every site; the 404 it got before ran the
   whole middleware stack, rendered the error page and logged a console error each time.
+- The workspace dev profile uses `debug = "line-tables-only"` (#68): full debug info made the
+  test binary 415 MB and workspace builds ran out of memory.
 
 ### M21i · The examples' tests, typed commands and the stubs
 
@@ -237,6 +254,15 @@ changes by milestone (each one pull request; details in its description and in
 - Fixed: error pages didn't get `App::share` values, so a layout using one (a cart count)
   failed to render them with `APP_DEBUG` (Renox's page showed instead).
 
+### Docs and examples checked against M21 (#63)
+
+- The socket recipe stops the service before enabling the socket (systemd can't listen while
+  the app holds the port); the shop admin's product delete asks in the kit's confirmation
+  sheet (its `hx-confirm` never ran); the shop's order policy checks the admin role itself and
+  uses `users_with_role`; crud's layout shows flashed messages; `rnx make:mail` prints how to
+  actually send the mail; authorization.md, stability.md, the README, llms.txt and the ROADMAP
+  no longer describe pre-M21 limits.
+
 ### M21g · Database sessions and deploys without refused connections
 
 - `SESSION_DRIVER=database`: sessions in a `sessions` table (new framework migration
@@ -249,12 +275,6 @@ changes by milestone (each one pull request; details in its description and in
   that old and new code both accept, and two copies behind Caddy.
 - `Toast` and `ToastKind` are `#[non_exhaustive]` (build toasts with `Toast::success(…)` and
   friends).
-- Docs and examples checked against M21: the socket recipe stops the service before enabling
-  the socket (systemd can't listen while the app holds the port); the shop admin's product delete
-  asks in the kit's confirmation sheet (its `hx-confirm` never ran); the shop's order policy
-  checks the admin role itself and uses `users_with_role`; crud's layout shows flashed messages;
-  `rnx make:mail` prints how to actually send the mail; authorization.md, stability.md, the README,
-  llms.txt and the ROADMAP no longer describe pre-M21 limits.
 
 ### M21f · Form requests, more rules, auth pages on the kit
 

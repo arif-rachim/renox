@@ -37,11 +37,13 @@ This does three things:
 
 2. Point `DATABASE_URL` at the server:
    `DATABASE_URL=postgres://user:password@host:5432/toko`.
-   `postgres://` and `postgresql://` URLs open a PostgreSQL pool; anything else is SQLite.
+   `postgres://` and `postgresql://` URLs open a PostgreSQL pool and `sqlite:` URLs a SQLite one;
+   any other URL is refused at boot (so a typo like `postgress://` doesn't become a SQLite file).
    `DATABASE_POOL_SIZE` (default 8) sets the pool size on both.
 
-3. Make your migrations run on PostgreSQL. See [Migrations](#migrations) below. Renox's own tables
-   (users, tokens, notifications, jobs, cache, sessions) already have PostgreSQL versions.
+3. Make your migrations run on PostgreSQL. See [Migrations](#migrations) below. Every one of Renox's own
+   tables (users, tokens, notifications, roles and permissions, audit logs, jobs, cache, sessions,
+   grid preferences, webhook calls) already has a PostgreSQL version.
 
 4. Run `my-app migrate`, then [copy the data](#moving-the-data) if the app already has some.
 
@@ -164,11 +166,14 @@ maintenance mode:
      FROM sqlite:///path/to/app.db
      INTO postgresql://user:password@host/toko
    WITH data only, reset sequences, truncate
+   CAST column job_batches.allow_failures to boolean using tinyint-to-boolean
    EXCLUDING TABLE NAMES LIKE 'renox_migrations';
    ```
 
    Timestamps written by Renox are ISO 8601 text, which PostgreSQL reads into `TIMESTAMPTZ`.
-   Booleans stored as 0/1 need a `CAST` rule if your tables have any.
+   Booleans stored as 0/1 need a `CAST` rule (the one above): Renox's own
+   `job_batches.allow_failures` is `INTEGER` on SQLite and `BOOLEAN` on PostgreSQL. Add a rule like
+   it for each boolean column of your own tables.
 4. Lowercase stored emails if some have capitals:
    `UPDATE users SET email = lower(email);`.
 5. Point `DATABASE_URL` at PostgreSQL, deploy, then `my-app up`.
