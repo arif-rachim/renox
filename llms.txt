@@ -202,6 +202,16 @@ Every example has a README.md that walks through it.
   or in the session), details under a row, editing in place, reordering rows, merged cells,
   bulk and row actions, summaries and groups, cards on phones, columns from related tables,
   exports (CSV, Excel with `xlsx`, print), polling.
+- [docs/validation.md](docs/validation.md): forms and validation: `Valid<T>` (form, JSON,
+  query), `impl Validate` and `#[derive(Validate)]`, every rule, `unique`/`exists`, password
+  policy, hooks (`prepare`/`authorize`/`after`), messages and translations, uploads as fields.
+- [docs/routing.md](docs/routing.md): routes, groups, resources, domains, extractors and
+  responses, middleware and guards, rate limits, sessions, CSRF, cookies, signed URLs,
+  maintenance mode.
+- [docs/mail.md](docs/mail.md): mail (drivers, views, attachments, queued mail, the preview) and
+  notifications (mail, database, custom channels, the in-app inbox, pruning, testing).
+- [docs/scheduling.md](docs/scheduling.md): the scheduler (cron, time zones, several servers,
+  housekeeping tasks), events and listeners, the cache and locks, app commands and prompts.
 - [docs/queue.md](docs/queue.md): jobs, retries and `failed`, `dispatch_in`, priority, unique
   jobs, middleware (overlap, rate limits), encrypted payloads, chains and batches with
   progress, the dashboard, testing jobs; mapped to Laravel's.

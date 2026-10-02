@@ -41,7 +41,7 @@ rnx tailwind --minify                # one build; rnx tailwind:install downloads
 `serve` already runs the queue workers and the scheduler. `queue:work` and `schedule:work` are for
 running them in separate processes.
 
-## App, module, routes
+## App, module, routes (details in [docs/routing.md](docs/routing.md))
 
 ```rust
 use renox::prelude::*;
@@ -312,7 +312,7 @@ fn plan_routes() -> Routes {
 }
 ```
 
-## Form + validation
+## Form + validation (details in [docs/validation.md](docs/validation.md))
 
 ```rust
 use renox::prelude::*;
@@ -1152,7 +1152,7 @@ Migrations run in a transaction each. A migration with `CREATE INDEX CONCURRENTL
 `BEGIN … COMMIT` runs without one, as does one with a `-- renox:no-transaction` line. Two
 `migrate` runs at once wait for each other; `migrate:status` flags edited and missing files.
 
-## Jobs, events, schedule, mail
+## Jobs, events, schedule, mail (details in [docs/queue.md](docs/queue.md) and [docs/scheduling.md](docs/scheduling.md))
 
 ```rust
 use renox::prelude::*;
@@ -1265,7 +1265,7 @@ A job that errors, panics or passes its `TIMEOUT` is retried up to `MAX_ATTEMPTS
 `failed_jobs` (`queue:failed`, `queue:retry`, `queue:forget`, `queue:prune-failed`); a panicking
 task or listener doesn't stop the others.
 
-## Mail and notifications
+## Mail and notifications (details in [docs/mail.md](docs/mail.md))
 
 ```rust
 use renox::prelude::*;
