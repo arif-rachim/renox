@@ -85,7 +85,9 @@ shows the queue: jobs waiting, throughput, failed jobs (retry or forget them) an
   `progress()`; htmx polls it with `hx-trigger="every 1s"` and gets only the `progress` block
   (`view(..).fragment("progress")`), which stops polling when the batch is finished.
 - **One notification, two channels.** `NewOrder` returns `Channel::Mail` and
-  `Channel::Database`; the database row shows up in `user.unread_notifications(&db)`.
+  `Channel::Database`; the database row, a `DatabaseMessage` (title, body and the order's
+  keys), shows up in `user.unread_notifications(&db)` (and in the UI kit's
+  `notification_bell` of an app with `Auth::new().notifications()`).
 - **Scheduled tasks are plain functions.** `daily_sales` is registered with
   `daily_at("21:00", ...)` narrowed by `.weekdays()` and `.timezone("Asia/Jakarta")` (instead
   of `APP_TIMEZONE`, with DST handled for zones that have it); `weekly_sales` uses a cron

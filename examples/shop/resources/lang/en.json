@@ -26,6 +26,11 @@
     "update": "Update", "remove": "Remove", "total": "Total",
     "checkout": "Check out", "empty": "Your cart is empty."
   },
+  "notifications": {
+    "placed": "Order #:id received",
+    "pay": "Pay :total by bank transfer within :days days.",
+    "shipped": "Order #:id is on its way"
+  },
   "orders": {
     "order": "Order",
     "placed": "Thank you! Order #:id is placed.",

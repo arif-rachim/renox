@@ -17,7 +17,7 @@ commit that `rnx` was built from.
   - `DatabaseNotification`, `AccessToken`, `NewToken`
   - `WebhookRequest`, `WebhookCall`, `JobContext`, `Htmx`, `Down`, `analytics::Event`
   - `view::ViewContext`, `auth::Registration`, `auth::Recipient`, `mail::Attachment`
-  - `Toast`, `report::ErrorReport`, `report::RequestReport`, `validation::FormContext`,
+  - `Toast`, `ToastAction`, `auth::DatabaseMessage`, `report::ErrorReport`, `report::RequestReport`, `validation::FormContext`,
     `rate_limit::LimitRequest`, `SentNotification`, `db::InvalidUlid`, `grid::Grid`,
     `grid::Column`, `grid::GridPrefs`, `grid::RowOrder`,
     `grid::Action`, `grid::Selection`, `storage::FileInfo`, `queue::BatchStatus`,

@@ -34,6 +34,7 @@
 
 pub(crate) mod account;
 pub mod events;
+mod inbox;
 mod module;
 pub mod notifications;
 mod passwords;
@@ -58,7 +59,8 @@ use axum::response::{IntoResponse, Redirect, Response};
 pub(crate) use account::require_password_confirmed;
 pub use module::{Auth, Registration};
 pub use notifications::{
-    Channel, DatabaseNotification, Notification, Recipient, prune_read_notifications,
+    Channel, DatabaseMessage, DatabaseNotification, Notification, Recipient,
+    prune_read_notifications,
 };
 pub use permissions::Permissions;
 pub(crate) use throttle::LoginThrottle;

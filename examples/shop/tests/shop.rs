@@ -668,6 +668,36 @@ async fn admins_move_orders_along_and_customers_hear_about_it() {
     assert_eq!(stock(&app, kopi.id).await, 3);
 }
 
+#[renox::test]
+async fn the_bell_tells_customers_and_admins_about_orders() {
+    let app = shop().await;
+    let boss = admin(&app).await;
+    let kopi = product(&app, "Kopi Susu", 25_000, 5).await;
+    let budi = customer(&app, "budi@example.com").await;
+    let order = placed_order(&app, &budi, &kopi, 2).await;
+
+    // The customer: their order, what to pay, a link to it.
+    app.get("/orders").await.assert_see(
+        r#"<span class="rx-bell__badge" data-rx-bell-count aria-hidden="true">1</span>"#,
+    );
+    app.get("/notifications")
+        .await
+        .assert_see(&format!(">Order #{} received</button>", order.id))
+        .assert_see("Pay Rp 50,000 by bank transfer within 3 days.");
+    let id = budi.notifications(app.db(), 1).await.unwrap()[0].id;
+    app.post(&format!("/notifications/{id}/open"), &[])
+        .await
+        .assert_redirect(&format!("/orders/{}", order.id));
+
+    // Every admin: the new order, with its total and address.
+    app.acting_as(&boss);
+    app.get("/notifications")
+        .await
+        .assert_see(&format!(">New order #{}</button>", order.id))
+        .assert_see("Rp 50,000, to Jl. Merdeka 1, Bandung 40111")
+        .assert_see(r#"href="/admin/orders?status=pending">All orders</a>"#);
+}
+
 async fn status(app: &TestApp, order_id: i64) -> OrderStatus {
     Order::find_or_404(app.db(), order_id).await.unwrap().status
 }

@@ -38,6 +38,8 @@ pub struct AppState {
     pub translator: Arc<Translator>,
     /// Live reload, only while developing locally.
     pub(crate) live: Option<Arc<crate::live::Live>>,
+    /// Wakes the users' open notification streams.
+    pub(crate) notification_hub: Arc<crate::auth::notifications::Hub>,
     pub(crate) listeners: Listeners,
     pub(crate) key: Key,
     /// With `SESSION_DRIVER=database` in tests, sessions are kept here

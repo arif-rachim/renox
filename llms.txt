@@ -48,7 +48,9 @@ Every example has a README.md that walks through it.
   (checkout: `toggle_buttons` + `show_when` + `required_if` for courier or pickup; the admin's
   category in a `select` whose options come from the server, added and renamed in place
   (`renox::select`, admin/categories.rs); its dashboard on the kit's `tabs`/`tab_panel`; the
-  order page an infolist with a `repeatable` of its lines; prices with the `money` filter); a
+  order page an infolist with a `repeatable` of its lines; prices with the `money` filter; the
+  `notification_bell` in its bar with `Auth::new().notifications()`, its notifications as
+  `DatabaseMessage`s that arrive live over Server-Sent Events); a
   typed `shop:make-admin` command with a prompt; an admin nav marked with `route_is`; recently
   viewed products (`session.push`, `{% break %}`), stock texts with plural ranges,
   `class_names`, `Redirect::route`; tests with time travel (unpaid orders cancelled
@@ -208,7 +210,7 @@ Every example has a README.md that walks through it.
 - [docs/ui.md](docs/ui.md): components that see the request, the UI kit (`renox/ui.html`: fields,
   buttons, cards, sheets, menus, tabs, tables, infolists: `infolist`/`entry`/`repeatable`),
   the filters `number`, `money` (`APP_CURRENCY`), `date`, `since`, `words`, `markdown`, and its
-  design rules, toasts, out-of-band
+  design rules, toasts (a body, links, a duration, an id, a position, `Renox.toast`), out-of-band
   fragments, htmx headers, live validation.
 - [docs/grid.md](docs/grid.md): data grids (`renox::grid` + `renox/grid.html`): columns and their
   kinds, filters per heading, search, filter chips, the advanced filter, preferences (per user
@@ -222,7 +224,9 @@ Every example has a README.md that walks through it.
   responses, middleware and guards, rate limits, sessions, CSRF, cookies, signed URLs,
   maintenance mode.
 - [docs/mail.md](docs/mail.md): mail (drivers, views, attachments, queued mail, the preview) and
-  notifications (mail, database, custom channels, the in-app inbox, pruning, testing).
+  notifications (mail, database, custom channels, `DatabaseMessage`, the in-app inbox and the
+  kit's live notification bell (`Auth::new().notifications()`, Server-Sent Events), pruning,
+  testing).
 - [docs/scheduling.md](docs/scheduling.md): the scheduler (cron, time zones, several servers,
   housekeeping tasks), events and listeners, the cache and locks, app commands and prompts.
 - [docs/queue.md](docs/queue.md): jobs, retries and `failed`, `dispatch_in`, priority, unique

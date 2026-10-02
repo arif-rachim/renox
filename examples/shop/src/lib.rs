@@ -32,7 +32,8 @@ pub fn app() -> App {
     App::new()
         .embed(renox::embedded!())
         .migrations(renox::migrations!())
-        .module(Auth::new())
+        // `.notifications()`: the bell in the layout, its page and its stream.
+        .module(Auth::new().notifications())
         // Roles for users: `require_role("admin")` on `/admin`,
         // `user.has_role("admin")` in handlers, `auth.roles` in templates.
         .module(Permissions)

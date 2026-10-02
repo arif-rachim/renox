@@ -1468,6 +1468,38 @@ Notes:
   `money(currency=…)` still covers a page with several. Separators follow the page's locale
   like `number`, so English pages show `Rp 75,000`.
 
+### Notifications next to Filament's
+
+Filament's notifications (https://filamentphp.com/docs/5.x/notifications/overview) and its
+database notifications as the yardstick, asked by the owner; both stages in one PR, live
+updates over Server-Sent Events (the owner's choice over polling).
+
+- [x] Stage 1, toasts: `body`, `link`/`action` (`ToastAction::link`, `ToastAction::event`,
+  `new_tab`), `seconds`/`persistent`, `id`; `toasts(position=…)`; `Renox.toast` and
+  `Renox.dismissToast` in the browser.
+- [x] Stage 2, the bell: `DatabaseMessage`, `Auth::new().notifications()` (the
+  `notifications.*` routes, `unread_notifications`), `notification_bell`,
+  `renox/notifications.html`, `/notifications/stream` (SSE), new `User` methods
+  (`notifications_before`, `notification`, `mark_notification_unread`,
+  `delete_notification`, `delete_notifications`).
+- [x] Examples: shop (the bell, `DatabaseMessage`s in the recipient's language, a toast with
+  a link), jobs (`DatabaseMessage`).
+- [ ] Later: a bell in the `rnx new` layout (it needs `.notifications()` in the stub);
+  broadcasting other events over the same stream; toast actions that send a request.
+
+Notes:
+- The stream is woken by a broadcast channel in the process (`auth::notifications::Hub`,
+  touched when a notification is stored and after each action on the list) and looks at the
+  table every 15 s anyway, so several servers and a separate `queue:work` need nothing more
+  (no Redis, no websockets). It ends after five minutes (the browser reconnects through the
+  auth middleware again, so a revoked session loses it) and at shutdown, like live reload.
+- The unread count is an `App::share` from the `Auth` module: one `COUNT` per rendered view
+  for a logged-in user. Macros can't see shared values, so the layout passes it:
+  `notification_bell(unread_notifications)`.
+- The panel is the notifications page's `panel` block, fetched with `HX-Request` (a
+  `View::fragment`): one template for the page, the panel and the answers to its actions.
+- `to_database` now runs in the recipient's language (`with_locale`), as `to_mail` did.
+
 ## Decisions
 
 - **Markdown in templates:** `pulldown-cmark` without its default features renders it; instead

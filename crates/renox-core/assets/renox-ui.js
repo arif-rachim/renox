@@ -38,13 +38,14 @@
     setTimeout(function () { toast.remove(); }, reduceMotion ? 0 : 200);
   }
 
-  // Success and info leave after a while, longer for longer messages, and
-  // wait while hovered or focused; errors stay until dismissed.
+  // Success and info leave after a while, longer for longer messages (or
+  // after data-duration), and wait while hovered or focused; errors and
+  // persistent toasts stay until dismissed.
   function arm(toast) {
     if (toast.hasAttribute("data-sticky") || toast.hasAttribute("data-armed")) return;
     toast.setAttribute("data-armed", "");
     var text = (toast.textContent || "").length;
-    var delay = Math.min(10000, 4000 + text * 40);
+    var delay = parseInt(toast.getAttribute("data-duration"), 10) || Math.min(10000, 4000 + text * 40);
     var timer;
     function start() { timer = setTimeout(function () { dismiss(toast); }, delay); }
     function stop() { clearTimeout(timer); }
@@ -55,35 +56,190 @@
     start();
   }
 
+  // Links built from data: http(s), mailto, tel or relative only.
+  function safeUrl(url) {
+    var cleaned = String(url || "").replace(/[\u0000-\u0020\u007f]/g, "").toLowerCase();
+    var colon = cleaned.indexOf(":");
+    var path = cleaned.search(/[\/?#]/);
+    if (colon < 0 || (path >= 0 && path < colon)) return true;
+    return /^(https?|mailto|tel)$/.test(cleaned.slice(0, colon));
+  }
+
+  function toastAction(action) {
+    var el;
+    if (action.url && safeUrl(action.url)) {
+      el = document.createElement("a");
+      el.href = action.url;
+      if (action.new_tab) { el.target = "_blank"; el.rel = "noopener"; }
+    } else if (action.event) {
+      el = document.createElement("button");
+      el.type = "button";
+      el.setAttribute("data-rx-toast-event", action.event);
+    } else {
+      return null;
+    }
+    el.className = "rx-toast__action";
+    el.setAttribute("data-renox-dismiss", "");
+    el.textContent = action.label;
+    return el;
+  }
+
+  // {kind, message, body?, actions?: [{label, url | event, new_tab?}],
+  // duration? (ms, 0 = stays), id?}: the same shape as `Toast` in Rust.
   function showToast(toast) {
     var kind = ICONS[toast.kind] ? toast.kind : "info";
+    if (toast.id) {
+      document.querySelectorAll("[data-toast-id]").forEach(function (old) {
+        if (old.getAttribute("data-toast-id") === String(toast.id)) old.remove();
+      });
+    }
     var el = document.createElement("div");
     el.className = "rx-toast rx-toast--" + kind;
     el.setAttribute("role", kind === "error" ? "alert" : "status");
     el.setAttribute("data-renox-toast", "");
-    if (kind === "error") el.setAttribute("data-sticky", "");
+    if (toast.id) el.setAttribute("data-toast-id", toast.id);
+    if (toast.duration === 0 || (kind === "error" && toast.duration == null)) el.setAttribute("data-sticky", "");
+    else if (toast.duration) el.setAttribute("data-duration", toast.duration);
     var icon = document.createElement("span");
     icon.className = "rx-toast__icon";
     icon.setAttribute("aria-hidden", "true");
     icon.innerHTML = ICONS[kind];
+    var content = document.createElement("div");
+    content.className = "rx-toast__content";
     var message = document.createElement("p");
     message.className = "rx-toast__message";
     message.textContent = toast.message;
+    content.appendChild(message);
+    if (toast.body) {
+      var body = document.createElement("p");
+      body.className = "rx-toast__body";
+      body.textContent = toast.body;
+      content.appendChild(body);
+    }
+    var actions = (toast.actions || []).map(toastAction).filter(Boolean);
+    if (actions.length) {
+      var row = document.createElement("div");
+      row.className = "rx-toast__actions";
+      actions.forEach(function (a) { row.appendChild(a); });
+      content.appendChild(row);
+    }
     var close = document.createElement("button");
     close.type = "button";
     close.className = "rx-toast__close";
     close.setAttribute("data-renox-dismiss", "");
     close.setAttribute("aria-label", region().getAttribute("data-dismiss-label") || "Dismiss");
     close.innerHTML = CLOSE;
-    el.append(icon, message, close);
+    el.append(icon, content, close);
     region().appendChild(el);
     arm(el);
+    return el;
   }
 
   document.addEventListener("renox:toast", function (event) {
     var detail = event.detail || {};
     (detail.toasts || []).forEach(showToast);
   });
+
+  // The page's own script: Renox.toast({kind: "success", message: "Saved"}),
+  // Renox.dismissToast("order-7").
+  window.Renox = window.Renox || {};
+  window.Renox.toast = showToast;
+  window.Renox.dismissToast = function (id) {
+    document.querySelectorAll("[data-toast-id]").forEach(function (toast) {
+      if (toast.getAttribute("data-toast-id") === String(id)) dismiss(toast);
+    });
+  };
+
+  // ---------- Notification bell ----------
+
+  // The bell (notification_bell): the panel is the notifications page's
+  // `panel` block, fetched when opened and after each action in it; a
+  // Server-Sent Events stream keeps the badge current and shows new ones.
+  function setupBell(bell) {
+    if (bell._rxBell) return;
+    bell._rxBell = true;
+    var button = bell.querySelector(".rx-bell__button");
+    var panel = document.getElementById(button.getAttribute("aria-controls"));
+    var badge = bell.querySelector("[data-rx-bell-count]");
+    if (!panel) return;
+
+    function setCount(value) {
+      var n = parseInt(value, 10) || 0;
+      badge.textContent = n > 99 ? "99+" : String(n);
+      badge.hidden = n === 0;
+      var label = button.getAttribute("data-label");
+      button.setAttribute("aria-label", n ? label + ", " + button.getAttribute("data-label-unread").split(":count").join(n) : label);
+    }
+
+    function load(url, options) {
+      var init = { credentials: "same-origin", headers: { "HX-Request": "true", "X-CSRF-Token": csrf(), "Accept": "text/html" } };
+      if (options) Object.keys(options).forEach(function (k) { init[k] = options[k]; });
+      return fetch(url, init).then(function (res) {
+        if (!res.ok) throw new Error(res.status);
+        return res.text();
+      }).then(function (html) {
+        panel.innerHTML = html;
+        var list = panel.querySelector("[data-rx-notifications]");
+        if (list) setCount(list.getAttribute("data-unread"));
+      });
+    }
+
+    function open() {
+      panel.hidden = false;
+      // The panel lists them: their toasts would only cover it.
+      document.querySelectorAll('[data-toast-id^="rx-notification-"]').forEach(dismiss);
+      // On phones the panel spans the screen, just under the bar.
+      panel.style.top = window.matchMedia("(max-width: 36rem)").matches
+        ? Math.round(button.getBoundingClientRect().bottom + 6) + "px" : "";
+      button.setAttribute("aria-expanded", "true");
+      load(bell.getAttribute("data-panel")).catch(function () {
+        // Can't load it here: the page has the same list.
+        window.location.href = button.href;
+      });
+    }
+
+    function close(restore) {
+      if (panel.hidden) return;
+      panel.hidden = true;
+      button.setAttribute("aria-expanded", "false");
+      if (restore) button.focus();
+    }
+
+    button.addEventListener("click", function (event) {
+      event.preventDefault();
+      if (panel.hidden) open(); else close();
+    });
+    // Mark read or unread, delete, mark all read, clear: the panel again.
+    panel.addEventListener("submit", function (event) {
+      var form = event.target.closest("[data-rx-notification-form]");
+      if (!form) return;
+      event.preventDefault();
+      load(form.action, { method: "POST", body: new URLSearchParams(new FormData(form)) }).then(function () {
+        var first = panel.querySelector(".rx-notifications__header button, .rx-notification button");
+        if (first && !panel.contains(document.activeElement)) first.focus();
+      }, function () { form.submit(); });
+    });
+    document.addEventListener("click", function (event) {
+      if (!bell.contains(event.target)) close();
+    });
+    bell.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && !panel.hidden) { event.stopPropagation(); close(true); }
+    });
+
+    if (!window.EventSource) return;
+    var stream = new EventSource(bell.getAttribute("data-stream"));
+    stream.addEventListener("count", function (event) { setCount(event.data); });
+    stream.addEventListener("notification", function (event) {
+      var n;
+      try { n = JSON.parse(event.data); } catch (e) { return; }
+      showToast({
+        kind: n.status, message: n.title, body: n.body, id: "rx-notification-" + n.id,
+        actions: n.url ? [{ label: bell.getAttribute("data-open-label") || "Open", url: n.url }] : []
+      });
+      if (!panel.hidden) load(bell.getAttribute("data-panel")).catch(function () {});
+    });
+    window.addEventListener("pagehide", function () { stream.close(); });
+  }
 
   // ---------- Sheets (dialogs) ----------
 
@@ -186,7 +342,15 @@
     }
 
     var dismisser = target.closest("[data-renox-dismiss]");
-    if (dismisser) { dismiss(dismisser.closest("[data-renox-toast]")); return; }
+    if (dismisser) {
+      var toastEl = dismisser.closest("[data-renox-toast]");
+      var eventName = dismisser.getAttribute("data-rx-toast-event");
+      if (eventName) {
+        document.dispatchEvent(new CustomEvent(eventName, { detail: { toast: toastEl && toastEl.getAttribute("data-toast-id") } }));
+      }
+      dismiss(toastEl);
+      return;
+    }
 
     var opener = target.closest("[data-rx-open]");
     if (opener) { event.preventDefault(); openSheet(opener.getAttribute("data-rx-open"), opener); return; }
@@ -1256,6 +1420,7 @@
     scope.querySelectorAll("select[data-rx-combobox]").forEach(enhanceSelect);
     scope.querySelectorAll("[data-rx-repeater]").forEach(limits);
     scope.querySelectorAll("[data-rx-wizard]").forEach(setupWizard);
+    scope.querySelectorAll("[data-rx-bell]").forEach(setupBell);
     applyAllWhen(scope);
   }
 

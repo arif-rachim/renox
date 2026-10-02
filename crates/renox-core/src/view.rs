@@ -66,6 +66,10 @@ const BUILTIN: &[(&str, &str)] = &[
     ),
     ("renox/debug.html", include_str!("../views/debug.html")),
     (
+        "renox/notifications.html",
+        include_str!("../views/notifications.html"),
+    ),
+    (
         "renox/queue/dashboard.html",
         include_str!("../views/queue/dashboard.html"),
     ),
@@ -289,6 +293,13 @@ impl Views {
         Self {
             reloader: Arc::new(reloader),
         }
+    }
+
+    /// Whether a template of this name exists (the app's or a built-in).
+    pub fn exists(&self, name: &str) -> bool {
+        self.reloader
+            .acquire_env()
+            .is_ok_and(|env| env.get_template(name).is_ok())
     }
 
     /// Renders a template with the given context and no request globals.
@@ -1080,12 +1091,19 @@ fn globals(
         csrf_field => Value::from_function(move || field.clone()),
         // `{{ toasts() }}`: the toast region, with the toasts waiting for
         // this page (taken from the session: shown once).
-        toasts => Value::from_function(move || {
+        // `toasts(position="bottom-end")` moves them (see toast::POSITIONS).
+        toasts => Value::from_function(move |kwargs: minijinja::value::Kwargs| {
+            let position: Option<String> = kwargs.get("position")?;
+            kwargs.assert_all_used()?;
             let waiting: Vec<crate::Toast> = toast_session
                 .as_ref()
                 .and_then(|s| s.pull(crate::toast::SESSION_KEY))
                 .unwrap_or_default();
-            Value::from_safe_string(crate::toast::region(&waiting, &dismiss_label))
+            Ok::<_, minijinja::Error>(Value::from_safe_string(crate::toast::region(
+                &waiting,
+                &dismiss_label,
+                position.as_deref().unwrap_or("top"),
+            )))
         }),
         // `{% if once('date-picker') %}…{% endif %}`: true the first time a key
         // is asked for on a page, e.g. for a component's script.
