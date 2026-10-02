@@ -1416,8 +1416,11 @@ asked by the owner; three stages on branch `ui-form`, one PR.
 - [x] Examples: fields (every kind, tags and specifications), shop (checkout courier or
   pickup, the admin's searchable category), uploads (`file`), teams ("New team" wizard with a
   repeater of members).
-- [ ] Later: a select whose options come from the server as you type (htmx), and rich text,
-  Markdown and code editors (large JavaScript: plugins rather than the kit).
+- [x] Options from the server as you type: `select(…, options_url=…)` with `renox::select`
+  (`SelectOption`, `OptionQuery`); `editable=true` adds what was typed (chosen at once) and
+  renames the chosen option; examples/shop's admin categories.
+- [ ] Later: rich text, Markdown and code editors (large JavaScript: plugins rather than the
+  kit).
 
 Notes:
 - Cally's `calendar-date` dispatches a `change` that doesn't bubble: the kit listens in the
@@ -1432,6 +1435,11 @@ Notes:
   `lines.2.` or `rx-lines-2-`, so any field inside (date pickers, combobox, show_when) follows.
 - A repeater's own error slot shows only the list's error: `error()` falls back to `name.*`,
   which showed a row's error twice.
+- Options from the server: one URL for searching (`GET ?q=`), labels (`GET ?values=`), adding
+  (`POST`) and renaming (`PUT` through `_method`), so an app writes three small handlers and
+  keeps its own rules and permissions. The page holds only the chosen options; the script
+  adds the server's ones to the native select as they're chosen, so the form posts as before.
+  Searches wait 250 ms and cancel the previous request (`AbortController`).
 - Found by tests: PostgreSQL's `JSONB` reorders object keys, so `KeyValues` is stored as a list
   of pairs; and the audit probe `validation_array_where_scalar_expected` caught `name[]=a`
   filling a text field once `[]` was read as nested, so a `[]` name is always a list.

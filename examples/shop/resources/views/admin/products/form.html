@@ -13,11 +13,14 @@
   {% call card() %}
     {{ form_errors() }}
     {{ input("name", "Name", value=product.name if product else none, required=true) }}
-    {#- A searchable select: type to filter the categories; "None" clears it. -#}
-    {%- set ns = namespace(options=[]) %}
-    {%- for category in categories %}{% set ns.options = ns.options + [[category.id, category.name]] %}{% endfor %}
-    {{ select("category_id", "Category", ns.options, selected=product.category_id if product else none,
-              placeholder="None", searchable=true) }}
+    {#- The categories come from the server as the admin types; one that isn't
+        there yet can be added ("Add “Juice”") and is chosen at once, and the
+        chosen one can be renamed (the pencil). Only the current one is in
+        the page: the rest stay on the server. -#}
+    {{ select("category_id", "Category", [[product.category_id, category_name]] if product and product.category_id else [],
+              selected=product.category_id if product else none, placeholder="None",
+              options_url=route('admin.categories.options'), editable=true,
+              hint="Type to search; add one that isn't there yet.") }}
     {{ textarea("description", "Description", value=product.description if product else none, rows=4) }}
     {{ input("price", "Price (Rp)", type="number", value=product.price if product else none, required=true,
              hint="In rupiah, without dots.", attrs={"min": 0, "inputmode": "numeric"}) }}

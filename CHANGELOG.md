@@ -10,6 +10,23 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### UI kit: options from the server, added and renamed in the select
+
+- New: `select(…, options_url=…)`: the options come from the server as you type (`GET ?q=…`,
+  after a short pause, older requests cancelled), for lists too long for the page; a value sent
+  back after a failed submit gets its label from `GET ?values=…`.
+- New: `select(…, options_url=…, editable=true)`: what was typed can be added ("Add “…”",
+  `POST label=…`) and is chosen at once; the chosen option (or a chip, with `multiple`) can be
+  renamed in place (`POST _method=PUT value=…&label=…`; Enter saves, Escape gives up). A 422
+  shows its message under the field.
+- New: `renox::select`: `SelectOption` (`{value, label}`, `SelectOption::new(id, name)`) and the
+  `OptionQuery` extractor (`q`, `values`, `is_lookup()`, `values_as::<i64>()`). Options in the
+  template may also be `SelectOption`s (maps with `value` and `label`).
+- New kit texts (en/id): `ui.searching`, `ui.load_failed`, `ui.add_option`, `ui.edit`,
+  `ui.editing`, `ui.save_failed`.
+- examples/shop: the admin's category select asks the server, adds categories and renames
+  them (`admin/categories.rs`); the product form no longer loads every category.
+
 ### Examples: the kit's tabs and datalist
 
 - examples/shop's admin dashboard puts low stock, notifications and recent activity on the

@@ -862,3 +862,100 @@ async fn stock_texts_use_plural_ranges_and_sold_out_cards_are_marked() {
         .assert_see(r#"class="product-card product-card--sold-out""#)
         .assert_see(r#"<article class="product-card">"#);
 }
+
+#[renox::test]
+async fn the_category_select_searches_adds_and_renames() {
+    let app = shop().await;
+    let drinks = category(&app, "Drinks").await;
+    category(&app, "Snacks").await;
+    let mut kopi = product(&app, "Kopi Susu", 25_000, 5).await;
+    kopi.category_id = Some(drinks.id);
+    kopi.save(app.db()).await.unwrap();
+
+    // Customers can't reach the options.
+    let budi = customer(&app, "budi@example.com").await;
+    app.acting_as(&budi);
+    app.get("/admin/categories/options?q=dr")
+        .await
+        .assert_forbidden();
+
+    let boss = admin(&app).await;
+    app.acting_as(&boss);
+    // The form has only the current category, and where to ask for more.
+    app.get(&format!("/admin/products/{}/edit", kopi.id))
+        .await
+        .assert_see(r#"data-rx-options-url="/admin/categories/options""#)
+        .assert_see("data-rx-editable")
+        .assert_see(&format!(
+            r#"<option value="{}" selected>Drinks</option>"#,
+            drinks.id
+        ))
+        .assert_dont_see(">Snacks</option>");
+
+    // Searching, and looking labels up.
+    let res = app.get("/admin/categories/options?q=dri").await;
+    res.assert_ok();
+    let found: renox::serde_json::Value = res.json();
+    assert_eq!(
+        found,
+        renox::serde_json::json!([{"value": drinks.id.to_string(), "label": "Drinks"}])
+    );
+    let res = app
+        .get(&format!(
+            "/admin/categories/options?values={}&values=x",
+            drinks.id
+        ))
+        .await;
+    let found: renox::serde_json::Value = res.json();
+    assert_eq!(found[0]["label"], "Drinks");
+
+    // Adding: the new category comes back to be chosen; a taken name is a 422.
+    let res = app
+        .htmx()
+        .post("/admin/categories/options", &[("label", "  Juice ")])
+        .await;
+    res.assert_ok();
+    let added: renox::serde_json::Value = res.json();
+    assert_eq!(added["label"], "Juice");
+    let juice = Category::where_eq("slug", "juice")
+        .first_or_404(app.db())
+        .await
+        .unwrap();
+    assert_eq!(added["value"], juice.id.to_string());
+    app.htmx()
+        .post("/admin/categories/options", &[("label", "Juice")])
+        .await
+        .assert_status(422)
+        .assert_invalid("label");
+
+    // Renaming the chosen one: the name changes, the slug (in links) stays.
+    let res = app
+        .htmx()
+        .put(
+            "/admin/categories/options",
+            &[
+                ("value", drinks.id.to_string().as_str()),
+                ("label", "Coffee & Tea"),
+            ],
+        )
+        .await;
+    res.assert_ok();
+    let renamed: renox::serde_json::Value = res.json();
+    assert_eq!(renamed["label"], "Coffee & Tea");
+    let drinks = Category::find_or_404(app.db(), drinks.id).await.unwrap();
+    assert_eq!(
+        (drinks.name.as_str(), drinks.slug.as_str()),
+        ("Coffee & Tea", "drinks")
+    );
+    // Not to another category's name.
+    app.htmx()
+        .put(
+            "/admin/categories/options",
+            &[
+                ("value", drinks.id.to_string().as_str()),
+                ("label", "Snacks"),
+            ],
+        )
+        .await
+        .assert_status(422);
+}

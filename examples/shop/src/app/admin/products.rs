@@ -3,7 +3,7 @@ use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::app::catalog::FEATURED;
-use crate::app::catalog::model::{Category, Product, slug};
+use crate::app::catalog::model::{Product, slug};
 
 /// `/admin/products?q=…&sort=stock`
 #[derive(Deserialize, Serialize, Default)]
@@ -58,9 +58,10 @@ impl Validate for ProductForm {
     }
 }
 
-pub async fn create(State(db): State<Db>) -> Result<View> {
-    let categories = Category::query().order_by("name").get(&db).await?;
-    Ok(view("admin/products/form.html", context! { categories }))
+/// The categories aren't loaded: the form's select asks for them as the
+/// admin types (`categories::options`).
+pub async fn create() -> Result<View> {
+    Ok(view("admin/products/form.html", context! {}))
 }
 
 pub async fn store(
@@ -79,10 +80,11 @@ pub async fn store(
 
 pub async fn edit(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
     let product = Product::find_or_404(&db, id).await?;
-    let categories = Category::query().order_by("name").get(&db).await?;
+    // Only the current category's name: the select fetches the rest.
+    let category_name = product.category(&db).await?.map(|c| c.name);
     Ok(view(
         "admin/products/form.html",
-        context! { product, categories },
+        context! { product, category_name },
     ))
 }
 

@@ -261,6 +261,7 @@ fn view_extras(app: App) -> App {
     {{ input("api_key", "API key", value=key, readonly=true, copyable=true) }}
     {{ tags_input("keywords", "Keywords") }} {# Vec<String> + #[serde(default)] #}
     {{ select("cats", "Categories", cats, multiple=true, searchable=true) }}
+    {{ select("customer_id", "Customer", [[c.id, c.name]], selected=c.id, options_url=route('customers.options'), editable=true) }} {# renox::select: GET ?q= / ?values=, POST label, PUT value+label #}
     {{ key_value("specs", "Specs", value=product.specs) }} {# renox::KeyValues #}
     {% call(row, prefix) repeater("lines", "Lines", rows=order.lines) %}
       {{ input(prefix ~ "[name]", "Name", value=row.name) }} {# lines[0][name] → Vec<Line>, v.nested #}

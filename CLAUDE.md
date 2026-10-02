@@ -173,6 +173,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            sent through `state.http`)
   src/webhook.rs           Webhook trait, receive route, webhook_calls store/retry, ProcessWebhook job
   src/security.rs          security headers + CSP (+ nonce), csrf-exempt and webhook route sets
+  src/select.rs            renox::select: SelectOption, OptionQuery (the kit's select with
+                           options_url / editable)
   src/method.rs            method spoofing layer (in front of the router)
   src/embedded.rs          Embedded (views/lang/public compiled in), public-file serving + content types
   assets/                  vendored htmx.min.js (2.0.11), alpine.min.js (3.17.4) + Alpine CSP build,
@@ -950,7 +952,11 @@ picks the build, not the terminal.
   renumbered by rewriting attributes), `key_value`, `wizard`; teams, fields and shop use
   them. Merged (#88, one PR for the three stages). Then the kit's `tabs` in shop's admin
   dashboard and `datalist` in teams, the two kit parts no example used yet (#90;
-  `hide_when` has none, as it mirrors `show_when`).
+  `hide_when` has none, as it mirrors `show_when`). Then options from the server:
+  `select(…, options_url=…, editable=true)` with `renox::select` (`SelectOption`,
+  `OptionQuery`), one URL for search/lookup/add/rename; the combobox adds fetched options to
+  the native select as they're chosen; shop's admin categories use it. Branch
+  `ui-select-remote`.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.

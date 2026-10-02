@@ -91,6 +91,7 @@ Then import what a page needs:
 | `date_picker(name, label, value=…, min=…, max=…)` | A date typed as `2026-10-02` or picked in a calendar (Cally, in a popover under the field, its month named in the page's language). Sent as `YYYY-MM-DD`, like `<input type="date">`: a `NaiveDate`. Without JavaScript it is a text field. |
 | `show_when(field, values)` + `hide_when(field, values)` | Fields shown (or hidden) while another field has one of `values`. Hidden fields are disabled, so the form doesn't send them; check them on the server with `required_if`. Without JavaScript they stay visible. |
 | `select(…, multiple=true, searchable=true)` | Several values (a `Vec`), and a box to type in that filters the options, with the chosen ones as chips. The native select stays underneath: the form sends the same thing, and it works without JavaScript. |
+| `select(…, options_url=…, editable=true)` | The options come from the server as you type (`renox::select`), for lists too long for the page. `editable`: what was typed can be added ("Add “…”") and is chosen at once, and the chosen option can be renamed (the pencil). See "Options from the server" below. |
 | `tags_input(name, label, value=[…], suggestions=[…])` | Free text as chips: Enter or a comma adds one, Backspace in the empty box removes the last. A `Vec<String>`. |
 | `repeater(name, label, rows=[…], min=…, max=…)` with `{% call(row, prefix) %}` | Rows added, removed and moved by the user, each with the fields of the call block, named `name[0][field]` and renumbered as rows move. A `Vec` of a struct, checked with `v.nested`. Adding a row needs JavaScript. |
 | `key_value(name, label, value=…)` | Pairs of text (a repeater with a key and a value per row): `KeyValues`. |
@@ -160,6 +161,54 @@ impl Validate for NewTeam {
     }
 }
 ```
+
+### Options from the server
+
+A select over a long list (customers, categories) asks the server as people type, through
+one URL. In the template, `options` only needs the chosen option(s):
+
+```html
+{{ select("category_id", "Category", [[product.category_id, category_name]] if product.category_id else [],
+          selected=product.category_id, placeholder="None",
+          options_url=route('admin.categories.options'), editable=true) }}
+```
+
+| The kit sends | The handler answers |
+|---|---|
+| `GET ?q=te` (typed, after a short pause) | the matches: `Json(Vec<SelectOption>)` |
+| `GET ?values=4` (a value sent back without its label, after a failed submit) | those options (`query.is_lookup()`, `query.values_as::<i64>()`) |
+| `POST label=Juice` (`editable`: "Add “Juice”") | the new option, which is chosen at once |
+| `POST _method=PUT value=4&label=Juice & Smoothies` (`editable`: renaming the chosen one) | the option as saved |
+
+A 422 from `Valid` shows its first message under the field (a name already taken, say), and
+Escape gives up a rename. Who may add or rename is the route's call (examples/shop puts the
+three handlers inside its admin group):
+
+```rust
+# use renox::prelude::*;
+use renox::select::{OptionQuery, SelectOption};
+
+#[derive(Model, serde::Serialize, Default)]
+struct Category { id: i64, name: String }
+
+async fn options(State(db): State<Db>, query: OptionQuery) -> Result<Json<Vec<SelectOption>>> {
+    let rows = if query.is_lookup() {
+        Category::query().where_in("id", query.values_as::<i64>()).get(&db).await?
+    } else {
+        Category::query()
+            .where_op("name", "like", format!("%{}%", query.q))
+            .order_by("name")
+            .limit(20)
+            .get(&db)
+            .await?
+    };
+    Ok(Json(rows.iter().map(|c| SelectOption::new(c.id, &c.name)).collect()))
+}
+// Routes: .get(url, options), .post(url, create), .put(url, rename); the POST and PUT take
+// `Valid<…>` forms with `label` (and `value`), checked like any form (`unique`, `max`).
+```
+
+Without JavaScript the native select shows only the options in the page.
 
 A field that depends on another, as in examples/shop's checkout: the address only for the
 courier, required only then.

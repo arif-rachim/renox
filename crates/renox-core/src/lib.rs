@@ -51,6 +51,7 @@ mod request_id;
 mod routing;
 pub mod schedule;
 pub mod security;
+pub mod select;
 pub mod seo;
 mod session;
 pub mod shell;

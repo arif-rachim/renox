@@ -476,6 +476,33 @@
 }
 .rx-combobox__option[data-active] { background: var(--rx-fill); }
 .rx-combobox__option[aria-selected="true"] { font-weight: 600; }
+.rx-combobox__option--create { color: var(--rx-accent-text); font-weight: 600; }
+.rx-combobox__option--create::before {
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 4v12M4 10h12' stroke='%23000' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 4v12M4 10h12' stroke='%23000' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+/* Searching, editing, an error: under the box, empty most of the time. */
+.rx-combobox__status { margin: 6px 0 0; font-size: var(--rx-text-footnote); color: var(--rx-secondary-label); }
+.rx-combobox__status:empty { display: none; }
+.rx-combobox__status--error { color: var(--rx-danger-text); }
+/* The single select's rename button, inside the box before the chevron. */
+.rx-combobox__box--editable { position: relative; }
+.rx-combobox__box--editable > .rx-input { padding-right: 76px; }
+.rx-combobox__edit {
+  position: absolute; top: 50%; right: 34px; transform: translateY(-50%);
+  display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--rx-radius-s);
+  background: transparent; color: var(--rx-secondary-label); cursor: pointer;
+}
+.rx-combobox__edit:hover { background: var(--rx-fill); color: var(--rx-label); }
+.rx-combobox__edit[hidden] { display: none; }
+@media (pointer: coarse) { .rx-combobox__edit { width: var(--rx-target); height: var(--rx-target); right: 30px; } .rx-combobox__box--editable > .rx-input { padding-right: 84px; } }
+/* Renaming: the box says so (the status line says how to finish). */
+.rx-combobox[data-rx-editing] .rx-input, .rx-combobox[data-rx-editing] .rx-tags {
+  border-color: var(--rx-accent); border-style: dashed; background-image: none;
+  background-color: color-mix(in srgb, var(--rx-accent) 6%, var(--rx-surface));
+}
+.rx-combobox [aria-busy="true"] { cursor: progress; }
 .rx-combobox__empty { padding: var(--rx-space-2) var(--rx-space-3); color: var(--rx-secondary-label); font-size: var(--rx-text-subhead); }
 /* The native select stays (it is what the form sends and what the browser
    checks for `required`), out of sight under the box. */
