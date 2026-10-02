@@ -29,7 +29,10 @@
 //!   copy buttons;
 //! - columns from other tables (`Column::related`, `Column::count_of`), an
 //!   advanced filter (`advanced_filter`), remembered filters (`remember`) and
-//!   polling every 30 seconds (`poll`).
+//!   polling every 30 seconds (`poll`);
+//! - two grids on one page (`/follow-up`) that page and filter apart
+//!   (`prefix`), with links, tooltips, wrapping and cut text, columns that
+//!   can't be sorted or filtered, and a numeric related column.
 //!
 //! ```text
 //! cargo run -- migrate

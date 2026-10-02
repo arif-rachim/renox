@@ -78,7 +78,9 @@ Every example has a README.md that walks through it.
   that open their order, bulk actions on selected (or all matching) orders and a row menu,
   totals in the footer and grouping by region, status or paid with subtotals, cards on
   phones, badges, avatars, descriptions and copy buttons, the customer's tier and a notes
-  count from other tables, an advanced filter, remembered filters and polling.
+  count from other tables, an advanced filter, remembered filters and polling; `/follow-up`
+  with two grids paging apart on one page (`prefix`), plus `link`, `tooltip`, `wrap`, `limit`,
+  `sortable(false)`/`filterable(false)`, `per_page` and a `numeric()` related column.
   [src/app/orders/mod.rs](examples/grid/src/app/orders/mod.rs),
   [views](examples/grid/resources/views/orders),
   [tests/grid.rs](examples/grid/tests/grid.rs)

@@ -302,3 +302,34 @@ async fn related_columns_and_the_advanced_filter() {
     // Remembered for the next visit.
     assert_eq!(app.get("/").await.text().matches("<tr data-id=").count(), 1);
 }
+
+#[renox::test]
+async fn two_grids_page_apart_on_one_page() {
+    // `/follow-up`: two grids with their own query string prefixes.
+    let app = with_orders(40).await;
+    let unpaid = Order::where_eq("paid", false)
+        .count(app.db())
+        .await
+        .unwrap();
+    let largest = Order::query()
+        .order_by_desc("total")
+        .first(app.db())
+        .await
+        .unwrap()
+        .unwrap();
+    let res = app.get("/follow-up").await;
+    res.assert_ok()
+        .assert_see(r#"id="grid-unpaid""#)
+        .assert_see(r#"id="grid-largest""#)
+        .assert_see(&format!("{unpaid} rows"))
+        .assert_see("40 rows")
+        // `link`: the order number opens the order.
+        .assert_see(&format!(r#"href="/orders/{}""#, largest.id));
+
+    // A page of the second grid leaves the first on its first page.
+    let res = app.get("/follow-up?largest.page=2").await;
+    res.assert_ok().assert_see("11–20 of 40");
+    if unpaid > 10 {
+        res.assert_see(&format!("1–10 of {unpaid}"));
+    }
+}
