@@ -50,6 +50,8 @@ http-body-util = "0.1.5"
 listenfd = "1.0.2"
 lettre = { version = "0.11.23", default-features = false, features = ["builder", "smtp-transport", "pool", "hostname", "tokio1-rustls-tls"] }
 mime_guess = "2.0.5"
+# The `markdown` template filter (raw HTML in the text is shown as text).
+pulldown-cmark = { version = "0.13.4", default-features = false, features = ["html"] }
 minijinja = { version = "2.24.0", features = ["loader", "json", "urlencode", "loop_controls"] }
 minijinja-autoreload = "2.24.0"
 multer = "3.1.0"

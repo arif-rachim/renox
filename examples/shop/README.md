@@ -25,7 +25,7 @@ them to the `sessions` table (tests/shop.rs runs a customer with it). `deploy/` 
 
 | Feature | Where |
 |---|---|
-| Wiring: modules (including `Permissions` and `Audit`), the `admin` role and who has it (`make_admin_of`, `admins`), the `rupiah` filter, `cart_count` on every page, the `shop:make-admin` command, the seeder | [src/lib.rs](src/lib.rs) |
+| Wiring: modules (including `Permissions` and `Audit`), the `admin` role and who has it (`make_admin_of`, `admins`), `cart_count` on every page, the `shop:make-admin` command, the seeder | [src/lib.rs](src/lib.rs) |
 | Home page with a cached product list; list with search, category filter, sort and pagination (the search box swaps only the results with htmx); product page with SEO tags; `sitemap.xml`; language switch | [src/app/catalog/mod.rs](src/app/catalog/mod.rs) |
 | Models, a factory, slugs, a "belongs to" method | [src/app/catalog/model.rs](src/app/catalog/model.rs) |
 | The cart in the database, loaded with its products in one query (`relations::belongs_to`), an upsert in plain SQL | [src/app/cart/mod.rs](src/app/cart/mod.rs) |
@@ -33,6 +33,7 @@ them to the `sessions` table (tests/shop.rs runs a customer with it). `deploy/` 
 | `OrderPlaced` event, its listener, the daily task that cancels unpaid orders, the order policy (owners; admins pass by role) | [src/app/orders/mod.rs](src/app/orders/mod.rs), [model.rs](src/app/orders/model.rs) |
 | Notifications: a queued confirmation mail (HTML and text) and a database row for the customer, a database row for every admin, a "shipped" mail | [src/app/orders/notifications.rs](src/app/orders/notifications.rs), [resources/views/mail](resources/views/mail) |
 | `/admin`: a route group guarded by the `admin` role (`require_role`), products with photo uploads and search/sort (deleting one asks for the password again), orders moved pending → paid → shipped (each move written to the audit log), a dashboard with pending orders, then low stock, notifications and recent activity on the kit's tabs (`tabs` + `tab_panel`: switched in the browser, arrow keys move between them) | [src/app/admin](src/app/admin) |
+| The order page as an infolist (`infolist`, `entry` with `since` and `money`, a `repeatable` of the order's lines) | [resources/views/orders/show.html](resources/views/orders/show.html) |
 | English and Indonesian, with plurals (`0 products`, `One product`, `3 products`) and translated validation labels | [resources/lang](resources/lang) |
 | Pages on the UI kit (`renox/ui.html`): a navigation bar with the cart and an account menu, product cards, kit fields and tables, status badges, toasts, the confirmation sheets, an error page in the layout, the coffee-brown accent | [resources/views](resources/views), [layouts/app.html](resources/views/layouts/app.html), [public/app.css](public/app.css) |
 | Deploy: Dockerfile (cargo-chef), systemd unit and socket, Litestream, from `rnx make:deploy` | [Dockerfile](Dockerfile), [deploy/](deploy) |
@@ -138,5 +139,6 @@ section.
 `rnx new`, `docker build .` works as is (CI checks that on every change). This example is part
 of the Renox workspace, so build it from a copy made with `rnx new` rather than from this folder.
 
-Money is in rupiah as `i64`, and the payment is a bank transfer the admin confirms by hand. To
+Money is in rupiah as `i64`, shown with the `money` filter (`APP_CURRENCY`, `IDR` by default:
+`Rp 75.000` in Indonesian, `Rp 75,000` in English), and the payment is a bank transfer the admin confirms by hand. To
 take card or e-wallet payments, see [examples/webhooks](../webhooks).

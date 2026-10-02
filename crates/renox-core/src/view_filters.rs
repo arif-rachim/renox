@@ -1,4 +1,5 @@
-//! Filters every template gets: `number` and `date`.
+//! Filters every template gets: `number`, `money`, `date`, `since`,
+//! `words` and `markdown`.
 
 use minijinja::value::Kwargs;
 use minijinja::{Error, ErrorKind, State, Value};
@@ -25,24 +26,88 @@ fn separators(locale: &str) -> (&'static str, &'static str) {
 /// `{{ 75000 | number }}` → `75,000` (en) or `75.000` (id);
 /// `{{ 3.14159 | number(2) }}` → `3.14` / `3,14`.
 pub(crate) fn number(state: &State, value: Value, decimals: Option<u32>) -> Result<String, Error> {
-    let n: f64 = if let Ok(i) = i64::try_from(value.clone()) {
+    let n = to_number("number", &value)?;
+    Ok(format_number(n, decimals.unwrap_or(0), &locale(state)))
+}
+
+/// A template value as a number: an integer, a float or numeric text.
+fn to_number(filter: &str, value: &Value) -> Result<f64, Error> {
+    Ok(if let Ok(i) = i64::try_from(value.clone()) {
         i as f64
     } else if let Some(s) = value.as_str() {
         s.trim().parse().map_err(|_| {
             Error::new(
                 ErrorKind::InvalidOperation,
-                format!("number: `{s}` is not a number"),
+                format!("{filter}: `{s}` is not a number"),
             )
         })?
     } else {
         f64::try_from(value.clone()).map_err(|_| {
             Error::new(
                 ErrorKind::InvalidOperation,
-                format!("number: `{value}` is not a number"),
+                format!("{filter}: `{value}` is not a number"),
             )
         })?
+    })
+}
+
+/// `{{ order.total | money }}` → `Rp 75.000` with `APP_CURRENCY=IDR`,
+/// `$75.00` with `USD`, with the page's separators. Keywords: `currency`
+/// (another ISO 4217 code for this amount), `decimals`, and `divide_by`
+/// for amounts kept in cents (`divide_by=100`).
+pub(crate) fn money(
+    currency: String,
+) -> impl Fn(&State, Value, Kwargs) -> Result<String, Error> + Send + Sync + 'static {
+    move |state: &State, value: Value, kwargs: Kwargs| {
+        let code: Option<String> = kwargs.get("currency")?;
+        let decimals: Option<u32> = kwargs.get("decimals")?;
+        let divide_by: Option<f64> = kwargs.get("divide_by")?;
+        kwargs.assert_all_used()?;
+        let mut amount = to_number("money", &value)?;
+        if let Some(divisor) = divide_by.filter(|d| *d != 0.0) {
+            amount /= divisor;
+        }
+        let code = code.map_or_else(|| currency.clone(), |c| c.trim().to_ascii_uppercase());
+        Ok(format_money(amount, &code, decimals, &locale(state)))
+    }
+}
+
+/// `amount` in the currency `code` (ISO 4217), with its symbol, its usual
+/// decimals (or `decimals`) and the locale's separators: `Rp 75.000`,
+/// `$1,250.50`, `€1.250,50` in `id` (what the `money` template filter
+/// uses). An unknown code is written before the amount (`CHF 12.00`).
+pub fn format_money(amount: f64, code: &str, decimals: Option<u32>, locale: &str) -> String {
+    let (symbol, usual) = match code {
+        "IDR" => ("Rp", 0),
+        "USD" => ("$", 2),
+        "EUR" => ("€", 2),
+        "GBP" => ("£", 2),
+        "JPY" => ("¥", 0),
+        "CNY" => ("CN¥", 2),
+        "SGD" => ("S$", 2),
+        "MYR" => ("RM", 2),
+        "AUD" => ("A$", 2),
+        "CAD" => ("CA$", 2),
+        "INR" => ("₹", 2),
+        "KRW" => ("₩", 0),
+        "THB" => ("฿", 2),
+        "PHP" => ("₱", 2),
+        "VND" => ("₫", 0),
+        other => (other, 2),
     };
-    Ok(format_number(n, decimals.unwrap_or(0), &locale(state)))
+    let figures = format_number(amount.abs(), decimals.unwrap_or(usual), locale);
+    let sign = if amount < 0.0 && figures.chars().any(|c| c.is_ascii_digit() && c != '0') {
+        "-"
+    } else {
+        ""
+    };
+    // `Rp 75.000`, `RM 12.00`, but `$75.00`.
+    let space = if symbol.ends_with(|c: char| c.is_ascii_alphabetic()) {
+        " "
+    } else {
+        ""
+    };
+    format!("{sign}{symbol}{space}{figures}")
 }
 
 /// `n` with `decimals` decimals and the locale's separators: `75.000` in
@@ -97,6 +162,183 @@ pub(crate) fn date(
             ));
         };
         Ok(formatted)
+    }
+}
+
+/// A moment from a template value: an RFC 3339 time, or a local date-time
+/// or date (both in `zone`).
+fn moment(value: &Value, zone: crate::timezone::Zone) -> Option<i64> {
+    let text = value
+        .as_str()
+        .map(str::to_owned)
+        .unwrap_or_else(|| value.to_string());
+    if let Ok(moment) = chrono::DateTime::parse_from_rfc3339(&text) {
+        return Some(moment.timestamp());
+    }
+    let local = text.parse::<chrono::NaiveDateTime>().ok().or_else(|| {
+        text.parse::<chrono::NaiveDate>()
+            .ok()
+            .and_then(|day| day.and_hms_opt(0, 0, 0))
+    })?;
+    zone.resolve(local)
+        .or_else(|| Some(local.and_utc().timestamp()))
+}
+
+/// `{{ order.created_at | since }}` → `3 hours ago`, `in 2 days`, `just
+/// now` (`3 jam yang lalu` in `id`), from the clock `TestApp::travel`
+/// moves. The texts are `ui.since.*` translations.
+pub(crate) fn since(
+    zone: crate::timezone::Zone,
+) -> impl Fn(&State, Value) -> Result<String, Error> + Send + Sync + 'static {
+    move |state: &State, value: Value| {
+        let then = moment(&value, zone).ok_or_else(|| {
+            Error::new(
+                ErrorKind::InvalidOperation,
+                format!("since: `{value}` is not a date"),
+            )
+        })?;
+        let seconds = crate::clock::unix_secs() - then;
+        let (key, count) = since_unit(seconds.unsigned_abs());
+        let text = |key: &str, args: &[(&str, Value)]| -> String {
+            let kwargs = minijinja::value::Kwargs::from_iter(
+                args.iter().map(|(k, v)| ((*k).to_owned(), v.clone())),
+            );
+            state
+                .lookup("t")
+                .and_then(|t| t.call(state, &[Value::from(key), Value::from(kwargs)]).ok())
+                .and_then(|v| v.as_str().map(str::to_owned))
+                .unwrap_or_else(|| {
+                    let params: Vec<(&str, String)> = args
+                        .iter()
+                        .filter(|(k, _)| *k != "count")
+                        .map(|(k, v)| (*k, v.to_string()))
+                        .collect();
+                    let count = args
+                        .iter()
+                        .find(|(k, _)| *k == "count")
+                        .and_then(|(_, v)| i64::try_from(v.clone()).ok());
+                    crate::i18n::format(&crate::i18n::builtin_text("en", key), &params, count)
+                })
+        };
+        let Some(unit) = key else {
+            return Ok(text("ui.since.now", &[]));
+        };
+        let time = text(unit, &[("count", Value::from(count))]);
+        let side = if seconds >= 0 {
+            "ui.since.past"
+        } else {
+            "ui.since.future"
+        };
+        Ok(text(side, &[("time", Value::from(time))]))
+    }
+}
+
+/// The unit and count for a distance in seconds; `None` under 45 seconds.
+fn since_unit(seconds: u64) -> (Option<&'static str>, i64) {
+    let round = |n: f64| (n.round() as i64).max(1);
+    let s = seconds as f64;
+    match seconds {
+        0..45 => (None, 0),
+        45..2_700 => (Some("ui.since.minutes"), round(s / 60.0)),
+        2_700..79_200 => (Some("ui.since.hours"), round(s / 3_600.0)),
+        79_200..2_246_400 => (Some("ui.since.days"), round(s / 86_400.0)),
+        2_246_400..27_648_000 => (Some("ui.since.months"), round(s / 2_629_746.0)),
+        _ => (Some("ui.since.years"), round(s / 31_556_952.0)),
+    }
+}
+
+/// `{{ post.summary | words(20) }}`: the first 20 words, then `…` (or
+/// `end="…"`) when there were more.
+pub(crate) fn words(value: Value, count: usize, kwargs: Kwargs) -> Result<String, Error> {
+    let end: Option<String> = kwargs.get("end")?;
+    kwargs.assert_all_used()?;
+    let text = value.as_str().map(str::to_owned).unwrap_or_else(|| {
+        if value.is_none() || value.is_undefined() {
+            String::new()
+        } else {
+            value.to_string()
+        }
+    });
+    let all: Vec<&str> = text.split_whitespace().collect();
+    if all.len() <= count {
+        return Ok(all.join(" "));
+    }
+    Ok(format!(
+        "{}{}",
+        all[..count].join(" "),
+        end.as_deref().unwrap_or("…")
+    ))
+}
+
+/// `{{ product.description | markdown }}`: Markdown (CommonMark with
+/// tables, strikethrough and task lists) as HTML. Safe for text people
+/// typed: HTML in it is shown as text, and links or images to anything but
+/// http(s), mailto, tel or a relative URL point nowhere.
+pub(crate) fn markdown(value: Value) -> Value {
+    let text = value.as_str().map(str::to_owned).unwrap_or_else(|| {
+        if value.is_none() || value.is_undefined() {
+            String::new()
+        } else {
+            value.to_string()
+        }
+    });
+    Value::from_safe_string(markdown_html(&text))
+}
+
+fn markdown_html(text: &str) -> String {
+    use pulldown_cmark::{Event, Options, Parser, Tag};
+    let options =
+        Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TASKLISTS;
+    let events = Parser::new_ext(text, options).map(|event| match event {
+        Event::Html(html) | Event::InlineHtml(html) => Event::Text(html),
+        Event::Start(Tag::Link {
+            link_type,
+            dest_url,
+            title,
+            id,
+        }) => Event::Start(Tag::Link {
+            link_type,
+            dest_url: safe_url(dest_url),
+            title,
+            id,
+        }),
+        Event::Start(Tag::Image {
+            link_type,
+            dest_url,
+            title,
+            id,
+        }) => Event::Start(Tag::Image {
+            link_type,
+            dest_url: safe_url(dest_url),
+            title,
+            id,
+        }),
+        other => other,
+    });
+    let mut html = String::new();
+    pulldown_cmark::html::push_html(&mut html, events);
+    html
+}
+
+/// The URL if it is http(s), mailto, tel or relative, else `#`.
+fn safe_url(url: pulldown_cmark::CowStr<'_>) -> pulldown_cmark::CowStr<'_> {
+    // Browsers ignore control characters and spaces inside a scheme.
+    let cleaned: String = url
+        .chars()
+        .filter(|c| !c.is_ascii_control() && !c.is_whitespace())
+        .collect::<String>()
+        .to_ascii_lowercase();
+    let scheme_end = cleaned.find(':');
+    let before_path = cleaned.find(['/', '?', '#']).unwrap_or(usize::MAX);
+    match scheme_end {
+        Some(end) if end < before_path => {
+            if matches!(&cleaned[..end], "http" | "https" | "mailto" | "tel") {
+                url
+            } else {
+                "#".into()
+            }
+        }
+        _ => url,
     }
 }
 
@@ -250,6 +492,54 @@ mod tests {
         assert!(bars.contains("aria-label=\"Sales &lt;q1>\""));
         assert!(spark_svg(&[], false, 96.0, 28.0, None).ends_with("></svg>"));
         assert!(spark_svg(&[5.0], false, 96.0, 28.0, None).contains("<circle"));
+    }
+
+    #[test]
+    fn formats_money_per_currency_and_locale() {
+        assert_eq!(format_money(75_000.0, "IDR", None, "id"), "Rp 75.000");
+        assert_eq!(format_money(1_250.5, "USD", None, "en"), "$1,250.50");
+        assert_eq!(format_money(1_250.5, "EUR", None, "id"), "€1.250,50");
+        assert_eq!(format_money(-5_000.0, "IDR", None, "en"), "-Rp 5,000");
+        assert_eq!(format_money(12.0, "CHF", None, "en"), "CHF 12.00");
+        assert_eq!(format_money(12.0, "MYR", Some(0), "en"), "RM 12");
+        assert_eq!(format_money(-0.001, "USD", None, "en"), "$0.00");
+    }
+
+    #[test]
+    fn picks_units_for_distances() {
+        assert_eq!(since_unit(10), (None, 0));
+        assert_eq!(since_unit(60), (Some("ui.since.minutes"), 1));
+        assert_eq!(since_unit(44 * 60), (Some("ui.since.minutes"), 44));
+        assert_eq!(since_unit(3 * 3_600), (Some("ui.since.hours"), 3));
+        assert_eq!(since_unit(23 * 3_600), (Some("ui.since.days"), 1));
+        assert_eq!(since_unit(40 * 86_400), (Some("ui.since.months"), 1));
+        assert_eq!(since_unit(400 * 86_400), (Some("ui.since.years"), 1));
+    }
+
+    #[test]
+    fn markdown_keeps_html_and_scripts_out() {
+        let html = markdown_html(
+            "**Bold** <script>alert(1)</script>\n\n[x](javascript:alert(1)) [y](https://renox.dev) [z](/a:b) ![i](JaVaScRiPt:x) [w](%20data:text/html,x)",
+        );
+        assert!(html.contains("<strong>Bold</strong>"), "{html}");
+        assert!(html.contains("&lt;script&gt;"), "{html}");
+        assert!(
+            !html.to_lowercase().contains("script:") && !html.contains("data:"),
+            "{html}"
+        );
+        assert!(
+            html.contains("href=\"https://renox.dev\"") && html.contains("href=\"/a:b\""),
+            "{html}"
+        );
+        assert!(
+            html.contains("href=\"#\"") && html.contains("src=\"#\""),
+            "{html}"
+        );
+        let table = markdown_html("| a | b |\n|---|---|\n| 1 | 2 |\n\n- [x] done\n\n~~old~~");
+        assert!(
+            table.contains("<table>") && table.contains("checkbox") && table.contains("<del>"),
+            "{table}"
+        );
     }
 
     #[test]

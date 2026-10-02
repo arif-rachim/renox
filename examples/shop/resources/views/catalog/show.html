@@ -16,7 +16,7 @@
     <div>
       {% if category %}<a class="rx-link" href="{{ route('products.index', category=category.slug) }}">{{ category.name }}</a>{% endif %}
       <h1 class="rx-title">{{ product.name }}</h1>
-      <p class="price">{{ product.price | rupiah }}</p>
+      <p class="price">{{ product.price | money }}</p>
     </div>
     <p>{{ product.description }}</p>
     {% if product.stock == 0 %}

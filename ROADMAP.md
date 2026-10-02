@@ -1444,7 +1444,36 @@ Notes:
   of pairs; and the audit probe `validation_array_where_scalar_expected` caught `name[]=a`
   filling a text field once `[]` was read as nested, so a `[]` name is always a list.
 
+### UI kit · Infolists next to Filament's
+
+Filament's infolists (https://filamentphp.com/docs/5.x/infolists/overview) as the yardstick,
+asked by the owner: read-only details of a record, which apps wrote by hand until now.
+
+- [x] `infolist(columns, inline)`, `entry(label, value, …)` with `format` (`date`,
+  `datetime`, `since`, `money`, `number`, `markdown`, `bool`, `color`, `image`,
+  `key_value`), `badge`/`labels`, `url`, `copyable`, `tooltip`, `hint`, `prefix`/`suffix`,
+  `limit`/`words`, `placeholder`, lists (`list`, `limit_list`), a call block as the value;
+  `repeatable(label, items, columns)`.
+- [x] Filters `money` (`APP_CURRENCY`, `renox::format_money`), `since`, `words`, `markdown`
+  (pulldown-cmark).
+- [x] Examples: shop's order page, fields' read-only product page.
+- [ ] Later: a code entry with syntax highlighting (a plugin, next to the editors), entry
+  actions (Filament's prefix/suffix actions: buttons beside a value).
+
+Notes:
+- Sections and tabs are the kit's `card`, `fieldset` and `tabs`, so there is no infolist
+  layout of its own; `repeatable` is a nested `<dl>` per item.
+- "Show N more" is a `<details>`: it works without the script.
+- The owner chose a global currency (`APP_CURRENCY`, default `IDR`) over a per-call one;
+  `money(currency=…)` still covers a page with several. Separators follow the page's locale
+  like `number`, so English pages show `Rp 75,000`.
+
 ## Decisions
+
+- **Markdown in templates:** `pulldown-cmark` without its default features renders it; instead
+  of a sanitizer (ammonia pulls in html5ever) raw HTML events become text and link and image
+  URLs other than http(s), mailto, tel and relative ones become `#`. That is enough because
+  pulldown-cmark escapes everything else it writes.
 
 - **Nested forms:** a form whose names have a `[` is read by Renox's own small deserializer
   (`validation/nested.rs`) instead of `serde_html_form`, which has no nesting: a tree of text,

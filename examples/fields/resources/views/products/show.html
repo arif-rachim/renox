@@ -1,0 +1,30 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import card, infolist, entry, link_button %}
+
+{#- The same product read-only: the kit's infolist, each value formatted by
+    its kind (money in APP_CURRENCY, dates, a Yes/No, swatches, badges,
+    pairs, Markdown). -#}
+{% block content %}
+{% call card(title=product.name, subtitle="Every field of the form, read-only.") %}
+  {% call infolist(columns=2) %}
+    {{ entry("Product ID", product.id, copyable=true, span="full") }}
+    {{ entry("Description", product.description, format="markdown", span="full", placeholder="No description") }}
+    {{ entry("Price", product.price, format="money") }}
+    {{ entry("Stock", product.stock, format="number", suffix="in stock") }}
+    {{ entry("Weight", product.weight_kg, format="number", decimals=2, suffix="kg") }}
+    {{ entry("Available", product.available, format="bool") }}
+    {{ entry("Size", product.size, badge="info", labels={"small": "Small", "medium": "Medium", "large": "Large"}) }}
+    {{ entry("Colors", product.colors, format="color") }}
+    {{ entry("Tags", product.tags, badge=true, limit_list=3) }}
+    {{ entry("Specifications", product.specs, format="key_value", span="full") }}
+    {{ entry("Opens at", product.opens_at) }}
+    {{ entry("Launch", product.launch_at, format="datetime", date_format="%d %b %Y, %H:%M") }}
+    {{ entry("Released on", product.released_on, format="date", date_format="%d %b %Y") }}
+    {{ entry("Updated", product.updated_at, format="since") }}
+  {% endcall %}
+  <div class="rx-card__footer">
+    {{ link_button(route('home'), "All products", variant="plain") }}
+    {{ link_button(route('products.edit', product.id), "Edit", variant="primary") }}
+  </div>
+{% endcall %}
+{% endblock %}

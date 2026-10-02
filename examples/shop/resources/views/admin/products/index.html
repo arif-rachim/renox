@@ -28,7 +28,7 @@
   {% for product in products.items %}
   <tr>
     <td><a class="rx-link" href="{{ route('admin.products.edit', product.id) }}">{{ product.name }}</a></td>
-    <td class="rx-num">{{ product.price | rupiah }}</td>
+    <td class="rx-num">{{ product.price | money }}</td>
     <td class="rx-num">{% if product.stock < 5 %}{{ badge(product.stock, kind="warning") }}{% else %}{{ product.stock }}{% endif %}</td>
     <td class="rx-hide-narrow">{{ "Yes" if product.active else "No" }}</td>
     <td>

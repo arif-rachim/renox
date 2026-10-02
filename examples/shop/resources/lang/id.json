@@ -36,6 +36,7 @@
     "pay_by_transfer": "Bayar lewat transfer bank dalam :days hari; pesanan yang belum dibayar dibatalkan.",
     "place": "Buat pesanan",
     "date": "Tanggal", "status": "Status", "none": "Belum ada pesanan.",
+    "items": "Barang", "items_count": "Jumlah barang",
     "statuses": { "pending": "Menunggu pembayaran", "paid": "Dibayar", "shipped": "Dikirim", "cancelled": "Dibatalkan" }
   },
   "renox": {

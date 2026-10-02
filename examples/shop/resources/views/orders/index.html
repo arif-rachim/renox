@@ -11,7 +11,7 @@
     <td><a class="rx-link" href="{{ route('orders.show', order.id) }}">#{{ order.id }}</a></td>
     <td class="rx-hide-narrow">{{ order.created_at | date('%d/%m/%Y %H:%M') }}</td>
     <td>{{ status_badge(order.status, t('orders.statuses.' ~ order.status)) }}</td>
-    <td class="rx-num">{{ order.total | rupiah }}</td>
+    <td class="rx-num">{{ order.total | money }}</td>
   </tr>
   {% endfor %}
 {% endcall %}

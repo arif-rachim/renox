@@ -146,6 +146,8 @@ impl Module for Guestbook {
     can be added and renamed in place), file drops, a date picker, key-value pairs, repeaters and wizards,
     fields shown only when another has a value, and nested form names
     (`lines[0][qty]`) read into a `Vec` of structs;
+  - infolists for a record's page: labels and values formatted as money (`APP_CURRENCY`),
+    dates, "3 hours ago", badges, Yes/No, swatches, pairs or Markdown;
   - keyboard support and WCAG AA contrast;
   - toasts (`Toast::success(…)`) and live validation.
 - A data grid for dashboards (`renox::grid`): filters per column by kind (a date range

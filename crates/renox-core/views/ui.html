@@ -625,6 +625,148 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 </div>
 {%- endmacro %}
 
+{#- Read-only details of a record (Filament's infolists): labels and
+    values in a grid of `columns`, one column on phones. `inline=true` puts
+    every label beside its value.
+
+    {% call infolist(columns=2) %}
+      {{ entry("Number", order.number, copyable=true) }}
+      {{ entry("Status", order.status, badge={"paid": "success", "pending": "warning"}) }}
+      {{ entry("Placed", order.created_at, format="since") }}
+      {{ entry("Total", order.total, format="money") }}
+      {{ entry("Note", order.note, format="markdown", span="full") }}
+    {% endcall %} -#}
+{% macro infolist(columns=1, inline=false) -%}
+<dl class="rx-infolist rx-cols-{{ columns }}{% if inline %} rx-infolist--inline{% endif %}">{{ caller() }}</dl>
+{%- endmacro %}
+
+{%- macro _empty_value(value) -%}
+{%- if value is none or value is undefined or value == "" or ((value is sequence or value is mapping) and value | length == 0) %}1{% endif -%}
+{%- endmacro -%}
+
+{#- One value of an entry, formatted. -#}
+{%- macro _entry_item(item, format, badge, labels, decimals, currency, date_format, limit, words, image_size, circular) -%}
+{%- set text = labels[item] if labels and labels[item] is defined else item %}
+{%- if format == "date" %}{% set text = text | date(date_format or "%Y-%m-%d") %}
+{%- elif format == "datetime" %}{% set text = text | date(date_format or "%Y-%m-%d %H:%M") %}
+{%- elif format == "money" %}{% set text = text | money(currency=currency, decimals=decimals) %}
+{%- elif format == "number" %}{% set text = text | number(decimals or 0) %}
+{%- endif %}
+{%- if words %}{% set text = text | words(words) %}{% endif %}
+{%- if limit and text is string and text | length > limit %}{% set text = text[:limit] | trim ~ "…" %}{% endif %}
+{%- if format == "since" -%}
+<time datetime="{{ item }}" title="{{ item | date(date_format or '%Y-%m-%d %H:%M') }}">{{ item | since }}</time>
+{%- elif format == "bool" -%}
+<span class="rx-entry__bool rx-entry__bool--{{ 'yes' if item else 'no' }}">{{ _icon("check" if item else "close") }}{{ t('ui.yes') if item else t('ui.no') }}</span>
+{%- elif format == "color" -%}
+<span class="rx-entry__color"><span class="rx-swatch" style="background: {{ item }}"></span>{{ item }}</span>
+{%- elif format == "image" -%}
+<img class="rx-entry__image{% if circular %} rx-entry__image--circular{% endif %}" src="{{ item }}" alt="" width="{{ image_size }}" height="{{ image_size }}" loading="lazy">
+{%- elif format == "markdown" -%}
+<div class="rx-prose">{{ item | markdown }}</div>
+{%- elif badge -%}
+{%- if badge is mapping %}{% set kind = badge[item] if badge[item] is defined else none %}
+{%- elif badge is string %}{% set kind = badge %}
+{%- else %}{% set kind = none %}{% endif -%}
+{{ _badge_span(text, kind) }}
+{%- else -%}
+{{ text }}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro _badge_span(text, kind) -%}<span class="rx-badge{% if kind %} rx-badge--{{ kind }}{% endif %}">{{ text }}</span>{%- endmacro -%}
+
+{#- A label and its value, inside an `infolist`. `value` may be a list
+    (each item shown alike: `list="comma"`, "lines" or "bullets";
+    `limit_list=3` folds the rest behind "Show 2 more"). With
+    `{% call entry("Customer") %}…{% endcall %}` the call block is the value.
+
+    `format`: "date", "datetime" (`date_format` with chrono's codes), "since"
+    ("3 hours ago", the date as its tooltip), "money" (`APP_CURRENCY`, or `currency`),
+    "number" (`decimals`), "markdown", "bool" (a check and Yes, or a cross
+    and No), "color" (a swatch), "image" (a URL; `image_size`, `circular`)
+    or "key_value" (pairs or a map, such as `KeyValues`, as a table).
+    `badge`: true, a kind ("success"), or kinds by value
+    (`{"paid": "success"}`); `labels` names values (`{"paid": "Paid"}`).
+    `url` makes it a link, `copyable` adds a copy button, `limit` (letters)
+    and `words` shorten it, `placeholder` stands in for nothing (—). -#}
+{% macro entry(label, value=none, format=none, badge=none, labels=none, url=none, new_tab=false, copyable=false, tooltip=none, placeholder="—", hint=none, prefix=none, suffix=none, limit=none, words=none, list="comma", limit_list=none, decimals=none, currency=none, date_format=none, image_size=40, circular=false, span=none, inline=false, hide_label=false, id=none) -%}
+<div class="rx-entry{% if span %} rx-span-{{ span }}{% endif %}{% if inline %} rx-entry--inline{% endif %}{% if format in ['money', 'number'] %} rx-entry--numeric{% endif %}"{% if id %} id="{{ id }}"{% endif %}>
+  <dt class="rx-entry__label{% if hide_label %} rx-visually-hidden{% endif %}">{{ label }}</dt>
+  <dd class="rx-entry__value"{% if tooltip %} title="{{ tooltip }}"{% endif %}>
+  {%- if caller is defined %}{{ caller() }}
+  {%- elif _empty_value(value) %}<span class="rx-entry__empty">{{ placeholder }}</span>
+  {%- elif format == "key_value" %}
+    <table class="rx-table rx-entry__pairs"><tbody>
+      {%- for pair in (value | items if value is mapping else value) %}
+      <tr><th scope="row">{{ pair[0] }}</th><td>{{ pair[1] }}</td></tr>
+      {%- endfor %}
+    </tbody></table>
+  {%- else %}
+    {%- set many = value is sequence %}
+    {%- set items = value if many else [value] %}
+    {%- set shown = items[:limit_list] if limit_list else items %}
+    {%- set inner %}
+      {%- if prefix %}<span class="rx-entry__affix">{{ prefix }}</span>{% endif %}
+      {%- if many and list in ["lines", "bullets"] %}
+      <ul class="rx-entry__list rx-entry__list--{{ list }}"{% if list == 'lines' %} role="list"{% endif %}>
+        {%- for item in shown %}<li>{{ _entry_item(item, format, badge, labels, decimals, currency, date_format, limit, words, image_size, circular) }}</li>{% endfor -%}
+      </ul>
+      {%- elif many %}
+      <span class="rx-entry__items{% if badge or format in ['image', 'color', 'bool'] %} rx-entry__items--row{% endif %}">
+        {%- for item in shown %}{{ _entry_item(item, format, badge, labels, decimals, currency, date_format, limit, words, image_size, circular) }}{% if not loop.last and not badge and format not in ['image', 'color', 'bool'] %}, {% endif %}{% endfor -%}
+      </span>
+      {%- else %}{{ _entry_item(value, format, badge, labels, decimals, currency, date_format, limit, words, image_size, circular) }}
+      {%- endif %}
+      {%- if suffix %}<span class="rx-entry__affix">{{ suffix }}</span>{% endif %}
+    {%- endset %}
+    {%- if copyable %}<span class="rx-entry__copied">{% endif %}
+    {%- if url %}<a class="rx-link" href="{{ url }}"{% if new_tab %} target="_blank" rel="noopener"{% endif %}>{{ inner }}</a>{% else %}{{ inner }}{% endif %}
+    {%- if copyable %}</span>{% endif %}
+    {%- if limit_list and items | length > limit_list %}
+    <details class="rx-entry__more">
+      <summary class="rx-link">{{ t('ui.show_more', count=items | length - limit_list) }}</summary>
+      {%- set rest = items[limit_list:] %}
+      {%- if list in ["lines", "bullets"] %}
+      <ul class="rx-entry__list rx-entry__list--{{ list }}"{% if list == 'lines' %} role="list"{% endif %}>
+        {%- for item in rest %}<li>{{ _entry_item(item, format, badge, labels, decimals, currency, date_format, limit, words, image_size, circular) }}</li>{% endfor -%}
+      </ul>
+      {%- else %}
+      <span class="rx-entry__items{% if badge or format in ['image', 'color', 'bool'] %} rx-entry__items--row{% endif %}">
+        {%- for item in rest %}{{ _entry_item(item, format, badge, labels, decimals, currency, date_format, limit, words, image_size, circular) }}{% if not loop.last and not badge and format not in ['image', 'color', 'bool'] %}, {% endif %}{% endfor -%}
+      </span>
+      {%- endif %}
+    </details>
+    {%- endif %}
+    {%- if copyable %}
+    <button class="rx-affix__button rx-entry__copy" type="button" data-rx-copy data-rx-copy-text="{{ value | join(', ') if many else value }}" aria-label="{{ t('ui.copy') }} {{ label }}" data-label-done="{{ t('ui.copied') }}">{{ _icon("copy") }}{{ _icon("check") }}<span class="rx-visually-hidden" aria-live="polite"></span></button>
+    {%- endif %}
+  {%- endif -%}
+  </dd>
+  {%- if hint %}<dd class="rx-hint rx-entry__hint">{{ hint }}</dd>{% endif %}
+</div>
+{%- endmacro %}
+
+{#- A list of records inside a record, each shown as its own small
+    infolist, such as an order's lines:
+    {% call(line) repeatable("Items", order.lines, columns=3) %}
+      {{ entry("Product", line.name) }}{{ entry("Qty", line.quantity) }}
+    {% endcall %} -#}
+{% macro repeatable(label, items, columns=1, placeholder="—", span="full", hide_label=false) -%}
+<div class="rx-entry rx-entry--repeatable{% if span %} rx-span-{{ span }}{% endif %}">
+  <dt class="rx-entry__label{% if hide_label %} rx-visually-hidden{% endif %}">{{ label }}</dt>
+  <dd class="rx-entry__value">
+  {%- if items %}
+    <ul class="rx-repeatable" role="list">
+      {%- for item in items %}
+      <li class="rx-repeatable__item"><dl class="rx-infolist rx-cols-{{ columns }}">{{ caller(item) }}</dl></li>
+      {%- endfor %}
+    </ul>
+  {%- else %}<span class="rx-entry__empty">{{ placeholder }}</span>{% endif %}
+  </dd>
+</div>
+{%- endmacro %}
+
 {#- What an empty list says: what goes here, and the way to add the first. -#}
 {% macro empty(title, message=none, action_href=none, action_label=none) -%}
 <div class="rx-empty">

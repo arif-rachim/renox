@@ -4,7 +4,7 @@
     {% if product.photo %}<img src="{{ storage_url(product.photo) }}" alt="" width="240" height="160" loading="lazy">{% else %}<div class="no-photo"></div>{% endif %}
     <div class="product-card__body">
       <h3>{{ product.name }}</h3>
-      <p class="price">{{ product.price | rupiah }}</p>
+      <p class="price">{{ product.price | money }}</p>
       {% if product.stock == 0 %}<p class="rx-subtitle">{{ t('products.sold_out') }}</p>{% endif %}
     </div>
   </a>

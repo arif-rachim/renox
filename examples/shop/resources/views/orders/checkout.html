@@ -3,8 +3,8 @@
 {% block content %}
 {% from "renox/ui.html" import card, textarea, toggle_buttons, show_when, button, group %}
 <h1 class="rx-title">{{ t('cart.checkout') }}</h1>
-{% call group(footer=t('cart.total') ~ ": " ~ (total | rupiah)) %}
-  {% for line in lines %}<div>{{ line.item.quantity }} × {{ line.product.name }}: {{ line.subtotal | rupiah }}</div>{% endfor %}
+{% call group(footer=t('cart.total') ~ ": " ~ (total | money)) %}
+  {% for line in lines %}<div>{{ line.item.quantity }} × {{ line.product.name }}: {{ line.subtotal | money }}</div>{% endfor %}
 {% endcall %}
 
 {# Live validation: the address is checked when it's left, before anything is sent. #}

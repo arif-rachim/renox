@@ -36,6 +36,7 @@
     "pay_by_transfer": "Pay by bank transfer within :days days; unpaid orders are cancelled.",
     "place": "Place order",
     "date": "Date", "status": "Status", "none": "No orders yet.",
+    "items": "Items", "items_count": "Items",
     "statuses": { "pending": "Waiting for payment", "paid": "Paid", "shipped": "Shipped", "cancelled": "Cancelled" }
   }
 }

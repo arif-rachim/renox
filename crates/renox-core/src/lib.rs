@@ -99,7 +99,7 @@ pub use toast::Toast;
 pub use upload::Upload;
 pub use validation::{Errors, KeyValues, Valid, Validate, ValidationError, Validator};
 pub use view::{View, Views, view};
-pub use view_filters::format_number;
+pub use view_filters::{format_money, format_number};
 
 pub use minijinja::context;
 

@@ -5,7 +5,7 @@
 <p><a href="{{ route('products.create') }}">New product</a></p>
 <ul>
   {% for p in products %}
-  <li><a href="{{ route('products.edit', p.id) }}">{{ p.name }}</a> ({{ p.size }}, {{ p.colors | join(", ") }})</li>
+  <li><a href="{{ route('products.show', p.id) }}">{{ p.name }}</a> ({{ p.size }}, {{ p.colors | join(", ") }})</li>
   {% endfor %}
 </ul>
 {% endblock %}

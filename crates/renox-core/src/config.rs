@@ -110,6 +110,10 @@ pub struct Config {
     pub locale: String,
     /// Language used for keys missing in the request's locale, from `APP_FALLBACK_LOCALE`.
     pub fallback_locale: String,
+    /// The currency of the `money` template filter, an ISO 4217 code, from
+    /// `APP_CURRENCY` (default `IDR`): `IDR` shows `Rp 75.000`, `USD`
+    /// `$75.00`, with the page's separators.
+    pub currency: String,
     /// Where translation files live, from `LANG_PATH`.
     pub lang_path: PathBuf,
     /// Mail settings, from `MAIL_*`.
@@ -230,6 +234,12 @@ impl Config {
             request_timeout: v.seconds("REQUEST_TIMEOUT", 60)?,
             locale: v.or("APP_LOCALE", "en"),
             fallback_locale: v.or("APP_FALLBACK_LOCALE", "en"),
+            currency: match v.or("APP_CURRENCY", "IDR").trim().to_ascii_uppercase() {
+                code if code.len() == 3 && code.bytes().all(|b| b.is_ascii_uppercase()) => code,
+                other => {
+                    bail!("APP_CURRENCY must be an ISO 4217 code like IDR or USD, got `{other}`")
+                }
+            },
             lang_path: v.or("LANG_PATH", "resources/lang").into(),
             mail: MailConfig {
                 mailer: v.or("MAIL_MAILER", "log"),
@@ -333,6 +343,7 @@ impl Default for Config {
             request_timeout: Some(Duration::from_secs(60)),
             locale: "en".into(),
             fallback_locale: "en".into(),
+            currency: "IDR".into(),
             lang_path: "resources/lang".into(),
             mail: MailConfig {
                 mailer: "memory".into(),
@@ -450,6 +461,16 @@ mod tests {
         assert_eq!(c.log_file, Some(PathBuf::from("storage/logs/app.log")));
         let err = load(&[("LOG_FORMAT", "xml")]).unwrap_err();
         assert!(err.to_string().contains("LOG_FORMAT"), "{err}");
+    }
+
+    #[test]
+    fn currency() {
+        assert_eq!(load(&[]).unwrap().currency, "IDR");
+        assert_eq!(load(&[("APP_CURRENCY", " usd ")]).unwrap().currency, "USD");
+        for bad in ["US", "rupiah", "U$D"] {
+            let err = load(&[("APP_CURRENCY", bad)]).unwrap_err();
+            assert!(err.to_string().contains("APP_CURRENCY"), "{err}");
+        }
     }
 
     #[test]
