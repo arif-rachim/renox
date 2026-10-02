@@ -1,5 +1,5 @@
 {% extends "layouts/app.html" %}
-{% from "renox/ui.html" import card, input, textarea, checkbox, radio, checkbox_list, date_picker, form_grid, fieldset, form_errors, button, link_button %}
+{% from "renox/ui.html" import card, input, textarea, checkbox, radio, checkbox_list, tags_input, key_value, date_picker, form_grid, fieldset, form_errors, button, link_button %}
 
 {#- The kit's fields show the old input after a failed save, else the value
     given here (the stored one). The value formats match what the inputs
@@ -30,6 +30,12 @@
           one value each, which `Valid` collects into a Vec. -#}
       {{ radio("size", "Size", sizes, selected=product.size if product else "medium", required=true) }}
       {{ checkbox_list("colors", "Colors", colors, selected=product.colors if product else []) }}
+    {% endcall %}
+
+    {% call fieldset("Details") %}
+      {{ tags_input("tags", "Tags", value=product.tags if product else [], suggestions=["organic", "single origin", "decaf"],
+                    hint="Press Enter or a comma after each.") }}
+      {{ key_value("specs", "Specifications", value=product.specs if product else none, key_label="Name", add_label="Add a specification") }}
     {% endcall %}
 
     {% call fieldset("Dates", columns=2) %}

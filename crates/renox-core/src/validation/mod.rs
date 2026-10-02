@@ -28,7 +28,9 @@
 //! ```
 
 pub(crate) mod extract;
+mod key_values;
 mod messages;
+pub(crate) mod nested;
 mod value;
 
 use std::collections::BTreeMap;
@@ -39,6 +41,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 pub use extract::Valid;
+pub use key_values::KeyValues;
 pub use messages::Locale;
 pub(crate) use messages::{render, template_for};
 pub use value::{FieldValue, Inspected};
@@ -312,8 +315,7 @@ impl Validator {
     }
 
     fn label_for(&self, name: &str) -> String {
-        self.translated_label(name)
-            .unwrap_or_else(|| name.replace('_', " "))
+        nested::label(name, |key| self.translated_label(key))
     }
 
     /// Rules for each item of a list, e.g. every tag or every uploaded
@@ -396,10 +398,11 @@ impl Validator {
     /// Starts the rules for one field. The label in messages defaults to the
     /// name with `_` replaced by spaces.
     pub fn field<'v>(&'v mut self, name: &str, value: &impl FieldValue) -> Field<'v> {
-        let translated = self.translated_label(name);
+        let translated = self.translated_label(name).is_some();
         let mut field = Field {
-            translated: translated.is_some(),
-            label: translated.unwrap_or_else(|| name.replace('_', " ")),
+            translated,
+            // `items.0.name` reads "name" (or the app's `items.*.name`).
+            label: self.label_for(name),
             name: name.to_owned(),
             value: value.inspect(),
             db_value: value.db_value(),

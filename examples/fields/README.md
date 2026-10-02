@@ -24,6 +24,12 @@ package already enables renox's `postgres` and `uuid` features.
 
 ## Things worth copying
 
+- **Tags and pairs are JSON columns.** The kit's `tags_input` sends one `tags` value per tag (a
+  `Vec<String>`, stored as `Json<Vec<String>>`); its `key_value` sends `specs[0][key]`,
+  `specs[0][value]`… read into `renox::KeyValues` and stored as `Json<KeyValues>` (a list of
+  pairs, so the order holds in PostgreSQL's `JSONB`). Such a nested name makes `Valid` read
+  the whole form as a tree; every other field still parses from its text.
+
 - **A radio group (or a `<select>`) is an enum.** `#[derive(DbEnum)] enum Size` is stored as
   text (`small`, `medium`, `large`); the form lists `Size::ALL` with the kit's `radio`, and an
   unknown value fails validation.

@@ -66,11 +66,26 @@ struct Payload {
 /// of the session.
 const OLD_INPUT_LIMIT: usize = 2048;
 
+fn drop_passwords(value: &mut Value) {
+    match value {
+        Value::Object(map) => {
+            map.retain(|key, _| !key.to_ascii_lowercase().contains("password"));
+            map.values_mut().for_each(drop_passwords);
+        }
+        Value::Array(items) => items.iter_mut().for_each(drop_passwords),
+        _ => {}
+    }
+}
+
 fn old_input(input: Value) -> Value {
     let Value::Object(mut map) = input else {
         return Value::Object(Map::new());
     };
     map.retain(|key, _| !key.starts_with('_') && !key.to_ascii_lowercase().contains("password"));
+    // Nested forms (`users[0][password]`) keep no password either.
+    for value in map.values_mut() {
+        drop_passwords(value);
+    }
     let size = |map: &Map<String, Value>| serde_json::to_string(map).map_or(0, |s| s.len());
     while size(&map) > OLD_INPUT_LIMIT {
         let Some(largest) = map
@@ -214,11 +229,14 @@ impl Session {
     }
 
     /// A field from the input flashed by the previous request.
+    /// `field` may be a nested name (`items[0][name]` or `items.0.name`)
+    /// of a form that used them.
     pub fn old(&self, field: &str) -> Option<Value> {
-        self.lock()
-            .flashed
-            .get(OLD_INPUT)
-            .and_then(|input| input.get(field))
+        let inner = self.lock();
+        let input = inner.flashed.get(OLD_INPUT)?;
+        input
+            .get(field)
+            .or_else(|| crate::validation::nested::lookup(input, field))
             .cloned()
     }
 

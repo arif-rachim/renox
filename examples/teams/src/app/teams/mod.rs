@@ -73,14 +73,55 @@ async fn public_page(State(db): State<Db>, domain: DomainParams) -> Result<View>
     ))
 }
 
+/// The "New team" wizard: the name, then people to add (rows of the
+/// kit's `repeater`, sent as `invites[0][email]`, `invites[1][email]`…).
 #[derive(Deserialize)]
 struct TeamForm {
     name: String,
+    #[serde(default)]
+    invites: Vec<Invite>,
+}
+
+#[derive(Deserialize)]
+struct Invite {
+    email: String,
+}
+
+impl Invite {
+    fn email(&self) -> String {
+        self.email.trim().to_lowercase()
+    }
+}
+
+/// One row's rules: `v.nested` keys its errors `invites.0.email`, which is
+/// where the kit shows them.
+impl Validate for Invite {
+    fn rules(&self, v: &mut Validator) {
+        v.field("email", &self.email).required().email();
+    }
 }
 
 impl Validate for TeamForm {
     fn rules(&self, v: &mut Validator) {
         v.field("name", &self.name).required().max(60);
+        v.field("invites", &self.invites).max(10);
+        v.nested("invites", &self.invites);
+    }
+
+    /// Every invited email belongs to someone who signed up.
+    async fn after(&self, form: &FormContext<'_>, errors: &mut Errors) -> Result {
+        for (i, invite) in self.invites.iter().enumerate() {
+            if User::find_by_email(&form.state.db, &invite.email())
+                .await?
+                .is_none()
+            {
+                errors.add(
+                    format!("invites.{i}.email"),
+                    "Nobody has signed up with this email address yet.",
+                );
+            }
+        }
+        Ok(())
     }
 }
 
@@ -140,11 +181,25 @@ async fn store(
     Valid(form): Valid<TeamForm>,
 ) -> Result<(Toast, Redirect)> {
     let team = Team::found(&db, &form.name, &user).await?;
+    // `after` checked that each email is a user's.
+    let mut added = 0;
+    for invite in &form.invites {
+        if let Some(member) = User::find_by_email(&db, &invite.email()).await?
+            && member.id != user.id
+            && MEMBERS
+                .attach_with(&db, team.id, member.id, &[("role", &MEMBER)])
+                .await?
+        {
+            added += 1;
+        }
+    }
     session.put(SESSION_KEY, team.id)?; // work in the new team right away
-    Ok((
-        Toast::success(format!("Team {} created.", team.name)),
-        Redirect::to("/projects"),
-    ))
+    let message = match added {
+        0 => format!("Team {} created.", team.name),
+        1 => format!("Team {} created, with one member.", team.name),
+        n => format!("Team {} created, with {n} members.", team.name),
+    };
+    Ok((Toast::success(message), Redirect::to("/projects")))
 }
 
 /// Makes another of the user's teams the current one.

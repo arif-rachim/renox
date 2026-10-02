@@ -234,7 +234,8 @@ fn view_extras(app: App) -> App {
 
 ```html
 {# layout: {{ renox_head() }}{{ renox_ui() }} in <head>, <body class="rx-page">, {{ toasts() }} #}
-{% from "renox/ui.html" import card, input, select, checkbox, radio, checkbox_list, toggle_buttons, show_when, date_picker, file, form_grid, button, confirm, table, form_errors %}
+{% from "renox/ui.html" import card, input, select, checkbox, radio, checkbox_list, toggle_buttons, show_when, date_picker, file, tags_input, key_value, repeater, form_grid, button, confirm, table, form_errors %}
+{# Several steps: {% call wizard("id", [["a", "First"], ["b", "Second"]], submit_label="Save") %} with wizard_step("id", "a") blocks #}
 <form method="post" action="/products" data-live-validate novalidate>{{ csrf_field() }}
   {% call card(title="New product") %}
     {{ form_errors() }}
@@ -251,6 +252,12 @@ fn view_extras(app: App) -> App {
     {{ date_picker("ships_on", "Ships on") }} {# NaiveDate #}
     {{ file("photo", "Photo", accept="image/*", preview=true) }} {# enctype="multipart/form-data" #}
     {{ input("api_key", "API key", value=key, readonly=true, copyable=true) }}
+    {{ tags_input("keywords", "Keywords") }} {# Vec<String> + #[serde(default)] #}
+    {{ select("cats", "Categories", cats, multiple=true, searchable=true) }}
+    {{ key_value("specs", "Specs", value=product.specs) }} {# renox::KeyValues #}
+    {% call(row, prefix) repeater("lines", "Lines", rows=order.lines) %}
+      {{ input(prefix ~ "[name]", "Name", value=row.name) }} {# lines[0][name] → Vec<Line>, v.nested #}
+    {% endcall %}
     {{ button("Create product") }}
   {% endcall %}
 </form>

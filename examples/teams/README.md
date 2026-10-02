@@ -25,7 +25,7 @@ Globex, Carol is a member of Acme. With `SUPER_ADMINS` set, Alice also sees `/ad
 | Wiring: `Auth::new().account()`, the modules, the tenancy layer, the shared `team`, `gate_before`, the `projects:count` command, the seeder | [src/lib.rs](src/lib.rs) |
 | The current team: session → membership check → `renox::context`, an extractor, a policy | [src/app/tenancy.rs](src/app/tenancy.rs) |
 | `Team`, the `team_user` pivot with a `role` (`MEMBERS`, `USER_TEAMS`), the secret helpers | [src/app/teams/model.rs](src/app/teams/model.rs) |
-| Create, switch, members (a form request: `MemberForm`'s `prepare`, `authorize`, `after`), the encrypted secret behind `require_password_confirmed`, each team's public page on its own host (`Routes::domain`, `DomainParams`, a domain fallback) | [src/app/teams/mod.rs](src/app/teams/mod.rs) |
+| Create (the "New team" wizard: a name, then a repeater of members' emails read into `Vec<Invite>`, each row checked with `v.nested` and `after`), switch, members (a form request: `MemberForm`'s `prepare`, `authorize`, `after`), the encrypted secret behind `require_password_confirmed`, each team's public page on its own host (`Routes::domain`, `DomainParams`, a domain fallback) | [src/app/teams/mod.rs](src/app/teams/mod.rs) |
 | `Project` with `default_scope = "team_only"` and a `saving` hook that fills `team_id` | [src/app/projects/model.rs](src/app/projects/model.rs) |
 | Project CRUD with no `team_id` in sight; name unique per team | [src/app/projects/mod.rs](src/app/projects/mod.rs) |
 | The super-admin check and the cross-team report with `Project::unscoped()` | [src/app/admin.rs](src/app/admin.rs) |
@@ -33,6 +33,13 @@ Globex, Carol is a member of Acme. With `SUPER_ADMINS` set, Alice also sees `/ad
 | Tables: `teams`, `team_user`, `projects` (unique `(team_id, name)`); `slug` added in a later migration | [migrations](migrations) |
 
 ## Things worth copying
+
+- **A form in steps with rows of fields.** [teams/index.html](resources/views/teams/index.html)
+  wraps "New team" in the kit's `wizard`: Next asks the server about the step's fields
+  (`data-live-validate`) before moving on. The members are a `repeater`, so its inputs are
+  named `invites[0][email]`, `invites[1][email]`… and `Valid` reads them into
+  `Vec<Invite>`; `v.nested("invites", …)` runs each row's rules and `after` checks every email
+  against the users, keyed `invites.1.email` so the error shows in that row.
 
 - **A form request.** `MemberForm` (`impl Validate`) does what Laravel's form requests do:
   `prepare` lowercases the email, `authorize` lets only the team's owners through (403

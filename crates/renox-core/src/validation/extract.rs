@@ -10,6 +10,7 @@ use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
 use super::messages::render;
+use super::nested;
 use super::{Errors, Locale, Validate, ValidationError, Validator};
 use crate::upload::{self, Upload};
 use crate::{AppState, Error};
@@ -39,10 +40,11 @@ impl Messages {
     }
 
     fn label(&self, field: &str) -> String {
-        self.texts
-            .get(&format!("renox.validation.attributes.{field}"))
-            .cloned()
-            .unwrap_or_else(|| field.replace('_', " "))
+        nested::label(field, |key| {
+            self.texts
+                .get(&format!("renox.validation.attributes.{key}"))
+                .cloned()
+        })
     }
 }
 
@@ -197,9 +199,11 @@ where
     // one field's errors and stop, whatever the rest of the form says; the
     // handler doesn't run, so nothing is saved.
     if let Some(field) = live_field {
+        // `items[0][name]` from the page; its errors are keyed `items.0.name`.
+        let key = nested::normalize(&field);
         let messages: Vec<String> = errors
             .iter()
-            .find(|(name, _)| *name == field)
+            .find(|(name, _)| *name == key)
             .map(|(_, messages)| messages.to_vec())
             .unwrap_or_default();
         let body = serde_json::json!({ "field": field, "errors": messages });
@@ -257,6 +261,9 @@ fn parse_pairs<T: DeserializeOwned>(
     uploads: &HashMap<String, Upload>,
     locale: &Messages,
 ) -> (Parsed<T>, Map<String, Value>) {
+    if nested::is_nested(pairs.iter().map(|(k, _)| k.as_str())) {
+        return parse_nested(pairs, uploads, locale);
+    }
     let mut input = Map::new();
     for (key, value) in pairs.iter().filter(|(_, v)| !uploads.contains_key(v)) {
         match input.get_mut(key) {
@@ -338,6 +345,98 @@ fn parse_pairs<T: DeserializeOwned>(
 }
 
 const PLACEHOLDERS: &[&str] = &["0", "false"];
+
+/// A form with nested names (`items[0][name]`): read as a tree, so lists of
+/// structs and maps work. Empty values are kept (an `Option` reads "" as
+/// `None`), so the rows of a list keep their numbers, and with them their
+/// errors (`items.2.name`). Missing fields and fields that don't parse are
+/// handled as for a plain form.
+fn parse_nested<T: DeserializeOwned>(
+    pairs: Vec<(String, String)>,
+    uploads: &HashMap<String, Upload>,
+    locale: &Messages,
+) -> (Parsed<T>, Map<String, Value>) {
+    let shown: Vec<(String, String)> = pairs
+        .iter()
+        .filter(|(_, v)| !uploads.contains_key(v))
+        .cloned()
+        .collect();
+    let input = match nested::Node::build(&shown).into_json() {
+        Value::Object(map) => map,
+        _ => Map::new(),
+    };
+    // Dotted names, keeping a `[]` ending: `name[]` is a list even when
+    // sent once, so it never fills a text field.
+    let mut filled: Vec<(String, String)> = pairs
+        .into_iter()
+        .map(|(k, v)| {
+            let key = nested::normalize(&k);
+            if k.ends_with("[]") {
+                (key + "[]", v)
+            } else {
+                (key, v)
+            }
+        })
+        .collect();
+    let mut errors = Errors::new();
+    let mut tries: HashMap<String, usize> = HashMap::new();
+    let mut coerced: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let parsed = loop {
+        let tree = nested::Node::build(&filled);
+        match upload::with_uploads(uploads, || nested::deserialize::<T>(tree)) {
+            Ok(data) => break Parsed::Ok(data, errors),
+            Err(err) => {
+                let message = err.inner().to_string();
+                let path = nested::normalize(&err.path().to_string());
+                let path = path.trim_start_matches('.').to_owned();
+                let path = if path.is_empty() {
+                    ".".to_owned()
+                } else {
+                    path
+                };
+                if let Some(field) = missing_field(&message) {
+                    let full = if path == "." {
+                        field.to_owned()
+                    } else {
+                        format!("{path}.{field}")
+                    };
+                    if !filled.iter().any(|(k, _)| *k == full) {
+                        filled.push((full, String::new()));
+                        continue;
+                    }
+                }
+                if coerce_browser_value(&mut filled, &path, &message, &mut coerced) {
+                    continue;
+                }
+                let blank = filled
+                    .iter()
+                    .any(|(k, v)| *k == path && v.trim().is_empty());
+                let tried = tries.entry(path.clone()).or_default();
+                if *tried == 0 {
+                    for (field, messages) in field_error(&path, &message, blank, locale).iter() {
+                        for message in messages {
+                            errors.add(field, message.clone());
+                        }
+                    }
+                }
+                let placeholder = match *tried {
+                    0 => expected_variant(&message)
+                        .or_else(|| PLACEHOLDERS.first().map(|p| (*p).to_owned())),
+                    n => PLACEHOLDERS.get(n).map(|p| (*p).to_owned()),
+                };
+                *tried += 1;
+                match placeholder {
+                    Some(value) if filled.iter().any(|(k, _)| *k == path) => {
+                        filled.retain(|(k, _)| *k != path);
+                        filled.push((path, value));
+                    }
+                    _ => break Parsed::Invalid(errors),
+                }
+            }
+        }
+    };
+    (parsed, input)
+}
 
 /// The first valid value an enum's error names: serde's "unknown variant
 /// `x`, expected one of `a`, `b`" or DbEnum's "expected one of: a, b".

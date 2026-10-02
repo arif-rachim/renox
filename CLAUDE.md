@@ -524,7 +524,9 @@ PostgreSQL suite 2.5x slower (reconnects).
 - Don't run tests with `--release` (slow compile, no debug assertions).
 
 ### 4.8 Forms and validation internals
-- Forms are deserialized with `serde_html_form` (repeated names → `Vec`). The retry loop in
+- Forms are deserialized with `serde_html_form` (repeated names → `Vec`), or, when a name has
+  a `[` (`lines[0][name]`), with `validation/nested.rs` (a tree of text, numbers parsed when
+  asked for, "" → `None`, empty values kept so rows keep their numbers). The retry loop in
   `validation/extract.rs` first rewrites browser values (`coerce_browser_value`: checkbox
   `on`/missing → bool, datetime-local + `:00`), then uses placeholders (`PLACEHOLDERS`: an enum's
   first variant from the error's "expected one of", then `0`, `false`), so the other rules still
@@ -907,7 +909,13 @@ picks the build, not the terminal.
   inputs (auth pages reveal passwords), `toggle_buttons`, `file`, `date_picker` (Cally in a
   popover; its `change` doesn't bubble, so listen in the capture phase), `show_when`/
   `hide_when` (hidden groups are disabled fieldsets); shop checkout, uploads and fields use
-  them. Branch `ui-form`. Stage 3: tags, key-value, repeater, searchable/multiple select, wizard.
+  them. Stage 3: nested form names (`validation/nested.rs`: a form with a `[` in a name is
+  read as a tree by its own small deserializer; errors and `old()` use dotted keys; labels
+  are the last part), `KeyValues` (stored as a list of pairs: JSONB reorders object keys),
+  `tags_input`, searchable/multiple `select` (a combobox over the native select, kept
+  visually hidden so `required` still works), `repeater` (`{% call(row, prefix) %}`,
+  renumbered by rewriting attributes), `key_value`, `wizard`; teams, fields and shop use
+  them. Branch `ui-form`.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.

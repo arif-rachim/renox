@@ -88,6 +88,11 @@ Then import what a page needs:
 | `file(name, label, accept=…, multiple=…, preview=…, current=…)` | A drop zone that is also the button; the chosen files are listed under it, images with a thumbnail when `preview`. `current` is the URL of the file stored now. The form needs `enctype="multipart/form-data"`, the field is an `Upload` (`Vec<Upload>` with `multiple`). |
 | `date_picker(name, label, value=…, min=…, max=…)` | A date typed as `2026-10-02` or picked in a calendar (Cally, in a popover under the field, its month named in the page's language). Sent as `YYYY-MM-DD`, like `<input type="date">`: a `NaiveDate`. Without JavaScript it is a text field. |
 | `show_when(field, values)` + `hide_when(field, values)` | Fields shown (or hidden) while another field has one of `values`. Hidden fields are disabled, so the form doesn't send them; check them on the server with `required_if`. Without JavaScript they stay visible. |
+| `select(…, multiple=true, searchable=true)` | Several values (a `Vec`), and a box to type in that filters the options, with the chosen ones as chips. The native select stays underneath: the form sends the same thing, and it works without JavaScript. |
+| `tags_input(name, label, value=[…], suggestions=[…])` | Free text as chips: Enter or a comma adds one, Backspace in the empty box removes the last. A `Vec<String>`. |
+| `repeater(name, label, rows=[…], min=…, max=…)` with `{% call(row, prefix) %}` | Rows added, removed and moved by the user, each with the fields of the call block, named `name[0][field]` and renumbered as rows move. A `Vec` of a struct, checked with `v.nested`. Adding a row needs JavaScript. |
+| `key_value(name, label, value=…)` | Pairs of text (a repeater with a key and a value per row): `KeyValues`. |
+| `wizard(id, steps, submit_label)` + `wizard_step(id, key)` | A form in steps. Next checks the step (the browser's rules, then the server's with `data-live-validate`); after a failed submit the first step with an error opens. Without JavaScript all steps show. |
 | `form_grid(columns=2)`, `fieldset(legend, hint=…, columns=…)` | Fields side by side from tablet width up (one column on phones), and a titled group of fields in a long form. A field's `span=2` or `span="full"` makes it wider. |
 
 Every field also takes `id`, `disabled` (the field isn't sent) and `span`; `input` and
@@ -108,6 +113,50 @@ field by its name, so a field with its own `id` and a radio group are found too.
            selected="regular", required=true) }}
   {{ checkbox_list("extras", "Extras", [["gift", "Gift wrap"], ["note", "Card"]], inline=true) }}
 {% endcall %}
+```
+
+Rows of fields, as in examples/teams' "New team" wizard: each row's inputs are named
+`invites[0][email]`, `invites[1][email]`…, and `Valid` reads them into a `Vec`.
+
+```html
+{% from "renox/ui.html" import wizard, wizard_step, repeater, input %}
+{% call wizard("new-team", [["name", "Name"], ["members", "Members"]], submit_label="Create team") %}
+  {% call wizard_step("new-team", "name") %}{{ input("name", "Name", required=true) }}{% endcall %}
+  {% call wizard_step("new-team", "members") %}
+    {% call(row, prefix) repeater("invites", "Members", item_label="Member", max=10) %}
+      {{ input(prefix ~ "[email]", "Email", type="email", value=row.email, required=true) }}
+    {% endcall %}
+  {% endcall %}
+{% endcall %}
+```
+
+```rust
+# use renox::prelude::*;
+#[derive(serde::Deserialize)]
+struct NewTeam {
+    name: String,
+    #[serde(default)]
+    invites: Vec<Invite>,
+}
+
+#[derive(serde::Deserialize)]
+struct Invite {
+    email: String,
+}
+
+impl Validate for Invite {
+    fn rules(&self, v: &mut Validator) {
+        v.field("email", &self.email).required().email();
+    }
+}
+
+impl Validate for NewTeam {
+    fn rules(&self, v: &mut Validator) {
+        v.field("name", &self.name).required();
+        // Each row's rules; errors keyed `invites.0.email`, shown in that row.
+        v.nested("invites", &self.invites);
+    }
+}
 ```
 
 A field that depends on another, as in examples/shop's checkout: the address only for the

@@ -45,7 +45,8 @@ Every example has a README.md that walks through it.
   of order status changes (the `Audit` module), product delete behind password confirmation;
   checkout in `db.retrying`; en/id with plurals; the `make:deploy` files (with the systemd
   socket); every page on the UI kit with a rebranded accent, toasts and confirmation sheets
-  (checkout: `toggle_buttons` + `show_when` + `required_if` for courier or pickup); a
+  (checkout: `toggle_buttons` + `show_when` + `required_if` for courier or pickup; the admin's
+  category in a searchable `select`); a
   typed `shop:make-admin` command with a prompt; an admin nav marked with `route_is`; recently
   viewed products (`session.push`, `{% break %}`), stock texts with plural ranges,
   `class_names`, `Redirect::route`; tests with time travel (unpaid orders cancelled
@@ -135,8 +136,9 @@ Every example has a README.md that walks through it.
   admin report and a command, project names unique per team, `gate_before` for super-admins,
   and a team secret in an `Encrypted<String>` field behind password confirmation; each team's
   public page on its own host (`Routes::domain`, `DomainParams`, a domain fallback); a form request
-  (`MemberForm`: `prepare`, `authorize`, `after`) checked live (`data-live-validate`); pages on
-  the UI kit with confirmation sheets and toasts.
+  (`MemberForm`: `prepare`, `authorize`, `after`) checked live (`data-live-validate`); "New
+  team" as a `wizard` with a `repeater` of members (`invites[0][email]` → `Vec<Invite>`,
+  `v.nested`, `after` per row); pages on the UI kit with confirmation sheets and toasts.
   [tenancy.rs](examples/teams/src/app/tenancy.rs),
   [projects/model.rs](examples/teams/src/app/projects/model.rs),
   [teams/mod.rs](examples/teams/src/app/teams/mod.rs),
@@ -152,6 +154,7 @@ Every example has a README.md that walks through it.
 - [examples/fields](examples/fields) ([README](examples/fields/README.md)): every form field type (text, textarea, number, money,
   switch, radio → `DbEnum`, checkbox list → `Json<Vec<String>>`, time, datetime-local, date)
   on the UI kit (`prefix`/`suffix`, `radio`, `checkbox_list`, `date_picker`, a `copyable` key,
+  `tags_input` → `Json<Vec<String>>`, `key_value` → `Json<KeyValues>` (a nested form),
   `form_grid`, `fieldset`)
   saved and shown back in the edit form, on SQLite and PostgreSQL; list items checked
   with `each` + `one_of` and `distinct`; products keyed by `id: Uuid` (a model key other than

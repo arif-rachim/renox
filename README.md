@@ -141,6 +141,10 @@ impl Module for Guestbook {
 - Components are macros that see the request (`old`, `error`, `t`, `can`, `auth`), and a UI kit
   after Apple's Human Interface Guidelines ships with Renox (`renox/ui.html`):
   - form fields, buttons, cards, alerts, sheets, menus, tabs and tables, with dark mode;
+  - the fields Filament has: radio groups, checkbox lists, toggle buttons, tags, a
+    searchable select, file drops, a date picker, key-value pairs, repeaters and wizards,
+    fields shown only when another has a value, and nested form names
+    (`lines[0][qty]`) read into a `Vec` of structs;
   - keyboard support and WCAG AA contrast;
   - toasts (`Toast::success(…)`) and live validation.
 - A data grid for dashboards (`renox::grid`): filters per column by kind (a date range

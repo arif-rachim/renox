@@ -19,6 +19,9 @@ every row by Renox's own tests, on SQLite and PostgreSQL.
 | `type=datetime-local` (no seconds needed) | `NaiveDateTime` | `TEXT` | `TIMESTAMP` |
 | (set by Renox) `created_at`, `updated_at` | `Option<DateTime>` (UTC) | `TEXT` | `TIMESTAMPTZ` |
 | `type=file` | `Upload`; store it and keep its key as `String` | `TEXT` | `TEXT` |
+| the kit's `tags_input` | `Vec<String>` with `#[serde(default)]`; stored as `Json<Vec<String>>` | `TEXT` | `JSONB` |
+| the kit's `key_value` (`meta[0][key]`, `meta[0][value]`) | `KeyValues` with `#[serde(default)]`; stored as `Json<KeyValues>` (a list of pairs, so the order holds) | `TEXT` | `JSONB` |
+| the kit's `repeater` (`lines[0][name]`, `lines[0][qty]`) | `Vec<Line>` of a `Deserialize` struct, checked with `v.nested("lines", &self.lines)` | (a table of its own, or `Json<Vec<Line>>`) | |
 | (structured data) | `Json<T>` for any serde type, or `serde_json::Value` | `TEXT` | `JSONB` (or `JSON`, `TEXT`) |
 | (public ids) | `uuid::Uuid`, with renox's `uuid` feature (`renox::uuid::Uuid`) | `BLOB` | `UUID` |
 | (sortable public ids) | `renox::db::Ulid` | `TEXT` | `TEXT` |
@@ -58,6 +61,13 @@ validation error.
   `2026-10-01T10:30:00`).
 - A field that doesn't parse (`weight=heavy`, `size=huge`) is reported together with every other
   field's errors.
+- Nested names (`lines[0][name]`, `meta[1][key]`, as the kit's `repeater` and `key_value`
+  send) make `Valid` read the whole form as a tree: a `Vec` of structs, maps, and every type
+  above still parsing from its text. Errors are keyed with dots (`lines.0.name`), which is
+  what `error('lines[0][name]')`, `old('lines[0][name]')` and the kit's error slots use, and a
+  row's field is labelled by its own name ("The name field is required."; translate it as
+  `renox.validation.attributes.lines.*.name` or `.name`). Empty values stay (an `Option`
+  reads "" as `None`), so rows keep their numbers.
 
 ## Choosing
 

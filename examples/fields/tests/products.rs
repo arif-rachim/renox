@@ -157,3 +157,53 @@ async fn each_color_is_checked_and_repeats_are_refused() {
         // Only what was sent is ticked: no listed color.
         .assert_dont_see(r#"name="colors" value="black" checked"#);
 }
+
+#[renox::test]
+async fn tags_and_specifications_ride_a_nested_form() {
+    let app = TestApp::new(fields::app()).await;
+    // `specs[0][key]` makes the whole form nested: every other field still
+    // parses from its text (numbers, the enum, the checkbox, dates, times).
+    let mut form = FULL.to_vec();
+    form.extend([
+        ("tags", "organic"),
+        ("tags", "decaf"),
+        ("tags", ""),
+        ("specs[0][key]", "Origin"),
+        ("specs[0][value]", "Aceh"),
+        ("specs[1][key]", ""),
+        ("specs[1][value]", ""),
+        ("specs[2][key]", "Roast"),
+        ("specs[2][value]", "Medium"),
+    ]);
+    let res = app.post("/products", &form).await;
+    res.assert_status(303);
+    let edit = res.header("location").unwrap().to_owned();
+    let product = Product::query().first(app.db()).await.unwrap().unwrap();
+    assert_eq!(*product.tags, ["organic", "decaf"]);
+    assert_eq!(
+        product.specs.iter().collect::<Vec<_>>(),
+        [("Origin", "Aceh"), ("Roast", "Medium")]
+    );
+    assert_eq!(product.size, Size::Large);
+    assert!(product.available);
+    assert_eq!(product.opens_at, NaiveTime::from_hms_opt(7, 30, 0));
+    assert_eq!(*product.colors, ["black", "red"]);
+
+    // The edit form shows them back: chips, and a row per pair.
+    app.get(&edit)
+        .await
+        .assert_see(r#"<input type="hidden" name="tags" value="decaf">"#)
+        .assert_see(r#"name="specs[1][key]" type="text" value="Roast""#)
+        .assert_see(r#"name="specs[1][value]" type="text" value="Medium""#);
+
+    // Too many tags: the error is the list's, the input kept.
+    let mut form = FULL.to_vec();
+    for tag in ["a", "b", "c", "d", "e", "f"] {
+        form.push(("tags", tag));
+    }
+    form.push(("specs[0][key]", "Origin"));
+    app.htmx()
+        .post("/products", &form)
+        .await
+        .assert_invalid("tags");
+}

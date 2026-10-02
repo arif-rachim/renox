@@ -390,6 +390,118 @@
 .rx-calendar calendar-month::part(outside) { color: var(--rx-tertiary-label); }
 .rx-calendar calendar-month::part(disallowed) { color: var(--rx-tertiary-label); opacity: 0.5; }
 
+/* A small square button with an icon (rows' tools). */
+.rx-icon-button {
+  display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; margin: 0;
+  border: 0; border-radius: var(--rx-radius-s); background: transparent; color: var(--rx-secondary-label); cursor: pointer;
+}
+.rx-icon-button:hover { background: var(--rx-fill); color: var(--rx-label); }
+.rx-icon-button--danger { color: var(--rx-danger-text); }
+.rx-icon-button--danger:hover { color: var(--rx-danger-text); background: color-mix(in srgb, var(--rx-danger) 10%, transparent); }
+.rx-icon-button:disabled { opacity: 0.35; cursor: not-allowed; background: transparent; }
+@media (pointer: coarse) { .rx-icon-button { width: var(--rx-target); height: var(--rx-target); } }
+.rx-button svg { flex: none; }
+.rx-button:has(> svg) { gap: 6px; }
+
+/* Tags: chips and the box to type the next one, all in one field. */
+.rx-tags {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: var(--rx-target); padding: 5px 8px;
+  border: 1px solid var(--rx-border); border-radius: var(--rx-radius-s); background: var(--rx-surface); cursor: text;
+  transition: border-color var(--rx-duration) var(--rx-ease), box-shadow var(--rx-duration) var(--rx-ease);
+}
+.rx-tags:hover { border-color: var(--rx-tertiary-label); }
+.rx-tags:focus-within { border-color: var(--rx-accent); box-shadow: 0 0 0 4px var(--rx-focus); }
+.rx-tags--invalid, .rx-tags:has([aria-invalid="true"]) { border-color: var(--rx-danger-text); }
+.rx-tags__list { display: contents; list-style: none; margin: 0; padding: 0; }
+.rx-tag {
+  display: inline-flex; align-items: center; gap: 2px; max-width: 100%; min-height: 30px; padding: 0 2px 0 10px;
+  border-radius: 999px; background: color-mix(in srgb, var(--rx-accent) 12%, var(--rx-surface)); color: var(--rx-label);
+  font-size: var(--rx-text-subhead);
+}
+.rx-tag__text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rx-tag__remove {
+  display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%;
+  background: transparent; color: var(--rx-secondary-label); cursor: pointer;
+}
+.rx-tag__remove:hover { background: var(--rx-fill-strong); color: var(--rx-label); }
+.rx-page .rx-tags__entry:focus-visible { outline: none; }
+.rx-tags__entry {
+  flex: 1 1 8rem; min-width: 6rem; min-height: 30px; padding: 0 4px; border: 0; background: transparent;
+  font: inherit; font-size: var(--rx-text-body); color: var(--rx-label); color-scheme: var(--rx-scheme, light);
+}
+.rx-tags__entry::placeholder { color: var(--rx-tertiary-label); }
+
+/* Repeater: one card-like block per row, its tools in the corner. */
+.rx-repeater__rows { display: grid; gap: var(--rx-space-3); }
+.rx-repeater__rows:empty { display: none; }
+.rx-repeater__row {
+  position: relative; margin: 0; min-width: 0; padding: var(--rx-space-3) var(--rx-space-4) var(--rx-space-4);
+  border: 1px solid var(--rx-separator); border-radius: var(--rx-radius); background: var(--rx-surface);
+  display: grid; gap: var(--rx-space-3);
+}
+.rx-repeater__title { float: left; padding: 0; font-size: var(--rx-text-footnote); font-weight: 600; color: var(--rx-secondary-label); text-transform: uppercase; letter-spacing: 0.02em; line-height: 36px; }
+.rx-repeater__tools { position: absolute; top: 6px; right: 8px; display: flex; gap: 2px; }
+.rx-repeater__fields { clear: both; display: grid; gap: var(--rx-space-4); min-width: 0; }
+.rx-repeater__row:first-child [data-rx-row-up], .rx-repeater__row:last-child [data-rx-row-down] { visibility: hidden; }
+
+/* Key-value: two fields side by side; their labels once, on the first row. */
+.rx-kv__row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: var(--rx-space-3); }
+.rx-kv .rx-repeater__row { padding-top: var(--rx-space-2); }
+.rx-kv .rx-repeater__title { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.rx-kv .rx-repeater__tools { position: static; order: 2; align-self: end; }
+.rx-kv .rx-repeater__row { grid-template-columns: minmax(0, 1fr) auto; align-items: end; padding: var(--rx-space-2) var(--rx-space-2) var(--rx-space-2) var(--rx-space-3); }
+.rx-kv .rx-repeater__fields { clear: none; }
+.rx-kv .rx-repeater__row + .rx-repeater__row .rx-label {
+  position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+/* Searchable select: a box to type in, chips for several, a listbox under it. */
+.rx-combobox { position: relative; }
+.rx-combobox__box { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rx-combobox__box.rx-tags { padding-right: 36px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' stroke='%2386868b' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
+.rx-combobox__list {
+  position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; right: 0; max-height: 16rem; overflow: auto;
+  margin: 0; padding: 6px; list-style: none; border: 0.5px solid var(--rx-separator); border-radius: var(--rx-radius);
+  background: var(--rx-surface-raised); box-shadow: var(--rx-shadow-raised);
+}
+.rx-combobox__option {
+  display: flex; align-items: center; gap: var(--rx-space-2); min-height: 40px; padding: 0 var(--rx-space-3);
+  border-radius: var(--rx-radius-s); cursor: pointer; color: var(--rx-label);
+}
+.rx-combobox__option::before { content: ""; flex: none; width: 14px; height: 14px; }
+.rx-combobox__option[aria-selected="true"]::before {
+  background: var(--rx-accent-text);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.5l2.6 2.6L10 3.5' stroke='%23000' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.5l2.6 2.6L10 3.5' stroke='%23000' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.rx-combobox__option[data-active] { background: var(--rx-fill); }
+.rx-combobox__option[aria-selected="true"] { font-weight: 600; }
+.rx-combobox__empty { padding: var(--rx-space-2) var(--rx-space-3); color: var(--rx-secondary-label); font-size: var(--rx-text-subhead); }
+/* The native select stays (it is what the form sends and what the browser
+   checks for `required`), out of sight under the box. */
+.rx-select[data-rx-enhanced] { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; min-height: 0; padding: 0; opacity: 0; pointer-events: none; }
+.rx-select--multiple { min-height: 7rem; padding-right: 12px; background-image: none; }
+
+/* Wizard: the steps on top, one panel at a time, Back and Next under it. */
+.rx-wizard { display: grid; gap: var(--rx-space-5); }
+.rx-wizard__steps { display: flex; gap: var(--rx-space-2); margin: 0; padding: 0; list-style: none; counter-reset: none; }
+.rx-wizard__step { flex: 1; display: flex; align-items: center; gap: var(--rx-space-2); min-width: 0; padding-bottom: var(--rx-space-2); border-bottom: 3px solid var(--rx-separator); color: var(--rx-secondary-label); font-size: var(--rx-text-subhead); }
+.rx-wizard__number { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--rx-fill-strong); color: var(--rx-label); font-size: var(--rx-text-footnote); font-weight: 700; }
+.rx-wizard__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rx-wizard__step[aria-current="step"] { color: var(--rx-label); font-weight: 600; border-color: var(--rx-accent); }
+.rx-wizard__step[aria-current="step"] .rx-wizard__number, .rx-wizard__step[data-done] .rx-wizard__number { background: var(--rx-accent); color: var(--rx-on-accent); }
+.rx-wizard__step[data-done] { border-color: var(--rx-accent); }
+.rx-wizard__panels, .rx-wizard__panel { display: grid; gap: var(--rx-space-4); min-width: 0; }
+.rx-wizard__panel[hidden] { display: none; }
+.rx-wizard__nav { display: flex; align-items: center; gap: var(--rx-space-3); }
+/* Without the script every step shows, and only the submit button. */
+.rx-wizard:not([data-rx-ready]) [data-rx-wizard-back], .rx-wizard:not([data-rx-ready]) [data-rx-wizard-next] { display: none; }
+@media (max-width: 36rem) {
+  .rx-wizard__step:not([aria-current="step"]) .rx-wizard__name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .rx-wizard__step { flex: 0 0 auto; }
+  .rx-wizard__step[aria-current="step"] { flex: 1; }
+}
+
 /* show_when / hide_when: a group with no box of its own. */
 .rx-when { display: grid; gap: var(--rx-space-4); }
 .rx-when[hidden] { display: none; }
@@ -446,6 +558,7 @@
 [aria-expanded="true"] > .rx-button__chevron { transform: rotate(180deg); }
 .rx-button--small { min-height: 32px; padding: 6px 14px; font-size: var(--rx-text-subhead); }
 .rx-button--block { width: 100%; }
+.rx-button[hidden] { display: none; }
 .rx-button:disabled, .rx-button[aria-disabled="true"] { opacity: 0.4; cursor: not-allowed; transform: none; }
 /* Busy (a form being sent, an htmx request): a spinner, the label kept. */
 .rx-button[aria-busy="true"], .rx-button.htmx-request { cursor: progress; }

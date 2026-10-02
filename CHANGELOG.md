@@ -15,6 +15,24 @@ changes by milestone (each one pull request; details in its description and in
 Closer to Filament's form fields, on the kit's own rules (labels, errors, keyboard, no
 JavaScript needed).
 
+Stage 3:
+
+- New: nested form names. A form with a name like `lines[0][name]` is read as a tree, so
+  `Valid` fills a `Vec` of structs or a map; errors are keyed `lines.0.name`, and `error()`,
+  `old()`, the kit's slots, live validation and `renox.js` take either spelling. A nested field
+  is labelled by its own name (`lines.0.name` → "name"; translations: the full name, then
+  `lines.*.name`, then `name`). Plain forms are read as before.
+- New: `renox::KeyValues` (also in the prelude): ordered pairs from the kit's `key_value`,
+  stored as a JSON list of pairs (a JSON object loses its order in PostgreSQL's `JSONB`).
+- New kit fields: `tags_input`; `select(…, multiple=true, searchable=true)` (an ARIA
+  combobox over the native select); `repeater` (rows added, removed and moved, renumbered;
+  a `{% call(row, prefix) %}` block draws a row); `key_value`; `wizard` + `wizard_step`.
+- New kit texts (en/id): `ui.search`, `ui.no_results`, `ui.remove`, `ui.add_row`,
+  `ui.move_up`, `ui.move_down`, `ui.key`, `ui.value`, `ui.back`, `ui.next`.
+- Examples: teams' "New team" is a wizard with a repeater of members (`v.nested` + `after`
+  per row); fields gets tags and specifications (`Json<KeyValues>`, a new migration); shop's
+  admin picks a category in a searchable select.
+
 Stage 2:
 
 - New: `toggle_buttons` (one or, with `multiple`, several choices as a row of buttons).

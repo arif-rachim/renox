@@ -127,6 +127,12 @@ const RENOX: &str = r#"(function () {
       if (!message) return;
       var name = CSS.escape(field);
       var input = form.querySelector('[name="' + name + '"]');
+      // `items.0.name`: the input of a nested form is named `items[0][name]`.
+      if (!input && field.indexOf(".") > 0) {
+        var parts0 = field.split(".");
+        var bracketed = parts0[0] + parts0.slice(1).map(function (p) { return "[" + p + "]"; }).join("");
+        input = form.querySelector('[name="' + CSS.escape(bracketed) + '"]');
+      }
       var slot = form.querySelector('[data-error-for="' + name + '"]');
       // `tags.1` / `photos.0`: an item of a list. Use the list's own input
       // (the item's one when there is one per item) and slot.

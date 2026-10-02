@@ -1171,6 +1171,22 @@ async fn validation_array_where_scalar_expected() {
     }
 }
 
+/// Nested names (`a[b][c]`) are read as a tree; one far deeper than any form
+/// is ignored instead of recursing, and the rest of the form still counts.
+#[renox::test]
+async fn nested_names_are_bounded() {
+    let app = fixture().await;
+    let body = format!("name=x&a{}=1&age=3", "%5Bb%5D".repeat(5_000));
+    let res = app
+        .request()
+        .htmx()
+        .header("x-csrf-token", &app.csrf_token())
+        .without_csrf()
+        .post_body("/profile", "application/x-www-form-urlencoded", body)
+        .await;
+    assert_eq!(res.status.as_u16(), 200, "{}", res.text());
+}
+
 #[renox::test]
 async fn validation_integer_overflow_and_float_specials() {
     let app = fixture().await;

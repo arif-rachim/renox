@@ -53,6 +53,40 @@ impl Validate for Delivery {
     }
 }
 
+#[derive(serde::Deserialize, serde::Serialize)]
+struct Line {
+    name: String,
+    qty: i64,
+}
+
+impl Validate for Line {
+    fn rules(&self, v: &mut Validator) {
+        v.field("name", &self.name).required();
+        v.field("qty", &self.qty).min(1);
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct Order {
+    #[serde(default)]
+    tags: Vec<String>,
+    #[serde(default)]
+    lines: Vec<Line>,
+    #[serde(default)]
+    meta: renox::KeyValues,
+    #[serde(default)]
+    sizes: Vec<String>,
+}
+
+impl Validate for Order {
+    fn rules(&self, v: &mut Validator) {
+        v.field("tags", &self.tags).max(3);
+        v.field("lines", &self.lines).required();
+        v.nested("lines", &self.lines);
+        v.field("meta", &self.meta).max(2);
+    }
+}
+
 struct Pages;
 
 impl Module for Pages {
@@ -89,6 +123,15 @@ impl Module for Pages {
             })
             .get("/fields", || async { view("fields.html", context! {}) })
             .get("/more", || async { view("more.html", context! {}) })
+            .get("/stage3", || async { view("stage3.html", context! {}) })
+            .post("/order", |Valid(order): Valid<Order>| async move {
+                renox::axum::Json(renox::serde_json::json!({
+                    "tags": order.tags,
+                    "lines": order.lines,
+                    "meta": order.meta,
+                    "sizes": order.sizes,
+                }))
+            })
             .post("/delivery", |Valid(_): Valid<Delivery>| async {
                 Redirect::to("/more")
             })
@@ -145,6 +188,25 @@ fn views() -> tempfile::TempDir {
 {{ file("docs", "Documents", multiple=true, required=true) }}
 {{ date_picker("on", "Delivery date", value="2026-10-02", min="2026-10-01", max="2026-12-31") }}
 {{ date_picker("back", "Return date") }}
+</form>"#,
+    );
+    write(
+        "stage3.html",
+        r#"{% from "renox/ui.html" import input, tags_input, repeater, key_value, select, wizard, wizard_step, form_errors %}
+<form method="post" action="/order" data-live-validate>{{ csrf_field() }}{{ form_errors() }}
+{% call wizard("w", [["items", "Items"], ["extra", "Extras"]], submit_label="Place order") %}
+{% call wizard_step("w", "items") %}
+{% call(row, prefix) repeater("lines", "Lines", rows=[{"name": "Kopi", "qty": 2}], item_label="Line", min=1, max=5) %}
+{{ input(prefix ~ "[name]", "Name", value=row.name, required=true) }}
+{{ input(prefix ~ "[qty]", "Quantity", type="number", value=row.qty) }}
+{% endcall %}
+{% endcall %}
+{% call wizard_step("w", "extra") %}
+{{ tags_input("tags", "Tags", value=["new", "sale"], suggestions=["gift"]) }}
+{{ key_value("meta", "Meta", value={"Color": "Red"}) }}
+{{ select("sizes", "Sizes", [["s", "Small"], ["m", "Medium"], ["l", "Large"]], selected=["m"], multiple=true, searchable=true) }}
+{% endcall %}
+{% endcall %}
 </form>"#,
     );
     write(
@@ -461,4 +523,156 @@ async fn stage_two_texts_follow_the_locale() {
         .assert_see("Berkas saat ini")
         .assert_see(r#"aria-label="Pilih tanggal""#)
         .assert_see(r#"locale="id""#);
+}
+
+#[renox::test]
+async fn repeaters_tags_key_values_and_wizards() {
+    let (app, _dir) = app().await;
+    let page = app.get("/stage3").await;
+    page.assert_ok()
+        // The repeater: a row from `rows`, numbered names, error slots keyed
+        // with dots, and a template row for the script to copy.
+        .assert_see(r#"data-rx-repeater="lines" data-rx-min="1" data-rx-max="5""#)
+        .assert_see(r#"data-rx-row data-rx-index="0""#)
+        .assert_see(r#"id="rx-lines-0-name" name="lines[0][name]" type="text" value="Kopi""#)
+        .assert_see(r#"name="lines[0][qty]" type="number" value="2""#)
+        .assert_see(r#"data-error-for="lines.0.name""#)
+        .assert_see(r#"name="lines[__INDEX__][name]""#)
+        .assert_see(r#"aria-label="Move up""#)
+        // Tags: a chip and a hidden input per tag, then the box to type in.
+        .assert_see(r#"<span class="rx-tag__text">new</span>"#)
+        .assert_see(r#"<input type="hidden" name="tags" value="sale">"#)
+        .assert_see(
+            r#"name="tags" type="text" autocomplete="off" data-rx-tags-entry list="rx-tags-list""#,
+        )
+        // Key-value: a repeater over the map's pairs.
+        .assert_see(r#"name="meta[0][key]" type="text" value="Color""#)
+        .assert_see(r#"name="meta[0][value]" type="text" value="Red""#)
+        // The searchable multiple select keeps a native select underneath.
+        .assert_see(r#"name="sizes" multiple data-rx-combobox"#)
+        .assert_see(r#"<option value="m" selected>Medium</option>"#)
+        // The wizard: steps, panels and the three buttons.
+        .assert_see(r#"data-rx-step-tab="extra""#)
+        .assert_see(r#"id="w-step-items" data-rx-step="items""#)
+        .assert_see("data-rx-wizard-next")
+        .assert_see("Place order");
+
+    // Nested names read into a Vec of structs, a KeyValues and lists.
+    let res = app
+        .post(
+            "/order",
+            &[
+                ("tags", "a"),
+                ("tags", "b"),
+                ("tags", ""),
+                ("lines[0][name]", "Kopi"),
+                ("lines[0][qty]", "2"),
+                ("lines[1][name]", "Teh"),
+                ("lines[1][qty]", " 1 "),
+                ("meta[0][key]", "Color"),
+                ("meta[0][value]", "Red"),
+                ("meta[1][key]", ""),
+                ("meta[1][value]", ""),
+                ("sizes", "s"),
+                ("sizes", "l"),
+            ],
+        )
+        .await;
+    res.assert_ok();
+    let body: renox::serde_json::Value = res.json();
+    assert_eq!(
+        body,
+        renox::serde_json::json!({
+            "tags": ["a", "b"],
+            "lines": [{"name": "Kopi", "qty": 2}, {"name": "Teh", "qty": 1}],
+            "meta": [["Color", "Red"]],
+            "sizes": ["s", "l"],
+        })
+    );
+
+    // Errors are keyed by the row: `lines.1.name`, labelled "name".
+    let res = app
+        .htmx()
+        .post(
+            "/order",
+            &[
+                ("lines[0][name]", "Kopi"),
+                ("lines[0][qty]", "abc"),
+                ("lines[1][name]", ""),
+                ("lines[1][qty]", "0"),
+            ],
+        )
+        .await;
+    res.assert_status(422);
+    let body: renox::serde_json::Value = res.json();
+    assert_eq!(
+        body["errors"]["lines.1.name"][0],
+        "The name field is required."
+    );
+    assert!(
+        body["errors"]["lines.0.qty"][0]
+            .as_str()
+            .unwrap()
+            .contains("qty")
+    );
+    assert!(
+        body["errors"]["lines.1.qty"][0]
+            .as_str()
+            .unwrap()
+            .contains("at least 1")
+    );
+
+    // A plain post goes back with the rows sent, refilled, and their errors.
+    app.request()
+        .header("referer", "/stage3")
+        .post(
+            "/order",
+            &[
+                ("lines[0][name]", "Kopi"),
+                ("lines[0][qty]", "2"),
+                ("lines[1][name]", ""),
+                ("lines[1][qty]", "3"),
+                ("lines[2][name]", "Susu"),
+                ("lines[2][qty]", "1"),
+                ("meta[0][key]", "a"),
+                ("meta[0][value]", "1"),
+                ("meta[1][key]", "b"),
+                ("meta[1][value]", "2"),
+                ("meta[2][key]", "c"),
+                ("meta[2][value]", "3"),
+            ],
+        )
+        .await
+        .assert_redirect("/stage3");
+    let page = app.get("/stage3").await;
+    page.assert_see(r#"name="lines[2][name]" type="text" value="Susu""#)
+        .assert_see(r#"name="lines[1][qty]" type="number" value="3""#)
+        .assert_see(r#"name="lines[1][name]" type="text" value="" required aria-required="true" aria-invalid="true""#)
+        .assert_see("The name field is required.")
+        .assert_see(r#"name="meta[2][key]" type="text" value="c""#)
+        // The tags left as they were sent: none.
+        .assert_dont_see(r#"<span class="rx-tag__text">new</span>"#)
+        // The summary links to the row's field.
+        .assert_see(r##"href="#rx-lines-1-name" data-rx-field="lines.1.name""##)
+        // A row's error shows in the row only, not again under the list.
+        .assert_see(r#"data-error-for="lines" aria-live="polite"></p>"#);
+    // The list's own error (no rows at all) shows under it.
+    app.request()
+        .header("referer", "/stage3")
+        .post("/order", &[("tags", "a")])
+        .await
+        .assert_redirect("/stage3");
+    app.get("/stage3").await.assert_see(
+        r#"data-error-for="lines" aria-live="polite">The lines field is required.</p>"#,
+    );
+
+    // Live validation names the row's field the way the page does.
+    let res = app
+        .request()
+        .header("x-renox-validate", "lines[0][name]")
+        .post("/order", &[("lines[0][name]", ""), ("lines[0][qty]", "1")])
+        .await;
+    let body: renox::serde_json::Value = res.json();
+    assert_eq!(body["field"], "lines[0][name]");
+    assert_eq!(body["errors"][0], "The name field is required.");
 }

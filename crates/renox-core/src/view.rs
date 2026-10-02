@@ -1055,6 +1055,8 @@ fn globals(
         errors => errors,
         // `error('photos')` also shows the first error of an item (`photos.1`).
         error => Value::from_function(move |field: String| {
+            // `items[0][name]`'s errors are keyed `items.0.name`.
+            let field = crate::validation::nested::normalize(&field);
             first_errors
                 .get(&field)
                 .or_else(|| {
