@@ -452,6 +452,7 @@ async fn cart(session: Session) -> Result<String> {
 | `push`, `increment` | append to a list; add to a number |
 | `flash`, `reflash`, `flashed` | values for the next request only ("Saved!" after a redirect) |
 | `old(field)`, `errors()` | the previous form's input and validation errors (filled by `Valid<T>`) |
+| `has_old_input` | whether the previous request flashed its input (a failed submit), even with no field in it |
 | `set_lifetime(minutes)` | this session lasts longer than `SESSION_LIFETIME` |
 | `token`, `regenerate_token`, `flush` | the CSRF token; a new one; empty everything |
 

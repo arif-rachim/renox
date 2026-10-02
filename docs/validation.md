@@ -102,6 +102,7 @@ Pages get these helpers (components imported from other files see them too):
 | `error('name')` | The field's first error, or `""`. For a list, `error('tags')` also shows the first error of an item (`tags.0`, `tags.1`, …). |
 | `errors` | Every error: a map of field → list of messages. Empty (falsy) when there are none. |
 | `old('name', default)` | What was submitted for the field before the redirect, else `default`, else `""`. |
+| `has_old()` | Whether the previous request was a failed submit. An unticked checkbox sends nothing, so `old()` alone can't tell "unticked" from "not submitted yet"; the UI kit's checkboxes and radios use it. |
 
 ```html
 <form method="post" action="{{ route('products.store') }}">

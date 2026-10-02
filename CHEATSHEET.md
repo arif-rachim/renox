@@ -196,10 +196,11 @@ and so is `{{ flash.anything }}`.
 Every view also gets: `request.path`, `request.query`, `request.route` (the route's name),
 `request.htmx`, `request.boosted` (`hx-boost`), `app.name`, `app.env`,
 `app.debug`, `app.url`, `app.locale`, `auth.check`, `auth.user`, `auth.roles`, `flash`, `errors`, `csrf_token`,
-and the functions `old()`, `error()`, `csrf_field()`, `method_field()`, `route()`, `asset()`,
+and the functions `old()`, `has_old()`, `error()`, `csrf_field()`, `method_field()`, `route()`, `asset()`,
 `storage_url()`, `t()`, `can()`, `route_is(pattern, …)`, `class_names(…)`, `page_url(n)`,
 `renox_head()`, `csp_nonce()`, `seo()`,
-`renox_ui()` (the UI kit), `renox_grid()` (the data grid's assets), `sparkline(values)`, `toasts()`, `once(key)`, `stack(name)` and, with `{% call %}`,
+`renox_ui()` (the UI kit), `renox_grid()` (the data grid's assets), `renox_calendar()` (the
+date picker's calendar; the kit's `date_picker` adds it once), `sparkline(values)`, `toasts()`, `once(key)`, `stack(name)` and, with `{% call %}`,
 `push(name)` / `prepend(name)`.
 
 Error pages are the app's own: `rnx new` writes `resources/views/errors/default.html`, which
