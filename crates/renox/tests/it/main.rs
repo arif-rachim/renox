@@ -29,6 +29,7 @@ mod mail;
 mod method;
 mod model_keys;
 mod models;
+mod notification_bell;
 mod operations;
 mod polish;
 #[cfg(feature = "postgres")]

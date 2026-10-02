@@ -63,6 +63,22 @@ header, so the proxy must pass it on: Caddy does; with nginx, `proxy_set_header 
 An app with `App::detect_locale()` answers `Vary: Accept-Language`: a CDN or caching proxy in
 front must keep that header, or it would serve one visitor's language to another.
 
+The notification bell (`Auth::new().notifications()`) keeps a Server-Sent Events stream
+open per page (`/notifications/stream`, at most five minutes each, then the browser opens a
+new one). Caddy passes it through as is; nginx buffers responses, so turn that off for it:
+
+```nginx
+location /notifications/stream {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_buffering off;
+    proxy_read_timeout 10m;
+}
+```
+
+Each open stream asks the database for news every 15 seconds (two small queries for its
+user) and at once when something changes in the same process; a graceful shutdown ends them
+all.
+
 Also set `APP_URL` to the public `https://` address, so links in mails point to the right
 place. An `https://` `APP_URL` also marks cookies `Secure` (the session, the app's `SetCookie`s,
 the maintenance bypass), and with `APP_ENV=production` as well, every response sends HSTS

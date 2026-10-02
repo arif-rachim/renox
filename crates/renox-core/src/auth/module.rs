@@ -106,6 +106,7 @@ pub struct Auth {
     registration: bool,
     redirect_to: Option<String>,
     verify_email: bool,
+    notifications: bool,
     rules: Option<RulesFn>,
     on_registered: Option<RegisteredFn>,
 }
@@ -119,9 +120,27 @@ impl Auth {
             registration: true,
             redirect_to: None,
             verify_email: false,
+            notifications: false,
             rules: None,
             on_registered: None,
         }
+    }
+
+    /// Turns on the in-app notification list for the UI kit's
+    /// `notification_bell`: the `notifications.*` routes (a page that is
+    /// also the bell's panel, mark read or unread, delete, and a stream of
+    /// Server-Sent Events for new ones), and `unread_notifications` (the
+    /// logged-in user's unread count) in every view.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # let _ =
+    /// App::new().module(Auth::new().notifications())
+    /// # ;
+    /// ```
+    pub fn notifications(mut self) -> Self {
+        self.notifications = true;
+        self
     }
 
     /// Validates fields the app adds to the registration form, with the
@@ -226,6 +245,17 @@ impl Module for Auth {
     }
 
     fn register(&self, app: &mut crate::Registry) {
+        if self.notifications {
+            app.share(
+                "unread_notifications",
+                |ctx: crate::view::ViewContext| async move {
+                    match ctx.user {
+                        Some(user) => user.unread_notification_count(&ctx.state.db).await,
+                        None => Ok(0),
+                    }
+                },
+            );
+        }
         // Schedule it, e.g. daily: `app.schedule().daily_at("03:00", …)`.
         app.command(
             "tokens:prune",
@@ -303,6 +333,9 @@ impl Module for Auth {
             .merge(Routes::new().post("/logout", destroy).name("logout"));
         if self.account {
             routes = routes.merge(super::account::routes());
+        }
+        if self.notifications {
+            routes = routes.merge(super::inbox::routes());
         }
         routes.route_layer(Extension(settings))
     }

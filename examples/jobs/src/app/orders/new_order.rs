@@ -1,4 +1,4 @@
-use renox::auth::{Channel, Notification, Recipient};
+use renox::auth::{Channel, DatabaseMessage, Notification, Recipient};
 use renox::mail::Mail;
 use renox::prelude::*;
 
@@ -29,7 +29,16 @@ impl Notification for NewOrder {
         ))
     }
 
+    // A `DatabaseMessage`: what the UI kit's `notification_bell` shows,
+    // plus the app's own keys.
     fn to_database(&self, _: &Recipient) -> renox::serde_json::Value {
-        json!({ "order_id": self.0.id, "total": self.0.total })
+        DatabaseMessage::info(format!("New order #{}", self.0.id))
+            .body(format!(
+                "Total: {}",
+                renox::format_money(self.0.total as f64, "IDR", None, "id")
+            ))
+            .with("order_id", self.0.id)
+            .with("total", self.0.total)
+            .into()
     }
 }

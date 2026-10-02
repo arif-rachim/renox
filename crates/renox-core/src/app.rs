@@ -662,6 +662,7 @@ impl App {
                     config.lang_path.clone(),
                 ])
             }),
+            notification_hub: Arc::new(crate::auth::notifications::Hub::new()),
             listeners: Arc::new(listeners),
             inspector: (config.debug && config.env == Environment::Local)
                 .then(|| Arc::new(crate::inspector::Inspector::default())),
@@ -1186,13 +1187,16 @@ impl Kernel {
             .router
             .into_make_service_with_connect_info::<SocketAddr>();
         let live = self.state.live.clone();
+        let notification_hub = self.state.notification_hub.clone();
         axum::serve(listener, service)
             .with_graceful_shutdown(async move {
                 shutdown_signal().await;
-                // Open live-reload streams would otherwise hold the shutdown.
+                // Open live-reload and notification streams would otherwise
+                // hold the shutdown.
                 if let Some(live) = live {
                     live.stop();
                 }
+                notification_hub.stop();
             })
             .await?;
 

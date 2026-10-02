@@ -13,7 +13,7 @@
 </head>
 <body class="rx-page">
   <a class="rx-visually-hidden skip" href="#main">Skip to content</a>
-  {% from "renox/ui.html" import menu, menu_link, menu_action, menu_separator, link_button, alert %}
+  {% from "renox/ui.html" import menu, menu_link, menu_action, menu_separator, link_button, alert, notification_bell %}
   <header class="bar">
     <nav class="bar__inner" aria-label="Main">
       <a class="bar__brand" href="{{ route('home') }}">{{ app.name }}</a>
@@ -21,6 +21,8 @@
       <span class="rx-spacer"></span>
       {% if auth.check %}
         <a class="bar__link" href="{{ route('cart.show') }}">{{ t('nav.cart') }} ({{ cart_count }})</a>
+        {#- New orders (admins) and order updates (customers), live: Auth::new().notifications(). -#}
+        {{ notification_bell(unread_notifications) }}
         {% call menu(auth.user.name, id="account-menu", variant="plain") %}
           {{ menu_link(route('orders.index'), t('nav.orders')) }}
           {% if 'admin' in auth.roles %}{{ menu_link(route('admin.dashboard'), "Admin") }}{% endif %}

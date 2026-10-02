@@ -767,6 +767,25 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 </div>
 {%- endmacro %}
 
+{#- The bell for in-app notifications (`Auth::new().notifications()`), for
+    the navigation bar: {{ notification_bell(unread_notifications) }}. Its
+    badge shows the unread count; a click opens the latest in a panel (mark
+    read or unread, delete, open), and new ones arrive while the page is open
+    (Server-Sent Events) as a toast and in the badge. Without JavaScript it
+    is a link to the notifications page. Shows nothing for guests. -#}
+{% macro notification_bell(count=none, id="rx-notifications") -%}
+{%- if auth.check %}
+{%- set count = count or 0 %}
+<div class="rx-bell" data-rx-bell data-stream="{{ route('notifications.stream') }}" data-panel="{{ route('notifications.index') }}" data-open-label="{{ t('ui.notifications.open') }}">
+  <a class="rx-bell__button" href="{{ route('notifications.index') }}" aria-controls="{{ id }}-panel" aria-expanded="false" aria-label="{{ t('ui.notifications.bell') }}{% if count %}, {{ t('ui.notifications.unread', count=count) }}{% endif %}" data-label="{{ t('ui.notifications.bell') }}" data-label-unread="{{ t('ui.notifications.unread') }}">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 10a6 6 0 0112 0v3.5l1.6 2.7a.6.6 0 01-.5.9H4.9a.6.6 0 01-.5-.9L6 13.5V10z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9.8 19.5a2.4 2.4 0 004.4 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    <span class="rx-bell__badge" data-rx-bell-count aria-hidden="true"{% if not count %} hidden{% endif %}>{{ ("99+" if count > 99 else count) if count else "" }}</span>
+  </a>
+  <div class="rx-bell__panel" id="{{ id }}-panel" role="region" aria-label="{{ t('ui.notifications.title') }}" hidden><p class="rx-bell__loading">{{ t('ui.notifications.loading') }}</p></div>
+</div>
+{%- endif %}
+{%- endmacro %}
+
 {#- What an empty list says: what goes here, and the way to add the first. -#}
 {% macro empty(title, message=none, action_href=none, action_label=none) -%}
 <div class="rx-empty">

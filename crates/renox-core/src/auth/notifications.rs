@@ -4,7 +4,7 @@
 //!
 //! ```
 //! # use renox::prelude::*;
-//! use renox::auth::{Channel, Notification, Recipient};
+//! use renox::auth::{Channel, DatabaseMessage, Notification, Recipient};
 //! use renox::mail::Mail;
 //!
 //! struct OrderShipped { order_id: i64 }
@@ -20,8 +20,13 @@
 //!         state.mail_view(&email, "Pesanan dikirim", "mail/shipped", context! { id => self.order_id })
 //!     }
 //!
+//!     // What the in-app list (the UI kit's `notification_bell`) shows.
 //!     fn to_database(&self, _: &Recipient) -> renox::serde_json::Value {
-//!         json!({ "order_id": self.order_id })
+//!         DatabaseMessage::success(format!("Order #{} shipped", self.order_id))
+//!             .body("It arrives in 2–3 days.")
+//!             .url(format!("/orders/{}", self.order_id))
+//!             .with("order_id", self.order_id) // any other keys the app reads back
+//!             .into()
 //!     }
 //!
 //!     fn to_channel(&self, _channel: &str, _: &Recipient) -> Result<renox::serde_json::Value> {
@@ -60,6 +65,7 @@ use crate::db::{DateTime, Db, now};
 use crate::i18n::with_locale;
 use crate::mail::Mail;
 use crate::queue::{Job, JobContext};
+use crate::toast::{ToastAction, ToastKind};
 use crate::{AppState, Result};
 
 /// Where a notification goes.
@@ -178,7 +184,10 @@ pub trait Notification: Send + Sync {
         Err(anyhow!("notification `{}` has no mail version", self.kind()).into())
     }
 
-    /// The JSON stored for `Channel::Database` (`DatabaseNotification::data`); `null` by default.
+    /// The JSON stored for `Channel::Database` (`DatabaseNotification::data`);
+    /// `null` by default. Return a [`DatabaseMessage`] for the UI kit's
+    /// `notification_bell`. It runs in the recipient's language, like
+    /// `to_mail`.
     fn to_database(&self, _to: &Recipient) -> Value {
         Value::Null
     }
@@ -191,6 +200,105 @@ pub trait Notification: Send + Sync {
             self.kind()
         )
         .into())
+    }
+}
+
+/// What a notification stores for the in-app list, in the shape the UI
+/// kit's `notification_bell` shows (and pushes as a toast when it arrives):
+/// a status (its icon), a title, a line of text, a link and buttons. Return
+/// it from [`Notification::to_database`] with `.into()`; `with` adds the
+/// app's own keys next to them.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct DatabaseMessage {
+    /// Its icon and color: success, info, warning or error.
+    pub status: ToastKind,
+    /// The first line.
+    pub title: String,
+    /// A second, lighter line.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body: Option<String>,
+    /// Where opening it goes (it is marked read on the way).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    /// Links or buttons under the text.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub actions: Vec<ToastAction>,
+    /// The app's own keys (`with`), stored next to the others.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, Value>,
+}
+
+impl DatabaseMessage {
+    /// A message with `status` and `title`.
+    pub fn new(status: ToastKind, title: impl Into<String>) -> Self {
+        Self {
+            status,
+            title: title.into(),
+            body: None,
+            url: None,
+            actions: Vec::new(),
+            extra: serde_json::Map::new(),
+        }
+    }
+
+    /// A success message (a green check).
+    pub fn success(title: impl Into<String>) -> Self {
+        Self::new(ToastKind::Success, title)
+    }
+
+    /// An info message.
+    pub fn info(title: impl Into<String>) -> Self {
+        Self::new(ToastKind::Info, title)
+    }
+
+    /// A warning.
+    pub fn warning(title: impl Into<String>) -> Self {
+        Self::new(ToastKind::Warning, title)
+    }
+
+    /// An error.
+    pub fn error(title: impl Into<String>) -> Self {
+        Self::new(ToastKind::Error, title)
+    }
+
+    /// Adds a second line.
+    pub fn body(mut self, body: impl Into<String>) -> Self {
+        self.body = Some(body.into());
+        self
+    }
+
+    /// Where opening the notification goes.
+    pub fn url(mut self, url: impl Into<String>) -> Self {
+        self.url = Some(url.into());
+        self
+    }
+
+    /// Adds a link or button.
+    pub fn action(mut self, action: ToastAction) -> Self {
+        self.actions.push(action);
+        self
+    }
+
+    /// Adds a link: `.link("Invoice", "/invoices/7")`.
+    pub fn link(self, label: impl Into<String>, url: impl Into<String>) -> Self {
+        self.action(ToastAction::link(label, url))
+    }
+
+    /// Stores `key` next to the message, for the app's own pages
+    /// (`notification.data.order_id`). The message's own keys win.
+    pub fn with(mut self, key: &str, value: impl Serialize) -> Self {
+        self.extra.insert(
+            key.to_owned(),
+            serde_json::to_value(value).unwrap_or(Value::Null),
+        );
+        self
+    }
+}
+
+impl From<DatabaseMessage> for Value {
+    fn from(message: DatabaseMessage) -> Self {
+        serde_json::to_value(message).unwrap_or(Value::Null)
     }
 }
 
@@ -208,6 +316,52 @@ pub struct DatabaseNotification {
     pub read_at: Option<DateTime>,
     /// When it was stored.
     pub created_at: DateTime,
+}
+
+impl DatabaseNotification {
+    /// The stored [`DatabaseMessage`], when `to_database` returned one (its
+    /// data has a `title`).
+    pub fn message(&self) -> Option<DatabaseMessage> {
+        serde_json::from_value(self.data.clone()).ok()
+    }
+}
+
+/// Wakes the open notification streams (`/notifications/stream`) of one
+/// user when something changed for them in this process; streams also look
+/// at the table every few seconds, for changes made by other servers or by
+/// `queue:work`.
+pub(crate) struct Hub {
+    tx: tokio::sync::broadcast::Sender<Signal>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Signal {
+    /// Something changed for this user.
+    User(i64),
+    /// The server is shutting down.
+    Stop,
+}
+
+impl Hub {
+    pub(crate) fn new() -> Self {
+        Self {
+            tx: tokio::sync::broadcast::channel(256).0,
+        }
+    }
+
+    /// Tells `user_id`'s streams to look now.
+    pub(crate) fn touch(&self, user_id: i64) {
+        let _ = self.tx.send(Signal::User(user_id));
+    }
+
+    /// Ends every stream, so a graceful shutdown doesn't wait for them.
+    pub(crate) fn stop(&self) {
+        let _ = self.tx.send(Signal::Stop);
+    }
+
+    pub(crate) fn subscribe(&self) -> tokio::sync::broadcast::Receiver<Signal> {
+        self.tx.subscribe()
+    }
 }
 
 pub(crate) type ChannelFn = Arc<
@@ -274,10 +428,11 @@ impl AppState {
         )
         .bind(user.id)
         .bind(notification.kind())
-        .bind(notification.to_database(to).to_string())
+        .bind(with_locale(to.locale().as_deref(), || notification.to_database(to)).to_string())
         .bind(now())
         .execute(&self.db)
         .await?;
+        self.notification_hub.touch(user.id);
         Ok(())
     }
 
@@ -351,7 +506,7 @@ impl AppState {
     }
 }
 
-fn from_row(row: &crate::db::Row) -> Result<DatabaseNotification> {
+pub(super) fn from_row(row: &crate::db::Row) -> Result<DatabaseNotification> {
     let data: String = row.try_get("data")?;
     Ok(DatabaseNotification {
         id: row.try_get("id")?,
@@ -374,6 +529,39 @@ impl User {
         .fetch_all(db)
         .await?;
         rows.iter().map(from_row).collect()
+    }
+
+    /// The user's notifications older than the one with id `before`,
+    /// newest first: the next page after a list ending at `before`.
+    pub async fn notifications_before(
+        &self,
+        db: &Db,
+        before: i64,
+        limit: u32,
+    ) -> Result<Vec<DatabaseNotification>> {
+        let rows = crate::db::sql(
+            "SELECT id, kind, data, read_at, created_at FROM notifications \
+             WHERE user_id = ? AND id < ? ORDER BY id DESC LIMIT ?",
+        )
+        .bind(self.id)
+        .bind(before)
+        .bind(i64::from(limit))
+        .fetch_all(db)
+        .await?;
+        rows.iter().map(from_row).collect()
+    }
+
+    /// One of the user's notifications, or `None` if it isn't theirs.
+    pub async fn notification(&self, db: &Db, id: i64) -> Result<Option<DatabaseNotification>> {
+        let row = crate::db::sql(
+            "SELECT id, kind, data, read_at, created_at FROM notifications \
+             WHERE id = ? AND user_id = ?",
+        )
+        .bind(id)
+        .bind(self.id)
+        .fetch_optional(db)
+        .await?;
+        row.as_ref().map(from_row).transpose()
     }
 
     /// The user's unread notifications, newest first.
@@ -409,6 +597,38 @@ impl User {
         .execute(db)
         .await?;
         Ok(done > 0)
+    }
+
+    /// Marks one of the user's notifications unread again; returns whether
+    /// it was theirs.
+    pub async fn mark_notification_unread(&self, db: &Db, id: i64) -> Result<bool> {
+        let done =
+            crate::db::sql("UPDATE notifications SET read_at = NULL WHERE id = ? AND user_id = ?")
+                .bind(id)
+                .bind(self.id)
+                .execute(db)
+                .await?;
+        Ok(done > 0)
+    }
+
+    /// Deletes one of the user's notifications; returns whether it was theirs.
+    pub async fn delete_notification(&self, db: &Db, id: i64) -> Result<bool> {
+        let done = crate::db::sql("DELETE FROM notifications WHERE id = ? AND user_id = ?")
+            .bind(id)
+            .bind(self.id)
+            .execute(db)
+            .await?;
+        Ok(done > 0)
+    }
+
+    /// Deletes all the user's notifications; returns how many there were.
+    pub async fn delete_notifications(&self, db: &Db) -> Result<u64> {
+        Ok(
+            crate::db::sql("DELETE FROM notifications WHERE user_id = ?")
+                .bind(self.id)
+                .execute(db)
+                .await?,
+        )
     }
 
     /// Marks all the user's unread notifications read; returns how many there were.

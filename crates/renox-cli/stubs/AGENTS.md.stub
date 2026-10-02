@@ -104,6 +104,10 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   A record's page (show) is an infolist, not hand-written markup: `{% call infolist(columns=2) %}`
   with `entry(label, value, format="money"|"date"|"since"|"bool"|…, badge=…)`; prices go
   through `| money` (`APP_CURRENCY`), never a hand-made "Rp" filter.
+  In-app notifications: `to_database` returns a `DatabaseMessage` (title, body, url), and
+  `Auth::new().notifications()` + `{{ notification_bell(unread_notifications) }}` in the
+  layout gives the list, the badge and live updates (SSE: behind nginx, `proxy_buffering off`).
+  Toasts can carry `.body(…)`, `.link(label, url)`, `.seconds(n)`/`.persistent()`.
 - `user.has_role("admin")` on a plain `User` (policies, `gate_before`) only knows the current
   request's user; in jobs and commands use `user.roles(&db).await`.
 - For a transaction that must be retried on conflicts and borrow locals, use

@@ -73,7 +73,13 @@ pub async fn store(
     let product = Product::create(&state.db, product).await?;
     state.cache.forget(FEATURED).await?;
     Ok((
-        Toast::success(format!("“{}” created.", product.name)),
+        // A toast with a link to the new product's page in the shop.
+        Toast::success(format!("“{}” created.", product.name))
+            .body("It is in the shop now.")
+            .link(
+                "View in the shop",
+                state.routes.url("products.show", &[&product.slug])?,
+            ),
         Redirect::route("admin.products.index", &[])?,
     ))
 }

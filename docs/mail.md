@@ -164,7 +164,7 @@ tests), its channels, and one version of the message per channel.
 
 ```rust
 use renox::prelude::*;
-use renox::auth::{Channel, Notification, Recipient};
+use renox::auth::{Channel, DatabaseMessage, Notification, Recipient};
 use renox::mail::Mail;
 
 struct OrderShipped { order_id: i64 }
@@ -191,8 +191,12 @@ impl Notification for OrderShipped {
             context! { order_id => self.order_id })
     }
 
+    // What the in-app list and the kit's bell show; see "Database notifications".
     fn to_database(&self, _: &Recipient) -> renox::serde_json::Value {
-        json!({ "order_id": self.order_id })
+        DatabaseMessage::success(format!("Order #{} shipped", self.order_id))
+            .url(format!("/orders/{}", self.order_id))
+            .with("order_id", self.order_id)
+            .into()
     }
 
     fn to_channel(&self, _channel: &str, _: &Recipient) -> Result<renox::serde_json::Value> {
@@ -244,13 +248,70 @@ database versions into the module.
 
 Each message is built in the recipient's language: `Recipient::in_locale("id")`, else the
 user's `locale` column when the `users` table has one, else the current language. While
-`to_mail` and `to_channel` run, `t()` in mail views and `state.current_lang()` in code use it,
+`to_mail`, `to_database` and `to_channel` run, `t()` in mail views and `state.current_lang()` in code use it,
 so one notification sent to many users speaks each one's language.
 
 ## Database notifications
 
 `Channel::Database` rows are a user's in-app list. `DatabaseNotification` has `id`, `kind`,
 `data` (what `to_database` returned), `read_at` (`None` while unread) and `created_at`.
+
+`to_database` may return any JSON, but a `DatabaseMessage` is what Renox's own list and the UI
+kit's bell know how to show: a status (`success`, `info`, `warning`, `error`: its icon), a
+title, a `body`, a `url` (where opening it goes) and links (`link(label, url)`, or
+`action(ToastAction::link(…))`). `.with(key, value)` keeps the app's own keys next to them
+(`notification.data.order_id`), and `notification.message()` reads the message back.
+
+### The bell
+
+`Auth::new().notifications()` turns on a ready-made list, like Filament's database
+notifications:
+
+```rust
+use renox::prelude::*;
+
+fn app() -> App {
+    App::new().module(Auth::new().notifications())
+}
+```
+
+and in the layout's navigation bar:
+
+```html
+{% from "renox/ui.html" import notification_bell %}
+{{ notification_bell(unread_notifications) }}
+```
+
+- `unread_notifications`, the logged-in user's unread count, is in every view (0 for guests);
+  the bell's badge shows it ("99+" past 99) and its label reads "Notifications, 3 unread".
+- A click opens a panel with the latest 20: each with its icon, title, body, time ("5 minutes
+  ago") and links, a dot while unread, buttons to mark it read or unread and to delete it,
+  and "Mark all as read" and "Clear all" on top. Opening one (its title, when it has a `url`)
+  marks it read and follows the link. Esc or a click outside closes the panel.
+- While a page is open, new notifications arrive by themselves: the page keeps a
+  Server-Sent Events stream (`/notifications/stream`), and each new one shows as a toast with
+  an "Open" link and updates the badge, as do reads in another tab.
+- Without JavaScript the bell is a link to `/notifications`, the same list as a page (with
+  "Older" pages), in the app's `layouts/app.html` (else Renox's sign-in layout). Replace
+  `renox/notifications.html` to change it; its `panel` block is what the bell shows.
+
+The routes, all for logged-in users: `notifications.index` (`GET /notifications`, the page;
+with `HX-Request` the panel alone), `notifications.stream`, `notifications.read`,
+`notifications.unread`, `notifications.open` (`POST /notifications/{id}/…`),
+`notifications.destroy` (`DELETE /notifications/{id}`), `notifications.read_all` (`POST
+/notifications/read-all`) and `notifications.clear` (`DELETE /notifications`). The kit texts
+are under `ui.notifications.*`.
+
+How new ones arrive: a stream sends `count` (the unread count) first and whenever it changes,
+and `notification` (the new one as JSON) when one is stored. A notification stored in the same
+process (a request, or the queue workers inside `serve`) wakes the user's streams at once;
+streams also look at the table every 15 seconds, so one stored by another server or by a
+separate `queue:work` arrives within that time. A stream ends after five minutes and the
+browser opens a new one, so a session that logged out or was revoked doesn't keep one open,
+and every stream ends when the server shuts down. Behind a proxy, keep SSE unbuffered (see
+[operations.md](operations.md)).
+
+### Your own list
 
 ```rust
 use renox::prelude::*;
@@ -360,6 +421,8 @@ More in [testing.md](testing.md) ("Jobs, events, notifications, mail, HTTP").
 | `$user->notify()`, `ShouldQueue` | `state.notify(&user, &n)`, `state.notify_later(&user, &n)` |
 | `Notification::route('mail', …)` (on-demand) | `Recipient::to("mail", …).and(…)` + `state.notify_to` |
 | `HasLocalePreference` | `Recipient::in_locale` or a `users.locale` column |
-| `$user->notifications`, `unreadNotifications`, `markAsRead` | `user.notifications(&db, n)`, `unread_notifications`, `mark_notification_read`, `mark_all_notifications_read` |
+| `$user->notifications`, `unreadNotifications`, `markAsRead`, `markAsUnread` | `user.notifications(&db, n)`, `notifications_before`, `unread_notifications`, `mark_notification_read`, `mark_notification_unread`, `mark_all_notifications_read`, `delete_notification`, `delete_notifications` |
+| Filament's `Notification::make()->title()->body()->sendToDatabase($user)` | `DatabaseMessage::success(title).body(…).url(…)` from `to_database` |
+| Filament's database notifications modal, polling or Echo | `Auth::new().notifications()` + `notification_bell(unread_notifications)`, Server-Sent Events |
 | `model:prune` on notifications | `notifications:prune --days 30` |
 | `Mail::fake()`, `Notification::fake()`, `assertSentTo` | memory mailer + `sent_mail()` / `assert_mail_sent`, `fake_notifications()` + `assert_notified` / `assert_notified_to` |

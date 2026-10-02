@@ -401,6 +401,39 @@ page, once. For an htmx request it rides in `HX-Trigger` (event `renox:toast`) a
 once. Kinds: `success`, `info`, `warning` and `error`; `error` is announced as an alert and
 stays until dismissed.
 
+A toast can say more, as Filament's notifications do:
+
+```rust
+use renox::prelude::*;
+use renox::{Toast, ToastAction};
+
+async fn place() -> (Toast, Redirect) {
+    let toast = Toast::success("Order #7 placed")
+        .body("We'll email you when it ships.")            // a second, lighter line
+        .link("View order", "/orders/7")                    // links under the text
+        .action(ToastAction::link("Help", "https://example.com/help").new_tab())
+        .action(ToastAction::event("Undo", "order-undo"))   // a DOM event on `document`
+        .seconds(8)                                          // or .persistent()
+        .id("order-7");                                      // Renox.dismissToast("order-7")
+    (toast, Redirect::to("/orders"))
+}
+```
+
+- Every action closes the toast. A link goes only to http(s), mailto, tel or a relative URL;
+  an event action dispatches its event on `document` (`detail.toast` is the id), so an htmx
+  element can listen with `hx-trigger="order-undo from:document"`.
+- `seconds(n)` sets how long it stays (errors too); `persistent()` keeps it until dismissed.
+  Every toast waits while hovered or focused.
+- A toast with an `id` replaces an earlier one with the same id.
+- `{{ toasts(position="bottom-end") }}` moves them: `top` (the default, centred),
+  `top-start`, `top-end`, `bottom`, `bottom-start` or `bottom-end`. Phones keep them centred.
+- From the page's own script: `Renox.toast({kind: "success", message: "Copied", body: "…",
+  actions: [{label: "Open", url: "/x"}], duration: 3000, id: "copy"})` and
+  `Renox.dismissToast("copy")`.
+
+In-app notifications that stay (a bell in the navigation bar, new ones arriving live) are in
+[mail.md](mail.md#the-bell).
+
 ## Fragments and out-of-band swaps
 
 `view(…).fragment("rows")` renders only that block for htmx requests. `.also("count")` adds
