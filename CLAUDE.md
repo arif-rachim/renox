@@ -974,7 +974,7 @@ picks the build, not the terminal.
   jobs use them. Merged (#96). Then dashboards (Filament's widgets as the yardstick, B before
   A): `renox::chart` (`Period`, `Trend`, `Series`), the `chart(…)` template function (SVG +
   HTML, no library), the kit's `stat`/`stats`/`dashboard`/`widget`/`period_filter`,
-  `query_with`; shop's admin dashboard uses them. Branch `ccr-0db862ed-uol6i8`.
+  `query_with`; shop's admin dashboard uses them. Merged (#97).
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.

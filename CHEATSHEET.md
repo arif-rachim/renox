@@ -202,6 +202,8 @@ Every view also gets: `request.path`, `request.query`, `request.route` (the rout
 `app.debug`, `app.url`, `app.locale`, `auth.check`, `auth.user`, `auth.roles`, `flash`, `errors`, `csrf_token`,
 and the functions `old()`, `has_old()`, `error()`, `csrf_field()`, `method_field()`, `route()`, `asset()`,
 `storage_url()`, `t()`, `can()`, `route_is(pattern, …)`, `class_names(…)`, `page_url(n)`,
+`query_with(key=value)` (this page's query with those keys set, or removed with `none`; `page` dropped),
+`chart(kind, data, …)` (an SVG chart: line, area, bar, pie, doughnut),
 `renox_head()`, `csp_nonce()`, `seo()`,
 `renox_ui()` (the UI kit), `renox_grid()` (the data grid's assets), `renox_calendar()` (the
 date picker's calendar; the kit's `date_picker` adds it once), `sparkline(values)`, `toasts()`, `once(key)`, `stack(name)` and, with `{% call %}`,
