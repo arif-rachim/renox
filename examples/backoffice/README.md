@@ -42,8 +42,10 @@ There is no sign-up page: staff are added by an admin. Log in as
   listed, the rest land.
 - **Export in the background.** On Invoices, filter (say, Status = Issued),
   tick "select all matching" and choose "Export in the background". A job
-  makes the CSV with the grid's filters; the bell holds the link (it works
-  for a day).
+  makes the CSV with the grid's filters and stores it on a disk of its own
+  (`App::disk("exports", …)` in [src/lib.rs](src/lib.rs): `storage/exports`,
+  or a bucket with `EXPORTS_DISK=s3`); the bell holds the link (it works for
+  a day).
 - **Grids everywhere.** Customers are edited in place (cells send `PATCH`);
   invoices group by status, total in the footer and remember their filters;
   products activate and deactivate in bulk; the activity log pages and

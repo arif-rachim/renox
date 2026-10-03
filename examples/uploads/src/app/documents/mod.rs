@@ -5,6 +5,7 @@
 use std::time::Duration;
 
 use renox::prelude::*;
+use renox::validation::Dimensions;
 use renox::{Download, Toast};
 use serde::{Deserialize, Serialize};
 
@@ -64,8 +65,12 @@ impl Validate for PhotoForm {
     fn rules(&self, v: &mut Validator) {
         v.field("title", &self.title).required().max(100);
         v.field("photos", &self.photos).required().max(10); // at most 10 files
-        // Each file checked by content, not by name: a text file called x.png is refused.
-        v.each("photos", &self.photos, |photo| photo.image().max(2048)); // KB
+        // Each file checked by content, not by name: a text file called x.png
+        // is refused. Its size in pixels comes from the image's header.
+        let size = Dimensions::new().max_width(6000).max_height(6000);
+        v.each("photos", &self.photos, |photo| {
+            photo.image().max(2048).dimensions(&size) // KB, then pixels
+        });
     }
 }
 

@@ -411,7 +411,11 @@ impl Validate for ProductForm {
         v.each("photos", &self.photos, |photo| photo.image().max(2048));
         // Also: digits(n), digits_between(a, b), date(), before…, after_or_equal(d), one_of, same, different,
         // alpha, alpha_num, alpha_dash, lowercase, uppercase, starts_with(&["08"]), ends_with,
-        // uuid, ip, size(n), required_without(&other), prohibited_if(cond), mimes(&["pdf", "jpg"]) for an Upload,
+        // uuid, ulid, ip, mac_address, json, timezone, hex_color, ascii, size(n), required_without(&other),
+        // required_with_all(&[&a, &b]), prohibited(), prohibited_if(cond), prohibits("other", &other),
+        // declined(), numeric(), integer(), decimal(2, 2), multiple_of(500), min_digits(n), not_matches(re),
+        // gt("min_price", &self.min_price) / gte / lt / lte (numbers, dates, lengths), mimes(&["pdf", "jpg"])
+        // and dimensions(&validation::Dimensions::new().min_width(800)) for an Upload,
         // v.distinct("tags", &self.tags), v.nested("lines", &self.lines) for a Vec of structs,
         // .apply(&MyRule) with `validation::Rule`.
     }
@@ -932,9 +936,9 @@ impl Policy for Product {
 // Routes::new().resource("/products", "products", Resource::new().index(index).show(show)…)
 // registers index/create/store/show/edit/update/destroy as Laravel does (products.index, …).
 // `AuthUser` sends guests to the login page; use `Option<AuthUser>` when optional.
-// `Path` is Renox's: `/products/abc` for a `Path<i64>` is a 404, like a missing product.
-async fn edit(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Result<View> {
-    let product = Product::find_or_404(&db, id).await?;
+// `Found` loads the product the route's `{id}` (or `{product}`, or a column such as `{slug}`)
+// names: a missing row or `/products/abc` is a 404 (Laravel's route model binding).
+async fn edit(user: AuthUser, Found(product): Found<Product>) -> Result<View> {
     user.authorize("update", &product)?; // 403 unless allowed
     Ok(view("products/edit.html", context! { product }))
 }
@@ -1604,6 +1608,25 @@ async fn private_file(State(state): State<AppState>) -> Result<Redirect> {
 }
 ```
 
+## More disks
+
+```rust
+use renox::prelude::*;
+use renox::storage::StorageConfig;
+
+fn with_disks(app: App) -> App {
+    // EXPORTS_DISK=s3 + EXPORTS_BUCKET=… (keys from S3_*), or local: storage/exports.
+    app.disk("exports", |config| StorageConfig::from_env(config, "EXPORTS"))
+}
+
+async fn save(State(state): State<AppState>) -> Result<String> {
+    let exports = state.disk("exports")?; // an unknown name is a 500
+    exports.put("orders.csv", "id,total\n".into()).await?;
+    // Public keys: `/_renox/disks/exports/public/…`; the rest through temporary_url.
+    Ok(exports.url("public/logo.png"))
+}
+```
+
 ## Security: CSP, CORS, webhooks
 
 ```rust
@@ -1616,16 +1639,23 @@ fn secured(app: App) -> App {
         csp.allow("script-src", "https://www.googletagmanager.com")
             .allow("frame-src", "https://www.youtube.com");
     })
+    // The CSRF token also as an `XSRF-TOKEN` cookie, accepted back in `X-XSRF-TOKEN` (axios).
+    .xsrf_cookie()
+    // TRUSTED_HOSTS=example.com,*.example.com: other `Host`s get a 400.
 }
 
 fn routes() -> Routes {
     let api = Routes::new()
         .get("/api/stock", || async { "12" })
-        .cors(&["https://app.example.com"]); // or &["*"]
+        .cors(&["https://app.example.com"]) // or &["*"]
+        .etag(); // `ETag`, and 304 when the browser has this version
     let webhooks = Routes::new()
         .post("/webhooks/payment", || async { StatusCode::OK })
         .without_csrf(); // no session: check the gateway's signature instead
-    api.merge(webhooks)
+    let pages = Routes::new()
+        .view("/about", "pages/about.html") // no handler needed
+        .redirect("/about-us", "/about"); // 302 (`permanent_redirect`: 301)
+    api.merge(webhooks).merge(pages)
 }
 ```
 

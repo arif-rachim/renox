@@ -125,8 +125,9 @@ async fn store(
     ))
 }
 
-async fn edit(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Result<View> {
-    let product = Product::find_or_404(&db, id).await?;
+// `Found` loads the product the route's `{id}` names, or answers 404
+// (Laravel's route model binding); trashed products count as missing.
+async fn edit(user: AuthUser, Found(product): Found<Product>) -> Result<View> {
     user.authorize("update", &product)?;
     Ok(view("products/form.html", context! { product }))
 }
@@ -134,10 +135,9 @@ async fn edit(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Resu
 async fn update(
     State(db): State<Db>,
     user: AuthUser,
-    Path(id): Path<i64>,
+    Found(original): Found<Product>,
     Valid(form): Valid<ProductForm>,
 ) -> Result<(Toast, Redirect)> {
-    let original = Product::find_or_404(&db, id).await?;
     user.authorize("update", &original)?;
     let mut product = original.clone();
     product.name = form.name;
@@ -158,9 +158,8 @@ async fn update(
 async fn destroy(
     State(db): State<Db>,
     user: AuthUser,
-    Path(id): Path<i64>,
+    Found(mut product): Found<Product>,
 ) -> Result<(Toast, Redirect)> {
-    let mut product = Product::find_or_404(&db, id).await?;
     user.authorize("delete", &product)?;
     product.delete(&db).await?; // soft: sets deleted_at
     Ok((

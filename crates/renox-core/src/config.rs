@@ -147,6 +147,10 @@ pub struct Config {
     pub analytics: AnalyticsConfig,
     /// Reverse proxies whose `X-Forwarded-For` is believed, from `TRUSTED_PROXIES`.
     pub trusted_proxies: crate::TrustedProxies,
+    /// Host names the app answers, from `TRUSTED_HOSTS` (comma-separated;
+    /// `*.example.com` for subdomains). Empty: any host. When set, `APP_URL`'s
+    /// host is allowed too, and other hosts get a 400.
+    pub trusted_hosts: Vec<String>,
 }
 
 /// Google Search Console, Google Analytics 4 and Google Tag Manager, from
@@ -283,6 +287,7 @@ impl Config {
                 access_key_id: v.optional("S3_ACCESS_KEY_ID"),
                 secret_access_key: v.optional("S3_SECRET_ACCESS_KEY"),
                 url: v.optional("STORAGE_URL"),
+                root: None,
             },
             upload_max_size: v
                 .or("UPLOAD_MAX_SIZE", "10")
@@ -292,6 +297,12 @@ impl Config {
                 .context("UPLOAD_MAX_SIZE must be a number of megabytes")?,
             csp: CspMode::parse(&v.or("CSP", "relaxed"))?,
             trusted_proxies: crate::TrustedProxies::parse(&v.or("TRUSTED_PROXIES", ""))?,
+            trusted_hosts: v
+                .or("TRUSTED_HOSTS", "")
+                .split(',')
+                .map(|host| host.trim().to_ascii_lowercase())
+                .filter(|host| !host.is_empty())
+                .collect(),
             vars: Default::default(),
             analytics: AnalyticsConfig {
                 google_site_verification: v.optional("GOOGLE_SITE_VERIFICATION"),
@@ -362,6 +373,7 @@ impl Default for Config {
             vars: Default::default(),
             analytics: AnalyticsConfig::default(),
             trusted_proxies: Default::default(),
+            trusted_hosts: Vec::new(),
         }
     }
 }
@@ -488,6 +500,7 @@ mod tests {
             ("MAIL_USERNAME", ""),
             ("CSP", "strict"),
             ("TRUSTED_PROXIES", "10.0.0.0/8"),
+            ("TRUSTED_HOSTS", "shop.example.com, *.Example.org"),
             ("S3_BUCKET", "files"),
         ])
         .unwrap();
@@ -501,6 +514,7 @@ mod tests {
         assert_eq!(c.mail.username, None, "empty means unset");
         assert_eq!(c.csp, CspMode::Strict);
         assert!(c.trusted_proxies.contains("10.1.2.3".parse().unwrap()));
+        assert_eq!(c.trusted_hosts, ["shop.example.com", "*.example.org"]);
         assert_eq!(c.storage.bucket.as_deref(), Some("files"));
     }
 

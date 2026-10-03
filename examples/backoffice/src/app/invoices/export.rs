@@ -81,13 +81,13 @@ impl Job for ExportInvoices {
             .count()
             .saturating_sub(1);
         let key = format!(
-            "exports/invoices-{}-{}.csv",
+            "invoices-{}-{}.csv",
             user.id,
             renox::db::now().format("%Y%m%d-%H%M%S")
         );
-        state.storage.put(&key, bytes).await?;
-        let url = state
-            .storage
+        let exports = state.disk("exports")?;
+        exports.put(&key, bytes).await?;
+        let url = exports
             .temporary_url(state, &key, Duration::from_secs(24 * 60 * 60))
             .await?;
         state.notify(&user, &ExportReady { url, rows }).await

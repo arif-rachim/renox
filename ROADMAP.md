@@ -1516,6 +1516,33 @@ Notes from M32:
 - Older milestone notes above still say "English and Indonesian": they record what was
   true then.
 
+### M33 · Small additions from the parity review
+The owner chose the "small adds" of the parity review before v1.0, so they land while the
+API may still change.
+- [x] Validation rules: `gt`/`gte`/`lt`/`lte`, `decimal`, `dimensions` (`Dimensions`),
+      `prohibited`/`prohibited_unless`/`prohibits`, `required_with_all`/
+      `required_without_all`, `accepted_if`/`declined`/`declined_if`, `numeric`, `integer`,
+      `multiple_of`, `min_digits`/`max_digits`, `json`, `ulid`, `timezone`, `mac_address`,
+      `ascii`, `hex_color`, `doesnt_start_with`/`doesnt_end_with`, `not_matches`
+- [x] Route model binding: `Found<M>`
+- [x] `Routes::view`, `Routes::redirect`, `Routes::permanent_redirect`
+- [x] Several disks: `App::disk`, `state.disk`, `StorageConfig::from_env`
+- [x] `Routes::etag()`, `App::xsrf_cookie()`, `TRUSTED_HOSTS`
+- [x] Examples (crud, relations, backoffice, uploads), guides, the parity review
+- [ ] Still open from the review's small adds: a public `current_password` rule, the HIBP
+      check, several mailers, session `keep`/`now`, named error bags, `hasManyThrough`
+
+Notes from M33:
+- `Found` picks the parameter named after the table, else the only one; a parameter named
+  after a column (`{slug}`) is matched against it. Several parameters and none named after
+  the model is the app's mistake (500), not a guess.
+- ETags are computed in the outermost layer: a handler returns an unrendered `View`, so a
+  route layer would hash an empty body. The route only marks the response.
+- `gt`/`lt` compare two texts as numbers when both read as one: forms often keep prices in a
+  `String`, and comparing their lengths would surprise.
+- A named local disk serves its public files at `/_renox/disks/<name>/public/…` rather than
+  under `/storage`, which belongs to the default disk.
+
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`
       (resource tables and forms); billing later

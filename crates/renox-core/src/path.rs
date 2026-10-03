@@ -60,3 +60,94 @@ where
         }
     }
 }
+
+/// The model a route parameter names, loaded from the database (Laravel's
+/// route model binding), or a 404 page when there's no such row.
+///
+/// Which parameter: the one named after the model's table (`{product}`
+/// for `Product`), else the route's only parameter. It is read as the
+/// model's key (`{product}`, `{id}`), or, when its name is one of the
+/// model's columns, matched against that column (`/posts/{slug}`). The
+/// query is the model's own, so default scopes (the current tenant) and
+/// soft deletes apply.
+///
+/// ```
+/// # use renox::prelude::*;
+/// # #[derive(Model, serde::Serialize, Default)] struct Product { id: i64, name: String }
+/// # #[derive(Model, serde::Serialize, Default)] struct Post { id: i64, slug: String }
+/// // GET /products/{product}
+/// async fn show(Found(product): Found<Product>) -> String { product.name }
+///
+/// // GET /blog/{slug}: the post whose `slug` column matches
+/// async fn post(Found(post): Found<Post>) -> String { post.slug }
+/// ```
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Found<M>(pub M);
+
+impl<M> Deref for Found<M> {
+    type Target = M;
+
+    fn deref(&self) -> &M {
+        &self.0
+    }
+}
+
+impl<M> DerefMut for Found<M> {
+    fn deref_mut(&mut self) -> &mut M {
+        &mut self.0
+    }
+}
+
+impl<M, S> FromRequestParts<S> for Found<M>
+where
+    M: crate::db::Model,
+    S: Send + Sync,
+{
+    type Rejection = Error;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Error> {
+        let params = axum::extract::RawPathParams::from_request_parts(parts, state)
+            .await
+            .map_err(|err| anyhow::anyhow!("{err}"))?;
+        let params: Vec<(String, String)> = params
+            .iter()
+            .map(|(name, value)| (name.to_owned(), value.to_owned()))
+            .collect();
+        let (name, value) = match params.iter().find(|(name, _)| name == M::TABLE) {
+            Some(param) => param.clone(),
+            None if params.len() == 1 => params[0].clone(),
+            None => {
+                return Err(anyhow::anyhow!(
+                    "Found<{}> needs a route parameter named `{}` (the route has {})",
+                    std::any::type_name::<M>(),
+                    M::TABLE,
+                    params
+                        .iter()
+                        .map(|(name, _)| format!("`{name}`"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+                .into());
+            }
+        };
+        let app = parts
+            .extensions
+            .get::<crate::AppState>()
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("Found<T> needs Renox's request layers"))?;
+        let by_column = name != M::TABLE && name != "id" && M::COLUMNS.contains(&name.as_str());
+        let found = if by_column {
+            M::query().where_eq(&name, value).first(&app.db).await?
+        } else {
+            let key = value
+                .parse::<M::Key>()
+                .ok()
+                .filter(|key| !crate::db::ModelKey::is_unsaved(key));
+            match key {
+                Some(key) => M::find(&app.db, key).await?,
+                None => None,
+            }
+        };
+        found.map(Found).ok_or(Error::NotFound)
+    }
+}

@@ -108,12 +108,16 @@ impl Module for Guestbook {
 - Routes for other hosts (`Routes::domain("{account}.example.com", …)`), a fallback for what
   nothing else answers, redirects by route name (`Redirect::route`, `Redirect::intended`), and
   the current route in views (`route_is('admin.*')`) and handlers (`CurrentRoute`).
+- Route model binding: `Found(post): Found<Post>` loads the row `{post}`, `{id}` or `{slug}`
+  names (404 if there's none, within the tenant's default scope). Pages without a handler
+  (`.view("/about", "about.html")`, `.redirect(…)`), and `.etag()` for 304s on feeds and lists.
 - Encrypted cookie sessions (or `SESSION_DRIVER=database`), flash messages, old input and
   list/counter helpers (`session.push`, `session.increment`) come built in. CSRF protection is
   automatic for forms and htmx.
 - `_method` spoofing lets plain forms send PUT and DELETE.
-- Security headers and a Content-Security-Policy are on by default, and CORS can be enabled per
-  route.
+- Security headers and a Content-Security-Policy are on by default, CORS can be enabled per
+  route, `TRUSTED_HOSTS` refuses other hosts, and `App::xsrf_cookie()` hands the CSRF token to
+  JavaScript clients as Laravel's `XSRF-TOKEN` cookie.
 - Webhooks from payment gateways and other services (`impl Webhook`, `.webhook::<W>(path)`):
   signature checks (HMAC, Stripe-style), each event stored and processed once in the queue,
   with `webhook:retry` when something failed.
@@ -206,7 +210,8 @@ impl Module for Guestbook {
 
 - `Valid<T>` validates forms, JSON bodies and query strings with rules such as `required`,
   `required_if`, `email`, `between`, `matches` (regex), `digits`, dates (`before`, `after`),
-  `unique`, `exists`, `same`, `alpha_dash`, `uuid`, `ip`, `size`, `image` and `mimes`, per item of
+  `unique`, `exists`, `same`, `gt`/`lt` against another field, `decimal`, `alpha_dash`, `uuid`,
+  `json`, `timezone`, `size`, `image`, `mimes` and `dimensions` (pixels), per item of
   a list (`each`, `nested`, `distinct`), and your own reusable `Rule`s. Messages come in English,
   or from your own translations (`resources/lang/<locale>.json`). Simple forms declare them as attributes:
   `#[derive(Validate)]` with `#[validate(required, email, unique("users", "email"))]`.
@@ -256,7 +261,8 @@ impl Module for Guestbook {
 <summary><b>Files, cache, translations</b></summary>
 
 - Uploads are ordinary form fields, checked by their content. They're stored locally or on S3/R2,
-  with signed temporary URLs; `storage.list`, `copy` and `rename` work on both.
+  with signed temporary URLs; `storage.list`, `copy` and `rename` work on both. More disks,
+  each with a name (`App::disk("backups", …)`, `state.disk("backups")`), sit next to the default.
 - The cache (`remember`, `put`, `forget`, `add`, `pull`, `increment`) is kept in memory or in the
   database, with atomic locks (`state.cache.lock("stock:42", ttl)`) that hold across servers on
   the database store.
@@ -399,6 +405,8 @@ out of the box.
 | `HasUlids` / `HasUuids`, `encrypted` casts, nested transactions | `id: Ulid` / `id: Uuid`, `Encrypted<T>` fields, `tx.savepoint(…)` |
 | `routeIs`, `@class`, `trans_choice` ranges | `route_is('admin.*')`, `class_names(…)`, `{0} none\|[1,*] :count` in lang files |
 | Factory states and sequences | `Product::factory().count(3).state(f).sequence(\|i, p\| …)` |
+| Route model binding, `Route::view`, `Route::redirect` | `Found<Post>`, `.view(…)`, `.redirect(…)` |
+| Several disks (`Storage::disk('s3')`) | `App::disk(name, …)`, `state.disk(name)` |
 | Middleware | `.require_auth()`, `.throttle(…)`, `Routes::route_layer`, `App::layer` |
 | `RateLimiter::for('api', …)` | `App::rate_limiter("api", …)` and `.throttle_by("api")` |
 | Exception reporting (`report()`), Telescope/Debugbar | `App::report(…)`, `/_renox/debug` |
@@ -458,6 +466,9 @@ review (after M17), milestones M18–M32 closed its gaps:
 - **M29–M32:** fourteen examples, among them a full back office; every example on the kit,
   with its navigation and page frame; a warm default theme with a type scale; and an
   English-only codebase.
+- **M33:** small additions the review still listed: 28 more validation rules
+  (`gt`/`lt`, `decimal`, `dimensions`, `json`, …), route model binding (`Found`), named
+  disks, ETags, the `XSRF-TOKEN` cookie, trusted hosts, and view and redirect routes.
 
 Next is 1.0: a documentation site with a tutorial and a Laravel guide, semver checks, and the
 first real release on crates.io (today's crates there are placeholders, so install from Git

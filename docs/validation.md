@@ -213,17 +213,41 @@ numbers, items for a `Vec`, kilobytes for an `Upload`.
 
 | Group | Rules |
 |---|---|
-| Presence | `required()`, `required_if(cond)`, `required_unless(cond)`, `required_with(&other)`, `required_without(&other)`, `prohibited_if(cond)` (must be empty), `accepted()` (a ticked checkbox) |
+| Presence | `required()`, `required_if(cond)`, `required_unless(cond)`, `required_with(&other)`, `required_without(&other)`, `required_with_all(&[&a, &b])`, `required_without_all(&[&a, &b])`, `prohibited()`, `prohibited_if(cond)`, `prohibited_unless(cond)` (must be empty), `prohibits("other", &other)` (this one or the other, not both), `accepted()` / `accepted_if(cond)` (a ticked checkbox), `declined()` / `declined_if(cond)` (unticked, or `no`/`off`/`0`/`false`) |
 | Size | `min(n)`, `max(n)`, `between(min, max)`, `size(n)` |
-| Text | `email()`, `url()` (`http://` or `https://`), `matches(r"^[A-Z]{2}\d{4}$")` (a regex; anchor it), `alpha()`, `alpha_num()`, `alpha_dash()`, `lowercase()`, `uppercase()`, `starts_with(&[…])`, `ends_with(&[…])`, `uuid()`, `ip()` |
+| Text | `email()`, `url()` (`http://` or `https://`), `matches(r"^[A-Z]{2}\d{4}$")` (a regex; anchor it), `not_matches(pattern)`, `alpha()`, `alpha_num()`, `alpha_dash()`, `ascii()`, `lowercase()`, `uppercase()`, `starts_with(&[…])`, `ends_with(&[…])`, `doesnt_start_with(&[…])`, `doesnt_end_with(&[…])`, `uuid()`, `ulid()`, `ip()`, `mac_address()`, `json()`, `timezone()` (an IANA name such as `Asia/Jakarta`), `hex_color()` (`#4f46e5`) |
+| Numbers | `numeric()` and `integer()` (for numbers typed into text fields), `decimal(min, max)` (decimal places: `decimal(2, 2)` for `12.50`), `multiple_of(n)`, `min_digits(n)`, `max_digits(n)` |
 | Digits | `digits(n)` (exactly `n` digits, e.g. a PIN), `digits_between(min, max)` (e.g. a phone number) |
 | Dates | `date()` (text such as `2026-10-01` or `2026-10-01T10:30`), `before(d)`, `before_or_equal(d)`, `after(d)`, `after_or_equal(d)`, where `d` is a `NaiveDate`, `NaiveDateTime` or `DateTime` |
 | Choices | `one_of(&[…])` (Laravel's `in`), `none_of(&[…])` (`not_in`) |
-| Other fields | `confirmed(&self.password_confirmation)`, `same("email", &self.email)`, `different("old_email", &self.old_email)` |
+| Other fields | `confirmed(&self.password_confirmation)`, `same("email", &self.email)`, `different("old_email", &self.old_email)`, `gt("min_price", &self.min_price)`, `gte(…)`, `lt(…)`, `lte(…)` |
 | Database | `unique(table, column)`, `exists(table, column)`, then `ignore(id)`, `where_eq(column, value)`, `where_null(column)`, `where_not_null(column)` |
-| Files | `image()`, `mimes(&["pdf", "jpg"])`, plus the size rules in kilobytes |
+| Files | `image()`, `mimes(&["pdf", "jpg"])`, `dimensions(&Dimensions::new().min_width(1200).ratio(3, 1))` (pixels, read from the image's header), plus the size rules in kilobytes |
 | Passwords | `password(&policy)` with a `Password` policy |
 | Your own | `rule(valid, message)`, `apply(&MyRule)` with a `Rule` |
+
+`gt`, `gte`, `lt` and `lte` compare a field with another one, named in the message: numbers
+by value, dates by date (typed or as text), other text by length, lists by their items and
+files by their size. Two texts that both read as numbers compare as numbers, so a price kept
+in a `String` works. When the other field is empty the rule is skipped (add `required` to it).
+
+```rust
+# use renox::prelude::*;
+use renox::validation::Dimensions;
+# struct Promo { min_order: i64, max_discount: i64, starts: String, ends: String, code: Option<String>, gift_card: Option<String>, banner: Option<Upload> }
+# impl Validate for Promo {
+fn rules(&self, v: &mut Validator) {
+    v.field("max_discount", &self.max_discount).lt("min_order", &self.min_order);
+    v.field("ends", &self.ends).required().date().gt("starts", &self.starts);
+    v.field("code", &self.code).prohibits("gift_card", &self.gift_card);
+    let banner = Dimensions::new().min_width(1200).ratio(3, 1);
+    v.field("banner", &self.banner).image().max(2048).dimensions(&banner);
+}
+# }
+```
+
+`decimal` counts the places as typed, so check a price as text: an `f64` field has already
+lost a trailing zero (`12.50` is `12.5`).
 
 On the validator itself:
 
@@ -535,7 +559,11 @@ The keys:
 | `required`, `accepted`, `prohibited` | presence rules (`required_if`, `required_with`… use `required`) |
 | `min.string`, `min.numeric`, `min.array`, `min.file` (and the same for `max`, `between`, `size`) | size rules, by what is measured |
 | `email`, `url`, `regex`, `alpha`, `alpha_num`, `alpha_dash`, `lowercase`, `uppercase`, `starts_with`, `ends_with`, `uuid`, `ip` | text rules (`regex` is `matches`) |
-| `numeric`, `digits`, `digits_between` | a value that isn't a number; digit rules |
+| `numeric`, `integer`, `decimal`, `multiple_of`, `digits`, `digits_between`, `min_digits`, `max_digits` | number and digit rules |
+| `gt.numeric`, `gt.string`, `gt.array`, `gt.file`, `gt.date` (and the same for `gte`, `lt`, `lte`) | comparisons with another field (`:other` is its label) |
+| `json`, `ulid`, `timezone`, `mac_address`, `ascii`, `hex_color`, `doesnt_start_with`, `doesnt_end_with`, `not_regex` | more text rules (`not_regex` is `not_matches`) |
+| `prohibits`, `declined` | presence rules |
+| `dimensions` | an image's size in pixels |
 | `date`, `before`, `before_or_equal`, `after`, `after_or_equal` | date rules |
 | `in`, `not_in` | `one_of`, `none_of` |
 | `confirmed`, `same`, `different`, `distinct` | rules across fields |

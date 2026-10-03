@@ -10,6 +10,44 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M33 · Small additions from the parity review
+
+The "small adds" the Laravel parity review still listed, before 1.0 freezes the API.
+
+- **Validation rules:** `gt`, `gte`, `lt`, `lte` against another field (numbers, dates typed
+  or as text, text by length, lists, files; two texts that read as numbers compare as
+  numbers); `decimal(min, max)`; `dimensions(&Dimensions)` (pixels, read from the PNG, JPEG,
+  GIF or WebP header); `prohibited`, `prohibited_unless`, `prohibits`; `required_with_all`,
+  `required_without_all`; `accepted_if`, `declined`, `declined_if`; `numeric`, `integer`,
+  `multiple_of`, `min_digits`, `max_digits`; `json`, `ulid`, `timezone`, `mac_address`,
+  `ascii`, `hex_color`, `doesnt_start_with`, `doesnt_end_with`, `not_matches`. Each has an
+  English message (`renox.validation.<key>` translates it), and the derive takes them
+  (`#[validate(gt("min", &self.min))]`).
+- `Upload::dimensions()`: an image's width and height.
+- **Breaking:** `Inspected::File` has a `dimensions` field and is `#[non_exhaustive]`; a
+  pattern on it needs `..`.
+- **Route model binding:** `Found<M>` loads the row a route parameter names (the one named
+  after the table, else the only one), by key or, when the parameter is named after a column
+  (`{slug}`), by that column; a missing row is a 404 and default scopes apply. In the prelude.
+- `Routes::view(path, template)`, `Routes::redirect(from, to)` (302) and
+  `Routes::permanent_redirect` (301).
+- `Routes::etag()`: an `ETag` on the routes before it, and `304 Not Modified` for a matching
+  `If-None-Match`. Hashed after the page is rendered, so it works for views too.
+- **Named disks:** `App::disk(name, settings)`, `state.disk(name)`, `Storage::name`,
+  `StorageConfig::from_env(config, "PREFIX")` (`<PREFIX>_DISK`, `_PATH`, `_BUCKET`, `_URL`,
+  the rest falling back to `S3_*`), `StorageConfig::root`. A named disk's public files are
+  served at `/_renox/disks/<name>/public/…`, private ones through `temporary_url`.
+- `App::xsrf_cookie()`: the CSRF token as an `XSRF-TOKEN` cookie scripts can read, accepted
+  back in `X-XSRF-TOKEN` (`XSRF_COOKIE`, `XSRF_HEADER`).
+- `TRUSTED_HOSTS` (`Config::trusted_hosts`): other `Host`s get a 400; `APP_URL`'s host is
+  always allowed and `/health` answers any host.
+- Examples: crud and the relations blog load models with `Found`; the blog's feed and sitemap
+  have ETags; backoffice's exports go to an `exports` disk; uploads refuses photos over
+  6000 pixels.
+- Docs: validation.md (the new rules), routing.md (`Found`, view and redirect routes, ETags,
+  `XSRF-TOKEN`, trusted hosts), operations.md, CHEATSHEET.md (more disks), README, the parity
+  review and its PDF.
+
 ### Docs refresh after M32
 
 - The Laravel parity review, until now the snapshot taken after M17, is rewritten for the code

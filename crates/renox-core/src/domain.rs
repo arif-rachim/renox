@@ -83,7 +83,7 @@ impl DomainPattern {
 
 /// The request's host from `Host` (HTTP/1) or the URI's authority (HTTP/2),
 /// without a port.
-fn host(req: &Request) -> Option<String> {
+pub(crate) fn host(req: &Request) -> Option<String> {
     let raw = req
         .headers()
         .get(axum::http::header::HOST)

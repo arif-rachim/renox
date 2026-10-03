@@ -10,6 +10,22 @@
 //! `STORAGE_DISK=s3` needs `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`,
 //! `S3_SECRET_ACCESS_KEY`, optionally `S3_ENDPOINT` (R2/MinIO) and
 //! `STORAGE_URL` (public base URL of the bucket or its CDN).
+//!
+//! More disks, each with a name, come from [`App::disk`](crate::App::disk),
+//! e.g. backups on another bucket; `state.disk("backups")` returns one:
+//!
+//! ```
+//! # use renox::prelude::*;
+//! use renox::storage::StorageConfig;
+//!
+//! # let _ =
+//! // BACKUPS_DISK=s3, BACKUPS_BUCKET=…; or BACKUPS_DISK=local, BACKUPS_PATH=…
+//! App::new().disk("backups", |config| StorageConfig::from_env(config, "BACKUPS"))
+//! # ;
+//! # async fn demo(state: AppState) -> Result {
+//! state.disk("backups")?.put("db/2026-10-03.sql.gz", vec![1, 2, 3].into()).await?;
+//! # Ok(()) }
+//! ```
 
 use std::path::{Component, Path, PathBuf};
 use std::time::Duration;
@@ -37,10 +53,13 @@ enum Disk {
     },
 }
 
-/// The app's file storage; `state.storage`.
+/// A file storage disk: `state.storage`, or a named one from
+/// `state.disk(name)`.
 #[derive(Clone)]
 pub struct Storage {
     disk: Disk,
+    /// `None` for `state.storage`, the name for `App::disk`'s disks.
+    name: Option<std::sync::Arc<str>>,
 }
 
 /// Rejects keys that could escape the storage root.
@@ -63,19 +82,49 @@ fn check_key(key: &str) -> Result<&str> {
 
 impl Storage {
     pub(crate) fn from_config(config: &Config) -> anyhow::Result<Self> {
-        let disk = match config.storage.disk.as_str() {
+        Self::open(&config.storage, config.storage_path.join("app"), None)
+    }
+
+    /// A named disk (`App::disk`), whose local files live in `settings.root`,
+    /// else `STORAGE_PATH/<name>`.
+    pub(crate) fn named(
+        config: &Config,
+        name: &str,
+        settings: &StorageConfig,
+    ) -> anyhow::Result<Self> {
+        Self::open(settings, config.storage_path.join(name), Some(name))
+    }
+
+    fn open(
+        settings: &StorageConfig,
+        default_root: PathBuf,
+        name: Option<&str>,
+    ) -> anyhow::Result<Self> {
+        let variable = match name {
+            Some(name) => format!("the `{name}` disk's driver"),
+            None => "STORAGE_DISK".to_owned(),
+        };
+        let disk = match settings.disk.as_str() {
             "local" => Disk::Local {
-                root: config.storage_path.join("app"),
+                root: settings.root.clone().unwrap_or(default_root),
             },
             #[cfg(feature = "s3")]
-            "s3" => s3(&config.storage)?,
+            "s3" => s3(settings)?,
             #[cfg(not(feature = "s3"))]
-            "s3" => bail!(
-                "STORAGE_DISK=s3 needs Renox's `s3` feature: renox = {{ features = [\"s3\"] }}"
-            ),
-            other => bail!("STORAGE_DISK must be local or s3, got `{other}`"),
+            "s3" => {
+                bail!("{variable}=s3 needs Renox's `s3` feature: renox = {{ features = [\"s3\"] }}")
+            }
+            other => bail!("{variable} must be local or s3, got `{other}`"),
         };
-        Ok(Self { disk })
+        Ok(Self {
+            disk,
+            name: name.map(Into::into),
+        })
+    }
+
+    /// The disk's name: `None` for `state.storage`.
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
     }
 
     /// Writes `bytes` to `key`, replacing any file there.
@@ -356,6 +405,22 @@ impl Storage {
     pub fn url(&self, key: &str) -> String {
         let key = key.trim_start_matches('/');
         let rest = key.strip_prefix("public/").unwrap_or(key);
+        // A named disk's public files are served by `/_renox/disks/<name>/public/…`.
+        if let Some(name) = &self.name {
+            #[cfg(feature = "s3")]
+            if let Disk::S3 {
+                public_url: Some(base),
+                ..
+            } = &self.disk
+            {
+                return format!("{}/{}", base.trim_end_matches('/'), encode_path(key));
+            }
+            return format!(
+                "/_renox/disks/{}/public/{}",
+                encode_path(name),
+                encode_path(rest)
+            );
+        }
         match &self.disk {
             Disk::Local { .. } => format!("/storage/{}", encode_path(rest)),
             #[cfg(feature = "s3")]
@@ -376,9 +441,13 @@ impl Storage {
     ) -> Result<String> {
         let key = check_key(key)?;
         match &self.disk {
-            Disk::Local { .. } => {
-                state.sign_path(&format!("/_renox/files/{}", encode_path(key)), ttl)
-            }
+            Disk::Local { .. } => match &self.name {
+                Some(name) => state.sign_path(
+                    &format!("/_renox/disks/{}/{}", encode_path(name), encode_path(key)),
+                    ttl,
+                ),
+                None => state.sign_path(&format!("/_renox/files/{}", encode_path(key)), ttl),
+            },
             #[cfg(feature = "s3")]
             Disk::S3 { store, .. } => {
                 use object_store::signer::Signer;
@@ -400,7 +469,8 @@ impl Storage {
     /// Where public local files live, for serving `/storage`.
     pub(crate) fn public_root(&self) -> Option<PathBuf> {
         match &self.disk {
-            Disk::Local { root } => Some(root.join("public")),
+            Disk::Local { root } if self.name.is_none() => Some(root.join("public")),
+            Disk::Local { .. } => None,
             #[cfg(feature = "s3")]
             Disk::S3 { .. } => None,
         }
@@ -461,6 +531,33 @@ pub struct StorageConfig {
     pub secret_access_key: Option<String>,
     /// Public base URL for keys under `public/` (bucket URL or CDN), for S3.
     pub url: Option<String>,
+    /// Where a local disk keeps its files. `None`: `STORAGE_PATH/app` for
+    /// `state.storage`, `STORAGE_PATH/<name>` for a named disk.
+    pub root: Option<PathBuf>,
+}
+
+impl StorageConfig {
+    /// A disk's settings from variables starting with `prefix`, for
+    /// [`App::disk`](crate::App::disk): `<PREFIX>_DISK` (`local` or `s3`,
+    /// default `local`), `<PREFIX>_PATH` (a local disk's folder),
+    /// `<PREFIX>_BUCKET`, `<PREFIX>_URL`, and `<PREFIX>_REGION`,
+    /// `<PREFIX>_ENDPOINT`, `<PREFIX>_ACCESS_KEY_ID`,
+    /// `<PREFIX>_SECRET_ACCESS_KEY`, which fall back to the `S3_*` ones.
+    pub fn from_env(config: &Config, prefix: &str) -> Self {
+        let prefix = prefix.trim_end_matches('_').to_ascii_uppercase();
+        let var = |name: &str| config.var(&format!("{prefix}_{name}"));
+        let shared = |name: &str, fallback: &Option<String>| var(name).or_else(|| fallback.clone());
+        Self {
+            disk: var("DISK").unwrap_or_else(|| "local".into()),
+            bucket: var("BUCKET"),
+            region: shared("REGION", &config.storage.region),
+            endpoint: shared("ENDPOINT", &config.storage.endpoint),
+            access_key_id: shared("ACCESS_KEY_ID", &config.storage.access_key_id),
+            secret_access_key: shared("SECRET_ACCESS_KEY", &config.storage.secret_access_key),
+            url: var("URL"),
+            root: var("PATH").map(PathBuf::from),
+        }
+    }
 }
 
 impl Default for StorageConfig {
@@ -473,6 +570,7 @@ impl Default for StorageConfig {
             access_key_id: None,
             secret_access_key: None,
             url: None,
+            root: None,
         }
     }
 }
@@ -510,6 +608,7 @@ fn s3(config: &StorageConfig) -> anyhow::Result<Disk> {
 pub(crate) fn router() -> Router<AppState> {
     Router::new()
         .route("/_renox/files/{*key}", get(private_file))
+        .route("/_renox/disks/{disk}/{*key}", get(disk_file))
         .layer(axum::middleware::map_response(
             crate::app::user_file_headers,
         ))
@@ -520,9 +619,35 @@ async fn private_file(
     State(state): State<AppState>,
     UrlPath(key): UrlPath<String>,
 ) -> Result<Response> {
-    let bytes = state.storage.get(&key).await?.ok_or(Error::NotFound)?;
+    file_response(&state.storage, &key).await
+}
+
+/// A named disk's file: anyone may read `public/…`, the rest needs a
+/// signed link from `temporary_url`.
+async fn disk_file(
+    State(state): State<AppState>,
+    UrlPath((disk, key)): UrlPath<(String, String)>,
+    uri: axum::http::Uri,
+) -> Result<Response> {
+    let storage = state.disks.get(&disk).ok_or(Error::NotFound)?;
+    let public = key.starts_with("public/");
+    if !public && !crate::signed::verify(&state, &uri) {
+        return Err(Error::Forbidden);
+    }
+    let mut res = file_response(storage, &key).await?;
+    if public {
+        res.headers_mut().insert(
+            CACHE_CONTROL,
+            axum::http::HeaderValue::from_static("public, max-age=3600"),
+        );
+    }
+    Ok(res)
+}
+
+async fn file_response(storage: &Storage, key: &str) -> Result<Response> {
+    let bytes = storage.get(key).await?.ok_or(Error::NotFound)?;
     let upload = crate::upload::Upload {
-        file_name: key.clone(),
+        file_name: key.to_owned(),
         content_type: String::new(),
         bytes: bytes.clone(),
     };

@@ -54,7 +54,7 @@ pub mod prelude {
     pub use axum::extract::{Form, Json, Query, State};
     pub use axum::http::StatusCode;
     pub use axum::response::{Html, IntoResponse, Redirect, Response};
-    pub use renox_core::Path;
+    pub use renox_core::{Found, Path};
 }
 
 /// Compiles the Rust in docs/types.md as a doctest.

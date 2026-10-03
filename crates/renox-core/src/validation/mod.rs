@@ -979,6 +979,322 @@ impl Field<'_> {
         self
     }
 
+    fn compare_rule(
+        mut self,
+        key: &str,
+        other: &str,
+        value: &impl FieldValue,
+        ok: fn(std::cmp::Ordering) -> bool,
+    ) -> Self {
+        if !self.present() {
+            return self;
+        }
+        let other_value = value.inspect();
+        if other_value == Inspected::Missing {
+            return self;
+        }
+        // Two texts that both read as numbers compare as numbers (a price
+        // in a `String`); other text compares by length.
+        let both_numeric = matches!(
+            (&self.value, &other_value),
+            (Inspected::Text(_), Inspected::Text(_))
+        ) && numeric_value(&self.value).is_some()
+            && numeric_value(&other_value).is_some();
+        let measured = |value: &Inspected| -> Option<(f64, &'static str)> {
+            match value {
+                Inspected::Text(_) if both_numeric => Some((numeric_value(value)?, "numeric")),
+                Inspected::Number(n) => Some((*n, "numeric")),
+                Inspected::Text(text) => Some((text.chars().count() as f64, "string")),
+                Inspected::Items(n) => Some((*n as f64, "array")),
+                Inspected::File { kilobytes, .. } => Some((*kilobytes, "file")),
+                _ => None,
+            }
+        };
+        let label = self.v.label_for(other);
+        // Dates compare as dates, whatever form they came in.
+        let as_date = |value: &Inspected| match value {
+            Inspected::Date(date) => Some(*date),
+            Inspected::Text(text) => parse_date(text.trim()),
+            _ => None,
+        };
+        let dates = as_date(&self.value).zip(as_date(&other_value));
+        if let Some((a, b)) = dates {
+            if !ok(a.cmp(&b)) {
+                self.fail(&format!("{key}.date"), &[("other", label)]);
+            }
+            return self;
+        }
+        match (measured(&self.value), measured(&other_value)) {
+            (Some((a, kind)), Some((b, other_kind))) if kind == other_kind => {
+                if !a.partial_cmp(&b).is_some_and(ok) {
+                    self.fail(&format!("{key}.{kind}"), &[("other", label)]);
+                }
+            }
+            _ => self.fail(&format!("{key}.numeric"), &[("other", label)]),
+        }
+        self
+    }
+
+    /// Greater than another field (Laravel's `gt`), named `other` in the
+    /// message: numbers by value (also two texts that both read as
+    /// numbers), dates by date, other text by length, lists by items,
+    /// files by size, e.g. a maximum price above the minimum. Skipped when
+    /// the other field is empty.
+    pub fn gt(self, other: &str, value: &impl FieldValue) -> Self {
+        self.compare_rule("gt", other, value, |o| o.is_gt())
+    }
+
+    /// Greater than or equal to another field; see [`gt`](Self::gt).
+    pub fn gte(self, other: &str, value: &impl FieldValue) -> Self {
+        self.compare_rule("gte", other, value, |o| o.is_ge())
+    }
+
+    /// Less than another field; see [`gt`](Self::gt).
+    pub fn lt(self, other: &str, value: &impl FieldValue) -> Self {
+        self.compare_rule("lt", other, value, |o| o.is_lt())
+    }
+
+    /// Less than or equal to another field; see [`gt`](Self::gt).
+    pub fn lte(self, other: &str, value: &impl FieldValue) -> Self {
+        self.compare_rule("lte", other, value, |o| o.is_le())
+    }
+
+    /// A number with `min` to `max` decimal places (Laravel's `decimal`),
+    /// e.g. `.decimal(2, 2)` for a price typed as `12.50`. A text field
+    /// keeps what was typed; an `f64` field has lost trailing zeros
+    /// (`12.50` is `12.5`), so check prices as text.
+    pub fn decimal(mut self, min: usize, max: usize) -> Self {
+        if !self.present() {
+            return self;
+        }
+        let text = match &self.value {
+            Inspected::Text(text) => text.trim().to_owned(),
+            Inspected::Number(n) => n.to_string(),
+            _ => String::new(),
+        };
+        let places = decimal_places(&text);
+        if !places.is_some_and(|p| p >= min && p <= max) {
+            let places = if min == max {
+                min.to_string()
+            } else {
+                format!("{min}-{max}")
+            };
+            self.fail("decimal", &[("decimal", places)]);
+        }
+        self
+    }
+
+    /// An uploaded image within `limits`, e.g.
+    /// `.dimensions(&Dimensions::new().min_width(400).ratio(16, 9))`; see
+    /// [`Dimensions`]. A file that isn't an image fails.
+    pub fn dimensions(mut self, limits: &Dimensions) -> Self {
+        if let (true, Inspected::File { dimensions, .. }) = (self.present(), &self.value) {
+            let ok = dimensions.is_some_and(|(w, h)| limits.allows(w, h));
+            if !ok {
+                self.fail("dimensions", &[]);
+            }
+        }
+        self
+    }
+
+    /// Must be empty (Laravel's `prohibited`), e.g. a field only an admin
+    /// may send, checked for everyone else.
+    pub fn prohibited(self) -> Self {
+        self.prohibited_if(true)
+    }
+
+    /// Must be empty unless `condition` holds.
+    pub fn prohibited_unless(self, condition: bool) -> Self {
+        self.prohibited_if(!condition)
+    }
+
+    /// When this field has a value, `other` must be empty (Laravel's
+    /// `prohibits`), e.g. a coupon code and a gift card can't both be used.
+    pub fn prohibits(mut self, other: &str, value: &impl FieldValue) -> Self {
+        if self.present() && value.inspect() != Inspected::Missing {
+            let other = self.v.label_for(other);
+            self.fail("prohibits", &[("other", other)]);
+        }
+        self
+    }
+
+    /// Required when every one of `others` has a value.
+    pub fn required_with_all(self, others: &[&dyn FieldValue]) -> Self {
+        let all = others.iter().all(|o| o.inspect() != Inspected::Missing);
+        self.required_if(all)
+    }
+
+    /// Required when none of `others` has a value, e.g. one way to reach
+    /// the customer at least.
+    pub fn required_without_all(self, others: &[&dyn FieldValue]) -> Self {
+        let none = others.iter().all(|o| o.inspect() == Inspected::Missing);
+        self.required_if(none)
+    }
+
+    /// An integer of at least `min` digits.
+    pub fn min_digits(mut self, min: usize) -> Self {
+        if self.present() && !integer_digits(&self.value).is_some_and(|n| n >= min) {
+            self.fail("min_digits", &[("min", min.to_string())]);
+        }
+        self
+    }
+
+    /// An integer of at most `max` digits.
+    pub fn max_digits(mut self, max: usize) -> Self {
+        if self.present() && !integer_digits(&self.value).is_some_and(|n| n <= max) {
+            self.fail("max_digits", &[("max", max.to_string())]);
+        }
+        self
+    }
+
+    /// A multiple of `step`, e.g. `.multiple_of(500)` for amounts in
+    /// steps of 500, or `.multiple_of(0.25)`.
+    pub fn multiple_of(mut self, step: impl Into<f64>) -> Self {
+        let step = step.into();
+        if !self.present() {
+            return self;
+        }
+        let ok = numeric_value(&self.value).is_some_and(|n| {
+            let ratio = n / step;
+            step != 0.0 && (ratio - ratio.round()).abs() < 1e-9
+        });
+        if !ok {
+            self.fail("multiple_of", &[("value", number(step))]);
+        }
+        self
+    }
+
+    /// A number: a number field, or text that reads as one (`12`, `-3.5`).
+    pub fn numeric(mut self) -> Self {
+        if self.present() && numeric_value(&self.value).is_none() {
+            self.fail("numeric", &[]);
+        }
+        self
+    }
+
+    /// A whole number: a number field without a fraction, or text that
+    /// reads as one.
+    pub fn integer(mut self) -> Self {
+        if self.present() && !numeric_value(&self.value).is_some_and(|n| n.fract() == 0.0) {
+            self.fail("integer", &[]);
+        }
+        self
+    }
+
+    /// Valid JSON text, e.g. a settings field edited by hand.
+    pub fn json(self) -> Self {
+        self.text_rule(
+            "json",
+            |t| serde_json::from_str::<serde_json::Value>(t).is_ok(),
+            &[],
+        )
+    }
+
+    /// A ULID (26 characters of Crockford's base 32).
+    pub fn ulid(self) -> Self {
+        self.text_rule("ulid", |t| t.trim().parse::<crate::db::Ulid>().is_ok(), &[])
+    }
+
+    /// An IANA time zone name, e.g. `Asia/Jakarta`, or `UTC`.
+    pub fn timezone(self) -> Self {
+        self.text_rule(
+            "timezone",
+            |t| t.trim().parse::<chrono_tz::Tz>().is_ok(),
+            &[],
+        )
+    }
+
+    /// A MAC address: `00:1A:2B:3C:4D:5E`, with `-` as well, or
+    /// `001A.2B3C.4D5E`.
+    pub fn mac_address(self) -> Self {
+        self.text_rule("mac_address", is_mac_address, &[])
+    }
+
+    /// ASCII characters only.
+    pub fn ascii(self) -> Self {
+        self.text_rule("ascii", |t| t.is_ascii(), &[])
+    }
+
+    /// A hex colour: `#RGB`, `#RGBA`, `#RRGGBB` or `#RRGGBBAA`.
+    pub fn hex_color(self) -> Self {
+        self.text_rule(
+            "hex_color",
+            |t| {
+                t.strip_prefix('#').is_some_and(|hex| {
+                    matches!(hex.len(), 3 | 4 | 6 | 8) && hex.chars().all(|c| c.is_ascii_hexdigit())
+                })
+            },
+            &[],
+        )
+    }
+
+    /// Doesn't start with any of `prefixes`.
+    pub fn doesnt_start_with(self, prefixes: &[&str]) -> Self {
+        let values = prefixes.join(", ");
+        self.text_rule(
+            "doesnt_start_with",
+            |t| !prefixes.iter().any(|p| t.starts_with(p)),
+            &[("values", values)],
+        )
+    }
+
+    /// Doesn't end with any of `suffixes`.
+    pub fn doesnt_end_with(self, suffixes: &[&str]) -> Self {
+        let values = suffixes.join(", ");
+        self.text_rule(
+            "doesnt_end_with",
+            |t| !suffixes.iter().any(|s| t.ends_with(s)),
+            &[("values", values)],
+        )
+    }
+
+    /// The text does not match `pattern` (Laravel's `not_regex`).
+    pub fn not_matches(mut self, pattern: &str) -> Self {
+        if let (true, Inspected::Text(text)) = (self.present(), &self.value) {
+            let matched = match cached_regex(pattern) {
+                Ok(regex) => regex.is_match(text),
+                Err(err) => {
+                    tracing::error!(pattern, error = %err, "invalid pattern in a `not_matches` rule");
+                    true
+                }
+            };
+            if matched {
+                self.fail("not_regex", &[]);
+            }
+        }
+        self
+    }
+
+    /// A checkbox that must be ticked when `condition` holds.
+    pub fn accepted_if(self, condition: bool) -> Self {
+        if condition { self.accepted() } else { self }
+    }
+
+    /// Must be declined: an unticked checkbox (`false`), or `no`, `off`,
+    /// `0` or `false`, e.g. "Don't share my data" answered no.
+    pub fn declined(mut self) -> Self {
+        let declined = match &self.value {
+            Inspected::Bool(b) => !b,
+            Inspected::Number(n) => *n == 0.0,
+            Inspected::Text(text) => {
+                matches!(
+                    text.trim().to_ascii_lowercase().as_str(),
+                    "no" | "off" | "0" | "false"
+                )
+            }
+            _ => false,
+        };
+        if !self.failed && !declined {
+            self.fail("declined", &[]);
+        }
+        self
+    }
+
+    /// Must be declined when `condition` holds; see [`declined`](Self::declined).
+    pub fn declined_if(self, condition: bool) -> Self {
+        if condition { self.declined() } else { self }
+    }
+
     /// The value meets `policy` (length, letters, mixed case, numbers,
     /// symbols); see [`Password`].
     pub fn password(mut self, policy: &Password) -> Self {
@@ -1203,6 +1519,142 @@ impl Default for Password {
 pub trait Rule {
     /// `Err(message)` when `value` breaks the rule.
     fn check(&self, value: &Inspected) -> std::result::Result<(), String>;
+}
+
+/// Limits for an uploaded image's size in pixels, for
+/// [`Field::dimensions`] (Laravel's `dimensions`).
+///
+/// ```
+/// # use renox::prelude::*;
+/// use renox::validation::Dimensions;
+/// # struct Form { banner: Option<Upload> }
+/// # impl Validate for Form {
+/// fn rules(&self, v: &mut Validator) {
+///     let banner = Dimensions::new().min_width(1200).ratio(3, 1);
+///     v.field("banner", &self.banner).image().dimensions(&banner);
+/// }
+/// # }
+/// ```
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Dimensions {
+    min_width: Option<u32>,
+    max_width: Option<u32>,
+    min_height: Option<u32>,
+    max_height: Option<u32>,
+    width: Option<u32>,
+    height: Option<u32>,
+    ratio: Option<(u32, u32)>,
+}
+
+impl Dimensions {
+    /// No limits yet.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// At least `px` wide.
+    pub fn min_width(mut self, px: u32) -> Self {
+        self.min_width = Some(px);
+        self
+    }
+
+    /// At most `px` wide.
+    pub fn max_width(mut self, px: u32) -> Self {
+        self.max_width = Some(px);
+        self
+    }
+
+    /// At least `px` high.
+    pub fn min_height(mut self, px: u32) -> Self {
+        self.min_height = Some(px);
+        self
+    }
+
+    /// At most `px` high.
+    pub fn max_height(mut self, px: u32) -> Self {
+        self.max_height = Some(px);
+        self
+    }
+
+    /// Exactly `px` wide.
+    pub fn width(mut self, px: u32) -> Self {
+        self.width = Some(px);
+        self
+    }
+
+    /// Exactly `px` high.
+    pub fn height(mut self, px: u32) -> Self {
+        self.height = Some(px);
+        self
+    }
+
+    /// Width to height in this ratio, e.g. `ratio(16, 9)` or `ratio(1, 1)`
+    /// for a square (to within a pixel of rounding).
+    pub fn ratio(mut self, width: u32, height: u32) -> Self {
+        self.ratio = Some((width, height));
+        self
+    }
+
+    fn allows(&self, w: u32, h: u32) -> bool {
+        let at_least = |limit: Option<u32>, v: u32| limit.is_none_or(|l| v >= l);
+        let at_most = |limit: Option<u32>, v: u32| limit.is_none_or(|l| v <= l);
+        let exactly = |limit: Option<u32>, v: u32| limit.is_none_or(|l| v == l);
+        let ratio = self.ratio.is_none_or(|(rw, rh)| {
+            // Within one pixel of the exact height for this width.
+            rw > 0 && (h as f64 - w as f64 * rh as f64 / rw as f64).abs() <= 1.0
+        });
+        at_least(self.min_width, w)
+            && at_most(self.max_width, w)
+            && at_least(self.min_height, h)
+            && at_most(self.max_height, h)
+            && exactly(self.width, w)
+            && exactly(self.height, h)
+            && ratio
+    }
+}
+
+/// Decimal places of a plain decimal number (`12`, `-3.50`), else `None`.
+fn decimal_places(text: &str) -> Option<usize> {
+    let digits = text.strip_prefix(['-', '+']).unwrap_or(text);
+    let (whole, fraction) = digits.split_once('.').unwrap_or((digits, ""));
+    let all_digits = |s: &str| s.chars().all(|c| c.is_ascii_digit());
+    (!whole.is_empty()
+        && all_digits(whole)
+        && all_digits(fraction)
+        && !(digits.contains('.') && fraction.is_empty()))
+    .then_some(fraction.len())
+}
+
+/// The value as a number: a number, or text that reads as a finite one.
+fn numeric_value(value: &Inspected) -> Option<f64> {
+    match value {
+        Inspected::Number(n) => Some(*n),
+        Inspected::Text(text) => {
+            let text = text.trim();
+            decimal_places(text)?;
+            text.parse::<f64>().ok().filter(|n| n.is_finite())
+        }
+        _ => None,
+    }
+}
+
+/// How many digits an integer value has (the sign doesn't count).
+fn integer_digits(value: &Inspected) -> Option<usize> {
+    let n = numeric_value(value)?;
+    (n.fract() == 0.0).then(|| format!("{}", n.abs() as u64).len())
+}
+
+fn is_mac_address(text: &str) -> bool {
+    let text = text.trim();
+    let hex = |s: &str, n: usize| s.len() == n && s.chars().all(|c| c.is_ascii_hexdigit());
+    for separator in [':', '-'] {
+        let parts: Vec<&str> = text.split(separator).collect();
+        if parts.len() == 6 && parts.iter().all(|p| hex(p, 2)) {
+            return true;
+        }
+    }
+    let parts: Vec<&str> = text.split('.').collect();
+    parts.len() == 3 && parts.iter().all(|p| hex(p, 4))
 }
 
 fn is_uuid(text: &str) -> bool {

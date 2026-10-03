@@ -79,7 +79,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            `sessions` table keyed by sha256(id), rotation on login/logout,
                            push/increment helpers,
                            a test mirror in `AppState::session_mirror`)
-  src/csrf.rs              CSRF middleware
+  src/csrf.rs              CSRF middleware; the XSRF-TOKEN cookie (App::xsrf_cookie) and
+                           X-XSRF-TOKEN header
   src/view.rs              MiniJinja env, View response (fragment/also), render middleware, globals
                            (request.route, route_is, loop controls), RequestGlobal (request globals
                            inside imported macros), BUILTIN views
@@ -113,7 +114,9 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            query_log.rs (capture_queries: a task-local statement log, also
                            feeding /_renox/debug)
   src/path.rs              renox::Path: axum's Path with a 404 (not 400) when a value won't parse
-                           (a parameter the route lacks is a 500)
+                           (a parameter the route lacks is a 500); Found<M> (route model binding:
+                           the parameter named after the table, else the only one; by key or
+                           by a column named like the parameter)
   src/validation/          Validator/rules (mod.rs, ValidateHooks for the derive), Valid<T>
                            (extract.rs: prepare → authorize → rules → after, FormContext), English
                            messages, nested.rs (form names like `lines[0][qty]` read as a
@@ -169,7 +172,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/health.rs            GET /health
   src/upload.rs            Upload (multipart file field), sniffing, store/store_public, token registry
   src/storage.rs           Storage (local disk; S3 with the `s3` feature), temporary URLs, /_renox/files,
-                           list/copy/rename/size/delete_all
+                           list/copy/rename/size/delete_all; named disks (App::disk,
+                           state.disk, StorageConfig::from_env) served at /_renox/disks/<name>
   src/http.rs              renox::http client (reqwest behind the `http` feature) + FakeHttp
   src/i18n.rs              Translator (lang JSON files), format() with plurals and ranges,
                            RequestLocale middleware (Accept-Language with App::detect_locale), Lang
@@ -180,7 +184,9 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/analytics.rs         analytics::event, GaClientId, ServerEvent job (`server-events` feature,
                            sent through `state.http`)
   src/webhook.rs           Webhook trait, receive route, webhook_calls store/retry, ProcessWebhook job
-  src/security.rs          security headers + CSP (+ nonce), csrf-exempt and webhook route sets
+  src/security.rs          security headers + CSP (+ nonce), csrf-exempt and webhook route sets,
+                           TRUSTED_HOSTS (400 for other hosts), ETags for Routes::etag (hashed
+                           here, after the view layer rendered the page)
   src/chart.rs             renox::chart: Period (extractor), Trend (count/sum/average per day or
                            month via Query::buckets), Series; the `chart(…)` template function
   src/select.rs            renox::select: SelectOption, OptionQuery (the kit's select with
@@ -556,8 +562,8 @@ PostgreSQL suite 2.5x slower (reconnects).
 - **On PostgreSQL:** `TEST_DATABASE_URL` (env or `.env`, read in `db/mod.rs`) makes `db::connect`
   swap any in-memory SQLite URL for a fresh `renox_test_…` schema (pool capped at 3). Run:
   ```
-  docker run -d --rm --name renox-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=renox_test \
-      -p 55432:5432 postgres:17-alpine
+  docker run -d --rm --name renox-pg --shm-size=512m -e POSTGRES_PASSWORD=postgres \
+      -e POSTGRES_DB=renox_test -p 55432:5432 postgres:17-alpine
   TEST_DATABASE_URL=postgres://postgres:postgres@localhost:55432/renox_test \
       cargo test -p renox -p renox-core -p renox-cli -p postgres-app -p fields --features renox/postgres
   ```
@@ -689,7 +695,8 @@ Parsed in `crates/renox-core/src/config.rs`; defaults in parentheses.
   feature; other schemes fail), `DATABASE_POOL_SIZE` (8, at least 1), `DATABASE_ACQUIRE_TIMEOUT`
   (seconds, 5), `DATABASE_STATEMENT_TIMEOUT` (seconds, 30, PostgreSQL; 0 = none).
 - **Requests:** `REQUEST_TIMEOUT` (seconds, 60; 0 = none), `UPLOAD_MAX_SIZE` (MB, 10),
-  `TRUSTED_PROXIES` (addresses, CIDR ranges or `*`), `CSP` (relaxed|strict|off, also `false`/`none`
+  `TRUSTED_PROXIES` (addresses, CIDR ranges or `*`), `TRUSTED_HOSTS` (host names, `*.example.com`;
+  other hosts get a 400; empty: any), `CSP` (relaxed|strict|off, also `false`/`none`
   for off; relaxed is the owner's chosen default).
 - **Logs:** `RUST_LOG` (default by command: `info,renox=debug` for `serve`/`queue:work`/
   `schedule:work` with debug on, `info` for them without, `warn` for every other command), `LOG_FORMAT` (text|json; anything else fails at boot),
@@ -829,6 +836,12 @@ picks the build, not the terminal.
 - PostgreSQL keeps microseconds: `db::now()` truncates to them, or a saved model won't equal the
   row read back.
 - `citext` doesn't help: `citext_col = $1` with a text parameter compares as text (case-sensitive).
+- Every test run leaves its `renox_test_…` schemas behind. After four days of runs (8,355
+  schemas) the container's default 64 MB `/dev/shm` filled up ("could not resize shared memory
+  segment … No space left on device"), a backend segfaulted and the server went into recovery,
+  so 273 tests failed at once with "not yet accepting connections". Recreate the container
+  (`docker stop renox-pg`, then the `docker run` above, which sets `--shm-size=512m`) when a
+  PostgreSQL run fails everywhere at once.
 - The worker arms `Notify::notified()` *before* querying, so a dispatch during the query isn't
   lost (it was, under PostgreSQL's slower round trips).
 
@@ -848,7 +861,7 @@ picks the build, not the terminal.
 
 ## 7. Where things stand (update this section when it changes)
 
-- **All milestones M0–M32 are merged to `main`** (M32: #108); the owner's B/C/D before
+- **All milestones M0–M32 are merged to `main`** (M32: #108; M33 on a branch); the owner's B/C/D before
   1.0 were M23–M25. History:
   `CHANGELOG.md` (per milestone) and `ROADMAP.md` (per-milestone notes and decisions).
 - After M17: a docs refresh (#45) and the Laravel parity review with M18–M21 planned (#46).
@@ -1023,6 +1036,10 @@ picks the build, not the terminal.
   (`docs/audit/2026-10-laravel-parity.md`), the Indonesian PDF replaced by an English one,
   every guide, CHEATSHEET, llms.txt and example README checked against the code: merged
   (#110).
+- **M33** (the parity review's small adds, chosen by the owner before v1.0: 28
+  validation rules with `Dimensions`, `Found<M>` route model binding, `Routes::view`/
+  `redirect`, named disks, `Routes::etag`, `App::xsrf_cookie`, `TRUSTED_HOSTS`): branch
+  `m33-small-adds`. Layers like `.etag()` cover only the routes added before them.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.
