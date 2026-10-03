@@ -377,14 +377,7 @@ async fn misconfiguration_fails_at_boot() {
         .await;
     assert!(format!("{:?}", bad_time.err().unwrap()).contains("task `nope`"));
 
-    let bad_zone = App::with_config({
-        let mut c = config();
-        c.timezone = "Mars/Olympus".into();
-        c
-    })
-    .boot()
-    .await;
-    assert!(format!("{:?}", bad_zone.err().unwrap()).contains("APP_TIMEZONE"));
+    // An unknown APP_TIMEZONE is refused when the config is read (the config tests).
 }
 
 #[tokio::test]

@@ -77,7 +77,7 @@ async fn kernel() -> (Kernel, tempfile::TempDir) {
 #[test]
 fn migrations_macro_embeds_files_in_order() {
     let migrations: &[Migration] = renox::migrations!("tests/migrations");
-    let names: Vec<_> = migrations.iter().map(|m| m.name).collect();
+    let names: Vec<_> = migrations.iter().map(|m| m.name()).collect();
     assert_eq!(
         names,
         [
@@ -85,7 +85,11 @@ fn migrations_macro_embeds_files_in_order() {
             "20260102000000_create_notes"
         ]
     );
-    assert!(migrations[0].up.contains("CREATE TABLE products"));
+    assert!(
+        migrations[0]
+            .up_for(Dialect::Sqlite)
+            .contains("CREATE TABLE products")
+    );
     // `NAME.postgres.up.sql` replaces the plain file on PostgreSQL only; the
     // plain `.down.sql` still serves both.
     assert!(
@@ -96,16 +100,16 @@ fn migrations_macro_embeds_files_in_order() {
     assert!(migrations[0].up_for(Dialect::Postgres).contains("IDENTITY"));
     assert_eq!(
         migrations[0].down_for(Dialect::Postgres),
-        migrations[0].down
+        migrations[0].down_for(Dialect::Sqlite)
     );
     // Trimmed: Git may check files out with CRLF line endings on Windows.
     assert_eq!(
-        migrations[0].down.map(str::trim),
+        migrations[0].down_for(Dialect::Sqlite).map(str::trim),
         Some("DROP TABLE products;")
     );
     assert!(
         renox::migrations!("tests/migrations_plain")[0]
-            .down
+            .down_for(Dialect::Sqlite)
             .is_none()
     );
     assert!(renox::migrations!("tests/does_not_exist").is_empty());

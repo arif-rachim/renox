@@ -137,7 +137,7 @@ async fn database_cache() {
     let dir = tempfile::tempdir().unwrap();
     let kernel = kernel({
         let mut c = config(dir.path());
-        c.cache_store = "database".into();
+        c.cache_store = renox::CacheStore::Database;
         c
     })
     .await;
@@ -157,14 +157,8 @@ async fn database_cache() {
         "expired rows are ignored"
     );
 
-    let bad = App::with_config({
-        let mut c = config(dir.path());
-        c.cache_store = "redis".into();
-        c
-    })
-    .boot()
-    .await;
-    assert!(format!("{:?}", bad.err().unwrap()).contains("CACHE_STORE"));
+    // An unknown store (`CACHE_STORE=redis`) is refused when the config is
+    // read: see the config tests.
 }
 
 #[tokio::test]
@@ -299,7 +293,10 @@ async fn several_servers_share_limits_with_the_database_store() {
         let dir = tempfile::tempdir().unwrap();
         let url = format!("sqlite://{}/app.db", dir.path().display());
         let server = |url: String| {
-            let store = store.to_owned();
+            let store = match store {
+                "database" => renox::CacheStore::Database,
+                _ => renox::CacheStore::Memory,
+            };
             TestApp::with_config(App::new().module(Auth::new()).module(Limited), move |c| {
                 c.database_url = url;
                 c.cache_store = store;

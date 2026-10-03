@@ -59,7 +59,7 @@ async fn rows(app: &TestApp) -> i64 {
 async fn the_database_holds_the_session_and_the_cookie_only_its_id() {
     // Outside the testing environment, so the real table is used.
     let app = TestApp::with_config(app(), |c| {
-        c.session_driver = "database".into();
+        c.session_driver = renox::SessionDriver::Database;
         c.env = renox::Environment::Local;
     })
     .await;
@@ -113,7 +113,7 @@ async fn the_database_holds_the_session_and_the_cookie_only_its_id() {
 #[renox::test]
 async fn cookie_sessions_carry_over_and_expired_rows_are_pruned() {
     let app = TestApp::with_config(app(), |c| {
-        c.session_driver = "database".into();
+        c.session_driver = renox::SessionDriver::Database;
         c.env = renox::Environment::Local;
     })
     .await;
@@ -142,7 +142,8 @@ async fn cookie_sessions_carry_over_and_expired_rows_are_pruned() {
 
 #[renox::test]
 async fn test_helpers_work_with_database_sessions() {
-    let app = TestApp::with_config(app(), |c| c.session_driver = "database".into()).await;
+    let app =
+        TestApp::with_config(app(), |c| c.session_driver = renox::SessionDriver::Database).await;
     let user = User::register(app.db(), "Cindy", "cindy@example.com", "password123")
         .await
         .unwrap();

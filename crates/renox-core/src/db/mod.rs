@@ -34,7 +34,7 @@ pub use factory::{Factory, FactoryBuilder};
 pub use from_row::FromRow;
 pub use json::Json;
 pub use key::{InvalidUlid, ModelKey, Ulid};
-pub use migrate::{Migration, MigrationStatus, Scripts};
+pub use migrate::{Migration, MigrationStatus};
 pub(crate) use migrate::{Migrator, framework_migration};
 pub use model::{Model, ModelHooks};
 pub use paginate::{CursorPage, Page, Paginated, SimplePage};

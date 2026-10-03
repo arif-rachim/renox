@@ -427,16 +427,17 @@ fn current(extensions: &axum::http::Extensions) -> Option<AuthUser> {
     })
 }
 
-/// Logs `user` in for this session. With `remember`, the session lasts
-/// `REMEMBER_LIFETIME` instead of `SESSION_LIFETIME`.
-pub fn login(session: &Session, user: &User, remember: Option<u64>) -> Result {
+/// Logs `user` in for this session. With `remember` (usually
+/// `Some(state.config.remember_lifetime)`, "remember me"), the session lasts
+/// that long instead of `SESSION_LIFETIME`.
+pub fn login(session: &Session, user: &User, remember: Option<std::time::Duration>) -> Result {
     session.regenerate_token();
     session.put(AUTH_ID, user.id)?;
     session.put(AUTH_HASH, fingerprint(&user.password))?;
     session.put(AUTH_AT, unix_millis())?;
     session.put(AUTH_SID, crate::crypto::random_token())?;
-    if let Some(minutes) = remember {
-        session.set_lifetime(minutes);
+    if let Some(lifetime) = remember {
+        session.set_lifetime(lifetime);
     }
     Ok(())
 }
@@ -464,7 +465,9 @@ pub async fn logout_other_devices(db: &Db, session: &Session, user: &User) -> Re
     let cut_off = user::revoke_sessions(db, user.id).await?;
     // Logged in again after the cut-off (even within the same millisecond),
     // so this session survives it.
-    let lifetime = session.lifetime();
+    let lifetime = session
+        .lifetime()
+        .map(|minutes| std::time::Duration::from_secs(minutes * 60));
     login(session, user, lifetime)?;
     session.put(AUTH_AT, cut_off + 1)?;
     Ok(())

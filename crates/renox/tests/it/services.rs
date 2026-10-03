@@ -221,7 +221,7 @@ impl Notification for Shipped {
         "shipped"
     }
 
-    fn channels_for(&self, to: &Recipient) -> Vec<Channel> {
+    fn channels(&self, to: &Recipient) -> Vec<Channel> {
         match to.address("whatsapp") {
             Some(_) => vec![Channel::Mail, Channel::Custom("whatsapp")],
             None => vec![Channel::Mail],
@@ -240,7 +240,12 @@ impl Notification for Shipped {
         )
     }
 
-    fn to_channel(&self, _: &str, to: &Recipient) -> Result<renox::serde_json::Value> {
+    fn to_channel(
+        &self,
+        _: &str,
+        to: &Recipient,
+        _state: &renox::AppState,
+    ) -> Result<renox::serde_json::Value> {
         Ok(json!({ "text": to.locale().unwrap_or_else(|| "en".into()) }))
     }
 }
@@ -313,12 +318,9 @@ async fn notifications_speak_the_recipients_language() {
 
     state.notify(&ana, &Shipped { order: 7 }).await.unwrap();
     let guest = Recipient::to("mail", "guest@example.test").and("whatsapp", "+15550111");
+    state.notify(&guest, &Shipped { order: 8 }).await.unwrap();
     state
-        .notify_to(&guest, &Shipped { order: 8 })
-        .await
-        .unwrap();
-    state
-        .notify_to(&guest.clone().in_locale("es"), &Shipped { order: 9 })
+        .notify(&guest.clone().in_locale("es"), &Shipped { order: 9 })
         .await
         .unwrap();
 

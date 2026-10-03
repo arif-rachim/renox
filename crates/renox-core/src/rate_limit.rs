@@ -110,7 +110,7 @@ pub(crate) async fn check(limiter: &Limiter, req: Request, next: Next) -> Respon
     let shared = req
         .extensions()
         .get::<crate::AppState>()
-        .filter(|state| state.config.cache_store == "database")
+        .filter(|state| state.config.cache_store == crate::CacheStore::Database)
         .map(|state| state.db.clone());
     let verdict = match &shared {
         Some(db) => shared_hit(limiter, db, &key(&req)).await,
@@ -265,7 +265,7 @@ pub(crate) async fn check_named(name: &str, req: Request, next: Next) -> Respons
         limit.key.clone().unwrap_or_else(|| key(&req)),
         limit.per.as_secs()
     );
-    let verdict = if state.config.cache_store == "database" {
+    let verdict = if state.config.cache_store == crate::CacheStore::Database {
         let shared = Limiter::new(format!("named:{name}"), limit.max, limit.per);
         shared_hit(&shared, &state.db, &key).await
     } else {

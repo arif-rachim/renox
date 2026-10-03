@@ -105,14 +105,18 @@ impl Notification for ExportReady {
         "export-ready"
     }
 
-    fn channels(&self) -> Vec<Channel> {
+    fn channels(&self, _to: &Recipient) -> Vec<Channel> {
         vec![Channel::Database]
     }
 
-    fn to_database(&self, _: &Recipient) -> renox::serde_json::Value {
-        DatabaseMessage::success("Your invoice export is ready")
+    fn to_database(
+        &self,
+        _: &Recipient,
+        _state: &renox::AppState,
+    ) -> Result<renox::serde_json::Value> {
+        Ok(DatabaseMessage::success("Your invoice export is ready")
             .body(format!("{} invoices; the link works for a day.", self.rows))
             .url(self.url.clone())
-            .into()
+            .into())
     }
 }

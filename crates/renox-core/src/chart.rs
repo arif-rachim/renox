@@ -356,7 +356,7 @@ impl<M: Model> Trend<M> {
     }
 
     async fn run(self, state: &AppState, aggregate: String) -> Result<Series> {
-        let zone: Zone = state.config.timezone.parse().unwrap_or_default();
+        let zone: Zone = state.config.timezone;
         let column = checked::<M>(&self.column)?;
         let column = column.as_str();
         let (start, end) = self.period.range(zone);

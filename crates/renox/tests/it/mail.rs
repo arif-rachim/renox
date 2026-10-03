@@ -219,10 +219,10 @@ async fn smtp_sends_multipart_mail() {
     let (port, received) = fake_smtp().await;
     let smtp = {
         let mut mail = MailConfig::default();
-        mail.mailer = "smtp".into();
+        mail.mailer = renox::mail::MailDriver::Smtp;
         mail.host = "127.0.0.1".into();
         mail.port = Some(port);
-        mail.encryption = "none".into();
+        mail.encryption = renox::mail::MailEncryption::None;
         mail.from_address = "shop@example.com".into();
         mail
     };
@@ -260,27 +260,12 @@ async fn smtp_sends_multipart_mail() {
 async fn bad_mail_settings_fail_at_boot() {
     let dir = views();
     for (mail, expected) in [
+        // An unknown MAIL_MAILER or MAIL_ENCRYPTION is refused when the
+        // config is read (the config tests); a bad sender only when SMTP starts.
         (
             {
                 let mut mail = MailConfig::default();
-                mail.mailer = "sendgrid".into();
-                mail
-            },
-            "MAIL_MAILER",
-        ),
-        (
-            {
-                let mut mail = MailConfig::default();
-                mail.mailer = "smtp".into();
-                mail.encryption = "ssl3".into();
-                mail
-            },
-            "MAIL_ENCRYPTION",
-        ),
-        (
-            {
-                let mut mail = MailConfig::default();
-                mail.mailer = "smtp".into();
+                mail.mailer = renox::mail::MailDriver::Smtp;
                 mail.from_address = "not an address".into();
                 mail
             },
@@ -309,7 +294,7 @@ impl Notification for OrderShipped {
         "order-shipped"
     }
 
-    fn channels(&self) -> Vec<Channel> {
+    fn channels(&self, _to: &Recipient) -> Vec<Channel> {
         vec![Channel::Mail, Channel::Database]
     }
 
@@ -321,8 +306,8 @@ impl Notification for OrderShipped {
         ))
     }
 
-    fn to_database(&self, _: &Recipient) -> serde_json::Value {
-        serde_json::json!({ "order_id": self.order_id })
+    fn to_database(&self, _: &Recipient, _state: &renox::AppState) -> Result<serde_json::Value> {
+        Ok(serde_json::json!({ "order_id": self.order_id }))
     }
 }
 
@@ -333,7 +318,7 @@ impl Notification for DatabaseOnly {
         "promo"
     }
 
-    fn channels(&self) -> Vec<Channel> {
+    fn channels(&self, _to: &Recipient) -> Vec<Channel> {
         vec![Channel::Mail]
     }
 }
@@ -450,10 +435,10 @@ async fn smtp_sends_cc_bcc_reply_to_from_and_attachments() {
     let (port, received) = fake_smtp().await;
     let kernel = kernel_with({
         let mut c = config(dir.path());
-        c.mail.mailer = "smtp".into();
+        c.mail.mailer = renox::mail::MailDriver::Smtp;
         c.mail.host = "127.0.0.1".into();
         c.mail.port = Some(port);
-        c.mail.encryption = "none".into();
+        c.mail.encryption = renox::mail::MailEncryption::None;
         c.mail.from_address = "shop@example.com".into();
         c
     })
@@ -502,7 +487,7 @@ async fn queued_mail_keeps_its_attachments() {
     let dir = views();
     let kernel = kernel_with({
         let mut c = config(dir.path());
-        c.mail.mailer = "memory".into();
+        c.mail.mailer = renox::mail::MailDriver::Memory;
         c
     })
     .await;
@@ -527,7 +512,7 @@ impl Notification for Shipped {
         "shipped"
     }
 
-    fn channels(&self) -> Vec<Channel> {
+    fn channels(&self, _to: &Recipient) -> Vec<Channel> {
         vec![
             Channel::Mail,
             Channel::Database,
@@ -543,11 +528,16 @@ impl Notification for Shipped {
         ))
     }
 
-    fn to_database(&self, _: &Recipient) -> serde_json::Value {
-        serde_json::json!({ "order_id": self.order_id })
+    fn to_database(&self, _: &Recipient, _state: &renox::AppState) -> Result<serde_json::Value> {
+        Ok(serde_json::json!({ "order_id": self.order_id }))
     }
 
-    fn to_channel(&self, channel: &str, _: &Recipient) -> Result<serde_json::Value> {
+    fn to_channel(
+        &self,
+        channel: &str,
+        _: &Recipient,
+        _state: &renox::AppState,
+    ) -> Result<serde_json::Value> {
         Ok(serde_json::json!({ "channel": channel, "text": format!("#{} shipped", self.order_id) }))
     }
 }
@@ -607,7 +597,7 @@ async fn notifications_reach_custom_channels_and_people_without_accounts() {
     // Someone without an account: mail and WhatsApp, no database row.
     let guest = Recipient::to("mail", "guest@example.com").and("whatsapp", "+15550122");
     state
-        .notify_to(&guest, &Shipped { order_id: 8 })
+        .notify(&guest, &Shipped { order_id: 8 })
         .await
         .unwrap();
     assert!(
@@ -664,11 +654,16 @@ impl Notification for Unknown {
         "unknown"
     }
 
-    fn channels(&self) -> Vec<Channel> {
+    fn channels(&self, _to: &Recipient) -> Vec<Channel> {
         vec![Channel::Custom("pigeon")]
     }
 
-    fn to_channel(&self, _: &str, _: &Recipient) -> Result<serde_json::Value> {
+    fn to_channel(
+        &self,
+        _: &str,
+        _: &Recipient,
+        _state: &renox::AppState,
+    ) -> Result<serde_json::Value> {
         Ok(serde_json::Value::Null)
     }
 }

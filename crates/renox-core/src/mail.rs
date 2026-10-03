@@ -19,7 +19,7 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
-use anyhow::{Context, bail};
+use anyhow::Context;
 use axum::Router;
 use axum::extract::{Path, State};
 use axum::response::Html;
@@ -187,12 +187,36 @@ impl Mail {
     }
 }
 
+setting_enum! {
+    /// How mail is sent, from `MAIL_MAILER`.
+    pub enum MailDriver ("MAIL_MAILER") {
+        /// Through an SMTP server (`MAIL_HOST`); use it in production.
+        Smtp = "smtp",
+        /// Written to the server log; nothing leaves the machine (the default).
+        Log = "log",
+        /// Kept in memory, for tests (`app.sent_mail()`).
+        Memory = "memory",
+    }
+}
+
+setting_enum! {
+    /// How the SMTP connection is secured, from `MAIL_ENCRYPTION`.
+    pub enum MailEncryption ("MAIL_ENCRYPTION") {
+        /// TLS from the start (usually port 465).
+        Tls = "tls",
+        /// Plain, upgraded with STARTTLS (usually port 587; the default).
+        StartTls = "starttls",
+        /// Not encrypted: a local test server such as Mailpit only.
+        None = "none",
+    }
+}
+
 /// Mail settings, from `MAIL_*`.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct MailConfig {
-    /// `smtp`, `log` or `memory`.
-    pub mailer: String,
+    /// How mail is sent: SMTP, the log or memory.
+    pub mailer: MailDriver,
     /// SMTP server, from `MAIL_HOST` (default `localhost`).
     pub host: String,
     /// SMTP port, from `MAIL_PORT`; `None` uses the encryption's usual port.
@@ -202,7 +226,7 @@ pub struct MailConfig {
     /// SMTP password, from `MAIL_PASSWORD`.
     pub password: Option<String>,
     /// `tls` (usually port 465), `starttls` (587) or `none` (e.g. Mailpit on 1025).
-    pub encryption: String,
+    pub encryption: MailEncryption,
     /// Sender address, from `MAIL_FROM_ADDRESS` (default `hello@example.com`).
     pub from_address: String,
     /// Sender name, from `MAIL_FROM_NAME`.
@@ -219,12 +243,12 @@ pub struct MailConfig {
 impl Default for MailConfig {
     fn default() -> Self {
         Self {
-            mailer: "log".into(),
+            mailer: MailDriver::Log,
             host: "localhost".into(),
             port: None,
             username: None,
             password: None,
-            encryption: "starttls".into(),
+            encryption: MailEncryption::StartTls,
             from_address: "hello@example.com".into(),
             timeout: std::time::Duration::from_secs(10),
             from_name: None,
@@ -240,33 +264,46 @@ impl MailConfig {
     /// while developing and keeps mail in memory in tests), `<PREFIX>_HOST`, `_PORT`,
     /// `_USERNAME`, `_PASSWORD`, `_ENCRYPTION`, `_TIMEOUT` (seconds), and
     /// `<PREFIX>_FROM_ADDRESS` / `_FROM_NAME`, which fall back to the
-    /// app's `MAIL_FROM_*`. A port or timeout that isn't a number is
-    /// ignored with a warning.
-    pub fn from_env(config: &Config, prefix: &str) -> Self {
+    /// app's `MAIL_FROM_*`. A value that doesn't fit (an unknown driver, a
+    /// port that isn't a number) is an error naming the variable, and the
+    /// app doesn't boot.
+    pub fn from_env(config: &Config, prefix: &str) -> crate::Result<Self> {
         let prefix = prefix.trim_end_matches('_').to_ascii_uppercase();
-        let var = |name: &str| config.var(&format!("{prefix}_{name}"));
-        let number = |name: &str| {
-            var(name).and_then(|value| match value.trim().parse::<u64>() {
-                Ok(n) => Some(n),
-                Err(_) => {
-                    tracing::warn!(variable = %format!("{prefix}_{name}"), %value, "not a number; ignored");
-                    None
-                }
-            })
+        let name = |name: &str| format!("{prefix}_{name}");
+        let var = |key: &str| config.var(&name(key));
+        let number = |key: &str| -> anyhow::Result<Option<u64>> {
+            var(key)
+                .map(|value| {
+                    value.trim().parse::<u64>().map_err(|_| {
+                        anyhow::anyhow!("{} must be a number, got `{value}`", name(key))
+                    })
+                })
+                .transpose()
         };
         let defaults = Self::default();
-        Self {
-            mailer: var("MAILER").unwrap_or_else(|| config.mail.mailer.clone()),
+        let port = number("PORT")?
+            .map(|p| {
+                u16::try_from(p).map_err(|_| anyhow::anyhow!("{} is not a port", name("PORT")))
+            })
+            .transpose()?;
+        Ok(Self {
+            mailer: var("MAILER")
+                .map(|v| MailDriver::parse_as(&v, &name("MAILER")))
+                .transpose()?
+                .unwrap_or(config.mail.mailer),
             host: var("HOST").unwrap_or(defaults.host),
-            port: number("PORT").and_then(|p| u16::try_from(p).ok()),
+            port,
             username: var("USERNAME"),
             password: var("PASSWORD"),
-            encryption: var("ENCRYPTION").unwrap_or(defaults.encryption),
+            encryption: var("ENCRYPTION")
+                .map(|v| MailEncryption::parse_as(&v, &name("ENCRYPTION")))
+                .transpose()?
+                .unwrap_or(defaults.encryption),
             from_address: var("FROM_ADDRESS").unwrap_or_else(|| config.mail.from_address.clone()),
             from_name: var("FROM_NAME").or_else(|| config.mail.from_name.clone()),
-            timeout: number("TIMEOUT").map_or(defaults.timeout, std::time::Duration::from_secs),
+            timeout: number("TIMEOUT")?.map_or(defaults.timeout, std::time::Duration::from_secs),
             failover: Vec::new(),
-        }
+        })
     }
 }
 
@@ -302,16 +339,15 @@ pub struct Mailer {
 
 impl Mailer {
     pub(crate) fn from_config(config: &Config) -> anyhow::Result<Self> {
-        Self::open(&config.mail, config, "MAIL_MAILER")
+        Self::open(&config.mail, config)
     }
 
-    /// A mailer from `mail`; `variable` names its driver setting in errors.
-    pub(crate) fn open(mail: &MailConfig, config: &Config, variable: &str) -> anyhow::Result<Self> {
-        let (driver, keep) = match mail.mailer.as_str() {
-            "log" => (Driver::Log, config.debug.then_some(OUTBOX)),
-            "memory" => (Driver::Memory, Some(usize::MAX)),
-            "smtp" => (smtp(mail, &config.name)?, config.debug.then_some(OUTBOX)),
-            other => bail!("{variable} must be smtp, log or memory, got `{other}`"),
+    /// A mailer from `mail`.
+    pub(crate) fn open(mail: &MailConfig, config: &Config) -> anyhow::Result<Self> {
+        let (driver, keep) = match mail.mailer {
+            MailDriver::Log => (Driver::Log, config.debug.then_some(OUTBOX)),
+            MailDriver::Memory => (Driver::Memory, Some(usize::MAX)),
+            MailDriver::Smtp => (smtp(mail, &config.name)?, config.debug.then_some(OUTBOX)),
         };
         Ok(Self {
             driver,
@@ -420,11 +456,12 @@ async fn deliver(driver: &Driver, mail: &Mail) -> Result {
 }
 
 fn smtp(mail: &MailConfig, app_name: &str) -> anyhow::Result<Driver> {
-    let mut builder = match mail.encryption.as_str() {
-        "tls" => AsyncSmtpTransport::<Tokio1Executor>::relay(&mail.host)?,
-        "starttls" => AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&mail.host)?,
-        "none" => AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&mail.host),
-        other => bail!("MAIL_ENCRYPTION must be tls, starttls or none, got `{other}`"),
+    let mut builder = match mail.encryption {
+        MailEncryption::Tls => AsyncSmtpTransport::<Tokio1Executor>::relay(&mail.host)?,
+        MailEncryption::StartTls => {
+            AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&mail.host)?
+        }
+        MailEncryption::None => AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&mail.host),
     };
     if let Some(port) = mail.port {
         builder = builder.port(port);

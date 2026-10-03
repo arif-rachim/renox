@@ -1295,7 +1295,7 @@ impl Job for SendReceipt {
 
     // Also: const ENCRYPTED (payload sealed with APP_KEY), const UNIQUE_FOR + fn unique_id
     // (one queued at a time), fn middleware (Middleware::without_overlapping(key),
-    // rate_limited(key, max, per)), async fn failed(self, state, error) once it fails for good.
+    // rate_limited(key, max, per)), async fn failed(self, ctx, error) once it fails for good.
 
     async fn handle(self, ctx: JobContext) -> Result {
         let mail = ctx.state.mail_view(
@@ -1415,14 +1415,11 @@ struct OrderShipped { order_id: i64 }
 
 impl Notification for OrderShipped {
     fn kind(&self) -> &'static str { "order-shipped" }
-    fn channels(&self) -> Vec<Channel> {
-        vec![Channel::Mail, Channel::Database, Channel::Custom("whatsapp")]
-    }
-    fn channels_for(&self, to: &Recipient) -> Vec<Channel> {
-        // Per recipient; defaults to channels().
-        let mut channels = self.channels();
-        if to.address("whatsapp").is_none() {
-            channels.retain(|c| *c != Channel::Custom("whatsapp"));
+    fn channels(&self, to: &Recipient) -> Vec<Channel> {
+        // Per recipient (Laravel's `via`); only Channel::Mail by default.
+        let mut channels = vec![Channel::Mail, Channel::Database];
+        if to.address("whatsapp").is_some() {
+            channels.push(Channel::Custom("whatsapp"));
         }
         channels
     }
@@ -1432,15 +1429,15 @@ impl Notification for OrderShipped {
         let subject = state.current_lang().t("mail.shipped", &[("id", &self.order_id)]);
         Ok(Mail::new(to.email().unwrap_or_default(), subject, "On its way."))
     }
-    fn to_database(&self, _: &Recipient) -> renox::serde_json::Value {
+    fn to_database(&self, _: &Recipient, _: &AppState) -> Result<renox::serde_json::Value> {
         // What the kit's notification_bell shows; any JSON works for your own list.
-        DatabaseMessage::success(format!("Order #{} shipped", self.order_id))
+        Ok(DatabaseMessage::success(format!("Order #{} shipped", self.order_id))
             .body("It arrives in 2–3 days.")
             .url(format!("/orders/{}", self.order_id))
             .with("order_id", self.order_id) // n.data.order_id; n.message() reads it back
-            .into()
+            .into())
     }
-    fn to_channel(&self, _: &str, _: &Recipient) -> Result<renox::serde_json::Value> {
+    fn to_channel(&self, _: &str, _: &Recipient, _: &AppState) -> Result<renox::serde_json::Value> {
         Ok(json!({ "text": format!("Order #{} shipped", self.order_id) }))
     }
 }
@@ -1458,7 +1455,7 @@ async fn ship(state: &AppState, user: &User) -> Result {
     state.notify(user, &OrderShipped { order_id: 7 }).await?;       // now
     state.notify_later(user, &OrderShipped { order_id: 7 }).await?; // one queued job per channel
     let guest = Recipient::to("mail", "guest@example.com").and("whatsapp", "+15550123").in_locale("es");
-    state.notify_to(&guest, &OrderShipped { order_id: 7 }).await   // no account: no database row
+    state.notify(&guest, &OrderShipped { order_id: 7 }).await      // no account: no database row
 }
 ```
 
@@ -1558,7 +1555,7 @@ async fn misc(State(state): State<AppState>, session: Session, lang: Lang) -> Re
     let visits_here = session.increment("visits", 1)?; // 1, 2, …
     let cart: Option<Vec<i64>> = session.get("cart");
     let _ = visits_here;
-    // Also: pull (read and remove), remove, regenerate_token(), set_lifetime(minutes).
+    // Also: pull (read and remove), remove, regenerate_token(), set_lifetime(Duration).
     let _ = cart;
     Ok(lang.choice("cart.count", count, &[])) // "12 items"; lang.t("cart.hello", &[("name", &"Anna")])
 }

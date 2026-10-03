@@ -206,15 +206,11 @@ struct OrderShipped { order_id: i64 }
 impl Notification for OrderShipped {
     fn kind(&self) -> &'static str { "order-shipped" }
 
-    fn channels(&self) -> Vec<Channel> {
-        vec![Channel::Mail, Channel::Database, Channel::Custom("whatsapp")]
-    }
-
-    // Per recipient (optional; channels() by default).
-    fn channels_for(&self, to: &Recipient) -> Vec<Channel> {
-        let mut channels = self.channels();
-        if to.address("whatsapp").is_none() {
-            channels.retain(|c| *c != Channel::Custom("whatsapp"));
+    // Per recipient (Laravel's `via`); only Channel::Mail by default.
+    fn channels(&self, to: &Recipient) -> Vec<Channel> {
+        let mut channels = vec![Channel::Mail, Channel::Database];
+        if to.address("whatsapp").is_some() {
+            channels.push(Channel::Custom("whatsapp"));
         }
         channels
     }
@@ -226,14 +222,14 @@ impl Notification for OrderShipped {
     }
 
     // What the in-app list and the kit's bell show; see "Database notifications".
-    fn to_database(&self, _: &Recipient) -> renox::serde_json::Value {
-        DatabaseMessage::success(format!("Order #{} shipped", self.order_id))
+    fn to_database(&self, _: &Recipient, _: &AppState) -> Result<renox::serde_json::Value> {
+        Ok(DatabaseMessage::success(format!("Order #{} shipped", self.order_id))
             .url(format!("/orders/{}", self.order_id))
             .with("order_id", self.order_id)
-            .into()
+            .into())
     }
 
-    fn to_channel(&self, _channel: &str, _: &Recipient) -> Result<renox::serde_json::Value> {
+    fn to_channel(&self, _channel: &str, _: &Recipient, _: &AppState) -> Result<renox::serde_json::Value> {
         Ok(json!({ "text": format!("Order #{} shipped", self.order_id) }))
     }
 }
@@ -257,11 +253,11 @@ async fn ship(state: &AppState, user: &User) -> Result {
     let guest = Recipient::to("mail", "guest@example.com")
         .and("whatsapp", "+6281234567890")
         .in_locale("es");
-    state.notify_to(&guest, &shipped).await
+    state.notify(&guest, &shipped).await
 }
 ```
 
-- `state.notify(&user, &n)` delivers now; `state.notify_to(&recipient, &n)` does the same for
+- `state.notify(&user, &n)` delivers now; `state.notify(&recipient, &n)` does the same for
   a `Recipient`. The database row is written first and mail sent last, so a failure doesn't
   leave a sent message behind that a retry would send again.
 - `state.notify_later(to, &n)` builds every message now and writes the database row now, then
@@ -398,7 +394,7 @@ Deleting a user's account deletes their notifications too.
 `Mail` sent, and `app.assert_mail_sent(to, subject)` checks one (`subject` is a part of the
 subject). Queued mail is sent when the test runs the queue (`app.run_jobs().await`).
 `app.fake_notifications()` records notifications instead of delivering them (no mail, no
-rows, no channel calls), whether sent with `notify`, `notify_to` or `notify_later`.
+rows, no channel calls), whether sent with `notify` or `notify_later`.
 
 ```rust
 use renox::prelude::*;
@@ -424,7 +420,7 @@ async fn mail_and_notifications() {
 
     app.fake_notifications();
     let guest = Recipient::to("mail", "guest@example.com");
-    state.notify_to(&guest, &Hello).await.unwrap();
+    state.notify(&guest, &Hello).await.unwrap();
     app.assert_notified_to("guest@example.com", "hello");
     // also app.assert_notified(&user, "hello"), app.notifications(), app.assert_nothing_notified()
 }
@@ -455,10 +451,10 @@ More in [testing.md](testing.md) ("Jobs, events, notifications, mail, HTTP").
 | `Mail::to($u)->locale('es')` | `state.mail_view_in("es", …)` |
 | `php artisan make:mail` | `rnx make:mail` (templates only) |
 | Mail preview packages, Mailpit | `/_renox/mail` (debug) |
-| `Notification` with `via()` | `Notification` with `channels()` / `channels_for()` |
+| `Notification` with `via()` | `Notification` with `channels(to)` |
 | `toMail`, `toDatabase` / `toArray`, custom channels | `to_mail`, `to_database`, `to_channel` + `App::channel` |
 | `$user->notify()`, `ShouldQueue` | `state.notify(&user, &n)`, `state.notify_later(&user, &n)` |
-| `Notification::route('mail', …)` (on-demand) | `Recipient::to("mail", …).and(…)` + `state.notify_to` |
+| `Notification::route('mail', …)` (on-demand) | `Recipient::to("mail", …).and(…)` + `state.notify` |
 | `HasLocalePreference` | `Recipient::in_locale` or a `users.locale` column |
 | `$user->notifications`, `unreadNotifications`, `markAsRead`, `markAsUnread` | `user.notifications(&db, n)`, `notifications_before`, `unread_notifications`, `mark_notification_read`, `mark_notification_unread`, `mark_all_notifications_read`, `delete_notification`, `delete_notifications` |
 | Filament's `Notification::make()->title()->body()->sendToDatabase($user)` | `DatabaseMessage::success(title).body(…).url(…)` from `to_database` |

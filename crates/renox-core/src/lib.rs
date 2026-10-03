@@ -7,6 +7,62 @@
 // Every public item is documented; clippy's `-D warnings` in CI keeps it so.
 #![warn(missing_docs)]
 
+/// An enum for a setting written as one word in `.env` (`SESSION_DRIVER=database`):
+/// `#[non_exhaustive]`, with `as_str`, `Display` and a parser that names the variable.
+macro_rules! setting_enum {
+    (
+        $(#[$meta:meta])*
+        pub enum $name:ident ($variable:literal) {
+            $( $(#[$vmeta:meta])* $variant:ident = $text:literal ),+ $(,)?
+        }
+    ) => {
+        $(#[$meta])*
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[non_exhaustive]
+        pub enum $name {
+            $( $(#[$vmeta])* $variant ),+
+        }
+
+        impl $name {
+            /// The value as written in `.env`.
+            pub fn as_str(&self) -> &'static str {
+                match self {
+                    $( Self::$variant => $text ),+
+                }
+            }
+
+            /// Reads the value of `
+            #[doc = $variable]
+            /// `.
+            #[allow(dead_code)]
+            pub(crate) fn parse(value: &str) -> anyhow::Result<Self> {
+                Self::parse_as(value, $variable)
+            }
+
+            /// Reads `value`, naming `variable` in the error.
+            #[allow(dead_code)]
+            pub(crate) fn parse_as(value: &str, variable: &str) -> anyhow::Result<Self> {
+                let value = value.trim().to_ascii_lowercase();
+                $( if value == $text { return Ok(Self::$variant); } )+
+                let expected: &[&str] = &[$($text),+];
+                anyhow::bail!("{variable} must be one of {}, got `{value}`", expected.join(", "))
+            }
+        }
+
+        impl ::std::fmt::Display for $name {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+                f.write_str(self.as_str())
+            }
+        }
+
+        impl ::serde::Serialize for $name {
+            fn serialize<S: ::serde::Serializer>(&self, s: S) -> ::std::result::Result<S::Ok, S::Error> {
+                s.serialize_str(self.as_str())
+            }
+        }
+    };
+}
+
 pub mod analytics;
 mod app;
 mod assets;
@@ -74,7 +130,9 @@ pub use app::{App, Kernel};
 pub use assets::{ALPINE_VERSION, CALLY_VERSION, HTMX_VERSION};
 pub use auth::{AuthUser, Policy};
 pub use client_ip::{ClientIp, TrustedProxies};
-pub use config::{AnalyticsConfig, Config, CspMode, Environment};
+pub use config::{
+    AnalyticsConfig, CacheStore, Config, CspMode, Environment, LogFormat, SessionDriver,
+};
 pub use cookies::{Cookies, SetCookie};
 pub use crypto::{generate_key, random_token};
 pub use csrf::{CSRF_FIELD, CSRF_HEADER, XSRF_COOKIE, XSRF_HEADER};

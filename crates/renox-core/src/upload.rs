@@ -41,13 +41,11 @@ use crate::storage::Storage;
 
 /// A file posted in a multipart form.
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct Upload {
-    /// The name the browser gave, e.g. `coffee photo.JPG`. Don't trust it for paths.
-    pub file_name: String,
-    /// The type the browser declared, e.g. `image/jpeg`. Don't trust it for security.
-    pub content_type: String,
-    /// The file's content.
-    pub bytes: Bytes,
+    file_name: String,
+    content_type: String,
+    bytes: Bytes,
 }
 
 impl fmt::Debug for Upload {
@@ -67,6 +65,35 @@ const ACTIVE_EXTENSIONS: &[&str] = &[
 ];
 
 impl Upload {
+    /// A file as a browser would send it, e.g. in tests:
+    /// `Upload::new("photo.png", "image/png", bytes)`.
+    pub fn new(
+        file_name: impl Into<String>,
+        content_type: impl Into<String>,
+        bytes: impl Into<Bytes>,
+    ) -> Self {
+        Self {
+            file_name: file_name.into(),
+            content_type: content_type.into(),
+            bytes: bytes.into(),
+        }
+    }
+
+    /// The name the browser gave, e.g. `coffee photo.JPG`. Don't trust it for paths.
+    pub fn file_name(&self) -> &str {
+        &self.file_name
+    }
+
+    /// The type the browser declared, e.g. `image/jpeg`. Don't trust it for security.
+    pub fn content_type(&self) -> &str {
+        &self.content_type
+    }
+
+    /// The file's content.
+    pub fn bytes(&self) -> &Bytes {
+        &self.bytes
+    }
+
     /// Size of the content in bytes.
     pub fn size(&self) -> usize {
         self.bytes.len()
@@ -277,11 +304,7 @@ mod tests {
     }
 
     fn upload(name: &str, bytes: &'static [u8]) -> Upload {
-        Upload {
-            file_name: name.into(),
-            content_type: "application/octet-stream".into(),
-            bytes: Bytes::from_static(bytes),
-        }
+        Upload::new(name, "application/octet-stream", Bytes::from_static(bytes))
     }
 
     #[test]

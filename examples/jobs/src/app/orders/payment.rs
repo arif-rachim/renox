@@ -88,7 +88,8 @@ impl Job for ChargePayment {
 
     /// Runs once, after the last attempt (or at once for a declined card):
     /// the chain stops here, so tell the staff.
-    async fn failed(self, state: AppState, error: String) {
+    async fn failed(self, ctx: JobContext, error: String) {
+        let state = ctx.state;
         if let Err(err) = needs_attention(&state, self.order_id, &error).await {
             eprintln!("could not flag order #{}: {err:?}", self.order_id);
         }

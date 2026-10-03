@@ -10,6 +10,42 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### v1.0 · The API audit's must-fix items (V1b)
+
+A read-only review of every public item before 1.0 found nine things that would be breaking
+to change later; the owner chose to fix all of them (and the should-fix ones, next). **Every
+item here is breaking.**
+
+- **Settings are enums**, not strings: `Config::session_driver` (`SessionDriver`),
+  `log_format` (`LogFormat`), `cache_store` (`CacheStore`), `MailConfig::mailer`
+  (`mail::MailDriver`) and `encryption` (`mail::MailEncryption`), `StorageConfig::disk`
+  (`storage::DiskDriver`), `WebhookCall::status` (`webhook::WebhookStatus`); each
+  `#[non_exhaustive]` with `as_str()` and `Display`. `Config::timezone` is a
+  `timezone::Zone`. An unknown value now fails when the config is read, naming the variable.
+- `MailConfig::from_env` and `StorageConfig::from_env` return `Result` (an unknown driver or a
+  port that isn't a number is an error naming `<PREFIX>_…`); `App::mailer` and `App::disk`
+  closures return `Result` too (`|c| MailConfig::from_env(c, "NEWS")` is unchanged).
+- **Lifetimes are `Duration`s:** `Config::session_lifetime`, `remember_lifetime`,
+  `Session::set_lifetime(Duration)`, `auth::login(session, user, Some(duration))`. The
+  `.env` values stay in minutes.
+- **`Notification`:** `channels(&self, to: &Recipient)` (Laravel's `via`; `channels_for` is
+  gone), `to_database(&self, to, state) -> Result<Value>`, `to_channel(&self, channel, to,
+  state)`.
+- **`AppState::notify(to: impl Into<Recipient>, …)`** takes a user (`&User`, `&AuthUser`) or a
+  `Recipient`; `notify_to` is gone.
+- **`Job::failed(self, ctx: JobContext, error)`**, like `handle`: the hook sees the job's id,
+  attempt and batch.
+- **`validation::Locale` is gone** (English was its only variant): `Validator::new()`,
+  `Validator::rules_of(&form)`, and `Validator::new().in_lang(&lang)` for the app's
+  translations; `Validator::locale()` is gone.
+- **`Upload`'s fields are private:** `file_name()`, `content_type()`, `bytes()`, and
+  `Upload::new(name, type, bytes)` for tests; `#[non_exhaustive]`.
+- **`Migration` is built with `const` methods:** `Migration::new(name, up, down)
+  .sqlite(up, down).postgres(up, down)`, `name()`; its fields are private and `db::Scripts`
+  is gone. `migrations!()` writes the same calls.
+- `FromDb`: docs/stability.md and the trait's docs list the types Renox promises; others that
+  sqlx decodes still work, as an escape hatch tied to sqlx.
+
 ### v1.0 · Release readiness (V1a)
 
 The first step towards 1.0, which the owner started after M34: everything needed to publish

@@ -60,6 +60,36 @@ impl CspMode {
     }
 }
 
+setting_enum! {
+    /// Where sessions live, from `SESSION_DRIVER`.
+    pub enum SessionDriver ("SESSION_DRIVER") {
+        /// The whole session in an encrypted cookie (the default).
+        Cookie = "cookie",
+        /// An id in the cookie, the session in the `sessions` table.
+        Database = "database",
+    }
+}
+
+setting_enum! {
+    /// How log lines are written, from `LOG_FORMAT`.
+    pub enum LogFormat ("LOG_FORMAT") {
+        /// Readable lines (the default).
+        Text = "text",
+        /// One JSON object per line, for a log service.
+        Json = "json",
+    }
+}
+
+setting_enum! {
+    /// Where the cache keeps its values, from `CACHE_STORE`.
+    pub enum CacheStore ("CACHE_STORE") {
+        /// In this process's memory (the default).
+        Memory = "memory",
+        /// In the `cache` table, shared by every server (throttles and the login lock too).
+        Database = "database",
+    }
+}
+
 /// Application configuration, read from the process environment and `.env`.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -82,16 +112,18 @@ pub struct Config {
     pub views_path: PathBuf,
     /// Files served as-is at the site root, from `PUBLIC_PATH`.
     pub public_path: PathBuf,
-    /// Minutes of inactivity before a session expires, from `SESSION_LIFETIME`.
-    pub session_lifetime: u64,
+    /// Inactivity before a session expires, from `SESSION_LIFETIME` in
+    /// minutes (default 120).
+    pub session_lifetime: Duration,
     /// Name of the session cookie, from `SESSION_COOKIE`.
     pub session_cookie: String,
     /// Where sessions live, from `SESSION_DRIVER`: `cookie` (default: the
     /// whole session in an encrypted cookie) or `database` (the cookie holds
     /// an id; the `sessions` table holds the rest).
-    pub session_driver: String,
-    /// Minutes a "remember me" login lasts, from `REMEMBER_LIFETIME` (30 days).
-    pub remember_lifetime: u64,
+    pub session_driver: SessionDriver,
+    /// How long a "remember me" login lasts, from `REMEMBER_LIFETIME` in
+    /// minutes (default 43200: 30 days).
+    pub remember_lifetime: Duration,
     /// SQLite database, from `DATABASE_URL`, e.g. `sqlite://storage/app.db`.
     pub database_url: String,
     /// Maximum open connections, from `DATABASE_POOL_SIZE`.
@@ -123,15 +155,15 @@ pub struct Config {
     /// Whether `serve` runs scheduled tasks, from `SCHEDULER`.
     pub scheduler: bool,
     /// `text` (default) or `json` (one object per line), from `LOG_FORMAT`.
-    pub log_format: String,
+    pub log_format: LogFormat,
     /// Where logs go instead of stdout, from `LOG_FILE` (appended to).
     pub log_file: Option<PathBuf>,
     /// The zone of scheduled times and the `date` filter, from
     /// `APP_TIMEZONE`: an IANA name (`Asia/Jakarta`), an offset (`+07:00`) or
     /// `UTC`. See [`crate::timezone::Zone`].
-    pub timezone: String,
+    pub timezone: crate::timezone::Zone,
     /// `memory` or `database`, from `CACHE_STORE`.
-    pub cache_store: String,
+    pub cache_store: CacheStore,
     /// Where the app keeps runtime files (maintenance flag, uploads), from `STORAGE_PATH`.
     pub storage_path: PathBuf,
     /// File storage, from `STORAGE_DISK`, `S3_*` and `STORAGE_URL`.
@@ -211,19 +243,20 @@ impl Config {
             port,
             views_path: v.or("VIEWS_PATH", "resources/views").into(),
             public_path: v.or("PUBLIC_PATH", "public").into(),
-            session_lifetime: v
-                .or("SESSION_LIFETIME", "120")
-                .parse()
-                .context("SESSION_LIFETIME must be a number of minutes")?,
+            session_lifetime: Duration::from_secs(
+                v.or("SESSION_LIFETIME", "120")
+                    .parse::<u64>()
+                    .context("SESSION_LIFETIME must be a number of minutes")?
+                    .saturating_mul(60),
+            ),
             session_cookie: v.or("SESSION_COOKIE", "renox_session"),
-            session_driver: match v.or("SESSION_DRIVER", "cookie").as_str() {
-                driver @ ("cookie" | "database") => driver.to_owned(),
-                other => bail!("SESSION_DRIVER must be cookie or database, got `{other}`"),
-            },
-            remember_lifetime: v
-                .or("REMEMBER_LIFETIME", "43200")
-                .parse()
-                .context("REMEMBER_LIFETIME must be a number of minutes")?,
+            session_driver: SessionDriver::parse(&v.or("SESSION_DRIVER", "cookie"))?,
+            remember_lifetime: Duration::from_secs(
+                v.or("REMEMBER_LIFETIME", "43200")
+                    .parse::<u64>()
+                    .context("REMEMBER_LIFETIME must be a number of minutes")?
+                    .saturating_mul(60),
+            ),
             database_url: v.or("DATABASE_URL", "sqlite://storage/app.db"),
             database_pool_size: v
                 .or("DATABASE_POOL_SIZE", "8")
@@ -246,7 +279,7 @@ impl Config {
             },
             lang_path: v.or("LANG_PATH", "resources/lang").into(),
             mail: MailConfig {
-                mailer: v.or("MAIL_MAILER", "log"),
+                mailer: crate::mail::MailDriver::parse(&v.or("MAIL_MAILER", "log"))?,
                 host: v.or("MAIL_HOST", "localhost"),
                 port: v
                     .get("MAIL_PORT")
@@ -256,7 +289,9 @@ impl Config {
                     .context("MAIL_PORT must be a port number")?,
                 username: v.get("MAIL_USERNAME").filter(|v| !v.is_empty()),
                 password: v.get("MAIL_PASSWORD").filter(|v| !v.is_empty()),
-                encryption: v.or("MAIL_ENCRYPTION", "starttls"),
+                encryption: crate::mail::MailEncryption::parse(
+                    &v.or("MAIL_ENCRYPTION", "starttls"),
+                )?,
                 from_address: v.or("MAIL_FROM_ADDRESS", "hello@example.com"),
                 from_name: v.get("MAIL_FROM_NAME").filter(|v| !v.is_empty()),
                 timeout: v
@@ -274,19 +309,19 @@ impl Config {
                 .parse()
                 .context("QUEUE_WORKERS must be a number")?,
             scheduler: v.bool("SCHEDULER", true)?,
-            log_format: match v.or("LOG_FORMAT", "text").as_str() {
-                format @ ("text" | "json") => format.to_owned(),
-                other => bail!("LOG_FORMAT must be text or json, got `{other}`"),
-            },
+            log_format: LogFormat::parse(&v.or("LOG_FORMAT", "text"))?,
             log_file: v
                 .get("LOG_FILE")
                 .filter(|p| !p.is_empty())
                 .map(PathBuf::from),
-            timezone: v.or("APP_TIMEZONE", "UTC"),
-            cache_store: v.or("CACHE_STORE", "memory"),
+            timezone: v
+                .or("APP_TIMEZONE", "UTC")
+                .parse()
+                .map_err(|err| anyhow::anyhow!("APP_TIMEZONE: {err}"))?,
+            cache_store: CacheStore::parse(&v.or("CACHE_STORE", "memory"))?,
             storage_path: v.or("STORAGE_PATH", "storage").into(),
             storage: StorageConfig {
-                disk: v.or("STORAGE_DISK", "local"),
+                disk: crate::storage::DiskDriver::parse(&v.or("STORAGE_DISK", "local"))?,
                 bucket: v.optional("S3_BUCKET"),
                 region: v.optional("S3_REGION"),
                 endpoint: v.optional("S3_ENDPOINT"),
@@ -347,10 +382,10 @@ impl Default for Config {
             port: 3000,
             views_path: "resources/views".into(),
             public_path: "public".into(),
-            session_lifetime: 120,
+            session_lifetime: Duration::from_secs(120 * 60),
             session_cookie: "renox_session".into(),
-            session_driver: "cookie".into(),
-            remember_lifetime: 43_200,
+            session_driver: SessionDriver::Cookie,
+            remember_lifetime: Duration::from_secs(43_200 * 60),
             database_url: "sqlite::memory:".into(),
             database_pool_size: 8,
             // Generous: parallel test suites open many SQLite files at once.
@@ -363,15 +398,15 @@ impl Default for Config {
             currency: "IDR".into(),
             lang_path: "resources/lang".into(),
             mail: MailConfig {
-                mailer: "memory".into(),
+                mailer: crate::mail::MailDriver::Memory,
                 ..MailConfig::default()
             },
             queue_workers: 0,
             scheduler: false,
-            log_format: "text".into(),
+            log_format: LogFormat::Text,
             log_file: None,
-            timezone: "UTC".into(),
-            cache_store: "memory".into(),
+            timezone: crate::timezone::Zone::default(),
+            cache_store: CacheStore::Memory,
             storage_path: "storage".into(),
             storage: StorageConfig::default(),
             upload_max_size: 10 * 1024 * 1024,
@@ -453,19 +488,19 @@ mod tests {
         );
         assert_eq!(c.database_acquire_timeout, Duration::from_secs(5));
         assert_eq!(c.request_timeout, Some(Duration::from_secs(60)));
-        assert_eq!(c.cache_store, "memory");
+        assert_eq!(c.cache_store, CacheStore::Memory);
         assert_eq!(c.csp, CspMode::Relaxed);
         assert!(c.key.is_none() && c.mail.port.is_none());
     }
 
     #[test]
     fn session_driver() {
-        assert_eq!(load(&[]).unwrap().session_driver, "cookie");
+        assert_eq!(load(&[]).unwrap().session_driver, SessionDriver::Cookie);
         assert_eq!(
             load(&[("SESSION_DRIVER", "database")])
                 .unwrap()
                 .session_driver,
-            "database"
+            SessionDriver::Database
         );
         assert!(load(&[("SESSION_DRIVER", "redis")]).is_err());
     }
@@ -475,7 +510,7 @@ mod tests {
         let c = load(&[]).unwrap();
         assert_eq!((c.log_format.as_str(), c.log_file), ("text", None));
         let c = load(&[("LOG_FORMAT", "json"), ("LOG_FILE", "storage/logs/app.log")]).unwrap();
-        assert_eq!(c.log_format, "json");
+        assert_eq!(c.log_format, LogFormat::Json);
         assert_eq!(c.log_file, Some(PathBuf::from("storage/logs/app.log")));
         let err = load(&[("LOG_FORMAT", "xml")]).unwrap_err();
         assert!(err.to_string().contains("LOG_FORMAT"), "{err}");
@@ -539,6 +574,13 @@ mod tests {
             ("MAIL_PORT", "99999"),
             ("CSP", "loose"),
             ("TRUSTED_PROXIES", "proxy.local"),
+            ("SESSION_DRIVER", "redis"),
+            ("CACHE_STORE", "redis"),
+            ("LOG_FORMAT", "xml"),
+            ("MAIL_MAILER", "sendgrid"),
+            ("MAIL_ENCRYPTION", "ssl3"),
+            ("STORAGE_DISK", "ftp"),
+            ("APP_TIMEZONE", "Mars/Olympus"),
         ] {
             let err = load(&[(name, value)])
                 .err()

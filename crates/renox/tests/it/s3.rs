@@ -31,7 +31,7 @@ async fn s3_app(app: App) -> Option<TestApp> {
     );
     Some(
         TestApp::with_config(app, |c| {
-            c.storage.disk = "s3".into();
+            c.storage.disk = renox::storage::DiskDriver::S3;
             c.storage.endpoint = Some(endpoint.clone());
             c.storage.bucket = Some(bucket);
             c.storage.region = Some("us-east-1".into());

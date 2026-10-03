@@ -11,8 +11,13 @@
 //!
 //! impl Notification for OrderShipped {
 //!     fn kind(&self) -> &'static str { "order-shipped" }
-//!     fn channels(&self) -> Vec<Channel> {
-//!         vec![Channel::Mail, Channel::Database, Channel::Custom("whatsapp")]
+//!     // Per recipient, like Laravel's `via`: WhatsApp only for those with a number.
+//!     fn channels(&self, to: &Recipient) -> Vec<Channel> {
+//!         let mut channels = vec![Channel::Mail, Channel::Database];
+//!         if to.address("whatsapp").is_some() {
+//!             channels.push(Channel::Custom("whatsapp"));
+//!         }
+//!         channels
 //!     }
 //!
 //!     fn to_mail(&self, to: &Recipient, state: &AppState) -> Result<Mail> {
@@ -21,15 +26,15 @@
 //!     }
 //!
 //!     // What the in-app list (the UI kit's `notification_bell`) shows.
-//!     fn to_database(&self, _: &Recipient) -> renox::serde_json::Value {
-//!         DatabaseMessage::success(format!("Order #{} shipped", self.order_id))
+//!     fn to_database(&self, _: &Recipient, _: &AppState) -> Result<renox::serde_json::Value> {
+//!         Ok(DatabaseMessage::success(format!("Order #{} shipped", self.order_id))
 //!             .body("It arrives in 2–3 days.")
 //!             .url(format!("/orders/{}", self.order_id))
 //!             .with("order_id", self.order_id) // any other keys the app reads back
-//!             .into()
+//!             .into())
 //!     }
 //!
-//!     fn to_channel(&self, _channel: &str, _: &Recipient) -> Result<renox::serde_json::Value> {
+//!     fn to_channel(&self, _channel: &str, _: &Recipient, _: &AppState) -> Result<renox::serde_json::Value> {
 //!         Ok(json!({ "text": format!("Order #{} has shipped", self.order_id) }))
 //!     }
 //! }
@@ -39,7 +44,7 @@
 //! state.notify_later(&user, &OrderShipped { order_id }).await?;    // through the queue
 //! // Someone without an account:
 //! let guest = Recipient::to("mail", "guest@example.com").and("whatsapp", "+6281234567890");
-//! state.notify_to(&guest, &OrderShipped { order_id }).await?;
+//! state.notify(&guest, &OrderShipped { order_id }).await?;
 //! let unread = user.unread_notifications(&db).await?;
 //! # let _ = unread; Ok(()) }
 //!
@@ -157,6 +162,12 @@ impl From<&User> for Recipient {
     }
 }
 
+impl From<&crate::AuthUser> for Recipient {
+    fn from(user: &crate::AuthUser) -> Self {
+        Self::for_user(user)
+    }
+}
+
 impl From<&Recipient> for Recipient {
     fn from(recipient: &Recipient) -> Self {
         recipient.clone()
@@ -168,15 +179,12 @@ pub trait Notification: Send + Sync {
     /// Stored with database notifications, e.g. to pick an icon.
     fn kind(&self) -> &'static str;
 
-    /// The channels to deliver on; only `Channel::Mail` unless overridden.
-    fn channels(&self) -> Vec<Channel> {
+    /// The channels to deliver on for this recipient (Laravel's `via`),
+    /// e.g. WhatsApp only for users who turned it on; only `Channel::Mail`
+    /// unless overridden.
+    fn channels(&self, to: &Recipient) -> Vec<Channel> {
+        let _ = to;
         vec![Channel::Mail]
-    }
-
-    /// The channels for this recipient (e.g. WhatsApp only for users who
-    /// turned it on); `channels()` unless overridden.
-    fn channels_for(&self, _to: &Recipient) -> Vec<Channel> {
-        self.channels()
     }
 
     /// The mail for `Channel::Mail`; an error unless overridden.
@@ -188,13 +196,15 @@ pub trait Notification: Send + Sync {
     /// `null` by default. Return a [`DatabaseMessage`] for the UI kit's
     /// `notification_bell`. It runs in the recipient's language, like
     /// `to_mail`.
-    fn to_database(&self, _to: &Recipient) -> Value {
-        Value::Null
+    fn to_database(&self, to: &Recipient, state: &AppState) -> Result<Value> {
+        let _ = (to, state);
+        Ok(Value::Null)
     }
 
     /// The message for one of the app's own channels; the channel's handler
     /// gets it.
-    fn to_channel(&self, channel: &str, _to: &Recipient) -> Result<Value> {
+    fn to_channel(&self, channel: &str, to: &Recipient, state: &AppState) -> Result<Value> {
+        let _ = (to, state);
         Err(anyhow!(
             "notification `{}` has no version for the `{channel}` channel",
             self.kind()
@@ -404,7 +414,7 @@ impl Job for SendToChannel {
 /// database row first, so a failure there doesn't leave a sent message
 /// behind that a retry would send again; mail last.
 fn ordered(notification: &impl Notification, to: &Recipient) -> Vec<Channel> {
-    let mut channels = notification.channels_for(to);
+    let mut channels = notification.channels(to);
     channels.sort_by_key(|channel| match channel {
         Channel::Database => 0,
         Channel::Custom(_) => 1,
@@ -428,7 +438,12 @@ impl AppState {
         )
         .bind(user.id)
         .bind(notification.kind())
-        .bind(with_locale(to.locale().as_deref(), || notification.to_database(to)).to_string())
+        .bind(
+            with_locale(to.locale().as_deref(), || {
+                notification.to_database(to, self)
+            })?
+            .to_string(),
+        )
         .bind(now())
         .execute(&self.db)
         .await?;
@@ -436,17 +451,16 @@ impl AppState {
         Ok(())
     }
 
-    /// Delivers `notification` to `user` now, on each of its channels.
-    pub async fn notify(&self, user: &User, notification: &impl Notification) -> Result {
-        self.notify_to(&Recipient::for_user(user), notification)
-            .await
-    }
-
-    /// Delivers `notification` now to a user or to addresses; see
-    /// [`Recipient`]. The database row is written first and mail sent last,
-    /// so a failure doesn't leave a message behind that a retry would send
-    /// again.
-    pub async fn notify_to(&self, to: &Recipient, notification: &impl Notification) -> Result {
+    /// Delivers `notification` now to a user (`&user`) or to addresses (a
+    /// [`Recipient`]), on each of its channels. The database row is written
+    /// first and mail sent last, so a failure doesn't leave a message behind
+    /// that a retry would send again.
+    pub async fn notify(
+        &self,
+        to: impl Into<Recipient>,
+        notification: &impl Notification,
+    ) -> Result {
+        let to = &to.into();
         if self.fakes.record_notification(notification.kind(), to) {
             return Ok(());
         }
@@ -457,7 +471,7 @@ impl AppState {
                 Channel::Database => self.store_notification(to, notification).await?,
                 Channel::Custom(name) => {
                     let send = self.channel(name)?;
-                    let message = with_locale(locale, || notification.to_channel(name, to))?;
+                    let message = with_locale(locale, || notification.to_channel(name, to, self))?;
                     send(self.clone(), to.clone(), message).await?;
                 }
                 Channel::Mail => {
@@ -469,7 +483,7 @@ impl AppState {
         Ok(())
     }
 
-    /// Like `notify_to`, but mail and the app's channels are sent by queue
+    /// Like `notify`, but mail and the app's channels are sent by queue
     /// workers, each channel as its own job with its own retries. The
     /// messages are built now; the database row is written now.
     pub async fn notify_later(
@@ -488,7 +502,7 @@ impl AppState {
                 Channel::Database => self.store_notification(&to, notification).await?,
                 Channel::Custom(name) => {
                     self.channel(name)?; // fail now for an unknown channel
-                    let message = with_locale(locale, || notification.to_channel(name, &to))?;
+                    let message = with_locale(locale, || notification.to_channel(name, &to, self))?;
                     self.dispatch(SendToChannel {
                         channel: name.to_owned(),
                         to: to.clone(),

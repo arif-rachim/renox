@@ -160,7 +160,7 @@ impl FieldValue for crate::upload::Upload {
     fn inspect(&self) -> Inspected {
         // An empty file that was chosen is a file with no type: `image()`
         // and `mimes()` refuse it. (No file chosen never gets here.)
-        if self.bytes.is_empty() {
+        if self.bytes().is_empty() {
             return Inspected::File {
                 kilobytes: 0.0,
                 extension: String::new(),
@@ -193,20 +193,20 @@ impl FieldValue for crate::upload::Upload {
 mod tests {
     use super::*;
     use crate::upload::Upload;
-    use crate::validation::{Locale, Validator};
+    use crate::validation::Validator;
 
     #[test]
     fn a_text_file_named_png_is_not_an_image() {
-        let fake = Some(Upload {
-            file_name: "fake.png".into(),
-            content_type: "image/png".into(),
-            bytes: axum::body::Bytes::from_static(b"not an image\n"),
-        });
+        let fake = Some(Upload::new(
+            "fake.png",
+            "image/png",
+            axum::body::Bytes::from_static(b"not an image\n"),
+        ));
         assert!(matches!(
             FieldValue::inspect(&fake),
             Inspected::File { image: false, .. }
         ));
-        let mut v = Validator::new(Locale::En);
+        let mut v = Validator::new();
         v.field("photo", &fake).label("picture").image().max(2048);
         assert_eq!(
             v.errors.first("photo"),

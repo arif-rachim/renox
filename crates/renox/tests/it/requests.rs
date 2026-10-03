@@ -121,7 +121,7 @@ impl Module for Pages {
             .post("/photos", |Valid(p): Valid<Photos>| async move {
                 p.photos
                     .iter()
-                    .map(|f| f.file_name.clone())
+                    .map(|f| f.file_name().to_owned())
                     .collect::<Vec<_>>()
                     .join(",")
             })

@@ -66,24 +66,21 @@ use crate::{AppState, Error, Result};
 
 pub(crate) const MIGRATIONS: [Migration; 2] = [
     crate::db::framework_migration!("webhook", "00010101000300_create_webhook_calls_table"),
-    Migration {
-        name: "00010101000301_store_webhook_payloads_as_bytes",
-        up: include_str!(
-            "../migrations/webhook/00010101000301_store_webhook_payloads_as_bytes.up.sql"
-        ),
-        down: Some(include_str!(
+    Migration::new(
+        "00010101000301_store_webhook_payloads_as_bytes",
+        include_str!("../migrations/webhook/00010101000301_store_webhook_payloads_as_bytes.up.sql"),
+        Some(include_str!(
             "../migrations/webhook/00010101000301_store_webhook_payloads_as_bytes.down.sql"
         )),
-        sqlite: None,
-        postgres: Some(crate::db::Scripts {
-            up: include_str!(
-                "../migrations/webhook/00010101000301_store_webhook_payloads_as_bytes.postgres.up.sql"
-            ),
-            down: Some(include_str!(
-                "../migrations/webhook/00010101000301_store_webhook_payloads_as_bytes.postgres.down.sql"
-            )),
-        }),
-    },
+    )
+    .postgres(
+        include_str!(
+            "../migrations/webhook/00010101000301_store_webhook_payloads_as_bytes.postgres.up.sql"
+        ),
+        Some(include_str!(
+            "../migrations/webhook/00010101000301_store_webhook_payloads_as_bytes.postgres.down.sql"
+        )),
+    ),
 ];
 
 /// Tells Renox how to receive one provider's webhooks.
@@ -133,6 +130,18 @@ impl WebhookRequest {
     }
 }
 
+setting_enum! {
+    /// Where a stored webhook call is, in `webhook_calls.status`.
+    pub enum WebhookStatus ("webhook_calls.status") {
+        /// Stored, waiting for its job (or retried).
+        Received = "received",
+        /// Handled without an error.
+        Processed = "processed",
+        /// Its handler failed; `webhook:retry <id>` runs it again.
+        Failed = "failed",
+    }
+}
+
 /// A stored call, as `handle` gets it.
 #[derive(Debug, Clone, Serialize)]
 #[non_exhaustive]
@@ -145,8 +154,8 @@ pub struct WebhookCall {
     pub event_id: String,
     /// The body exactly as received.
     pub payload: Vec<u8>,
-    /// `received`, `processed` or `failed`.
-    pub status: String,
+    /// Received, processed or failed.
+    pub status: WebhookStatus,
     /// The last processing error; `None` unless `failed`.
     pub error: Option<String>,
     /// Unix seconds.
@@ -203,7 +212,8 @@ fn from_row(row: &crate::db::Row) -> std::result::Result<WebhookCall, crate::db:
         provider: row.try_get("provider")?,
         event_id: row.try_get("event_id")?,
         payload: row.try_get("payload")?,
-        status: row.try_get("status")?,
+        status: WebhookStatus::parse(&row.try_get::<String>("status")?)
+            .map_err(|err| crate::db::DbError::from(sqlx::Error::Decode(err.into())))?,
         error: row.try_get("error")?,
         received_at: row.try_get("received_at")?,
         processed_at: row.try_get("processed_at")?,
@@ -334,12 +344,12 @@ impl Job for ProcessWebhook {
         let Some(call) = WebhookCall::find(&db, self.call_id).await? else {
             return Ok(());
         };
-        if call.status == "processed" {
+        if call.status == WebhookStatus::Processed {
             return Ok(());
         }
         let Some(handle) = ctx.state.webhooks.get(call.provider.as_str()).cloned() else {
             let error = format!("no webhook `{}` is registered", call.provider);
-            mark(&db, call.id, "failed", Some(&error)).await?;
+            mark(&db, call.id, WebhookStatus::Failed, Some(&error)).await?;
             return Err(anyhow!(error).into());
         };
         let id = call.id;
@@ -355,19 +365,19 @@ impl Job for ProcessWebhook {
             .into()),
         };
         match outcome {
-            Ok(()) => mark(&db, id, "processed", None).await,
+            Ok(()) => mark(&db, id, WebhookStatus::Processed, None).await,
             Err(err) => {
-                mark(&db, id, "failed", Some(&format!("{err:?}"))).await?;
+                mark(&db, id, WebhookStatus::Failed, Some(&format!("{err:?}"))).await?;
                 Err(err)
             }
         }
     }
 }
 
-async fn mark(db: &Db, id: i64, status: &str, error: Option<&str>) -> Result {
-    let processed_at = (status == "processed").then(unix_now);
+async fn mark(db: &Db, id: i64, status: WebhookStatus, error: Option<&str>) -> Result {
+    let processed_at = (status == WebhookStatus::Processed).then(unix_now);
     crate::db::sql("UPDATE webhook_calls SET status = ?, error = ?, processed_at = ? WHERE id = ?")
-        .bind(status)
+        .bind(status.as_str())
         .bind(error)
         .bind(processed_at)
         .bind(id)

@@ -19,18 +19,24 @@ impl Notification for OrderShipped {
         "order-shipped"
     }
 
-    fn channels(&self) -> Vec<Channel> {
+    fn channels(&self, _to: &Recipient) -> Vec<Channel> {
         vec![Channel::Database]
     }
 
-    fn to_database(&self, _: &Recipient) -> renox::serde_json::Value {
-        DatabaseMessage::success(format!("Order #{} shipped", self.order))
-            .body("It arrives in 2–3 days.")
-            .url(format!("/orders/{}", self.order))
-            .link("Track", "https://track.example.com/7")
-            .action(ToastAction::link("Bad", "javascript:alert(1)"))
-            .with("order_id", self.order)
-            .into()
+    fn to_database(
+        &self,
+        _: &Recipient,
+        _state: &renox::AppState,
+    ) -> Result<renox::serde_json::Value> {
+        Ok(
+            DatabaseMessage::success(format!("Order #{} shipped", self.order))
+                .body("It arrives in 2–3 days.")
+                .url(format!("/orders/{}", self.order))
+                .link("Track", "https://track.example.com/7")
+                .action(ToastAction::link("Bad", "javascript:alert(1)"))
+                .with("order_id", self.order)
+                .into(),
+        )
     }
 }
 
@@ -42,12 +48,16 @@ impl Notification for Plain {
         "weekly-report"
     }
 
-    fn channels(&self) -> Vec<Channel> {
+    fn channels(&self, _to: &Recipient) -> Vec<Channel> {
         vec![Channel::Database]
     }
 
-    fn to_database(&self, _: &Recipient) -> renox::serde_json::Value {
-        json!({ "message": "Your weekly report is ready" })
+    fn to_database(
+        &self,
+        _: &Recipient,
+        _state: &renox::AppState,
+    ) -> Result<renox::serde_json::Value> {
+        Ok(json!({ "message": "Your weekly report is ready" }))
     }
 }
 

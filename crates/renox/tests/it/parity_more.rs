@@ -292,20 +292,20 @@ async fn named_mailers_and_failover() {
         App::new()
             .mailer("newsletter", |_| {
                 let mut news = MailConfig::default();
-                news.mailer = "memory".into();
-                news
+                news.mailer = renox::mail::MailDriver::Memory;
+                Ok(news)
             })
             .mailer("backup", |config| {
-                let mut backup = MailConfig::from_env(config, "BACKUP");
-                backup.mailer = "memory".into();
-                backup
+                let mut backup = MailConfig::from_env(config, "BACKUP")?;
+                backup.mailer = renox::mail::MailDriver::Memory;
+                Ok(backup)
             }),
         |c| {
             // The default mailer: an SMTP server that isn't there.
-            c.mail.mailer = "smtp".into();
+            c.mail.mailer = renox::mail::MailDriver::Smtp;
             c.mail.host = "127.0.0.1".into();
             c.mail.port = Some(9);
-            c.mail.encryption = "none".into();
+            c.mail.encryption = renox::mail::MailEncryption::None;
             c.mail.timeout = std::time::Duration::from_secs(2);
             c.mail.failover = vec!["backup".into()];
         },
@@ -371,10 +371,11 @@ fn mail_config_from_env_falls_back_to_the_apps_sender() {
         .vars
         .insert("NEWS_HOST".into(), "smtp.news.test".into());
     config.vars.insert("NEWS_PORT".into(), "2525".into());
-    config.mail.mailer = "log".into();
-    let news = MailConfig::from_env(&config, "news");
+    config.mail.mailer = renox::mail::MailDriver::Log;
+    let news = MailConfig::from_env(&config, "news").unwrap();
     assert_eq!(
-        news.mailer, "log",
+        news.mailer,
+        renox::mail::MailDriver::Log,
         "the app's driver unless NEWS_MAILER says"
     );
     assert_eq!(news.host, "smtp.news.test");

@@ -627,7 +627,7 @@ impl Notification for {pascal} {{
         "{kebab}"
     }}
 
-    fn channels(&self) -> Vec<Channel> {{
+    fn channels(&self, _to: &Recipient) -> Vec<Channel> {{
         vec![Channel::Mail, Channel::Database]
     }}
 
@@ -638,8 +638,8 @@ impl Notification for {pascal} {{
         Ok(Mail::new(to.email().unwrap_or_default(), "{title}", "…"))
     }}
 
-    fn to_database(&self, _to: &Recipient) -> renox::serde_json::Value {{
-        json!({{ "id": self.id }})
+    fn to_database(&self, _to: &Recipient, _state: &AppState) -> Result<renox::serde_json::Value> {{
+        Ok(json!({{ "id": self.id }}))
     }}
 }}
 "#,
