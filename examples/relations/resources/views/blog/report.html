@@ -1,29 +1,31 @@
 {% extends "layouts/app.html" %}
 
+{% block seo %}{{ seo(title="Report · " ~ app.name) }}{% endblock %}
+
 {% block content %}
 <h1>Report</h1>
-<p>{{ discussed }} post{{ "" if discussed == 1 else "s" }} with comments.</p>
+<p class="mt-2 text-zinc-600 dark:text-zinc-400">{{ discussed }} post{{ "" if discussed == 1 else "s" }} with comments.</p>
 
-<h2>By category</h2>
+<h2 class="mt-10 mb-3">By category</h2>
 <table>
   <tr><th>Category</th><th>Posts</th><th>Comments</th></tr>
   {% for row in categories %}<tr><td>{{ row.category }}</td><td>{{ row.posts }}</td><td>{{ row.comments }}</td></tr>{% endfor %}
 </table>
 
-<h2>Tags</h2>
+<h2 class="mt-10 mb-3">Tags</h2>
 <table>
   <tr><th>Tag</th><th>Posts</th></tr>
   {% for name, posts in tags %}<tr><td>#{{ name }}</td><td>{{ posts }}</td></tr>{% endfor %}
 </table>
 
-<h2>Most active commenters</h2>
+<h2 class="mt-10 mb-3">Most active commenters</h2>
 <table>
   <tr><th>Author</th><th>Comments</th></tr>
   {% for row in commenters %}<tr><td>{{ row.author }}</td><td>{{ row.comments }}</td></tr>{% endfor %}
 </table>
-<h2>Latest likes</h2>
+<h2 class="mt-10 mb-3">Latest likes</h2>
 {# A polymorphic "belongs to": each like is on a post or a comment. #}
-<ul class="links">
+<ul class="links space-y-2 text-sm">
   {% for like in likes %}
   <li>
     {% if like.post %}the post <a href="{{ route('posts.show', like.post.id) }}">{{ like.post.title }}</a>

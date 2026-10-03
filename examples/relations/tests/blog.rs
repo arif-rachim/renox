@@ -309,8 +309,8 @@ async fn posts_and_comments_are_liked() {
     let text = page.text();
     let likes = |from: &str| {
         let start = text.find(from).unwrap();
-        let at = text[start..].find(r#"<span class="likes">"#).unwrap() + start;
-        text[at..at + 30].to_owned()
+        let at = text[start..].find(r#"<span class="likes muted">"#).unwrap() + start;
+        text[at..at + 36].to_owned()
     };
     assert!(likes("<h1>").contains(">2 likes<"));
     assert!(likes("<strong>Ani</strong>").contains(">1 like<"));
@@ -367,4 +367,78 @@ async fn the_seeder_fills_the_app_and_can_run_again() {
     // A second `db:seed` leaves a seeded database as it is.
     app.kernel().seed().await.unwrap();
     assert_eq!(Post::query().count(app.db()).await.unwrap(), seeded);
+}
+
+#[renox::test]
+async fn posts_are_markdown_with_their_own_description() {
+    let b = blog().await;
+    let mut post = b.beans.clone();
+    post.body = "Beans from **Gayo**, roasted on Tuesdays.\n\n## Brewing\n\n- V60\n- Aeropress\n\n<script>alert(1)</script>".into();
+    post.save(b.app.db()).await.unwrap();
+    b.app
+        .get(&format!("/posts/{}", post.id))
+        .await
+        .assert_ok()
+        .assert_see("<strong>Gayo</strong>")
+        .assert_see("<h2>Brewing</h2>")
+        .assert_see("<li>V60</li>")
+        // Raw HTML in a body is shown as text, never run.
+        .assert_dont_see("<script>alert(1)</script>")
+        // Search engines and link previews get the first paragraph.
+        .assert_see(r#"<meta name="description" content="Beans from Gayo, roasted on Tuesdays.">"#)
+        .assert_see(r#"<meta property="og:type" content="article">"#)
+        .assert_see("<title>Beans · ");
+    // The list shows it as plain text.
+    b.app
+        .get("/")
+        .await
+        .assert_see("Beans from Gayo, roasted on Tuesdays.");
+}
+
+#[renox::test]
+async fn search_finds_every_word_in_titles_and_bodies() {
+    let b = blog().await;
+    let found = b.app.get("/?q=all+rust").await;
+    found
+        .assert_ok()
+        .assert_see(">Rust</a>")
+        .assert_dont_see(">Beans</a>")
+        .assert_see("Posts with “all rust”");
+    b.app
+        .get("/?q=nothing-like-this")
+        .await
+        .assert_see("No posts with “nothing-like-this”");
+    // Odd input is only text to look for: no error.
+    b.app.get("/?q=%25_%27").await.assert_ok();
+}
+
+#[renox::test]
+async fn the_feed_and_the_sitemap_list_the_posts() {
+    let b = blog().await;
+    let feed = b.app.get("/feed.xml").await;
+    feed.assert_ok()
+        .assert_header("content-type", "application/rss+xml; charset=utf-8");
+    let xml = feed.text();
+    assert!(xml.starts_with("<?xml"), "{xml}");
+    assert!(xml.contains("<title>Beans</title>"), "{xml}");
+    assert!(
+        xml.contains(&format!("http://127.0.0.1:3000/posts/{}</link>", b.rust.id)),
+        "{xml}"
+    );
+    let sitemap = b.app.get("/sitemap.xml").await;
+    sitemap.assert_ok();
+    let text = sitemap.text();
+    assert!(
+        text.contains(&format!("/posts/{}</loc>", b.loose.id)),
+        "{text}"
+    );
+    assert!(
+        text.contains(&format!("/categories/{}</loc>", b.coffee.id)),
+        "{text}"
+    );
+    // Every page links the feed for readers that look for it.
+    b.app
+        .get("/")
+        .await
+        .assert_see(r#"<link rel="alternate" type="application/rss+xml""#);
 }

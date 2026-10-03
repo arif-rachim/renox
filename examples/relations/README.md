@@ -7,6 +7,10 @@ lazy, hidden queries: one row gets a method per relation, a page of rows gets on
 relation (counts included), and reports use the query builder or SQL joins. Read it with
 [docs/relations.md](../../docs/relations.md).
 
+It is also a small public blog: bodies are Markdown, each post has its own title and
+description for search engines, the posts are searchable, and there is an RSS feed and a
+sitemap. The pages are styled with [Tailwind CSS](https://tailwindcss.com).
+
 ```bash
 cd examples/relations
 cp .env.example .env    # optional: the settings this example reads
@@ -32,6 +36,21 @@ cargo run                        # http://127.0.0.1:3000
 | A post's like count; its comments' like counts; each card's like count | `LIKEABLE.of(&post, Like::query()).count(..)`; `like_counts` (`Morph::count_many`: `LIKEABLE.count_many(db, parents, Like::query())`, one query per page) | `show`, `index` |
 | The latest likes with what was liked (`morphTo`) | `LIKEABLE.parents::<Post, _>` and `::<Comment, _>`: one query for the likes, one per parent type | `latest_likes`, `report` |
 | Posts that have comments | `where_has(Comment::query(), "post_id")` (`whereHas`, an `EXISTS` without SQL) | `report` |
+
+## The public blog
+
+| Feature | How | Where |
+|---|---|---|
+| Markdown bodies | `{{ post.body \| markdown }}` inside Tailwind's `prose` (raw HTML in a body shows as text) | [show.html](resources/views/blog/show.html) |
+| A title and description per post for search engines and link previews | `{% block seo %}{{ seo(title=…, description=…, type="article") }}{% endblock %}`; the description is `Post::summary` (the first paragraph without Markdown marks) | `show`, [model.rs](src/app/blog/model.rs) |
+| Search | `?q=`: each word must be in the title or the body (`where_any` + `where_like`); pages keep `q` | `index` |
+| RSS 2.0 at `/feed.xml`, linked from every page's `<head>` | XML written by the handler, escaped by `xml()` | `feed` |
+| `/sitemap.xml` | `renox::seo::Sitemap`; its route is named `sitemap`, so `robots.txt` points at it in production | `sitemap` |
+| Tailwind | the input [resources/css/app.css](resources/css/app.css) (`@import "tailwindcss"`, the typography plugin, base styles for plain elements), built into `public/css/app.css` | `rnx tailwind --minify` |
+
+The built CSS is committed, so `cargo run` works as it is. After changing classes in a view or
+the input, rebuild it with `rnx tailwind --minify` (from this directory; the CLI downloads the
+pinned Tailwind binary once, no Node needed), or run `rnx serve`, which rebuilds as you edit.
 
 ## Things worth copying
 
@@ -66,7 +85,8 @@ cargo run                        # http://127.0.0.1:3000
 cargo test -p relations
 ```
 
-[tests/blog.rs](tests/blog.rs) checks each card's relations, comments, tag syncing (including an
+[tests/blog.rs](tests/blog.rs) checks the Markdown, the description and search, the feed and
+the sitemap, each card's relations, comments, tag syncing (including an
 unknown tag being refused), both directions of many to many, pivot columns (pinning, timestamps,
 a tag the post doesn't have), the report's numbers, likes on posts and comments, and what
 deletes take with them. [tests/queries.rs](tests/queries.rs) counts the statements with

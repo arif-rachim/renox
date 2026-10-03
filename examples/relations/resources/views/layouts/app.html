@@ -3,15 +3,35 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  {% block seo %}{{ seo(title="Blog") }}{% endblock %}
-  <link rel="stylesheet" href="{{ asset('app.css') }}">
+  <meta name="color-scheme" content="light dark">
+  {#- The title, description, canonical link and OpenGraph tags (a post
+      page passes its own). -#}
+  {% block seo %}{{ seo(title=app.name, description="Coffee, travel and Rust.") }}{% endblock %}
+  <link rel="alternate" type="application/rss+xml" title="{{ app.name }}" href="{{ route('feed') }}">
+  {#- Built by Tailwind from resources/css/app.css (`rnx tailwind --minify`). -#}
+  <link rel="stylesheet" href="{{ asset('css/app.css') }}">
   {{ renox_head() }}
 </head>
-<body>
-  <nav><a href="{{ route('posts.index') }}"><strong>Blog</strong></a> <a href="{{ route('report') }}">Report</a></nav>
-  <main>
-    {% if flash.status %}<p class="flash">{{ flash.status }}</p>{% endif %}
+<body class="bg-white text-zinc-800 antialiased dark:bg-zinc-950 dark:text-zinc-300">
+  <header class="border-b border-zinc-200 dark:border-zinc-800">
+    <div class="mx-auto flex max-w-3xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-4">
+      <a href="{{ route('posts.index') }}" class="text-lg font-bold tracking-tight text-zinc-900 no-underline hover:no-underline dark:text-white">{{ app.name }}</a>
+      <nav class="flex gap-4 text-sm">
+        <a href="{{ route('report') }}">Report</a>
+        <a href="{{ route('feed') }}">RSS</a>
+      </nav>
+      <form role="search" method="get" action="{{ route('posts.index') }}" class="w-full sm:ml-auto sm:w-64">
+        <label class="sr-only" for="q">Search posts</label>
+        <input id="q" type="search" name="q" value="{{ q | default('') }}" placeholder="Search posts" class="!py-1.5 text-sm">
+      </form>
+    </div>
+  </header>
+  <main class="mx-auto max-w-3xl px-4 py-10">
+    {% if flash.status %}<p class="mb-6 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200" role="status">{{ flash.status }}</p>{% endif %}
     {% block content %}{% endblock %}
   </main>
+  <footer class="mx-auto max-w-3xl border-t border-zinc-200 px-4 py-6 text-sm text-zinc-500 dark:border-zinc-800">
+    Follow along with <a href="{{ route('feed') }}">the RSS feed</a>.
+  </footer>
 </body>
 </html>

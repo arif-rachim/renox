@@ -27,6 +27,13 @@ curl -X POST localhost:3000/api/products -H 'authorization: Bearer <token>' \
 Add `"read_only":true` to the login body for a token that can only read: writing with it gets
 `403`.
 
+Or open http://127.0.0.1:3000 in a browser: [public/client.html](public/client.html) and
+[client.js](public/client.js) are a small front end that knows the server only through this
+API, as a mobile app or a single-page app would. It logs in for a token (kept in
+`sessionStorage`), asks `GET /api/me` who it is and what it may do, lists the products with
+"Load more" (the cursor), shows 422 errors next to the fields, deletes, and logs out
+(`DELETE /api/tokens/current`). Tick "Read-only token" and the form to add products goes away.
+
 ## What's where
 
 | Feature | Where |
@@ -38,7 +45,7 @@ Add `"read_only":true` to the login body for a token that can only read: writing
 
 Routes: `POST /api/tokens`; with `products:read`: `GET /api/products`, `GET /api/products/{id}`;
 with `products:write`: `POST /api/products`, `DELETE /api/products/{id}`; any valid token:
-`DELETE /api/tokens/current` (revokes the token the request used: "log out" on one device),
+`GET /api/me` (the user and the token's abilities), `DELETE /api/tokens/current` (revokes the token the request used: "log out" on one device),
 `DELETE /api/tokens` (revokes all of the user's tokens).
 
 ## Things worth copying

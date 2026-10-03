@@ -126,11 +126,15 @@ impl Job for NotifyWarehouse {
             .config
             .var("WAREHOUSE_EMAIL")
             .unwrap_or_else(|| "warehouse@example.com".into());
-        let mail = Mail::new(
+        let mut mail = Mail::new(
             to,
             format!("Pack order #{}", order.id),
             format!("{} for {}", order.item, order.customer_email),
         );
+        // The shop manager gets a copy, and the warehouse sees that they do.
+        if let Some(manager) = ctx.state.config.var("MANAGER_EMAIL") {
+            mail = mail.cc(manager);
+        }
         ctx.state.mailer.send(mail).await
     }
 }

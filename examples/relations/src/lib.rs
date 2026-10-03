@@ -14,6 +14,9 @@
 //! - Reports: SQL joins read into `#[derive(FromRow)]` structs and tuples,
 //!   `group_by` + `select_as` for one table, `where_has` for "has any".
 //!
+//! - A public blog on top: Markdown bodies, `seo()` per post, search, an
+//!   RSS feed and a sitemap, styled with Tailwind.
+//!
 //! See docs/relations.md for the reference.
 //!
 //! ```text
@@ -65,8 +68,8 @@ async fn seed(db: Db) -> Result {
             &db,
             Post {
                 category_id: (i % 4 != 3).then(|| categories[i % 3].id),
-                title: Sentence(3..7).fake(),
-                body: Paragraph(2..4).fake(),
+                title: capitalized(Sentence(3..7).fake()),
+                body: markdown_body(),
                 ..Default::default()
             },
         )
@@ -100,4 +103,32 @@ async fn seed(db: Db) -> Result {
         }
     }
     Ok(())
+}
+
+/// A post body in Markdown: an intro, a heading, a list and a closing
+/// paragraph with some emphasis.
+fn markdown_body() -> String {
+    let intro = capitalized(Paragraph(2..4).fake());
+    let heading = capitalized(Sentence(2..4).fake());
+    let items: Vec<String> = (0..3).map(|_| capitalized(Sentence(3..6).fake())).collect();
+    let outro = capitalized(Paragraph(1..3).fake());
+    let (first, rest) = outro.split_once(' ').unwrap_or((&outro, ""));
+    format!(
+        "{intro}\n\n## {}\n\n{}\n\n**{first}** {rest}",
+        heading.trim_end_matches('.'),
+        items
+            .iter()
+            .map(|item| format!("- {item}"))
+            .collect::<Vec<_>>()
+            .join("\n"),
+    )
+}
+
+/// Lorem ipsum starts in lower case; a title doesn't.
+fn capitalized(text: String) -> String {
+    let mut chars = text.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().chain(chars).collect(),
+        None => text,
+    }
 }

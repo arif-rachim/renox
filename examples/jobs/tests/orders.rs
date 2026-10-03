@@ -609,3 +609,55 @@ async fn the_seeder_fills_the_app_and_can_run_again() {
         seeded
     );
 }
+
+#[renox::test]
+async fn mails_carry_copies_replies_and_attachments() {
+    let app = TestApp::with_config(jobs::app(), |c| {
+        for (name, value) in [
+            ("MANAGER_EMAIL", "manager@example.com"),
+            ("ACCOUNTS_EMAIL", "accounts@example.com"),
+            ("SUPPORT_EMAIL", "help@example.com"),
+        ] {
+            c.vars.insert(name.into(), value.into());
+        }
+    })
+    .await;
+    User::register(app.db(), "Admin", "admin@example.com", "password123")
+        .await
+        .unwrap();
+    gateway(&app, FakeResponse::json(201, json!({ "id": "ch_1" })));
+    place(&app).await;
+    app.post("/orders/1/pay", &[("card_token", "tok_visa")])
+        .await;
+    app.run_jobs().await;
+    let mail = |subject: &str| {
+        app.sent_mail()
+            .into_iter()
+            .find(|m| m.subject.starts_with(subject))
+            .unwrap_or_else(|| panic!("no mail “{subject}”"))
+    };
+    // Replies to a receipt reach support.
+    assert_eq!(
+        mail("Your receipt").reply_to.as_deref(),
+        Some("help@example.com")
+    );
+    // The manager is copied on the warehouse's mail.
+    assert_eq!(mail("Pack order").cc, ["manager@example.com"]);
+
+    app.acting_as(&admin(&app).await);
+    app.post("/statements", &[]).await;
+    app.run_jobs().await;
+    let statement = mail("Your monthly statement");
+    // The books get a copy the customer doesn't see.
+    assert_eq!(statement.to, ["buyer@example.com"]);
+    assert_eq!(statement.bcc, ["accounts@example.com"]);
+    // And the orders come as a CSV file.
+    let [csv] = statement.attachments.as_slice() else {
+        panic!("one attachment: {:?}", statement.attachments);
+    };
+    assert!(csv.filename.starts_with("statement-") && csv.filename.ends_with(".csv"));
+    assert_eq!(csv.content_type, "text/csv");
+    let text = String::from_utf8(csv.data.clone()).unwrap();
+    assert!(text.starts_with("order,date,item,total\n1,"), "{text}");
+    assert!(text.contains(",\"Kopi\",18000"), "{text}");
+}

@@ -61,14 +61,34 @@ impl Job for SendStatement {
         };
         let count = orders().count(db).await?;
         let total: i64 = orders().sum(db, "total").await?;
-        let mail = Mail::new(
+        // The orders themselves, as a spreadsheet the customer can open.
+        let mut csv = String::from("order,date,item,total\n");
+        for order in orders().order_by("id").get(db).await? {
+            let date = order
+                .created_at
+                .map(|at| at.format("%Y-%m-%d").to_string())
+                .unwrap_or_default();
+            csv.push_str(&format!(
+                "{},{date},\"{}\",{}\n",
+                order.id,
+                order.item.replace('"', "\"\""),
+                order.total
+            ));
+        }
+        let month = renox::db::now().format("%Y-%m");
+        let mut mail = Mail::new(
             &self.customer_email,
             "Your monthly statement",
             format!(
-                "{count} order(s) in the last 30 days, {}.",
+                "{count} order(s) in the last 30 days, {}. The orders are attached.",
                 super::money(&ctx.state, total)
             ),
-        );
+        )
+        .attach(format!("statement-{month}.csv"), "text/csv", csv);
+        // A copy for the books, without the customer seeing it.
+        if let Some(accounts) = ctx.state.config.var("ACCOUNTS_EMAIL") {
+            mail = mail.bcc(accounts);
+        }
         ctx.state.mailer.send(mail).await
     }
 }

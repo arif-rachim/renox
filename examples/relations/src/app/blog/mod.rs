@@ -6,6 +6,13 @@
 //! (counts included); reports use the query builder's `group_by` and SQL
 //! joins read into structs.
 //!
+//! It is also a public blog: bodies are Markdown (the `markdown` filter),
+//! each post has its own title and description for search engines
+//! (`seo()`), the posts are searchable (`?q=`), and there is an RSS feed
+//! (`/feed.xml`) and a sitemap (`/sitemap.xml`, `renox::seo::Sitemap`). The
+//! pages are styled with Tailwind (resources/css/app.css, built by
+//! `rnx tailwind` into public/css/app.css).
+//!
 //! Made with `rnx make:module blog`, `rnx make:model Post --module blog` (and
 //! `Category`, `Comment`, `Tag`, `Like`) and `rnx make:migration` for each
 //! migration (the blog tables, the pivot columns, the likes table), then
@@ -50,6 +57,11 @@ impl Module for Blog {
             .name("tags.show")
             .get("/report", report)
             .name("report")
+            .get("/feed.xml", feed)
+            .name("feed")
+            // Named `sitemap`: robots.txt points search engines at it.
+            .get("/sitemap.xml", sitemap)
+            .name("sitemap")
     }
 }
 
@@ -63,14 +75,35 @@ struct Card {
     comments: i64,
     latest_comment: Option<Comment>,
     likes: i64,
+    /// The first paragraph as plain text, under the title.
+    summary: String,
+}
+
+/// `?q=`: words to look for in titles and bodies.
+#[derive(Deserialize, Default)]
+struct Search {
+    q: Option<String>,
 }
 
 /// 10 posts with their categories, comment counts, latest comments, tags
 /// and like counts in 8 queries in all (count and page, categories, comment
 /// counts, latest comments, tag links and tags, like counts), whatever the
-/// page size.
-async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
-    let posts = Post::query().latest().paginate(&db, page, 10).await?;
+/// page size. `?q=` keeps the posts whose title or body has every word.
+async fn index(
+    State(db): State<Db>,
+    Page(page): Page,
+    Query(search): Query<Search>,
+) -> Result<View> {
+    let q = search.q.unwrap_or_default().trim().to_owned();
+    let mut query = Post::query().latest();
+    for word in q.split_whitespace().take(5) {
+        let pattern = format!("%{word}%");
+        query = query.where_any(|any| {
+            any.where_like("title", pattern.clone())
+                .where_like("body", pattern)
+        });
+    }
+    let posts = query.paginate(&db, page, 10).await?;
     let categories = belongs_to::<Category, _, _>(&db, &posts.items, |p| p.category_id).await?;
     // `withCount`: one GROUP BY query; posts without comments get 0.
     let counts = count_many(&db, &posts.items, Comment::query(), "post_id").await?;
@@ -97,9 +130,10 @@ async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
         comments: counts.get(&post.id).copied().unwrap_or(0),
         latest_comment: latest.remove(&post.id).and_then(|mut c| c.pop()),
         likes: likes.get(&post.id).copied().unwrap_or(0),
+        summary: post.summary(220),
         post,
     });
-    Ok(view("blog/index.html", context! { posts }))
+    Ok(view("blog/index.html", context! { posts, q }))
 }
 
 /// A tag of the post with the pivot's columns, for the template.
@@ -142,9 +176,10 @@ async fn show(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
         .collect();
     let tag_ids: Vec<i64> = tags.iter().map(|t| t.tag.id).collect();
     let all_tags = Tag::query().order_by("name").get(&db).await?;
+    let description = post.summary(160);
     Ok(view(
         "blog/show.html",
-        context! { post, category, comments, tags, tag_ids, all_tags, likes },
+        context! { post, description, category, comments, tags, tag_ids, all_tags, likes },
     ))
 }
 
@@ -329,4 +364,57 @@ async fn report(State(db): State<Db>) -> Result<View> {
         "blog/report.html",
         context! { categories, tags, commenters, discussed, likes },
     ))
+}
+
+/// The 20 latest posts as RSS 2.0, for feed readers.
+async fn feed(State(state): State<AppState>) -> Result<Response> {
+    let posts = Post::query().latest().limit(20).get(&state.db).await?;
+    let site = state.config.url.trim_end_matches('/');
+    let mut items = String::new();
+    for post in &posts {
+        let link = format!("{site}{}", state.url("posts.show", &[&post.id])?);
+        let date = post
+            .created_at
+            .map(|at| at.to_rfc2822())
+            .unwrap_or_default();
+        items.push_str(&format!(
+            "<item><title>{}</title><link>{link}</link><guid>{link}</guid>\
+             <pubDate>{date}</pubDate><description>{}</description></item>",
+            xml(&post.title),
+            xml(&post.summary(300)),
+        ));
+    }
+    let body = format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
+         <rss version=\"2.0\"><channel><title>{}</title><link>{site}/</link>\
+         <description>The latest posts</description>{items}</channel></rss>",
+        xml(&state.config.name)
+    );
+    Ok((
+        [(
+            renox::axum::http::header::CONTENT_TYPE,
+            "application/rss+xml; charset=utf-8",
+        )],
+        body,
+    )
+        .into_response())
+}
+
+/// Text inside an XML element.
+fn xml(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
+/// Every page worth finding: the home page, the posts, the categories.
+async fn sitemap(State(state): State<AppState>) -> Result<renox::seo::Sitemap> {
+    let mut map = renox::seo::Sitemap::new(&state).route("posts.index", &[], None)?;
+    for post in Post::query().latest().get(&state.db).await? {
+        map = map.route("posts.show", &[&post.id], post.updated_at)?;
+    }
+    for category in Category::all(&state.db).await? {
+        map = map.route("categories.show", &[&category.id], None)?;
+    }
+    Ok(map)
 }

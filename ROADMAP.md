@@ -1400,8 +1400,10 @@ with its README, the features and the common business apps. Three PRs:
       import from the browser, background exports with a notification, roles/permissions
       and audit-log screens, typed settings, email verification for staff added by an admin,
       and sign-in pages in the company's colours
-- [ ] M29c: smaller extensions (relations as a public blog with Markdown/SEO/RSS/search and
-      Tailwind; an api client page; S3 in uploads; mail attachments and cc in jobs)
+- [x] M29c: smaller extensions: relations as a public blog (Markdown, `seo()` per post,
+      search, RSS, `Sitemap`, Tailwind), a browser client for the api (public/client.html,
+      `GET /api/me`), uploads on S3 (the `s3` feature, tested on SeaweedFS in CI), and mail
+      attachments, `cc`, `bcc` and `reply_to` in jobs
 
 Notes from M29a:
 - Guests could change orders in examples/grid since M27: the grid's edit routes had no
@@ -1427,6 +1429,15 @@ Notes from M29b:
   `GridRequest::new` and export what the user saw (`Grid::export` on that request).
 - Toasts answered with `HxRefresh` wait in the session for the refreshed page, so tests
   read them from the next page, not from `HX-Trigger`.
+
+Notes from M29c:
+- An example on Tailwind commits its built CSS (public/css/app.css), so `cargo run` and CI
+  need no download; `rnx tailwind --minify` rebuilds it after views change. The
+  typography plugin (`prose`) is in the standalone CLI.
+- The base layer of the Tailwind input styles plain elements (`h1`, `td`, inputs), which
+  keeps templates short and tests able to look for `<h1>Coffee</h1>`.
+- examples/postgres stays separate from examples/fields. Merging them was considered,
+  but fields is about input types and postgres about running one app on both databases.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`
