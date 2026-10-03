@@ -10,6 +10,18 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+## 1.0.0-rc.1 · 2026-10-03
+
+The first release on crates.io, a release candidate for 1.0.0: `renox`, `renox-core`,
+`renox-macros` and `renox-cli`, all at this version. Everything below, from M0 to the v1.0
+steps, is in it. Try it with `cargo install renox-cli --version 1.0.0-rc.1`; apps made by
+that `rnx new` depend on `renox = "1.0.0-rc.1"` (Cargo picks a pre-release only when asked).
+If nothing turns up, the same code becomes 1.0.0, and the semver promise
+([docs/stability.md](docs/stability.md)) starts there.
+
+- `rnx new` from crates.io writes a pre-release version whole (`"1.0.0-rc.1"`, not `"1.0"`,
+  which would never pick it).
+
 ### v1.0 · The starter kit and the semver promise (V1e)
 
 - **`rnx new <name> --starter`:** the starter kit (Breeze and Jetstream as the yardstick),

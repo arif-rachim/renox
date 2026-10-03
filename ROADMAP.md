@@ -1595,8 +1595,11 @@ Started by the owner on 2026-10-03, after M34. In steps, one PR each:
       `users:admin`, seeder, tests; in tests/cli/run.sh), and the semver promise in
       docs/stability.md ("The promise": deprecation policy, data compatibility across 1.x,
       support window for the previous minor, MSRV rule) with SECURITY.md's supported versions
+- [ ] `1.0.0-rc.1`: the version set and the changelog dated (branch `release-1.0.0-rc.1`);
+      published once the owner confirms, then checked (docs.rs, `cargo install renox-cli`,
+      `rnx new demo` from crates.io)
 - [ ] Real crates published to crates.io (`renox`, `renox-core`, `renox-macros`, `renox-cli`;
-      only 0.0.1 placeholders exist; the owner runs `cargo login` and RELEASING.md), then
+      only 0.0.1 placeholders exist before the release candidate; the owner runs `cargo login` and RELEASING.md), then
       crates.io/docs.rs badges and `cargo install renox-cli` in the README
 
 ### UI kit · Form fields next to Filament's forms
