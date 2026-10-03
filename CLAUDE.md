@@ -1015,7 +1015,7 @@ picks the build, not the terminal.
   `/_renox/fonts`; `data-rx-theme="classic"` for the old look): merged (#107).
 - **M32** (English only, asked by the owner: no Indonesian anywhere in the repo, the built-in
   `id` locale dropped, Spanish as the examples' second language; framework tests use
-  `crates/renox/tests/lang/es.json`): branch `m32-english`.
+  `crates/renox/tests/lang/es.json`): merged (#108).
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.

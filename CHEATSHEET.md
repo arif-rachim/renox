@@ -181,9 +181,9 @@ and is still alive across an `.await`. Collect into a `Vec` first, then await. A
 <p>{{ t('shop.welcome', name=auth.user.name) if auth.check }}</p>
 {% if flash.status %}<p class="flash">{{ flash.status }}</p>{% endif %}
 {% if can('admin') %}<a href="/admin">Admin</a>{% endif %}    {# gate #}
-<p>{{ product.price | number }}</p>                            {# 75.000 (id) / 75,000 (en); number(2) #}
+<p>{{ product.price | number }}</p>                            {# 75,000 (en) / 75.000 (es); number(2) #}
 <p>{{ order.created_at | date('%d/%m/%Y %H:%M') }}</p>        {# in APP_TIMEZONE; default %Y-%m-%d #}
-<p>{{ order.total | money }}</p>                               {# APP_CURRENCY: Rp 75.000; money(currency='USD', divide_by=100) #}
+<p>{{ order.total | money }}</p>                               {# APP_CURRENCY: Rp 75,000 (en); money(currency='USD', divide_by=100) #}
 <p>{{ order.created_at | since }}</p>                          {# 3 hours ago / in 2 days #}
 <p>{{ post.body | words(30) }}</p>                             {# the first 30 words… #}
 <div>{{ post.body | markdown }}</div>                          {# HTML typed in is shown as text #}
