@@ -306,7 +306,8 @@ Every example has a README.md that walks through it.
   parity review, current as of M32, and an English summary of the gaps
   ([PDF](docs/audit/2026-10-laravel-gap-report.pdf)).
 - [CONTRIBUTING.md](CONTRIBUTING.md): the checks every change needs;
-  [SECURITY.md](SECURITY.md): how to report a vulnerability.
+  [SECURITY.md](SECURITY.md): how to report a vulnerability;
+  [RELEASING.md](RELEASING.md): how a release goes to crates.io.
 - `crates/renox-core/src`: the runtime. `db/` (Db, models, queries, relations, migrations),
   `validation/`, `auth/` (incl. `permissions.rs`, `account.rs`, `events.rs`, `tokens.rs`),
   `audit.rs`, `context.rs`, `queue/`, `schedule.rs` + `timezone.rs`, `cache.rs`, `view.rs`,
