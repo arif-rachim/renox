@@ -257,6 +257,7 @@ fn run_in(parent: &Path, name: &str, renox_path: Option<&Path>, options: Options
         fs::create_dir_all(path.parent().expect("stub paths have a parent"))?;
         fs::write(&path, contents)
             .with_context(|| format!("could not write {}", path.display()))?;
+        crate::format::touched(&path);
     }
 
     if tailwind {
@@ -485,6 +486,57 @@ mod tests {
         assert!(root.join("src/app/users/mod.rs").is_file());
         let tests = fs::read_to_string(root.join("tests/home.rs")).unwrap();
         assert!(tests.contains("use desk::roles"), "{tests}");
+    }
+
+    /// The `.rs` files under `dir`.
+    fn rust_files(dir: &Path) -> Vec<std::path::PathBuf> {
+        let mut files = Vec::new();
+        for entry in fs::read_dir(dir).unwrap().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                files.extend(rust_files(&path));
+            } else if path.extension().is_some_and(|ext| ext == "rs") {
+                files.push(path);
+            }
+        }
+        files
+    }
+
+    /// A new app passes `cargo fmt --check` as it is, whatever its name: rustfmt
+    /// sorts `use` lines, so a stub's order must not depend on where the name
+    /// sorts next to `renox` (#124: `renoxium` failed, `desk` passed).
+    #[test]
+    fn new_apps_are_formatted_whatever_their_name() {
+        if std::process::Command::new("rustfmt")
+            .arg("--version")
+            .output()
+            .is_err()
+        {
+            eprintln!("rustfmt isn't installed; skipped");
+            return;
+        }
+        let dir = tempfile::tempdir().unwrap();
+        for (name, starter) in [
+            ("aardvark", false),
+            ("aardvark-kit", true),
+            ("zebra", false),
+            ("zebra-kit", true),
+            ("renoxium", true),
+        ] {
+            let options = Options { starter, ..SQLITE };
+            run_in(dir.path(), name, None, options).unwrap();
+            let files = rust_files(&dir.path().join(name));
+            let output = std::process::Command::new("rustfmt")
+                .args(["--check", "--edition", "2024"])
+                .args(&files)
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{name}: rustfmt would change the new app:\n{}",
+                String::from_utf8_lossy(&output.stdout)
+            );
+        }
     }
 
     #[test]

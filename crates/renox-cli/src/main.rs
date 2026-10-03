@@ -1,6 +1,7 @@
 //! `rnx`: the command-line tool for the Renox web framework.
 
 mod deploy;
+mod format;
 mod generate;
 mod make;
 mod new;
@@ -230,7 +231,16 @@ enum Command {
 }
 
 fn main() -> Result<()> {
-    match Cli::parse().command {
+    let result = run(Cli::parse().command);
+    // The Rust files the command wrote, in rustfmt's style (format.rs).
+    if result.is_ok() {
+        format::format_touched();
+    }
+    result
+}
+
+fn run(command: Command) -> Result<()> {
+    match command {
         Command::New {
             name,
             renox_path,

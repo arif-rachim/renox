@@ -1,7 +1,10 @@
-use {{crate_name}}::roles::{self, ADMIN, MEMBER};
 use renox::prelude::*;
 use renox::testing::TestApp;
 use std::time::Duration;
+
+// The app's own items in a group of their own: rustfmt sorts each group, so
+// this order holds whatever the app is called.
+use {{crate_name}}::roles::{self, ADMIN, MEMBER};
 
 /// A verified user with `role`.
 async fn person(app: &TestApp, email: &str, role: &str) -> User {

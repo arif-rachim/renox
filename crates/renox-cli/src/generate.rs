@@ -24,6 +24,7 @@ pub(crate) fn write_new(path: &Path, contents: &str) -> Result<()> {
         fs::create_dir_all(dir).with_context(|| format!("could not create {}", dir.display()))?;
     }
     fs::write(path, contents).with_context(|| format!("could not write {}", path.display()))?;
+    crate::format::touched(path);
     println!("Created {}", shown(path));
     Ok(())
 }
@@ -135,6 +136,7 @@ pub(crate) fn add_mod(mod_rs: &Path, name: &str) -> Result<()> {
         fs::create_dir_all(dir)?;
     }
     fs::write(mod_rs, out)?;
+    crate::format::touched(mod_rs);
     println!("Updated {}", shown(mod_rs));
     Ok(())
 }
@@ -219,6 +221,7 @@ fn register_call(main_rs: &Path, call: &str) -> Result<()> {
         .collect();
     lines.insert(last + 1, format!("{indent}{call}"));
     fs::write(main_rs, lines.join("\n") + "\n")?;
+    crate::format::touched(main_rs);
     println!("Updated {} ({call})", shown(main_rs));
     Ok(())
 }
@@ -251,6 +254,7 @@ fn add_top_mod(root: &Path, name: &str) -> Result<()> {
     let line = format!("mod {name};");
     lines.insert(at, &line);
     fs::write(&file, lines.join("\n") + "\n")?;
+    crate::format::touched(&file);
     println!("Updated {} (mod {name};)", shown(&file));
     Ok(())
 }
@@ -297,6 +301,7 @@ fn register_in_module(mod_rs: &Path, call: &str) -> Result<()> {
         return Ok(());
     }
     fs::write(mod_rs, lines.join("\n") + "\n")?;
+    crate::format::touched(mod_rs);
     println!("Updated {} ({call})", shown(mod_rs));
     Ok(())
 }

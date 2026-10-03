@@ -10,6 +10,14 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Fixed (#124):** a new app failed `cargo fmt --check` before anyone wrote a line: the
+  starter kit's `tests/home.rs` sorted its imports for names before `renox` only
+  (`renoxium` failed, `desk` passed), the plain app's `tests/home.rs` had two chains over
+  rustfmt's width, and almost every `rnx make:*` generator wrote or edited files rustfmt
+  would change (where a `mod` line or `.module(…)` lands depends on the name). `rnx new` and
+  every `rnx make:*` now put the Rust files they wrote or edited through rustfmt (each file
+  on its own, so the rest of the app is left alone; the app's `rustfmt.toml` applies;
+  nothing happens without rustfmt), and both stubs are formatted as they are.
 - README: install from crates.io, the first steps after `rnx new`, and how to use Renox with
   Claude Code or another coding agent (the `AGENTS.md`/`CLAUDE.md` every new app has, and a
   snippet for other projects). The crates.io and docs.rs badges.
