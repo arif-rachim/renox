@@ -80,6 +80,9 @@ grep -q '^APP_KEY=base64:' .env
 grep -q '^DATABASE_URL=' .env # the rest comes from .env.example
 cp "$WORK/env.bak" .env
 
+step "cargo fmt --check (what rnx new and every generator wrote)"
+cargo fmt --check
+
 step "cargo build and test"
 cargo build --all-targets
 if [ "$DATABASE" = sqlite ]; then
@@ -148,16 +151,17 @@ if [ "$DATABASE" = sqlite ]; then
     cargo test
 fi
 
-step "rnx new desk --starter --database $DATABASE"
+step "rnx new studio --starter --database $DATABASE (a name after \"renox\": #124)"
 cd "$WORK"
 if [ -n "${FROM_GIT:-}" ]; then
-    "$RNX" new desk --starter --database "$DATABASE"
+    "$RNX" new studio --starter --database "$DATABASE"
 else
-    "$RNX" new desk --starter --database "$DATABASE" --renox-path "$REPO"
+    "$RNX" new studio --starter --database "$DATABASE" --renox-path "$REPO"
 fi
-cd desk
+cd studio
 test -f src/app/users/mod.rs
 grep -q '.module(Permissions)' src/lib.rs
+cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 if [ "$DATABASE" = sqlite ]; then
     cargo test

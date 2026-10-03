@@ -621,6 +621,12 @@ PostgreSQL suite 2.5x slower (reconnects).
   (`FROM_GIT=1 DOCKER=1` for the Docker job). **Add every new `make:*` there.**
   With sqlite it also makes `rnx new site --tailwind` (downloads the pinned Tailwind CLI with
   `curl`, so it needs the network) and runs `rnx tailwind --minify` and the app's tests.
+- Every `.rs` file a command writes or edits goes through `format::touched` (in
+  `write_new` and the in-place edits of generate.rs, and `rnx new`'s stubs); `main` runs
+  rustfmt on them at the end, one file at a time through stdin (with a path, rustfmt
+  follows `mod` lines into the rest of the crate). New apps and generator output must pass
+  `cargo fmt --check`: tests/cli/run.sh checks it, and new.rs has a test with names on both
+  sides of `renox` (#124). A new place that writes Rust files must call `touched`.
 - `rnx new` pins `rev` from `renox-cli/build.rs` (`git rev-parse HEAD`, else the cargo checkout
   directory's short rev). Testing it through `cargo install --git` needs the change committed,
   since that builds the committed tree.
