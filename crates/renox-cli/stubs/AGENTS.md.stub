@@ -163,7 +163,10 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   `table` + `row_actions`, `list`, `card_grid` + `media_card`, `link_tabs`, `sheet`/
   `action_sheet`/`confirm`, `menu`, `badge`, `alert`, `empty`, `progress`, `toasts()`.
   `public/app.css` is for brand tokens (`--rx-accent`) and what is truly the app's own; if
-  the kit lacks something, use its `rx-*` classes and tokens, never a parallel style.
+  the kit lacks something, use its `rx-*` classes and tokens, never a parallel style. Text
+  in the app's own CSS takes the kit's type scale (`font: var(--rx-type-heading)`, `-body`,
+  `-label`, `-caption`…), not sizes of its own. `data-rx-theme="classic"` on `<html>` is the
+  kit's older look.
 - Lists of records with filters, sorting, search or exports: build a `renox::grid::Grid`
   (docs/grid.md) and render it with `renox/grid.html` rather than a hand-made table. Excel
   exports need the `xlsx` feature (`renox = { …, features = ["xlsx"] }`); CSV and the print

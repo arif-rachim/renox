@@ -286,10 +286,8 @@ async fn components_see_the_request_and_refill_forms() {
     let css = page.text();
     let url = css
         .split("href=\"")
-        .nth(1)
-        .unwrap()
-        .split('"')
-        .next()
+        .filter_map(|rest| rest.split('"').next())
+        .find(|url| url.starts_with("/_renox/ui-") && url.ends_with(".css"))
         .unwrap()
         .to_owned();
     let res = app.get(&url).await;
@@ -720,4 +718,40 @@ async fn selects_ask_the_server_for_options() {
         .assert_see(r#"<option value="7">Kopi</option>"#)
         .assert_see(r#"<option value="9" selected data-rx-unresolved>9</option>"#)
         .assert_see(r#"<option value="l" selected data-rx-unresolved>l</option>"#);
+}
+
+#[renox::test]
+async fn the_kit_serves_its_fonts_and_preloads_the_text_one() {
+    let (app, _dir) = app().await;
+    let page = app.get("/form").await.text();
+    assert!(
+        page.contains(r#"<link rel="preload" href="/_renox/fonts/inter-latin-wght-4.1.woff2" as="font" type="font/woff2" crossorigin>"#),
+        "{page}"
+    );
+    for font in [
+        "/_renox/fonts/inter-latin-wght-4.1.woff2",
+        "/_renox/fonts/poppins-latin-500-4.003.woff2",
+        "/_renox/fonts/poppins-latin-600-4.003.woff2",
+        "/_renox/fonts/poppins-latin-700-4.003.woff2",
+    ] {
+        let res = app.get(font).await;
+        res.assert_ok()
+            .assert_header("content-type", "font/woff2")
+            .assert_header("cache-control", "public, max-age=31536000, immutable");
+        assert!(res.body.starts_with(b"wOF2"), "{font} is a woff2 file");
+    }
+    // The stylesheet names them, and keeps the first look as a theme.
+    let css_url = page
+        .split("href=\"")
+        .find_map(|rest| {
+            rest.split('"')
+                .next()
+                .filter(|u| u.starts_with("/_renox/ui-") && u.ends_with(".css"))
+        })
+        .unwrap()
+        .to_owned();
+    let css = app.get(&css_url).await.text();
+    assert!(css.contains("/_renox/fonts/poppins-latin-600-4.003.woff2"));
+    assert!(css.contains(r#":root:where([data-rx-theme="classic"])"#));
+    assert!(css.contains("--rx-type-display:"));
 }
