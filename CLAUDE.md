@@ -185,7 +185,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/method.rs            method spoofing layer (in front of the router)
   src/embedded.rs          Embedded (views/lang/public compiled in), public-file serving + content types
   assets/                  vendored htmx.min.js (2.0.11), alpine.min.js (3.17.4) + Alpine CSP build,
-                           cally.js (0.9.2)
+                           cally.js (0.9.2); fonts/ (Inter 4.1 and Poppins 4.003 Latin woff2,
+                           OFL 1.1, served by assets.rs from /_renox/fonts)
   views/                   built-in templates (error, pagination, auth/*, mail/*, ui.html (the kit),
                            debug.html (/_renox/debug), queue/dashboard.html,
                            notifications.html (the bell's page and panel)); see §4.3
@@ -622,7 +623,7 @@ PostgreSQL suite 2.5x slower (reconnects).
   in headless Chrome over CDP (a 760 × 752 viewport with `Emulation.setScrollbarsHidden`,
   `Page.captureScreenshot` per typed character, `Input.insertText`), then composing the frames
   with Pillow (a browser bar on top, a caption bar under the page, one 128-colour palette for
-  every frame, ~77 KB). Last recorded in M30 on the kit. Re-record it when the guestbook's
+  every frame, ~73 KB). Last recorded in M31 on the warm theme. Re-record it when the guestbook's
   look changes.
 
 ### 4.11 Git, PRs, CI (how the owner works)
@@ -1007,6 +1008,9 @@ picks the build, not the terminal.
   `rx-page--fill`, `hide_label`; `rnx new`'s layout on `navbar`; all fourteen examples and
   their mails on the kit): merged (#105). New pages in examples and stubs
   use kit components only; `public/app.css` holds brand tokens and what is truly the app's.
+- **M31** (the warm default theme and the `--rx-type-*` type scale, chosen by the owner after
+  screenshot comparisons; Inter and Poppins bundled in assets/fonts and served from
+  `/_renox/fonts`; `data-rx-theme="classic"` for the old look): branch `m31-warm-theme`.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.

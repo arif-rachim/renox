@@ -1466,6 +1466,33 @@ Notes from M30:
 - What stays app CSS: brand tokens, and documents meant for paper (backoffice's printed
   invoice).
 
+### M31 · A warm default theme and a type scale
+The owner asked for a better-looking default and floated neumorphism with Poppins. Three
+directions were compared on the examples' pages, in light, dark and phone widths: the look
+as it was, "Warm" (Poppins and Inter, warm paper, hairlines, indigo), and "Soft"
+(neumorphism kept readable). Then Warm with a fixed type scale was compared too. The owner
+chose Warm with the scale.
+- [x] Warm as the default theme, its tokens in renox-ui.css, dark mode
+- [x] Inter and Poppins bundled (OFL 1.1, Latin subsets), served from `/_renox/fonts`,
+      the text font preloaded by `renox_ui()`
+- [x] The type scale (`--rx-type-*`, eight roles) on every component; small capitals,
+      large figures, pills for changes
+- [x] `data-rx-theme="classic"` for the previous look
+- [x] docs/ui.md "Themes and type", AGENTS.md.stub, the demo GIF
+
+Notes from M31:
+- Full neumorphism was not the default: shadow-only edges miss WCAG AA for controls, make
+  buttons and fields look alike, disappear in dark mode, and crowd data grids. The Soft
+  prototype kept hairlines for that reason and still lost its effect in dark mode.
+- A stat's figure is sized from its card's width (`container-type` on `.rx-stat`,
+  `font-size: clamp(1rem, 12cqi, 2rem)`), so "Rp 17,469,180" stays on one line wherever it
+  fits. On a phone's half-width card it wraps between words instead of being cut.
+- Theme selectors use `:where([data-rx-theme=…])` so they weigh no more than `:root`: an
+  app's brand tokens, loaded after the kit, keep winning in any theme.
+- All examples share cookies on 127.0.0.1 during browser checks (one cookie name for every
+  port), so a check that visits several examples has to log in again before each app's
+  pages.
+
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`
       (resource tables and forms); billing later

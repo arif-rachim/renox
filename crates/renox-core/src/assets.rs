@@ -28,6 +28,28 @@ pub(crate) const GRID_JS: &str = include_str!("../assets/renox-grid.js");
 pub const CALLY_VERSION: &str = "0.9.2";
 const CALLY: &str = include_str!("../assets/cally.js");
 
+/// The kit's fonts (SIL Open Font License 1.1; assets/fonts has the
+/// licences): Inter for text, Poppins for titles and figures, Latin subsets.
+/// Their names carry the font's version, so they are cached for good.
+pub(crate) const FONTS: [(&str, &[u8]); 4] = [
+    (
+        "/_renox/fonts/inter-latin-wght-4.1.woff2",
+        include_bytes!("../assets/fonts/inter-latin-wght-4.1.woff2"),
+    ),
+    (
+        "/_renox/fonts/poppins-latin-500-4.003.woff2",
+        include_bytes!("../assets/fonts/poppins-latin-500-4.003.woff2"),
+    ),
+    (
+        "/_renox/fonts/poppins-latin-600-4.003.woff2",
+        include_bytes!("../assets/fonts/poppins-latin-600-4.003.woff2"),
+    ),
+    (
+        "/_renox/fonts/poppins-latin-700-4.003.woff2",
+        include_bytes!("../assets/fonts/poppins-latin-700-4.003.woff2"),
+    ),
+];
+
 static GRID_URLS: LazyLock<[String; 3]> = LazyLock::new(|| {
     [
         format!("/_renox/grid-{:016x}.css", fnv1a(GRID_CSS)),
@@ -59,14 +81,18 @@ static UI_URLS: LazyLock<[String; 2]> = LazyLock::new(|| {
     ]
 });
 
-/// `{{ renox_ui() }}`: the kit's stylesheet and script, for the `<head>`;
+/// `{{ renox_ui() }}`: the kit's stylesheet and script, for the `<head>`,
+/// and a preload of the text font so the first paint uses it;
 /// `renox_ui(styles=false)` only the script, for an app with its own copy
 /// of the styles (`ui:publish`).
 pub(crate) fn ui_tags(styles: bool) -> String {
     let [css, js] = &*UI_URLS;
     let script = format!("<script src=\"{js}\" defer></script>");
     if styles {
-        format!("<link rel=\"stylesheet\" href=\"{css}\">\n{script}")
+        let font = FONTS[0].0;
+        format!(
+            "<link rel=\"preload\" href=\"{font}\" as=\"font\" type=\"font/woff2\" crossorigin>\n<link rel=\"stylesheet\" href=\"{css}\">\n{script}"
+        )
     } else {
         script
     }
@@ -228,7 +254,11 @@ static URLS: LazyLock<[String; 4]> = LazyLock::new(|| {
 pub(crate) fn router() -> Router<AppState> {
     let [htmx, alpine, renox, alpine_csp] = &*URLS;
     let [ui_css, ui_js] = &*UI_URLS;
-    Router::new()
+    let mut router = Router::new();
+    for (path, bytes) in FONTS {
+        router = router.route(path, get(move || async move { font(bytes) }));
+    }
+    router
         .route(
             ui_css,
             get(|| async { asset("text/css; charset=utf-8", UI_CSS) }),
@@ -250,6 +280,16 @@ fn asset(content_type: &'static str, body: &'static str) -> impl IntoResponse {
     (
         [
             (CONTENT_TYPE, content_type),
+            (CACHE_CONTROL, "public, max-age=31536000, immutable"),
+        ],
+        body,
+    )
+}
+
+fn font(body: &'static [u8]) -> impl IntoResponse {
+    (
+        [
+            (CONTENT_TYPE, "font/woff2"),
             (CACHE_CONTROL, "public, max-age=31536000, immutable"),
         ],
         body,
@@ -324,6 +364,8 @@ mod ui_tests {
         );
         super::publish_ui(&config, true).unwrap();
         assert!(super::ui_tags(false).starts_with("<script"));
-        assert!(super::ui_tags(true).starts_with("<link rel=\"stylesheet\""));
+        let tags = super::ui_tags(true);
+        assert!(tags.starts_with("<link rel=\"preload\""), "{tags}");
+        assert!(tags.contains("<link rel=\"stylesheet\""), "{tags}");
     }
 }

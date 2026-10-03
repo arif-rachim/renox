@@ -43,7 +43,7 @@
   flex: none;
 }
 .rx-grid__heading { min-width: 0; }
-.rx-grid__title { margin: 0; font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.01em; }
+.rx-grid__title { margin: 0; font: var(--rx-type-heading); letter-spacing: -0.01em; }
 .rx-grid__count { margin: 2px 0 0; color: var(--rx-secondary-label); font-size: var(--rx-text-footnote); }
 .rx-grid__tools { display: flex; align-items: center; gap: 8px; flex: none; }
 .rx-grid__link {
@@ -125,8 +125,9 @@ tr[data-href] { cursor: pointer; }
 .rx-grid__table thead th {
   /* Opaque, so frozen headings hide what scrolls under them. */
   background: linear-gradient(var(--rx-fill), var(--rx-fill)) var(--rx-surface);
-  font-weight: 600;
-  font-size: var(--rx-text-footnote);
+  font: var(--rx-type-caption);
+  text-transform: var(--rx-caption-case);
+  letter-spacing: var(--rx-caption-tracking);
   color: var(--rx-secondary-label);
   padding-top: 7px; padding-bottom: 7px;
 }

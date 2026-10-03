@@ -139,7 +139,8 @@ impl Module for Guestbook {
 - Tailwind CSS without Node: `rnx new --tailwind`, and `rnx serve` / `rnx build` run Tailwind's
   standalone CLI (downloaded once, checked by SHA-256).
 - Components are macros that see the request (`old`, `error`, `t`, `can`, `auth`), and a UI kit
-  after Apple's Human Interface Guidelines ships with Renox (`renox/ui.html`):
+  ships with Renox (`renox/ui.html`), with a warm default theme (Inter and Poppins bundled, a
+  type scale that puts the important figure first; a `classic` theme too):
   - form fields, buttons, cards, alerts, sheets, menus, tabs and tables, with dark mode;
   - the page's frame: a navigation bar or a back office's sidebar, page headers, toolbars,
     row actions, lists, card grids and progress bars;

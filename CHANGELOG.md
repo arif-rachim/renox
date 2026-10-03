@@ -10,6 +10,32 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M31 · A warm default theme and a type scale
+
+The owner found the kit's look plain. Three directions were tried on the examples (the
+look as it was, "Warm", and a neumorphism-like "Soft"), and then Warm with a fixed type
+scale. The owner chose Warm with the scale as the default.
+- A new default look in renox-ui.css:
+  - Inter for text and Poppins for titles and figures, bundled as SIL OFL 1.1 Latin
+    subsets (about 72 KB), served from `/_renox/fonts/…` with immutable caching.
+    `renox_ui()` preloads the text font.
+  - A warm paper page, white surfaces with a hairline and a soft shadow, rounded-rectangle
+    buttons, a white secondary button with a border, and an indigo accent. Dark mode
+    included; text keeps WCAG AA.
+- A type scale: `--rx-type-display`, `-title`, `-heading`, `-lead`, `-body`, `-label`,
+  `-note` and `-caption`, each a whole `font`, used by every component and available to
+  apps. Small capitals for table, grid, stat and infolist labels; a stat's figure is the
+  largest thing on its card and shrinks with it; changes are tinted pills; a table's total
+  and a card's price use the title face.
+- New tokens: `--rx-font-display`, `--rx-surface-border`, `--rx-button-radius`,
+  `--rx-button-padding`, `--rx-button-secondary-*`, `--rx-input-shadow`,
+  `--rx-badge-radius` and `--rx-sidebar-bg`. The `--rx-text-*` sizes follow the new scale.
+- `data-rx-theme="classic"` on `<html>` keeps the previous look. Its selectors use `:where`,
+  so an app's own `:root` tokens (a brand colour) still win.
+- **Changed look:** apps get the new theme when they update; `data-rx-theme="classic"`
+  restores the old one.
+- docs/ui.md "Themes and type"; the README's demo GIF re-recorded.
+
 ### M30 · Every example on the UI kit
 
 The owner asked for every example to use Renox's own UI kit instead of markup and CSS of

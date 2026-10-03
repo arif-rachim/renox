@@ -249,7 +249,8 @@ Every example has a README.md that walks through it.
   buttons, cards, sheets, menus, tabs, tables, infolists: `infolist`/`entry`/`repeatable`;
   the page's frame: `navbar`/`nav_links`/`nav_link`, `sidebar` + `rx-shell` for back
   offices, `page_header`, `toolbar`, `row_actions`, `list`, `card_grid`/`media_card`,
-  `link_tabs`, `thumbnail`, `progress`, `rx-page--fill`: build pages from these, not app CSS),
+  `link_tabs`, `thumbnail`, `progress`, `rx-page--fill`: build pages from these, not app CSS;
+  themes and the type scale: the warm default, `data-rx-theme="classic"`, `--rx-type-*`),
   the filters `number`, `money` (`APP_CURRENCY`), `date`, `since`, `words`, `markdown`,
   dashboards (`renox::chart`: `Period`, `Trend`, `Series`; `chart(…)`, `stat`, `stats`,
   `dashboard`, `widget`, `period_filter`), and its

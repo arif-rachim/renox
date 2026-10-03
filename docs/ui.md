@@ -45,8 +45,12 @@ on a page. Use it for a component's script or style when the component appears s
 
 ## The UI kit
 
-`renox/ui.html` is a set of components styled after Apple's Human Interface Guidelines. Add
-its stylesheet and script to the layout, and the toast region to the body:
+`renox/ui.html` is a set of components built on the Human Interface Guidelines' principles
+(hierarchy, clarity, accessibility), with a warm default look: Inter for text and Poppins for
+titles and figures (both bundled), a paper-white page, white surfaces with a hairline, an
+indigo accent, and a type scale that makes the important thing the largest (see
+[Themes and type](#themes-and-type)). Add its stylesheet and script to the layout, and the
+toast region to the body:
 
 ```html
 <head>
@@ -350,6 +354,46 @@ Every class starts with `rx-`, and nothing in the kit styles bare elements, so i
 to an app's own CSS. To rebrand it, override the tokens on `:root`, e.g.
 `--rx-accent: #0a7d5a;`.
 
+### Themes and type
+
+The look is a set of tokens on `:root` (renox-ui.css): colours, the fonts, radii, shadows,
+the hairline on surfaces, the button shape, and a type scale. The default theme is "warm";
+`data-rx-theme="classic"` on `<html>` brings back the kit's first look (system fonts, Apple's
+web blue, cool greys, pill buttons, no hairlines, no small capitals):
+
+```html
+<html lang="{{ app.locale }}" data-rx-theme="classic">
+```
+
+An app's own `:root` tokens, in a stylesheet after `renox_ui()`, win over either theme, so a
+brand colour stays when the theme changes (examples/shop's brown, examples/backoffice's
+colour from its settings).
+
+The type scale has eight roles, each a whole `font` (weight, size, line height, family) in
+`rem`, so it follows the reader's text size. The kit's components use them, and so can an
+app: `font: var(--rx-type-heading)`.
+
+| Token | For | Warm | Classic |
+|---|---|---|---|
+| `--rx-type-display` | the figure that matters: a stat, a total | Poppins 600, 32 px | system 600, 28 px |
+| `--rx-type-title` | a page's title (`rx-title`, `page_header`) | Poppins 600, 28 px | system 700, 22 px |
+| `--rx-type-heading` | a card, widget, sheet or grid title | Poppins 600, 17 px | system 600, 19 px |
+| `--rx-type-lead` | the line under a page's title | Inter 400, 16 px | system 400, 15 px |
+| `--rx-type-body` | text, table cells, fields | Inter 400, 15 px | system 400, 17 px |
+| `--rx-type-label` | a field's label | Inter 600, 13 px | system 600, 15 px |
+| `--rx-type-note` | hints, descriptions | Inter 400, 13 px | system 400, 13 px |
+| `--rx-type-caption` | small capitals over figures and table columns | Inter 600, 11 px, uppercase | system 500, 13 px |
+
+What the warm theme highlights: a stat's figure is the largest thing on its card (it
+shrinks with the card rather than breaking mid-number) and its change is a tinted pill;
+table and grid headings, stat and infolist labels are small capitals; a table's total row
+and a card's price use the title face.
+
+The fonts are SIL Open Font License 1.1 Latin subsets (about 72 KB in all) that Renox serves
+from `/_renox/fonts/…`, cached for good; `renox_ui()` preloads the text font. Other scripts
+fall back to the system font. An app that wants other fonts sets `--rx-font` and
+`--rx-font-display` (and the `--rx-type-*` tokens, which name the family) on `:root`.
+
 ### Infolists: read-only details
 
 A record's page (an order, a customer) is labels and values: an infolist, Filament's name for
@@ -406,7 +450,7 @@ Every template gets these filters, which the infolist uses too:
 
 ### Design principles
 
-The kit follows the Human Interface Guidelines. These are the rules its components enforce,
+The kit follows the Human Interface Guidelines' principles. These are the rules its components enforce,
 and worth keeping in an app's own pages:
 
 - **Hierarchy.**
@@ -433,8 +477,9 @@ and worth keeping in an app's own pages:
   - Translucent materials are only for what floats over it: the navigation bar, menus,
     toasts, the sheet's backdrop.
 - **Accessibility.**
-  - Contrast is at least 4.5:1 for text in both appearances. Apple's system blue (#007AFF)
-    falls short under white text, so the accent is #0071E3.
+  - Contrast is at least 4.5:1 for text in both appearances. The default accent, indigo
+    #4F46E5, keeps 6.3:1 under white text (the classic theme's is #0071E3, since Apple's
+    system blue falls short).
   - Every control has a 44 × 44 pt target and a visible focus ring for keyboards.
   - Hints and errors are tied to their fields with `aria-describedby`, and errors are
     announced.
