@@ -152,6 +152,12 @@ rnx tailwind --watch                                   # rebuild public/css/app.
 - Load the row a route names with `Found(product): Found<Product>` (route model binding:
   `{product}`, `{id}`, or a column's name like `{slug}`) instead of `Path(id)` +
   `find_or_404`; a missing row is a 404, and default scopes apply. Authorize after it.
+- A second mail provider or a newsletter account: `App::mailer("news", |c|
+  MailConfig::from_env(c, "NEWS"))`, then `state.mailer_named("news")?` or
+  `state.queue_mail_via("news", mail)`; `MAIL_FAILOVER=news` hands mail on when the default
+  mailer fails.
+- Two plain forms on one page sharing field names: `#[validate(bag = "login")]` on one, and
+  `error('email', bag='login')` / the kit's `bag="login"` on its fields.
 - A second place for files (backups, exports): `App::disk("exports", |c|
   StorageConfig::from_env(c, "EXPORTS"))` and `state.disk("exports")?`, not a second
   `Storage` built by hand.

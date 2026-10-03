@@ -13,4 +13,11 @@
 {% else %}
 {{ empty("No posts.") }}
 {% endif %}
+{% if comments is defined and comments %}
+<h2 class="rx-card__title">Latest comments</h2>
+{% call list(label="Latest comments") %}
+  {% for comment in comments %}<li><a class="rx-list__main rx-link" href="{{ route('posts.show', comment.post_id) }}"><strong>{{ comment.author }}</strong>: {{ comment.body | words(12) }}</a></li>
+  {% endfor %}
+{% endcall %}
+{% endif %}
 {% endblock %}

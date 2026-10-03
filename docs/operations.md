@@ -161,7 +161,7 @@ and has no automated test yet.
 | A handler panics | That request gets a 500 error page, and the app keeps serving. |
 | A job panics | The attempt counts as failed and is retried, then the job goes to `failed_jobs`. The worker keeps running. |
 | A scheduled task or event listener panics | It's logged. The task runs again on schedule, and the other listeners still run. |
-| The SMTP server is down or silent | A direct `mailer.send` fails within `MAIL_TIMEOUT`. Queued mail (`queue_mail`) and queued notifications get five attempts, then go to `failed_jobs`. |
+| The SMTP server is down or silent | A direct `mailer.send` fails within `MAIL_TIMEOUT`. Queued mail (`queue_mail`) and queued notifications get five attempts, then go to `failed_jobs`. With `MAIL_FAILOVER`, the next mailer sends it first. |
 | The process is killed (`SIGKILL`, out of memory) | Jobs it was running are retried after 15 minutes, or at `TIMEOUT` + 1 minute for longer jobs. If that was their last attempt, they go to `failed_jobs`. |
 | The process gets `SIGTERM` (deploy, restart) | It stops taking requests and waits up to 30 s for running jobs. |
 

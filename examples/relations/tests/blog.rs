@@ -171,11 +171,16 @@ async fn categories_and_tags_list_their_posts() {
         .await
         .assert_see(r#"<h1 class="rx-title">Coffee</h1>"#)
         .assert_see(">Beans<")
-        .assert_dont_see(">Rust<");
+        .assert_dont_see(">Rust<")
+        // Through its posts: the comments on Beans, not Clara's on Rust.
+        .assert_see("<strong>Anna</strong>")
+        .assert_see("<strong>Ben</strong>")
+        .assert_dont_see("<strong>Clara</strong>");
     b.app
         .get(&format!("/tags/{}", b.tags[0].id))
         .await
         .assert_see(r#"<h1 class="rx-title">#howto</h1>"#)
+        .assert_dont_see("Latest comments") // tags don't list them
         .assert_see(">Beans<")
         .assert_see(">Rust<")
         .assert_dont_see(">Loose<");

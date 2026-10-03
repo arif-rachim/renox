@@ -49,6 +49,7 @@ cargo run                        # http://127.0.0.1:3000
 | `/sitemap.xml` | `renox::seo::Sitemap`; its route is named `sitemap`, so `robots.txt` points at it in production | `sitemap` |
 | 304s for feed readers and crawlers | `.etag()` on a group of just those two routes: an `ETag` on each, and `304 Not Modified` without the body when nothing changed | `routes` |
 | The post the URL names | `Found(post): Found<Post>` loads the post `{id}` names, or answers 404 | `show` |
+| A category's latest comments, through its posts | `has_many_through(&db, &[category], Post::query(), "category_id", …, Comment::query().latest().limit(5), "post_id", …)`: two queries | `category`, [list.html](resources/views/blog/list.html) |
 | The UI kit and Tailwind together | the kit for the components (its `navbar`, `page_header`, `card`, `list`, `table`, fields and buttons); Tailwind's `prose` (the typography plugin in [resources/css/app.css](resources/css/app.css)) for the Markdown bodies, built into `public/css/app.css` | [layouts/app.html](resources/views/layouts/app.html), `rnx tailwind --minify` |
 
 The built CSS is committed, so `cargo run` works as it is. After changing classes in a view or

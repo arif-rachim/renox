@@ -201,6 +201,34 @@ let on_videos = COMMENTABLE.parents::<Video, _>(&db, &recent, parent).await?;
 The database can't enforce a foreign key here, so delete the children yourself, e.g. in the
 parent's `deleting` hook (see `ModelHooks` in the cheatsheet). Index the two columns together.
 
+## Through a middle model: `has_many_through`
+
+A category's comments are the comments of its posts (Laravel's `hasManyThrough`).
+`has_many_through` loads them for a page of parents in two queries, the middle rows and then
+the children, grouped by parent:
+
+```rust
+# use renox::prelude::*;
+use renox::db::relations::has_many_through;
+# #[derive(Model, serde::Serialize, Default)] #[model(table = "categories")] struct Category { id: i64, name: String }
+# #[derive(Model, serde::Serialize, Default)] #[model(table = "posts")] struct Post { id: i64, category_id: Option<i64>, title: String }
+# #[derive(Model, serde::Serialize, Default)] #[model(table = "comments")] struct Comment { id: i64, post_id: i64, body: String }
+# async fn demo(db: Db, categories: Vec<Category>) -> Result {
+let comments = has_many_through(
+    &db,
+    &categories,
+    Post::query(), "category_id", |p: &Post| p.category_id, // the middle model, pointing at the parent
+    Comment::query().latest(), "post_id", |c: &Comment| c.post_id, // the children, pointing at the middle
+)
+.await?;
+let first = comments.get(&categories[0].id).map_or(&[][..], Vec::as_slice);
+# let _ = first; Ok(()) }
+```
+
+Filters and order go on either query. A `limit` on the children's query counts across all the
+parents, so use it with one parent (examples/relations' category page shows its five latest
+comments that way).
+
 ## Joins and reports: SQL read into structs
 
 A join or an aggregate is clearest as SQL. `fetch_as` reads the rows into:

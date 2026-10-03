@@ -440,8 +440,19 @@ struct ContactForm {
 // the fields. Every field's errors show at once, even when one doesn't parse.
 async fn store(session: Session, Valid(form): Valid<ProductForm>) -> Result<Redirect> {
     let _ = form.name;
-    session.flash("status", "Saved.")?;
-    Ok(Redirect::to("/products"))
+    session.flash("status", "Saved.")?; // session.keep(&["status"]) carries it one more request;
+    Ok(Redirect::to("/products"))       // session.now(key, value) shows one on this page only
+}
+
+/// Two forms on one page with the same field names: this one's errors go in the `login` bag,
+/// shown by `error('email', bag='login')` / `{{ ui.input("email", "Email", bag="login") }}`.
+#[derive(Deserialize, Validate)]
+#[validate(bag = "login")]
+struct SignIn {
+    #[validate(required, email)]
+    email: String,
+    #[validate(required, current_password)] // the logged-in user's password (Laravel's current_password)
+    current_password: String,
 }
 ```
 
@@ -666,7 +677,8 @@ async fn tag(db: &Db, invoice: &Invoice) -> Result {
 Generic code over models names the key when it needs one: `fn like<P: Model<Key = i64>>(p: &P)`.
 
 Relations are explicit: a method for one related row, and loaders for a page of rows
-(`relations::belongs_to`, `has_many`, `Pivot` for many-to-many, `count_many`/`sum_many` for
+(`relations::belongs_to`, `has_many`, `has_many_through` (a country's orders through its
+customers, two queries), `Pivot` for many-to-many, `count_many`/`sum_many` for
 counts and totals per row; one query each, no N+1). Filter by related rows with
 `.where_has(Review::where_eq("stars", 5), "product_id")` / `.where_doesnt_have(…)`.
 For joins and reports, use `sql("…").fetch_as::<T>(&db)` with `#[derive(FromRow)]` or a tuple.
@@ -998,7 +1010,7 @@ use renox::prelude::*;
 fn back_office() -> Auth {
     Auth::new()
         .account()                 // /account: profile, password, other devices, delete
-        .password_rules(renox::validation::Password::min(12).mixed_case().numbers()) // also letters(), symbols()
+        .password_rules(renox::validation::Password::min(12).mixed_case().numbers()) // also letters(), symbols(), uncompromised()
         .verify_email()            // mails a link; guard routes with .require_verified()
         .without_registration()    // no /register: an admin adds users
         .redirect_to("/dashboard") // after login, when no page asked for one
@@ -1393,6 +1405,9 @@ async fn send_invoice(state: &AppState, pdf: Vec<u8>) -> Result {
         .from("Billing <billing@shop.example>") // instead of MAIL_FROM_*
         .attach("INV-001.pdf", "application/pdf", pdf);
     state.queue_mail(mail).await?; // or state.mailer.send(mail).await? for now
+    // A mailer of its own: App::mailer("newsletter", |c| MailConfig::from_env(c, "NEWSLETTER")),
+    // then state.mailer_named("newsletter")?.send(…) or state.queue_mail_via("newsletter", …).
+    // MAIL_FAILOVER=backup tries the `backup` mailer when the default one fails.
     Ok(())
 }
 

@@ -10,6 +10,34 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M34 · The rest of the parity review's small additions
+
+- `Field::current_password()`: the logged-in user's password (Laravel's `current_password`).
+- `Password::uncompromised()`: refuses passwords from known breaches through Have I Been
+  Pwned's range API (only five characters of the SHA-1 leave the server; allowed with a
+  warning when the service can't be reached). New dependency: `sha1` (RustCrypto, the same
+  `digest` as `sha2`).
+- `Validator::finish_for(&state, user)` runs those two with the database checks; `Valid<T>`
+  uses it. `finish(&db)` still works, without them.
+- `Session::keep(&[keys])` and `Session::now(key, value)` (Laravel's `flash()->now()`).
+- **Named error bags:** `Validate::ERROR_BAG` (`#[validate(bag = "login")]` with the derive),
+  `ValidationError::in_bag`/`bag`, `Session::flash_errors_in`/`errors_in`/`error_bag`, the
+  template functions `error('email', bag='login')` and `errors_in('login')`, and `bag=` on the
+  kit's form fields. `errors` and `error()` show the default bag only.
+- **Breaking:** `ValidationError` has a private field (its bag), so it can't be built with a
+  struct literal any more; use `ValidationError::new`.
+- **Several mailers:** `App::mailer(name, settings)`, `MailConfig::from_env(config, prefix)`
+  (its driver defaults to the app's `MAIL_MAILER`), `state.mailer_named(name)`,
+  `state.queue_mail_via(name, mail)` (the `renox.send-mail-via` job).
+- `MAIL_FAILOVER` (`MailConfig::failover`): mailers tried in order when the default one
+  fails; a permanent error (a bad address) isn't handed on; an unknown name fails at boot.
+- `relations::has_many_through`: a parent's children through a middle model, in two queries.
+- Examples: jobs sends its sales reports through a `reports` mailer; the relations blog's
+  category page lists the latest comments of its posts with `has_many_through`.
+- Docs: validation.md (bags, `uncompromised`, `current_password`), mail.md (more mailers,
+  failover), relations.md (`has_many_through`), routing.md (`keep`, `now`), ui.md (`bag=`),
+  operations.md, CHEATSHEET, README, the parity review and its PDF.
+
 ### M33 · Small additions from the parity review
 
 The "small adds" the Laravel parity review still listed, before 1.0 freezes the API.

@@ -211,7 +211,7 @@ impl Module for Guestbook {
 - `Valid<T>` validates forms, JSON bodies and query strings with rules such as `required`,
   `required_if`, `email`, `between`, `matches` (regex), `digits`, dates (`before`, `after`),
   `unique`, `exists`, `same`, `gt`/`lt` against another field, `decimal`, `alpha_dash`, `uuid`,
-  `json`, `timezone`, `size`, `image`, `mimes` and `dimensions` (pixels), per item of
+  `json`, `timezone`, `size`, `image`, `mimes`, `dimensions` (pixels) and `current_password`, per item of
   a list (`each`, `nested`, `distinct`), and your own reusable `Rule`s. Messages come in English,
   or from your own translations (`resources/lang/<locale>.json`). Simple forms declare them as attributes:
   `#[derive(Validate)]` with `#[validate(required, email, unique("users", "email"))]`.
@@ -221,7 +221,9 @@ impl Module for Guestbook {
   verification, with Argon2id hashing and login throttling, on pages built with the UI kit;
   `.account()` adds a profile page
   (email change with re-verification, password, "log out other devices", delete account).
-  Logout ends only this device. Password rules come from `Password::min(12).mixed_case()…`, and
+  Logout ends only this device. Password rules come from `Password::min(12).mixed_case()…`
+  (`.uncompromised()` refuses passwords from known breaches, asking Have I Been Pwned by hash
+  prefix), and
   users imported from Laravel log in with their bcrypt hashes.
 - Auth events (`LoggedIn`, `LoginFailed`, `Registered`, …) and an opt-in `Audit` module that
   records them, plus your own entries (`audit::record`).
@@ -245,7 +247,9 @@ impl Module for Guestbook {
   claimed once when several servers share the database.
 - Events and listeners are included.
 - Mail comes from templates, with a text version, several recipients, cc/bcc, reply-to and
-  attachments, SMTP in production and a preview page at `/_renox/mail` while developing.
+  attachments, SMTP in production and a preview page at `/_renox/mail` while developing. More
+  mailers by name (`App::mailer`), and `MAIL_FAILOVER` to a second provider when the first
+  is down.
 - Notifications go by mail, to the database and through your own channels (WhatsApp, SMS…), now
   or through the queue, to users or to plain addresses, each in the recipient's language, with
   channels chosen per recipient. Mail views have `t()` and components (button, panel, table).
@@ -362,7 +366,8 @@ out of the box.
 - [`examples/relations`](examples/relations): a public blog on Tailwind (Markdown posts, `seo()`
   tags, an RSS feed, a sitemap and search) over belongs-to, has-many and many-to-many (a pivot
   with its own columns and `sync`), polymorphic likes, loaded without N+1 with counts per post,
-  and reports with `group_by` and SQL joins.
+  a category's latest comments through its posts (`has_many_through`), and reports with
+  `group_by` and SQL joins.
 - [`examples/teams`](examples/teams): a multi-tenant SaaS: teams and members, a default scope
   that keeps each team's projects apart, a super-admin, an encrypted team secret, and a form
   request (`prepare`, `authorize`, `after`) for adding members.
@@ -407,6 +412,8 @@ out of the box.
 | Factory states and sequences | `Product::factory().count(3).state(f).sequence(\|i, p\| …)` |
 | Route model binding, `Route::view`, `Route::redirect` | `Found<Post>`, `.view(…)`, `.redirect(…)` |
 | Several disks (`Storage::disk('s3')`) | `App::disk(name, …)`, `state.disk(name)` |
+| Several mailers, the `failover` transport | `App::mailer(name, …)`, `state.mailer_named(name)`, `MAIL_FAILOVER` |
+| `hasManyThrough`, named error bags | `relations::has_many_through`, `#[validate(bag = "login")]` |
 | Middleware | `.require_auth()`, `.throttle(…)`, `Routes::route_layer`, `App::layer` |
 | `RateLimiter::for('api', …)` | `App::rate_limiter("api", …)` and `.throttle_by("api")` |
 | Exception reporting (`report()`), Telescope/Debugbar | `App::report(…)`, `/_renox/debug` |
@@ -469,6 +476,8 @@ review (after M17), milestones M18–M32 closed its gaps:
 - **M33:** small additions the review still listed: 28 more validation rules
   (`gt`/`lt`, `decimal`, `dimensions`, `json`, …), route model binding (`Found`), named
   disks, ETags, the `XSRF-TOKEN` cookie, trusted hosts, and view and redirect routes.
+- **M34:** the rest of the review's small additions: `current_password`, the breach check,
+  session `keep`/`now`, named error bags, several mailers with failover, `has_many_through`.
 
 Next is 1.0: a documentation site with a tutorial and a Laravel guide, semver checks, and the
 first real release on crates.io (today's crates there are placeholders, so install from Git

@@ -16,6 +16,8 @@ use crate::{AppState, Error, Result};
 
 const OLD_INPUT: &str = "_old_input";
 const ERRORS: &str = "_errors";
+/// The named error bag the flashed errors belong to, when not the default one.
+const ERROR_BAG: &str = "_error_bag";
 
 /// The current visitor's session, stored in an encrypted cookie.
 ///
@@ -220,6 +222,27 @@ impl Session {
         }
     }
 
+    /// Keeps only these of the values flashed by the previous request for
+    /// one more request (Laravel's `keep`), e.g. a status message across a
+    /// second redirect.
+    pub fn keep(&self, keys: &[&str]) {
+        let mut inner = self.lock();
+        for key in keys {
+            if let Some(value) = inner.flashed.get(*key).cloned() {
+                inner.flash_next.entry((*key).to_owned()).or_insert(value);
+            }
+        }
+    }
+
+    /// A flash value for this request only (Laravel's `flash()->now()`):
+    /// the page rendered now sees it in `flash`, the next request doesn't.
+    /// For a handler that renders a page instead of redirecting.
+    pub fn now(&self, key: &str, value: impl Serialize) -> Result {
+        let value = serde_json::to_value(value)?;
+        self.lock().flashed.insert(key.to_owned(), value);
+        Ok(())
+    }
+
     /// Flashes the submitted form so the next page can refill it with `old()`.
     /// Passwords and Renox's own fields (`_token`, `_method`) are never kept,
     /// and the largest values are dropped when the rest wouldn't fit in the
@@ -252,11 +275,40 @@ impl Session {
         self.flash(ERRORS, errors)
     }
 
-    /// Validation errors flashed by the previous request.
+    /// Flashes validation errors for the next request in a named bag (Laravel's
+    /// error bags), e.g. `login` when a page has two forms; templates read
+    /// them with `error('email', bag='login')`.
+    pub fn flash_errors_in(&self, bag: &str, errors: &impl Serialize) -> Result {
+        self.flash(ERRORS, errors)?;
+        self.flash(ERROR_BAG, bag)
+    }
+
+    /// Validation errors flashed by the previous request, in the default bag
+    /// (errors flashed in a named bag aren't here; see [`errors_in`](Self::errors_in)).
     pub fn errors(&self) -> Map<String, Value> {
-        match self.lock().flashed.get(ERRORS) {
-            Some(Value::Object(errors)) => errors.clone(),
+        let inner = self.lock();
+        match (inner.flashed.get(ERRORS), inner.flashed.get(ERROR_BAG)) {
+            (Some(Value::Object(errors)), None) => errors.clone(),
             _ => Map::new(),
+        }
+    }
+
+    /// Validation errors flashed by the previous request in the bag `bag`.
+    pub fn errors_in(&self, bag: &str) -> Map<String, Value> {
+        let inner = self.lock();
+        match (inner.flashed.get(ERRORS), inner.flashed.get(ERROR_BAG)) {
+            (Some(Value::Object(errors)), Some(Value::String(name))) if name == bag => {
+                errors.clone()
+            }
+            _ => Map::new(),
+        }
+    }
+
+    /// The bag the previous request's errors were flashed in, if not the default.
+    pub fn error_bag(&self) -> Option<String> {
+        match self.lock().flashed.get(ERROR_BAG) {
+            Some(Value::String(name)) => Some(name.clone()),
+            _ => None,
         }
     }
 
@@ -265,6 +317,7 @@ impl Session {
         let mut flashed = self.lock().flashed.clone();
         flashed.remove(OLD_INPUT);
         flashed.remove(ERRORS);
+        flashed.remove(ERROR_BAG);
         flashed
     }
 

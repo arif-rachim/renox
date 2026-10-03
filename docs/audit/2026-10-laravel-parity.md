@@ -1,4 +1,4 @@
-# Laravel parity review (October 2026, after M32; updated for M33)
+# Laravel parity review (October 2026, after M32; updated for M33 and M34)
 
 **Question:** is Renox mature enough to compete with Laravel (and, for admin work, Filament), and
 if not, what is still missing?
@@ -26,17 +26,18 @@ all of the first kind:
 
 - **Every September gap planned for M18–M21 is closed**, and so are the leftovers moved to
   M22–M25 (non-integer keys, savepoints, encrypted fields, domains, `route_is`, derived
-  validation, `Accept-Language`). Of the 94 gap rows in the September tables, 63 are now ✅,
-  16 🟡, and 15 still ❌/⛔ (most of them minor or deliberately not planned).
+  validation, `Accept-Language`). Of the 94 gap rows in the September tables, 63 were ✅
+  after M32, 16 🟡 and 15 ❌/⛔; M33 and M34 then closed most of the minor ones (the tables
+  below are current).
 - **Renox went past the September scope** with what Laravel developers get from Filament: a data
   grid (M27–M28), form fields, infolists, actions, notifications and dashboard widgets in the UI
   kit (post-M28), navigation and a theme (M30–M31), and `examples/backoffice` built the way
   Filament's demo is (M29b).
 - **For HTML-over-the-wire business and SaaS apps on one server or a few**, a Laravel developer
   now finds an equivalent for nearly everything they use daily. What is left in code is small:
-  2FA and social login (plugins), a few validation rules, several mailers, search,
-  broadcasting, billing (M33 closed route model binding, most missing rules, several disks,
-  ETags, the `XSRF-TOKEN` cookie and trusted hosts).
+  2FA and social login (plugins), search, broadcasting and billing (M33 and M34 closed the
+  small adds: route model binding, most missing rules, the breach check, several disks and
+  mailers, ETags, the `XSRF-TOKEN` cookie, trusted hosts, error bags, `has_many_through`).
 - **What really separates Renox from Laravel now is maturity:** no release (crates.io holds
   0.0.1 placeholders, no git tags), one maintainer, a week of public history, no third-party
   packages, no docs site, tutorial or community. Only v1.0 and time fix these, and the owner
@@ -62,6 +63,7 @@ all of the first kind:
 | post-M28 (#88–#99) | Filament's forms, infolists, notifications, widgets and actions in the kit; `renox::chart`; `renox::select` |
 | M29–M32 | every example complete and on the kit, `examples/backoffice`, the kit's navigation, the warm theme, English only |
 | M33 | 28 validation rules (`gt`/`lt`, `decimal`, `dimensions`, `json`, `prohibits`, …), `Found<M>` route model binding, `Routes::view`/`redirect`, named disks, `Routes::etag`, `App::xsrf_cookie`, `TRUSTED_HOSTS` |
+| M34 | `current_password`, `Password::uncompromised`, session `keep`/`now`, named error bags, `App::mailer` + `MAIL_FAILOVER`, `has_many_through` |
 
 The five bugs and traps the September review found are all fixed:
 
@@ -145,8 +147,8 @@ maintenance mode.
 | Terminable middleware, ETag, trusted hosts | yes | axum middleware can work after `next.run`; hashed assets are cached `immutable`; `Routes::etag()` (`304` on `If-None-Match`); `TRUSTED_HOSTS` | ✅ | – | M33 |
 | `routeIs`, current route in views | yes | `route_is('orders.*')`, `request.route`, `CurrentRoute` | ✅ | – | M24 |
 | `redirect()->route()`, `intended()` | yes | `Redirect::route`, `Redirect::intended` (`RedirectExt`) | ✅ | – | M24 |
-| Session `push/increment/keep/now` | yes | `push`, `increment`, `pull`, `reflash`; no `keep(keys)` or `now` | 🟡 | Min | M24 |
-| Named error bags | yes | one bag per response | ❌ | Min | open |
+| Session `push/increment/keep/now` | yes | `push`, `increment`, `pull`, `reflash`, `keep(&[keys])`, `now(key, value)` | ✅ | – | M24, M34 |
+| Named error bags | yes | `Validate::ERROR_BAG` / `#[validate(bag = "…")]`, `error(field, bag=…)`, `errors_in(bag)`, `bag=` on the kit's fields | ✅ | – | M34 |
 | `XSRF-TOKEN` cookie for SPAs | yes | `App::xsrf_cookie()`: the cookie, and `X-XSRF-TOKEN` accepted | ✅ | – | M33 |
 
 New rows:
@@ -154,8 +156,8 @@ New rows:
 | Feature | Laravel | Renox | St | Imp | Since |
 |---|---|---|---|---|---|
 | Validation rules missing in September | `json`, `gt/gte/lt/lte` (field against field), `decimal`, `dimensions`, `prohibited`/`prohibited_unless`/`prohibits`, `required_with_all`/`required_without_all`, `max_digits`/`min_digits`, `multiple_of`, `mac_address`, `ulid`, `timezone`, `declined` | all of these, plus `accepted_if`/`declined_if`, `numeric`/`integer` for text, `ascii`, `hex_color`, `doesnt_start_with`/`doesnt_end_with`, `not_matches` (`Dimensions`) | ✅ | – | M33 |
-| Validation rules still missing | `extensions`/`mimetypes`, `exclude*`/`missing*`, `uncompromised` | `mimes` covers file types by content; `rule(valid, message)` and `Rule` for the rest | 🟡 | Min | open |
-| `current_password` rule | yes | used by the account pages (message key `current_password`), not a public rule | 🟡 | Min | M18b |
+| Validation rules still missing | `extensions`/`mimetypes`, `exclude*`/`missing*` | `mimes` covers file types by content; `rule(valid, message)` and `Rule` for the rest; `Password::uncompromised()` done (M34) | 🟡 | Min | open |
+| `current_password` rule | yes | `Field::current_password()`, checked with the request's user by `Validator::finish_for` | ✅ | – | M18b, M34 |
 | Live validation | Precognition | `<form data-live-validate>` against the same `Valid<T>` (`X-Renox-Validate`) | ✅ | – | M21b |
 | Nested form input | `lines.*.qty` | `lines[0][qty]` read as a tree (`validation/nested.rs`), dotted error keys | ✅ | – | post-M28 (#88) |
 | API resources (JSON transformers) | `JsonResource` | serde `Serialize` structs and `Json`; `Paginated` serializes | ✅ | – | n/a |
@@ -177,7 +179,7 @@ New rows:
 | Polymorphic relations | morphTo/morphMany/morphToMany | `Morph` (`parents`, `load`, `count_many`); no polymorphic many-to-many | 🟡 | Min | M19b |
 | Cursor and simple pagination | yes | `cursor_paginate`, `simple_paginate` | ✅ | – | M19a |
 | Transactions | `DB::transaction(fn, attempts)`, savepoints | `db.transaction`, `transaction_retrying`, `Db::retrying`, `Transaction::savepoint` | ✅ | – | M19a, M21a, M23 |
-| hasOneOfMany, hasManyThrough | yes | a join read with `fetch_as`, or `where_in_query`; no loader and no documented pattern | ❌ | Min | open |
+| hasOneOfMany, hasManyThrough | yes | `relations::has_many_through` (two queries); "latest of many" as a join with `fetch_as` | 🟡 | Min | M34 |
 | `firstOrNew`, `updateOrCreate`, `refresh`, `touch` | yes | `first_or_new`, `update_or_create`, `refresh`, `touch` | ✅ | – | M19a, M19b |
 | Factory states, sequences | yes | `Factory::factory()`, `state`, `sequence`, `count`; no `has()`/`for()` | ✅ | – | M24 |
 | Query log, `toSql` | `DB::listen`, `toSql` | `to_sql`, `capture_queries`, SQL per request in `/_renox/debug` | ✅ | – | M19a, M21a, M21d |
@@ -239,7 +241,7 @@ New rows:
 | Cache `add`/`pull`/`increment`, tags, pruning | yes | `add`, `pull`, `increment`/`decrement`, `prune`; no tags | ✅ (no tags) | Min | M20a |
 | `dispatch_sync`, encrypted payloads, `failed()`, forget/prune | yes | `dispatch_sync`, `Job::ENCRYPTED`, `Job::failed`, `queue:forget`, `queue:prune-failed` | ✅ | – | M20b |
 | Plural ranges, `Accept-Language` | yes | `{0}`/`[2,*]` ranges; `App::detect_locale` (with `Vary`) | ✅ | – | M24, M25 |
-| Multiple mailers, failover, API drivers | SES, Postmark, Resend | one mailer: SMTP, log, memory (every provider offers SMTP) | 🟡 | Min | open |
+| Multiple mailers, failover, API drivers | SES, Postmark, Resend | `App::mailer` + `mailer_named`/`queue_mail_via`, `MAIL_FAILOVER`; drivers SMTP, log, memory (every provider offers SMTP; no HTTP API drivers) | 🟡 | Min | M34 |
 | Several named disks, directory ops | yes | `list`, `copy`, `rename`, `size`, `delete_all`; `App::disk(name, …)` + `state.disk(name)` (local or S3 each, `StorageConfig::from_env`) | ✅ | – | M20c, M33 |
 | Broadcasting (Reverb/Pusher) | yes | no general broadcasting; SSE for the notification bell (`/notifications/stream`) and live reload | ⛔/🟡 | Min–Maj | – |
 
@@ -325,12 +327,11 @@ New rows:
    policy; then users, contributors, community.
 2. **2FA (Maj):** TOTP and recovery codes (`renox-2fa`).
 3. **Social login (Maj):** OAuth providers (`renox-oauth`).
-4. **Small adds (Min):** M33 closed the validation rules, route model binding, named disks,
-   the `XSRF-TOKEN` cookie, ETags, trusted hosts and view/redirect routes. Left: a public
-   `current_password` rule and the HIBP `uncompromised` check; several mailers and failover;
-   session `keep`/`now`; named error bags; `hasOneOfMany`/`hasManyThrough` (at least a
-   documented pattern); polymorphic many-to-many; a row stream; cache tags; queued
-   listeners; Slack/SMS channels.
+4. **Small adds (Min):** M33 and M34 closed the list the review started with (validation
+   rules, route model binding, disks, `XSRF-TOKEN`, ETags, trusted hosts, view/redirect
+   routes, `current_password`, the breach check, several mailers and failover, session
+   `keep`/`now`, error bags, `has_many_through`). Left, all minor: polymorphic many-to-many;
+   a row stream; cache tags; queued listeners; Slack/SMS channels; HTTP API mail drivers.
 5. **Admin (Min):** `renox-admin`, a resource declared at run time over the grid and kit;
    global search; rich text/Markdown/code editors as plugins.
 6. **Search (Maj for some):** a Scout-like full-text interface (SQLite FTS5, PostgreSQL
@@ -352,10 +353,9 @@ In the order the owner ranked the open work (CLAUDE.md §7, "Still open"):
    guarantee in docs/stability.md. The owner decides when v1.0 starts.
 2. **2FA and social login:** `renox-2fa` (TOTP, recovery codes, password confirmation reused)
    and `renox-oauth` (Google, GitHub, … linked to `users`), as separate crates.
-3. **Small adds:** M33 did the validation rules, route model binding, disks, `XSRF-TOKEN`,
-   ETags and trusted hosts. Next: error bags and `keep`/`now`, then data items
-   (`hasManyThrough` pattern, polymorphic many-to-many, row stream). The optional HIBP check
-   rides on `renox::http`.
+3. **Small adds:** done in M33 and M34. What's left is minor and can wait for users to ask:
+   polymorphic many-to-many, a row stream, cache tags, queued listeners, HTTP API mail
+   drivers.
 4. **Admin:** decide whether `renox-admin` is still worth a crate once the kit, grid and
    generators are released; global search and editors as plugins.
 5. **Search, realtime, billing:** a search interface over FTS5/`tsvector`; SSE broadcasting

@@ -101,6 +101,11 @@ shows the queue: jobs waiting, throughput, failed jobs (retry or forget them) an
   expression, `cron("30 7 * * 1", ...)` (Mondays at 07:30). Tests call them directly or by
   name with `app.kernel().run_scheduled("weekly-sales")`, which is also what
   `schedule:run` does.
+- **A mailer of its own.** The sales reports go out through `App::mailer("reports", …)`
+  (`state.queue_mail_via("reports", mail)`), configured with `REPORTS_MAILER`,
+  `REPORTS_HOST`, … and the app's `MAIL_MAILER` when those are unset; the tests read what it
+  sent with `state.mailer_named("reports")`. `MAIL_FAILOVER=reports` would make it the
+  fallback when the main mailer fails.
 - **Count and sum in SQL.** The reports use `Order::query()...count(&db)` and
   `.sum::<i64, _>(&db, "total")` instead of loading every order.
 - **A lock against double sends.** Scheduled runs are already claimed once per slot, even
