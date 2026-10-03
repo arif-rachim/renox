@@ -1,7 +1,7 @@
 CREATE TABLE teams (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    -- Sealed with state.encrypt (AES-256-GCM under APP_KEY), never plain text.
+    -- Sealed by `Encrypted<String>` (with APP_KEY) (AES-256-GCM under APP_KEY), never plain text.
     webhook_secret TEXT,
     created_at TEXT,
     updated_at TEXT

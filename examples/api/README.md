@@ -6,6 +6,7 @@ next to (or instead of) HTML pages.
 
 ```bash
 cd examples/api
+cp .env.example .env    # optional: the settings this example reads
 cargo run -- migrate
 cargo run -- db:seed             # demo@example.com / password123, two products
 cargo run                        # http://127.0.0.1:3000

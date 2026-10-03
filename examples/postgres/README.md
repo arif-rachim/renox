@@ -8,6 +8,7 @@ Without any variables it runs on SQLite:
 
 ```bash
 cd examples/postgres
+cp .env.example .env    # optional: the settings this example reads
 cargo run -- migrate
 cargo run                        # http://127.0.0.1:3000
 ```

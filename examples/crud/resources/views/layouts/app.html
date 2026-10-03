@@ -35,7 +35,6 @@
   </header>
   <main class="rx-container" id="main">
     {#- Messages the Auth module flashes ("Your email is verified.", a changed password). -#}
-    {% if flash.status %}{{ alert(flash.status, kind="success") }}{% endif %}
     {% block content %}{% endblock %}
   </main>
   {#- Toasts from `Toast::success(…)`, after a redirect or an htmx request. -#}

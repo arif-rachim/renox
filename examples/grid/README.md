@@ -4,10 +4,16 @@ A sales dashboard on one data grid (`renox::grid` and the `grid` macro of
 `renox/grid.html`), to see what the grid does on a desktop and on a phone.
 
 ```text
+cp .env.example .env    # optional: the settings this example reads
 cargo run -- migrate
 cargo run -- db:seed    # 480 orders, and demo@example.com / password
 cargo run               # http://127.0.0.1:3000
 ```
+
+Anyone can browse, filter and export. Changing orders (editing in place,
+dragging rows, the bulk actions and Delete) needs a login: log in as
+demo@example.com / password and the tools appear (`orders_grid(can_edit)`;
+the routes that change data sit behind `require_auth`).
 
 ## What to try
 

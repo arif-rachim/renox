@@ -1,9 +1,10 @@
-{# One page of rows. When there are more, the last item loads the next page
-   as soon as it scrolls into view, and is replaced by it. #}
-{% for task in tasks.items %}{% include "tasks/_row.html" %}{% endfor %}
-{% if tasks.has_next %}
-{#- route() with a named argument adds it as the query string: /?page=2 -#}
-<li class="loader" hx-get="{{ route('tasks.index', page=tasks.page + 1) }}" hx-trigger="revealed" hx-swap="outerHTML">
-  <a href="{{ route('tasks.index', page=tasks.page + 1) }}">More…</a>
+{# A batch of rows, newest first. When there are more, the last item loads
+   the next batch (the rows older than the last one shown) as soon as it
+   scrolls into view, and is replaced by it. #}
+{% for task in rows %}{% include "tasks/_row.html" %}{% endfor %}
+{% if next %}
+{#- route() with a named argument adds it as the query string: /?before=… -#}
+<li class="loader" hx-get="{{ route('tasks.index', before=next) }}" hx-trigger="revealed" hx-swap="outerHTML">
+  <a href="{{ route('tasks.index', before=next) }}">More…</a>
 </li>
 {% endif %}

@@ -2,10 +2,16 @@
 
 {% block content %}
 <h1>Tasks</h1>
-<form method="get"><input name="q" value="{{ q or '' }}" placeholder="Search"> <button>Search</button></form>
+<form method="get">
+  <input name="q" value="{{ q or '' }}" placeholder="Search">
+  <label><input type="checkbox" name="overdue" value="true"{% if overdue %} checked{% endif %}> Overdue only</label>
+  <button>Search</button>
+</form>
 <form method="post" action="{{ route('tasks.store') }}">
   {{ csrf_field() }}
-  <input name="title" placeholder="New task"> <input type="date" name="due_on">
+  {#- `old()` refills the fields after a failed submit. -#}
+  <input name="title" placeholder="New task" value="{{ old('title') or '' }}">
+  <input type="date" name="due_on" value="{{ old('due_on') or '' }}">
   <p class="error" data-error-for="title">{{ error('title') }}</p>
   <button>Add</button>
 </form>
@@ -15,9 +21,11 @@
     <form method="post" action="{{ route('tasks.toggle', task.id) }}">
       {{ csrf_field() }}{{ method_field('PATCH') }}
       <button>{{ "☑" if task.done else "☐" }}</button> {{ task.title }}
-      {% if task.due_on %}<small>due {{ task.due_on }}</small>{% endif %}
+      {% if task.due_on %}<small>due {{ task.due_on | date("%d %b %Y") }}</small>{% endif %}
     </form>
   </li>
+  {% else %}
+  <li>No tasks{% if q or overdue %} match{% endif %}.</li>
   {% endfor %}
 </ul>
 {% from "renox/pagination.html" import pagination %}{{ pagination(tasks) }}

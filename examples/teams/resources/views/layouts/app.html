@@ -39,7 +39,6 @@
   </header>
   <main class="rx-container" id="main">
     <div class="rx-stack">
-      {% if flash.status %}{{ alert(flash.status, kind="success") }}{% endif %}
       {% block content %}{% endblock %}
     </div>
   </main>

@@ -1,4 +1,6 @@
-//! Made with `rnx make:module products` and `rnx make:model Product --module products -m`.
+//! Made with `rnx make:module products` and
+//! `rnx make:model Product --module products -m --key ulid` (a `Ulid` id,
+//! made on insert; the migration's `id TEXT PRIMARY KEY`).
 
 use renox::db::{CursorPage, Ulid};
 use renox::prelude::*;

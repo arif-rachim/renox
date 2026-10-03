@@ -1,6 +1,6 @@
 {% extends "renox/mail/layout.html" %}
 {% block content %}
 <p>Thank you for your order!</p>
-<p><strong>{{ order.item }}</strong>: Rp {{ order.total }}</p>
+<p><strong>{{ order.item }}</strong>: {{ order.total | money }}</p>
 <p>Order #{{ order.id }}</p>
 {% endblock %}

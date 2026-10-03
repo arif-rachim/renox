@@ -45,6 +45,13 @@ pub fn app() -> App {
             });
         })
         .seeder(|db| async move {
+            // Seeding twice is harmless: a seeded database stays as it is.
+            if User::find_by_email(&db, "demo@example.com")
+                .await?
+                .is_some()
+            {
+                return Ok(());
+            }
             User::register(&db, "Demo", "demo@example.com", "password123").await?;
             for (name, price) in [("Kopi", 18_000), ("Teh", 9_000)] {
                 let product = Product {

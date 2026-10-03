@@ -1079,3 +1079,111 @@ async fn admins_adjust_stock_from_the_list() {
         .assert_see("“Kopi”: 10 in stock.")
         .assert_see("Delivery");
 }
+
+#[renox::test]
+async fn mail_and_notifications_speak_the_customers_language() {
+    let app = shop().await;
+    let boss = admin(&app).await;
+    // The admin reads English (a user without a `locale` gets the language
+    // of whatever request caused the notification).
+    renox::db::sql("UPDATE users SET locale = 'en' WHERE id = ?")
+        .bind(boss.id)
+        .execute(app.db())
+        .await
+        .unwrap();
+    let kopi = product(&app, "Kopi Susu", 25_000, 5).await;
+    let budi = customer(&app, "budi@example.com").await;
+    app.acting_as(&budi);
+    app.get("/language/id").await; // saved on the user
+    app.post(
+        "/cart",
+        &[("product_id", &kopi.id.to_string()), ("quantity", "1")],
+    )
+    .await;
+    app.post("/checkout", &[("delivery", "pickup")]).await;
+    let order = Order::where_eq("user_id", budi.id)
+        .first_or_404(app.db())
+        .await
+        .unwrap();
+    assert!(order.pickup);
+    app.run_jobs().await;
+    app.assert_mail_sent(
+        "budi@example.com",
+        &format!("Pesanan #{} diterima", order.id),
+    );
+    let mail = app
+        .sent_mail()
+        .into_iter()
+        .find(|m| m.to.iter().any(|t| t.contains("budi")))
+        .unwrap();
+    let body = format!("{:?}", mail);
+    assert!(body.contains("Ambil di toko setelah siap"), "{body}");
+    assert!(!body.contains("Kami kirim ke"));
+    // The admin, still on English, gets the new order in English.
+    app.acting_as(&boss);
+    app.get("/notifications")
+        .await
+        .assert_see(&format!("New order #{}", order.id));
+    app.put(
+        &format!("/admin/orders/{}/status", order.id),
+        &[("status", "paid")],
+    )
+    .await;
+    app.put(
+        &format!("/admin/orders/{}/status", order.id),
+        &[("status", "shipped")],
+    )
+    .await;
+    app.run_jobs().await;
+    app.assert_mail_sent(
+        "budi@example.com",
+        &format!("Pesanan #{} siap diambil", order.id),
+    );
+}
+
+#[renox::test]
+async fn a_stale_cancel_changes_nothing() {
+    let app = shop().await;
+    let boss = admin(&app).await;
+    let kopi = product(&app, "Kopi Susu", 25_000, 5).await;
+    let budi = customer(&app, "budi@example.com").await;
+    let order = placed_order(&app, &budi, &kopi, 1).await;
+    // Paid by someone else after the admin opened the page.
+    renox::db::sql("UPDATE orders SET status = 'paid' WHERE id = ?")
+        .bind(order.id)
+        .execute(app.db())
+        .await
+        .unwrap();
+    app.acting_as(&boss);
+    // The handler reads the order fresh, so this is the normal "can't go
+    // from paid to cancelled".
+    app.put(
+        &format!("/admin/orders/{}/status", order.id),
+        &[("status", "cancelled")],
+    )
+    .await
+    .assert_status(409);
+    assert_eq!(status(&app, order.id).await, OrderStatus::Paid);
+    assert_eq!(stock(&app, kopi.id).await, 4, "the stock stays sold");
+}
+
+#[renox::test]
+async fn make_admin_finds_the_user_in_any_case() {
+    let app = shop().await;
+    customer(&app, "budi@example.com").await;
+    app.kernel()
+        .call("shop:make-admin", ["Budi@Example.COM"])
+        .await
+        .unwrap();
+}
+
+#[renox::test]
+async fn the_seeder_fills_the_app_and_can_run_again() {
+    let app = TestApp::new(shop::app()).await;
+    app.kernel().seed().await.unwrap();
+    let seeded = Product::query().count(app.db()).await.unwrap();
+    assert!(seeded > 0);
+    // A second `db:seed` leaves a seeded database as it is.
+    app.kernel().seed().await.unwrap();
+    assert_eq!(Product::query().count(app.db()).await.unwrap(), seeded);
+}

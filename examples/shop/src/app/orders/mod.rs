@@ -102,7 +102,7 @@ pub async fn cancel_unpaid(state: &AppState) -> Result<usize> {
 async fn checkout_form(State(db): State<Db>, user: AuthUser) -> Result<Response> {
     let lines = crate::app::cart::lines(&db, user.id).await?;
     if lines.is_empty() {
-        return Ok(Redirect::to("/cart").into_response());
+        return Ok(Redirect::route("cart.show", &[])?.into_response());
     }
     let total: i64 = lines.iter().map(|l| l.subtotal).sum();
     Ok(view("orders/checkout.html", context! { lines, total }).into_response())
@@ -143,19 +143,20 @@ async fn place(
         Delivery::Courier => form.address.trim().to_owned(),
         Delivery::Pickup => lang.t("orders.pickup_address", &[]),
     };
-    match checkout::place(&state.db, user.id, &address).await? {
+    let pickup = matches!(form.delivery, Delivery::Pickup);
+    match checkout::place(&state.db, user.id, &address, pickup).await? {
         Checkout::Placed(order) => {
             state.emit(OrderPlaced { order_id: order.id }).await?;
             let toast = Toast::success(lang.t("orders.placed", &[("id", &order.id)]));
             // A named route, filled in: /orders/42.
             Ok((toast, Redirect::route("orders.show", &[&order.id])?).into_response())
         }
-        Checkout::EmptyCart => Ok(Redirect::to("/cart").into_response()),
+        Checkout::EmptyCart => Ok(Redirect::route("cart.show", &[])?.into_response()),
         Checkout::OutOfStock(names) => {
             let names = names.join(", ");
             // An error toast stays until it's dismissed: it needs reading.
             let toast = Toast::error(lang.t("orders.out_of_stock", &[("names", &names)]));
-            Ok((toast, Redirect::to("/cart")).into_response())
+            Ok((toast, Redirect::route("cart.show", &[])?).into_response())
         }
     }
 }

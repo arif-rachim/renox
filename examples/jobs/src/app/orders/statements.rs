@@ -64,7 +64,10 @@ impl Job for SendStatement {
         let mail = Mail::new(
             &self.customer_email,
             "Your monthly statement",
-            format!("{count} order(s) in the last 30 days, Rp {total}."),
+            format!(
+                "{count} order(s) in the last 30 days, {}.",
+                super::money(&ctx.state, total)
+            ),
         );
         ctx.state.mailer.send(mail).await
     }

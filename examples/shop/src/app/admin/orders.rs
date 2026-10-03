@@ -1,3 +1,7 @@
+//! The admin's orders: a list by status, the order page with its audit
+//! trail, and status changes (pay, ship, cancel) that are audited and tell
+//! the customer.
+
 use renox::Toast;
 use renox::audit::{self, Entry};
 use renox::prelude::*;
@@ -56,7 +60,14 @@ pub async fn update_status(
     let from = order.status;
     match (from, form.status) {
         (Pending, Cancelled) => {
-            checkout::cancel(&state.db, &order).await?;
+            // `false`: the customer paid or cancelled it meanwhile; nothing
+            // changed, so nothing is audited.
+            if !checkout::cancel(&state.db, &order).await? {
+                return Err(abort(
+                    StatusCode::CONFLICT,
+                    format!("Order #{} changed meanwhile; reload the page.", order.id),
+                ));
+            }
         }
         (Pending, Paid) | (Paid, Shipped) => {
             order.status = form.status;

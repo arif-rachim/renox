@@ -232,9 +232,10 @@ async fn the_show_page_formats_every_field() {
     ]);
     app.post("/products", &form).await.assert_status(303);
     let product = Product::query().first(app.db()).await.unwrap().unwrap();
-    app.get("/")
-        .await
-        .assert_see(&format!(r#"href="/products/{}">Kopi Gayo"#, product.id));
+    app.get("/").await.assert_see(&format!(
+        r#"href="/products/{}"><strong>Kopi Gayo</strong>"#,
+        product.id
+    ));
     app.get(&format!("/products/{}", product.id))
         .await
         .assert_ok()
@@ -253,4 +254,81 @@ async fn the_show_page_formats_every_field() {
         .assert_see(">01 Oct 2026, 10:30<")
         .assert_see(">27 Sep 2026<")
         .assert_see(">just now</time>");
+}
+
+#[renox::test]
+async fn the_seeder_fills_the_app_and_can_run_again() {
+    let app = TestApp::new(fields::app()).await;
+    app.kernel().seed().await.unwrap();
+    let seeded = Product::query().count(app.db()).await.unwrap();
+    assert!(seeded > 0);
+    // A second `db:seed` leaves a seeded database as it is.
+    app.kernel().seed().await.unwrap();
+    assert_eq!(Product::query().count(app.db()).await.unwrap(), seeded);
+}
+
+#[renox::test]
+async fn the_index_lists_products_in_a_table_or_says_it_is_empty() {
+    let app = TestApp::new(fields::app()).await;
+    app.get("/")
+        .await
+        .assert_ok()
+        .assert_see("No products yet")
+        .assert_see(r#"href="/products/new""#);
+
+    app.kernel().seed().await.unwrap();
+    let kopi = Product::query()
+        .where_eq("name", "Kopi Gayo")
+        .first(app.db())
+        .await
+        .unwrap()
+        .unwrap();
+    app.get("/")
+        .await
+        .assert_dont_see("No products yet")
+        .assert_see(r#"<table class="rx-table">"#)
+        .assert_see("Rp 85,000")
+        .assert_see(r#"<span class="rx-badge rx-badge--info">Medium</span>"#)
+        .assert_see(&format!(r#"href="/products/{}/edit""#, kopi.id))
+        .assert_see(&format!(r#"action="/products/{}""#, kopi.id));
+}
+
+#[renox::test]
+async fn saving_shows_a_toast_on_the_next_page() {
+    let app = TestApp::new(fields::app()).await;
+    let res = app.post("/products", FULL).await;
+    let edit = res.header("location").unwrap().to_owned();
+    app.get(&edit).await.assert_see("Product created.");
+
+    let update = edit.trim_end_matches("/edit").to_owned();
+    app.put(&update, FULL).await.assert_redirect(&edit);
+    app.get(&edit).await.assert_see("Saved.");
+    // Once only.
+    app.get(&edit).await.assert_dont_see("Saved.");
+}
+
+#[renox::test]
+async fn a_product_can_be_deleted() {
+    let app = TestApp::new(fields::app()).await;
+    app.kernel().seed().await.unwrap();
+    let kopi = Product::query()
+        .where_eq("name", "Kopi Gayo")
+        .first(app.db())
+        .await
+        .unwrap()
+        .unwrap();
+
+    app.delete(&format!("/products/{}", kopi.id))
+        .await
+        .assert_redirect("/");
+    assert!(Product::find(app.db(), kopi.id).await.unwrap().is_none());
+    assert_eq!(Product::query().count(app.db()).await.unwrap(), 1);
+    app.get("/")
+        .await
+        .assert_see("“Kopi Gayo” deleted.")
+        .assert_dont_see("<strong>Kopi Gayo</strong>");
+    // Gone: a second delete is a 404.
+    app.delete(&format!("/products/{}", kopi.id))
+        .await
+        .assert_status(404);
 }

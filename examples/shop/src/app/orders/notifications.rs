@@ -47,7 +47,7 @@ impl Notification for OrderConfirmation {
     fn to_mail(&self, to: &Recipient, state: &AppState) -> Result<Mail> {
         state.mail_view(
             to.email().unwrap_or_default(),
-            format!("Order #{} received", self.order.id),
+            t("mail.confirmation.subject", &[("id", &self.order.id)]),
             "mail/order_confirmation", // .html and .txt
             context! { order => self.order, items => self.items },
         )
@@ -81,10 +81,19 @@ impl Notification for NewOrder {
     }
 
     fn to_database(&self, _: &Recipient) -> renox::serde_json::Value {
-        DatabaseMessage::success(format!("New order #{}", self.0.id))
-            .body(format!("{}, to {}", money(self.0.total), self.0.address))
+        DatabaseMessage::success(t("notifications.new_order", &[("id", &self.0.id)]))
+            .body(t(
+                "notifications.new_order_body",
+                &[
+                    ("total", &money(self.0.total)),
+                    ("address", &self.0.address),
+                ],
+            ))
             .url(format!("/orders/{}", self.0.id))
-            .link("All orders", "/admin/orders?status=pending")
+            .link(
+                t("notifications.all_orders", &[]),
+                "/admin/orders?status=pending",
+            )
             .with("order_id", self.0.id)
             .with("total", self.0.total)
             .into()
@@ -106,14 +115,26 @@ impl Notification for OrderShipped {
     fn to_mail(&self, to: &Recipient, state: &AppState) -> Result<Mail> {
         state.mail_view(
             to.email().unwrap_or_default(),
-            format!("Order #{} is on its way", self.0.id),
+            t(
+                if self.0.pickup {
+                    "mail.shipped.ready_subject"
+                } else {
+                    "mail.shipped.subject"
+                },
+                &[("id", &self.0.id)],
+            ),
             "mail/order_shipped",
             context! { order => self.0 },
         )
     }
 
     fn to_database(&self, _: &Recipient) -> renox::serde_json::Value {
-        DatabaseMessage::success(t("notifications.shipped", &[("id", &self.0.id)]))
+        let key = if self.0.pickup {
+            "notifications.ready"
+        } else {
+            "notifications.shipped"
+        };
+        DatabaseMessage::success(t(key, &[("id", &self.0.id)]))
             .url(format!("/orders/{}", self.0.id))
             .with("order_id", self.0.id)
             .into()

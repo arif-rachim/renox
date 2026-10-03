@@ -68,7 +68,7 @@ async fn an_order_notifies_admins() {
     assert_eq!(unread[0].data["total"], 18000);
     let message = unread[0].message().unwrap(); // a DatabaseMessage
     assert_eq!(message.title, "New order #1");
-    assert_eq!(message.body.as_deref(), Some("Total: Rp 18.000"));
+    assert_eq!(message.body.as_deref(), Some("Total: Rp 18,000"));
     assert_eq!(order(&app, 1).await.status, OrderStatus::Unpaid);
     app.get("/")
         .await
@@ -152,7 +152,7 @@ async fn paying_runs_the_chain_in_order() {
         .into_iter()
         .find(|m| m.is_for("buyer@example.com"))
         .unwrap();
-    assert!(receipt.text.contains("Kopi: Rp 18000"), "{}", receipt.text);
+    assert!(receipt.text.contains("Kopi: Rp 18,000"), "{}", receipt.text);
 
     // Pressing "Pay" again doesn't charge twice.
     app.post("/orders/1/pay", &[("card_token", "tok_visa")])
@@ -325,7 +325,7 @@ async fn statements_go_out_as_a_batch_with_progress() {
     assert!(
         statement
             .text
-            .contains("2 order(s) in the last 30 days, Rp 15000"),
+            .contains("2 order(s) in the last 30 days, Rp 15,000"),
         "{}",
         statement.text
     );
@@ -415,7 +415,7 @@ async fn the_daily_report_sums_todays_orders() {
         .find(|m| m.subject == "Today's sales")
         .unwrap();
     assert!(
-        report.text.contains("1 order(s) today, Rp 5000"),
+        report.text.contains("1 order(s) today, Rp 5,000"),
         "{}",
         report.text
     );
@@ -446,7 +446,7 @@ async fn the_weekly_report_covers_seven_days() {
     assert!(
         report
             .text
-            .contains("2 order(s) in the last 7 days, Rp 23000"),
+            .contains("2 order(s) in the last 7 days, Rp 23,000"),
         "{}",
         report.text
     );
@@ -565,5 +565,47 @@ async fn failures_are_posted_to_the_chat() {
     assert_eq!(
         text, "[testing] charge-payment #1: the card was declined",
         "{text}"
+    );
+}
+
+#[renox::test]
+async fn staff_only_nobody_signs_up() {
+    let app = TestApp::new(jobs::app()).await;
+    app.get("/register").await.assert_not_found();
+    app.post(
+        "/register",
+        &[
+            ("name", "Mallory"),
+            ("email", "m@example.com"),
+            ("password", "password123"),
+            ("password_confirmation", "password123"),
+        ],
+    )
+    .await
+    .assert_status(405);
+    // The staff actions need a login; the shop front stays open.
+    app.post("/statements", &[("month", "2026-01")])
+        .await
+        .assert_redirect("/login");
+    app.get("/").await.assert_ok();
+}
+
+#[renox::test]
+async fn the_seeder_fills_the_app_and_can_run_again() {
+    let app = TestApp::new(jobs::app()).await;
+    app.kernel().seed().await.unwrap();
+    let seeded = renox::db::sql("SELECT COUNT(*) FROM users")
+        .scalar::<i64>(app.db())
+        .await
+        .unwrap();
+    assert!(seeded > 0);
+    // A second `db:seed` leaves a seeded database as it is.
+    app.kernel().seed().await.unwrap();
+    assert_eq!(
+        renox::db::sql("SELECT COUNT(*) FROM users")
+            .scalar::<i64>(app.db())
+            .await
+            .unwrap(),
+        seeded
     );
 }

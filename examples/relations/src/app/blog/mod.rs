@@ -148,17 +148,12 @@ async fn show(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
     ))
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Validate)]
 struct CommentForm {
+    #[validate(required, max = 50)]
     author: String,
+    #[validate(required, max = 1000)]
     body: String,
-}
-
-impl Validate for CommentForm {
-    fn rules(&self, v: &mut Validator) {
-        v.field("author", &self.author).required().max(50);
-        v.field("body", &self.body).required().max(1000);
-    }
 }
 
 async fn comment(
@@ -184,7 +179,7 @@ async fn comment(
 async fn like_post(State(db): State<Db>, Path(id): Path<i64>) -> Result<Redirect> {
     let post = Post::find_or_404(&db, id).await?;
     Like::create(&db, Like::on(&post)).await?;
-    Ok(Redirect::to(&format!("/posts/{}", post.id)))
+    Redirect::route("posts.show", &[&post.id])
 }
 
 /// Likes a comment: the same table, type "comments".
@@ -198,16 +193,11 @@ async fn like_comment(State(db): State<Db>, Path(id): Path<i64>) -> Result<Redir
 }
 
 /// The checked boxes of the tag form (none checked sends nothing).
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 struct TagsForm {
     #[serde(default)]
+    #[validate(each(exists("tags", "id")))]
     tags: Vec<i64>,
-}
-
-impl Validate for TagsForm {
-    fn rules(&self, v: &mut Validator) {
-        v.each("tags", &self.tags, |tag| tag.exists("tags", "id"));
-    }
 }
 
 /// Makes the post's tags exactly the checked ones, in one transaction.
@@ -220,16 +210,14 @@ async fn retag(
     let post = Post::find_or_404(&db, id).await?;
     POST_TAGS.sync(&db, post.id, form.tags).await?;
     session.flash("status", "Tags saved.")?;
-    Ok(Redirect::to(&format!("/posts/{}", post.id)))
+    Redirect::route("posts.show", &[&post.id])
 }
 
-#[derive(Deserialize)]
+/// A checkbox: nothing to check, but `Valid` still turns "on"/missing
+/// into a bool.
+#[derive(Deserialize, Validate)]
 struct PinForm {
     pinned: bool,
-}
-
-impl Validate for PinForm {
-    fn rules(&self, _v: &mut Validator) {}
 }
 
 /// Changes a column of the pivot row (and its `updated_at`):
@@ -249,7 +237,7 @@ async fn pin(
     }
     let status = if form.pinned { "Pinned." } else { "Unpinned." };
     session.flash("status", status)?;
-    Ok(Redirect::to(&format!("/posts/{}", post.id)))
+    Redirect::route("posts.show", &[&post.id])
 }
 
 /// "Has many" from the other side: the category's posts.

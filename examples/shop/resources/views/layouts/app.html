@@ -39,7 +39,6 @@
   <main class="rx-container rx-container--wide" id="main">
     <div class="rx-stack">
       {#- Messages the Auth module flashes; the shop's own use toasts. -#}
-      {% if flash.status %}{{ alert(flash.status, kind="success") }}{% endif %}
       {% block content %}{% endblock %}
     </div>
   </main>

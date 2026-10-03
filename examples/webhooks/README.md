@@ -16,6 +16,7 @@ Only the providers you use need theirs; a call to a provider whose secret is mis
 
 ```bash
 cd examples/webhooks
+cp .env.example .env    # optional: the settings this example reads
 cargo run -- migrate
 cargo run -- db:seed             # pending orders INV-1, INV-2, INV-3
 cargo run                        # http://127.0.0.1:3000 lists the orders
@@ -32,8 +33,8 @@ curl -X POST localhost:3000/webhooks/xendit -H 'content-type: application/json' 
   -d '{"id":"inv_1","external_id":"INV-1","status":"PAID"}'
 ```
 
-Once the queue worker (part of `cargo run`) has handled the call, `/` shows INV-1 paid via
-xendit.
+Once the queue worker (part of `cargo run`) has handled the call, reload `/`: INV-1's badge
+turns from Pending to Paid, via Xendit.
 
 ## What's where
 
@@ -44,6 +45,8 @@ xendit.
 | Midtrans: SHA-512 `signature_key` in the JSON body | [src/app/payments/midtrans.rs](src/app/payments/midtrans.rs) |
 | Xendit: `x-callback-token` header | [src/app/payments/xendit.rs](src/app/payments/xendit.rs) |
 | Stripe: timestamped HMAC-SHA256 in `Stripe-Signature`, older than five minutes refused | [src/app/payments/stripe.rs](src/app/payments/stripe.rs) |
+| The orders page on the UI kit: a `table`, the amount with the `money` filter, a `badge` per status, an `empty` state | [resources/views/orders/index.html](resources/views/orders/index.html) |
+| The layout: the kit (`renox_ui()`), a navigation bar, `toasts()` | [resources/views/layouts/app.html](resources/views/layouts/app.html), [public/app.css](public/app.css) |
 
 ## Things worth copying
 
@@ -65,4 +68,4 @@ cargo test -p webhooks
 ```
 
 [tests/payments.rs](tests/payments.rs) sends correctly signed, forged and repeated calls for
-each provider.
+each provider, and checks the orders page (a pending, then a paid badge; the empty state).

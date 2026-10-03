@@ -1,6 +1,8 @@
 //! The sales dashboard: data grids over the orders, filled from the server
 //! a page at a time. Made with `rnx make:module orders` and
-//! `rnx make:model Order --module orders -m`; the grids are `renox::grid`
+//! `rnx make:model Order --module orders -m`, later
+//! `rnx make:migration add_position_to_orders` and
+//! `rnx make:migration add_customers_and_notes`; the grids are `renox::grid`
 //! (see `orders_grid` and `regions_grid`).
 
 pub mod model;
@@ -31,24 +33,34 @@ impl Module for Orders {
             .name("orders.follow_up")
             .get("/orders/{id}", show)
             .name("orders.show")
-            .patch("/orders/{id}", update)
-            .name("orders.update")
-            .post("/orders/reorder", reorder)
-            .name("orders.reorder")
-            .delete("/orders/{id}", destroy)
-            .name("orders.destroy")
-            .post("/orders/bulk/status/{status}", bulk_status)
-            .name("orders.bulk_status")
-            .post("/orders/bulk/delete", bulk_delete)
-            .name("orders.bulk_delete")
+            .merge(writes())
     }
+}
+
+/// Changing orders needs a login (the grids show their edit tools only
+/// then, see `orders_grid`).
+fn writes() -> Routes {
+    Routes::new()
+        .patch("/orders/{id}", update)
+        .name("orders.update")
+        .post("/orders/reorder", reorder)
+        .name("orders.reorder")
+        .delete("/orders/{id}", destroy)
+        .name("orders.destroy")
+        .post("/orders/bulk/status/{status}", bulk_status)
+        .name("orders.bulk_status")
+        .post("/orders/bulk/delete", bulk_delete)
+        .name("orders.bulk_delete")
+        .require_auth()
 }
 
 /// The orders grid: which columns, how they group and filter, which show
 /// on a phone (`mobile`), which stay put while scrolling (`frozen`), which
 /// can be edited in place, and the details under a row (`audit`).
-pub fn orders_grid() -> Grid {
-    Grid::new("orders")
+/// `can_edit` (a logged-in user) adds in-place editing, dragging rows into
+/// order and the bulk and delete actions.
+pub fn orders_grid(can_edit: bool) -> Grid {
+    let grid = Grid::new("orders")
         .title("Orders")
         .column(Column::number("position", "#").hidden())
         // `searchable`: the toolbar's search box looks in these.
@@ -161,7 +173,12 @@ pub fn orders_grid() -> Grid {
         .audit()
         // CSV, Excel and a print page of every filtered row (`export` below).
         .exports()
-        .edit_url("/orders/{id}")
+        // Each row's ⋯ menu.
+        .row_action(Action::link("Open", "/orders/{id}"));
+    if !can_edit {
+        return grid;
+    }
+    grid.edit_url("/orders/{id}")
         // Sorted by # (ascending), rows can be dragged into order.
         .reorder("position", "/orders/reorder")
         // Checkboxes, and these over the selected rows (or all matching).
@@ -172,8 +189,6 @@ pub fn orders_grid() -> Grid {
                 .confirm("Delete the selected orders? This can't be undone.")
                 .danger(),
         )
-        // Each row's ⋯ menu.
-        .row_action(Action::link("Open", "/orders/{id}"))
         .row_action(
             Action::new("Delete", "/orders/{id}")
                 .method("DELETE")
@@ -271,12 +286,13 @@ async fn follow_up(request: GridRequest) -> Result<View> {
     Ok(view("orders/follow_up.html", context! { unpaid, largest }))
 }
 
-async fn index(request: GridRequest) -> Result<Response> {
+async fn index(request: GridRequest, user: Option<AuthUser>) -> Result<Response> {
+    let grid = orders_grid(user.is_some());
     // `?export=csv|xlsx|print`: the file, not the page.
-    if let Some(file) = orders_grid().export(Order::query(), &request).await? {
+    if let Some(file) = grid.export(Order::query(), &request).await? {
         return Ok(file);
     }
-    let page = orders_grid()
+    let page = grid
         .page(Order::query(), &request)
         .await?
         // Values the template's custom cells read: where the trend went.
@@ -343,9 +359,18 @@ pub struct OrderEdit {
     pub paid: Option<bool>,
 }
 
+/// Whether an order in `status` is paid (`None`: it can be either).
+fn paid_for(status: &str) -> Option<bool> {
+    match status {
+        "paid" | "shipped" => Some(true),
+        "new" => Some(false),
+        _ => None,
+    }
+}
+
 async fn update(
     State(state): State<AppState>,
-    user: Option<AuthUser>,
+    user: AuthUser,
     Path(id): Path<i64>,
     Valid(edit): Valid<OrderEdit>,
 ) -> Result<Toast> {
@@ -354,6 +379,10 @@ async fn update(
         order.customer = v;
     }
     if let Some(v) = edit.status {
+        // Paid and shipped orders are paid; new ones aren't.
+        if let Some(paid) = paid_for(&v) {
+            order.paid = paid;
+        }
         order.status = v;
     }
     if let Some(mut v) = edit.tags {
@@ -375,7 +404,7 @@ async fn update(
     if let Some(v) = edit.paid {
         order.paid = v;
     }
-    order.updated_by = user.map_or_else(|| "Guest".to_owned(), |u| u.name.clone());
+    order.updated_by = user.name.clone();
     order.save(&state.db).await?;
     Ok(Toast::success(format!("{} saved.", order.number)))
 }
@@ -389,7 +418,7 @@ async fn destroy(State(state): State<AppState>, Path(id): Path<i64>) -> Result<T
 /// A bulk action: the selected orders, or all the filters match.
 async fn bulk_status(
     State(state): State<AppState>,
-    user: Option<AuthUser>,
+    user: AuthUser,
     Path(status): Path<String>,
     request: GridRequest,
     Form(selection): Form<Selection>,
@@ -397,11 +426,29 @@ async fn bulk_status(
     if !STATUSES.iter().any(|(s, _)| *s == status) {
         return Err(Error::NotFound);
     }
-    let by = user.map_or_else(|| "Guest".to_owned(), |u| u.name.clone());
-    let changed = orders_grid()
-        .selected(Order::query(), &request, &selection)?
-        .update(&state.db, &[("status", &status), ("updated_by", &by)])
-        .await?;
+    let selected = orders_grid(true).selected(Order::query(), &request, &selection)?;
+    let changed = match paid_for(&status) {
+        Some(paid) => {
+            selected
+                .update(
+                    &state.db,
+                    &[
+                        ("status", &status),
+                        ("paid", &paid),
+                        ("updated_by", &user.name),
+                    ],
+                )
+                .await?
+        }
+        None => {
+            selected
+                .update(
+                    &state.db,
+                    &[("status", &status), ("updated_by", &user.name)],
+                )
+                .await?
+        }
+    };
     Ok(Toast::success(format!("{changed} orders marked {status}.")))
 }
 
@@ -410,7 +457,7 @@ async fn bulk_delete(
     request: GridRequest,
     Form(selection): Form<Selection>,
 ) -> Result<Toast> {
-    let deleted = orders_grid()
+    let deleted = orders_grid(true)
         .selected(Order::query(), &request, &selection)?
         .delete(&state.db)
         .await?;

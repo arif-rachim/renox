@@ -1,4 +1,4 @@
 Thank you for your order!
 
-{{ order.item }}: Rp {{ order.total }}
+{{ order.item }}: {{ order.total | money }}
 Order #{{ order.id }}

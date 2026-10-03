@@ -541,7 +541,10 @@ async fn every_team_has_a_public_page_on_its_own_host() {
         .assert_view("teams/public.html")
         .assert_see("<h1 class=\"rx-title\">Acme</h1>")
         .assert_see("1 member · 2 projects")
-        .assert_dont_see("Rocket skates");
+        .assert_dont_see("Rocket skates")
+        // Links back to the app are absolute: this host has only this page.
+        .assert_see(r#"href="http://127.0.0.1:3000/login""#)
+        .assert_dont_see(r#"href="/login""#);
     on("globex.localhost", "/")
         .await
         .assert_see("1 member · 1 project");
@@ -554,4 +557,24 @@ async fn every_team_has_a_public_page_on_its_own_host() {
     // A second team with the same name gets its own host.
     let clone = Team::found(w.app.db(), "Acme", &w.bob).await.unwrap();
     assert_eq!(clone.slug, "acme-2");
+}
+
+#[renox::test]
+async fn the_seeder_fills_the_app_and_can_run_again() {
+    let app = TestApp::new(teams::app()).await;
+    app.kernel().seed().await.unwrap();
+    let seeded = renox::db::sql("SELECT COUNT(*) FROM users")
+        .scalar::<i64>(app.db())
+        .await
+        .unwrap();
+    assert!(seeded > 0);
+    // A second `db:seed` leaves a seeded database as it is.
+    app.kernel().seed().await.unwrap();
+    assert_eq!(
+        renox::db::sql("SELECT COUNT(*) FROM users")
+            .scalar::<i64>(app.db())
+            .await
+            .unwrap(),
+        seeded
+    );
 }

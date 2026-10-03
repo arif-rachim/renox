@@ -1,13 +1,17 @@
-//! Made with `rnx make:module products` and `rnx make:model Product --module products -m`.
+//! Made with `rnx make:module products`, then
+//! `rnx make:model Product --module products -m --key uuid` (a `Uuid` key and
+//! its migration) and `rnx make:migration add_tags_and_specs_to_products`.
 //! Each field shows one pairing of HTML input, Rust type and column type.
 
+use renox::Toast;
 use renox::chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use renox::db::Json;
 use renox::prelude::*;
 use renox::uuid::Uuid;
 use serde::{Deserialize, Serialize};
 
-/// A `<select>`, stored as text (`small`, `medium`, `large`).
+/// One choice of a few: the kit's `radio` group, stored as text (`small`,
+/// `medium`, `large`).
 #[derive(DbEnum, Debug, Clone, Copy, PartialEq, Default)]
 pub enum Size {
     Small,
@@ -35,7 +39,8 @@ pub struct Product {
     pub colors: Json<Vec<String>>,
     /// Free tags: a JSON list, like `colors`, typed instead of picked.
     pub tags: Json<Vec<String>>,
-    /// Pairs typed by the user ("Origin": "Aceh"): a JSON object.
+    /// Pairs typed by the user ("Origin": "Aceh"): `KeyValues`, stored as a
+    /// JSON list of `[key, value]` pairs, so their order holds.
     pub specs: Json<KeyValues>,
     pub opens_at: Option<NaiveTime>,
     pub launch_at: Option<NaiveDateTime>,
@@ -52,7 +57,7 @@ struct ProductForm {
     weight_kg: f64,              // <input type="number" step="0.01">
     price: i64,                  // <input type="number" step="1">
     available: bool,             // <input type="checkbox">: "on", or nothing → false
-    size: Size,                  // radio buttons, or a <select>
+    size: Size,                  // the kit's radio group: one value of the enum
     #[serde(default)]
     colors: Vec<String>, // <select multiple> or checkboxes named "colors"
     opens_at: Option<NaiveTime>, // <input type="time">
@@ -124,6 +129,8 @@ impl Module for Products {
             .name("products.edit")
             .put("/products/{id}", update)
             .name("products.update")
+            .delete("/products/{id}", destroy)
+            .name("products.destroy")
     }
 }
 
@@ -143,11 +150,15 @@ async fn create() -> View {
     form_view(None)
 }
 
-async fn store(State(db): State<Db>, Valid(form): Valid<ProductForm>) -> Result<Redirect> {
+async fn store(State(db): State<Db>, Valid(form): Valid<ProductForm>) -> Result<(Toast, Redirect)> {
     let mut product = Product::default(); // the nil UUID: not saved yet
     form.apply(&mut product);
     let product = Product::create(&db, product).await?;
-    Ok(Redirect::to(&format!("/products/{}/edit", product.id)))
+    // The toast is shown on the next page (or at once for an htmx request).
+    Ok((
+        Toast::success("Product created."),
+        Redirect::route("products.edit", &[&product.id])?,
+    ))
 }
 
 /// The product read-only, on the kit's infolist.
@@ -162,13 +173,24 @@ async fn edit(State(db): State<Db>, Path(id): Path<Uuid>) -> Result<View> {
 
 async fn update(
     State(db): State<Db>,
-    session: Session,
     Path(id): Path<Uuid>,
     Valid(form): Valid<ProductForm>,
-) -> Result<Redirect> {
+) -> Result<(Toast, Redirect)> {
     let mut product = Product::find_or_404(&db, id).await?;
     form.apply(&mut product);
     product.save(&db).await?;
-    session.flash("status", "Saved.")?;
-    Ok(Redirect::to(&format!("/products/{id}/edit")))
+    Ok((
+        Toast::success("Saved."),
+        Redirect::route("products.edit", &[&id])?,
+    ))
+}
+
+/// The index page's Delete, behind the kit's `confirm` sheet.
+async fn destroy(State(db): State<Db>, Path(id): Path<Uuid>) -> Result<(Toast, Redirect)> {
+    let mut product = Product::find_or_404(&db, id).await?;
+    product.delete(&db).await?; // no soft deletes here: the row goes
+    Ok((
+        Toast::success(format!("“{}” deleted.", product.name)),
+        Redirect::route("home", &[])?,
+    ))
 }
