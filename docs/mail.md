@@ -413,7 +413,7 @@ More in [testing.md](testing.md) ("Jobs, events, notifications, mail, HTTP").
 | `Mail::to()->cc()->bcc()`, `replyTo`, `from`, `attach` | `Mail` builder: `also_to`, `cc`, `bcc`, `reply_to`, `from`, `attach` |
 | `Mail::send` / `Mail::queue` | `state.mailer.send(mail)` / `state.queue_mail(mail)` |
 | Markdown mail components (`x-mail::button`, `panel`, `table`) | `renox/mail/components.html`: `button`, `panel`, `table`, `divider` |
-| `Mail::to($u)->locale('id')` | `state.mail_view_in("id", …)` |
+| `Mail::to($u)->locale('es')` | `state.mail_view_in("es", …)` |
 | `php artisan make:mail` | `rnx make:mail` (templates only) |
 | Mail preview packages, Mailpit | `/_renox/mail` (debug) |
 | `Notification` with `via()` | `Notification` with `channels()` / `channels_for()` |

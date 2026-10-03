@@ -36,7 +36,7 @@ my-app/
 ├── migrations/
 ├── resources/
 │   ├── views/              # layouts/, components/, products/
-│   └── lang/               # en.json, id.json
+│   └── lang/               # en.json, es.json (other locales)
 ├── public/
 ├── storage/                # app.db, uploads/, logs/
 └── tests/
@@ -277,7 +277,7 @@ examples, and the gaps they exposed) and M10d (doctests on public APIs).
   - [x] `examples/webhooks`: payment gateway webhooks (M11b)
 - [x] Short files, no decorative code, comments only where something isn't obvious; the official way
       only (when there are two ways, show the main one)
-- [x] Each example names the generator commands that made its files (`rnx make:model Produk`, …),
+- [x] Each example names the generator commands that made its files (`rnx make:model Product`, …),
       so agents know not to type the boilerplate
 - [x] `CHEATSHEET.md`: one page of the most common patterns (commands, app/module/routes, views,
       forms + validation, model + migration + queries, pagination, auth/policies/gates, HTMX, raw
@@ -1493,6 +1493,28 @@ Notes from M31:
   port), so a check that visits several examples has to log in again before each app's
   pages.
 
+### M32 · English only
+The owner asked for the whole repository in English (discussion with the owner stays in
+Indonesian), including dropping the built-in Indonesian locale; Spanish replaces it where an
+example shows a second language.
+- [x] Framework: `id` texts removed from `i18n.rs`, `validation/messages.rs` (`Locale::Id`)
+      and `auth/module.rs`; doc examples and unit tests in English
+- [x] CLI: no `id.json` stub; generators' help and tests in English (`make:rule TaxId`)
+- [x] Tests: a Spanish fixture (`crates/renox/tests/lang/es.json`) for translated kit,
+      auth and validation texts, plurals and `detect_locale`; fixture tables `products` and
+      `notes`
+- [x] Examples: English seed data, names, pages, mails and tests; hello and shop in
+      English and Spanish
+- [x] Docs: README, CHEATSHEET, llms.txt, docs/*.md, stubs, CLAUDE.md
+
+Notes from M32:
+- Kept on purpose: IDR/"Rp", `Asia/Jakarta`, Indonesian place names and phone numbers, and
+  the `id` row of the number-separator table in `view_filters.rs` (formatting data).
+- Spanish uses "." for thousands like Indonesian did, so the shop's prices read the same
+  ("Rp 25.000") in both locales.
+- Older milestone notes above still say "English and Indonesian": they record what was
+  true then.
+
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`
       (resource tables and forms); billing later
@@ -1700,8 +1722,10 @@ Notes:
 - **Storage:** the local disk is Renox's own code; S3 is an opt-in `s3` feature because object_store's
   AWS support pulls in reqwest and aws-lc-rs, which most apps on one server don't need.
 - **i18n:** plain JSON files, loaded into memory at boot and reloaded in debug. Renox's own texts
-  stay in code for en/id (so apps work without lang files) but every one of them can be overridden
-  by key, which is also how other languages are added.
+  stay in code in English (so apps work without lang files) but every one of them can be overridden
+  by key, which is also how other languages are added. Until M32 Indonesian was built in too; it
+  was dropped when the owner made the whole repo English (examples use Spanish as the second
+  language).
 - **Live reload polls file times** (500 ms) instead of using a watcher, avoiding the watcher-event
   pitfalls `rnx serve` hit, and is only compiled into responses when `APP_ENV=local` with debug on.
 - **HTMX validation errors:** returned as 422 JSON and placed by the bundled script, rather than

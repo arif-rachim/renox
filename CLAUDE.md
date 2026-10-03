@@ -19,8 +19,11 @@ repo, and every trap hit so far, so you don't have to rediscover them.
   events, mail, notifications, cache, storage, i18n, webhooks, SEO and analytics.
 - **Apps depend on Renox; framework code is never copied into apps.** Upgrading is a version bump.
   This is a hard requirement from the owner.
-- **The owner** is a solo founder, fluent in Rust, who reviews in Indonesian. Write code, comments,
-  docs, commit messages and PRs in English.
+- **The owner** is a solo founder, fluent in Rust, who discusses and reviews in Indonesian. Everything
+  in the repo is English: code, comments, docs, example content (seed data, names, pages,
+  mails), tests, commit messages and PRs. No Indonesian anywhere, and no built-in Indonesian
+  locale (M32): Renox ships English texts; an example that needs a second language uses
+  Spanish (hello, shop). Currency (`IDR`, "Rp") is not language and may stay.
 - **Open source**, `MIT OR Apache-2.0`. Repo: https://github.com/arif-rachim/renox (default branch
   `main`). crates.io: `renox` and `renox-cli` have placeholder `0.0.1` releases (to reserve the
   names). `renox-core` and `renox-macros` are not published yet. Until real releases, `rnx new`
@@ -112,7 +115,7 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/path.rs              renox::Path: axum's Path with a 404 (not 400) when a value won't parse
                            (a parameter the route lacks is a 500)
   src/validation/          Validator/rules (mod.rs, ValidateHooks for the derive), Valid<T>
-                           (extract.rs: prepare → authorize → rules → after, FormContext), en/id
+                           (extract.rs: prepare → authorize → rules → after, FormContext), English
                            messages, nested.rs (form names like `lines[0][qty]` read as a
                            tree), key_values.rs (KeyValues)
   src/auth/                User, hashing (Argon2id + bcrypt import), login/logout (per device),
@@ -349,7 +352,7 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
   apps don't need sqlx directly. The primary key column is always `id`; its type is the key
   (`Model::Key`, sealed `ModelKey`: `i64`, `Ulid`, `Uuid`, `String`, M22); an empty key (`0`,
   nil, `""`) = unsaved, ULIDs/UUID v7s are made on insert. Table name =
-  snake_case struct name (no pluralisation; Indonesian names don't pluralise with "s"). The query
+  snake_case struct name (no pluralisation: not every language plurals with "s"). The query
   builder validates column names against `COLUMNS` and operators against a whitelist, so SQL
   injection via names is an error.
 - **Relations are explicit loaders, no lazy relations** (`db::relations`: `belongs_to`,
@@ -458,10 +461,9 @@ a closure borrowing `req` alive across `next.run(req).await` (scope it in a bloc
   missing keys).
 - Template context: `merge_maps([shared, view ctx, globals])`; the **last** map wins (shared
   values, then the handler's, then Renox's globals).
-- Auth pages/mails take a `text` object from `auth/module.rs::texts(&lang)`: the built-in en/id
-  dictionary with the app's `renox.auth.*` translations on top. Add new keys to **both** built-in
-  locales. Auth handlers take a `Lang` extractor (background code uses
-  `Lang::of(state, &state.config.locale)`).
+- Auth pages/mails take a `text` object from `auth/module.rs::texts(&lang)`: the built-in
+  English dictionary with the app's `renox.auth.*` translations on top. Auth handlers take a
+  `Lang` extractor (background code uses `Lang::of(state, &state.config.locale)`).
 - Validation messages live in `validation/messages.rs` (keys like `required`, `min.string`,
   `max.file`, `auth.failed`); apps override them with `renox.validation.<key>` and name fields with
   `renox.validation.attributes.<field>` (`messages::template_for`). Built-in labels for Renox's own
@@ -628,7 +630,7 @@ PostgreSQL suite 2.5x slower (reconnects).
 
 ### 4.11 Git, PRs, CI (how the owner works)
 - One branch and one PR per milestone or fix (branch names like `m17b-examples`, `fix-…`). The
-  owner reviews and **merges PRs themselves**, then says "Done"/"lanjut". Don't merge unless asked.
+  owner reviews and **merges PRs themselves**, then says so ("Done"). Don't merge unless asked.
 - Before starting, check open PRs (`gh pr list -R arif-rachim/renox`) and base new branches on an
   up-to-date `main`. **Don't stack PRs** on unmerged branches (§6.3): push the next branch, but open
   its PR only after the previous one is merged.
@@ -672,7 +674,7 @@ Parsed in `crates/renox-core/src/config.rs`; defaults in parentheses.
 - **App:** `APP_NAME` (Renox), `APP_ENV` (local; accepts local|dev|development,
   testing|test, production|prod; anything else fails at boot), `APP_DEBUG` (on in local),
   `APP_URL`, `APP_KEY` (required in production; `base64:…`, `rnx key:generate`), `APP_HOST`
-  (127.0.0.1, an IP), `APP_PORT` (3000), `APP_LOCALE` (en; built-ins for en|id),
+  (127.0.0.1, an IP), `APP_PORT` (3000), `APP_LOCALE` (en; English is built in, other locales come from the app's `lang/*.json`),
   `APP_FALLBACK_LOCALE` (en), `APP_CURRENCY` (IDR; the `money` filter), `APP_TIMEZONE` (`UTC`, an offset like `+07:00`, or an IANA name like
   `Asia/Jakarta`, with DST).
 - **Paths:** `VIEWS_PATH` (resources/views), `LANG_PATH` (resources/lang), `PUBLIC_PATH`
@@ -751,9 +753,9 @@ opening #5 with the same commit to `main`. Lesson: don't stack; if you must, ret
   A blank number then becomes "required", a wrong type "must be a number".
 - Focus went to the alphabetically first field (errors are a `BTreeMap`); now the first
   `[aria-invalid]` in DOM order.
-- Indonesian message said "Password minimal 8 karakter" while the page said "Kata sandi" →
-  localised labels in auth forms.
-- Reset-password mail button reused the page's "Simpan kata sandi" label → uses the subject.
+- A translated validation message named the field differently from the translated page label
+  → localised labels in auth forms.
+- The reset-password mail button reused the page's save-button label → uses the subject.
 - A scripted edit meant to add `.image()` to the guestbook's photo rule silently didn't apply, so a
   text file named `.png` was accepted. All framework tests passed; only the headless-Chrome upload
   check showed it. Keep browser checks for UI features.
@@ -1010,7 +1012,10 @@ picks the build, not the terminal.
   use kit components only; `public/app.css` holds brand tokens and what is truly the app's.
 - **M31** (the warm default theme and the `--rx-type-*` type scale, chosen by the owner after
   screenshot comparisons; Inter and Poppins bundled in assets/fonts and served from
-  `/_renox/fonts`; `data-rx-theme="classic"` for the old look): branch `m31-warm-theme`.
+  `/_renox/fonts`; `data-rx-theme="classic"` for the old look): merged (#107).
+- **M32** (English only, asked by the owner: no Indonesian anywhere in the repo, the built-in
+  `id` locale dropped, Spanish as the examples' second language; framework tests use
+  `crates/renox/tests/lang/es.json`): branch `m32-english`.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.
