@@ -990,7 +990,7 @@ picks the build, not the terminal.
   fields/webhooks/uploads on the kit, current patterns): merged (#101). M29b
   (`examples/backoffice`: invoices with a stock ledger, Midtrans/Xendit payment pages and
   webhooks, CSV import, exports from a job with the grid's filters, roles, activity log,
-  settings, branded sign-in): branch `m29b-backoffice`. M29c (smaller extensions) follows.
+  settings, branded sign-in): merged (#102). M29c (smaller extensions) follows.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.
