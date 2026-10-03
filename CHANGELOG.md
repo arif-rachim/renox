@@ -10,6 +10,12 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- README: install from crates.io, the first steps after `rnx new`, and how to use Renox with
+  Claude Code or another coding agent (the `AGENTS.md`/`CLAUDE.md` every new app has, and a
+  snippet for other projects). The crates.io and docs.rs badges.
+- The docs site: search results styled as the list they are; an empty favicon (no 404 in
+  the console).
+
 ## 1.0.0-rc.1 · 2026-10-03
 
 The first release on crates.io, a release candidate for 1.0.0: `renox`, `renox-core`,

@@ -144,7 +144,9 @@
 .site-edit { font: var(--rx-type-note); margin-top: 1.5rem; }
 
 /* Search results. */
-.site-hit { display: flex; flex-direction: column; gap: 0.25rem; }
+.site-hit { display: flex; flex-direction: column; gap: 0.25rem; color: inherit; text-decoration: none; }
+.site-hit strong { color: var(--rx-accent); }
+.site-hit:hover strong, .site-hit:focus-visible strong { text-decoration: underline; }
 .site-hit__snippet { font: var(--rx-type-note); color: var(--rx-secondary-label); }
 
 /* The home page. */

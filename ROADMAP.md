@@ -1595,9 +1595,14 @@ Started by the owner on 2026-10-03, after M34. In steps, one PR each:
       `users:admin`, seeder, tests; in tests/cli/run.sh), and the semver promise in
       docs/stability.md ("The promise": deprecation policy, data compatibility across 1.x,
       support window for the previous minor, MSRV rule) with SECURITY.md's supported versions
-- [ ] `1.0.0-rc.1`: the version set and the changelog dated (branch `release-1.0.0-rc.1`);
-      published once the owner confirms, then checked (docs.rs, `cargo install renox-cli`,
-      `rnx new demo` from crates.io)
+- [x] `1.0.0-rc.1`: the version set and the changelog dated (#122), published on
+      2026-10-03 after the owner confirmed, tag `v1.0.0-rc.1`; checked: docs.rs built,
+      `cargo install renox-cli --version 1.0.0-rc.1`, `rnx new` (plain and `--starter`) pass
+      their tests against the published crates
+- [x] The README's quick start from crates.io and its "Use Renox with Claude Code" section
+- [ ] The docs site online on the owner's server, at Renox's own domain (GitHub Pages was
+      tried and dropped: the account maps project sites to a personal domain)
+- [ ] 1.0.0
 - [ ] Real crates published to crates.io (`renox`, `renox-core`, `renox-macros`, `renox-cli`;
       only 0.0.1 placeholders exist before the release candidate; the owner runs `cargo login` and RELEASING.md), then
       crates.io/docs.rs badges and `cargo install renox-cli` in the README
