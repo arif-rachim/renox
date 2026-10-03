@@ -19,9 +19,12 @@
 
   <section class="site-quick" aria-labelledby="quick-start">
     <h2 class="rx-card__title" id="quick-start">Quick start</h2>
-    <pre><code class="language-bash">cargo install --locked --git https://github.com/arif-rachim/renox renox-cli
-rnx new blog &amp;&amp; cd blog
-rnx serve        # http://127.0.0.1:3000</code></pre>
+    <pre><code class="language-bash">cargo install renox-cli --version 1.0.0-rc.1   # installs `rnx`
+rnx new blog &amp;&amp; cd blog                          # or: --starter, --database postgres, --tailwind
+rnx serve                                        # http://127.0.0.1:3000</code></pre>
+    <p class="rx-subtitle">Using Claude Code or another coding agent? Every new app has an
+      <code>AGENTS.md</code> and a <code>CLAUDE.md</code> that tell it how Renox works; see
+      <a href="{{ route('docs.show', 'overview') }}#use-renox-with-claude-code-or-another-coding-agent">the overview</a>.</p>
   </section>
 
   <section aria-labelledby="explore">

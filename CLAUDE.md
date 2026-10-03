@@ -255,7 +255,9 @@ site/                      the documentation site (package `renox-site`, publish
                            pages, src/render.rs: pulldown-cmark, anchors, TOC, hidden doctest
                            lines, links → /docs/{slug} or GitHub), search, sitemap, ETags;
                            deploy/ has its systemd units. A new guide in docs/ needs a line in
-                           content.rs PAGES (and site/build.rs already watches docs/)
+                           content.rs PAGES (and site/build.rs already watches docs/).
+                           The owner hosts it on their own server (not GitHub Pages: the
+                           account's user site maps project sites to a personal domain)
 tests/chaos/               app + run.sh (postgres|sqlite) that the `chaos` CI job injects faults
                            into (docker pause/stop/restart, python3 holding SQLite's lock)
 tests/cli/run.sh           `rnx new` + every `make:*`, then build and test the app (CI `cli`/`docker`)
@@ -626,8 +628,10 @@ PostgreSQL suite 2.5x slower (reconnects).
 ### 4.10 Docs and examples for app authors and agents
 - `README.md` is compiled (`ReadMe`): keep its Rust blocks complete. It's the front page, so it
   sells: tagline, why, GIF, 3-line quick start, a short taste, fold-out feature tour, comparison
-  with Loco/Axum, then status. Keep claims true (checked against the code) and keep the
-  crates.io/docs.rs badges out until real crates are published (install stays `--git`).
+  with Loco/Axum, then status. Keep claims true (checked against the code). Since
+  1.0.0-rc.1 it has the crates.io/docs.rs badges, installs from crates.io (`--version` while
+  1.0 is a release candidate) and has a "Use Renox with Claude Code" section. Its docs links
+  are repository files until the docs site has its own address; then point them there.
 - `CHEATSHEET.md` is compiled: every ```rust block must build on its own (visible `use` lines, no
   `# ` hidden lines since GitHub shows them; define items only, no top-level statements, so the
   doctest's `main` does nothing). Check with `cargo test --doc -p renox`.
@@ -1077,9 +1081,14 @@ picks the build, not the terminal.
   `retry`/`retry_all`, secrets hidden from `Debug`): merged (#118). V1d (the docs site `site/`, docs/tutorial.md,
   docs/laravel.md; the owner hosts it on their own server): merged (#120). V1e
   (`rnx new --starter`, the 1.x promise in docs/stability.md): merged (#121). Then the release
-  candidate: version `1.0.0-rc.1` (branch `release-1.0.0-rc.1`), published by the owner's
-  `cargo login` token with each `cargo publish` confirmed by the owner; after it checks out,
-  1.0.0, the badges and `cargo install renox-cli` in the docs.
+  candidate `1.0.0-rc.1`: merged (#122), published to crates.io on 2026-10-03 with the
+  owner's `cargo login` token after the owner confirmed (tag `v1.0.0-rc.1`; docs.rs built,
+  `cargo install renox-cli --version 1.0.0-rc.1` + `rnx new` checked). Then the README's
+  start and coding-agent sections: branch `readme-start-and-agents`. GitHub Pages was tried and dropped
+  (the owner's account serves project sites on a personal domain): the docs site runs on the
+  owner's own server, built with Renox, once they have a domain (renox.rs was free on
+  2026-10-03; renox.dev is taken).
+  Left: 1.0.0 when the owner is happy with the rc (ask before every `cargo publish`).
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). 
