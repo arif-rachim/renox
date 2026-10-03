@@ -17,7 +17,7 @@
 //!
 //!     fn to_mail(&self, to: &Recipient, state: &AppState) -> Result<Mail> {
 //!         let email = to.email().unwrap_or_default();
-//!         state.mail_view(&email, "Pesanan dikirim", "mail/shipped", context! { id => self.order_id })
+//!         state.mail_view(&email, "Your order has shipped", "mail/shipped", context! { id => self.order_id })
 //!     }
 //!
 //!     // What the in-app list (the UI kit's `notification_bell`) shows.
@@ -30,7 +30,7 @@
 //!     }
 //!
 //!     fn to_channel(&self, _channel: &str, _: &Recipient) -> Result<renox::serde_json::Value> {
-//!         Ok(json!({ "text": format!("Pesanan #{} sudah dikirim", self.order_id) }))
+//!         Ok(json!({ "text": format!("Order #{} has shipped", self.order_id) }))
 //!     }
 //! }
 //!
@@ -38,7 +38,7 @@
 //! state.notify(&user, &OrderShipped { order_id }).await?;          // now
 //! state.notify_later(&user, &OrderShipped { order_id }).await?;    // through the queue
 //! // Someone without an account:
-//! let guest = Recipient::to("mail", "tamu@example.com").and("whatsapp", "+6281234567890");
+//! let guest = Recipient::to("mail", "guest@example.com").and("whatsapp", "+6281234567890");
 //! state.notify_to(&guest, &OrderShipped { order_id }).await?;
 //! let unread = user.unread_notifications(&db).await?;
 //! # let _ = unread; Ok(()) }
@@ -131,7 +131,7 @@ impl Recipient {
         self.address("mail")
     }
 
-    /// Writes to this recipient in `locale` (e.g. `"id"`).
+    /// Writes to this recipient in `locale` (e.g. `"es"`).
     pub fn in_locale(mut self, locale: impl Into<String>) -> Self {
         self.language = Some(locale.into());
         self

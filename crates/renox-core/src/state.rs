@@ -121,7 +121,7 @@ impl Fakes {
 }
 
 impl AppState {
-    /// The URL path of a named route, e.g. `state.url("produk.show", &[&id])`.
+    /// The URL path of a named route, e.g. `state.url("products.show", &[&id])`.
     pub fn url(&self, name: &str, params: &[&dyn Display]) -> Result<String> {
         Ok(self.routes.url(name, params)?)
     }

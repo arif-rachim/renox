@@ -235,7 +235,8 @@ On the validator itself:
   of an order sent as JSON, or a form's rows named `lines[0][quantity]`); errors are keyed
   `lines.0.quantity` and labelled by the item's own field ("The quantity field is required.").
 - `v.error(field, message)`: an error no rule covers.
-- `v.locale()`: the request's language (`Locale::En` or `Locale::Id`), e.g. to pick a label.
+- `v.locale()`: the language of the built-in messages (`Locale::En`; other languages come from
+  the app's lang files).
 
 Values a rule can check implement `FieldValue`: `String`, `&str`, the integer and float types,
 `bool`, `NaiveDate`, `NaiveDateTime`, `DateTime<Utc>`, `Upload`, and `Option<T>` / `Vec<T>` of
@@ -324,30 +325,30 @@ fn rules(&self, v: &mut Validator) {
 # }
 ```
 
-A rule used by several forms implements `Rule`; `rnx make:rule Npwp --module invoices` writes
+A rule used by several forms implements `Rule`; `rnx make:rule TaxId --module invoices` writes
 one. Its message may use `:attribute` (the field's label). It is skipped for missing values:
 
 ```rust
 use renox::prelude::*;
 use renox::validation::{Inspected, Rule};
 
-/// An Indonesian tax number: 15 or 16 digits.
-struct Npwp;
+/// A tax ID: 15 or 16 digits.
+struct TaxId;
 
-impl Rule for Npwp {
+impl Rule for TaxId {
     fn check(&self, value: &Inspected) -> std::result::Result<(), String> {
         let Inspected::Text(text) = value else { return Ok(()) };
         match text.chars().filter(char::is_ascii_digit).count() {
             15 | 16 => Ok(()),
-            _ => Err("The :attribute must be a valid NPWP.".into()),
+            _ => Err("The :attribute must be a valid tax ID.".into()),
         }
     }
 }
 
-# struct Form { npwp: String }
+# struct Form { tax_id: String }
 # impl Validate for Form {
 fn rules(&self, v: &mut Validator) {
-    v.field("npwp", &self.npwp).required().apply(&Npwp);
+    v.field("tax_id", &self.tax_id).required().apply(&TaxId);
 }
 # }
 ```
@@ -464,7 +465,7 @@ struct ProductForm {
 }
 
 impl ValidateHooks for ProductForm {
-    /// "  Kopi   Susu " is checked and saved as "Kopi Susu".
+    /// "  Iced   Coffee " is checked and saved as "Iced Coffee".
     fn prepare(&mut self) {
         self.name = self.name.split_whitespace().collect::<Vec<_>>().join(" ");
     }
@@ -488,7 +489,7 @@ smooths that over:
 - **Lists:** a multi-select or checkbox group repeats its name. Declare the field as `Vec<T>`
   with `#[serde(default)]`, so that nothing chosen is an empty list. A name ending in `[]`
   (`tags[]`) is a list even when sent once, so it never fills a text field.
-- **Rows:** `lines[0][name]=Kopi&lines[0][qty]=2&lines[1][name]=Teh…` reads into
+- **Rows:** `lines[0][name]=Coffee&lines[0][qty]=2&lines[1][name]=Tea…` reads into
   `lines: Vec<Line>`; `meta[0][key]`/`meta[0][value]` into a `renox::KeyValues` (ordered pairs,
   rows without a key skipped). Empty values stay, so rows keep their numbers and their errors
   (`lines.1.name`); an `Option` reads "" as `None`. `error()` and `old()` in templates take
@@ -506,8 +507,9 @@ Type-by-type mappings (HTML input, Rust type, SQLite and PostgreSQL column) are 
 ## Messages and translations
 
 Messages come in the request's language (the session's locale, `Accept-Language` with
-`App::detect_locale`, else `APP_LOCALE`). English (`en`) and Indonesian (`id`) are built in;
-other languages fall back to English unless the app translates them.
+`App::detect_locale`, else `APP_LOCALE`). Renox ships English messages; for another language
+the app translates them in its own lang file (e.g. `resources/lang/es.json`), and anything it
+leaves out stays English.
 
 A message template uses `:attribute` (the field's label), `:Attribute` (the same, capitalized)
 and the rule's parameters (`:min`, `:max`, `:size`, `:digits`, `:date`, `:values`, `:other`).
@@ -518,9 +520,9 @@ The app overrides any built-in message under `renox.validation.<key>` and names 
 {
   "renox": {
     "validation": {
-      "required": ":Attribute harus diisi.",
-      "min.string": ":Attribute paling sedikit :min huruf.",
-      "attributes": { "name": "nama", "message": "pesan", "photo": "foto" }
+      "required": "El campo :attribute es obligatorio.",
+      "min.string": ":Attribute debe tener al menos :min caracteres.",
+      "attributes": { "name": "nombre", "message": "mensaje", "photo": "foto" }
     }
   }
 }
@@ -662,11 +664,11 @@ async fn invalid_products_are_refused() {
         .await
         .assert_invalid("name")
         .assert_invalid("price");
-    app.post_json("/products", &json!({ "name": "Kopi", "price": -1 }))
+    app.post_json("/products", &json!({ "name": "Coffee", "price": -1 }))
         .await
         .assert_invalid("price");
     app.post("/products", &[("name", ""), ("price", "1")]).await.assert_status(303);
-    app.post("/products", &[("name", "Kopi"), ("price", "9000")])
+    app.post("/products", &[("name", "Coffee"), ("price", "9000")])
         .await
         .assert_redirect("/products");
 }

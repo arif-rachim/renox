@@ -20,7 +20,7 @@ impl Module for Pages {
         Routes::new()
             .get("/session/put", |s: Session| async move {
                 s.put("cart", 3).unwrap();
-                s.put("coupon", "HEMAT").unwrap();
+                s.put("coupon", "SAVE10").unwrap();
                 s.flash("status", "Saved.").unwrap();
                 "put"
             })
@@ -92,7 +92,7 @@ async fn session_helpers() {
 
     app.get("/session/pull")
         .await
-        .assert_see("pulled=Some(\"HEMAT\") removed=Some(Number(3)) again=None");
+        .assert_see("pulled=Some(\"SAVE10\") removed=Some(Number(3)) again=None");
     app.get("/session/read")
         .await
         .assert_see("cart=None has_coupon=false");
@@ -151,7 +151,7 @@ async fn custom_rules_and_raw_sql_variants() {
     // Plain SQL on both databases: no auto-increment, BIGINT for i64 binds.
     let values = vec![
         renox::db::DbValue::Integer(1),
-        renox::db::DbValue::Text("kopi".into()),
+        renox::db::DbValue::Text("coffee".into()),
         renox::db::DbValue::Integer(5),
     ];
     renox::db::sql("INSERT INTO notes (id, body, stars) VALUES (?, ?, ?)")
@@ -165,7 +165,7 @@ async fn custom_rules_and_raw_sql_variants() {
         .await
         .unwrap()
         .map(|row| row.try_get::<String>("body").unwrap());
-    assert_eq!(found.as_deref(), Some("kopi"));
+    assert_eq!(found.as_deref(), Some("coffee"));
     let none = renox::db::sql("SELECT body FROM notes WHERE stars = ?")
         .bind(1)
         .fetch_optional(db)

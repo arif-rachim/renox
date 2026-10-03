@@ -24,7 +24,7 @@ The same code runs on S3 or any store that speaks its API (Cloudflare R2, Digita
 Spaces, MinIO, SeaweedFS). The example's `s3` feature turns on renox's:
 
 ```bash
-STORAGE_DISK=s3 S3_BUCKET=toko-uploads S3_REGION=ap-southeast-1 \
+STORAGE_DISK=s3 S3_BUCKET=shop-uploads S3_REGION=ap-southeast-1 \
   S3_ACCESS_KEY_ID=… S3_SECRET_ACCESS_KEY=… STORAGE_URL=https://cdn.example.com \
   cargo run --features s3
 ```

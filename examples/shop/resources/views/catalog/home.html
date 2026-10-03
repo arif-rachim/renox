@@ -5,7 +5,7 @@
 {% block content %}
 {% from "renox/ui.html" import link_button, empty, page_header, card_grid %}
 {{ page_header(t('home.title'), subtitle=t('home.description')) }}
-{# route() with named arguments adds them as the query string: /products?category=kopi #}
+{# route() with named arguments adds them as the query string: /products?category=coffee #}
 <nav class="rx-row" aria-label="{{ t('products.all_categories') }}">
   {% for category in categories %}
   {{ link_button(route('products.index', category=category.slug), category.name, size="small") }}

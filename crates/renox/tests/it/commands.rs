@@ -135,14 +135,14 @@ async fn database_errors_say_what_went_wrong() {
     Note::create(
         db,
         Note {
-            title: "Kopi".into(),
+            title: "Coffee".into(),
             ..Default::default()
         },
     )
     .await
     .unwrap();
 
-    let duplicate = renox::db::sql("INSERT INTO notes (title) VALUES ('Kopi')")
+    let duplicate = renox::db::sql("INSERT INTO notes (title) VALUES ('Coffee')")
         .execute(db)
         .await
         .unwrap_err();
@@ -183,7 +183,7 @@ async fn json_columns_round_trip() {
     let mut note = Note::create(
         db,
         Note {
-            title: "Teh".into(),
+            title: "Tea".into(),
             meta: Json(Meta {
                 pinned: true,
                 tags: vec!["daily".into()],

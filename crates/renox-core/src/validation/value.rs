@@ -192,16 +192,19 @@ mod tests {
     #[test]
     fn a_text_file_named_png_is_not_an_image() {
         let fake = Some(Upload {
-            file_name: "palsu.png".into(),
+            file_name: "fake.png".into(),
             content_type: "image/png".into(),
-            bytes: axum::body::Bytes::from_static(b"ini bukan gambar\n"),
+            bytes: axum::body::Bytes::from_static(b"not an image\n"),
         });
         assert!(matches!(
             FieldValue::inspect(&fake),
             Inspected::File { image: false, .. }
         ));
-        let mut v = Validator::new(Locale::Id);
-        v.field("photo", &fake).label("foto").image().max(2048);
-        assert_eq!(v.errors.first("photo"), Some("Foto harus berupa gambar."));
+        let mut v = Validator::new(Locale::En);
+        v.field("photo", &fake).label("picture").image().max(2048);
+        assert_eq!(
+            v.errors.first("photo"),
+            Some("The picture must be an image.")
+        );
     }
 }

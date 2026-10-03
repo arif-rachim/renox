@@ -68,7 +68,7 @@ step "every generator"
 "$RNX" make:test Checkout
 "$RNX" make:notification OrderShipped --module catalog
 "$RNX" make:event OrderPlaced --module catalog
-"$RNX" make:rule Npwp --module catalog
+"$RNX" make:rule TaxId --module catalog
 "$RNX" make:middleware StampRequests
 "$RNX" make:component price_tag
 "$RNX" make:deploy

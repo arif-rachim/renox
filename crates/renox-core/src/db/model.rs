@@ -10,21 +10,21 @@ use anyhow::anyhow;
 /// # use renox::prelude::*;
 /// # use serde::Serialize;
 /// #[derive(Model, Serialize, Default)]
-/// #[model(table = "produk", soft_deletes)]
-/// struct Produk {
+/// #[model(table = "products", soft_deletes)]
+/// struct Product {
 ///     id: i64,
-///     nama: String,
-///     harga: i64,
+///     name: String,
+///     price: i64,
 ///     created_at: Option<DateTime>,
 ///     updated_at: Option<DateTime>,
 ///     deleted_at: Option<DateTime>,
 /// }
 ///
 /// # async fn demo(db: Db) -> Result {
-/// let mut kopi = Produk { nama: "Kopi".into(), harga: 18_000, ..Default::default() };
-/// kopi.save(&db).await?;                      // INSERT, sets id and timestamps
-/// let murah = Produk::query().where_op("harga", "<", 20_000).get(&db).await?;
-/// # let _ = murah; Ok(()) }
+/// let mut coffee = Product { name: "Coffee".into(), price: 18_000, ..Default::default() };
+/// coffee.save(&db).await?;                     // INSERT, sets id and timestamps
+/// let cheap = Product::query().where_op("price", "<", 20_000).get(&db).await?;
+/// # let _ = cheap; Ok(()) }
 /// ```
 ///
 /// The primary key is the `id` column. Its type is the `id` field's: `i64`
@@ -177,7 +177,7 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
     /// # use renox::prelude::*;
     /// # #[derive(Model, serde::Serialize, Default)] struct Stock { id: i64, sku: String, qty: i64 }
     /// # async fn demo(db: Db) -> Result {
-    /// let feed = vec![Stock { sku: "KOPI-1".into(), qty: 12, ..Default::default() }];
+    /// let feed = vec![Stock { sku: "COFFEE-1".into(), qty: 12, ..Default::default() }];
     /// Stock::upsert(&db, feed, &["sku"], &["qty"]).await?;
     /// # Ok(()) }
     /// ```

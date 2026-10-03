@@ -35,8 +35,8 @@
     {% endif %}
     {#- The language: a kit menu of links (the route saves the choice). -#}
     {% call menu(app.locale | upper, id="language-menu", variant="plain") %}
-      {{ menu_link(route('language', 'id'), "Bahasa Indonesia") }}
       {{ menu_link(route('language', 'en'), "English") }}
+      {{ menu_link(route('language', 'es'), "Español") }}
     {% endcall %}
   {% endcall %}
   <main class="rx-container rx-container--wide" id="main">
@@ -45,7 +45,7 @@
       {% block content %}{% endblock %}
     </div>
   </main>
-  {#- Toasts from `(Toast::success(…), Redirect)`: "Kopi is in your cart." -#}
+  {#- Toasts from `(Toast::success(…), Redirect)`: "Coffee Latte is in your cart." -#}
   {{ toasts() }}
   {{ stack('scripts') }}
 </body>

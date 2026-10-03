@@ -11,7 +11,7 @@ use axum::response::{IntoResponse, IntoResponseParts, Redirect, Response, Respon
 /// ```
 /// # use renox::prelude::*;
 /// async fn index(htmx: Htmx) -> View {
-///     let page = view("produk/index.html", context! {});
+///     let page = view("products/index.html", context! {});
 ///     if htmx.request { page.fragment("list") } else { page }
 /// }
 /// ```
@@ -120,7 +120,7 @@ impl IntoResponse for HxRefresh {
 }
 
 /// Triggers client-side events after the swap (`HX-Trigger`), e.g.
-/// `(HxTrigger("produk-saved".into()), view(...))`.
+/// `(HxTrigger("product-saved".into()), view(...))`.
 pub struct HxTrigger(pub String);
 
 impl IntoResponseParts for HxTrigger {
@@ -189,7 +189,7 @@ pub(crate) fn add_trigger<B>(
         None => Map::new(),
     };
     triggers.insert(name.to_owned(), detail);
-    // Headers are ASCII: "“Kopi” masuk keranjang ✓" goes as \u escapes, which
+    // Headers are ASCII: "“Coffee” added to the cart ✓" goes as \u escapes, which
     // JSON.parse turns back into the same text.
     let json = ascii_json(&Value::Object(triggers).to_string());
     match axum::http::HeaderValue::from_str(&json) {
@@ -239,7 +239,7 @@ impl<S: Send + Sync> FromRequestParts<S> for Back {
     }
 }
 
-/// The `Referer` as a path on this site (`/produk?page=2`), or `None` when
+/// The `Referer` as a path on this site (`/products?page=2`), or `None` when
 /// it's missing or points anywhere else. The request's `Host` decides what
 /// "this site" is.
 pub(crate) fn same_site_referer(headers: &axum::http::HeaderMap) -> Option<String> {
@@ -284,7 +284,7 @@ mod tests {
             "hx-trigger",
             axum::http::HeaderValue::from_static("task-added"),
         );
-        let text = "“Kopi” masuk keranjang ✓ 🎉";
+        let text = "“Coffee” added to the cart ✓ 🎉";
         add_trigger(
             &mut res,
             "renox:toast",

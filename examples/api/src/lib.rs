@@ -53,7 +53,7 @@ pub fn app() -> App {
                 return Ok(());
             }
             User::register(&db, "Demo", "demo@example.com", "password123").await?;
-            for (name, price) in [("Kopi", 18_000), ("Teh", 9_000)] {
+            for (name, price) in [("Coffee", 18_000), ("Tea", 9_000)] {
                 let product = Product {
                     name: name.into(),
                     price,

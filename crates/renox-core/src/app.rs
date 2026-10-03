@@ -75,8 +75,8 @@ Commands:
 /// ```no_run
 /// # use renox::prelude::*;
 /// # use serde::{Deserialize, Serialize};
-/// # struct Produk;
-/// # impl Module for Produk { fn name(&self) -> &'static str { "produk" } }
+/// # struct Products;
+/// # impl Module for Products { fn name(&self) -> &'static str { "products" } }
 /// # #[derive(Serialize, Deserialize)] struct SendReceipt;
 /// # impl Job for SendReceipt { const NAME: &'static str = "send-receipt"; async fn handle(self, _: JobContext) -> Result { Ok(()) } }
 /// # async fn cleanup(_: AppState) -> Result { Ok(()) }
@@ -84,7 +84,7 @@ Commands:
 /// fn main() -> renox::Result {
 ///     App::new()
 ///         .migrations(renox::migrations!())
-///         .module(Produk)
+///         .module(Products)
 ///         .job::<SendReceipt>()
 ///         .schedule(|s| { s.daily_at("02:00", "cleanup", cleanup); })
 ///         .seeder(seed)
@@ -238,11 +238,11 @@ impl App {
     ///
     /// ```
     /// # use renox::prelude::*;
-    /// # #[derive(Model, serde::Serialize, Default)] struct Produk { id: i64 }
-    /// # impl Factory for Produk { fn definition() -> Self { Produk::default() } }
+    /// # #[derive(Model, serde::Serialize, Default)] struct Product { id: i64 }
+    /// # impl Factory for Product { fn definition() -> Self { Product::default() } }
     /// # let _ =
     /// App::new().seeder(|db| async move {
-    ///     Produk::create_many(&db, 50).await?;
+    ///     Product::create_many(&db, 50).await?;
     ///     Ok(())
     /// })
     /// # ;
@@ -261,7 +261,7 @@ impl App {
     /// ```
     /// # use renox::prelude::*;
     /// # let _ =
-    /// App::new().gate("admin", |user| user.email.ends_with("@toko.id"))
+    /// App::new().gate("admin", |user| user.email.ends_with("@shop.example"))
     /// // in a handler: auth.gate("admin")?;   in a template: {% if can('admin') %}
     /// # ;
     /// ```

@@ -795,7 +795,7 @@ mod tests {
             ("batches", "batch"),
             ("news", "news"),
             ("address", "address"),
-            ("barang", "barang"),
+            ("staff", "staff"),
         ] {
             assert_eq!(singular(plural), single);
         }

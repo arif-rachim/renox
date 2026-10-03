@@ -13,7 +13,7 @@ async fn photos_are_checked_by_content_and_served_publicly() {
             "/photos",
             &[("title", "Fake")],
             &[
-                ("photos", "kopi.png", PNG),
+                ("photos", "coffee.png", PNG),
                 ("photos", "fake.png", b"just text"),
             ],
         )
@@ -22,8 +22,8 @@ async fn photos_are_checked_by_content_and_served_publicly() {
 
     app.post_multipart(
         "/photos",
-        &[("title", "Kopi")],
-        &[("photos", "kopi.png", PNG)],
+        &[("title", "Coffee")],
+        &[("photos", "coffee.png", PNG)],
     )
     .await
     .assert_redirect("/");
@@ -44,7 +44,7 @@ async fn photos_are_checked_by_content_and_served_publicly() {
             .unwrap(),
         2
     );
-    let photo = Document::where_eq("title", "Kopi")
+    let photo = Document::where_eq("title", "Coffee")
         .first(app.db())
         .await
         .unwrap()
@@ -140,8 +140,8 @@ async fn uploads_say_so_on_the_next_page() {
 
     app.post_multipart(
         "/photos",
-        &[("title", "Kopi")],
-        &[("photos", "kopi.png", PNG)],
+        &[("title", "Coffee")],
+        &[("photos", "coffee.png", PNG)],
     )
     .await
     .assert_redirect("/");
@@ -189,8 +189,8 @@ async fn deleting_a_document_removes_its_file() {
     let app = TestApp::new(uploads::app()).await;
     app.post_multipart(
         "/photos",
-        &[("title", "Kopi")],
-        &[("photos", "kopi.png", PNG)],
+        &[("title", "Coffee")],
+        &[("photos", "coffee.png", PNG)],
     )
     .await;
     app.post_multipart(
@@ -201,7 +201,7 @@ async fn deleting_a_document_removes_its_file() {
     .await;
     let storage = app.state().storage.clone();
 
-    for title in ["Kopi", "September"] {
+    for title in ["Coffee", "September"] {
         let doc = Document::where_eq("title", title)
             .first(app.db())
             .await
@@ -289,8 +289,8 @@ mod on_s3 {
         };
         app.post_multipart(
             "/photos",
-            &[("title", "Kopi")],
-            &[("photos", "kopi.png", PNG)],
+            &[("title", "Coffee")],
+            &[("photos", "coffee.png", PNG)],
         )
         .await
         .assert_redirect("/");

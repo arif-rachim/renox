@@ -31,7 +31,7 @@ impl Job for Greet {
     const NAME: &'static str = "greet";
 
     async fn handle(self, ctx: JobContext) -> Result {
-        log(&ctx.state, &format!("halo {}", self.name)).await
+        log(&ctx.state, &format!("hello {}", self.name)).await
     }
 }
 
@@ -183,20 +183,15 @@ async fn dispatched_jobs_run() {
     kernel
         .state()
         .dispatch(Greet {
-            name: "Arif".into(),
+            name: "Alex".into(),
         })
         .await
         .unwrap();
-    queue
-        .dispatch(Greet {
-            name: "Budi".into(),
-        })
-        .await
-        .unwrap();
+    queue.dispatch(Greet { name: "Ben".into() }).await.unwrap();
     assert_eq!(queue.pending().await.unwrap(), 2);
 
     assert_eq!(kernel.run_jobs().await.unwrap(), 2);
-    assert_eq!(logged(&kernel).await, ["halo Arif", "halo Budi"]);
+    assert_eq!(logged(&kernel).await, ["hello Alex", "hello Ben"]);
     assert_eq!(queue.pending().await.unwrap(), 0);
 }
 
@@ -267,7 +262,7 @@ async fn delayed_jobs_wait() {
     queue
         .dispatch_after(
             Greet {
-                name: "nanti".into(),
+                name: "later".into(),
             },
             Duration::from_secs(3600),
         )
@@ -284,7 +279,7 @@ async fn workers_can_be_limited_to_queues() {
     kernel
         .state()
         .dispatch(Greet {
-            name: "Arif".into(),
+            name: "Alex".into(),
         })
         .await
         .unwrap();
@@ -337,7 +332,7 @@ async fn background_workers_pick_up_jobs_and_stop_cleanly() {
     kernel
         .state()
         .dispatch(Greet {
-            name: "latar".into(),
+            name: "background".into(),
         })
         .await
         .unwrap();
@@ -355,7 +350,7 @@ async fn background_workers_pick_up_jobs_and_stop_cleanly() {
     }
     assert_eq!(
         logged(&kernel).await,
-        ["halo latar"],
+        ["hello background"],
         "woken without waiting for the poll"
     );
     stop.send(true).unwrap();

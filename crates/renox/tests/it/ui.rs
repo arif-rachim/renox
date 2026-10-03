@@ -127,7 +127,7 @@ impl Module for Pages {
             .get("/remote", || async {
                 view(
                     "remote.html",
-                    context! { chosen => vec![renox::select::SelectOption::new(7, "Kopi")] },
+                    context! { chosen => vec![renox::select::SelectOption::new(7, "Coffee")] },
                 )
             })
             .post("/order", |Valid(order): Valid<Order>| async move {
@@ -202,7 +202,7 @@ fn views() -> tempfile::TempDir {
 <form method="post" action="/order" data-live-validate>{{ csrf_field() }}{{ form_errors() }}
 {% call wizard("w", [["items", "Items"], ["extra", "Extras"]], submit_label="Place order") %}
 {% call wizard_step("w", "items") %}
-{% call(row, prefix) repeater("lines", "Lines", rows=[{"name": "Kopi", "qty": 2}], item_label="Line", min=1, max=5) %}
+{% call(row, prefix) repeater("lines", "Lines", rows=[{"name": "Coffee", "qty": 2}], item_label="Line", min=1, max=5) %}
 {{ input(prefix ~ "[name]", "Name", value=row.name, required=true) }}
 {{ input(prefix ~ "[qty]", "Quantity", type="number", value=row.qty) }}
 {% endcall %}
@@ -316,7 +316,7 @@ async fn components_see_the_request_and_refill_forms() {
 #[renox::test]
 async fn toasts_follow_the_next_page_or_ride_htmx() {
     let (app, _dir) = app().await;
-    app.post("/signup", &[("name", "Ana"), ("email", "ana@test.id")])
+    app.post("/signup", &[("name", "Ana"), ("email", "ana@example.test")])
         .await
         .assert_redirect("/form");
     let page = app.get("/form").await;
@@ -378,7 +378,7 @@ async fn live_validation_checks_one_field_without_the_handler() {
     let res = app
         .request()
         .header("x-renox-validate", "name")
-        .post("/signup", &[("name", "Ana"), ("email", "ana@test.id")])
+        .post("/signup", &[("name", "Ana"), ("email", "ana@example.test")])
         .await;
     let body: renox::serde_json::Value = res.json();
     assert_eq!(body["errors"], renox::serde_json::json!([]));
@@ -391,11 +391,13 @@ async fn kit_texts_follow_the_locale() {
     let path = dir.path().to_path_buf();
     let app = TestApp::with_config(App::new().module(Auth::new()).module(Pages), move |c| {
         c.views_path = path;
-        c.locale = "id".into();
+        c.locale = "es".into();
+        c.lang_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/lang");
     })
     .await;
-    app.get("/form").await.assert_see("(opsional)");
-    app.get("/components").await.assert_see("Batal|");
+    // The app's `tests/lang/es.json` translates the kit's texts.
+    app.get("/form").await.assert_see("(opcional)");
+    app.get("/components").await.assert_see("Cancelar|");
 }
 
 #[renox::test]
@@ -524,17 +526,18 @@ async fn stage_two_texts_follow_the_locale() {
     let path = dir.path().to_path_buf();
     let app = TestApp::with_config(App::new().module(Auth::new()).module(Pages), move |c| {
         c.views_path = path;
-        c.locale = "id".into();
+        c.locale = "es".into();
+        c.lang_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/lang");
     })
     .await;
     app.get("/more")
         .await
-        .assert_see("Tampilkan kata sandi")
-        .assert_see(r#"aria-label="Salin""#)
-        .assert_see("Pilih berkas atau tarik ke sini")
-        .assert_see("Berkas saat ini")
-        .assert_see(r#"aria-label="Pilih tanggal""#)
-        .assert_see(r#"locale="id""#);
+        .assert_see("Mostrar contraseña")
+        .assert_see(r#"aria-label="Copiar""#)
+        .assert_see("Elige un archivo o suéltalo aquí")
+        .assert_see("Archivo actual")
+        .assert_see(r#"aria-label="Elige una fecha""#)
+        .assert_see(r#"locale="es""#);
 }
 
 #[renox::test]
@@ -546,7 +549,7 @@ async fn repeaters_tags_key_values_and_wizards() {
         // with dots, and a template row for the script to copy.
         .assert_see(r#"data-rx-repeater="lines" data-rx-min="1" data-rx-max="5""#)
         .assert_see(r#"data-rx-row data-rx-index="0""#)
-        .assert_see(r#"id="rx-lines-0-name" name="lines[0][name]" type="text" value="Kopi""#)
+        .assert_see(r#"id="rx-lines-0-name" name="lines[0][name]" type="text" value="Coffee""#)
         .assert_see(r#"name="lines[0][qty]" type="number" value="2""#)
         .assert_see(r#"data-error-for="lines.0.name""#)
         .assert_see(r#"name="lines[__INDEX__][name]""#)
@@ -577,9 +580,9 @@ async fn repeaters_tags_key_values_and_wizards() {
                 ("tags", "a"),
                 ("tags", "b"),
                 ("tags", ""),
-                ("lines[0][name]", "Kopi"),
+                ("lines[0][name]", "Coffee"),
                 ("lines[0][qty]", "2"),
-                ("lines[1][name]", "Teh"),
+                ("lines[1][name]", "Tea"),
                 ("lines[1][qty]", " 1 "),
                 ("meta[0][key]", "Color"),
                 ("meta[0][value]", "Red"),
@@ -596,7 +599,7 @@ async fn repeaters_tags_key_values_and_wizards() {
         body,
         renox::serde_json::json!({
             "tags": ["a", "b"],
-            "lines": [{"name": "Kopi", "qty": 2}, {"name": "Teh", "qty": 1}],
+            "lines": [{"name": "Coffee", "qty": 2}, {"name": "Tea", "qty": 1}],
             "meta": [["Color", "Red"]],
             "sizes": ["s", "l"],
         })
@@ -608,7 +611,7 @@ async fn repeaters_tags_key_values_and_wizards() {
         .post(
             "/order",
             &[
-                ("lines[0][name]", "Kopi"),
+                ("lines[0][name]", "Coffee"),
                 ("lines[0][qty]", "abc"),
                 ("lines[1][name]", ""),
                 ("lines[1][qty]", "0"),
@@ -640,11 +643,11 @@ async fn repeaters_tags_key_values_and_wizards() {
         .post(
             "/order",
             &[
-                ("lines[0][name]", "Kopi"),
+                ("lines[0][name]", "Coffee"),
                 ("lines[0][qty]", "2"),
                 ("lines[1][name]", ""),
                 ("lines[1][qty]", "3"),
-                ("lines[2][name]", "Susu"),
+                ("lines[2][name]", "Milk"),
                 ("lines[2][qty]", "1"),
                 ("meta[0][key]", "a"),
                 ("meta[0][value]", "1"),
@@ -657,7 +660,7 @@ async fn repeaters_tags_key_values_and_wizards() {
         .await
         .assert_redirect("/stage3");
     let page = app.get("/stage3").await;
-    page.assert_see(r#"name="lines[2][name]" type="text" value="Susu""#)
+    page.assert_see(r#"name="lines[2][name]" type="text" value="Milk""#)
         .assert_see(r#"name="lines[1][qty]" type="number" value="3""#)
         .assert_see(r#"name="lines[1][name]" type="text" value="" required aria-required="true" aria-invalid="true""#)
         .assert_see("The name field is required.")
@@ -695,7 +698,7 @@ async fn selects_ask_the_server_for_options() {
     let page = app.get("/remote").await;
     page.assert_ok()
         // Options as `SelectOption`s; the URL and texts for the script.
-        .assert_see(r#"<option value="7" selected>Kopi</option>"#)
+        .assert_see(r#"<option value="7" selected>Coffee</option>"#)
         .assert_see(r#"data-rx-options-url="/options""#)
         .assert_see(r#"data-rx-editable data-add="Add “:value”""#)
         .assert_see(r#"data-editing="Editing “:value”: Enter saves, Esc cancels.""#)
@@ -715,7 +718,7 @@ async fn selects_ask_the_server_for_options() {
         .await;
     app.get("/remote")
         .await
-        .assert_see(r#"<option value="7">Kopi</option>"#)
+        .assert_see(r#"<option value="7">Coffee</option>"#)
         .assert_see(r#"<option value="9" selected data-rx-unresolved>9</option>"#)
         .assert_see(r#"<option value="l" selected data-rx-unresolved>l</option>"#);
 }

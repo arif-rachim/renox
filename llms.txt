@@ -43,7 +43,7 @@ Every example has a README.md that walks through it.
   confirmation mail; notifications; a daily task cancelling unpaid orders; an admin for the
   `admin` role (the `Permissions` module, `require_role`) with photo uploads and an audit trail
   of order status changes (the `Audit` module), product delete behind password confirmation;
-  checkout in `db.retrying`; en/id with plurals; the `make:deploy` files (with the systemd
+  checkout in `db.retrying`; English and Spanish texts with plurals; the `make:deploy` files (with the systemd
   socket); every page on the UI kit with a rebranded accent, toasts and confirmation sheets
   (checkout: `toggle_buttons` + `show_when` + `required_if` for courier or pickup; the admin's
   category in a `select` whose options come from the server, added and renamed in place
@@ -219,7 +219,7 @@ Every example has a README.md that walks through it.
     [tests/payments.rs](examples/webhooks/tests/payments.rs)
 - [examples/hello](examples/hello) ([README](examples/hello/README.md)): a guestbook in one file: HTMX form posts that return
   fragments, a photo upload, an event whose listener queues a mail job, a scheduled task,
-  i18n (en/id) with a language switch and the browser's language (`detect_locale`), a
+  English and Spanish (`es.json`) with a language switch and the browser's language (`detect_locale`), a
   `#[derive(Validate)]` form, login with the account page, a seeder, and a typed
   `entries:prune` command that confirms (tested with time travel and `prompt::answering`).
   - [examples/hello/src/lib.rs](examples/hello/src/lib.rs),
@@ -292,7 +292,7 @@ Every example has a README.md that walks through it.
   the pre-1.0 audit, with repro tests and fix directions; ROADMAP M13/M14 track them.
 - [docs/audit/2026-09-laravel-parity.md](docs/audit/2026-09-laravel-parity.md): the Laravel
   parity review behind M18–M21, and a later gap report
-  ([PDF](docs/audit/2026-09-laravel-gap-report.pdf), in Indonesian).
+  ([PDF](docs/audit/2026-09-laravel-gap-report.pdf)).
 - `crates/renox-core/src`: the runtime. `db/` (Db, models, queries, relations, migrations),
   `validation/`, `auth/` (incl. `permissions.rs`, `account.rs`, `events.rs`, `tokens.rs`),
   `audit.rs`, `context.rs`, `queue/`, `schedule.rs` + `timezone.rs`, `cache.rs`, `view.rs`,

@@ -102,13 +102,13 @@ fn date(y: i32, m: u32, d: u32) -> NaiveDate {
 async fn every_type_round_trips_through_the_database() {
     let app = app().await;
     let item = Item {
-        name: "Kopi".into(),
+        name: "Coffee".into(),
         quantity: 3,
         weight: 0.25,
         active: true,
         status: Status::SoldOut,
         tags: Json(vec!["hot".into(), "sweet".into()]),
-        extra: Some(json!({ "origin": "Gayo", "grade": 1 })),
+        extra: Some(json!({ "origin": "Kenya", "grade": 1 })),
         opens_at: NaiveTime::from_hms_opt(7, 30, 0),
         starts_at: date(2026, 10, 1).and_hms_opt(9, 15, 0),
         released_on: Some(date(2026, 9, 27)),
@@ -170,7 +170,7 @@ async fn forms_send_every_input_type() {
         .post(
             "/items",
             &[
-                ("name", "Teh"),
+                ("name", "Tea"),
                 ("quantity", "2"),
                 ("weight", "1.5"),
                 ("active", "on"),
@@ -200,7 +200,7 @@ async fn forms_send_every_input_type() {
         .post(
             "/items",
             &[
-                ("name", "Air"),
+                ("name", "Water"),
                 ("quantity", "1"),
                 ("weight", "1"),
                 ("status", "draft"),

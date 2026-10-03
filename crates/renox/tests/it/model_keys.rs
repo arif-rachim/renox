@@ -556,7 +556,7 @@ mod uuids {
         let first = Account::create(
             db,
             Account {
-                name: "Kas".into(),
+                name: "Cash".into(),
                 ..Default::default()
             },
         )
@@ -570,11 +570,11 @@ mod uuids {
         second.save(db).await.unwrap();
         assert!(second.id > first.id);
         let mut found = Account::find_or_404(db, first.id).await.unwrap();
-        found.name = "Kas kecil".into();
+        found.name = "Petty cash".into();
         found.save(db).await.unwrap();
         assert_eq!(
             Account::find_or_404(db, first.id).await.unwrap().name,
-            "Kas kecil"
+            "Petty cash"
         );
         found.delete(db).await.unwrap();
         assert_eq!(Account::all(db).await.unwrap(), [second]);

@@ -114,31 +114,31 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         fs::write(
             dir.path().join("Cargo.toml"),
-            "[package]\nname = \"toko-kopi\"\nversion = \"0.1.0\"\n\n[dependencies]\nname = \"not this\"\n",
+            "[package]\nname = \"coffee-shop\"\nversion = \"0.1.0\"\n\n[dependencies]\nname = \"not this\"\n",
         )
         .unwrap();
         make_deploy(dir.path()).unwrap();
         let docker = fs::read_to_string(dir.path().join("Dockerfile")).unwrap();
-        assert!(docker.contains("cp target/release/toko-kopi /toko-kopi"));
+        assert!(docker.contains("cp target/release/coffee-shop /coffee-shop"));
         assert!(
             docker.contains("cargo chef cook --release"),
             "dependencies in their own layer"
         );
-        let unit = fs::read_to_string(dir.path().join("deploy/toko-kopi.service")).unwrap();
+        let unit = fs::read_to_string(dir.path().join("deploy/coffee-shop.service")).unwrap();
         assert!(
-            unit.contains("Description=Toko Kopi")
-                && unit.contains("ExecStartPre=/opt/toko-kopi/toko-kopi migrate")
+            unit.contains("Description=Coffee Shop")
+                && unit.contains("ExecStartPre=/opt/coffee-shop/coffee-shop migrate")
         );
-        let socket = fs::read_to_string(dir.path().join("deploy/toko-kopi.socket")).unwrap();
+        let socket = fs::read_to_string(dir.path().join("deploy/coffee-shop.socket")).unwrap();
         assert!(
-            socket.contains("Description=Toko Kopi (listening socket)")
+            socket.contains("Description=Coffee Shop (listening socket)")
                 && socket.contains("ListenStream=127.0.0.1:3000"),
             "{socket}"
         );
         assert!(
             fs::read_to_string(dir.path().join("deploy/litestream.yml"))
                 .unwrap()
-                .contains("/opt/toko-kopi/storage/app.db")
+                .contains("/opt/coffee-shop/storage/app.db")
         );
 
         fs::write(dir.path().join("Dockerfile"), "custom").unwrap();

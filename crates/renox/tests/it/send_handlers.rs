@@ -554,7 +554,7 @@ async fn data_apis_work_in_routed_handlers() {
         format!("CREATE TABLE pages (id {id}, doc_id TEXT NOT NULL)"),
         "CREATE TABLE doc_tags (doc_id TEXT NOT NULL, tag_id BIGINT NOT NULL)".into(),
         "INSERT INTO notes (body) VALUES ('x')".into(),
-        "INSERT INTO tags (note_id, name) VALUES (1, 'kopi'), (NULL, 'teh')".into(),
+        "INSERT INTO tags (note_id, name) VALUES (1, 'coffee'), (NULL, 'tea')".into(),
     ] {
         renox::db::sql(statement).execute(app.db()).await.unwrap();
     }

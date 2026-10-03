@@ -123,8 +123,8 @@ const PAGE: &str = r##"{% from "renox/ui.html" import stats, stat, dashboard, wi
 {% call widget("Mixed", url="/mixed", poll=15, id="mixed") %}first{% endcall %}
 {% endcall %}
 <div id="area">{{ chart("area", [1, 2, 3], title="Signups", table=false) }}</div>
-<div id="bars">{{ chart("bar", labels=["A", "B"], series=[{"name": "Kopi", "values": [1, 2]}, {"name": "Teh", "values": [3, -1]}], stacked=true) }}</div>
-<div id="grouped">{{ chart("bar", labels=["A", "B"], series=[{"name": "Kopi", "values": [1, 2]}, {"name": "Teh", "values": [3, none]}], height=160) }}</div>
+<div id="bars">{{ chart("bar", labels=["A", "B"], series=[{"name": "Coffee", "values": [1, 2]}, {"name": "Tea", "values": [3, -1]}], stacked=true) }}</div>
+<div id="grouped">{{ chart("bar", labels=["A", "B"], series=[{"name": "Coffee", "values": [1, 2]}, {"name": "Tea", "values": [3, none]}], height=160) }}</div>
 <div id="pie">{{ chart("doughnut", labels=["a", "b", "c", "d", "e", "f", "g"], values=[10, 20, 30, 10, 10, 10, 10], title="Mix") }}</div>
 <div id="month">{{ chart("bar", labels=["2026-08", "2026-09"], values=[1, 2], x_format="%m/%Y") }}</div>"##;
 
@@ -145,6 +145,7 @@ async fn app(timezone: &str, locale: &str) -> (TestApp, tempfile::TempDir) {
         c.views_path = path;
         c.timezone = timezone;
         c.locale = locale;
+        c.lang_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/lang");
     })
     .await;
     (app, views)
@@ -228,13 +229,13 @@ async fn days_are_cut_in_app_timezone() {
 #[renox::test]
 async fn charts_stats_and_widgets_render() {
     let (app, _views) = app("UTC", "en").await;
-    let page = app.get("/page?q=kopi&page=3&period=7d").await;
+    let page = app.get("/page?q=coffee&page=3&period=7d").await;
     let html = page.assert_ok().text();
     let has = |needle: &str| assert!(html.contains(needle), "missing {needle}\n{html}");
 
     // The period filter keeps the query (but the page) and marks the current one.
-    has(r#"href="?q=kopi&amp;period=7d" aria-current="page">7 days</a>"#);
-    has(r#"href="?q=kopi&amp;period=30d">30 days</a>"#);
+    has(r#"href="?q=coffee&amp;period=7d" aria-current="page">7 days</a>"#);
+    has(r#"href="?q=coffee&amp;period=30d">30 days</a>"#);
 
     // Figures.
     has(r#"<div class="rx-stats rx-cols-3">"#);
@@ -304,7 +305,7 @@ async fn charts_stats_and_widgets_render() {
     assert!(area.contains(r#"<figcaption class="rx-visually-hidden">Signups</figcaption>"#));
     let bars = &html
         [html.find(r#"<div id="bars">"#).unwrap()..html.find(r#"<div id="grouped">"#).unwrap()];
-    assert!(bars.contains(r#"<span class="rx-chart__key rx-chart__key--box rx-series-2" aria-hidden="true"></span>Teh"#), "{bars}");
+    assert!(bars.contains(r#"<span class="rx-chart__key rx-chart__key--box rx-series-2" aria-hidden="true"></span>Tea"#), "{bars}");
     assert_eq!(
         bars.matches(r#"<div class="rx-chart__column">"#).count(),
         2,
@@ -342,18 +343,19 @@ async fn charts_stats_and_widgets_render() {
 }
 
 #[renox::test]
-async fn dashboards_speak_indonesian() {
-    let (app, _views) = app("UTC", "id").await;
+async fn dashboards_speak_the_apps_language() {
+    // Texts from the app's `tests/lang/es.json`, numbers in Spanish style.
+    let (app, _views) = app("UTC", "es").await;
     let html = app.get("/page").await.text();
     for needle in [
-        ">7 hari</a>",
-        r#"aria-current="page">30 hari</a>"#,
-        "dibanding periode sebelumnya",
+        ">7 días</a>",
+        r#"aria-current="page">30 días</a>"#,
+        "frente al periodo anterior",
         "Rp 75.000",
-        ">30 rb</span>",
-        ">1 Okt</span>",
-        "Lihat datanya",
-        "Lainnya",
+        ">30K</span>",
+        ">Oct 1</span>",
+        "Ver los datos",
+        "Otros",
     ] {
         assert!(html.contains(needle), "missing {needle}");
     }

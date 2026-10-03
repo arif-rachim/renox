@@ -40,7 +40,7 @@ impl Module for Site {
             .get("/greet", |lang: Lang| async move {
                 format!(
                     "{} / {}",
-                    lang.t("welcome", &[("name", &"budi")]),
+                    lang.t("welcome", &[("name", &"ben")]),
                     lang.choice("items", 2, &[])
                 )
             })
@@ -58,15 +58,15 @@ fn write_lang(dir: &std::path::Path) {
     )
     .unwrap();
     std::fs::write(
-        lang.join("id.json"),
-        r#"{ "welcome": "Selamat datang, :Name!", "items": "Satu barang|:count barang",
-             "renox": { "validation": { "required": ":Attribute harus ada.", "attributes": { "email": "alamat email" } } } }"#,
+        lang.join("es.json"),
+        r#"{ "welcome": "¡Bienvenido, :Name!", "items": "Un artículo|:count artículos",
+             "renox": { "validation": { "required": "El campo :attribute es obligatorio.", "attributes": { "email": "correo electrónico" } } } }"#,
     )
     .unwrap();
     std::fs::write(
-        lang.join("ms.json"),
-        r#"{ "welcome": "Selamat datang ke kedai, :name!",
-             "renox": { "auth": { "login_title": "Log masuk" }, "validation": { "required": ":Attribute diperlukan." } } }"#,
+        lang.join("fr.json"),
+        r#"{ "welcome": "Bienvenue à la boutique, :name !",
+             "renox": { "auth": { "login_title": "Se connecter" }, "validation": { "required": ":Attribute est obligatoire." } } }"#,
     )
     .unwrap();
 }
@@ -75,7 +75,7 @@ async fn kernel(dir: &std::path::Path, debug: bool) -> Kernel {
     std::fs::create_dir_all(dir.join("views")).unwrap();
     std::fs::write(
         dir.join("views/page.html"),
-        "{{ t('welcome', name='arif') }}|{{ t('items', count=1) }}|{{ t('items', count=3) }}|{{ t('only_en') }}|{{ t('missing.key') }}|{{ app.locale }}",
+        "{{ t('welcome', name='anna') }}|{{ t('items', count=1) }}|{{ t('items', count=3) }}|{{ t('only_en') }}|{{ t('missing.key') }}|{{ app.locale }}",
     )
     .unwrap();
     let config = {
@@ -135,17 +135,17 @@ async fn templates_translate_for_each_visitor() {
 
     assert_eq!(
         visitor.get("/").await.1,
-        "Welcome, arif!|One item|3 items|fallback works|missing.key|en"
+        "Welcome, anna!|One item|3 items|fallback works|missing.key|en"
     );
-    visitor.get("/lang/id").await;
+    visitor.get("/lang/es").await;
     assert_eq!(
         visitor.get("/").await.1,
-        "Selamat datang, Arif!|Satu barang|3 barang|fallback works|missing.key|id",
-        "missing Indonesian keys fall back to English"
+        "¡Bienvenido, Anna!|Un artículo|3 artículos|fallback works|missing.key|es",
+        "missing Spanish keys fall back to English"
     );
     assert_eq!(
         visitor.get("/greet").await.1,
-        "Selamat datang, Budi! / 2 barang"
+        "¡Bienvenido, Ben! / 2 artículos"
     );
 
     visitor.get("/lang/xx").await;
@@ -182,27 +182,27 @@ async fn built_in_texts_can_be_translated() {
         first_error(visitor.get("/signup?email=").await.1),
         "The email address field is required."
     );
-    visitor.get("/lang/id").await;
+    visitor.get("/lang/es").await;
     assert_eq!(
         first_error(visitor.get("/signup?email=").await.1),
-        "Alamat email harus ada."
+        "El campo correo electrónico es obligatorio."
     );
-    visitor.get("/lang/ms").await;
+    visitor.get("/lang/fr").await;
     assert_eq!(
         first_error(visitor.get("/signup?email=").await.1),
-        "Email diperlukan."
+        "Email est obligatoire."
     );
 
     let login = visitor.get("/login").await.1;
     assert!(
-        login.contains(">Log masuk</h2>"),
+        login.contains(">Se connecter</h2>"),
         "renox.auth.* overrides the built-in page"
     );
-    assert!(login.contains(r#"<html lang="ms">"#));
-    visitor.get("/lang/id").await;
+    assert!(login.contains(r#"<html lang="fr">"#));
+    visitor.get("/lang/es").await;
     assert!(
-        visitor.get("/login").await.1.contains(">Masuk</h2>"),
-        "built-in Indonesian"
+        visitor.get("/login").await.1.contains(">Log in</h2>"),
+        "a key the app's file lacks keeps the built-in English text"
     );
 }
 
@@ -210,7 +210,7 @@ async fn built_in_texts_can_be_translated() {
 async fn broken_lang_files_fail_at_boot() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("lang")).unwrap();
-    std::fs::write(dir.path().join("lang/id.json"), "{ not json").unwrap();
+    std::fs::write(dir.path().join("lang/es.json"), "{ not json").unwrap();
     let config = {
         let mut c = Config::default();
         c.lang_path = dir.path().join("lang");
@@ -218,7 +218,7 @@ async fn broken_lang_files_fail_at_boot() {
     };
     let err = App::with_config(config).boot().await.err().unwrap();
     assert!(
-        format!("{err:?}").contains("id.json is not valid JSON"),
+        format!("{err:?}").contains("es.json is not valid JSON"),
         "{err:?}"
     );
 
@@ -242,7 +242,7 @@ async fn debug_mode_picks_up_edited_lang_files() {
         router: kernel.router(),
         cookie: None,
     };
-    assert!(visitor.get("/").await.1.starts_with("Welcome, arif!"));
+    assert!(visitor.get("/").await.1.starts_with("Welcome, anna!"));
 
     tokio::time::sleep(Duration::from_millis(1100)).await;
     std::fs::write(
@@ -251,5 +251,24 @@ async fn debug_mode_picks_up_edited_lang_files() {
     )
     .unwrap();
     tokio::time::sleep(Duration::from_millis(1100)).await;
-    assert!(visitor.get("/").await.1.starts_with("Hi arif|"));
+    assert!(visitor.get("/").await.1.starts_with("Hi anna|"));
+}
+
+#[renox::test]
+async fn an_apps_language_file_brings_plurals_and_ranges() {
+    // `tests/lang/es.json`: Renox ships English only; Spanish comes from the app.
+    let app = renox::testing::TestApp::with_config(App::new(), |c| {
+        c.lang_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/lang");
+    })
+    .await;
+    let es = app.state().lang("es");
+    assert_eq!(es.t("welcome", &[("name", &"ben")]), "¡Bienvenido, Ben!");
+    assert_eq!(es.choice("messages", 0, &[]), "Aún no hay mensajes");
+    assert_eq!(es.choice("messages", 3, &[]), "3 mensajes");
+    assert_eq!(es.choice("messages", 12, &[]), "Muchos mensajes (12)");
+    assert_eq!(es.choice("ui.since.hours", 1, &[]), "una hora");
+    assert_eq!(es.choice("ui.since.hours", 5, &[]), "5 horas");
+    assert_eq!(es.t("ui.cancel", &[]), "Cancelar");
+    // A language without a file gets the built-in English texts.
+    assert_eq!(app.state().lang("fr").t("ui.cancel", &[]), "Cancel");
 }

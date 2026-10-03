@@ -23,9 +23,9 @@ use crate::AppState;
 /// # async fn store() {}
 /// # let _ =
 /// Routes::new()
-///     .get("/produk", index).name("produk.index")
-///     .get("/produk/{id}", show).name("produk.show")
-///     .post("/produk", store).name("produk.store")
+///     .get("/products", index).name("products.index")
+///     .get("/products/{id}", show).name("products.show")
+///     .post("/products", store).name("products.store")
 /// # ;
 /// ```
 #[derive(Default)]
@@ -562,7 +562,7 @@ impl RouteTable {
         Ok(())
     }
 
-    /// The path pattern of a named route, e.g. `/produk/{id}`.
+    /// The path pattern of a named route, e.g. `/products/{id}`.
     pub fn path(&self, name: &str) -> Option<&str> {
         self.paths.get(name).map(String::as_str)
     }
@@ -573,7 +573,7 @@ impl RouteTable {
     }
 
     /// The name of the route with this path pattern (axum's `MatchedPath`,
-    /// e.g. `/produk/{id}`) on `domain` (`None` for routes without one).
+    /// e.g. `/products/{id}`) on `domain` (`None` for routes without one).
     pub fn name_of(&self, path: &str, domain: Option<&str>) -> Option<&str> {
         self.paths
             .iter()
@@ -652,7 +652,7 @@ mod tests {
     fn table() -> RouteTable {
         let mut t = RouteTable::default();
         t.insert("home".into(), "/".into()).unwrap();
-        t.insert("produk.show".into(), "/produk/{id}".into())
+        t.insert("products.show".into(), "/products/{id}".into())
             .unwrap();
         t.insert("docs".into(), "/docs/{*path}".into()).unwrap();
         t
@@ -662,10 +662,10 @@ mod tests {
     fn builds_urls() {
         let t = table();
         assert_eq!(t.url("home", &[]).unwrap(), "/");
-        assert_eq!(t.url("produk.show", &[&42]).unwrap(), "/produk/42");
+        assert_eq!(t.url("products.show", &[&42]).unwrap(), "/products/42");
         assert_eq!(
-            t.url("produk.show", &[&"a b/c"]).unwrap(),
-            "/produk/a%20b%2Fc"
+            t.url("products.show", &[&"a b/c"]).unwrap(),
+            "/products/a%20b%2Fc"
         );
         assert_eq!(
             t.url("docs", &[&"guide/intro"]).unwrap(),
@@ -677,7 +677,7 @@ mod tests {
     fn rejects_bad_calls() {
         let t = table();
         assert!(t.url("missing", &[]).is_err());
-        assert!(t.url("produk.show", &[]).is_err());
+        assert!(t.url("products.show", &[]).is_err());
         assert!(t.url("home", &[&1]).is_err());
     }
 

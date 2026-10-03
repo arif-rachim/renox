@@ -680,14 +680,14 @@ pub(crate) fn numbered_placeholders(sql: &str) -> Cow<'_, str> {
 /// ```
 /// # use renox::prelude::*;
 /// # async fn demo(db: Db) -> Result {
-/// let rows = renox::db::sql("SELECT nama FROM produk WHERE harga < ?")
+/// let rows = renox::db::sql("SELECT name FROM products WHERE price < ?")
 ///     .bind(20_000)
 ///     .fetch_all(&db)
 ///     .await?;
-/// let nama: String = rows[0].try_get("nama")?;
+/// let name: String = rows[0].try_get("name")?;
 ///
-/// let total: i64 = renox::db::sql("SELECT COUNT(*) FROM produk").scalar(&db).await?;
-/// # let _ = (nama, total); Ok(()) }
+/// let total: i64 = renox::db::sql("SELECT COUNT(*) FROM products").scalar(&db).await?;
+/// # let _ = (name, total); Ok(()) }
 /// ```
 pub fn sql(sql: impl Into<String>) -> Sql {
     Sql {
@@ -862,7 +862,7 @@ impl Row {
         self
     }
 
-    /// A column's value, by name (`"nama"`) or position (`0`).
+    /// A column's value, by name (`"name"`) or position (`0`).
     pub fn try_get<T: FromDb>(&self, index: impl RowIndex) -> Result<T, DbError> {
         super::encrypted::reading(self.1.as_ref(), || match &self.0 {
             RowInner::Sqlite(row) => Ok(row.try_get(index)?),

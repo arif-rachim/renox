@@ -6,7 +6,7 @@ const DAY: Duration = Duration::from_secs(24 * 60 * 60);
 
 async fn app() -> TestApp {
     let app = TestApp::new(api::app()).await;
-    User::register(app.db(), "Arif", "arif@example.com", "password123")
+    User::register(app.db(), "Alex", "alex@example.com", "password123")
         .await
         .unwrap();
     app
@@ -24,7 +24,7 @@ async fn login(app: &TestApp, read_only: bool) -> String {
         .post_json(
             "/api/tokens",
             &json!({
-                "email": "arif@example.com",
+                "email": "alex@example.com",
                 "password": "password123",
                 "device": "test",
                 "read_only": read_only,
@@ -40,7 +40,7 @@ async fn login(app: &TestApp, read_only: bool) -> String {
 #[renox::test]
 async fn tokens_are_issued_for_the_right_password_only() {
     let app = app().await;
-    let wrong = json!({ "email": "arif@example.com", "password": "nope", "device": "test" });
+    let wrong = json!({ "email": "alex@example.com", "password": "nope", "device": "test" });
     let unknown = json!({ "email": "who@example.com", "password": "nope", "device": "test" });
     for body in [wrong, unknown] {
         app.request()
@@ -102,12 +102,12 @@ async fn products_are_created_with_json_and_validated() {
                 .await
         }
     };
-    let created = post(json!({ "name": "Kopi", "price": 18000 })).await;
+    let created = post(json!({ "name": "Coffee", "price": 18000 })).await;
     created
         .assert_status(201)
-        .assert_json(json!({ "name": "Kopi", "price": 18000 }));
+        .assert_json(json!({ "name": "Coffee", "price": 18000 }));
 
-    let invalid = post(json!({ "name": "Kopi", "price": -1 })).await;
+    let invalid = post(json!({ "name": "Coffee", "price": -1 })).await;
     invalid.assert_status(422);
     assert!(
         invalid
@@ -125,7 +125,7 @@ async fn products_are_created_with_json_and_validated() {
         .get(&format!("/api/products/{id}"))
         .await
         .assert_ok()
-        .assert_json_path("name", "Kopi");
+        .assert_json_path("name", "Coffee");
     let missing = app
         .request()
         .json()
@@ -192,7 +192,10 @@ async fn read_only_tokens_cannot_write() {
                 .without_csrf()
                 .json()
                 .header("authorization", &token)
-                .post_json("/api/products", &json!({ "name": "Kopi", "price": 18000 }))
+                .post_json(
+                    "/api/products",
+                    &json!({ "name": "Coffee", "price": 18000 }),
+                )
                 .await
         }
     };
@@ -249,7 +252,7 @@ async fn tokens_expire_after_thirty_days() {
 #[renox::test]
 async fn expired_tokens_stop_working() {
     let app = app().await;
-    let user = User::find_by_email(app.db(), "arif@example.com")
+    let user = User::find_by_email(app.db(), "alex@example.com")
         .await
         .unwrap()
         .unwrap();
@@ -388,7 +391,7 @@ async fn the_app_on_another_origin_is_allowed() {
 #[renox::test]
 async fn expired_tokens_are_pruned_every_night() {
     let app = app().await;
-    let user = User::find_by_email(app.db(), "arif@example.com")
+    let user = User::find_by_email(app.db(), "alex@example.com")
         .await
         .unwrap()
         .unwrap();
@@ -427,7 +430,7 @@ async fn me_says_who_and_what_the_token_may_do() {
         .get("/api/me")
         .await;
     res.assert_ok()
-        .assert_json_path("user.email", "arif@example.com")
+        .assert_json_path("user.email", "alex@example.com")
         .assert_json_path("abilities", json!(["products:read", "products:write"]));
     let read_only = login(&app, true).await;
     app.request()

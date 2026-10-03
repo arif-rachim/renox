@@ -10,6 +10,30 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M32 · English only
+
+Everything in the repository is now English: code, comments, docs, tests, and the examples'
+seed data, names, pages and mails. Renox no longer ships a built-in Indonesian locale.
+
+- **Breaking:** the built-in `id` texts are gone. Validation messages, auth pages and mails,
+  and the kit's texts are built in for English only. Apps add any other language with
+  `resources/lang/<locale>.json` (`renox.validation.*`, `renox.auth.*`, `ui.*`), as before.
+  An app that relied on `APP_LOCALE=id` without a lang file now gets English.
+- **Breaking:** `validation::Locale` has only `En` (still `#[non_exhaustive]`);
+  `Locale::parse` returns `En` for every input.
+- `rnx new` no longer writes `resources/lang/id.json`.
+- The password check on the account pages names the field with the app's
+  `renox.validation.attributes.<field>`, when there is one.
+- `chart(…)` month labels are English for every locale; axis ticks keep the locale's
+  number separators.
+- Command prompts accept only English answers ("tidak" is no longer a no).
+- examples/hello and examples/shop use Spanish (`es.json`) as their second language;
+  hello's routes are `/hello/{name}` and `/language/{locale}`. Every example's seed data,
+  names and tests are in English. Place names, `Asia/Jakarta`, phone numbers and the
+  rupiah currency stay: they are data, not language.
+- The framework's tests use a Spanish fixture (`crates/renox/tests/lang/es.json`) for
+  everything the Indonesian built-ins used to cover.
+
 ### M31 · A warm default theme and a type scale
 
 The owner found the kit's look plain. Three directions were tried on the examples (the

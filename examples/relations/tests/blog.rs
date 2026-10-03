@@ -46,7 +46,7 @@ async fn blog() -> Blog {
         .await
         .unwrap();
     POST_TAGS.attach(db, rust.id, [tags[0].id]).await.unwrap();
-    for (post_id, author) in [(beans.id, "Ani"), (beans.id, "Budi"), (rust.id, "Citra")] {
+    for (post_id, author) in [(beans.id, "Anna"), (beans.id, "Ben"), (rust.id, "Clara")] {
         let comment = Comment {
             post_id,
             author: author.into(),
@@ -72,8 +72,8 @@ async fn the_list_shows_each_posts_relations() {
     page.assert_ok()
         .assert_see("#howto")
         .assert_see("#review")
-        .assert_see("2 comments; latest by Budi")
-        .assert_see("1 comment; latest by Citra")
+        .assert_see("2 comments; latest by Ben")
+        .assert_see("1 comment; latest by Clara")
         .assert_see("0 comments")
         .assert_see("Uncategorized");
     // Each card has its own category.
@@ -96,12 +96,12 @@ async fn a_post_with_its_comments_and_new_ones() {
         .get(&url)
         .await
         .assert_see("Comments (2)")
-        .assert_see("<strong>Ani</strong>")
+        .assert_see("<strong>Anna</strong>")
         .assert_see(">Coffee</a>");
     b.app
         .post(
             &format!("/posts/{}/comments", b.beans.id),
-            &[("author", "Dewi"), ("body", "Where to buy?")],
+            &[("author", "Diana"), ("body", "Where to buy?")],
         )
         .await
         .assert_redirect(&format!("{url}#comments"));
@@ -198,7 +198,7 @@ async fn the_report_joins_and_counts() {
         .assert_see(r#"<td>Uncategorized</td><td class="rx-num">1</td><td class="rx-num">0</td>"#)
         .assert_see(r#"<td>#howto</td><td class="rx-num">2</td>"#)
         .assert_see(r#"<td>#news</td><td class="rx-num">0</td>"#)
-        .assert_see(r#"<td>Ani</td><td class="rx-num">1</td>"#);
+        .assert_see(r#"<td>Anna</td><td class="rx-num">1</td>"#);
 }
 
 #[renox::test]
@@ -293,17 +293,17 @@ async fn posts_and_comments_are_liked() {
         .await
         .assert_redirect(&url);
     b.app.post(&format!("{url}/like"), &[]).await;
-    let ani = Comment::where_eq("author", "Ani")
+    let anna = Comment::where_eq("author", "Anna")
         .first(b.app.db())
         .await
         .unwrap()
         .unwrap();
     b.app
-        .post(&format!("/comments/{}/like", ani.id), &[])
+        .post(&format!("/comments/{}/like", anna.id), &[])
         .await
-        .assert_redirect(&format!("{url}#comment-{}", ani.id));
+        .assert_redirect(&format!("{url}#comment-{}", anna.id));
 
-    // Two likes on the post, one on Ani's comment, none on Budi's.
+    // Two likes on the post, one on Anna's comment, none on Ben's.
     let page = b.app.get(&url).await;
     page.assert_ok();
     let text = page.text();
@@ -316,12 +316,12 @@ async fn posts_and_comments_are_liked() {
         text[at..at + 48].to_owned()
     };
     assert!(likes("<h1").contains(">2 likes<"));
-    assert!(likes("<strong>Ani</strong>").contains(">1 like<"));
-    assert!(likes("<strong>Budi</strong>").contains(">0 likes<"));
+    assert!(likes("<strong>Anna</strong>").contains(">1 like<"));
+    assert!(likes("<strong>Ben</strong>").contains(">0 likes<"));
     b.app
         .assert_database_has(
             "likes",
-            &[("likeable_type", &"comments"), ("likeable_id", &ani.id)],
+            &[("likeable_type", &"comments"), ("likeable_id", &anna.id)],
         )
         .await;
 
@@ -334,7 +334,7 @@ async fn posts_and_comments_are_liked() {
         .get("/report")
         .await
         .assert_see(">Beans</a>")
-        .assert_see("a comment by Ani");
+        .assert_see("a comment by Anna");
 
     b.app.post("/posts/999/like", &[]).await.assert_not_found();
     b.app
@@ -376,26 +376,28 @@ async fn the_seeder_fills_the_app_and_can_run_again() {
 async fn posts_are_markdown_with_their_own_description() {
     let b = blog().await;
     let mut post = b.beans.clone();
-    post.body = "Beans from **Gayo**, roasted on Tuesdays.\n\n## Brewing\n\n- V60\n- Aeropress\n\n<script>alert(1)</script>".into();
+    post.body = "Beans from **Ethiopia**, roasted on Tuesdays.\n\n## Brewing\n\n- V60\n- Aeropress\n\n<script>alert(1)</script>".into();
     post.save(b.app.db()).await.unwrap();
     b.app
         .get(&format!("/posts/{}", post.id))
         .await
         .assert_ok()
-        .assert_see("<strong>Gayo</strong>")
+        .assert_see("<strong>Ethiopia</strong>")
         .assert_see("<h2>Brewing</h2>")
         .assert_see("<li>V60</li>")
         // Raw HTML in a body is shown as text, never run.
         .assert_dont_see("<script>alert(1)</script>")
         // Search engines and link previews get the first paragraph.
-        .assert_see(r#"<meta name="description" content="Beans from Gayo, roasted on Tuesdays.">"#)
+        .assert_see(
+            r#"<meta name="description" content="Beans from Ethiopia, roasted on Tuesdays.">"#,
+        )
         .assert_see(r#"<meta property="og:type" content="article">"#)
         .assert_see("<title>Beans · ");
     // The list shows it as plain text.
     b.app
         .get("/")
         .await
-        .assert_see("Beans from Gayo, roasted on Tuesdays.");
+        .assert_see("Beans from Ethiopia, roasted on Tuesdays.");
 }
 
 #[renox::test]

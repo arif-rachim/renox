@@ -167,9 +167,9 @@ async fn roles_reach_policies_and_gate_before() {
     permissions::define_role(db, "admin", &[]).await.unwrap();
     permissions::define_role(db, "editor", &[]).await.unwrap();
     let (ana, bo, cy) = (
-        user(&app, "ana@t.id").await,
-        user(&app, "bo@t.id").await,
-        user(&app, "cy@t.id").await,
+        user(&app, "ana@t.test").await,
+        user(&app, "bo@t.test").await,
+        user(&app, "cy@t.test").await,
     );
     ana.assign_role(db, "admin").await.unwrap();
     cy.assign_role(db, "editor").await.unwrap();
@@ -220,7 +220,7 @@ async fn roles_reach_policies_and_gate_before() {
 #[renox::test]
 async fn path_values_that_dont_fit_are_404() {
     let (app, _dir) = app().await;
-    let me = user(&app, "me@t.id").await;
+    let me = user(&app, "me@t.test").await;
     app.acting_as(&me);
     app.get("/notes/abc/edit").await.assert_status(404);
     app.get("/notes/99999999999999999999/edit")
@@ -237,7 +237,7 @@ async fn path_values_that_dont_fit_are_404() {
 #[renox::test]
 async fn confirming_the_password_returns_to_the_form_page() {
     let (app, _dir) = app().await;
-    let me = user(&app, "me@t.id").await;
+    let me = user(&app, "me@t.test").await;
     app.acting_as(&me);
     // A DELETE from a form on /notes/new: after confirming, back to /notes/new.
     app.request()
@@ -276,7 +276,7 @@ async fn confirming_the_password_returns_to_the_form_page() {
 #[renox::test]
 async fn a_hook_error_keeps_the_old_input() {
     let (app, _dir) = app().await;
-    let me = user(&app, "me@t.id").await;
+    let me = user(&app, "me@t.test").await;
     app.acting_as(&me);
     app.request()
         .header("referer", "/notes/new")
@@ -339,7 +339,7 @@ async fn retrying_borrows_and_rolls_back_with_a_value() {
 #[renox::test]
 async fn queries_are_counted() {
     let (app, _dir) = app().await;
-    let me = user(&app, "me@t.id").await;
+    let me = user(&app, "me@t.test").await;
     app.acting_as(&me);
     let (res, queries) = renox::db::capture_queries(app.get("/notes/1/audit")).await;
     res.assert_ok();

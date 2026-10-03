@@ -53,7 +53,7 @@ impl Module for Pages {
             .get("/typo", || async {
                 view(
                     "typo.html",
-                    context! { product => context! { name => "Kopi" } },
+                    context! { product => context! { name => "Coffee" } },
                 )
             })
             .get("/flash", || async { view("flash.html", context! {}) })
@@ -121,7 +121,7 @@ fn app() -> App {
         .module(Pages)
         .templates(|env| {
             env.add_filter("rupiah", |n: i64| {
-                format!("Rp {}", renox::format_number(n as f64, 0, "id"))
+                format!("Rp {}", renox::format_number(n as f64, 0, "de"))
             });
         })
         .share("cart_count", |ctx: ViewContext| async move {
@@ -131,7 +131,7 @@ fn app() -> App {
             Ok(ctx.user.map_or("guest".to_owned(), |u| u.name.clone()))
         })
         .provide(Shop {
-            name: "Toko Kopi".into(),
+            name: "Coffee Shop".into(),
         })
         .layer(from_fn(stamp))
         .layer(from_fn(order_a))
@@ -162,7 +162,7 @@ async fn test_app(dir: &tempfile::TempDir, locale: &str, debug: bool) -> TestApp
 #[renox::test]
 async fn filters_and_template_hooks() {
     let dir = views();
-    let app = test_app(&dir, "id", true).await;
+    let app = test_app(&dir, "de", true).await;
     app.get("/prices")
         .await
         .assert_ok()
@@ -178,24 +178,24 @@ async fn shared_view_data_follows_the_user_and_yields_to_the_handler() {
     let dir = views();
     let app = test_app(&dir, "en", true).await;
     app.get("/menu").await.assert_see("0 items for guest");
-    let user = User::register(app.db(), "Arif", "arif@example.com", "rahasia123")
+    let user = User::register(app.db(), "Alex", "alex@example.com", "letmein123")
         .await
         .unwrap();
     app.acting_as(&user);
-    app.get("/menu").await.assert_see("3 items for Arif");
+    app.get("/menu").await.assert_see("3 items for Alex");
     app.get("/menu-override")
         .await
-        .assert_see("99 items for Arif");
+        .assert_see("99 items for Alex");
 }
 
 #[renox::test]
 async fn provided_values_and_app_layers() {
     let dir = views();
     let app = test_app(&dir, "en", true).await;
-    app.get("/shop").await.assert_see("Toko Kopi");
+    app.get("/shop").await.assert_see("Coffee Shop");
     assert_eq!(
         app.state().provided::<Shop>().map(|s| s.name.clone()),
-        Some("Toko Kopi".to_owned())
+        Some("Coffee Shop".to_owned())
     );
     let missing = app.get("/missing").await;
     missing.assert_status(500);
@@ -219,7 +219,7 @@ async fn provided_values_and_app_layers() {
 async fn users_keep_the_apps_own_columns() {
     let dir = views();
     let app = test_app(&dir, "en", true).await;
-    let mut user = User::register(app.db(), "Arif", "arif@example.com", "rahasia123")
+    let mut user = User::register(app.db(), "Alex", "alex@example.com", "letmein123")
         .await
         .unwrap();
     assert_eq!(user.get::<String>("role"), Some("member".into()));
@@ -236,7 +236,7 @@ async fn users_keep_the_apps_own_columns() {
     assert_eq!(admins.len(), 1);
 
     app.acting_as(&user);
-    app.get("/me").await.assert_see("Arif is admin");
+    app.get("/me").await.assert_see("Alex is admin");
     app.get("/admin").await.assert_see("admin area");
     let json: renox::serde_json::Value = app.get("/me.json").await.json();
     assert_eq!(json["role"], "admin");
@@ -247,7 +247,7 @@ async fn users_keep_the_apps_own_columns() {
 async fn async_gates_can_query_the_database() {
     let dir = views();
     let app = test_app(&dir, "en", true).await;
-    let mut user = User::register(app.db(), "Arif", "arif@example.com", "rahasia123")
+    let mut user = User::register(app.db(), "Alex", "alex@example.com", "letmein123")
         .await
         .unwrap();
     app.acting_as(&user);
@@ -286,10 +286,10 @@ async fn registration_hooks_validate_and_save_extra_fields() {
     .await;
     let form = |email: &'static str, phone: &'static str| {
         vec![
-            ("name", "Arif"),
+            ("name", "Alex"),
             ("email", email),
-            ("password", "rahasia123"),
-            ("password_confirmation", "rahasia123"),
+            ("password", "letmein123"),
+            ("password_confirmation", "letmein123"),
             ("phone", phone),
         ]
     };
@@ -298,17 +298,17 @@ async fn registration_hooks_validate_and_save_extra_fields() {
         .htmx()
         .post(
             "/register",
-            &[("name", ""), ("email", "x"), ("password", "rahasia123")],
+            &[("name", ""), ("email", "x"), ("password", "letmein123")],
         )
         .await;
     res.assert_invalid("phone").assert_invalid("email");
 
-    app.post("/register", &form("arif@example.com", "0812"))
+    app.post("/register", &form("alex@example.com", "0812"))
         .await;
     app.assert_database_has(
         "users",
         &[
-            ("email", &"arif@example.com"),
+            ("email", &"alex@example.com"),
             ("phone", &"0812"),
             ("role", &"admin"),
         ],
@@ -316,11 +316,9 @@ async fn registration_hooks_validate_and_save_extra_fields() {
     .await;
 
     app.logout();
-    let res = app
-        .post("/register", &form("budi@example.com", "000"))
-        .await;
+    let res = app.post("/register", &form("ben@example.com", "000")).await;
     res.assert_status(400);
-    app.assert_database_missing("users", &[("email", &"budi@example.com")])
+    app.assert_database_missing("users", &[("email", &"ben@example.com")])
         .await;
 }
 

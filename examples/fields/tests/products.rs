@@ -6,7 +6,7 @@ use renox::prelude::*;
 use renox::testing::TestApp;
 
 const FULL: &[(&str, &str)] = &[
-    ("name", "Kopi Gayo"),
+    ("name", "Highland Coffee"),
     ("description", "Arabica"),
     ("stock", "12"),
     ("weight_kg", "0.25"),
@@ -28,7 +28,7 @@ async fn a_product_round_trips_from_the_form_to_the_database_and_back() {
     let edit = res.header("location").unwrap().to_owned();
 
     let product = Product::query().first(app.db()).await.unwrap().unwrap();
-    assert_eq!(product.name, "Kopi Gayo");
+    assert_eq!(product.name, "Highland Coffee");
     assert_eq!(product.description.as_deref(), Some("Arabica"));
     assert_eq!(
         (product.stock, product.weight_kg, product.price),
@@ -51,7 +51,7 @@ async fn a_product_round_trips_from_the_form_to_the_database_and_back() {
     app.get(&edit)
         .await
         .assert_ok()
-        .assert_see(r#"name="name" type="text" value="Kopi Gayo""#)
+        .assert_see(r#"name="name" type="text" value="Highland Coffee""#)
         .assert_see(">Arabica</textarea>")
         .assert_see(r#"value="0.25""#)
         .assert_see(r#"name="available" value="on" checked"#)
@@ -82,7 +82,7 @@ async fn unchecking_and_emptying_fields_saves_them_empty() {
     app.put(
         &update,
         &[
-            ("name", "Kopi Gayo"),
+            ("name", "Highland Coffee"),
             ("stock", "0"),
             ("weight_kg", "0"),
             ("price", "0"),
@@ -233,7 +233,7 @@ async fn the_show_page_formats_every_field() {
     app.post("/products", &form).await.assert_status(303);
     let product = Product::query().first(app.db()).await.unwrap().unwrap();
     app.get("/").await.assert_see(&format!(
-        r#"href="/products/{}"><strong>Kopi Gayo</strong>"#,
+        r#"href="/products/{}"><strong>Highland Coffee</strong>"#,
         product.id
     ));
     app.get(&format!("/products/{}", product.id))
@@ -277,8 +277,8 @@ async fn the_index_lists_products_in_a_table_or_says_it_is_empty() {
         .assert_see(r#"href="/products/new""#);
 
     app.kernel().seed().await.unwrap();
-    let kopi = Product::query()
-        .where_eq("name", "Kopi Gayo")
+    let coffee = Product::query()
+        .where_eq("name", "Highland Coffee")
         .first(app.db())
         .await
         .unwrap()
@@ -289,8 +289,8 @@ async fn the_index_lists_products_in_a_table_or_says_it_is_empty() {
         .assert_see(r#"<table class="rx-table">"#)
         .assert_see("Rp 85,000")
         .assert_see(r#"<span class="rx-badge rx-badge--info">Medium</span>"#)
-        .assert_see(&format!(r#"href="/products/{}/edit""#, kopi.id))
-        .assert_see(&format!(r#"action="/products/{}""#, kopi.id));
+        .assert_see(&format!(r#"href="/products/{}/edit""#, coffee.id))
+        .assert_see(&format!(r#"action="/products/{}""#, coffee.id));
 }
 
 #[renox::test]
@@ -311,24 +311,24 @@ async fn saving_shows_a_toast_on_the_next_page() {
 async fn a_product_can_be_deleted() {
     let app = TestApp::new(fields::app()).await;
     app.kernel().seed().await.unwrap();
-    let kopi = Product::query()
-        .where_eq("name", "Kopi Gayo")
+    let coffee = Product::query()
+        .where_eq("name", "Highland Coffee")
         .first(app.db())
         .await
         .unwrap()
         .unwrap();
 
-    app.delete(&format!("/products/{}", kopi.id))
+    app.delete(&format!("/products/{}", coffee.id))
         .await
         .assert_redirect("/");
-    assert!(Product::find(app.db(), kopi.id).await.unwrap().is_none());
+    assert!(Product::find(app.db(), coffee.id).await.unwrap().is_none());
     assert_eq!(Product::query().count(app.db()).await.unwrap(), 1);
     app.get("/")
         .await
-        .assert_see("“Kopi Gayo” deleted.")
-        .assert_dont_see("<strong>Kopi Gayo</strong>");
+        .assert_see("“Highland Coffee” deleted.")
+        .assert_dont_see("<strong>Highland Coffee</strong>");
     // Gone: a second delete is a 404.
-    app.delete(&format!("/products/{}", kopi.id))
+    app.delete(&format!("/products/{}", coffee.id))
         .await
         .assert_status(404);
 }

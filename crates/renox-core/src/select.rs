@@ -7,8 +7,8 @@
 //! |---|---|
 //! | `GET ?q=kop` (what was typed) | the matching options, a JSON list of [`SelectOption`] |
 //! | `GET ?values=3&values=5` (labels for values the page has) | those options |
-//! | `POST label=Kopi` (`editable`: "Add “Kopi”") | the new option, auto-selected |
-//! | `POST _method=PUT value=3&label=Kopi Susu` (`editable`: renaming the chosen one) | the option as saved |
+//! | `POST label=Coffee` (`editable`: "Add “Coffee”") | the new option, auto-selected |
+//! | `POST _method=PUT value=3&label=Iced Coffee` (`editable`: renaming the chosen one) | the option as saved |
 //!
 //! A 422 (from `Valid`) shows its first message under the field. Who may
 //! add or rename options is the handler's call, like any route.
@@ -56,7 +56,7 @@ use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 
 /// One option of a select: the value the form sends and the label people
-/// see. Serialized as `{"value": "3", "label": "Kopi"}`; the value is
+/// see. Serialized as `{"value": "3", "label": "Coffee"}`; the value is
 /// always text, as a form sends it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -135,8 +135,8 @@ mod tests {
 
     #[test]
     fn reads_searches_and_lookups() {
-        let search = OptionQuery::parse("q=%20Kopi%20Susu%20");
-        assert_eq!(search.q, "Kopi Susu");
+        let search = OptionQuery::parse("q=%20Iced%20Coffee%20");
+        assert_eq!(search.q, "Iced Coffee");
         assert!(!search.is_lookup());
         let lookup = OptionQuery::parse("values=3&values=&values%5B%5D=5&other=x");
         assert_eq!(lookup.values, ["3", "5"]);
@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn options_serialize_with_text_values() {
-        let json = serde_json::to_string(&SelectOption::new(3, "Kopi")).unwrap();
-        assert_eq!(json, r#"{"value":"3","label":"Kopi"}"#);
+        let json = serde_json::to_string(&SelectOption::new(3, "Coffee")).unwrap();
+        assert_eq!(json, r#"{"value":"3","label":"Coffee"}"#);
     }
 }

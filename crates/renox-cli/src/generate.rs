@@ -147,7 +147,7 @@ fn module_dir(root: &Path, module: &str) -> Result<PathBuf> {
     Ok(dir)
 }
 
-/// `rnx make:module stok_barang`: a module with an index route and view.
+/// `rnx make:module stock_items`: a module with an index route and view.
 pub fn module(root: &Path, name: &str) -> Result<()> {
     check_name(name)?;
     let snake = name.to_snake_case();
@@ -301,7 +301,7 @@ fn register_in_module(mod_rs: &Path, call: &str) -> Result<()> {
     Ok(())
 }
 
-/// `rnx make:model Produk [--module produk] [--migration] [--key ulid]`.
+/// `rnx make:model Product [--module products] [--migration] [--key ulid]`.
 pub fn model(
     root: &Path,
     name: &str,
@@ -368,7 +368,7 @@ pub struct {pascal} {{
     Ok(())
 }
 
-/// `rnx make:job KirimStruk --module pesanan`.
+/// `rnx make:job SendReceipt --module orders`.
 pub fn job(root: &Path, name: &str, module: &str) -> Result<()> {
     check_name(name)?;
     let pascal = name.to_upper_camel_case();
@@ -459,7 +459,7 @@ impl AppCommand for {pascal} {{
     )
 }
 
-/// `rnx make:policy Produk --module produk`: `impl Policy` for a model.
+/// `rnx make:policy Product --module products`: `impl Policy` for a model.
 pub fn policy(root: &Path, model: &str, module: &str) -> Result<()> {
     check_name(model)?;
     let pascal = model.to_upper_camel_case();
@@ -488,7 +488,7 @@ impl Policy for {pascal} {{
     add_mod(&dir.join("mod.rs"), "policy")
 }
 
-/// `rnx make:mail pesanan_dikirim`: an HTML and a text template.
+/// `rnx make:mail order_shipped`: an HTML and a text template.
 pub fn mail(root: &Path, name: &str) -> Result<()> {
     check_name(name)?;
     let snake = name.to_snake_case();
@@ -514,7 +514,7 @@ pub fn mail(root: &Path, name: &str) -> Result<()> {
     Ok(())
 }
 
-/// `rnx make:factory Produk --module produk`: fake records for seeders and tests.
+/// `rnx make:factory Product --module products`: fake records for seeders and tests.
 pub fn factory(root: &Path, model: &str, module: &str) -> Result<()> {
     check_name(model)?;
     let pascal = model.to_upper_camel_case();
@@ -681,7 +681,7 @@ impl Event for {pascal} {{}}
     )
 }
 
-/// `rnx make:rule Npwp --module invoices`: a validation rule to `apply`.
+/// `rnx make:rule TaxId --module invoices`: a validation rule to `apply`.
 pub fn rule(root: &Path, name: &str, module: &str) -> Result<()> {
     check_name(name)?;
     let pascal = name.to_upper_camel_case();
@@ -793,24 +793,24 @@ mod tests {
     #[test]
     fn modules_are_created_and_registered() {
         let dir = app();
-        module(dir.path(), "stok_barang").unwrap();
-        let code = read(&dir, "src/app/stok_barang/mod.rs");
-        assert!(code.contains("pub struct StokBarang;"));
+        module(dir.path(), "stock_items").unwrap();
+        let code = read(&dir, "src/app/stock_items/mod.rs");
+        assert!(code.contains("pub struct StockItems;"));
         assert!(
-            code.contains(r#"Routes::new().get("/stok-barang", index).name("stok_barang.index")"#)
+            code.contains(r#"Routes::new().get("/stock-items", index).name("stock_items.index")"#)
         );
         assert!(
-            read(&dir, "resources/views/stok_barang/index.html").contains("<h1>Stok Barang</h1>")
+            read(&dir, "resources/views/stock_items/index.html").contains("<h1>Stock Items</h1>")
         );
         assert_eq!(
             read(&dir, "src/app/mod.rs"),
-            "pub mod home;\npub mod stok_barang;\n"
+            "pub mod home;\npub mod stock_items;\n"
         );
         assert!(read(&dir, "src/main.rs").contains(
-            "        .module(app::home::Home)\n        .module(app::stok_barang::StokBarang)\n        .run()"
+            "        .module(app::home::Home)\n        .module(app::stock_items::StockItems)\n        .run()"
         ));
         assert!(
-            module(dir.path(), "stok_barang").is_err(),
+            module(dir.path(), "stock_items").is_err(),
             "never overwrites"
         );
         assert!(module(dir.path(), "../evil").is_err());
@@ -819,11 +819,12 @@ mod tests {
     #[test]
     fn models_jobs_policies_and_mails() {
         let dir = app();
-        module(dir.path(), "produk").unwrap();
-        model(dir.path(), "Produk", None, true, crate::KeyType::Integer).unwrap();
-        let code = read(&dir, "src/app/produk/model.rs");
+        module(dir.path(), "product").unwrap();
+        model(dir.path(), "Product", None, true, crate::KeyType::Integer).unwrap();
+        let code = read(&dir, "src/app/product/model.rs");
         assert!(
-            code.contains(r#"#[model(table = "produk")]"#) && code.contains("pub struct Produk {")
+            code.contains(r#"#[model(table = "product")]"#)
+                && code.contains("pub struct Product {")
         );
         let migrations: Vec<_> = fs::read_dir(dir.path().join("migrations"))
             .unwrap()
@@ -832,50 +833,52 @@ mod tests {
 
         model(
             dir.path(),
-            "Kategori",
-            Some("produk"),
+            "Category",
+            Some("product"),
             false,
             crate::KeyType::Integer,
         )
         .unwrap();
         model(
             dir.path(),
-            "Faktur",
-            Some("produk"),
+            "Invoice",
+            Some("product"),
             false,
             crate::KeyType::Ulid,
         )
         .unwrap();
-        let faktur = read(&dir, "src/app/produk/faktur.rs");
+        let invoice = read(&dir, "src/app/product/invoice.rs");
         assert!(
-            faktur.starts_with("use renox::db::Ulid;\n") && faktur.contains("    pub id: Ulid,\n"),
-            "{faktur}"
+            invoice.starts_with("use renox::db::Ulid;\n")
+                && invoice.contains("    pub id: Ulid,\n"),
+            "{invoice}"
         );
         assert!(
-            dir.path().join("src/app/produk/kategori.rs").exists(),
+            dir.path().join("src/app/product/category.rs").exists(),
             "model.rs is taken"
         );
 
-        job(dir.path(), "KirimStruk", "produk").unwrap();
+        job(dir.path(), "MailReceipt", "product").unwrap();
         assert!(
-            read(&dir, "src/app/produk/kirim_struk.rs")
-                .contains(r#"const NAME: &'static str = "kirim-struk";"#)
+            read(&dir, "src/app/product/mail_receipt.rs")
+                .contains(r#"const NAME: &'static str = "mail-receipt";"#)
         );
-        command(dir.path(), "stok:import", "produk").unwrap();
+        command(dir.path(), "stock:import", "product").unwrap();
         assert!(
-            read(&dir, "src/app/produk/stok_import.rs").contains("impl AppCommand for StokImport")
+            read(&dir, "src/app/product/stock_import.rs")
+                .contains("impl AppCommand for StockImport")
         );
-        assert!(command(dir.path(), "Bad Name", "produk").is_err());
-        assert!(command(dir.path(), "self", "produk").is_err());
-        policy(dir.path(), "Produk", "produk").unwrap();
-        assert!(read(&dir, "src/app/produk/policy.rs").contains("impl Policy for Produk"));
+        assert!(command(dir.path(), "Bad Name", "product").is_err());
+        assert!(command(dir.path(), "self", "product").is_err());
+        policy(dir.path(), "Product", "product").unwrap();
+        assert!(read(&dir, "src/app/product/policy.rs").contains("impl Policy for Product"));
 
-        let mods = read(&dir, "src/app/produk/mod.rs");
+        let mods = read(&dir, "src/app/product/mod.rs");
         for m in [
             "pub mod model;",
-            "pub mod kategori;",
-            "pub mod kirim_struk;",
-            "pub mod stok_import;",
+            "pub mod category;",
+            "pub mod mail_receipt;",
+            "pub mod stock_import;",
             "pub mod policy;",
         ] {
             assert!(mods.contains(m), "{mods}");
@@ -892,14 +895,14 @@ mod tests {
             "unknown module"
         );
 
-        mail(dir.path(), "pesanan_dikirim").unwrap();
+        mail(dir.path(), "order_shipped").unwrap();
         assert!(
-            read(&dir, "resources/views/mail/pesanan_dikirim.html")
+            read(&dir, "resources/views/mail/order_shipped.html")
                 .contains("renox/mail/layout.html")
         );
         assert!(
             dir.path()
-                .join("resources/views/mail/pesanan_dikirim.txt")
+                .join("resources/views/mail/order_shipped.txt")
                 .exists()
         );
     }

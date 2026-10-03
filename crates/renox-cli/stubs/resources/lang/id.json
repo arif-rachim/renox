@@ -1,6 +1,0 @@
-{
-  "home": {
-    "running": "Aplikasi Renox kamu sudah jalan.",
-    "edit": "Ubah resources/views/home/index.html lalu refresh: template dimuat ulang tanpa build."
-  }
-}

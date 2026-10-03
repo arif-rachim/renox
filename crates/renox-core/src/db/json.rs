@@ -22,7 +22,7 @@ use super::{DbValue, ToDbValue};
 ///     tags: Json<Vec<String>>, // tags TEXT (SQLite) / tags JSONB (PostgreSQL)
 /// }
 ///
-/// let product = Product { tags: Json(vec!["kopi".into()]), ..Default::default() };
+/// let product = Product { tags: Json(vec!["coffee".into()]), ..Default::default() };
 /// assert_eq!(product.tags.len(), 1); // derefs to the Vec
 /// ```
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

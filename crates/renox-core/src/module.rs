@@ -8,15 +8,15 @@ use crate::{Registry, Routes};
 /// # use renox::prelude::*;
 /// # async fn index() -> &'static str { "" }
 /// # async fn show() -> &'static str { "" }
-/// pub struct Produk;
+/// pub struct Products;
 ///
-/// impl Module for Produk {
-///     fn name(&self) -> &'static str { "produk" }
+/// impl Module for Products {
+///     fn name(&self) -> &'static str { "products" }
 ///
 ///     fn routes(&self) -> Routes {
 ///         Routes::new()
-///             .get("/produk", index).name("produk.index")
-///             .get("/produk/{id}", show).name("produk.show")
+///             .get("/products", index).name("products.index")
+///             .get("/products/{id}", show).name("products.show")
 ///     }
 /// }
 /// ```
@@ -29,7 +29,7 @@ pub trait Module: Send + Sync + 'static {
         Routes::new()
     }
 
-    /// Migrations this module owns, e.g. `renox::migrations!("src/app/produk/migrations")`.
+    /// Migrations this module owns, e.g. `renox::migrations!("src/app/products/migrations")`.
     fn migrations(&self) -> &'static [Migration] {
         &[]
     }

@@ -41,10 +41,6 @@ const STUBS: &[(&str, &str)] = &[
         "resources/lang/en.json",
         include_str!("../stubs/resources/lang/en.json"),
     ),
-    (
-        "resources/lang/id.json",
-        include_str!("../stubs/resources/lang/id.json"),
-    ),
 ];
 
 const RENOX_GIT: &str = "https://github.com/arif-rachim/renox";
@@ -234,7 +230,7 @@ fn validate_name(name: &str) -> Result<()> {
     Ok(())
 }
 
-/// `toko-kopi` -> `Toko Kopi`
+/// `coffee-shop` -> `Coffee Shop`
 fn title(name: &str) -> String {
     name.split(['-', '_'])
         .filter(|word| !word.is_empty())
@@ -255,11 +251,11 @@ mod tests {
 
     #[test]
     fn validates_names() {
-        assert!(validate_name("toko").is_ok());
-        assert!(validate_name("toko-kopi_2").is_ok());
-        assert!(validate_name("Toko").is_err());
-        assert!(validate_name("2toko").is_err());
-        assert!(validate_name("../toko").is_err());
+        assert!(validate_name("shop").is_ok());
+        assert!(validate_name("coffee-shop_2").is_ok());
+        assert!(validate_name("Shop").is_err());
+        assert!(validate_name("2shop").is_err());
+        assert!(validate_name("../shop").is_err());
         for reserved in ["renox", "fn", "self", "type"] {
             assert!(validate_name(reserved).is_err(), "{reserved}");
         }
@@ -289,13 +285,13 @@ mod tests {
         let checkout = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         run_in(
             dir.path(),
-            "toko-kopi",
+            "coffee-shop",
             Some(&checkout),
             Database::Sqlite,
             false,
         )
         .unwrap();
-        let root = dir.path().join("toko-kopi");
+        let root = dir.path().join("coffee-shop");
         for (file, _) in STUBS {
             let text = fs::read_to_string(root.join(file)).unwrap();
             // `{{name}}`-style placeholders (templates' `{{ x }}` has spaces).
@@ -307,7 +303,7 @@ mod tests {
             assert!(!left, "{file} still has a placeholder");
         }
         let cargo = fs::read_to_string(root.join("Cargo.toml")).unwrap();
-        assert!(cargo.contains("name = \"toko-kopi\""), "{cargo}");
+        assert!(cargo.contains("name = \"coffee-shop\""), "{cargo}");
         assert!(cargo.contains("renox = { path = "), "{cargo}");
         // The real .env has a key; the example doesn't.
         let env = read_lf(root.join(".env"));
@@ -317,10 +313,10 @@ mod tests {
         assert!(env.contains("DATABASE_URL=sqlite://storage/app.db"));
         // AGENTS.md names the crate in its test example.
         let agents = fs::read_to_string(root.join("AGENTS.md")).unwrap();
-        assert!(agents.contains("toko_kopi::app()"));
+        assert!(agents.contains("coffee_shop::app()"));
         // Not twice, and not over a bad name or a checkout that isn't Renox.
-        assert!(run_in(dir.path(), "toko-kopi", None, Database::Sqlite, false).is_err());
-        assert!(run_in(dir.path(), "Toko", None, Database::Sqlite, false).is_err());
+        assert!(run_in(dir.path(), "coffee-shop", None, Database::Sqlite, false).is_err());
+        assert!(run_in(dir.path(), "Shop", None, Database::Sqlite, false).is_err());
         assert!(
             run_in(
                 dir.path(),
@@ -349,6 +345,6 @@ mod tests {
 
     #[test]
     fn titles_names() {
-        assert_eq!(title("toko-kopi_nusantara"), "Toko Kopi Nusantara");
+        assert_eq!(title("coffee-shop_downtown"), "Coffee Shop Downtown");
     }
 }

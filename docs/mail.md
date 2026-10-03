@@ -43,13 +43,13 @@ use renox::mail::Mail;
 
 async fn invoice(State(state): State<AppState>) -> Result {
     let pdf: Vec<u8> = b"%PDF-1.7 ...".to_vec();
-    let mail = Mail::new("budi@example.com", "Invoice INV-001", "Your invoice is attached.")
+    let mail = Mail::new("ben@example.com", "Invoice INV-001", "Your invoice is attached.")
         .html("<p>Your invoice is attached.</p>") // text is still sent as the plain part
-        .also_to("siti@example.com")
+        .also_to("sarah@example.com")
         .cc("sales@example.com")
         .bcc("archive@example.com")
-        .reply_to("Toko Kopi <halo@toko.id>")
-        .from("Toko Kopi Billing <billing@toko.id>") // instead of MAIL_FROM_*
+        .reply_to("Coffee Shop <hello@shop.example>")
+        .from("Coffee Shop Billing <billing@shop.example>") // instead of MAIL_FROM_*
         .attach("INV-001.pdf", "application/pdf", pdf);
     state.mailer.send(mail).await // now, in this request
 }
@@ -77,7 +77,7 @@ use renox::prelude::*;
 async fn receipt(state: &AppState, order_id: i64, pdf: Vec<u8>) -> Result {
     let mail = state
         .mail_view(
-            "budi@example.com",
+            "ben@example.com",
             format!("Receipt for order #{order_id}"),
             "mail/receipt", // mail/receipt.html (+ mail/receipt.txt)
             context! { order_id, total => 75_000 },
@@ -128,13 +128,13 @@ request's, else `APP_LOCALE`. Outside a request (a job, a command) pick one:
 use renox::prelude::*;
 
 async fn welcome(state: &AppState, user: &User) -> Result {
-    // This mail only, in Indonesian: t() in the view and the subject below use "id".
-    let subject = state.lang("id").t("mail.welcome", &[("name", &user.name)]);
-    let mail = state.mail_view_in("id", &user.email, subject, "mail/welcome", context! {})?;
+    // This mail only, in Spanish (from lang/es.json): t() in the view and the subject use "es".
+    let subject = state.lang("es").t("mail.welcome", &[("name", &user.name)]);
+    let mail = state.mail_view_in("es", &user.email, subject, "mail/welcome", context! {})?;
     state.queue_mail(mail).await?;
 
     // Or for the rest of this job or task:
-    renox::i18n::set_current_locale("id");
+    renox::i18n::set_current_locale("es");
     let subject = state.current_lang().t("mail.welcome", &[("name", &user.name)]);
     let _ = subject;
     Ok(())
@@ -222,7 +222,7 @@ async fn ship(state: &AppState, user: &User) -> Result {
     // Someone without an account (no database row for them):
     let guest = Recipient::to("mail", "guest@example.com")
         .and("whatsapp", "+6281234567890")
-        .in_locale("id");
+        .in_locale("es");
     state.notify_to(&guest, &shipped).await
 }
 ```
@@ -246,7 +246,7 @@ database versions into the module.
 
 ## Localized notifications
 
-Each message is built in the recipient's language: `Recipient::in_locale("id")`, else the
+Each message is built in the recipient's language: `Recipient::in_locale("es")`, else the
 user's `locale` column when the `users` table has one, else the current language. While
 `to_mail`, `to_database` and `to_channel` run, `t()` in mail views and `state.current_lang()` in code use it,
 so one notification sent to many users speaks each one's language.
@@ -379,11 +379,11 @@ async fn mail_and_notifications() {
     let app = TestApp::new(App::new().module(Auth::new())).await;
     let state = app.state();
 
-    let mail = state.mail_view("budi@example.com", "Welcome", "renox/mail/layout", context! {}).unwrap();
+    let mail = state.mail_view("ben@example.com", "Welcome", "renox/mail/layout", context! {}).unwrap();
     state.queue_mail(mail).await.unwrap();
     app.run_jobs().await;
-    app.assert_mail_sent("budi@example.com", "Welcome");
-    assert!(app.sent_mail()[0].is_for("budi@example.com"));
+    app.assert_mail_sent("ben@example.com", "Welcome");
+    assert!(app.sent_mail()[0].is_for("ben@example.com"));
 
     app.fake_notifications();
     let guest = Recipient::to("mail", "guest@example.com");
@@ -413,7 +413,7 @@ More in [testing.md](testing.md) ("Jobs, events, notifications, mail, HTTP").
 | `Mail::to()->cc()->bcc()`, `replyTo`, `from`, `attach` | `Mail` builder: `also_to`, `cc`, `bcc`, `reply_to`, `from`, `attach` |
 | `Mail::send` / `Mail::queue` | `state.mailer.send(mail)` / `state.queue_mail(mail)` |
 | Markdown mail components (`x-mail::button`, `panel`, `table`) | `renox/mail/components.html`: `button`, `panel`, `table`, `divider` |
-| `Mail::to($u)->locale('id')` | `state.mail_view_in("id", …)` |
+| `Mail::to($u)->locale('es')` | `state.mail_view_in("es", …)` |
 | `php artisan make:mail` | `rnx make:mail` (templates only) |
 | Mail preview packages, Mailpit | `/_renox/mail` (debug) |
 | `Notification` with `via()` | `Notification` with `channels()` / `channels_for()` |

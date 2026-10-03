@@ -20,7 +20,7 @@ pub fn migration_keyed(name: &str, dir: &Path, key: KeyType) -> Result<()> {
             .chars()
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
     if !valid {
-        bail!("`{name}` is not a valid migration name: use snake_case, e.g. create_produk_table");
+        bail!("`{name}` is not a valid migration name: use snake_case, e.g. create_product_table");
     }
 
     fs::create_dir_all(dir).with_context(|| format!("could not create {}", dir.display()))?;
@@ -124,23 +124,23 @@ mod tests {
 
     #[test]
     fn creates_table_templates() {
-        let (up, down) = template("create_produk_table", Database::Sqlite, KeyType::Integer);
-        assert!(up.starts_with("CREATE TABLE \"produk\" ("));
+        let (up, down) = template("create_product_table", Database::Sqlite, KeyType::Integer);
+        assert!(up.starts_with("CREATE TABLE \"product\" ("));
         assert!(up.contains("AUTOINCREMENT"));
-        assert_eq!(down, "DROP TABLE \"produk\";\n");
+        assert_eq!(down, "DROP TABLE \"product\";\n");
         let (up, _) = template("create_order_table", Database::Sqlite, KeyType::Integer);
         assert!(
             up.starts_with("CREATE TABLE \"order\" ("),
             "a keyword works as a table name"
         );
-        let (up, _) = template("create_produk_table", Database::Postgres, KeyType::Integer);
+        let (up, _) = template("create_product_table", Database::Postgres, KeyType::Integer);
         assert!(up.contains("IDENTITY") && up.contains("TIMESTAMPTZ"));
         let (up, _) = template("create_invoice_table", Database::Sqlite, KeyType::Ulid);
         assert!(up.contains("    id TEXT PRIMARY KEY,\n"), "{up}");
         let (up, _) = template("create_invoice_table", Database::Postgres, KeyType::Uuid);
         assert!(up.contains("    id UUID PRIMARY KEY,\n"), "{up}");
         assert!(
-            template("add_stok_to_produk", Database::Sqlite, KeyType::Integer)
+            template("add_stock_to_product", Database::Sqlite, KeyType::Integer)
                 .0
                 .starts_with("-- ")
         );
@@ -149,15 +149,15 @@ mod tests {
     #[test]
     fn writes_both_files() {
         let dir = tempfile_dir();
-        migration("create_produk_table", &dir).unwrap();
+        migration("create_product_table", &dir).unwrap();
         let mut files: Vec<_> = fs::read_dir(&dir)
             .unwrap()
             .map(|e| e.unwrap().file_name().into_string().unwrap())
             .collect();
         files.sort();
         assert_eq!(files.len(), 2);
-        assert!(files[0].ends_with("_create_produk_table.down.sql"));
-        assert!(files[1].ends_with("_create_produk_table.up.sql"));
+        assert!(files[0].ends_with("_create_product_table.down.sql"));
+        assert!(files[1].ends_with("_create_product_table.up.sql"));
         assert!(migration("Bad Name", &dir).is_err());
         assert!(migration("create__table", &dir).is_err());
         fs::remove_dir_all(dir).unwrap();

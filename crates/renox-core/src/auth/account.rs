@@ -122,14 +122,18 @@ async fn check_password(
     }
     let locale = crate::validation::Locale::parse(&lang.locale);
     let template = crate::validation::template_for(locale, Some(&lang.texts()), "current_password");
-    let name = match (locale, field) {
-        (crate::validation::Locale::Id, "current_password") => "kata sandi saat ini",
-        (crate::validation::Locale::Id, _) => "kata sandi",
-        (_, "current_password") => "current password",
-        _ => "password",
-    };
+    // The app's name for the field (`renox.validation.attributes.<field>`)
+    // when its lang file has one.
+    let name = lang
+        .texts()
+        .get(&format!("renox.validation.attributes.{field}"))
+        .cloned()
+        .unwrap_or_else(|| match field {
+            "current_password" => "current password".to_owned(),
+            _ => "password".to_owned(),
+        });
     let mut errors = Errors::new();
-    errors.add(field, crate::validation::render(&template, name, &[]));
+    errors.add(field, crate::validation::render(&template, &name, &[]));
     Err(ValidationError::new(errors).into())
 }
 

@@ -109,14 +109,14 @@ async fn commands_ask_for_what_is_missing() {
 
     // Given as an option, the email isn't asked; "no" creates nothing.
     renox::prompt::answering(
-        ["Budi", "password123", "no"],
+        ["Ben", "password123", "no"],
         app.kernel()
-            .call("user:create", ["--email", "budi@example.com"]),
+            .call("user:create", ["--email", "ben@example.com"]),
     )
     .await
     .unwrap();
     assert!(
-        User::find_by_email(app.db(), "budi@example.com")
+        User::find_by_email(app.db(), "ben@example.com")
             .await
             .unwrap()
             .is_none()

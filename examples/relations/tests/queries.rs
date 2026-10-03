@@ -88,7 +88,7 @@ async fn the_index_runs_the_same_queries_for_any_page_size() {
             let post = Post::create(db, post).await.unwrap();
             let comment = Comment {
                 post_id: post.id,
-                author: "Ani".into(),
+                author: "Anna".into(),
                 body: "Nice.".into(),
                 ..Default::default()
             };

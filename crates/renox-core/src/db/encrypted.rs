@@ -30,7 +30,7 @@ use super::{DbValue, ToDbValue};
 ///
 /// # async fn demo(db: Db) -> Result {
 /// let supplier = Supplier::create(&db, Supplier {
-///     name: "Kopi Nusantara".into(),
+///     name: "Corner Coffee".into(),
 ///     bank_account: Encrypted::new("BCA 123-456-789".into()),
 ///     ..Default::default()
 /// }).await?;

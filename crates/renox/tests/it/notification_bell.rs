@@ -140,14 +140,14 @@ async fn toasts_carry_a_body_actions_a_duration_and_a_position() {
 async fn the_list_shows_marks_deletes_and_opens_notifications() {
     let (app, _dir) = app(true, true).await;
     let ana = user(&app, "ana@example.com").await;
-    let budi = user(&app, "budi@example.com").await;
+    let ben = user(&app, "ben@example.com").await;
     app.state()
         .notify(&ana, &OrderShipped { order: 7 })
         .await
         .unwrap();
     app.state().notify(&ana, &Plain).await.unwrap();
     app.state()
-        .notify(&budi, &OrderShipped { order: 9 })
+        .notify(&ben, &OrderShipped { order: 9 })
         .await
         .unwrap();
     let ids: Vec<i64> = ana
@@ -204,14 +204,14 @@ async fn the_list_shows_marks_deletes_and_opens_notifications() {
         .assert_status(303);
     assert_eq!(ana.unread_notification_count(app.db()).await.unwrap(), 2);
     // Someone else's notification is out of reach.
-    let theirs = budi.notifications(app.db(), 1).await.unwrap()[0].id;
+    let theirs = ben.notifications(app.db(), 1).await.unwrap()[0].id;
     app.post(&format!("/notifications/{theirs}/read"), &[])
         .await;
     app.post(&format!("/notifications/{theirs}/open"), &[])
         .await
         .assert_not_found();
     app.delete(&format!("/notifications/{theirs}")).await;
-    assert_eq!(budi.unread_notification_count(app.db()).await.unwrap(), 1);
+    assert_eq!(ben.unread_notification_count(app.db()).await.unwrap(), 1);
 
     // Opening one marks it read and goes where it points.
     app.post(&format!("/notifications/{shipped}/open"), &[])
@@ -238,7 +238,7 @@ async fn the_list_shows_marks_deletes_and_opens_notifications() {
         .await
         .assert_see("No notifications");
     assert!(ana.notifications(app.db(), 10).await.unwrap().is_empty());
-    assert_eq!(budi.notifications(app.db(), 10).await.unwrap().len(), 1);
+    assert_eq!(ben.notifications(app.db(), 10).await.unwrap().len(), 1);
 }
 
 #[renox::test]
@@ -280,7 +280,7 @@ async fn without_the_option_there_are_no_routes() {
 }
 
 #[renox::test]
-async fn the_list_speaks_indonesian() {
+async fn the_list_speaks_the_apps_language() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("bell.html"), BELL).unwrap();
     let path = dir.path().to_path_buf();
@@ -288,7 +288,8 @@ async fn the_list_speaks_indonesian() {
         App::new().module(Auth::new().notifications()).module(Pages),
         move |c| {
             c.views_path = path;
-            c.locale = "id".into();
+            c.locale = "es".into();
+            c.lang_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/lang");
         },
     )
     .await;
@@ -297,12 +298,12 @@ async fn the_list_speaks_indonesian() {
     app.acting_as(&ana);
     app.get("/bell")
         .await
-        .assert_see(r#"aria-label="Notifikasi, 1 belum dibaca""#);
+        .assert_see(r#"aria-label="Notificaciones, 1 sin leer""#);
     app.get("/notifications")
         .await
-        .assert_see("Tandai semua dibaca")
-        .assert_see("baru saja</time>")
-        .assert_see("Hapus semua");
+        .assert_see("Marcar todo como leído")
+        .assert_see("justo ahora</time>")
+        .assert_see("Borrar todo");
 }
 
 /// Reads the stream until `needle` shows up (or 5 s pass).
@@ -323,7 +324,7 @@ async fn read_until(stream: &mut tokio::net::TcpStream, seen: &mut String, needl
 async fn new_notifications_arrive_over_server_sent_events() {
     let (app, _dir) = app(true, true).await;
     let ana = user(&app, "ana@example.com").await;
-    let budi = user(&app, "budi@example.com").await;
+    let ben = user(&app, "ben@example.com").await;
     app.acting_as(&ana);
     let url = app.serve().await;
     let cookie = app.session_cookie().unwrap();
@@ -345,7 +346,7 @@ async fn new_notifications_arrive_over_server_sent_events() {
 
     // Someone else's notification says nothing here; Ana's arrives at once.
     app.state()
-        .notify(&budi, &OrderShipped { order: 9 })
+        .notify(&ben, &OrderShipped { order: 9 })
         .await
         .unwrap();
     app.state()

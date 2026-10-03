@@ -287,8 +287,8 @@ async fn fixture() -> Fixture {
     fixture_with(Auth::new(), |_| {}).await
 }
 
-async fn arif(app: &TestApp) -> User {
-    User::register(app.db(), "Arif", "arif@example.com", "rahasia123")
+async fn alex(app: &TestApp) -> User {
+    User::register(app.db(), "Alex", "alex@example.com", "letmein123")
         .await
         .unwrap()
 }
@@ -369,12 +369,12 @@ fn multipart(fields: &[(&str, &str)], files: &[(&str, &str, &[u8])], boundary: &
 #[renox::test]
 async fn session_garbage_tampered_truncated_cookies_are_ignored() {
     let app = fixture().await;
-    let user = arif(&app).await;
+    let user = alex(&app).await;
     app.acting_as(&user);
     let good = session_pair(&app.get("/whoami").await).unwrap();
     assert_eq!(
         get_with_cookie(&app, "/whoami", &good).await,
-        "user:arif@example.com"
+        "user:alex@example.com"
     );
 
     let value = good.trim_start_matches("renox_session=");
@@ -406,8 +406,8 @@ async fn session_garbage_tampered_truncated_cookies_are_ignored() {
 async fn session_cookie_from_another_app_key_is_ignored() {
     let a = fixture().await;
     let b = fixture().await; // new random APP_KEY
-    let user = arif(&a).await;
-    arif(&b).await;
+    let user = alex(&a).await;
+    alex(&b).await;
     a.acting_as(&user);
     let cookie = session_pair(&a.get("/whoami").await).unwrap();
     assert_eq!(get_with_cookie(&b, "/whoami", &cookie).await, "guest");
@@ -416,11 +416,11 @@ async fn session_cookie_from_another_app_key_is_ignored() {
 #[renox::test]
 async fn session_login_rotates_csrf_token() {
     let app = fixture().await;
-    arif(&app).await;
+    alex(&app).await;
     let before = app.get("/token").await.text();
     app.post(
         "/login",
-        &[("email", "arif@example.com"), ("password", "rahasia123")],
+        &[("email", "alex@example.com"), ("password", "letmein123")],
     )
     .await
     .assert_redirect("/");
@@ -438,10 +438,10 @@ async fn session_login_rotates_csrf_token() {
 #[renox::test]
 async fn session_logout_clears_session_and_token() {
     let app = fixture().await;
-    arif(&app).await;
+    alex(&app).await;
     app.post(
         "/login",
-        &[("email", "arif@example.com"), ("password", "rahasia123")],
+        &[("email", "alex@example.com"), ("password", "letmein123")],
     )
     .await;
     let token = app.get("/token").await.text();
@@ -455,11 +455,11 @@ async fn session_logout_clears_session_and_token() {
 #[renox::test]
 async fn session_old_cookie_is_dead_after_logout() {
     let app = fixture().await;
-    arif(&app).await;
+    alex(&app).await;
     let login = app
         .post(
             "/login",
-            &[("email", "arif@example.com"), ("password", "rahasia123")],
+            &[("email", "alex@example.com"), ("password", "letmein123")],
         )
         .await;
     let stolen = session_pair(&login).unwrap();
@@ -474,13 +474,13 @@ async fn session_old_cookie_is_dead_after_logout() {
 #[renox::test]
 async fn session_remember_me_cookie_flags() {
     let app = fixture().await;
-    arif(&app).await;
+    alex(&app).await;
     let res = app
         .post(
             "/login",
             &[
-                ("email", "arif@example.com"),
-                ("password", "rahasia123"),
+                ("email", "alex@example.com"),
+                ("password", "letmein123"),
                 ("remember", "1"),
             ],
         )
@@ -501,15 +501,15 @@ async fn session_cookie_is_secure_on_https() {
 #[renox::test]
 async fn session_password_change_kills_other_sessions() {
     let app = fixture().await;
-    let mut user = arif(&app).await;
+    let mut user = alex(&app).await;
     let login = app
         .post(
             "/login",
-            &[("email", "arif@example.com"), ("password", "rahasia123")],
+            &[("email", "alex@example.com"), ("password", "letmein123")],
         )
         .await;
     let other_device = session_pair(&login).unwrap();
-    user.set_password(app.db(), "baru-rahasia-123")
+    user.set_password(app.db(), "new-letmein-123")
         .await
         .unwrap();
     assert_eq!(
@@ -667,7 +667,7 @@ async fn csrf_json_requests() {
 #[renox::test]
 async fn csrf_valid_bearer_skips_csrf() {
     let app = fixture().await;
-    let user = arif(&app).await;
+    let user = alex(&app).await;
     let token = user.create_token(app.db(), "cli", None).await.unwrap();
     app.request()
         .without_csrf()
@@ -681,7 +681,7 @@ async fn csrf_valid_bearer_skips_csrf() {
 #[renox::test]
 async fn csrf_wrong_bearer_does_not_skip_csrf() {
     let app = fixture().await;
-    arif(&app).await;
+    alex(&app).await;
     for bearer in [
         "Bearer garbage",
         "Bearer 1|wrong",
@@ -709,7 +709,7 @@ async fn csrf_wrong_bearer_does_not_skip_csrf() {
 #[renox::test]
 async fn csrf_wrong_bearer_cannot_forge_session_writes() {
     let app = fixture().await;
-    arif(&app).await;
+    alex(&app).await;
     let res = app
         .request()
         .without_csrf()
@@ -728,12 +728,12 @@ async fn csrf_wrong_bearer_cannot_forge_session_writes() {
 #[renox::test]
 async fn auth_wrong_password_and_unknown_email_look_the_same() {
     let app = fixture().await;
-    arif(&app).await;
+    alex(&app).await;
     let a = app
         .htmx()
         .post(
             "/login",
-            &[("email", "arif@example.com"), ("password", "wrong-pass")],
+            &[("email", "alex@example.com"), ("password", "wrong-pass")],
         )
         .await;
     let b = app
@@ -750,12 +750,12 @@ async fn auth_wrong_password_and_unknown_email_look_the_same() {
 #[renox::test]
 async fn auth_throttle_after_five_attempts_including_case_variants() {
     let app = fixture().await;
-    arif(&app).await;
+    alex(&app).await;
     for i in 0..5 {
         let email = if i % 2 == 0 {
-            "ARIF@example.com"
+            "ALEX@example.com"
         } else {
-            "arif@EXAMPLE.com"
+            "alex@EXAMPLE.com"
         };
         let res = app
             .htmx()
@@ -774,7 +774,7 @@ async fn auth_throttle_after_five_attempts_including_case_variants() {
         .htmx()
         .post(
             "/login",
-            &[("email", "arif@example.com"), ("password", "rahasia123")],
+            &[("email", "alex@example.com"), ("password", "letmein123")],
         )
         .await;
     res.assert_status(422);
@@ -802,22 +802,22 @@ async fn login_from(app: &TestApp, ip: &str, email: &str, password: &str) -> Sta
 #[renox::test]
 async fn auth_throttle_holds_across_ips() {
     let app = fixture().await;
-    arif(&app).await;
+    alex(&app).await;
     for i in 0..5 {
         assert_eq!(
-            login_from(&app, "10.0.0.1", "arif@example.com", "x-wrong").await,
+            login_from(&app, "10.0.0.1", "alex@example.com", "x-wrong").await,
             422,
             "{i}"
         );
     }
     // Same IP is locked even with the right password.
-    let locked = login_from(&app, "10.0.0.1", "arif@example.com", "rahasia123").await;
+    let locked = login_from(&app, "10.0.0.1", "alex@example.com", "letmein123").await;
     assert_eq!(locked, 422);
     // 30 more guesses, each from a fresh IP.
     for i in 0..30 {
-        login_from(&app, &format!("10.1.0.{i}"), "arif@example.com", "x-wrong").await;
+        login_from(&app, &format!("10.1.0.{i}"), "alex@example.com", "x-wrong").await;
     }
-    let from_new_ip = login_from(&app, "10.2.0.1", "arif@example.com", "rahasia123").await;
+    let from_new_ip = login_from(&app, "10.2.0.1", "alex@example.com", "letmein123").await;
     assert_ne!(
         from_new_ip.as_u16(),
         200,
@@ -829,11 +829,11 @@ async fn auth_throttle_holds_across_ips() {
 async fn auth_intended_url_cannot_leave_the_site() {
     // Only same-site paths are honoured.
     let app = fixture().await;
-    arif(&app).await;
+    alex(&app).await;
     app.get("/dashboard?x=1").await.assert_redirect("/login");
     app.post(
         "/login",
-        &[("email", "arif@example.com"), ("password", "rahasia123")],
+        &[("email", "alex@example.com"), ("password", "letmein123")],
     )
     .await
     .assert_redirect("/dashboard?x=1");
@@ -881,21 +881,21 @@ async fn auth_set_locale_link_is_not_an_open_redirect() {
     let res = app
         .request()
         .header("referer", "https://evil.com/")
-        .get("/lang/id")
+        .get("/lang/es")
         .await;
     let loc = res.header("location").unwrap_or_default();
     assert!(
         !loc.contains("evil.com"),
-        "GET /lang/id redirected to {loc}"
+        "GET /lang/es redirected to {loc}"
     );
 }
 
 #[renox::test]
 async fn auth_deleted_user_session_is_dead() {
     let app = fixture().await;
-    let user = arif(&app).await;
+    let user = alex(&app).await;
     app.acting_as(&user);
-    assert_eq!(app.get("/whoami").await.text(), "user:arif@example.com");
+    assert_eq!(app.get("/whoami").await.text(), "user:alex@example.com");
     renox::db::sql("DELETE FROM users WHERE id = ?")
         .bind(user.id)
         .execute(app.db())
@@ -908,7 +908,7 @@ async fn auth_deleted_user_session_is_dead() {
 #[renox::test]
 async fn auth_unverified_user_on_verified_route() {
     let app = fixture_with(Auth::new().verify_email(), |_| {}).await;
-    let user = arif(&app).await;
+    let user = alex(&app).await;
     app.acting_as(&user);
     app.get("/verified").await.assert_redirect("/verify-email");
     app.request()
@@ -925,7 +925,7 @@ async fn auth_unverified_user_on_verified_route() {
 #[renox::test]
 async fn auth_logged_in_user_on_guest_pages() {
     let app = fixture().await;
-    let user = arif(&app).await;
+    let user = alex(&app).await;
     app.acting_as(&user);
     for p in [
         "/login",
@@ -976,44 +976,44 @@ async fn reset(app: &TestApp, token: &str, email: &str) -> TestResponse {
 #[renox::test]
 async fn auth_password_reset_token_misuse() {
     let app = fixture().await;
-    arif(&app).await;
-    User::register(app.db(), "Budi", "budi@example.com", "budi-secret-1")
+    alex(&app).await;
+    User::register(app.db(), "Ben", "ben@example.com", "ben-secret-1")
         .await
         .unwrap();
-    app.post("/forgot-password", &[("email", "arif@example.com")])
+    app.post("/forgot-password", &[("email", "alex@example.com")])
         .await;
-    app.post("/forgot-password", &[("email", "budi@example.com")])
+    app.post("/forgot-password", &[("email", "ben@example.com")])
         .await;
-    let arif_token = reset_token(&app, "arif@example.com");
+    let alex_token = reset_token(&app, "alex@example.com");
 
-    // Arif's token on Budi's account.
-    reset(&app, &arif_token, "budi@example.com")
+    // Alex's token on Ben's account.
+    reset(&app, &alex_token, "ben@example.com")
         .await
         .assert_status(422);
-    let budi = User::find_by_email(app.db(), "budi@example.com")
+    let ben = User::find_by_email(app.db(), "ben@example.com")
         .await
         .unwrap()
         .unwrap();
-    assert!(budi.check_password("budi-secret-1").await);
+    assert!(ben.check_password("ben-secret-1").await);
 
     // Works once (case-variant email), then not again.
-    reset(&app, &arif_token, "ARIF@example.com")
+    reset(&app, &alex_token, "ALEX@example.com")
         .await
         .assert_hx_redirect("/login");
-    reset(&app, &arif_token, "arif@example.com")
+    reset(&app, &alex_token, "alex@example.com")
         .await
         .assert_status(422);
 
     // Expired.
-    app.post("/forgot-password", &[("email", "budi@example.com")])
+    app.post("/forgot-password", &[("email", "ben@example.com")])
         .await;
-    let budi_token = reset_token(&app, "budi@example.com");
+    let ben_token = reset_token(&app, "ben@example.com");
     renox::db::sql("UPDATE password_reset_tokens SET created_at = ?")
         .bind(renox::db::now() - renox::chrono::TimeDelta::hours(2))
         .execute(app.db())
         .await
         .unwrap();
-    reset(&app, &budi_token, "budi@example.com")
+    reset(&app, &ben_token, "ben@example.com")
         .await
         .assert_status(422);
 }
@@ -1021,12 +1021,12 @@ async fn auth_password_reset_token_misuse() {
 #[renox::test]
 async fn auth_password_reset_revokes_api_tokens() {
     let app = fixture().await;
-    let user = arif(&app).await;
+    let user = alex(&app).await;
     let api = user.create_token(app.db(), "cli", None).await.unwrap();
-    app.post("/forgot-password", &[("email", "arif@example.com")])
+    app.post("/forgot-password", &[("email", "alex@example.com")])
         .await;
-    let token = reset_token(&app, "arif@example.com");
-    reset(&app, &token, "arif@example.com")
+    let token = reset_token(&app, "alex@example.com");
+    reset(&app, &token, "alex@example.com")
         .await
         .assert_hx_redirect("/login");
     app.logout();
@@ -1045,10 +1045,10 @@ async fn auth_password_reset_revokes_api_tokens() {
 #[renox::test]
 async fn auth_reset_form_does_not_enumerate_emails() {
     let app = fixture().await;
-    arif(&app).await;
+    alex(&app).await;
     let a = app
         .htmx()
-        .post("/forgot-password", &[("email", "arif@example.com")])
+        .post("/forgot-password", &[("email", "alex@example.com")])
         .await;
     let a_page = app.get("/forgot-password").await.text();
     let b = app
@@ -1068,15 +1068,15 @@ async fn auth_email_case_and_whitespace() {
     app.post(
         "/register",
         &[
-            ("name", "Arif"),
-            ("email", "  Arif@Example.COM "),
-            ("password", "rahasia123"),
-            ("password_confirmation", "rahasia123"),
+            ("name", "Alex"),
+            ("email", "  Alex@Example.COM "),
+            ("password", "letmein123"),
+            ("password_confirmation", "letmein123"),
         ],
     )
     .await
     .assert_redirect("/");
-    app.assert_database_has("users", &[("email", &"arif@example.com")])
+    app.assert_database_has("users", &[("email", &"alex@example.com")])
         .await;
     app.post("/logout", &[]).await;
     app.htmx()
@@ -1084,16 +1084,16 @@ async fn auth_email_case_and_whitespace() {
             "/register",
             &[
                 ("name", "Dup"),
-                ("email", "ARIF@example.com"),
-                ("password", "rahasia123"),
-                ("password_confirmation", "rahasia123"),
+                ("email", "ALEX@example.com"),
+                ("password", "letmein123"),
+                ("password_confirmation", "letmein123"),
             ],
         )
         .await
         .assert_invalid("email");
     app.post(
         "/login",
-        &[("email", " ARIF@EXAMPLE.COM"), ("password", "rahasia123")],
+        &[("email", " ALEX@EXAMPLE.COM"), ("password", "letmein123")],
     )
     .await
     .assert_redirect("/");
@@ -1107,7 +1107,7 @@ async fn authz_policies_gates_and_templates() {
     // Guest: Can in templates is false, gates are false.
     let page = app.get("/").await.text();
     assert!(!page.contains("EDIT") && !page.contains("ADMIN") && !page.contains("NOGATE"));
-    let user = arif(&app).await; // id 1 owns the post
+    let user = alex(&app).await; // id 1 owns the post
     app.acting_as(&user);
     let page = app.get("/").await.text();
     assert!(page.contains("EDIT") && !page.contains("ADMIN") && !page.contains("NOGATE"));
@@ -1275,8 +1275,8 @@ async fn validation_unique_race() {
         [
             ("name", n),
             ("email", "race@example.com"),
-            ("password", "rahasia123"),
-            ("password_confirmation", "rahasia123"),
+            ("password", "letmein123"),
+            ("password_confirmation", "letmein123"),
         ]
     };
     let (f1, f2) = (form("A"), form("B"));
@@ -1783,12 +1783,12 @@ fn enc(s: &str) -> String {
 #[renox::test]
 async fn auth_login_with_padded_email() {
     let app = fixture().await;
-    arif(&app).await;
+    alex(&app).await;
     let res = app
         .htmx()
         .post(
             "/login",
-            &[("email", " arif@example.com "), ("password", "rahasia123")],
+            &[("email", " alex@example.com "), ("password", "letmein123")],
         )
         .await;
     assert_eq!(res.status.as_u16(), 200, "{} {}", res.status, res.text());
@@ -1893,12 +1893,12 @@ impl Module for Slugs {
 #[renox::test]
 async fn auth_intended_backslash_path() {
     let app = TestApp::new(App::new().module(Auth::new()).module(Slugs)).await;
-    arif(&app).await;
+    alex(&app).await;
     app.get("/\\evil.com").await.assert_redirect("/login");
     let res = app
         .post(
             "/login",
-            &[("email", "arif@example.com"), ("password", "rahasia123")],
+            &[("email", "alex@example.com"), ("password", "letmein123")],
         )
         .await;
     let loc = res.header("location").unwrap_or_default();
@@ -1955,12 +1955,12 @@ async fn login_lock_behind_a_proxy_uses_the_forwarded_ip() {
         c.trusted_proxies = TrustedProxies::parse("127.0.0.1").unwrap();
     })
     .await;
-    arif(&app).await;
+    alex(&app).await;
     let login = |forwarded: &'static str, password: &'static str| {
         let app = &app;
         async move {
             let probe = app.get("/token").await;
-            let body = format!("email=arif%40example.com&password={password}");
+            let body = format!("email=alex%40example.com&password={password}");
             let mut req = Request::post("/login")
                 .header("cookie", session_pair(&probe).unwrap())
                 .header("x-csrf-token", probe.text())
@@ -1977,6 +1977,6 @@ async fn login_lock_behind_a_proxy_uses_the_forwarded_ip() {
     for _ in 0..5 {
         assert_eq!(login("1.1.1.1", "wrong").await, 422);
     }
-    assert_eq!(login("1.1.1.1", "rahasia123").await, 422, "locked");
-    assert_eq!(login("2.2.2.2", "rahasia123").await, 200, "another visitor");
+    assert_eq!(login("1.1.1.1", "letmein123").await, 422, "locked");
+    assert_eq!(login("2.2.2.2", "letmein123").await, 200, "another visitor");
 }

@@ -5,18 +5,18 @@
 //! # use renox::prelude::*;
 //! # use serde::Deserialize;
 //! #[derive(Deserialize)]
-//! struct ProdukForm { nama: String, foto: Option<Upload> }
+//! struct ProductForm { name: String, photo: Option<Upload> }
 //!
-//! impl Validate for ProdukForm {
+//! impl Validate for ProductForm {
 //!     fn rules(&self, v: &mut Validator) {
-//!         v.field("nama", &self.nama).required();
-//!         v.field("foto", &self.foto).image().max(2048);     // KB
+//!         v.field("name", &self.name).required();
+//!         v.field("photo", &self.photo).image().max(2048);     // KB
 //!     }
 //! }
 //!
-//! async fn store(State(state): State<AppState>, back: Back, Valid(form): Valid<ProdukForm>) -> Result<Back> {
-//!     if let Some(foto) = &form.foto {
-//!         let key = foto.store_public(&state.storage, "produk").await?;   // public/produk/…jpg
+//! async fn store(State(state): State<AppState>, back: Back, Valid(form): Valid<ProductForm>) -> Result<Back> {
+//!     if let Some(photo) = &form.photo {
+//!         let key = photo.store_public(&state.storage, "products").await?;   // public/products/…jpg
 //!         let url = state.storage.url(&key);
 //! #       let _ = url;
 //!     }
@@ -42,7 +42,7 @@ use crate::storage::Storage;
 /// A file posted in a multipart form.
 #[derive(Clone)]
 pub struct Upload {
-    /// The name the browser gave, e.g. `foto kopi.JPG`. Don't trust it for paths.
+    /// The name the browser gave, e.g. `coffee photo.JPG`. Don't trust it for paths.
     pub file_name: String,
     /// The type the browser declared, e.g. `image/jpeg`. Don't trust it for security.
     pub content_type: String,
@@ -198,7 +198,7 @@ mod tests {
 
     #[test]
     fn sniffs_content_instead_of_trusting_names() {
-        let png = upload("foto.txt", b"\x89PNG\r\n\x1a\nrest");
+        let png = upload("photo.txt", b"\x89PNG\r\n\x1a\nrest");
         assert!(png.is_image());
         assert_eq!(png.safe_extension(), "png");
         let fake = upload("virus.jpg", b"MZ\x90\x00");
@@ -210,8 +210,8 @@ mod tests {
 
     #[test]
     fn keys_are_random_and_contained() {
-        let a = upload("a.PNG", b"x").key("/produk/");
-        assert!(a.starts_with("produk/") && a.ends_with(".png"), "{a}");
-        assert_ne!(a, upload("a.png", b"x").key("produk"));
+        let a = upload("a.PNG", b"x").key("/products/");
+        assert!(a.starts_with("products/") && a.ends_with(".png"), "{a}");
+        assert_ne!(a, upload("a.png", b"x").key("products"));
     }
 }

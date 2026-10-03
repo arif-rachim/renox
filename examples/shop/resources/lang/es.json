@@ -1,0 +1,151 @@
+{
+  "nav": {
+    "products": "Productos", "cart": "Carrito", "orders": "Mis pedidos",
+    "login": "Iniciar sesión", "register": "Registrarse", "logout": "Cerrar sesión"
+  },
+  "home": {
+    "title": "Recién tostado",
+    "description": "Café, té y algo para picar, directo a tu puerta.",
+    "new": "Novedades en la tienda",
+    "recent": "Vistos hace poco"
+  },
+  "products": {
+    "none": "Todavía no hay productos.",
+    "sold_out": "Agotado",
+    "search": "Buscar",
+    "category": "Categoría", "sort_by": "Ordenar por",
+    "all_categories": "Todas las categorías",
+    "sort": { "newest": "Más recientes", "price_asc": "Más baratos", "price_desc": "Más caros", "name": "Nombre" },
+    "found": "Un producto encontrado|:count productos encontrados",
+    "in_stock": "{0} Agotado|{1} Solo queda uno|[2,5] Solo quedan :count|[6,*] :count en stock"
+  },
+  "cart": {
+    "added": ":name está en tu carrito.",
+    "quantity": "Cantidad", "add": "Añadir al carrito", "login_to_buy": "Inicia sesión para comprar",
+    "product": "Producto", "price": "Precio", "subtotal": "Subtotal",
+    "update": "Actualizar", "remove": "Quitar", "total": "Total",
+    "checkout": "Pagar", "empty": "Tu carrito está vacío."
+  },
+  "notifications": {
+    "placed": "Pedido #:id recibido",
+    "pay": "Paga :total por transferencia bancaria en un plazo de :days días.",
+    "shipped": "El pedido #:id va de camino",
+    "ready": "El pedido #:id está listo para recoger",
+    "new_order": "Pedido nuevo #:id", "new_order_body": ":total, a :address",
+    "all_orders": "Todos los pedidos"
+  },
+  "mail": {
+    "confirmation": {
+      "subject": "Pedido #:id recibido", "thanks": "Gracias por tu pedido #:id.", "total": "Total",
+      "pay": "Transfiere :total en un plazo de :days días, indicando el pedido #:id.",
+      "to": "Lo enviaremos a: :address",
+      "pickup": "Recógelo en la tienda cuando esté listo: :address",
+      "view": "Ver tu pedido"
+    },
+    "shipped": {
+      "subject": "El pedido #:id va de camino", "ready_subject": "El pedido #:id está listo para recoger",
+      "sent": "Buenas noticias: el pedido #:id va de camino a :address.",
+      "ready": "Buenas noticias: el pedido #:id está listo. Recógelo en la tienda: :address."
+    }
+  },
+  "orders": {
+    "order": "Pedido",
+    "placed": "¡Gracias! El pedido #:id está hecho.",
+    "out_of_stock": "No queda stock suficiente de: :names. Cambia tu carrito, por favor.",
+    "delivery": "Entrega", "courier": "Mensajero", "pickup": "Recoger en la tienda",
+    "pickup_address": "Recoger en la tienda: 12 Market Street, Springfield",
+    "address": "Dirección de entrega",
+    "pay_by_transfer": "Paga por transferencia bancaria en un plazo de :days días; los pedidos sin pagar se cancelan.",
+    "place": "Hacer el pedido",
+    "date": "Fecha", "status": "Estado", "none": "Todavía no hay pedidos.",
+    "items": "Artículos", "items_count": "Artículos",
+    "statuses": { "pending": "Esperando el pago", "paid": "Pagado", "shipped": "Enviado", "cancelled": "Cancelado" }
+  },
+  "renox": {
+    "validation": {
+      "attributes": {
+        "address": "dirección",
+        "quantity": "cantidad",
+        "product_id": "producto",
+        "name": "nombre",
+        "email": "correo electrónico",
+        "password": "contraseña"
+      },
+      "required": "El campo :attribute es obligatorio.",
+      "between": {
+        "string": "El campo :attribute debe tener entre :min y :max caracteres.",
+        "numeric": "El campo :attribute debe estar entre :min y :max."
+      },
+      "min": { "string": "El campo :attribute debe tener al menos :min caracteres." },
+      "max": { "string": "El campo :attribute no puede tener más de :max caracteres." },
+      "exists": "El :attribute elegido no es válido.",
+      "email": "El campo :attribute debe ser un correo electrónico válido.",
+      "confirmed": "La confirmación de :attribute no coincide.",
+      "unique": "Ese :attribute ya está en uso.",
+      "auth": {
+        "failed": "El correo o la contraseña no son correctos.",
+        "throttle": "Demasiados intentos. Vuelve a intentarlo dentro de :seconds segundos."
+      }
+    },
+    "auth": {
+      "login_title": "Iniciar sesión",
+      "register_title": "Crear una cuenta",
+      "name": "Nombre",
+      "email": "Correo electrónico",
+      "password": "Contraseña",
+      "password_confirmation": "Repite la contraseña",
+      "remember": "Recordarme",
+      "login_button": "Entrar",
+      "register_button": "Registrarse",
+      "no_account": "¿Todavía no tienes cuenta?",
+      "have_account": "¿Ya tienes cuenta?",
+      "forgot_link": "¿Olvidaste tu contraseña?",
+      "forgot_title": "¿Olvidaste tu contraseña?",
+      "forgot_intro": "Escribe tu correo y te enviaremos un enlace para elegir una contraseña nueva.",
+      "send_link": "Enviarme un enlace",
+      "back_to_login": "Volver a iniciar sesión",
+      "reset_title": "Elige una contraseña nueva",
+      "reset_button": "Guardar la contraseña",
+      "reset_link_sent": "Si ese correo tiene una cuenta, el enlace ya va de camino.",
+      "reset_invalid": "Este enlace no es válido o ha caducado.",
+      "password_reset_done": "Tu contraseña ha cambiado. Ya puedes iniciar sesión.",
+      "logout": "Cerrar sesión",
+      "mail_reset_subject": "Restablece tu contraseña",
+      "mail_reset_intro": "Has pedido restablecer tu contraseña. Elige una nueva con el botón de abajo.",
+      "mail_reset_outro": "El enlace vale durante 60 minutos. Si no lo has pedido tú, ignora este correo."
+    }
+  },
+  "ui": {
+    "optional": "opcional",
+    "cancel": "Cancelar",
+    "close": "Cerrar",
+    "dismiss": "Descartar",
+    "more": "Más",
+    "skip": "Saltar al contenido",
+    "main_navigation": "Principal",
+    "errors_title": "Revisa los campos marcados.",
+    "show_password": "Mostrar la contraseña",
+    "hide_password": "Ocultar la contraseña",
+    "search": "Buscar",
+    "no_results": "Sin resultados",
+    "loading": "Cargando…",
+    "notifications": {
+      "title": "Notificaciones",
+      "bell": "Notificaciones",
+      "unread": ":count sin leer",
+      "unread_marker": "sin leer",
+      "mark_all_read": "Marcar todo como leído",
+      "clear": "Borrar todo",
+      "mark_read": "Marcar como leída",
+      "mark_unread": "Marcar como no leída",
+      "delete": "Eliminar",
+      "empty": "No hay notificaciones",
+      "empty_hint": "Estás al día.",
+      "see_all": "Ver todas",
+      "older": "Anteriores",
+      "newest": "Más recientes",
+      "open": "Abrir",
+      "loading": "Cargando…"
+    }
+  }
+}

@@ -14,11 +14,11 @@ async fn tasks_keep_their_types_on_either_database() {
     let app = app().await;
     app.post(
         "/tasks",
-        &[("title", "Beli kopi"), ("due_on", "2026-10-01")],
+        &[("title", "Buy coffee"), ("due_on", "2026-10-01")],
     )
     .await
     .assert_redirect("/");
-    let task = Task::where_eq("title", "Beli kopi")
+    let task = Task::where_eq("title", "Buy coffee")
         .first(app.db())
         .await
         .unwrap()
@@ -36,7 +36,7 @@ async fn tasks_keep_their_types_on_either_database() {
 async fn search_ignores_case_and_overdue_uses_dates() {
     let app = app().await;
     let yesterday = renox::db::now().date_naive().pred_opt().unwrap();
-    for (title, due_on) in [("Beli KOPI", Some(yesterday)), ("Bayar listrik", None)] {
+    for (title, due_on) in [("Buy COFFEE", Some(yesterday)), ("Pay electricity", None)] {
         Task::create(
             app.db(),
             Task {
@@ -48,14 +48,14 @@ async fn search_ignores_case_and_overdue_uses_dates() {
         .await
         .unwrap();
     }
-    app.get("/?q=kopi")
+    app.get("/?q=coffee")
         .await
-        .assert_see("Beli KOPI")
-        .assert_dont_see("Bayar listrik");
+        .assert_see("Buy COFFEE")
+        .assert_dont_see("Pay electricity");
     app.get("/?overdue=true")
         .await
-        .assert_see("Beli KOPI")
-        .assert_dont_see("Bayar listrik");
+        .assert_see("Buy COFFEE")
+        .assert_dont_see("Pay electricity");
 }
 
 #[renox::test]

@@ -85,7 +85,7 @@ impl Job for ThankGuest {
         let entry = Entry::find_or_404(&ctx.state.db, self.entry_id).await?;
         let mail = renox::mail::Mail::new(
             "owner@example.com",
-            format!("{} menulis di buku tamu", entry.name),
+            format!("{} signed the guestbook", entry.name),
             entry.message,
         );
         ctx.state.mailer.send(mail).await
@@ -105,9 +105,9 @@ impl Module for Guestbook {
             .name("guestbook.index")
             .post("/entries", store)
             .name("guestbook.store")
-            .get("/halo/{nama}", greet)
+            .get("/hello/{name}", greet)
             .name("greet")
-            .get("/bahasa/{locale}", switch_language)
+            .get("/language/{locale}", switch_language)
             .name("language")
     }
 
@@ -219,8 +219,8 @@ async fn switch_language(session: Session, back: Back, Path(locale): Path<String
     Ok(back)
 }
 
-async fn greet(Path(nama): Path<String>) -> String {
-    format!("Halo, {nama}!")
+async fn greet(Path(name): Path<String>) -> String {
+    format!("Hello, {name}!")
 }
 
 /// The guestbook app; `main.rs` runs it and the tests boot it.
@@ -231,7 +231,7 @@ pub fn app() -> App {
         .module(Auth::new().account().redirect_to("/")) // login, register, /account
         .module(Guestbook)
         // A visitor who hasn't picked a language gets their browser's (en or
-        // id), else APP_LOCALE; /bahasa/{locale} still wins.
+        // es), else APP_LOCALE; /language/{locale} still wins.
         .detect_locale()
         .seeder(|db| async move {
             Entry::create_many(&db, 30).await?;

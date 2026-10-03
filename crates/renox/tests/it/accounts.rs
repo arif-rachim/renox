@@ -397,7 +397,7 @@ async fn auth_events_land_in_the_audit_log() {
 }
 
 #[renox::test]
-async fn password_policy_messages_are_translated() {
+async fn password_policy_messages_name_each_rule_and_are_translated() {
     use renox::validation::{Locale, Validator};
     struct Form(&'static str);
     impl Validate for Form {
@@ -426,18 +426,40 @@ async fn password_policy_messages_are_translated() {
             .contains("uppercase and one lowercase")
     );
     assert!(
-        message("Abcdefgh!", Locale::Id)
+        message("Abcdefgh!", Locale::En)
             .await
             .unwrap()
-            .contains("angka")
+            .contains("at least one number")
     );
     assert!(
-        message("Abcdefgh1", Locale::Id)
+        message("Abcdefgh1", Locale::En)
             .await
             .unwrap()
-            .contains("simbol")
+            .contains("at least one symbol")
     );
-    assert!(message("Ab1!", Locale::Id).await.unwrap().contains("8"));
+    assert!(message("Ab1!", Locale::En).await.unwrap().contains("8"));
+
+    // The app's lang file translates them (`tests/lang/es.json`), with its
+    // name for the field.
+    let spanish = TestApp::with_config(self::app(), |c| {
+        c.locale = "es".into();
+        c.lang_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/lang");
+    })
+    .await;
+    spanish
+        .htmx()
+        .post(
+            "/register",
+            &[
+                ("name", "C"),
+                ("email", "c@example.com"),
+                ("password", "passwordxx"),
+                ("password_confirmation", "passwordxx"),
+            ],
+        )
+        .await
+        .assert_invalid("password")
+        .assert_see("El campo contraseña debe contener al menos un número.");
 }
 
 #[renox::test]

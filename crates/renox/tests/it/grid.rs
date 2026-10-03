@@ -440,7 +440,7 @@ async fn guests_keep_their_columns_in_the_session() {
 #[renox::test]
 async fn users_keep_their_columns_in_the_database() {
     let (app, _views) = app().await;
-    let user = User::register(app.db(), "Arif", "arif@example.com", "password123")
+    let user = User::register(app.db(), "Alex", "alex@example.com", "password123")
         .await
         .unwrap();
     app.acting_as(&user);
@@ -590,8 +590,8 @@ async fn tasks_app() -> (TestApp, tempfile::TempDir) {
                 city: city.into(),
                 title: title.into(),
                 position: i as i64 + 10,
-                created_by: "Arif".into(),
-                updated_by: "Dewi".into(),
+                created_by: "Alex".into(),
+                updated_by: "Dana".into(),
                 ..Default::default()
             },
         )
@@ -642,8 +642,8 @@ async fn rows_open_their_audit_and_details() {
     let (app, _views) = tasks_app().await;
     let res = app.get("/tasks").await;
     res.assert_see("<template data-grid-details>")
-        .assert_see("<dt>Created</dt><dd>Arif")
-        .assert_see("<dt>Last updated</dt><dd>Dewi")
+        .assert_see("<dt>Created</dt><dd>Alex")
+        .assert_see("<dt>Last updated</dt><dd>Dana")
         .assert_see(r#"<b class="more">d more</b>"#)
         .assert_see(r#"data-grid-expand aria-expanded="false""#)
         .assert_see("data-grid-row");
@@ -1317,7 +1317,7 @@ async fn pets_app() -> (TestApp, tempfile::TempDir) {
     })
     .await;
     let mut owners = Vec::new();
-    for name in ["Ani", "Budi", "Citra"] {
+    for name in ["Anna", "Ben", "Clara"] {
         owners.push(
             GridOwner::create(
                 app.db(),
@@ -1369,21 +1369,21 @@ fn cells(html: &str, column: &str) -> Vec<String> {
 async fn related_columns_show_sort_filter_and_search() {
     let (app, _views) = pets_app().await;
     let html = app.get("/owners").await.text();
-    assert_eq!(cells(&html, "name"), ["Ani", "Budi", "Citra"]);
+    assert_eq!(cells(&html, "name"), ["Anna", "Ben", "Clara"]);
     assert_eq!(cells(&html, "pets"), ["2", "1", "0"]);
     assert_eq!(cells(&html, "kilos"), ["10", "30", "0"]);
     let by_pets = app.get("/owners?sort=-pets").await.text();
-    assert_eq!(cells(&by_pets, "name"), ["Ani", "Budi", "Citra"]);
+    assert_eq!(cells(&by_pets, "name"), ["Anna", "Ben", "Clara"]);
     let heavy = app.get("/owners?min.kilos=20").await.text();
-    assert_eq!(cells(&heavy, "name"), ["Budi"]);
+    assert_eq!(cells(&heavy, "name"), ["Ben"]);
 
     let pets = app.get("/pets?state=1").await.text();
-    assert_eq!(cells(&pets, "owner"), ["Ani", "Ani", "Budi", ""]);
+    assert_eq!(cells(&pets, "owner"), ["Anna", "Anna", "Ben", ""]);
     let sorted = app.get("/pets?state=1&sort=-owner").await.text();
     assert_eq!(cells(&sorted, "name")[0], "Rex");
-    let filtered = app.get("/pets?state=1&q.owner=bud").await.text();
+    let filtered = app.get("/pets?state=1&q.owner=ben").await.text();
     assert_eq!(cells(&filtered, "name"), ["Rex"]);
-    let searched = app.get("/pets?state=1&search=ani").await.text();
+    let searched = app.get("/pets?state=1&search=anna").await.text();
     assert_eq!(cells(&searched, "name"), ["Kiki", "Momo"]);
 }
 
@@ -1399,12 +1399,12 @@ async fn the_advanced_filter_combines_rules() {
         ["Momo", "Rex"]
     );
     assert_eq!(
-        names("r.0.c=weight&r.0.o=gt&r.0.v=5&r.1.c=owner&r.1.o=equals&r.1.v=ani").await,
+        names("r.0.c=weight&r.0.o=gt&r.0.v=5&r.1.c=owner&r.1.o=equals&r.1.v=anna").await,
         ["Momo"],
         "all by default"
     );
     assert_eq!(
-        names("match=any&r.0.c=weight&r.0.o=lt&r.0.v=4&r.1.c=owner&r.1.o=equals&r.1.v=budi").await,
+        names("match=any&r.0.c=weight&r.0.o=lt&r.0.v=4&r.1.c=owner&r.1.o=equals&r.1.v=ben").await,
         ["Rex", "Stray"]
     );
     assert_eq!(names("r.0.c=owner&r.0.o=empty").await, ["Stray"]);
@@ -1447,7 +1447,7 @@ async fn remembered_grids_come_back_as_they_were_left() {
         async move { cells(&app.get(&format!("/pets{q}")).await.text(), "name") }
     };
     assert_eq!(
-        names("?state=1&q.owner=ani&sort=-name").await,
+        names("?state=1&q.owner=anna&sort=-name").await,
         ["Momo", "Kiki"]
     );
     // A visit without the grid's values: the session's.

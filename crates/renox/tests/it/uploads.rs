@@ -226,14 +226,14 @@ async fn images_are_uploaded_stored_and_served() {
         .upload(
             "/products",
             &[
-                ("name", Part::Text("Kopi")),
-                ("photo", Part::File("kopi.PNG", PNG)),
+                ("name", Part::Text("Coffee")),
+                ("photo", Part::File("coffee.PNG", PNG)),
             ],
         )
         .await;
     assert_eq!(reply.status, StatusCode::OK, "{}", reply.text());
     let text = reply.text();
-    let url = text.strip_prefix("Kopi ").unwrap().to_owned();
+    let url = text.strip_prefix("Coffee ").unwrap().to_owned();
     assert!(
         url.starts_with("/storage/products/") && url.ends_with(".png"),
         "{url}"
@@ -253,12 +253,12 @@ async fn images_are_uploaded_stored_and_served() {
     let no_photo = browser
         .upload(
             "/products",
-            &[("name", Part::Text("Teh")), ("photo", Part::File("", b""))],
+            &[("name", Part::Text("Tea")), ("photo", Part::File("", b""))],
         )
         .await;
     assert_eq!(
         no_photo.text(),
-        "Teh no photo",
+        "Tea no photo",
         "an empty file input is no file"
     );
 }
@@ -283,7 +283,7 @@ async fn file_rules_check_content_and_size() {
             "/products",
             &[
                 ("name", Part::Text("x")),
-                ("photo", Part::File("foto.png", b"MZ not an image")),
+                ("photo", Part::File("photo.png", b"MZ not an image")),
             ],
         )
         .await;
@@ -333,10 +333,10 @@ async fn file_rules_check_content_and_size() {
     let pdf = browser
         .upload(
             "/documents",
-            &[("document", Part::File("laporan.pdf", b"%PDF-1.7 ..."))],
+            &[("document", Part::File("report.pdf", b"%PDF-1.7 ..."))],
         )
         .await;
-    assert_eq!(pdf.text(), "laporan.pdf");
+    assert_eq!(pdf.text(), "report.pdf");
 }
 
 #[tokio::test]
@@ -346,11 +346,15 @@ async fn plain_multipart_forms_carry_the_csrf_token_as_a_field() {
     let browser = Browser::new(&kernel).await;
 
     let ok = browser
-        .form_upload("/products", &browser.token, &[("name", Part::Text("Kopi"))])
+        .form_upload(
+            "/products",
+            &browser.token,
+            &[("name", Part::Text("Coffee"))],
+        )
         .await;
-    assert_eq!(ok.text(), "Kopi no photo");
+    assert_eq!(ok.text(), "Coffee no photo");
     let forged = browser
-        .form_upload("/products", "wrong", &[("name", Part::Text("Kopi"))])
+        .form_upload("/products", "wrong", &[("name", Part::Text("Coffee"))])
         .await;
     assert_eq!(forged.status.as_u16(), 419);
 
@@ -359,7 +363,7 @@ async fn plain_multipart_forms_carry_the_csrf_token_as_a_field() {
             "/products",
             &browser.token,
             &[
-                ("name", Part::Text("Kopi")),
+                ("name", Part::Text("Coffee")),
                 ("photo", Part::File("x.png", b"nope")),
             ],
         )
@@ -367,7 +371,7 @@ async fn plain_multipart_forms_carry_the_csrf_token_as_a_field() {
     assert_eq!(invalid.status, StatusCode::SEE_OTHER);
     let page = browser.get("/products/create").await.text();
     assert!(
-        page.contains(r#"value="Kopi""#) && page.contains("The photo must be an image."),
+        page.contains(r#"value="Coffee""#) && page.contains("The photo must be an image."),
         "{page}"
     );
 }

@@ -23,7 +23,7 @@ async fn place(app: &TestApp) {
         "/orders",
         &[
             ("customer_email", "buyer@example.com"),
-            ("item", "Kopi"),
+            ("item", "Coffee"),
             ("total", "18000"),
         ],
     )
@@ -49,7 +49,7 @@ async fn an_order_notifies_admins() {
         "/orders",
         &[
             ("customer_email", "buyer@example.com"),
-            ("item", "Kopi"),
+            ("item", "Coffee"),
             ("total", "18000"),
         ],
     )
@@ -93,7 +93,7 @@ async fn placing_an_order_emits_order_placed() {
     assert!(app.sent_mail().is_empty());
     // Nothing is emitted for an invalid order.
     app.htmx()
-        .post("/orders", &[("item", "Kopi")])
+        .post("/orders", &[("item", "Coffee")])
         .await
         .assert_status(422);
     assert_eq!(app.emitted::<OrderPlaced>().len(), 1);
@@ -102,7 +102,7 @@ async fn placing_an_order_emits_order_placed() {
 #[renox::test]
 async fn the_listener_notifies_every_admin() {
     let app = app().await;
-    let second = User::register(app.db(), "Sari", "sari@example.com", "password123")
+    let second = User::register(app.db(), "Sarah", "sarah@example.com", "password123")
         .await
         .unwrap();
     // Notifications are recorded, not sent: no mail, no database rows.
@@ -152,7 +152,11 @@ async fn paying_runs_the_chain_in_order() {
         .into_iter()
         .find(|m| m.is_for("buyer@example.com"))
         .unwrap();
-    assert!(receipt.text.contains("Kopi: Rp 18,000"), "{}", receipt.text);
+    assert!(
+        receipt.text.contains("Coffee: Rp 18,000"),
+        "{}",
+        receipt.text
+    );
 
     // Pressing "Pay" again doesn't charge twice.
     app.post("/orders/1/pay", &[("card_token", "tok_visa")])
@@ -288,7 +292,7 @@ async fn statements_go_out_as_a_batch_with_progress() {
     ] {
         let order = Order {
             customer_email: email.into(),
-            item: "Kopi".into(),
+            item: "Coffee".into(),
             total,
             ..Default::default()
         };
@@ -342,7 +346,7 @@ async fn receipts_jump_ahead_of_reports() {
     let app = app().await;
     let order = Order {
         customer_email: "buyer@example.com".into(),
-        item: "Kopi".into(),
+        item: "Coffee".into(),
         total: 18_000,
         ..Default::default()
     };
@@ -384,7 +388,7 @@ async fn the_daily_report_sums_todays_orders() {
     for total in [18_000, 9_000] {
         let order = Order {
             customer_email: "b@example.com".into(),
-            item: "Kopi".into(),
+            item: "Coffee".into(),
             total,
             ..Default::default()
         };
@@ -395,7 +399,7 @@ async fn the_daily_report_sums_todays_orders() {
     app.travel(Duration::from_secs(3 * 24 * 60 * 60));
     let today = Order {
         customer_email: "b@example.com".into(),
-        item: "Teh".into(),
+        item: "Tea".into(),
         total: 5_000,
         ..Default::default()
     };
@@ -427,7 +431,7 @@ async fn the_weekly_report_covers_seven_days() {
     for (total, days_ago) in [(18_000, 0), (5_000, 3), (1_000, 10)] {
         let order = Order {
             customer_email: "b@example.com".into(),
-            item: "Kopi".into(),
+            item: "Coffee".into(),
             total,
             created_at: Some(renox::db::now() - renox::chrono::TimeDelta::days(days_ago)),
             ..Default::default()
@@ -659,5 +663,5 @@ async fn mails_carry_copies_replies_and_attachments() {
     assert_eq!(csv.content_type, "text/csv");
     let text = String::from_utf8(csv.data.clone()).unwrap();
     assert!(text.starts_with("order,date,item,total\n1,"), "{text}");
-    assert!(text.contains(",\"Kopi\",18000"), "{text}");
+    assert!(text.contains(",\"Coffee\",18000"), "{text}");
 }

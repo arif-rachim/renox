@@ -13,9 +13,9 @@ the cache, the scheduler, `db:shell` and `migrate:*` all work on both databases.
 ## Starting a new app on PostgreSQL
 
 ```bash
-rnx new toko --database postgres
-createdb toko && createdb toko_test     # or edit the URLs in .env
-cd toko
+rnx new shop --database postgres
+createdb shop && createdb shop_test     # or edit the URLs in .env
+cd shop
 rnx serve
 ```
 
@@ -36,7 +36,7 @@ This does three things:
    ```
 
 2. Point `DATABASE_URL` at the server:
-   `DATABASE_URL=postgres://user:password@host:5432/toko`.
+   `DATABASE_URL=postgres://user:password@host:5432/shop`.
    `postgres://` and `postgresql://` URLs open a PostgreSQL pool and `sqlite:` URLs a SQLite one;
    any other URL is refused at boot (so a typo like `postgress://` doesn't become a SQLite file).
    `DATABASE_POOL_SIZE` (default 8) sets the pool size on both.
@@ -100,7 +100,7 @@ enum types, sequences and functions (not what extensions created).
 
   `None` binds as an untyped `NULL`, so it fits any column.
 - Results must match the Rust type exactly. On PostgreSQL:
-  - `SUM` of a `BIGINT` is `NUMERIC`, so write `CAST(SUM(harga) AS BIGINT)` to read an `i64`;
+  - `SUM` of a `BIGINT` is `NUMERIC`, so write `CAST(SUM(price) AS BIGINT)` to read an `i64`;
   - `SELECT 1` is a 32-bit integer.
 
   `COUNT(*)` is a `BIGINT` on both.
@@ -137,7 +137,7 @@ the environment or from `.env`. Tests stay isolated from each other and from you
 data.
 
 ```bash
-TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/toko_test cargo test
+TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/shop_test cargo test
 ```
 
 The schemas (`renox_test_…`) are left behind for inspection. To drop them all, drop and recreate
@@ -146,7 +146,7 @@ the test database.
 A quick local server for tests:
 
 ```bash
-docker run -d --rm --name pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=toko_test \
+docker run -d --rm --name pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=shop_test \
   -p 5432:5432 postgres:17-alpine
 ```
 
@@ -164,7 +164,7 @@ maintenance mode:
    ```
    LOAD DATABASE
      FROM sqlite:///path/to/app.db
-     INTO postgresql://user:password@host/toko
+     INTO postgresql://user:password@host/shop
    WITH data only, reset sequences, truncate
    CAST column job_batches.allow_failures to boolean using tinyint-to-boolean
    EXCLUDING TABLE NAMES LIKE 'renox_migrations';

@@ -8,10 +8,10 @@ use serde::Serialize;
 ///
 /// ```
 /// # use renox::prelude::*;
-/// # #[derive(Model, serde::Serialize, Default)] struct Produk { id: i64 }
+/// # #[derive(Model, serde::Serialize, Default)] struct Product { id: i64 }
 /// async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
-///     let produk = Produk::query().latest().paginate(&db, page, 20).await?;
-///     Ok(view("produk/index.html", context! { produk }))
+///     let products = Product::query().latest().paginate(&db, page, 20).await?;
+///     Ok(view("products/index.html", context! { products }))
 /// }
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,7 +39,7 @@ impl<S: Send + Sync> FromRequestParts<S> for Page {
 ///
 /// ```jinja
 /// {% from "renox/pagination.html" import pagination %}
-/// {{ pagination(produk) }}
+/// {{ pagination(products) }}
 /// ```
 #[derive(Debug, Clone, Serialize)]
 #[non_exhaustive]

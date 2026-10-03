@@ -18,23 +18,23 @@ async fn guests_can_register() {
     app.post(
         "/register",
         &[
-            ("name", "Arif"),
-            ("email", "arif@example.com"),
-            ("password", "rahasia123"),
-            ("password_confirmation", "rahasia123"),
+            ("name", "Anna"),
+            ("email", "anna@example.com"),
+            ("password", "secret123"),
+            ("password_confirmation", "secret123"),
         ],
     )
     .await
     .assert_redirect("/");
-    app.assert_database_has("users", &[("email", &"arif@example.com")]).await;
+    app.assert_database_has("users", &[("email", &"anna@example.com")]).await;
     // Registered and logged in: the account page is theirs.
-    app.get("/account").await.assert_ok().assert_see("arif@example.com");
+    app.get("/account").await.assert_ok().assert_see("anna@example.com");
 }
 
 #[renox::test]
 async fn sessions_end_after_their_lifetime() {
     let app = TestApp::new({{crate_name}}::app()).await;
-    let user = User::register(app.db(), "Arif", "arif@example.com", "rahasia123")
+    let user = User::register(app.db(), "Anna", "anna@example.com", "secret123")
         .await
         .unwrap();
     app.acting_as(&user);

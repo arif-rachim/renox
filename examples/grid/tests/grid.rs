@@ -13,7 +13,7 @@ async fn with_orders(n: usize) -> TestApp {
 
 /// Logs a user in: changing orders needs one.
 async fn log_in(app: &TestApp) {
-    let user = User::register(app.db(), "Dewi", "dewi@example.com", "password123")
+    let user = User::register(app.db(), "Diana", "diana@example.com", "password123")
         .await
         .unwrap();
     app.acting_as(&user);
@@ -86,7 +86,7 @@ async fn paid_follows_the_status() {
         .assert_status(204);
     let order = Order::find_or_404(app.db(), order.id).await.unwrap();
     assert!(!order.paid, "a new order isn't paid");
-    assert_eq!(order.updated_by, "Dewi");
+    assert_eq!(order.updated_by, "Diana");
 }
 
 #[renox::test]
@@ -148,7 +148,7 @@ async fn an_order_opens_from_its_row() {
 #[renox::test]
 async fn each_user_keeps_their_columns() {
     let app = with_orders(3).await;
-    let user = User::register(app.db(), "Dewi", "dewi@example.com", "password123")
+    let user = User::register(app.db(), "Diana", "diana@example.com", "password123")
         .await
         .unwrap();
     app.acting_as(&user);
@@ -168,7 +168,7 @@ async fn each_user_keeps_their_columns() {
 async fn cells_are_edited_in_place() {
     let app = with_orders(1).await;
     let order = Order::query().first(app.db()).await.unwrap().unwrap();
-    let user = User::register(app.db(), "Sari", "sari@example.com", "password123")
+    let user = User::register(app.db(), "Sarah", "sarah@example.com", "password123")
         .await
         .unwrap();
     app.acting_as(&user);
@@ -181,7 +181,7 @@ async fn cells_are_edited_in_place() {
         .patch(
             &url,
             &[
-                ("customer", "Ibu Ani"),
+                ("customer", "Mrs Anna"),
                 ("paid", "true"),
                 ("tags", "promo"),
                 ("tags", "nope"),
@@ -195,10 +195,10 @@ async fn cells_are_edited_in_place() {
         "a toast"
     );
     let saved = Order::find_or_404(app.db(), order.id).await.unwrap();
-    assert_eq!(saved.customer, "Ibu Ani");
+    assert_eq!(saved.customer, "Mrs Anna");
     assert!(saved.paid);
     assert_eq!(saved.tags.0, ["promo"], "unknown tags dropped");
-    assert_eq!(saved.updated_by, "Sari");
+    assert_eq!(saved.updated_by, "Sarah");
     // Invalid values: 422 with the errors, nothing saved.
     app.htmx()
         .patch(&url, &[("items", "5000"), ("status", "lost")])

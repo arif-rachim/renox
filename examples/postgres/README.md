@@ -38,7 +38,7 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/tasks cargo run
 - **One migration per database where the SQL differs.** On PostgreSQL the migrator uses
   `*.postgres.up.sql` when it exists, and the plain `*.up.sql` otherwise. Here `done` is
   `BOOLEAN` vs `INTEGER` and `due_on` is `DATE` vs `TEXT`; the model is the same.
-- **Search ignores case on both.** `where_like("title", ...)` finds "Beli KOPI" for `?q=kopi`
+- **Search ignores case on both.** `where_like("title", ...)` finds "Buy COFFEE" for `?q=coffee`
   on SQLite and PostgreSQL alike.
 - **Dates compare as dates.** `?overdue=true` uses `where_op("due_on", "<", today)` with a
   `NaiveDate`.

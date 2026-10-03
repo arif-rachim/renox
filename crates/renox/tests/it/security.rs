@@ -175,7 +175,7 @@ async fn production_over_https_gets_hsts() {
     let (app, _dir) = app(
         |c| {
             c.env = Environment::Production;
-            c.url = "https://toko.example".into();
+            c.url = "https://shop.example".into();
         },
         |a| a,
     )

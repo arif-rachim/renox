@@ -37,7 +37,7 @@ rnx serve                                                           # http://127
 
 The new app has a layout built with the UI kit (navigation bar, account menu, toasts), a home
 page, login and registration, an account page (profile, password, other devices), an error page
-in the layout, English and Indonesian texts, a test in `tests/home.rs`, and an `AGENTS.md` for
+in the layout, its texts in `resources/lang/en.json`, a test in `tests/home.rs`, and an `AGENTS.md` for
 coding agents. With `--database postgres`, create the
 `blog` and `blog_test` databases first (or edit `.env`).
 
@@ -207,8 +207,8 @@ impl Module for Guestbook {
 - `Valid<T>` validates forms, JSON bodies and query strings with rules such as `required`,
   `required_if`, `email`, `between`, `matches` (regex), `digits`, dates (`before`, `after`),
   `unique`, `exists`, `same`, `alpha_dash`, `uuid`, `ip`, `size`, `image` and `mimes`, per item of
-  a list (`each`, `nested`, `distinct`), and your own reusable `Rule`s. Messages come in English
-  and Indonesian, or from your own translations. Simple forms declare them as attributes:
+  a list (`each`, `nested`, `distinct`), and your own reusable `Rule`s. Messages come in English,
+  or from your own translations (`resources/lang/<locale>.json`). Simple forms declare them as attributes:
   `#[derive(Validate)]` with `#[validate(required, email, unique("users", "email"))]`.
 - Form requests: `prepare` tidies the input, `authorize` answers 403 before any rule, and
   `after` runs checks that need the database, with errors shown like a rule's.
@@ -261,7 +261,8 @@ impl Module for Guestbook {
   database, with atomic locks (`state.cache.lock("stock:42", ttl)`) that hold across servers on
   the database store.
 - Each visitor gets their own locale (chosen, or their browser's with `App::detect_locale()`),
-  from `resources/lang/*.json`, with `t()`, plurals and Laravel's plural ranges.
+  from `resources/lang/*.json`, with `t()`, plurals and Laravel's plural ranges. Renox's own
+  texts are English; the same files translate them (`ui.*`, `renox.auth.*`, `renox.validation.*`).
 </details>
 
 <details>
@@ -346,7 +347,7 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 - [`examples/shop`](examples/shop): a whole online shop: htmx search, a cart, checkout in one
   transaction that never oversells, queued mail and notifications, an admin for the `admin` role
   with photo uploads and an audit trail, a typed `shop:make-admin` command that asks for what's
-  missing, English and Indonesian, and its deploy files (with the systemd socket). Start here.
+  missing, English and Spanish texts, and its deploy files (with the systemd socket). Start here.
 - [`examples/htmx-recipes`](examples/htmx-recipes): a modal form, inline edit, infinite scroll,
   delete in place, tabs and a dropdown, with htmx, Alpine and fragment-returning handlers.
 - [`examples/relations`](examples/relations): a blog with belongs-to, has-many and many-to-many
@@ -376,7 +377,7 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 - [`examples/webhooks`](examples/webhooks): Midtrans, Xendit and Stripe webhooks marking orders
   paid, each tested with good, forged and repeated calls.
 - [`examples/hello`](examples/hello): the guestbook from the GIF, with an HTMX form, a photo upload,
-  an event that queues mail, a scheduled task, English and Indonesian, login and an account page.
+  an event that queues mail, a scheduled task, English and Spanish texts, login and an account page.
 
 ## Coming from Laravel
 

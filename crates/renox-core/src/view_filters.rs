@@ -23,7 +23,7 @@ fn separators(locale: &str) -> (&'static str, &'static str) {
     }
 }
 
-/// `{{ 75000 | number }}` → `75,000` (en) or `75.000` (id);
+/// `{{ 75000 | number }}` → `75,000` (en) or `75.000` (es, de);
 /// `{{ 3.14159 | number(2) }}` → `3.14` / `3,14`.
 pub(crate) fn number(state: &State, value: Value, decimals: Option<u32>) -> Result<String, Error> {
     let n = to_number("number", &value)?;
@@ -74,7 +74,7 @@ pub(crate) fn money(
 
 /// `amount` in the currency `code` (ISO 4217), with its symbol, its usual
 /// decimals (or `decimals`) and the locale's separators: `Rp 75.000`,
-/// `$1,250.50`, `€1.250,50` in `id` (what the `money` template filter
+/// `$1,250.50`, `€1.250,50` in `de` (what the `money` template filter
 /// uses). An unknown code is written before the amount (`CHF 12.00`).
 pub fn format_money(amount: f64, code: &str, decimals: Option<u32>, locale: &str) -> String {
     let (symbol, usual) = match code {
@@ -185,7 +185,7 @@ fn moment(value: &Value, zone: crate::timezone::Zone) -> Option<i64> {
 }
 
 /// `{{ order.created_at | since }}` → `3 hours ago`, `in 2 days`, `just
-/// now` (`3 jam yang lalu` in `id`), from the clock `TestApp::travel`
+/// now` (`3 hours ago`), from the clock `TestApp::travel`
 /// moves. The texts are `ui.since.*` translations.
 pub(crate) fn since(
     zone: crate::timezone::Zone,
@@ -496,9 +496,9 @@ mod tests {
 
     #[test]
     fn formats_money_per_currency_and_locale() {
-        assert_eq!(format_money(75_000.0, "IDR", None, "id"), "Rp 75.000");
+        assert_eq!(format_money(75_000.0, "IDR", None, "es"), "Rp 75.000");
         assert_eq!(format_money(1_250.5, "USD", None, "en"), "$1,250.50");
-        assert_eq!(format_money(1_250.5, "EUR", None, "id"), "€1.250,50");
+        assert_eq!(format_money(1_250.5, "EUR", None, "de"), "€1.250,50");
         assert_eq!(format_money(-5_000.0, "IDR", None, "en"), "-Rp 5,000");
         assert_eq!(format_money(12.0, "CHF", None, "en"), "CHF 12.00");
         assert_eq!(format_money(12.0, "MYR", Some(0), "en"), "RM 12");
@@ -544,9 +544,9 @@ mod tests {
 
     #[test]
     fn formats_numbers_per_locale() {
-        assert_eq!(format_number(75_000.0, 0, "id"), "75.000");
+        assert_eq!(format_number(75_000.0, 0, "es"), "75.000");
         assert_eq!(format_number(1_234_567.891, 2, "en"), "1,234,567.89");
-        assert_eq!(format_number(-1234.5, 1, "id"), "-1.234,5");
+        assert_eq!(format_number(-1234.5, 1, "de"), "-1.234,5");
         assert_eq!(format_number(999.0, 0, "en"), "999");
         assert_eq!(format_number(-0.001, 2, "en"), "0.00");
     }

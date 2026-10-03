@@ -105,8 +105,8 @@ pub struct Config {
     /// Longest a request may take to answer, from `REQUEST_TIMEOUT` in
     /// seconds (default 60; 0 for none). Streaming a response isn't counted.
     pub request_timeout: Option<Duration>,
-    /// Default language of the app, from `APP_LOCALE`. Built-in messages exist
-    /// for `en` and `id`; other locales need a lang file.
+    /// Default language of the app, from `APP_LOCALE`. Renox's own texts are
+    /// English; other locales need a lang file (`resources/lang/es.json`).
     pub locale: String,
     /// Language used for keys missing in the request's locale, from `APP_FALLBACK_LOCALE`.
     pub fallback_locale: String,

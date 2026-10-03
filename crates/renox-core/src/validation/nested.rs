@@ -1,4 +1,4 @@
-//! Forms with nested names: `items[0][name]=Kopi&items[0][qty]=2` read into
+//! Forms with nested names: `items[0][name]=Coffee&items[0][qty]=2` read into
 //! `items: Vec<Item>`, and `meta[0][key]=…` into a list of pairs. Plain
 //! forms keep going through `serde_html_form`; a form switches to this
 //! reader when one of its names has a `[`.
@@ -407,11 +407,11 @@ mod tests {
     #[test]
     fn nested_names_read_into_lists_of_structs() {
         let node = Node::build(&pairs(&[
-            ("title", "Kopi"),
-            ("lines[1][name]", "Teh"),
+            ("title", "Coffee"),
+            ("lines[1][name]", "Tea"),
             ("lines[1][qty]", "1"),
             ("lines[1][note]", ""),
-            ("lines[0][name]", "Kopi"),
+            ("lines[0][name]", "Coffee"),
             ("lines[0][qty]", " 2 "),
             ("lines[0][note]", "less sugar"),
             ("lines[0][gift]", "on"),
@@ -420,20 +420,20 @@ mod tests {
             ("size", "large"),
         ]));
         let order: Order = deserialize(node).unwrap();
-        assert_eq!(order.title, "Kopi");
+        assert_eq!(order.title, "Coffee");
         assert_eq!(order.tags, ["a", "b"]);
         assert_eq!(order.size, Size::Large);
         assert_eq!(
             order.lines,
             [
                 Line {
-                    name: "Kopi".into(),
+                    name: "Coffee".into(),
                     qty: 2,
                     note: Some("less sugar".into()),
                     gift: true
                 },
                 Line {
-                    name: "Teh".into(),
+                    name: "Tea".into(),
                     qty: 1,
                     note: None,
                     gift: false
@@ -487,11 +487,11 @@ mod tests {
         assert!(is_nested(["a", "b[0]"].into_iter()));
         assert!(!is_nested(["a", "b.c"].into_iter()));
         let json = Node::build(&pairs(&[
-            ("items[0][name]", "Kopi"),
+            ("items[0][name]", "Coffee"),
             ("items[1][name]", ""),
         ]))
         .into_json();
-        assert_eq!(lookup(&json, "items[0][name]").unwrap(), "Kopi");
+        assert_eq!(lookup(&json, "items[0][name]").unwrap(), "Coffee");
         assert_eq!(lookup(&json, "items.1.name").unwrap(), "");
         assert_eq!(lookup(&json, "items").unwrap().as_array().unwrap().len(), 2);
         assert!(lookup(&json, "items.5.name").is_none());

@@ -75,7 +75,7 @@ impl Module for Products {
 struct Login {
     email: String,
     password: String,
-    /// Shown in the user's list of tokens, e.g. "Arif's iPhone".
+    /// Shown in the user's list of tokens, e.g. "Alex's iPhone".
     device: String,
     /// `true` asks for a token that can only read (e.g. for a dashboard);
     /// by default the token can read and write products.

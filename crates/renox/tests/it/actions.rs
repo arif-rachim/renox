@@ -57,9 +57,9 @@ const PRODUCTS: &str = r##"{% from "renox/ui.html" import action_sheet, icon_but
 {{ input("change", "Change", type="number", id="change-7") }}
 {% endcall %}
 {% call action_sheet("note-7", "Note", "/notes", "Add a note", slide_over=true, modal_icon="info", danger=true) %}{{ input("note", "Note", id="note-7") }}{% endcall %}
-{{ icon_button("edit", "Edit Kopi", href="/products/7/edit") }}
-{{ icon_button("trash", "Delete Kopi", variant="danger", key="mod+backspace", attrs={"hx-delete": "/products/7"}) }}
-{{ icon_button("external", "View Kopi", disabled_reason="Hidden from the shop.") }}
+{{ icon_button("edit", "Edit Coffee", href="/products/7/edit") }}
+{{ icon_button("trash", "Delete Coffee", variant="danger", key="mod+backspace", attrs={"hx-delete": "/products/7"}) }}
+{{ icon_button("external", "View Coffee", disabled_reason="Hidden from the shop.") }}
 {{ icon_button("refresh", "Reload", disabled=true, badge=2) }}
 {{ button("Save", key="mod+s", icon="check") }}
 {{ button("Publish", disabled_reason="Add a photo first.") }}
@@ -69,8 +69,8 @@ const PRODUCTS: &str = r##"{% from "renox/ui.html" import action_sheet, icon_but
 {{ link_button("/orders", "Blank", badge="") }}
 {{ open_button("panel", "Filters", icon="settings", badge=3) }}
 {% call sheet("panel", "Filters", slide_over=true, width="sm", icon="success") %}…{% endcall %}
-{{ confirm("del-7", "Delete", "/products/7", "Delete Kopi?", "Gone for good.", icon="trash") }}
-{{ confirm("del-8", "Delete", "/products/8", "Delete Teh?", "Gone for good.", modal_icon=none) }}
+{{ confirm("del-7", "Delete", "/products/7", "Delete Coffee?", "Gone for good.", icon="trash") }}
+{{ confirm("del-8", "Delete", "/products/8", "Delete Tea?", "Gone for good.", modal_icon=none) }}
 {{ toasts() }}"##;
 
 async fn app() -> (TestApp, tempfile::TempDir) {
@@ -116,10 +116,10 @@ async fn icon_buttons_and_buttons_carry_icons_counts_keys_and_reasons() {
     app.get("/products")
         .await
         // An icon link: its label is its name and its tooltip.
-        .assert_see(r#"<a class="rx-icon-button rx-icon-button--plain" href="/products/7/edit" aria-label="Edit Kopi" data-rx-tip="Edit Kopi"><svg"#)
-        .assert_see(r#"<button class="rx-icon-button rx-icon-button--danger" type="button" aria-label="Delete Kopi" data-rx-tip="Delete Kopi" data-rx-key="mod+backspace" hx-delete="/products/7"><svg"#)
+        .assert_see(r#"<a class="rx-icon-button rx-icon-button--plain" href="/products/7/edit" aria-label="Edit Coffee" data-rx-tip="Edit Coffee"><svg"#)
+        .assert_see(r#"<button class="rx-icon-button rx-icon-button--danger" type="button" aria-label="Delete Coffee" data-rx-tip="Delete Coffee" data-rx-key="mod+backspace" hx-delete="/products/7"><svg"#)
         // Disabled with a reason: focusable, the reason as its tooltip.
-        .assert_see(r#"<button class="rx-icon-button rx-icon-button--plain" type="button" aria-label="View Kopi" aria-disabled="true" data-rx-tip="Hidden from the shop."><svg"#)
+        .assert_see(r#"<button class="rx-icon-button rx-icon-button--plain" type="button" aria-label="View Coffee" aria-disabled="true" data-rx-tip="Hidden from the shop."><svg"#)
         .assert_see(r#"aria-label="Reload" data-rx-tip="Reload" disabled><svg"#)
         .assert_see(r#"<span class="rx-button__badge">2</span></button>"#)
         .assert_see(r#"type="submit" data-rx-key="mod+s"><span class="rx-button__icon" aria-hidden="true"><svg"#)

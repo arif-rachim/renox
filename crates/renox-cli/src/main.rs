@@ -31,7 +31,7 @@ struct Cli {
 enum Command {
     /// Create a new Renox application.
     New {
-        /// Directory and package name, e.g. `toko`.
+        /// Directory and package name, e.g. `shop`.
         name: String,
         /// Use a local checkout of Renox instead of the Git repository.
         #[arg(long, value_name = "DIR")]
@@ -49,10 +49,10 @@ enum Command {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         cargo_args: Vec<String>,
     },
-    /// Create a migration in `migrations/`, e.g. `create_produk_table`.
+    /// Create a migration in `migrations/`, e.g. `create_products_table`.
     #[command(name = "make:migration")]
     MakeMigration {
-        /// Snake-case description, e.g. `create_produk_table`.
+        /// Snake-case description, e.g. `create_products_table`.
         name: String,
         /// Directory for the migration files.
         #[arg(long, default_value = "migrations")]
@@ -61,7 +61,7 @@ enum Command {
     /// Create a module: routes, an index view, and its registration.
     #[command(name = "make:module")]
     MakeModule {
-        /// e.g. `produk` or `stok_barang`.
+        /// e.g. `products` or `stock_items`.
         name: String,
         /// A whole resource: model, migration, factory, form, the seven
         /// handlers (`Routes::resource`), views on the UI kit, and tests.
@@ -117,7 +117,7 @@ enum Command {
     /// Create a model (and with --migration, its table's migration).
     #[command(name = "make:model")]
     MakeModel {
-        /// e.g. `Produk`.
+        /// e.g. `Product`.
         name: String,
         /// Module to put it in; defaults to the model's name in snake_case.
         #[arg(long)]
@@ -133,7 +133,7 @@ enum Command {
     /// Create a queued job in a module.
     #[command(name = "make:job")]
     MakeJob {
-        /// e.g. `KirimStruk`.
+        /// e.g. `SendReceipt`.
         name: String,
         #[arg(long)]
         module: String,
@@ -149,7 +149,7 @@ enum Command {
     /// Create a policy for a module's model.
     #[command(name = "make:policy")]
     MakePolicy {
-        /// The model, e.g. `Produk`.
+        /// The model, e.g. `Product`.
         model: String,
         #[arg(long)]
         module: String,
@@ -170,7 +170,7 @@ enum Command {
     /// Create an HTML and a text mail template.
     #[command(name = "make:mail")]
     MakeMail {
-        /// e.g. `pesanan_dikirim`.
+        /// e.g. `order_shipped`.
         name: String,
     },
     /// Run pending migrations.
@@ -454,8 +454,8 @@ mod tests {
     #[test]
     fn commands_parse_with_their_options() {
         assert!(matches!(
-            parse(&["new", "toko", "--database", "postgres", "--tailwind"]),
-            Command::New { name, database: Database::Postgres, tailwind: true, renox_path: None } if name == "toko"
+            parse(&["new", "shop", "--database", "postgres", "--tailwind"]),
+            Command::New { name, database: Database::Postgres, tailwind: true, renox_path: None } if name == "shop"
         ));
         assert!(matches!(
             parse(&["make:model", "Order", "-m", "--key", "ulid"]),
@@ -550,8 +550,8 @@ mod tests {
     fn the_key_goes_into_env() {
         assert_eq!(with_key("", "k"), "APP_KEY=k\n");
         assert_eq!(
-            with_key("APP_NAME=Toko\nAPP_KEY=\nAPP_DEBUG=true", "k"),
-            "APP_NAME=Toko\nAPP_KEY=k\nAPP_DEBUG=true\n"
+            with_key("APP_NAME=Shop\nAPP_KEY=\nAPP_DEBUG=true", "k"),
+            "APP_NAME=Shop\nAPP_KEY=k\nAPP_DEBUG=true\n"
         );
         assert_eq!(
             with_key("export APP_KEY=old\nAPP_KEY=other", "k"),

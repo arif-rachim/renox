@@ -4,7 +4,7 @@
 //! ```
 //! # use renox::prelude::*;
 //! # async fn demo(state: AppState, order: renox::serde_json::Value) -> Result {
-//! let mail = state.mail_view("budi@example.com", "Struk pesanan", "mail/receipt", context! { order })?;
+//! let mail = state.mail_view("ben@example.com", "Your receipt", "mail/receipt", context! { order })?;
 //! state.mailer.send(mail.clone()).await?;   // now
 //! state.queue_mail(mail).await?;            // through the queue, with retries
 //! # Ok(()) }
@@ -42,12 +42,12 @@ const OUTBOX: usize = 50;
 /// ```
 /// # use renox::mail::Mail;
 /// let pdf: Vec<u8> = b"%PDF-1.7 ...".to_vec();
-/// let mail = Mail::new("budi@example.com", "Invoice INV-001", "Your invoice is attached.")
+/// let mail = Mail::new("ben@example.com", "Invoice INV-001", "Your invoice is attached.")
 ///     .also_to("finance@example.com")
 ///     .cc("sales@example.com")
 ///     .bcc("archive@example.com")
-///     .reply_to("Toko Kopi <halo@toko.id>")
-///     .from("Toko Kopi Billing <billing@toko.id>") // instead of MAIL_FROM_*
+///     .reply_to("Coffee Shop <hello@shop.example>")
+///     .from("Coffee Shop Billing <billing@shop.example>") // instead of MAIL_FROM_*
 ///     .attach("INV-001.pdf", "application/pdf", pdf);
 /// ```
 ///
@@ -678,11 +678,11 @@ mod tests {
     #[test]
     fn html_becomes_readable_text() {
         let html = r#"<html><head><style>p{color:red}</style></head><body>
-            <h1>Halo &amp; selamat</h1><p>Klik <a href="https://x.id/a?b=1&amp;c=2">di sini</a>.</p>
+            <h1>Hello &amp; welcome</h1><p>Click <a href="https://x.id/a?b=1&amp;c=2">here</a>.</p>
             <table><tr><td>Total</td><td>Rp 10.000</td></tr></table></body></html>"#;
         assert_eq!(
             html_to_text(html),
-            "Halo & selamat\n\nKlik di sini (https://x.id/a?b=1&c=2).\n\nTotal Rp 10.000\n"
+            "Hello & welcome\n\nClick here (https://x.id/a?b=1&c=2).\n\nTotal Rp 10.000\n"
         );
     }
 }

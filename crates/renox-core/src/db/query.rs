@@ -167,17 +167,17 @@ fn json_in(kind: &str, column: &str, dialect: Dialect) -> String {
 ///
 /// ```
 /// # #[derive(Model, serde::Serialize, Default)]
-/// # #[model(table = "produk")]
-/// # struct Produk { id: i64, nama: String, harga: i64, kategori: Option<String>, user_id: i64 }
+/// # #[model(table = "products")]
+/// # struct Product { id: i64, name: String, price: i64, category: Option<String>, user_id: i64 }
 /// # use renox::prelude::*;
 /// # async fn demo(db: Db, page: u32) -> Result {
-/// let produk = Produk::query()
-///     .where_eq("kategori", "kopi")
-///     .where_op("harga", "<", 25_000)
-///     .order_by("nama")
+/// let products = Product::query()
+///     .where_eq("category", "coffee")
+///     .where_op("price", "<", 25_000)
+///     .order_by("name")
 ///     .paginate(&db, page, 20)
 ///     .await?;
-/// # let _ = produk; Ok(()) }
+/// # let _ = products; Ok(()) }
 /// ```
 ///
 /// Column names are checked against the model; an unknown column or operator

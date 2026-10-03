@@ -45,8 +45,8 @@ async fn customer(app: &TestApp) -> Customer {
     Customer::create(
         app.db(),
         Customer {
-            name: "Warung Bu Sri".into(),
-            email: Some("sri@example.com".into()),
+            name: "Sally's Diner".into(),
+            email: Some("sally@example.com".into()),
             ..Default::default()
         },
     )
@@ -116,7 +116,7 @@ async fn guests_log_in_and_new_staff_verify_first() {
     // The sign-in page wears the company's name and colour.
     app.get("/login")
         .await
-        .assert_see("Toko Makmur")
+        .assert_see("Corner Store")
         .assert_see("--rx-accent: #0f766e");
     // Nobody signs up: an admin adds staff.
     app.get("/register").await.assert_not_found();
@@ -131,7 +131,7 @@ async fn guests_log_in_and_new_staff_verify_first() {
 #[renox::test]
 async fn each_role_changes_only_its_own_things() {
     let app = app().await;
-    let kopi = product(&app, "KOPI", 50_000, 10).await;
+    let coffee = product(&app, "COFFEE", 50_000, 10).await;
     let buyer = customer(&app).await;
 
     staff(&app, "warehouse").await;
@@ -145,12 +145,12 @@ async fn each_role_changes_only_its_own_things() {
     app.get("/staff").await.assert_forbidden();
     app.htmx()
         .post(
-            &format!("/products/{}/stock", kopi.id),
+            &format!("/products/{}/stock", coffee.id),
             &[("reason", "received"), ("quantity", "5")],
         )
         .await
         .assert_ok();
-    assert_eq!(stock_of(&app, kopi.id).await, 15);
+    assert_eq!(stock_of(&app, coffee.id).await, 15);
     // The menu shows what they may open.
     app.get("/")
         .await
@@ -161,42 +161,42 @@ async fn each_role_changes_only_its_own_things() {
     app.logout();
     staff(&app, "cashier").await;
     app.post(
-        &format!("/products/{}/stock", kopi.id),
+        &format!("/products/{}/stock", coffee.id),
         &[("reason", "received"), ("quantity", "5")],
     )
     .await
     .assert_forbidden();
     app.get("/settings").await.assert_forbidden();
-    draft(&app, &buyer, &[(&kopi, 1)]).await;
+    draft(&app, &buyer, &[(&coffee, 1)]).await;
 }
 
 #[renox::test]
 async fn issuing_takes_the_stock_and_voiding_brings_it_back() {
     let app = app().await;
-    let kopi = product(&app, "KOPI", 50_000, 10).await;
-    let gula = product(&app, "GULA", 20_000, 3).await;
+    let coffee = product(&app, "COFFEE", 50_000, 10).await;
+    let sugar = product(&app, "SUGAR", 20_000, 3).await;
     let buyer = customer(&app).await;
     staff(&app, "cashier").await;
 
-    let invoice = draft(&app, &buyer, &[(&kopi, 2), (&gula, 1)]).await;
+    let invoice = draft(&app, &buyer, &[(&coffee, 2), (&sugar, 1)]).await;
     // The price of the product, 11% tax, the number from the settings.
     assert_eq!(invoice.subtotal, 120_000);
     assert_eq!(invoice.tax, 13_200);
     assert_eq!(invoice.total, 133_200);
     assert_eq!(invoice.number, format!("INV-{:05}", invoice.id));
     assert_eq!(invoice.status, "draft");
-    assert_eq!(stock_of(&app, kopi.id).await, 10, "a draft takes nothing");
+    assert_eq!(stock_of(&app, coffee.id).await, 10, "a draft takes nothing");
 
     let issue = format!("/invoices/{}/issue", invoice.id);
     app.post(&issue, &[])
         .await
         .assert_redirect(&format!("/invoices/{}", invoice.id));
-    assert_eq!(stock_of(&app, kopi.id).await, 8);
-    assert_eq!(stock_of(&app, gula.id).await, 2);
+    assert_eq!(stock_of(&app, coffee.id).await, 8);
+    assert_eq!(stock_of(&app, sugar.id).await, 2);
     app.assert_database_has(
         "stock_movements",
         &[
-            ("product_id", &kopi.id),
+            ("product_id", &coffee.id),
             ("quantity", &-2_i64),
             ("reason", &"sold"),
             ("invoice_id", &invoice.id),
@@ -205,20 +205,20 @@ async fn issuing_takes_the_stock_and_voiding_brings_it_back() {
     .await;
     // A second click finds it issued already.
     app.post(&issue, &[]).await.assert_status(409);
-    assert_eq!(stock_of(&app, kopi.id).await, 8);
+    assert_eq!(stock_of(&app, coffee.id).await, 8);
 
     app.post(&format!("/invoices/{}/void", invoice.id), &[])
         .await
         .assert_redirect(&format!("/invoices/{}", invoice.id));
-    assert_eq!(stock_of(&app, kopi.id).await, 10);
-    assert_eq!(stock_of(&app, gula.id).await, 3);
+    assert_eq!(stock_of(&app, coffee.id).await, 10);
+    assert_eq!(stock_of(&app, sugar.id).await, 3);
     app.assert_database_has(
         "audit_logs",
         &[("action", &"invoice.voided"), ("subject_id", &invoice.id)],
     )
     .await;
     // The ledger adds up to the stock.
-    let total: i64 = StockMovement::where_eq("product_id", kopi.id)
+    let total: i64 = StockMovement::where_eq("product_id", coffee.id)
         .sum(app.db(), "quantity")
         .await
         .unwrap();
@@ -228,18 +228,18 @@ async fn issuing_takes_the_stock_and_voiding_brings_it_back() {
 #[renox::test]
 async fn an_invoice_short_of_stock_changes_nothing() {
     let app = app().await;
-    let kopi = product(&app, "KOPI", 50_000, 10).await;
-    let gula = product(&app, "GULA", 20_000, 1).await;
+    let coffee = product(&app, "COFFEE", 50_000, 10).await;
+    let sugar = product(&app, "SUGAR", 20_000, 1).await;
     let buyer = customer(&app).await;
     staff(&app, "cashier").await;
 
-    let invoice = draft(&app, &buyer, &[(&kopi, 2), (&gula, 5)]).await;
+    let invoice = draft(&app, &buyer, &[(&coffee, 2), (&sugar, 5)]).await;
     app.post(&format!("/invoices/{}/issue", invoice.id), &[])
         .await
         .assert_status(409)
-        .assert_see("Only 1 of Product GULA in stock; 5 needed.");
+        .assert_see("Only 1 of Product SUGAR in stock; 5 needed.");
     // The first line's stock came back with the rollback, and it's a draft.
-    assert_eq!(stock_of(&app, kopi.id).await, 10);
+    assert_eq!(stock_of(&app, coffee.id).await, 10);
     assert_eq!(
         Invoice::find_or_404(app.db(), invoice.id)
             .await
@@ -294,10 +294,10 @@ async fn the_invoice_form_checks_each_line() {
 #[renox::test]
 async fn cash_pays_an_issued_invoice_and_tells_the_cashiers() {
     let app = app().await;
-    let kopi = product(&app, "KOPI", 50_000, 10).await;
+    let coffee = product(&app, "COFFEE", 50_000, 10).await;
     let buyer = customer(&app).await;
     let cashier = staff(&app, "cashier").await;
-    let invoice = draft(&app, &buyer, &[(&kopi, 1)]).await;
+    let invoice = draft(&app, &buyer, &[(&coffee, 1)]).await;
     let paid = format!("/invoices/{}/paid", invoice.id);
     // A draft isn't paid.
     app.post(&paid, &[]).await.assert_status(409);
@@ -319,14 +319,14 @@ async fn cash_pays_an_issued_invoice_and_tells_the_cashiers() {
 #[renox::test]
 async fn stock_is_received_counted_and_never_below_zero() {
     let app = app().await;
-    let kopi = product(&app, "KOPI", 50_000, 10).await;
+    let coffee = product(&app, "COFFEE", 50_000, 10).await;
     staff(&app, "warehouse").await;
-    let url = format!("/products/{}/stock", kopi.id);
+    let url = format!("/products/{}/stock", coffee.id);
     app.htmx()
         .post(&url, &[("reason", "damaged"), ("quantity", "11")])
         .await
         .assert_invalid("quantity");
-    assert_eq!(stock_of(&app, kopi.id).await, 10);
+    assert_eq!(stock_of(&app, coffee.id).await, 10);
     // Counted: the shelf has 7, so the ledger says -3.
     app.htmx()
         .post(
@@ -339,7 +339,7 @@ async fn stock_is_received_counted_and_never_below_zero() {
         )
         .await
         .assert_ok();
-    assert_eq!(stock_of(&app, kopi.id).await, 7);
+    assert_eq!(stock_of(&app, coffee.id).await, 7);
     app.assert_database_has(
         "stock_movements",
         &[
@@ -349,7 +349,7 @@ async fn stock_is_received_counted_and_never_below_zero() {
         ],
     )
     .await;
-    app.get(&format!("/products/{}", kopi.id))
+    app.get(&format!("/products/{}", coffee.id))
         .await
         .assert_see("Stocktake")
         .assert_see("Stock ledger");
@@ -358,13 +358,13 @@ async fn stock_is_received_counted_and_never_below_zero() {
 #[renox::test]
 async fn products_import_from_csv_line_by_line() {
     let app = app().await;
-    product(&app, "KOPI", 50_000, 10).await;
+    product(&app, "COFFEE", 50_000, 10).await;
     staff(&app, "warehouse").await;
     let csv = "sku,name,price,stock\n\
-               KOPI,Kopi arabika,55000,5\n\
-               teh-01,\"Teh, melati\",18000,20\n\
+               COFFEE,Arabica coffee,55000,5\n\
+               tea-01,\"Tea, jasmine\",18000,20\n\
                BAD SKU,Nope,1,1\n\
-               GULA,Gula,mahal,1\n";
+               SUGAR,Sugar,pricey,1\n";
     let res = app
         .htmx()
         .post_multipart(
@@ -379,23 +379,23 @@ async fn products_import_from_csv_line_by_line() {
         .await
         .assert_see("1 added, 1 updated, 2 skipped.")
         .assert_see("line 4: `BAD SKU` isn&#x27;t a SKU")
-        .assert_see("line 5: `mahal` isn&#x27;t a price");
+        .assert_see("line 5: `pricey` isn&#x27;t a price");
 
-    let kopi = Product::where_eq("sku", "KOPI")
+    let coffee = Product::where_eq("sku", "COFFEE")
         .first(app.db())
         .await
         .unwrap()
         .unwrap();
     assert_eq!(
-        (kopi.name.as_str(), kopi.price, kopi.stock),
-        ("Kopi arabika", 55_000, 15)
+        (coffee.name.as_str(), coffee.price, coffee.stock),
+        ("Arabica coffee", 55_000, 15)
     );
-    let teh = Product::where_eq("sku", "TEH-01")
+    let tea = Product::where_eq("sku", "TEA-01")
         .first(app.db())
         .await
         .unwrap()
         .unwrap();
-    assert_eq!((teh.name.as_str(), teh.stock), ("Teh, melati", 20));
+    assert_eq!((tea.name.as_str(), tea.stock), ("Tea, jasmine", 20));
     app.assert_database_count("products", 2).await;
 
     // Only CSV files.
@@ -408,11 +408,11 @@ async fn products_import_from_csv_line_by_line() {
 #[renox::test]
 async fn exports_run_in_the_background_with_the_grids_filters() {
     let app = app().await;
-    let kopi = product(&app, "KOPI", 50_000, 100).await;
+    let coffee = product(&app, "COFFEE", 50_000, 100).await;
     let buyer = customer(&app).await;
     let cashier = staff(&app, "cashier").await;
-    let first = draft(&app, &buyer, &[(&kopi, 1)]).await;
-    let second = draft(&app, &buyer, &[(&kopi, 2)]).await;
+    let first = draft(&app, &buyer, &[(&coffee, 1)]).await;
+    let second = draft(&app, &buyer, &[(&coffee, 2)]).await;
     app.post(&format!("/invoices/{}/issue", second.id), &[])
         .await;
 
@@ -459,10 +459,10 @@ async fn exports_run_in_the_background_with_the_grids_filters() {
 #[renox::test]
 async fn a_xendit_payment_page_and_its_webhook_pay_the_invoice() {
     let app = app().await;
-    let kopi = product(&app, "KOPI", 50_000, 10).await;
+    let coffee = product(&app, "COFFEE", 50_000, 10).await;
     let buyer = customer(&app).await;
     let cashier = staff(&app, "cashier").await;
-    let invoice = draft(&app, &buyer, &[(&kopi, 1)]).await;
+    let invoice = draft(&app, &buyer, &[(&coffee, 1)]).await;
     app.post(&format!("/invoices/{}/issue", invoice.id), &[])
         .await;
     let link = format!("/invoices/{}/payment-link", invoice.id);
@@ -529,10 +529,10 @@ async fn a_xendit_payment_page_and_its_webhook_pay_the_invoice() {
 #[renox::test]
 async fn a_midtrans_settlement_pays_the_invoice() {
     let app = app().await;
-    let kopi = product(&app, "KOPI", 50_000, 10).await;
+    let coffee = product(&app, "COFFEE", 50_000, 10).await;
     let buyer = customer(&app).await;
     staff(&app, "cashier").await;
-    let invoice = draft(&app, &buyer, &[(&kopi, 1)]).await;
+    let invoice = draft(&app, &buyer, &[(&coffee, 1)]).await;
     app.post(&format!("/invoices/{}/issue", invoice.id), &[])
         .await;
     let body = |status: &str, key: &str| {
@@ -573,35 +573,35 @@ async fn admins_add_staff_who_verify_their_email() {
         .post(
             "/staff",
             &[
-                ("name", "Sari"),
-                ("email", "sari@example.com"),
+                ("name", "Sarah"),
+                ("email", "sarah@example.com"),
                 ("password", "first-password"),
                 ("role", "cashier"),
             ],
         )
         .await
         .assert_ok();
-    app.assert_mail_sent("sari@example.com", "erif");
-    let sari = User::find_by_email(app.db(), "sari@example.com")
+    app.assert_mail_sent("sarah@example.com", "erif");
+    let sarah = User::find_by_email(app.db(), "sarah@example.com")
         .await
         .unwrap()
         .unwrap();
-    assert!(sari.email_verified_at.is_none());
-    assert_eq!(sari.roles(app.db()).await.unwrap(), ["cashier"]);
+    assert!(sarah.email_verified_at.is_none());
+    assert_eq!(sarah.roles(app.db()).await.unwrap(), ["cashier"]);
     app.assert_database_has(
         "audit_logs",
-        &[("action", &"staff.added"), ("subject_id", &sari.id)],
+        &[("action", &"staff.added"), ("subject_id", &sarah.id)],
     )
     .await;
     // Roles change from the staff page; an admin keeps their own.
     app.htmx()
         .put(
-            &format!("/staff/{}/roles", sari.id),
+            &format!("/staff/{}/roles", sarah.id),
             &[("roles", "cashier"), ("roles", "warehouse")],
         )
         .await
         .assert_ok();
-    let mut roles = sari.roles(app.db()).await.unwrap();
+    let mut roles = sarah.roles(app.db()).await.unwrap();
     roles.sort();
     assert_eq!(roles, ["cashier", "warehouse"]);
     app.htmx()
@@ -612,7 +612,7 @@ async fn admins_add_staff_who_verify_their_email() {
         .await
         .assert_invalid("roles");
     assert_eq!(admin.roles(app.db()).await.unwrap(), ["admin"]);
-    app.get("/staff").await.assert_see("sari@example.com");
+    app.get("/staff").await.assert_see("sarah@example.com");
     app.get("/activity").await.assert_see("staff.roles_changed");
 }
 
@@ -623,11 +623,11 @@ async fn settings_shape_invoices_and_the_pages() {
     let form = |color: &'static str| {
         vec![
             ("_method", "PUT"),
-            ("company_name", "Kopi Kenangan Mantan"),
-            ("company_address", "Jl. Braga 1"),
-            ("company_email", "halo@kkm.test"),
+            ("company_name", "Northwind Coffee"),
+            ("company_address", "1 Harbour Road"),
+            ("company_email", "hello@northwind.test"),
             ("tax_percent", "10"),
-            ("invoice_prefix", "KKM-"),
+            ("invoice_prefix", "NWC-"),
             ("payment_days", "7"),
             ("payment_gateway", "none"),
             ("brand_color", color),
@@ -642,15 +642,15 @@ async fn settings_shape_invoices_and_the_pages() {
         .assert_redirect("/settings");
     app.get("/")
         .await
-        .assert_see("Kopi Kenangan Mantan")
+        .assert_see("Northwind Coffee")
         .assert_see("--rx-accent: #7a4520");
     app.assert_database_has("audit_logs", &[("action", &"settings.updated")])
         .await;
 
-    let kopi = product(&app, "KOPI", 10_000, 10).await;
+    let coffee = product(&app, "COFFEE", 10_000, 10).await;
     let buyer = customer(&app).await;
-    let invoice = draft(&app, &buyer, &[(&kopi, 1)]).await;
-    assert!(invoice.number.starts_with("KKM-"));
+    let invoice = draft(&app, &buyer, &[(&coffee, 1)]).await;
+    assert!(invoice.number.starts_with("NWC-"));
     assert_eq!((invoice.tax, invoice.total), (1_000, 11_000));
     assert_eq!(
         invoice.due_on - invoice.issued_on,
@@ -661,20 +661,20 @@ async fn settings_shape_invoices_and_the_pages() {
 #[renox::test]
 async fn the_dashboard_shows_what_needs_doing() {
     let app = app().await;
-    let low = product(&app, "GULA", 20_000, 2).await;
+    let low = product(&app, "SUGAR", 20_000, 2).await;
     Product::where_eq("id", low.id)
         .update(app.db(), &[("min_stock", &5_i64)])
         .await
         .unwrap();
     let buyer = customer(&app).await;
-    let kopi = product(&app, "KOPI", 50_000, 10).await;
+    let coffee = product(&app, "COFFEE", 50_000, 10).await;
     let cashier = staff(&app, "cashier").await;
-    let invoice = draft(&app, &buyer, &[(&kopi, 1)]).await;
+    let invoice = draft(&app, &buyer, &[(&coffee, 1)]).await;
     app.post(&format!("/invoices/{}/issue", invoice.id), &[])
         .await;
     app.get("/")
         .await
-        .assert_see("Product GULA")
+        .assert_see("Product SUGAR")
         .assert_see("Nothing overdue");
     // Fifteen days on (a new login: sessions don't last that long), it is
     // past due.

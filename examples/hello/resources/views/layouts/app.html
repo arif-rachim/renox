@@ -28,8 +28,8 @@
     {% endif %}
     {#- The language: the route saves the choice in the session. -#}
     {% call menu(app.locale | upper, id="language-menu", variant="plain") %}
-      {{ menu_link(route('language', 'id'), "Bahasa Indonesia") }}
       {{ menu_link(route('language', 'en'), "English") }}
+      {{ menu_link(route('language', 'es'), "Español") }}
     {% endcall %}
   {% endcall %}
   <main class="rx-container rx-stack" id="main">

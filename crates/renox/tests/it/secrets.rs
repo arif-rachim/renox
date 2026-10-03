@@ -52,8 +52,8 @@ async fn encrypted_fields_are_sealed_in_the_table() {
     let supplier = Supplier::create(
         db,
         Supplier {
-            name: "Kopi Nusantara".into(),
-            bank_account: Encrypted::new("BCA 123-456-789".into()),
+            name: "Island Coffee".into(),
+            bank_account: Encrypted::new("ACME 123-456-789".into()),
             api_keys: Some(vec!["sk_live_1".to_owned(), "sk_live_2".to_owned()].into()),
             ..Default::default()
         },
@@ -64,7 +64,7 @@ async fn encrypted_fields_are_sealed_in_the_table() {
     // The table holds sealed text, never the value.
     let account = stored(&app, "bank_account").await.unwrap();
     assert!(
-        !account.contains("BCA") && !account.contains("123"),
+        !account.contains("ACME") && !account.contains("123"),
         "{account}"
     );
     let keys = stored(&app, "api_keys").await.unwrap();
@@ -72,7 +72,7 @@ async fn encrypted_fields_are_sealed_in_the_table() {
 
     // Read back as the value, through the model and through `fetch_as`.
     let found = Supplier::find_or_404(db, supplier.id).await.unwrap();
-    assert_eq!(*found.bank_account, "BCA 123-456-789");
+    assert_eq!(*found.bank_account, "ACME 123-456-789");
     assert_eq!(
         found.api_keys.as_deref().map(Vec::as_slice),
         Some(&["sk_live_1".to_owned(), "sk_live_2".to_owned()][..])
@@ -82,20 +82,20 @@ async fn encrypted_fields_are_sealed_in_the_table() {
             .fetch_as(db)
             .await
             .unwrap();
-    assert_eq!(*rows[0].1, "BCA 123-456-789");
+    assert_eq!(*rows[0].1, "ACME 123-456-789");
 
     // Debug never shows it; JSON (your choice to send) does.
-    assert!(!format!("{found:?}").contains("BCA"));
+    assert!(!format!("{found:?}").contains("ACME"));
     assert_eq!(
         serde_json::to_value(&found).unwrap()["bank_account"],
-        "BCA 123-456-789"
+        "ACME 123-456-789"
     );
     // A form or JSON body fills it like a plain field.
     let parsed: Supplier = serde_json::from_value(json!({
-        "id": 0, "name": "X", "bank_account": "BNI 1", "api_keys": null, "updated_at": null
+        "id": 0, "name": "X", "bank_account": "Zenith 1", "api_keys": null, "updated_at": null
     }))
     .unwrap();
-    assert_eq!(*parsed.bank_account, "BNI 1");
+    assert_eq!(*parsed.bank_account, "Zenith 1");
 }
 
 #[renox::test]
@@ -105,8 +105,8 @@ async fn encrypted_fields_update_and_compare_by_value() {
     let original = Supplier::create(
         db,
         Supplier {
-            name: "Teh Jawa".into(),
-            bank_account: Encrypted::new("BRI 1".into()),
+            name: "Java Tea".into(),
+            bank_account: Encrypted::new("Union 1".into()),
             ..Default::default()
         },
     )
@@ -130,13 +130,13 @@ async fn encrypted_fields_update_and_compare_by_value() {
             .await
             .unwrap()
             .bank_account,
-        "BRI 1-2"
+        "Union 1-2"
     );
 
     // Inside a transaction too (the transaction carries the key).
     let mut tx = db.begin().await.unwrap();
     let mut row = Supplier::find_or_404(&mut tx, original.id).await.unwrap();
-    row.bank_account = Encrypted::new("Mandiri 9".into());
+    row.bank_account = Encrypted::new("Union 9".into());
     row.save(&mut tx).await.unwrap();
     tx.commit().await.unwrap();
     assert_eq!(
@@ -144,7 +144,7 @@ async fn encrypted_fields_update_and_compare_by_value() {
             .await
             .unwrap()
             .bank_account,
-        "Mandiri 9"
+        "Union 9"
     );
 }
 
@@ -154,8 +154,8 @@ async fn encrypted_fields_need_the_apps_key() {
     Supplier::create(
         app.db(),
         Supplier {
-            name: "Gula Aren".into(),
-            bank_account: Encrypted::new("BCA 7".into()),
+            name: "Palm Sugar".into(),
+            bank_account: Encrypted::new("ACME 7".into()),
             ..Default::default()
         },
     )
@@ -170,7 +170,7 @@ async fn encrypted_fields_need_the_apps_key() {
     let read = Supplier::all(&bare).await.unwrap_err();
     assert!(format!("{read:?}").contains("without a key"), "{read:?}");
     let mut new = Supplier {
-        name: "Tanpa kunci".into(),
+        name: "No key".into(),
         bank_account: Encrypted::new("x".into()),
         ..Default::default()
     };

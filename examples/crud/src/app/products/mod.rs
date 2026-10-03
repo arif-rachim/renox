@@ -69,7 +69,7 @@ struct ProductForm {
 }
 
 impl ValidateHooks for ProductForm {
-    /// Before the rules: "  Kopi   Susu " is saved (and checked) as "Kopi Susu".
+    /// Before the rules: "  Coffee   Latte " is saved (and checked) as "Coffee Latte".
     fn prepare(&mut self) {
         self.name = self.name.split_whitespace().collect::<Vec<_>>().join(" ");
     }

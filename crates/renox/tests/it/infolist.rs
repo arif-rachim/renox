@@ -15,7 +15,7 @@ impl Module for Pages {
         Routes::new().get("/order", || async {
             let placed =
                 (renox::chrono::Utc::now() - renox::chrono::TimeDelta::hours(3)).to_rfc3339();
-            let meta: renox::KeyValues = [("Origin", "Aceh"), ("Roast", "Medium")]
+            let meta: renox::KeyValues = [("Origin", "Colombia"), ("Roast", "Medium")]
                 .into_iter()
                 .collect();
             view(
@@ -24,8 +24,8 @@ impl Module for Pages {
                     placed => placed,
                     meta => meta,
                     lines => vec![
-                        context! { name => "Kopi", qty => 2 },
-                        context! { name => "Teh", qty => 1 },
+                        context! { name => "Coffee", qty => 2 },
+                        context! { name => "Tea", qty => 1 },
                     ],
                 },
             )
@@ -47,7 +47,7 @@ const ORDER: &str = r##"{% from "renox/ui.html" import infolist, entry, repeatab
 {{ entry("Blank", "", placeholder="Not set") }}
 {{ entry("Tags", ["a", "b", "c", "d"], badge=true, limit_list=2) }}
 {{ entry("Steps", ["x", "y"], list="bullets") }}
-{{ entry("Names", ["Ana", "Budi"]) }}
+{{ entry("Names", ["Ana", "Ben"]) }}
 {{ entry("Active", true, format="bool") }}
 {{ entry("Archived", false, format="bool") }}
 {{ entry("Color", "#ff0000", format="color") }}
@@ -69,6 +69,7 @@ async fn app(locale: &str) -> (TestApp, tempfile::TempDir) {
     let app = TestApp::with_config(App::new().module(Pages), move |c| {
         c.views_path = path;
         c.locale = locale;
+        c.lang_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/lang");
     })
     .await;
     (app, dir)
@@ -97,13 +98,13 @@ async fn entries_format_their_values() {
     has("Show 2 more</summary>");
     has(r#"<span class="rx-badge">c</span><span class="rx-badge">d</span>"#);
     has(r#"<ul class="rx-entry__list rx-entry__list--bullets"><li>x</li><li>y</li></ul>"#);
-    has("Ana, Budi");
+    has("Ana, Ben");
     has("rx-entry__bool--yes");
     has("</svg>Yes</span>");
     has("</svg>No</span>");
     has(r#"style="background: #ff0000""#);
     has(r#"class="rx-entry__image rx-entry__image--circular" src="/a.png""#);
-    has(r#"<tr><th scope="row">Origin</th><td>Aceh</td></tr>"#);
+    has(r#"<tr><th scope="row">Origin</th><td>Colombia</td></tr>"#);
     has(
         r#"<a class="rx-link" href="https://renox.dev" target="_blank" rel="noopener">renox.dev</a>"#,
     );
@@ -112,8 +113,8 @@ async fn entries_format_their_values() {
     has(r#"title="abcdefghij">abcd…"#);
     has("<em>custom</em>");
     has(r#"<li class="rx-repeatable__item"><dl class="rx-infolist rx-cols-2">"#);
-    has("Kopi");
-    has("Teh");
+    has("Coffee");
+    has("Tea");
     has(r#"<dl class="rx-infolist rx-cols-1 rx-infolist--inline">"#);
     has(r#"<dt class="rx-entry__label rx-visually-hidden">Inline</dt>"#);
     assert_eq!(html.matches("rx-repeatable__item").count(), 2);
@@ -125,15 +126,16 @@ async fn entries_format_their_values() {
 
 #[renox::test]
 async fn entries_follow_the_locale() {
-    let (app, _dir) = app("id").await;
+    // Texts from the app's `tests/lang/es.json`, numbers in Spanish style.
+    let (app, _dir) = app("es").await;
     app.get("/order")
         .await
-        .assert_see(">3 jam yang lalu</time>")
+        .assert_see(">hace 3 horas</time>")
         .assert_see("Rp 75.000")
         .assert_see("1.234,5")
-        .assert_see("</svg>Ya</span>")
-        .assert_see("</svg>Tidak</span>")
-        .assert_see("Tampilkan 2 lagi");
+        .assert_see("</svg>Sí</span>")
+        .assert_see("</svg>No</span>")
+        .assert_see("Mostrar 2 más");
 }
 
 #[renox::test]

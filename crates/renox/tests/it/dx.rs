@@ -111,7 +111,7 @@ async fn db_shell_runs_statements() {
     };
     let input = format!(
         ".tables\n{table}\n\
-INSERT INTO notes (body, score, raw) VALUES ('halo', 1.5, {blob}), (NULL, 2, NULL);\n\
+INSERT INTO notes (body, score, raw) VALUES ('note', 1.5, {blob}), (NULL, 2, NULL);\n\
 SELECT id, body,\n  score, raw FROM notes ORDER BY id;\nSELECT * FROM missing;\n.quit\nSELECT 1;\n"
     );
     let input = input.as_bytes();
@@ -124,7 +124,7 @@ SELECT id, body,\n  score, raw FROM notes ORDER BY id;\nSELECT * FROM missing;\n
     assert!(out.lines().next().unwrap().contains("users"), "{out}");
     assert!(out.contains("OK (2 row(s) affected)"), "{out}");
     assert!(out.contains("id | body | score | raw"), "{out}");
-    assert!(out.contains("1  | halo | 1.5   | <2 bytes>"), "{out}");
+    assert!(out.contains("1  | note | 1.5   | <2 bytes>"), "{out}");
     assert!(out.contains("2  | NULL | 2     | NULL"), "{out}");
     assert!(out.contains("(2 row(s))"), "{out}");
     assert!(

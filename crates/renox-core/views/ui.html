@@ -754,7 +754,7 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     handler answers with a `Toast`, and `HxRefresh` or `HxTrigger` (or a
     fragment for `target` with `swap`). Without JavaScript it is a plain
     form.
-    {% call action_sheet("restock-7", "Restock", route('stock.update', 7), "Restock Kopi", method="PUT") %}
+    {% call action_sheet("restock-7", "Restock", route('stock.update', 7), "Restock Coffee", method="PUT") %}
       {{ input("quantity", "Quantity", type="number", required=true) }}
     {% endcall %} -#}
 {% macro action_sheet(id, label, action, title, description=none, submit_label=none, method="POST", variant="secondary", size=none, icon=none, key=none, slide_over=false, width=none, modal_icon=none, danger=false, target=none, swap=none, enctype=none) -%}
