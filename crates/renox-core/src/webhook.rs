@@ -158,10 +158,10 @@ pub struct WebhookCall {
     pub status: WebhookStatus,
     /// The last processing error; `None` unless `failed`.
     pub error: Option<String>,
-    /// Unix seconds.
-    pub received_at: i64,
-    /// When processing succeeded, in Unix seconds; `None` until then.
-    pub processed_at: Option<i64>,
+    /// When it arrived.
+    pub received_at: crate::db::DateTime,
+    /// When processing succeeded; `None` until then.
+    pub processed_at: Option<crate::db::DateTime>,
 }
 
 impl WebhookCall {
@@ -215,8 +215,10 @@ fn from_row(row: &crate::db::Row) -> std::result::Result<WebhookCall, crate::db:
         status: WebhookStatus::parse(&row.try_get::<String>("status")?)
             .map_err(|err| crate::db::DbError::from(sqlx::Error::Decode(err.into())))?,
         error: row.try_get("error")?,
-        received_at: row.try_get("received_at")?,
-        processed_at: row.try_get("processed_at")?,
+        received_at: crate::db::from_unix(row.try_get("received_at")?),
+        processed_at: row
+            .try_get::<Option<i64>>("processed_at")?
+            .map(crate::db::from_unix),
     })
 }
 

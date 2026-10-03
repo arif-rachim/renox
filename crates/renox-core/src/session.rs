@@ -237,7 +237,7 @@ impl Session {
     /// A flash value for this request only (Laravel's `flash()->now()`):
     /// the page rendered now sees it in `flash`, the next request doesn't.
     /// For a handler that renders a page instead of redirecting.
-    pub fn now(&self, key: &str, value: impl Serialize) -> Result {
+    pub fn flash_now(&self, key: &str, value: impl Serialize) -> Result {
         let value = serde_json::to_value(value)?;
         self.lock().flashed.insert(key.to_owned(), value);
         Ok(())

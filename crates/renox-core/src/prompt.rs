@@ -5,7 +5,7 @@
 //! # use renox::prelude::*;
 //! use renox::prompt;
 //!
-//! async fn create_admin(state: AppState, args: renox::command::Args) -> Result {
+//! async fn create_admin(args: renox::command::Args, state: AppState) -> Result {
 //!     let email = match args.value("--email") {
 //!         Some(email) => email.to_owned(),
 //!         None => prompt::ask("Email").await?,

@@ -649,17 +649,6 @@ impl RouteTable {
             .min()
     }
 
-    /// All named routes as `(name, path)`, sorted by name.
-    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
-        let mut routes: Vec<_> = self
-            .paths
-            .iter()
-            .map(|(n, p)| (n.as_str(), p.as_str()))
-            .collect();
-        routes.sort();
-        routes.into_iter()
-    }
-
     /// Builds the URL path of a named route, filling its parameters in order.
     pub fn url(&self, name: &str, params: &[&dyn Display]) -> anyhow::Result<String> {
         let pattern = self

@@ -234,8 +234,8 @@ async fn crashed_final_attempt_is_not_run_again() {
 async fn retry_and_flush_edges() {
     let k = kernel().await;
     let q = &k.state().queue;
-    assert_eq!(q.retry(Some(987_654)).await.unwrap(), 0);
-    assert_eq!(q.retry(None).await.unwrap(), 0);
+    assert!(!q.retry(987_654).await.unwrap());
+    assert_eq!(q.retry_all().await.unwrap(), 0);
     assert_eq!(q.flush_failed().await.unwrap(), 0);
 }
 

@@ -1579,9 +1579,11 @@ Started by the owner on 2026-10-03, after M34. In steps, one PR each:
 - [x] V1b, the audit's must-fix (A) items: enums for settings, `Duration` lifetimes,
       `Notification` and `Job::failed` signatures, `notify` for users and recipients,
       `Upload`/`Migration` encapsulated, no `Locale`, `FromDb`'s promise written down
-- [ ] V1c, the audit's should-fix (B) items (all but renaming `gate` to `authorize_gate`):
+- [x] V1c, the audit's should-fix (B) items (all but renaming `gate` to `authorize_gate`):
       closure argument order, private `AppState` internals, `disk_named`, one `Factory`
-      API, `DateTime` timestamps, sealed traits, hidden derive plumbing, `Zone` opaque, …
+      API, `DateTime` timestamps, private `Recipient` fields, `flash_now`/`remember_locale`,
+      `renox::Result` returns, `UpcomingRun`, opaque `Zone`, sealed traits, hidden derive
+      plumbing, `DownOptions`, `retry`/`retry_all`, secrets hidden from `Debug`
 - [ ] Documentation site built with Renox: a tutorial, a "Laravel → Renox" guide, the API
       reference; a starter kit; the semver stability guarantee
 - [ ] Real crates published to crates.io (`renox`, `renox-core`, `renox-macros`, `renox-cli`;

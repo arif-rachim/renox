@@ -107,7 +107,7 @@ Every example has a README.md that walks through it.
   pages through `state.http` (tested with `FakeHttp`) and their webhooks; a CSV import in a
   multipart sheet with a savepoint per line; exports from a job that rebuilds the grid's
   filters (`GridRequest::new`), stores them on a named disk (`App::disk("exports", …)`,
-  `state.disk("exports")`) and notifies with a `temporary_url`; roles and permissions on
+  `state.disk_named("exports")`) and notifies with a `temporary_url`; roles and permissions on
   every change (`require_permission`, `can()` in the menu), staff added by an admin with
   `send_verification` and `require_verified`; the activity log as a model over `audit_logs`;
   typed settings shared as `company`; sign-in pages rebranded by overriding

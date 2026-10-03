@@ -17,26 +17,12 @@ use crate::Result;
 /// }
 ///
 /// # async fn demo(db: Db) -> Result {
-/// Product::create_many(&db, 50).await?;
+/// Product::factory().count(50).create(&db).await?;
 /// # Ok(()) }
 /// ```
 pub trait Factory: Model {
     /// A model with sample values (usually fake data), not saved.
     fn definition() -> Self;
-
-    /// A new, unsaved model.
-    fn make() -> Self {
-        Self::definition()
-    }
-
-    /// A new model, saved.
-    fn create_one(db: &Db) -> impl Future<Output = Result<Self>> + Send {
-        async move {
-            let mut model = Self::definition();
-            model.save(db).await?;
-            Ok(model)
-        }
-    }
 
     /// A builder for models with states and sequences (Laravel's
     /// `Product::factory()->count(3)->state(…)->create()`):
@@ -62,21 +48,6 @@ pub trait Factory: Model {
         FactoryBuilder {
             count: 1,
             steps: Vec::new(),
-        }
-    }
-
-    /// `count` new models, saved in one transaction.
-    fn create_many(db: &Db, count: usize) -> impl Future<Output = Result<Vec<Self>>> + Send {
-        async move {
-            let mut tx = db.begin().await?;
-            let mut models = Vec::with_capacity(count);
-            for _ in 0..count {
-                let mut model = Self::definition();
-                model.save(&mut tx).await?;
-                models.push(model);
-            }
-            tx.commit().await?;
-            Ok(models)
         }
     }
 }

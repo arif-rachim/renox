@@ -52,7 +52,8 @@ pub fn app() -> App {
         .migrations(renox::migrations!())
         .module(Auth::new())
         .module(app::orders::Orders)
-        .seeder(|db| async move {
+        .seeder(|state| async move {
+            let db = state.db;
             // Seeding twice is harmless: a seeded database stays as it is.
             if User::find_by_email(&db, "demo@example.com")
                 .await?
@@ -61,7 +62,7 @@ pub fn app() -> App {
                 return Ok(());
             }
             User::register(&db, "Demo", "demo@example.com", "password").await?;
-            Order::create_many(&db, 480).await?;
+            Order::factory().count(480).create(&db).await?;
             // Hand-sorted order starts as the order they were made in.
             renox::db::sql("UPDATE orders SET position = id")
                 .execute(&db)

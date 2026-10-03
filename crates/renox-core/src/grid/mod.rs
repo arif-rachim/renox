@@ -1836,7 +1836,7 @@ impl GridRequest {
             session: None,
             user_id: None,
             lang: None,
-            zone: crate::timezone::Zone::Fixed(0),
+            zone: crate::timezone::Zone::UTC,
         }
     }
 

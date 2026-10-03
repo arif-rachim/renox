@@ -91,7 +91,7 @@ impl Product {
     pub fn for_owner(user: &User) -> Self {
         Product {
             user_id: user.id,
-            ..Product::make()
+            ..Product::factory().make_one()
         }
     }
 }

@@ -150,14 +150,16 @@ pub use redirect::RedirectExt;
 pub use registry::Registry;
 pub use request_id::RequestId;
 pub use routing::Resource;
-pub use routing::{CurrentRoute, RouteInfo, RouteTable, Routes};
+pub(crate) use routing::RouteTable;
+pub use routing::{CurrentRoute, RouteInfo, Routes};
 pub use session::Session;
 pub use state::AppState;
 pub use state::SentNotification;
 pub use toast::{Toast, ToastAction, ToastKind};
 pub use upload::Upload;
 pub use validation::{Errors, KeyValues, Valid, Validate, ValidationError, Validator};
-pub use view::{View, Views, view};
+pub(crate) use view::Views;
+pub use view::{View, view};
 pub use view_filters::{format_money, format_number};
 
 pub use minijinja::context;
@@ -169,6 +171,9 @@ pub use chrono;
 pub use clap;
 #[cfg(feature = "fake")]
 pub use fake;
+/// `minijinja`, for the app's own template filters and functions
+/// (`App::templates(|env| …)` gets a `minijinja::Environment`).
+pub use minijinja;
 pub use serde;
 pub use serde_json;
 #[doc(hidden)]

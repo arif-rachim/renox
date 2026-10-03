@@ -266,7 +266,7 @@ impl Module for Guestbook {
 
 - Uploads are ordinary form fields, checked by their content. They're stored locally or on S3/R2,
   with signed temporary URLs; `storage.list`, `copy` and `rename` work on both. More disks,
-  each with a name (`App::disk("backups", …)`, `state.disk("backups")`), sit next to the default.
+  each with a name (`App::disk("backups", …)`, `state.disk_named("backups")`), sit next to the default.
 - The cache (`remember`, `put`, `forget`, `add`, `pull`, `increment`) is kept in memory or in the
   database, with atomic locks (`state.cache.lock("stock:42", ttl)`) that hold across servers on
   the database store.
@@ -411,7 +411,7 @@ out of the box.
 | `routeIs`, `@class`, `trans_choice` ranges | `route_is('admin.*')`, `class_names(…)`, `{0} none\|[1,*] :count` in lang files |
 | Factory states and sequences | `Product::factory().count(3).state(f).sequence(\|i, p\| …)` |
 | Route model binding, `Route::view`, `Route::redirect` | `Found<Post>`, `.view(…)`, `.redirect(…)` |
-| Several disks (`Storage::disk('s3')`) | `App::disk(name, …)`, `state.disk(name)` |
+| Several disks (`Storage::disk('s3')`) | `App::disk(name, …)`, `state.disk_named(name)` |
 | Several mailers, the `failover` transport | `App::mailer(name, …)`, `state.mailer_named(name)`, `MAIL_FAILOVER` |
 | `hasManyThrough`, named error bags | `relations::has_many_through`, `#[validate(bag = "login")]` |
 | Middleware | `.require_auth()`, `.throttle(…)`, `Routes::route_layer`, `App::layer` |
@@ -477,7 +477,7 @@ review (after M17), milestones M18–M32 closed its gaps:
   (`gt`/`lt`, `decimal`, `dimensions`, `json`, …), route model binding (`Found`), named
   disks, ETags, the `XSRF-TOKEN` cookie, trusted hosts, and view and redirect routes.
 - **M34:** the rest of the review's small additions: `current_password`, the breach check,
-  session `keep`/`now`, named error bags, several mailers with failover, `has_many_through`.
+  session `keep`/`flash_now`, named error bags, several mailers with failover, `has_many_through`.
 
 Next is 1.0: a documentation site with a tutorial and a Laravel guide, semver checks, and the
 first real release on crates.io (today's crates there are placeholders, so install from Git

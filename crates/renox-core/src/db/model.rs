@@ -27,6 +27,9 @@ use anyhow::anyhow;
 /// # let _ = cheap; Ok(()) }
 /// ```
 ///
+/// Implement it with `#[derive(Model)]`: the hidden items it writes may
+/// change in a minor release.
+///
 /// The primary key is the `id` column. Its type is the `id` field's: `i64`
 /// (numbered by the database; `0` means "not saved yet"), or a
 /// [`Ulid`](super::Ulid), a UUID or a `String` (see [`ModelKey`]).
@@ -49,12 +52,16 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
     /// The primary key.
     fn id(&self) -> Self::Key;
     /// Sets the primary key (after an insert, for keys the database numbers).
+    #[doc(hidden)]
     fn set_id(&mut self, id: Self::Key);
     /// Values of every column except `id`, in `COLUMNS` order.
+    #[doc(hidden)]
     fn values(&self) -> Vec<DbValue>;
     /// Updates `created_at` / `updated_at` if the model has them.
+    #[doc(hidden)]
     fn touch(&mut self, _now: DateTime, _creating: bool) {}
     /// Updates `deleted_at` if the model has it.
+    #[doc(hidden)]
     fn set_deleted_at(&mut self, _at: Option<DateTime>) {}
 
     /// Conditions every query of this model starts with, e.g. the current

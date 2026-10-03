@@ -211,7 +211,13 @@ async fn maintenance_mode_with_a_bypass_secret() {
     let config = config(dir.path());
     let kernel = kernel(config.clone()).await;
 
-    renox::maintenance::down(&config.storage_path, Some("opensesame".into()), Some(120)).unwrap();
+    renox::maintenance::down(
+        &config.storage_path,
+        renox::maintenance::DownOptions::new()
+            .secret("opensesame")
+            .retry(120),
+    )
+    .unwrap();
     let down = send(&kernel, from("10.0.0.1", "/")).await;
     assert_eq!(down.status, StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(down.headers["retry-after"], "120");

@@ -30,6 +30,7 @@ pub(crate) async fn run(db: &Db) -> Result {
 
 /// The shell over any input and output, e.g. for tests. `interactive` shows
 /// a banner and prompts.
+#[doc(hidden)]
 pub async fn run_with(
     db: &Db,
     input: impl AsyncBufRead + Unpin,

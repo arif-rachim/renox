@@ -160,7 +160,7 @@ async fn app_commands_run_with_their_arguments() {
     let app = TestApp::new(App::new().module(Auth::new()).command(
         "admin:create",
         "Create an admin user",
-        move |state: AppState, args: Args| {
+        move |args: Args, state: AppState| {
             let seen = seen.clone();
             async move {
                 let email = args
@@ -191,7 +191,7 @@ async fn app_commands_run_with_their_arguments() {
 
 #[renox::test]
 async fn command_names_are_checked_at_boot() {
-    async fn noop(_: AppState, _: Args) -> Result {
+    async fn noop(_: Args, _: AppState) -> Result {
         Ok(())
     }
     for (name, why) in [("migrate", "built in"), ("two words", "not a valid")] {

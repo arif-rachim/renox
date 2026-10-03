@@ -118,6 +118,7 @@ pub trait Policy {
 /// It serializes as the model's own fields plus `_can` (`{"update": true, …}`);
 /// guests get `false` for every ability.
 #[derive(Debug, Clone, serde::Serialize)]
+#[non_exhaustive]
 pub struct Can<T> {
     /// The model, serialized as its own fields.
     #[serde(flatten)]
@@ -129,7 +130,8 @@ pub struct Can<T> {
 
 /// Who asks a policy, for [`Can::new`]: a [`User`], or an [`AuthUser`],
 /// which also applies `App::gate_before` (pass `user.as_ref()` for that).
-pub trait Viewer {
+/// Sealed: only those two.
+pub trait Viewer: viewer::Sealed {
     /// The user the policy is asked about.
     fn as_user(&self) -> &User;
 
@@ -137,6 +139,12 @@ pub trait Viewer {
     fn before(&self, _ability: &str) -> Option<bool> {
         None
     }
+}
+
+mod viewer {
+    pub trait Sealed {}
+    impl Sealed for super::User {}
+    impl Sealed for super::AuthUser {}
 }
 
 impl Viewer for User {

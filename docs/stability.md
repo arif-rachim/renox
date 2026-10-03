@@ -58,11 +58,12 @@ because of a dependency.
 | `clap` (4) | `command::AppCommand` (a `clap::Parser`), re-exported as `renox::clap` |
 | `anyhow` (1) | `Error::Internal`, `Error::permanent`, re-exported as `renox::anyhow` |
 | `tower` / `tower-http` (0.5 / 0.7) | `Routes::route_layer(L)`, `Routes::cors_layer(CorsLayer)` (`renox::cors`) |
-| `minijinja` (2) | `context!`, template values |
+| `minijinja` (2) | `context!`, template values, `App::templates` / `Registry::templates` (a `minijinja::Environment`), re-exported as `renox::minijinja` |
 | `tokio` (1), `serde` (1), `serde_json` (1), `chrono` (0.4) | Re-exported and used throughout |
+| `bytes` (1) | `Bytes` in `Storage::put`/`get`, `Upload::bytes`, `WebhookRequest::body`, `Download::bytes` (as `axum::body::Bytes`) |
+| `http` (1) | `HeaderMap`, `Method`, `StatusCode` in `FormContext`, `WebhookRequest`, `TestResponse` (as `axum::http`) |
 | `fake` (5) | `Factory` definitions, re-exported as `renox::fake` |
 | `uuid` (1) | `Uuid` model keys and fields, re-exported as `renox::uuid` (the `uuid` feature) |
-| `chrono-tz` (0.10) | `renox::timezone::Zone::Named(chrono_tz::Tz)` (not re-exported; parse zones with `"Asia/Jakarta".parse::<Zone>()`) |
 
 **`sqlx` is not part of the stable API.**
 - Database errors are Renox's own `db::DbError`. Rows are `db::Row`, and values go through
@@ -82,7 +83,8 @@ because of a dependency.
 
 ## Also outside the promise
 
-- Items marked `#[doc(hidden)]` (used by Renox's own macros).
+- Items marked `#[doc(hidden)]` (used by Renox's own macros), such as `Model`'s `values`,
+  `set_id`, `touch` and `set_deleted_at`: implement `Model` with `#[derive(Model)]`.
 - The HTML of the built-in pages under `renox/…` (override them in your views to fix their
   markup). For the UI kit (`renox/ui.html`), the macro names and keyword arguments, the `rx-*`
   class names apps use and the `--rx-*` tokens are kept; its inner markup may change.

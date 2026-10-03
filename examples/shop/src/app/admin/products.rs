@@ -84,7 +84,7 @@ pub async fn store(
             .body("It is in the shop now.")
             .link(
                 "View in the shop",
-                state.routes.url("products.show", &[&product.slug])?,
+                state.url("products.show", &[&product.slug])?,
             ),
         Redirect::route("admin.products.index", &[])?,
     ))

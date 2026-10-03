@@ -20,9 +20,14 @@ use std::str::FromStr;
 use anyhow::{Context, bail};
 use chrono::{FixedOffset, LocalResult, NaiveDateTime, Offset, TimeZone};
 
-/// A time zone: UTC, a fixed offset or an IANA zone.
+/// A time zone: UTC, a fixed offset or an IANA zone (with its daylight
+/// saving rules). Made by parsing (`"Asia/Jakarta".parse::<Zone>()`,
+/// `"+07:00".parse()`), or [`Zone::UTC`] and [`Zone::fixed`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Zone {
+pub struct Zone(Kind);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Kind {
     /// A fixed offset from UTC, in seconds (`UTC` is 0).
     Fixed(i32),
     /// An IANA zone, with its daylight saving time rules.
@@ -31,19 +36,25 @@ pub enum Zone {
 
 impl Default for Zone {
     fn default() -> Self {
-        Zone::Fixed(0)
+        Zone::UTC
     }
 }
 
 impl Zone {
     /// Coordinated Universal Time.
-    pub const UTC: Zone = Zone::Fixed(0);
+    pub const UTC: Zone = Zone(Kind::Fixed(0));
+
+    /// A fixed offset from UTC, in seconds east (`Zone::fixed(7 * 3600)` is
+    /// `+07:00`), with no daylight saving time.
+    pub const fn fixed(seconds: i32) -> Zone {
+        Zone(Kind::Fixed(seconds))
+    }
 
     /// The offset from UTC at the moment `unix` (seconds), in seconds.
     pub fn offset_at(&self, unix: i64) -> i64 {
-        match self {
-            Zone::Fixed(offset) => i64::from(*offset),
-            Zone::Named(tz) => {
+        match &self.0 {
+            Kind::Fixed(offset) => i64::from(*offset),
+            Kind::Named(tz) => {
                 let utc = chrono::DateTime::from_timestamp(unix, 0).unwrap_or_default();
                 i64::from(
                     tz.offset_from_utc_datetime(&utc.naive_utc())
@@ -64,11 +75,11 @@ impl Zone {
     /// spring it doesn't (`None`); in the hour repeated in autumn it's the
     /// first one.
     pub fn resolve(&self, local: NaiveDateTime) -> Option<i64> {
-        let result = match self {
-            Zone::Fixed(offset) => FixedOffset::east_opt(*offset)?
+        let result = match &self.0 {
+            Kind::Fixed(offset) => FixedOffset::east_opt(*offset)?
                 .from_local_datetime(&local)
                 .map(|t| t.timestamp()),
-            Zone::Named(tz) => tz.from_local_datetime(&local).map(|t| t.timestamp()),
+            Kind::Named(tz) => tz.from_local_datetime(&local).map(|t| t.timestamp()),
         };
         match result {
             LocalResult::Single(at) => Some(at),
@@ -106,10 +117,10 @@ impl FromStr for Zone {
             if !(0..=14).contains(&hour) || !(0..60).contains(&minute) {
                 bail!("`{value}` is not a UTC offset");
             }
-            return Ok(Zone::Fixed(sign * (hour * 3600 + minute * 60)));
+            return Ok(Zone::fixed(sign * (hour * 3600 + minute * 60)));
         }
         match value.parse::<chrono_tz::Tz>() {
-            Ok(tz) => Ok(Zone::Named(tz)),
+            Ok(tz) => Ok(Zone(Kind::Named(tz))),
             Err(_) => bail!(
                 "unknown time zone `{value}`: use UTC, an offset like +07:00 or an IANA name \
                  like Asia/Jakarta"
@@ -120,14 +131,14 @@ impl FromStr for Zone {
 
 impl fmt::Display for Zone {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Zone::Fixed(0) => f.write_str("UTC"),
-            Zone::Fixed(offset) => {
+        match &self.0 {
+            Kind::Fixed(0) => f.write_str("UTC"),
+            Kind::Fixed(offset) => {
                 let sign = if *offset < 0 { '-' } else { '+' };
                 let offset = offset.abs();
                 write!(f, "{sign}{:02}:{:02}", offset / 3600, offset % 3600 / 60)
             }
-            Zone::Named(tz) => f.write_str(tz.name()),
+            Kind::Named(tz) => f.write_str(tz.name()),
         }
     }
 }
@@ -146,7 +157,7 @@ mod tests {
         assert_eq!("".parse::<Zone>().unwrap(), Zone::UTC);
         assert_eq!(
             "-03:30".parse::<Zone>().unwrap(),
-            Zone::Fixed(-(3 * 3600 + 1800))
+            Zone::fixed(-(3 * 3600 + 1800))
         );
         assert_eq!(
             "Asia/Jakarta".parse::<Zone>().unwrap().to_string(),

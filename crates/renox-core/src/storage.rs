@@ -12,7 +12,7 @@
 //! `STORAGE_URL` (public base URL of the bucket or its CDN).
 //!
 //! More disks, each with a name, come from [`App::disk`](crate::App::disk),
-//! e.g. backups on another bucket; `state.disk("backups")` returns one:
+//! e.g. backups on another bucket; `state.disk_named("backups")` returns one:
 //!
 //! ```
 //! # use renox::prelude::*;
@@ -23,7 +23,7 @@
 //! App::new().disk("backups", |config| StorageConfig::from_env(config, "BACKUPS"))
 //! # ;
 //! # async fn demo(state: AppState) -> Result {
-//! state.disk("backups")?.put("db/2026-10-03.sql.gz", vec![1, 2, 3].into()).await?;
+//! state.disk_named("backups")?.put("db/2026-10-03.sql.gz", vec![1, 2, 3].into()).await?;
 //! # Ok(()) }
 //! ```
 
@@ -54,7 +54,7 @@ enum Disk {
 }
 
 /// A file storage disk: `state.storage`, or a named one from
-/// `state.disk(name)`.
+/// `state.disk_named(name)`.
 #[derive(Clone)]
 pub struct Storage {
     disk: Disk,
@@ -525,7 +525,7 @@ setting_enum! {
 }
 
 /// Settings for `state.storage`, from `STORAGE_DISK` and `S3_*`.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 #[non_exhaustive]
 pub struct StorageConfig {
     /// A local folder or an S3 bucket.
@@ -545,6 +545,25 @@ pub struct StorageConfig {
     /// Where a local disk keeps its files. `None`: `STORAGE_PATH/app` for
     /// `state.storage`, `STORAGE_PATH/<name>` for a named disk.
     pub root: Option<PathBuf>,
+}
+
+impl std::fmt::Debug for StorageConfig {
+    // Secrets show as `[hidden]`, so a logged config doesn't leak them.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StorageConfig")
+            .field("disk", &self.disk)
+            .field("bucket", &self.bucket)
+            .field("region", &self.region)
+            .field("endpoint", &self.endpoint)
+            .field("access_key_id", &self.access_key_id)
+            .field(
+                "secret_access_key",
+                &self.secret_access_key.as_ref().map(|_| "[hidden]"),
+            )
+            .field("url", &self.url)
+            .field("root", &self.root)
+            .finish()
+    }
 }
 
 impl StorageConfig {

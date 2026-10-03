@@ -99,7 +99,8 @@ impl AppCommand for MakeAdmin {
     }
 }
 
-async fn seed(db: Db) -> Result {
+async fn seed(state: AppState) -> Result {
+    let db = state.db;
     // Seeding twice is harmless: a seeded database stays as it is.
     if User::find_by_email(&db, "admin@example.com")
         .await?
@@ -120,7 +121,7 @@ async fn seed(db: Db) -> Result {
         )
         .await?;
         for _ in 0..8 {
-            let mut product = Product::make();
+            let mut product = Product::factory().make_one();
             product.category_id = Some(category.id);
             product.slug = format!("{}-{}", product.slug, category.id); // fake names repeat
             if Product::where_eq("slug", &product.slug).count(&db).await? == 0 {

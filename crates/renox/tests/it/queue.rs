@@ -224,7 +224,7 @@ async fn jobs_that_keep_failing_can_be_retried_later() {
     );
     assert_eq!(queue.pending().await.unwrap(), 0);
 
-    assert_eq!(queue.retry(Some(failed[0].id)).await.unwrap(), 1);
+    assert!(queue.retry(failed[0].id).await.unwrap());
     assert_eq!(queue.pending().await.unwrap(), 1);
     let attempts: i64 = renox::db::sql("SELECT max_attempts FROM jobs")
         .scalar(kernel.db())
@@ -397,14 +397,14 @@ async fn scheduled_tasks_run_on_demand_with_their_hooks() {
             s.daily_at("04:00", "broken", |_| async {
                 Err(abort(StatusCode::INTERNAL_SERVER_ERROR, "disk full"))
             })
-            .on_failure(|state, err| async move {
+            .on_failure(|err, state| async move {
                 let _ = state
                     .cache
                     .put("broken.error", &format!("{err:?}"), None)
                     .await;
             });
             s.hourly("panics", |_| async { panic!("boom") })
-                .on_failure(|state, _| async move {
+                .on_failure(|_, state| async move {
                     let _ = state.cache.put("panics.caught", &true, None).await;
                 });
         })

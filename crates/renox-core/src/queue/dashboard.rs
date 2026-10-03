@@ -208,7 +208,7 @@ async fn show(State(state): State<AppState>) -> Result<View> {
                 .collect(),
             job: f.job,
             queue: f.queue,
-            ago: ago(now - f.failed_at),
+            ago: ago(now - f.failed_at.timestamp()),
         })
         .collect();
     let batches = queue.recent_batches(10).await?;
@@ -231,7 +231,7 @@ async fn show(State(state): State<AppState>) -> Result<View> {
 }
 
 async fn retry(State(state): State<AppState>, Path(id): Path<i64>) -> Result<Redirect> {
-    state.queue.retry(Some(id)).await?;
+    state.queue.retry(id).await?;
     Ok(Redirect::to("/_renox/queue"))
 }
 
@@ -241,6 +241,6 @@ async fn forget(State(state): State<AppState>, Path(id): Path<i64>) -> Result<Re
 }
 
 async fn retry_all(State(state): State<AppState>) -> Result<Redirect> {
-    state.queue.retry(None).await?;
+    state.queue.retry_all().await?;
     Ok(Redirect::to("/_renox/queue"))
 }

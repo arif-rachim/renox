@@ -270,7 +270,7 @@ async fn named_disks_keep_their_own_files() {
     )
     .await;
     let state = app.state();
-    let exports = state.disk("exports").unwrap();
+    let exports = state.disk_named("exports").unwrap();
     assert_eq!(exports.name(), Some("exports"));
     exports
         .put("reports/october.csv", "a,b\n1,2\n".into())
@@ -286,8 +286,8 @@ async fn named_disks_keep_their_own_files() {
             .join("exports/reports/october.csv")
             .exists()
     );
-    assert!(state.disk("backups").is_ok());
-    assert!(state.disk("nope").is_err());
+    assert!(state.disk_named("backups").is_ok());
+    assert!(state.disk_named("nope").is_err());
 
     // Public files are served at the disk's URL; the rest need a signed link.
     let url = exports.url("public/logo.txt");

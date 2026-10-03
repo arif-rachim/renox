@@ -230,7 +230,7 @@ type FailedFn = Arc<
 
 /// A registered job type: how to run it and when to retry it.
 #[derive(Clone)]
-pub struct JobHandler {
+pub(crate) struct JobHandler {
     pub(crate) run: RunFn,
     pub(crate) failed: FailedFn,
     pub(crate) backoff: fn(u32) -> Duration,
@@ -241,7 +241,7 @@ pub struct JobHandler {
 }
 
 /// The handler for `J`; `Registry::job` registers it.
-pub fn handler<J: Job>() -> JobHandler {
+pub(crate) fn handler<J: Job>() -> JobHandler {
     JobHandler {
         run: Arc::new(|payload, ctx| {
             Box::pin(async move {
@@ -444,7 +444,7 @@ impl Queue {
             failed: row.try_get("failed")?,
             cancelled: row.try_get::<Option<i64>>("cancelled_at")?.is_some(),
             finished: row.try_get::<Option<i64>>("finished_at")?.is_some(),
-            created_at: row.try_get("created_at")?,
+            created_at: crate::db::from_unix(row.try_get("created_at")?),
         }))
     }
 
@@ -482,15 +482,24 @@ impl Queue {
                     job: r.try_get("job")?,
                     payload: r.try_get("payload")?,
                     error: r.try_get("error")?,
-                    failed_at: r.try_get("failed_at")?,
+                    failed_at: crate::db::from_unix(r.try_get("failed_at")?),
                 })
             })
             .collect()
     }
 
-    /// Puts failed jobs back on their queue with fresh attempts (and their
-    /// chains and batches); `None` retries all.
-    pub async fn retry(&self, id: Option<i64>) -> Result<u64> {
+    /// Puts the failed job `id` back on its queue with fresh attempts (and
+    /// its chain and batch); returns whether there was such a job.
+    pub async fn retry(&self, id: i64) -> Result<bool> {
+        Ok(self.move_failed(Some(id)).await? == 1)
+    }
+
+    /// Puts every failed job back on its queue; returns how many.
+    pub async fn retry_all(&self) -> Result<u64> {
+        self.move_failed(None).await
+    }
+
+    async fn move_failed(&self, id: Option<i64>) -> Result<u64> {
         let mut tx = self.db.begin().await?;
         let filter = if id.is_some() { " WHERE id = ?" } else { "" };
         let mut batches = crate::db::sql(format!(
@@ -856,8 +865,8 @@ pub struct BatchStatus {
     pub cancelled: bool,
     /// Every job has run or been skipped.
     pub finished: bool,
-    /// Unix seconds.
-    pub created_at: i64,
+    /// When it was made.
+    pub created_at: crate::db::DateTime,
 }
 
 impl BatchStatus {
@@ -884,8 +893,8 @@ pub struct FailedJob {
     pub payload: String,
     /// The last attempt's error.
     pub error: String,
-    /// Unix seconds.
-    pub failed_at: i64,
+    /// When it failed for good.
+    pub failed_at: crate::db::DateTime,
 }
 
 impl AppState {

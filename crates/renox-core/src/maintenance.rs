@@ -24,8 +24,9 @@ const BYPASS_COOKIE: &str = "renox_maintenance";
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct Down {
-    /// When the app went down, in unix seconds.
-    pub since: i64,
+    /// When the app went down (stored as unix seconds).
+    #[serde(with = "chrono::serde::ts_seconds")]
+    pub since: crate::db::DateTime,
     /// Seconds to suggest in `Retry-After`.
     pub retry: Option<u64>,
     /// The path that sets the bypass cookie (`/{secret}`), if any.
@@ -36,16 +37,50 @@ pub(crate) fn file(storage: &Path) -> PathBuf {
     storage.join("framework").join("down")
 }
 
-/// Takes the app down.
-pub fn down(storage: &Path, secret: Option<String>, retry: Option<u64>) -> Result {
+/// How [`down`] takes the app down, as `my-app down --secret … --retry …`.
+///
+/// ```no_run
+/// use renox::maintenance::{self, DownOptions};
+/// # fn demo(storage: &std::path::Path) -> renox::Result {
+/// maintenance::down(storage, DownOptions::new().secret("let-me-in").retry(120))?;
+/// # Ok(()) }
+/// ```
+#[derive(Debug, Clone, Default)]
+#[non_exhaustive]
+pub struct DownOptions {
+    secret: Option<String>,
+    retry: Option<u64>,
+}
+
+impl DownOptions {
+    /// No bypass secret, no `Retry-After`.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// `/{secret}` sets a cookie that lets its browser through.
+    pub fn secret(mut self, secret: impl Into<String>) -> Self {
+        self.secret = Some(secret.into());
+        self
+    }
+
+    /// Seconds to suggest in `Retry-After`.
+    pub fn retry(mut self, seconds: u64) -> Self {
+        self.retry = Some(seconds);
+        self
+    }
+}
+
+/// Takes the app down (every process that shares `storage`).
+pub fn down(storage: &Path, options: DownOptions) -> Result {
     let path = file(storage);
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }
     let state = Down {
-        since: unix_now(),
-        retry,
-        secret,
+        since: crate::db::from_unix(unix_now()),
+        retry: options.retry,
+        secret: options.secret,
     };
     std::fs::write(path, serde_json::to_string(&state)?)?;
     Ok(())

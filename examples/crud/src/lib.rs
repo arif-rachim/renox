@@ -18,7 +18,8 @@ pub fn app() -> App {
         .migrations(renox::migrations!())
         .module(Auth::new())
         .module(app::products::Products)
-        .seeder(|db| async move {
+        .seeder(|state| async move {
+            let db = state.db;
             // Seeding twice is harmless: a seeded database stays as it is.
             if User::find_by_email(&db, "demo@example.com")
                 .await?

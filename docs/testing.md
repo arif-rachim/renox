@@ -99,8 +99,7 @@ Also `FakeResponse::text(status, body)`, `FakeResponse::status(n)`, `.header(…
 - `renox::db::capture_queries(future)` returns what the future ran, requests included, so a
   test can catch an N+1:
   `let (res, queries) = capture_queries(app.get("/posts")).await; assert!(queries.len() <= 3);`
-- Factories fill tables: `Product::create_one(app.db()).await`, `Product::create_many(app.db(),
-  20).await`, or with states and sequences: `Product::factory().count(3).state(sold_out)
+- Factories fill tables: `Product::factory().create_one(app.db()).await`, `Product::factory().count(20).create(app.db()).await`, or with states and sequences: `Product::factory().count(3).state(sold_out)
   .sequence(|i, p| p.name = format!("Coffee {i}")).create(app.db()).await` (`make()` for unsaved
   models; `factory().state(…).make_one()` / `.create_one(db)` for a single one).
 

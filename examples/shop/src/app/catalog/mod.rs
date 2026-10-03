@@ -186,7 +186,7 @@ async fn language(
     Path(locale): Path<String>,
 ) -> Result<Back> {
     if ["en", "es"].contains(&locale.as_str()) {
-        renox::i18n::set_locale(&session, &locale)?;
+        renox::i18n::remember_locale(&session, &locale)?;
         if let Some(user) = user {
             renox::db::sql("UPDATE users SET locale = ? WHERE id = ?")
                 .bind(&locale)

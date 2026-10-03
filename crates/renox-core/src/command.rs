@@ -5,7 +5,7 @@
 //! # use renox::prelude::*;
 //! use renox::command::Args;
 //!
-//! async fn create_admin(state: AppState, args: Args) -> Result {
+//! async fn create_admin(args: Args, state: AppState) -> Result {
 //!     let (Some(email), Some(password)) = (args.value("--email"), args.value("--password")) else {
 //!         return Err(Error::BadRequest("usage: admin:create --email E --password P".into()));
 //!     };
@@ -145,13 +145,13 @@ pub(crate) struct Command {
 
 pub(crate) fn command<F, Fut>(name: &str, about: &str, run: F) -> Command
 where
-    F: Fn(AppState, Args) -> Fut + Send + Sync + 'static,
+    F: Fn(Args, AppState) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = Result> + Send + 'static,
 {
     Command {
         name: name.to_owned(),
         about: about.to_owned(),
-        run: Arc::new(move |state, args| Box::pin(run(state, args))),
+        run: Arc::new(move |state, args| Box::pin(run(args, state))),
     }
 }
 

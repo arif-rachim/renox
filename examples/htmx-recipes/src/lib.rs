@@ -28,8 +28,9 @@ pub fn app() -> App {
         .embed(renox::embedded!())
         .migrations(renox::migrations!())
         .module(app::tasks::Tasks)
-        .seeder(|db| async move {
-            Task::create_many(&db, 40).await?;
+        .seeder(|state| async move {
+            let db = state.db;
+            Task::factory().count(40).create(&db).await?;
             Ok(())
         })
 }

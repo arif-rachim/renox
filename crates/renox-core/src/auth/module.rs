@@ -153,7 +153,7 @@ impl Auth {
     ///     .registration_rules(|form, v| {
     ///         v.field("phone", &form.get("phone")).required().max(20);
     ///     })
-    ///     .on_registered(|state, mut user, form| async move {
+    ///     .on_registered(|mut user, form, state| async move {
     ///         // `phone` and `role` are columns the app added to `users`.
     ///         user.set(&state.db, "phone", form.get("phone")).await?;
     ///         let first = User::query().count(&state.db).await? == 1;
@@ -174,11 +174,11 @@ impl Auth {
     /// deleted again and the visitor gets the error, so they can try again.
     pub fn on_registered<F, Fut>(mut self, hook: F) -> Self
     where
-        F: Fn(AppState, User, Registration) -> Fut + Send + Sync + 'static,
+        F: Fn(User, Registration, AppState) -> Fut + Send + Sync + 'static,
         Fut: std::future::Future<Output = Result> + Send + 'static,
     {
         self.on_registered = Some(Arc::new(move |state, user, form| {
-            Box::pin(hook(state, user, form))
+            Box::pin(hook(user, form, state))
         }));
         self
     }
@@ -260,7 +260,7 @@ impl Module for Auth {
         app.command(
             "tokens:prune",
             "Delete API tokens that expired more than a day ago",
-            |state, _args| async move {
+            |_args, state| async move {
                 let day = std::time::Duration::from_secs(24 * 60 * 60);
                 let pruned = super::prune_expired_tokens(&state.db, day).await?;
                 println!("Deleted {pruned} expired API tokens.");
@@ -270,7 +270,7 @@ impl Module for Auth {
         app.command(
             "notifications:prune",
             "Delete notifications read more than --days ago (default 30)",
-            |state, args| async move {
+            |args, state| async move {
                 let days: u64 = args
                     .value("--days")
                     .unwrap_or("30")

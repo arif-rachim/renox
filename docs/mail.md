@@ -238,8 +238,8 @@ fn app() -> App {
     App::new()
         .module(Auth::new())
         // Your own channel: `message` is what to_channel built.
-        .channel("whatsapp", |state, to: Recipient, message| async move {
-            let phone = to.address("whatsapp").or_else(|| to.user.as_ref()?.get("phone"));
+        .channel("whatsapp", |to: Recipient, message, state| async move {
+            let phone = to.address("whatsapp").or_else(|| to.user()?.get("phone"));
             let _ = (state, phone, message); // call your provider's API here
             Ok(())
         })

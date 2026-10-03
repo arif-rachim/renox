@@ -71,7 +71,7 @@ impl Module for Forms {
             .get(
                 "/language/{code}",
                 |session: Session, Path(code): Path<String>| async move {
-                    renox::i18n::set_locale(&session, &code)?;
+                    renox::i18n::remember_locale(&session, &code)?;
                     Ok::<_, Error>("set")
                 },
             )

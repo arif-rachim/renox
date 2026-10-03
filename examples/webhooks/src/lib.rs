@@ -19,7 +19,8 @@ pub fn app() -> App {
         .embed(renox::embedded!())
         .migrations(renox::migrations!())
         .module(app::payments::Payments)
-        .seeder(|db| async move {
+        .seeder(|state| async move {
+            let db = state.db;
             // Seeding twice is harmless: a seeded database stays as it is.
             if Order::query().exists(&db).await? {
                 return Ok(());

@@ -51,6 +51,11 @@ use crate::{AppState, Config};
 /// The timestamp type for `created_at`, `updated_at` and `deleted_at`.
 pub type DateTime = chrono::DateTime<chrono::Utc>;
 
+/// Unix seconds (the queue's and webhooks' columns) as a `DateTime`.
+pub(crate) fn from_unix(seconds: i64) -> DateTime {
+    chrono::DateTime::from_timestamp(seconds, 0).unwrap_or_default()
+}
+
 /// The current time, as stored in timestamps: to the microsecond, which is
 /// what PostgreSQL keeps, so a saved model equals the same row read back.
 pub fn now() -> DateTime {
