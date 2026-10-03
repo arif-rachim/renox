@@ -226,3 +226,120 @@ async fn deleting_a_document_removes_its_file() {
     // Gone: a second delete is a 404.
     app.delete("/documents/1").await.assert_status(404);
 }
+
+/// The same app with its files on S3: a real S3-compatible server when
+/// `TEST_S3_ENDPOINT` is set (CI's `s3` job runs SeaweedFS; the commands are
+/// at the top of crates/renox/tests/it/s3.rs), else nothing to do:
+///
+/// ```text
+/// TEST_S3_ENDPOINT=http://127.0.0.1:8333 TEST_S3_BUCKET=renox-test \
+///     TEST_S3_ACCESS_KEY_ID=renox TEST_S3_SECRET_ACCESS_KEY=renox-secret \
+///     cargo test -p uploads --features s3
+/// ```
+#[cfg(feature = "s3")]
+mod on_s3 {
+    use super::{PDF, PNG};
+    use renox::prelude::*;
+    use renox::testing::TestApp;
+    use uploads::Document;
+
+    async fn s3_app() -> Option<TestApp> {
+        let endpoint = std::env::var("TEST_S3_ENDPOINT").ok()?;
+        let var = |name: &str| std::env::var(name).unwrap_or_else(|_| panic!("{name} is required"));
+        let (bucket, id, secret) = (
+            var("TEST_S3_BUCKET"),
+            var("TEST_S3_ACCESS_KEY_ID"),
+            var("TEST_S3_SECRET_ACCESS_KEY"),
+        );
+        Some(
+            TestApp::with_config(uploads::app(), |c| {
+                c.storage.disk = "s3".into();
+                c.storage.endpoint = Some(endpoint.clone());
+                c.storage.bucket = Some(bucket.clone());
+                c.storage.region = Some("us-east-1".into());
+                c.storage.access_key_id = Some(id);
+                c.storage.secret_access_key = Some(secret);
+                // Public files are read straight from the bucket.
+                c.storage.url = Some(format!("{endpoint}/{bucket}"));
+            })
+            .await,
+        )
+    }
+
+    /// GET over plain HTTP (the test server speaks http): status and body.
+    async fn http_get(url: &str) -> (u16, Vec<u8>) {
+        use renox::tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let rest = url.strip_prefix("http://").expect("an http:// URL");
+        let (host, path) = rest.split_at(rest.find('/').unwrap_or(rest.len()));
+        let mut stream = renox::tokio::net::TcpStream::connect(host).await.unwrap();
+        let request = format!("GET {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n");
+        stream.write_all(request.as_bytes()).await.unwrap();
+        let mut response = Vec::new();
+        stream.read_to_end(&mut response).await.unwrap();
+        let split = response.windows(4).position(|w| w == b"\r\n\r\n").unwrap();
+        let head = String::from_utf8_lossy(&response[..split]);
+        let status = head.split(' ').nth(1).unwrap().parse().unwrap();
+        (status, response[split + 4..].to_vec())
+    }
+
+    #[renox::test]
+    async fn photos_and_invoices_live_on_s3() {
+        let Some(app) = s3_app().await else {
+            return;
+        };
+        app.post_multipart(
+            "/photos",
+            &[("title", "Kopi")],
+            &[("photos", "kopi.png", PNG)],
+        )
+        .await
+        .assert_redirect("/");
+        app.post_multipart(
+            "/invoices",
+            &[("title", "March")],
+            &[("invoice", "march.pdf", PDF)],
+        )
+        .await
+        .assert_redirect("/");
+        let photo = Document::where_eq("kind", "photo")
+            .first(app.db())
+            .await
+            .unwrap()
+            .unwrap();
+        let invoice = Document::where_eq("kind", "invoice")
+            .first(app.db())
+            .await
+            .unwrap()
+            .unwrap();
+        let storage = &app.state().storage;
+        assert_eq!(
+            storage.get(&invoice.file_key).await.unwrap().as_deref(),
+            Some(PDF)
+        );
+
+        // The page links the photo at its address on the store.
+        let url = storage.url(&photo.file_key);
+        assert!(url.starts_with("http://"), "{url}");
+        app.get("/").await.assert_see(&url);
+
+        // An invoice's link is presigned by S3, and works without the app.
+        let res = app.get(&format!("/invoices/{}/download", invoice.id)).await;
+        let link = res.header("location").expect("a redirect").to_owned();
+        assert!(link.contains("X-Amz-Signature"), "{link}");
+        assert_eq!(http_get(&link).await, (200, PDF.to_vec()));
+        // The app can send it too, with its original name.
+        let file = app.get(&format!("/invoices/{}", invoice.id)).await;
+        file.assert_ok();
+        assert!(
+            file.header("content-disposition")
+                .unwrap_or_default()
+                .contains("march.pdf")
+        );
+
+        // Deleting the document deletes the object.
+        app.delete(&format!("/documents/{}", invoice.id)).await;
+        assert!(!storage.exists(&invoice.file_key).await.unwrap());
+        app.delete(&format!("/documents/{}", photo.id)).await;
+        assert!(!storage.exists(&photo.file_key).await.unwrap());
+    }
+}

@@ -49,6 +49,8 @@ impl Module for Products {
             .name("api.products.destroy")
             .require_ability("products:write");
         let account = Routes::new()
+            .get("/api/me", me)
+            .name("api.me")
             .delete("/api/tokens/current", revoke_current)
             .name("api.tokens.destroy")
             .delete("/api/tokens", revoke_all)
@@ -61,6 +63,10 @@ impl Module for Products {
             // The limit is picked per request by the `api` limiter (lib.rs).
             .throttle_by("api")
             .cors(&["https://app.example.com"])
+            // A small front end for trying the API in a browser: a static
+            // page in public/ (client.html + client.js) that logs in for a
+            // token and calls the routes above with it, as an app would.
+            .get("/", || async { Redirect::to("/client.html") })
     }
 }
 
@@ -111,6 +117,19 @@ async fn issue_token(
         "expires_at": expires_at,
         "user": { "id": user.id, "name": user.name },
     })))
+}
+
+/// Who the token belongs to and what it may do: what an app asks first,
+/// to show the user's name and hide buttons the token can't use.
+async fn me(user: AuthUser) -> Json<renox::serde_json::Value> {
+    let abilities: Vec<&str> = ["products:read", "products:write"]
+        .into_iter()
+        .filter(|ability| user.token_can(ability))
+        .collect();
+    Json(json!({
+        "user": { "id": user.id, "name": user.name, "email": user.email },
+        "abilities": abilities,
+    }))
 }
 
 /// "Log out" in the app: this device's token stops working.

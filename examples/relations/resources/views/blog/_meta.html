@@ -1,4 +1,4 @@
-<p class="meta">
-  {% if post.category %}<a href="{{ route('categories.show', post.category.id) }}">{{ post.category.name }}</a>{% else %}Uncategorized{% endif %}
+<p class="meta mt-2 flex flex-wrap items-center gap-2 text-sm">
+  {% if post.category %}<a href="{{ route('categories.show', post.category.id) }}" class="font-medium">{{ post.category.name }}</a>{% else %}<span class="text-zinc-500">Uncategorized</span>{% endif %}
   {% for tag in post.tags %} <a class="tag" href="{{ route('tags.show', tag.id) }}">#{{ tag.name }}</a>{% endfor %}
 </p>

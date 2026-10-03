@@ -220,7 +220,9 @@ examples/                  workspace members, each with a README.md and its own 
                            a category select answered by the server: admin/categories.rs)
   htmx-recipes/            modal form, inline edit, infinite scroll, tabs, HxRefresh/HxRedirect,
                            an out-of-band count (.also), HxRetarget/HxReswap, toasts
-  relations/               belongs to, has many, many to many (pivot columns), Morph, no N+1
+  relations/               belongs to, has many, many to many (pivot columns), Morph, no N+1;
+                           also a public blog (Markdown, seo(), RSS, sitemap, search) on
+                           Tailwind (resources/css/app.css → committed public/css/app.css)
   grid/                    a sales dashboard on one data grid (renox::grid): phone and desktop
                            columns, filters by kind, frozen columns, grouped headings, sparklines
   backoffice/              an UMKM back office (Filament's demo as the yardstick): grids,
@@ -555,7 +557,8 @@ PostgreSQL suite 2.5x slower (reconnects).
   Not the other examples (SQLite migrations).
 - **S3:** `cargo test -p renox --features s3 --test it s3` with `TEST_S3_ENDPOINT`,
   `TEST_S3_BUCKET`, `TEST_S3_ACCESS_KEY_ID`, `TEST_S3_SECRET_ACCESS_KEY` (without them the tests do
-  nothing). The SeaweedFS commands are at the top of `it/s3.rs`.
+  nothing). The SeaweedFS commands are at the top of `it/s3.rs`. With the same variables,
+  `cargo test -p uploads --features s3` runs examples/uploads on that bucket (CI's `s3` job runs both).
 - Don't run tests with `--release` (slow compile, no debug assertions).
 
 ### 4.8 Forms and validation internals
@@ -652,7 +655,7 @@ PostgreSQL suite 2.5x slower (reconnects).
   aws-lc-rs`, doc), **test** on Ubuntu/macOS/Windows, **test (PostgreSQL)**, **chaos** (sqlite,
   postgres; `tests/chaos/run.sh`), **MSRV (1.94)**, **feature matrix** (`cargo hack check -p
   renox-core -p renox --each-feature --no-dev-deps`), **cli** (sqlite, postgres;
-  `tests/cli/run.sh`), **docker** (`make:deploy` image answers `/health`), **s3** (SeaweedFS),
+  `tests/cli/run.sh`), **docker** (`make:deploy` image answers `/health`), **s3** (SeaweedFS; renox's `it/s3.rs` and examples/uploads),
   **cargo-deny**, **coverage** (informational).
 - MSRV is `rust-version` in the workspace `Cargo.toml` (1.94, set by sqlx 0.9); the `msrv` job
   uses the same number, so raise both together and note it in CHANGELOG.md.
@@ -990,7 +993,10 @@ picks the build, not the terminal.
   fields/webhooks/uploads on the kit, current patterns): merged (#101). M29b
   (`examples/backoffice`: invoices with a stock ledger, Midtrans/Xendit payment pages and
   webhooks, CSV import, exports from a job with the grid's filters, roles, activity log,
-  settings, branded sign-in): merged (#102). M29c (smaller extensions) follows.
+  settings, branded sign-in): merged (#102). M29c (relations as a public blog on Tailwind
+  with Markdown/SEO/RSS/sitemap/search, an api browser client + `GET /api/me`, uploads on S3
+  tested in CI's `s3` job, mail cc/bcc/reply_to/attachments in jobs): merged (#104).
+  M29 is done.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.

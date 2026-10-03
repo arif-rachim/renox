@@ -10,6 +10,28 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M29c · Examples extended
+
+Smaller additions to four examples, the last of the M29 plan. No framework API changed.
+- relations is also a public blog:
+  - Markdown bodies.
+  - A title and description per post (`seo()` with `Post::summary`).
+  - Search (`?q=`, every word in the title or body), an RSS feed (`/feed.xml`) and a
+    sitemap (`/sitemap.xml`).
+  - Styled with Tailwind: the input is in resources/css/app.css, and the built
+    public/css/app.css is committed.
+- api has a browser client: a static page in public/ that logs in for a token and uses
+  the API as a mobile app or single-page app would. `GET /api/me` says who the token
+  belongs to and what it may do.
+- uploads runs on S3 with its `s3` feature: public photos at `STORAGE_URL`, private
+  invoices behind presigned links. A test runs it against a real server, and CI's `s3` job
+  runs it on SeaweedFS.
+- jobs' mail:
+  - The monthly statement attaches the customer's orders as CSV and sends a hidden
+    copy to the books (`bcc`).
+  - Replies to receipts go to support (`reply_to`).
+  - The warehouse mail copies the manager (`cc`).
+
 ### M29b · examples/backoffice
 
 A new example: the back office of a small business, in the style of Filament's demo, built

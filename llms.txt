@@ -118,7 +118,11 @@ Every example has a README.md that walks through it.
   timestamps: `attach_with`, `update_pivot`, `load_with_pivot`), a page loaded without N+1
   (`belongs_to`, `has_many`, `load_for`, `count_many`), `where_has`, a `group_by` + `select_as`
   report, likes on posts and comments through a polymorphic `Morph`, and reports as SQL joins
-  with `fetch_as`; tests/queries.rs counts queries to prove no N+1.
+  with `fetch_as`; tests/queries.rs counts queries to prove no N+1. Also a public blog:
+  Markdown bodies (`markdown` filter in Tailwind's `prose`), `seo()` per post with
+  `Post::summary` as the description, `?q=` search (`where_any` + `where_like`), an RSS feed
+  and a `Sitemap`, styled with Tailwind (resources/css/app.css → public/css/app.css, built
+  with `rnx tailwind --minify` and committed).
   [src/app/blog/mod.rs](examples/relations/src/app/blog/mod.rs),
   [model.rs](examples/relations/src/app/blog/model.rs),
   [tests/blog.rs](examples/relations/tests/blog.rs)
@@ -143,7 +147,11 @@ Every example has a README.md that walks through it.
   `create_token_with` with abilities and an expiry, pruned nightly), Bearer auth,
   `require_ability` on reads and writes, a list with `cursor_paginate`, JSON bodies validated
   with 422 errors, JSON 401/403/404, CORS and a rate limit; products keyed by `Ulid`; tests with `assert_json_path` and
-  time travel (token expiry, the rate limit's window). [src/app/products/mod.rs](examples/api/src/app/products/mod.rs),
+  time travel (token expiry, the rate limit's window); `GET /api/me` (the token's abilities via
+  `token_can`); a static browser client in public/ (client.html + client.js: token in
+  sessionStorage, Bearer calls, cursor "Load more", 422 errors next to fields, logout).
+  [src/app/products/mod.rs](examples/api/src/app/products/mod.rs),
+  [public/client.js](examples/api/public/client.js),
   [tests/api.rs](examples/api/tests/api.rs)
 - [examples/jobs](examples/jobs) ([README](examples/jobs/README.md)): an event whose listener queues a receipt mail (a mail template
   with a text version), a notification to admins by mail and in the database, and scheduled
@@ -153,7 +161,8 @@ Every example has a README.md that walks through it.
   and its `failed` hook, receipts on a `high` queue, unique reminders, and monthly statements
   as a batch with an htmx progress bar. The charge calls the payment gateway with `state.http`
   (a sandbox route stands in for it; the tests use `app.fake_http()`), and the admin sees the
-  queue dashboard. `App::report` posts errors to a chat webhook. Tests travel past backoffs
+  queue dashboard. `App::report` posts errors to a chat webhook. Mail extras: a CSV
+  attachment and a `bcc` on the statements, `reply_to` on receipts, `cc` on the warehouse mail. Tests travel past backoffs
   and `UNIQUE_FOR`, and fake events and notifications. [src/app/orders/mod.rs](examples/jobs/src/app/orders/mod.rs),
   [payment.rs](examples/jobs/src/app/orders/payment.rs),
   [remind.rs](examples/jobs/src/app/orders/remind.rs),
@@ -176,7 +185,9 @@ Every example has a README.md that walks through it.
   [tests/teams.rs](examples/teams/tests/teams.rs)
 - [examples/uploads](examples/uploads) ([README](examples/uploads/README.md)): public photos checked by content, private invoices behind
   expiring signed links, `post_multipart` in tests; both forms on the kit's `file` field, a kit
-  table with delete (the stored file goes too), toasts after uploads.
+  table with delete (the stored file goes too), toasts after uploads; on S3 with its `s3`
+  feature (presigned invoice links, public photos at `STORAGE_URL`), tested against
+  SeaweedFS in CI.
   [src/app/documents/mod.rs](examples/uploads/src/app/documents/mod.rs),
   [tests/documents.rs](examples/uploads/tests/documents.rs)
 - [examples/postgres](examples/postgres) ([README](examples/postgres/README.md)): one app on PostgreSQL and SQLite (BOOLEAN and DATE

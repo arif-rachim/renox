@@ -1,9 +1,11 @@
 {% extends "layouts/app.html" %}
 
+{% block seo %}{{ seo(title=heading ~ " · " ~ app.name) }}{% endblock %}
+
 {% block content %}
 <h1>{{ heading }}</h1>
-<ul>
-  {% for post in posts %}<li><a href="{{ route('posts.show', post.id) }}">{{ post.title }}</a>{% if post.id in pinned %} <strong>pinned</strong>{% endif %}</li>
-  {% else %}<li class="muted">No posts.</li>{% endfor %}
+<ul class="mt-6 divide-y divide-zinc-200 dark:divide-zinc-800">
+  {% for post in posts %}<li class="flex items-center gap-3 py-3"><a href="{{ route('posts.show', post.id) }}">{{ post.title }}</a>{% if post.id in pinned %} <strong class="tag">pinned</strong>{% endif %}</li>
+  {% else %}<li class="muted py-3">No posts.</li>{% endfor %}
 </ul>
 {% endblock %}

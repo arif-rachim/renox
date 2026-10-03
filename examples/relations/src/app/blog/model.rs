@@ -25,6 +25,31 @@ pub struct Post {
     pub updated_at: Option<DateTime>,
 }
 
+impl Post {
+    /// The first paragraph as plain text, at most `max` characters: the
+    /// page's description for search engines and the feed. The body is
+    /// Markdown, so its marks are dropped.
+    pub fn summary(&self, max: usize) -> String {
+        let first = self
+            .body
+            .split("\n\n")
+            .map(str::trim)
+            .find(|p| !p.is_empty() && !p.starts_with('#'))
+            .unwrap_or_default();
+        let plain: String = first
+            .chars()
+            .filter(|c| !matches!(c, '*' | '_' | '`' | '#' | '[' | ']'))
+            .collect();
+        let plain = plain.split_whitespace().collect::<Vec<_>>().join(" ");
+        if plain.chars().count() <= max {
+            return plain;
+        }
+        let cut: String = plain.chars().take(max).collect();
+        let cut = cut.rsplit_once(' ').map_or(cut.as_str(), |(head, _)| head);
+        format!("{cut}…")
+    }
+}
+
 #[derive(Model, Serialize, Deserialize, Default, Debug, Clone)]
 #[model(table = "comments")]
 pub struct Comment {
