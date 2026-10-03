@@ -141,6 +141,8 @@ impl Module for Guestbook {
 - Components are macros that see the request (`old`, `error`, `t`, `can`, `auth`), and a UI kit
   after Apple's Human Interface Guidelines ships with Renox (`renox/ui.html`):
   - form fields, buttons, cards, alerts, sheets, menus, tabs and tables, with dark mode;
+  - the page's frame: a navigation bar or a back office's sidebar, page headers, toolbars,
+    row actions, lists, card grids and progress bars;
   - actions as Filament has them: a form in a sheet or slide-over sent with htmx (errors
     stay in the sheet, a success closes it with a toast), icon buttons with tooltips,
     counts on buttons, disabled buttons that say why, and keyboard shortcuts (⌘S);

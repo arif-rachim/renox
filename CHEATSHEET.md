@@ -249,6 +249,14 @@ fn view_extras(app: App) -> App {
 
 ```html
 {# layout: {{ renox_head() }}{{ renox_ui() }} in <head>, <body class="rx-page">, {{ toasts() }} #}
+{# The page's frame (rnx new's layout uses navbar; a back office uses sidebar + rx-shell) #}
+{% from "renox/ui.html" import navbar, nav_links, nav_link, page_header, toolbar, row_actions, list, card_grid, media_card, link_tabs, progress, link_button %}
+{% call navbar(app.name, href=route('home')) %}
+  {% call nav_links() %}{{ nav_link(route('products.index'), "Products", active=route_is('products.*')) }}{% endcall %}
+{% endcall %}
+{{ page_header("Products", subtitle="All items", back=route('home')) }}
+{% call toolbar() %}{{ link_button(route('products.create'), "New product") }}{% endcall %} {# above a table #}
+{# in a table row: {% call row_actions() %}…icon buttons…{% endcall %}; also list(), card_grid() + media_card(href, title, image=…), link_tabs(items, current=…), progress(42) #}
 {% from "renox/ui.html" import card, input, select, checkbox, radio, checkbox_list, toggle_buttons, show_when, date_picker, file, tags_input, key_value, repeater, form_grid, button, confirm, table, form_errors %}
 {# Several steps: {% call wizard("id", [["a", "First"], ["b", "Second"]], submit_label="Save") %} with wizard_step("id", "a") blocks #}
 <form method="post" action="/products" data-live-validate novalidate>{{ csrf_field() }}
