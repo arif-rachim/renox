@@ -57,11 +57,19 @@ impl Module for Blog {
             .name("tags.show")
             .get("/report", report)
             .name("report")
-            .get("/feed.xml", feed)
-            .name("feed")
-            // Named `sitemap`: robots.txt points search engines at it.
-            .get("/sitemap.xml", sitemap)
-            .name("sitemap")
+            .merge(
+                Routes::new()
+                    .get("/feed.xml", feed)
+                    .name("feed")
+                    // Named `sitemap`: robots.txt points search engines at it.
+                    .get("/sitemap.xml", sitemap)
+                    .name("sitemap")
+                    // Feed readers and crawlers ask again and again: a 304
+                    // without the body when nothing changed since their last
+                    // visit. (A layer covers the routes added before it, so
+                    // these two have a group of their own.)
+                    .etag(),
+            )
     }
 }
 
@@ -155,8 +163,8 @@ struct CommentRow {
 /// One post: the relation methods on `Post`, one query each (the tags with
 /// their pivot columns: one for the links, one for the tags). Likes: one
 /// query for the post's (`LIKEABLE.of`), one for all its comments'.
-async fn show(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
-    let post = Post::find_or_404(&db, id).await?;
+/// `Found` loads the post `{id}` names, or answers 404.
+async fn show(State(db): State<Db>, Found(post): Found<Post>) -> Result<View> {
     let category = post.category(&db).await?;
     let comments = post.comments(&db).await?;
     let likes = LIKEABLE.of(&post, Like::query()).count(&db).await?;

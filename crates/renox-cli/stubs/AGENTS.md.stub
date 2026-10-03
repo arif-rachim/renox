@@ -149,6 +149,14 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   marks the current section in a nav.
 - `Routes::domain("admin.example.com", …)`: that host gets only those routes (plus Renox's
   own and public files), not the routes without a domain; the proxy must pass `Host` on.
+- Load the row a route names with `Found(product): Found<Product>` (route model binding:
+  `{product}`, `{id}`, or a column's name like `{slug}`) instead of `Path(id)` +
+  `find_or_404`; a missing row is a 404, and default scopes apply. Authorize after it.
+- A second place for files (backups, exports): `App::disk("exports", |c|
+  StorageConfig::from_env(c, "EXPORTS"))` and `state.disk("exports")?`, not a second
+  `Storage` built by hand.
+- Layers such as `.etag()`, `.throttle(…)` and `.require_auth()` cover only the routes added
+  before them: give such routes a `Routes` group of their own and `merge` it.
 - Commands: `rnx make:command orders:close` writes a typed one (a clap struct with
   `impl AppCommand`, registered with `app.typed_command::<T>()`); ask for missing values with
   `renox::prompt::ask/confirm/secret/choice`, and answer them in tests with

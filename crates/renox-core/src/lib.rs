@@ -77,7 +77,7 @@ pub use client_ip::{ClientIp, TrustedProxies};
 pub use config::{AnalyticsConfig, Config, CspMode, Environment};
 pub use cookies::{Cookies, SetCookie};
 pub use crypto::{generate_key, random_token};
-pub use csrf::{CSRF_FIELD, CSRF_HEADER};
+pub use csrf::{CSRF_FIELD, CSRF_HEADER, XSRF_COOKIE, XSRF_HEADER};
 pub use domain::DomainParams;
 pub use download::Download;
 pub use embedded::Embedded;
@@ -86,7 +86,7 @@ pub use htmx::{Back, Htmx, HxPushUrl, HxRedirect, HxRefresh, HxReswap, HxRetarge
 pub use i18n::Lang;
 pub use method::METHOD_FIELD;
 pub use module::Module;
-pub use path::Path;
+pub use path::{Found, Path};
 pub use provided::Provided;
 pub use redirect::RedirectExt;
 pub use registry::Registry;

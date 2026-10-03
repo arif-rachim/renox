@@ -24,8 +24,9 @@
   and downloads; cache (`add`, `pull`, `increment`) and atomic locks; session, uploads and
   translations (plurals and ranges, the browser's language); session `push`/`increment`;
   factory states and sequences; domain and fallback routes, `Redirect::route`/`intended`,
-  `route_is`, `class_names`, `{% break %}`; signed URLs and private files; CSP, CORS and
-  webhooks; SEO and analytics; tests; form requests (`prepare`, `authorize`, `after`),
+  `route_is`, `class_names`, `{% break %}`; route model binding (`Found`), view and redirect
+  routes, ETags; signed URLs, private files and named disks; CSP, CORS, `xsrf_cookie`,
+  `TRUSTED_HOSTS` and webhooks; SEO and analytics; tests; form requests (`prepare`, `authorize`, `after`),
   `#[derive(Validate)]` and the full rule list; typed app commands
   (clap) and prompts; stacks (`push`/`stack`);
   Tailwind; errors, logs and debugging (request ids, JSON logs,
@@ -105,7 +106,8 @@ Every example has a README.md that walks through it.
   `WHERE stock >= ?`, a 409 and rollback when short), voided, printed; Midtrans/Xendit payment
   pages through `state.http` (tested with `FakeHttp`) and their webhooks; a CSV import in a
   multipart sheet with a savepoint per line; exports from a job that rebuilds the grid's
-  filters (`GridRequest::new`) and notifies with a `temporary_url`; roles and permissions on
+  filters (`GridRequest::new`), stores them on a named disk (`App::disk("exports", …)`,
+  `state.disk("exports")`) and notifies with a `temporary_url`; roles and permissions on
   every change (`require_permission`, `can()` in the menu), staff added by an admin with
   `send_verification` and `require_verified`; the activity log as a model over `audit_logs`;
   typed settings shared as `company`; sign-in pages rebranded by overriding
@@ -127,7 +129,7 @@ Every example has a README.md that walks through it.
   with `fetch_as`; tests/queries.rs counts queries to prove no N+1. Also a public blog:
   Markdown bodies (`markdown` filter in Tailwind's `prose`), `seo()` per post with
   `Post::summary` as the description, `?q=` search (`where_any` + `where_like`), an RSS feed
-  and a `Sitemap`; pages on the UI kit with Tailwind's `prose` for the bodies
+  and a `Sitemap` with `.etag()` (304s), the post page loaded with `Found<Post>`; pages on the UI kit with Tailwind's `prose` for the bodies
   (resources/css/app.css → public/css/app.css, built with `rnx tailwind --minify` and
   committed): the kit and Tailwind side by side.
   [src/app/blog/mod.rs](examples/relations/src/app/blog/mod.rs),
@@ -135,7 +137,8 @@ Every example has a README.md that walks through it.
   [tests/blog.rs](examples/relations/tests/blog.rs)
 - [examples/crud](examples/crud) ([README](examples/crud/README.md)): one resource end to end: model and migration, list with
   pagination, create and edit forms with validation, owner-only edit and delete through a policy,
-  soft delete with a trash and restore, model hooks (`#[model(hooks)]`: a slug filled on save,
+  soft delete with a trash and restore, `Found<Product>` (route model binding) in edit, update
+  and delete, model hooks (`#[model(hooks)]`: a slug filled on save,
   a cached count forgotten), `save_changes` on update, and tests for each. It is the example of
   the UI kit (`renox/ui.html`: fields, table, confirmation sheet, menu), toasts, live validation
   (`data-live-validate`), `push`/`stack` and an error page in the layout. The form is
@@ -192,7 +195,7 @@ Every example has a README.md that walks through it.
   [projects/model.rs](examples/teams/src/app/projects/model.rs),
   [teams/mod.rs](examples/teams/src/app/teams/mod.rs),
   [tests/teams.rs](examples/teams/tests/teams.rs)
-- [examples/uploads](examples/uploads) ([README](examples/uploads/README.md)): public photos checked by content, private invoices behind
+- [examples/uploads](examples/uploads) ([README](examples/uploads/README.md)): public photos checked by content and size in pixels (`dimensions`), private invoices behind
   expiring signed links, `post_multipart` in tests; both forms on the kit's `file` field, a kit
   table with delete (the stored file goes too), toasts after uploads; on S3 with its `s3`
   feature (presigned invoice links, public photos at `STORAGE_URL`), tested against

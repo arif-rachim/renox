@@ -26,6 +26,8 @@ commit that `rnx` was built from.
 - **New variants on these enums.** A `match` on them needs a `_` arm:
   - `Error`, `Environment`, `CspMode`, `Channel`, `Locale`, `DbValue`, `Inspected` (a `Rule`
     matching on `Inspected` needs a `_` arm), `ToastKind`, `chart::Bucket`, `report::ReportKind`, `grid::Kind`, `grid::Summary`
+- **New fields on this enum variant.** A pattern on it needs `..`:
+  - `Inspected::File { image, .. }` (it gained `dimensions` in M33)
 - New methods, functions, modules, template functions, validation rules, CLI commands and `.env`
   settings (always with defaults).
 - New provided methods on traits you implement (`Model`, `Notification`, `ModelHooks`,

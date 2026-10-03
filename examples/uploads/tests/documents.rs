@@ -2,7 +2,10 @@ use renox::prelude::*;
 use renox::testing::TestApp;
 use uploads::Document;
 
-const PNG: &[u8] = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR not a real image, but it starts like one";
+/// Not a real image, but it starts like one: a PNG header saying 800 × 600.
+const PNG: &[u8] = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\x03\x20\0\0\x02\x58 and no pixels";
+/// The same, 8000 pixels wide.
+const WIDE_PNG: &[u8] = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\x1f\x40\0\0\x02\x58 and no pixels";
 const PDF: &[u8] = b"%PDF-1.7\n% an invoice\n";
 
 #[renox::test]
@@ -130,6 +133,16 @@ async fn photo_uploads_have_limits() {
         )
         .await
         .assert_invalid("photos.0");
+    // Wider than 6000 pixels: the header says so, whatever the file size.
+    app.htmx()
+        .post_multipart(
+            "/photos",
+            &[("title", "Too wide")],
+            &[("photos", "wide.png", WIDE_PNG)],
+        )
+        .await
+        .assert_invalid("photos.0")
+        .assert_see("invalid image dimensions");
     app.assert_database_count("documents", 0).await;
 }
 

@@ -109,7 +109,12 @@ pub struct App {
     layers: Vec<AppLayer>,
     limiters: HashMap<String, crate::rate_limit::LimitRule>,
     detect_locale: bool,
+    disks: Vec<(String, DiskSettings)>,
+    xsrf_cookie: bool,
 }
+
+/// How `App::disk` gets a disk's settings once the configuration is loaded.
+type DiskSettings = Box<dyn Fn(&Config) -> crate::storage::StorageConfig + Send + Sync>;
 
 /// A layer from `App::layer`, applied to the app's routes at boot.
 /// Applied to the app's router and to each `Routes::domain` router.
@@ -133,6 +138,8 @@ impl App {
             layers: Vec::new(),
             limiters: HashMap::new(),
             detect_locale: false,
+            disks: Vec::new(),
+            xsrf_cookie: false,
         }
     }
 
@@ -407,6 +414,43 @@ impl App {
         self
     }
 
+    /// Also sends the CSRF token as an `XSRF-TOKEN` cookie that scripts can
+    /// read, and accepts it back in an `X-XSRF-TOKEN` header (Laravel's
+    /// behaviour), for a JavaScript client on the same site: axios sends
+    /// it by itself. Forms and htmx don't need it; they send `_token` or
+    /// `X-CSRF-Token`.
+    pub fn xsrf_cookie(mut self) -> Self {
+        self.xsrf_cookie = true;
+        self
+    }
+
+    /// Adds a storage disk named `name` (letters, digits, `-`, `_`), e.g.
+    /// backups on another bucket, read with `state.disk(name)`. `settings`
+    /// runs once the configuration is loaded; [`StorageConfig::from_env`]
+    /// reads `<PREFIX>_DISK`, `<PREFIX>_BUCKET`, … A local disk keeps its
+    /// files in `STORAGE_PATH/<name>` unless its settings say otherwise.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// use renox::storage::StorageConfig;
+    ///
+    /// # let _ =
+    /// App::new()
+    ///     .disk("backups", |config| StorageConfig::from_env(config, "BACKUPS"))
+    ///     .disk("exports", |_| StorageConfig::default()) // local: storage/exports
+    /// # ;
+    /// ```
+    ///
+    /// [`StorageConfig::from_env`]: crate::storage::StorageConfig::from_env
+    pub fn disk(
+        mut self,
+        name: &str,
+        settings: impl Fn(&Config) -> crate::storage::StorageConfig + Send + Sync + 'static,
+    ) -> Self {
+        self.disks.push((name.to_owned(), Box::new(settings)));
+        self
+    }
+
     /// Makes `value` available everywhere the app runs: `Provided<T>` in
     /// handlers, `state.provided::<T>()` in jobs, listeners, commands and
     /// scheduled tasks. One value per type; a second one replaces the first.
@@ -620,6 +664,23 @@ impl App {
         let routes = Arc::new(routes);
 
         let storage = crate::storage::Storage::from_config(&config)?;
+        let mut disks = HashMap::new();
+        for (name, settings) in &self.disks {
+            let valid = !name.is_empty()
+                && name
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+            if !valid {
+                return Err(anyhow!(
+                    "disk name `{name}`: use letters, digits, `-` and `_` (App::disk)"
+                )
+                .into());
+            }
+            let disk = crate::storage::Storage::named(&config, name, &settings(&config))?;
+            if disks.insert(name.clone(), disk).is_some() {
+                return Err(anyhow!("two disks are named `{name}` (App::disk)").into());
+            }
+        }
         // Release builds serve what was compiled in; debug builds read the disk.
         let embedded = self.embedded.filter(|_| !config.debug);
         // Rate limits and login locks shared by every server (CACHE_STORE=database).
@@ -637,7 +698,9 @@ impl App {
             zone,
             versions,
         );
-        let security = Arc::new(crate::security::Security::new(&config, &self.csp, &listing));
+        let mut security = crate::security::Security::new(&config, &self.csp, &listing);
+        security.xsrf_cookie = self.xsrf_cookie;
+        let security = Arc::new(security);
         let state = AppState {
             security,
             webhooks: Arc::new(webhooks),
@@ -645,6 +708,7 @@ impl App {
             queue: Queue::new(db.clone(), key.clone()),
             cache: crate::cache::Cache::new(&config.cache_store, db.clone())?,
             storage,
+            disks: Arc::new(disks),
             http: crate::http::Http::default(),
             fakes: Arc::default(),
             translator: Arc::new(match embedded {

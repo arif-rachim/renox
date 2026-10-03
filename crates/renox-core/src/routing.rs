@@ -146,6 +146,54 @@ impl Routes {
         self.add(path, method_router, "*")
     }
 
+    /// A page that needs no handler: `GET path` renders `template` with the
+    /// usual globals (Laravel's `Route::view`), e.g. an "About" page.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # let _: Routes =
+    /// Routes::new().view("/about", "pages/about.html").name("about")
+    /// # ;
+    /// ```
+    pub fn view(self, path: &str, template: &str) -> Self {
+        let template = template.to_owned();
+        self.add(
+            path,
+            axum::routing::get(move || {
+                let template = template.clone();
+                async move { crate::view(&template, minijinja::context! {}) }
+            }),
+            "GET",
+        )
+    }
+
+    /// Sends `path` to `to` with a 302 (Laravel's `Route::redirect`), e.g.
+    /// an old address.
+    pub fn redirect(self, path: &str, to: &str) -> Self {
+        let to = to.to_owned();
+        self.add(
+            path,
+            axum::routing::any(move || {
+                let to = to.clone();
+                async move { redirect_with(axum::http::StatusCode::FOUND, &to) }
+            }),
+            "*",
+        )
+    }
+
+    /// Like [`redirect`](Self::redirect), with a 301: the move is permanent.
+    pub fn permanent_redirect(self, path: &str, to: &str) -> Self {
+        let to = to.to_owned();
+        self.add(
+            path,
+            axum::routing::any(move || {
+                let to = to.clone();
+                async move { redirect_with(axum::http::StatusCode::MOVED_PERMANENTLY, &to) }
+            }),
+            "*",
+        )
+    }
+
     fn add(mut self, path: &str, method_router: MethodRouter<AppState>, method: &str) -> Self {
         self.router = self.router.route(path, method_router);
         self.last_path = Some(path.to_owned());
@@ -325,6 +373,23 @@ impl Routes {
             route.middleware.push(format!("webhook:{}", W::PROVIDER));
         }
         routes
+    }
+
+    /// Gives the routes added so far an `ETag` (a hash of the page as sent),
+    /// and answers `304 Not Modified` without the body when the browser
+    /// already has that version (`If-None-Match`). For pages fetched again
+    /// and again that rarely change, e.g. a catalogue or an API list.
+    /// Only `GET`/`HEAD` answers with status 200 and a body of at most
+    /// 2 MB get one; streamed bodies don't.
+    pub fn etag(self) -> Self {
+        self.route_layer(from_fn(
+            |req: Request, next: axum::middleware::Next| async move {
+                let mut res = next.run(req).await;
+                res.extensions_mut().insert(crate::security::WantsEtag);
+                res
+            },
+        ))
+        .mark("etag")
     }
 
     /// Lets the routes added so far be posted to without a CSRF token, for
@@ -839,5 +904,13 @@ mod route_name_tests {
         assert!(!route_name_matches("shop.products.show", "products.*"));
         assert!(route_name_matches("anything", "*"));
         assert!(!route_name_matches("admin", "admin.*"));
+    }
+}
+
+/// A redirect with this status and `Location`.
+fn redirect_with(status: axum::http::StatusCode, to: &str) -> axum::response::Response {
+    match axum::http::HeaderValue::from_str(to) {
+        Ok(location) => (status, [(axum::http::header::LOCATION, location)]).into_response(),
+        Err(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 }

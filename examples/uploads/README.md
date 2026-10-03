@@ -58,7 +58,9 @@ TEST_S3_ENDPOINT=http://127.0.0.1:8333 TEST_S3_BUCKET=renox-test \
 ## Things worth copying
 
 - **Files are checked by content, not by name.** `photo.image().max(2048)` refuses a text
-  file called `x.png`; the invoice must be a PDF (`.mimes(&["pdf"])`, at most 5 MB).
+  file called `x.png`; the invoice must be a PDF (`.mimes(&["pdf"])`, at most 5 MB). A photo
+  over 6000 pixels wide or high is refused too (`.dimensions(&Dimensions::new()
+  .max_width(6000).max_height(6000))`), read from the image's header.
 - **Several files in one field.** `photos: Vec<Upload>` takes `<input type="file" multiple>`;
   `v.each(...)` checks every file, and errors come back per file (`photos.0`, `photos.1`, ...).
 - **Public vs private is one call.** `store_public` puts the photo under `/storage/...` and the

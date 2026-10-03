@@ -510,3 +510,191 @@ async fn handlers_can_return_their_own_validation_errors() {
     let reply = client.post("/stock", "quantity=99", false).await;
     assert_eq!(reply.status, StatusCode::SEE_OTHER);
 }
+
+/// Runs `rules` on a validator and returns the errors (no database checks).
+async fn errors_of(rules: impl Fn(&mut Validator)) -> Errors {
+    struct Rules<F>(F);
+    impl<F: Fn(&mut Validator)> Validate for Rules<F> {
+        fn rules(&self, v: &mut Validator) {
+            (self.0)(v)
+        }
+    }
+    let app = renox::testing::TestApp::new(App::new()).await;
+    Validator::rules_of(&Rules(rules), Locale::En)
+        .finish(app.db())
+        .await
+        .unwrap()
+}
+
+fn png(width: u32, height: u32) -> renox::Upload {
+    let mut bytes = b"\x89PNG\r\n\x1a\n\0\0\0\x0dIHDR".to_vec();
+    bytes.extend_from_slice(&width.to_be_bytes());
+    bytes.extend_from_slice(&height.to_be_bytes());
+    renox::Upload {
+        file_name: "banner.png".into(),
+        content_type: "image/png".into(),
+        bytes: bytes.into(),
+    }
+}
+
+#[renox::test]
+async fn the_rules_added_after_the_parity_review() {
+    use renox::validation::Dimensions;
+    let errors = errors_of(|v| {
+        // Field against field: numbers, text lengths, dates.
+        v.field("max_price", &10).gt("min_price", &20);
+        v.field("max_ok", &30).gt("min_price", &20);
+        v.field("nickname", &"Al").gte("name", &"Alex");
+        v.field("ends_on", &"2026-10-01")
+            .lt("starts_on", &"2026-09-01".to_owned());
+        v.field("ends_ok", &"2026-10-01").gte(
+            "starts_on",
+            &renox::chrono::NaiveDate::from_ymd_opt(2026, 9, 1).unwrap(),
+        );
+        v.field("count", &3).lte("limit", &Option::<i64>::None); // the other is empty: skipped
+        // Decimals, digits, multiples, numbers in text.
+        v.field("price", &"12.5").decimal(2, 2);
+        v.field("price_ok", &"12.50").decimal(2, 2);
+        v.field("rate", &"1.12345").decimal(1, 4);
+        v.field("pin", &123).min_digits(4);
+        v.field("year", &20260).max_digits(4);
+        v.field("amount", &1250).multiple_of(500);
+        v.field("amount_ok", &1500).multiple_of(500);
+        v.field("quarter", &0.75).multiple_of(0.25);
+        v.field("qty", &"12a").numeric();
+        v.field("qty_ok", &" -3.5 ").numeric();
+        v.field("whole", &"3.5").integer();
+        // Formats.
+        v.field("settings", &"{\"a\": 1").json();
+        v.field("settings_ok", &"{\"a\": [1, 2]}").json();
+        v.field("ulid", &"01ARZ3NDEKTSV4RRFFQ69G5FAI").ulid();
+        v.field("ulid_ok", &"01arz3ndektsv4rrffq69g5fav").ulid();
+        v.field("zone", &"Asia/Jakarta").timezone();
+        v.field("zone_bad", &"Mars/Olympus").timezone();
+        v.field("mac", &"00:1A:2B:3C:4D").mac_address();
+        v.field("mac_ok", &"001A.2B3C.4D5E").mac_address();
+        v.field("colour", &"#12345").hex_color();
+        v.field("colour_ok", &"#4f46e5").hex_color();
+        v.field("code", &"kopi→").ascii();
+        v.field("handle", &"admin-alex")
+            .doesnt_start_with(&["admin", "root"]);
+        v.field("email", &"a@test.invalid")
+            .doesnt_end_with(&[".invalid"]);
+        v.field("sku", &"TMP-1").not_matches(r"^TMP-");
+        // Presence.
+        v.field("coupon", &"SAVE10").prohibits("gift_card", &"GC-1");
+        v.field("internal_note", &"hi").prohibited();
+        v.field("discount", &"5").prohibited_unless(false);
+        v.field("phone", &Option::<String>::None)
+            .required_without_all(&[&Option::<String>::None, &""]);
+        v.field("postcode", &"")
+            .required_with_all(&[&"1 Main St", &"Springfield"]);
+        v.field("share_data", &true).declined();
+        v.field("share_ok", &"no").declined();
+        v.field("terms", &false).accepted_if(true);
+        v.field("banner", &Some(png(800, 600)))
+            .dimensions(&Dimensions::new().min_width(1200));
+        v.field("banner_ok", &Some(png(1600, 900)))
+            .dimensions(&Dimensions::new().min_width(1200).ratio(16, 9));
+        v.field("square", &Some(png(400, 410)))
+            .dimensions(&Dimensions::new().ratio(1, 1));
+    })
+    .await;
+
+    let expect = [
+        ("max_price", "The max price must be greater than min price."),
+        ("nickname", "The nickname must be at least as long as name."),
+        ("ends_on", "The ends on must be before starts on."),
+        ("price", "The price must have 2 decimal places."),
+        ("rate", "The rate must have 1-4 decimal places."),
+        ("pin", "The pin must have at least 4 digits."),
+        ("year", "The year must not have more than 4 digits."),
+        ("amount", "The amount must be a multiple of 500."),
+        ("qty", "The qty must be a number."),
+        ("whole", "The whole must be a whole number."),
+        ("settings", "The settings must be valid JSON."),
+        ("ulid", "The ulid must be a valid ULID."),
+        ("zone_bad", "The zone bad must be a valid time zone."),
+        ("mac", "The mac must be a valid MAC address."),
+        ("colour", "The colour must be a valid hexadecimal colour."),
+        ("code", "The code may only contain ASCII characters."),
+        (
+            "handle",
+            "The handle may not start with one of: admin, root.",
+        ),
+        ("email", "The email may not end with one of: .invalid."),
+        ("sku", "The sku format is invalid."),
+        (
+            "coupon",
+            "The coupon field can't be sent together with gift card.",
+        ),
+        (
+            "internal_note",
+            "The internal note field must be empty here.",
+        ),
+        ("discount", "The discount field must be empty here."),
+        ("phone", "The phone field is required."),
+        ("postcode", "The postcode field is required."),
+        ("share_data", "The share data must be declined."),
+        ("terms", "The terms must be accepted."),
+        ("banner", "The banner has invalid image dimensions."),
+        ("square", "The square has invalid image dimensions."),
+    ];
+    for (field, message) in expect {
+        assert_eq!(errors.first(field), Some(message), "{field}");
+    }
+    for field in [
+        "max_ok",
+        "ends_ok",
+        "count",
+        "price_ok",
+        "amount_ok",
+        "quarter",
+        "qty_ok",
+        "settings_ok",
+        "ulid_ok",
+        "zone",
+        "mac_ok",
+        "colour_ok",
+        "share_ok",
+        "banner_ok",
+    ] {
+        assert!(!errors.has(field), "{field}: {:?}", errors.first(field));
+    }
+    let all: Vec<&str> = errors.iter().map(|(field, _)| field).collect();
+    assert_eq!(all.len(), expect.len(), "unexpected errors: {all:?}");
+}
+
+#[derive(Deserialize, Serialize, renox::Validate)]
+struct Range {
+    #[validate(required, integer)]
+    min: String,
+    #[validate(required, gt("min", &self.min), multiple_of(5))]
+    max: String,
+    #[validate(decimal(0, 2), prohibits("max", &self.max))]
+    exact: Option<String>,
+}
+
+#[renox::test]
+async fn the_derive_takes_the_new_rules_too() {
+    let app = renox::testing::TestApp::new(App::new()).await;
+    let range = Range {
+        min: "20".into(),
+        max: "15".into(),
+        exact: Some("1.234".into()),
+    };
+    let errors = Validator::rules_of(&range, Locale::En)
+        .finish(app.db())
+        .await
+        .unwrap();
+    assert_eq!(errors.first("min"), None);
+    // Two texts that read as numbers compare as numbers.
+    assert_eq!(
+        errors.first("max"),
+        Some("The max must be greater than min.")
+    );
+    assert_eq!(
+        errors.first("exact"),
+        Some("The exact must have 0-2 decimal places.")
+    );
+}

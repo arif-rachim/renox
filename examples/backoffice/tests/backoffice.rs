@@ -437,6 +437,8 @@ async fn exports_run_in_the_background_with_the_grids_filters() {
         data["url"].as_str().unwrap().to_owned()
     })
     .unwrap();
+    // A signed link to the `exports` disk, not the default one.
+    assert!(link.contains("/_renox/disks/exports/invoices-"), "{link}");
     let csv = app.get(&link).await;
     csv.assert_ok();
     let text = csv.text();

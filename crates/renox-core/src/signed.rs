@@ -66,19 +66,26 @@ impl<S: Send + Sync> FromRequestParts<S> for ValidSignature {
             .extensions
             .get::<AppState>()
             .ok_or_else(|| anyhow::anyhow!("the auth middleware is not installed"))?;
-        let query = parts.uri.query().unwrap_or_default();
-        let (unsigned_query, given) = match query.rsplit_once("&signature=") {
-            Some((rest, signature)) => (rest, signature),
-            None => return Err(Error::Forbidden),
-        };
-        let expires: u64 = unsigned_query
-            .strip_prefix("expires=")
-            .and_then(|v| v.parse().ok())
-            .ok_or(Error::Forbidden)?;
-        let unsigned = format!("{}?{unsigned_query}", parts.uri.path());
-        if expires < now() || !constant_time_eq(&signature(state, &unsigned), given) {
-            return Err(Error::Forbidden);
+        if verify(state, &parts.uri) {
+            Ok(Self)
+        } else {
+            Err(Error::Forbidden)
         }
-        Ok(Self)
     }
+}
+
+/// Whether `uri` carries a valid, unexpired signature from `sign_path`.
+pub(crate) fn verify(state: &AppState, uri: &axum::http::Uri) -> bool {
+    let query = uri.query().unwrap_or_default();
+    let Some((unsigned_query, given)) = query.rsplit_once("&signature=") else {
+        return false;
+    };
+    let Some(expires) = unsigned_query
+        .strip_prefix("expires=")
+        .and_then(|v| v.parse::<u64>().ok())
+    else {
+        return false;
+    };
+    let unsigned = format!("{}?{unsigned_query}", uri.path());
+    expires >= now() && constant_time_eq(&signature(state, &unsigned), given)
 }

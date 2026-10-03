@@ -83,6 +83,11 @@ Without this setting:
 Don't set it when the app is reachable directly: anyone could then send a fake
 `X-Forwarded-For`. `ClientIp` in a handler gives the same address the app uses.
 
+Set `TRUSTED_HOSTS` to the host names the app serves (`example.com,*.example.com`). Requests
+for any other `Host` then get a 400, so a password reset mail can't be built with an
+attacker's host in its link. `APP_URL`'s host is always allowed and `/health` answers for any
+host (load balancers check it by IP).
+
 Routes on other hosts (`Routes::domain("admin.example.com", …)`) are chosen by the `Host`
 header, so the proxy must pass it on: Caddy does; with nginx, `proxy_set_header Host $host`.
 An app with `App::detect_locale()` answers `Vary: Accept-Language`: a CDN or caching proxy in
@@ -216,7 +221,8 @@ sent, so signatures can be checked again.
 
 **PostgreSQL.** Use your provider's backups or `pg_dump`.
 
-**Files.** Uploads live in `STORAGE_PATH/app` (or the S3 bucket). Back that directory up too.
+**Files.** Uploads live in `STORAGE_PATH/app` (or the S3 bucket), and each disk added with
+`App::disk` in `STORAGE_PATH/<name>` (or its own bucket). Back those directories up too.
 
 **Keys.** Keep `.env`'s `APP_KEY` with the backups. Without it, sessions end, signed links
 (`signed_url`, the local disk's `temporary_url`s, email verification links) stop working, the app's encrypted cookies (`SetCookie::encrypted`, read with

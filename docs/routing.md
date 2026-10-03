@@ -125,6 +125,19 @@ fn routes() -> Routes {
 A resource has only the actions you give it. `rnx make:module products --resource` writes one
 with its handlers, views and tests.
 
+Pages that need no handler (Laravel's `Route::view` and `Route::redirect`):
+
+```rust
+use renox::prelude::*;
+
+fn routes() -> Routes {
+    Routes::new()
+        .view("/about", "pages/about.html").name("about") // GET, rendered with the globals
+        .redirect("/about-us", "/about")                  // 302, any method
+        .permanent_redirect("/old-shop", "/products")     // 301
+}
+```
+
 ### Other hosts and the fallback
 
 `Routes::domain` serves routes only on hosts matching a pattern; `{name}` matches one label of
@@ -199,6 +212,7 @@ something that reads the body (`Valid<T>`, `Form`, `Json`) must come last.
 | Extractor | Gives | Notes |
 |---|---|---|
 | `Path<T>` | route parameters: `Path(id): Path<i64>`, `Path((a, b)): Path<(i64, i64)>` | `renox::Path` (in the prelude): a value that doesn't parse (`/products/abc`) is a **404**, not axum's 400; a parameter the route lacks is a 500 (the app's bug) |
+| `Found<M>` | the model a route parameter names, loaded (route model binding) | 404 when there's no such row; below |
 | `Query<T>` | the query string, deserialized | axum's; `Option` fields for optional ones |
 | `Valid<T>` | a validated form, JSON body or (for GET) query string | errors: redirect back, or 422 for htmx/JSON; see [validation.md](validation.md) |
 | `Form<T>`, `Json<T>` | the body, unvalidated | axum's |
@@ -252,6 +266,33 @@ fn app() -> App {
     App::new().provide(Payments { api_key: "sk_test_123".into() })
 }
 ```
+
+### Route model binding: `Found<M>`
+
+`Found(product): Found<Product>` loads the row a route parameter names, or answers 404 like a
+missing route. The parameter is the one named after the model's table (`{product}` for
+`Product`), else the route's only one. It is read as the model's key (`{product}`, `{id}`, a
+ULID or UUID too), or matched against a column when its name is one (`/blog/{slug}` finds the
+post whose `slug` matches). The query is the model's own, so a default scope (the current
+team) and soft deletes apply: another team's id, or a trashed row, is a 404.
+
+```rust
+use renox::prelude::*;
+# #[derive(Model, serde::Serialize, Default)] struct Team { id: i64, name: String }
+# #[derive(Model, serde::Serialize, Default)] struct Post { id: i64, slug: String, title: String }
+
+// GET /teams/{team}/posts/{post}: each model takes the parameter named after it.
+async fn show(Found(team): Found<Team>, Found(post): Found<Post>) -> String {
+    format!("{}: {}", team.name, post.title)
+}
+
+// GET /blog/{slug}: `slug` is a column, so the post is found by it.
+async fn by_slug(Found(post): Found<Post>) -> String {
+    post.title
+}
+```
+
+Authorization stays in the handler (`user.authorize("update", &post)?`), as with `find_or_404`.
 
 ## What a handler can return
 
@@ -425,6 +466,26 @@ routes added before it: preflights are answered and the `Access-Control-Allow-*`
 added. For credentials or other headers, build a `renox::cors::CorsLayer` and pass it to
 `.cors_layer(…)`.
 
+### ETags
+
+`.etag()` gives the routes added before it an `ETag` header, a hash of the page as it is sent,
+and answers **304 Not Modified** without the body when the browser's `If-None-Match` names it:
+for feeds, sitemaps, catalogues and API lists that are fetched again and again but rarely
+change. Only `GET`/`HEAD` answers with status 200 and a body of at most 2 MB get one.
+
+```rust
+use renox::prelude::*;
+# async fn feed() -> &'static str { "" }
+# async fn sitemap() -> &'static str { "" }
+
+fn routes() -> Routes {
+    Routes::new()
+        .get("/feed.xml", feed)
+        .get("/sitemap.xml", sitemap)
+        .etag() // covers the two routes above
+}
+```
+
 ## Sessions
 
 `Session` is the visitor's session. By default it's an encrypted, signed cookie (key derived
@@ -477,6 +538,9 @@ Every POST, PUT, PATCH and DELETE must carry the session's token; without it the
   A Bearer token that doesn't authenticate gets 401.
 - **No session at all** (a payment gateway): `.without_csrf()` on those routes, and check the
   request's signature instead. `Routes::webhook::<W>("/webhooks/stripe")` does both for you.
+- **A JavaScript client on the same site** (axios, a small SPA): `App::new().xsrf_cookie()`
+  also sends the token as an `XSRF-TOKEN` cookie that scripts can read, and accepts it back in
+  an `X-XSRF-TOKEN` header, as Laravel does. axios sends it by itself.
 
 ## Method spoofing
 
@@ -579,6 +643,11 @@ it.
 TRUSTED_PROXIES=127.0.0.1,10.0.0.0/8
 ```
 
+- **Trusted hosts:** with `TRUSTED_HOSTS=example.com,*.example.com`, a request for any other
+  host gets a 400, so links built from the `Host` header (password reset mails, redirects)
+  can't point at someone else's site. `APP_URL`'s host is always allowed, and `/health`
+  answers whatever the host, since load balancers check it by IP. Unset: any host.
+
 See [operations.md](operations.md) for timeouts, proxies and `/health` in production.
 
 ## Coming from Laravel
@@ -594,7 +663,11 @@ See [operations.md](operations.md) for timeouts, proxies and `/health` in produc
 | `route('x', $id)`, `url()` | `route('x', id)` in templates, `state.url("x", &[&id])` |
 | `request()->routeIs('admin.*')`, `Route::currentRouteName()` | `route_is('admin.*')`, `CurrentRoute` |
 | `php artisan route:list` | `my-app route:list` |
-| Route model binding | `Path(id): Path<i64>` + `Model::find_or_404` |
+| Route model binding, `{post:slug}` | `Found<Post>` (`{post}`, `{id}`, or a column's name such as `{slug}`) |
+| `Route::view`, `Route::redirect`, `Route::permanentRedirect` | `.view(path, template)`, `.redirect(from, to)`, `.permanent_redirect(from, to)` |
+| `SetCacheHeaders` with `etag` | `.etag()` |
+| The `XSRF-TOKEN` cookie | `App::xsrf_cookie()` |
+| `TrustHosts` | `TRUSTED_HOSTS` |
 | `$request->query()`, `$request->ip()` | `Query<T>`, `ClientIp` |
 | Middleware, `Kernel::$middleware` | `App::layer(from_fn(…))` |
 | Route middleware | `.route_layer(…)` after the routes |

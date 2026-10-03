@@ -14,7 +14,7 @@
     {% call card(title="Photos", subtitle="Public: anyone with the link sees them.") %}
       {{ input("title", "Title", id="photo-title", required=true, placeholder="Photo title") }}
       {# errors for each file (photos.0, photos.1, …) show in its slot too #}
-      {{ file("photos", "Photos", accept="image/*", multiple=true, preview=true, required=true, hint="Up to 10 images, 2 MB each.") }}
+      {{ file("photos", "Photos", accept="image/*", multiple=true, preview=true, required=true, hint="Up to 10 images, 2 MB and 6000 pixels a side each.") }}
       <div class="rx-card__footer">{{ button("Upload photos") }}</div>
     {% endcall %}
   </form>

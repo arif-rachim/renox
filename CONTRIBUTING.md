@@ -42,8 +42,8 @@ cargo test --workspace
   Include the negative cases: bad input, a forged request, a failing dependency.
 - **Both databases.** Anything that touches SQL must pass on PostgreSQL too:
   ```bash
-  docker run -d --rm --name renox-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=renox_test \
-      -p 55432:5432 postgres:17-alpine
+  docker run -d --rm --name renox-pg --shm-size=512m -e POSTGRES_PASSWORD=postgres \
+      -e POSTGRES_DB=renox_test -p 55432:5432 postgres:17-alpine
   TEST_DATABASE_URL=postgres://postgres:postgres@localhost:55432/renox_test \
       cargo test -p renox -p renox-core -p renox-cli -p postgres-app -p fields --features renox/postgres
   ```

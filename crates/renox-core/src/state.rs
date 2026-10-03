@@ -32,6 +32,8 @@ pub struct AppState {
     pub cache: Cache,
     /// The file storage disk (`STORAGE_DISK`).
     pub storage: Storage,
+    /// The app's other disks (`App::disk`), by name; see [`AppState::disk`].
+    pub(crate) disks: Arc<std::collections::HashMap<String, Storage>>,
     /// Calls other services; faked in tests (`TestApp::fake_http`).
     pub http: crate::http::Http,
     /// Translations from `LANG_PATH` and the built-in ones.
@@ -146,5 +148,15 @@ impl AppState {
     /// sealed with another key.
     pub fn decrypt(&self, sealed: &str) -> Result<String> {
         Ok(crate::crypto::open(&self.key, sealed)?)
+    }
+}
+
+impl AppState {
+    /// A disk the app added with [`App::disk`](crate::App::disk), e.g.
+    /// `state.disk("backups")?`; an unknown name is an error (500).
+    pub fn disk(&self, name: &str) -> Result<&Storage> {
+        self.disks.get(name).ok_or_else(|| {
+            anyhow::anyhow!("no disk named `{name}`: add it with `App::disk(\"{name}\", …)`").into()
+        })
     }
 }

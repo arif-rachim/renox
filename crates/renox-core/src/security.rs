@@ -29,7 +29,7 @@ use axum::http::header::{
 use axum::http::request::Parts;
 use axum::http::{HeaderName, HeaderValue, Method};
 use axum::middleware::Next;
-use axum::response::Response;
+use axum::response::{IntoResponse, Response};
 
 use crate::AppState;
 use crate::config::{Config, CspMode, Environment};
@@ -82,6 +82,10 @@ pub(crate) struct Security {
     csrf_exempt: HashSet<(String, String)>,
     /// Path patterns of webhook routes, which work in maintenance mode.
     webhook_paths: HashSet<String>,
+    /// `App::xsrf_cookie`: the CSRF token also goes out as `XSRF-TOKEN`.
+    pub xsrf_cookie: bool,
+    /// `TRUSTED_HOSTS` plus `APP_URL`'s host; empty answers any host.
+    trusted_hosts: Vec<String>,
 }
 
 impl Security {
@@ -146,7 +150,27 @@ impl Security {
             policy,
             hsts: config.env == Environment::Production && config.url.starts_with("https://"),
             csrf_exempt,
+            xsrf_cookie: false,
+            trusted_hosts: trusted_hosts(config),
         }
+    }
+
+    /// Whether the app answers requests for `host` (`TRUSTED_HOSTS`).
+    pub fn allows_host(&self, host: Option<&str>) -> bool {
+        if self.trusted_hosts.is_empty() {
+            return true;
+        }
+        let Some(host) = host.map(str::to_ascii_lowercase) else {
+            return false;
+        };
+        self.trusted_hosts
+            .iter()
+            .any(|allowed| match allowed.strip_prefix("*.") {
+                Some(parent) => host
+                    .strip_suffix(parent)
+                    .is_some_and(|sub| sub.len() > 1 && sub.ends_with('.')),
+                None => *allowed == host,
+            })
     }
 
     /// Whether the matched route receives webhooks.
@@ -166,18 +190,99 @@ impl Security {
     }
 }
 
+/// Marks a response from a `Routes::etag()` route.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct WantsEtag;
+
+/// The largest body `Routes::etag()` hashes.
+const ETAG_LIMIT: u64 = 2 * 1024 * 1024;
+
+/// Adds an `ETag` to a rendered page, or turns it into a 304 when the
+/// browser's `If-None-Match` names it.
+async fn etag(res: Response, method: &Method, if_none_match: Option<HeaderValue>) -> Response {
+    use axum::body::HttpBody as _;
+    use axum::http::StatusCode;
+    let wanted = res.extensions().get::<WantsEtag>().is_some()
+        && matches!(*method, Method::GET | Method::HEAD)
+        && res.status() == StatusCode::OK
+        && !res.headers().contains_key(axum::http::header::ETAG)
+        && res
+            .body()
+            .size_hint()
+            .exact()
+            .is_some_and(|size| size <= ETAG_LIMIT);
+    if !wanted {
+        return res;
+    }
+    let (mut parts, body) = res.into_parts();
+    let Ok(bytes) = axum::body::to_bytes(body, ETAG_LIMIT as usize).await else {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "could not read the page").into_response();
+    };
+    let hash = crate::webhook::sha256_hex(&bytes);
+    let tag = format!("\"{}\"", &hash[..32]);
+    let matches = if_none_match
+        .as_ref()
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| {
+            v.split(',')
+                .map(|t| t.trim().trim_start_matches("W/"))
+                .any(|t| t == tag || t == "*")
+        });
+    if let Ok(value) = HeaderValue::from_str(&tag) {
+        parts.headers.insert(axum::http::header::ETAG, value);
+    }
+    if matches {
+        parts.status = StatusCode::NOT_MODIFIED;
+        parts.headers.remove(axum::http::header::CONTENT_LENGTH);
+        parts.headers.remove(axum::http::header::CONTENT_TYPE);
+        return Response::from_parts(parts, axum::body::Body::empty());
+    }
+    Response::from_parts(parts, axum::body::Body::from(bytes))
+}
+
+fn trusted_hosts(config: &Config) -> Vec<String> {
+    let mut hosts = config.trusted_hosts.clone();
+    if !hosts.is_empty()
+        && let Ok(url) = config.url.parse::<axum::http::Uri>()
+        && let Some(host) = url.host()
+    {
+        hosts.push(host.to_ascii_lowercase());
+    }
+    hosts
+}
+
 pub(crate) async fn middleware(
     State(state): State<AppState>,
     mut req: Request,
     next: Next,
 ) -> Response {
+    // A request for a host the app doesn't serve (`TRUSTED_HOSTS`): links
+    // built from it, such as password reset mails, would point elsewhere.
+    // Load balancers' health checks often use an IP, so `/health` answers.
+    if req.uri().path() != "/health"
+        && !state
+            .security
+            .allows_host(crate::domain::host(&req).as_deref())
+    {
+        return (
+            axum::http::StatusCode::BAD_REQUEST,
+            "This host is not served here.",
+        )
+            .into_response();
+    }
     let client = crate::client_ip::resolve(&req, &state.config.trusted_proxies);
     req.extensions_mut().insert(client);
     let security = &state.security;
     let nonce = crate::crypto::random_token();
     req.extensions_mut().insert(CspNonce(nonce.clone()));
     let wants_json = crate::error::wants_json(req.headers());
+    let method = req.method().clone();
+    let if_none_match = req
+        .headers()
+        .get(axum::http::header::IF_NONE_MATCH)
+        .cloned();
     let mut res = next.run(req).await;
+    res = etag(res, &method, if_none_match).await;
     // Errors from outside the view layer (e.g. CSRF's 419) for API clients.
     if wants_json && let Some(page) = res.extensions_mut().remove::<crate::error::ErrorPage>() {
         res = page.json(state.config.debug);

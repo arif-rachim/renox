@@ -15,7 +15,9 @@ pub enum Inspected {
     /// A list (`Vec`) with this many items.
     Items(usize),
     /// An uploaded file: size in kilobytes, the extension its content (or
-    /// else its name) indicates, and whether it really is an image.
+    /// else its name) indicates, whether it really is an image, and its
+    /// size in pixels.
+    #[non_exhaustive]
     File {
         /// Size in kilobytes.
         kilobytes: f64,
@@ -23,6 +25,8 @@ pub enum Inspected {
         extension: String,
         /// Whether the content really is an image.
         image: bool,
+        /// Width and height in pixels, for images.
+        dimensions: Option<(u32, u32)>,
     },
     /// A date or a date and time (a date alone is its midnight).
     Date(chrono::NaiveDateTime),
@@ -161,6 +165,7 @@ impl FieldValue for crate::upload::Upload {
                 kilobytes: 0.0,
                 extension: String::new(),
                 image: false,
+                dimensions: None,
             };
         }
         let extension = match self.sniffed_type() {
@@ -175,6 +180,7 @@ impl FieldValue for crate::upload::Upload {
             kilobytes: self.size() as f64 / 1024.0,
             extension,
             image: self.is_image(),
+            dimensions: self.dimensions(),
         }
     }
 

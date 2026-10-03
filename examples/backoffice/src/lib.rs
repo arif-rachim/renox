@@ -56,6 +56,12 @@ pub fn app() -> App {
         .share("company", |ctx| async move {
             Settings::load(&ctx.state.db).await
         })
+        // Exports go to a disk of their own (`state.disk("exports")`):
+        // `storage/exports` by default, or a bucket with EXPORTS_DISK=s3,
+        // EXPORTS_BUCKET=… (keys and region from S3_*).
+        .disk("exports", |config| {
+            renox::storage::StorageConfig::from_env(config, "EXPORTS")
+        })
         .seeder(app::seed::run)
 }
 

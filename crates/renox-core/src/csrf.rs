@@ -9,6 +9,11 @@ use crate::{Error, Session};
 
 /// The request header that carries the CSRF token (htmx and `fetch` requests).
 pub const CSRF_HEADER: &str = "x-csrf-token";
+/// The cookie that carries the CSRF token to JavaScript clients, with
+/// [`App::xsrf_cookie`](crate::App::xsrf_cookie).
+pub const XSRF_COOKIE: &str = "XSRF-TOKEN";
+/// The header such clients send it back in (axios does it by itself).
+pub const XSRF_HEADER: &str = "x-xsrf-token";
 /// The form field that carries the CSRF token.
 pub const CSRF_FIELD: &str = "_token";
 
@@ -42,6 +47,31 @@ pub(crate) const FORM_LIMIT: usize = 2 * 1024 * 1024;
 /// either in the `X-CSRF-Token` header (sent automatically for HTMX requests)
 /// or in a `_token` field of a urlencoded or multipart form (`{{ csrf_field() }}`).
 pub(crate) async fn middleware(req: Request, next: Next) -> Response {
+    let xsrf = req
+        .extensions()
+        .get::<crate::AppState>()
+        .filter(|state| state.security.xsrf_cookie)
+        .and_then(|state| {
+            let session = req.extensions().get::<Session>()?.clone();
+            Some((session, state.config.url.starts_with("https://")))
+        });
+    let mut res = check(req, next).await;
+    // The token as it is after the handler (a login issues a new one).
+    if let Some((session, secure)) = xsrf {
+        let cookie = cookie::Cookie::build((XSRF_COOKIE, session.token()))
+            .path("/")
+            .same_site(cookie::SameSite::Lax)
+            .secure(secure)
+            .build();
+        if let Ok(value) = axum::http::HeaderValue::from_str(&cookie.to_string()) {
+            res.headers_mut()
+                .append(axum::http::header::SET_COOKIE, value);
+        }
+    }
+    res
+}
+
+async fn check(req: Request, next: Next) -> Response {
     if matches!(
         *req.method(),
         Method::GET | Method::HEAD | Method::OPTIONS | Method::TRACE
@@ -87,7 +117,11 @@ pub(crate) async fn middleware(req: Request, next: Next) -> Response {
     };
     let expected = session.token();
 
-    if let Some(token) = req.headers().get(CSRF_HEADER) {
+    if let Some(token) = req
+        .headers()
+        .get(CSRF_HEADER)
+        .or_else(|| req.headers().get(XSRF_HEADER))
+    {
         return match token.to_str() {
             Ok(token) if constant_time_eq(token, &expected) => next.run(req).await,
             _ => Error::PageExpired.into_response(),

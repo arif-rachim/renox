@@ -430,6 +430,16 @@ async fn the_feed_and_the_sitemap_list_the_posts() {
         xml.contains(&format!("http://127.0.0.1:3000/posts/{}</link>", b.rust.id)),
         "{xml}"
     );
+    // A reader that has this version gets a 304 without the body.
+    let tag = feed.header("etag").expect("an ETag").to_owned();
+    b.app
+        .request()
+        .header("if-none-match", &tag)
+        .get("/feed.xml")
+        .await
+        .assert_status(304);
+    // The pages themselves don't get one (`.etag()` covers only the feeds).
+    assert_eq!(b.app.get("/").await.header("etag"), None);
     let sitemap = b.app.get("/sitemap.xml").await;
     sitemap.assert_ok();
     let text = sitemap.text();
