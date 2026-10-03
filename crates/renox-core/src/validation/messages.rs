@@ -50,6 +50,9 @@ pub(crate) fn template(locale: Locale, key: &str) -> &'static str {
             }
             "password.numbers" => "The :attribute must contain at least one number.",
             "password.symbols" => "The :attribute must contain at least one symbol.",
+            "password.uncompromised" => {
+                "The :attribute has appeared in a data leak. Please choose a different one."
+            }
             "current_password" => "The :attribute is incorrect.",
             "accepted" => "The :attribute must be accepted.",
             "unique" => "The :attribute has already been taken.",
@@ -224,6 +227,8 @@ mod tests {
             "doesnt_end_with",
             "not_regex",
             "declined",
+            "password.uncompromised",
+            "current_password",
         ] {
             assert_ne!(
                 template(Locale::En, key),

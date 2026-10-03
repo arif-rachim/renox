@@ -109,7 +109,7 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            the key for Encrypted columns), key.rs (ModelKey, Ulid), encrypted.rs
                            (Encrypted<T>, Unsealed), mod.rs
                            (connect, TEST_DATABASE_URL), model.rs, query.rs, from_row.rs,
-                           relations.rs (belongs_to/has_many/Pivot/Morph), value.rs (DbValue),
+                           relations.rs (belongs_to/has_many/has_many_through/Pivot/Morph), value.rs (DbValue),
                            paginate.rs, migrate.rs (migrator), factory.rs, json.rs, error.rs,
                            query_log.rs (capture_queries: a task-local statement log, also
                            feeding /_renox/debug)
@@ -150,7 +150,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            link, copyable); related/count_of/sum_of, advanced_filter,
                            remember, poll; export.rs: CSV, Excel (`xlsx`), print page
   src/mail.rs              Mail (recipients, cc/bcc/reply_to/from, attachments), Mailer
-                           (smtp/log/memory), mail_view, queue_mail, /_renox/mail preview
+                           (smtp/log/memory, MAIL_FAILOVER), named mailers (App::mailer,
+                           mailer_named, queue_mail_via), mail_view, queue_mail, /_renox/mail
   src/cache.rs             Cache (memory / database store), remember(), add/pull/increment,
                            Lock/LockGuard (`renox:lock:*` rows), prune
   src/counters.rs          counters in the cache table (renox:count:…) for shared throttles/login lock
@@ -704,7 +705,8 @@ Parsed in `crates/renox-core/src/config.rs`; defaults in parentheses.
   be opened).
 - **Mail:** `MAIL_MAILER` (log; smtp|log|memory), `MAIL_HOST`, `MAIL_PORT`, `MAIL_ENCRYPTION`
   (starttls; tls|starttls|none), `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS`,
-  `MAIL_FROM_NAME`, `MAIL_TIMEOUT` (seconds, 10, the whole send).
+  `MAIL_FROM_NAME`, `MAIL_TIMEOUT` (seconds, 10, the whole send), `MAIL_FAILOVER` (names of
+  `App::mailer` mailers tried in order when the default fails; an unknown name fails at boot).
 - **Background:** `QUEUE_WORKERS` (2; 0 = none in serve), `SCHEDULER` (true), `CACHE_STORE`
   (memory|database; database also shares throttles and the login lock between servers).
 - **Storage:** `STORAGE_DISK` (local|s3), `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`,
@@ -861,7 +863,7 @@ picks the build, not the terminal.
 
 ## 7. Where things stand (update this section when it changes)
 
-- **All milestones M0–M32 are merged to `main`** (M32: #108; M33 on a branch); the owner's B/C/D before
+- **All milestones M0–M33 are merged to `main`** (M33: #112; M34 on a branch); the owner's B/C/D before
   1.0 were M23–M25. History:
   `CHANGELOG.md` (per milestone) and `ROADMAP.md` (per-milestone notes and decisions).
 - After M17: a docs refresh (#45) and the Laravel parity review with M18–M21 planned (#46).
@@ -1040,10 +1042,14 @@ picks the build, not the terminal.
   validation rules with `Dimensions`, `Found<M>` route model binding, `Routes::view`/
   `redirect`, named disks, `Routes::etag`, `App::xsrf_cookie`, `TRUSTED_HOSTS`): merged
   (#112). Layers like `.etag()` cover only the routes added before them.
+- **M34** (the rest of the small adds: `current_password`, `Password::uncompromised` (HIBP),
+  `Validator::finish_for`, session `keep`/`now`, named error bags, `App::mailer` +
+  `MAIL_FAILOVER`, `has_many_through`): merged (#114). Async rule checks live in
+  `Validator::checks` and run in `finish_with` after the database ones.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.
-- **Still open** (ROADMAP `- [ ]`): an optional HIBP check; the plugins (`renox-2fa`,
+- **Still open** (ROADMAP `- [ ]`): the plugins (`renox-2fa`,
   `renox-oauth`, `renox-admin`, separate crates). A Laravel gap review after M25 (in the
   conversation that planned M26) ranked them: release and docs first, then 2FA and social
   login, then small adds (validation rules like `json`/`gt`/`decimal`/`dimensions`, several

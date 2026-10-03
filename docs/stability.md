@@ -30,8 +30,8 @@ commit that `rnx` was built from.
   - `Inspected::File { image, .. }` (it gained `dimensions` in M33)
 - New methods, functions, modules, template functions, validation rules, CLI commands and `.env`
   settings (always with defaults).
-- New provided methods on traits you implement (`Model`, `Notification`, `ModelHooks`,
-  `validation::ValidateHooks`, …); `FromRow` stays one method. `db::Number` is sealed: only `i64`
+- New provided methods and associated constants with defaults on traits you implement
+  (`Model`, `Notification`, `ModelHooks`, `validation::ValidateHooks`, `Validate::ERROR_BAG`, …); `FromRow` stays one method. `db::Number` is sealed: only `i64`
   and `f64`. `db::ModelKey` is sealed too (`i64`, `Ulid`, `Uuid`, `String`), so new key types
   and new methods on it aren't breaking, and so is `RedirectExt` (only for axum's `Redirect`).
 

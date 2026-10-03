@@ -111,6 +111,79 @@ pub fn has_many<'a, C: Model, P: Model, K: ForeignKey<P::Key>>(
     }
 }
 
+/// The children of each parent reached through a middle model (Laravel's
+/// `hasManyThrough`), in two queries: a country's posts through its users,
+/// a project's deployments through its environments. `through` is the
+/// middle query (`User::query()`) with its column pointing at the parent
+/// (`"country_id"`) read by `through_key`; `children`, `column` and
+/// `foreign_key` are the children's, pointing at the middle model.
+///
+/// ```
+/// # use renox::prelude::*;
+/// use renox::db::relations::has_many_through;
+/// # #[derive(Model, serde::Serialize, Default)] struct Country { id: i64, name: String }
+/// # #[derive(Model, serde::Serialize, Default)] struct Customer { id: i64, country_id: i64 }
+/// # #[derive(Model, serde::Serialize, Default)] struct Order { id: i64, customer_id: i64, total: i64 }
+/// # async fn demo(db: Db, countries: Vec<Country>) -> Result {
+/// let orders = has_many_through(
+///     &db,
+///     &countries,
+///     Customer::query(), "country_id", |c: &Customer| c.country_id,
+///     Order::query().latest(), "customer_id", |o: &Order| o.customer_id,
+/// )
+/// .await?;
+/// let first = orders.get(&countries[0].id).map_or(&[][..], Vec::as_slice);
+/// # let _ = first; Ok(()) }
+/// ```
+#[allow(clippy::too_many_arguments)]
+pub fn has_many_through<'a, C, T, P, KT, KC>(
+    db: &'a Db,
+    parents: &[P],
+    through: Query<T>,
+    through_column: &str,
+    through_key: impl Fn(&T) -> KT + Send + 'a,
+    children: Query<C>,
+    column: &str,
+    foreign_key: impl Fn(&C) -> KC + Send + 'a,
+) -> impl Future<Output = Result<HashMap<P::Key, Vec<C>>>> + Send + 'a
+where
+    C: Model,
+    T: Model,
+    P: Model,
+    KT: ForeignKey<P::Key>,
+    KC: ForeignKey<T::Key>,
+{
+    let ids: Vec<P::Key> = parents.iter().map(Model::id).collect();
+    let middle = (!ids.is_empty()).then(|| through.where_in(through_column, ids));
+    let column = column.to_owned();
+    async move {
+        let mut grouped: HashMap<P::Key, Vec<C>> = HashMap::new();
+        let Some(middle) = middle else {
+            return Ok(grouped);
+        };
+        // Each middle row's parent, by the middle row's key.
+        let parent_of: HashMap<T::Key, P::Key> = middle
+            .get(db)
+            .await?
+            .iter()
+            .filter_map(|row| Some((row.id(), through_key(row).key()?)))
+            .collect();
+        if parent_of.is_empty() {
+            return Ok(grouped);
+        }
+        let middle_ids: Vec<T::Key> = parent_of.keys().cloned().collect();
+        for child in children.where_in(&column, middle_ids).get(db).await? {
+            let parent = foreign_key(&child)
+                .key()
+                .and_then(|middle| parent_of.get(&middle).cloned());
+            if let Some(parent) = parent {
+                grouped.entry(parent).or_default().push(child);
+            }
+        }
+        Ok(grouped)
+    }
+}
+
 /// How many children each parent has (`withCount`), in one `GROUP BY`
 /// query; parents without children get 0. `children` sets the filters.
 ///

@@ -156,7 +156,7 @@ where
     let (mut data, mut errors): (T, Errors) = match parsed {
         Parsed::Ok(data, errors) => (data, errors),
         Parsed::Invalid(errors) => {
-            return Err(ValidationError::new(errors)
+            return Err(bagged::<T>(ValidationError::new(errors))
                 .with_input_map(input)
                 .into_response());
         }
@@ -178,7 +178,7 @@ where
     let mut validator = Validator::rules_with_texts(&data, locale.locale, locale.texts.clone());
     extra(&data, &input, &mut validator);
     let rule_errors = validator
-        .finish(&state.db)
+        .finish_for(state, user.as_deref())
         .await
         .map_err(IntoResponse::into_response)?;
     // A field that didn't parse was checked with a placeholder; its own
@@ -215,9 +215,17 @@ where
         crate::context::set(SubmittedInput(input.clone()));
         Ok((data, input))
     } else {
-        Err(ValidationError::new(errors)
+        Err(bagged::<T>(ValidationError::new(errors))
             .with_input_map(input)
             .into_response())
+    }
+}
+
+/// The error in `T`'s named bag, if it has one.
+fn bagged<T: Validate>(error: ValidationError) -> ValidationError {
+    match T::ERROR_BAG {
+        Some(bag) => error.in_bag(bag),
+        None => error,
     }
 }
 

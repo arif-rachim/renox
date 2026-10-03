@@ -437,6 +437,7 @@ const REQUEST_GLOBALS: &[&str] = &[
     "csrf_field",
     "flash",
     "errors",
+    "errors_in",
     "error",
     "old",
     "has_old",
@@ -747,6 +748,7 @@ pub(crate) async fn middleware(
             return res;
         }
         if let Some(session) = &session {
+            let bag = failed.bag().map(str::to_owned);
             // A `ValidationError` made after `Valid` (a model hook, the
             // handler) carries no input: refill with what `Valid` read.
             let input = if failed.input.is_empty() {
@@ -756,9 +758,11 @@ pub(crate) async fn middleware(
             } else {
                 failed.input
             };
-            let flashed = session
-                .flash_errors(&failed.errors)
-                .and_then(|()| session.flash_input(&input));
+            let flashed = match &bag {
+                Some(bag) => session.flash_errors_in(bag, &failed.errors),
+                None => session.flash_errors(&failed.errors),
+            }
+            .and_then(|()| session.flash_input(&input));
             if let Err(err) = flashed {
                 return err.into_response();
             }
@@ -1041,8 +1045,20 @@ fn globals(
         .map(|c| c.grants.roles.clone())
         .unwrap_or_default();
     let gate_user = current_user.and_then(|c| Some((c.user?, c.gates, c.grants)));
-    let errors = session.map(Session::errors).unwrap_or_default();
-    let first_errors: std::collections::BTreeMap<String, String> = errors
+    // Errors flashed in a named bag (`Validate::ERROR_BAG`) are shown only
+    // by `error(field, bag=…)` and `errors_in(bag)`.
+    let error_bag = session.and_then(Session::error_bag);
+    let flashed_errors = match (session, &error_bag) {
+        (Some(session), Some(bag)) => session.errors_in(bag),
+        (Some(session), None) => session.errors(),
+        (None, _) => Default::default(),
+    };
+    let errors = if error_bag.is_none() {
+        flashed_errors.clone()
+    } else {
+        Default::default()
+    };
+    let first_errors: std::collections::BTreeMap<String, String> = flashed_errors
         .iter()
         .filter_map(|(field, messages)| {
             messages
@@ -1100,11 +1116,28 @@ fn globals(
         csrf_token => token,
         flash => Value::from_object(Flashed(session.map(Session::flashed).unwrap_or_default())),
         errors => errors,
-        // `error('photos')` also shows the first error of an item (`photos.1`).
-        error => Value::from_function(move |field: String| {
+        // `errors_in('login')`: every error of a named bag.
+        errors_in => {
+            let bag = error_bag.clone();
+            Value::from_function(move |name: String| {
+                if bag.as_deref() == Some(name.as_str()) {
+                    Value::from_serialize(&flashed_errors)
+                } else {
+                    Value::from_serialize(serde_json::Map::new())
+                }
+            })
+        },
+        // `error('photos')` also shows the first error of an item (`photos.1`);
+        // `error('email', bag='login')` reads a named bag.
+        error => Value::from_function(move |field: String, kwargs: minijinja::value::Kwargs| {
+            let bag: Option<String> = kwargs.get("bag")?;
+            kwargs.assert_all_used()?;
+            if bag != error_bag {
+                return Ok::<_, minijinja::Error>(String::new());
+            }
             // `items[0][name]`'s errors are keyed `items.0.name`.
             let field = crate::validation::nested::normalize(&field);
-            first_errors
+            Ok(first_errors
                 .get(&field)
                 .or_else(|| {
                     let prefix = format!("{field}.");
@@ -1114,7 +1147,7 @@ fn globals(
                         .map(|(_, message)| message)
                 })
                 .cloned()
-                .unwrap_or_default()
+                .unwrap_or_default())
         }),
         renox_head => Value::from_function(move || head.clone()),
         seo => seo,

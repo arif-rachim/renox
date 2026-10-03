@@ -22,7 +22,7 @@ pub mod model;
 
 use std::collections::HashMap;
 
-use renox::db::relations::{belongs_to, count_many, has_many};
+use renox::db::relations::{belongs_to, count_many, has_many, has_many_through};
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -290,14 +290,27 @@ async fn pin(
     Redirect::route("posts.show", &[&post.id])
 }
 
-/// "Has many" from the other side: the category's posts.
-async fn category(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
-    let category = Category::find_or_404(&db, id).await?;
+/// "Has many" from the other side: the category's posts. And "has many
+/// through": the latest comments on any of them, the category reaching its
+/// comments through its posts (two queries, `has_many_through`).
+async fn category(State(db): State<Db>, Found(category): Found<Category>) -> Result<View> {
     let posts = category.posts(&db).await?;
+    let mut through = has_many_through(
+        &db,
+        std::slice::from_ref(&category),
+        Post::query(),
+        "category_id",
+        |p: &Post| p.category_id,
+        Comment::query().latest().limit(5),
+        "post_id",
+        |c: &Comment| c.post_id,
+    )
+    .await?;
+    let comments = through.remove(&category.id).unwrap_or_default();
     let pinned: Vec<i64> = Vec::new();
     Ok(view(
         "blog/list.html",
-        context! { heading => category.name, posts, pinned },
+        context! { heading => category.name, posts, pinned, comments },
     ))
 }
 

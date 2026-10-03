@@ -25,7 +25,7 @@
   translations (plurals and ranges, the browser's language); session `push`/`increment`;
   factory states and sequences; domain and fallback routes, `Redirect::route`/`intended`,
   `route_is`, `class_names`, `{% break %}`; route model binding (`Found`), view and redirect
-  routes, ETags; signed URLs, private files and named disks; CSP, CORS, `xsrf_cookie`,
+  routes, ETags; `has_many_through`; named error bags; session `keep`/`now`; signed URLs, private files and named disks; CSP, CORS, `xsrf_cookie`,
   `TRUSTED_HOSTS` and webhooks; SEO and analytics; tests; form requests (`prepare`, `authorize`, `after`),
   `#[derive(Validate)]` and the full rule list; typed app commands
   (clap) and prompts; stacks (`push`/`stack`);
@@ -129,7 +129,8 @@ Every example has a README.md that walks through it.
   with `fetch_as`; tests/queries.rs counts queries to prove no N+1. Also a public blog:
   Markdown bodies (`markdown` filter in Tailwind's `prose`), `seo()` per post with
   `Post::summary` as the description, `?q=` search (`where_any` + `where_like`), an RSS feed
-  and a `Sitemap` with `.etag()` (304s), the post page loaded with `Found<Post>`; pages on the UI kit with Tailwind's `prose` for the bodies
+  and a `Sitemap` with `.etag()` (304s), the post page loaded with `Found<Post>`, a category's
+  latest comments through its posts (`has_many_through`); pages on the UI kit with Tailwind's `prose` for the bodies
   (resources/css/app.css → public/css/app.css, built with `rnx tailwind --minify` and
   committed): the kit and Tailwind side by side.
   [src/app/blog/mod.rs](examples/relations/src/app/blog/mod.rs),
@@ -168,7 +169,8 @@ Every example has a README.md that walks through it.
 - [examples/jobs](examples/jobs) ([README](examples/jobs/README.md)): an event whose listener queues a receipt mail (a mail template
   with a text version), a notification to admins by mail and in the database, and scheduled
   reports: daily on weekdays and weekly by `cron`, in `Asia/Jakarta`, with an `on_failure` alert,
-  a cache lock against overlapping runs, and counts and sums done in SQL. The M20b queue:
+  a cache lock against overlapping runs, counts and sums done in SQL, and their own mailer
+  (`App::mailer("reports", …)`, `queue_mail_via`). The M20b queue:
   payment as a chain (charge → receipt → warehouse) with an encrypted, rate-limited charge job
   and its `failed` hook, receipts on a `high` queue, unique reminders, and monthly statements
   as a batch with an htmx progress bar. The charge calls the payment gateway with `state.http`

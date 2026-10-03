@@ -210,6 +210,10 @@ pub struct MailConfig {
     /// How long sending one mail over SMTP may take, from `MAIL_TIMEOUT` in
     /// seconds (default 10).
     pub timeout: std::time::Duration,
+    /// Mailers (`App::mailer` names) to try in order when this one fails,
+    /// from `MAIL_FAILOVER` (comma-separated), e.g. `backup` for a second
+    /// SMTP provider.
+    pub failover: Vec<String>,
 }
 
 impl Default for MailConfig {
@@ -224,6 +228,44 @@ impl Default for MailConfig {
             from_address: "hello@example.com".into(),
             timeout: std::time::Duration::from_secs(10),
             from_name: None,
+            failover: Vec::new(),
+        }
+    }
+}
+
+impl MailConfig {
+    /// A mailer's settings from variables starting with `prefix`, for
+    /// [`App::mailer`](crate::App::mailer): `<PREFIX>_MAILER` (`smtp`,
+    /// `log` or `memory`; default: the app's `MAIL_MAILER`, so it logs
+    /// while developing and keeps mail in memory in tests), `<PREFIX>_HOST`, `_PORT`,
+    /// `_USERNAME`, `_PASSWORD`, `_ENCRYPTION`, `_TIMEOUT` (seconds), and
+    /// `<PREFIX>_FROM_ADDRESS` / `_FROM_NAME`, which fall back to the
+    /// app's `MAIL_FROM_*`. A port or timeout that isn't a number is
+    /// ignored with a warning.
+    pub fn from_env(config: &Config, prefix: &str) -> Self {
+        let prefix = prefix.trim_end_matches('_').to_ascii_uppercase();
+        let var = |name: &str| config.var(&format!("{prefix}_{name}"));
+        let number = |name: &str| {
+            var(name).and_then(|value| match value.trim().parse::<u64>() {
+                Ok(n) => Some(n),
+                Err(_) => {
+                    tracing::warn!(variable = %format!("{prefix}_{name}"), %value, "not a number; ignored");
+                    None
+                }
+            })
+        };
+        let defaults = Self::default();
+        Self {
+            mailer: var("MAILER").unwrap_or_else(|| config.mail.mailer.clone()),
+            host: var("HOST").unwrap_or(defaults.host),
+            port: number("PORT").and_then(|p| u16::try_from(p).ok()),
+            username: var("USERNAME"),
+            password: var("PASSWORD"),
+            encryption: var("ENCRYPTION").unwrap_or(defaults.encryption),
+            from_address: var("FROM_ADDRESS").unwrap_or_else(|| config.mail.from_address.clone()),
+            from_name: var("FROM_NAME").or_else(|| config.mail.from_name.clone()),
+            timeout: number("TIMEOUT").map_or(defaults.timeout, std::time::Duration::from_secs),
+            failover: Vec::new(),
         }
     }
 }
@@ -251,6 +293,8 @@ struct Sent {
 #[derive(Clone)]
 pub struct Mailer {
     driver: Driver,
+    /// Mailers tried in order when `driver` fails (`MAIL_FAILOVER`).
+    failover: Vec<(String, Driver)>,
     outbox: Arc<Mutex<(u64, VecDeque<Sent>)>>,
     /// The memory driver keeps everything; others keep the last `OUTBOX` in debug.
     keep: Option<usize>,
@@ -258,44 +302,56 @@ pub struct Mailer {
 
 impl Mailer {
     pub(crate) fn from_config(config: &Config) -> anyhow::Result<Self> {
-        let mail = &config.mail;
+        Self::open(&config.mail, config, "MAIL_MAILER")
+    }
+
+    /// A mailer from `mail`; `variable` names its driver setting in errors.
+    pub(crate) fn open(mail: &MailConfig, config: &Config, variable: &str) -> anyhow::Result<Self> {
         let (driver, keep) = match mail.mailer.as_str() {
             "log" => (Driver::Log, config.debug.then_some(OUTBOX)),
             "memory" => (Driver::Memory, Some(usize::MAX)),
-            "smtp" => (smtp(config)?, config.debug.then_some(OUTBOX)),
-            other => bail!("MAIL_MAILER must be smtp, log or memory, got `{other}`"),
+            "smtp" => (smtp(mail, &config.name)?, config.debug.then_some(OUTBOX)),
+            other => bail!("{variable} must be smtp, log or memory, got `{other}`"),
         };
         Ok(Self {
             driver,
+            failover: Vec::new(),
             outbox: Arc::default(),
             keep,
         })
     }
 
-    /// Sends `mail` through the configured driver (the `log` and `memory` drivers
-    /// only record it).
+    /// Tries `others` in order when this mailer fails.
+    pub(crate) fn with_failover(mut self, others: Vec<(String, Mailer)>) -> Self {
+        self.failover = others
+            .into_iter()
+            .map(|(name, mailer)| (name, mailer.driver))
+            .collect();
+        self
+    }
+
+    /// Sends `mail` through the configured driver (the `log` and `memory`
+    /// drivers only record it). When it fails and `MAIL_FAILOVER` names
+    /// other mailers, they're tried in order; a mail that can't be sent at
+    /// all (a bad address) isn't handed on.
     pub async fn send(&self, mail: Mail) -> Result {
-        match &self.driver {
-            Driver::Log => tracing::info!(
-                "mail (log driver)\nTo: {}\nSubject: {}\n\n{}\n",
-                mail.to.join(", "),
-                mail.subject,
-                mail.text
-            ),
-            Driver::Memory => {}
-            Driver::Smtp {
-                transport,
-                from,
-                timeout,
-            } => {
-                let message = message(from, &mail)?;
-                // lettre's own timeout doesn't cover a server that accepts the
-                // connection and then says nothing.
-                tokio::time::timeout(*timeout, transport.send(message))
-                    .await
-                    .map_err(|_| anyhow::anyhow!("no answer from the SMTP server in {timeout:?}"))
-                    .and_then(|sent| sent.map_err(anyhow::Error::from))
-                    .with_context(|| format!("sending mail to {}", mail.to.join(", ")))?;
+        if let Err(mut last) = deliver(&self.driver, &mail).await {
+            if last.is_permanent() || self.failover.is_empty() {
+                return Err(last);
+            }
+            let mut sent = false;
+            for (name, driver) in &self.failover {
+                tracing::warn!(error = ?last, mailer = %name, "sending mail failed; trying the next mailer");
+                match deliver(driver, &mail).await {
+                    Ok(()) => {
+                        sent = true;
+                        break;
+                    }
+                    Err(err) => last = err,
+                }
+            }
+            if !sent {
+                return Err(last);
             }
         }
         self.remember(mail);
@@ -335,8 +391,35 @@ impl Mailer {
     }
 }
 
-fn smtp(config: &Config) -> anyhow::Result<Driver> {
-    let mail = &config.mail;
+/// Hands `mail` to one driver.
+async fn deliver(driver: &Driver, mail: &Mail) -> Result {
+    match driver {
+        Driver::Log => tracing::info!(
+            "mail (log driver)\nTo: {}\nSubject: {}\n\n{}\n",
+            mail.to.join(", "),
+            mail.subject,
+            mail.text
+        ),
+        Driver::Memory => {}
+        Driver::Smtp {
+            transport,
+            from,
+            timeout,
+        } => {
+            let message = message(from, mail)?;
+            // lettre's own timeout doesn't cover a server that accepts the
+            // connection and then says nothing.
+            tokio::time::timeout(*timeout, transport.send(message))
+                .await
+                .map_err(|_| anyhow::anyhow!("no answer from the SMTP server in {timeout:?}"))
+                .and_then(|sent| sent.map_err(anyhow::Error::from))
+                .with_context(|| format!("sending mail to {}", mail.to.join(", ")))?;
+        }
+    }
+    Ok(())
+}
+
+fn smtp(mail: &MailConfig, app_name: &str) -> anyhow::Result<Driver> {
     let mut builder = match mail.encryption.as_str() {
         "tls" => AsyncSmtpTransport::<Tokio1Executor>::relay(&mail.host)?,
         "starttls" => AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&mail.host)?,
@@ -353,7 +436,7 @@ fn smtp(config: &Config) -> anyhow::Result<Driver> {
     let name = mail
         .from_name
         .clone()
-        .unwrap_or_else(|| config.name.clone());
+        .unwrap_or_else(|| app_name.to_owned());
     let address = mail.from_address.parse().with_context(|| {
         format!(
             "MAIL_FROM_ADDRESS `{}` is not an email address",
@@ -446,6 +529,28 @@ impl Job for SendMail {
     }
 }
 
+/// Sends a mail from the queue through a named mailer; see
+/// `AppState::queue_mail_via`.
+#[derive(Serialize, Deserialize)]
+pub(crate) struct SendMailVia {
+    pub mailer: String,
+    pub mail: Mail,
+}
+
+impl Job for SendMailVia {
+    const NAME: &'static str = "renox.send-mail-via";
+    const MAX_ATTEMPTS: u32 = 5;
+
+    async fn handle(self, ctx: JobContext) -> Result {
+        // A mailer removed since the mail was queued won't come back.
+        let mailer = ctx
+            .state
+            .mailer_named(&self.mailer)
+            .map_err(|err| Error::permanent(anyhow::anyhow!("{err:?}")))?;
+        mailer.send(self.mail).await
+    }
+}
+
 impl AppState {
     /// Renders `{view}.html` into a mail, with `{view}.txt` as the text
     /// version when it exists (otherwise text made from the HTML).
@@ -492,6 +597,26 @@ impl AppState {
     /// Sends `mail` from a queue worker, retrying up to five times.
     pub async fn queue_mail(&self, mail: Mail) -> Result<i64> {
         self.dispatch(SendMail(mail)).await
+    }
+
+    /// A mailer the app added with [`App::mailer`](crate::App::mailer), e.g.
+    /// `state.mailer_named("newsletter")?.send(mail)`; an unknown name is an
+    /// error (500).
+    pub fn mailer_named(&self, name: &str) -> Result<&Mailer> {
+        self.mailers.get(name).ok_or_else(|| {
+            anyhow::anyhow!("no mailer named `{name}`: add it with `App::mailer(\"{name}\", …)`")
+                .into()
+        })
+    }
+
+    /// Like `queue_mail`, through the mailer named `mailer`.
+    pub async fn queue_mail_via(&self, mailer: &str, mail: Mail) -> Result<i64> {
+        self.mailer_named(mailer)?;
+        self.dispatch(SendMailVia {
+            mailer: mailer.to_owned(),
+            mail,
+        })
+        .await
     }
 }
 

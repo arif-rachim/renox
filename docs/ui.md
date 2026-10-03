@@ -319,6 +319,9 @@ Classes without a macro: `rx-page--fill` on `<body>` makes the page as tall as t
 is a picture as wide as its column. `input`, `textarea`, `select` and `checkbox` take
 `hide_label=true` (the label stays for screen readers, e.g. a quantity in a table row), and `confirm` takes `cancel_label` ("Keep order")
 and `fields` (hidden values sent with it, `{"status": "cancelled"}`).
+Every form field (`input`, `textarea`, `select`, `checkbox`, `radio`, `checkbox_list`,
+`toggle_buttons`, `file`, `date_picker`, `tags_input`) takes `bag="login"` to show the errors
+of a named error bag, for a page with two forms that share field names ([validation.md](validation.md)).
 
 Build pages from these and the components above rather than writing your own: an app's
 `public/app.css` holds its brand tokens and what is truly its own (a printed invoice), not a

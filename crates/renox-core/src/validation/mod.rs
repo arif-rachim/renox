@@ -132,6 +132,13 @@ impl Errors {
 /// }
 /// ```
 pub trait Validate {
+    /// The named error bag this form's errors are flashed in (Laravel's
+    /// error bags), for a page with two forms that share field names, e.g.
+    /// `Some("login")` next to a sign-up form. Templates read them with
+    /// `error('email', bag='login')`. `#[validate(bag = "login")]` on a
+    /// derived struct sets it.
+    const ERROR_BAG: Option<&'static str> = None;
+
     /// Declares the fields' rules on `v`; they run after `prepare` and `authorize`.
     fn rules(&self, v: &mut Validator);
 
@@ -241,6 +248,21 @@ struct Pending {
     message: Option<String>,
 }
 
+/// A check that needs the request's user or a service, run by `finish`.
+struct AsyncCheck {
+    field: String,
+    label: String,
+    kind: AsyncKind,
+    message: Option<String>,
+}
+
+enum AsyncKind {
+    /// The logged-in user's password (Laravel's `current_password`).
+    CurrentPassword(String),
+    /// Not in a known data breach (Have I Been Pwned's range API).
+    Uncompromised(String),
+}
+
 /// A condition added to a `unique`/`exists` check.
 enum ScopeCondition {
     Eq(String, DbValue),
@@ -281,6 +303,7 @@ pub struct Validator {
     texts: Option<crate::i18n::Texts>,
     errors: Errors,
     pending: Vec<Pending>,
+    checks: Vec<AsyncCheck>,
 }
 
 impl Validator {
@@ -291,6 +314,7 @@ impl Validator {
             texts: None,
             errors: Errors::new(),
             pending: Vec::new(),
+            checks: Vec::new(),
         }
     }
 
@@ -356,6 +380,7 @@ impl Validator {
                 texts: self.texts.clone(),
                 errors: Errors::new(),
                 pending: Vec::new(),
+                checks: Vec::new(),
             };
             item.rules(&mut inner);
             for (field, messages) in inner.errors.iter() {
@@ -367,6 +392,10 @@ impl Validator {
             for mut pending in inner.pending {
                 pending.field = format!("{name}.{i}.{}", pending.field);
                 self.pending.push(pending);
+            }
+            for mut check in inner.checks {
+                check.field = format!("{name}.{i}.{}", check.field);
+                self.checks.push(check);
             }
         }
     }
@@ -408,6 +437,7 @@ impl Validator {
             db_value: value.db_value(),
             failed: false,
             last_pending: None,
+            last_check: None,
             v: self,
         };
         // `NaN`, `inf` and `1e999` parse as floats, but aren't numbers anyone entered.
@@ -430,7 +460,30 @@ impl Validator {
     }
 
     /// Runs the database checks and returns every error (empty when valid).
+    /// `current_password` fails here, as there's no user to check against,
+    /// and the breach check of `Password::uncompromised` is skipped; use
+    /// [`finish_for`](Self::finish_for) for those (`Valid<T>` does).
     pub async fn finish(self, db: &Db) -> Result<Errors> {
+        self.finish_with(db, None, None).await
+    }
+
+    /// Like [`finish`](Self::finish), with the logged-in user for
+    /// `current_password` and the app's HTTP client for
+    /// `Password::uncompromised`.
+    pub async fn finish_for(
+        self,
+        state: &crate::AppState,
+        user: Option<&crate::auth::User>,
+    ) -> Result<Errors> {
+        self.finish_with(&state.db, Some(state), user).await
+    }
+
+    async fn finish_with(
+        self,
+        db: &Db,
+        state: Option<&crate::AppState>,
+        user: Option<&crate::auth::User>,
+    ) -> Result<Errors> {
         let mut errors = self.errors;
         for check in self.pending {
             if errors.has(&check.field) {
@@ -492,6 +545,29 @@ impl Validator {
                 errors.add(check.field, message);
             }
         }
+        for check in self.checks {
+            if errors.has(&check.field) {
+                continue;
+            }
+            let key = match &check.kind {
+                AsyncKind::CurrentPassword(password) => match user {
+                    Some(user) if user.check_password(password).await => continue,
+                    _ => "current_password",
+                },
+                AsyncKind::Uncompromised(password) => match state {
+                    Some(state) if breached(state, password).await => "password.uncompromised",
+                    _ => continue,
+                },
+            };
+            let message = check.message.unwrap_or_else(|| {
+                render(
+                    &messages::template_for(self.locale, self.texts.as_ref(), key),
+                    &check.label,
+                    &[],
+                )
+            });
+            errors.add(check.field, message);
+        }
         Ok(errors)
     }
 
@@ -535,6 +611,8 @@ pub struct Field<'v> {
     db_value: DbValue,
     failed: bool,
     last_pending: Option<usize>,
+    /// The `current_password`/`uncompromised` check just added, for `message`.
+    last_check: Option<usize>,
 }
 
 fn number(n: f64) -> String {
@@ -566,7 +644,19 @@ impl Field<'_> {
             self.v.errors.add(&self.name, message);
             self.failed = true;
             self.last_pending = None;
+            self.last_check = None;
         }
+    }
+
+    fn check(&mut self, kind: AsyncKind) {
+        self.v.checks.push(AsyncCheck {
+            field: self.name.clone(),
+            label: self.label.clone(),
+            kind,
+            message: None,
+        });
+        self.last_pending = None;
+        self.last_check = Some(self.v.checks.len() - 1);
     }
 
     fn present(&self) -> bool {
@@ -578,6 +668,8 @@ impl Field<'_> {
         let message = message.into();
         if let Some(i) = self.last_pending {
             self.v.pending[i].message = Some(message);
+        } else if let Some(i) = self.last_check {
+            self.v.checks[i].message = Some(message);
         } else if self.failed
             && let Some(last) = self
                 .v
@@ -723,6 +815,7 @@ impl Field<'_> {
             self.v.errors.add(&self.name, message);
             self.failed = true;
             self.last_pending = None;
+            self.last_check = None;
         }
         self
     }
@@ -1298,10 +1391,27 @@ impl Field<'_> {
     /// The value meets `policy` (length, letters, mixed case, numbers,
     /// symbols); see [`Password`].
     pub fn password(mut self, policy: &Password) -> Self {
-        if let (true, Inspected::Text(text)) = (self.present(), &self.value)
-            && let Some((key, params)) = policy.broken(text)
-        {
-            self.fail(key, &params);
+        if let (true, Inspected::Text(text)) = (self.present(), &self.value) {
+            match policy.broken(text) {
+                Some((key, params)) => self.fail(key, &params),
+                None if policy.uncompromised => {
+                    let text = text.clone();
+                    self.check(AsyncKind::Uncompromised(text));
+                }
+                None => {}
+            }
+        }
+        self
+    }
+
+    /// The logged-in user's password (Laravel's `current_password`), e.g.
+    /// before changing an email address. Checked last, once the other
+    /// rules pass; it fails when no one is logged in. Needs
+    /// [`Validator::finish_for`], which `Valid<T>` uses.
+    pub fn current_password(mut self) -> Self {
+        if let (true, Inspected::Text(text)) = (self.present(), &self.value) {
+            let text = text.clone();
+            self.check(AsyncKind::CurrentPassword(text));
         }
         self
     }
@@ -1316,6 +1426,7 @@ impl Field<'_> {
             self.v.errors.add(&self.name, message);
             self.failed = true;
             self.last_pending = None;
+            self.last_check = None;
         }
         self
     }
@@ -1334,6 +1445,7 @@ impl Field<'_> {
                 message: None,
             });
             self.last_pending = Some(self.v.pending.len() - 1);
+            self.last_check = None;
         }
         self
     }
@@ -1421,6 +1533,7 @@ pub struct Password {
     mixed_case: bool,
     numbers: bool,
     symbols: bool,
+    uncompromised: bool,
 }
 
 impl Password {
@@ -1432,7 +1545,19 @@ impl Password {
             mixed_case: false,
             numbers: false,
             symbols: false,
+            uncompromised: false,
         }
+    }
+
+    /// Not a password found in a known data breach (Laravel's
+    /// `uncompromised`), checked with Have I Been Pwned: only the first
+    /// five characters of the password's SHA-1 leave the server
+    /// (k-anonymity), through `state.http` (faked in tests). When the
+    /// service can't be reached the password is allowed and a warning
+    /// logged. Runs once the other rules pass.
+    pub fn uncompromised(mut self) -> Self {
+        self.uncompromised = true;
+        self
     }
 
     /// At least one letter.
@@ -1613,6 +1738,43 @@ impl Dimensions {
     }
 }
 
+/// The Have I Been Pwned range API (`app.fake_http()` answers it in tests).
+const PWNED_RANGE: &str = "https://api.pwnedpasswords.com/range/";
+
+/// Whether `password` appears in a known breach. Errors (no network, a
+/// slow service) count as "no", with a warning, so sign-ups keep working.
+async fn breached(state: &crate::AppState, password: &str) -> bool {
+    use sha1::{Digest, Sha1};
+    let hash: String = Sha1::digest(password.as_bytes())
+        .iter()
+        .map(|b| format!("{b:02X}"))
+        .collect();
+    let (prefix, suffix) = hash.split_at(5);
+    let response = state
+        .http
+        .get(format!("{PWNED_RANGE}{prefix}"))
+        .header("Add-Padding", "true")
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await;
+    match response {
+        Ok(response) if response.status().is_success() => response.text().lines().any(|line| {
+            line.split_once(':').is_some_and(|(candidate, count)| {
+                candidate.trim().eq_ignore_ascii_case(suffix)
+                    && count.trim().parse::<u64>().is_ok_and(|n| n > 0)
+            })
+        }),
+        Ok(response) => {
+            tracing::warn!(status = %response.status(), "the password breach check answered with an error; allowing the password");
+            false
+        }
+        Err(err) => {
+            tracing::warn!(error = ?err, "the password breach check failed; allowing the password");
+            false
+        }
+    }
+}
+
 /// Decimal places of a plain decimal number (`12`, `-3.50`), else `None`.
 fn decimal_places(text: &str) -> Option<usize> {
     let digits = text.strip_prefix(['-', '+']).unwrap_or(text);
@@ -1762,6 +1924,8 @@ pub struct ValidationError {
     pub errors: Errors,
     /// The submitted values flashed back into the form (never passwords).
     pub input: Map<String, Value>,
+    /// The named error bag (`in_bag`), for a page with several forms.
+    bag: Option<String>,
 }
 
 impl ValidationError {
@@ -1770,7 +1934,23 @@ impl ValidationError {
         Self {
             errors,
             input: Map::new(),
+            bag: None,
         }
+    }
+
+    /// Flashes the errors in the named bag `bag` (Laravel's error bags) when
+    /// the form is sent back: the page shows them with
+    /// `error('email', bag='login')`, and the default `error('email')` of
+    /// another form on the page stays empty. `Valid<T>` does it for
+    /// [`Validate::ERROR_BAG`].
+    pub fn in_bag(mut self, bag: impl Into<String>) -> Self {
+        self.bag = Some(bag.into());
+        self
+    }
+
+    /// The named error bag, if any.
+    pub fn bag(&self) -> Option<&str> {
+        self.bag.as_deref()
     }
 
     /// The submitted values to refill the form with (passwords are dropped).

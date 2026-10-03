@@ -38,6 +38,11 @@ pub fn app() -> App {
         // Every error a person should see (a 500, a job failed for good, a
         // failed scheduled task) also goes to the team's chat.
         .report(post_to_chat)
+        // Sales reports' own mailer: REPORTS_MAILER=smtp, REPORTS_HOST=…
+        // in .env; unset, it is the app's MAIL_MAILER (`log`, `memory` in tests).
+        .mailer("reports", |config| {
+            renox::mail::MailConfig::from_env(config, "REPORTS")
+        })
         .seeder(|db| async move {
             // Seeding twice is harmless: a seeded database stays as it is.
             if User::find_by_email(&db, "admin@example.com")

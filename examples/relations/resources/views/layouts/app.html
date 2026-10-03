@@ -28,8 +28,8 @@
     {% if flash.status %}{{ alert(flash.status, kind="success") }}{% endif %}
     {% block content %}{% endblock %}
   </main>
-  <footer class="rx-container rx-subtitle">
-    Follow along with <a class="rx-link" href="{{ route('feed') }}">the RSS feed</a>.
+  <footer class="rx-container">
+    <p class="rx-subtitle">Follow along with <a class="rx-link" href="{{ route('feed') }}">the RSS feed</a>.</p>
   </footer>
 </body>
 </html>

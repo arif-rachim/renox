@@ -262,6 +262,12 @@ impl Config {
                 timeout: v
                     .seconds("MAIL_TIMEOUT", 10)?
                     .unwrap_or(Duration::from_secs(10)),
+                failover: v
+                    .or("MAIL_FAILOVER", "")
+                    .split(',')
+                    .map(|name| name.trim().to_owned())
+                    .filter(|name| !name.is_empty())
+                    .collect(),
             },
             queue_workers: v
                 .or("QUEUE_WORKERS", "2")
@@ -498,6 +504,7 @@ mod tests {
             ("UPLOAD_MAX_SIZE", "2"),
             ("MAIL_PORT", "2525"),
             ("MAIL_USERNAME", ""),
+            ("MAIL_FAILOVER", "backup, log"),
             ("CSP", "strict"),
             ("TRUSTED_PROXIES", "10.0.0.0/8"),
             ("TRUSTED_HOSTS", "shop.example.com, *.Example.org"),
@@ -512,6 +519,7 @@ mod tests {
         assert_eq!(c.upload_max_size, 2 * 1024 * 1024);
         assert_eq!(c.mail.port, Some(2525));
         assert_eq!(c.mail.username, None, "empty means unset");
+        assert_eq!(c.mail.failover, ["backup", "log"]);
         assert_eq!(c.csp, CspMode::Strict);
         assert!(c.trusted_proxies.contains("10.1.2.3".parse().unwrap()));
         assert_eq!(c.trusted_hosts, ["shop.example.com", "*.example.org"]);

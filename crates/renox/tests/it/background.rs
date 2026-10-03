@@ -114,9 +114,11 @@ async fn locks_let_one_holder_in() {
         assert!(guard.release().await.unwrap());
         assert!(!lock.is_held().await.unwrap());
 
-        // Dropping a guard releases it in the background.
+        // Dropping a guard releases it in the background. `block` returns as
+        // soon as it's free; the long limit is slack for a loaded PostgreSQL
+        // (2 s failed once with the whole suite running).
         drop(lock.try_acquire().await.unwrap().unwrap());
-        let again = lock.block(Duration::from_secs(2)).await.unwrap();
+        let again = lock.block(Duration::from_secs(10)).await.unwrap();
 
         // A lock whose ttl ran out can be taken; the old guard then can't
         // release the new holder's lock.
