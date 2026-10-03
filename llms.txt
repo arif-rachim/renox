@@ -44,7 +44,10 @@ Every example has a README.md that walks through it.
   `admin` role (the `Permissions` module, `require_role`) with photo uploads and an audit trail
   of order status changes (the `Audit` module), product delete behind password confirmation;
   checkout in `db.retrying`; English and Spanish texts with plurals; the `make:deploy` files (with the systemd
-  socket); every page on the UI kit with a rebranded accent, toasts and confirmation sheets
+  socket); every page on the UI kit with a rebranded accent (its `navbar` with the cart's count,
+  the bell and the account and language menus; `page_header`s; products as `media_card`s in a
+  `card_grid`; filters in a `toolbar`; the admin's sections as `link_tabs`; tables with
+  `row_actions`), toasts and confirmation sheets
   (checkout: `toggle_buttons` + `show_when` + `required_if` for courier or pickup; the admin's
   category in a `select` whose options come from the server, added and renamed in place
   (`renox::select`, admin/categories.rs); its dashboard with `renox::chart` (`Period`,
@@ -91,7 +94,8 @@ Every example has a README.md that walks through it.
   phones, badges, avatars, descriptions and copy buttons, the customer's tier and a notes
   count from other tables, an advanced filter, remembered filters and polling; `/follow-up`
   with two grids paging apart on one page (`prefix`), plus `link`, `tooltip`, `wrap`, `limit`,
-  `sortable(false)`/`filterable(false)`, `per_page` and a `numeric()` related column.
+  `sortable(false)`/`filterable(false)`, `per_page` and a `numeric()` related column; the
+  layout's `rx-page--fill` + `rx-grid-fill` give the grid the screen's height.
   [src/app/orders/mod.rs](examples/grid/src/app/orders/mod.rs),
   [views](examples/grid/resources/views/orders),
   [tests/grid.rs](examples/grid/tests/grid.rs)
@@ -105,15 +109,17 @@ Every example has a README.md that walks through it.
   every change (`require_permission`, `can()` in the menu), staff added by an admin with
   `send_verification` and `require_verified`; the activity log as a model over `audit_logs`;
   typed settings shared as `company`; sign-in pages rebranded by overriding
-  `renox/auth/layout.html`; a dashboard with `Trend` and the kit's stats.
+  `renox/auth/layout.html`; a dashboard with `Trend` and the kit's stats; the frame of a back
+  office from the kit (`rx-shell`, `sidebar`, a full-width `navbar` with the bell).
   [invoices/mod.rs](examples/backoffice/src/app/invoices/mod.rs),
   [payments.rs](examples/backoffice/src/app/invoices/payments.rs),
   [export.rs](examples/backoffice/src/app/invoices/export.rs),
   [products/stock.rs](examples/backoffice/src/app/products/stock.rs),
   [products/import.rs](examples/backoffice/src/app/products/import.rs),
   [staff.rs](examples/backoffice/src/app/staff.rs),
+  [layouts/app.html](examples/backoffice/resources/views/layouts/app.html),
   [tests/backoffice.rs](examples/backoffice/tests/backoffice.rs)
-- [examples/relations](examples/relations) ([README](examples/relations/README.md)): a blog: belongs to, has many, many to many through a
+- [examples/relations](examples/relations) ([README](examples/relations/README.md)): relations on a blog: belongs to, has many, many to many through a
   pivot (`Pivot::sync` from checkboxes, `inverse()`) with pivot columns (a pinned flag and
   timestamps: `attach_with`, `update_pivot`, `load_with_pivot`), a page loaded without N+1
   (`belongs_to`, `has_many`, `load_for`, `count_many`), `where_has`, a `group_by` + `select_as`
@@ -223,6 +229,7 @@ Every example has a README.md that walks through it.
   `#[derive(Validate)]` form, login with the account page, a seeder, and a typed
   `entries:prune` command that confirms (tested with time travel and `prompt::answering`).
   - [examples/hello/src/lib.rs](examples/hello/src/lib.rs),
+    [lang/es.json](examples/hello/resources/lang/es.json),
     [tests](examples/hello/tests/guestbook.rs)
 
 ## Guides
@@ -290,9 +297,11 @@ Every example has a README.md that walks through it.
 - [ROADMAP.md](ROADMAP.md): milestones and design decisions.
 - [docs/audit/2026-09-pre-1.0.md](docs/audit/2026-09-pre-1.0.md): known issues (IDs W*, D*, A*) from
   the pre-1.0 audit, with repro tests and fix directions; ROADMAP M13/M14 track them.
-- [docs/audit/2026-09-laravel-parity.md](docs/audit/2026-09-laravel-parity.md): the Laravel
-  parity review behind M18–M21, and a later gap report
-  ([PDF](docs/audit/2026-09-laravel-gap-report.pdf)).
+- [docs/audit/2026-10-laravel-parity.md](docs/audit/2026-10-laravel-parity.md): the Laravel
+  parity review, current as of M32, and an English summary of the gaps
+  ([PDF](docs/audit/2026-10-laravel-gap-report.pdf)).
+- [CONTRIBUTING.md](CONTRIBUTING.md): the checks every change needs;
+  [SECURITY.md](SECURITY.md): how to report a vulnerability.
 - `crates/renox-core/src`: the runtime. `db/` (Db, models, queries, relations, migrations),
   `validation/`, `auth/` (incl. `permissions.rs`, `account.rs`, `events.rs`, `tokens.rs`),
   `audit.rs`, `context.rs`, `queue/`, `schedule.rs` + `timezone.rs`, `cache.rs`, `view.rs`,

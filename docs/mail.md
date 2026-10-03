@@ -5,8 +5,10 @@ from MiniJinja templates with a text version, and can send it through the queue 
 On top of mail, a **notification** is one message to a user (or to an address) delivered on
 several channels: mail, a row in the `notifications` table for an in-app list, and your own
 channels (WhatsApp, SMS, Slack). The short version is in the [cheat-sheet](../CHEATSHEET.md)
-("Mail and notifications"); [examples/jobs](../examples/jobs) queues receipts and reports, and
-[examples/shop](../examples/shop) sends order notifications.
+("Mail and notifications"); [examples/jobs](../examples/jobs) queues receipts and reports
+(with cc, bcc, reply-to and attachments), [examples/shop](../examples/shop) sends order
+notifications with the bell, and [examples/backoffice](../examples/backoffice) tells users in the bell when a payment
+arrives or an export is ready.
 
 ## Configuration
 
@@ -275,11 +277,14 @@ fn app() -> App {
 }
 ```
 
-and in the layout's navigation bar:
+and in the layout's navigation bar (the kit's `navbar`, see [ui.md](ui.md)):
 
 ```html
-{% from "renox/ui.html" import notification_bell %}
-{{ notification_bell(unread_notifications) }}
+{% from "renox/ui.html" import navbar, notification_bell %}
+{% call navbar(app.name, href=route('home')) %}
+  <span class="rx-spacer"></span>
+  {{ notification_bell(unread_notifications) }} {# nothing for guests #}
+{% endcall %}
 ```
 
 - `unread_notifications`, the logged-in user's unread count, is in every view (0 for guests);

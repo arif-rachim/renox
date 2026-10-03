@@ -1,4 +1,4 @@
-//! Example: the back office of a small business (an UMKM), the kind of app
+//! Example: the back office of a small business, the kind of app
 //! Filament's demo shows, built from Renox's parts:
 //!
 //! - a dashboard: figures with their change, revenue by day, overdue

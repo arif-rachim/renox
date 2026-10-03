@@ -614,7 +614,8 @@ Notes from M17b:
 
 ### M18 · v0.19: SaaS foundations
 
-From the Laravel parity review (docs/audit/2026-09-laravel-parity.md). What a typical SaaS needs
+From the Laravel parity review of September (after M17; brought up to date after M32 as
+docs/audit/2026-10-laravel-parity.md). What a typical SaaS needs
 before it can start: tenants, roles, accounts.
 
 - [x] Tenancy: a default scope on models (`#[model(default_scope = "…")]` naming a
@@ -1393,7 +1394,7 @@ with its README, the features and the common business apps. Three PRs:
       repeated rows), tests for every README claim, seeders that run twice, `.env.example`
       files, fields/webhooks/uploads on the kit, current patterns (`Routes::resource`,
       `Redirect::route`, derive, `money`)
-- [x] M29b: `examples/backoffice`, an UMKM back office in the style of Filament's demo: grids
+- [x] M29b: `examples/backoffice`, a small business's back office in the style of Filament's demo: grids
       everywhere (customers, products, invoices, the stock ledger, staff, activity), invoices
       with line items (`repeater`) issued from stock, voided and printed, Midtrans/Xendit
       payment pages and webhooks end to end, a stock ledger that never goes below zero, CSV

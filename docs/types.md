@@ -76,7 +76,8 @@ validation error.
 
 ## Choosing
 
-- **Money:** use `i64` in the smallest unit, `price: i64 // rupiah`, and format it for display.
+- **Money:** use `i64` in the smallest unit, `price: i64 // rupiah`, and format it for display
+  (the `money` template filter, in `APP_CURRENCY`).
   Floats round (`0.1 + 0.2 != 0.3`). sqlx deliberately has no decimal type on SQLite, so a
   `Decimal` would behave differently on the two databases.
 - **Time zones:** `DateTime` (UTC) is for moments something happened (`created_at`, `paid_at`).

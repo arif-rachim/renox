@@ -344,19 +344,24 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 
 ## Examples
 
+Every example is built with the UI kit, so they also show what a Renox app looks like
+out of the box.
+
 - [`examples/shop`](examples/shop): a whole online shop: htmx search, a cart, checkout in one
   transaction that never oversells, queued mail and notifications, an admin for the `admin` role
   with photo uploads and an audit trail, a typed `shop:make-admin` command that asks for what's
   missing, English and Spanish texts, and its deploy files (with the systemd socket). Start here.
 - [`examples/htmx-recipes`](examples/htmx-recipes): a modal form, inline edit, infinite scroll,
   delete in place, tabs and a dropdown, with htmx, Alpine and fragment-returning handlers.
-- [`examples/relations`](examples/relations): a blog with belongs-to, has-many and many-to-many
-  (a pivot with its own columns and `sync`), polymorphic likes, loaded without N+1 with counts
-  per post, and reports with `group_by` and SQL joins.
+- [`examples/relations`](examples/relations): a public blog on Tailwind (Markdown posts, `seo()`
+  tags, an RSS feed, a sitemap and search) over belongs-to, has-many and many-to-many (a pivot
+  with its own columns and `sync`), polymorphic likes, loaded without N+1 with counts per post,
+  and reports with `group_by` and SQL joins.
 - [`examples/teams`](examples/teams): a multi-tenant SaaS: teams and members, a default scope
   that keeps each team's projects apart, a super-admin, an encrypted team secret, and a form
   request (`prepare`, `authorize`, `after`) for adding members.
-- [`examples/grid`](examples/grid): a sales dashboard on one data grid, on a phone and a desktop.
+- [`examples/grid`](examples/grid): a sales dashboard on one data grid, on a phone and a desktop,
+  and a follow-up page with two grids.
 - [`examples/backoffice`](examples/backoffice): the back office of a small business: invoices
   issued from a stock ledger and printed, Midtrans/Xendit payment pages and their webhooks, a
   CSV import, exports made in the background, staff roles, the activity log and settings.
@@ -365,12 +370,13 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
   soft deletes with a trash, model hooks, an error page in the layout, and tests.
 - [`examples/api`](examples/api): a JSON API for a mobile app, with tokens that carry abilities
   and expire, Bearer auth, cursor pagination, JSON validation errors, CORS and a named rate
-  limiter (per user, per IP for guests).
-- [`examples/jobs`](examples/jobs): an event, a queued receipt mail, admin notifications, and
-  daily and weekly reports scheduled in a time zone, and the queue's chains, batches with a
-  progress bar, unique and encrypted jobs.
+  limiter (per user, per IP for guests), plus a small browser client that calls it.
+- [`examples/jobs`](examples/jobs): an event, a queued receipt mail (with reply-to), admin
+  notifications, a statement mailed with a CSV attachment and a bcc, daily and weekly reports
+  scheduled in a time zone, and the queue's chains, batches with a progress bar, unique and
+  encrypted jobs.
 - [`examples/uploads`](examples/uploads): public photos checked by content, and private invoices
-  behind expiring links.
+  behind expiring links, on the local disk or S3 (tested against a real S3 server in CI).
 - [`examples/fields`](examples/fields): every form input type saved and shown back, on SQLite
   and PostgreSQL ([docs/types.md](docs/types.md)).
 - [`examples/postgres`](examples/postgres): one app, tested on PostgreSQL and SQLite.
@@ -413,6 +419,8 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 | Vite + Tailwind | `rnx new --tailwind` (the standalone CLI, no Node) |
 | Livewire | htmx and Alpine.js, with handlers that return fragments |
 | Filament tables | `renox::grid` with `renox/grid.html` ([docs/grid.md](docs/grid.md)) |
+| Filament forms, infolists, actions, notifications, widgets | the kit's fields, `infolist`, `action_sheet`, `Toast` and `notification_bell`, `stat`/`chart(…)` with `renox::chart` ([docs/ui.md](docs/ui.md)) |
+| Filament's demo app | [`examples/backoffice`](examples/backoffice) |
 
 Not planned: runtime-reflected Eloquent-style models, Redis, and a REPL.
 
@@ -431,18 +439,30 @@ Not planned: runtime-reflected Eloquent-style models, Redis, and a REPL.
 
 ## Status
 
-Renox is **pre-1.0**. After the Laravel parity review
-([docs/audit/2026-09-laravel-parity.md](docs/audit/2026-09-laravel-parity.md)), milestones M18
-(tenancy, roles, accounts), M19 (query builder and models), M20 (scheduler, locks, queue,
-HTTP client, queue dashboard, localized mail) and M21 (the UI kit, scaffolding, test tools,
-error reports and logs, Tailwind, typed commands, form requests, database sessions, deploys
-without refused connections), M22 (model keys other than integers), M23 (savepoints,
-encrypted fields), M24 (domain and fallback routes, `route_is`, factory states, plural
-ranges), M25 (`#[derive(Validate)]`, the browser's language), M26 (completeness: key bugs,
-docs for every public item, CLI tests), M27 (the data grid) and M28 (grid search, actions,
-summaries, groups, cards on phones, related columns, advanced filter) are done. Next is 1.0: a documentation site with a tutorial and a Laravel guide, semver checks, and the first
-real release on crates.io (today's crates there are placeholders, so install from Git as above).
-Until then the API may still change; breaking changes are listed in [CHANGELOG.md](CHANGELOG.md).
+Renox is **pre-1.0**. The [Laravel parity review](docs/audit/2026-10-laravel-parity.md)
+compares it with Laravel and Filament feature by feature, as of October 2026. Since the first
+review (after M17), milestones M18–M32 closed its gaps:
+
+- **M18–M21:** tenancy, roles and permissions, account pages; the query builder and model
+  hooks; cron schedules in real time zones, locks, a fuller queue, an HTTP client, a queue
+  dashboard, localized mail; the UI kit, scaffolding, test tools, error reports and logs,
+  Tailwind, typed commands, form requests, database sessions, deploys without refused
+  connections.
+- **M22–M26:** ULID/UUID/string keys, savepoints, encrypted fields, domain and fallback routes,
+  `route_is`, factory states, plural ranges, `#[derive(Validate)]`, the browser's language,
+  and a completeness pass (docs for every public item, CLI tests).
+- **M27–M28:** the data grid, then search, actions, summaries, groups, cards on phones,
+  related columns and an advanced filter.
+- **After M28:** Filament's forms, infolists, notifications, dashboard widgets and actions in
+  the UI kit.
+- **M29–M32:** fourteen examples, among them a full back office; every example on the kit,
+  with its navigation and page frame; a warm default theme with a type scale; and an
+  English-only codebase.
+
+Next is 1.0: a documentation site with a tutorial and a Laravel guide, semver checks, and the
+first real release on crates.io (today's crates there are placeholders, so install from Git
+as above). Until then the API may still change; breaking changes are listed in
+[CHANGELOG.md](CHANGELOG.md).
 
 `rnx new` pins your app to the Renox commit your `rnx` was built from
 (`renox = { git = …, rev = "…" }`). To upgrade, reinstall `rnx` or move the `rev`, then read the

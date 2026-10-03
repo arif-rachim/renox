@@ -22,12 +22,12 @@ many at once: `cargo run -- products:import products.csv --owner demo@example.co
 | Feature | Where |
 |---|---|
 | Wiring: the `Auth` module, the products module, the seeder (factory states and a sequence) | [src/lib.rs](src/lib.rs) |
-| Routes (public list, members-only create/edit/update/delete/trash/restore), the form (`#[derive(Validate)]` with a `prepare` hook), handlers | [src/app/products/mod.rs](src/app/products/mod.rs) |
+| Routes (`Routes::resource`: the public list, members-only create/edit/update/delete; trash and restore), the form (`#[derive(Validate)]` with a `prepare` hook), handlers | [src/app/products/mod.rs](src/app/products/mod.rs) |
 | `products:import`: a CSV import in one transaction, each line in a savepoint | [src/app/products/import.rs](src/app/products/import.rs) |
 | The model with `soft_deletes` and `hooks` (`impl ModelHooks`: a slug, a check, a cache key forgotten), a factory (the seeder adds owners with `.state(...)`), `for_owner` for the tests | [src/app/products/model.rs](src/app/products/model.rs) |
 | The policy: only the owner may update, delete or restore | [src/app/products/policy.rs](src/app/products/policy.rs) |
 | List, form and trash pages, built with the UI kit (`renox/ui.html`): a table with a confirmation sheet for deletes, a form with live validation, an inset grouped list | [resources/views/products](resources/views/products) |
-| The layout: a translucent navigation bar with an account menu, the kit's styles, the toast region | [resources/views/layouts/app.html](resources/views/layouts/app.html) |
+| The layout: the kit's `navbar` with an account `menu`, the kit's styles, the toast region | [resources/views/layouts/app.html](resources/views/layouts/app.html) |
 | Error pages (404, 403, 500…) in the layout | [resources/views/errors/default.html](resources/views/errors/default.html) |
 | The table, with `deleted_at`; `slug` added in a second migration | [migrations](migrations) |
 

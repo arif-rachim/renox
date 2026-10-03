@@ -30,7 +30,7 @@ Globex, Carol is a member of Acme. With `SUPER_ADMINS` set, Alice also sees `/ad
 | `Project` with `default_scope = "team_only"` and a `saving` hook that fills `team_id` | [src/app/projects/model.rs](src/app/projects/model.rs) |
 | Project CRUD with no `team_id` in sight; name unique per team | [src/app/projects/mod.rs](src/app/projects/mod.rs) |
 | The super-admin check and the cross-team report with `Project::unscoped()` | [src/app/admin.rs](src/app/admin.rs) |
-| Pages on the UI kit: a navigation bar with the current team and an account menu, kit forms with live validation (the project name suggests common names with `datalist`), tables, confirmation sheets (delete a project, replace the secret), toasts, an error page in the layout | [resources/views](resources/views) |
+| Pages on the UI kit: its `navbar` with the current team and an account menu, kit forms with live validation (the project name suggests common names with `datalist`), tables, confirmation sheets (delete a project, replace the secret), toasts, an error page in the layout | [resources/views](resources/views) |
 | Tables: `teams`, `team_user`, `projects` (unique `(team_id, name)`); `slug` added in a later migration | [migrations](migrations) |
 
 ## Things worth copying

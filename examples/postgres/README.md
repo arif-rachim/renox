@@ -40,6 +40,8 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/tasks cargo run
   `BOOLEAN` vs `INTEGER` and `due_on` is `DATE` vs `TEXT`; the model is the same.
 - **Search ignores case on both.** `where_like("title", ...)` finds "Buy COFFEE" for `?q=coffee`
   on SQLite and PostgreSQL alike.
+- **Undated tasks last on both.** `order_by_raw("due_on IS NULL, due_on, id")`: SQLite puts
+  `NULL` first and PostgreSQL last, so the order says where they go.
 - **Dates compare as dates.** `?overdue=true` uses `where_op("due_on", "<", today)` with a
   `NaiveDate`.
 

@@ -10,6 +10,28 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### Docs refresh after M32
+
+- The Laravel parity review, until now the snapshot taken after M17, is rewritten for the code
+  after M32: `docs/audit/2026-10-laravel-parity.md` (was `2026-09-laravel-parity.md`), with
+  the milestone that closed each gap, Filament's features next to the kit and the grid, the
+  gaps still open, and measured numbers.
+- `docs/audit/2026-10-laravel-gap-report.pdf`, an English summary of it, replaces the
+  Indonesian `2026-09-laravel-gap-report.pdf` (from M20b).
+- `docs/audit/2026-09-pre-1.0.md` says every finding in it is closed.
+- README: the status after M32, what the examples show today, Filament's forms, infolists,
+  actions, widgets and demo in the Laravel table.
+- The guides, CHEATSHEET.md, llms.txt, CONTRIBUTING.md, the example READMEs and the new
+  app's AGENTS.md checked against the code. Corrections: docs/operations.md lists every
+  built-in command with its options (`migrate:fresh`, `db:seed`, `db:shell`, `route:list`,
+  `ui:publish`, `schedule:work` were never mentioned) and each command's default `RUST_LOG`;
+  docs/ui.md's sidebar example imports `notification_bell` (it failed to render), names the
+  four fields that take `hide_label`, and lists the missing `repeater`, `file`, `wizard` and
+  `media_card` parameters; `Routes::webhook` takes a path in docs/routing.md;
+  AGENTS.md.stub's `action_sheet` takes `action`, not `url`, and a cut sentence is repaired;
+  CONTRIBUTING.md lists every CI check, the browser-check rule and the English-only rule;
+  the last Indonesian words ("UMKM", `create_produk`) are gone.
+
 ### M32 · English only
 
 Everything in the repository is now English: code, comments, docs, tests, and the examples'
