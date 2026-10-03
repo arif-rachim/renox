@@ -1064,7 +1064,7 @@ picks the build, not the terminal.
   (the should-fix items; the owner chose all but `gate` → `authorize_gate`: the state last in
   every closure, seeders get `AppState`, `disk_named`, builder-only `Factory`, `DateTime`
   timestamps, opaque `Zone`, sealed `Viewer`/`Executor`/`ForeignKey`, `DownOptions`,
-  `retry`/`retry_all`, secrets hidden from `Debug`): branch `v1c-api-should`. Next the docs
+  `retry`/`retry_all`, secrets hidden from `Debug`): merged (#118). Next the docs
   site and the publish, which the owner runs (`cargo login`, RELEASING.md).
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
