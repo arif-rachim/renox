@@ -1584,8 +1584,13 @@ Started by the owner on 2026-10-03, after M34. In steps, one PR each:
       API, `DateTime` timestamps, private `Recipient` fields, `flash_now`/`remember_locale`,
       `renox::Result` returns, `UpcomingRun`, opaque `Zone`, sealed traits, hidden derive
       plumbing, `DownOptions`, `retry`/`retry_all`, secrets hidden from `Debug`
-- [ ] Documentation site built with Renox: a tutorial, a "Laravel → Renox" guide, the API
-      reference; a starter kit; the semver stability guarantee
+- [x] V1d, the documentation site built with Renox (`site/`, package `renox-site`): the
+      repository's Markdown compiled into one binary, a sidebar, a table of contents per
+      page, search, a sitemap, ETags, systemd units for the owner's own server;
+      docs/tutorial.md (Stash, a bookmarks app, `rnx new` to deploy) and docs/laravel.md,
+      both compiled as doctests (`TutorialGuide`, `LaravelGuide`). The API reference is
+      docs.rs, linked from the site once crates are published
+- [ ] A starter kit; the semver stability guarantee
 - [ ] Real crates published to crates.io (`renox`, `renox-core`, `renox-macros`, `renox-cli`;
       only 0.0.1 placeholders exist; the owner runs `cargo login` and RELEASING.md), then
       crates.io/docs.rs badges and `cargo install renox-cli` in the README

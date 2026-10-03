@@ -10,6 +10,21 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### v1.0 · The documentation site, the tutorial and the Laravel guide (V1d)
+
+- **`site/`** (package `renox-site`, not published): the documentation site, a Renox app on
+  the UI kit. It compiles README.md, CHEATSHEET.md, every guide in `docs/`, the changelog and
+  the project files into one binary; links between the files become site addresses, the
+  doctests' hidden lines are left out, headings get anchors and a table of contents. Search,
+  `/sitemap.xml`, ETags on the pages, systemd service and socket units and a Caddy recipe in
+  `site/README.md`.
+- **docs/tutorial.md:** one app built from `rnx new` to a server (Stash, a bookmarks app):
+  a model and migration, a list page, an htmx form with toasts, a policy, a weekly mail from a
+  scheduled job, tests with a factory and time travel, deploying with systemd and Litestream.
+- **docs/laravel.md:** Laravel → Renox, concept by concept.
+- Both guides are compiled as doctests (`TutorialGuide`, `LaravelGuide`).
+- docs/scheduling.md named `on_failure`'s arguments in the old order.
+
 ### v1.0 · The API audit's should-fix items (V1c)
 
 Cheap now, breaking later: the rest of the audit, as the owner chose (all but renaming `gate`
