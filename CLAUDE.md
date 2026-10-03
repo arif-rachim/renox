@@ -1021,8 +1021,8 @@ picks the build, not the terminal.
 - **Docs refresh after M32** (asked by the owner: the README, the guides and the Laravel parity
   review, which was still the M17 snapshot): the review rewritten for today
   (`docs/audit/2026-10-laravel-parity.md`), the Indonesian PDF replaced by an English one,
-  every guide, CHEATSHEET, llms.txt and example README checked against the code: branch
-  `docs-refresh-m32`.
+  every guide, CHEATSHEET, llms.txt and example README checked against the code: merged
+  (#110).
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.
