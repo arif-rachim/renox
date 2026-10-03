@@ -7,6 +7,7 @@ repo, and every trap hit so far, so you don't have to rediscover them.
 - `ROADMAP.md`: the plan, per-milestone notes and the "Decisions" section.
 - `CHANGELOG.md`: what changed, milestone by milestone.
 - `CONTRIBUTING.md`: the checks every change needs. `SECURITY.md`: how vulnerabilities are reported.
+  `RELEASING.md`: how a release goes to crates.io (the owner publishes).
 - `CHEATSHEET.md` and `llms.txt`: the app author's view (patterns, and which example shows what).
 - `docs/*.md`: guides (routing, validation, types, relations, authorization, queue, mail, scheduling, ui, grid, testing, PostgreSQL, operations, development, stability).
 - `docs/audit/`: the pre-1.0 audit (finding IDs W*, D*, A* used in ROADMAP M13/M14).
@@ -1052,7 +1053,7 @@ picks the build, not the terminal.
   `Validator::checks` and run in `finish_with` after the database ones.
 - **v1.0 started** (the owner, 2026-10-03, after M34). V1a (release readiness: lockstep `=`
   versions, path-only dev-deps, docs.rs metadata, `rnx new` from crates.io, the semver CI
-  job, RELEASING.md): branch `v1a-release-ready`. Next V1b, the API audit's fixes (the owner
+  job, RELEASING.md): merged (#115). Next V1b, the API audit's fixes (the owner
   chose all A and B findings except `gate` → `authorize_gate`), then the docs site and the
   publish, which the owner runs (`cargo login`, RELEASING.md).
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
