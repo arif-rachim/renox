@@ -247,6 +247,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "backoffice"
+version = "0.0.0"
+dependencies = [
+ "renox",
+ "serde",
+ "tracing",
+]
+
+[[package]]
 name = "base64"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

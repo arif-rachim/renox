@@ -1,0 +1,16 @@
+{#- The company's colour from the settings, in place of the kit's blue:
+    buttons, links, focus rings. Lighter and darker shades are mixed in
+    the browser. `brand_color` is checked to be #rrggbb when saved. -#}
+<style>
+  :root {
+    --brand: {{ company.brand_color }};
+    --rx-accent: var(--brand);
+    --rx-accent-hover: color-mix(in srgb, var(--brand) 88%, white);
+    --rx-accent-pressed: color-mix(in srgb, var(--brand) 85%, black);
+    --rx-accent-text: color-mix(in srgb, var(--brand) 80%, black);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --rx-accent-text: color-mix(in srgb, var(--brand) 55%, white); }
+  }
+  :root[data-theme="dark"] { --rx-accent-text: color-mix(in srgb, var(--brand) 55%, white); }
+</style>

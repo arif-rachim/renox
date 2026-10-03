@@ -1,0 +1,47 @@
+{% extends "layouts/app.html" %}
+{% from "renox/grid.html" import grid %}
+{% from "renox/ui.html" import action_sheet, input, select, checkbox_list, badge, form_grid, open_button %}
+
+{#- The kit's action_sheet without its button (the grid's cell has it):
+    a form sent with htmx; errors stay in the sheet, a success closes it. -#}
+{% macro roles_sheet(member, role_names) -%}
+<dialog class="rx-sheet" id="roles-{{ member.id }}" aria-labelledby="roles-{{ member.id }}-title">
+  <form class="rx-sheet__inner" method="post" action="{{ route('staff.roles', member.id) }}" hx-post="{{ route('staff.roles', member.id) }}" hx-swap="none" data-rx-action novalidate>
+    {{ csrf_field() }}{{ method_field('PUT') }}
+    <h2 class="rx-sheet__title" id="roles-{{ member.id }}-title">Roles of {{ member.name }}</h2>
+    <div class="rx-sheet__body">
+      {{ checkbox_list("roles", "Roles", role_names, selected=member.roles, id="roles-" ~ member.id ~ "-list", hint="Admin: everything. Cashier: customers, invoices, exports. Warehouse: products and stock.") }}
+    </div>
+    <div class="rx-sheet__actions">
+      <button class="rx-button rx-button--secondary" type="button" data-rx-close><span class="rx-button__label">Cancel</span></button>
+      <button class="rx-button rx-button--primary" type="submit"><span class="rx-button__label">Save</span></button>
+    </div>
+  </form>
+</dialog>
+{%- endmacro %}
+
+{% block content %}
+<div class="page__head">
+  <h1 class="rx-title">Staff</h1>
+  {#- No sign-up page: an admin adds people here, with a first password
+      they change on /account. They verify their email before starting. -#}
+  {% call action_sheet("new-staff", "Add someone", route('staff.store'), "Add someone", description="They get a mail to verify their address.", variant="primary", icon="plus") %}
+    {{ input("name", "Name", required=true, autocomplete="off") }}
+    {{ input("email", "Email", type="email", required=true, autocomplete="off") }}
+    {% call form_grid(2) %}
+      {{ input("password", "First password", type="password", required=true, autocomplete="new-password", revealable=true) }}
+      {{ select("role", "Role", role_names, required=true) }}
+    {% endcall %}
+  {% endcall %}
+</div>
+{% call(row, column) grid(staff) %}
+  {%- if column.key == "roles" -%}
+    {%- for role in row.roles %}{{ badge(role, "info" if role == "admin" else none) }} {% else %}<span class="rx-subtitle">No role</span>{% endfor -%}
+  {%- elif column.key == "actions" -%}
+    {{ open_button("roles-" ~ row.id, "Roles", size="small") }}
+  {%- endif -%}
+{% endcall %}
+{%- for member in members %}
+{{ roles_sheet(member, role_names) }}
+{%- endfor %}
+{% endblock %}

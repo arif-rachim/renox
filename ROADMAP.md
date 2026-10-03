@@ -1393,11 +1393,13 @@ with its README, the features and the common business apps. Three PRs:
       repeated rows), tests for every README claim, seeders that run twice, `.env.example`
       files, fields/webhooks/uploads on the kit, current patterns (`Routes::resource`,
       `Redirect::route`, derive, `money`)
-- [ ] M29b: `examples/backoffice`, an UMKM back office in the style of Filament's demo: grids
-      everywhere, invoices/POS with line items and printing, Midtrans/Xendit payments end to
-      end, a stock ledger with `lock_for_update`, CSV import from the browser, background
-      exports with a notification, roles/permissions and audit-log screens, settings,
-      email verification and branded auth pages
+- [x] M29b: `examples/backoffice`, an UMKM back office in the style of Filament's demo: grids
+      everywhere (customers, products, invoices, the stock ledger, staff, activity), invoices
+      with line items (`repeater`) issued from stock, voided and printed, Midtrans/Xendit
+      payment pages and webhooks end to end, a stock ledger that never goes below zero, CSV
+      import from the browser, background exports with a notification, roles/permissions
+      and audit-log screens, typed settings, email verification for staff added by an admin,
+      and sign-in pages in the company's colours
 - [ ] M29c: smaller extensions (relations as a public blog with Markdown/SEO/RSS/search and
       Tailwind; an api client page; S3 in uploads; mail attachments and cc in jobs)
 
@@ -1410,6 +1412,21 @@ Notes from M29a:
   of the request that caused it (the buyer's, for the admin's "new order").
 - Infinite scroll by page number repeats a row when one is added at the top meanwhile;
   htmx-recipes pages by id now (`?before=`).
+
+Notes from M29b:
+- No point-of-sale screen: an invoice issued and "Paid in cash" is the counter sale; a POS
+  view (a cart in the session, a barcode field) is left for an app to build on it.
+- The stock ledger doesn't use `lock_for_update`: a conditional `UPDATE … WHERE stock >= ?`
+  through `Query::increment` takes stock safely on SQLite and PostgreSQL without reading the
+  row first, and its "no row changed" is the "not enough" answer. `lock_for_update` stays
+  shown in the docs for read-then-write cases.
+- Staff are added with a first password and a verification mail (`send_verification`);
+  Renox has no public "send a password reset link" call, so an invitation link would need
+  one (a small addition for later, with a `renox-admin` plugin in mind).
+- Bulk actions carry the grid's query string, so a job can rebuild the grid's filters with
+  `GridRequest::new` and export what the user saw (`Grid::export` on that request).
+- Toasts answered with `HxRefresh` wait in the session for the refreshed page, so tests
+  read them from the next page, not from `HX-Trigger`.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

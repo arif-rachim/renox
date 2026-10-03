@@ -1,0 +1,7 @@
+{
+  "renox": {
+    "validation": {
+      "attributes": { "product_id": "product", "customer_id": "customer", "unit_price": "price" }
+    }
+  }
+}

@@ -353,6 +353,9 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
   that keeps each team's projects apart, a super-admin, an encrypted team secret, and a form
   request (`prepare`, `authorize`, `after`) for adding members.
 - [`examples/grid`](examples/grid): a sales dashboard on one data grid, on a phone and a desktop.
+- [`examples/backoffice`](examples/backoffice): the back office of a small business: invoices
+  issued from a stock ledger and printed, Midtrans/Xendit payment pages and their webhooks, a
+  CSV import, exports made in the background, staff roles, the activity log and settings.
 - [`examples/crud`](examples/crud): one resource end to end on the UI kit, with pagination, live
   validation, toasts, owner-only edit and delete through a policy (behind a confirmation sheet),
   soft deletes with a trash, model hooks, an error page in the layout, and tests.

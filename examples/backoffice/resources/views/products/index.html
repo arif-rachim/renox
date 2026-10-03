@@ -1,0 +1,34 @@
+{% extends "layouts/app.html" %}
+{% from "renox/grid.html" import grid %}
+{% from "renox/ui.html" import action_sheet, input, form_grid, file, badge %}
+
+{% block content %}
+<div class="page__head">
+  <h1 class="rx-title">Products</h1>
+  {%- if can('products.manage') %}
+  <div class="rx-row">
+    {#- A file in a sheet: the form goes as multipart, the same Valid<T>
+        path as any form (`enctype`). -#}
+    {% call action_sheet("import-products", "Import", route('products.import'), "Import products", description="A CSV file with sku,name,price,stock per line. New SKUs are added, known ones get the new name and price; stock is received into the ledger.", submit_label="Import", icon="upload", enctype="multipart/form-data") %}
+      {{ file("file", "CSV file", accept=".csv,text/csv", required=true) }}
+    {% endcall %}
+    {% call action_sheet("new-product", "New product", route('products.store'), "New product", variant="primary", icon="plus", key="n") %}
+      {% call form_grid(2) %}
+        {{ input("sku", "SKU", required=true, autocomplete="off", hint="Letters, digits and dashes.") }}
+        {{ input("price", "Price", type="number", required=true, prefix="Rp", attrs={'min': 0}) }}
+      {% endcall %}
+      {{ input("name", "Name", required=true, autocomplete="off") }}
+      {% call form_grid(2) %}
+        {{ input("opening_stock", "On the shelf now", type="number", attrs={'min': 0}) }}
+        {{ input("min_stock", "Minimum", type="number", attrs={'min': 0}, hint="Below it, the dashboard warns.") }}
+      {% endcall %}
+    {% endcall %}
+  </div>
+  {%- endif %}
+</div>
+{% call(row, column) grid(products) %}
+  {%- if column.key == "level" -%}
+    <span class="level">{{ row.stock | number }} {% if row.level == "out" %}{{ badge("Out", "danger") }}{% elif row.level == "low" %}{{ badge("Low", "warning") }}{% endif %}</span>
+  {%- endif -%}
+{% endcall %}
+{% endblock %}
