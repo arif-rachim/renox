@@ -1882,11 +1882,7 @@ impl<S: Send + Sync> FromRequestParts<S> for GridRequest {
             session,
             user_id: user.map(|u| u.id),
             lang,
-            zone: app
-                .config
-                .timezone
-                .parse()
-                .unwrap_or(crate::timezone::Zone::Fixed(0)),
+            zone: app.config.timezone,
         })
     }
 }

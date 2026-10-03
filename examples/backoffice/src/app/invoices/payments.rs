@@ -189,18 +189,24 @@ impl Notification for PaymentReceived {
         "payment-received"
     }
 
-    fn channels(&self) -> Vec<Channel> {
+    fn channels(&self, _to: &Recipient) -> Vec<Channel> {
         vec![Channel::Database]
     }
 
-    fn to_database(&self, _: &Recipient) -> renox::serde_json::Value {
+    fn to_database(
+        &self,
+        _: &Recipient,
+        _state: &renox::AppState,
+    ) -> Result<renox::serde_json::Value> {
         let invoice = &self.0;
         let via = invoice.paid_via.as_deref().unwrap_or("cash");
-        DatabaseMessage::success(format!("{} is paid", invoice.number))
-            .body(format!("{} via {via}", money(invoice.total)))
-            .url(format!("/invoices/{}", invoice.id))
-            .with("invoice_id", invoice.id)
-            .into()
+        Ok(
+            DatabaseMessage::success(format!("{} is paid", invoice.number))
+                .body(format!("{} via {via}", money(invoice.total)))
+                .url(format!("/invoices/{}", invoice.id))
+                .with("invoice_id", invoice.id)
+                .into(),
+        )
     }
 }
 

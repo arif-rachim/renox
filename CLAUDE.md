@@ -130,7 +130,7 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            permissions.rs (Permissions module: roles, permissions), events.rs
                            (LoggedIn, LoginFailed, …), verification, tokens.rs (API tokens,
                            abilities, prune), LoginThrottle (pair/account/IP), notifications
-                           (Recipient, Channel::Custom, notify/notify_to/notify_later,
+                           (Recipient, Channel::Custom, notify/notify_later,
                            SendToChannel job, DatabaseMessage, Hub), inbox.rs (the
                            notifications.* routes and the SSE stream of `.notifications()`)
   src/audit.rs             Audit module (audit_logs table, records auth events), audit::record,
@@ -496,6 +496,10 @@ Add the field to `Config` (its doc names the env var), parse it in `Config::from
 to the config tests there, give it a test-friendly value in `Default`, and document it in
 `crates/renox-cli/stubs/env.stub` (and `examples/hello/.env.example` when the guestbook uses it).
 App-specific settings need no field: `config.var(name)` reads `config.vars`, then the environment.
+A setting that takes one of a few words (`SESSION_DRIVER=database`) is an enum made with
+`setting_enum!` (lib.rs: `#[non_exhaustive]`, `as_str`, `Display`, `Serialize`, and
+`parse`/`parse_as` that name the variable in errors), never a `String` compared in code.
+Durations are `Duration` fields even when `.env` has minutes or seconds.
 
 ### 4.5 Migrations owned by the framework
 Names start with `0001…` so they sort before app migrations (`2026…`). There are seventeen:
@@ -1053,9 +1057,12 @@ picks the build, not the terminal.
   `Validator::checks` and run in `finish_with` after the database ones.
 - **v1.0 started** (the owner, 2026-10-03, after M34). V1a (release readiness: lockstep `=`
   versions, path-only dev-deps, docs.rs metadata, `rnx new` from crates.io, the semver CI
-  job, RELEASING.md): merged (#115). Next V1b, the API audit's fixes (the owner
-  chose all A and B findings except `gate` → `authorize_gate`), then the docs site and the
-  publish, which the owner runs (`cargo login`, RELEASING.md).
+  job, RELEASING.md): merged (#115). V1b (the API audit's must-fix items: settings as enums with
+  `setting_enum!` in lib.rs, `Duration` lifetimes, `Notification::channels(to)` and
+  `to_database(to, state) -> Result`, `notify(impl Into<Recipient>)`, `Job::failed(ctx, …)`,
+  no `Locale`, private `Upload` fields, `Migration` builders): branch `v1b-api-must`. Next
+  V1c (the should-fix items; the owner chose all but `gate` → `authorize_gate`), then the
+  docs site and the publish, which the owner runs (`cargo login`, RELEASING.md).
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). 

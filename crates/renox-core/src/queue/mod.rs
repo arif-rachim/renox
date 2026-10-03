@@ -129,9 +129,10 @@ pub trait Job: Serialize + DeserializeOwned + Send + Sync + 'static {
     fn handle(self, ctx: JobContext) -> impl Future<Output = Result> + Send;
 
     /// Runs once the job has failed for good (attempts used up, or a
-    /// permanent error), with the last error, e.g. to tell the user.
-    fn failed(self, state: AppState, error: String) -> impl Future<Output = ()> + Send {
-        let _ = (state, error);
+    /// permanent error), with the last error, e.g. to tell the user. `ctx`
+    /// is the last attempt's: the state, the job's id, the attempt, its batch.
+    fn failed(self, ctx: JobContext, error: String) -> impl Future<Output = ()> + Send {
+        let _ = (ctx, error);
         async {}
     }
 }
@@ -223,8 +224,9 @@ pub struct JobContext {
 
 type RunFn =
     Arc<dyn Fn(String, JobContext) -> Pin<Box<dyn Future<Output = Result> + Send>> + Send + Sync>;
-type FailedFn =
-    Arc<dyn Fn(String, AppState, String) -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync>;
+type FailedFn = Arc<
+    dyn Fn(String, JobContext, String) -> Pin<Box<dyn Future<Output = ()> + Send>> + Send + Sync,
+>;
 
 /// A registered job type: how to run it and when to retry it.
 #[derive(Clone)]
@@ -248,10 +250,10 @@ pub fn handler<J: Job>() -> JobHandler {
                 job.handle(ctx).await
             })
         }),
-        failed: Arc::new(|payload, state, error| {
+        failed: Arc::new(|payload, ctx, error| {
             Box::pin(async move {
                 if let Ok(job) = serde_json::from_str::<J>(&payload) {
-                    job.failed(state, error).await;
+                    job.failed(ctx, error).await;
                 }
             })
         }),

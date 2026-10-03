@@ -23,7 +23,7 @@ pub use model::{Invoice, InvoiceLine, STATUS_TONES, STATUSES};
 /// Today in `APP_TIMEZONE`: an invoice issued at 1 a.m. in Jakarta is
 /// dated that day, not the day before (UTC).
 pub fn today(config: &Config) -> NaiveDate {
-    let zone: renox::timezone::Zone = config.timezone.parse().unwrap_or_default();
+    let zone: renox::timezone::Zone = config.timezone;
     zone.local(renox::db::now().timestamp()).date()
 }
 

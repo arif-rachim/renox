@@ -266,7 +266,7 @@ mod on_s3 {
         );
         Some(
             TestApp::with_config(uploads::app(), |c| {
-                c.storage.disk = "s3".into();
+                c.storage.disk = renox::storage::DiskDriver::S3;
                 c.storage.endpoint = Some(endpoint.clone());
                 c.storage.bucket = Some(bucket.clone());
                 c.storage.region = Some("us-east-1".into());

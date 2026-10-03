@@ -132,7 +132,7 @@ async fn save(db: &Db, title: String, kind: &str, file_key: String, upload: &Upl
         title,
         kind: kind.into(),
         file_key,
-        file_name: upload.file_name.clone(),
+        file_name: upload.file_name().to_owned(),
         ..Default::default()
     };
     Document::create(db, document).await?;

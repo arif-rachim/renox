@@ -42,7 +42,6 @@ use serde_json::{Map, Value, json};
 
 pub use extract::Valid;
 pub use key_values::KeyValues;
-pub use messages::Locale;
 pub(crate) use messages::{render, template_for};
 pub use value::{FieldValue, Inspected};
 
@@ -298,7 +297,6 @@ async fn ensure_sqlite_column(db: &Db, table: &str, column: &str) -> Result {
 /// Collects rule failures. Rules run in order and stop at a field's first
 /// failure; rules other than `required` and `accepted` skip empty values.
 pub struct Validator {
-    locale: Locale,
     /// The request language's lang file, for overridden messages and labels.
     texts: Option<crate::i18n::Texts>,
     errors: Errors,
@@ -306,16 +304,28 @@ pub struct Validator {
     checks: Vec<AsyncCheck>,
 }
 
+impl Default for Validator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Validator {
-    /// A validator whose messages are in `locale`.
-    pub fn new(locale: Locale) -> Self {
+    /// A validator with Renox's English messages.
+    pub fn new() -> Self {
         Self {
-            locale,
             texts: None,
             errors: Errors::new(),
             pending: Vec::new(),
             checks: Vec::new(),
         }
+    }
+
+    /// Messages and field names in `lang`, from the app's lang file
+    /// (`renox.validation.*`, `renox.validation.attributes.*`), e.g. for
+    /// rules run in a handler or a command: `Validator::new().in_lang(&lang)`.
+    pub fn in_lang(self, lang: &crate::Lang) -> Self {
+        self.with_texts(lang.texts())
     }
 
     /// Uses the app's translations of messages (`renox.validation.*`) and
@@ -326,7 +336,7 @@ impl Validator {
     }
 
     fn template(&self, key: &str) -> std::borrow::Cow<'static, str> {
-        messages::template_for(self.locale, self.texts.as_ref(), key)
+        messages::template_for(self.texts.as_ref(), key)
     }
 
     /// A field's name for messages: the app's translation
@@ -376,7 +386,6 @@ impl Validator {
     pub fn nested<T: Validate>(&mut self, name: &str, items: &[T]) {
         for (i, item) in items.iter().enumerate() {
             let mut inner = Validator {
-                locale: self.locale,
                 texts: self.texts.clone(),
                 errors: Errors::new(),
                 pending: Vec::new(),
@@ -447,11 +456,6 @@ impl Validator {
             field.fail("numeric", &[]);
         }
         field
-    }
-
-    /// The language messages are written in, e.g. to pick labels.
-    pub fn locale(&self) -> Locale {
-        self.locale
     }
 
     /// Adds an error that no rule covers.
@@ -537,7 +541,7 @@ impl Validator {
                 let key = if check.unique { "unique" } else { "exists" };
                 let message = check.message.unwrap_or_else(|| {
                     render(
-                        &messages::template_for(self.locale, self.texts.as_ref(), key),
+                        &messages::template_for(self.texts.as_ref(), key),
                         &check.label,
                         &[],
                     )
@@ -561,7 +565,7 @@ impl Validator {
             };
             let message = check.message.unwrap_or_else(|| {
                 render(
-                    &messages::template_for(self.locale, self.texts.as_ref(), key),
+                    &messages::template_for(self.texts.as_ref(), key),
                     &check.label,
                     &[],
                 )
@@ -572,12 +576,8 @@ impl Validator {
     }
 
     /// Like `rules_of`, with the app's translations of messages and labels.
-    pub(crate) fn rules_with_texts(
-        data: &impl Validate,
-        locale: Locale,
-        texts: crate::i18n::Texts,
-    ) -> Self {
-        let mut validator = Self::new(locale).with_texts(texts);
+    pub(crate) fn rules_with_texts(data: &impl Validate, texts: crate::i18n::Texts) -> Self {
+        let mut validator = Self::new().with_texts(texts);
         data.rules(&mut validator);
         validator
     }
@@ -586,15 +586,14 @@ impl Validator {
     ///
     /// ```
     /// # use renox::prelude::*;
-    /// # use renox::validation::Locale;
     /// # #[derive(serde::Deserialize)] struct ProductForm { name: String }
     /// # impl Validate for ProductForm { fn rules(&self, v: &mut Validator) { v.field("name", &self.name).required(); } }
     /// # async fn demo(form: ProductForm, db: Db) -> Result {
-    /// let errors = Validator::rules_of(&form, Locale::En).finish(&db).await?;
+    /// let errors = Validator::rules_of(&form).finish(&db).await?;
     /// # let _ = errors; Ok(()) }
     /// ```
-    pub fn rules_of(data: &impl Validate, locale: Locale) -> Self {
-        let mut validator = Self::new(locale);
+    pub fn rules_of(data: &impl Validate) -> Self {
+        let mut validator = Self::new();
         data.rules(&mut validator);
         validator
     }

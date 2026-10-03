@@ -9,7 +9,10 @@ use renox::prelude::*;
 use renox::testing::TestApp;
 
 async fn app(store: &str) -> TestApp {
-    let store = store.to_owned();
+    let store = match store {
+        "database" => renox::CacheStore::Database,
+        _ => renox::CacheStore::Memory,
+    };
     TestApp::with_config(App::new(), move |c| c.cache_store = store).await
 }
 

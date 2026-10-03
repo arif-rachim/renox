@@ -115,10 +115,10 @@ pub struct App {
 }
 
 /// How `App::mailer` gets a mailer's settings once the configuration is loaded.
-type MailerSettings = Box<dyn Fn(&Config) -> crate::mail::MailConfig + Send + Sync>;
+type MailerSettings = Box<dyn Fn(&Config) -> Result<crate::mail::MailConfig> + Send + Sync>;
 
 /// How `App::disk` gets a disk's settings once the configuration is loaded.
-type DiskSettings = Box<dyn Fn(&Config) -> crate::storage::StorageConfig + Send + Sync>;
+type DiskSettings = Box<dyn Fn(&Config) -> Result<crate::storage::StorageConfig> + Send + Sync>;
 
 /// A layer from `App::layer`, applied to the app's routes at boot.
 /// Applied to the app's router and to each `Routes::domain` router.
@@ -449,7 +449,7 @@ impl App {
     pub fn mailer(
         mut self,
         name: &str,
-        settings: impl Fn(&Config) -> crate::mail::MailConfig + Send + Sync + 'static,
+        settings: impl Fn(&Config) -> Result<crate::mail::MailConfig> + Send + Sync + 'static,
     ) -> Self {
         self.mailers.push((name.to_owned(), Box::new(settings)));
         self
@@ -468,7 +468,7 @@ impl App {
     /// # let _ =
     /// App::new()
     ///     .disk("backups", |config| StorageConfig::from_env(config, "BACKUPS"))
-    ///     .disk("exports", |_| StorageConfig::default()) // local: storage/exports
+    ///     .disk("exports", |_| Ok(StorageConfig::default())) // local: storage/exports
     /// # ;
     /// ```
     ///
@@ -476,7 +476,7 @@ impl App {
     pub fn disk(
         mut self,
         name: &str,
-        settings: impl Fn(&Config) -> crate::storage::StorageConfig + Send + Sync + 'static,
+        settings: impl Fn(&Config) -> Result<crate::storage::StorageConfig> + Send + Sync + 'static,
     ) -> Self {
         self.disks.push((name.to_owned(), Box::new(settings)));
         self
@@ -560,10 +560,7 @@ impl App {
         }
         check_commands(&commands)?;
         schedule.check()?;
-        let zone: Zone = config
-            .timezone
-            .parse()
-            .map_err(|err| anyhow!("APP_TIMEZONE: {err}"))?;
+        let zone: Zone = config.timezone;
 
         let migrator = Migrator::new(migrations)?;
         let key = match &config.key {
@@ -708,7 +705,7 @@ impl App {
                 )
                 .into());
             }
-            let disk = crate::storage::Storage::named(&config, name, &settings(&config))?;
+            let disk = crate::storage::Storage::named(&config, name, &settings(&config)?)?;
             if disks.insert(name.clone(), disk).is_some() {
                 return Err(anyhow!("two disks are named `{name}` (App::disk)").into());
             }
@@ -716,7 +713,8 @@ impl App {
         // Release builds serve what was compiled in; debug builds read the disk.
         let embedded = self.embedded.filter(|_| !config.debug);
         // Rate limits and login locks shared by every server (CACHE_STORE=database).
-        let shared_counters = (config.cache_store == "database").then(|| db.clone());
+        let shared_counters =
+            (config.cache_store == crate::CacheStore::Database).then(|| db.clone());
         let versions = Arc::new(crate::embedded::AssetVersions::new(
             &config.public_path,
             embedded.map(|e| e.public),
@@ -735,8 +733,7 @@ impl App {
         let security = Arc::new(security);
         let mut mailers = HashMap::new();
         for (name, settings) in &self.mailers {
-            let mailer =
-                Mailer::open(&settings(&config), &config, &format!("the `{name}` mailer"))?;
+            let mailer = Mailer::open(&settings(&config)?, &config)?;
             if mailers.insert(name.clone(), mailer).is_some() {
                 return Err(anyhow!("two mailers are named `{name}` (App::mailer)").into());
             }
@@ -755,7 +752,7 @@ impl App {
             mailer,
             mailers: Arc::new(mailers),
             queue: Queue::new(db.clone(), key.clone()),
-            cache: crate::cache::Cache::new(&config.cache_store, db.clone())?,
+            cache: crate::cache::Cache::new(config.cache_store, db.clone())?,
             storage,
             disks: Arc::new(disks),
             http: crate::http::Http::default(),
@@ -765,7 +762,7 @@ impl App {
                 None => crate::i18n::Translator::load(&config.lang_path, config.debug)?,
             }),
             // Tests read database sessions synchronously (`TestApp::session_get`).
-            session_mirror: (config.session_driver == "database"
+            session_mirror: (config.session_driver == crate::SessionDriver::Database
                 && config.env == Environment::Testing)
                 .then(Default::default),
             live: (config.debug && config.env == Environment::Local).then(|| {
@@ -1793,7 +1790,7 @@ fn init_tracing(config: &Config, long_running: bool) {
             }
         }
     });
-    let json = config.log_format == "json";
+    let json = config.log_format == crate::LogFormat::Json;
     let builder = tracing_subscriber::fmt().with_env_filter(filter);
     let _ = match (json, file) {
         (true, Some(file)) => builder

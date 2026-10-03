@@ -9,10 +9,9 @@ use std::time::{Duration, Instant};
 
 use axum::body::Bytes;
 use renox::Kernel;
-use renox::db::{Dialect, Migration, Scripts};
+use renox::db::{Dialect, Migration};
 use renox::prelude::*;
 use renox::testing::TestApp;
-use renox::validation::Locale;
 
 #[derive(Model, serde::Serialize, Default, Debug, Clone)]
 #[model(table = "products", soft_deletes)]
@@ -111,7 +110,7 @@ async fn injection_through_validation_table_and_column_is_inert() {
         ("products\"; DROP TABLE products; --", "name"),
         ("products", "name\" = name OR 1=1; DROP TABLE products; --"),
     ] {
-        let mut v = Validator::new(Locale::En);
+        let mut v = Validator::new();
         v.field("x", &"a".to_owned()).unique(table, column);
         // An error (unknown table/column), never an executed payload.
         let r = v.finish(db).await;
@@ -133,7 +132,7 @@ async fn exists_rule_with_text_input_against_integer_column() {
     let k = kernel().await;
     let db = k.db();
     Product::create(db, p("a")).await.unwrap();
-    let mut v = Validator::new(Locale::En);
+    let mut v = Validator::new();
     v.field("product_id", &"abc".to_owned())
         .exists("products", "id");
     let result = v.finish(db).await;
@@ -510,7 +509,10 @@ async fn edited_and_removed_migrations_on_a_file_database() {
     let status = k.migration_status().await.unwrap();
     eprintln!(
         "edited migration: migrate ran {done:?}; status says {:?}",
-        status.iter().find(|m| m.name == M_A.name).map(|m| m.batch)
+        status
+            .iter()
+            .find(|m| m.name == M_A.name())
+            .map(|m| m.batch)
     );
     k.db().close().await;
     drop(k);
@@ -518,7 +520,7 @@ async fn edited_and_removed_migrations_on_a_file_database() {
     // Removed but still in renox_migrations.
     let k = boot(cfg(), &[M_A]).await;
     let status = k.migration_status().await.unwrap();
-    let listed = status.iter().any(|m| m.name == M_C.name);
+    let listed = status.iter().any(|m| m.name == M_C.name());
     eprintln!("removed migration listed by migrate:status: {listed}");
     let rollback = k.rollback(1).await;
     eprintln!(
@@ -535,26 +537,17 @@ async fn edited_and_removed_migrations_on_a_file_database() {
     );
 }
 
-const PG_OBJECTS: Migration = Migration {
-    name: "20300101000010_pg_objects",
-    up: "CREATE TABLE parent (id BIGINT PRIMARY KEY);
+const PG_OBJECTS: Migration = Migration::new("20300101000010_pg_objects", "CREATE TABLE parent (id BIGINT PRIMARY KEY);
          CREATE TABLE child (id BIGINT PRIMARY KEY, parent_id BIGINT REFERENCES parent (id));
          CREATE VIEW child_view AS SELECT c.id, p.id AS pid FROM child c JOIN parent p ON p.id = c.parent_id;
-         CREATE VIEW child_view2 AS SELECT id FROM child_view;",
-    down: None,
-    sqlite: None,
-    postgres: Some(Scripts {
-        up: "CREATE TYPE mood AS ENUM ('happy', 'sad');
+         CREATE VIEW child_view2 AS SELECT id FROM child_view;", None).postgres("CREATE TYPE mood AS ENUM ('happy', 'sad');
              CREATE SEQUENCE invoice_no;
              CREATE TABLE parent (id BIGINT PRIMARY KEY, m mood);
              CREATE TABLE child (id BIGINT PRIMARY KEY, parent_id BIGINT REFERENCES parent (id));
              CREATE VIEW child_view AS SELECT c.id, p.id AS pid FROM child c JOIN parent p ON p.id = c.parent_id;
              CREATE VIEW child_view2 AS SELECT id FROM child_view;
              CREATE MATERIALIZED VIEW child_mv AS SELECT id FROM child;
-             CREATE FUNCTION add1(i BIGINT) RETURNS BIGINT AS 'SELECT i + 1' LANGUAGE SQL;",
-        down: None,
-    }),
-};
+             CREATE FUNCTION add1(i BIGINT) RETURNS BIGINT AS 'SELECT i + 1' LANGUAGE SQL;", None);
 
 #[renox::test]
 async fn migrate_fresh_with_views_foreign_keys_and_types() {
@@ -593,16 +586,7 @@ async fn concurrent_migrate_runs_wait_for_each_other() {
 
 #[renox::test]
 async fn migration_with_its_own_transaction_or_concurrently_runs() {
-    const OWN_TX: Migration = Migration {
-        name: "20300101000020_own_tx",
-        up: "BEGIN; CREATE TABLE own_tx (id BIGINT PRIMARY KEY); COMMIT;",
-        down: None,
-        sqlite: None,
-        postgres: Some(Scripts {
-            up: "CREATE TABLE own_tx (id BIGINT PRIMARY KEY); CREATE INDEX CONCURRENTLY own_tx_id ON own_tx (id);",
-            down: None,
-        }),
-    };
+    const OWN_TX: Migration = Migration::new("20300101000020_own_tx", "BEGIN; CREATE TABLE own_tx (id BIGINT PRIMARY KEY); COMMIT;", None).postgres("CREATE TABLE own_tx (id BIGINT PRIMARY KEY); CREATE INDEX CONCURRENTLY own_tx_id ON own_tx (id);", None);
     let k = boot(config(), &[OWN_TX]).await;
     let r = k.migrate().await;
     eprintln!(
@@ -615,7 +599,10 @@ async fn migration_with_its_own_transaction_or_concurrently_runs() {
 // ---------------------------------------------------------------- 8. cache
 
 async fn cache_app(store: &str) -> TestApp {
-    let store = store.to_owned();
+    let store = match store {
+        "database" => renox::CacheStore::Database,
+        _ => renox::CacheStore::Memory,
+    };
     TestApp::with_config(App::new(), move |c| c.cache_store = store).await
 }
 
@@ -920,11 +907,11 @@ async fn unique_rule_with_a_mistyped_column_is_an_error() {
     let k = kernel().await;
     let db = k.db();
     Product::create(db, p("dup")).await.unwrap();
-    let mut v = Validator::new(Locale::En);
+    let mut v = Validator::new();
     v.field("name", &"dup".to_owned())
         .unique("products", "name_typo");
     let unique = v.finish(db).await;
-    let mut v = Validator::new(Locale::En);
+    let mut v = Validator::new();
     v.field("name", &"dup".to_owned())
         .exists("products", "name_typo");
     let exists = v.finish(db).await;
@@ -1053,14 +1040,20 @@ async fn a_no_transaction_migration_runs_outside_the_wrapper() {
         Some("DROP TABLE marked"),
     );
     let k = boot(config(), &[MARKED]).await;
-    assert!(k.migrate().await.unwrap().iter().any(|m| m == MARKED.name));
+    assert!(
+        k.migrate()
+            .await
+            .unwrap()
+            .iter()
+            .any(|m| m == MARKED.name())
+    );
     assert!(table_exists(k.db(), "marked").await);
     assert!(
         k.rollback(1)
             .await
             .unwrap()
             .iter()
-            .any(|m| m == MARKED.name)
+            .any(|m| m == MARKED.name())
     );
     assert!(!table_exists(k.db(), "marked").await);
 }

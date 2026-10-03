@@ -515,7 +515,7 @@ async fn cart(session: Session) -> Result<String> {
 | `keep(&["status"])`, `now(key, value)` | keep some flashed values for one more request; a flash value for the page rendered now only (Laravel's `flash()->now()`) |
 | `old(field)`, `errors()` | the previous form's input and validation errors (filled by `Valid<T>`) |
 | `has_old_input` | whether the previous request flashed its input (a failed submit), even with no field in it |
-| `set_lifetime(minutes)` | this session lasts longer than `SESSION_LIFETIME` |
+| `set_lifetime(duration)` | this session lasts longer than `SESSION_LIFETIME` |
 | `token`, `regenerate_token`, `flush` | the CSRF token; a new one; empty everything |
 
 - Lifetime: `SESSION_LIFETIME` minutes of inactivity (120). "Remember me" on Renox's login

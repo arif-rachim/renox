@@ -263,7 +263,7 @@ async fn trusted_hosts_refuse_other_hosts() {
 async fn named_disks_keep_their_own_files() {
     let app = TestApp::new(
         App::new()
-            .disk("exports", |_| StorageConfig::default())
+            .disk("exports", |_| Ok(StorageConfig::default()))
             .disk("backups", |config| {
                 StorageConfig::from_env(config, "BACKUPS")
             }),
@@ -326,10 +326,10 @@ async fn disk_names_are_checked_at_boot() {
         config.database_url = "sqlite::memory:".into();
         config
     };
-    let bad = App::with_config(config()).disk("bad name", |_| StorageConfig::default());
+    let bad = App::with_config(config()).disk("bad name", |_| Ok(StorageConfig::default()));
     let twice = App::with_config(config())
-        .disk("twice", |_| StorageConfig::default())
-        .disk("twice", |_| StorageConfig::default());
+        .disk("twice", |_| Ok(StorageConfig::default()))
+        .disk("twice", |_| Ok(StorageConfig::default()));
     for (app, expected) in [(bad, "disk name"), (twice, "two disks")] {
         let err = match app.boot().await {
             Ok(_) => panic!("{expected}: booted"),
@@ -347,12 +347,12 @@ fn from_env_reads_a_prefix_and_falls_back_to_s3() {
         .vars
         .insert("ARCHIVE_BUCKET".into(), "old-orders".into());
     config.storage.region = Some("ap-southeast-1".into());
-    let archive = StorageConfig::from_env(&config, "archive");
-    assert_eq!(archive.disk, "s3");
+    let archive = StorageConfig::from_env(&config, "archive").unwrap();
+    assert_eq!(archive.disk, renox::storage::DiskDriver::S3);
     assert_eq!(archive.bucket.as_deref(), Some("old-orders"));
     assert_eq!(archive.region.as_deref(), Some("ap-southeast-1"));
     assert_eq!(archive.url, None);
-    let local = StorageConfig::from_env(&config, "SCRATCH");
-    assert_eq!(local.disk, "local");
+    let local = StorageConfig::from_env(&config, "SCRATCH").unwrap();
+    assert_eq!(local.disk, renox::storage::DiskDriver::Local);
     assert_eq!(local.root, None);
 }

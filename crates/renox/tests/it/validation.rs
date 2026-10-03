@@ -4,7 +4,6 @@ use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use renox::Kernel;
 use renox::prelude::*;
-use renox::validation::Locale;
 use serde::{Deserialize, Serialize};
 use tower::ServiceExt;
 
@@ -108,17 +107,14 @@ async fn kernel(locale: &str) -> (Kernel, tempfile::TempDir) {
     (kernel, dir)
 }
 
-async fn errors_for(form: &ProductForm, locale: Locale) -> Errors {
+async fn errors_for(form: &ProductForm) -> Errors {
     let (kernel, _dir) = kernel("en").await;
-    Validator::rules_of(form, locale)
-        .finish(kernel.db())
-        .await
-        .unwrap()
+    Validator::rules_of(form).finish(kernel.db()).await.unwrap()
 }
 
 #[tokio::test]
 async fn valid_input_has_no_errors() {
-    assert!(errors_for(&valid_form(), Locale::En).await.is_empty());
+    assert!(errors_for(&valid_form()).await.is_empty());
 }
 
 #[tokio::test]
@@ -134,7 +130,7 @@ async fn rules_report_the_first_failure_per_field() {
         agree: Some(false),
         ..Default::default()
     };
-    let errors = errors_for(&form, Locale::En).await;
+    let errors = errors_for(&form).await;
     assert_eq!(
         errors.first("name"),
         Some("The name must be between 3 and 20 characters.")
@@ -186,7 +182,7 @@ async fn unique_and_exists_query_the_database() {
         ..valid_form()
     };
     assert_eq!(
-        errors_for(&taken, Locale::En).await.first("name"),
+        errors_for(&taken).await.first("name"),
         Some("The name has already been taken.")
     );
 
@@ -195,21 +191,21 @@ async fn unique_and_exists_query_the_database() {
         ignore_id: Some(1),
         ..valid_form()
     };
-    assert!(errors_for(&editing_itself, Locale::En).await.is_empty());
+    assert!(errors_for(&editing_itself).await.is_empty());
 
     let no_tea_yet = ProductForm {
         category: Some("tea".into()),
         ..valid_form()
     };
     assert_eq!(
-        errors_for(&no_tea_yet, Locale::En).await.first("category"),
+        errors_for(&no_tea_yet).await.first("category"),
         Some("The selected category is invalid.")
     );
     let has_coffee = ProductForm {
         category: Some("coffee".into()),
         ..valid_form()
     };
-    assert!(errors_for(&has_coffee, Locale::En).await.is_empty());
+    assert!(errors_for(&has_coffee).await.is_empty());
 }
 
 struct Shop;
@@ -520,7 +516,7 @@ async fn errors_of(rules: impl Fn(&mut Validator)) -> Errors {
         }
     }
     let app = renox::testing::TestApp::new(App::new()).await;
-    Validator::rules_of(&Rules(rules), Locale::En)
+    Validator::rules_of(&Rules(rules))
         .finish(app.db())
         .await
         .unwrap()
@@ -530,11 +526,7 @@ fn png(width: u32, height: u32) -> renox::Upload {
     let mut bytes = b"\x89PNG\r\n\x1a\n\0\0\0\x0dIHDR".to_vec();
     bytes.extend_from_slice(&width.to_be_bytes());
     bytes.extend_from_slice(&height.to_be_bytes());
-    renox::Upload {
-        file_name: "banner.png".into(),
-        content_type: "image/png".into(),
-        bytes: bytes.into(),
-    }
+    renox::Upload::new("banner.png", "image/png", bytes)
 }
 
 #[renox::test]
@@ -683,10 +675,7 @@ async fn the_derive_takes_the_new_rules_too() {
         max: "15".into(),
         exact: Some("1.234".into()),
     };
-    let errors = Validator::rules_of(&range, Locale::En)
-        .finish(app.db())
-        .await
-        .unwrap();
+    let errors = Validator::rules_of(&range).finish(app.db()).await.unwrap();
     assert_eq!(errors.first("min"), None);
     // Two texts that read as numbers compare as numbers.
     assert_eq!(

@@ -61,7 +61,8 @@ impl Job for Broken {
         Err(Error::permanent(anyhow::anyhow!("the supplier is down")))
     }
 
-    async fn failed(self, state: AppState, error: String) {
+    async fn failed(self, ctx: JobContext, error: String) {
+        let state = ctx.state;
         let _ = log(
             &state,
             format!("gave up on {}: {}", self.0, error.contains("supplier")),

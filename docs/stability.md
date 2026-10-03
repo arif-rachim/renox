@@ -27,10 +27,13 @@ same version and makes apps depend on its own release.
     `grid::Column`, `grid::GridPrefs`, `grid::RowOrder`,
     `grid::Action`, `grid::Selection`, `storage::FileInfo`, `queue::BatchStatus`,
     `queue::QueueCounts`, `queue::QueueStats` (the dashboard's), `http::SentRequest`,
-    `select::SelectOption` (use `SelectOption::new`), `select::OptionQuery`
+    `select::SelectOption` (use `SelectOption::new`), `select::OptionQuery`, `Upload` (use
+    `Upload::new`), `db::Migration` (use `Migration::new(..).sqlite(..).postgres(..)`)
 - **New variants on these enums.** A `match` on them needs a `_` arm:
-  - `Error`, `Environment`, `CspMode`, `Channel`, `Locale`, `DbValue`, `Inspected` (a `Rule`
+  - `Error`, `Environment`, `CspMode`, `Channel`, `DbValue`, `Inspected` (a `Rule`
     matching on `Inspected` needs a `_` arm), `ToastKind`, `chart::Bucket`, `report::ReportKind`, `grid::Kind`, `grid::Summary`
+  - the settings: `SessionDriver`, `LogFormat`, `CacheStore`, `mail::MailDriver`,
+    `mail::MailEncryption`, `storage::DiskDriver`, and `webhook::WebhookStatus`
 - **New fields on this enum variant.** A pattern on it needs `..`:
   - `Inspected::File { image, .. }` (it gained `dimensions` in M33)
 - New methods, functions, modules, template functions, validation rules, CLI commands and `.env`
@@ -69,6 +72,13 @@ because of a dependency.
   re-export `renox::db::sqlx`.
 - Renox may move to a new sqlx version in a minor release. Code that uses the escape hatches may
   then need a change.
+- `FromDb` and `RowIndex` are implemented for whatever sqlx can decode, through sqlx's traits.
+  The promise covers the types Renox lists: the integer and float types, `bool`, `String`,
+  `Vec<u8>`, the chrono date and time types, `Option<T>` of those, `db::Json<T>`,
+  `db::Encrypted<T>`, `db::Ulid`, `Uuid` (the `uuid` feature) and `#[derive(DbEnum)]` enums;
+  column names (`&str`) and positions (`usize`) for `RowIndex`. A type of your own made
+  decodable by implementing sqlx's traits works too, but is an escape hatch: a sqlx upgrade
+  may need it changed.
 
 ## Also outside the promise
 

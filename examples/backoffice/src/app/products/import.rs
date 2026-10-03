@@ -34,7 +34,7 @@ pub(crate) async fn upload(
     let Some(file) = form.file else {
         return Err(Error::BadRequest("No file was sent.".into()));
     };
-    let text = String::from_utf8_lossy(&file.bytes);
+    let text = String::from_utf8_lossy(file.bytes());
     let report = import(&db, &text, &user.name).await?;
     let mut toast = Toast::success(format!(
         "{} added, {} updated.",

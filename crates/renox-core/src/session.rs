@@ -200,10 +200,10 @@ impl Session {
         serde_json::from_value(value).ok()
     }
 
-    /// Keeps this session for `minutes` of inactivity instead of
-    /// `SESSION_LIFETIME`, e.g. for "remember me".
-    pub fn set_lifetime(&self, minutes: u64) {
-        self.lock().lifetime = Some(minutes);
+    /// Keeps this session for `lifetime` of inactivity instead of
+    /// `SESSION_LIFETIME`, e.g. for "remember me" (whole minutes, at least one).
+    pub fn set_lifetime(&self, lifetime: std::time::Duration) {
+        self.lock().lifetime = Some(lifetime.as_secs().div_ceil(60).max(1));
     }
 
     /// Stores a value for the next request only.
@@ -382,7 +382,7 @@ pub(crate) async fn middleware(
 ) -> Response {
     let config = &state.config;
     let now = unix_now();
-    let database = config.session_driver == "database";
+    let database = config.session_driver == crate::SessionDriver::Database;
     let (sid, payload) = match read_cookie(req.headers(), &config.session_cookie, &state.key) {
         Some(Stored::Handle { sid }) if database => {
             let payload = store::load(&state, &sid, now).await;
@@ -397,7 +397,9 @@ pub(crate) async fn middleware(
 
     let mut res = next.run(req).await;
 
-    let lifetime = session.lifetime().unwrap_or(config.session_lifetime) * 60;
+    let lifetime = session
+        .lifetime()
+        .map_or(config.session_lifetime.as_secs(), |minutes| minutes * 60);
     let payload = session.to_payload(now + lifetime);
     let stored = if database {
         let rotate = session.take_rotate();
@@ -644,7 +646,11 @@ pub(crate) fn from_cookie(state: &AppState, cookie_header: Option<&str>) -> Sess
 
 /// `session` encrypted as a `name=value` cookie pair. Used by `renox::testing`.
 pub(crate) fn cookie_pair(state: &AppState, session: &Session) -> String {
-    let lifetime = session.lifetime().unwrap_or(state.config.session_lifetime) * 60;
+    let lifetime = session
+        .lifetime()
+        .map_or(state.config.session_lifetime.as_secs(), |minutes| {
+            minutes * 60
+        });
     // A whole-session cookie, which the database driver reads too.
     let value = serde_json::to_string(&Stored::Full(session.to_payload(unix_now() + lifetime)))
         .expect("session payloads serialize");

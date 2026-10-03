@@ -7,7 +7,6 @@ use std::time::Duration;
 use renox::prelude::*;
 use renox::signed::ValidSignature;
 use renox::testing::TestApp;
-use renox::validation::Locale;
 
 struct Pages;
 
@@ -45,7 +44,7 @@ impl Module for Pages {
                 "kept"
             })
             .get("/session/longer", |s: Session| async move {
-                s.set_lifetime(60 * 24 * 7);
+                s.set_lifetime(std::time::Duration::from_secs(60 * 60 * 24 * 7));
                 "a week"
             })
             .get("/session/token", |s: Session| async move {
@@ -126,7 +125,7 @@ async fn htmx_response_headers() {
 async fn custom_rules_and_raw_sql_variants() {
     let app = app().await;
     let db = app.db();
-    let mut v = Validator::new(Locale::En);
+    let mut v = Validator::new();
     v.field("stock", &5)
         .rule(5 <= 10, "never")
         .rule(5 > 10, "Not enough stock.")

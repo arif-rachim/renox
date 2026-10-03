@@ -880,7 +880,10 @@ async fn the_shop_speaks_spanish_with_plurals() {
 async fn the_shop_runs_the_same_with_database_sessions() {
     // SESSION_DRIVER=database: login, the flashed message and the chosen
     // language live in the `sessions` table instead of the cookie.
-    let app = TestApp::with_config(shop::app(), |c| c.session_driver = "database".into()).await;
+    let app = TestApp::with_config(shop::app(), |c| {
+        c.session_driver = renox::SessionDriver::Database
+    })
+    .await;
     let coffee = product(&app, "Coffee Latte", 25_000, 5).await;
     let ben = customer(&app, "ben@example.com").await;
     app.acting_as(&ben);

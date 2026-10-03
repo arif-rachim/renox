@@ -87,7 +87,8 @@ impl Job for Charge {
         Ok(())
     }
 
-    async fn failed(self, state: AppState, error: String) {
+    async fn failed(self, ctx: JobContext, error: String) {
+        let state = ctx.state;
         // Once, after the last attempt: tell someone.
         eprintln!("charge {} failed for good: {error}", self.order_id);
         let _ = state; // e.g. notify the customer through state.mailer
@@ -302,7 +303,7 @@ alert when `oldest_wait` grows. The throughput counts are per-minute rows in the
 |---|---|
 | `dispatch($job)`, `->delay()`, `->onQueue()` | `state.dispatch(job)`, `dispatch_after`, `dispatch_on` / `const QUEUE` |
 | `$tries`, `$timeout`, `backoff()` | `MAX_ATTEMPTS`, `TIMEOUT`, `fn backoff` |
-| `failed()` | `async fn failed(self, state, error)` |
+| `failed()` | `async fn failed(self, ctx, error)` |
 | `ShouldBeUnique`, `uniqueFor`, `uniqueId` | `UNIQUE_FOR`, `fn unique_id` |
 | `ShouldBeEncrypted` | `const ENCRYPTED: bool = true` |
 | `WithoutOverlapping`, `RateLimited` middleware | `Middleware::without_overlapping`, `Middleware::rate_limited` |

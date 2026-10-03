@@ -134,28 +134,19 @@ pub fn expand(input: TokenStream) -> Result<TokenStream> {
             None => quote! { "" },
         };
         let down = include(&set.plain.down);
-        let own = |files: &Files| match &files.up {
+        // `.sqlite(up, down)` / `.postgres(up, down)` for a database's own files.
+        let own = |method: proc_macro2::TokenStream, files: &Files| match &files.up {
             Some(up) => {
                 let up = up.to_string_lossy().into_owned();
                 let down = include(&files.down);
-                quote! {
-                    ::core::option::Option::Some(::renox::db::Scripts {
-                        up: ::core::include_str!(#up),
-                        down: #down,
-                    })
-                }
+                quote! { .#method(::core::include_str!(#up), #down) }
             }
-            None => quote! { ::core::option::Option::None },
+            None => quote! {},
         };
-        let (sqlite, postgres) = (own(&set.sqlite), own(&set.postgres));
+        let sqlite = own(quote! { sqlite }, &set.sqlite);
+        let postgres = own(quote! { postgres }, &set.postgres);
         items.push(quote! {
-            ::renox::db::Migration {
-                name: #name,
-                up: #up,
-                down: #down,
-                sqlite: #sqlite,
-                postgres: #postgres,
-            }
+            ::renox::db::Migration::new(#name, #up, #down) #sqlite #postgres
         });
     }
 

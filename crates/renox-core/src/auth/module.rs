@@ -10,7 +10,7 @@ use super::user::dummy_hash;
 use super::{User, intended, login, logout, passwords, verification, verify_password};
 use crate::db::Migration;
 use crate::i18n::Lang;
-use crate::validation::{Errors, Locale, Valid, Validate, ValidationError, Validator};
+use crate::validation::{Errors, Valid, Validate, ValidationError, Validator};
 use crate::{
     AppState, AuthUser, ClientIp, Htmx, HxRedirect, Module, Result, Routes, Session, View, context,
     view,
@@ -344,7 +344,7 @@ impl Module for Auth {
 /// The built-in (English) texts, with the app's `renox.auth.*`
 /// translations for the request's language on top.
 pub(super) fn texts(lang: &Lang) -> Value {
-    let mut base = text(Locale::parse(&lang.locale));
+    let mut base = text();
     if let Value::Object(map) = &mut base {
         for (key, value) in lang.texts().iter() {
             if let Some(key) = key.strip_prefix("renox.auth.") {
@@ -357,8 +357,7 @@ pub(super) fn texts(lang: &Lang) -> Value {
 
 /// A built-in message (e.g. `auth.failed`), translated if the app's lang file has it.
 fn message(lang: &Lang, key: &str, params: &[(&str, String)]) -> String {
-    let template =
-        crate::validation::template_for(Locale::parse(&lang.locale), Some(&lang.texts()), key);
+    let template = crate::validation::template_for(Some(&lang.texts()), key);
     crate::i18n::format(&template, params, None)
 }
 
@@ -394,9 +393,9 @@ struct LoginForm {
 }
 
 /// Built-in labels for Renox's own forms; an app's lang file wins.
-pub(super) fn label(v: &Validator, field: &'static str) -> &'static str {
-    match (v.locale(), field) {
-        (Locale::En, "current_password") => "current password",
+pub(super) fn label(_v: &Validator, field: &'static str) -> &'static str {
+    match field {
+        "current_password" => "current password",
         _ => field,
     }
 }
@@ -546,11 +545,7 @@ async fn store_register(
         // Two sign-ups with one email at the same moment: the database's
         // unique index stops the second, which gets the `unique` rule's answer.
         Err(err) if err.is_unique_violation() => {
-            let template = crate::validation::template_for(
-                Locale::parse(&lang.locale),
-                Some(&lang.texts()),
-                "unique",
-            );
+            let template = crate::validation::template_for(Some(&lang.texts()), "unique");
             let mut errors = Errors::new();
             errors.add("email", crate::validation::render(&template, "email", &[]));
             return Err(ValidationError::new(errors)
@@ -605,62 +600,60 @@ async fn destroy(
 
 /// Words on the built-in pages (English; apps translate them with
 /// `renox.auth.*` keys in their lang files).
-pub(super) fn text(locale: Locale) -> Value {
-    match locale {
-        Locale::En => json!({
-            "login_title": "Log in",
-            "register_title": "Create an account",
-            "name": "Name",
-            "email": "Email",
-            "password": "Password",
-            "password_confirmation": "Confirm password",
-            "remember": "Remember me",
-            "login_button": "Log in",
-            "register_button": "Register",
-            "no_account": "No account yet?",
-            "have_account": "Already registered?",
-            "forgot_link": "Forgot your password?",
-            "forgot_title": "Forgot your password?",
-            "forgot_intro": "Enter your email and we'll send you a link to choose a new password.",
-            "send_link": "Email me a reset link",
-            "back_to_login": "Back to log in",
-            "reset_title": "Choose a new password",
-            "reset_button": "Reset password",
-            "reset_link_sent": "If that email has an account, a reset link is on its way.",
-            "reset_invalid": "This password reset link is invalid or has expired.",
-            "password_reset_done": "Your password has been reset. You can log in now.",
-            "verify_title": "Verify your email",
-            "verify_intro": "We've emailed you a link to verify your address. Didn't get it?",
-            "resend_button": "Send another link",
-            "logout": "Log out",
-            "verification_sent": "A new verification link has been sent.",
-            "verified": "Your email address is verified.",
-            "mail_reset_subject": "Reset your password",
-            "mail_reset_intro": "You asked to reset your password. Choose a new one with the button below.",
-            "mail_reset_outro": "The link works for 60 minutes. If you didn't ask for this, ignore this email.",
-            "mail_verify_subject": "Verify your email address",
-            "mail_verify_intro": "Please confirm that this is your email address.",
-            "mail_verify_outro": "The link works for 60 minutes.",
-            "account_title": "Your account",
-            "profile_title": "Profile",
-            "profile_saved": "Your profile is saved.",
-            "email_unverified": "Your new email address isn't verified yet: check your inbox.",
-            "save": "Save",
-            "password_title": "Change password",
-            "current_password": "Current password",
-            "new_password": "New password",
-            "password_changed": "Your password is changed. Your other devices are logged out.",
-            "other_devices_title": "Other devices",
-            "other_devices_intro": "Log out everywhere else, e.g. on a phone you lost.",
-            "other_devices_button": "Log out other devices",
-            "other_devices_logged_out": "Your other devices are logged out.",
-            "delete_title": "Delete account",
-            "delete_intro": "Your account and its data are deleted for good.",
-            "delete_button": "Delete my account",
-            "delete_confirm": "Delete your account for good?",
-            "confirm_title": "Confirm your password",
-            "confirm_intro": "This is a secure area. Please confirm your password to continue.",
-            "confirm_button": "Confirm",
-        }),
-    }
+pub(super) fn text() -> Value {
+    json!({
+        "login_title": "Log in",
+        "register_title": "Create an account",
+        "name": "Name",
+        "email": "Email",
+        "password": "Password",
+        "password_confirmation": "Confirm password",
+        "remember": "Remember me",
+        "login_button": "Log in",
+        "register_button": "Register",
+        "no_account": "No account yet?",
+        "have_account": "Already registered?",
+        "forgot_link": "Forgot your password?",
+        "forgot_title": "Forgot your password?",
+        "forgot_intro": "Enter your email and we'll send you a link to choose a new password.",
+        "send_link": "Email me a reset link",
+        "back_to_login": "Back to log in",
+        "reset_title": "Choose a new password",
+        "reset_button": "Reset password",
+        "reset_link_sent": "If that email has an account, a reset link is on its way.",
+        "reset_invalid": "This password reset link is invalid or has expired.",
+        "password_reset_done": "Your password has been reset. You can log in now.",
+        "verify_title": "Verify your email",
+        "verify_intro": "We've emailed you a link to verify your address. Didn't get it?",
+        "resend_button": "Send another link",
+        "logout": "Log out",
+        "verification_sent": "A new verification link has been sent.",
+        "verified": "Your email address is verified.",
+        "mail_reset_subject": "Reset your password",
+        "mail_reset_intro": "You asked to reset your password. Choose a new one with the button below.",
+        "mail_reset_outro": "The link works for 60 minutes. If you didn't ask for this, ignore this email.",
+        "mail_verify_subject": "Verify your email address",
+        "mail_verify_intro": "Please confirm that this is your email address.",
+        "mail_verify_outro": "The link works for 60 minutes.",
+        "account_title": "Your account",
+        "profile_title": "Profile",
+        "profile_saved": "Your profile is saved.",
+        "email_unverified": "Your new email address isn't verified yet: check your inbox.",
+        "save": "Save",
+        "password_title": "Change password",
+        "current_password": "Current password",
+        "new_password": "New password",
+        "password_changed": "Your password is changed. Your other devices are logged out.",
+        "other_devices_title": "Other devices",
+        "other_devices_intro": "Log out everywhere else, e.g. on a phone you lost.",
+        "other_devices_button": "Log out other devices",
+        "other_devices_logged_out": "Your other devices are logged out.",
+        "delete_title": "Delete account",
+        "delete_intro": "Your account and its data are deleted for good.",
+        "delete_button": "Delete my account",
+        "delete_confirm": "Delete your account for good?",
+        "confirm_title": "Confirm your password",
+        "confirm_intro": "This is a secure area. Please confirm your password to continue.",
+        "confirm_button": "Confirm",
+    })
 }

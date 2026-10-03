@@ -3,10 +3,10 @@
 
 use renox::prelude::*;
 use renox::testing::TestApp;
-use renox::validation::{FormContext, Locale};
+use renox::validation::FormContext;
 
 async fn errors_of(app: &TestApp, rules: impl FnOnce(&mut Validator)) -> Errors {
-    let mut v = Validator::new(Locale::En);
+    let mut v = Validator::new();
     rules(&mut v);
     v.finish(app.db()).await.unwrap()
 }

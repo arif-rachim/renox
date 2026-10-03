@@ -398,7 +398,7 @@ async fn auth_events_land_in_the_audit_log() {
 
 #[renox::test]
 async fn password_policy_messages_name_each_rule_and_are_translated() {
-    use renox::validation::{Locale, Validator};
+    use renox::validation::Validator;
     struct Form(&'static str);
     impl Validate for Form {
         fn rules(&self, v: &mut Validator) {
@@ -407,10 +407,10 @@ async fn password_policy_messages_name_each_rule_and_are_translated() {
         }
     }
     let app = boot().await;
-    let message = |password: &'static str, locale: Locale| {
+    let message = |password: &'static str| {
         let db = app.db().clone();
         async move {
-            Validator::rules_of(&Form(password), locale)
+            Validator::rules_of(&Form(password))
                 .finish(&db)
                 .await
                 .unwrap()
@@ -418,26 +418,26 @@ async fn password_policy_messages_name_each_rule_and_are_translated() {
                 .map(str::to_owned)
         }
     };
-    assert_eq!(message("Abcdefg1!", Locale::En).await, None);
+    assert_eq!(message("Abcdefg1!").await, None);
     assert!(
-        message("abcdefg1!", Locale::En)
+        message("abcdefg1!")
             .await
             .unwrap()
             .contains("uppercase and one lowercase")
     );
     assert!(
-        message("Abcdefgh!", Locale::En)
+        message("Abcdefgh!")
             .await
             .unwrap()
             .contains("at least one number")
     );
     assert!(
-        message("Abcdefgh1", Locale::En)
+        message("Abcdefgh1")
             .await
             .unwrap()
             .contains("at least one symbol")
     );
-    assert!(message("Ab1!", Locale::En).await.unwrap().contains("8"));
+    assert!(message("Ab1!").await.unwrap().contains("8"));
 
     // The app's lang file translates them (`tests/lang/es.json`), with its
     // name for the field.

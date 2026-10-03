@@ -120,8 +120,7 @@ async fn check_password(
     if user.check_password(password).await {
         return Ok(());
     }
-    let locale = crate::validation::Locale::parse(&lang.locale);
-    let template = crate::validation::template_for(locale, Some(&lang.texts()), "current_password");
+    let template = crate::validation::template_for(Some(&lang.texts()), "current_password");
     // The app's name for the field (`renox.validation.attributes.<field>`)
     // when its lang file has one.
     let name = lang

@@ -22,7 +22,7 @@ impl Notification for Shipped {
         "shipped"
     }
 
-    fn channels(&self) -> Vec<Channel> {
+    fn channels(&self, _to: &Recipient) -> Vec<Channel> {
         vec![Channel::Mail]
     }
 

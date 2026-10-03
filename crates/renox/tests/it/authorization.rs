@@ -7,7 +7,6 @@ use renox::axum::extract::Request;
 use renox::axum::middleware::{Next, from_fn};
 use renox::prelude::*;
 use renox::testing::TestApp;
-use renox::validation::Locale;
 
 #[derive(Clone)]
 struct CurrentTeam(i64);
@@ -291,12 +290,12 @@ async fn unique_and_exists_can_be_scoped() {
                 .where_eq("team_id", 2);
         }
     }
-    let errors = Validator::rules_of(&Pick { project: 1 }, Locale::En)
+    let errors = Validator::rules_of(&Pick { project: 1 })
         .finish(app.db())
         .await
         .unwrap();
     assert!(errors.has("project"), "project 1 is team 1's");
-    let errors = Validator::rules_of(&Pick { project: 3 }, Locale::En)
+    let errors = Validator::rules_of(&Pick { project: 3 })
         .finish(app.db())
         .await
         .unwrap();

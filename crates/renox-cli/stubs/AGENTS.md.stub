@@ -119,7 +119,7 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   its fields their own `id`. Icon-only buttons are `icon_button(icon, label, …)` (the label
   is the accessible name); shortcuts are `key="mod+s"`; a button that can't be used yet
   takes `disabled_reason="…"`.
-  In-app notifications: `to_database` returns a `DatabaseMessage` (title, body, url), and
+  In-app notifications: `to_database` returns `Ok(DatabaseMessage…into())` (title, body, url), and
   `Auth::new().notifications()` + `{{ notification_bell(unread_notifications) }}` in the
   layout gives the list, the badge and live updates (SSE: behind nginx, `proxy_buffering off`).
   Toasts can carry `.body(…)`, `.link(label, url)`, `.seconds(n)`/`.persistent()`.

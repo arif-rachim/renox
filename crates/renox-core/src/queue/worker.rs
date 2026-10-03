@@ -298,7 +298,13 @@ impl Worker {
                 );
                 crate::report::send(&self.state, report);
                 if let (Some(handler), Ok(plain)) = (&handler, plain) {
-                    let hook = (handler.failed)(plain, self.state.clone(), failure.error);
+                    let ctx = JobContext {
+                        state: self.state.clone(),
+                        attempt: job.attempts,
+                        id: job.id,
+                        batch_id: job.batch_id.or(job.callback_of),
+                    };
+                    let hook = (handler.failed)(plain, ctx, failure.error);
                     let hook = crate::context::scope_app(self.state.clone(), hook);
                     if tokio::spawn(hook).await.is_err() {
                         tracing::error!(job = %job.job, id = job.id, "the job's failed hook panicked");

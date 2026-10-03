@@ -524,10 +524,10 @@ async fn fake_smtp() -> (u16, Arc<Mutex<Smtp>>) {
 
 fn smtp_config(port: u16) -> Config {
     let mut c = config();
-    c.mail.mailer = "smtp".into();
+    c.mail.mailer = renox::mail::MailDriver::Smtp;
     c.mail.host = "127.0.0.1".into();
     c.mail.port = Some(port);
-    c.mail.encryption = "none".into();
+    c.mail.encryption = renox::mail::MailEncryption::None;
     c.mail.from_address = "app@example.com".into();
     c
 }
@@ -702,7 +702,7 @@ impl renox::auth::Notification for Shipped {
     fn kind(&self) -> &'static str {
         "shipped"
     }
-    fn channels(&self) -> Vec<renox::auth::Channel> {
+    fn channels(&self, _to: &renox::auth::Recipient) -> Vec<renox::auth::Channel> {
         vec![renox::auth::Channel::Mail, renox::auth::Channel::Database]
     }
     fn to_mail(&self, to: &renox::auth::Recipient, _: &AppState) -> Result<Mail> {
@@ -712,8 +712,12 @@ impl renox::auth::Notification for Shipped {
             "on its way",
         ))
     }
-    fn to_database(&self, _: &renox::auth::Recipient) -> renox::serde_json::Value {
-        json!({"order": 1})
+    fn to_database(
+        &self,
+        _: &renox::auth::Recipient,
+        _state: &renox::AppState,
+    ) -> Result<renox::serde_json::Value> {
+        Ok(json!({"order": 1}))
     }
 }
 

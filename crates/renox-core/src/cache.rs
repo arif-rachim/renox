@@ -45,7 +45,6 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 
-use anyhow::bail;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -94,11 +93,10 @@ fn live(expires: Option<i64>, now: i64) -> bool {
 }
 
 impl Cache {
-    pub(crate) fn new(store: &str, db: Db) -> anyhow::Result<Self> {
+    pub(crate) fn new(store: crate::CacheStore, db: Db) -> anyhow::Result<Self> {
         let store = match store {
-            "memory" => Store::Memory(Arc::default()),
-            "database" => Store::Database(db),
-            other => bail!("CACHE_STORE must be memory or database, got `{other}`"),
+            crate::CacheStore::Memory => Store::Memory(Arc::default()),
+            crate::CacheStore::Database => Store::Database(db),
         };
         Ok(Self {
             store,

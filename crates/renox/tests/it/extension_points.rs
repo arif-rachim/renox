@@ -154,7 +154,7 @@ async fn test_app(dir: &tempfile::TempDir, locale: &str, debug: bool) -> TestApp
         c.views_path = views;
         c.locale = locale;
         c.debug = debug;
-        c.timezone = "+07:00".into();
+        c.timezone = "+07:00".parse().unwrap();
     })
     .await
 }

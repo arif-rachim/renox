@@ -11,7 +11,7 @@ use serde_json::{Map, Value};
 
 use super::messages::render;
 use super::nested;
-use super::{Errors, Locale, Validate, ValidationError, Validator};
+use super::{Errors, Validate, ValidationError, Validator};
 use crate::upload::{self, Upload};
 use crate::{AppState, Error};
 
@@ -30,13 +30,12 @@ pub struct Valid<T>(pub T);
 
 /// Built-in messages in the request's language, with the app's overrides.
 struct Messages {
-    locale: Locale,
     texts: crate::i18n::Texts,
 }
 
 impl Messages {
     fn template(&self, key: &str) -> std::borrow::Cow<'static, str> {
-        super::messages::template_for(self.locale, Some(&self.texts), key)
+        super::messages::template_for(Some(&self.texts), key)
     }
 
     fn label(&self, field: &str) -> String {
@@ -101,7 +100,6 @@ where
     let path = req.uri().path().to_owned();
     let locale_name = crate::i18n::request_locale(req.extensions(), state);
     let locale = &Messages {
-        locale: Locale::parse(&locale_name),
         texts: state.translator.texts(&locale_name),
     };
     let content_type = req
@@ -175,7 +173,7 @@ where
     {
         return Err(Error::Forbidden.into_response());
     }
-    let mut validator = Validator::rules_with_texts(&data, locale.locale, locale.texts.clone());
+    let mut validator = Validator::rules_with_texts(&data, locale.texts.clone());
     extra(&data, &input, &mut validator);
     let rule_errors = validator
         .finish_for(state, user.as_deref())
@@ -248,14 +246,7 @@ async fn read_multipart(
                     continue;
                 }
                 let token = upload::token(uploads.len());
-                uploads.insert(
-                    token.clone(),
-                    Upload {
-                        file_name,
-                        content_type,
-                        bytes,
-                    },
-                );
+                uploads.insert(token.clone(), Upload::new(file_name, content_type, bytes));
                 pairs.push((name, token));
             }
             None => pairs.push((name, field.text().await?)),
@@ -621,9 +612,8 @@ mod tests {
     use super::*;
     use serde::Deserialize;
 
-    fn plain(locale: Locale) -> Messages {
+    fn plain() -> Messages {
         Messages {
-            locale,
             texts: Default::default(),
         }
     }
@@ -640,7 +630,7 @@ mod tests {
         let pairs = form_urlencoded::parse(body.as_bytes())
             .into_owned()
             .collect();
-        match parse_pairs::<Form>(pairs, &HashMap::new(), &plain(Locale::En)).0 {
+        match parse_pairs::<Form>(pairs, &HashMap::new(), &plain()).0 {
             Parsed::Ok(form, errors) if errors.is_empty() => Ok(form),
             Parsed::Ok(_, errors) | Parsed::Invalid(errors) => Err(errors),
         }
@@ -661,7 +651,7 @@ mod tests {
         let pairs = form_urlencoded::parse(body.as_bytes())
             .into_owned()
             .collect();
-        match parse_pairs::<Browser>(pairs, &HashMap::new(), &plain(Locale::En)).0 {
+        match parse_pairs::<Browser>(pairs, &HashMap::new(), &plain()).0 {
             Parsed::Ok(form, errors) if errors.is_empty() => Ok(form),
             Parsed::Ok(_, errors) | Parsed::Invalid(errors) => Err(errors),
         }
@@ -708,7 +698,7 @@ mod tests {
         let pairs = form_urlencoded::parse(b"name=Coffee&tag=a&tag=b&price=")
             .into_owned()
             .collect();
-        let (_, input) = parse_pairs::<Form>(pairs, &HashMap::new(), &plain(Locale::En));
+        let (_, input) = parse_pairs::<Form>(pairs, &HashMap::new(), &plain());
         assert_eq!(input["name"], "Coffee");
         assert_eq!(input["tag"], serde_json::json!(["a", "b"]));
         assert_eq!(input["price"], "");

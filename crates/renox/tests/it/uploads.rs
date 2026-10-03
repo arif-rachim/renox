@@ -52,7 +52,7 @@ impl Module for Shop {
             .post("/products", store)
             .post(
                 "/documents",
-                |Valid(form): Valid<DocumentForm>| async move { form.document.file_name.clone() },
+                |Valid(form): Valid<DocumentForm>| async move { form.document.file_name().to_owned() },
             )
     }
 }
@@ -451,7 +451,7 @@ async fn s3_needs_the_feature() {
     let dir = tempfile::tempdir().unwrap();
     let config = {
         let mut c = Config::default();
-        c.storage.disk = "s3".into();
+        c.storage.disk = renox::storage::DiskDriver::S3;
         c
     };
     let _ = dir;

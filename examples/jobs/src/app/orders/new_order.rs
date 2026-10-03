@@ -13,7 +13,7 @@ impl Notification for NewOrder {
         "new-order"
     }
 
-    fn channels(&self) -> Vec<Channel> {
+    fn channels(&self, _to: &Recipient) -> Vec<Channel> {
         vec![Channel::Mail, Channel::Database]
     }
 
@@ -33,16 +33,11 @@ impl Notification for NewOrder {
 
     // A `DatabaseMessage`: what the UI kit's `notification_bell` shows,
     // plus the app's own keys.
-    fn to_database(&self, _: &Recipient) -> renox::serde_json::Value {
-        DatabaseMessage::info(format!("New order #{}", self.0.id))
-            .body(format!(
-                "Total: {}",
-                renox::context::app()
-                    .map(|state| super::money(&state, self.0.total))
-                    .unwrap_or_else(|| self.0.total.to_string())
-            ))
+    fn to_database(&self, _: &Recipient, state: &AppState) -> Result<renox::serde_json::Value> {
+        Ok(DatabaseMessage::info(format!("New order #{}", self.0.id))
+            .body(format!("Total: {}", super::money(state, self.0.total)))
             .with("order_id", self.0.id)
             .with("total", self.0.total)
-            .into()
+            .into())
     }
 }

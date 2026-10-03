@@ -286,8 +286,8 @@ On the validator itself:
   of an order sent as JSON, or a form's rows named `lines[0][quantity]`); errors are keyed
   `lines.0.quantity` and labelled by the item's own field ("The quantity field is required.").
 - `v.error(field, message)`: an error no rule covers.
-- `v.locale()`: the language of the built-in messages (`Locale::En`; other languages come from
-  the app's lang files).
+- `Validator::new().in_lang(&lang)`: messages and field names from the app's lang file for
+  that language (`Valid<T>` does it for the request's language).
 
 Values a rule can check implement `FieldValue`: `String`, `&str`, the integer and float types,
 `bool`, `NaiveDate`, `NaiveDateTime`, `DateTime<Utc>`, `Upload`, and `Option<T>` / `Vec<T>` of
@@ -693,11 +693,10 @@ called):
 
 ```rust
 # use renox::prelude::*;
-use renox::validation::Locale;
 # #[derive(serde::Deserialize, Validate)]
 # struct ProductForm { #[validate(required)] name: String }
 # async fn demo(db: Db, form: ProductForm) -> Result {
-let errors = Validator::rules_of(&form, Locale::En).finish(&db).await?;
+let errors = Validator::rules_of(&form).finish(&db).await?;
 if let Some(message) = errors.first("name") {
     eprintln!("skipped: {message}");
 }

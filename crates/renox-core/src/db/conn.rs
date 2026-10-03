@@ -944,7 +944,12 @@ impl fmt::Debug for Row {
 }
 
 /// A Rust type that can be read from a column on every enabled database:
-/// integers, floats, `bool`, `String`, `Vec<u8>`, chrono types, `Option<T>`, …
+/// the integer and float types, `bool`, `String`, `Vec<u8>`, the chrono date
+/// and time types, `Option<T>` of those, `Json<T>`, `Encrypted<T>`, `Ulid`,
+/// `Uuid` (the `uuid` feature) and `#[derive(DbEnum)]` enums. Those are the
+/// types Renox promises; the trait is implemented through sqlx's own
+/// traits, so other types sqlx decodes work too, without that promise (see
+/// docs/stability.md).
 pub trait FromDb: for<'r> sqlx::Decode<'r, Sqlite> + sqlx::Type<Sqlite> + bounds::Postgres {}
 
 impl<T> FromDb for T where

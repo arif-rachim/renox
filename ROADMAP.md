@@ -1576,9 +1576,12 @@ Started by the owner on 2026-10-03, after M34. In steps, one PR each:
       cycle), docs.rs metadata, `rnx new` from crates.io, RELEASING.md
 - [x] cargo-semver-checks in CI (moved from M16b): against the base branch with
       `--release-type minor` until the first release, then against crates.io
-- [ ] V1b, the API audit's fixes (the owner chose all of A and B, except renaming `gate` to
-      `authorize_gate`): enums for settings, `Duration` lifetimes, `Notification` and
-      `Job::failed` signatures, `Upload`/`Migration` encapsulated, no `Locale`, sealed traits…
+- [x] V1b, the audit's must-fix (A) items: enums for settings, `Duration` lifetimes,
+      `Notification` and `Job::failed` signatures, `notify` for users and recipients,
+      `Upload`/`Migration` encapsulated, no `Locale`, `FromDb`'s promise written down
+- [ ] V1c, the audit's should-fix (B) items (all but renaming `gate` to `authorize_gate`):
+      closure argument order, private `AppState` internals, `disk_named`, one `Factory`
+      API, `DateTime` timestamps, sealed traits, hidden derive plumbing, `Zone` opaque, …
 - [ ] Documentation site built with Renox: a tutorial, a "Laravel → Renox" guide, the API
       reference; a starter kit; the semver stability guarantee
 - [ ] Real crates published to crates.io (`renox`, `renox-core`, `renox-macros`, `renox-cli`;

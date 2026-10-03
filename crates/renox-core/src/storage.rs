@@ -30,7 +30,7 @@
 use std::path::{Component, Path, PathBuf};
 use std::time::Duration;
 
-use anyhow::{Context, bail};
+use anyhow::Context;
 use axum::Router;
 use axum::body::Bytes;
 use axum::extract::{Path as UrlPath, State};
@@ -100,21 +100,22 @@ impl Storage {
         default_root: PathBuf,
         name: Option<&str>,
     ) -> anyhow::Result<Self> {
-        let variable = match name {
-            Some(name) => format!("the `{name}` disk's driver"),
-            None => "STORAGE_DISK".to_owned(),
-        };
-        let disk = match settings.disk.as_str() {
-            "local" => Disk::Local {
+        let disk = match settings.disk {
+            DiskDriver::Local => Disk::Local {
                 root: settings.root.clone().unwrap_or(default_root),
             },
             #[cfg(feature = "s3")]
-            "s3" => s3(settings)?,
+            DiskDriver::S3 => s3(settings)?,
             #[cfg(not(feature = "s3"))]
-            "s3" => {
-                bail!("{variable}=s3 needs Renox's `s3` feature: renox = {{ features = [\"s3\"] }}")
+            DiskDriver::S3 => {
+                let variable = match name {
+                    Some(name) => format!("the `{name}` disk's driver"),
+                    None => "STORAGE_DISK".to_owned(),
+                };
+                anyhow::bail!(
+                    "{variable}=s3 needs Renox's `s3` feature: renox = {{ features = [\"s3\"] }}"
+                )
             }
-            other => bail!("{variable} must be local or s3, got `{other}`"),
         };
         Ok(Self {
             disk,
@@ -513,12 +514,22 @@ fn encode_path(key: &str) -> String {
     out
 }
 
+setting_enum! {
+    /// Where a disk keeps its files, from `STORAGE_DISK` (or `<PREFIX>_DISK`).
+    pub enum DiskDriver ("STORAGE_DISK") {
+        /// A folder on this server (the default).
+        Local = "local",
+        /// An S3-compatible bucket (AWS S3, Cloudflare R2, MinIO); needs the `s3` feature.
+        S3 = "s3",
+    }
+}
+
 /// Settings for `state.storage`, from `STORAGE_DISK` and `S3_*`.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct StorageConfig {
-    /// `local` or `s3`.
-    pub disk: String,
+    /// A local folder or an S3 bucket.
+    pub disk: DiskDriver,
     /// The S3 bucket, from `S3_BUCKET`.
     pub bucket: Option<String>,
     /// The S3 region, from `S3_REGION`.
@@ -543,12 +554,15 @@ impl StorageConfig {
     /// `<PREFIX>_BUCKET`, `<PREFIX>_URL`, and `<PREFIX>_REGION`,
     /// `<PREFIX>_ENDPOINT`, `<PREFIX>_ACCESS_KEY_ID`,
     /// `<PREFIX>_SECRET_ACCESS_KEY`, which fall back to the `S3_*` ones.
-    pub fn from_env(config: &Config, prefix: &str) -> Self {
+    pub fn from_env(config: &Config, prefix: &str) -> Result<Self> {
         let prefix = prefix.trim_end_matches('_').to_ascii_uppercase();
         let var = |name: &str| config.var(&format!("{prefix}_{name}"));
         let shared = |name: &str, fallback: &Option<String>| var(name).or_else(|| fallback.clone());
-        Self {
-            disk: var("DISK").unwrap_or_else(|| "local".into()),
+        Ok(Self {
+            disk: var("DISK")
+                .map(|v| DiskDriver::parse_as(&v, &format!("{prefix}_DISK")))
+                .transpose()?
+                .unwrap_or(DiskDriver::Local),
             bucket: var("BUCKET"),
             region: shared("REGION", &config.storage.region),
             endpoint: shared("ENDPOINT", &config.storage.endpoint),
@@ -556,14 +570,14 @@ impl StorageConfig {
             secret_access_key: shared("SECRET_ACCESS_KEY", &config.storage.secret_access_key),
             url: var("URL"),
             root: var("PATH").map(PathBuf::from),
-        }
+        })
     }
 }
 
 impl Default for StorageConfig {
     fn default() -> Self {
         Self {
-            disk: "local".into(),
+            disk: DiskDriver::Local,
             bucket: None,
             region: None,
             endpoint: None,
@@ -646,11 +660,7 @@ async fn disk_file(
 
 async fn file_response(storage: &Storage, key: &str) -> Result<Response> {
     let bytes = storage.get(key).await?.ok_or(Error::NotFound)?;
-    let upload = crate::upload::Upload {
-        file_name: key.to_owned(),
-        content_type: String::new(),
-        bytes: bytes.clone(),
-    };
+    let upload = crate::upload::Upload::new(key, "", bytes.clone());
     let content_type = upload.sniffed_type().unwrap_or("application/octet-stream");
     Ok((
         [

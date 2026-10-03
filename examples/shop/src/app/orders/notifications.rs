@@ -40,7 +40,7 @@ impl Notification for OrderConfirmation {
         "order-confirmation"
     }
 
-    fn channels(&self) -> Vec<Channel> {
+    fn channels(&self, _to: &Recipient) -> Vec<Channel> {
         vec![Channel::Mail, Channel::Database]
     }
 
@@ -55,16 +55,22 @@ impl Notification for OrderConfirmation {
 
     // What the bell shows (and pushes as a toast while the customer is on
     // the site); `order_id` and `total` stay for the shop's own pages.
-    fn to_database(&self, _: &Recipient) -> renox::serde_json::Value {
-        DatabaseMessage::info(t("notifications.placed", &[("id", &self.order.id)]))
-            .body(t(
-                "notifications.pay",
-                &[("total", &money(self.order.total)), ("days", &3)],
-            ))
-            .url(format!("/orders/{}", self.order.id))
-            .with("order_id", self.order.id)
-            .with("total", self.order.total)
-            .into()
+    fn to_database(
+        &self,
+        _: &Recipient,
+        _state: &renox::AppState,
+    ) -> Result<renox::serde_json::Value> {
+        Ok(
+            DatabaseMessage::info(t("notifications.placed", &[("id", &self.order.id)]))
+                .body(t(
+                    "notifications.pay",
+                    &[("total", &money(self.order.total)), ("days", &3)],
+                ))
+                .url(format!("/orders/{}", self.order.id))
+                .with("order_id", self.order.id)
+                .with("total", self.order.total)
+                .into(),
+        )
     }
 }
 
@@ -76,27 +82,33 @@ impl Notification for NewOrder {
         "new-order"
     }
 
-    fn channels(&self) -> Vec<Channel> {
+    fn channels(&self, _to: &Recipient) -> Vec<Channel> {
         vec![Channel::Database]
     }
 
-    fn to_database(&self, _: &Recipient) -> renox::serde_json::Value {
-        DatabaseMessage::success(t("notifications.new_order", &[("id", &self.0.id)]))
-            .body(t(
-                "notifications.new_order_body",
-                &[
-                    ("total", &money(self.0.total)),
-                    ("address", &self.0.address),
-                ],
-            ))
-            .url(format!("/orders/{}", self.0.id))
-            .link(
-                t("notifications.all_orders", &[]),
-                "/admin/orders?status=pending",
-            )
-            .with("order_id", self.0.id)
-            .with("total", self.0.total)
-            .into()
+    fn to_database(
+        &self,
+        _: &Recipient,
+        _state: &renox::AppState,
+    ) -> Result<renox::serde_json::Value> {
+        Ok(
+            DatabaseMessage::success(t("notifications.new_order", &[("id", &self.0.id)]))
+                .body(t(
+                    "notifications.new_order_body",
+                    &[
+                        ("total", &money(self.0.total)),
+                        ("address", &self.0.address),
+                    ],
+                ))
+                .url(format!("/orders/{}", self.0.id))
+                .link(
+                    t("notifications.all_orders", &[]),
+                    "/admin/orders?status=pending",
+                )
+                .with("order_id", self.0.id)
+                .with("total", self.0.total)
+                .into(),
+        )
     }
 }
 
@@ -108,7 +120,7 @@ impl Notification for OrderShipped {
         "order-shipped"
     }
 
-    fn channels(&self) -> Vec<Channel> {
+    fn channels(&self, _to: &Recipient) -> Vec<Channel> {
         vec![Channel::Mail, Channel::Database]
     }
 
@@ -128,15 +140,19 @@ impl Notification for OrderShipped {
         )
     }
 
-    fn to_database(&self, _: &Recipient) -> renox::serde_json::Value {
+    fn to_database(
+        &self,
+        _: &Recipient,
+        _state: &renox::AppState,
+    ) -> Result<renox::serde_json::Value> {
         let key = if self.0.pickup {
             "notifications.ready"
         } else {
             "notifications.shipped"
         };
-        DatabaseMessage::success(t(key, &[("id", &self.0.id)]))
+        Ok(DatabaseMessage::success(t(key, &[("id", &self.0.id)]))
             .url(format!("/orders/{}", self.0.id))
             .with("order_id", self.0.id)
-            .into()
+            .into())
     }
 }
