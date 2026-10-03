@@ -220,7 +220,9 @@ examples/                  workspace members, each with a README.md and its own 
                            a category select answered by the server: admin/categories.rs)
   htmx-recipes/            modal form, inline edit, infinite scroll, tabs, HxRefresh/HxRedirect,
                            an out-of-band count (.also), HxRetarget/HxReswap, toasts
-  relations/               belongs to, has many, many to many (pivot columns), Morph, no N+1
+  relations/               belongs to, has many, many to many (pivot columns), Morph, no N+1;
+                           also a public blog (Markdown, seo(), RSS, sitemap, search) on
+                           Tailwind (resources/css/app.css → committed public/css/app.css)
   grid/                    a sales dashboard on one data grid (renox::grid): phone and desktop
                            columns, filters by kind, frozen columns, grouped headings, sparklines
   backoffice/              an UMKM back office (Filament's demo as the yardstick): grids,
@@ -990,7 +992,10 @@ picks the build, not the terminal.
   fields/webhooks/uploads on the kit, current patterns): merged (#101). M29b
   (`examples/backoffice`: invoices with a stock ledger, Midtrans/Xendit payment pages and
   webhooks, CSV import, exports from a job with the grid's filters, roles, activity log,
-  settings, branded sign-in): branch `m29b-backoffice`. M29c (smaller extensions) follows.
+  settings, branded sign-in): merged (#102). M29c (relations as a public blog on Tailwind
+  with Markdown/SEO/RSS/sitemap/search, an api browser client + `GET /api/me`, uploads on S3
+  tested in CI's `s3` job, mail cc/bcc/reply_to/attachments in jobs): branch
+  `m29c-extensions`. M29 is done once it is merged.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.

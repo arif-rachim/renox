@@ -75,6 +75,11 @@ shows the queue: jobs waiting, throughput, failed jobs (retry or forget them) an
   wait for the next window without using up an attempt) and
   `Middleware::without_overlapping("charge:{order_id}")` (never two charges for one order at
   once). Across several servers both need `CACHE_STORE=database`.
+- **Copies, replies and attachments.** The monthly statement attaches the customer's orders
+  as a CSV file (`Mail::attach(name, "text/csv", bytes)`) and sends the books a copy the
+  customer doesn't see (`.bcc(ACCOUNTS_EMAIL)`); the receipt's replies go to support
+  (`.reply_to(SUPPORT_EMAIL)`) rather than the no-reply sender; the warehouse's mail copies the
+  manager (`.cc(MANAGER_EMAIL)`). Queued mail keeps its attachments (stored as base64).
 - **Encrypt what's sensitive.** `ChargePayment` carries the card token, so it sets
   `const ENCRYPTED: bool = true`: the payload is sealed with `APP_KEY` in `jobs` and
   `failed_jobs`, and opened by the worker.

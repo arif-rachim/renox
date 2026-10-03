@@ -415,3 +415,40 @@ async fn the_seeder_fills_the_app_and_can_run_again() {
     app.kernel().seed().await.unwrap();
     assert_eq!(api::Product::query().count(app.db()).await.unwrap(), seeded);
 }
+
+#[renox::test]
+async fn me_says_who_and_what_the_token_may_do() {
+    let app = app().await;
+    let full = bearer(&app).await;
+    let res = app
+        .request()
+        .without_csrf()
+        .header("authorization", &full)
+        .get("/api/me")
+        .await;
+    res.assert_ok()
+        .assert_json_path("user.email", "arif@example.com")
+        .assert_json_path("abilities", json!(["products:read", "products:write"]));
+    let read_only = login(&app, true).await;
+    app.request()
+        .without_csrf()
+        .header("authorization", &read_only)
+        .get("/api/me")
+        .await
+        .assert_json_path("abilities", json!(["products:read"]));
+    app.request().json().get("/api/me").await.assert_status(401);
+}
+
+#[renox::test]
+async fn a_static_page_is_the_apis_browser_client() {
+    let app = app().await;
+    app.get("/").await.assert_redirect("/client.html");
+    app.get("/client.html")
+        .await
+        .assert_ok()
+        .assert_see(r#"<script src="/client.js" defer></script>"#)
+        .assert_see("Get a token");
+    let script = app.get("/client.js").await;
+    script.assert_ok();
+    assert!(script.text().contains("Bearer"));
+}

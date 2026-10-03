@@ -177,6 +177,8 @@ jobs:
           docker logs renox-s3 | tail -40
           exit 1
       - run: cargo test -p renox --features s3 --test it s3
+      # examples/uploads with its files on the same server.
+      - run: cargo test -p uploads --features s3
 
   deny:
     name: cargo-deny

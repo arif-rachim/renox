@@ -1,0 +1,34 @@
+/* Tailwind CSS (https://tailwindcss.com/docs), built into public/css/app.css by
+   `rnx tailwind --minify` (or `rnx serve`) with the standalone CLI: no Node needed.
+   The built file is committed, so `cargo run` works without building it. */
+@import "tailwindcss";
+/* `prose` for the Markdown bodies. */
+@plugin "@tailwindcss/typography";
+@source "../views";
+
+/* Plain elements get their look here, so the templates stay readable and the
+   tests can look for `<h1>Coffee</h1>`. */
+@layer base {
+  h1 { @apply text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50; }
+  h2 { @apply text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50; }
+  a { @apply text-emerald-700 decoration-emerald-700/30 underline-offset-2 hover:underline dark:text-emerald-400; }
+  table { @apply w-full text-left text-sm; }
+  th { @apply border-b border-zinc-200 py-2 pr-4 font-medium text-zinc-500 dark:border-zinc-800; }
+  td { @apply border-b border-zinc-100 py-2 pr-4 dark:border-zinc-900; }
+  input:not([type=checkbox]), textarea {
+    @apply w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base text-zinc-900 placeholder:text-zinc-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100;
+  }
+  button { @apply cursor-pointer; }
+  [aria-invalid=true] { @apply border-red-600; }
+}
+
+@layer components {
+  .btn { @apply inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700; }
+  .btn-quiet { @apply inline-flex min-h-9 items-center gap-1 rounded-lg border border-zinc-300 px-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800; }
+  .tag { @apply rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700 no-underline hover:bg-emerald-50 hover:text-emerald-800 hover:no-underline dark:bg-zinc-800 dark:text-zinc-300; }
+  .muted { @apply text-sm text-zinc-500 dark:text-zinc-400; }
+  .error { @apply mt-1 text-sm text-red-700 empty:hidden dark:text-red-400; }
+  .pagination { @apply mt-8 flex flex-wrap gap-1; }
+  .pagination a, .pagination span { @apply rounded-lg border border-zinc-200 px-3 py-1.5 text-sm no-underline dark:border-zinc-800; }
+  .pagination [aria-current] { @apply border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900; }
+}

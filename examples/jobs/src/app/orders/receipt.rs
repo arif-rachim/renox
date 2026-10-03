@@ -20,12 +20,22 @@ impl Job for SendReceipt {
 
     async fn handle(self, ctx: JobContext) -> Result {
         let order = Order::find_or_404(&ctx.state.db, self.order_id).await?;
-        let mail = ctx.state.mail_view(
-            &order.customer_email,
-            format!("Your receipt for order #{}", order.id),
-            "mail/receipt",
-            context! { order },
-        )?;
+        let mail = ctx
+            .state
+            .mail_view(
+                &order.customer_email,
+                format!("Your receipt for order #{}", order.id),
+                "mail/receipt",
+                context! { order },
+            )?
+            // Customers answer receipts with questions: those go to support,
+            // not to the no-reply sender (MAIL_FROM_ADDRESS).
+            .reply_to(
+                ctx.state
+                    .config
+                    .var("SUPPORT_EMAIL")
+                    .unwrap_or_else(|| "support@example.com".into()),
+            );
         ctx.state.mailer.send(mail).await
     }
 }

@@ -1,19 +1,22 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-<h1>Posts</h1>
+<h1>{% if q %}Posts with “{{ q }}”{% else %}Posts{% endif %}</h1>
+<div class="mt-6 divide-y divide-zinc-200 dark:divide-zinc-800">
 {% for post in posts.items %}
-<article class="card">
-  <h2><a href="{{ route('posts.show', post.id) }}">{{ post.title }}</a></h2>
+<article class="card py-6">
+  <h2><a href="{{ route('posts.show', post.id) }}" class="text-zinc-900 dark:text-white">{{ post.title }}</a></h2>
   {% include "blog/_meta.html" %}
-  <p class="muted">
+  <p class="mt-3 text-zinc-600 dark:text-zinc-400">{{ post.summary }}</p>
+  <p class="muted mt-3">
     {{ post.comments }} comment{{ "" if post.comments == 1 else "s" }}
     {%- if post.latest_comment %}; latest by {{ post.latest_comment.author }}{% endif %}
     · {{ post.likes }} like{{ "" if post.likes == 1 else "s" }}
   </p>
 </article>
 {% else %}
-<p class="muted">No posts yet. Run <code>cargo run -- db:seed</code>.</p>
+<p class="muted py-6">{% if q %}No posts with “{{ q }}”. <a href="{{ route('posts.index') }}">All posts</a>{% else %}No posts yet. Run <code>cargo run -- db:seed</code>.{% endif %}</p>
 {% endfor %}
+</div>
 {% from "renox/pagination.html" import pagination %}{{ pagination(posts) }}
 {% endblock %}
