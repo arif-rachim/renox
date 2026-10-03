@@ -10,6 +10,30 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M29b · examples/backoffice
+
+A new example: the back office of a small business, in the style of Filament's demo, built
+from Renox's parts. No framework API changed.
+- Grids for customers (edited in place), products (bulk activate, a stock level cell),
+  invoices (grouped by status, totals, remembered filters, row menu), each product's stock
+  ledger, staff (roles in a sheet) and the activity log (a model over `audit_logs`).
+- Invoices: a form with line items (the kit's `repeater`, each line validated with
+  `Validator::nested`), drafts that take no stock, issuing that takes it through the ledger
+  in one transaction (409 and a rollback when something is short), voiding that returns it,
+  "Paid in cash", and a print page.
+- Online payments: Midtrans Snap or a Xendit invoice made through `state.http` (tested with
+  `FakeHttp`), and their webhooks marking the invoice paid and telling the cashiers.
+- A stock ledger (`stock_movements`): received, damaged, counted (the difference to the
+  shelf), sold, returned, imported; stock never below zero.
+- Products imported from a CSV file in a sheet (multipart), a savepoint per line.
+- Invoice exports in the background: a bulk action queues a job that applies the grid's
+  filters, stores the CSV and puts a link valid for a day in the bell.
+- Roles (admin, cashier, warehouse) with permissions on every change, staff added by an
+  admin (no registration) who verify their email, the activity log, typed company
+  settings shared with every page, and sign-in pages in the company's colours.
+- A dashboard: billed and collected against the period before, unpaid, overdue invoices,
+  products running low. 16 tests.
+
 ### M29a · The examples checked and fixed
 
 An audit of the 13 examples (README against code, tests, seeders, patterns) found bugs and

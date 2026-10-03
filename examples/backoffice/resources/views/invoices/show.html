@@ -1,0 +1,68 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import infolist, entry, link_button, button, confirm, badge, alert, card %}
+
+{% block content %}
+<div class="page__head">
+  <div>
+    <p class="rx-subtitle"><a class="rx-link" href="{{ route('invoices.index') }}">Invoices</a></p>
+    <h1 class="rx-title">{{ invoice.number }} {{ badge(invoice.status | capitalize, {"draft": "neutral", "issued": "info", "paid": "success", "void": "danger"}[invoice.status]) }}{% if overdue %} {{ badge("Overdue", "warning") }}{% endif %}</h1>
+  </div>
+  <div class="rx-row">
+    {{ link_button(route('invoices.print', invoice.id), "Print", icon="external", new_tab=true) }}
+    {%- if can('invoices.manage') %}
+      {%- if invoice.status == "draft" %}
+      <form method="post" action="{{ route('invoices.issue', invoice.id) }}">{{ csrf_field() }}{{ button("Issue", key="i") }}</form>
+      {%- endif %}
+      {%- if invoice.status == "issued" %}
+      {%- if gateway %}
+      {#- Asks the gateway for a payment page; the webhook marks it paid. -#}
+      <form method="post" action="{{ route('invoices.payment_link', invoice.id) }}" hx-post="{{ route('invoices.payment_link', invoice.id) }}" hx-swap="none">{{ csrf_field() }}{{ button(("New payment link" if invoice.payment_url else "Payment link"), variant="secondary") }}</form>
+      {%- else %}
+      {{ button("Payment link", variant="secondary", type="button", disabled=true, disabled_reason="Choose a payment gateway in Settings, with its key in .env.") }}
+      {%- endif %}
+      <form method="post" action="{{ route('invoices.paid', invoice.id) }}">{{ csrf_field() }}{{ button("Paid in cash", key="p") }}</form>
+      {%- endif %}
+      {%- if invoice.status in ["draft", "issued"] %}
+      {{ confirm("void-invoice", "Void", route('invoices.void', invoice.id), "Void " ~ invoice.number ~ "?", ("Its stock comes back to the shelf." if invoice.status == "issued" else "The draft is kept, marked void."), method="POST") }}
+      {%- endif %}
+    {%- endif %}
+  </div>
+</div>
+
+{%- if invoice.payment_url and invoice.status == "issued" %}
+{{ alert("Send this link to the customer: " ~ invoice.payment_url, kind="info", title="Payment page") }}
+{%- endif %}
+
+{% call infolist(columns=3) %}
+  {{ entry("Customer", customer.name, hint=customer.email) }}
+  {{ entry("Issued", invoice.issued_on, format="date", date_format="%d %B %Y") }}
+  {{ entry("Due", invoice.due_on, format="date", date_format="%d %B %Y") }}
+  {{ entry("Paid", invoice.paid_at, format="since", hint=invoice.paid_via) }}
+  {{ entry("Written by", invoice.created_by) }}
+  {{ entry("Notes", invoice.notes, words=40) }}
+{% endcall %}
+
+{% call card() %}
+<div class="rx-table-wrap">
+<table class="rx-table">
+  <caption class="rx-visually-hidden">Lines</caption>
+  <thead><tr><th scope="col">Item</th><th scope="col" class="num">Quantity</th><th scope="col" class="num">Price</th><th scope="col" class="num">Amount</th></tr></thead>
+  <tbody>
+  {%- for line in lines %}
+  <tr>
+    <td>{{ line.description }}</td>
+    <td class="num">{{ line.quantity | number }}</td>
+    <td class="num">{{ line.unit_price | money }}</td>
+    <td class="num">{{ line.amount | money }}</td>
+  </tr>
+  {%- endfor %}
+  </tbody>
+  <tfoot>
+  <tr class="total"><td colspan="3">Subtotal</td><td class="num">{{ invoice.subtotal | money }}</td></tr>
+  <tr class="total"><td colspan="3">Tax</td><td class="num">{{ invoice.tax | money }}</td></tr>
+  <tr class="total total--grand"><td colspan="3">Total</td><td class="num">{{ invoice.total | money }}</td></tr>
+  </tfoot>
+</table>
+</div>
+{% endcall %}
+{% endblock %}

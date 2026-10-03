@@ -95,6 +95,24 @@ Every example has a README.md that walks through it.
   [src/app/orders/mod.rs](examples/grid/src/app/orders/mod.rs),
   [views](examples/grid/resources/views/orders),
   [tests/grid.rs](examples/grid/tests/grid.rs)
+- [examples/backoffice](examples/backoffice) ([README](examples/backoffice/README.md)): the back
+  office of a small business on grids and the kit: invoices with line items (`repeater` +
+  `Validator::nested`) issued from a stock ledger in one transaction (`Query::increment` with
+  `WHERE stock >= ?`, a 409 and rollback when short), voided, printed; Midtrans/Xendit payment
+  pages through `state.http` (tested with `FakeHttp`) and their webhooks; a CSV import in a
+  multipart sheet with a savepoint per line; exports from a job that rebuilds the grid's
+  filters (`GridRequest::new`) and notifies with a `temporary_url`; roles and permissions on
+  every change (`require_permission`, `can()` in the menu), staff added by an admin with
+  `send_verification` and `require_verified`; the activity log as a model over `audit_logs`;
+  typed settings shared as `company`; sign-in pages rebranded by overriding
+  `renox/auth/layout.html`; a dashboard with `Trend` and the kit's stats.
+  [invoices/mod.rs](examples/backoffice/src/app/invoices/mod.rs),
+  [payments.rs](examples/backoffice/src/app/invoices/payments.rs),
+  [export.rs](examples/backoffice/src/app/invoices/export.rs),
+  [products/stock.rs](examples/backoffice/src/app/products/stock.rs),
+  [products/import.rs](examples/backoffice/src/app/products/import.rs),
+  [staff.rs](examples/backoffice/src/app/staff.rs),
+  [tests/backoffice.rs](examples/backoffice/tests/backoffice.rs)
 - [examples/relations](examples/relations) ([README](examples/relations/README.md)): a blog: belongs to, has many, many to many through a
   pivot (`Pivot::sync` from checkboxes, `inverse()`) with pivot columns (a pinned flag and
   timestamps: `attach_with`, `update_pivot`, `load_with_pivot`), a page loaded without N+1

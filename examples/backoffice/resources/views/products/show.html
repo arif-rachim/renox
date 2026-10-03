@@ -1,0 +1,29 @@
+{% extends "layouts/app.html" %}
+{% from "renox/grid.html" import grid %}
+{% from "renox/ui.html" import action_sheet, input, select, infolist, entry, link_button, badge, toggle_buttons %}
+
+{% block content %}
+<div class="page__head">
+  <div>
+    <p class="rx-subtitle"><a class="rx-link" href="{{ route('products.index') }}">Products</a></p>
+    <h1 class="rx-title">{{ product.name }}</h1>
+  </div>
+  {%- if can('stock.adjust') %}
+  {% call action_sheet("adjust-stock", "Adjust stock", route('products.stock', product.id), "Adjust stock", description="Every change is a line in the ledger below.", submit_label="Save", variant="primary") %}
+    {{ toggle_buttons("reason", "What happened", [["received", "Received"], ["damaged", "Damaged"], ["counted", "Counted"]], selected="received", required=true) }}
+    {{ input("quantity", "Quantity", type="number", required=true, attrs={'min': 0}, hint="For Counted: what is on the shelf.") }}
+    {{ input("note", "Note", autocomplete="off", placeholder="Supplier, delivery note…") }}
+  {% endcall %}
+  {%- endif %}
+</div>
+
+{% call infolist(columns=4) %}
+  {{ entry("SKU", product.sku, copyable=true) }}
+  {{ entry("Price", product.price, format="money") }}
+  {{ entry("In stock", product.stock, badge=("danger" if level == "out" else ("warning" if level == "low" else "success"))) }}
+  {{ entry("Minimum", product.min_stock) }}
+{% endcall %}
+
+{#- The ledger: every change to the stock, with its invoice. -#}
+{{ grid(movements) }}
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "layouts/app.html" %}
+{% from "renox/grid.html" import grid %}
+{% from "renox/ui.html" import action_sheet, input, form_grid %}
+
+{% block content %}
+<div class="page__head">
+  <h1 class="rx-title">Customers</h1>
+  {%- if can('customers.manage') %}
+  {#- A form in a sheet, sent with htmx: errors stay in the sheet, a
+      success closes it and the page reloads (HxRefresh). -#}
+  {% call action_sheet("new-customer", "New customer", route('customers.store'), "New customer", variant="primary", icon="plus", key="n") %}
+    {{ input("name", "Name", required=true, autocomplete="off") }}
+    {% call form_grid(2) %}
+      {{ input("email", "Email", type="email", autocomplete="off") }}
+      {{ input("phone", "Phone", type="tel", autocomplete="off") }}
+    {% endcall %}
+    {{ input("city", "City", autocomplete="off") }}
+  {% endcall %}
+  {%- endif %}
+</div>
+{#- Cells are edited in place by staff with customers.manage. -#}
+{{ grid(customers) }}
+{% endblock %}

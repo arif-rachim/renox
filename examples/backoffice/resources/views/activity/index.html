@@ -1,0 +1,11 @@
+{% extends "layouts/app.html" %}
+{% from "renox/grid.html" import grid %}
+
+{% block content %}
+<div class="page__head">
+  <h1 class="rx-title">Activity</h1>
+</div>
+{#- Logins come from the Audit module; staff, settings and voided
+    invoices from the app (renox::audit::record). -#}
+{{ grid(activity) }}
+{% endblock %}

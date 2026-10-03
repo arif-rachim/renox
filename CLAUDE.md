@@ -223,6 +223,10 @@ examples/                  workspace members, each with a README.md and its own 
   relations/               belongs to, has many, many to many (pivot columns), Morph, no N+1
   grid/                    a sales dashboard on one data grid (renox::grid): phone and desktop
                            columns, filters by kind, frozen columns, grouped headings, sparklines
+  backoffice/              an UMKM back office (Filament's demo as the yardstick): grids,
+                           invoices issued from a stock ledger, payment pages + webhooks,
+                           CSV import, exports from a job, roles, activity log, settings,
+                           branded sign-in pages (resources/views/renox/auth/layout.html)
   teams/                   multi-tenant SaaS on the UI kit: default scopes, renox::context,
                            gate_before, Encrypted<String>, a form request checked live, public
                            team pages on their own host (Routes::domain), a wizard with a
@@ -984,7 +988,9 @@ picks the build, not the terminal.
 - **M29** (examples complete; three PRs after an audit of all 13 examples): M29a (example
   bugs, tests for README claims, seeders that run twice, `.env.example` everywhere,
   fields/webhooks/uploads on the kit, current patterns): merged (#101). M29b
-  (`examples/backoffice`) and M29c (smaller extensions) follow.
+  (`examples/backoffice`: invoices with a stock ledger, Midtrans/Xendit payment pages and
+  webhooks, CSV import, exports from a job with the grid's filters, roles, activity log,
+  settings, branded sign-in): branch `m29b-backoffice`. M29c (smaller extensions) follows.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.
