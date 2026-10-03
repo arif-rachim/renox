@@ -1044,12 +1044,12 @@ picks the build, not the terminal.
   (#112). Layers like `.etag()` cover only the routes added before them.
 - **M34** (the rest of the small adds: `current_password`, `Password::uncompromised` (HIBP),
   `Validator::finish_for`, session `keep`/`now`, named error bags, `App::mailer` +
-  `MAIL_FAILOVER`, `has_many_through`): branch `m34-small-adds`. Async rule checks live in
+  `MAIL_FAILOVER`, `has_many_through`): merged (#114). Async rule checks live in
   `Validator::checks` and run in `finish_with` after the database ones.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.
-- **Still open** (ROADMAP `- [ ]`): an optional HIBP check; the plugins (`renox-2fa`,
+- **Still open** (ROADMAP `- [ ]`): the plugins (`renox-2fa`,
   `renox-oauth`, `renox-admin`, separate crates). A Laravel gap review after M25 (in the
   conversation that planned M26) ranked them: release and docs first, then 2FA and social
   login, then small adds (validation rules like `json`/`gt`/`decimal`/`dimensions`, several

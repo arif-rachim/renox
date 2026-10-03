@@ -631,7 +631,8 @@ before it can start: tenants, roles, accounts.
       current one and keeps this session logged in), delete account; `auth::change_password`
 - [x] Password rules (`Password::min(12).mixed_case().numbers().symbols()`) used by
       register/reset/change; `require_password_confirmed`
-- [ ] Optional breached-password check (HIBP), once the HTTP client (M20c) exists
+- [x] Optional breached-password check (HIBP), once the HTTP client (M20c) exists: done in
+      M34 as `Password::uncompromised()`
 - [x] Auth events (`Registered`, `LoggedIn`, `LoginFailed`, `LockedOut`, `LoggedOut`,
       `PasswordReset`, `EmailVerified`) and an opt-in audit log (the `Audit` module,
       `audit::record(&db, Entry::new(action).user(id).subject(table, id))`)
