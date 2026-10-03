@@ -602,7 +602,10 @@ client-side state. `examples/htmx-recipes` has modals, inline editing, infinite 
 
 `Auth::new()` is a module with Breeze's pages built in (login, registration, password reset,
 email verification, an account page), on the kit and overridable by file. Sanctum's tokens
-are part of it.
+are part of it. For what Breeze and Jetstream scaffold around those pages, `rnx new desk
+--starter` writes the starter kit: a sidebar layout with the notification bell, a dashboard,
+roles (`admin`, `member`), a users page where admins change roles, the activity log, a
+`users:admin` command for the first admin, a seeder and the tests for all of it.
 
 ```rust
 use renox::auth::Permissions;

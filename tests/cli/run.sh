@@ -148,6 +148,24 @@ if [ "$DATABASE" = sqlite ]; then
     cargo test
 fi
 
+step "rnx new desk --starter --database $DATABASE"
+cd "$WORK"
+if [ -n "${FROM_GIT:-}" ]; then
+    "$RNX" new desk --starter --database "$DATABASE"
+else
+    "$RNX" new desk --starter --database "$DATABASE" --renox-path "$REPO"
+fi
+cd desk
+test -f src/app/users/mod.rs
+grep -q '.module(Permissions)' src/lib.rs
+cargo clippy --all-targets -- -D warnings
+if [ "$DATABASE" = sqlite ]; then
+    cargo test
+    cargo run --quiet -- migrate
+    cargo run --quiet -- db:seed
+    cargo run --quiet -- users:admin member@example.com
+fi
+
 echo
 if [ "$DATABASE" = sqlite ]; then
     echo "cli e2e: the generated app builds, passes its tests and runs its commands"

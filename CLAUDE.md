@@ -213,6 +213,8 @@ crates/renox-cli/          `rnx`: main.rs (key:generate, forwarding), new.rs, se
                            standalone CLI: download via curl + SHA-256 check, build/watch; used by
                            new --tailwind, serve, build)
   build.rs                 sets RENOX_GIT_REV (the commit `rnx new` pins apps to)
+  stubs/starter/           `rnx new --starter`: the starter kit's files, written over the
+                           stubs below (same path) or next to them (`STARTER` in new.rs)
   stubs/                   the files `rnx new` writes (Cargo.toml.stub, env.stub, build.rs, src/,
                            resources/, migrations/, tests/, AGENTS.md.stub + CLAUDE.md.stub: the
                            new app's agent guide, named .stub so agents in this repo don't load
@@ -1073,8 +1075,10 @@ picks the build, not the terminal.
   every closure, seeders get `AppState`, `disk_named`, builder-only `Factory`, `DateTime`
   timestamps, opaque `Zone`, sealed `Viewer`/`Executor`/`ForeignKey`, `DownOptions`,
   `retry`/`retry_all`, secrets hidden from `Debug`): merged (#118). V1d (the docs site `site/`, docs/tutorial.md,
-  docs/laravel.md; the owner hosts it on their own server): branch `v1d-docs-site`. Next a
-  starter kit and the publish, which the owner runs (`cargo login`, RELEASING.md).
+  docs/laravel.md; the owner hosts it on their own server): merged (#120). V1e
+  (`rnx new --starter`, the 1.x promise in docs/stability.md): branch `v1e-starter-kit`.
+  Left: the publish, which the owner runs (`cargo login`, RELEASING.md), then the badges
+  and `cargo install renox-cli` in the docs.
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). 

@@ -43,6 +43,86 @@ const STUBS: &[(&str, &str)] = &[
     ),
 ];
 
+/// `--starter`: the starter kit, files written over the stubs above (same
+/// path) or next to them. Sign-up with email verification, roles, the
+/// activity log, a dashboard and the users page in the kit's sidebar layout.
+const STARTER: &[(&str, &str)] = &[
+    ("src/lib.rs", include_str!("../stubs/starter/src/lib.rs")),
+    (
+        "src/app/mod.rs",
+        include_str!("../stubs/starter/src/app/mod.rs"),
+    ),
+    (
+        "src/app/home/mod.rs",
+        include_str!("../stubs/starter/src/app/home/mod.rs"),
+    ),
+    (
+        "src/app/dashboard/mod.rs",
+        include_str!("../stubs/starter/src/app/dashboard/mod.rs"),
+    ),
+    (
+        "src/app/users/mod.rs",
+        include_str!("../stubs/starter/src/app/users/mod.rs"),
+    ),
+    (
+        "src/app/activity/mod.rs",
+        include_str!("../stubs/starter/src/app/activity/mod.rs"),
+    ),
+    (
+        "src/app/roles.rs",
+        include_str!("../stubs/starter/src/app/roles.rs"),
+    ),
+    (
+        "src/app/seed.rs",
+        include_str!("../stubs/starter/src/app/seed.rs"),
+    ),
+    (
+        "tests/home.rs",
+        include_str!("../stubs/starter/tests/home.rs"),
+    ),
+    (
+        "resources/views/layouts/app.html",
+        include_str!("../stubs/starter/resources/views/layouts/app.html"),
+    ),
+    (
+        "resources/views/home/index.html",
+        include_str!("../stubs/starter/resources/views/home/index.html"),
+    ),
+    (
+        "resources/views/dashboard/show.html",
+        include_str!("../stubs/starter/resources/views/dashboard/show.html"),
+    ),
+    (
+        "resources/views/users/index.html",
+        include_str!("../stubs/starter/resources/views/users/index.html"),
+    ),
+    (
+        "resources/views/activity/index.html",
+        include_str!("../stubs/starter/resources/views/activity/index.html"),
+    ),
+    (
+        "resources/lang/en.json",
+        include_str!("../stubs/starter/resources/lang/en.json"),
+    ),
+];
+
+/// The files of a new app: the stubs, with the starter kit's over them.
+fn files(starter: bool) -> Vec<(&'static str, &'static str)> {
+    let kit: &[(&str, &str)] = if starter { STARTER } else { &[] };
+    let mut files: Vec<_> = STUBS
+        .iter()
+        .map(|&(path, text)| {
+            let over = kit.iter().find(|(kit_path, _)| *kit_path == path);
+            (path, over.map_or(text, |(_, text)| *text))
+        })
+        .collect();
+    files.extend(
+        kit.iter()
+            .filter(|(path, _)| !STUBS.iter().any(|(stub, _)| stub == path)),
+    );
+    files
+}
+
 const RENOX_GIT: &str = "https://github.com/arif-rachim/renox";
 
 /// Renox from GitHub, pinned to the commit this `rnx` was built from, so
@@ -68,23 +148,25 @@ fn registry_dependency(version: &str) -> String {
     format!("renox = {{ version = \"{}\"", major_minor.join("."))
 }
 
-pub fn run(
-    name: &str,
-    renox_path: Option<&Path>,
-    database: Database,
-    tailwind: bool,
-) -> Result<()> {
-    run_in(Path::new("."), name, renox_path, database, tailwind)
+/// What `rnx new` makes, besides the name.
+#[derive(Clone, Copy)]
+pub struct Options {
+    pub database: Database,
+    pub tailwind: bool,
+    pub starter: bool,
+}
+
+pub fn run(name: &str, renox_path: Option<&Path>, options: Options) -> Result<()> {
+    run_in(Path::new("."), name, renox_path, options)
 }
 
 /// `run`, making the app in `parent` (tests use a temporary directory).
-fn run_in(
-    parent: &Path,
-    name: &str,
-    renox_path: Option<&Path>,
-    database: Database,
-    tailwind: bool,
-) -> Result<()> {
+fn run_in(parent: &Path, name: &str, renox_path: Option<&Path>, options: Options) -> Result<()> {
+    let Options {
+        database,
+        tailwind,
+        starter,
+    } = options;
     validate_name(name)?;
     let root = &parent.join(name);
     if root.exists() {
@@ -152,7 +234,7 @@ fn run_in(
     };
     let key = crate::generate_key();
 
-    for (file, contents) in STUBS {
+    for (file, contents) in files(starter) {
         let contents = contents
             .replace("{{name}}", name)
             .replace("{{title}}", &title(name))
@@ -163,7 +245,7 @@ fn run_in(
             .replace("{{database_url}}", &database_url)
             .replace("{{test_database_url}}", &test_database_url);
         // Only the real .env gets a key; .env.example stays shareable.
-        let contents = match *file {
+        let contents = match file {
             ".env" => contents.replace("{{app_key}}", &key),
             _ => contents.replace("{{app_key}}", ""),
         };
@@ -183,6 +265,12 @@ fn run_in(
             "Created {name}. Next: create the `{crate_name}` and `{crate_name}_test` databases \
              (or edit DATABASE_URL and TEST_DATABASE_URL in .env), then\n\n    cd {name}\n    rnx serve\n"
         ),
+    }
+    if starter {
+        println!(
+            "Then sign up at /register and make yourself an admin:\n\n    \
+             rnx users:admin you@example.com\n\n(or `rnx db:seed` for admin@example.com, password123)\n"
+        );
     }
     Ok(())
 }
@@ -293,6 +381,12 @@ mod tests {
         assert!(docs_url(None).ends_with("/blob/main"));
     }
 
+    const SQLITE: Options = Options {
+        database: Database::Sqlite,
+        tailwind: false,
+        starter: false,
+    };
+
     /// A written file with `\n` line ends (Windows checkouts give the stubs `\r\n`).
     fn read_lf(path: std::path::PathBuf) -> String {
         fs::read_to_string(path).unwrap().replace("\r\n", "\n")
@@ -302,16 +396,9 @@ mod tests {
     fn makes_an_app_with_every_placeholder_filled() {
         let dir = tempfile::tempdir().unwrap();
         let checkout = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        run_in(
-            dir.path(),
-            "coffee-shop",
-            Some(&checkout),
-            Database::Sqlite,
-            false,
-        )
-        .unwrap();
+        run_in(dir.path(), "coffee-shop", Some(&checkout), SQLITE).unwrap();
         let root = dir.path().join("coffee-shop");
-        for (file, _) in STUBS {
+        for (file, _) in files(false) {
             let text = fs::read_to_string(root.join(file)).unwrap();
             // `{{name}}`-style placeholders (templates' `{{ x }}` has spaces).
             let left = text.split("{{").skip(1).any(|rest| {
@@ -334,24 +421,24 @@ mod tests {
         let agents = fs::read_to_string(root.join("AGENTS.md")).unwrap();
         assert!(agents.contains("coffee_shop::app()"));
         // Not twice, and not over a bad name or a checkout that isn't Renox.
-        assert!(run_in(dir.path(), "coffee-shop", None, Database::Sqlite, false).is_err());
-        assert!(run_in(dir.path(), "Shop", None, Database::Sqlite, false).is_err());
-        assert!(
-            run_in(
-                dir.path(),
-                "other",
-                Some(dir.path()),
-                Database::Sqlite,
-                false
-            )
-            .is_err()
-        );
+        assert!(run_in(dir.path(), "coffee-shop", None, SQLITE).is_err());
+        assert!(run_in(dir.path(), "Shop", None, SQLITE).is_err());
+        assert!(run_in(dir.path(), "other", Some(dir.path()), SQLITE).is_err());
     }
 
     #[test]
     fn postgres_apps_point_at_their_databases() {
         let dir = tempfile::tempdir().unwrap();
-        run_in(dir.path(), "kasir", None, Database::Postgres, false).unwrap();
+        run_in(
+            dir.path(),
+            "kasir",
+            None,
+            Options {
+                database: Database::Postgres,
+                ..SQLITE
+            },
+        )
+        .unwrap();
         let root = dir.path().join("kasir");
         let cargo = fs::read_to_string(root.join("Cargo.toml")).unwrap();
         assert!(cargo.contains("features = [\"postgres\"]"), "{cargo}");
@@ -360,6 +447,36 @@ mod tests {
         assert!(env.contains(
             "\nTEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/kasir_test"
         ));
+    }
+
+    #[test]
+    fn the_starter_kit_writes_over_the_stubs() {
+        let dir = tempfile::tempdir().unwrap();
+        let starter = Options {
+            starter: true,
+            ..SQLITE
+        };
+        run_in(dir.path(), "desk", None, starter).unwrap();
+        let root = dir.path().join("desk");
+        // Every stub once, the kit's version where it has one, and its own files.
+        let files = files(true);
+        assert_eq!(files.len(), STUBS.len() + 8);
+        for (file, _) in &files {
+            assert!(root.join(file).is_file(), "{file}");
+        }
+        for (file, text) in STARTER {
+            let written = read_lf(root.join(file));
+            let expected = text
+                .replace("\r\n", "\n")
+                .replace("{{crate_name}}", "desk")
+                .replace("{{title}}", "Desk");
+            assert_eq!(written, expected, "{file}");
+        }
+        let lib = fs::read_to_string(root.join("src/lib.rs")).unwrap();
+        assert!(lib.contains(".module(Permissions)"), "{lib}");
+        assert!(root.join("src/app/users/mod.rs").is_file());
+        let tests = fs::read_to_string(root.join("tests/home.rs")).unwrap();
+        assert!(tests.contains("use desk::roles"), "{tests}");
     }
 
     #[test]

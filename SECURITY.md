@@ -18,7 +18,8 @@ Please give us a reasonable time to ship a fix before you publish details.
 
 Renox is before 1.0: only the latest commit on `main` (and, once published, the latest
 release on crates.io) gets security fixes. From 1.0, the latest minor release of the
-current major version does.
+current major version does, and so does the minor release before it for six months after
+its successor ships (see [docs/stability.md](docs/stability.md)).
 
 Apps made by `rnx new` are pinned to a Renox commit. To get a fix, move that pin (or the
 version) forward and run `cargo update -p renox`.

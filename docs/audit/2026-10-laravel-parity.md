@@ -317,14 +317,15 @@ New rows:
 | Envoy | SSH task runner | n/a: `rnx build` + `make:deploy` | n/a | – |
 | Vapor (serverless) | Lambda | not planned | ⛔ | Min |
 | Pint | formatter | rustfmt, clippy in CI | ✅ | – |
-| Starter kits | Breeze/Jetstream, React/Vue/Livewire kits | `rnx new` (layout on the kit, auth pages, account pages, `--tailwind`); a starter kit is a v1.0 item | 🟡 | Min |
+| Starter kits | Breeze/Jetstream, React/Vue/Livewire kits | `rnx new` (layout on the kit, auth pages, account pages, `--tailwind`); `rnx new --starter` (verification, roles, dashboard, users, activity log; V1e). No JavaScript-framework kits: htmx is the stack | ✅ | – |
 | Agent support | Boost | llms.txt, CHEATSHEET, AGENTS.md/CLAUDE.md in new apps | ✅ | – |
 
 ## Still open, ranked
 
-1. **Maturity (B):** a release on crates.io, `cargo-semver-checks`, the docs site with a
-   tutorial and a "Laravel → Renox" guide, API docs on docs.rs, a starter kit, a support
-   policy; then users, contributors, community.
+1. **Maturity (B):** a release on crates.io (the owner runs it, RELEASING.md); then users,
+   contributors, community. Done for v1.0 (V1a–V1e): `cargo-semver-checks` in CI, the API
+   audit, the docs site with a tutorial and a "Laravel → Renox" guide, the starter kit, the
+   support policy and the semver promise (docs/stability.md, SECURITY.md).
 2. **2FA (Maj):** TOTP and recovery codes (`renox-2fa`).
 3. **Social login (Maj):** OAuth providers (`renox-oauth`).
 4. **Small adds (Min):** M33 and M34 closed the list the review started with (validation
@@ -350,7 +351,8 @@ In the order the owner ranked the open work (CLAUDE.md §7, "Still open"):
 1. **Release and docs (v1.0):** API audit, `cargo-semver-checks` in CI, real crates
    (`renox`, `renox-core`, `renox-macros`, `renox-cli`) with docs.rs, the docs site built with
    Renox (tutorial, "Laravel → Renox" guide, API reference), a starter kit, the semver
-   guarantee in docs/stability.md. The owner decides when v1.0 starts.
+   guarantee in docs/stability.md. Started 2026-10-03; everything but the release is done
+   (V1a–V1e).
 2. **2FA and social login:** `renox-2fa` (TOTP, recovery codes, password confirmation reused)
    and `renox-oauth` (Google, GitHub, … linked to `users`), as separate crates.
 3. **Small adds:** done in M33 and M34. What's left is minor and can wait for users to ask:

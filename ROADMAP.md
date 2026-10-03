@@ -1590,7 +1590,11 @@ Started by the owner on 2026-10-03, after M34. In steps, one PR each:
       docs/tutorial.md (Stash, a bookmarks app, `rnx new` to deploy) and docs/laravel.md,
       both compiled as doctests (`TutorialGuide`, `LaravelGuide`). The API reference is
       docs.rs, linked from the site once crates are published
-- [ ] A starter kit; the semver stability guarantee
+- [x] V1e, the starter kit: `rnx new --starter` (stubs/starter/: sidebar layout, email
+      verification, roles with `Permissions`, dashboard, users page, activity log,
+      `users:admin`, seeder, tests; in tests/cli/run.sh), and the semver promise in
+      docs/stability.md ("The promise": deprecation policy, data compatibility across 1.x,
+      support window for the previous minor, MSRV rule) with SECURITY.md's supported versions
 - [ ] Real crates published to crates.io (`renox`, `renox-core`, `renox-macros`, `renox-cli`;
       only 0.0.1 placeholders exist; the owner runs `cargo login` and RELEASING.md), then
       crates.io/docs.rs badges and `cargo install renox-cli` in the README

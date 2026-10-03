@@ -31,14 +31,16 @@ You need Rust 1.94 or later.
 
 ```bash
 cargo install --locked --git https://github.com/arif-rachim/renox renox-cli   # installs `rnx`
-rnx new blog && cd blog                                             # or: --database postgres, --tailwind
+rnx new blog && cd blog                                             # or: --starter, --database postgres, --tailwind
 rnx serve                                                           # http://127.0.0.1:3000
 ```
 
 The new app has a layout built with the UI kit (navigation bar, account menu, toasts), a home
 page, login and registration, an account page (profile, password, other devices), an error page
 in the layout, its texts in `resources/lang/en.json`, a test in `tests/home.rs`, and an `AGENTS.md` for
-coding agents. With `--database postgres`, create the
+coding agents. `rnx new blog --starter` writes the starter kit on top: a sidebar layout with
+the notification bell, email verification, roles, a dashboard, a users page for admins and the
+activity log, with their tests. With `--database postgres`, create the
 `blog` and `blog_test` databases first (or edit `.env`).
 
 `rnx serve` rebuilds and restarts on Rust changes, and the browser reloads itself when a view
@@ -422,7 +424,8 @@ out of the box.
 | Gates and policies | `App::gate`, `impl Policy`, `user.authorize(…)`, `.require_gate(…)` |
 | spatie/laravel-permission | the `Permissions` module: `assign_role`, `has_permission`, `.require_role(…)` |
 | Global scopes (tenancy) | `#[model(default_scope = "…")]` with `renox::context` |
-| Breeze / Sanctum | `Auth::new().account()` (pages included) / API tokens with abilities (`create_token_with`, `.require_ability(…)`) |
+| Breeze / Jetstream | `rnx new --starter`: email verification, roles, a dashboard, the users page and the activity log; or `Auth::new().account()` alone |
+| Sanctum | API tokens with abilities (`create_token_with`, `.require_ability(…)`) |
 | `Cache::lock` | `state.cache.lock(name, ttl)` |
 | Queues, mail, notifications, scheduler | `impl Job`, `mail_view`, `impl Notification`, `app.schedule()` |
 | Horizon | the queue dashboard: `.module(renox::queue::Dashboard)` |
