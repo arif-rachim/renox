@@ -421,7 +421,7 @@ async fn batches_track_progress_and_follow_up() {
     // Retrying the failed job puts it back in its batch.
     let failed = queue.failed().await.unwrap();
     let y = failed.iter().find(|f| f.payload.contains('y')).unwrap();
-    queue.retry(Some(y.id)).await.unwrap();
+    queue.retry(y.id).await.unwrap();
     let status = queue.batch_status(tolerant).await.unwrap().unwrap();
     assert_eq!(
         (status.failed, status.pending, status.finished),

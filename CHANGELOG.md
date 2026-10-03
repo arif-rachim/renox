@@ -10,6 +10,41 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### v1.0 · The API audit's should-fix items (V1c)
+
+Cheap now, breaking later: the rest of the audit, as the owner chose (all but renaming `gate`
+to `authorize_gate`). **Breaking**, item by item:
+
+- **The state comes last in every closure:** `App::command(name, about, |args, state| …)`,
+  `App::channel(name, |to, message, state| …)`, `on_failure(|err, state| …)`,
+  `Auth::on_registered(|user, form, state| …)`, like `listen` and `report` already were. A
+  seeder gets the `AppState` (`|state| … &state.db`), not just the `Db`.
+- `AppState::routes`, `views` and `translator` are internal (`state.url(…)`, `view()`, `Lang`
+  and `t()` cover them); `RouteTable` and `Views` are no longer exported.
+- `state.disk(name)` is `state.disk_named(name)`, like `mailer_named`.
+- `Factory` keeps `definition()` and `factory()`; `Model::make()`, `create_one(&db)` and
+  `create_many(&db, n)` are gone: `factory().make_one()`, `.create_one(&db)`,
+  `.count(n).create(&db)`.
+- Timestamps are `DateTime`: `FailedJob::failed_at`, `BatchStatus::created_at`,
+  `WebhookCall::received_at` / `processed_at`, `maintenance::Down::since` (still unix seconds
+  in its file).
+- `Recipient`'s fields are private: `user()`, `address(channel)`, `locale()`.
+- `Session::now` is `Session::flash_now`; `i18n::set_locale` is `i18n::remember_locale`.
+- `Config::load` / `from_env` / `from_vars` and `TrustedProxies::parse` return
+  `renox::Result`; `Schedule::upcoming` returns `UpcomingRun`s (`name`, `at`, `zone`).
+- `timezone::Zone` is opaque: `Zone::UTC`, `Zone::fixed(seconds)`, `"Asia/Jakarta".parse()`;
+  `chrono-tz` is no longer part of the API.
+- Sealed: `auth::Viewer`, `db::Executor`, `relations::ForeignKey`.
+- `Model`'s `values`, `set_id`, `touch`, `set_deleted_at` are `#[doc(hidden)]` (implement
+  `Model` with the derive); `queue::handler` / `JobHandler` are internal; `shell::run_with`
+  is hidden; `auth::Can` is `#[non_exhaustive]`.
+- `maintenance::down(storage, DownOptions::new().secret(…).retry(…))`.
+- `Queue::retry(id) -> bool` and `Queue::retry_all() -> u64` replace `retry(Option<i64>)`.
+- `Debug` for `Config`, `AnalyticsConfig`, `MailConfig` and `StorageConfig` hides `APP_KEY`,
+  passwords and secrets (and `Config::vars`' values).
+- `renox::minijinja` is re-exported; docs/stability.md lists `bytes` and `http` among the
+  public dependencies and no longer lists `chrono-tz`.
+
 ### v1.0 · The API audit's must-fix items (V1b)
 
 A read-only review of every public item before 1.0 found nine things that would be breaking

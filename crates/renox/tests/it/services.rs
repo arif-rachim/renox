@@ -286,7 +286,7 @@ async fn notifications_speak_the_recipients_language() {
     let app = TestApp::with_config(
         App::new()
             .module(Auth::new())
-            .channel("whatsapp", move |_, _, message| {
+            .channel("whatsapp", move |_, message, _| {
                 let log = log.clone();
                 async move {
                     log.lock()

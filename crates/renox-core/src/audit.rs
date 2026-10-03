@@ -109,7 +109,7 @@ impl Module for Audit {
         app.command(
             "audit:prune",
             "Delete audit entries older than --days (default 365)",
-            |state, args| async move {
+            |args, state| async move {
                 let days: u64 = args
                     .value("--days")
                     .unwrap_or("365")

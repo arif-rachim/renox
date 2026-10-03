@@ -176,7 +176,7 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/upload.rs            Upload (multipart file field), sniffing, store/store_public, token registry
   src/storage.rs           Storage (local disk; S3 with the `s3` feature), temporary URLs, /_renox/files,
                            list/copy/rename/size/delete_all; named disks (App::disk,
-                           state.disk, StorageConfig::from_env) served at /_renox/disks/<name>
+                           state.disk_named, StorageConfig::from_env) served at /_renox/disks/<name>
   src/http.rs              renox::http client (reqwest behind the `http` feature) + FakeHttp
   src/i18n.rs              Translator (lang JSON files), format() with plurals and ranges,
                            RequestLocale middleware (Accept-Language with App::detect_locale), Lang
@@ -1052,7 +1052,7 @@ picks the build, not the terminal.
   `redirect`, named disks, `Routes::etag`, `App::xsrf_cookie`, `TRUSTED_HOSTS`): merged
   (#112). Layers like `.etag()` cover only the routes added before them.
 - **M34** (the rest of the small adds: `current_password`, `Password::uncompromised` (HIBP),
-  `Validator::finish_for`, session `keep`/`now`, named error bags, `App::mailer` +
+  `Validator::finish_for`, session `keep`/`flash_now`, named error bags, `App::mailer` +
   `MAIL_FAILOVER`, `has_many_through`): merged (#114). Async rule checks live in
   `Validator::checks` and run in `finish_with` after the database ones.
 - **v1.0 started** (the owner, 2026-10-03, after M34). V1a (release readiness: lockstep `=`
@@ -1060,9 +1060,12 @@ picks the build, not the terminal.
   job, RELEASING.md): merged (#115). V1b (the API audit's must-fix items: settings as enums with
   `setting_enum!` in lib.rs, `Duration` lifetimes, `Notification::channels(to)` and
   `to_database(to, state) -> Result`, `notify(impl Into<Recipient>)`, `Job::failed(ctx, …)`,
-  no `Locale`, private `Upload` fields, `Migration` builders): branch `v1b-api-must`. Next
-  V1c (the should-fix items; the owner chose all but `gate` → `authorize_gate`), then the
-  docs site and the publish, which the owner runs (`cargo login`, RELEASING.md).
+  no `Locale`, private `Upload` fields, `Migration` builders): merged (#117). V1c
+  (the should-fix items; the owner chose all but `gate` → `authorize_gate`: the state last in
+  every closure, seeders get `AppState`, `disk_named`, builder-only `Factory`, `DateTime`
+  timestamps, opaque `Zone`, sealed `Viewer`/`Executor`/`ForeignKey`, `DownOptions`,
+  `retry`/`retry_all`, secrets hidden from `Debug`): branch `v1c-api-should`. Next the docs
+  site and the publish, which the owner runs (`cargo login`, RELEASING.md).
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). 

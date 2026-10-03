@@ -170,7 +170,7 @@ fn app() -> App {
             Ok(user.email.starts_with("bill"))
         })
         .gate_before(|user, _ability| (user.email == "root@example.com").then_some(true))
-        .command("projects:count", "count", |state, _args| async move {
+        .command("projects:count", "count", |_args, state| async move {
             // A command has its own, empty context: the scope fails closed.
             let scoped = Project::query().count(&state.db).await?;
             let all = Project::unscoped().count(&state.db).await?;

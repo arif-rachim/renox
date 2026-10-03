@@ -141,7 +141,7 @@ impl Module for Probe {
             .get(
                 "/lang/{locale}",
                 |session: Session, back: Back, Path(l): Path<String>| async move {
-                    renox::i18n::set_locale(&session, &l).unwrap();
+                    renox::i18n::remember_locale(&session, &l).unwrap();
                     back
                 },
             );
@@ -1714,7 +1714,13 @@ async fn htmx_behaviour() {
 async fn maintenance_mode() {
     let app = fixture_with(Auth::new(), |c| c.url = "https://shop.example.com".into()).await;
     let storage = app.state().config.storage_path.clone();
-    renox::maintenance::down(&storage, Some("s3cr3t".into()), Some(60)).unwrap();
+    renox::maintenance::down(
+        &storage,
+        renox::maintenance::DownOptions::new()
+            .secret("s3cr3t")
+            .retry(60),
+    )
+    .unwrap();
 
     let res = app.get("/").await;
     res.assert_status(503);
@@ -1761,7 +1767,11 @@ async fn maintenance_mode() {
 async fn maintenance_bypass_cookie_is_not_the_raw_secret() {
     let app = fixture().await;
     let storage = app.state().config.storage_path.clone();
-    renox::maintenance::down(&storage, Some("s3cr3t".into()), None).unwrap();
+    renox::maintenance::down(
+        &storage,
+        renox::maintenance::DownOptions::new().secret("s3cr3t"),
+    )
+    .unwrap();
     let res = app.get("/s3cr3t").await;
     let line = set_cookie_line(&res, "renox_maintenance").unwrap();
     assert!(

@@ -215,7 +215,7 @@ async fn store(
 
 /// Remembers the visitor's language and goes back to where they were.
 async fn switch_language(session: Session, back: Back, Path(locale): Path<String>) -> Result<Back> {
-    renox::i18n::set_locale(&session, &locale)?;
+    renox::i18n::remember_locale(&session, &locale)?;
     Ok(back)
 }
 
@@ -233,8 +233,9 @@ pub fn app() -> App {
         // A visitor who hasn't picked a language gets their browser's (en or
         // es), else APP_LOCALE; /language/{locale} still wins.
         .detect_locale()
-        .seeder(|db| async move {
-            Entry::create_many(&db, 30).await?;
+        .seeder(|state| async move {
+            let db = state.db;
+            Entry::factory().count(30).create(&db).await?;
             Ok(())
         })
 }

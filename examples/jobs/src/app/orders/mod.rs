@@ -201,7 +201,7 @@ async fn sales_report(state: AppState, days: i64, subject: &str, period: &str) -
 }
 
 /// Runs when a report fails (the error is logged anyway): tells a person.
-async fn report_failed(state: AppState, err: Error) {
+async fn report_failed(err: Error, state: AppState) {
     let to = state
         .config
         .var("ALERT_EMAIL")

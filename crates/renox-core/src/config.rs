@@ -91,7 +91,7 @@ setting_enum! {
 }
 
 /// Application configuration, read from the process environment and `.env`.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 #[non_exhaustive]
 pub struct Config {
     /// The application's name, from `APP_NAME` (Renox).
@@ -185,10 +185,61 @@ pub struct Config {
     pub trusted_hosts: Vec<String>,
 }
 
+impl std::fmt::Debug for Config {
+    // Secrets show as `[hidden]`, so a logged config doesn't leak them.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Config")
+            .field("name", &self.name)
+            .field("env", &self.env)
+            .field("debug", &self.debug)
+            .field("url", &self.url)
+            .field("key", &self.key.as_ref().map(|_| "[hidden]"))
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .field("views_path", &self.views_path)
+            .field("public_path", &self.public_path)
+            .field("session_lifetime", &self.session_lifetime)
+            .field("session_cookie", &self.session_cookie)
+            .field("session_driver", &self.session_driver)
+            .field("remember_lifetime", &self.remember_lifetime)
+            .field("database_url", &self.database_url)
+            .field("database_pool_size", &self.database_pool_size)
+            .field("database_acquire_timeout", &self.database_acquire_timeout)
+            .field(
+                "database_statement_timeout",
+                &self.database_statement_timeout,
+            )
+            .field("request_timeout", &self.request_timeout)
+            .field("locale", &self.locale)
+            .field("fallback_locale", &self.fallback_locale)
+            .field("currency", &self.currency)
+            .field("lang_path", &self.lang_path)
+            .field("mail", &self.mail)
+            .field("queue_workers", &self.queue_workers)
+            .field("scheduler", &self.scheduler)
+            .field("log_format", &self.log_format)
+            .field("log_file", &self.log_file)
+            .field("timezone", &self.timezone)
+            .field("cache_store", &self.cache_store)
+            .field("storage_path", &self.storage_path)
+            .field("storage", &self.storage)
+            .field("upload_max_size", &self.upload_max_size)
+            .field("csp", &self.csp)
+            .field(
+                "vars",
+                &self.vars.keys().collect::<std::collections::BTreeSet<_>>(),
+            )
+            .field("analytics", &self.analytics)
+            .field("trusted_proxies", &self.trusted_proxies)
+            .field("trusted_hosts", &self.trusted_hosts)
+            .finish()
+    }
+}
+
 /// Google Search Console, Google Analytics 4 and Google Tag Manager, from
 /// `GOOGLE_SITE_VERIFICATION`, `GA4_MEASUREMENT_ID`, `GA4_API_SECRET` and
 /// `GTM_CONTAINER_ID`. Tags are added to pages only in production.
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 #[non_exhaustive]
 pub struct AnalyticsConfig {
     /// The `content` of Search Console's `google-site-verification` meta tag.
@@ -201,21 +252,41 @@ pub struct AnalyticsConfig {
     pub gtm_container_id: Option<String>,
 }
 
+impl std::fmt::Debug for AnalyticsConfig {
+    // Secrets show as `[hidden]`, so a logged config doesn't leak them.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AnalyticsConfig")
+            .field("google_site_verification", &self.google_site_verification)
+            .field("ga4_measurement_id", &self.ga4_measurement_id)
+            .field(
+                "ga4_api_secret",
+                &self.ga4_api_secret.as_ref().map(|_| "[hidden]"),
+            )
+            .field("gtm_container_id", &self.gtm_container_id)
+            .finish()
+    }
+}
+
 impl Config {
     /// Loads `.env` (if present) and reads the configuration from the environment.
-    pub fn load() -> anyhow::Result<Self> {
+    pub fn load() -> crate::Result<Self> {
         let _ = dotenvy::dotenv();
         Self::from_env()
     }
 
     /// Reads the configuration from the environment only, without loading `.env`.
-    pub fn from_env() -> anyhow::Result<Self> {
+    pub fn from_env() -> crate::Result<Self> {
         Self::from_vars(|name| env::var(name).ok())
     }
 
     /// Reads the configuration from `get` (a variable's value by name), e.g.
     /// a map in a test: `Config::from_vars(|name| vars.get(name).cloned())`.
-    pub fn from_vars(get: impl Fn(&str) -> Option<String>) -> anyhow::Result<Self> {
+    /// A value that doesn't fit is an error naming its variable.
+    pub fn from_vars(get: impl Fn(&str) -> Option<String>) -> crate::Result<Self> {
+        Ok(Self::read(get)?)
+    }
+
+    fn read(get: impl Fn(&str) -> Option<String>) -> anyhow::Result<Self> {
         let v = Vars(get);
         let env = Environment::parse(&v.or("APP_ENV", "local"))?;
         let debug = v.bool("APP_DEBUG", env == Environment::Local)?;
@@ -337,7 +408,7 @@ impl Config {
                 .and_then(|mb| mb.checked_mul(1024 * 1024))
                 .context("UPLOAD_MAX_SIZE must be a number of megabytes")?,
             csp: CspMode::parse(&v.or("CSP", "relaxed"))?,
-            trusted_proxies: crate::TrustedProxies::parse(&v.or("TRUSTED_PROXIES", ""))?,
+            trusted_proxies: crate::TrustedProxies::read(&v.or("TRUSTED_PROXIES", ""))?,
             trusted_hosts: v
                 .or("TRUSTED_HOSTS", "")
                 .split(',')
@@ -474,7 +545,7 @@ mod tests {
             .iter()
             .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
             .collect();
-        Config::from_vars(|name| vars.get(name).cloned())
+        Config::read(|name| vars.get(name).cloned())
     }
 
     #[test]
@@ -491,6 +562,22 @@ mod tests {
         assert_eq!(c.cache_store, CacheStore::Memory);
         assert_eq!(c.csp, CspMode::Relaxed);
         assert!(c.key.is_none() && c.mail.port.is_none());
+    }
+
+    #[test]
+    fn debug_hides_secrets() {
+        let mut c = load(&[("APP_KEY", "base64:c2VjcmV0"), ("MAIL_PASSWORD", "hunter2")]).unwrap();
+        c.vars
+            .insert("XENDIT_SECRET_KEY".into(), "xnd_live_123".into());
+        let shown = format!("{c:?}");
+        for secret in ["c2VjcmV0", "hunter2", "xnd_live_123"] {
+            assert!(!shown.contains(secret), "{secret} in {shown}");
+        }
+        assert!(
+            shown.contains("XENDIT_SECRET_KEY"),
+            "variable names stay: {shown}"
+        );
+        assert!(shown.contains("[hidden]"));
     }
 
     #[test]

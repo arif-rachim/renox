@@ -187,7 +187,7 @@ impl Module for Flash {
                 )
             })
             .get("/now", |session: Session| async move {
-                session.now("status", "Shown now.").unwrap();
+                session.flash_now("status", "Shown now.").unwrap();
                 view("flash.html", context! {})
             })
     }

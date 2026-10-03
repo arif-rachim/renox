@@ -23,7 +23,8 @@ pub fn app() -> App {
         .migrations(renox::migrations!())
         .module(app::tasks::Tasks)
         // `cargo run -- db:seed`: a few tasks, one of them overdue.
-        .seeder(|db| async move {
+        .seeder(|state| async move {
+            let db = state.db;
             if Task::query().exists(&db).await? {
                 return Ok(()); // seeded already
             }

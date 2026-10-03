@@ -59,7 +59,7 @@ pub fn app() -> App {
         .command(
             "projects:count",
             "Count the projects of every team",
-            |state, _args| async move {
+            |_args, state| async move {
                 for (team, projects) in app::admin::project_counts(&state.db).await? {
                     println!("{:>5}  {}", projects, team.name);
                 }
@@ -71,7 +71,8 @@ pub fn app() -> App {
 
 /// `rnx db:seed`: two teams, three users (password `password123`), and a few
 /// projects. Alice is in both teams, so she can switch between them.
-async fn seed(db: Db) -> Result {
+async fn seed(state: AppState) -> Result {
+    let db = state.db;
     // Seeding twice is harmless: a seeded database stays as it is.
     if User::find_by_email(&db, "alice@example.com")
         .await?

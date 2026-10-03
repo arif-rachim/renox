@@ -15,11 +15,11 @@
 //!     Ok(back)
 //! }
 //! # fn demo(session: &Session) -> Result {
-//! renox::i18n::set_locale(&session, "en")?;   // this visitor's language from now on
+//! renox::i18n::remember_locale(&session, "en")?;   // this visitor's language from now on
 //! # Ok(()) }
 //! ```
 //!
-//! A request's language is the one stored with `set_locale`, else `APP_LOCALE`.
+//! A request's language is the one stored with `remember_locale`, else `APP_LOCALE`.
 //! Missing keys fall back to `APP_FALLBACK_LOCALE`, then to the key itself.
 //! Renox's own texts can be replaced or translated from the same files:
 //! `renox.validation.required`, `renox.validation.attributes.email` and
@@ -554,7 +554,7 @@ pub fn set_current_locale(locale: &str) {
 }
 
 /// Makes `locale` this visitor's language from the next request on.
-pub fn set_locale(session: &Session, locale: &str) -> Result {
+pub fn remember_locale(session: &Session, locale: &str) -> Result {
     session.put(SESSION_KEY, locale)
 }
 

@@ -79,7 +79,7 @@ use renox::prelude::*;
 
 async fn backup(_state: AppState) -> Result { Ok(()) }
 
-async fn alert(state: AppState, err: Error) {
+async fn alert(err: Error, state: AppState) {
     let to = state.config.var("ALERT_EMAIL").unwrap_or_else(|| "ops@example.com".into());
     let mail = renox::mail::Mail::new(to, "The backup failed", format!("{err:?}"));
     if let Err(err) = state.queue_mail(mail).await {
@@ -411,7 +411,7 @@ name as `Args`:
 use renox::prelude::*;
 use renox::command::Args;
 
-async fn create_admin(state: AppState, args: Args) -> Result {
+async fn create_admin(args: Args, state: AppState) -> Result {
     let (Some(email), Some(password)) = (args.value("--email"), args.value("--password")) else {
         return Err(Error::BadRequest("usage: admin:create --email E --password P".into()));
     };
@@ -496,7 +496,7 @@ the module's `register`.
 use renox::prelude::*;
 use renox::prompt;
 
-async fn create_user(state: AppState, args: renox::command::Args) -> Result {
+async fn create_user(args: renox::command::Args, state: AppState) -> Result {
     let email = match args.value("--email") {
         Some(email) => email.to_owned(),
         None => prompt::ask("Email").await?, // asks until something is typed

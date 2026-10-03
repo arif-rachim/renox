@@ -101,7 +101,7 @@ impl Module for Products {
     fn register(&self, app: &mut Registry) {
         // `my-app products:import file.csv --dry-run` (or `rnx products:import …`)
         app.typed_command::<ImportProducts>();
-        // Untyped: app.command("name", "about", |state, args: renox::command::Args| async { … })
+        // Untyped: app.command("name", "about", |args: renox::command::Args, state| async { … })
     }
 }
 
@@ -441,7 +441,7 @@ struct ContactForm {
 async fn store(session: Session, Valid(form): Valid<ProductForm>) -> Result<Redirect> {
     let _ = form.name;
     session.flash("status", "Saved.")?; // session.keep(&["status"]) carries it one more request;
-    Ok(Redirect::to("/products"))       // session.now(key, value) shows one on this page only
+    Ok(Redirect::to("/products"))       // session.flash_now(key, value) shows one on this page only
 }
 
 /// Two forms on one page with the same field names: this one's errors go in the `login` bag,
@@ -889,8 +889,9 @@ impl Factory for Product {
 
 fn seeders(app: App) -> App {
     // `rnx db:seed`, or `rnx migrate:fresh --seed`
-    app.seeder(|db| async move {
-        Product::create_many(&db, 50).await?; // in one transaction
+    app.seeder(|state| async move {
+        let db = state.db;
+        Product::factory().count(50).create(&db).await?; // in one transaction
         // Seeders run in the app's context: config, encrypt, the cache, random_token().
         let state = renox::context::app().expect("in a seeder");
         let _invite = (state.encrypt("secret"), renox::random_token());
@@ -904,8 +905,8 @@ fn premium(p: &mut Product) {
 }
 
 async fn in_a_test(db: &Db) -> Result {
-    let draft = Product::make();                // not saved
-    let saved = Product::create_one(db).await?; // saved
+    let draft = Product::factory().make_one();                // not saved
+    let saved = Product::factory().create_one(db).await?; // saved
     let three = Product::factory()
         .count(3)
         .state(premium)
@@ -975,7 +976,7 @@ fn auth() -> Auth {
         .registration_rules(|form, v| {
             v.field("phone", &form.get("phone")).required().max(20);
         })
-        .on_registered(|state, mut user, form| async move {
+        .on_registered(|mut user, form, state| async move {
             user.set(&state.db, "phone", form.get("phone")).await // a failure undoes the sign-up
         })
 }
@@ -1335,7 +1336,7 @@ fn background(app: App) -> App {
             });
             s.cron("30 9 * * 1-5", "standup", |_state| async move { Ok(()) }) // min hour day month weekday
                 .timezone("Europe/Amsterdam") // instead of APP_TIMEZONE; DST handled
-                .on_failure(|_state, err| async move { eprintln!("standup failed: {err:?}") })
+                .on_failure(|err, _state| async move { eprintln!("standup failed: {err:?}") })
                 .on_success(|_state| async move {});
             s.weekly_on(renox::chrono::Weekday::Mon, "07:00", "weekly", |_state| async move { Ok(()) });
             s.monthly_on(1, "00:05", "invoices", |_state| async move { Ok(()) });
@@ -1444,8 +1445,8 @@ impl Notification for OrderShipped {
 
 fn channels(app: App) -> App {
     // Your own channel: call WhatsApp, SMS or Slack with what `to_channel` built.
-    app.channel("whatsapp", |_state, to: Recipient, message| async move {
-        let phone = to.address("whatsapp").or_else(|| to.user.as_ref()?.get("phone"));
+    app.channel("whatsapp", |to: Recipient, message, _state| async move {
+        let phone = to.address("whatsapp").or_else(|| to.user()?.get("phone"));
         let _ = (phone, message);
         Ok(())
     })
@@ -1561,7 +1562,7 @@ async fn misc(State(state): State<AppState>, session: Session, lang: Lang) -> Re
 }
 
 async fn switch_language(session: Session, back: Back) -> Result<Back> {
-    renox::i18n::set_locale(&session, "es")?; // (with lang/es.json) this visitor's language from the next request on
+    renox::i18n::remember_locale(&session, "es")?; // (with lang/es.json) this visitor's language from the next request on
     // (App::new().detect_locale() picks the browser's language until the visitor chooses one)
     Ok(back)
 }
@@ -1632,7 +1633,7 @@ fn with_disks(app: App) -> App {
 }
 
 async fn save(State(state): State<AppState>) -> Result<String> {
-    let exports = state.disk("exports")?; // an unknown name is a 500
+    let exports = state.disk_named("exports")?; // an unknown name is a 500
     exports.put("orders.csv", "id,total\n".into()).await?;
     // Public keys: `/_renox/disks/exports/public/…`; the rest through temporary_url.
     Ok(exports.url("public/logo.png"))

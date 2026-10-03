@@ -7,7 +7,7 @@ use renox::testing::TestApp;
 
 async fn with_orders(n: usize) -> TestApp {
     let app = TestApp::new(grid::app()).await;
-    Order::create_many(app.db(), n).await.unwrap();
+    Order::factory().count(n).create(app.db()).await.unwrap();
     app
 }
 

@@ -33,7 +33,7 @@ impl Module for Site {
             .get(
                 "/lang/{locale}",
                 |session: Session, Path(locale): Path<String>| async move {
-                    renox::i18n::set_locale(&session, &locale)?;
+                    renox::i18n::remember_locale(&session, &locale)?;
                     Ok::<_, Error>("ok")
                 },
             )

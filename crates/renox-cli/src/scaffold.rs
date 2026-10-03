@@ -483,7 +483,7 @@ __fields__    pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
 }
 
-/// Fake records for seeders and tests: `__Model__::create_many(&db, 20)`.
+/// Fake records for seeders and tests: `__Model__::factory().count(20).create(&db)`.
 impl Factory for __Model__ {
     fn definition() -> Self {
         __Model__ {

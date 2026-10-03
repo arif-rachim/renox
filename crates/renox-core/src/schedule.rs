@@ -20,7 +20,7 @@
 //!     });
 //!     s.cron("30 9 * * 1-5", "standup", |state| async move { report(&state).await })
 //!         .timezone("Europe/Amsterdam")
-//!         .on_failure(|_state, err| async move {
+//!         .on_failure(|err, _state| async move {
 //!             tracing::error!(error = ?err, "standup report failed");
 //!         });
 //!     s.weekly_on(Weekday::Mon, "07:00", "weekly-report", |state| async move {
@@ -332,10 +332,10 @@ impl ScheduledTask<'_> {
     /// someone). The failure is logged either way.
     pub fn on_failure<F, Fut>(self, hook: F) -> Self
     where
-        F: Fn(AppState, Error) -> Fut + Send + Sync + 'static,
+        F: Fn(Error, AppState) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = ()> + Send + 'static,
     {
-        let hook: FailFn = Arc::new(move |state, err| Box::pin(hook(state, err)));
+        let hook: FailFn = Arc::new(move |state, err| Box::pin(hook(err, state)));
         self.edit(|t| {
             t.on_failure = Some(hook);
             Ok(())
@@ -527,19 +527,34 @@ impl Schedule {
     pub(crate) fn is_empty(&self) -> bool {
         self.tasks.is_empty()
     }
+}
 
-    /// Each task with its next run time (unix seconds; `i64::MAX` if it
-    /// never runs) and its time zone.
-    pub fn upcoming(&self, zone: Zone) -> Vec<(String, i64, Zone)> {
+/// A scheduled task's next run, from [`Schedule::upcoming`].
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct UpcomingRun {
+    /// The task's name.
+    pub name: String,
+    /// When it runs next; `None` if it never will (a date that can't come).
+    pub at: Option<crate::db::DateTime>,
+    /// The zone its times are in.
+    pub zone: Zone,
+}
+
+impl Schedule {
+    /// Each task with its next run (in `zone` unless the task has its own),
+    /// as `schedule:list` shows them.
+    pub fn upcoming(&self, zone: Zone) -> Vec<UpcomingRun> {
         let now = unix_now();
         self.tasks
             .iter()
             .map(|t| {
-                (
-                    t.name.clone(),
-                    t.next_run(now, zone),
-                    t.zone.unwrap_or(zone),
-                )
+                let at = t.next_run(now, zone);
+                UpcomingRun {
+                    name: t.name.clone(),
+                    at: (at != i64::MAX).then(|| crate::db::from_unix(at)),
+                    zone: t.zone.unwrap_or(zone),
+                }
             })
             .collect()
     }
@@ -1056,7 +1071,8 @@ mod tests {
         schedule.check().unwrap();
         let upcoming = schedule.upcoming(Zone::UTC);
         assert_eq!(upcoming.len(), 4);
-        assert_eq!(upcoming[1].1 % 900, 0, "aligned to the quarter hour");
-        assert_eq!(upcoming[2].1 % 3600, 0, "on the hour");
+        let at = |i: usize| upcoming[i].at.unwrap().timestamp();
+        assert_eq!(at(1) % 900, 0, "aligned to the quarter hour");
+        assert_eq!(at(2) % 3600, 0, "on the hour");
     }
 }

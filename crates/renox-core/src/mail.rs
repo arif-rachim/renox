@@ -212,7 +212,7 @@ setting_enum! {
 }
 
 /// Mail settings, from `MAIL_*`.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 #[non_exhaustive]
 pub struct MailConfig {
     /// How mail is sent: SMTP, the log or memory.
@@ -238,6 +238,24 @@ pub struct MailConfig {
     /// from `MAIL_FAILOVER` (comma-separated), e.g. `backup` for a second
     /// SMTP provider.
     pub failover: Vec<String>,
+}
+
+impl std::fmt::Debug for MailConfig {
+    // Secrets show as `[hidden]`, so a logged config doesn't leak them.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MailConfig")
+            .field("mailer", &self.mailer)
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .field("username", &self.username)
+            .field("password", &self.password.as_ref().map(|_| "[hidden]"))
+            .field("encryption", &self.encryption)
+            .field("from_address", &self.from_address)
+            .field("from_name", &self.from_name)
+            .field("timeout", &self.timeout)
+            .field("failover", &self.failover)
+            .finish()
+    }
 }
 
 impl Default for MailConfig {

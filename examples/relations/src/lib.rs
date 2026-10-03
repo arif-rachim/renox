@@ -42,7 +42,8 @@ pub fn app() -> App {
         .seeder(seed)
 }
 
-async fn seed(db: Db) -> Result {
+async fn seed(state: AppState) -> Result {
+    let db = state.db;
     // Seeding twice is harmless: a seeded database stays as it is.
     if Category::query().exists(&db).await? {
         return Ok(());

@@ -35,9 +35,16 @@ use crate::Result;
 
 /// A foreign key's value for a parent keyed by `K`: the key itself (`i64`,
 /// a `Ulid`…), or an `Option` of it for an optional relation.
-pub trait ForeignKey<K> {
+pub trait ForeignKey<K>: foreign_key::Sealed<K> {
     /// The parent's key, or `None` when the relation is empty.
     fn key(self) -> Option<K>;
+}
+
+mod foreign_key {
+    /// Only a key or an `Option` of one.
+    pub trait Sealed<K> {}
+    impl<K: super::ModelKey> Sealed<K> for K {}
+    impl<K: super::ModelKey> Sealed<K> for Option<K> {}
 }
 
 impl<K: ModelKey> ForeignKey<K> for K {

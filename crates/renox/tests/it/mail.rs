@@ -554,12 +554,10 @@ async fn channel_kernel(dir: &std::path::Path) -> (Kernel, Outbox) {
             "ALTER TABLE users ADD COLUMN phone TEXT",
             None,
         )])
-        .channel("whatsapp", move |_, to: Recipient, message| {
+        .channel("whatsapp", move |to: Recipient, message, _| {
             let sent = sent.clone();
             async move {
-                let phone = to
-                    .address("whatsapp")
-                    .or_else(|| to.user.as_ref()?.get("phone"));
+                let phone = to.address("whatsapp").or_else(|| to.user()?.get("phone"));
                 sent.lock().unwrap().push((phone, message));
                 Ok(())
             }

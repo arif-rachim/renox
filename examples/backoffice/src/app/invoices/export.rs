@@ -85,7 +85,7 @@ impl Job for ExportInvoices {
             user.id,
             renox::db::now().format("%Y%m%d-%H%M%S")
         );
-        let exports = state.disk("exports")?;
+        let exports = state.disk_named("exports")?;
         exports.put(&key, bytes).await?;
         let url = exports
             .temporary_url(state, &key, Duration::from_secs(24 * 60 * 60))

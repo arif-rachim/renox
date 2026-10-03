@@ -184,7 +184,11 @@ async fn failed_calls_can_be_retried() {
 #[renox::test]
 async fn webhooks_work_in_maintenance_mode_and_show_in_route_list() {
     let app = app().await;
-    renox::maintenance::down(&app.state().config.storage_path, None, None).unwrap();
+    renox::maintenance::down(
+        &app.state().config.storage_path,
+        renox::maintenance::DownOptions::new(),
+    )
+    .unwrap();
     app.get("/").await.assert_status(503);
     let call = body("evt_4", "A-4");
     send(&app, &call, &webhook::hmac_sha256_hex(SECRET, &call))

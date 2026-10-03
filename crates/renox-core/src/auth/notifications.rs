@@ -50,8 +50,8 @@
 //!
 //! // The app's own channel: `message` is what `to_channel` returned.
 //! # let _ =
-//! App::new().channel("whatsapp", |state, to: Recipient, message| async move {
-//!     let phone = to.address("whatsapp").or_else(|| to.user.as_ref()?.get("phone"));
+//! App::new().channel("whatsapp", |to: Recipient, message, state| async move {
+//!     let phone = to.address("whatsapp").or_else(|| to.user()?.get("phone"));
 //!     let _ = (state, phone, message); // call your provider's API here
 //!     Ok(())
 //! })
@@ -92,13 +92,12 @@ pub enum Channel {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct Recipient {
-    /// The user, if the recipient has an account.
-    pub user: Option<User>,
+    user: Option<User>,
     /// An address per channel, e.g. `mail` → `a@b.c`, `whatsapp` → `+62…`.
-    pub routes: BTreeMap<String, String>,
+    routes: BTreeMap<String, String>,
     /// The language to write in; see [`Recipient::locale`].
     #[serde(default)]
-    pub language: Option<String>,
+    language: Option<String>,
 }
 
 impl Recipient {
@@ -109,6 +108,11 @@ impl Recipient {
             routes: BTreeMap::new(),
             language: None,
         }
+    }
+
+    /// The user, if the recipient has an account.
+    pub fn user(&self) -> Option<&User> {
+        self.user.as_ref()
     }
 
     /// Someone without an account: `Recipient::to("mail", "a@b.c")`.
@@ -129,6 +133,11 @@ impl Recipient {
             "mail" => self.user.as_ref().map(|u| u.email.clone()),
             _ => None,
         })
+    }
+
+    /// Whether `address` is one of the recipient's addresses, on any channel.
+    pub(crate) fn has_address(&self, address: &str) -> bool {
+        self.routes.values().any(|a| a == address) || self.email().as_deref() == Some(address)
     }
 
     /// The address for the `mail` channel (see [`Recipient::address`]).
@@ -386,10 +395,10 @@ pub(crate) type ChannelFn = Arc<
 
 pub(crate) fn channel_fn<F, Fut>(send: F) -> ChannelFn
 where
-    F: Fn(AppState, Recipient, Value) -> Fut + Send + Sync + 'static,
+    F: Fn(Recipient, Value, AppState) -> Fut + Send + Sync + 'static,
     Fut: std::future::Future<Output = Result> + Send + 'static,
 {
-    Arc::new(move |state, to, message| Box::pin(send(state, to, message)))
+    Arc::new(move |state, to, message| Box::pin(send(to, message, state)))
 }
 
 /// Delivers a message to one of the app's channels from the queue.

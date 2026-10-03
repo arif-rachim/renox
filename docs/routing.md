@@ -512,7 +512,7 @@ async fn cart(session: Session) -> Result<String> {
 | `get`, `has`, `put`, `remove`, `pull` | read and write values (any `Serialize` type) |
 | `push`, `increment` | append to a list; add to a number |
 | `flash`, `reflash`, `flashed` | values for the next request only ("Saved!" after a redirect) |
-| `keep(&["status"])`, `now(key, value)` | keep some flashed values for one more request; a flash value for the page rendered now only (Laravel's `flash()->now()`) |
+| `keep(&["status"])`, `flash_now(key, value)` | keep some flashed values for one more request; a flash value for the page rendered now only (Laravel's `flash()->now()`) |
 | `old(field)`, `errors()` | the previous form's input and validation errors (filled by `Valid<T>`) |
 | `has_old_input` | whether the previous request flashed its input (a failed submit), even with no field in it |
 | `set_lifetime(duration)` | this session lasts longer than `SESSION_LIFETIME` |

@@ -231,7 +231,7 @@ impl TestApp {
         let sent = self.notifications();
         assert!(
             sent.iter()
-                .any(|n| n.kind == kind && n.to.user.as_ref().is_some_and(|u| u.id == user.id)),
+                .any(|n| n.kind == kind && n.to.user().is_some_and(|u| u.id == user.id)),
             "user {} got no `{kind}` notification; sent: {:?}",
             user.id,
             sent.iter().map(|n| n.kind).collect::<Vec<_>>()
@@ -245,9 +245,8 @@ impl TestApp {
     pub fn assert_notified_to(&self, address: &str, kind: &str) -> &Self {
         let sent = self.notifications();
         assert!(
-            sent.iter().any(|n| n.kind == kind
-                && (n.to.routes.values().any(|a| a == address)
-                    || n.to.email().as_deref() == Some(address))),
+            sent.iter()
+                .any(|n| n.kind == kind && n.to.has_address(address)),
             "`{address}` got no `{kind}` notification"
         );
         self

@@ -535,8 +535,8 @@ use renox::prelude::*;
 
 use super::{from}::{pascal};
 
-/// Fake records: `{pascal}::make()` (unsaved), `{pascal}::create_one(&db)`,
-/// `{pascal}::create_many(&db, 20)`.
+/// Fake records: `{pascal}::factory().make_one()` (unsaved),
+/// `{pascal}::factory().create_one(&db)`, `{pascal}::factory().count(20).create(&db)`.
 impl Factory for {pascal} {{
     fn definition() -> Self {{
         let _word: String = Word().fake(); // fill the fields with fake data
@@ -561,8 +561,8 @@ pub fn seeder(root: &Path, name: &str) -> Result<()> {
 
 /// Run by `rnx db:seed` (and `migrate:fresh --seed`), in the app's context:
 /// `renox::context::app()` gives the config, `encrypt`, the cache.
-pub async fn run(db: Db) -> Result {
-    let _ = db; // e.g. User::register(&db, "Admin", "admin@example.com", "password123").await?;
+pub async fn run(state: AppState) -> Result {
+    let _ = state; // e.g. User::register(&state.db, "Admin", "admin@example.com", "password123").await?;
     Ok(())
 }
 "#,

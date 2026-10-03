@@ -35,7 +35,8 @@ const PRODUCTS: [(&str, &str, i64); 16] = [
     ("WATER-19L", "Mineral water 19 L", 22_000),
 ];
 
-pub async fn run(db: Db) -> Result {
+pub async fn run(state: AppState) -> Result {
+    let db = state.db;
     if User::find_by_email(&db, "admin@example.com")
         .await?
         .is_some()

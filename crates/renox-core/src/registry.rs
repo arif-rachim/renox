@@ -63,7 +63,7 @@ impl Registry {
     /// [`crate::command`].
     pub fn command<F, Fut>(&mut self, name: &str, about: &str, run: F) -> &mut Self
     where
-        F: Fn(AppState, crate::command::Args) -> Fut + Send + Sync + 'static,
+        F: Fn(crate::command::Args, AppState) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result> + Send + 'static,
     {
         self.commands
@@ -136,7 +136,7 @@ impl Registry {
     /// `Notification::to_channel` built. See [`crate::auth::notifications`].
     pub fn channel<F, Fut>(&mut self, name: &str, send: F) -> &mut Self
     where
-        F: Fn(AppState, crate::auth::Recipient, serde_json::Value) -> Fut + Send + Sync + 'static,
+        F: Fn(crate::auth::Recipient, serde_json::Value, AppState) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result> + Send + 'static,
     {
         self.channels.insert(

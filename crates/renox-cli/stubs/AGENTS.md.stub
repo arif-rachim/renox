@@ -159,7 +159,7 @@ rnx tailwind --watch                                   # rebuild public/css/app.
 - Two plain forms on one page sharing field names: `#[validate(bag = "login")]` on one, and
   `error('email', bag='login')` / the kit's `bag="login"` on its fields.
 - A second place for files (backups, exports): `App::disk("exports", |c|
-  StorageConfig::from_env(c, "EXPORTS"))` and `state.disk("exports")?`, not a second
+  StorageConfig::from_env(c, "EXPORTS"))` and `state.disk_named("exports")?`, not a second
   `Storage` built by hand.
 - Layers such as `.etag()`, `.throttle(…)` and `.require_auth()` cover only the routes added
   before them: give such routes a `Routes` group of their own and `merge` it.

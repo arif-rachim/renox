@@ -14,7 +14,8 @@ pub fn app() -> App {
         .migrations(renox::migrations!())
         .module(app::products::Products)
         // `cargo run -- db:seed`: two products to open and edit.
-        .seeder(|db| async move {
+        .seeder(|state| async move {
+            let db = state.db;
             if Product::query().exists(&db).await? {
                 return Ok(()); // seeded already
             }

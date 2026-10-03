@@ -29,7 +29,7 @@ use crate::{
     auth, csrf, session, view,
 };
 
-type Seeder = Box<dyn Fn(Db) -> Pin<Box<dyn Future<Output = Result> + Send>> + Send + Sync>;
+type Seeder = Box<dyn Fn(AppState) -> Pin<Box<dyn Future<Output = Result> + Send>> + Send + Sync>;
 
 /// How long `serve` waits for running jobs after a shutdown signal.
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(30);
@@ -80,7 +80,7 @@ Commands:
 /// # #[derive(Serialize, Deserialize)] struct SendReceipt;
 /// # impl Job for SendReceipt { const NAME: &'static str = "send-receipt"; async fn handle(self, _: JobContext) -> Result { Ok(()) } }
 /// # async fn cleanup(_: AppState) -> Result { Ok(()) }
-/// # async fn seed(_: Db) -> Result { Ok(()) }
+/// # async fn seed(_: AppState) -> Result { Ok(()) }
 /// fn main() -> renox::Result {
 ///     App::new()
 ///         .migrations(renox::migrations!())
@@ -152,7 +152,7 @@ impl App {
     /// when they haven't chosen one: the first of their languages this app
     /// has texts for (the built-in `en` and `id`, or a
     /// `resources/lang/<locale>.json`), else `APP_LOCALE`. A language set
-    /// with `i18n::set_locale` still wins. Responses then carry
+    /// with `i18n::remember_locale` still wins. Responses then carry
     /// `Vary: Accept-Language`, so caches keep the languages apart.
     ///
     /// ```
@@ -246,25 +246,27 @@ impl App {
     }
 
     /// Registers a seeder for `db:seed`. Seeders run in registration order,
-    /// in the app's context: `renox::context::app()` gives the `AppState`.
+    /// in the app's context (model hooks and `renox::context::app()` see
+    /// it), and get the app's state: `state.db`, its config, storage…
     ///
     /// ```
     /// # use renox::prelude::*;
     /// # #[derive(Model, serde::Serialize, Default)] struct Product { id: i64 }
     /// # impl Factory for Product { fn definition() -> Self { Product::default() } }
     /// # let _ =
-    /// App::new().seeder(|db| async move {
-    ///     Product::create_many(&db, 50).await?;
+    /// App::new().seeder(|state| async move {
+    ///     Product::factory().count(50).create(&state.db).await?;
     ///     Ok(())
     /// })
     /// # ;
     /// ```
     pub fn seeder<F, Fut>(mut self, seeder: F) -> Self
     where
-        F: Fn(Db) -> Fut + Send + Sync + 'static,
+        F: Fn(AppState) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result> + Send + 'static,
     {
-        self.seeders.push(Box::new(move |db| Box::pin(seeder(db))));
+        self.seeders
+            .push(Box::new(move |state| Box::pin(seeder(state))));
         self
     }
 
@@ -366,7 +368,7 @@ impl App {
     /// create the first admin or run an import. See [`crate::command`].
     pub fn command<F, Fut>(mut self, name: &str, about: &str, run: F) -> Self
     where
-        F: Fn(AppState, crate::command::Args) -> Fut + Send + Sync + 'static,
+        F: Fn(crate::command::Args, AppState) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result> + Send + 'static,
     {
         self.registry.command(name, about, run);
@@ -412,7 +414,7 @@ impl App {
     /// [`Registry::channel`].
     pub fn channel<F, Fut>(mut self, name: &str, send: F) -> Self
     where
-        F: Fn(AppState, crate::auth::Recipient, serde_json::Value) -> Fut + Send + Sync + 'static,
+        F: Fn(crate::auth::Recipient, serde_json::Value, AppState) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result> + Send + 'static,
     {
         self.registry.channel(name, send);
@@ -456,7 +458,7 @@ impl App {
     }
 
     /// Adds a storage disk named `name` (letters, digits, `-`, `_`), e.g.
-    /// backups on another bucket, read with `state.disk(name)`. `settings`
+    /// backups on another bucket, read with `state.disk_named(name)`. `settings`
     /// runs once the configuration is loaded; [`StorageConfig::from_env`]
     /// reads `<PREFIX>_DISK`, `<PREFIX>_BUCKET`, … A local disk keeps its
     /// files in `STORAGE_PATH/<name>` unless its settings say otherwise.
@@ -996,10 +998,11 @@ impl App {
                     ),
                     None => return Err(anyhow!("usage: queue:retry <id|all>").into()),
                 };
-                println!(
-                    "Queued {} job(s) again.",
-                    kernel.state.queue.retry(id).await?
-                );
+                let queued = match id {
+                    Some(id) => u64::from(kernel.state.queue.retry(id).await?),
+                    None => kernel.state.queue.retry_all().await?,
+                };
+                println!("Queued {queued} job(s) again.");
             }
             "queue:forget" => {
                 let id: i64 = args
@@ -1048,13 +1051,16 @@ impl App {
                 if kernel.schedule.is_empty() {
                     println!("No scheduled tasks.");
                 }
-                for (name, at, zone) in kernel.schedule.upcoming(kernel.zone) {
-                    let when = if at == i64::MAX {
-                        "never".to_owned()
-                    } else {
-                        zone.local(at).format("%Y-%m-%d %H:%M").to_string()
+                for run in kernel.schedule.upcoming(kernel.zone) {
+                    let when = match run.at {
+                        Some(at) => run
+                            .zone
+                            .local(at.timestamp())
+                            .format("%Y-%m-%d %H:%M")
+                            .to_string(),
+                        None => "never".to_owned(),
                     };
-                    println!("  {when:<16}  {zone:<18}  {name}");
+                    println!("  {when:<16}  {:<18}  {}", run.zone, run.name);
                 }
             }
             "schedule:run" => {
@@ -1080,7 +1086,14 @@ impl App {
             "down" => {
                 let secret = flag_text(args, "--secret").map(str::to_owned);
                 let retry = flag_value(args, "--retry")?.map(u64::from);
-                crate::maintenance::down(&kernel.state.config.storage_path, secret.clone(), retry)?;
+                let mut options = crate::maintenance::DownOptions::new();
+                if let Some(secret) = &secret {
+                    options = options.secret(secret.clone());
+                }
+                if let Some(retry) = retry {
+                    options = options.retry(retry);
+                }
+                crate::maintenance::down(&kernel.state.config.storage_path, options)?;
                 match secret {
                     Some(secret) => println!("The app is down. Visit /{secret} to bypass it."),
                     None => println!("The app is down."),
@@ -1353,7 +1366,7 @@ impl Kernel {
         for seeder in &self.seeders {
             // In the app's context, so a seeder can reach `renox::context::app()`
             // (config, `encrypt`, the cache) and model hooks see it too.
-            crate::context::scope_app(self.state.clone(), seeder(self.db().clone())).await?;
+            crate::context::scope_app(self.state.clone(), seeder(self.state.clone())).await?;
         }
         Ok(())
     }

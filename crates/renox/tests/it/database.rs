@@ -450,7 +450,7 @@ async fn foreign_keys_are_enforced() {
 async fn paginate_counts_pages() {
     let (kernel, _dir) = kernel().await;
     let db = kernel.db();
-    Product::create_many(db, 23).await.unwrap();
+    Product::factory().count(23).create(db).await.unwrap();
     let page = Product::query()
         .order_by("id")
         .paginate(db, 3, 10)
@@ -467,11 +467,13 @@ async fn paginate_counts_pages() {
 #[tokio::test]
 async fn seeders_run_in_order() {
     let (kernel, _dir) = kernel_with(|app| {
-        app.seeder(|db| async move {
-            Product::create_many(&db, 3).await?;
+        app.seeder(|state| async move {
+            let db = state.db;
+            Product::factory().count(3).create(&db).await?;
             Ok(())
         })
-        .seeder(|db| async move {
+        .seeder(|state| async move {
+            let db = state.db;
             let first = Product::query()
                 .order_by("id")
                 .first(&db)

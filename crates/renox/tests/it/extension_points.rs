@@ -270,7 +270,7 @@ async fn registration_hooks_validate_and_save_extra_fields() {
                     .registration_rules(|form, v| {
                         v.field("phone", &form.get("phone")).required().max(20);
                     })
-                    .on_registered(|state, mut user, form| async move {
+                    .on_registered(|mut user, form, state| async move {
                         if form.get("phone") == "000" {
                             return Err(Error::BadRequest("that number is blocked".into()));
                         }

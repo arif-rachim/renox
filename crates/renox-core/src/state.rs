@@ -18,10 +18,10 @@ use crate::{Config, Result, RouteTable, Views};
 pub struct AppState {
     /// The configuration.
     pub config: Arc<Config>,
-    /// Named routes, to build URLs.
-    pub routes: Arc<RouteTable>,
-    /// The template engine.
-    pub views: Views,
+    /// Named routes, to build URLs (`state.url(name, params)`).
+    pub(crate) routes: Arc<RouteTable>,
+    /// The template engine (`view()` renders, `mail_view` for mail).
+    pub(crate) views: Views,
     /// The database connection pool.
     pub db: Db,
     /// Sends mail (`MAIL_MAILER`).
@@ -38,8 +38,8 @@ pub struct AppState {
     pub(crate) disks: Arc<std::collections::HashMap<String, Storage>>,
     /// Calls other services; faked in tests (`TestApp::fake_http`).
     pub http: crate::http::Http,
-    /// Translations from `LANG_PATH` and the built-in ones.
-    pub translator: Arc<Translator>,
+    /// Translations from `LANG_PATH` and the built-in ones (`Lang`, `t()`).
+    pub(crate) translator: Arc<Translator>,
     /// Live reload, only while developing locally.
     pub(crate) live: Option<Arc<crate::live::Live>>,
     /// Wakes the users' open notification streams.
@@ -155,8 +155,8 @@ impl AppState {
 
 impl AppState {
     /// A disk the app added with [`App::disk`](crate::App::disk), e.g.
-    /// `state.disk("backups")?`; an unknown name is an error (500).
-    pub fn disk(&self, name: &str) -> Result<&Storage> {
+    /// `state.disk_named("backups")?`; an unknown name is an error (500).
+    pub fn disk_named(&self, name: &str) -> Result<&Storage> {
         self.disks.get(name).ok_or_else(|| {
             anyhow::anyhow!("no disk named `{name}`: add it with `App::disk(\"{name}\", …)`").into()
         })

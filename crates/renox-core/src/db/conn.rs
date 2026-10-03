@@ -444,10 +444,17 @@ impl fmt::Debug for Transaction {
     }
 }
 
-/// Where a query runs: `&db` or `&mut tx`.
-pub trait Executor<'c>: Send {
+/// Where a query runs: `&db` or `&mut tx`. Sealed: only those.
+pub trait Executor<'c>: Send + executor::Sealed {
     #[doc(hidden)]
     fn into_conn(self) -> Conn<'c>;
+}
+
+mod executor {
+    pub trait Sealed {}
+    impl Sealed for &super::Db {}
+    impl Sealed for &mut super::Transaction {}
+    impl Sealed for super::Conn<'_> {}
 }
 
 #[doc(hidden)]
