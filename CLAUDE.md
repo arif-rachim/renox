@@ -980,10 +980,10 @@ picks the build, not the terminal.
   sheets, `icon_button`, `icon`/`badge`/`key`/`disabled_reason` on buttons, keyboard
   shortcuts (`data-rx-key`), tooltips (`data-rx-tip`, one element placed by renox-ui.js:
   a CSS `::before` was dimmed by disabled buttons and widened phone tables while hidden);
-  shop's admin products use them. Branch `ccr-0db862ed-uol6i8`.
+  shop's admin products use them. Merged (#99).
 - **M29** (examples complete; three PRs after an audit of all 13 examples): M29a (example
   bugs, tests for README claims, seeders that run twice, `.env.example` everywhere,
-  fields/webhooks/uploads on the kit, current patterns): branch `m29a-examples-fix`. M29b
+  fields/webhooks/uploads on the kit, current patterns): merged (#101). M29b
   (`examples/backoffice`) and M29c (smaller extensions) follow.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
