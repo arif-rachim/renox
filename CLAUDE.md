@@ -1038,8 +1038,8 @@ picks the build, not the terminal.
   (#110).
 - **M33** (the parity review's small adds, chosen by the owner before v1.0: 28
   validation rules with `Dimensions`, `Found<M>` route model binding, `Routes::view`/
-  `redirect`, named disks, `Routes::etag`, `App::xsrf_cookie`, `TRUSTED_HOSTS`): branch
-  `m33-small-adds`. Layers like `.etag()` cover only the routes added before them.
+  `redirect`, named disks, `Routes::etag`, `App::xsrf_cookie`, `TRUSTED_HOSTS`): merged
+  (#112). Layers like `.etag()` cover only the routes added before them.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.
