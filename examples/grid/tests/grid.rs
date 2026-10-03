@@ -124,9 +124,11 @@ async fn filters_narrow_the_orders() {
         .await
         .unwrap()
         .unwrap();
+    // Fake names can hold an apostrophe (O'Connell), which the page escapes.
+    let shown = first.customer.replace('&', "&amp;").replace('\'', "&#39;");
     app.get(&format!("/?q.number={}&m.number=equals", first.number))
         .await
-        .assert_see(&first.customer);
+        .assert_see(&shown);
     app.get("/?q.customer=nobody-has-this-name")
         .await
         .assert_see("Nothing matches these filters.");

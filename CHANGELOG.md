@@ -47,6 +47,8 @@ examples that didn't use the kit at all.
   - What is left in the apps' `public/app.css`: shop's brand colour tokens and backoffice's
     printed invoice.
 - `AGENTS.md.stub` tells app agents to build pages from the kit.
+- The README's demo GIF is re-recorded on the kit's guestbook.
+- examples/grid: a filter test no longer fails on a fake name with an apostrophe.
 
 ### M29c · Examples extended
 

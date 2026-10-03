@@ -617,10 +617,12 @@ PostgreSQL suite 2.5x slower (reconnects).
   `@htmx:after-request="sending = false; if (…) $el.reset()"` → "CSP Parser Error: Unexpected
   token: if"). That's why relaxed is the default; strict apps move logic into `Alpine.data`.
   Browser-check CSP work by collecting `Log.entryAdded` / `Runtime.exceptionThrown` over CDP.
-- `docs/assets/demo.gif` was made by driving examples/hello (`APP_LOCALE=en`) in headless Chrome
-  over CDP (`Page.captureScreenshot` per typed character, `Input.insertText`), then composing the
-  frames with Pillow (browser bar, captions, 64-colour palette, ~210 KB). Re-record it when the
-  guestbook's look changes.
+- `docs/assets/demo.gif` was made by driving examples/hello (`APP_LOCALE=en`, a fresh database)
+  in headless Chrome over CDP (a 760 × 752 viewport with `Emulation.setScrollbarsHidden`,
+  `Page.captureScreenshot` per typed character, `Input.insertText`), then composing the frames
+  with Pillow (a browser bar on top, a caption bar under the page, one 128-colour palette for
+  every frame, ~77 KB). Last recorded in M30 on the kit. Re-record it when the guestbook's
+  look changes.
 
 ### 4.11 Git, PRs, CI (how the owner works)
 - One branch and one PR per milestone or fix (branch names like `m17b-examples`, `fix-…`). The

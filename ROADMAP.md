@@ -1452,7 +1452,7 @@ and to keep Tailwind next to the kit in relations.
       `rx-image`, `hide_label`, `confirm(cancel_label, fields)`
 - [x] `rnx new`'s layout on `navbar`; AGENTS.md.stub's rule to build pages from the kit
 - [x] All fourteen examples on the kit; mails on the kit's mail layout and components
-- [ ] Re-record docs/assets/demo.gif: the guestbook's look changed (CLAUDE.md §4.10)
+- [x] Re-record docs/assets/demo.gif on the kit's guestbook (CLAUDE.md §4.10)
 
 Notes from M30:
 - An imported macro's name hides a context value of the same name: jobs' statements page
