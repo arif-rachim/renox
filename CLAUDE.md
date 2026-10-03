@@ -1090,11 +1090,14 @@ picks the build, not the terminal.
   candidate `1.0.0-rc.1`: merged (#122), published to crates.io on 2026-10-03 with the
   owner's `cargo login` token after the owner confirmed (tag `v1.0.0-rc.1`; docs.rs built,
   `cargo install renox-cli --version 1.0.0-rc.1` + `rnx new` checked). Then the README's
-  start and coding-agent sections: branch `readme-start-and-agents`. GitHub Pages was tried and dropped
+  start and coding-agent sections: merged (#123). GitHub Pages was tried and dropped
   (the owner's account serves project sites on a personal domain): the docs site runs on the
   owner's own server, built with Renox, once they have a domain (renox.rs was free on
   2026-10-03; renox.dev is taken).
-  Left: 1.0.0 when the owner is happy with the rc (ask before every `cargo publish`).
+  Then #124 (new apps failed `cargo fmt --check`): `rnx` formats what it writes, merged
+  (#125); GitHub Pages switched off (2026-10-04). Release candidate `1.0.0-rc.2` with that
+  fix: branch `release-1.0.0-rc.2`. Left: 1.0.0 when the owner is happy with the rc (ask
+  before every `cargo publish`).
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). 
