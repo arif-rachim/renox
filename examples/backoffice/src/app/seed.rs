@@ -17,22 +17,22 @@ use crate::Settings;
 const CITIES: [&str; 6] = ["Bandung", "Jakarta", "Bogor", "Cimahi", "Garut", "Sumedang"];
 
 const PRODUCTS: [(&str, &str, i64); 16] = [
-    ("KOPI-ARB", "Kopi arabika 250 g", 65_000),
-    ("KOPI-ROB", "Kopi robusta 250 g", 45_000),
-    ("TEH-MLT", "Teh melati 100 g", 18_000),
-    ("GULA-AREN", "Gula aren 500 g", 32_000),
-    ("SUSU-UHT", "Susu UHT 1 L", 21_000),
-    ("CUP-12", "Gelas kertas 12 oz (50)", 38_000),
-    ("CUP-16", "Gelas kertas 16 oz (50)", 44_000),
-    ("LID-90", "Tutup gelas 90 mm (50)", 19_000),
-    ("SDT-KYU", "Sendok kayu (100)", 25_000),
-    ("SIRUP-VAN", "Sirup vanila 750 ml", 89_000),
-    ("SIRUP-KRM", "Sirup karamel 750 ml", 89_000),
-    ("COKLAT-BBK", "Cokelat bubuk 500 g", 74_000),
-    ("FILTER-V60", "Kertas filter V60 (100)", 55_000),
-    ("TAS-KRT", "Tas kertas (25)", 27_000),
-    ("ES-BATU", "Es batu kristal 5 kg", 15_000),
-    ("AIR-GLN", "Air mineral galon", 22_000),
+    ("COF-ARB", "Arabica coffee 250 g", 65_000),
+    ("COF-ROB", "Robusta coffee 250 g", 45_000),
+    ("TEA-JAS", "Jasmine tea 100 g", 18_000),
+    ("SUGAR-PALM", "Palm sugar 500 g", 32_000),
+    ("MILK-UHT", "UHT milk 1 L", 21_000),
+    ("CUP-12", "Paper cups 12 oz (50)", 38_000),
+    ("CUP-16", "Paper cups 16 oz (50)", 44_000),
+    ("LID-90", "Cup lids 90 mm (50)", 19_000),
+    ("SPOON-WD", "Wooden spoons (100)", 25_000),
+    ("SYRUP-VAN", "Vanilla syrup 750 ml", 89_000),
+    ("SYRUP-CRM", "Caramel syrup 750 ml", 89_000),
+    ("COCOA-PWD", "Cocoa powder 500 g", 74_000),
+    ("FILTER-V60", "V60 filter papers (100)", 55_000),
+    ("BAG-PPR", "Paper bags (25)", 27_000),
+    ("ICE-5KG", "Ice cubes 5 kg", 15_000),
+    ("WATER-19L", "Mineral water 19 L", 22_000),
 ];
 
 pub async fn run(db: Db) -> Result {
@@ -45,9 +45,9 @@ pub async fn run(db: Db) -> Result {
     crate::define_roles(&db).await?;
     Settings::default().save(&db).await?;
     for (name, email, role) in [
-        ("Arif", "admin@example.com", "admin"),
-        ("Dewi", "cashier@example.com", "cashier"),
-        ("Budi", "warehouse@example.com", "warehouse"),
+        ("Alex", "admin@example.com", "admin"),
+        ("Diana", "cashier@example.com", "cashier"),
+        ("Ben", "warehouse@example.com", "warehouse"),
     ] {
         let user = User::register(&db, name, email, "password123").await?;
         // Seeded staff need no verification mail.
@@ -157,8 +157,8 @@ pub async fn run(db: Db) -> Result {
                 }),
                 paid_via: paid
                     .then(|| ["cash", "midtrans", "xendit"][(0..3).fake::<usize>()].into()),
-                created_by: "Dewi".into(),
-                updated_by: "Dewi".into(),
+                created_by: "Diana".into(),
+                updated_by: "Diana".into(),
                 created_at: Some(written),
                 ..Default::default()
             },
@@ -176,7 +176,7 @@ pub async fn run(db: Db) -> Result {
                         reason: "sold",
                         note: "",
                         invoice_id: Some(invoice.id),
-                        user_name: "Dewi",
+                        user_name: "Diana",
                     },
                 )
                 .await?;
@@ -202,7 +202,7 @@ async fn received(tx: &mut Transaction, product_id: i64, quantity: i64) -> Resul
             reason: "received",
             note: "Opening stock",
             invoice_id: None,
-            user_name: "Budi",
+            user_name: "Ben",
         },
     )
     .await?;

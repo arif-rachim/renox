@@ -70,7 +70,7 @@ pub const TAGS: [(&str, &str); 4] = [
     ("wholesale", "Wholesale"),
 ];
 
-const STAFF: [&str; 4] = ["Arif", "Dewi", "Budi", "Sari"];
+const STAFF: [&str; 4] = ["Alex", "Diana", "Ben", "Sarah"];
 
 fn pick<T: Copy>(items: &[T]) -> T {
     items[(0..items.len()).fake::<usize>()]

@@ -50,7 +50,7 @@ async function show() {
 }
 
 function money(amount) {
-  return "Rp " + Number(amount).toLocaleString("id-ID");
+  return "Rp " + Number(amount).toLocaleString("en-US");
 }
 
 // A row of the kit's `list`: the name takes the room, then the price and

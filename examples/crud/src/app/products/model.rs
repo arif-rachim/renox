@@ -19,7 +19,7 @@ pub struct Product {
     pub id: i64,
     pub user_id: i64,
     pub name: String,
-    /// Made from `name` by the `saving` hook, e.g. "Kopi Susu" → "kopi-susu".
+    /// Made from `name` by the `saving` hook, e.g. "Coffee Latte" → "coffee-latte".
     pub slug: String,
     /// In the smallest currency unit (e.g. rupiah), to avoid float rounding.
     pub price: i64,

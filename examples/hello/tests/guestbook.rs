@@ -4,9 +4,9 @@ use std::time::Duration;
 
 const DAY: u64 = 24 * 60 * 60;
 
-/// Tests don't read `.env`; the guestbook's default language is Indonesian.
+/// Tests don't read `.env`; the guestbook's default language is English.
 async fn app() -> TestApp {
-    TestApp::with_config(hello::app(), |config| config.locale = "id".into()).await
+    TestApp::with_config(hello::app(), |config| config.locale = "en".into()).await
 }
 
 #[renox::test]
@@ -15,42 +15,76 @@ async fn the_guestbook_lists_entries() {
     app.get("/")
         .await
         .assert_ok()
-        .assert_see("Buku Tamu")
-        .assert_see("Belum ada pesan.");
+        .assert_see("Guestbook")
+        .assert_see("No messages yet.");
 }
 
 #[renox::test]
 async fn signing_the_guestbook_thanks_the_owner_by_mail() {
     let app = app().await;
-    app.post("/entries", &[("name", "Arif"), ("message", "Kopinya enak")])
-        .await
-        .assert_status(303);
+    app.post(
+        "/entries",
+        &[("name", "Alex"), ("message", "The coffee is great")],
+    )
+    .await
+    .assert_status(303);
     app.assert_database_has(
         "entries",
-        &[("name", &"Arif"), ("message", &"Kopinya enak")],
+        &[("name", &"Alex"), ("message", &"The coffee is great")],
     )
     .await;
-    app.get("/").await.assert_see("Kopinya enak");
+    app.get("/").await.assert_see("The coffee is great");
 
     assert_eq!(app.queued_jobs().await, ["thank-guest"]);
     app.run_jobs().await;
-    app.assert_mail_sent("owner@example.com", "Arif menulis di buku tamu");
+    app.assert_mail_sent("owner@example.com", "Alex signed the guestbook");
 }
 
 #[renox::test]
 async fn the_browser_language_is_used_until_one_is_chosen() {
-    let app = app().await; // APP_LOCALE=id
+    let app = app().await; // APP_LOCALE=en
     app.request()
-        .header("accept-language", "en-GB,en;q=0.9")
+        .header("accept-language", "es-ES,es;q=0.9")
+        .get("/")
+        .await
+        .assert_see("Libro de visitas")
+        .assert_see("Todavía no hay mensajes.");
+    app.get("/language/en").await;
+    app.request()
+        .header("accept-language", "es-ES,es;q=0.9")
         .get("/")
         .await
         .assert_see("Guestbook");
-    app.get("/bahasa/id").await;
-    app.request()
-        .header("accept-language", "en-GB,en;q=0.9")
-        .get("/")
+}
+
+#[renox::test]
+async fn spanish_visitors_get_spanish_messages_and_pages() {
+    let app = app().await;
+    app.get("/language/es").await;
+    let res = app
+        .htmx()
+        .post("/entries", &[("name", ""), ("message", "x")])
+        .await;
+    res.assert_invalid("name")
+        .assert_json_path("errors.name.0", "El campo nombre es obligatorio.")
+        .assert_json_path(
+            "errors.message.0",
+            "El campo mensaje debe tener entre 3 y 280 caracteres.",
+        );
+    app.get("/login")
         .await
-        .assert_see("Buku Tamu");
+        .assert_ok()
+        .assert_see("Iniciar sesión")
+        .assert_see("Recordarme");
+    let user = User::register(app.db(), "Ben", "ben@example.com", "password123")
+        .await
+        .unwrap();
+    app.acting_as(&user);
+    app.get("/account")
+        .await
+        .assert_ok()
+        .assert_see("Tu cuenta")
+        .assert_see("Cerrar sesión en otros dispositivos");
 }
 
 #[renox::test]
@@ -67,11 +101,14 @@ async fn empty_entries_are_rejected() {
 #[renox::test]
 async fn the_prune_command_deletes_old_entries() {
     let app = app().await;
-    app.post("/entries", &[("name", "Arif"), ("message", "Kopinya enak")])
-        .await;
+    app.post(
+        "/entries",
+        &[("name", "Alex"), ("message", "The coffee is great")],
+    )
+    .await;
     // Forty days later, another entry; then the command, on the moved clock.
     app.travel(Duration::from_secs(40 * DAY));
-    app.post("/entries", &[("name", "Budi"), ("message", "Tehnya juga")])
+    app.post("/entries", &[("name", "Ben"), ("message", "The tea too")])
         .await;
     let prune = |args: &'static [&'static str], answer: &'static str| {
         app.at_travelled_time(renox::prompt::answering(
@@ -84,7 +121,7 @@ async fn the_prune_command_deletes_old_entries() {
     app.assert_database_count("entries", 2).await;
     prune(&["--days", "30"], "yes").await.unwrap();
     app.assert_database_count("entries", 1).await;
-    app.assert_database_has("entries", &[("name", &"Budi")])
+    app.assert_database_has("entries", &[("name", &"Ben")])
         .await;
     // clap checks the arguments.
     assert!(prune(&["--days", "x"], "yes").await.is_err());
@@ -95,7 +132,7 @@ async fn a_logged_in_guest_can_open_their_account() {
     let app = app().await;
     app.get("/account").await.assert_redirect("/login");
 
-    let user = User::register(app.db(), "Budi", "budi@example.com", "password123")
+    let user = User::register(app.db(), "Ben", "ben@example.com", "password123")
         .await
         .unwrap();
     app.acting_as(&user);
@@ -103,12 +140,12 @@ async fn a_logged_in_guest_can_open_their_account() {
     app.get("/")
         .await
         .assert_ok()
-        .assert_see(r#"href="/account">Budi</a>"#);
+        .assert_see(r#"href="/account">Ben</a>"#);
     app.get("/account")
         .await
         .assert_ok()
-        .assert_see("Akun kamu")
-        .assert_see("budi@example.com");
+        .assert_see("Your account")
+        .assert_see("ben@example.com");
 }
 
 const PNG: &[u8] = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR not a real image, but it starts like one";
@@ -121,7 +158,7 @@ async fn photos_are_checked_by_their_content() {
     app.htmx()
         .post_multipart(
             "/entries",
-            &[("name", "Arif"), ("message", "Kopinya enak")],
+            &[("name", "Alex"), ("message", "The coffee is great")],
             &[("photo", "fake.png", b"just text")],
         )
         .await
@@ -130,8 +167,8 @@ async fn photos_are_checked_by_their_content() {
     // A real image is stored and shown.
     app.post_multipart(
         "/entries",
-        &[("name", "Arif"), ("message", "Kopinya enak")],
-        &[("photo", "kopi.png", PNG)],
+        &[("name", "Alex"), ("message", "The coffee is great")],
+        &[("photo", "coffee.png", PNG)],
     )
     .await
     .assert_status(303);
@@ -151,10 +188,10 @@ async fn htmx_gets_the_new_list_and_an_event() {
     let app = app().await;
     let res = app
         .htmx()
-        .post("/entries", &[("name", "Budi"), ("message", "Mampir lagi")])
+        .post("/entries", &[("name", "Ben"), ("message", "Back again")])
         .await;
     res.assert_ok()
         .assert_header("hx-trigger", "entry-added")
-        .assert_see("Mampir lagi")
+        .assert_see("Back again")
         .assert_dont_see("<html");
 }

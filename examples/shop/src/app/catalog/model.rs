@@ -59,7 +59,7 @@ impl Product {
     }
 }
 
-/// `Kopi Susu Gula Aren!` -> `kopi-susu-gula-aren`.
+/// `Coffee Latte Brown Sugar!` -> `coffee-latte-brown-sugar`.
 pub fn slug(text: &str) -> String {
     let mut out = String::new();
     for c in text.to_lowercase().chars() {
@@ -76,7 +76,10 @@ pub fn slug(text: &str) -> String {
 mod tests {
     #[test]
     fn slugs() {
-        assert_eq!(super::slug("Kopi Susu  Gula Aren!"), "kopi-susu-gula-aren");
-        assert_eq!(super::slug("  Teh -- Hijau "), "teh-hijau");
+        assert_eq!(
+            super::slug("Coffee Latte  Brown Sugar!"),
+            "coffee-latte-brown-sugar"
+        );
+        assert_eq!(super::slug("  Green -- Tea "), "green-tea");
     }
 }

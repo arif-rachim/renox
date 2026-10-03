@@ -75,7 +75,7 @@ async fn home(State(state): State<AppState>, session: Session) -> Result<View> {
     ))
 }
 
-/// `/products?q=kopi&category=minuman&sort=price_asc&page=2`
+/// `/products?q=coffee&category=drinks&sort=price_asc&page=2`
 #[derive(Deserialize, Serialize, Default)]
 struct Filters {
     q: Option<String>,
@@ -185,7 +185,7 @@ async fn language(
     back: Back,
     Path(locale): Path<String>,
 ) -> Result<Back> {
-    if ["en", "id"].contains(&locale.as_str()) {
+    if ["en", "es"].contains(&locale.as_str()) {
         renox::i18n::set_locale(&session, &locale)?;
         if let Some(user) = user {
             renox::db::sql("UPDATE users SET locale = ? WHERE id = ?")

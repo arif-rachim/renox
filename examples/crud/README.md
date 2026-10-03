@@ -37,7 +37,7 @@ many at once: `cargo run -- products:import products.csv --owner demo@example.co
   `.require_auth()`, joined with `merge`. Guests who open `/products/new` go to `/login`.
 - **Rules as attributes.** `ProductForm` derives `Validate`
   (`#[validate(required, max = 100)]`); `#[validate(hooks)]` + `impl ValidateHooks` adds
-  `prepare`, which tidies the name ("  Kopi   Susu " → "Kopi Susu") before the rules run.
+  `prepare`, which tidies the name ("  Coffee   Latte " → "Coffee Latte") before the rules run.
 - **An import that survives bad lines.** `products:import` opens one transaction and runs each
   line in `tx.savepoint(|tx| …)`: a line with a bad price, or a name the `saving` hook refuses,
   is undone alone and listed; the rest is committed together. On PostgreSQL a failed

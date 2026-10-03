@@ -197,10 +197,10 @@ mod tests {
     #[test]
     fn reads_quoted_names() {
         assert_eq!(
-            parse(r#"kp-01,"Kopi, robusta",25000,10"#).unwrap(),
-            ("KP-01".into(), "Kopi, robusta".into(), 25000, 10)
+            parse(r#"cf-01,"Coffee, robusta",25000,10"#).unwrap(),
+            ("CF-01".into(), "Coffee, robusta".into(), 25000, 10)
         );
-        assert!(parse("KP-01,Kopi,mahal,1").is_err());
-        assert!(parse("KP 01,Kopi,1,1").is_err());
+        assert!(parse("CF-01,Coffee,pricey,1").is_err());
+        assert!(parse("CF 01,Coffee,1,1").is_err());
     }
 }

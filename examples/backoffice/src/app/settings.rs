@@ -15,7 +15,7 @@ pub struct Settings {
     pub company_address: String,
     #[validate(email)]
     pub company_email: String,
-    /// PPN on every invoice, in percent.
+    /// VAT on every invoice, in percent.
     #[validate(between(0, 100))]
     pub tax_percent: i64,
     /// Invoice numbers start with this: INV-00042.
@@ -36,9 +36,9 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Settings {
-            company_name: "Toko Makmur".into(),
-            company_address: "Jl. Merdeka 17, Bandung".into(),
-            company_email: "halo@tokomakmur.test".into(),
+            company_name: "Corner Store".into(),
+            company_address: "17 Market Street, Bandung".into(),
+            company_email: "hello@cornerstore.test".into(),
             tax_percent: 11,
             invoice_prefix: "INV-".into(),
             payment_days: 14,

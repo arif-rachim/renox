@@ -157,33 +157,33 @@ async fn the_saving_hook_fills_the_slug_on_create_and_update() {
 
     app.post(
         "/products",
-        &[("name", "Kopi Susu  Gula Aren"), ("price", "18000")],
+        &[("name", "Iced Latte  Brown Sugar"), ("price", "18000")],
     )
     .await
     .assert_redirect("/products");
     let product = Product::query().first(app.db()).await.unwrap().unwrap();
-    assert_eq!(product.slug, "kopi-susu-gula-aren");
+    assert_eq!(product.slug, "iced-latte-brown-sugar");
 
     app.put(
         &format!("/products/{}", product.id),
-        &[("name", "Es Teh"), ("price", "18000")],
+        &[("name", "Iced Tea"), ("price", "18000")],
     )
     .await
     .assert_redirect("/products");
-    app.assert_database_has("products", &[("id", &product.id), ("slug", &"es-teh")])
+    app.assert_database_has("products", &[("id", &product.id), ("slug", &"iced-tea")])
         .await;
 
     // Outside a request too: the hook runs for every model write.
     let made = Product::create(
         app.db(),
         Product {
-            name: "Nasi Goreng!".into(),
+            name: "Fried Rice!".into(),
             ..Product::for_owner(&me)
         },
     )
     .await
     .unwrap();
-    assert_eq!(made.slug, "nasi-goreng");
+    assert_eq!(made.slug, "fried-rice");
 }
 
 #[renox::test]
@@ -326,13 +326,13 @@ async fn the_form_tidies_the_name_before_the_rules() {
     app.acting_as(&owner);
     app.post(
         "/products",
-        &[("name", "  Kopi   Susu "), ("price", "18000")],
+        &[("name", "  Coffee   Latte "), ("price", "18000")],
     )
     .await
     .assert_redirect("/products");
     app.assert_database_has(
         "products",
-        &[("name", &"Kopi Susu"), ("slug", &"kopi-susu")],
+        &[("name", &"Coffee Latte"), ("slug", &"coffee-latte")],
     )
     .await;
     // Only spaces: `required` sees an empty name.
@@ -351,7 +351,7 @@ async fn an_import_skips_bad_lines_and_keeps_the_rest() {
     let file = dir.join("products.csv");
     std::fs::write(
         &file,
-        "name,price\nKopi Susu,18000\nTeh, abc\n!!!,5000\n\nGula Aren,12000\n",
+        "name,price\nCoffee Latte,18000\nTea, abc\n!!!,5000\n\nBrown Sugar,12000\n",
     )
     .unwrap();
     let path = file.display().to_string();
@@ -369,7 +369,7 @@ async fn an_import_skips_bad_lines_and_keeps_the_rest() {
         .pluck(app.db(), "name")
         .await
         .unwrap();
-    assert_eq!(names, ["Kopi Susu", "Gula Aren"]);
+    assert_eq!(names, ["Coffee Latte", "Brown Sugar"]);
     assert!(
         app.kernel()
             .call(
@@ -416,7 +416,7 @@ async fn the_form_checks_a_field_as_you_type() {
         .request()
         .htmx()
         .header("x-renox-validate", "name")
-        .post("/products", &[("name", "Kopi"), ("price", "1000")])
+        .post("/products", &[("name", "Coffee"), ("price", "1000")])
         .await;
     assert!(res.json_path("errors").as_array().unwrap().is_empty());
     app.assert_database_count("products", 0).await;
@@ -432,7 +432,7 @@ async fn saving_without_changes_says_so() {
     let product = Product::create(
         app.db(),
         Product {
-            name: "Kopi".into(),
+            name: "Coffee".into(),
             price: 1000,
             ..Product::for_owner(&owner)
         },
@@ -442,7 +442,7 @@ async fn saving_without_changes_says_so() {
     app.acting_as(&owner);
     app.put(
         &format!("/products/{}", product.id),
-        &[("name", "Kopi"), ("price", "1000")],
+        &[("name", "Coffee"), ("price", "1000")],
     )
     .await
     .assert_redirect("/products");
@@ -457,7 +457,7 @@ async fn only_the_owner_restores_from_the_trash() {
     let mut product = Product::create(
         app.db(),
         Product {
-            name: "Kopi Toraja".into(),
+            name: "House Blend".into(),
             ..Product::for_owner(&owner)
         },
     )

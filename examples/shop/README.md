@@ -35,7 +35,7 @@ them to the `sessions` table (tests/shop.rs runs a customer with it). `deploy/` 
 | Notifications: a queued confirmation mail (HTML and text) and a database row for the customer, a database row for every admin, a "shipped" mail; mail and rows in the recipient's language (the language switch saves it in `users.locale`, which `Recipient::locale` reads; a pickup order's mails say "ready" instead of "on its way"); the rows are `DatabaseMessage`s, which the bell in the bar (`notification_bell`, `Auth::new().notifications()`) shows and pushes live while a page is open | [src/app/orders/notifications.rs](src/app/orders/notifications.rs), [resources/views/mail](resources/views/mail), [layouts/app.html](resources/views/layouts/app.html) |
 | `/admin`: a route group guarded by the `admin` role (`require_role`), products with photo uploads and search/sort (deleting one asks for the password again; an "Adjust stock" `action_sheet` per row, edit and "view in the shop" `icon_button`s, the latter disabled with a reason for hidden products, `n` for a new product and ⌘S / Ctrl+S on the form), orders moved pending → paid → shipped (each move written to the audit log), a dashboard with a period filter, figures with their change (revenue, orders, average order, new customers), revenue against the period before, orders per day and orders by status loaded on their own every minute (`renox::chart`: `Period`, `Trend`; the kit's `stat`, `chart`, `widget`), then pending orders, low stock, notifications and recent activity on the kit's tabs (`tabs` + `tab_panel`: switched in the browser, arrow keys move between them) | [src/app/admin](src/app/admin) |
 | The order page as an infolist (`infolist`, `entry` with `since` and `money`, a `repeatable` of the order's lines) | [resources/views/orders/show.html](resources/views/orders/show.html) |
-| English and Indonesian, with plurals (`0 products`, `One product`, `3 products`) and translated validation labels | [resources/lang](resources/lang) |
+| English and Spanish, with plurals (`0 products`, `One product`, `3 products`); the Spanish file also translates the validation messages and labels, the login pages and the UI kit's labels the shop shows (`renox.validation.*`, `renox.auth.*`, `ui.*`) | [resources/lang](resources/lang) |
 | Pages on the UI kit (`renox/ui.html`): its `navbar` (links, the cart's count as a badge, the bell, the account and language menus), `page_header`s, products as `media_card`s in a `card_grid`, filters in a `toolbar`, the admin's sections as `link_tabs`, kit fields and tables with `row_actions`, status badges, toasts, the confirmation sheets, an error page in the layout, the coffee-brown accent (the only rules in `public/app.css`) | [resources/views](resources/views), [layouts/app.html](resources/views/layouts/app.html), [public/app.css](public/app.css) |
 | Deploy: Dockerfile (cargo-chef), systemd unit and socket, Litestream, from `rnx make:deploy` | [Dockerfile](Dockerfile), [deploy/](deploy) |
 
@@ -105,7 +105,7 @@ them to the `sessions` table (tests/shop.rs runs a customer with it). `deploy/` 
   `{% break %}` in the loop.
 - **Texts that count.** The stock hint is one translation with Laravel's plural ranges:
   `"{0} Sold out|{1} Only one left|[2,5] Only :count left|[6,*] :count in stock"` (and in
-  Indonesian). Sold-out cards get an extra class with
+  Spanish). Sold-out cards get an extra class with
   `class_names('product-card', {'product-card--sold-out': product.stock == 0})`.
 - **Redirects by route name.** After checkout, `Redirect::route("orders.show", &[&order.id])?`;
   the admin goes back with `Redirect::route("admin.products.index", &[])?`. The admin nav marks
@@ -126,7 +126,7 @@ cargo test -p shop
   later `app.at_travelled_time(app.kernel().run_scheduled("cancel-unpaid-orders"))` cancels
   only the older one (a day after that, the second goes too).
 - `app.fake_notifications()` records the confirmation and the admins' "new order" without
-  mail, jobs or database rows (`assert_notified(&budi, "order-confirmation")`);
+  mail, jobs or database rows (`assert_notified(&ben, "order-confirmation")`);
   `app.fake_events()` keeps the `OrderPlaced` listener from running, so checkout is tested
   alone (`assert_emitted::<OrderPlaced>(..)`).
 
@@ -141,5 +141,5 @@ section.
 of the Renox workspace, so build it from a copy made with `rnx new` rather than from this folder.
 
 Money is in rupiah as `i64`, shown with the `money` filter (`APP_CURRENCY`, `IDR` by default:
-`Rp 75.000` in Indonesian, `Rp 75,000` in English), and the payment is a bank transfer the admin confirms by hand. To
+`Rp 75.000` in Spanish, `Rp 75,000` in English), and the payment is a bank transfer the admin confirms by hand. To
 take card or e-wallet payments, see [examples/webhooks](../webhooks).

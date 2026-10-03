@@ -53,7 +53,7 @@
     "placed": "Thank you! Order #:id is placed.",
     "out_of_stock": "Not enough stock left for: :names. Please change your cart.",
     "delivery": "Delivery", "courier": "Courier", "pickup": "Pick up at the store",
-    "pickup_address": "Pick up at the store: Jl. Braga 12, Bandung",
+    "pickup_address": "Pick up at the store: 12 Market Street, Springfield",
     "address": "Delivery address",
     "pay_by_transfer": "Pay by bank transfer within :days days; unpaid orders are cancelled.",
     "place": "Place order",
