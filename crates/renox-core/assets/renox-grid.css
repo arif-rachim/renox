@@ -9,6 +9,10 @@
   flex: 1 1 auto;
   min-height: 0;
   height: 100%;
+  padding: var(--rx-space-4, 16px) var(--rx-space-5, 20px) var(--rx-space-5, 20px);
+}
+@media (max-width: 767px) {
+  .rx-grid-fill { padding: 0; }
 }
 
 .rx-grid, .rx-grid *, .rx-grid *::before, .rx-grid *::after { box-sizing: border-box; }

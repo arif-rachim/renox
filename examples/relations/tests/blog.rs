@@ -169,13 +169,13 @@ async fn categories_and_tags_list_their_posts() {
     b.app
         .get(&format!("/categories/{}", b.coffee.id))
         .await
-        .assert_see("<h1>Coffee</h1>")
+        .assert_see(r#"<h1 class="rx-title">Coffee</h1>"#)
         .assert_see(">Beans<")
         .assert_dont_see(">Rust<");
     b.app
         .get(&format!("/tags/{}", b.tags[0].id))
         .await
-        .assert_see("<h1>#howto</h1>")
+        .assert_see(r#"<h1 class="rx-title">#howto</h1>"#)
         .assert_see(">Beans<")
         .assert_see(">Rust<")
         .assert_dont_see(">Loose<");
@@ -193,12 +193,12 @@ async fn the_report_joins_and_counts() {
         .get("/report")
         .await
         .assert_see("2 posts with comments.")
-        .assert_see("<td>Coffee</td><td>1</td><td>2</td>")
-        .assert_see("<td>Code</td><td>1</td><td>1</td>")
-        .assert_see("<td>Uncategorized</td><td>1</td><td>0</td>")
-        .assert_see("<td>#howto</td><td>2</td>")
-        .assert_see("<td>#news</td><td>0</td>")
-        .assert_see("<td>Ani</td><td>1</td>");
+        .assert_see(r#"<td>Coffee</td><td class="rx-num">1</td><td class="rx-num">2</td>"#)
+        .assert_see(r#"<td>Code</td><td class="rx-num">1</td><td class="rx-num">1</td>"#)
+        .assert_see(r#"<td>Uncategorized</td><td class="rx-num">1</td><td class="rx-num">0</td>"#)
+        .assert_see(r#"<td>#howto</td><td class="rx-num">2</td>"#)
+        .assert_see(r#"<td>#news</td><td class="rx-num">0</td>"#)
+        .assert_see(r#"<td>Ani</td><td class="rx-num">1</td>"#);
 }
 
 #[renox::test]
@@ -309,10 +309,13 @@ async fn posts_and_comments_are_liked() {
     let text = page.text();
     let likes = |from: &str| {
         let start = text.find(from).unwrap();
-        let at = text[start..].find(r#"<span class="likes muted">"#).unwrap() + start;
-        text[at..at + 36].to_owned()
+        let at = text[start..]
+            .find(r#"<span class="likes rx-subtitle">"#)
+            .unwrap()
+            + start;
+        text[at..at + 48].to_owned()
     };
-    assert!(likes("<h1>").contains(">2 likes<"));
+    assert!(likes("<h1").contains(">2 likes<"));
     assert!(likes("<strong>Ani</strong>").contains(">1 like<"));
     assert!(likes("<strong>Budi</strong>").contains(">0 likes<"));
     b.app

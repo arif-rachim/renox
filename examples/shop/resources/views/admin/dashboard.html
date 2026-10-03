@@ -1,7 +1,7 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-{% from "renox/ui.html" import group, link_button, tabs, tab_panel, stats, stat, dashboard, widget, period_filter %}
+{% from "renox/ui.html" import group, link_button, tabs, tab_panel, stats, stat, dashboard, widget, period_filter, badge %}
 <h1 class="rx-title">Admin</h1>
 {% include "admin/_nav.html" %}
 <div class="rx-row">
@@ -47,7 +47,8 @@
 {% call tab_panel("dashboard", "notifications") %}
 {% call group() %}
   {% for n in notifications %}
-  <div class="{{ 'unread' if not n.read_at }}">
+  <div>
+    {% if not n.read_at %}{{ badge("New", "info") }} {% endif %}
     {% if n.kind == 'new-order' %}New order <a class="rx-link" href="{{ route('orders.show', n.data.order_id) }}">#{{ n.data.order_id }}</a>: {{ n.data.total | money }}
     {% else %}{{ n.kind }}{% endif %}
     <span class="rx-subtitle">{{ n.created_at | date('%d/%m %H:%M') }}</span>

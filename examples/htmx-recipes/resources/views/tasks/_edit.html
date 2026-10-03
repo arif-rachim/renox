@@ -1,12 +1,13 @@
-<li id="task-{{ task.id }}" class="task editing">
+{% from "renox/ui.html" import input, button %}
+<li id="task-{{ task.id }}">
   {# Save answers with the row; Escape asks for the row as it was. Errors
-     (422) appear in the slot below without replacing anything. #}
+     (422) appear under the field without replacing anything. #}
   <form method="post" action="{{ route('tasks.update', task.id) }}"
         hx-patch="{{ route('tasks.update', task.id) }}" hx-target="closest li" hx-swap="outerHTML">
     {{ csrf_field() }}{{ method_field('PATCH') }}
-    <input name="title" value="{{ task.title }}" autofocus aria-label="Title"
-           hx-get="{{ route('tasks.show', task.id) }}" hx-trigger="keyup[key=='Escape']" hx-target="closest li" hx-swap="outerHTML">
-    <button>Save</button>
-    <p class="error" data-error-for="title"></p>
+    {{ input("title", "Title", value=task.title, required=true, hide_label=true, id="title-" ~ task.id,
+             attrs={"autofocus": true, "hx-get": route('tasks.show', task.id), "hx-trigger": "keyup[key=='Escape']",
+                    "hx-target": "closest li", "hx-swap": "outerHTML"}) }}
+    {{ button("Save", size="small") }}
   </form>
 </li>

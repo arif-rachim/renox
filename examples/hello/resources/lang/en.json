@@ -3,9 +3,8 @@
     "title": "Guestbook",
     "name": "Name",
     "message": "Message",
-    "photo": "Photo (optional)",
+    "photo": "Photo",
     "send": "Send",
-    "sending": "Sending…",
     "empty": "No messages yet.",
     "thanks": "Thank you, :name! Your message is saved."
   },

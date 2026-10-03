@@ -1,83 +1,77 @@
 {% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, card, button, checkbox_list, list, badge, input, textarea, empty %}
 
 {#- The post's own title and description for search engines and link
     previews; `type="article"` for OpenGraph. -#}
 {% block seo %}{{ seo(title=post.title ~ " · " ~ app.name, description=description, type="article") }}{% endblock %}
 
 {% block content %}
-<article>
-  <h1>{{ post.title }}</h1>
-  <p class="meta mt-3 flex flex-wrap items-center gap-2 text-sm">
-    {% if post.created_at %}<time class="text-zinc-500" datetime="{{ post.created_at }}">{{ post.created_at | date('%d %B %Y') }}</time> ·{% endif %}
-    {% if category %}<a href="{{ route('categories.show', category.id) }}">{{ category.name }}</a>{% else %}<span class="text-zinc-500">Uncategorized</span>{% endif %}
-    {% for tag in tags %} <a class="tag" href="{{ route('tags.show', tag.id) }}">#{{ tag.name }}</a>{% endfor %}
+<article class="rx-stack">
+  <h1 class="rx-title">{{ post.title }}</h1>
+  <p class="rx-row rx-subtitle">
+    {% if post.created_at %}<time datetime="{{ post.created_at }}">{{ post.created_at | date('%d %B %Y') }}</time> ·{% endif %}
+    {% if category %}<a class="rx-link" href="{{ route('categories.show', category.id) }}">{{ category.name }}</a>{% else %}<span>Uncategorized</span>{% endif %}
+    {% for tag in tags %} <a class="rx-link" href="{{ route('tags.show', tag.id) }}">#{{ tag.name }}</a>{% endfor %}
   </p>
-  {#- The body is Markdown; raw HTML in it is shown as text. -#}
-  <div class="prose prose-zinc mt-8 max-w-none dark:prose-invert">{{ post.body | markdown }}</div>
-  <form method="post" action="{{ route('posts.like', post.id) }}" class="mt-8 flex items-center gap-3">
-    {{ csrf_field() }}<button class="btn-quiet">♥ Like</button> <span class="likes muted">{{ likes }} like{{ "" if likes == 1 else "s" }}</span>
+  {#- The body is Markdown; raw HTML in it is shown as text. Tailwind's
+      `prose` sets its type. -#}
+  <div class="prose prose-zinc max-w-none dark:prose-invert">{{ post.body | markdown }}</div>
+  <form method="post" action="{{ route('posts.like', post.id) }}" class="rx-row">
+    {{ csrf_field() }}{{ button("♥ Like", variant="secondary", size="small") }} <span class="likes rx-subtitle">{{ likes }} like{{ "" if likes == 1 else "s" }}</span>
   </form>
 </article>
 
-<section class="mt-12 rounded-xl border border-zinc-200 p-5 dark:border-zinc-800">
-<h2>Tags</h2>
+{% call card(title="Tags") %}
 {# The pivot's own columns: when the post was tagged, and whether it is pinned on the tag's page. #}
 {% if tags %}
-<ul class="links mt-3 space-y-2">
+{% call list(label="Tags") %}
   {% for tag in tags %}
-  <li class="flex flex-wrap items-center gap-2 text-sm">
-    <a class="tag" href="{{ route('tags.show', tag.id) }}">#{{ tag.name }}</a>
-    {% if tag.pivot.created_at %}<span class="muted">tagged {{ tag.pivot.created_at | date('%d/%m/%Y') }}</span>{% endif %}
-    {% if tag.pivot.pinned %}<strong>pinned</strong>{% endif %}
-    <form method="post" action="{{ route('posts.pin', post.id, tag.id) }}" class="inline">
+  <li>
+    <span class="rx-list__main"><a class="rx-link" href="{{ route('tags.show', tag.id) }}">#{{ tag.name }}</a>
+    {% if tag.pivot.created_at %}<span class="rx-subtitle">tagged {{ tag.pivot.created_at | date('%d/%m/%Y') }}</span>{% endif %}
+    {% if tag.pivot.pinned %}{{ badge("pinned", "info") }}{% endif %}</span>
+    <form method="post" action="{{ route('posts.pin', post.id, tag.id) }}">
       {{ csrf_field() }}{{ method_field('PUT') }}
       <input type="hidden" name="pinned" value="{% if tag.pivot.pinned %}false{% else %}true{% endif %}">
-      <button class="btn-quiet !min-h-7 !text-xs">{% if tag.pivot.pinned %}Unpin{% else %}Pin{% endif %} on #{{ tag.name }}</button>
+      {{ button(("Unpin" if tag.pivot.pinned else "Pin") ~ " on #" ~ tag.name, variant="plain", size="small") }}
     </form>
   </li>
   {% endfor %}
-</ul>
+{% endcall %}
 {% endif %}
 {# Pivot::sync makes the post's tags exactly the checked ones. #}
-<form method="post" action="{{ route('posts.tags', post.id) }}" class="tags mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+<form method="post" action="{{ route('posts.tags', post.id) }}" class="rx-stack">
   {{ csrf_field() }}{{ method_field('PUT') }}
-  {% for tag in all_tags %}
-  <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" name="tags" value="{{ tag.id }}" class="size-4 accent-emerald-700" {% if tag.id in tag_ids %}checked{% endif %}> {{ tag.name }}</label>
-  {% endfor %}
-  <p class="error w-full" data-error-for="tags">{{ error('tags') }}</p>
-  <button class="btn-quiet">Save tags</button>
+  {{ checkbox_list("tags", "Tags of this post", tag_options, selected=tag_ids, inline=true) }}
+  <div>{{ button("Save tags", variant="secondary") }}</div>
 </form>
-</section>
+{% endcall %}
 
-<section class="mt-12">
-<h2 id="comments">Comments ({{ comments | length }})</h2>
-<div class="mt-4 space-y-5">
+<h2 class="rx-card__title" id="comments">Comments ({{ comments | length }})</h2>
+{% if comments %}
+{% call list(label="Comments") %}
 {% for comment in comments %}
-<div class="comment border-l-2 border-zinc-200 pl-4 dark:border-zinc-800" id="comment-{{ comment.id }}">
-  <p class="text-sm"><strong>{{ comment.author }}</strong> <span class="muted">{{ comment.created_at | date('%d/%m/%Y') }}</span></p>
-  <p class="mt-1">{{ comment.body }}</p>
-  <form method="post" action="{{ route('comments.like', comment.id) }}" class="mt-1 flex items-center gap-2">
-    {{ csrf_field() }}<button class="text-sm text-zinc-500 hover:text-emerald-700">♥ Like</button> <span class="likes muted">{{ comment.likes }} like{{ "" if comment.likes == 1 else "s" }}</span>
+<li id="comment-{{ comment.id }}">
+  <div class="rx-list__main">
+    <p><strong>{{ comment.author }}</strong> <span class="rx-subtitle">{{ comment.created_at | date('%d/%m/%Y') }}</span></p>
+    <p>{{ comment.body }}</p>
+  </div>
+  <form method="post" action="{{ route('comments.like', comment.id) }}" class="rx-row">
+    {{ csrf_field() }}{{ button("♥ Like", variant="plain", size="small") }} <span class="likes rx-subtitle">{{ comment.likes }} like{{ "" if comment.likes == 1 else "s" }}</span>
   </form>
-</div>
-{% else %}
-<p class="muted">No comments yet.</p>
+</li>
 {% endfor %}
-</div>
+{% endcall %}
+{% else %}
+<p class="rx-subtitle">No comments yet.</p>
+{% endif %}
 
-<form method="post" action="{{ route('posts.comment', post.id) }}" class="stack mt-8 grid gap-3">
+<form method="post" action="{{ route('posts.comment', post.id) }}" novalidate>
   {{ csrf_field() }}
-  <div>
-    <label class="mb-1 block text-sm font-medium" for="author">Name</label>
-    <input id="author" name="author" autocomplete="name" value="{{ old('author') }}"{% if error('author') %} aria-invalid="true"{% endif %}>
-    <p class="error" data-error-for="author">{{ error('author') }}</p>
-  </div>
-  <div>
-    <label class="mb-1 block text-sm font-medium" for="body">Comment</label>
-    <textarea id="body" name="body" rows="3"{% if error('body') %} aria-invalid="true"{% endif %}>{{ old('body') }}</textarea>
-    <p class="error" data-error-for="body">{{ error('body') }}</p>
-  </div>
-  <div><button class="btn">Comment</button></div>
+  {% call card(title="Leave a comment") %}
+    {{ input("author", "Name", required=true, autocomplete="name") }}
+    {{ textarea("body", "Comment", rows=3, required=true) }}
+    <div class="rx-card__footer">{{ button("Comment") }}</div>
+  {% endcall %}
 </form>
-</section>
 {% endblock %}

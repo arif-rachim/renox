@@ -1,12 +1,11 @@
 {% extends "layouts/app.html" %}
-{% from "renox/ui.html" import stats, stat, dashboard, widget, period_filter, link_button, badge, empty %}
+{% from "renox/ui.html" import stats, stat, dashboard, widget, period_filter, link_button, badge, empty, table, page_header %}
 
 {% block content %}
-<div class="page__head">
-  <h1 class="rx-title">Dashboard</h1>
+{% call page_header("Dashboard") %}
   {#- One period for every figure and chart below (`?period=`). -#}
   {{ period_filter(period) }}
-</div>
+{% endcall %}
 
 {% call stats(4) %}
   {{ stat("Billed", billed_total | money, delta=billed_change, trend=billed.values, url=route('invoices.index')) }}
@@ -20,25 +19,33 @@
     {{ chart("line", labels=billed_labels, series=billed_series, format="money", title="Billed") }}
   {% endcall %}
   {% call widget("Running low", description=(low_count ~ " below their minimum")) %}
-    {%- for product in low %}
-    <a class="line" href="{{ route('products.show', product.id) }}">
-      <span>{{ product.name }}</span>
-      {{ badge(product.stock ~ " left", "danger" if product.stock <= 0 else "warning") }}
-    </a>
+    {%- if low %}
+    {% call table(["Product", ["Left", "num"]], caption="Running low") %}
+      {%- for product in low %}
+      <tr>
+        <td><a class="rx-link" href="{{ route('products.show', product.id) }}">{{ product.name }}</a></td>
+        <td class="rx-num">{{ badge(product.stock, "error" if product.stock <= 0 else "warning") }}</td>
+      </tr>
+      {%- endfor %}
+    {% endcall %}
     {%- else %}
     {{ empty("Stock is fine", "Every product is at or above its minimum.") }}
-    {%- endfor %}
+    {%- endif %}
   {% endcall %}
   {% call widget("Overdue invoices", span="full") %}
-    {%- for invoice in overdue %}
-    <a class="line" href="{{ route('invoices.show', invoice.id) }}">
-      <span>{{ invoice.number }}</span>
-      <span class="rx-subtitle">due {{ invoice.due_on | date('%d %b') }}</span>
-      <span class="line__end">{{ invoice.total | money }}</span>
-    </a>
+    {%- if overdue %}
+    {% call table(["Invoice", ["Due", "hide-narrow"], ["Total", "num"]], caption="Overdue invoices") %}
+      {%- for invoice in overdue %}
+      <tr>
+        <td><a class="rx-link" href="{{ route('invoices.show', invoice.id) }}">{{ invoice.number }}</a></td>
+        <td class="rx-hide-narrow">{{ invoice.due_on | date('%d %b') }}</td>
+        <td class="rx-num">{{ invoice.total | money }}</td>
+      </tr>
+      {%- endfor %}
+    {% endcall %}
     {%- else %}
     {{ empty("Nothing overdue", "Every issued invoice is still within its terms.") }}
-    {%- endfor %}
+    {%- endif %}
   {% endcall %}
 {% endcall %}
 {% endblock %}

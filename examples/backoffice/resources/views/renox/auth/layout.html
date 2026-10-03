@@ -1,6 +1,6 @@
-{#- Renox's sign-in pages (login, password reset, email verification,
-    account) in the company's colours: this file replaces the built-in
-    renox/auth/layout.html, and the pages that extend it come along. -#}
+{#- Renox's sign-in pages in the company's colours: the built-in
+    renox/auth/layout.html with the accent from the settings and the kit's
+    brand mark. Every sign-in page extends it. -#}
 <!doctype html>
 <html lang="{{ app.locale }}">
 <head>
@@ -10,19 +10,13 @@
   <title>{% block title %}{{ company.company_name }}{% endblock %}</title>
   {{ renox_head() }}
   {{ renox_ui() }}
-  <link rel="stylesheet" href="{{ asset('app.css') }}">
   {% include "layouts/_brand.html" %}
   {{ stack('head') }}
 </head>
-<body class="rx-page welcome">
-  <aside class="welcome__brand">
-    {% include "layouts/_logo.html" %}
-    <p class="welcome__name">{{ company.company_name }}</p>
-    <p class="welcome__line">Back office</p>
-    {% if company.company_address %}<p class="welcome__address">{{ company.company_address }}</p>{% endif %}
-  </aside>
+<body class="rx-page">
   <main class="rx-auth{% block main_class %}{% endblock %}">
     <div class="rx-auth__inner">
+      <p class="rx-auth__brand"><a href="/"><span class="rx-brand-mark" aria-hidden="true">{{ company.company_name[:1] | upper }}</span> {{ company.company_name }}</a></p>
       {% block content %}{% endblock %}
     </div>
   </main>

@@ -1,12 +1,9 @@
 {% extends "layouts/app.html" %}
-{% from "renox/ui.html" import infolist, entry, link_button, button, confirm, badge, alert, card %}
+{% from "renox/ui.html" import infolist, entry, link_button, button, confirm, badge, alert, table, page_header %}
 
 {% block content %}
-<div class="page__head">
-  <div>
-    <p class="rx-subtitle"><a class="rx-link" href="{{ route('invoices.index') }}">Invoices</a></p>
-    <h1 class="rx-title">{{ invoice.number }} {{ badge(invoice.status | capitalize, {"draft": "neutral", "issued": "info", "paid": "success", "void": "danger"}[invoice.status]) }}{% if overdue %} {{ badge("Overdue", "warning") }}{% endif %}</h1>
-  </div>
+{% call page_header(invoice.number, back=route('invoices.index'), back_label="Invoices", badge=(invoice.status | capitalize), badge_kind={"draft": none, "issued": "info", "paid": "success", "void": "error"}[invoice.status],
+                   subtitle=("Overdue since " ~ (invoice.due_on | date('%d %B %Y')) if overdue else none)) %}
   <div class="rx-row">
     {{ link_button(route('invoices.print', invoice.id), "Print", icon="external", new_tab=true) }}
     {%- if can('invoices.manage') %}
@@ -27,7 +24,7 @@
       {%- endif %}
     {%- endif %}
   </div>
-</div>
+{% endcall %}
 
 {%- if invoice.payment_url and invoice.status == "issued" %}
 {{ alert("Send this link to the customer: " ~ invoice.payment_url, kind="info", title="Payment page") }}
@@ -42,27 +39,18 @@
   {{ entry("Notes", invoice.notes, words=40) }}
 {% endcall %}
 
-{% call card() %}
-<div class="rx-table-wrap">
-<table class="rx-table">
-  <caption class="rx-visually-hidden">Lines</caption>
-  <thead><tr><th scope="col">Item</th><th scope="col" class="num">Quantity</th><th scope="col" class="num">Price</th><th scope="col" class="num">Amount</th></tr></thead>
-  <tbody>
+{#- The kit's table: ["…", "num"] right-aligns a column. -#}
+{% call table(["Item", ["Quantity", "num"], ["Price", "num"], ["Amount", "num"]], caption="Lines") %}
   {%- for line in lines %}
   <tr>
     <td>{{ line.description }}</td>
-    <td class="num">{{ line.quantity | number }}</td>
-    <td class="num">{{ line.unit_price | money }}</td>
-    <td class="num">{{ line.amount | money }}</td>
+    <td class="rx-num">{{ line.quantity | number }}</td>
+    <td class="rx-num">{{ line.unit_price | money }}</td>
+    <td class="rx-num">{{ line.amount | money }}</td>
   </tr>
   {%- endfor %}
-  </tbody>
-  <tfoot>
-  <tr class="total"><td colspan="3">Subtotal</td><td class="num">{{ invoice.subtotal | money }}</td></tr>
-  <tr class="total"><td colspan="3">Tax</td><td class="num">{{ invoice.tax | money }}</td></tr>
-  <tr class="total total--grand"><td colspan="3">Total</td><td class="num">{{ invoice.total | money }}</td></tr>
-  </tfoot>
-</table>
-</div>
+  <tr><td colspan="3">Subtotal</td><td class="rx-num">{{ invoice.subtotal | money }}</td></tr>
+  <tr><td colspan="3">Tax</td><td class="rx-num">{{ invoice.tax | money }}</td></tr>
+  <tr><td colspan="3"><strong>Total</strong></td><td class="rx-num"><strong>{{ invoice.total | money }}</strong></td></tr>
 {% endcall %}
 {% endblock %}

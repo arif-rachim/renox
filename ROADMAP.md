@@ -1439,6 +1439,33 @@ Notes from M29c:
 - examples/postgres stays separate from examples/fields. Merging them was considered,
   but fields is about input types and postgres about running one app on both databases.
 
+### M30 · Every example on the UI kit
+Asked by the owner after M29 ("make sure the examples use Renox's standard kit, don't make
+things up"). An audit found five examples off the kit (hello, jobs, postgres, relations,
+api's client), htmx-recipes hand-making its modal, menu and tabs, and every kit example
+carrying a copy of the `rnx new` stub's navigation bar CSS, because the kit had no
+navigation. The owner chose to add navigation to the kit (rather than keep app CSS for it)
+and to keep Tailwind next to the kit in relations.
+- [x] Kit: `navbar`/`nav_links`/`nav_link`, `sidebar`/`sidebar_link`/`sidebar_section` +
+      `rx-shell`, `page_header`, `toolbar`, `row_actions`, `list`, `columns`, `card_grid` +
+      `media_card`, `link_tabs`, `thumbnail`, `progress`, `menu_button`, `rx-page--fill`,
+      `rx-image`, `hide_label`, `confirm(cancel_label, fields)`
+- [x] `rnx new`'s layout on `navbar`; AGENTS.md.stub's rule to build pages from the kit
+- [x] All fourteen examples on the kit; mails on the kit's mail layout and components
+- [ ] Re-record docs/assets/demo.gif: the guestbook's look changed (CLAUDE.md §4.10)
+
+Notes from M30:
+- An imported macro's name hides a context value of the same name: jobs' statements page
+  has a `progress` number, so it imports the kit's macro `as progress_bar`.
+- Imports a block needs when htmx asks for that block alone (`View::fragment`) go at the
+  top of the template, outside `{% block content %}`, or the fragment fails with an undefined
+  macro (shop's product results, hello's entries).
+- A flex item whose width comes from its content gives an `overflow-x: auto` child no width:
+  `page_header`'s buttons take the rest of the row (`flex: 1 1 auto`) so a `period_filter` in
+  them shows.
+- What stays app CSS: brand tokens, and documents meant for paper (backoffice's printed
+  invoice).
+
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`
       (resource tables and forms); billing later

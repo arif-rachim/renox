@@ -180,7 +180,7 @@ fn use_tailwind(root: &Path) -> Result<()> {
     fs::remove_file(root.join("public/app.css"))?;
     let input = root.join(crate::tailwind::INPUT);
     fs::create_dir_all(input.parent().expect("the input has a parent"))?;
-    // The app's own rules (the navigation bar…), without the stub's header comment.
+    // The app's own rules, without the stub's header comment.
     let rules = own
         .split_once("*/")
         .map_or(own.as_str(), |(_, rest)| rest.trim_start());

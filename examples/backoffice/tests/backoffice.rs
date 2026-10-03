@@ -117,7 +117,7 @@ async fn guests_log_in_and_new_staff_verify_first() {
     app.get("/login")
         .await
         .assert_see("Toko Makmur")
-        .assert_see("--brand: #0f766e");
+        .assert_see("--rx-accent: #0f766e");
     // Nobody signs up: an admin adds staff.
     app.get("/register").await.assert_not_found();
 
@@ -643,7 +643,7 @@ async fn settings_shape_invoices_and_the_pages() {
     app.get("/")
         .await
         .assert_see("Kopi Kenangan Mantan")
-        .assert_see("--brand: #7a4520");
+        .assert_see("--rx-accent: #7a4520");
     app.assert_database_has("audit_logs", &[("action", &"settings.updated")])
         .await;
 

@@ -46,7 +46,7 @@ turns from Pending to Paid, via Xendit.
 | Xendit: `x-callback-token` header | [src/app/payments/xendit.rs](src/app/payments/xendit.rs) |
 | Stripe: timestamped HMAC-SHA256 in `Stripe-Signature`, older than five minutes refused | [src/app/payments/stripe.rs](src/app/payments/stripe.rs) |
 | The orders page on the UI kit: a `table`, the amount with the `money` filter, a `badge` per status, an `empty` state | [resources/views/orders/index.html](resources/views/orders/index.html) |
-| The layout: the kit (`renox_ui()`), a navigation bar, `toasts()` | [resources/views/layouts/app.html](resources/views/layouts/app.html), [public/app.css](public/app.css) |
+| The layout: the kit (`renox_ui()`), its `navbar`, `toasts()` | [resources/views/layouts/app.html](resources/views/layouts/app.html), [public/app.css](public/app.css) |
 
 ## Things worth copying
 

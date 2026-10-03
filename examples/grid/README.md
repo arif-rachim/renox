@@ -95,7 +95,9 @@ the routes that change data sit behind `require_auth`).
 - `resources/views/orders/show.html`: one order, opened from its row.
 - `migrations/20260103000000_add_customers_and_notes.up.sql`: the `customers` and
   `order_notes` tables behind the Tier and Notes columns.
-- `public/app.css`: the dashboard shell (a bar on top, the grid filling the rest).
+- `resources/views/layouts/app.html`: the frame, all from the kit: `rx-page--fill` (the page
+  as tall as the screen), its `navbar` with the three views, and `rx-grid-fill` on `<main>`
+  so the grid fills the rest.
 - `tests/grid.rs`: the tests (below).
 
 ## Tests

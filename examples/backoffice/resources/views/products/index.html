@@ -1,10 +1,9 @@
 {% extends "layouts/app.html" %}
 {% from "renox/grid.html" import grid %}
-{% from "renox/ui.html" import action_sheet, input, form_grid, file, badge %}
+{% from "renox/ui.html" import action_sheet, input, form_grid, file, badge, page_header %}
 
 {% block content %}
-<div class="page__head">
-  <h1 class="rx-title">Products</h1>
+{% call page_header("Products") %}
   {%- if can('products.manage') %}
   <div class="rx-row">
     {#- A file in a sheet: the form goes as multipart, the same Valid<T>
@@ -25,10 +24,10 @@
     {% endcall %}
   </div>
   {%- endif %}
-</div>
+{% endcall %}
 {% call(row, column) grid(products) %}
   {%- if column.key == "level" -%}
-    <span class="level">{{ row.stock | number }} {% if row.level == "out" %}{{ badge("Out", "danger") }}{% elif row.level == "low" %}{{ badge("Low", "warning") }}{% endif %}</span>
+    {{ row.stock | number }} {% if row.level == "out" %}{{ badge("Out", "error") }}{% elif row.level == "low" %}{{ badge("Low", "warning") }}{% endif %}
   {%- endif -%}
 {% endcall %}
 {% endblock %}

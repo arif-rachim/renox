@@ -1,7 +1,7 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-{% from "renox/ui.html" import table, button, link_button, empty %}
+{% from "renox/ui.html" import table, button, link_button, empty, input, toolbar %}
 <h1 class="rx-title">{{ t('nav.cart') }}</h1>
 {% if lines %}
 {% call table([t('cart.product'), [t('cart.price'), "num"], t('cart.quantity'), [t('cart.subtotal'), "num"], ""], caption=t('nav.cart')) %}
@@ -10,11 +10,15 @@
     <td><a class="rx-link" href="{{ route('products.show', line.product.slug) }}">{{ line.product.name }}</a></td>
     <td class="rx-num">{{ line.product.price | money }}</td>
     <td>
-      <form method="post" action="{{ route('cart.update', line.item.id) }}" class="qty">
+      <form method="post" action="{{ route('cart.update', line.item.id) }}">
         {{ csrf_field() }}{{ method_field('PATCH') }}
-        <input class="rx-input" type="number" name="quantity" value="{{ line.item.quantity }}" min="1" max="99"
-               aria-label="{{ t('cart.quantity') }}: {{ line.product.name }}">
-        {{ button(t('cart.update'), variant="secondary", size="small") }}
+        {#- The kit's toolbar: the field and its button in a row; the label is
+            for screen readers (the column heading says it). -#}
+        {% call toolbar() %}
+          {{ input("quantity", t('cart.quantity') ~ ": " ~ line.product.name, type="number", value=line.item.quantity,
+                   required=true, hide_label=true, id="quantity-" ~ line.item.id, attrs={"min": 1, "max": 99}) }}
+          {{ button(t('cart.update'), variant="secondary", size="small") }}
+        {% endcall %}
       </form>
     </td>
     <td class="rx-num">{{ line.subtotal | money }}</td>

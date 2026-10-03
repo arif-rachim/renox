@@ -8,8 +8,9 @@
 {% if teams %}
 {% call group() %}
   {% for item, membership in teams %}
-  <div class="row-actions row-actions--between">
+  <div class="rx-row">
     <span>{{ item.name }} {{ badge(membership.role) }}</span>
+    <span class="rx-spacer"></span>
     {% if team and team.id == item.id %}
     {{ badge("Current team", kind="success") }}
     {% else %}

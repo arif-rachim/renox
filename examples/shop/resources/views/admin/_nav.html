@@ -1,9 +1,7 @@
-{#- The admin's sections; the current one is marked for screen readers too. -#}
-{% from "renox/ui.html" import link_button %}
-<nav class="chips" aria-label="Admin">
-  {#- `route_is` matches the section by route name (`admin.products.*`), whatever the query. -#}
-  {% for name, label, section in [("admin.dashboard", "Dashboard", "admin.dashboard"), ("admin.products.index", "Products", "admin.products.*"), ("admin.orders.index", "Orders", "admin.orders.*")] %}
-  {{ link_button(route(name), label, variant=("secondary" if route_is(section) else "plain"), size="small",
-                 attrs=({"aria-current": "page"} if route_is(section) else {})) }}
-  {% endfor %}
-</nav>
+{#- The admin's sections: the kit's `link_tabs`; `route_is` picks the
+    current one by route name (`admin.products.*`), whatever the query. -#}
+{% from "renox/ui.html" import link_tabs %}
+{% set sections = [(route('admin.dashboard'), "Dashboard", "admin.dashboard"), (route('admin.products.index'), "Products", "admin.products.*"), (route('admin.orders.index'), "Orders", "admin.orders.*")] %}
+{% set ns = namespace(current=none) %}
+{% for href, label, section in sections %}{% if route_is(section) %}{% set ns.current = href %}{% endif %}{% endfor %}
+{{ link_tabs(sections, current=ns.current, label="Admin") }}

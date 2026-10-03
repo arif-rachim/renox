@@ -16,15 +16,15 @@ cargo run                        # http://127.0.0.1:3000
 
 | Recipe | HTML | Handler answers |
 |---|---|---|
-| Modal form (Alpine) that adds a row | `hx-post` + `hx-swap="afterbegin"` in [index.html](resources/views/tasks/index.html); the modal closes on the `task-added` event | the new row and `HX-Trigger: task-added`; 422 errors appear in the modal |
-| Two places change at once (out-of-band swap) | the count's `<small id="open-count">` in [index.html](resources/views/tasks/index.html) | `view("tasks/answer.html", …).fragment("row").also("count")`: the row, then the count with `hx-swap-oob="true"` ([answer.html](resources/views/tasks/answer.html)); add, toggle, edit and delete all keep "N open" right |
+| Modal form that adds a row | the kit's `action_sheet` with `target="#tasks"` and `swap="afterbegin"` in [index.html](resources/views/tasks/index.html): htmx sends it, a success closes the sheet and clears it | the new row (and `HX-Trigger: task-added` for anyone listening); 422 errors stay in the sheet, under the field |
+| Two places change at once (out-of-band swap) | the count's `<span id="open-count">` in [index.html](resources/views/tasks/index.html) | `view("tasks/answer.html", …).fragment("row").also("count")`: the row, then the count with `hx-swap-oob="true"` ([answer.html](resources/views/tasks/answer.html)); add, toggle, edit and delete all keep "N open" right |
 | The server picks where the answer goes | add a task that's already on the list | `HxRetarget("#task-1")` + `HxReswap("outerHTML")`: the existing row is refreshed instead of a copy added, with a toast saying why |
 | Toasts over htmx | delete a task | `(Toast::success("“Task 1” deleted."), answer)`: the toast rides `HX-Trigger` and shows at once; after "Clear done" (`HX-Refresh`) or "Archive" (`HX-Redirect`) it waits for the next page |
 | Inline edit | double-click the title (`hx-trigger="dblclick"`) in [_row.html](resources/views/tasks/_row.html); Save is `hx-patch`, Escape (`keyup[key=='Escape']`) asks for the row again, in [_edit.html](resources/views/tasks/_edit.html) | the form, then the updated row |
 | Toggle in place | a checkbox with `hx-patch` | the row |
-| Dropdown menu (Alpine) with delete | `x-data="{ menu: false }"`, `@click.outside`, `hx-delete` + `hx-confirm` | an empty row part, so the row is swapped for nothing, with the open count out of band and a toast |
+| Menu with edit and delete | the kit's `menu` whose `menu_button`s carry `hx-get` and `hx-delete` + `hx-confirm` | an empty row part, so the row is swapped for nothing, with the open count out of band and a toast |
 | Infinite scroll | the last item has `hx-trigger="revealed"` and `hx-swap="outerHTML"`, in [_rows.html](resources/views/tasks/_rows.html); its URL is `route('tasks.index', before=…)`, the oldest row shown (by id, so a task added meanwhile doesn't repeat a row) | the next rows (and the next loader) |
-| Tabs (Alpine) | `x-data="{ tab: 'all' }"` and an `x-show` on each row; no request | — |
+| Tabs (Alpine) | the kit's segmented control (`rx-segmented`) driven by `x-data="{ tab: 'all' }"`, and an `x-show` on each row; no request | — |
 | Reload after a bulk change | "Clear done" | `HX-Refresh: true` (`HxRefresh`) |
 | Go elsewhere after an action | "Archive done" | `HX-Redirect: /summary` (`htmx.redirect`, a 303 for plain forms) |
 
@@ -32,10 +32,10 @@ All handlers are in [src/app/tasks/mod.rs](src/app/tasks/mod.rs).
 
 ## Things worth copying
 
-- **Hand-made here, ready-made in the kit.** The modal, the dropdown and the tabs are written
-  out with Alpine to show how they work. In an app, the UI kit has them done, with keyboard
-  support and focus handling: `sheet`/`open_button`, `menu`, `tabs`, and `confirm` for a delete
-  (docs/ui.md; examples/crud uses them). This page loads `renox_ui()` only for its toasts.
+- **The kit with htmx attributes.** The sheet, the menu, the fields and the list are the UI
+  kit's (keyboard support and focus handling included); the recipes are the htmx attributes on
+  them: `action_sheet`'s `target`/`swap`, `menu_button`'s and `checkbox`'s `attrs`, a `list`
+  whose rows are fragments.
 
 - **One handler, two answers.** `Htmx` tells a handler whether htmx asked; it returns a fragment
   for htmx and a redirect for a plain form, so every action works without JavaScript too.

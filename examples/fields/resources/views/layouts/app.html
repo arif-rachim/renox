@@ -13,12 +13,9 @@
   <link rel="stylesheet" href="{{ asset('app.css') }}">
 </head>
 <body class="rx-page">
-  <a class="rx-visually-hidden skip" href="#main">Skip to content</a>
-  <header class="bar">
-    <nav class="bar__inner" aria-label="Main">
-      <a class="bar__brand" href="{{ route('home') }}">{{ app.name }}</a>
-    </nav>
-  </header>
+  {#- The kit's navigation bar (renox/ui.html). -#}
+  {% from "renox/ui.html" import navbar %}
+  {{ navbar(app.name, href=route('home')) }}
   <main class="rx-container" id="main">
     {% block content %}{% endblock %}
   </main>

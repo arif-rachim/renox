@@ -63,10 +63,11 @@ impl Module for Products {
             // The limit is picked per request by the `api` limiter (lib.rs).
             .throttle_by("api")
             .cors(&["https://app.example.com"])
-            // A small front end for trying the API in a browser: a static
-            // page in public/ (client.html + client.js) that logs in for a
-            // token and calls the routes above with it, as an app would.
-            .get("/", || async { Redirect::to("/client.html") })
+            // A small front end for trying the API in a browser: a page on
+            // the UI kit (resources/views/client.html) whose script
+            // (public/client.js) logs in for a token and calls the routes
+            // above with it, as an app would.
+            .get("/", || async { view("client.html", context! {}) })
     }
 }
 

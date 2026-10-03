@@ -73,7 +73,7 @@ async fn an_order_notifies_admins() {
     app.get("/")
         .await
         .assert_view("orders/index.html")
-        .assert_see("<em>unpaid</em>")
+        .assert_see(">unpaid</span>")
         .assert_see("tok_declined")
         .assert_dont_see("Remind customer");
     app.acting_as(&admin);
@@ -315,7 +315,7 @@ async fn statements_go_out_as_a_batch_with_progress() {
         .await
         .assert_see("3 of 3 sent. Done.")
         .assert_dont_see("every 1s")
-        .assert_dont_see("<nav>");
+        .assert_dont_see("rx-navbar");
 
     let statement = app
         .sent_mail()

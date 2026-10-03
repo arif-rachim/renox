@@ -151,7 +151,7 @@ async fn the_cart_adds_up_and_stays_private() {
         .await;
     app.get("/cart")
         .await
-        .assert_see("Cart (3)")
+        .assert_see(r#"<span>Cart</span><span class="rx-nav-badge">3</span>"#)
         .assert_see("Rp 75,000");
     app.htmx()
         .post("/cart", &[("product_id", &id), ("quantity", "0")])
@@ -170,7 +170,9 @@ async fn the_cart_adds_up_and_stays_private() {
     app.patch(&format!("/cart/{item}"), &[("quantity", "4")])
         .await
         .assert_redirect("/cart");
-    app.get("/cart").await.assert_see("Cart (4)");
+    app.get("/cart")
+        .await
+        .assert_see(r#"<span>Cart</span><span class="rx-nav-badge">4</span>"#);
 
     // Someone else can't change or remove Budi's item.
     let siti = customer(&app, "siti@example.com").await;
@@ -502,12 +504,12 @@ async fn admins_manage_products_with_photos() {
         ("/admin", "Dashboard"),
     ] {
         let html = app.get(page).await.text();
-        let current: Vec<&str> = html
+        // The admin's nav (the kit's `link_tabs`), not the dashboard's period filter.
+        let start = html.find(r#"aria-label="Admin""#).expect("the admin nav");
+        let end = html[start..].find("</nav>").unwrap() + start;
+        let current: Vec<&str> = html[start..end]
             .split("<a ")
-            // The admin's nav, not the dashboard's period filter.
-            .filter(|link| {
-                link.contains(r#"aria-current="page""#) && !link.contains("rx-segmented__item")
-            })
+            .filter(|link| link.contains(r#"aria-current="page""#))
             .collect();
         assert_eq!(current.len(), 1, "{page}");
         assert!(
@@ -880,8 +882,8 @@ async fn error_pages_keep_the_shop_layout() {
     app.acting_as(&budi);
     let res = app.get("/products/no-such-coffee").await;
     res.assert_not_found()
-        .assert_see(r#"class="bar__brand""#)
-        .assert_see("Cart (0)")
+        .assert_see(r#"class="rx-navbar__brand""#)
+        .assert_see("<span>Cart</span>")
         .assert_see("That page isn&#39;t here.");
 }
 
@@ -942,8 +944,8 @@ async fn stock_texts_use_plural_ranges_and_sold_out_cards_are_marked() {
         .assert_see("Tinggal 3 lagi");
     app.get("/products")
         .await
-        .assert_see(r#"class="product-card product-card--sold-out""#)
-        .assert_see(r#"<article class="product-card">"#);
+        .assert_see(r#"class="rx-media-card rx-media-card--dimmed""#)
+        .assert_see(r#"<article class="rx-media-card">"#);
 }
 
 #[renox::test]

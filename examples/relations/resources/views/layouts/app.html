@@ -2,36 +2,34 @@
 <html lang="{{ app.locale }}">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
   {#- The title, description, canonical link and OpenGraph tags (a post
       page passes its own). -#}
   {% block seo %}{{ seo(title=app.name, description="Coffee, travel and Rust.") }}{% endblock %}
   <link rel="alternate" type="application/rss+xml" title="{{ app.name }}" href="{{ route('feed') }}">
-  {#- Built by Tailwind from resources/css/app.css (`rnx tailwind --minify`). -#}
-  <link rel="stylesheet" href="{{ asset('css/app.css') }}">
   {{ renox_head() }}
+  {#- The UI kit for the components (navigation, fields, buttons, lists,
+      tables); Tailwind (built from resources/css/app.css by `rnx tailwind
+      --minify`) for the Markdown bodies (`prose`) and a little layout. -#}
+  {{ renox_ui() }}
+  <link rel="stylesheet" href="{{ asset('css/app.css') }}">
 </head>
-<body class="bg-white text-zinc-800 antialiased dark:bg-zinc-950 dark:text-zinc-300">
-  <header class="border-b border-zinc-200 dark:border-zinc-800">
-    <div class="mx-auto flex max-w-3xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-4">
-      <a href="{{ route('posts.index') }}" class="text-lg font-bold tracking-tight text-zinc-900 no-underline hover:no-underline dark:text-white">{{ app.name }}</a>
-      <nav class="flex gap-4 text-sm">
-        <a href="{{ route('report') }}">Report</a>
-        <a href="{{ route('feed') }}">RSS</a>
-      </nav>
-      <form role="search" method="get" action="{{ route('posts.index') }}" class="w-full sm:ml-auto sm:w-64">
-        <label class="sr-only" for="q">Search posts</label>
-        <input id="q" type="search" name="q" value="{{ q | default('') }}" placeholder="Search posts" class="!py-1.5 text-sm">
-      </form>
-    </div>
-  </header>
-  <main class="mx-auto max-w-3xl px-4 py-10">
-    {% if flash.status %}<p class="mb-6 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200" role="status">{{ flash.status }}</p>{% endif %}
+<body class="rx-page">
+  {% from "renox/ui.html" import navbar, nav_links, nav_link, alert %}
+  {% call navbar(app.name, href=route('posts.index')) %}
+    {% call nav_links() %}
+      {{ nav_link(route('posts.index'), "Posts", active=route_is('posts.index')) }}
+      {{ nav_link(route('report'), "Report", active=route_is('report')) }}
+      {{ nav_link(route('feed'), "RSS") }}
+    {% endcall %}
+  {% endcall %}
+  <main class="rx-container rx-stack" id="main">
+    {% if flash.status %}{{ alert(flash.status, kind="success") }}{% endif %}
     {% block content %}{% endblock %}
   </main>
-  <footer class="mx-auto max-w-3xl border-t border-zinc-200 px-4 py-6 text-sm text-zinc-500 dark:border-zinc-800">
-    Follow along with <a href="{{ route('feed') }}">the RSS feed</a>.
+  <footer class="rx-container rx-subtitle">
+    Follow along with <a class="rx-link" href="{{ route('feed') }}">the RSS feed</a>.
   </footer>
 </body>
 </html>

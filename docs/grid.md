@@ -131,8 +131,9 @@ column.
 - The macro adds the grid's stylesheet and script itself (`renox_grid()`). The layout should
   have `{{ renox_ui() }}` (the grid uses the kit's buttons) and `{{ toasts() }}` (for actions
   and edits that answer with a `Toast`).
-- The grid needs the element around it to have a height. `rx-grid-fill` is a flex child that
-  takes the rest of a column-flex `body` (`height: 100dvh`), as examples/grid does.
+- The grid needs the element around it to have a height. Put `rx-page--fill` on `<body>` (the
+  page as tall as the screen, its `<main>` taking the rest under the kit's `navbar`) and
+  `rx-grid-fill` on the `<main>`, as examples/grid does.
 - `{{ sparkline(values) }}` draws a small chart as inline SVG: a line, or bars with
   `kind="bars"`. `width` and `height` are in pixels (96 × 28 by default), and `label` is what
   screen readers hear (by default "first → last"). It uses the text color, so `rx-up` or

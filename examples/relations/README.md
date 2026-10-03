@@ -9,7 +9,8 @@ relation (counts included), and reports use the query builder or SQL joins. Read
 
 It is also a small public blog: bodies are Markdown, each post has its own title and
 description for search engines, the posts are searchable, and there is an RSS feed and a
-sitemap. The pages are styled with [Tailwind CSS](https://tailwindcss.com).
+sitemap. The pages are on the UI kit, with [Tailwind CSS](https://tailwindcss.com) for the
+Markdown bodies' type.
 
 ```bash
 cd examples/relations
@@ -46,7 +47,7 @@ cargo run                        # http://127.0.0.1:3000
 | Search | `?q=`: each word must be in the title or the body (`where_any` + `where_like`); pages keep `q` | `index` |
 | RSS 2.0 at `/feed.xml`, linked from every page's `<head>` | XML written by the handler, escaped by `xml()` | `feed` |
 | `/sitemap.xml` | `renox::seo::Sitemap`; its route is named `sitemap`, so `robots.txt` points at it in production | `sitemap` |
-| Tailwind | the input [resources/css/app.css](resources/css/app.css) (`@import "tailwindcss"`, the typography plugin, base styles for plain elements), built into `public/css/app.css` | `rnx tailwind --minify` |
+| The UI kit and Tailwind together | the kit for the components (its `navbar`, `page_header`, `card`, `list`, `table`, fields and buttons); Tailwind's `prose` (the typography plugin in [resources/css/app.css](resources/css/app.css)) for the Markdown bodies, built into `public/css/app.css` | [layouts/app.html](resources/views/layouts/app.html), `rnx tailwind --minify` |
 
 The built CSS is committed, so `cargo run` works as it is. After changing classes in a view or
 the input, rebuild it with `rnx tailwind --minify` (from this directory; the CLI downloads the
