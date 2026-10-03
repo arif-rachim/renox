@@ -60,6 +60,14 @@ fn docs_url(rev: Option<&str>) -> String {
     format!("{RENOX_GIT}/blob/{}", rev.unwrap_or("main"))
 }
 
+/// Renox from crates.io, at this `rnx`'s own version (`cargo install
+/// renox-cli` builds from the registry, without git): a caret requirement,
+/// since a minor release doesn't break apps.
+fn registry_dependency(version: &str) -> String {
+    let major_minor: Vec<&str> = version.split('.').take(2).collect();
+    format!("renox = {{ version = \"{}\"", major_minor.join("."))
+}
+
 pub fn run(
     name: &str,
     renox_path: Option<&Path>,
@@ -102,6 +110,16 @@ fn run_in(
                 format!("renox = {{ path = {:?}", crate_dir.display().to_string()),
                 docs_url(None),
                 format!("the local Renox checkout this app uses: `{checkout}`"),
+            )
+        }
+        None if rev.is_none() && option_env!("RENOX_FROM_CRATES_IO").is_some() => {
+            let version = env!("CARGO_PKG_VERSION");
+            (
+                registry_dependency(version),
+                format!("{RENOX_GIT}/blob/v{version}"),
+                format!(
+                    "the crates Cargo downloaded: `~/.cargo/registry/src/*/renox-core-{version}/`"
+                ),
             )
         }
         None => (
@@ -263,6 +281,7 @@ mod tests {
 
     #[test]
     fn pins_the_git_dependency() {
+        assert_eq!(registry_dependency("1.2.3"), "renox = { version = \"1.2\"");
         let rev = "0123456789abcdef0123456789abcdef01234567";
         assert!(git_dependency(Some(rev)).ends_with(&format!("rev = \"{rev}\"")));
         assert!(git_dependency(None).ends_with("branch = \"main\""));

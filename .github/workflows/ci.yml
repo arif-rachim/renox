@@ -115,6 +115,29 @@ jobs:
       # a missing `#[cfg(feature = …)]` fails here.
       - run: cargo hack check -p renox-core -p renox --each-feature --no-dev-deps
 
+  semver:
+    name: semver checks
+    # Public API changes against the branch a pull request goes into. Until
+    # the first real release this only reports them (every change of a 0.0.x
+    # crate counts as breaking); after 1.0 the baseline becomes the release on
+    # crates.io and a breaking change without a major version fails here.
+    if: github.event_name == 'pull_request'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-semver-checks
+      # renox-macros is a proc-macro crate, which cargo-semver-checks can't read.
+      # `--release-type minor`: the version doesn't change between commits, and
+      # an unchanged 0.0.x version would let every check be skipped.
+      - run: cargo semver-checks -p renox-core -p renox --baseline-rev origin/${{ github.base_ref }} --release-type minor
+
   cli:
     name: rnx new + make:* (${{ matrix.database }})
     runs-on: ubuntu-latest

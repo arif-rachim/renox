@@ -10,6 +10,11 @@ homepage.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
+# docs.rs builds the API reference with these features on, so the PostgreSQL,
+# UUID and Excel APIs are documented too. Not `s3`: it builds aws-lc (C, cmake).
+[package.metadata.docs.rs]
+features = ["postgres", "uuid", "xlsx"]
+
 [features]
 default = ["fake", "http", "server-events"]
 # `renox::fake` for factories (`Factory::definition` with fake data).
@@ -82,4 +87,5 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 
 [dev-dependencies]
 # Doc examples are written the way apps use Renox: through the `renox` crate.
+# Path only, so `cargo publish` drops it (`renox` is published after this crate).
 renox = { path = "../renox" }
