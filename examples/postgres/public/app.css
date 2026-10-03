@@ -1,6 +1,1 @@
-body { font-family: system-ui, sans-serif; max-width: 42rem; margin: 3rem auto; padding: 0 1rem; color: #222; line-height: 1.5; }
-button { font: inherit; padding: .5rem 1rem; }
-code { background: #f4f4f4; padding: .1rem .3rem; border-radius: .2rem; }
-nav { display: flex; gap: 1rem; align-items: center; margin-bottom: 2rem; }
-nav > :first-child { margin-right: auto; }
-nav form { margin: 0; }
+/* The app's own styles, on top of the Renox UI kit (rx-* classes, docs/ui.md). */

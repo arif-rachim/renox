@@ -1,11 +1,16 @@
 {% extends "layouts/app.html" %}
+{% from "renox/ui.html" import list, badge, empty %}
 
 {% block seo %}{{ seo(title=heading ~ " · " ~ app.name) }}{% endblock %}
 
 {% block content %}
-<h1>{{ heading }}</h1>
-<ul class="mt-6 divide-y divide-zinc-200 dark:divide-zinc-800">
-  {% for post in posts %}<li class="flex items-center gap-3 py-3"><a href="{{ route('posts.show', post.id) }}">{{ post.title }}</a>{% if post.id in pinned %} <strong class="tag">pinned</strong>{% endif %}</li>
-  {% else %}<li class="muted py-3">No posts.</li>{% endfor %}
-</ul>
+<h1 class="rx-title">{{ heading }}</h1>
+{% if posts %}
+{% call list(label=heading) %}
+  {% for post in posts %}<li><a class="rx-list__main rx-link" href="{{ route('posts.show', post.id) }}">{{ post.title }}</a>{% if post.id in pinned %} {{ badge("pinned", "info") }}{% endif %}</li>
+  {% endfor %}
+{% endcall %}
+{% else %}
+{{ empty("No posts.") }}
+{% endif %}
 {% endblock %}

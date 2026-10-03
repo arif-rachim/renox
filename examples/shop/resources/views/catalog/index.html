@@ -1,50 +1,35 @@
 {% extends "layouts/app.html" %}
+{#- Imported at the top, so the `results` block sees them when htmx asks for it alone. -#}
+{% from "renox/ui.html" import button, empty, page_header, toolbar, input, select, card_grid %}
 
 {% block seo %}{{ seo(title=t('nav.products') ~ " · " ~ app.name) }}{% endblock %}
 
 {% block content %}
-{% from "renox/ui.html" import button, empty %}
-<h1 class="rx-title">{{ t('nav.products') }}</h1>
+{{ page_header(t('nav.products')) }}
 
 {# Typing or choosing asks for just the results (the `results` block) and
    keeps the address bar in step, so the page can be shared or reloaded. #}
-<form class="toolbar" method="get" action="{{ route('products.index') }}" role="search"
+<form method="get" action="{{ route('products.index') }}" role="search"
       hx-get="{{ route('products.index') }}" hx-target="#results" hx-swap="outerHTML" hx-push-url="true"
       hx-trigger="input changed delay:300ms from:input[name=q], change from:select">
-  {#- Filters are plain kit fields: nothing here is required, so no "(optional)" marks. -#}
-  <div class="rx-field">
-    <label class="rx-label" for="filter-q">{{ t('products.search') }}</label>
-    <input class="rx-input" id="filter-q" type="search" name="q" value="{{ filters.q or '' }}">
-  </div>
-  <div class="rx-field">
-    <label class="rx-label" for="filter-category">{{ t('products.category') }}</label>
-    <select class="rx-select" id="filter-category" name="category">
-      <option value="">{{ t('products.all_categories') }}</option>
-      {% for category in categories %}
-      <option value="{{ category.slug }}" {% if filters.category == category.slug %}selected{% endif %}>{{ category.name }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="rx-field">
-    <label class="rx-label" for="filter-sort">{{ t('products.sort_by') }}</label>
-    <select class="rx-select" id="filter-sort" name="sort">
-      {% for value, label in [('newest', t('products.sort.newest')), ('price_asc', t('products.sort.price_asc')), ('price_desc', t('products.sort.price_desc')), ('name', t('products.sort.name'))] %}
-      <option value="{{ value }}" {% if filters.sort == value %}selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <noscript>{{ button(t('products.search'), variant="secondary") }}</noscript>
+  {#- The kit's toolbar: fields side by side, no "(optional)" marks on filters. -#}
+  {% call toolbar() %}
+    {{ input("q", t('products.search'), type="search", value=(filters.q or ''), id="filter-q") }}
+    {{ select("category", t('products.category'), category_options, selected=filters.category, placeholder=t('products.all_categories'), id="filter-category") }}
+    {{ select("sort", t('products.sort_by'), [['newest', t('products.sort.newest')], ['price_asc', t('products.sort.price_asc')], ['price_desc', t('products.sort.price_desc')], ['name', t('products.sort.name')]], selected=filters.sort, id="filter-sort") }}
+    <noscript>{{ button(t('products.search'), variant="secondary") }}</noscript>
+  {% endcall %}
 </form>
 
 {% block results %}
 <section id="results" class="rx-stack" aria-live="polite">
   <p class="rx-subtitle">{{ t('products.found', count=products.total) }}</p>
   {% if products.items %}
-  <div class="grid">
+  {% call card_grid() %}
     {% for card in products.items %}
     {% with product = card %}{% include "catalog/_card.html" %}{% endwith %}
     {% endfor %}
-  </div>
+  {% endcall %}
   {% else %}
   <div class="rx-card">{{ empty(t('products.found', count=0)) }}</div>
   {% endif %}

@@ -157,6 +157,13 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   `authorize` (403 before the rules), `after` (database checks, errors shown on the field).
   Rules include `alpha_dash`, `uuid`, `ip`, `size`, `starts_with`, `required_without`,
   `prohibited_if`, and `v.distinct(…)` for lists.
+- Pages are built from the UI kit (`renox/ui.html`, docs/ui.md), not from your own markup and
+  CSS: `navbar`/`nav_link` (or `sidebar` + `rx-shell` for a back office), `page_header`,
+  `card`, the fields (`input`, `select`, `toolbar` for filters), `button`/`link_button`,
+  `table` + `row_actions`, `list`, `card_grid` + `media_card`, `link_tabs`, `sheet`/
+  `action_sheet`/`confirm`, `menu`, `badge`, `alert`, `empty`, `progress`, `toasts()`.
+  `public/app.css` is for brand tokens (`--rx-accent`) and what is truly the app's own; if
+  the kit lacks something, use its `rx-*` classes and tokens, never a parallel style.
 - Lists of records with filters, sorting, search or exports: build a `renox::grid::Grid`
   (docs/grid.md) and render it with `renox/grid.html` rather than a hand-made table. Excel
   exports need the `xlsx` feature (`renox = { …, features = ["xlsx"] }`); CSV and the print

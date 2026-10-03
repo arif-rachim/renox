@@ -2,19 +2,24 @@
 <html lang="{{ app.locale }}">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
   {#- Title, description, canonical URL and social cards; a page overrides it with
       {% block seo %}{{ seo(title="…", description="…", image="…") }}{% endblock %} -#}
   {% block seo %}{{ seo() }}{% endblock %}
-  <link rel="stylesheet" href="{{ asset('app.css') }}">
   {{ renox_head() }}
+  {#- The UI kit (renox/ui.html): the navigation bar, fields, buttons, tables, toasts. -#}
+  {{ renox_ui() }}
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
 </head>
-<body>
-  <nav>
-    <a href="{{ route("home") }}"><strong>{{ app.name }}</strong></a>
-  </nav>
-  <main>
+<body class="rx-page">
+  {% from "renox/ui.html" import navbar, menu, menu_action, link_button, alert %}
+  {% call navbar(app.name, href=route('home')) %}
+    <span class="rx-spacer"></span>
+  {% endcall %}
+  <main class="rx-container rx-stack" id="main">
     {% block content %}{% endblock %}
   </main>
+  {{ toasts() }}
 </body>
 </html>

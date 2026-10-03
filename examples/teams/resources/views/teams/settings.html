@@ -1,7 +1,7 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-{% from "renox/ui.html" import card, input, button, badge, table, open_button, sheet %}
+{% from "renox/ui.html" import card, input, button, link_button, badge, table, open_button, sheet %}
 <h1 class="rx-title">{{ team.name }}</h1>
 
 {% call table(["Name", ["Email", "hide-narrow"], "Role"], caption="Members") %}
@@ -24,10 +24,9 @@
 
 {% call card(title="Webhook secret", subtitle="It's stored encrypted; showing or changing it asks for your password.") %}
   {% if secret %}
-  <p class="secret">{{ secret }}</p>
-  <div class="rx-card__footer">
-    <a class="rx-button rx-button--secondary" href="{{ route('team.secret') }}"><span class="rx-button__label">Reveal</span></a>
-  </div>
+  {#- Masked here; Reveal shows it in full after the password. -#}
+  {{ input("masked_secret", "Secret", value=secret, readonly=true) }}
+  <div class="rx-card__footer">{{ link_button(route('team.secret'), "Reveal") }}</div>
   {% else %}
   <p class="rx-subtitle">No secret yet.</p>
   <form method="post" action="{{ route('team.secret.rotate') }}" class="rx-card__footer">{{ csrf_field() }}{{ button("Make one") }}</form>

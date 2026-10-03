@@ -1,10 +1,8 @@
 {% extends "layouts/app.html" %}
-{% from "renox/ui.html" import card, input, textarea, select, button, form_errors, form_grid, fieldset, radio %}
+{% from "renox/ui.html" import card, input, textarea, select, button, form_errors, form_grid, fieldset, radio, page_header %}
 
 {% block content %}
-<div class="page__head">
-  <h1 class="rx-title">Settings</h1>
-</div>
+{{ page_header("Settings") }}
 <form method="post" action="{{ route('settings.update') }}" data-live-validate novalidate>
   {{ csrf_field() }}{{ method_field('PUT') }}
   {% call card() %}

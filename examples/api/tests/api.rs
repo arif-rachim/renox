@@ -442,12 +442,13 @@ async fn me_says_who_and_what_the_token_may_do() {
 #[renox::test]
 async fn a_static_page_is_the_apis_browser_client() {
     let app = app().await;
-    app.get("/").await.assert_redirect("/client.html");
-    app.get("/client.html")
+    app.get("/")
         .await
         .assert_ok()
-        .assert_see(r#"<script src="/client.js" defer></script>"#)
-        .assert_see("Get a token");
+        .assert_see("client.js")
+        .assert_see("Get a token")
+        // The kit's fields, with the slots the script fills from a 422.
+        .assert_see(r#"data-error-for="name""#);
     let script = app.get("/client.js").await;
     script.assert_ok();
     assert!(script.text().contains("Bearer"));

@@ -84,7 +84,9 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            region markup (positions), safe_url for links built from data
   src/clock.rs             the current time with a test offset (TestApp::travel); Stamp for
                            in-memory windows (rate limits, login lock), never Instant
-  views/ui.html            the UI kit (renox/ui.html); assets/renox-ui.css|js its styles and script
+  views/ui.html            the UI kit (renox/ui.html): fields, buttons, sheets, menus, tables,
+                           infolists, dashboards, and the page's frame (navbar, sidebar +
+                           rx-shell, page_header, toolbar, list, card_grid…); assets/renox-ui.css|js
   views/grid.html          the data grid macro (renox/grid.html), grid_print.html (its print
                            export); assets/renox-grid.css|js, and
                            assets/cally.js (Cally 0.9.2, MIT: the date range calendar)
@@ -616,10 +618,12 @@ PostgreSQL suite 2.5x slower (reconnects).
   `@htmx:after-request="sending = false; if (…) $el.reset()"` → "CSP Parser Error: Unexpected
   token: if"). That's why relaxed is the default; strict apps move logic into `Alpine.data`.
   Browser-check CSP work by collecting `Log.entryAdded` / `Runtime.exceptionThrown` over CDP.
-- `docs/assets/demo.gif` was made by driving examples/hello (`APP_LOCALE=en`) in headless Chrome
-  over CDP (`Page.captureScreenshot` per typed character, `Input.insertText`), then composing the
-  frames with Pillow (browser bar, captions, 64-colour palette, ~210 KB). Re-record it when the
-  guestbook's look changes.
+- `docs/assets/demo.gif` was made by driving examples/hello (`APP_LOCALE=en`, a fresh database)
+  in headless Chrome over CDP (a 760 × 752 viewport with `Emulation.setScrollbarsHidden`,
+  `Page.captureScreenshot` per typed character, `Input.insertText`), then composing the frames
+  with Pillow (a browser bar on top, a caption bar under the page, one 128-colour palette for
+  every frame, ~77 KB). Last recorded in M30 on the kit. Re-record it when the guestbook's
+  look changes.
 
 ### 4.11 Git, PRs, CI (how the owner works)
 - One branch and one PR per milestone or fix (branch names like `m17b-examples`, `fix-…`). The
@@ -995,8 +999,14 @@ picks the build, not the terminal.
   webhooks, CSV import, exports from a job with the grid's filters, roles, activity log,
   settings, branded sign-in): merged (#102). M29c (relations as a public blog on Tailwind
   with Markdown/SEO/RSS/sitemap/search, an api browser client + `GET /api/me`, uploads on S3
-  tested in CI's `s3` job, mail cc/bcc/reply_to/attachments in jobs): merged (#104).
-  M29 is done.
+  tested in CI's `s3` job, mail cc/bcc/reply_to/attachments in jobs): merged (#104). M29 is
+  done.
+- **M30** (every example on the UI kit, asked by the owner: the kit's navigation
+  (`navbar`, `sidebar` + `rx-shell`), `page_header`, `toolbar`, `row_actions`, `list`,
+  `card_grid`/`media_card`, `link_tabs`, `thumbnail`, `progress`, `menu_button`,
+  `rx-page--fill`, `hide_label`; `rnx new`'s layout on `navbar`; all fourteen examples and
+  their mails on the kit): merged (#105). New pages in examples and stubs
+  use kit components only; `public/app.css` holds brand tokens and what is truly the app's.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.

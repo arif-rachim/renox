@@ -3,9 +3,8 @@
     "title": "Buku Tamu",
     "name": "Nama",
     "message": "Pesan",
-    "photo": "Foto (opsional)",
+    "photo": "Foto",
     "send": "Kirim",
-    "sending": "Mengirim…",
     "empty": "Belum ada pesan.",
     "thanks": "Terima kasih, :name! Pesanmu tersimpan."
   },

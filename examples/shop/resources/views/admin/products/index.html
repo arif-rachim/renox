@@ -1,27 +1,19 @@
 {% extends "layouts/app.html" %}
-{% from "renox/ui.html" import confirm, table, link_button, button, badge, empty, action_sheet, icon_button, input %}
+{% from "renox/ui.html" import confirm, table, link_button, button, badge, empty, action_sheet, icon_button, input, select, toolbar, row_actions, page_header %}
 
 {% block content %}
-<h1 class="rx-title">Products</h1>
-{% include "admin/_nav.html" %}
-
-<form class="toolbar" method="get" role="search">
-  <div class="rx-field">
-    <label class="rx-label" for="filter-q">Name</label>
-    <input class="rx-input" id="filter-q" type="search" name="q" value="{{ filters.q or '' }}">
-  </div>
-  <div class="rx-field">
-    <label class="rx-label" for="filter-sort">Sort by</label>
-    <select class="rx-select" id="filter-sort" name="sort">
-      {% for value in ['newest', 'name', 'price', 'stock'] %}
-      <option value="{{ value }}" {% if filters.sort == value %}selected{% endif %}>{{ value | capitalize }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  {{ button("Filter", variant="secondary") }}
-  <span class="rx-spacer"></span>
+{% call page_header("Products") %}
   {#- "n" (when not typing in a field) opens the new product form. -#}
   {{ link_button(route('admin.products.create'), "New product", variant="primary", icon="plus", key="n") }}
+{% endcall %}
+{% include "admin/_nav.html" %}
+
+<form method="get" role="search">
+  {% call toolbar() %}
+    {{ input("q", "Name", type="search", value=(filters.q or ''), id="filter-q") }}
+    {{ select("sort", "Sort by", [['newest', 'Newest'], ['name', 'Name'], ['price', 'Price'], ['stock', 'Stock']], selected=filters.sort, id="filter-sort") }}
+    {{ button("Filter", variant="secondary") }}
+  {% endcall %}
 </form>
 
 {% if products.items %}
@@ -33,7 +25,7 @@
     <td class="rx-num">{% if product.stock < 5 %}{{ badge(product.stock, kind="warning") }}{% else %}{{ product.stock }}{% endif %}</td>
     <td class="rx-hide-narrow">{{ "Yes" if product.active else "No" }}</td>
     <td>
-      <div class="row-actions">
+      {% call row_actions() %}
       {{ icon_button("edit", "Edit " ~ product.name, href=route('admin.products.edit', product.id)) }}
       {#- Disabled with a reason: still focusable, the reason is its tooltip. -#}
       {%- if product.active %}
@@ -54,7 +46,7 @@
       {{ confirm("delete-" ~ product.id, "Delete", route('admin.products.destroy', product.id),
                  "Delete " ~ product.name ~ "?", "It disappears from the shop. Orders already placed keep its name and price.",
                  size="small", icon="trash") }}
-      </div>
+      {% endcall %}
     </td>
   </tr>
   {% endfor %}

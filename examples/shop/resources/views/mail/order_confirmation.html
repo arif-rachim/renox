@@ -1,9 +1,12 @@
+{#- The kit's mail layout and components (renox/mail/*): styled inline for mail clients. -#}
+{% extends "renox/mail/layout.html" %}
+{% from "renox/mail/components.html" import table, panel, button %}
+{% block content %}
 <p>{{ t('mail.confirmation.thanks', id=order.id) }}</p>
-<table>
-  {% for item in items %}
-  <tr><td>{{ item.quantity }} × {{ item.name }}</td><td>{{ (item.price * item.quantity) | money }}</td></tr>
-  {% endfor %}
-  <tr><th>{{ t('mail.confirmation.total') }}</th><th>{{ order.total | money }}</th></tr>
-</table>
-<p>{{ t('mail.confirmation.pay', total=order.total | money, days=3, id=order.id) }}</p>
+{%- set ns = namespace(rows=[]) %}
+{%- for item in items %}{% set ns.rows = ns.rows + [[item.quantity ~ " × " ~ item.name, (item.price * item.quantity) | money]] %}{% endfor %}
+{{ table(ns.rows, total=[t('mail.confirmation.total'), order.total | money]) }}
+{% call panel() %}{{ t('mail.confirmation.pay', total=order.total | money, days=3, id=order.id) }}{% endcall %}
 <p>{{ t('mail.confirmation.pickup' if order.pickup else 'mail.confirmation.to', address=order.address) }}</p>
+{{ button(app.url ~ "/orders/" ~ order.id, t('mail.confirmation.view')) }}
+{% endblock %}

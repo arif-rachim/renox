@@ -128,10 +128,17 @@ async fn index(
             .and_then(|id| categories.get(&id).cloned()),
         product,
     });
-    let all_categories = Category::query().order_by("name").get(&db).await?;
+    // The category filter's options: [slug, name] pairs for the kit's select.
+    let category_options: Vec<(String, String)> = Category::query()
+        .order_by("name")
+        .get(&db)
+        .await?
+        .into_iter()
+        .map(|c| (c.slug, c.name))
+        .collect();
     Ok(view(
         "catalog/index.html",
-        context! { products, filters, categories => all_categories },
+        context! { products, filters, category_options },
     )
     // The search box asks with htmx and gets only the results back.
     .fragment("results"))

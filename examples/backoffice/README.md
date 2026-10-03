@@ -71,7 +71,8 @@ There is no sign-up page: staff are added by an admin. Log in as
 | Activity log | `src/app/activity.rs` (a model over `audit_logs`) |
 | Settings | `src/app/settings.rs`, shared as `company` (`src/lib.rs`) |
 | Dashboard | `src/app/dashboard.rs`, `dashboard/show.html` |
-| Branded sign-in | `resources/views/renox/auth/layout.html`, `layouts/_brand.html` |
+| The frame (all from the kit) | `resources/views/layouts/app.html`: `rx-shell`, `sidebar`, `navbar`, `page_header`s in the pages |
+| Branded sign-in | `resources/views/renox/auth/layout.html` (the built-in layout with the brand mark), `layouts/_brand.html` (the settings' colour as the kit's `--rx-accent`) |
 | Tests | `tests/backoffice.rs` |
 
 ## Patterns worth copying

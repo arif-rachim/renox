@@ -10,6 +10,46 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### M30 · Every example on the UI kit
+
+The owner asked for every example to use Renox's own UI kit instead of markup and CSS of
+their own. The audit found what the kit lacked (each kit app had copied a navigation bar
+from the `rnx new` stub, the back offices had their own sidebars and headers) and five
+examples that didn't use the kit at all.
+- New in the kit (`renox/ui.html`, docs/ui.md "Navigation and page structure"):
+  - `navbar`, `nav_links` and `nav_link`, with a "Skip to content" link and a scrolling
+    links row on phones;
+  - `sidebar`, `sidebar_link` and `sidebar_section` with the `rx-shell`, `rx-shell__main`
+    and `rx-shell__content` layout;
+  - `page_header`, `toolbar` (filters, no "optional" marks), `row_actions`, `list`,
+    `columns`, `card_grid` + `media_card`, `link_tabs`, `thumbnail`, `progress`,
+    `menu_button` (a menu item for htmx);
+  - the classes `rx-page--fill` (a page as tall as the screen, for a grid that fills it)
+    and `rx-image`;
+  - `hide_label` on `input`, `select`, `textarea` and `checkbox`;
+  - `cancel_label` and `fields` on `confirm`;
+  - `[hidden]` always wins inside `rx-page`;
+  - the texts `ui.skip` and `ui.main_navigation` (en, id).
+- `rnx new` writes the layout with the kit's `navbar`; its `public/app.css` starts empty.
+- Every example's pages are on the kit:
+  - hello, jobs, postgres and htmx-recipes moved from their own CSS. htmx-recipes'
+    recipes are now htmx attributes on kit components: `action_sheet` with
+    `target`/`swap`, `menu_button`, a `checkbox` with `attrs`, a `list` of fragment rows.
+  - relations uses the kit, plus Tailwind for the Markdown bodies' `prose`.
+  - api's browser client is a kit page.
+  - grid's frame is `rx-page--fill`, a `navbar` and `rx-grid-fill`, with the kit's
+    `progress` in a cell.
+  - backoffice uses `rx-shell`, `sidebar` and `page_header`; its sign-in layout is the
+    built-in one with the brand mark.
+  - shop, teams, crud, fields, uploads and webhooks dropped their copied navbar CSS. Shop's
+    cards, filters, admin sections and row buttons are kit components.
+  - shop's and jobs' mails use the kit's mail layout and components.
+  - What is left in the apps' `public/app.css`: shop's brand colour tokens and backoffice's
+    printed invoice.
+- `AGENTS.md.stub` tells app agents to build pages from the kit.
+- The README's demo GIF is re-recorded on the kit's guestbook.
+- examples/grid: a filter test no longer fails on a fake name with an apostrophe.
+
 ### M29c · Examples extended
 
 Smaller additions to four examples, the last of the M29 plan. No framework API changed.

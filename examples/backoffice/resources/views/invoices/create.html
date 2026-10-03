@@ -1,13 +1,8 @@
 {% extends "layouts/app.html" %}
-{% from "renox/ui.html" import card, select, input, textarea, repeater, button, link_button, form_errors, form_grid %}
+{% from "renox/ui.html" import card, select, input, textarea, repeater, button, link_button, form_errors, form_grid, page_header %}
 
 {% block content %}
-<div class="page__head">
-  <div>
-    <p class="rx-subtitle"><a class="rx-link" href="{{ route('invoices.index') }}">Invoices</a></p>
-    <h1 class="rx-title">New invoice</h1>
-  </div>
-</div>
+{{ page_header("New invoice", back=route('invoices.index'), back_label="Invoices") }}
 {#- Lines are a repeater: rows named lines[0][product_id], lines[0][quantity]…,
     read as a list by Valid<InvoiceForm>; each row's errors show in the row. -#}
 <form method="post" action="{{ route('invoices.store') }}" novalidate>

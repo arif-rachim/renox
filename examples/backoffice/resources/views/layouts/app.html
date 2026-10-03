@@ -7,38 +7,33 @@
   {% block seo %}{{ seo(title=company.company_name) }}{% endblock %}
   {{ renox_head() }}
   {{ renox_ui() }}
-  <link rel="stylesheet" href="{{ asset('app.css') }}">
   {% include "layouts/_brand.html" %}
   {{ stack('head') }}
 </head>
-<body class="rx-page shell">
-  <a class="rx-visually-hidden skip" href="#main">Skip to content</a>
-  {% from "renox/ui.html" import menu, menu_link, menu_action, menu_separator, notification_bell %}
+{#- The kit's back-office shell: `rx-shell`, its `sidebar`, then the main
+    column with a full-width `navbar` for the bell and the account menu. -#}
+<body class="rx-page rx-shell">
+  {% from "renox/ui.html" import sidebar, sidebar_link, sidebar_section, navbar, menu, menu_link, menu_action, menu_separator, notification_bell %}
   {#- Every link is a page anyone on the staff may see; the ones behind a
       permission show only to those who have it (`can(…)` asks the
       Permissions module). -#}
-  <nav class="side" aria-label="Main">
-    <a class="side__brand" href="{{ route('home') }}">{% include "layouts/_logo.html" %}<span>{{ company.company_name }}</span></a>
-    <div class="side__links">
-      {%- for name, label, section, gate in [
-        ('home', 'Dashboard', 'home', none),
-        ('invoices.index', 'Invoices', 'invoices.*', none),
-        ('customers.index', 'Customers', 'customers.*', none),
-        ('products.index', 'Products', 'products.*', none),
-        ('staff.index', 'Staff', 'staff.*', 'staff.manage'),
-        ('activity.index', 'Activity', 'activity.*', 'activity.view'),
-        ('settings.edit', 'Settings', 'settings.*', 'settings.manage'),
-      ] if not gate or can(gate) %}
-      {%- set on = route_is(section) %}
-      <a class="{{ class_names('side__link', {'side__link--on': on}) }}" href="{{ route(name) }}"{% if on %} aria-current="page"{% endif %}>{{ label }}</a>
-      {%- endfor %}
-    </div>
-  </nav>
-  <div class="shell__main">
-    <header class="top">
+  {% call sidebar(company.company_name, href=route('home')) %}
+    {{ sidebar_link(route('home'), "Dashboard", active=route_is('home')) }}
+    {{ sidebar_link(route('invoices.index'), "Invoices", active=route_is('invoices.*')) }}
+    {{ sidebar_link(route('customers.index'), "Customers", active=route_is('customers.*')) }}
+    {{ sidebar_link(route('products.index'), "Products", active=route_is('products.*')) }}
+    {%- if can('staff.manage') or can('activity.view') or can('settings.manage') %}
+    {{ sidebar_section("Admin") }}
+    {%- if can('staff.manage') %}{{ sidebar_link(route('staff.index'), "Staff", active=route_is('staff.*')) }}{% endif %}
+    {%- if can('activity.view') %}{{ sidebar_link(route('activity.index'), "Activity", active=route_is('activity.*')) }}{% endif %}
+    {%- if can('settings.manage') %}{{ sidebar_link(route('settings.edit'), "Settings", active=route_is('settings.*')) }}{% endif %}
+    {%- endif %}
+  {% endcall %}
+  <div class="rx-shell__main">
+    {% call navbar(none, width="full", skip=false) %}
       <span class="rx-spacer"></span>
-      {#- Paid invoices and finished exports, live: Auth::new().notifications(). -#}
       {%- if auth.check %}
+      {#- Paid invoices and finished exports, live: Auth::new().notifications(). -#}
       {{ notification_bell(unread_notifications) }}
       {% call menu(auth.user.name, id="account-menu", variant="plain") %}
         {{ menu_link(route('account.show'), "Account") }}
@@ -46,8 +41,8 @@
         {{ menu_action(route('logout'), "Log out") }}
       {% endcall %}
       {%- endif %}
-    </header>
-    <main class="page" id="main">
+    {% endcall %}
+    <main class="rx-shell__content" id="main">
       {% block content %}{% endblock %}
     </main>
   </div>

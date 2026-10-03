@@ -3,30 +3,31 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
   {% block seo %}{{ seo(title="Sales dashboard") }}{% endblock %}
-  <link rel="stylesheet" href="{{ asset('app.css') }}">
   {{ renox_head() }}
   {{ renox_ui() }}
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
 </head>
-<body class="dashboard">
-  <header class="topbar">
-    <div class="topbar__start">
-      <a class="brand" href="{{ route('orders.index') }}">Sales</a>
-      <nav class="tabs" aria-label="Views">
-        <a class="{{ class_names('tab', {'tab--on': route_is('orders.index')}) }}" href="{{ route('orders.index') }}"{% if route_is('orders.index') %} aria-current="page"{% endif %}>Orders</a>
-        <a class="{{ class_names('tab', {'tab--on': route_is('orders.regions')}) }}" href="{{ route('orders.regions') }}"{% if route_is('orders.regions') %} aria-current="page"{% endif %}>By region</a>
-        <a class="{{ class_names('tab', {'tab--on': route_is('orders.follow_up')}) }}" href="{{ route('orders.follow_up') }}"{% if route_is('orders.follow_up') %} aria-current="page"{% endif %}>Follow up</a>
-      </nav>
-    </div>
-    <nav class="topbar__nav">
-      {%- if auth.check %}
-      <span class="topbar__user">{{ auth.user.name }}</span>
-      <form method="post" action="{{ route('logout') }}">{{ csrf_field() }}<button class="rx-button rx-button--plain rx-button--small">Log out</button></form>
-      {%- else %}
-      <a class="rx-button rx-button--plain rx-button--small" href="{{ route('login') }}">Log in</a>
-      {%- endif %}
-    </nav>
-  </header>
+{#- `rx-page--fill`: the page is as tall as the screen and <main> takes the
+    rest, so a grid in it (`rx-grid-fill`) scrolls only its rows. -#}
+<body class="rx-page rx-page--fill">
+  {% from "renox/ui.html" import navbar, nav_links, nav_link, menu, menu_action, link_button %}
+  {% call navbar("Sales", href=route('orders.index'), width="full") %}
+    {% call nav_links() %}
+      {{ nav_link(route('orders.index'), "Orders", active=route_is('orders.index')) }}
+      {{ nav_link(route('orders.regions'), "By region", active=route_is('orders.regions')) }}
+      {{ nav_link(route('orders.follow_up'), "Follow up", active=route_is('orders.follow_up')) }}
+    {% endcall %}
+    <span class="rx-spacer"></span>
+    {%- if auth.check %}
+    {% call menu(auth.user.name, id="account-menu", variant="plain") %}
+      {{ menu_action(route('logout'), "Log out") }}
+    {% endcall %}
+    {%- else %}
+    {{ link_button(route('login'), "Log in", variant="plain", size="small") }}
+    {%- endif %}
+  {% endcall %}
   {% block content %}{% endblock %}
   {{ toasts() }}
 </body>

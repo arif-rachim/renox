@@ -77,7 +77,7 @@ async fn members_see_only_their_teams_projects() {
         .get("/projects")
         .await
         .assert_ok()
-        .assert_see("Acme's projects")
+        .assert_see("Acme&#39;s projects")
         .assert_see("Rocket skates")
         .assert_dont_see("Warehouse");
 
@@ -136,7 +136,7 @@ async fn switching_teams_changes_what_is_visible() {
     w.app
         .get("/projects")
         .await
-        .assert_see("Globex's projects")
+        .assert_see("Globex&#39;s projects")
         .assert_see("Warehouse")
         .assert_dont_see("Rocket skates");
 
@@ -279,7 +279,7 @@ async fn without_a_team_there_are_no_rows() {
     w.app
         .get("/projects")
         .await
-        .assert_see("Initech's projects")
+        .assert_see("Initech&#39;s projects")
         .assert_see("No projects yet");
 }
 

@@ -25,7 +25,11 @@ async function api(method, path, body) {
 // A 422 reply: {"message", "errors": {"field": ["…"]}} next to the fields.
 function showErrors(form, err) {
   form.querySelectorAll("[data-error-for]").forEach((p) => {
-    p.textContent = (err.errors && err.errors[p.dataset.errorFor] || [])[0] || "";
+    const message = (err.errors && err.errors[p.dataset.errorFor] || [])[0] || "";
+    p.textContent = message;
+    // The kit marks the field too, for its red border and screen readers.
+    const field = form.elements[p.dataset.errorFor];
+    if (field) field.toggleAttribute("aria-invalid", !!message);
   });
   const general = form.querySelector("[data-error]");
   general.textContent = err.errors ? "" : err.message || "";
@@ -49,17 +53,21 @@ function money(amount) {
   return "Rp " + Number(amount).toLocaleString("id-ID");
 }
 
+// A row of the kit's `list`: the name takes the room, then the price and
+// a Delete button (the kit's classes, so it looks like the rest of the page).
 function row(product, canWrite) {
   const li = document.createElement("li");
   const name = document.createElement("span");
+  name.className = "rx-list__main";
   name.textContent = product.name;
   const price = document.createElement("span");
-  price.className = "price";
+  price.className = "rx-subtitle";
   price.textContent = money(product.price);
   li.append(name, price);
   if (canWrite) {
     const del = document.createElement("button");
-    del.className = "quiet";
+    del.className = "rx-button rx-button--plain-danger rx-button--small";
+    del.type = "button";
     del.textContent = "Delete";
     del.addEventListener("click", async () => {
       await api("DELETE", "/api/products/" + product.id);
@@ -87,10 +95,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = event.target;
     try {
       const reply = await api("POST", "/api/tokens", {
-        email: form.email.value,
-        password: form.password.value,
+        email: form.elements.email.value,
+        password: form.elements.password.value,
         device: "Browser client",
-        read_only: form.read_only.checked,
+        read_only: form.elements.read_only.checked,
       });
       sessionStorage.setItem(TOKEN, reply.token);
       showErrors(form, {});
@@ -105,8 +113,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = event.target;
     try {
       const product = await api("POST", "/api/products", {
-        name: form.name.value,
-        price: Number(form.price.value),
+        name: form.elements.name.value,
+        price: Number(form.elements.price.value),
       });
       showErrors(form, {});
       form.reset();

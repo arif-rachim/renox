@@ -103,7 +103,7 @@ async fn a_logged_in_guest_can_open_their_account() {
     app.get("/")
         .await
         .assert_ok()
-        .assert_see(r#"<a href="/account">Budi</a>"#);
+        .assert_see(r#"href="/account">Budi</a>"#);
     app.get("/account")
         .await
         .assert_ok()

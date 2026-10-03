@@ -1,39 +1,38 @@
 {% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, table, list, empty %}
 
 {% block seo %}{{ seo(title="Report · " ~ app.name) }}{% endblock %}
 
 {% block content %}
-<h1>Report</h1>
-<p class="mt-2 text-zinc-600 dark:text-zinc-400">{{ discussed }} post{{ "" if discussed == 1 else "s" }} with comments.</p>
+{{ page_header("Report", subtitle=(discussed ~ " post" ~ ("" if discussed == 1 else "s") ~ " with comments.")) }}
 
-<h2 class="mt-10 mb-3">By category</h2>
-<table>
-  <tr><th>Category</th><th>Posts</th><th>Comments</th></tr>
-  {% for row in categories %}<tr><td>{{ row.category }}</td><td>{{ row.posts }}</td><td>{{ row.comments }}</td></tr>{% endfor %}
-</table>
+{% call table(["Category", ["Posts", "num"], ["Comments", "num"]], caption="By category") %}
+  {% for row in categories %}<tr><td>{{ row.category }}</td><td class="rx-num">{{ row.posts }}</td><td class="rx-num">{{ row.comments }}</td></tr>{% endfor %}
+{% endcall %}
 
-<h2 class="mt-10 mb-3">Tags</h2>
-<table>
-  <tr><th>Tag</th><th>Posts</th></tr>
-  {% for name, posts in tags %}<tr><td>#{{ name }}</td><td>{{ posts }}</td></tr>{% endfor %}
-</table>
+{% call table(["Tag", ["Posts", "num"]], caption="Tags") %}
+  {% for name, posts in tags %}<tr><td>#{{ name }}</td><td class="rx-num">{{ posts }}</td></tr>{% endfor %}
+{% endcall %}
 
-<h2 class="mt-10 mb-3">Most active commenters</h2>
-<table>
-  <tr><th>Author</th><th>Comments</th></tr>
-  {% for row in commenters %}<tr><td>{{ row.author }}</td><td>{{ row.comments }}</td></tr>{% endfor %}
-</table>
-<h2 class="mt-10 mb-3">Latest likes</h2>
+{% call table(["Author", ["Comments", "num"]], caption="Most active commenters") %}
+  {% for row in commenters %}<tr><td>{{ row.author }}</td><td class="rx-num">{{ row.comments }}</td></tr>{% endfor %}
+{% endcall %}
+
+<h2 class="rx-card__title">Latest likes</h2>
 {# A polymorphic "belongs to": each like is on a post or a comment. #}
-<ul class="links space-y-2 text-sm">
+{% if likes %}
+{% call list(label="Latest likes") %}
   {% for like in likes %}
   <li>
-    {% if like.post %}the post <a href="{{ route('posts.show', like.post.id) }}">{{ like.post.title }}</a>
-    {% elif like.comment %}a comment by {{ like.comment.author }} on <a href="{{ route('posts.show', like.comment.post_id) }}#comment-{{ like.comment.id }}">a post</a>
+    <span class="rx-list__main">
+    {% if like.post %}the post <a class="rx-link" href="{{ route('posts.show', like.post.id) }}">{{ like.post.title }}</a>
+    {% elif like.comment %}a comment by {{ like.comment.author }} on <a class="rx-link" href="{{ route('posts.show', like.comment.post_id) }}#comment-{{ like.comment.id }}">a post</a>
     {% endif %}
+    </span>
   </li>
-  {% else %}
-  <li class="muted">No likes yet.</li>
   {% endfor %}
-</ul>
+{% endcall %}
+{% else %}
+{{ empty("No likes yet.") }}
+{% endif %}
 {% endblock %}
