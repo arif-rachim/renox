@@ -39,7 +39,8 @@
       "subject": "Pesanan #:id diterima", "thanks": "Terima kasih atas pesanan #:id.", "total": "Total",
       "pay": "Silakan transfer :total dalam :days hari, dengan keterangan pesanan #:id.",
       "to": "Kami kirim ke: :address",
-      "pickup": "Ambil di toko setelah siap: :address"
+      "pickup": "Ambil di toko setelah siap: :address",
+      "view": "Lihat pesanan"
     },
     "shipped": {
       "subject": "Pesanan #:id sedang dikirim", "ready_subject": "Pesanan #:id siap diambil",

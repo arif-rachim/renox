@@ -12,31 +12,30 @@
   {{ stack('head') }}
 </head>
 <body class="rx-page">
-  <a class="rx-visually-hidden skip" href="#main">Skip to content</a>
-  {% from "renox/ui.html" import menu, menu_link, menu_action, menu_separator, link_button, badge, alert %}
-  <header class="bar">
-    <nav class="bar__inner" aria-label="Main">
-      <a class="bar__brand" href="{{ route('projects.index') }}">{{ app.name }}</a>
-      {% if auth.check %}
-        {#- `team` is shared with every view (App::share): the current team, or none. -#}
-        {% if team %}
-        <a class="bar__link" href="{{ route('team.settings') }}">{{ team.name }} {{ badge(team.role) }}</a>
-        {% endif %}
-        <span class="rx-spacer"></span>
-        {% call menu(auth.user.name, id="account-menu", variant="plain") %}
-          {{ menu_link(route('teams.index'), "Switch team") }}
-          {% if can('admin') %}{{ menu_link(route('admin.teams'), "All teams (admin)") }}{% endif %}
-          {{ menu_link(route('account.show'), "Account") }}
-          {{ menu_separator() }}
-          {{ menu_action(route('logout'), "Log out") }}
-        {% endcall %}
-      {% else %}
-        <span class="rx-spacer"></span>
-        {{ link_button(route('login'), "Log in", variant="plain", size="small") }}
-        {{ link_button(route('register'), "Register", variant="primary", size="small") }}
+  {% from "renox/ui.html" import navbar, nav_links, nav_link, menu, menu_link, menu_action, menu_separator, link_button, badge, alert %}
+  {#- The kit's navigation bar (renox/ui.html). -#}
+  {% call navbar(app.name, href=route('projects.index')) %}
+    {% if auth.check %}
+      {#- `team` is shared with every view (App::share): the current team, or none. -#}
+      {% if team %}
+      {% call nav_links() %}
+        {{ nav_link(route('team.settings'), team.name, active=route_is('team.*'), badge=team.role) }}
+      {% endcall %}
       {% endif %}
-    </nav>
-  </header>
+      <span class="rx-spacer"></span>
+      {% call menu(auth.user.name, id="account-menu", variant="plain") %}
+        {{ menu_link(route('teams.index'), "Switch team") }}
+        {% if can('admin') %}{{ menu_link(route('admin.teams'), "All teams (admin)") }}{% endif %}
+        {{ menu_link(route('account.show'), "Account") }}
+        {{ menu_separator() }}
+        {{ menu_action(route('logout'), "Log out") }}
+      {% endcall %}
+    {% else %}
+      <span class="rx-spacer"></span>
+      {{ link_button(route('login'), "Log in", variant="plain", size="small") }}
+      {{ link_button(route('register'), "Register", variant="primary", size="small") }}
+    {% endif %}
+  {% endcall %}
   <main class="rx-container" id="main">
     <div class="rx-stack">
       {% block content %}{% endblock %}

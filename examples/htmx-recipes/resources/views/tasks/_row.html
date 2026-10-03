@@ -1,18 +1,15 @@
-<li id="task-{{ task.id }}" class="task{{ ' done' if task.done }}"
+{% from "renox/ui.html" import checkbox, menu, menu_button %}
+<li id="task-{{ task.id }}"
     x-show="tab === 'all' || tab === '{{ 'done' if task.done else 'open' }}'">
   {# Toggle in place: the answer is this row, re-rendered. #}
-  <input type="checkbox" aria-label="Done" {% if task.done %}checked{% endif %}
-         hx-patch="{{ route('tasks.toggle', task.id) }}" hx-target="closest li" hx-swap="outerHTML">
+  {{ checkbox("done", "Done: " ~ task.title, checked=task.done, hide_label=true, id="done-" ~ task.id,
+              attrs={"hx-patch": route('tasks.toggle', task.id), "hx-target": "closest li", "hx-swap": "outerHTML"}) }}
   {# Inline edit: double-click swaps the row for a small form. #}
-  <span class="title" title="Double-click to edit"
+  <span class="{{ class_names('rx-list__main', {'rx-list__main--done': task.done}) }}" title="Double-click to edit"
         hx-get="{{ route('tasks.edit', task.id) }}" hx-trigger="dblclick" hx-target="closest li" hx-swap="outerHTML">{{ task.title }}</span>
-  {# Dropdown menu (Alpine); delete swaps the row for nothing. #}
-  <div class="menu" x-data="{ menu: false }" @click.outside="menu = false" @keydown.escape="menu = false">
-    <button type="button" aria-label="Actions" :aria-expanded="menu" @click="menu = !menu">⋯</button>
-    <div class="menu-items" x-show="menu" x-cloak>
-      <button type="button" hx-get="{{ route('tasks.edit', task.id) }}" hx-target="closest li" hx-swap="outerHTML">Edit</button>
-      <button type="button" hx-delete="{{ route('tasks.destroy', task.id) }}" hx-target="closest li" hx-swap="outerHTML"
-              hx-confirm="Delete this task?">Delete</button>
-    </div>
-  </div>
+  {# The kit's menu; its items carry htmx attributes. Delete swaps the row for nothing. #}
+  {% call menu("More", id="task-menu-" ~ task.id, variant="plain") %}
+    {{ menu_button("Edit", attrs={"hx-get": route('tasks.edit', task.id), "hx-target": "closest li", "hx-swap": "outerHTML"}) }}
+    {{ menu_button("Delete", danger=true, attrs={"hx-delete": route('tasks.destroy', task.id), "hx-target": "closest li", "hx-swap": "outerHTML", "hx-confirm": "Delete this task?"}) }}
+  {% endcall %}
 </li>

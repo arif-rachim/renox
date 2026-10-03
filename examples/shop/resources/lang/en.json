@@ -39,7 +39,8 @@
       "subject": "Order #:id received", "thanks": "Thank you for your order #:id.", "total": "Total",
       "pay": "Please transfer :total within :days days, mentioning order #:id.",
       "to": "We'll send it to: :address",
-      "pickup": "Pick it up at the store once it's ready: :address"
+      "pickup": "Pick it up at the store once it's ready: :address",
+      "view": "See your order"
     },
     "shipped": {
       "subject": "Order #:id is on its way", "ready_subject": "Order #:id is ready for pickup",

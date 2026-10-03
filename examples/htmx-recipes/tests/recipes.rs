@@ -54,12 +54,12 @@ async fn plain_forms_skip_duplicates_too_and_the_empty_note_follows_the_list() {
     let app = with_tasks(0).await;
     app.get("/")
         .await
-        .assert_see(r#"<p id="empty" class="muted" hx-swap-oob="true">"#);
+        .assert_see(r#"<p id="empty" class="rx-subtitle" hx-swap-oob="true">"#);
     // The first task hides the note (out of band); deleting it shows it again.
     app.htmx()
         .post("/tasks", &[("title", "Buy coffee")])
         .await
-        .assert_see(r#"<p id="empty" class="muted" hidden hx-swap-oob="true">"#);
+        .assert_see(r#"<p id="empty" class="rx-subtitle" hidden hx-swap-oob="true">"#);
     // Without htmx: a redirect and a toast, still no copy.
     app.post("/tasks", &[("title", "  Buy coffee ")])
         .await
@@ -79,7 +79,7 @@ async fn plain_forms_skip_duplicates_too_and_the_empty_note_follows_the_list() {
     app.htmx()
         .delete(&format!("/tasks/{}", task.id))
         .await
-        .assert_see(r#"<p id="empty" class="muted" hx-swap-oob="true">"#);
+        .assert_see(r#"<p id="empty" class="rx-subtitle" hx-swap-oob="true">"#);
 }
 
 #[renox::test]
@@ -90,7 +90,7 @@ async fn the_modal_adds_a_row_and_closes() {
         .assert_header("hx-trigger", "task-added")
         .assert_see(r#"<li id="task-1""#)
         .assert_see(">Buy coffee<")
-        .assert_see(r#"<small id="open-count" hx-swap-oob="true">1 open</small>"#)
+        .assert_see(r#"<span class="rx-subtitle" id="open-count" hx-swap-oob="true">1 open</span>"#)
         .assert_dont_see("<html");
 
     // The same task again: the server retargets the answer to the existing
@@ -133,7 +133,7 @@ async fn titles_are_edited_in_place() {
         .await
         .assert_see(r#"value="Task 1""#)
         .assert_see(r#"hx-patch="/tasks/1""#)
-        .assert_see(r#"hx-trigger="keyup[key=='Escape']""#);
+        .assert_see(r#"hx-trigger="keyup[key==&#39;Escape&#39;]""#);
     app.htmx()
         .patch("/tasks/1", &[("title", "Renamed")])
         .await
@@ -155,7 +155,7 @@ async fn checkboxes_toggle_and_rows_delete_in_place() {
     app.htmx()
         .patch("/tasks/1/toggle", &[])
         .await
-        .assert_see(r#"class="task done""#)
+        .assert_see(r#"class="rx-list__main rx-list__main--done""#)
         .assert_see("checked");
     assert!(Task::find_or_404(app.db(), 1).await.unwrap().done);
     app.htmx()
@@ -169,7 +169,7 @@ async fn checkboxes_toggle_and_rows_delete_in_place() {
     res.assert_ok();
     assert_eq!(
         res.text(),
-        r#"<small id="open-count" hx-swap-oob="true">1 open</small><p id="empty" class="muted" hidden hx-swap-oob="true">Nothing to do. Add a task.</p>"#
+        r#"<span class="rx-subtitle" id="open-count" hx-swap-oob="true">1 open</span><p id="empty" class="rx-subtitle" hidden hx-swap-oob="true">Nothing to do. Add a task.</p>"#
     );
     let trigger: renox::serde_json::Value =
         renox::serde_json::from_str(res.header("hx-trigger").unwrap()).unwrap();

@@ -251,6 +251,74 @@ impl Validate for Checkout {
 | `empty(title, message, action_href, action_label)` | What an empty list says, with the way to add the first item. |
 | `notification_bell(count=none, id="rx-notifications")` | The signed-in user's notifications in the navigation bar: a badge with the unread count, a panel, new ones live as toasts. Needs `Auth::new().notifications()`; pass `unread_notifications`. See [docs/mail.md](mail.md#the-bell). |
 
+### Navigation and page structure
+
+The frame of a page comes from the kit too, so an app writes no CSS for its navigation bar,
+its sidebar or its page headings. examples/backoffice (a sidebar), examples/shop (a navigation
+bar with links, a cart count and menus) and every other example are built this way.
+
+```html
+<body class="rx-page">
+  {% from "renox/ui.html" import navbar, nav_links, nav_link, menu, menu_link, menu_action, link_button %}
+  {% call navbar(app.name, href=route('home'), width="wide") %}
+    {% call nav_links() %}
+      {{ nav_link(route('products.index'), "Products", active=route_is('products.*')) }}
+      {{ nav_link(route('cart.show'), "Cart", active=route_is('cart.*'), badge=cart_count) }}
+    {% endcall %}
+    <span class="rx-spacer"></span>
+    {% call menu(auth.user.name, id="account-menu", variant="plain") %}
+      {{ menu_link(route('account.show'), "Account") }}
+      {{ menu_action(route('logout'), "Log out") }}
+    {% endcall %}
+  {% endcall %}
+  <main class="rx-container rx-container--wide" id="main">…</main>
+</body>
+```
+
+A back office puts its sections down the side instead:
+
+```html
+<body class="rx-page rx-shell">
+  {% from "renox/ui.html" import sidebar, sidebar_link, sidebar_section, navbar %}
+  {% call sidebar(company.name, href=route('home')) %}
+    {{ sidebar_link(route('home'), "Dashboard", active=route_is('home')) }}
+    {{ sidebar_link(route('invoices.index'), "Invoices", active=route_is('invoices.*')) }}
+    {{ sidebar_section("Admin") }}
+    {% if can('staff.manage') %}{{ sidebar_link(route('staff.index'), "Staff", active=route_is('staff.*')) }}{% endif %}
+  {% endcall %}
+  <div class="rx-shell__main">
+    {% call navbar(none, width="full", skip=false) %}<span class="rx-spacer"></span>{{ notification_bell(unread_notifications) }}{% endcall %}
+    <main class="rx-shell__content" id="main">…</main>
+  </div>
+</body>
+```
+
+| Component | What it is |
+|---|---|
+| `navbar(brand, href="/", logo=…, mark=…, width="narrow", label=…, skip=true)` | The bar on top: translucent, sticky, a hairline under it. `brand` links to `href` (`none` for no brand); `logo` is an image URL, `mark=true` the name's first letter in the accent colour. `width` matches the page: `narrow` (`rx-container`), `wide` (`rx-container--wide`) or `full`. It starts with a "Skip to content" link to `#main`. |
+| `nav_links()` + `nav_link(href, label, active=…, badge=…)` | The bar's sections. `active` (usually `route_is('….*')`) marks the current one with `aria-current`; `badge` shows a count. On phones the links get a row of their own that scrolls sideways. |
+| `sidebar(brand, href="/", logo=…, mark=true, label=…, skip=true)` + `sidebar_link(href, label, active=…, badge=…)`, `sidebar_section(title)` | Sections down the side, for back offices: `rx-shell` on `<body>`, the sidebar, then `rx-shell__main` holding a full-width `navbar` and `<main class="rx-shell__content">`. On phones the sidebar becomes a bar of links on top. |
+| `page_header(title, subtitle=…, back=…, back_label=…, badge=…, badge_kind=…)` | A page's heading: the title (with a badge), a line under it, a link back (`back`), and the call block's buttons at the end of the row (under the title on phones). |
+| `toolbar()` | Filter fields side by side, wrapping on narrow screens and lined up with their buttons; no "(optional)" marks (filters are all optional). Inside the `<form>`. |
+| `row_actions()` | A table row's buttons at the end of the row; icons only on phones (labels stay for screen readers). |
+| `list(id=…, label=…)` | Rows in a surface, each an `<li>` you write; `rx-list__main` on the part that takes the room left (`rx-list__main--done` strikes it through). Rows can be fragments htmx adds and swaps. |
+| `columns(count=2)` | Columns from tablet width up, one on phones (a photo next to its details). |
+| `card_grid()` + `media_card(href, title, image=…, subtitle=…, note=…, dimmed=…)` | Cards with a picture in a grid that fills the row (each at least 13rem; set `--rx-card-min` for another width). |
+| `link_tabs(items, current=…, label=…)` | Links that look like a segmented control, for sections or filters that are URLs: `items` are `[href, label]` pairs. `tabs` switches panels on one page instead. |
+| `thumbnail(src, alt="", href=…)` | A small square picture, e.g. in a table row. |
+| `progress(value, max=100, label=…, show_value=true)` | A native `<progress>` in the kit's colours, with the percentage next to it. |
+| `menu_button(label, attrs={…}, danger=…)` | A menu item that is a plain button, for what `attrs` make it do (htmx: `hx-get`, `hx-delete`…). |
+
+Classes without a macro: `rx-page--fill` on `<body>` makes the page as tall as the screen with
+`<main>` taking the rest (for a data grid that fills the screen, `rx-grid-fill`); `rx-image`
+is a picture as wide as its column. Fields take `hide_label=true` (the label stays for screen
+readers, e.g. a quantity in a table row), and `confirm` takes `cancel_label` ("Keep order")
+and `fields` (hidden values sent with it, `{"status": "cancelled"}`).
+
+Build pages from these and the components above rather than writing your own: an app's
+`public/app.css` holds its brand tokens and what is truly its own (a printed invoice), not a
+navigation bar or a card.
+
 Renox's own pages use the kit too: the sign-in pages (`renox/auth/*`: login, registration,
 password reset, email verification, password confirmation, the account page) and the error
 page. The sign-in pages' layout has `stack('head')` and `stack('scripts')` (Renox's own error

@@ -144,6 +144,8 @@
   text-rendering: optimizeLegibility;
 }
 .rx-page *, .rx-page *::before, .rx-page *::after { box-sizing: border-box; }
+/* `hidden` wins over a component's own display (a card hidden by a script stays hidden). */
+.rx-page [hidden] { display: none !important; }
 .rx-container { width: min(100% - 2 * var(--rx-space-4), 44rem); margin-inline: auto; padding-block: var(--rx-space-8); }
 .rx-container--wide { width: min(100% - 2 * var(--rx-space-4), 72rem); }
 .rx-stack { display: grid; gap: var(--rx-space-5); }
@@ -154,6 +156,148 @@
 .rx-subtitle { color: var(--rx-secondary-label); font-size: var(--rx-text-subhead); margin: 0; }
 .rx-link { color: var(--rx-accent-text); text-decoration: none; border-radius: 4px; }
 .rx-link:hover { text-decoration: underline; }
+
+/* ---------- Navigation: navbar, sidebar, shell, page header ---------- */
+
+/* "Skip to content": hidden until focused with the keyboard. */
+.rx-skip { position: absolute; left: -9999px; top: 8px; z-index: 100; padding: 8px 12px; border-radius: 8px; background: var(--rx-surface); color: var(--rx-label); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18); }
+.rx-skip:focus { left: 8px; }
+
+/* The bar on top: translucent material over the content, a hairline under it. */
+.rx-navbar {
+  position: sticky; top: 0; z-index: 30;
+  background: var(--rx-material);
+  -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 0.5px solid var(--rx-separator);
+}
+.rx-navbar__inner { width: min(100% - 2 * var(--rx-space-4), 44rem); margin-inline: auto; min-height: 52px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--rx-space-3); }
+.rx-navbar__inner--wide { width: min(100% - 2 * var(--rx-space-4), 72rem); }
+.rx-navbar__inner--full { width: auto; margin-inline: 0; padding-inline: var(--rx-space-6); }
+.rx-navbar__brand { display: inline-flex; align-items: center; gap: 10px; min-height: var(--rx-target); font-weight: 700; font-size: 1.0625rem; letter-spacing: -0.02em; color: var(--rx-label); text-decoration: none; }
+.rx-navbar__links { display: flex; align-items: center; gap: 2px; }
+.rx-navbar__link, .rx-sidebar__link {
+  display: inline-flex; align-items: center; gap: 6px; min-height: var(--rx-target); padding-inline: 10px;
+  border-radius: 8px; color: var(--rx-label); text-decoration: none; font-size: var(--rx-text-subhead); white-space: nowrap;
+}
+.rx-navbar__link:hover, .rx-sidebar__link:hover { background: var(--rx-fill); }
+.rx-navbar__link[aria-current="page"], .rx-sidebar__link[aria-current="page"] { color: var(--rx-accent-text); font-weight: 600; }
+.rx-nav-badge { min-width: 20px; padding: 0 6px; border-radius: 10px; background: var(--rx-fill-strong); color: var(--rx-label); font-size: var(--rx-text-footnote); font-weight: 600; line-height: 20px; text-align: center; }
+.rx-brand-mark { display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 8px; background: var(--rx-accent); color: var(--rx-on-accent); font-size: 0.9375rem; font-weight: 700; letter-spacing: 0; object-fit: cover; }
+@media (max-width: 36rem) {
+  /* Phones: the links get a row of their own, which scrolls sideways. */
+  .rx-navbar__links { order: 10; flex-basis: 100%; overflow-x: auto; scrollbar-width: none; margin-inline: -10px; padding-bottom: 4px; }
+  .rx-navbar__links::-webkit-scrollbar { display: none; }
+  .rx-navbar__inner--full { padding-inline: var(--rx-space-4); }
+  /* Room for the brand, the account buttons and a menu on one line. */
+  .rx-navbar__inner { column-gap: 6px; }
+  .rx-navbar__inner > .rx-button--small, .rx-navbar__inner > .rx-menu > .rx-button--small { padding-inline: 10px; }
+}
+
+/* A back office: the sidebar, then the main column. */
+.rx-shell { display: grid; grid-template-columns: 15rem minmax(0, 1fr); min-height: 100vh; min-height: 100dvh; }
+.rx-shell__main { min-width: 0; display: flex; flex-direction: column; }
+.rx-shell__content { width: 100%; max-width: 80rem; padding: var(--rx-space-6); display: grid; gap: var(--rx-space-5); align-content: start; min-width: 0; }
+.rx-sidebar {
+  position: sticky; top: 0; height: 100vh; height: 100dvh; overflow-y: auto;
+  padding: var(--rx-space-4) var(--rx-space-3);
+  background: var(--rx-material-thick); border-right: 0.5px solid var(--rx-separator);
+}
+.rx-sidebar__brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px var(--rx-space-4); font-weight: 700; letter-spacing: -0.01em; color: var(--rx-label); text-decoration: none; }
+.rx-sidebar__links { display: flex; flex-direction: column; gap: 2px; }
+.rx-sidebar__link { display: flex; }
+.rx-sidebar__link > span:first-child { flex: 1; }
+.rx-sidebar__link[aria-current="page"] { background: color-mix(in srgb, var(--rx-accent) 12%, transparent); }
+.rx-sidebar__section { margin: var(--rx-space-4) 10px 4px; font-size: var(--rx-text-footnote); font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; color: var(--rx-secondary-label); }
+@media (max-width: 48rem) {
+  .rx-shell { grid-template-columns: minmax(0, 1fr); }
+  .rx-sidebar { position: static; height: auto; overflow: visible; padding: 8px var(--rx-space-4); border-right: 0; border-bottom: 0.5px solid var(--rx-separator); }
+  .rx-sidebar__brand { padding: 4px 0 6px; }
+  .rx-sidebar__links { flex-direction: row; overflow-x: auto; scrollbar-width: none; margin-inline: -10px; }
+  .rx-sidebar__links::-webkit-scrollbar { display: none; }
+  .rx-sidebar__section { display: none; }
+  .rx-shell__content { padding: var(--rx-space-4); }
+}
+
+/* A page's title row: the title (and a way back) on one side, its buttons on the other. */
+.rx-page-header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--rx-space-3); }
+.rx-page-header__text { display: grid; gap: 2px; min-width: 0; }
+.rx-page-header__back { display: inline-flex; align-items: center; gap: 2px; margin-left: -4px; color: var(--rx-accent-text); text-decoration: none; font-size: var(--rx-text-subhead); }
+.rx-page-header__back:hover { text-decoration: underline; }
+/* The buttons take the rest of the row (so a segmented control in them gets
+   a width to scroll in), pushed to its end. */
+.rx-page-header__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--rx-space-2); flex: 1 1 auto; min-width: 0; }
+.rx-page-header__actions > * { max-width: 100%; }
+
+/* Filters side by side; all optional, so no marks. */
+.rx-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--rx-space-3); }
+.rx-toolbar > .rx-field { flex: 1 1 12rem; }
+.rx-toolbar .rx-required { display: none; }
+.rx-toolbar .rx-error:empty { display: none; }
+
+/* A table row's buttons; icons only on phones. */
+.rx-row-actions { display: flex; flex-wrap: wrap; gap: var(--rx-space-1); align-items: center; justify-content: flex-end; white-space: nowrap; }
+@media (max-width: 36rem) {
+  .rx-row-actions { display: grid; grid-template-columns: repeat(2, auto); justify-content: end; }
+  .rx-row-actions .rx-button { padding-inline: 10px; }
+  .rx-row-actions .rx-button__icon { margin: 0; }
+  .rx-row-actions .rx-button__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+
+/* A page as tall as the screen, its <main> taking the rest under the
+   navigation bar (and scrolling on its own), e.g. for a data grid that
+   fills the screen (`rx-grid-fill`). */
+.rx-page--fill { display: flex; flex-direction: column; height: 100vh; height: 100dvh; min-height: 0; }
+.rx-page--fill > main { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+
+/* A picture in the page (a product photo): as wide as its column. */
+.rx-image { display: block; width: 100%; height: auto; border-radius: var(--rx-radius-l); }
+
+/* A list of rows (htmx-friendly: rows are plain <li>s). */
+.rx-list { list-style: none; margin: 0; padding: 0; background: var(--rx-surface); border-radius: var(--rx-radius); box-shadow: var(--rx-shadow); }
+.rx-list > li { display: flex; align-items: center; gap: var(--rx-space-3); min-height: var(--rx-target); padding: var(--rx-space-2) var(--rx-space-4); }
+.rx-list > li + li { border-top: 0.5px solid var(--rx-separator); }
+.rx-list > li[hidden] { display: none; }
+.rx-list__main { flex: 1; min-width: 0; }
+.rx-list__main--done { color: var(--rx-secondary-label); text-decoration: line-through; }
+/* A row that is one form (an inline edit) spreads it over the row. */
+.rx-list > li > form:only-child { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--rx-space-2); flex: 1; }
+.rx-list > li > form:only-child > .rx-field { flex: 1 1 12rem; }
+
+/* A small square picture. */
+.rx-thumbnail { display: block; width: 48px; height: 48px; object-fit: cover; border-radius: 8px; background: var(--rx-fill); }
+.rx-thumbnail-link { display: inline-block; border-radius: 8px; }
+
+/* Columns from tablet width up. */
+.rx-columns { display: grid; gap: var(--rx-space-8); grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 40rem) {
+  .rx-columns.rx-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rx-columns.rx-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* Cards with a picture, in a grid that fills the row. */
+.rx-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(var(--rx-card-min, 13rem), 100%), 1fr)); gap: var(--rx-space-4); }
+.rx-media-card { background: var(--rx-surface); border-radius: var(--rx-radius-l); box-shadow: var(--rx-shadow); overflow: hidden; }
+.rx-media-card__link { display: grid; height: 100%; color: inherit; text-decoration: none; border-radius: inherit; }
+.rx-media-card__link:hover .rx-media-card__title { color: var(--rx-accent-text); }
+.rx-media-card__image { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; background: var(--rx-fill); }
+.rx-media-card--dimmed .rx-media-card__image { opacity: 0.5; }
+.rx-media-card__body { display: grid; gap: 2px; padding: var(--rx-space-3) var(--rx-space-4) var(--rx-space-4); }
+.rx-media-card__title { font-size: var(--rx-text-callout); font-weight: 600; }
+.rx-media-card__subtitle { font-weight: 600; font-variant-numeric: tabular-nums; }
+.rx-media-card__note { color: var(--rx-secondary-label); font-size: var(--rx-text-subhead); }
+
+/* Links as a segmented control. */
+.rx-link-tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.rx-link-tabs .rx-segmented { display: inline-flex; }
+.rx-link-tabs .rx-segmented__item { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; white-space: nowrap; }
+
+/* How far along: the native <progress>, in the kit's colors. */
+.rx-progress-wrap { display: inline-flex; align-items: center; gap: 8px; }
+.rx-progress { -webkit-appearance: none; appearance: none; width: 6rem; height: 6px; border: 0; border-radius: 3px; background: var(--rx-fill-strong); overflow: hidden; vertical-align: middle; }
+.rx-progress::-webkit-progress-bar { background: var(--rx-fill-strong); border-radius: 3px; }
+.rx-progress::-webkit-progress-value { background: var(--rx-accent); border-radius: 3px; }
+.rx-progress::-moz-progress-bar { background: var(--rx-accent); border-radius: 3px; }
+.rx-progress__value { font-size: var(--rx-text-footnote); color: var(--rx-secondary-label); font-variant-numeric: tabular-nums; }
 /* Secondary columns and details that phones can do without. */
 @media (max-width: 36rem) {
   .rx-hide-narrow { display: none !important; }
@@ -1098,7 +1242,8 @@ a.rx-stat:focus-visible { outline: 2px solid var(--rx-accent); outline-offset: 2
 }
 /* Reduce transparency: solid materials instead of blur. */
 @media (prefers-reduced-transparency: reduce) {
-  .rx-toast, .rx-menu__list { background: var(--rx-surface-raised); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .rx-toast, .rx-menu__list, .rx-navbar { background: var(--rx-surface-raised); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .rx-sidebar { background: var(--rx-surface); }
 }
 @media (forced-colors: active) {
   .rx-button, .rx-input, .rx-select, .rx-textarea, .rx-toast, .rx-card, .rx-affix { border: 1px solid CanvasText; }

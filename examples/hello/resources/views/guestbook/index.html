@@ -1,34 +1,39 @@
 {% extends "layouts/app.html" %}
+{#- At the top, so the `entries` block sees them when htmx asks for it alone. -#}
+{% from "renox/ui.html" import card, input, textarea, file, button, list, thumbnail, empty, page_header %}
 
 {% block content %}
-<h1>{{ t('guestbook.title') }}</h1>
+{{ page_header(t('guestbook.title')) }}
 
+{#- htmx sends the form and swaps in the new list; errors show next to the
+    fields (422). The kit's button shows a spinner while it's sent; Alpine
+    clears the form after a success. -#}
 <form method="post" action="{{ route('guestbook.store') }}" enctype="multipart/form-data"
       hx-post="{{ route('guestbook.store') }}" hx-target="#entries" hx-swap="outerHTML"
-      x-data="{ sending: false }" @htmx:before-request="sending = true"
-      @htmx:after-request="sending = false; if ($event.detail.successful) $el.reset()">
+      x-data @htmx:after-request="if ($event.detail.successful) $el.reset()" novalidate>
   {{ csrf_field() }}
-  <input name="name" placeholder="{{ t('guestbook.name') }}" value="{{ old('name', auth.user.name if auth.check else '') }}">
-  <p class="error" data-error-for="name">{{ error('name') }}</p>
-  <textarea name="message" placeholder="{{ t('guestbook.message') }}">{{ old('message') }}</textarea>
-  <p class="error" data-error-for="message">{{ error('message') }}</p>
-  <label>{{ t('guestbook.photo') }} <input type="file" name="photo" accept="image/*"></label>
-  <p class="error" data-error-for="photo">{{ error('photo') }}</p>
-  <button :disabled="sending" x-text="sending ? '{{ t('guestbook.sending') }}' : '{{ t('guestbook.send') }}'">{{ t('guestbook.send') }}</button>
+  {% call card() %}
+    {{ input("name", t('guestbook.name'), value=(auth.user.name if auth.check else none), required=true, autocomplete="name") }}
+    {{ textarea("message", t('guestbook.message'), rows=3, required=true) }}
+    {{ file("photo", t('guestbook.photo'), accept="image/*", preview=true) }}
+    <div class="rx-card__footer">{{ button(t('guestbook.send')) }}</div>
+  {% endcall %}
 </form>
 
 {% block entries %}
-<section id="entries" hx-boost="true" hx-target="#entries" hx-select="#entries" hx-swap="outerHTML">
-  <ul>
+<section id="entries" class="rx-stack" hx-boost="true" hx-target="#entries" hx-select="#entries" hx-swap="outerHTML">
+  {% if entries.items %}
+  {% call list(label=t('guestbook.title')) %}
     {% for entry in entries.items %}
     <li>
-      {% if entry.photo %}<img src="{{ storage_url(entry.photo) }}" alt="" width="48" height="48">{% endif %}
-      <strong>{{ entry.name }}</strong>: {{ entry.message }}
+      {% if entry.photo %}{{ thumbnail(storage_url(entry.photo)) }}{% endif %}
+      <span class="rx-list__main"><strong>{{ entry.name }}</strong>: {{ entry.message }}</span>
     </li>
-    {% else %}
-    <li class="empty">{{ t('guestbook.empty') }}</li>
     {% endfor %}
-  </ul>
+  {% endcall %}
+  {% else %}
+  {{ empty(t('guestbook.empty')) }}
+  {% endif %}
   {% from "renox/pagination.html" import pagination %}
   {{ pagination(entries) }}
 </section>

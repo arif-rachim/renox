@@ -68,9 +68,9 @@ Every example has a README.md that walks through it.
     [admin/orders.rs](examples/shop/src/app/admin/orders.rs) (audit); roles:
     [lib.rs](examples/shop/src/lib.rs); tests:
     [tests/shop.rs](examples/shop/tests/shop.rs)
-- [examples/htmx-recipes](examples/htmx-recipes) ([README](examples/htmx-recipes/README.md)): htmx + Alpine recipes, each a few attributes and
-  a handler that answers with a fragment: modal form (HX-Trigger closes it), inline edit
-  (`hx-patch`, Escape cancels), toggle, dropdown with delete (an empty row part, the open count out of band and a
+- [examples/htmx-recipes](examples/htmx-recipes) ([README](examples/htmx-recipes/README.md)): htmx recipes on the UI kit, each a few attributes and
+  a handler that answers with a fragment: a modal form (`action_sheet` with `target`/`swap`), inline edit
+  (`hx-patch`, Escape cancels), toggle (a kit `checkbox` with `attrs`), a kit `menu` with `menu_button`s for edit and delete (an empty row part, the open count out of band and a
   toast), infinite scroll
   (`revealed`), client-side tabs, `HxRefresh`, `HxRedirect`; an out-of-band count
   (`.fragment("row").also("count")`), `HxRetarget`/`HxReswap` for a duplicate, toasts over htmx.
@@ -121,8 +121,9 @@ Every example has a README.md that walks through it.
   with `fetch_as`; tests/queries.rs counts queries to prove no N+1. Also a public blog:
   Markdown bodies (`markdown` filter in Tailwind's `prose`), `seo()` per post with
   `Post::summary` as the description, `?q=` search (`where_any` + `where_like`), an RSS feed
-  and a `Sitemap`, styled with Tailwind (resources/css/app.css → public/css/app.css, built
-  with `rnx tailwind --minify` and committed).
+  and a `Sitemap`; pages on the UI kit with Tailwind's `prose` for the bodies
+  (resources/css/app.css → public/css/app.css, built with `rnx tailwind --minify` and
+  committed): the kit and Tailwind side by side.
   [src/app/blog/mod.rs](examples/relations/src/app/blog/mod.rs),
   [model.rs](examples/relations/src/app/blog/model.rs),
   [tests/blog.rs](examples/relations/tests/blog.rs)
@@ -148,9 +149,11 @@ Every example has a README.md that walks through it.
   `require_ability` on reads and writes, a list with `cursor_paginate`, JSON bodies validated
   with 422 errors, JSON 401/403/404, CORS and a rate limit; products keyed by `Ulid`; tests with `assert_json_path` and
   time travel (token expiry, the rate limit's window); `GET /api/me` (the token's abilities via
-  `token_can`); a static browser client in public/ (client.html + client.js: token in
-  sessionStorage, Bearer calls, cursor "Load more", 422 errors next to fields, logout).
+  `token_can`); a browser client: a kit page (resources/views/client.html) and
+  public/client.js (token in sessionStorage, Bearer calls, cursor "Load more", 422 errors in
+  the kit fields' slots, logout).
   [src/app/products/mod.rs](examples/api/src/app/products/mod.rs),
+  [views/client.html](examples/api/resources/views/client.html),
   [public/client.js](examples/api/public/client.js),
   [tests/api.rs](examples/api/tests/api.rs)
 - [examples/jobs](examples/jobs) ([README](examples/jobs/README.md)): an event whose listener queues a receipt mail (a mail template
@@ -243,7 +246,10 @@ Every example has a README.md that walks through it.
   session, login), the database, jobs, event and notification fakes, HTTP fakes, time travel,
   counting queries, a browser-test recipe.
 - [docs/ui.md](docs/ui.md): components that see the request, the UI kit (`renox/ui.html`: fields,
-  buttons, cards, sheets, menus, tabs, tables, infolists: `infolist`/`entry`/`repeatable`),
+  buttons, cards, sheets, menus, tabs, tables, infolists: `infolist`/`entry`/`repeatable`;
+  the page's frame: `navbar`/`nav_links`/`nav_link`, `sidebar` + `rx-shell` for back
+  offices, `page_header`, `toolbar`, `row_actions`, `list`, `card_grid`/`media_card`,
+  `link_tabs`, `thumbnail`, `progress`, `rx-page--fill`: build pages from these, not app CSS),
   the filters `number`, `money` (`APP_CURRENCY`), `date`, `since`, `words`, `markdown`,
   dashboards (`renox::chart`: `Period`, `Trend`, `Series`; `chart(…)`, `stat`, `stats`,
   `dashboard`, `widget`, `period_filter`), and its

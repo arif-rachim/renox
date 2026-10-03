@@ -1,5 +1,5 @@
 {% extends "layouts/app.html" %}
-{% from "renox/ui.html" import card, input, file, button, link_button, table, badge, confirm, empty %}
+{% from "renox/ui.html" import card, input, file, button, link_button, table, badge, confirm, empty, thumbnail %}
 
 {% block content %}
 <div class="rx-stack">
@@ -37,7 +37,7 @@
         <td>
           {%- if doc.kind == "photo" %}
           {#- Public: the file's own URL under /storage. -#}
-          <a href="{{ storage_url(doc.file_key) }}"><img class="thumb" src="{{ storage_url(doc.file_key) }}" alt="{{ doc.title }}"></a>
+          {{ thumbnail(storage_url(doc.file_key), alt=doc.title, href=storage_url(doc.file_key)) }}
           {%- else %}{{ badge("PDF") }}{% endif -%}
         </td>
         <td><strong>{{ doc.title }}</strong><br><span class="rx-subtitle">{{ doc.file_name }}</span></td>

@@ -1,10 +1,9 @@
 {% extends "layouts/app.html" %}
 {% from "renox/grid.html" import grid %}
 
+{% from "renox/ui.html" import page_header %}
 {% block content %}
-<div class="page__head">
-  <h1 class="rx-title">Activity</h1>
-</div>
+{{ page_header("Activity") }}
 {#- Logins come from the Audit module; staff, settings and voided
     invoices from the app (renox::audit::record). -#}
 {{ grid(activity) }}

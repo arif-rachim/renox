@@ -3,32 +3,29 @@
 {% block seo %}{{ seo(title=app.name, description=t('home.description')) }}{% endblock %}
 
 {% block content %}
-{% from "renox/ui.html" import link_button, empty %}
-<div>
-  <h1 class="rx-title">{{ t('home.title') }}</h1>
-  <p class="rx-subtitle">{{ t('home.description') }}</p>
-</div>
+{% from "renox/ui.html" import link_button, empty, page_header, card_grid %}
+{{ page_header(t('home.title'), subtitle=t('home.description')) }}
 {# route() with named arguments adds them as the query string: /products?category=kopi #}
-<ul class="chips" aria-label="{{ t('products.all_categories') }}">
+<nav class="rx-row" aria-label="{{ t('products.all_categories') }}">
   {% for category in categories %}
-  <li>{{ link_button(route('products.index', category=category.slug), category.name, size="small") }}</li>
+  {{ link_button(route('products.index', category=category.slug), category.name, size="small") }}
   {% endfor %}
-</ul>
+</nav>
 
 {% if recent %}
 <h2 class="rx-card__title">{{ t('home.recent') }}</h2>
-<div class="grid">
+{% call card_grid() %}
   {% for product in recent %}
   {% if loop.index > 4 %}{% break %}{% endif %}{% include "catalog/_card.html" %}
   {% endfor %}
-</div>
+{% endcall %}
 {% endif %}
 
 <h2 class="rx-card__title">{{ t('home.new') }}</h2>
 {% if featured %}
-<div class="grid">
+{% call card_grid() %}
   {% for product in featured %}{% include "catalog/_card.html" %}{% endfor %}
-</div>
+{% endcall %}
 {% else %}
 <div class="rx-card">{{ empty(t('products.none')) }}</div>
 {% endif %}

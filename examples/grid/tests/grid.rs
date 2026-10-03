@@ -101,7 +101,7 @@ async fn the_dashboard_shows_a_page_of_orders() {
         .assert_see(">Customer</th>")
         .assert_see(">Amounts</th>")
         .assert_see(r#"<svg class="rx-spark""#)
-        .assert_see(r#"class="progress""#)
+        .assert_see(r#"<progress class="rx-progress""#)
         .assert_see(">Open<");
     assert_eq!(res.text().matches("<tr data-id=").count(), 25);
     app.get("/?page=3").await.assert_see("51–60 of 60");
@@ -124,9 +124,11 @@ async fn filters_narrow_the_orders() {
         .await
         .unwrap()
         .unwrap();
+    // Fake names can hold an apostrophe (O'Connell), which the page escapes.
+    let shown = first.customer.replace('&', "&amp;").replace('\'', "&#39;");
     app.get(&format!("/?q.number={}&m.number=equals", first.number))
         .await
-        .assert_see(&first.customer);
+        .assert_see(&shown);
     app.get("/?q.customer=nobody-has-this-name")
         .await
         .assert_see("Nothing matches these filters.");

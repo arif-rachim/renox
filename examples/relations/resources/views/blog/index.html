@@ -1,22 +1,29 @@
 {% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, toolbar, input, button, card, empty %}
 
 {% block content %}
-<h1>{% if q %}Posts with “{{ q }}”{% else %}Posts{% endif %}</h1>
-<div class="mt-6 divide-y divide-zinc-200 dark:divide-zinc-800">
+{{ page_header(("Posts with “" ~ q ~ "”") if q else "Posts") }}
+<form method="get" action="{{ route('posts.index') }}" role="search">
+  {% call toolbar() %}
+    {{ input("q", "Search posts", type="search", value=(q or ''), hide_label=true, placeholder="Search posts", id="search-q") }}
+    {{ button("Search", variant="secondary") }}
+  {% endcall %}
+</form>
 {% for post in posts.items %}
-<article class="card py-6">
-  <h2><a href="{{ route('posts.show', post.id) }}" class="text-zinc-900 dark:text-white">{{ post.title }}</a></h2>
+{% call card() %}
+<article class="rx-stack">
+  <h2 class="rx-card__title"><a class="rx-link" href="{{ route('posts.show', post.id) }}">{{ post.title }}</a></h2>
   {% include "blog/_meta.html" %}
-  <p class="mt-3 text-zinc-600 dark:text-zinc-400">{{ post.summary }}</p>
-  <p class="muted mt-3">
+  <p>{{ post.summary }}</p>
+  <p class="rx-subtitle">
     {{ post.comments }} comment{{ "" if post.comments == 1 else "s" }}
     {%- if post.latest_comment %}; latest by {{ post.latest_comment.author }}{% endif %}
     · {{ post.likes }} like{{ "" if post.likes == 1 else "s" }}
   </p>
 </article>
+{% endcall %}
 {% else %}
-<p class="muted py-6">{% if q %}No posts with “{{ q }}”. <a href="{{ route('posts.index') }}">All posts</a>{% else %}No posts yet. Run <code>cargo run -- db:seed</code>.{% endif %}</p>
+{% if q %}{{ empty("No posts with “" ~ q ~ "”", action_href=route('posts.index'), action_label="All posts") }}{% else %}{{ empty("No posts yet", "Run cargo run -- db:seed.") }}{% endif %}
 {% endfor %}
-</div>
 {% from "renox/pagination.html" import pagination %}{{ pagination(posts) }}
 {% endblock %}

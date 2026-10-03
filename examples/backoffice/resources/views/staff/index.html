@@ -1,6 +1,6 @@
 {% extends "layouts/app.html" %}
 {% from "renox/grid.html" import grid %}
-{% from "renox/ui.html" import action_sheet, input, select, checkbox_list, badge, form_grid, open_button %}
+{% from "renox/ui.html" import action_sheet, input, select, checkbox_list, badge, form_grid, open_button, page_header %}
 
 {#- The kit's action_sheet without its button (the grid's cell has it):
     a form sent with htmx; errors stay in the sheet, a success closes it. -#}
@@ -21,8 +21,7 @@
 {%- endmacro %}
 
 {% block content %}
-<div class="page__head">
-  <h1 class="rx-title">Staff</h1>
+{% call page_header("Staff") %}
   {#- No sign-up page: an admin adds people here, with a first password
       they change on /account. They verify their email before starting. -#}
   {% call action_sheet("new-staff", "Add someone", route('staff.store'), "Add someone", description="They get a mail to verify their address.", variant="primary", icon="plus") %}
@@ -33,7 +32,7 @@
       {{ select("role", "Role", role_names, required=true) }}
     {% endcall %}
   {% endcall %}
-</div>
+{% endcall %}
 {% call(row, column) grid(staff) %}
   {%- if column.key == "roles" -%}
     {%- for role in row.roles %}{{ badge(role, "info" if role == "admin" else none) }} {% else %}<span class="rx-subtitle">No role</span>{% endfor -%}

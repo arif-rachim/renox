@@ -28,7 +28,7 @@ package already enables renox's `postgres` and `uuid` features.
 | The list as a kit `table` (price with the `money` filter, badges for size and availability), an `empty` state, Edit and a `confirm` sheet for Delete | [resources/views/products/index.html](resources/views/products/index.html) |
 | The form on the UI kit: text, textarea, number with a prefix or suffix, a switch, a radio group, a checkbox list, time, datetime-local, a date in the kit's calendar (`date_picker`), the key read-only with a copy button, in a `form_grid` and `fieldset`s | [resources/views/products/form.html](resources/views/products/form.html) |
 | The product read-only, as an infolist: money, numbers with a suffix, Yes/No, a badge with labels, color swatches, tag badges, the specifications as a table, Markdown, dates and `since` | [resources/views/products/show.html](resources/views/products/show.html) |
-| The layout: the kit (`renox_ui()`), a navigation bar, `toasts()` | [resources/views/layouts/app.html](resources/views/layouts/app.html), [public/app.css](public/app.css) |
+| The layout: the kit (`renox_ui()`), its `navbar`, `toasts()` | [resources/views/layouts/app.html](resources/views/layouts/app.html), [public/app.css](public/app.css) |
 | Column types on SQLite and on PostgreSQL | [.up.sql](migrations/20260101000000_create_products_table.up.sql), [.postgres.up.sql](migrations/20260101000000_create_products_table.postgres.up.sql) |
 
 ## Things worth copying

@@ -2,28 +2,40 @@
 <html lang="{{ app.locale }}">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
   {#- Title, description, canonical URL and social cards; a page overrides it with
       {% block seo %}{{ seo(title="…", description="…", image="…") }}{% endblock %} -#}
   {% block seo %}{{ seo() }}{% endblock %}
-  <link rel="stylesheet" href="{{ asset('app.css') }}">
   {{ renox_head() }}
+  {#- The UI kit (renox/ui.html): the navigation bar, fields, buttons, lists, toasts. -#}
+  {{ renox_ui() }}
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
 </head>
-<body>
-  <nav>
-    <a href="{{ route('guestbook.index') }}"><strong>{{ app.name }}</strong></a>
+<body class="rx-page">
+  {% from "renox/ui.html" import navbar, menu, menu_link, menu_action, menu_separator, link_button, alert %}
+  {% call navbar(app.name, href=route('guestbook.index')) %}
+    <span class="rx-spacer"></span>
     {% if auth.check %}
-    <a href="{{ route('account.show') }}">{{ auth.user.name }}</a>
-    <form method="post" action="{{ route('logout') }}">{{ csrf_field() }}<button>{{ t('nav.logout') }}</button></form>
+      {% call menu(auth.user.name, id="account-menu", variant="plain") %}
+        {{ menu_link(route('account.show'), auth.user.name) }}
+        {{ menu_separator() }}
+        {{ menu_action(route('logout'), t('nav.logout')) }}
+      {% endcall %}
     {% else %}
-    <a href="{{ route('login') }}">{{ t('nav.login') }}</a>
-    <a href="{{ route('register') }}">{{ t('nav.register') }}</a>
+      {{ link_button(route('login'), t('nav.login'), variant="plain", size="small") }}
+      {{ link_button(route('register'), t('nav.register'), variant="primary", size="small") }}
     {% endif %}
-    <span class="lang"><a href="{{ route('language', 'id') }}">ID</a> | <a href="{{ route('language', 'en') }}">EN</a></span>
-  </nav>
-  <main>
-    {% if flash.status %}<p class="flash">{{ flash.status }}</p>{% endif %}
+    {#- The language: the route saves the choice in the session. -#}
+    {% call menu(app.locale | upper, id="language-menu", variant="plain") %}
+      {{ menu_link(route('language', 'id'), "Bahasa Indonesia") }}
+      {{ menu_link(route('language', 'en'), "English") }}
+    {% endcall %}
+  {% endcall %}
+  <main class="rx-container rx-stack" id="main">
+    {% if flash.status %}{{ alert(flash.status, kind="success") }}{% endif %}
     {% block content %}{% endblock %}
   </main>
+  {{ toasts() }}
 </body>
 </html>

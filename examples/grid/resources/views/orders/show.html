@@ -2,7 +2,7 @@
 {% from "renox/ui.html" import card, link_button, infolist, entry %}
 
 {% block content %}
-<main class="page">
+<main class="rx-container" id="main">
   {% call card(title=order.number, subtitle=order.customer) %}
     {#- The kit's infolist: labels and values, formatted by kind. -#}
     {% call infolist(columns=2) %}

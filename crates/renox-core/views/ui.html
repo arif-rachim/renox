@@ -24,8 +24,8 @@
 {%- for key, value in attrs | items %} {{ key }}{% if value is not true %}="{{ value }}"{% endif %}{% endfor -%}
 {%- endmacro -%}
 
-{%- macro _label(id, label, required) -%}
-<label class="rx-label" for="{{ id }}">{{ label }}{% if not required %} <span class="rx-required">({{ t('ui.optional') }})</span>{% endif %}</label>
+{%- macro _label(id, label, required, hidden=false) -%}
+<label class="rx-label{% if hidden %} rx-visually-hidden{% endif %}" for="{{ id }}">{{ label }}{% if not required %} <span class="rx-required">({{ t('ui.optional') }})</span>{% endif %}</label>
 {%- endmacro -%}
 
 {%- macro _describe(id, hint, message) -%}
@@ -49,12 +49,12 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     `revealable`: a button that shows the password; `copyable`: a button
     that copies the value. A disabled field isn't sent with the form; a
     readonly one is. -#}
-{% macro input(name, label, type="text", value=none, hint=none, required=false, autocomplete=none, placeholder=none, attrs={}, id=none, prefix=none, suffix=none, datalist=none, disabled=false, readonly=false, span=none, revealable=false, copyable=false) -%}
+{% macro input(name, label, type="text", value=none, hint=none, required=false, autocomplete=none, placeholder=none, attrs={}, id=none, prefix=none, suffix=none, datalist=none, disabled=false, readonly=false, span=none, revealable=false, copyable=false, hide_label=false) -%}
 {%- set id = id or _id(name) %}
 {%- set message = error(name) %}
 {%- set affixed = prefix or suffix or revealable or copyable %}
 <div class="{{ _field_class(span) }}">
-  {{ _label(id, label, required) }}
+  {{ _label(id, label, required, hide_label) }}
   {%- if affixed %}
   <div class="rx-affix">
     {%- if prefix %}<span class="rx-affix__text" id="{{ id }}-prefix">{{ prefix }}</span>{% endif %}
@@ -91,11 +91,11 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 </div>
 {%- endmacro %}
 
-{% macro textarea(name, label, value=none, rows=4, hint=none, required=false, placeholder=none, attrs={}, id=none, disabled=false, readonly=false, span=none) -%}
+{% macro textarea(name, label, value=none, rows=4, hint=none, required=false, placeholder=none, attrs={}, id=none, disabled=false, readonly=false, span=none, hide_label=false) -%}
 {%- set id = id or _id(name) %}
 {%- set message = error(name) %}
 <div class="{{ _field_class(span) }}">
-  {{ _label(id, label, required) }}
+  {{ _label(id, label, required, hide_label) }}
   <textarea class="rx-textarea" id="{{ id }}" name="{{ name }}" rows="{{ rows }}"
     {%- if required %} required aria-required="true"{% endif %}
     {%- if placeholder %} placeholder="{{ placeholder }}"{% endif %}
@@ -119,7 +119,7 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     failed submit) is looked up (`GET ?values=…`). `editable`: what was
     typed can be added ("Add “…”", `POST label=…`) and is chosen at once,
     and a chosen option can be renamed (`POST _method=PUT value=…&label=…`). -#}
-{% macro select(name, label, options, selected=none, hint=none, required=false, placeholder=none, attrs={}, id=none, disabled=false, span=none, multiple=false, searchable=false, options_url=none, editable=false) -%}
+{% macro select(name, label, options, selected=none, hint=none, required=false, placeholder=none, attrs={}, id=none, disabled=false, span=none, multiple=false, searchable=false, options_url=none, editable=false, hide_label=false) -%}
 {%- set id = id or _id(name) %}
 {%- set message = error(name) %}
 {%- if multiple %}
@@ -131,7 +131,7 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 {%- endif %}
 {%- set ns = namespace(known=[]) %}
 <div class="{{ _field_class(span) }}">
-  {{ _label(id, label, required) }}
+  {{ _label(id, label, required, hide_label) }}
   <select class="rx-select{% if multiple %} rx-select--multiple{% endif %}" id="{{ id }}" name="{{ name }}"
     {%- if multiple %} multiple{% endif %}
     {%- if searchable or options_url %} data-rx-combobox data-placeholder="{{ placeholder or t('ui.search') }}" data-empty="{{ t('ui.no_results') }}" data-remove="{{ t('ui.remove') }}"{% endif %}
@@ -162,14 +162,14 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 {#- A checkbox for a yes/no choice; `switch` looks like iOS' toggle, for
     settings that take effect as a whole ("Email me updates"). After a failed
     submit it shows what was sent: an unticked box stays unticked. -#}
-{% macro checkbox(name, label, checked=false, hint=none, value="on", switch=false, attrs={}, id=none, disabled=false, span=none) -%}
+{% macro checkbox(name, label, checked=false, hint=none, value="on", switch=false, attrs={}, id=none, disabled=false, span=none, hide_label=false) -%}
 {%- set id = id or _id(name) %}
 {%- set message = error(name) %}
 {%- set on = (old(name, none) | string == value | string) if has_old() else checked %}
 <div class="{{ _field_class(span) }}">
   <label class="rx-check{% if switch %} rx-check--switch{% endif %}" for="{{ id }}">
     {%- if not switch %}<input class="rx-checkbox" type="checkbox" id="{{ id }}" name="{{ name }}" value="{{ value }}"{% if on %} checked{% endif %}{% if disabled %} disabled{% endif %}{% if message %} aria-invalid="true"{% endif %} aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>{% endif %}
-    <span class="rx-check__text"><span>{{ label }}</span>{% if hint %}<span class="rx-hint" id="{{ id }}-hint">{{ hint }}</span>{% endif %}</span>
+    <span class="rx-check__text"><span{% if hide_label %} class="rx-visually-hidden"{% endif %}>{{ label }}</span>{% if hint %}<span class="rx-hint" id="{{ id }}-hint">{{ hint }}</span>{% endif %}</span>
     {%- if switch %}<input class="rx-switch" type="checkbox" role="switch" id="{{ id }}" name="{{ name }}" value="{{ value }}"{% if on %} checked{% endif %}{% if disabled %} disabled{% endif %}{% if message %} aria-invalid="true"{% endif %} aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{{ _attrs(attrs) }}>{% endif %}
   </label>
   <p class="rx-error" id="{{ id }}-error" data-error-for="{{ _key(name) }}" aria-live="polite">{{ message }}</p>
@@ -509,6 +509,166 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 {%- endif %}
 {%- endmacro %}
 
+{#- Navigation and page structure. A page's bar: the app's name, its
+    links and the account menu, from the kit rather than each app's CSS.
+
+    {% call navbar(app.name, href=route('home')) %}
+      {% call nav_links() %}
+        {{ nav_link(route('products.index'), "Products", active=route_is('products.*')) }}
+      {% endcall %}
+      <span class="rx-spacer"></span>
+      {{ link_button(route('login'), "Log in", variant="plain", size="small") }}
+    {% endcall %}
+
+    `brand` links to `href` (no brand: `brand=none`); `logo` is an image URL,
+    `mark=true` shows the name's first letter in the accent colour instead.
+    `width`: "narrow" (as `rx-container`), "wide" (as `rx-container--wide`) or
+    "full". It starts with a "Skip to content" link to `#main` (`skip=false`
+    when a `sidebar` already has one). On phones the links move to a row of
+    their own that scrolls sideways. -#}
+{% macro navbar(brand, href="/", logo=none, mark=false, width="narrow", label=none, skip=true) -%}
+{%- if skip %}<a class="rx-skip" href="#main">{{ t('ui.skip') }}</a>{% endif %}
+<header class="rx-navbar">
+  <nav class="rx-navbar__inner rx-navbar__inner--{{ width }}" aria-label="{{ label or t('ui.main_navigation') }}">
+    {%- if brand %}<a class="rx-navbar__brand" href="{{ href }}">{{ _brand_mark(brand, logo, mark) }}<span>{{ brand }}</span></a>{% endif %}
+    {%- if caller is defined %}{{ caller() }}{% endif %}
+  </nav>
+</header>
+{%- endmacro %}
+
+{#- The navigation bar's links, kept together (on phones, a row that scrolls). -#}
+{% macro nav_links() -%}
+<div class="rx-navbar__links">{{ caller() }}</div>
+{%- endmacro %}
+
+{#- One link of a `navbar` or `sidebar`; `active` (e.g. `route_is('orders.*')`)
+    marks the current section with `aria-current`. `badge`: a count after it. -#}
+{% macro nav_link(href, label, active=false, badge=none) -%}
+<a class="rx-navbar__link" href="{{ href }}"{% if active %} aria-current="page"{% endif %}><span>{{ label }}</span>{% if badge is not none and badge != "" %}<span class="rx-nav-badge">{{ badge }}</span>{% endif %}</a>
+{%- endmacro %}
+
+{#- Navigation down the side, for back offices: put `rx-shell` on <body>, the
+    sidebar first, then `<div class="rx-shell__main">` with a `navbar(none,
+    width="full", skip=false)` for the account menu and `<main
+    class="rx-shell__content" id="main">`. On phones it becomes a bar on top
+    whose links scroll sideways. The brand takes `logo` and `mark` as in
+    `navbar` (`mark` on by default). -#}
+{% macro sidebar(brand, href="/", logo=none, mark=true, label=none, skip=true) -%}
+{%- if skip %}<a class="rx-skip" href="#main">{{ t('ui.skip') }}</a>{% endif %}
+<nav class="rx-sidebar" aria-label="{{ label or t('ui.main_navigation') }}">
+  {%- if brand %}<a class="rx-sidebar__brand" href="{{ href }}">{{ _brand_mark(brand, logo, mark) }}<span>{{ brand }}</span></a>{% endif %}
+  <div class="rx-sidebar__links">{{ caller() }}</div>
+</nav>
+{%- endmacro %}
+
+{#- One link of a `sidebar` (as `nav_link`). -#}
+{% macro sidebar_link(href, label, active=false, badge=none) -%}
+<a class="rx-sidebar__link" href="{{ href }}"{% if active %} aria-current="page"{% endif %}><span>{{ label }}</span>{% if badge is not none and badge != "" %}<span class="rx-nav-badge">{{ badge }}</span>{% endif %}</a>
+{%- endmacro %}
+
+{#- A heading between groups of sidebar links ("Admin"). -#}
+{% macro sidebar_section(title) -%}
+<p class="rx-sidebar__section">{{ title }}</p>
+{%- endmacro %}
+
+{%- macro _brand_mark(brand, logo, mark) -%}
+{%- if logo %}<img class="rx-brand-mark" src="{{ logo }}" alt="" width="28" height="28">
+{%- elif mark %}<span class="rx-brand-mark" aria-hidden="true">{{ (brand | string)[:1] | upper }}</span>{% endif -%}
+{%- endmacro -%}
+
+{#- A page's heading: the title (with a `badge` of `badge_kind`), a
+    `subtitle`, a link `back` to where the page sits (`back_label`), and the
+    page's buttons from the call block, at the end of the row (under the
+    title on phones).
+
+    {% call page_header("Invoices", subtitle="150 this month") %}
+      {{ link_button(route('invoices.create'), "New invoice", variant="primary") }}
+    {% endcall %} -#}
+{% macro page_header(title, subtitle=none, back=none, back_label=none, badge=none, badge_kind=none) -%}
+<div class="rx-page-header">
+  <div class="rx-page-header__text">
+    {%- if back %}<a class="rx-page-header__back" href="{{ back }}">{{ _icon("prev") }}<span>{{ back_label or t('ui.back') }}</span></a>{% endif %}
+    <h1 class="rx-title">{{ title }}{% if badge %} <span class="rx-badge{% if badge_kind %} rx-badge--{{ badge_kind }}{% endif %}">{{ badge }}</span>{% endif %}</h1>
+    {%- if subtitle %}<p class="rx-subtitle">{{ subtitle }}</p>{% endif %}
+  </div>
+  {%- if caller is defined %}<div class="rx-page-header__actions">{{ caller() }}</div>{% endif %}
+</div>
+{%- endmacro %}
+
+{#- How far along something is: a bar with `label` (its accessible name) and,
+    unless `show_value=false`, the percentage next to it. -#}
+{% macro progress(value, max=100, label=none, show_value=true) -%}
+{%- set percent = ((value / max * 100) | round | int) if max else 0 %}
+<span class="rx-progress-wrap"><progress class="rx-progress" value="{{ value }}" max="{{ max }}"{% if label %} aria-label="{{ label }}"{% endif %}>{{ percent }}%</progress>{% if show_value %}<span class="rx-progress__value">{{ percent }}%</span>{% endif %}</span>
+{%- endmacro %}
+
+{#- Fields side by side for filtering a list: they wrap on narrow screens,
+    line up at the bottom with the buttons, and show no "(optional)" marks
+    (filters are all optional). Put it inside the <form>. -#}
+{% macro toolbar() -%}
+<div class="rx-toolbar">{{ caller() }}</div>
+{%- endmacro %}
+
+{#- A table row's buttons (edit, delete…), at the end of the row. On phones
+    only their icons show, two by two; the labels stay for screen readers. -#}
+{% macro row_actions() -%}
+<div class="rx-row-actions">{{ caller() }}</div>
+{%- endmacro %}
+
+{#- Columns side by side from tablet width up (one on phones), e.g. a photo
+    next to its details: `{% call columns(2) %}<div>…</div><div>…</div>{% endcall %}`. -#}
+{% macro columns(count=2) -%}
+<div class="rx-columns rx-cols-{{ count }}">{{ caller() }}</div>
+{%- endmacro %}
+
+{#- Cards in a grid that fills the row, each at least 13rem wide (set
+    `--rx-card-min` in the app's CSS for another width), for `media_card`s. -#}
+{% macro card_grid() -%}
+<div class="rx-card-grid">{{ caller() }}</div>
+{%- endmacro %}
+
+{#- A card that is one link: an `image` (or an empty frame), the `title`, a
+    `subtitle` (a price…) and a `note` ("Sold out"). `dimmed` greys the
+    image out. -#}
+{% macro media_card(href, title, image=none, subtitle=none, note=none, dimmed=false, image_alt="") -%}
+<article class="rx-media-card{% if dimmed %} rx-media-card--dimmed{% endif %}">
+  <a class="rx-media-card__link" href="{{ href }}">
+    {%- if image %}<img class="rx-media-card__image" src="{{ image }}" alt="{{ image_alt }}" width="240" height="160" loading="lazy">{% else %}<span class="rx-media-card__image" aria-hidden="true"></span>{% endif %}
+    <span class="rx-media-card__body">
+      <span class="rx-media-card__title">{{ title }}</span>
+      {%- if subtitle %}<span class="rx-media-card__subtitle">{{ subtitle }}</span>{% endif %}
+      {%- if note %}<span class="rx-media-card__note">{{ note }}</span>{% endif %}
+    </span>
+  </a>
+</article>
+{%- endmacro %}
+
+{#- A list of rows in a surface, each row a <li> the call block writes
+    (`rx-list__main` on the part that should take the room left). The
+    rows of one list can come from fragments (htmx adds and swaps them). -#}
+{% macro list(id=none, label=none) -%}
+<ul class="rx-list"{% if id %} id="{{ id }}"{% endif %}{% if label %} aria-label="{{ label }}"{% endif %}>{{ caller() }}</ul>
+{%- endmacro %}
+
+{#- A small square picture, e.g. in a table row; a link to `href` when given. -#}
+{% macro thumbnail(src, alt="", href=none) -%}
+{%- if href %}<a class="rx-thumbnail-link" href="{{ href }}">{% endif %}<img class="rx-thumbnail" src="{{ src }}" alt="{{ alt }}" width="48" height="48" loading="lazy">{% if href %}</a>{% endif %}
+{%- endmacro %}
+
+{#- Links that look like a segmented control, for switching between pages
+    or filters (each a URL): `items` are [href, label] pairs, `current` the
+    href shown as chosen (`aria-current`). `tabs` switches panels on one
+    page instead. -#}
+{% macro link_tabs(items, current=none, label=none) -%}
+<nav class="rx-link-tabs" aria-label="{{ label or t('ui.main_navigation') }}">
+  <div class="rx-segmented">
+    {%- for item in items %}
+    <a class="rx-segmented__item" href="{{ item[0] }}"{% if item[0] == current %} aria-current="page"{% endif %}>{{ item[1] }}</a>
+    {%- endfor %}
+  </div>
+</nav>
+{%- endmacro %}
+
 {% macro card(title=none, subtitle=none) -%}
 <section class="rx-card"{% if title %} aria-labelledby="{{ _id(title | lower | replace(' ', '-')) }}-title"{% endif %}>
   {%- if title %}
@@ -615,7 +775,9 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 
 {#- A destructive action behind a confirmation sheet: the button opens it,
     Cancel is focused first, and only the sheet's button sends the form. -#}
-{% macro confirm(id, label, action, title, message, confirm_label=none, method="DELETE", size=none, icon=none, modal_icon="warning", key=none) -%}
+{#- `cancel_label` names the button that keeps things as they are ("Keep
+    order"); `fields` are hidden values sent with the form ({"status": "cancelled"}). -#}
+{% macro confirm(id, label, action, title, message, confirm_label=none, method="DELETE", size=none, icon=none, modal_icon="warning", key=none, cancel_label=none, fields={}) -%}
 {{ open_button(id, label, variant="plain-danger", size=size, icon=icon, key=key) }}
 <dialog class="rx-sheet" id="{{ id }}" aria-labelledby="{{ id }}-title" aria-describedby="{{ id }}-message" role="alertdialog">
   <div class="rx-sheet__inner">
@@ -623,9 +785,10 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     <h2 class="rx-sheet__title" id="{{ id }}-title">{{ title }}</h2>
     <p class="rx-sheet__message" id="{{ id }}-message">{{ message }}</p>
     <div class="rx-sheet__actions">
-      <button class="rx-button rx-button--secondary" type="button" data-rx-close autofocus><span class="rx-button__label">{{ t('ui.cancel') }}</span></button>
+      <button class="rx-button rx-button--secondary" type="button" data-rx-close autofocus><span class="rx-button__label">{{ cancel_label or t('ui.cancel') }}</span></button>
       <form method="post" action="{{ action }}">
         {{ csrf_field() }}{% if method | upper != "POST" %}{{ method_field(method) }}{% endif %}
+        {%- for name, value in fields | items %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
         <button class="rx-button rx-button--danger" type="submit"><span class="rx-button__label">{{ confirm_label or label }}</span></button>
       </form>
     </div>
@@ -647,6 +810,12 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 {%- endmacro %}
 
 {#- A menu item that sends a form (POST, or `method` through _method). -#}
+{#- A menu item that is a plain button, for what `attrs` make it do, such as
+    htmx: `menu_button("Edit", attrs={"hx-get": url, "hx-target": "closest li"})`. -#}
+{% macro menu_button(label, attrs={}, danger=false) -%}
+<button class="rx-menu__item{% if danger %} rx-menu__item--danger{% endif %}" role="menuitem" type="button"{{ _attrs(attrs) }}>{{ label }}</button>
+{%- endmacro %}
+
 {% macro menu_action(action, label, method="POST", danger=false) -%}
 <form method="post" action="{{ action }}" role="none">{{ csrf_field() }}{% if method | upper != "POST" %}{{ method_field(method) }}{% endif %}<button class="rx-menu__item{% if danger %} rx-menu__item--danger{% endif %}" role="menuitem" type="submit">{{ label }}</button></form>
 {%- endmacro %}

@@ -1,11 +1,10 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-{% from "renox/ui.html" import table, link_button, confirm, empty %}
-<div class="row-actions row-actions--between">
-  <h1 class="rx-title">{{ team.name }}'s projects</h1>
+{% from "renox/ui.html" import table, link_button, confirm, empty, page_header, row_actions %}
+{% call page_header(team.name ~ "'s projects") %}
   {{ link_button(route('projects.create'), "New project", variant="primary") }}
-</div>
+{% endcall %}
 
 {% if projects %}
 {% call table(["Name", ["Description", "hide-narrow"], ""], caption="Projects") %}
@@ -14,11 +13,11 @@
     <td>{{ project.name }}</td>
     <td class="rx-hide-narrow">{{ project.description }}</td>
     <td>
-      <div class="row-actions">
+      {% call row_actions() %}
         {{ link_button(route('projects.edit', project.id), "Edit", variant="plain", size="small") }}
         {{ confirm("delete-" ~ project.id, "Delete", route('projects.destroy', project.id),
                    "Delete " ~ project.name ~ "?", "It's gone for everyone in " ~ team.name ~ ".", size="small") }}
-      </div>
+      {% endcall %}
     </td>
   </tr>
   {% endfor %}

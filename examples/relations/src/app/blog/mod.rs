@@ -175,11 +175,18 @@ async fn show(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
         .map(|(tag, pivot)| TagLink { tag, pivot })
         .collect();
     let tag_ids: Vec<i64> = tags.iter().map(|t| t.tag.id).collect();
-    let all_tags = Tag::query().order_by("name").get(&db).await?;
+    // Every tag as [id, name], the kit's checkbox_list options.
+    let tag_options: Vec<(i64, String)> = Tag::query()
+        .order_by("name")
+        .get(&db)
+        .await?
+        .into_iter()
+        .map(|tag| (tag.id, tag.name))
+        .collect();
     let description = post.summary(160);
     Ok(view(
         "blog/show.html",
-        context! { post, description, category, comments, tags, tag_ids, all_tags, likes },
+        context! { post, description, category, comments, tags, tag_ids, tag_options, likes },
     ))
 }
 

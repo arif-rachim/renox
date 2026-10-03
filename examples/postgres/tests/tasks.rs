@@ -103,7 +103,7 @@ async fn overdue_means_before_today_and_not_done() {
     }
     app.get("/?overdue=true")
         .await
-        .assert_see("</button> Late")
+        .assert_see(r#"<span class="rx-list__main">Late"#)
         .assert_dont_see("Due today")
         .assert_dont_see("Late but done")
         .assert_dont_see("Someday");

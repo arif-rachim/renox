@@ -1,48 +1,59 @@
 {% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, card, input, select, button, table, badge, row_actions, toolbar, empty, form_grid %}
 
 {% block content %}
-<h1>Place an order</h1>
-<form method="post" action="{{ route('orders.store') }}">
+{{ page_header("Place an order") }}
+<form method="post" action="{{ route('orders.store') }}" novalidate>
   {{ csrf_field() }}
-  <input name="customer_email" placeholder="Your email" value="{{ old('customer_email') }}">
-  <p class="error" data-error-for="customer_email">{{ error('customer_email') }}</p>
-  <input name="item" placeholder="Item" value="{{ old('item') }}">
-  <p class="error" data-error-for="item">{{ error('item') }}</p>
-  <input name="total" placeholder="Total (Rp)" inputmode="numeric" value="{{ old('total') }}">
-  <p class="error" data-error-for="total">{{ error('total') }}</p>
-  <button>Order</button>
+  {% call card() %}
+    {{ input("customer_email", "Your email", type="email", required=true, autocomplete="email") }}
+    {% call form_grid(2) %}
+      {{ input("item", "Item", required=true) }}
+      {{ input("total", "Total", type="number", required=true, prefix="Rp", attrs={"min": 1}) }}
+    {% endcall %}
+    <div class="rx-card__footer">{{ button("Order") }}</div>
+  {% endcall %}
 </form>
 
-<h2>Orders</h2>
-<ul class="orders">
+<h2 class="rx-card__title">Orders</h2>
+{% if orders %}
+{% call table(["Order", ["Total", "num"], "Status", ""], caption="Orders") %}
   {% for order in orders %}
-  <li>
-    #{{ order.id }} {{ order.item }}: {{ order.total | money }} <em>{{ order.status }}</em>
-    {% if order.status == "unpaid" %}
-    {#- The card token would come from the payment provider's script; these are its test tokens. #}
-    <form method="post" action="{{ route('orders.pay', order.id) }}">
-      {{ csrf_field() }}
-      <select name="card_token" aria-label="Test card">
-        <option value="tok_visa">Card that works</option>
-        <option value="tok_declined">Card that is declined</option>
-        <option value="tok_unreachable">Gateway that times out</option>
-      </select>
-      <button>Pay</button>
-    </form>
-    {% if auth.check %}
-    <form method="post" action="{{ route('orders.remind', order.id) }}">
-      {{ csrf_field() }}<button>Remind customer</button>
-    </form>
-    {% endif %}
-    {% endif %}
-  </li>
+  <tr>
+    <td>#{{ order.id }} {{ order.item }}</td>
+    <td class="rx-num">{{ order.total | money }}</td>
+    <td>{{ badge(order.status, {"unpaid": "warning", "processing": "info", "paid": "success", "needs_attention": "error"}[order.status]) }}</td>
+    <td>
+      {% if order.status == "unpaid" %}
+      {% call row_actions() %}
+        {#- The card token would come from the payment provider's script; these are its test tokens. #}
+        <form method="post" action="{{ route('orders.pay', order.id) }}">
+          {{ csrf_field() }}
+          {% call toolbar() %}
+            {{ select("card_token", "Test card", [["tok_visa", "Card that works"], ["tok_declined", "Card that is declined"], ["tok_unreachable", "Gateway that times out"]], hide_label=true, id="card-" ~ order.id) }}
+            {{ button("Pay", size="small") }}
+          {% endcall %}
+        </form>
+        {% if auth.check %}
+        <form method="post" action="{{ route('orders.remind', order.id) }}">
+          {{ csrf_field() }}{{ button("Remind customer", variant="secondary", size="small") }}
+        </form>
+        {% endif %}
+      {% endcall %}
+      {% endif %}
+    </td>
+  </tr>
   {% endfor %}
-</ul>
+{% endcall %}
+{% else %}
+{{ empty("No orders yet", "Place one above.") }}
+{% endif %}
 
 {% if auth.check %}
-<h2>Staff</h2>
-<form method="post" action="{{ route('statements.store') }}">
-  {{ csrf_field() }}<button>Email monthly statements</button>
-</form>
+{% call card(title="Staff") %}
+  <form method="post" action="{{ route('statements.store') }}">
+    {{ csrf_field() }}{{ button("Email monthly statements", variant="secondary") }}
+  </form>
+{% endcall %}
 {% endif %}
 {% endblock %}

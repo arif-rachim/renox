@@ -1,13 +1,12 @@
 {% extends "layouts/app.html" %}
 {% from "renox/grid.html" import grid %}
-{% from "renox/ui.html" import link_button %}
+{% from "renox/ui.html" import link_button, page_header %}
 
 {% block content %}
-<div class="page__head">
-  <h1 class="rx-title">Invoices</h1>
+{% call page_header("Invoices") %}
   {%- if can('invoices.manage') %}
   {{ link_button(route('invoices.create'), "New invoice", variant="primary", icon="plus", key="n") }}
   {%- endif %}
-</div>
+{% endcall %}
 {{ grid(invoices) }}
 {% endblock %}

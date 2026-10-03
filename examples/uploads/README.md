@@ -52,7 +52,7 @@ TEST_S3_ENDPOINT=http://127.0.0.1:8333 TEST_S3_BUCKET=renox-test \
 | Wiring | [src/lib.rs](src/lib.rs) |
 | The model, routes, upload validation, public and private storing, the expiring link, the inline download, deleting a document with its file, toasts after each | [src/app/documents/mod.rs](src/app/documents/mod.rs) |
 | The page with both forms on the UI kit's `file` field (a drop zone listing the chosen files, photos previewed; the photo form posts with htmx), and the uploaded documents as a kit `table` (photos as thumbnails, invoices as View/Download links, Delete behind `confirm`) or an `empty` state | [resources/views/documents/index.html](resources/views/documents/index.html) |
-| The layout: the kit (`renox_ui()`), a navigation bar, `toasts()` | [resources/views/layouts/app.html](resources/views/layouts/app.html), [public/app.css](public/app.css) |
+| The layout: the kit (`renox_ui()`), its `navbar`, `toasts()` | [resources/views/layouts/app.html](resources/views/layouts/app.html), [public/app.css](public/app.css) |
 | The table | [migrations](migrations) |
 
 ## Things worth copying
