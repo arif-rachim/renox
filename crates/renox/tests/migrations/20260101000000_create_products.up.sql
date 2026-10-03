@@ -1,8 +1,8 @@
-CREATE TABLE produk (
+CREATE TABLE products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nama TEXT NOT NULL,
-    harga INTEGER NOT NULL,
-    kategori TEXT,
+    name TEXT NOT NULL,
+    price INTEGER NOT NULL,
+    category TEXT,
     created_at TEXT,
     updated_at TEXT,
     deleted_at TEXT

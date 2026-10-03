@@ -7,17 +7,17 @@ use crate::Result;
 ///
 /// ```
 /// # use renox::prelude::*;
-/// # #[derive(Model, serde::Serialize, Default)] struct Produk { id: i64, nama: String, harga: i64 }
+/// # #[derive(Model, serde::Serialize, Default)] struct Product { id: i64, name: String, price: i64 }
 /// use renox::fake::{Fake, faker::lorem::en::Word};
 ///
-/// impl Factory for Produk {
+/// impl Factory for Product {
 ///     fn definition() -> Self {
-///         Produk { nama: Word().fake(), harga: (5_000..50_000).fake(), ..Default::default() }
+///         Product { name: Word().fake(), price: (5_000..50_000).fake(), ..Default::default() }
 ///     }
 /// }
 ///
 /// # async fn demo(db: Db) -> Result {
-/// Produk::create_many(&db, 50).await?;
+/// Product::create_many(&db, 50).await?;
 /// # Ok(()) }
 /// ```
 pub trait Factory: Model {
@@ -43,18 +43,18 @@ pub trait Factory: Model {
     ///
     /// ```
     /// # use renox::prelude::*;
-    /// # #[derive(Model, serde::Serialize, Default)] struct Produk { id: i64, nama: String, stok: i64 }
-    /// # impl Factory for Produk { fn definition() -> Self { Produk { nama: "Kopi".into(), stok: 10, ..Default::default() } } }
+    /// # #[derive(Model, serde::Serialize, Default)] struct Product { id: i64, name: String, stock: i64 }
+    /// # impl Factory for Product { fn definition() -> Self { Product { name: "Coffee".into(), stock: 10, ..Default::default() } } }
     /// /// A state: a plain function (or closure) that changes the model.
-    /// fn sold_out(p: &mut Produk) {
-    ///     p.stok = 0;
+    /// fn sold_out(p: &mut Product) {
+    ///     p.stock = 0;
     /// }
     ///
     /// # async fn demo(db: Db) -> Result {
-    /// let gone = Produk::factory().count(3).state(sold_out).create(&db).await?;
-    /// let named = Produk::factory()
+    /// let gone = Product::factory().count(3).state(sold_out).create(&db).await?;
+    /// let named = Product::factory()
     ///     .count(2)
-    ///     .sequence(|i, p| p.nama = format!("Kopi {}", i + 1)) // "Kopi 1", "Kopi 2"
+    ///     .sequence(|i, p| p.name = format!("Coffee {}", i + 1)) // "Coffee 1", "Coffee 2"
     ///     .make(); // unsaved
     /// # let _ = (gone, named); Ok(()) }
     /// ```

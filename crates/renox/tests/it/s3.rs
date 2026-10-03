@@ -72,11 +72,11 @@ async fn files_round_trip_through_s3() {
 
     assert!(!storage.exists(&key).await.unwrap());
     assert_eq!(storage.get(&key).await.unwrap(), None);
-    storage.put(&key, "halo dunia".into()).await.unwrap();
+    storage.put(&key, "hello world".into()).await.unwrap();
     assert!(storage.exists(&key).await.unwrap());
     assert_eq!(
         storage.get(&key).await.unwrap().as_deref(),
-        Some(&b"halo dunia"[..])
+        Some(&b"hello world"[..])
     );
 
     // Presigned by S3, readable without credentials until it expires.
@@ -84,7 +84,7 @@ async fn files_round_trip_through_s3() {
         .temporary_url(app.state(), &key, Duration::from_secs(60))
         .await
         .unwrap();
-    assert_eq!(http_get(&link).await, (200, b"halo dunia".to_vec()));
+    assert_eq!(http_get(&link).await, (200, b"hello world".to_vec()));
     let (status, _) = http_get(&link.replace("X-Amz-Signature=", "X-Amz-Signature=0")).await;
     assert_eq!(status, 403, "a changed signature is refused");
     let (status, _) = http_get(link.split('?').next().unwrap()).await;

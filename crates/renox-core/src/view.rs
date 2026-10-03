@@ -119,7 +119,7 @@ pub struct ViewContext {
     pub state: AppState,
     /// The logged-in user, if any.
     pub user: Option<Arc<crate::auth::User>>,
-    /// The request's language, e.g. `id`.
+    /// The request's language, e.g. `en`.
     pub locale: String,
     /// The request's path, e.g. `/products`.
     pub path: String,
@@ -213,7 +213,7 @@ impl Views {
                 },
             );
             // The current URL's query string with `page` set to `page`, for
-            // pagination links that keep filters such as `?q=kopi`.
+            // pagination links that keep filters such as `?q=coffee`.
             env.add_function("page_url", |state: &minijinja::State, page: u32| -> Value {
                 let query = state
                     .lookup("request")
@@ -617,7 +617,7 @@ fn safe_join(dir: &Path, name: &str) -> Option<PathBuf> {
 /// # let _ = move || {
 /// async fn index() -> View {
 /// #   let list: Vec<String> = Vec::new();
-///     view("produk/index.html", context! { produk => list }).fragment("list")
+///     view("products/index.html", context! { products => list }).fragment("list")
 /// }
 /// # };
 /// ```

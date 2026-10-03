@@ -53,11 +53,11 @@ async fn sitemap(State(state): State<AppState>) -> Result<Sitemap> {
     Sitemap::new(&state)
         .route("home", &[], None)?
         .route("products.show", &[&7], Some(at))
-        .map(|map| map.add("/search?q=kopi&page=2", None))
+        .map(|map| map.add("/search?q=coffee&page=2", None))
 }
 
 const PAGE: &str = r#"<head>{{ renox_head() }}</head>{% block body %}<p>body</p>{% endblock %}"#;
-const PRODUCT: &str = r#"<head>{{ seo(title='Kopi "Susu" · Toko', description='Enak & murah', image='/img/kopi.jpg', type='product') }}</head>"#;
+const PRODUCT: &str = r#"<head>{{ seo(title='Coffee "Latte" · Shop', description='Tasty & cheap', image='/img/coffee.jpg', type='product') }}</head>"#;
 
 async fn app(configure: impl FnOnce(&mut Config) + Send) -> (TestApp, tempfile::TempDir) {
     let dir = tempfile::tempdir().unwrap();
@@ -66,8 +66,8 @@ async fn app(configure: impl FnOnce(&mut Config) + Send) -> (TestApp, tempfile::
     let views = dir.path().to_path_buf();
     let public = dir.path().join("public");
     let app = TestApp::with_config(App::new().module(Shop), |c| {
-        c.name = "Toko".into();
-        c.url = "https://toko.example".into();
+        c.name = "Shop".into();
+        c.url = "https://shop.example".into();
         c.views_path = views;
         c.public_path = public;
         configure(c);
@@ -88,14 +88,14 @@ async fn seo_writes_title_description_canonical_and_social_cards() {
     let (app, _dir) = app(|_| {}).await;
     let page = app.get("/products/7?utm_source=x").await.text();
     for expected in [
-        "<title>Kopi &quot;Susu&quot; · Toko</title>",
-        r#"<meta name="description" content="Enak &amp; murah">"#,
-        r#"<link rel="canonical" href="https://toko.example/products/7">"#,
-        r#"<meta property="og:title" content="Kopi &quot;Susu&quot; · Toko">"#,
+        "<title>Coffee &quot;Latte&quot; · Shop</title>",
+        r#"<meta name="description" content="Tasty &amp; cheap">"#,
+        r#"<link rel="canonical" href="https://shop.example/products/7">"#,
+        r#"<meta property="og:title" content="Coffee &quot;Latte&quot; · Shop">"#,
         r#"<meta property="og:type" content="product">"#,
-        r#"<meta property="og:url" content="https://toko.example/products/7">"#,
-        r#"<meta property="og:image" content="https://toko.example/img/kopi.jpg">"#,
-        r#"<meta property="og:site_name" content="Toko">"#,
+        r#"<meta property="og:url" content="https://shop.example/products/7">"#,
+        r#"<meta property="og:image" content="https://shop.example/img/coffee.jpg">"#,
+        r#"<meta property="og:site_name" content="Shop">"#,
         r#"<meta property="og:locale" content="en">"#,
         r#"<meta name="twitter:card" content="summary_large_image">"#,
     ] {
@@ -151,20 +151,20 @@ async fn robots_txt_and_the_sitemap_in_production() {
     let (app, _dir) = app(production).await;
     assert_eq!(
         app.get("/robots.txt").await.text(),
-        "User-agent: *\nAllow: /\n\nSitemap: https://toko.example/sitemap.xml\n"
+        "User-agent: *\nAllow: /\n\nSitemap: https://shop.example/sitemap.xml\n"
     );
     let res = app.get("/sitemap.xml").await;
     res.assert_header("content-type", "application/xml; charset=utf-8");
     let xml = res.text();
-    assert!(xml.contains("<loc>https://toko.example/</loc>"), "{xml}");
+    assert!(xml.contains("<loc>https://shop.example/</loc>"), "{xml}");
     assert!(
         xml.contains(
-            "<loc>https://toko.example/products/7</loc><lastmod>2026-09-01T10:00:00Z</lastmod>"
+            "<loc>https://shop.example/products/7</loc><lastmod>2026-09-01T10:00:00Z</lastmod>"
         ),
         "{xml}"
     );
     assert!(
-        xml.contains("<loc>https://toko.example/search?q=kopi&amp;page=2</loc>"),
+        xml.contains("<loc>https://shop.example/search?q=coffee&amp;page=2</loc>"),
         "{xml}"
     );
 }

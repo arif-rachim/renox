@@ -341,8 +341,8 @@ impl Module for Auth {
     }
 }
 
-/// The built-in texts for the request's language, with the app's
-/// `renox.auth.*` translations on top.
+/// The built-in (English) texts, with the app's `renox.auth.*`
+/// translations for the request's language on top.
 pub(super) fn texts(lang: &Lang) -> Value {
     let mut base = text(Locale::parse(&lang.locale));
     if let Value::Object(map) = &mut base {
@@ -396,9 +396,6 @@ struct LoginForm {
 /// Built-in labels for Renox's own forms; an app's lang file wins.
 pub(super) fn label(v: &Validator, field: &'static str) -> &'static str {
     match (v.locale(), field) {
-        (Locale::Id, "name") => "nama",
-        (Locale::Id, "password") => "kata sandi",
-        (Locale::Id, "current_password") => "kata sandi saat ini",
         (Locale::En, "current_password") => "current password",
         _ => field,
     }
@@ -606,7 +603,8 @@ async fn destroy(
     ))
 }
 
-/// Words on the built-in pages.
+/// Words on the built-in pages (English; apps translate them with
+/// `renox.auth.*` keys in their lang files).
 pub(super) fn text(locale: Locale) -> Value {
     match locale {
         Locale::En => json!({
@@ -663,61 +661,6 @@ pub(super) fn text(locale: Locale) -> Value {
             "confirm_title": "Confirm your password",
             "confirm_intro": "This is a secure area. Please confirm your password to continue.",
             "confirm_button": "Confirm",
-        }),
-        Locale::Id => json!({
-            "login_title": "Masuk",
-            "register_title": "Buat akun",
-            "name": "Nama",
-            "email": "Email",
-            "password": "Kata sandi",
-            "password_confirmation": "Ulangi kata sandi",
-            "remember": "Ingat saya",
-            "login_button": "Masuk",
-            "register_button": "Daftar",
-            "no_account": "Belum punya akun?",
-            "have_account": "Sudah punya akun?",
-            "forgot_link": "Lupa kata sandi?",
-            "forgot_title": "Lupa kata sandi?",
-            "forgot_intro": "Masukkan email kamu, kami kirimkan link untuk membuat kata sandi baru.",
-            "send_link": "Kirim link atur ulang",
-            "back_to_login": "Kembali ke halaman masuk",
-            "reset_title": "Buat kata sandi baru",
-            "reset_button": "Simpan kata sandi",
-            "reset_link_sent": "Kalau email itu terdaftar, link atur ulang sedang dikirim.",
-            "reset_invalid": "Link atur ulang kata sandi tidak valid atau sudah kedaluwarsa.",
-            "password_reset_done": "Kata sandi sudah diganti. Silakan masuk.",
-            "verify_title": "Verifikasi email",
-            "verify_intro": "Kami sudah mengirim link verifikasi ke email kamu. Belum menerima?",
-            "resend_button": "Kirim ulang link",
-            "logout": "Keluar",
-            "verification_sent": "Link verifikasi baru sudah dikirim.",
-            "verified": "Alamat email kamu sudah terverifikasi.",
-            "mail_reset_subject": "Atur ulang kata sandi",
-            "mail_reset_intro": "Kamu meminta atur ulang kata sandi. Buat kata sandi baru lewat tombol di bawah.",
-            "mail_reset_outro": "Link berlaku 60 menit. Kalau kamu tidak memintanya, abaikan email ini.",
-            "mail_verify_subject": "Verifikasi alamat email",
-            "mail_verify_intro": "Silakan konfirmasi bahwa ini alamat email kamu.",
-            "mail_verify_outro": "Link berlaku 60 menit.",
-            "account_title": "Akun kamu",
-            "profile_title": "Profil",
-            "profile_saved": "Profil kamu sudah disimpan.",
-            "email_unverified": "Alamat email baru kamu belum terverifikasi: cek kotak masuk.",
-            "save": "Simpan",
-            "password_title": "Ganti kata sandi",
-            "current_password": "Kata sandi saat ini",
-            "new_password": "Kata sandi baru",
-            "password_changed": "Kata sandi sudah diganti. Perangkat lain kamu sudah dikeluarkan.",
-            "other_devices_title": "Perangkat lain",
-            "other_devices_intro": "Keluar dari semua perangkat lain, misalnya ponsel yang hilang.",
-            "other_devices_button": "Keluarkan perangkat lain",
-            "other_devices_logged_out": "Perangkat lain kamu sudah dikeluarkan.",
-            "delete_title": "Hapus akun",
-            "delete_intro": "Akun dan datanya dihapus permanen.",
-            "delete_button": "Hapus akun saya",
-            "delete_confirm": "Hapus akun kamu secara permanen?",
-            "confirm_title": "Konfirmasi kata sandi",
-            "confirm_intro": "Ini area aman. Masukkan kata sandi kamu untuk melanjutkan.",
-            "confirm_button": "Konfirmasi",
         }),
     }
 }

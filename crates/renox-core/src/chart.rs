@@ -567,29 +567,23 @@ fn text(state: &State, key: &str, fallback_locale: &str) -> String {
         .unwrap_or_else(|| crate::i18n::builtin_text(fallback_locale, key))
 }
 
-const MONTHS_EN: [&str; 12] = [
+const MONTHS: [&str; 12] = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
-const MONTHS_ID: [&str; 12] = [
-    "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
-];
 
-/// `2026-10-02` → `Oct 2` (`2 Okt` in `id`), `2026-10` → `Oct 2026`, or
-/// with `format` (chrono's codes); other labels as they are.
-fn display_label(label: &str, format: Option<&str>, locale: &str) -> String {
-    let indonesian = locale.split(['-', '_']).next() == Some("id");
-    let months = if indonesian { MONTHS_ID } else { MONTHS_EN };
+/// `2026-10-02` → `Oct 2`, `2026-10` → `Oct 2026`, or with `format`
+/// (chrono's codes, e.g. `%d/%m`); other labels as they are.
+fn display_label(label: &str, format: Option<&str>) -> String {
     if let Ok(day) = NaiveDate::parse_from_str(label, "%Y-%m-%d") {
         return match format {
             Some(format) => day.format(format).to_string(),
-            None if indonesian => format!("{} {}", day.day(), months[day.month0() as usize]),
-            None => format!("{} {}", months[day.month0() as usize], day.day()),
+            None => format!("{} {}", MONTHS[day.month0() as usize], day.day()),
         };
     }
     if let Ok(month) = NaiveDate::parse_from_str(&format!("{label}-01"), "%Y-%m-%d") {
         return match format {
             Some(format) => month.format(format).to_string(),
-            None => format!("{} {}", months[month.month0() as usize], month.year()),
+            None => format!("{} {}", MONTHS[month.month0() as usize], month.year()),
         };
     }
     label.to_owned()
@@ -615,14 +609,10 @@ impl Formatter {
         }
     }
 
-    /// Axis ticks: `12.5K` / `12,5 rb`, plain under 10,000.
+    /// Axis ticks: `12.5K` (`12,5K` where the locale writes a decimal
+    /// comma), plain under 10,000.
     fn tick(&self, value: f64) -> String {
-        let indonesian = self.locale.split(['-', '_']).next() == Some("id");
-        let units: [(f64, &str); 4] = if indonesian {
-            [(1e12, " T"), (1e9, " M"), (1e6, " jt"), (1e3, " rb")]
-        } else {
-            [(1e12, "T"), (1e9, "B"), (1e6, "M"), (1e3, "K")]
-        };
+        let units: [(f64, &str); 4] = [(1e12, "T"), (1e9, "B"), (1e6, "M"), (1e3, "K")];
         let suffix = if self.format == "percent" { "%" } else { "" };
         if value.abs() >= 10_000.0 {
             for (size, unit) in units {
@@ -721,7 +711,7 @@ pub(crate) fn chart(
             labels: data
                 .labels
                 .iter()
-                .map(|l| display_label(l, x_format.as_deref(), &locale))
+                .map(|l| display_label(l, x_format.as_deref()))
                 .collect(),
             id,
             show_data: text(state, "ui.chart.show_data", &locale),
@@ -1305,11 +1295,10 @@ mod tests {
 
     #[test]
     fn labels_and_ticks_read_well() {
-        assert_eq!(display_label("2026-10-02", None, "en"), "Oct 2");
-        assert_eq!(display_label("2026-10-02", None, "id"), "2 Okt");
-        assert_eq!(display_label("2026-08", None, "id"), "Agu 2026");
-        assert_eq!(display_label("2026-10-02", Some("%d/%m"), "en"), "02/10");
-        assert_eq!(display_label("Kopi", None, "en"), "Kopi");
+        assert_eq!(display_label("2026-10-02", None), "Oct 2");
+        assert_eq!(display_label("2026-08", None), "Aug 2026");
+        assert_eq!(display_label("2026-10-02", Some("%d/%m")), "02/10");
+        assert_eq!(display_label("Coffee", None), "Coffee");
         let f = |locale: &str| Formatter {
             format: "number".into(),
             decimals: None,
@@ -1317,7 +1306,7 @@ mod tests {
             locale: locale.into(),
         };
         assert_eq!(f("en").tick(12_500.0), "12.5K");
-        assert_eq!(f("id").tick(2_500_000.0), "2,5 jt");
+        assert_eq!(f("es").tick(2_500_000.0), "2,5M");
         assert_eq!(f("en").tick(750.0), "750");
         assert_eq!(f("en").tick(2_000_000_000.0), "2B");
     }

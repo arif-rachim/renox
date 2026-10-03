@@ -51,7 +51,7 @@ struct Greet {
 impl Job for Greet {
     const NAME: &'static str = "probe-greet";
     async fn handle(self, ctx: JobContext) -> Result {
-        log(&ctx.state, &format!("halo {}", self.name)).await
+        log(&ctx.state, &format!("hello {}", self.name)).await
     }
 }
 
@@ -130,7 +130,7 @@ async fn worker_survives_a_panicking_job() {
         })
         .await
         .unwrap();
-    let ran = wait_for(k.db(), "halo after", 4).await;
+    let ran = wait_for(k.db(), "hello after", 4).await;
     let jobs: Vec<String> = renox::db::sql(
         "SELECT job || ' attempts=' || attempts || ' reserved=' || COALESCE(CAST(reserved_at AS TEXT), 'null') FROM jobs",
     )
@@ -681,11 +681,11 @@ async fn mail_view_templates() {
             "a@example.com",
             "s",
             "mail/only_html",
-            context! { name => "Budi" },
+            context! { name => "Ben" },
         )
         .unwrap();
     assert_eq!(
-        mail.text, "Hi Budi",
+        mail.text, "Hi Ben",
         "missing .txt falls back to text from the HTML"
     );
     assert!(
@@ -720,7 +720,7 @@ impl renox::auth::Notification for Shipped {
 #[renox::test]
 async fn notification_failing_halfway_sends_no_mail() {
     let app = TestApp::new(App::new().module(Auth::new())).await;
-    let user = User::register(app.db(), "Budi", "budi@example.com", "password123")
+    let user = User::register(app.db(), "Ben", "ben@example.com", "password123")
         .await
         .unwrap();
     renox::db::sql("DROP TABLE notifications")

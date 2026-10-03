@@ -1,26 +1,26 @@
 //! Form validation with Laravel-style rules, database-backed `unique` and
-//! `exists`, and messages in English and Indonesian.
+//! `exists`, and English messages (an app translates them in its lang files).
 //!
 //! ```
 //! # use renox::prelude::*;
 //! use serde::{Deserialize, Serialize};
 //!
 //! #[derive(Deserialize, Serialize)]
-//! struct ProdukForm {
-//!     nama: String,
-//!     harga: i64,
+//! struct ProductForm {
+//!     name: String,
+//!     price: i64,
 //!     email: Option<String>,
 //! }
 //!
-//! impl Validate for ProdukForm {
+//! impl Validate for ProductForm {
 //!     fn rules(&self, v: &mut Validator) {
-//!         v.field("nama", &self.nama).required().max(100).unique("produk", "nama");
-//!         v.field("harga", &self.harga).label("harga jual").min(1_000);
+//!         v.field("name", &self.name).required().max(100).unique("products", "name");
+//!         v.field("price", &self.price).label("sale price").min(1_000);
 //!         v.field("email", &self.email).email();
 //!     }
 //! }
 //!
-//! async fn store(State(db): State<Db>, back: Back, Valid(form): Valid<ProdukForm>) -> Result<Back> {
+//! async fn store(State(db): State<Db>, back: Back, Valid(form): Valid<ProductForm>) -> Result<Back> {
 //!     // `form` passed every rule; invalid input never gets here.
 //! #   let _ = (db, form);
 //!     Ok(back)
@@ -511,10 +511,10 @@ impl Validator {
     /// ```
     /// # use renox::prelude::*;
     /// # use renox::validation::Locale;
-    /// # #[derive(serde::Deserialize)] struct ProdukForm { nama: String }
-    /// # impl Validate for ProdukForm { fn rules(&self, v: &mut Validator) { v.field("nama", &self.nama).required(); } }
-    /// # async fn demo(form: ProdukForm, db: Db) -> Result {
-    /// let errors = Validator::rules_of(&form, Locale::Id).finish(&db).await?;
+    /// # #[derive(serde::Deserialize)] struct ProductForm { name: String }
+    /// # impl Validate for ProductForm { fn rules(&self, v: &mut Validator) { v.field("name", &self.name).required(); } }
+    /// # async fn demo(form: ProductForm, db: Db) -> Result {
+    /// let errors = Validator::rules_of(&form, Locale::En).finish(&db).await?;
     /// # let _ = errors; Ok(()) }
     /// ```
     pub fn rules_of(data: &impl Validate, locale: Locale) -> Self {
@@ -524,7 +524,7 @@ impl Validator {
     }
 }
 
-/// The rules for one field, chained: `v.field("nama", &self.nama).required().max(100)`.
+/// The rules for one field, chained: `v.field("name", &self.name).required().max(100)`.
 pub struct Field<'v> {
     v: &'v mut Validator,
     name: String,
@@ -546,7 +546,7 @@ fn number(n: f64) -> String {
 }
 
 impl Field<'_> {
-    /// The name used in messages, e.g. `.label("harga jual")`.
+    /// The name used in messages, e.g. `.label("sale price")`.
     pub fn label(mut self, label: &str) -> Self {
         self.label = label.to_owned();
         self
@@ -1171,30 +1171,30 @@ impl Default for Password {
     }
 }
 
-/// A rule to reuse across forms, e.g. an Indonesian tax number:
+/// A rule to reuse across forms, e.g. a tax number:
 ///
 /// ```
 /// # use renox::prelude::*;
 /// use renox::validation::{Inspected, Rule};
 ///
-/// struct Npwp;
+/// struct TaxId;
 ///
-/// impl Rule for Npwp {
+/// impl Rule for TaxId {
 ///     fn check(&self, value: &Inspected) -> std::result::Result<(), String> {
 ///         let Inspected::Text(text) = value else { return Ok(()) };
 ///         let digits = text.chars().filter(char::is_ascii_digit).count();
 ///         if digits == 15 || digits == 16 {
 ///             Ok(())
 ///         } else {
-///             Err("The :attribute must be a valid NPWP.".into()) // :attribute is the field's label
+///             Err("The :attribute must be a valid tax ID.".into()) // :attribute is the field's label
 ///         }
 ///     }
 /// }
 ///
-/// # struct Form { npwp: String }
+/// # struct Form { tax_id: String }
 /// # impl Validate for Form {
 /// fn rules(&self, v: &mut Validator) {
-///     v.field("npwp", &self.npwp).required().apply(&Npwp);
+///     v.field("tax_id", &self.tax_id).required().apply(&TaxId);
 /// }
 /// # }
 /// ```
@@ -1297,10 +1297,10 @@ const DONT_FLASH: &[&str] = &[
 ///
 /// ```
 /// # use renox::prelude::*;
-/// # #[derive(serde::Serialize)] struct StokForm { jumlah: i64 }
-/// # fn demo(form: StokForm) -> Result {
+/// # #[derive(serde::Serialize)] struct StockForm { quantity: i64 }
+/// # fn demo(form: StockForm) -> Result {
 /// let mut errors = Errors::new();
-/// errors.add("stok", "Stok tidak cukup.");
+/// errors.add("quantity", "Not enough stock.");
 /// return Err(ValidationError::new(errors).with_input(&form).into());
 /// # }
 /// ```
@@ -1366,9 +1366,9 @@ mod tests {
 
     #[test]
     fn checks_emails_and_urls() {
-        assert!(is_email("arif@example.com"));
-        assert!(!is_email("arif@localhost"));
-        assert!(!is_email("arif example@x.com"));
+        assert!(is_email("alex@example.com"));
+        assert!(!is_email("alex@localhost"));
+        assert!(!is_email("alex example@x.com"));
         assert!(!is_email("@x.com"));
         assert!(is_url("https://renox.dev/docs"));
         assert!(!is_url("ftp://renox.dev"));

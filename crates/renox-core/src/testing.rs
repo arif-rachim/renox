@@ -2,20 +2,20 @@
 //!
 //! ```
 //! # use renox::prelude::*;
-//! # mod toko { pub fn app() -> renox::App { renox::App::new() } }
+//! # mod shop { pub fn app() -> renox::App { renox::App::new() } }
 //! use renox::testing::TestApp;
 //!
 //! #[renox::test]
 //! async fn creating_a_product() {
-//!     let app = TestApp::new(toko::app()).await;           // in-memory DB, migrated
-//!     let user = User::register(app.db(), "Arif", "arif@example.com", "rahasia123").await.unwrap();
+//!     let app = TestApp::new(shop::app()).await;           // in-memory DB, migrated
+//!     let user = User::register(app.db(), "Alex", "alex@example.com", "secret123").await.unwrap();
 //!
 //!     app.acting_as(&user)
-//!         .post("/produk", &[("nama", "Kopi"), ("harga", "18000")])
+//!         .post("/products", &[("name", "Coffee"), ("price", "18000")])
 //!         .await
-//!         .assert_redirect("/produk");
-//!     app.assert_database_has("produk", &[("nama", &"Kopi")]).await;
-//!     app.get("/produk").await.assert_ok().assert_see("Kopi");
+//!         .assert_redirect("/products");
+//!     app.assert_database_has("products", &[("name", &"Coffee")]).await;
+//!     app.get("/products").await.assert_ok().assert_see("Coffee");
 //! }
 //! ```
 //!
@@ -628,7 +628,7 @@ impl TestRequest<'_> {
     }
 
     /// A multipart form, as a browser sends one with a file input:
-    /// `post_multipart("/photos", &[("title", "Kopi")], &[("photo", "kopi.png", &bytes)])`.
+    /// `post_multipart("/photos", &[("title", "Coffee")], &[("photo", "coffee.png", &bytes)])`.
     pub async fn post_multipart(
         self,
         uri: &str,
@@ -917,7 +917,7 @@ impl TestResponse {
     }
 
     /// Panics unless the JSON body has `expected` at `path`
-    /// (`assert_json_path("data.0.name", "Kopi")`).
+    /// (`assert_json_path("data.0.name", "Coffee")`).
     #[track_caller]
     pub fn assert_json_path(&self, path: &str, expected: impl Serialize) -> &Self {
         let expected = serde_json::to_value(expected).expect("a JSON value");

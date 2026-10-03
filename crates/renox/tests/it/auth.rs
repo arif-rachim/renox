@@ -68,7 +68,7 @@ async fn kernel(auth: Auth) -> (Kernel, tempfile::TempDir) {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("home.html"),
-        "{% if auth.check %}Halo {{ auth.user.name }}{% else %}Tamu{% endif %}|admin={% if can('admin') %}yes{% else %}no{% endif %}|{{ auth.user | tojson }}",
+        "{% if auth.check %}Hello {{ auth.user.name }}{% else %}Guest{% endif %}|admin={% if can('admin') %}yes{% else %}no{% endif %}|{{ auth.user | tojson }}",
     )
     .unwrap();
     std::fs::write(
@@ -86,7 +86,7 @@ async fn kernel(auth: Auth) -> (Kernel, tempfile::TempDir) {
     let kernel = App::with_config(config)
         .module(auth)
         .module(Dashboard)
-        .gate("admin", |user| user.email.ends_with("@toko.id"))
+        .gate("admin", |user| user.email.ends_with("@shop.test"))
         .boot()
         .await
         .unwrap();
@@ -180,7 +180,7 @@ async fn registering_logs_in_and_goes_home() {
     let reply = client
         .post(
             "/register",
-            "name=Arif&email=arif@example.com&password=rahasia123&password_confirmation=rahasia123",
+            "name=Alex&email=alex@example.com&password=secret123&password_confirmation=secret123",
         )
         .await;
     assert_eq!(
@@ -188,13 +188,13 @@ async fn registering_logs_in_and_goes_home() {
         (StatusCode::SEE_OTHER, Some("/"))
     );
     let home = client.get("/").await.body;
-    assert!(home.starts_with("Halo Arif|admin=no|"), "{home}");
+    assert!(home.starts_with("Hello Alex|admin=no|"), "{home}");
     assert!(
         !home.contains("argon2") && !home.contains("password"),
         "the hash never reaches templates: {home}"
     );
 
-    let user = User::find_by_email(kernel.db(), "ARIF@example.com")
+    let user = User::find_by_email(kernel.db(), "ALEX@example.com")
         .await
         .unwrap()
         .unwrap();
@@ -204,7 +204,7 @@ async fn registering_logs_in_and_goes_home() {
 #[tokio::test]
 async fn registration_is_validated() {
     let (kernel, _dir) = kernel(Auth::new()).await;
-    User::register(kernel.db(), "Arif", "arif@example.com", "rahasia123")
+    User::register(kernel.db(), "Alex", "alex@example.com", "secret123")
         .await
         .unwrap();
     let mut client = Client::new(&kernel);
@@ -212,7 +212,7 @@ async fn registration_is_validated() {
     let reply = client
         .post(
             "/register",
-            "name=Lain&email=ARIF@example.com&password=pendek&password_confirmation=beda",
+            "name=Other&email=ALEX@example.com&password=short&password_confirmation=different",
         )
         .await;
     assert_eq!(reply.location(), Some("/register"));
@@ -222,26 +222,26 @@ async fn registration_is_validated() {
         "emails are unique regardless of case"
     );
     assert!(page.contains("The password must be at least 8 characters."));
-    assert!(page.contains(r#"value="Lain""#), "old input is kept");
+    assert!(page.contains(r#"value="Other""#), "old input is kept");
     assert_eq!(client.get("/whoami").await.body, "guest");
 }
 
 #[tokio::test]
 async fn logging_in_and_out() {
     let (kernel, _dir) = kernel(Auth::new()).await;
-    User::register(kernel.db(), "Arif", "arif@toko.id", "rahasia123")
+    User::register(kernel.db(), "Alex", "alex@shop.test", "secret123")
         .await
         .unwrap();
     let mut client = Client::new(&kernel);
 
-    let reply = client.login("arif@toko.id", "salah").await;
+    let reply = client.login("alex@shop.test", "wrong").await;
     assert_eq!(reply.location(), Some("/login"));
     let page = client.get("/login").await.body;
     assert!(page.contains("These credentials do not match our records."));
-    assert!(page.contains(r#"value="arif@toko.id""#));
+    assert!(page.contains(r#"value="alex@shop.test""#));
 
     let guest_token = client.get("/token").await.body;
-    let reply = client.login("Arif@Toko.id", "rahasia123").await;
+    let reply = client.login("Alex@Shop.test", "secret123").await;
     assert_eq!(
         (reply.status, reply.location()),
         (StatusCode::SEE_OTHER, Some("/"))
@@ -251,7 +251,7 @@ async fn logging_in_and_out() {
             .get("/")
             .await
             .body
-            .starts_with("Halo Arif|admin=yes")
+            .starts_with("Hello Alex|admin=yes")
     );
     assert_ne!(
         client.get("/token").await.body,
@@ -266,13 +266,13 @@ async fn logging_in_and_out() {
 
     let reply = client.post("/logout", "").await;
     assert_eq!(reply.location(), Some("/"));
-    assert!(client.get("/").await.body.starts_with("Tamu"));
+    assert!(client.get("/").await.body.starts_with("Guest"));
 }
 
 #[tokio::test]
 async fn guards_send_guests_to_login_and_back() {
     let (kernel, _dir) = kernel(Auth::new()).await;
-    User::register(kernel.db(), "Arif", "arif@example.com", "rahasia123")
+    User::register(kernel.db(), "Alex", "alex@example.com", "secret123")
         .await
         .unwrap();
     let mut client = Client::new(&kernel);
@@ -309,18 +309,18 @@ async fn guards_send_guests_to_login_and_back() {
     client.get("/dashboard?tab=2").await;
     assert_eq!(
         client
-            .login("arif@example.com", "rahasia123")
+            .login("alex@example.com", "secret123")
             .await
             .location(),
         Some("/dashboard?tab=2")
     );
-    assert_eq!(client.get("/dashboard").await.body, "hi Arif");
+    assert_eq!(client.get("/dashboard").await.body, "hi Alex");
 }
 
 #[tokio::test]
 async fn htmx_logins_redirect_the_whole_page() {
     let (kernel, _dir) = kernel(Auth::new().redirect_to("/dashboard")).await;
-    User::register(kernel.db(), "Arif", "arif@example.com", "rahasia123")
+    User::register(kernel.db(), "Alex", "alex@example.com", "secret123")
         .await
         .unwrap();
     let mut client = Client::new(&kernel);
@@ -331,7 +331,7 @@ async fn htmx_logins_redirect_the_whole_page() {
                 .header("hx-request", "true")
                 .header("x-csrf-token", token)
                 .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
-                .body(Body::from("email=arif@example.com&password=rahasia123"))
+                .body(Body::from("email=alex@example.com&password=secret123"))
                 .unwrap(),
         )
         .await;
@@ -344,19 +344,19 @@ async fn htmx_logins_redirect_the_whole_page() {
 #[tokio::test]
 async fn remember_me_extends_the_session_cookie() {
     let (kernel, _dir) = kernel(Auth::new()).await;
-    User::register(kernel.db(), "Arif", "arif@example.com", "rahasia123")
+    User::register(kernel.db(), "Alex", "alex@example.com", "secret123")
         .await
         .unwrap();
 
     let mut client = Client::new(&kernel);
-    let reply = client.login("arif@example.com", "rahasia123").await;
+    let reply = client.login("alex@example.com", "secret123").await;
     assert!(reply.headers["set-cookie"].contains("Max-Age=7200"));
 
     let mut client = Client::new(&kernel);
     let reply = client
         .post(
             "/login",
-            "email=arif@example.com&password=rahasia123&remember=1",
+            "email=alex@example.com&password=secret123&remember=1",
         )
         .await;
     assert!(
@@ -373,20 +373,18 @@ async fn remember_me_extends_the_session_cookie() {
 #[tokio::test]
 async fn changing_the_password_logs_out_other_sessions() {
     let (kernel, _dir) = kernel(Auth::new()).await;
-    let mut user = User::register(kernel.db(), "Arif", "arif@example.com", "rahasia123")
+    let mut user = User::register(kernel.db(), "Alex", "alex@example.com", "secret123")
         .await
         .unwrap();
     let mut laptop = Client::new(&kernel);
-    laptop.login("arif@example.com", "rahasia123").await;
-    assert_eq!(laptop.get("/whoami").await.body, "Arif");
+    laptop.login("alex@example.com", "secret123").await;
+    assert_eq!(laptop.get("/whoami").await.body, "Alex");
 
-    user.set_password(kernel.db(), "baru-rahasia")
-        .await
-        .unwrap();
+    user.set_password(kernel.db(), "new-secret").await.unwrap();
     assert_eq!(laptop.get("/whoami").await.body, "guest");
     assert_eq!(
         laptop
-            .login("arif@example.com", "baru-rahasia")
+            .login("alex@example.com", "new-secret")
             .await
             .location(),
         Some("/")
@@ -396,11 +394,11 @@ async fn changing_the_password_logs_out_other_sessions() {
 #[tokio::test]
 async fn deleted_users_are_logged_out() {
     let (kernel, _dir) = kernel(Auth::new()).await;
-    let user = User::register(kernel.db(), "Arif", "arif@example.com", "rahasia123")
+    let user = User::register(kernel.db(), "Alex", "alex@example.com", "secret123")
         .await
         .unwrap();
     let mut client = Client::new(&kernel);
-    client.login("arif@example.com", "rahasia123").await;
+    client.login("alex@example.com", "secret123").await;
     user.force_delete(kernel.db()).await.unwrap();
     assert_eq!(client.get("/whoami").await.body, "guest");
 }
@@ -408,14 +406,14 @@ async fn deleted_users_are_logged_out() {
 #[tokio::test]
 async fn repeated_failures_are_throttled() {
     let (kernel, _dir) = kernel(Auth::new()).await;
-    User::register(kernel.db(), "Arif", "throttle@example.com", "rahasia123")
+    User::register(kernel.db(), "Alex", "throttle@example.com", "secret123")
         .await
         .unwrap();
     let mut client = Client::new(&kernel);
     for _ in 0..5 {
-        client.login("throttle@example.com", "salah").await;
+        client.login("throttle@example.com", "wrong").await;
     }
-    client.login("throttle@example.com", "rahasia123").await;
+    client.login("throttle@example.com", "secret123").await;
     let page = client.get("/login").await.body;
     assert!(
         page.contains("Too many login attempts. Please try again in"),
@@ -431,12 +429,12 @@ async fn repeated_failures_are_throttled() {
 #[tokio::test]
 async fn policies_and_gates() {
     let (kernel, _dir) = kernel(Auth::new()).await;
-    let owner = User::register(kernel.db(), "Arif", "arif@example.com", "rahasia123")
+    let owner = User::register(kernel.db(), "Alex", "alex@example.com", "secret123")
         .await
         .unwrap();
     let mut client = Client::new(&kernel);
     assert_eq!(client.get("/posts").await.body, "1:view;2:view;", "guests");
-    client.login("arif@example.com", "rahasia123").await;
+    client.login("alex@example.com", "secret123").await;
     assert_eq!(
         client.get("/posts").await.body,
         format!(
@@ -461,7 +459,7 @@ async fn policies_and_gates() {
     assert_eq!(
         client.get("/admin").await.status,
         StatusCode::FORBIDDEN,
-        "not an @toko.id email"
+        "not an @shop.test email"
     );
 }
 

@@ -153,19 +153,19 @@ mod tests {
         let throttle = LoginThrottle::new(None);
         for i in 0..20 {
             throttle
-                .fail("Arif@example.com", format!("10.0.0.{i}").parse().ok())
+                .fail("Alex@example.com", format!("10.0.0.{i}").parse().ok())
                 .await;
         }
         let other_ip = "10.9.9.9".parse().ok();
         assert!(
             throttle
-                .blocked_for("arif@example.com", other_ip)
+                .blocked_for("alex@example.com", other_ip)
                 .await
                 .is_some()
         );
         assert!(
             throttle
-                .blocked_for("budi@example.com", other_ip)
+                .blocked_for("ben@example.com", other_ip)
                 .await
                 .is_none()
         );

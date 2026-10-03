@@ -16,7 +16,7 @@ fn config(dir: &std::path::Path) -> Config {
         c.env = Environment::Testing;
         c.key = Some(renox::generate_key());
         c.views_path = dir.to_path_buf();
-        c.name = "Toko Kopi".into();
+        c.name = "Coffee Shop".into();
         c
     }
 }
@@ -37,17 +37,17 @@ fn views() -> tempfile::TempDir {
     std::fs::write(
         dir.path().join("mail/receipt.html"),
         r#"{% extends "renox/mail/layout.html" %}{% from "renox/mail/button.html" import button %}
-{% block content %}<h1>Terima kasih, {{ name }}</h1><table><tr><td>Total</td><td>Rp {{ total }}</td></tr></table>{{ button("https://toko.id/o/1", "Lihat pesanan") }}{% endblock %}"#,
+{% block content %}<h1>Thank you, {{ name }}</h1><table><tr><td>Total</td><td>Rp {{ total }}</td></tr></table>{{ button("https://shop.test/o/1", "View order") }}{% endblock %}"#,
     )
     .unwrap();
     std::fs::write(
         dir.path().join("mail/plain.html"),
-        "<p>Hanya HTML untuk {{ name }}</p>",
+        "<p>Only HTML for {{ name }}</p>",
     )
     .unwrap();
     std::fs::write(
         dir.path().join("mail/plain.txt"),
-        "Versi teks untuk {{ name }} dari {{ app.name }}",
+        "Text version for {{ name }} from {{ app.name }}",
     )
     .unwrap();
     dir
@@ -61,32 +61,32 @@ async fn mail_views_render_html_and_text() {
 
     let mail = state
         .mail_view(
-            "budi@example.com",
-            "Struk",
+            "ben@example.com",
+            "Receipt",
             "mail/receipt",
-            context! { name => "Budi", total => "25.000" },
+            context! { name => "Ben", total => "25.000" },
         )
         .unwrap();
     let html = mail.html.as_deref().unwrap();
     assert!(
-        html.contains("<h1>Terima kasih, Budi</h1>") && html.contains("Toko Kopi"),
+        html.contains("<h1>Thank you, Ben</h1>") && html.contains("Coffee Shop"),
         "layout and app name"
     );
-    assert!(html.contains(r#"href="https://toko.id/o/1""#));
-    assert!(mail.text.contains("Terima kasih, Budi"), "{}", mail.text);
+    assert!(html.contains(r#"href="https://shop.test/o/1""#));
+    assert!(mail.text.contains("Thank you, Ben"), "{}", mail.text);
     assert!(mail.text.contains("Total Rp 25.000"), "{}", mail.text);
     assert!(
-        mail.text.contains("Lihat pesanan (https://toko.id/o/1)"),
+        mail.text.contains("View order (https://shop.test/o/1)"),
         "{}",
         mail.text
     );
     assert!(!mail.text.contains('<'), "{}", mail.text);
 
     let plain = state
-        .mail_view("a@b.id", "x", "mail/plain", context! { name => "Ani" })
+        .mail_view("a@b.test", "x", "mail/plain", context! { name => "Anna" })
         .unwrap();
     assert_eq!(
-        plain.text, "Versi teks untuk Ani dari Toko Kopi",
+        plain.text, "Text version for Anna from Coffee Shop",
         "a .txt template wins"
     );
 }
@@ -97,12 +97,12 @@ async fn queued_mail_is_sent_by_a_worker() {
     let kernel = kernel_with(config(dir.path())).await;
     kernel
         .state()
-        .queue_mail(Mail::new("a@b.id", "Nanti", "isi"))
+        .queue_mail(Mail::new("a@b.test", "Later", "body"))
         .await
         .unwrap();
     assert!(kernel.mailer().sent().is_empty());
     kernel.run_jobs().await.unwrap();
-    assert_eq!(kernel.mailer().sent()[0].subject, "Nanti");
+    assert_eq!(kernel.mailer().sent()[0].subject, "Later");
 }
 
 async fn get(kernel: &Kernel, uri: &str) -> (StatusCode, String) {
@@ -125,13 +125,13 @@ async fn sent_mail_can_be_previewed_in_debug_only() {
         c
     })
     .await;
-    let mail = Mail::new("budi@example.com", "Halo <Budi>", "teks").html("<p>\"html\" & more</p>");
+    let mail = Mail::new("ben@example.com", "Hello <Ben>", "text").html("<p>\"html\" & more</p>");
     kernel.mailer().send(mail).await.unwrap();
 
     let (status, list) = get(&kernel, "/_renox/mail").await;
     assert_eq!(status, StatusCode::OK);
     assert!(
-        list.contains("Halo &lt;Budi&gt;") && list.contains(r#"href="/_renox/mail/1""#),
+        list.contains("Hello &lt;Ben&gt;") && list.contains(r#"href="/_renox/mail/1""#),
         "{list}"
     );
     let (_, page) = get(&kernel, "/_renox/mail/1").await;
@@ -141,16 +141,19 @@ async fn sent_mail_can_be_previewed_in_debug_only() {
         ),
         "{page}"
     );
-    assert!(page.contains("<pre>teks</pre>"));
+    assert!(page.contains("<pre>text</pre>"));
 
-    let full = Mail::new("budi@example.com", "Invoice", "see file")
+    let full = Mail::new("ben@example.com", "Invoice", "see file")
         .cc("tim@example.com")
-        .reply_to("halo@example.com")
+        .reply_to("hello@example.com")
         .attach("<inv>.pdf", "application/pdf", vec![1, 2, 3]);
     kernel.mailer().send(full).await.unwrap();
     let (_, page) = get(&kernel, "/_renox/mail/2").await;
     assert!(page.contains("<p>Cc: tim@example.com</p>"), "{page}");
-    assert!(page.contains("<p>Reply-To: halo@example.com</p>"), "{page}");
+    assert!(
+        page.contains("<p>Reply-To: hello@example.com</p>"),
+        "{page}"
+    );
     assert!(
         page.contains("Attachments: &lt;inv&gt;.pdf (application/pdf, 3 bytes)"),
         "{page}"
@@ -220,7 +223,7 @@ async fn smtp_sends_multipart_mail() {
         mail.host = "127.0.0.1".into();
         mail.port = Some(port);
         mail.encryption = "none".into();
-        mail.from_address = "toko@example.com".into();
+        mail.from_address = "shop@example.com".into();
         mail
     };
     let kernel = kernel_with({
@@ -232,23 +235,23 @@ async fn smtp_sends_multipart_mail() {
     let mail = kernel
         .state()
         .mail_view(
-            "budi@example.com",
-            "Struk pesanan",
+            "ben@example.com",
+            "Order receipt",
             "mail/receipt",
-            context! { name => "Budi", total => "1" },
+            context! { name => "Ben", total => "1" },
         )
         .unwrap();
     kernel.mailer().send(mail).await.unwrap();
 
     let data = received.lock().unwrap().clone();
-    assert!(data.contains("MAIL FROM:<toko@example.com>"), "{data}");
-    assert!(data.contains("RCPT TO:<budi@example.com>"));
+    assert!(data.contains("MAIL FROM:<shop@example.com>"), "{data}");
+    assert!(data.contains("RCPT TO:<ben@example.com>"));
     assert!(
-        data.contains("From: \"Toko Kopi\" <toko@example.com>")
-            || data.contains("From: Toko Kopi <toko@example.com>"),
+        data.contains("From: \"Coffee Shop\" <shop@example.com>")
+            || data.contains("From: Coffee Shop <shop@example.com>"),
         "{data}"
     );
-    assert!(data.contains("Subject: Struk pesanan"));
+    assert!(data.contains("Subject: Order receipt"));
     assert!(data.contains("multipart/alternative"));
     assert!(data.contains("text/plain") && data.contains("text/html"));
 }
@@ -313,8 +316,8 @@ impl Notification for OrderShipped {
     fn to_mail(&self, to: &Recipient, _: &AppState) -> Result<Mail> {
         Ok(Mail::new(
             to.email().unwrap_or_default(),
-            format!("Pesanan #{} dikirim", self.order_id),
-            "Sedang di jalan.",
+            format!("Order #{} shipped", self.order_id),
+            "On its way.",
         ))
     }
 
@@ -340,41 +343,41 @@ async fn notifications_go_to_mail_and_the_database() {
     let dir = views();
     let kernel = kernel_with(config(dir.path())).await;
     let (state, db) = (kernel.state(), kernel.db());
-    let budi = User::register(db, "Budi", "budi@example.com", "rahasia123")
+    let ben = User::register(db, "Ben", "ben@example.com", "secret123")
         .await
         .unwrap();
-    let ani = User::register(db, "Ani", "ani@example.com", "rahasia123")
+    let anna = User::register(db, "Anna", "anna@example.com", "secret123")
         .await
         .unwrap();
 
     state
-        .notify(&budi, &OrderShipped { order_id: 7 })
+        .notify(&ben, &OrderShipped { order_id: 7 })
         .await
         .unwrap();
     state
-        .notify(&budi, &OrderShipped { order_id: 8 })
+        .notify(&ben, &OrderShipped { order_id: 8 })
         .await
         .unwrap();
-    assert_eq!(kernel.mailer().sent()[1].subject, "Pesanan #8 dikirim");
+    assert_eq!(kernel.mailer().sent()[1].subject, "Order #8 shipped");
 
-    let all = budi.notifications(db, 10).await.unwrap();
+    let all = ben.notifications(db, 10).await.unwrap();
     assert_eq!((all.len(), all[0].kind.as_str()), (2, "order-shipped"));
     assert_eq!(all[0].data["order_id"], 8, "newest first");
-    assert_eq!(budi.unread_notification_count(db).await.unwrap(), 2);
+    assert_eq!(ben.unread_notification_count(db).await.unwrap(), 2);
 
     assert!(
-        !ani.mark_notification_read(db, all[0].id).await.unwrap(),
-        "not Ani's"
+        !anna.mark_notification_read(db, all[0].id).await.unwrap(),
+        "not Anna's"
     );
-    assert!(budi.mark_notification_read(db, all[0].id).await.unwrap());
+    assert!(ben.mark_notification_read(db, all[0].id).await.unwrap());
     assert_eq!(
-        budi.unread_notifications(db).await.unwrap()[0].data["order_id"],
+        ben.unread_notifications(db).await.unwrap()[0].data["order_id"],
         7
     );
-    assert_eq!(budi.mark_all_notifications_read(db).await.unwrap(), 1);
-    assert_eq!(budi.unread_notification_count(db).await.unwrap(), 0);
+    assert_eq!(ben.mark_all_notifications_read(db).await.unwrap(), 1);
+    assert_eq!(ben.unread_notification_count(db).await.unwrap(), 0);
 
-    let err = state.notify(&ani, &DatabaseOnly).await.unwrap_err();
+    let err = state.notify(&anna, &DatabaseOnly).await.unwrap_err();
     assert!(format!("{err:?}").contains("notification `promo` has no mail version"));
 }
 
@@ -382,7 +385,7 @@ async fn notifications_go_to_mail_and_the_database() {
 async fn auth_mails_are_html_with_a_text_version() {
     let dir = views();
     let kernel = kernel_with(config(dir.path())).await;
-    User::register(kernel.db(), "Budi", "budi@example.com", "rahasia123")
+    User::register(kernel.db(), "Ben", "ben@example.com", "secret123")
         .await
         .unwrap();
     let router = kernel.router();
@@ -416,7 +419,7 @@ async fn auth_mails_are_html_with_a_text_version() {
             Request::post("/forgot-password")
                 .header("cookie", cookie)
                 .header("content-type", "application/x-www-form-urlencoded")
-                .body(Body::from(format!("_token={token}&email=budi@example.com")))
+                .body(Body::from(format!("_token={token}&email=ben@example.com")))
                 .unwrap(),
         )
         .await
@@ -451,26 +454,26 @@ async fn smtp_sends_cc_bcc_reply_to_from_and_attachments() {
         c.mail.host = "127.0.0.1".into();
         c.mail.port = Some(port);
         c.mail.encryption = "none".into();
-        c.mail.from_address = "toko@example.com".into();
+        c.mail.from_address = "shop@example.com".into();
         c
     })
     .await;
     let pdf = b"%PDF-1.7 invoice".to_vec();
-    let mail = Mail::new("budi@example.com", "Invoice INV-001", "Terlampir.")
-        .also_to("siti@example.com")
+    let mail = Mail::new("ben@example.com", "Invoice INV-001", "Attached.")
+        .also_to("sara@example.com")
         .cc("sales@example.com")
-        .bcc("arsip@example.com")
-        .reply_to("Halo Toko <halo@example.com>")
-        .from("Toko Billing <billing@example.com>")
+        .bcc("archive@example.com")
+        .reply_to("Coffee Shop <hello@example.com>")
+        .from("Shop Billing <billing@example.com>")
         .attach("INV-001.pdf", "application/pdf", pdf.clone());
     kernel.mailer().send(mail.clone()).await.unwrap();
 
     let data = received.lock().unwrap().clone();
     for rcpt in [
-        "budi@example.com",
-        "siti@example.com",
+        "ben@example.com",
+        "sara@example.com",
         "sales@example.com",
-        "arsip@example.com",
+        "archive@example.com",
     ] {
         assert!(
             data.contains(&format!("RCPT TO:<{rcpt}>")),
@@ -480,7 +483,7 @@ async fn smtp_sends_cc_bcc_reply_to_from_and_attachments() {
     assert!(data.contains("MAIL FROM:<billing@example.com>"), "{data}");
     assert!(data.contains("Cc: sales@example.com"), "{data}");
     assert!(!data.contains("Bcc:"), "bcc isn't a header: {data}");
-    assert!(data.contains("Reply-To:") && data.contains("halo@example.com"));
+    assert!(data.contains("Reply-To:") && data.contains("hello@example.com"));
     assert!(data.contains("multipart/mixed") && data.contains("application/pdf"));
     assert!(data.contains("INV-001.pdf"));
     let _ = pdf;
@@ -488,7 +491,7 @@ async fn smtp_sends_cc_bcc_reply_to_from_and_attachments() {
     // An invalid address anywhere fails the send, permanently (no retries).
     let err = kernel
         .mailer()
-        .send(Mail::new("budi@example.com", "x", "y").cc("not an email"))
+        .send(Mail::new("ben@example.com", "x", "y").cc("not an email"))
         .await
         .unwrap_err();
     assert!(err.is_permanent(), "{err:?}");
@@ -504,7 +507,7 @@ async fn queued_mail_keeps_its_attachments() {
     })
     .await;
     let bytes: Vec<u8> = (0..=255).collect();
-    let mail = Mail::new("budi@example.com", "Data", "see attachment")
+    let mail = Mail::new("ben@example.com", "Data", "see attachment")
         .cc("tim@example.com")
         .attach("data.bin", "application/octet-stream", bytes.clone());
     kernel.state().queue_mail(mail).await.unwrap();
@@ -535,8 +538,8 @@ impl Notification for Shipped {
     fn to_mail(&self, to: &Recipient, _: &AppState) -> Result<Mail> {
         Ok(Mail::new(
             to.email().unwrap_or_default(),
-            format!("Pesanan #{} dikirim", self.order_id),
-            "Sedang di jalan.",
+            format!("Order #{} shipped", self.order_id),
+            "On its way.",
         ))
     }
 
@@ -545,7 +548,7 @@ impl Notification for Shipped {
     }
 
     fn to_channel(&self, channel: &str, _: &Recipient) -> Result<serde_json::Value> {
-        Ok(serde_json::json!({ "channel": channel, "text": format!("#{} dikirim", self.order_id) }))
+        Ok(serde_json::json!({ "channel": channel, "text": format!("#{} shipped", self.order_id) }))
     }
 }
 
@@ -583,26 +586,26 @@ async fn notifications_reach_custom_channels_and_people_without_accounts() {
     let dir = views();
     let (kernel, outbox) = channel_kernel(dir.path()).await;
     let (state, db) = (kernel.state(), kernel.db());
-    let mut budi = User::register(db, "Budi", "budi@example.com", "rahasia123")
+    let mut ben = User::register(db, "Ben", "ben@example.com", "secret123")
         .await
         .unwrap();
-    budi.set(db, "phone", "+628111").await.unwrap();
+    ben.set(db, "phone", "+15550111").await.unwrap();
 
-    state.notify(&budi, &Shipped { order_id: 7 }).await.unwrap();
-    assert_eq!(budi.unread_notification_count(db).await.unwrap(), 1);
+    state.notify(&ben, &Shipped { order_id: 7 }).await.unwrap();
+    assert_eq!(ben.unread_notification_count(db).await.unwrap(), 1);
     assert!(
         kernel
             .mailer()
             .sent()
             .iter()
-            .any(|m| m.is_for("budi@example.com"))
+            .any(|m| m.is_for("ben@example.com"))
     );
     let (phone, message) = outbox.lock().unwrap()[0].clone();
-    assert_eq!(phone.as_deref(), Some("+628111"));
-    assert_eq!(message["text"], "#7 dikirim");
+    assert_eq!(phone.as_deref(), Some("+15550111"));
+    assert_eq!(message["text"], "#7 shipped");
 
     // Someone without an account: mail and WhatsApp, no database row.
-    let guest = Recipient::to("mail", "tamu@example.com").and("whatsapp", "+628222");
+    let guest = Recipient::to("mail", "guest@example.com").and("whatsapp", "+15550122");
     state
         .notify_to(&guest, &Shipped { order_id: 8 })
         .await
@@ -612,9 +615,9 @@ async fn notifications_reach_custom_channels_and_people_without_accounts() {
             .mailer()
             .sent()
             .iter()
-            .any(|m| m.is_for("tamu@example.com"))
+            .any(|m| m.is_for("guest@example.com"))
     );
-    assert_eq!(outbox.lock().unwrap()[1].0.as_deref(), Some("+628222"));
+    assert_eq!(outbox.lock().unwrap()[1].0.as_deref(), Some("+15550122"));
     let rows: i64 = renox::db::sql("SELECT COUNT(*) FROM notifications")
         .scalar(db)
         .await
@@ -627,17 +630,17 @@ async fn queued_notifications_send_each_channel_as_its_own_job() {
     let dir = views();
     let (kernel, outbox) = channel_kernel(dir.path()).await;
     let (state, db) = (kernel.state(), kernel.db());
-    let budi = User::register(db, "Budi", "budi@example.com", "rahasia123")
+    let ben = User::register(db, "Ben", "ben@example.com", "secret123")
         .await
         .unwrap();
     let mails_before = kernel.mailer().sent().len();
 
     state
-        .notify_later(&budi, &Shipped { order_id: 9 })
+        .notify_later(&ben, &Shipped { order_id: 9 })
         .await
         .unwrap();
     // The database row is written at once; mail and WhatsApp wait for a worker.
-    assert_eq!(budi.unread_notification_count(db).await.unwrap(), 1);
+    assert_eq!(ben.unread_notification_count(db).await.unwrap(), 1);
     assert_eq!(kernel.mailer().sent().len(), mails_before);
     assert!(outbox.lock().unwrap().is_empty());
     assert_eq!(state.queue.pending().await.unwrap(), 2);
@@ -648,7 +651,7 @@ async fn queued_notifications_send_each_channel_as_its_own_job() {
             .mailer()
             .sent()
             .iter()
-            .any(|m| m.subject == "Pesanan #9 dikirim")
+            .any(|m| m.subject == "Order #9 shipped")
     );
     assert_eq!(outbox.lock().unwrap().len(), 1);
     assert_eq!(state.queue.pending().await.unwrap(), 0);
@@ -674,12 +677,12 @@ impl Notification for Unknown {
 async fn an_unregistered_channel_is_an_error() {
     let dir = views();
     let (kernel, _) = channel_kernel(dir.path()).await;
-    let budi = User::register(kernel.db(), "Budi", "budi@example.com", "rahasia123")
+    let ben = User::register(kernel.db(), "Ben", "ben@example.com", "secret123")
         .await
         .unwrap();
     for result in [
-        kernel.state().notify(&budi, &Unknown).await,
-        kernel.state().notify_later(&budi, &Unknown).await,
+        kernel.state().notify(&ben, &Unknown).await,
+        kernel.state().notify_later(&ben, &Unknown).await,
     ] {
         let err = format!("{:?}", result.unwrap_err());
         assert!(err.contains("no `pigeon` notification channel"), "{err}");

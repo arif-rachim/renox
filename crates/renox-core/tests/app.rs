@@ -59,14 +59,14 @@ async fn counter(session: Session) -> Result<String> {
 }
 
 async fn flash(session: Session, back: Back) -> Result<Back> {
-    session.flash("status", "Tersimpan")?;
+    session.flash("status", "Saved")?;
     Ok(back)
 }
 
 async fn page() -> View {
     view(
         "page.html",
-        context! { items => ["a", "b"], title => "Daftar" },
+        context! { items => ["a", "b"], title => "List" },
     )
     .fragment("list")
 }
@@ -77,7 +77,7 @@ async fn create() -> View {
 
 async fn store(session: Session, back: Back, axum::Form(note): axum::Form<Note>) -> Result<Back> {
     session.flash_input(&note)?;
-    session.flash_errors(&context! { title => ["Judul sudah dipakai."] })?;
+    session.flash_errors(&context! { title => ["The title is taken."] })?;
     Ok(back)
 }
 
@@ -191,7 +191,7 @@ async fn flash_lasts_for_one_request() {
     let token = token(&mut app).await;
     let res = app.post_form("/flash", &format!("_token={token}")).await;
     assert_eq!(res.status, StatusCode::SEE_OTHER);
-    assert_eq!(app.get("/flashed").await.body, "Tersimpan");
+    assert_eq!(app.get("/flashed").await.body, "Saved");
     assert_eq!(app.get("/flashed").await.body, "");
 }
 
@@ -227,7 +227,7 @@ async fn views_render_with_globals() {
     let res = app.get("/page").await;
     assert_eq!(res.status, StatusCode::OK);
     assert_eq!(res.headers["content-type"], "text/html; charset=utf-8");
-    assert!(res.body.contains("<h1>Daftar - Test App</h1>"));
+    assert!(res.body.contains("<h1>List - Test App</h1>"));
     assert!(res.body.contains(r#"href="/notes/3""#));
     assert!(res.body.contains("<li>a</li><li>b</li>"));
     assert!(res.body.contains("<p>/page </p>"), "`/` is not escaped");
@@ -247,17 +247,17 @@ async fn old_input_and_errors_survive_the_redirect() {
     let mut app = app().await;
     let token = token(&mut app).await;
     app.get("/notes/create").await;
-    app.post_form("/notes", &format!("_token={token}&title=Halo+%3Cb%3E"))
+    app.post_form("/notes", &format!("_token={token}&title=Hello+%3Cb%3E"))
         .await;
     let res = app.get("/notes/create").await;
     assert!(
-        res.body.contains(r#"value="Halo &lt;b&gt;""#),
+        res.body.contains(r#"value="Hello &lt;b&gt;""#),
         "{}",
         res.body
     );
     assert!(
         res.body
-            .contains(r#"<span class="error">Judul sudah dipakai.</span>"#)
+            .contains(r#"<span class="error">The title is taken.</span>"#)
     );
     assert!(
         res.body

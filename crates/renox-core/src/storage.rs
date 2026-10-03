@@ -1,7 +1,7 @@
 //! File storage on the local disk, or on S3-compatible storage (AWS S3,
 //! Cloudflare R2, MinIO) with the `s3` feature.
 //!
-//! Keys are relative paths like `produk/abc.jpg`. Keys under `public/` are
+//! Keys are relative paths like `products/abc.jpg`. Keys under `public/` are
 //! public: `storage.url(key)` links to them (served from `/storage/...` for the
 //! local disk, or `STORAGE_URL` for S3). Other keys are private; share them
 //! with `storage.temporary_url(key, ttl)`, a link that expires.
@@ -543,9 +543,9 @@ mod tests {
 
     #[test]
     fn keys_cannot_escape_the_root() {
-        assert!(check_key("produk/a.jpg").is_ok());
-        assert!(check_key("/produk/a.jpg").is_ok());
-        for bad in ["../etc/passwd", "produk/../../x", "", "a\\..\\b", "./x"] {
+        assert!(check_key("products/a.jpg").is_ok());
+        assert!(check_key("/products/a.jpg").is_ok());
+        for bad in ["../etc/passwd", "products/../../x", "", "a\\..\\b", "./x"] {
             assert!(check_key(bad).is_err(), "{bad}");
         }
     }

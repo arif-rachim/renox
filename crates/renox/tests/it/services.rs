@@ -255,8 +255,8 @@ fn site() -> tempfile::TempDir {
 {% from "renox/mail/components.html" import button, panel, table, divider %}
 {% block content %}<p>{{ t('shipped.body', order=order) }} ({{ app.locale }})</p>
 {% call panel() %}{{ t('shipped.panel') }}{% endcall %}
-{{ table([["Kopi", "18.000"]], head=["Item", "Rp"], total=["Total", "18.000"]) }}{{ divider() }}
-{{ button("https://toko.test/o/" ~ order, t('shipped.track')) }}{% endblock %}"#,
+{{ table([["Coffee", "18.000"]], head=["Item", "Rp"], total=["Total", "18.000"]) }}{{ divider() }}
+{{ button("https://shop.test/o/" ~ order, t('shipped.track')) }}{% endblock %}"#,
     )
     .unwrap();
     std::fs::write(
@@ -265,8 +265,8 @@ fn site() -> tempfile::TempDir {
     )
     .unwrap();
     std::fs::write(
-        dir.path().join("lang/id.json"),
-        r#"{"shipped": {"subject": "Pesanan :order dikirim", "body": "Pesanan :order sedang dikirim", "panel": "Tiba besok", "track": "Lacak"}}"#,
+        dir.path().join("lang/es.json"),
+        r#"{"shipped": {"subject": "Pedido :order enviado", "body": "El pedido :order va en camino", "panel": "Llega mañana", "track": "Seguir"}}"#,
     )
     .unwrap();
     dir
@@ -301,10 +301,10 @@ async fn notifications_speak_the_recipients_language() {
         .execute(app.db())
         .await
         .unwrap();
-    let ana = User::register(app.db(), "Ana", "ana@test.id", "password-123")
+    let ana = User::register(app.db(), "Ana", "ana@example.test", "password-123")
         .await
         .unwrap();
-    renox::db::sql("UPDATE users SET locale = 'id' WHERE id = ?")
+    renox::db::sql("UPDATE users SET locale = 'es' WHERE id = ?")
         .bind(ana.id)
         .execute(app.db())
         .await
@@ -312,45 +312,45 @@ async fn notifications_speak_the_recipients_language() {
     let ana = User::find_or_404(app.db(), ana.id).await.unwrap();
 
     state.notify(&ana, &Shipped { order: 7 }).await.unwrap();
-    let guest = Recipient::to("mail", "guest@test.id").and("whatsapp", "+62811");
+    let guest = Recipient::to("mail", "guest@example.test").and("whatsapp", "+15550111");
     state
         .notify_to(&guest, &Shipped { order: 8 })
         .await
         .unwrap();
     state
-        .notify_to(&guest.clone().in_locale("id"), &Shipped { order: 9 })
+        .notify_to(&guest.clone().in_locale("es"), &Shipped { order: 9 })
         .await
         .unwrap();
 
     let mail = app.sent_mail();
-    assert_eq!(mail[0].subject, "Pesanan 7 dikirim");
+    assert_eq!(mail[0].subject, "Pedido 7 enviado");
     let html = mail[0].html.clone().unwrap();
-    assert!(html.contains("Pesanan 7 sedang dikirim (id)"), "{html}");
-    assert!(html.contains("Tiba besok") && html.contains(">Lacak<") && html.contains("18.000"));
+    assert!(html.contains("El pedido 7 va en camino (es)"), "{html}");
+    assert!(html.contains("Llega mañana") && html.contains(">Seguir<") && html.contains("18.000"));
     assert!(
-        mail[0].text.contains("Pesanan 7 sedang dikirim"),
+        mail[0].text.contains("El pedido 7 va en camino"),
         "{}",
         mail[0].text
     );
     assert_eq!(mail[1].subject, "Order 8 shipped");
     assert!(mail[1].html.as_deref().unwrap().contains("(en)"));
-    assert_eq!(mail[2].subject, "Pesanan 9 dikirim");
+    assert_eq!(mail[2].subject, "Pedido 9 enviado");
     // Per-recipient channels: only the guests had WhatsApp, each in their language.
-    assert_eq!(*sent.lock().unwrap(), ["en", "id"]);
+    assert_eq!(*sent.lock().unwrap(), ["en", "es"]);
 
     // Outside a notification: the app's language, or the one asked for.
     assert_eq!(state.current_lang().t("shipped.track", &[]), "Track it");
-    assert_eq!(state.lang("id").t("shipped.track", &[]), "Lacak");
+    assert_eq!(state.lang("es").t("shipped.track", &[]), "Seguir");
     let direct = state
         .mail_view_in(
-            "id",
-            "x@test.id",
+            "es",
+            "x@example.test",
             "s",
             "mail/shipped",
             context! { order => 1 },
         )
         .unwrap();
-    assert!(direct.html.unwrap().contains("(id)"));
+    assert!(direct.html.unwrap().contains("(es)"));
 }
 
 async fn admin(app: &TestApp, email: &str) -> User {
@@ -394,11 +394,11 @@ async fn the_queue_dashboard_is_gated_and_acts() {
     queue.batch("nightly").push(Boom).dispatch().await.unwrap();
 
     app.get("/_renox/queue").await.assert_status(303);
-    let someone = admin(&app, "someone@test.id").await;
+    let someone = admin(&app, "someone@example.test").await;
     app.acting_as(&someone);
     app.get("/_renox/queue").await.assert_status(403);
 
-    let ops = admin(&app, "ops@test.id").await;
+    let ops = admin(&app, "ops@example.test").await;
     app.acting_as(&ops);
     let page = app.get("/_renox/queue").await;
     page.assert_ok()

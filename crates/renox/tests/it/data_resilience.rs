@@ -15,28 +15,29 @@ use renox::testing::TestApp;
 use renox::validation::Locale;
 
 #[derive(Model, serde::Serialize, Default, Debug, Clone)]
-#[model(table = "produk", soft_deletes)]
-struct Produk {
+#[model(table = "products", soft_deletes)]
+struct Product {
     id: i64,
-    nama: String,
-    harga: i64,
-    kategori: Option<String>,
+    name: String,
+    price: i64,
+    category: Option<String>,
     created_at: Option<DateTime>,
     updated_at: Option<DateTime>,
     deleted_at: Option<DateTime>,
 }
 
 #[derive(Model, serde::Serialize, Default, Debug)]
-struct Catatan {
+#[model(table = "notes")]
+struct Note {
     id: i64,
-    produk_id: Option<i64>,
-    isi: String,
+    product_id: Option<i64>,
+    body: String,
 }
 
-fn p(nama: &str) -> Produk {
-    Produk {
-        nama: nama.into(),
-        harga: 1000,
+fn p(name: &str) -> Product {
+    Product {
+        name: name.into(),
+        price: 1000,
         ..Default::default()
     }
 }
@@ -78,37 +79,37 @@ fn pk(d: Dialect) -> &'static str {
 async fn injection_through_query_names_is_refused() {
     let k = kernel().await;
     let db = k.db();
-    Produk::create(db, p("a")).await.unwrap();
-    let evil = "nama\" = 'x' OR 1=1 --";
-    assert!(Produk::query().where_eq(evil, "x").get(db).await.is_err());
+    Product::create(db, p("a")).await.unwrap();
+    let evil = "name\" = 'x' OR 1=1 --";
+    assert!(Product::query().where_eq(evil, "x").get(db).await.is_err());
     assert!(
-        Produk::query()
-            .where_op("harga", "= 1 OR 1=1 --", 0)
+        Product::query()
+            .where_op("price", "= 1 OR 1=1 --", 0)
             .get(db)
             .await
             .is_err()
     );
     assert!(
-        Produk::query()
-            .order_by("harga; DROP TABLE produk")
+        Product::query()
+            .order_by("price; DROP TABLE products")
             .get(db)
             .await
             .is_err()
     );
-    assert!(Produk::query().where_in(evil, [1]).get(db).await.is_err());
-    assert!(Produk::query().where_null(evil).count(db).await.is_err());
-    assert!(Produk::query().where_eq(evil, 1).delete(db).await.is_err());
-    assert_eq!(Produk::query().count(db).await.unwrap(), 1);
+    assert!(Product::query().where_in(evil, [1]).get(db).await.is_err());
+    assert!(Product::query().where_null(evil).count(db).await.is_err());
+    assert!(Product::query().where_eq(evil, 1).delete(db).await.is_err());
+    assert_eq!(Product::query().count(db).await.unwrap(), 1);
 }
 
 #[renox::test]
 async fn injection_through_validation_table_and_column_is_inert() {
     let k = kernel().await;
     let db = k.db();
-    Produk::create(db, p("a")).await.unwrap();
+    Product::create(db, p("a")).await.unwrap();
     for (table, column) in [
-        ("produk\"; DROP TABLE produk; --", "nama"),
-        ("produk", "nama\" = nama OR 1=1; DROP TABLE produk; --"),
+        ("products\"; DROP TABLE products; --", "name"),
+        ("products", "name\" = name OR 1=1; DROP TABLE products; --"),
     ] {
         let mut v = Validator::new(Locale::En);
         v.field("x", &"a".to_owned()).unique(table, column);
@@ -122,22 +123,22 @@ async fn injection_through_validation_table_and_column_is_inert() {
         );
         assert!(r.is_err());
     }
-    assert_eq!(Produk::query().count(db).await.unwrap(), 1);
+    assert_eq!(Product::query().count(db).await.unwrap(), 1);
 }
 
 #[renox::test]
 async fn exists_rule_with_text_input_against_integer_column() {
-    // A <select name="produk_id"> arrives as a String: `exists("produk","id")`
+    // A <select name="product_id"> arrives as a String: `exists("products","id")`
     // must be a validation error ("does not exist"), not a 500.
     let k = kernel().await;
     let db = k.db();
-    Produk::create(db, p("a")).await.unwrap();
+    Product::create(db, p("a")).await.unwrap();
     let mut v = Validator::new(Locale::En);
-    v.field("produk_id", &"abc".to_owned())
-        .exists("produk", "id");
+    v.field("product_id", &"abc".to_owned())
+        .exists("products", "id");
     let result = v.finish(db).await;
     assert!(
-        matches!(&result, Ok(errors) if errors.has("produk_id")),
+        matches!(&result, Ok(errors) if errors.has("product_id")),
         "expected a validation error, got {:?}",
         result.map(|e| e.iter().count())
     );
@@ -147,16 +148,16 @@ async fn exists_rule_with_text_input_against_integer_column() {
 async fn assert_database_has_quotes_table_names() {
     let app =
         Arc::new(TestApp::new(App::new().migrations(renox::migrations!("tests/migrations"))).await);
-    Produk::create(app.db(), p("a")).await.unwrap();
+    Product::create(app.db(), p("a")).await.unwrap();
     let a = app.clone();
     // The future is Send, so it can be spawned.
     let joined = tokio::spawn(async move {
-        a.assert_database_has("produk\" ; DROP TABLE produk; --", &[])
+        a.assert_database_has("products\" ; DROP TABLE products; --", &[])
             .await;
     })
     .await;
     assert!(joined.is_err(), "unknown table must fail the assertion");
-    app.assert_database_count("produk", 1).await;
+    app.assert_database_count("products", 1).await;
 }
 
 // ---------------------------------------------------------------- boundaries
@@ -164,10 +165,10 @@ async fn assert_database_has_quotes_table_names() {
 #[renox::test]
 async fn where_in_empty_list() {
     let k = kernel().await;
-    Produk::create(k.db(), p("a")).await.unwrap();
+    Product::create(k.db(), p("a")).await.unwrap();
     let none: Vec<i64> = Vec::new();
     assert!(
-        Produk::query()
+        Product::query()
             .where_in("id", none)
             .get(k.db())
             .await
@@ -180,11 +181,11 @@ async fn where_in_empty_list() {
 async fn where_in_with_a_huge_list() {
     // 70 000 ids: over PostgreSQL's 65 535 bind limit and SQLite's default 32 766.
     let k = kernel().await;
-    let a = Produk::create(k.db(), p("a")).await.unwrap();
+    let a = Product::create(k.db(), p("a")).await.unwrap();
     let mut ids: Vec<i64> = (100_000..170_000).collect();
     ids.push(a.id);
     let started = Instant::now();
-    let found = Produk::query().where_in("id", ids).get(k.db()).await;
+    let found = Product::query().where_in("id", ids).get(k.db()).await;
     eprintln!(
         "where_in 70k on {:?}: {:?} in {:?}",
         k.db().dialect(),
@@ -197,13 +198,13 @@ async fn where_in_with_a_huge_list() {
 #[renox::test]
 async fn huge_limit_and_offset_are_clamped() {
     let k = kernel().await;
-    Produk::create(k.db(), p("a")).await.unwrap();
-    let all = Produk::query().limit(u64::MAX).get(k.db()).await;
+    Product::create(k.db(), p("a")).await.unwrap();
+    let all = Product::query().limit(u64::MAX).get(k.db()).await;
     eprintln!(
         "limit(u64::MAX): {:?}",
         all.as_ref().map(Vec::len).map_err(|e| format!("{e:?}"))
     );
-    let none = Produk::query().offset(u64::MAX).get(k.db()).await;
+    let none = Product::query().offset(u64::MAX).get(k.db()).await;
     eprintln!(
         "offset(u64::MAX): {:?}",
         none.as_ref().map(Vec::len).map_err(|e| format!("{e:?}"))
@@ -216,27 +217,27 @@ async fn huge_limit_and_offset_are_clamped() {
 async fn paginate_page_zero_and_huge() {
     let k = kernel().await;
     for i in 0..3 {
-        Produk::create(k.db(), p(&format!("p{i}"))).await.unwrap();
+        Product::create(k.db(), p(&format!("p{i}"))).await.unwrap();
     }
-    let first = Produk::query().paginate(k.db(), 0, 2).await.unwrap();
+    let first = Product::query().paginate(k.db(), 0, 2).await.unwrap();
     assert_eq!((first.page, first.items.len()), (1, 2));
-    let far = Produk::query()
+    let far = Product::query()
         .paginate(k.db(), u32::MAX, 1000)
         .await
         .unwrap();
     assert!(far.items.is_empty());
     assert_eq!(far.last_page, 1);
     assert!(!far.has_next);
-    let zero_per_page = Produk::query().paginate(k.db(), 1, 0).await.unwrap();
+    let zero_per_page = Product::query().paginate(k.db(), 1, 0).await.unwrap();
     assert_eq!(zero_per_page.per_page, 1);
 }
 
 #[renox::test]
 async fn find_or_404_on_missing_id() {
     let k = kernel().await;
-    let err = Produk::find_or_404(k.db(), 424242).await.unwrap_err();
+    let err = Product::find_or_404(k.db(), 424242).await.unwrap_err();
     assert_eq!(err.status(), StatusCode::NOT_FOUND);
-    let err = Produk::find_or_404(k.db(), -1).await.unwrap_err();
+    let err = Product::find_or_404(k.db(), -1).await.unwrap_err();
     assert_eq!(err.status(), StatusCode::NOT_FOUND);
 }
 
@@ -245,13 +246,13 @@ async fn find_or_404_on_missing_id() {
 #[renox::test]
 async fn saving_a_deleted_row_is_not_found() {
     let k = kernel().await;
-    let mut a = Produk::create(k.db(), p("a")).await.unwrap();
+    let mut a = Product::create(k.db(), p("a")).await.unwrap();
     a.force_delete(k.db()).await.unwrap();
-    a.nama = "b".into();
+    a.name = "b".into();
     let err = a.save(k.db()).await.unwrap_err();
     assert_eq!(err.status(), StatusCode::NOT_FOUND);
     assert_eq!(
-        Produk::query().with_trashed().count(k.db()).await.unwrap(),
+        Product::query().with_trashed().count(k.db()).await.unwrap(),
         0,
         "no resurrection"
     );
@@ -290,23 +291,23 @@ async fn unique_violation_is_a_conflict() {
 async fn foreign_key_and_not_null_violations_error() {
     let k = kernel().await;
     let db = k.db();
-    let fk = Catatan::create(
+    let fk = Note::create(
         db,
-        Catatan {
-            produk_id: Some(999),
-            isi: "x".into(),
+        Note {
+            product_id: Some(999),
+            body: "x".into(),
             ..Default::default()
         },
     )
     .await;
     assert!(fk.is_err(), "foreign keys are enforced");
-    let nn = renox::db::sql("INSERT INTO produk (nama, harga) VALUES (?, ?)")
+    let nn = renox::db::sql("INSERT INTO products (name, price) VALUES (?, ?)")
         .bind(None::<String>)
         .bind(1)
         .execute(db)
         .await;
     assert!(nn.is_err());
-    assert_eq!(Catatan::query().count(db).await.unwrap(), 0);
+    assert_eq!(Note::query().count(db).await.unwrap(), 0);
 }
 
 // ---------------------------------------------------------------- 2. transactions
@@ -317,7 +318,7 @@ async fn transaction_error_and_drop_roll_back() {
     let db = k.db();
     async fn work(db: &Db) -> Result {
         let mut tx = db.begin().await?;
-        Produk::create(&mut tx, p("in-tx")).await?;
+        Product::create(&mut tx, p("in-tx")).await?;
         Err(Error::BadRequest("boom".into()))?;
         tx.commit().await?;
         Ok(())
@@ -325,12 +326,12 @@ async fn transaction_error_and_drop_roll_back() {
     assert!(work(db).await.is_err());
     {
         let mut tx = db.begin().await.unwrap();
-        Produk::create(&mut tx, p("dropped")).await.unwrap();
+        Product::create(&mut tx, p("dropped")).await.unwrap();
     }
     let mut tx = db.begin().await.unwrap();
-    Produk::create(&mut tx, p("rolled")).await.unwrap();
+    Product::create(&mut tx, p("rolled")).await.unwrap();
     tx.rollback().await.unwrap();
-    assert_eq!(Produk::query().with_trashed().count(db).await.unwrap(), 0);
+    assert_eq!(Product::query().with_trashed().count(db).await.unwrap(), 0);
 }
 
 #[renox::test]
@@ -340,7 +341,7 @@ async fn nested_begin_on_the_test_pool_fails_fast() {
     let k = kernel().await;
     let db = k.db();
     let mut tx = db.begin().await.unwrap();
-    Produk::create(&mut tx, p("outer")).await.unwrap();
+    Product::create(&mut tx, p("outer")).await.unwrap();
     let started = Instant::now();
     let inner = tokio::time::timeout(Duration::from_secs(5), db.begin()).await;
     eprintln!(
@@ -379,9 +380,9 @@ async fn file_sqlite_write_while_own_transaction_is_open_fails_fast() {
     .await;
     let db = k.db();
     let mut tx = db.begin().await.unwrap();
-    Produk::create(&mut tx, p("outer")).await.unwrap();
+    Product::create(&mut tx, p("outer")).await.unwrap();
     let started = Instant::now();
-    let other = Produk::create(db, p("other")).await;
+    let other = Product::create(db, p("other")).await;
     tx.commit().await.unwrap();
     let err = format!("{:?}", other.unwrap_err());
     assert!(err.contains("database is locked"), "{err}");
@@ -914,18 +915,18 @@ async fn zero_pool_size_is_a_boot_error() {
 
 #[renox::test]
 async fn unique_rule_with_a_mistyped_column_is_an_error() {
-    // `unique("produk", "nama_typo")` with the value already present in `nama`:
+    // `unique("products", "name_typo")` with the value already present in `name`:
     // must be an error (no such column), not a silent pass.
     let k = kernel().await;
     let db = k.db();
-    Produk::create(db, p("dup")).await.unwrap();
+    Product::create(db, p("dup")).await.unwrap();
     let mut v = Validator::new(Locale::En);
-    v.field("nama", &"dup".to_owned())
-        .unique("produk", "nama_typo");
+    v.field("name", &"dup".to_owned())
+        .unique("products", "name_typo");
     let unique = v.finish(db).await;
     let mut v = Validator::new(Locale::En);
-    v.field("nama", &"dup".to_owned())
-        .exists("produk", "nama_typo");
+    v.field("name", &"dup".to_owned())
+        .exists("products", "name_typo");
     let exists = v.finish(db).await;
     let show = |r: &Result<Errors>| match r {
         Ok(e) => format!("ok, {} field error(s)", e.iter().count()),
@@ -938,7 +939,7 @@ async fn unique_rule_with_a_mistyped_column_is_an_error() {
         show(&exists)
     );
     let raw =
-        renox::db::sql("SELECT COUNT(*) FROM produk WHERE \"no_such_column\" = 'no_such_column'")
+        renox::db::sql("SELECT COUNT(*) FROM products WHERE \"no_such_column\" = 'no_such_column'")
             .scalar::<i64>(db)
             .await;
     eprintln!(

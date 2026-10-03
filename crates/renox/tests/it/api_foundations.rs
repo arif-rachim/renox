@@ -105,7 +105,7 @@ async fn route_groups_prefix_paths_and_names() {
     app.get("/").await.assert_ok();
     app.get("/admin").await.assert_redirect("/login");
     app.get("/admin/products/7").await.assert_redirect("/login");
-    let user = User::register(app.db(), "Arif", "arif@example.com", "rahasia123")
+    let user = User::register(app.db(), "Alex", "alex@example.com", "letmein123")
         .await
         .unwrap();
     app.acting_as(&user);
@@ -167,7 +167,7 @@ async fn app_commands_run_with_their_arguments() {
                     .value("--email")
                     .unwrap_or("admin@example.com")
                     .to_owned();
-                User::register(&state.db, "Admin", &email, "rahasia123").await?;
+                User::register(&state.db, "Admin", &email, "letmein123").await?;
                 seen.fetch_add(1, Ordering::SeqCst);
                 Ok(())
             }

@@ -329,8 +329,8 @@ page. The sign-in pages' layout has `stack('head')` and `stack('scripts')` (Reno
 page has no stacks); to change one of those pages, put a file with the same name under
 `resources/views/renox/auth/`.
 
-The kit's own texts ("optional", "Cancel", the error summary's title) come in English and
-Indonesian. An app can change them in `lang/*.json`, under the keys `ui.optional`,
+The kit's own texts ("optional", "Cancel", the error summary's title) come in English. An
+app can change or translate them in `lang/<locale>.json` (e.g. `es.json`), under the keys `ui.optional`,
 `ui.cancel`, `ui.close`, `ui.dismiss`, `ui.more` and `ui.errors_title`; the infolist's under
 `ui.yes`, `ui.no`, `ui.show_more` and `ui.since.*` (`now`, `past`, `future`, `minutes`,
 `hours`, `days`, `months`, `years`). The data grid's texts
@@ -441,10 +441,10 @@ Every template gets these filters, which the infolist uses too:
 
 | Filter | Gives |
 |---|---|
-| `number`, `number(2)` | `75,000` in `en`, `75.000` in `id`: the page's locale picks the separators. |
-| `money` | The amount in `APP_CURRENCY` (default `IDR`): `Rp 75.000` (id), `Rp 75,000` (en), `$1,250.50` with `USD`. Keywords: `currency="USD"` for another currency, `decimals=0`, `divide_by=100` for amounts kept in cents. `renox::format_money` does the same in Rust. |
+| `number`, `number(2)` | `75,000` in `en`, `75.000` in `es` or `de`: the page's locale picks the separators. |
+| `money` | The amount in `APP_CURRENCY` (default `IDR`): `Rp 75,000` (en), `Rp 75.000` (es), `$1,250.50` with `USD`. Keywords: `currency="USD"` for another currency, `decimals=0`, `divide_by=100` for amounts kept in cents. `renox::format_money` does the same in Rust. |
 | `date`, `date('%d/%m/%Y %H:%M')` | A date with chrono's format codes; a moment (`created_at`) in `APP_TIMEZONE`. |
-| `since` | "3 hours ago", "in 2 days", "just now" ("3 jam yang lalu" in `id`), from the clock `TestApp::travel` moves. |
+| `since` | "3 hours ago", "in 2 days", "just now" (translated with `ui.since.*`), from the clock `TestApp::travel` moves. |
 | `words(20)` | The first 20 words, then "…" (`end="…"`). |
 | `markdown` | Markdown (CommonMark, tables, strikethrough, task lists) as HTML. HTML in the text is shown as text, and a link or image to anything but `http(s)`, `mailto`, `tel` or a relative URL points nowhere, so it is safe for what people typed. |
 
@@ -754,9 +754,9 @@ async fn dashboard(State(state): State<AppState>, period: Period) -> Result<View
   or pass `labels=…` with `series=[…]` or `values=[…]`. Options: `format` (`number`,
   `money` in `APP_CURRENCY` or `currency=…`, `percent`), `decimals`, `height` (240 px),
   `title` (for screen readers), `name` (one series' name), `x_format` (chrono's codes for
-  date labels; else `Oct 2` / `2 Okt`, `Oct 2026`), `legend=false`, `table=false`, `id`.
-- **How they read.** One axis that starts at 0 with clean ticks (`12.5K`, `2,5 jt` in
-  Indonesian); a legend for two series or more; hairline grid; 2 px lines with a dot at the
+  date labels; else `Oct 2`, `Oct 2026`), `legend=false`, `table=false`, `id`.
+- **How they read.** One axis that starts at 0 with clean ticks (`12.5K`, or `2,5M` where
+  the locale writes a decimal comma); a legend for two series or more; hairline grid; 2 px lines with a dot at the
   end; bars at most 24 px wide with rounded ends; a doughnut keeps six slices and folds the
   rest into "Other". The six series colours come in a fixed order checked for colour
   blindness in both appearances (`--rx-chart-1` … `--rx-chart-6`; a seventh series is grey).

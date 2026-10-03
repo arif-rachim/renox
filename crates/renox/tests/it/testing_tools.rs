@@ -195,7 +195,7 @@ async fn time_travel_moves_the_clock_for_requests_and_jobs() {
 async fn login(app: &TestApp, password: &str) -> renox::testing::TestResponse {
     app.post(
         "/login",
-        &[("email", "arif@example.com"), ("password", password)],
+        &[("email", "alex@example.com"), ("password", password)],
     )
     .await
 }
@@ -210,7 +210,7 @@ async fn time_travel_reaches_rate_limits_and_the_login_lock() {
     app.travel(Duration::from_secs(61));
     app.get("/limited").await.assert_ok();
 
-    User::register(app.db(), "Arif", "arif@example.com", "password123")
+    User::register(app.db(), "Alex", "alex@example.com", "password123")
         .await
         .unwrap();
     for _ in 0..5 {

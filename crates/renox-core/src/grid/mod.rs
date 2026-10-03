@@ -598,7 +598,7 @@ impl Grid {
     }
 
     /// An advanced filter in the toolbar: rules on any filterable column
-    /// ("Total is greater than 1,000,000", "Name doesn't contain kopi",
+    /// ("Total is greater than 1,000,000", "Name doesn't contain coffee",
     /// "Ordered before 2026-03-01", "Email is empty"), all or any of them
     /// holding. They travel in the query string (`match=any&r.0.c=total&
     /// r.0.o=gt&r.0.v=1000000`), next to the headings' filters.
@@ -2548,7 +2548,7 @@ mod tests {
         let state = State_::parse(
             &grid,
             &params(&[
-                ("q.name", "kopi"),
+                ("q.name", "coffee"),
                 ("m.name", "starts"),
                 ("min.total", "1000"),
                 ("max.total", "x"),
@@ -2562,7 +2562,7 @@ mod tests {
             ]),
         );
         assert_eq!(state.filters.len(), 3, "{:?}", state.filters);
-        assert_eq!(state.filters["name"].pattern().as_deref(), Some("kopi%"));
+        assert_eq!(state.filters["name"].pattern().as_deref(), Some("coffee%"));
         assert_eq!(state.filters["total"].min, Some(1000.0));
         assert_eq!(state.filters["total"].max, None);
         assert_eq!(state.page, 3);
@@ -2589,9 +2589,9 @@ mod tests {
             }
             .pattern()
         };
-        assert_eq!(pattern("kopi", None).as_deref(), Some("%kopi%"));
-        assert_eq!(pattern("kopi", Some("ends")).as_deref(), Some("%kopi"));
-        assert_eq!(pattern("kopi", Some("equals")).as_deref(), Some("kopi"));
+        assert_eq!(pattern("coffee", None).as_deref(), Some("%coffee%"));
+        assert_eq!(pattern("coffee", Some("ends")).as_deref(), Some("%coffee"));
+        assert_eq!(pattern("coffee", Some("equals")).as_deref(), Some("coffee"));
         assert_eq!(
             pattern("ko%pi", Some("equals")).as_deref(),
             Some("ko%pi"),

@@ -5,59 +5,59 @@ use renox::testing::TestApp;
 use serde::{Deserialize, Serialize};
 
 #[derive(Model, Serialize, Deserialize, Default)]
-#[model(table = "produk", soft_deletes)]
-struct Produk {
+#[model(table = "products", soft_deletes)]
+struct Product {
     id: i64,
-    nama: String,
-    harga: i64,
-    kategori: Option<String>,
+    name: String,
+    price: i64,
+    category: Option<String>,
     created_at: Option<DateTime>,
     updated_at: Option<DateTime>,
     deleted_at: Option<DateTime>,
 }
 
 #[derive(Deserialize, Serialize)]
-struct ProdukForm {
-    nama: String,
-    harga: i64,
+struct ProductForm {
+    name: String,
+    price: i64,
 }
 
-impl Validate for ProdukForm {
+impl Validate for ProductForm {
     fn rules(&self, v: &mut Validator) {
-        v.field("nama", &self.nama).required();
-        v.field("harga", &self.harga).min(1000);
+        v.field("name", &self.name).required();
+        v.field("price", &self.price).min(1000);
     }
 }
 
 #[derive(Serialize, Deserialize)]
-struct HitungStok;
+struct CountStock;
 
-impl Job for HitungStok {
-    const NAME: &'static str = "hitung-stok";
+impl Job for CountStock {
+    const NAME: &'static str = "count-stock";
 
     async fn handle(self, _: JobContext) -> Result {
         Ok(())
     }
 }
 
-struct Toko;
+struct Shop;
 
-impl Module for Toko {
+impl Module for Shop {
     fn name(&self) -> &'static str {
-        "toko"
+        "shop"
     }
 
     fn routes(&self) -> Routes {
         Routes::new()
             .get("/", || async { view("shop/home.html", ()) })
             .name("home")
-            .post("/produk", simpan)
-            .post("/stok", |State(state): State<AppState>| async move {
-                state.dispatch(HitungStok).await?;
+            .post("/products", store)
+            .post("/stock", |State(state): State<AppState>| async move {
+                state.dispatch(CountStock).await?;
                 state
                     .queue_mail(renox::mail::Mail::new(
-                        "gudang@toko.id",
-                        "Stok dihitung",
+                        "warehouse@shop.test",
+                        "Stock counted",
                         "ok",
                     ))
                     .await?;
@@ -73,16 +73,16 @@ impl Module for Toko {
     }
 
     fn register(&self, app: &mut Registry) {
-        app.job::<HitungStok>();
+        app.job::<CountStock>();
     }
 }
 
-async fn simpan(State(db): State<Db>, Valid(form): Valid<ProdukForm>) -> Result<Redirect> {
-    Produk::create(
+async fn store(State(db): State<Db>, Valid(form): Valid<ProductForm>) -> Result<Redirect> {
+    Product::create(
         &db,
-        Produk {
-            nama: form.nama,
-            harga: form.harga,
+        Product {
+            name: form.name,
+            price: form.price,
             ..Default::default()
         },
     )
@@ -94,7 +94,7 @@ fn app() -> App {
     App::new()
         .migrations(renox::migrations!("tests/migrations"))
         .module(Auth::new())
-        .module(Toko)
+        .module(Shop)
 }
 
 async fn test_app() -> TestApp {
@@ -107,18 +107,18 @@ async fn pages_forms_and_the_database() {
     app.get("/")
         .await
         .assert_ok()
-        .assert_see("<h1>Toko</h1>")
-        .assert_dont_see("Halo");
+        .assert_see("<h1>Shop</h1>")
+        .assert_dont_see("Hello");
 
-    app.post("/produk", &[("nama", "Kopi"), ("harga", "18000")])
+    app.post("/products", &[("name", "Coffee"), ("price", "18000")])
         .await
         .assert_redirect("/");
-    app.assert_database_has("produk", &[("nama", &"Kopi"), ("harga", &18000)])
+    app.assert_database_has("products", &[("name", &"Coffee"), ("price", &18000)])
         .await;
-    app.assert_database_missing("produk", &[("nama", &"Teh")])
+    app.assert_database_missing("products", &[("name", &"Tea")])
         .await;
-    app.assert_database_count("produk", 1).await;
-    app.assert_database_has("produk", &[("kategori", &None::<String>)])
+    app.assert_database_count("products", 1).await;
+    app.assert_database_has("products", &[("category", &None::<String>)])
         .await;
 }
 
@@ -127,33 +127,33 @@ async fn csrf_and_validation() {
     let app = test_app().await;
     app.request()
         .without_csrf()
-        .post("/produk", &[("nama", "Kopi"), ("harga", "18000")])
+        .post("/products", &[("name", "Coffee"), ("price", "18000")])
         .await
         .assert_status(419);
 
     app.htmx()
-        .post("/produk", &[("nama", ""), ("harga", "500")])
+        .post("/products", &[("name", ""), ("price", "500")])
         .await
-        .assert_invalid("nama")
-        .assert_invalid("harga");
+        .assert_invalid("name")
+        .assert_invalid("price");
     app.request()
         .json()
-        .post("/produk", &[("harga", "10")])
+        .post("/products", &[("price", "10")])
         .await
-        .assert_invalid("harga");
+        .assert_invalid("price");
     app.post_json(
-        "/produk",
-        &serde_json::json!({ "nama": "Teh", "harga": 5000 }),
+        "/products",
+        &serde_json::json!({ "name": "Tea", "price": 5000 }),
     )
     .await
     .assert_redirect("/");
-    app.assert_database_count("produk", 1).await;
+    app.assert_database_count("products", 1).await;
 }
 
 #[renox::test]
 async fn acting_as_a_user() {
     let app = test_app().await;
-    let user = User::register(app.db(), "Arif", "arif@example.com", "rahasia123")
+    let user = User::register(app.db(), "Alex", "alex@example.com", "letmein123")
         .await
         .unwrap();
 
@@ -168,8 +168,8 @@ async fn acting_as_a_user() {
         .get("/dashboard")
         .await
         .assert_ok()
-        .assert_see("dashboard Arif");
-    app.get("/").await.assert_see("Halo Arif");
+        .assert_see("dashboard Alex");
+    app.get("/").await.assert_see("Hello Alex");
     app.logout()
         .get("/dashboard")
         .await
@@ -179,19 +179,19 @@ async fn acting_as_a_user() {
 #[renox::test]
 async fn queue_and_mail_fakes() {
     let app = test_app().await;
-    app.post("/stok", &[])
+    app.post("/stock", &[])
         .await
         .assert_ok()
         .assert_see("queued");
-    assert_eq!(app.queued_jobs().await, ["hitung-stok", "renox.send-mail"]);
+    assert_eq!(app.queued_jobs().await, ["count-stock", "renox.send-mail"]);
     assert!(app.sent_mail().is_empty());
     assert_eq!(app.run_jobs().await, 2);
-    app.assert_mail_sent("gudang@toko.id", "Stok");
+    app.assert_mail_sent("warehouse@shop.test", "Stock");
 }
 
 #[renox::test]
-#[should_panic(expected = "expected to see \"Harga\" in:")]
+#[should_panic(expected = "expected to see \"Price\" in:")]
 async fn failed_assertions_explain_themselves() {
     let app = test_app().await;
-    app.get("/").await.assert_see("Harga");
+    app.get("/").await.assert_see("Price");
 }

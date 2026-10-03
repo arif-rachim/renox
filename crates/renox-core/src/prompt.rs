@@ -145,7 +145,7 @@ pub async fn confirm(question: &str, default: bool) -> Result<bool> {
         match answer.trim().to_lowercase().as_str() {
             "" => return Ok(default),
             "y" | "yes" | "ya" => return Ok(true),
-            "n" | "no" | "tidak" => return Ok(false),
+            "n" | "no" => return Ok(false),
             other if !interactive => {
                 return Err(Error::Internal(anyhow::anyhow!(
                     "\"{other}\" isn't yes or no (for \"{question}\")"

@@ -74,10 +74,13 @@ fn from(ip: &str, uri: &str) -> Request<Body> {
 async fn cache_basics(kernel: &Kernel) {
     let cache = &kernel.state().cache;
     assert_eq!(cache.get::<String>("menu").await.unwrap(), None);
-    cache.put("menu", &vec!["kopi", "teh"], None).await.unwrap();
+    cache
+        .put("menu", &vec!["coffee", "tea"], None)
+        .await
+        .unwrap();
     assert_eq!(
         cache.get::<Vec<String>>("menu").await.unwrap().unwrap(),
-        ["kopi", "teh"]
+        ["coffee", "tea"]
     );
     assert!(cache.has("menu").await.unwrap());
     assert!(
@@ -208,23 +211,23 @@ async fn maintenance_mode_with_a_bypass_secret() {
     std::fs::create_dir_all(dir.path().join("views/errors")).unwrap();
     std::fs::write(
         dir.path().join("views/errors/503.html"),
-        "Sedang perbaikan, kembali sebentar lagi",
+        "Down for maintenance, back soon",
     )
     .unwrap();
     let config = config(dir.path());
     let kernel = kernel(config.clone()).await;
 
-    renox::maintenance::down(&config.storage_path, Some("izinkan".into()), Some(120)).unwrap();
+    renox::maintenance::down(&config.storage_path, Some("opensesame".into()), Some(120)).unwrap();
     let down = send(&kernel, from("10.0.0.1", "/")).await;
     assert_eq!(down.status, StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(down.headers["retry-after"], "120");
-    assert_eq!(down.body, "Sedang perbaikan, kembali sebentar lagi");
+    assert_eq!(down.body, "Down for maintenance, back soon");
 
     let health = send(&kernel, from("10.0.0.1", "/health")).await;
     assert_eq!(health.status, StatusCode::OK, "health checks keep working");
     assert!(health.body.contains(r#""maintenance":true"#));
 
-    let bypass = send(&kernel, from("10.0.0.1", "/izinkan")).await;
+    let bypass = send(&kernel, from("10.0.0.1", "/opensesame")).await;
     assert_eq!(bypass.status, StatusCode::SEE_OTHER);
     let cookie = bypass.headers["set-cookie"]
         .to_str()
@@ -244,7 +247,7 @@ async fn maintenance_mode_with_a_bypass_secret() {
     let mut wrong = from("10.0.0.1", "/");
     wrong
         .headers_mut()
-        .insert("cookie", "renox_maintenance=tebak".parse().unwrap());
+        .insert("cookie", "renox_maintenance=guess".parse().unwrap());
     assert_eq!(
         send(&kernel, wrong).await.status,
         StatusCode::SERVICE_UNAVAILABLE
@@ -315,14 +318,14 @@ async fn several_servers_share_limits_with_the_database_store() {
             other.status
         );
 
-        User::register(a.db(), "Arif", "arif@example.com", "rahasia123")
+        User::register(a.db(), "Alex", "alex@example.com", "letmein123")
             .await
             .unwrap();
         for _ in 0..5 {
             a.htmx()
                 .post(
                     "/login",
-                    &[("email", "arif@example.com"), ("password", "salah")],
+                    &[("email", "alex@example.com"), ("password", "wrong")],
                 )
                 .await
                 .assert_invalid("email");
@@ -331,7 +334,7 @@ async fn several_servers_share_limits_with_the_database_store() {
             .htmx()
             .post(
                 "/login",
-                &[("email", "arif@example.com"), ("password", "rahasia123")],
+                &[("email", "alex@example.com"), ("password", "letmein123")],
             )
             .await;
         if shared {

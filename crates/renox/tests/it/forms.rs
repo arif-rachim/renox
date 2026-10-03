@@ -19,12 +19,12 @@ async fn the_new_rules() {
         v.field("name_bad", &"José 2").alpha();
         v.field("code", &"AB12").alpha_num();
         v.field("code_bad", &"AB-12").alpha_num();
-        v.field("slug", &"kopi-susu_2").alpha_dash();
-        v.field("slug_bad", &"kopi susu").alpha_dash();
+        v.field("slug", &"coffee-milk_2").alpha_dash();
+        v.field("slug_bad", &"coffee milk").alpha_dash();
         v.field("handle", &"ana").lowercase();
         v.field("handle_bad", &"Ana").lowercase();
-        v.field("sku", &"KOPI-1").uppercase();
-        v.field("sku_bad", &"Kopi-1").uppercase();
+        v.field("sku", &"COFFEE-1").uppercase();
+        v.field("sku_bad", &"Coffee-1").uppercase();
         v.field("phone", &"0812").starts_with(&["08", "+62"]);
         v.field("phone_bad", &"12").starts_with(&["08", "+62"]);
         v.field("mail", &"a@company.com")
@@ -43,8 +43,8 @@ async fn the_new_rules() {
             .required_without(&None::<String>);
         v.field("email_ok", &None::<String>)
             .required_without(&Some("0812"));
-        v.field("coupon", &"HEMAT").prohibited_if(true);
-        v.field("coupon_ok", &"HEMAT").prohibited_if(false);
+        v.field("coupon", &"SAVE10").prohibited_if(true);
+        v.field("coupon_ok", &"SAVE10").prohibited_if(false);
         v.distinct("invites", &["a@b.c", "x@y.z", " A@B.C ", ""]);
     })
     .await;

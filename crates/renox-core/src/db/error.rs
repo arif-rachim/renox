@@ -6,7 +6,7 @@ use std::fmt;
 /// ```
 /// # use renox::prelude::*;
 /// # async fn demo(db: Db) -> Result {
-/// let inserted = renox::db::sql("INSERT INTO tags (name) VALUES (?)").bind("kopi").execute(&db).await;
+/// let inserted = renox::db::sql("INSERT INTO tags (name) VALUES (?)").bind("coffee").execute(&db).await;
 /// match inserted {
 ///     Err(err) if err.is_unique_violation() => { /* already there */ }
 ///     other => { other?; }

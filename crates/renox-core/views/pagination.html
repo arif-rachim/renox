@@ -1,7 +1,7 @@
 {#- Page links for a `Paginated` value:
     {% from "renox/pagination.html" import pagination %}
-    {{ pagination(produk) }}
-    Links keep the page's other query parameters (e.g. ?q=kopi).
+    {{ pagination(products) }}
+    Links keep the page's other query parameters (e.g. ?q=coffee).
     Add hx-boost="true" on a parent element to swap pages without a full reload. -#}
 {% macro pagination(p) -%}
 {% if p.last_page > 1 -%}

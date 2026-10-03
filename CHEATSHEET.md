@@ -184,7 +184,7 @@ and is still alive across an `.await`. Collect into a `Vec` first, then await. A
 <p>{{ product.price | number }}</p>                            {# 75.000 (id) / 75,000 (en); number(2) #}
 <p>{{ order.created_at | date('%d/%m/%Y %H:%M') }}</p>        {# in APP_TIMEZONE; default %Y-%m-%d #}
 <p>{{ order.total | money }}</p>                               {# APP_CURRENCY: Rp 75.000; money(currency='USD', divide_by=100) #}
-<p>{{ order.created_at | since }}</p>                          {# 3 hours ago / 3 jam yang lalu #}
+<p>{{ order.created_at | since }}</p>                          {# 3 hours ago / in 2 days #}
 <p>{{ post.body | words(30) }}</p>                             {# the first 30 words… #}
 <div>{{ post.body | markdown }}</div>                          {# HTML typed in is shown as text #}
 <span>{{ cart_count }}</span>                                  {# from App::share #}
@@ -285,7 +285,7 @@ fn view_extras(app: App) -> App {
     {{ button("Create product") }}
   {% endcall %}
 </form>
-{{ confirm("del-7", "Delete", "/products/7", "Delete “Kopi”?", "It goes to the trash.") }}
+{{ confirm("del-7", "Delete", "/products/7", "Delete “Coffee”?", "It goes to the trash.") }}
 
 {# Actions: a form in a sheet, sent with htmx (422 → errors in the sheet, success → closes).
    The handler answers (Toast, HxRefresh), or a ValidationError for its own checks. #}
@@ -293,7 +293,7 @@ fn view_extras(app: App) -> App {
 {% call action_sheet("stock-7", "Stock", route('products.stock', 7), "Adjust stock", method="PUT", icon="box") %}
   {{ input("change", "Change", type="number", id="stock-change-7") }} {# slide_over=true, width="lg" #}
 {% endcall %}
-{{ icon_button("edit", "Edit Kopi", href="/products/7/edit") }}       {# label = aria-label + tooltip #}
+{{ icon_button("edit", "Edit Coffee", href="/products/7/edit") }}       {# label = aria-label + tooltip #}
 {{ button("Save", key="mod+s", icon="check") }}                        {# ⌘S / Ctrl+S; also badge=3 #}
 {{ button("Publish", disabled_reason="Add a photo first.") }}          {# focusable, reason as tooltip #}
 
@@ -533,7 +533,7 @@ async fn queries(db: &Db) -> Result {
         .await?;
     let one = Product::find_or_404(db, tea.id).await?; // missing row -> 404 page
     let total = Product::query().count(db).await?;
-    let q = "kopi";
+    let q = "coffee";
     let found = Product::query()
         .where_any(|any| any.where_like("name", format!("%{q}%")).where_op("price", "<", 5_000)) // (… OR …)
         .when(!q.is_empty(), |query| query.where_not_null("user_id"))
@@ -545,7 +545,7 @@ async fn queries(db: &Db) -> Result {
     Product::where_eq("user_id", 1).update(db, &[("price", &12_000)]).await?; // sets updated_at
     Product::where_eq("id", tea.id).increment(db, "price", 500).await?;
     let first = Product::where_eq("name", "Tea").first_or_404(db).await?;
-    Product::insert_many(db, vec![Product { name: "Kopi".into(), ..Default::default() }]).await?;
+    Product::insert_many(db, vec![Product { name: "Coffee".into(), ..Default::default() }]).await?;
     tea.delete(db).await?; // soft delete; .with_trashed() / .only_trashed() / restore()
     let _ = (cheap, one, total, found, revenue, names, first);
     Ok(())
@@ -595,10 +595,10 @@ async fn even_more_queries(db: &Db) -> Result {
         .await?;
     let any_free = Product::where_eq("price", 0).exists(db).await?;
     let some = Product::find_many(db, [1, 2, 3]).await?; // in id order; missing ids are skipped
-    let kopi = Product::where_eq("name", "Kopi")
-        .first_or_create(db, || Product { name: "Kopi".into(), ..Default::default() })
+    let coffee = Product::where_eq("name", "Coffee")
+        .first_or_create(db, || Product { name: "Coffee".into(), ..Default::default() })
         .await?;
-    Product::upsert(db, vec![kopi.clone()], &["name"], &["price"]).await?; // needs a unique index on name
+    Product::upsert(db, vec![coffee.clone()], &["name"], &["price"]).await?; // needs a unique index on name
     let seen = Product::query() // 500 rows at a time, in id order (the query's order and limit don't apply)
         .chunk(db, 500, |rows| async move {
             let _ = rows;
@@ -797,7 +797,7 @@ async fn dashboard(State(state): State<AppState>, period: Period) -> Result<View
   {% endcall %}
   {{ widget("By status", url=route('dashboard.statuses'), poll=60) }} {# loaded after the page, every 60 s #}
 {% endcall %}
-{{ chart("bar", labels=["Kopi", "Teh"], series=[{"name": "2025", "values": [3, 5]}, {"name": "2026", "values": [4, 6]}]) }}
+{{ chart("bar", labels=["Coffee", "Tea"], series=[{"name": "2025", "values": [3, 5]}, {"name": "2026", "values": [4, 6]}]) }}
 ```
 
 ## Data grid (details in [docs/grid.md](docs/grid.md), example in examples/grid)
@@ -885,7 +885,7 @@ async fn in_a_test(db: &Db) -> Result {
     let three = Product::factory()
         .count(3)
         .state(premium)
-        .sequence(|i, p| p.name = format!("Kopi {}", i + 1)) // by position: 0, 1, 2
+        .sequence(|i, p| p.name = format!("Coffee {}", i + 1)) // by position: 0, 1, 2
         .create(db)                                          // or .make() unsaved
         .await?;
     let _ = (draft, saved, three);
@@ -1373,12 +1373,12 @@ use renox::mail::Mail;
 
 async fn send_invoice(state: &AppState, pdf: Vec<u8>) -> Result {
     let mail = state
-        .mail_view("budi@example.com", "Invoice INV-001", "mail/invoice", context! {})? // .html + .txt
-        .also_to("siti@example.com")
+        .mail_view("ben@example.com", "Invoice INV-001", "mail/invoice", context! {})? // .html + .txt
+        .also_to("sarah@example.com")
         .cc("sales@example.com")
         .bcc("archive@example.com")
-        .reply_to("Toko Kopi <halo@toko.id>")
-        .from("Billing <billing@toko.id>") // instead of MAIL_FROM_*
+        .reply_to("Coffee Shop <hello@shop.example>")
+        .from("Billing <billing@shop.example>") // instead of MAIL_FROM_*
         .attach("INV-001.pdf", "application/pdf", pdf);
     state.queue_mail(mail).await?; // or state.mailer.send(mail).await? for now
     Ok(())
@@ -1430,7 +1430,7 @@ fn channels(app: App) -> App {
 async fn ship(state: &AppState, user: &User) -> Result {
     state.notify(user, &OrderShipped { order_id: 7 }).await?;       // now
     state.notify_later(user, &OrderShipped { order_id: 7 }).await?; // one queued job per channel
-    let guest = Recipient::to("mail", "guest@example.com").and("whatsapp", "+628123").in_locale("id");
+    let guest = Recipient::to("mail", "guest@example.com").and("whatsapp", "+15550123").in_locale("es");
     state.notify_to(&guest, &OrderShipped { order_id: 7 }).await   // no account: no database row
 }
 ```
@@ -1445,7 +1445,7 @@ follow `url`), new ones live over Server-Sent Events (a toast + the badge), and 
 Mail views can `{% from "renox/mail/components.html" import button, panel, table, divider %}`:
 `{{ button(url, t('mail.track')) }}`, `{% call panel() %}…{% endcall %}`,
 `{{ table(rows, head=[…], total=[…]) }}`. `state.mail_view_in("id", …)` renders in a given
-language; `state.lang("id").t(…)` and `renox::i18n::set_current_locale("id")` (for the rest of
+language; `state.lang("es").t(…)` and `renox::i18n::set_current_locale("es")` (for the rest of
 a job) help code outside a request.
 
 ## Calling other services (HTTP)
@@ -1533,11 +1533,11 @@ async fn misc(State(state): State<AppState>, session: Session, lang: Lang) -> Re
     let _ = visits_here;
     // Also: pull (read and remove), remove, regenerate_token(), set_lifetime(minutes).
     let _ = cart;
-    Ok(lang.choice("cart.count", count, &[])) // "12 items"; lang.t("cart.hello", &[("name", &"Arif")])
+    Ok(lang.choice("cart.count", count, &[])) // "12 items"; lang.t("cart.hello", &[("name", &"Anna")])
 }
 
 async fn switch_language(session: Session, back: Back) -> Result<Back> {
-    renox::i18n::set_locale(&session, "id")?; // this visitor's language from the next request on
+    renox::i18n::set_locale(&session, "es")?; // (with lang/es.json) this visitor's language from the next request on
     // (App::new().detect_locale() picks the browser's language until the visitor chooses one)
     Ok(back)
 }
@@ -1559,7 +1559,9 @@ async fn upload(State(state): State<AppState>, Valid(form): Valid<PhotoForm>) ->
 }
 ```
 
-Translations live in `resources/lang/<locale>.json`, nested or flat. `one|many` texts are plurals,
+Renox's own texts are English. Translations live in `resources/lang/<locale>.json` (e.g.
+`es.json`), nested or flat, and also translate Renox's texts (`ui.*`, `renox.auth.*`,
+`renox.validation.*`); `detect_locale` picks only languages the app has a file for. `one|many` texts are plurals,
 and Laravel's ranges pick by count (`{n}` exactly, `[a,b]`, `*` for open):
 
 ```json
@@ -1704,13 +1706,13 @@ fn app() -> App {
 #[renox::test]
 async fn members_only() {
     let app = TestApp::new(app()).await; // in-memory SQLite (or TEST_DATABASE_URL), migrated
-    let user = User::register(app.db(), "Arif", "arif@example.com", "password123").await.unwrap();
+    let user = User::register(app.db(), "Anna", "anna@example.com", "password123").await.unwrap();
 
     app.get("/login").await.assert_ok().assert_see("Log in");
     app.acting_as(&user);
     app.post("/logout", &[]).await.assert_status(303);
     app.htmx().post("/register", &[("email", "")]).await.assert_invalid("email");
-    app.assert_database_has("users", &[("email", &"arif@example.com")]).await;
+    app.assert_database_has("users", &[("email", &"anna@example.com")]).await;
 }
 ```
 
@@ -1726,7 +1728,7 @@ fn app() -> App {
 async fn with_settings() {
     let app = TestApp::with_config(app(), |c| {
         c.vars.insert("MIDTRANS_SERVER_KEY".into(), "test-key".into()); // what state.config.var reads
-        c.locale = "id".into();
+        c.locale = "es".into();
     })
     .await;
     let state = app.state(); // the AppState handlers get
@@ -1756,7 +1758,7 @@ async fn test_tools() {
     app.travel(Duration::from_secs(3600)); // requests and jobs see the clock an hour on
     app.run_all_jobs().await; // retries waiting for their backoff too
     app.assert_not_emitted::<OrderPlaced>().assert_nothing_notified();
-    // JSON: res.assert_json_path("data.0.name", "Kopi"), res.assert_json(json!({ "total": 2 }))
+    // JSON: res.assert_json_path("data.0.name", "Coffee"), res.assert_json(json!({ "total": 2 }))
     // Events/notifications: app.assert_emitted::<OrderPlaced>(|e| e.id == 7), app.assert_notified(&user, "kind")
     // A real server for a browser test: let url = app.serve().await;
 }

@@ -669,7 +669,7 @@ mod tests {
         let fake = http.fake();
         fake.on("*", FakeResponse::text(200, "ok"));
         http.get("https://a.test/r?x=1")
-            .query(&[("q", "kopi susu"), ("n", "2")])
+            .query(&[("q", "iced coffee"), ("n", "2")])
             .bearer("t0k")
             .send()
             .await
@@ -681,7 +681,7 @@ mod tests {
             .await
             .unwrap();
         let sent = fake.sent();
-        assert_eq!(sent[0].url, "https://a.test/r?x=1&q=kopi+susu&n=2");
+        assert_eq!(sent[0].url, "https://a.test/r?x=1&q=iced+coffee&n=2");
         assert_eq!(sent[0].header("authorization"), Some("Bearer t0k"));
         assert_eq!(sent[1].header("authorization"), Some("Basic dTpw"));
         assert_eq!(sent[1].body, "a=1+2");

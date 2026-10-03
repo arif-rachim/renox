@@ -44,7 +44,7 @@ writes the tests of a whole resource (create, list, show, edit, update, delete, 
   post is answered with a 303 back to the form (errors and old input flashed), so for that one
   check `assert_status(303)`, then `get` the form and `assert_see` the message.
 - **JSON:**
-  - `assert_json_path("data.0.name", "Kopi")` checks the value at a path of keys and indexes;
+  - `assert_json_path("data.0.name", "Coffee")` checks the value at a path of keys and indexes;
   - `json_path(path)` reads it;
   - `assert_json(json!({ … }))` checks the body contains the expected keys (other keys may
     be there too).
@@ -101,7 +101,7 @@ Also `FakeResponse::text(status, body)`, `FakeResponse::status(n)`, `.header(…
   `let (res, queries) = capture_queries(app.get("/posts")).await; assert!(queries.len() <= 3);`
 - Factories fill tables: `Product::create_one(app.db()).await`, `Product::create_many(app.db(),
   20).await`, or with states and sequences: `Product::factory().count(3).state(sold_out)
-  .sequence(|i, p| p.name = format!("Kopi {i}")).create(app.db()).await` (`make()` for unsaved
+  .sequence(|i, p| p.name = format!("Coffee {i}")).create(app.db()).await` (`make()` for unsaved
   models; `factory().state(…).make_one()` / `.create_one(db)` for a single one).
 
 ## Jobs, events, notifications, mail, HTTP

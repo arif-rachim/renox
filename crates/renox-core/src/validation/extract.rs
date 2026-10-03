@@ -623,16 +623,16 @@ mod tests {
     #[derive(Deserialize, Debug)]
     #[allow(dead_code)]
     struct Form {
-        nama: String,
-        harga: i64,
-        catatan: Option<String>,
+        name: String,
+        price: i64,
+        note: Option<String>,
     }
 
     fn parse(body: &str) -> Result<Form, Errors> {
         let pairs = form_urlencoded::parse(body.as_bytes())
             .into_owned()
             .collect();
-        match parse_pairs::<Form>(pairs, &HashMap::new(), &plain(Locale::Id)).0 {
+        match parse_pairs::<Form>(pairs, &HashMap::new(), &plain(Locale::En)).0 {
             Parsed::Ok(form, errors) if errors.is_empty() => Ok(form),
             Parsed::Ok(_, errors) | Parsed::Invalid(errors) => Err(errors),
         }
@@ -680,29 +680,29 @@ mod tests {
 
     #[test]
     fn empty_fields_are_missing() {
-        let form = parse("nama=Kopi&harga=5&catatan=").unwrap();
-        assert!(form.catatan.is_none());
+        let form = parse("name=Coffee&price=5&note=").unwrap();
+        assert!(form.note.is_none());
         // Text left empty reaches the rules as "".
-        assert_eq!(parse("nama=&harga=5").unwrap().nama, "");
-        assert_eq!(parse("harga=5").unwrap().nama, "");
-        let errors = parse("nama=Kopi&harga=").unwrap_err();
-        assert_eq!(errors.first("harga"), Some("Harga wajib diisi."));
+        assert_eq!(parse("name=&price=5").unwrap().name, "");
+        assert_eq!(parse("price=5").unwrap().name, "");
+        let errors = parse("name=Coffee&price=").unwrap_err();
+        assert_eq!(errors.first("price"), Some("The price field is required."));
     }
 
     #[test]
     fn wrong_types_name_the_field() {
-        let errors = parse("nama=Kopi&harga=murah").unwrap_err();
-        assert_eq!(errors.first("harga"), Some("Harga harus berupa angka."));
+        let errors = parse("name=Coffee&price=cheap").unwrap_err();
+        assert_eq!(errors.first("price"), Some("The price must be a number."));
     }
 
     #[test]
     fn keeps_every_input_for_old_values() {
-        let pairs = form_urlencoded::parse(b"nama=Kopi&tag=a&tag=b&harga=")
+        let pairs = form_urlencoded::parse(b"name=Coffee&tag=a&tag=b&price=")
             .into_owned()
             .collect();
         let (_, input) = parse_pairs::<Form>(pairs, &HashMap::new(), &plain(Locale::En));
-        assert_eq!(input["nama"], "Kopi");
+        assert_eq!(input["name"], "Coffee");
         assert_eq!(input["tag"], serde_json::json!(["a", "b"]));
-        assert_eq!(input["harga"], "");
+        assert_eq!(input["price"], "");
     }
 }

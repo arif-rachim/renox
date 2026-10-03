@@ -19,10 +19,10 @@ use syn::{DeriveInput, parse_macro_input};
 /// # use renox::prelude::*;
 /// # use serde::Serialize;
 /// #[derive(Model, Serialize, Default)]
-/// #[model(table = "produk", soft_deletes)]
-/// struct Produk {
+/// #[model(table = "products", soft_deletes)]
+/// struct Product {
 ///     id: i64,
-///     nama: String,
+///     name: String,
 ///     #[model(skip)]
 ///     label: String, // not a column; filled with Default when loading
 ///     created_at: Option<DateTime>,

@@ -79,13 +79,20 @@ impl Module for Forms {
 }
 
 async fn app() -> TestApp {
-    TestApp::new(App::new().module(Auth::new()).module(Forms).detect_locale()).await
+    // `tests/lang` has `es.json`, so Spanish is available; other languages aren't.
+    TestApp::with_config(
+        App::new().module(Auth::new()).module(Forms).detect_locale(),
+        |c| {
+            c.lang_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/lang");
+        },
+    )
+    .await
 }
 
 fn signup<'a>(overrides: &[(&'a str, &'a str)]) -> Vec<(&'a str, &'a str)> {
     let mut form = vec![
-        ("name", "Arif"),
-        ("email", "arif@example.com"),
+        ("name", "Alex"),
+        ("email", "alex@example.com"),
         ("password", "password123"),
         ("password_confirmation", "password123"),
         ("t_shirt", "M"),
@@ -103,7 +110,7 @@ async fn derived_rules_check_every_field() {
     app.post("/signup", &signup(&[]))
         .await
         .assert_ok()
-        .assert_see("Arif 0 0");
+        .assert_see("Alex 0 0");
 
     let res = app
         .htmx()
@@ -133,7 +140,7 @@ async fn derived_rules_check_every_field() {
 
     // `each` checks items, `distinct` repeats, `max` the list.
     let mut form = signup(&[]);
-    form.extend([("tags", "kopi"), ("tags", "kopi"), ("tags", "toolong")]);
+    form.extend([("tags", "coffee"), ("tags", "coffee"), ("tags", "toolong")]);
     app.htmx()
         .post("/signup", &form)
         .await
@@ -147,7 +154,7 @@ async fn derived_rules_check_every_field() {
         .assert_invalid("tags");
 
     // `unique` reads the database.
-    User::register(app.db(), "Arif", "arif@example.com", "password123")
+    User::register(app.db(), "Alex", "alex@example.com", "password123")
         .await
         .unwrap();
     app.htmx()
@@ -159,9 +166,9 @@ async fn derived_rules_check_every_field() {
 #[renox::test]
 async fn derived_rules_work_with_hooks() {
     let app = app().await;
-    app.post("/invite", &[("email", "  Budi@Example.COM ")])
+    app.post("/invite", &[("email", "  Ben@Example.COM ")])
         .await
-        .assert_see("invited budi@example.com");
+        .assert_see("invited ben@example.com");
     app.post("/invite", &[("email", "x@blocked.test")])
         .await
         .assert_forbidden();
@@ -191,27 +198,27 @@ async fn the_browser_language_picks_the_locale() {
             res.text()
         }
     };
-    assert_eq!(locale("id-ID,id;q=0.9,en;q=0.8").await, "id");
+    assert_eq!(locale("es-MX,es;q=0.9,en;q=0.8").await, "es");
     assert_eq!(locale("fr-FR, en;q=0.5").await, "en");
     assert_eq!(locale("de").await, "en", "none available: APP_LOCALE");
     // Validation messages follow it.
     let res = app
         .request()
         .htmx()
-        .header("accept-language", "id")
+        .header("accept-language", "es")
         .post("/invite", &[("email", "")])
         .await;
     assert!(
         res.json_path("errors.email.0")
             .as_str()
             .unwrap()
-            .contains("wajib"),
+            .contains("es obligatorio"),
         "{}",
         res.text()
     );
     // A language the visitor chose wins over the browser's.
     app.get("/language/en").await.assert_see("set");
-    assert_eq!(locale("id").await, "en");
+    assert_eq!(locale("es").await, "en");
 }
 
 #[renox::test]
@@ -219,7 +226,7 @@ async fn without_detect_locale_the_header_is_ignored() {
     let app = TestApp::new(App::new().module(Forms)).await;
     let res = app
         .request()
-        .header("accept-language", "id")
+        .header("accept-language", "es")
         .get("/locale")
         .await;
     res.assert_see("en");

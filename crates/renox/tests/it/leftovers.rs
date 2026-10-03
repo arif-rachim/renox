@@ -83,7 +83,7 @@ impl Module for Site {
                     .require_auth(),
             )
             .get("/cart", |session: Session| async move {
-                let items = session.push("cart", "kopi")?;
+                let items = session.push("cart", "coffee")?;
                 let visits = session.increment("visits", 1)?;
                 Ok::<_, Error>(format!("{items} {visits}"))
             })
@@ -130,7 +130,7 @@ async fn app() -> (TestApp, tempfile::TempDir) {
     std::fs::write(dir.path().join("public/robots-extra.txt"), "static").unwrap();
     std::fs::write(
         dir.path().join("menu.html"),
-        r#"<nav>{% for item in ["kopi", "teh", "susu"] %}{% if item == "susu" %}{% break %}{% endif %}<a class="{{ class_names('tab', {'tab-active': route_is('shop.*'), 'admin': route_is('admin.*')}) }}">{{ item }}</a>{% endfor %}</nav> route={{ request.route }}"#,
+        r#"<nav>{% for item in ["coffee", "tea", "milk"] %}{% if item == "milk" %}{% break %}{% endif %}<a class="{{ class_names('tab', {'tab-active': route_is('shop.*'), 'admin': route_is('admin.*')}) }}">{{ item }}</a>{% endfor %}</nav> route={{ request.route }}"#,
     )
     .unwrap();
     std::fs::write(
@@ -264,13 +264,15 @@ async fn views_and_handlers_know_the_current_route() {
     let (app, _dir) = app().await;
     let page = app.get("/menu").await;
     page.assert_ok()
-        .assert_see(r#"<a class="tab tab-active">kopi</a><a class="tab tab-active">teh</a></nav>"#)
+        .assert_see(
+            r#"<a class="tab tab-active">coffee</a><a class="tab tab-active">tea</a></nav>"#,
+        )
         .assert_see("route=shop.menu");
-    // `{% break %}` stopped before susu.
-    page.assert_dont_see("susu");
+    // `{% break %}` stopped before milk.
+    page.assert_dont_see("milk");
     on(&app, "admin.example.com", "/menu")
         .await
-        .assert_see(r#"<a class="tab admin">kopi</a>"#)
+        .assert_see(r#"<a class="tab admin">coffee</a>"#)
         .assert_see("route=admin.menu");
     app.get("/route")
         .await
@@ -296,7 +298,7 @@ async fn sessions_push_and_increment() {
     app.get("/cart").await.assert_see("2 2");
     assert_eq!(
         app.session_get::<Vec<String>>("cart"),
-        Some(vec!["kopi".to_owned(), "kopi".to_owned()])
+        Some(vec!["coffee".to_owned(), "coffee".to_owned()])
     );
 }
 

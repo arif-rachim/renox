@@ -9,64 +9,64 @@ use serde::{Deserialize, Serialize};
 use tower::ServiceExt;
 
 #[derive(Model, Serialize, Default)]
-#[model(table = "produk", soft_deletes)]
-struct Produk {
+#[model(table = "products", soft_deletes)]
+struct Product {
     id: i64,
-    nama: String,
-    harga: i64,
-    kategori: Option<String>,
+    name: String,
+    price: i64,
+    category: Option<String>,
     created_at: Option<DateTime>,
     updated_at: Option<DateTime>,
     deleted_at: Option<DateTime>,
 }
 
 #[derive(Deserialize, Serialize, Default)]
-struct ProdukForm {
-    nama: String,
-    harga: i64,
-    kategori: Option<String>,
+struct ProductForm {
+    name: String,
+    price: i64,
+    category: Option<String>,
     email: Option<String>,
     website: Option<String>,
     password: Option<String>,
     password_confirmation: Option<String>,
-    setuju: Option<bool>,
+    agree: Option<bool>,
     #[serde(skip)]
     ignore_id: Option<i64>,
 }
 
-impl Validate for ProdukForm {
+impl Validate for ProductForm {
     fn rules(&self, v: &mut Validator) {
-        let nama = v
-            .field("nama", &self.nama)
+        let name = v
+            .field("name", &self.name)
             .required()
             .between(3, 20)
-            .unique("produk", "nama");
+            .unique("products", "name");
         if let Some(id) = self.ignore_id {
-            nama.ignore(id);
+            name.ignore(id);
         }
-        v.field("harga", &self.harga)
-            .label("harga jual")
+        v.field("price", &self.price)
+            .label("selling price")
             .min(1_000)
             .max(1_000_000);
-        v.field("kategori", &self.kategori)
-            .one_of(&["kopi", "teh"])
-            .exists("produk", "kategori");
+        v.field("category", &self.category)
+            .one_of(&["coffee", "tea"])
+            .exists("products", "category");
         v.field("email", &self.email).email();
         v.field("website", &self.website).url();
         v.field("password", &self.password)
             .min(8)
             .confirmed(&self.password_confirmation);
-        v.field("setuju", &self.setuju)
+        v.field("agree", &self.agree)
             .accepted()
-            .message("Centang dulu persetujuannya.");
+            .message("Tick the box to agree first.");
     }
 }
 
-fn valid_form() -> ProdukForm {
-    ProdukForm {
-        nama: "Kopi Susu".into(),
-        harga: 18_000,
-        setuju: Some(true),
+fn valid_form() -> ProductForm {
+    ProductForm {
+        name: "Milk Coffee".into(),
+        price: 18_000,
+        agree: Some(true),
         ..Default::default()
     }
 }
@@ -75,7 +75,7 @@ async fn kernel(locale: &str) -> (Kernel, tempfile::TempDir) {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("form.html"),
-        r#"<input name="nama" value="{{ old('nama') }}"><input name="password" value="{{ old('password') }}"><p data-error-for="nama">{{ error('nama') }}</p><p>{{ error('harga') }}</p>{{ csrf_token }}"#,
+        r#"<input name="name" value="{{ old('name') }}"><input name="password" value="{{ old('password') }}"><p data-error-for="name">{{ error('name') }}</p><p>{{ error('price') }}</p>{{ csrf_token }}"#,
     )
     .unwrap();
     let config = {
@@ -84,6 +84,7 @@ async fn kernel(locale: &str) -> (Kernel, tempfile::TempDir) {
         c.key = Some(renox::generate_key());
         c.views_path = dir.path().to_path_buf();
         c.locale = locale.into();
+        c.lang_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/lang");
         c
     };
     let kernel = App::with_config(config)
@@ -93,12 +94,12 @@ async fn kernel(locale: &str) -> (Kernel, tempfile::TempDir) {
         .await
         .unwrap();
     kernel.migrate().await.unwrap();
-    Produk::create(
+    Product::create(
         kernel.db(),
-        Produk {
-            nama: "Kopi Hitam".into(),
-            harga: 15_000,
-            kategori: Some("kopi".into()),
+        Product {
+            name: "Black Coffee".into(),
+            price: 15_000,
+            category: Some("coffee".into()),
             ..Default::default()
         },
     )
@@ -107,7 +108,7 @@ async fn kernel(locale: &str) -> (Kernel, tempfile::TempDir) {
     (kernel, dir)
 }
 
-async fn errors_for(form: &ProdukForm, locale: Locale) -> Errors {
+async fn errors_for(form: &ProductForm, locale: Locale) -> Errors {
     let (kernel, _dir) = kernel("en").await;
     Validator::rules_of(form, locale)
         .finish(kernel.db())
@@ -122,29 +123,29 @@ async fn valid_input_has_no_errors() {
 
 #[tokio::test]
 async fn rules_report_the_first_failure_per_field() {
-    let form = ProdukForm {
-        nama: "Ko".into(),
-        harga: 500,
-        kategori: Some("susu".into()),
-        email: Some("bukan-email".into()),
+    let form = ProductForm {
+        name: "Co".into(),
+        price: 500,
+        category: Some("milk".into()),
+        email: Some("not-an-email".into()),
         website: Some("renox.dev".into()),
-        password: Some("rahasia123".into()),
-        password_confirmation: Some("beda".into()),
-        setuju: Some(false),
+        password: Some("secret123".into()),
+        password_confirmation: Some("different".into()),
+        agree: Some(false),
         ..Default::default()
     };
     let errors = errors_for(&form, Locale::En).await;
     assert_eq!(
-        errors.first("nama"),
-        Some("The nama must be between 3 and 20 characters.")
+        errors.first("name"),
+        Some("The name must be between 3 and 20 characters.")
     );
     assert_eq!(
-        errors.first("harga"),
-        Some("The harga jual must be at least 1000.")
+        errors.first("price"),
+        Some("The selling price must be at least 1000.")
     );
     assert_eq!(
-        errors.first("kategori"),
-        Some("The selected kategori is invalid.")
+        errors.first("category"),
+        Some("The selected category is invalid.")
     );
     assert_eq!(
         errors.first("email"),
@@ -158,54 +159,57 @@ async fn rules_report_the_first_failure_per_field() {
         errors.first("password"),
         Some("The password confirmation does not match.")
     );
-    assert_eq!(errors.first("setuju"), Some("Centang dulu persetujuannya."));
+    assert_eq!(errors.first("agree"), Some("Tick the box to agree first."));
     assert!(errors.iter().all(|(_, messages)| messages.len() == 1));
 }
 
 #[tokio::test]
-async fn messages_come_in_indonesian() {
-    let form = ProdukForm {
-        nama: " ".into(),
-        harga: 2_000_000,
-        setuju: Some(true),
-        ..Default::default()
-    };
-    let errors = errors_for(&form, Locale::Id).await;
-    assert_eq!(errors.first("nama"), Some("Nama wajib diisi."));
-    assert_eq!(errors.first("harga"), Some("Harga jual maksimal 1000000."));
+async fn messages_come_in_the_apps_language() {
+    // `tests/lang/es.json` translates the messages and the field names.
+    let (mut client, _dir) = Client::new("es").await;
+    let reply = client
+        .post("/products", "name=+&price=2000000&agree=true", true)
+        .await;
+    let body: serde_json::Value = serde_json::from_str(&reply.body).unwrap();
+    assert_eq!(body["errors"]["name"][0], "El campo nombre es obligatorio.");
+    // An explicit `label` wins over the lang file's attribute name.
+    assert_eq!(
+        body["errors"]["price"][0],
+        "El campo selling price no debe ser mayor que 1000000."
+    );
 }
 
 #[tokio::test]
 async fn unique_and_exists_query_the_database() {
-    let taken = ProdukForm {
-        nama: "Kopi Hitam".into(),
+    let taken = ProductForm {
+        name: "Black Coffee".into(),
         ..valid_form()
     };
     assert_eq!(
-        errors_for(&taken, Locale::Id).await.first("nama"),
-        Some("Nama sudah digunakan.")
+        errors_for(&taken, Locale::En).await.first("name"),
+        Some("The name has already been taken.")
     );
 
-    let editing_itself = ProdukForm {
-        nama: "Kopi Hitam".into(),
+    let editing_itself = ProductForm {
+        name: "Black Coffee".into(),
         ignore_id: Some(1),
         ..valid_form()
     };
-    assert!(errors_for(&editing_itself, Locale::Id).await.is_empty());
+    assert!(errors_for(&editing_itself, Locale::En).await.is_empty());
 
-    let no_teh_yet = ProdukForm {
-        kategori: Some("teh".into()),
+    let no_tea_yet = ProductForm {
+        category: Some("tea".into()),
         ..valid_form()
     };
     assert_eq!(
-        errors_for(&no_teh_yet, Locale::En).await.first("kategori"),
-        Some("The selected kategori is invalid.")
+        errors_for(&no_tea_yet, Locale::En).await.first("category"),
+        Some("The selected category is invalid.")
     );
-    let has_kopi = ProdukForm {
-        kategori: Some("kopi".into()),
+    let has_coffee = ProductForm {
+        category: Some("coffee".into()),
         ..valid_form()
     };
-    assert!(errors_for(&has_kopi, Locale::En).await.is_empty());
+    assert!(errors_for(&has_coffee, Locale::En).await.is_empty());
 }
 
 struct Shop;
@@ -217,44 +221,44 @@ impl Module for Shop {
 
     fn routes(&self) -> Routes {
         Routes::new()
-            .get("/produk/create", || async { view("form.html", ()) })
-            .post("/produk", store)
-            .get("/cari", search)
-            .post("/stok", stok)
+            .get("/products/create", || async { view("form.html", ()) })
+            .post("/products", store)
+            .get("/search", search)
+            .post("/stock", stock)
     }
 }
 
-async fn store(State(db): State<Db>, Valid(form): Valid<ProdukForm>) -> Result<String> {
-    let produk = Produk::create(
+async fn store(State(db): State<Db>, Valid(form): Valid<ProductForm>) -> Result<String> {
+    let product = Product::create(
         &db,
-        Produk {
-            nama: form.nama,
-            harga: form.harga,
+        Product {
+            name: form.name,
+            price: form.price,
             ..Default::default()
         },
     )
     .await?;
-    Ok(format!("created {}", produk.id))
+    Ok(format!("created {}", product.id))
 }
 
 #[derive(Deserialize)]
-struct Cari {
+struct Search {
     q: String,
 }
 
-impl Validate for Cari {
+impl Validate for Search {
     fn rules(&self, v: &mut Validator) {
         v.field("q", &self.q).min(3);
     }
 }
 
-async fn search(Valid(cari): Valid<Cari>) -> String {
-    format!("mencari {}", cari.q)
+async fn search(Valid(search): Valid<Search>) -> String {
+    format!("searching {}", search.q)
 }
 
-async fn stok(Form(form): Form<serde_json::Value>) -> Result<String> {
+async fn stock(Form(form): Form<serde_json::Value>) -> Result<String> {
     let mut errors = Errors::new();
-    errors.add("jumlah", "Stok tidak cukup.");
+    errors.add("quantity", "Not enough stock.");
     Err(ValidationError::new(errors).with_input(&form).into())
 }
 
@@ -279,7 +283,7 @@ impl Client {
             cookie: None,
             token: String::new(),
         };
-        let page = client.get("/produk/create").await.body;
+        let page = client.get("/products/create").await.body;
         client.token = page.rsplit('>').next().unwrap().to_owned();
         (client, dir)
     }
@@ -316,7 +320,7 @@ impl Client {
     async fn post(&mut self, uri: &str, body: &str, htmx: bool) -> Reply {
         let mut req = Request::post(uri)
             .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .header("referer", "/produk/create");
+            .header("referer", "/products/create");
         if htmx {
             req = req
                 .header("hx-request", "true")
@@ -336,8 +340,8 @@ async fn valid_forms_reach_the_handler() {
     let (mut client, _dir) = Client::new("en").await;
     let reply = client
         .post(
-            "/produk",
-            "nama=Teh+Tarik&harga=12000&setuju=true&kategori=",
+            "/products",
+            "name=Pulled+Tea&price=12000&agree=true&category=",
             false,
         )
         .await;
@@ -349,82 +353,89 @@ async fn valid_forms_reach_the_handler() {
 
 #[tokio::test]
 async fn invalid_forms_redirect_back_with_errors_and_old_input() {
-    let (mut client, _dir) = Client::new("id").await;
+    let (mut client, _dir) = Client::new("es").await;
     let reply = client
         .post(
-            "/produk",
-            "nama=Kopi+Hitam&harga=abc&setuju=true&password=rahasia",
+            "/products",
+            "name=Black+Coffee&price=abc&agree=true&password=secret",
             false,
         )
         .await;
     assert_eq!(reply.status, StatusCode::SEE_OTHER);
-    assert_eq!(reply.location.as_deref(), Some("/produk/create"));
+    assert_eq!(reply.location.as_deref(), Some("/products/create"));
 
-    let page = client.get("/produk/create").await.body;
+    let page = client.get("/products/create").await.body;
     assert!(
-        page.contains(r#"<input name="nama" value="Kopi Hitam">"#),
+        page.contains(r#"<input name="name" value="Black Coffee">"#),
         "{page}"
     );
     assert!(
         page.contains(r#"<input name="password" value="">"#),
         "passwords are never flashed"
     );
-    assert!(page.contains("<p>Harga harus berupa angka.</p>"), "{page}");
-
-    let reply = client
-        .post("/produk", "nama=Kopi+Hitam&harga=5000&setuju=true", false)
-        .await;
-    assert_eq!(reply.status, StatusCode::SEE_OTHER);
-    let page = client.get("/produk/create").await.body;
     assert!(
-        page.contains(r#"<p data-error-for="nama">Nama sudah digunakan.</p>"#),
+        page.contains("<p>El campo precio debe ser un número.</p>"),
         "{page}"
     );
 
-    let page = client.get("/produk/create").await.body;
-    assert!(!page.contains("sudah digunakan"), "errors last one request");
+    let reply = client
+        .post(
+            "/products",
+            "name=Black+Coffee&price=5000&agree=true",
+            false,
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::SEE_OTHER);
+    let page = client.get("/products/create").await.body;
+    assert!(
+        page.contains(r#"<p data-error-for="name">El campo nombre ya está en uso.</p>"#),
+        "{page}"
+    );
+
+    let page = client.get("/products/create").await.body;
+    assert!(!page.contains("ya está en uso"), "errors last one request");
 }
 
 #[tokio::test]
 async fn htmx_and_json_requests_get_422_json() {
     let (mut client, _dir) = Client::new("en").await;
     let reply = client
-        .post("/produk", "nama=&harga=5000&setuju=true", true)
+        .post("/products", "name=&price=5000&agree=true", true)
         .await;
     assert_eq!(reply.status, StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(reply.content_type.as_deref(), Some("application/json"));
     let body: serde_json::Value = serde_json::from_str(&reply.body).unwrap();
-    assert_eq!(body["errors"]["nama"][0], "The nama field is required.");
-    assert_eq!(body["message"], "The nama field is required.");
+    assert_eq!(body["errors"]["name"][0], "The name field is required.");
+    assert_eq!(body["message"], "The name field is required.");
 
     let token = client.token.clone();
     let reply = client
         .send(
-            Request::post("/produk")
+            Request::post("/products")
                 .header(CONTENT_TYPE, "application/json")
                 .header("x-csrf-token", token)
-                .body(Body::from(r#"{"nama": "Es Teh", "harga": "murah"}"#))
+                .body(Body::from(r#"{"name": "Iced Tea", "price": "cheap"}"#))
                 .unwrap(),
         )
         .await;
     assert_eq!(reply.status, StatusCode::UNPROCESSABLE_ENTITY);
     let body: serde_json::Value = serde_json::from_str(&reply.body).unwrap();
-    assert_eq!(body["errors"]["harga"][0], "The harga must be a number.");
+    assert_eq!(body["errors"]["price"][0], "The price must be a number.");
 
     // JSON bodies report every field too: a missing one, a wrong type, a rule.
     let token = client.token.clone();
     let reply = client
         .send(
-            Request::post("/produk")
+            Request::post("/products")
                 .header(CONTENT_TYPE, "application/json")
                 .header("x-csrf-token", token)
-                .body(Body::from(r#"{"harga": true, "email": "x"}"#))
+                .body(Body::from(r#"{"price": true, "email": "x"}"#))
                 .unwrap(),
         )
         .await;
     let body: serde_json::Value = serde_json::from_str(&reply.body).unwrap();
-    assert_eq!(body["errors"]["nama"][0], "The nama field is required.");
-    assert_eq!(body["errors"]["harga"][0], "The harga must be a number.");
+    assert_eq!(body["errors"]["name"][0], "The name field is required.");
+    assert_eq!(body["errors"]["price"][0], "The price must be a number.");
     assert!(
         body["errors"]["email"][0]
             .as_str()
@@ -435,9 +446,9 @@ async fn htmx_and_json_requests_get_422_json() {
     // Errors for API clients are JSON too, from the handler or from CSRF.
     let reply = client
         .send(
-            Request::post("/produk")
+            Request::post("/products")
                 .header(CONTENT_TYPE, "application/json")
-                .body(Body::from(r#"{"nama": "Kopi"}"#))
+                .body(Body::from(r#"{"name": "Coffee"}"#))
                 .unwrap(),
         )
         .await;
@@ -457,13 +468,13 @@ async fn htmx_and_json_requests_get_422_json() {
     // A field that doesn't parse doesn't hide the other fields' errors, and
     // its placeholder value (0, below the minimum) adds no error of its own.
     let reply = client
-        .post("/produk", "nama=&harga=murah&setuju=maybe&email=x", true)
+        .post("/products", "name=&price=cheap&agree=maybe&email=x", true)
         .await;
     let body: serde_json::Value = serde_json::from_str(&reply.body).unwrap();
-    assert_eq!(body["errors"]["nama"][0], "The nama field is required.");
-    assert_eq!(body["errors"]["harga"].as_array().unwrap().len(), 1);
-    assert_eq!(body["errors"]["harga"][0], "The harga must be a number.");
-    assert_eq!(body["errors"]["setuju"].as_array().unwrap().len(), 1);
+    assert_eq!(body["errors"]["name"][0], "The name field is required.");
+    assert_eq!(body["errors"]["price"].as_array().unwrap().len(), 1);
+    assert_eq!(body["errors"]["price"][0], "The price must be a number.");
+    assert_eq!(body["errors"]["agree"].as_array().unwrap().len(), 1);
     assert!(
         body["errors"]["email"][0]
             .as_str()
@@ -475,10 +486,13 @@ async fn htmx_and_json_requests_get_422_json() {
 #[tokio::test]
 async fn query_strings_are_validated_for_get() {
     let (mut client, _dir) = Client::new("en").await;
-    assert_eq!(client.get("/cari?q=kopi").await.body, "mencari kopi");
+    assert_eq!(
+        client.get("/search?q=coffee").await.body,
+        "searching coffee"
+    );
     let reply = client
         .send(
-            Request::get("/cari?q=ko")
+            Request::get("/search?q=co")
                 .header("hx-request", "true")
                 .body(Body::empty())
                 .unwrap(),
@@ -490,9 +504,9 @@ async fn query_strings_are_validated_for_get() {
 #[tokio::test]
 async fn handlers_can_return_their_own_validation_errors() {
     let (mut client, _dir) = Client::new("en").await;
-    let reply = client.post("/stok", "jumlah=99", true).await;
+    let reply = client.post("/stock", "quantity=99", true).await;
     assert_eq!(reply.status, StatusCode::UNPROCESSABLE_ENTITY);
-    assert!(reply.body.contains("Stok tidak cukup."));
-    let reply = client.post("/stok", "jumlah=99", false).await;
+    assert!(reply.body.contains("Not enough stock."));
+    let reply = client.post("/stock", "quantity=99", false).await;
     assert_eq!(reply.status, StatusCode::SEE_OTHER);
 }

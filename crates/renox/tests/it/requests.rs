@@ -9,9 +9,9 @@ use renox::validation::{Inspected, Rule};
 use renox::{Cookies, Download, SetCookie};
 use serde::Deserialize;
 
-struct Npwp;
+struct TaxId;
 
-impl Rule for Npwp {
+impl Rule for TaxId {
     fn check(&self, value: &Inspected) -> std::result::Result<(), String> {
         let Inspected::Text(text) = value else {
             return Ok(());
@@ -20,7 +20,7 @@ impl Rule for Npwp {
         if digits == 15 || digits == 16 {
             Ok(())
         } else {
-            Err("The :attribute must be a valid NPWP.".into())
+            Err("The :attribute must be a valid tax ID.".into())
         }
     }
 }
@@ -38,7 +38,7 @@ struct Signup {
     username: String,
     email: String,
     email_again: String,
-    npwp: String,
+    tax_id: String,
     #[serde(default)]
     tags: Vec<String>,
 }
@@ -61,7 +61,7 @@ impl Validate for Signup {
             .none_of(&["admin", "root"]);
         v.field("email_again", &self.email_again)
             .same("email", &self.email);
-        v.field("npwp", &self.npwp).apply(&Npwp);
+        v.field("tax_id", &self.tax_id).apply(&TaxId);
         v.field("tags", &self.tags).max(3);
         v.each("tags", &self.tags, |tag| tag.max(5));
     }
@@ -148,16 +148,16 @@ impl Module for Pages {
                 },
             )
             .get("/dl/bytes", || async {
-                Download::bytes("faktur Mei.pdf", "application/pdf", b"%PDF".to_vec())
+                Download::bytes("invoice May.pdf", "application/pdf", b"%PDF".to_vec())
             })
             .get("/dl/inline", || async {
-                Download::bytes("faktur.pdf", "application/pdf", b"%PDF".to_vec()).inline()
+                Download::bytes("invoice.pdf", "application/pdf", b"%PDF".to_vec()).inline()
             })
             .get("/dl/html", || async {
                 Download::bytes("page.html", "text/html", b"<script>".to_vec()).inline()
             })
             .get("/dl/file", |State(state): State<AppState>| async move {
-                Download::file(state.config.storage_path.join("report.csv"), "laporan.csv").await
+                Download::file(state.config.storage_path.join("report.csv"), "report.csv").await
             })
             .get("/dl/missing", || async {
                 Download::file("/no/such/file.csv", "x.csv").await
@@ -166,7 +166,7 @@ impl Module for Pages {
                 Download::from_storage(&state.storage, "exports/data.json", "data.json").await
             })
             .get("/dl/stream", || async {
-                let rows = ["id,name\n", "1,Kopi\n", "2,Teh\n"]
+                let rows = ["id,name\n", "1,Coffee\n", "2,Tea\n"]
                     .map(|line| Ok::<_, std::io::Error>(renox::axum::body::Bytes::from(line)));
                 Download::stream("items.csv", "text/csv", futures_util::stream::iter(rows))
             })
@@ -185,8 +185,8 @@ fn signup(overrides: &[(&str, &str)]) -> renox::serde_json::Value {
     let mut form = json!({
         "code": "AB1234", "pin": "123456", "phone": "081234567890", "kind": "person",
         "birthday": "1990-05-01", "starts": "2026-10-01", "ends": "2026-10-05",
-        "username": "arif", "email": "a@b.co", "email_again": "a@b.co",
-        "npwp": "01.234.567.8-901.000", "tags": ["kopi", "teh"],
+        "username": "alex", "email": "a@b.co", "email_again": "a@b.co",
+        "tax_id": "01.234.567.8-901.000", "tags": ["latte", "tea"],
     });
     for (key, value) in overrides {
         form[*key] = json!(value);
@@ -212,7 +212,7 @@ async fn more_rules_pass_and_fail_one_by_one() {
         ("ends", "2026-10-01"),
         ("username", "admin"),
         ("email_again", "c@d.co"),
-        ("npwp", "123"),
+        ("tax_id", "123"),
     ] {
         let res = app.post_json("/signup", &signup(&[(field, value)])).await;
         res.assert_invalid(field);
@@ -235,9 +235,12 @@ async fn more_rules_pass_and_fail_one_by_one() {
         body["errors"]["email_again"][0],
         "The email again and email must match."
     );
-    let res = app.post_json("/signup", &signup(&[("npwp", "1")])).await;
+    let res = app.post_json("/signup", &signup(&[("tax_id", "1")])).await;
     let body: renox::serde_json::Value = res.json();
-    assert_eq!(body["errors"]["npwp"][0], "The npwp must be a valid NPWP.");
+    assert_eq!(
+        body["errors"]["tax_id"][0],
+        "The tax id must be a valid tax ID."
+    );
     let res = app
         .post_json("/signup", &signup(&[("ends", "2026-09-30")]))
         .await;
@@ -252,7 +255,7 @@ async fn more_rules_pass_and_fail_one_by_one() {
 async fn each_item_and_nested_structs_are_validated() {
     let (app, _dir) = app().await;
     let mut form = signup(&[]);
-    form["tags"] = json!(["kopi", "espresso"]);
+    form["tags"] = json!(["latte", "espresso"]);
     let res = app.post_json("/signup", &form).await;
     res.assert_invalid("tags.1");
     let body: renox::serde_json::Value = res.json();
@@ -371,7 +374,7 @@ async fn downloads_set_safe_headers() {
         .assert_header("x-content-type-options", "nosniff");
     assert_eq!(
         res.header("content-disposition"),
-        Some("attachment; filename=\"faktur Mei.pdf\"; filename*=UTF-8''faktur%20Mei.pdf")
+        Some("attachment; filename=\"invoice May.pdf\"; filename*=UTF-8''invoice%20May.pdf")
     );
     assert!(
         app.get("/dl/inline")
@@ -414,5 +417,5 @@ async fn downloads_set_safe_headers() {
     let res = app.get("/dl/stream").await;
     res.assert_ok().assert_header("content-type", "text/csv");
     assert!(res.header("content-length").is_none());
-    assert_eq!(res.text(), "id,name\n1,Kopi\n2,Teh\n");
+    assert_eq!(res.text(), "id,name\n1,Coffee\n2,Tea\n");
 }

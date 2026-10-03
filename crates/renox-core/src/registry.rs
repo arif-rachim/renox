@@ -84,12 +84,12 @@ impl Registry {
     /// # use renox::prelude::*;
     /// # let _ =
     /// App::new().templates(|env| {
-    ///     env.add_filter("rupiah", |n: i64| format!("Rp {}", renox::format_number(n as f64, 0, "id")));
+    ///     env.add_filter("rupiah", |n: i64| format!("Rp {}", renox::format_number(n as f64, 0, "de")));
     /// })
     /// # ;
     /// ```
     ///
-    /// Built in: `number` (`{{ price | number }}` → `75.000` in Indonesian,
+    /// Built in: `number` (`{{ price | number }}` → `75.000` in German,
     /// `number(2)` for decimals) and `date` (`{{ created_at | date("%d/%m/%Y") }}`,
     /// in `APP_TIMEZONE`).
     pub fn templates(

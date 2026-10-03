@@ -138,12 +138,12 @@ fn link(kernel: &Kernel) -> String {
 #[tokio::test]
 async fn forgotten_passwords_are_reset_by_email() {
     let kernel = kernel(Auth::new()).await;
-    User::register(kernel.db(), "Arif", "arif@example.com", "lama-rahasia")
+    User::register(kernel.db(), "Alex", "alex@example.com", "old-secret")
         .await
         .unwrap();
     let mut laptop = Client::new(&kernel);
     laptop
-        .post("/login", "email=arif@example.com&password=lama-rahasia")
+        .post("/login", "email=alex@example.com&password=old-secret")
         .await;
 
     let mut client = Client::new(&kernel);
@@ -157,13 +157,13 @@ async fn forgotten_passwords_are_reset_by_email() {
 
     // Unknown emails get the same answer and no mail.
     let reply = client
-        .post("/forgot-password", "email=siapa@example.com")
+        .post("/forgot-password", "email=nobody@example.com")
         .await;
     assert_eq!(reply.location(), Some("/forgot-password"));
     assert!(kernel.mailer().sent().is_empty());
 
     client
-        .post("/forgot-password", "email=ARIF@example.com")
+        .post("/forgot-password", "email=ALEX@example.com")
         .await;
     let page = client.get("/forgot-password").await.body;
     assert!(page.contains("If that email has an account, a reset link is on its way."));
@@ -174,22 +174,22 @@ async fn forgotten_passwords_are_reset_by_email() {
             mails[0].to[0].as_str(),
             mails[0].subject.as_str()
         ),
-        (1, "arif@example.com", "Reset your password")
+        (1, "alex@example.com", "Reset your password")
     );
 
     // A second request within a minute sends nothing new.
     client
-        .post("/forgot-password", "email=arif@example.com")
+        .post("/forgot-password", "email=alex@example.com")
         .await;
     assert_eq!(kernel.mailer().sent().len(), 1);
 
     let reset = link(&kernel);
     assert!(
-        reset.starts_with("/reset-password/") && reset.ends_with("?email=arif%40example.com"),
+        reset.starts_with("/reset-password/") && reset.ends_with("?email=alex%40example.com"),
         "{reset}"
     );
     let page = client.get(&reset).await.body;
-    assert!(page.contains(r#"value="arif@example.com""#));
+    assert!(page.contains(r#"value="alex@example.com""#));
     let token = reset
         .trim_start_matches("/reset-password/")
         .split('?')
@@ -198,7 +198,7 @@ async fn forgotten_passwords_are_reset_by_email() {
         .to_owned();
 
     let reply = client
-        .post("/reset-password", "token=salah&email=arif@example.com&password=baru-rahasia&password_confirmation=baru-rahasia")
+        .post("/reset-password", "token=wrong&email=alex@example.com&password=new-secret&password_confirmation=new-secret")
         .await;
     assert_eq!(reply.status, StatusCode::SEE_OTHER);
     assert!(
@@ -212,7 +212,7 @@ async fn forgotten_passwords_are_reset_by_email() {
     let reply = client
         .post(
             "/reset-password",
-            &format!("token={token}&email=arif@example.com&password=baru-rahasia&password_confirmation=baru-rahasia"),
+            &format!("token={token}&email=alex@example.com&password=new-secret&password_confirmation=new-secret"),
         )
         .await;
     assert_eq!(reply.location(), Some("/login"));
@@ -224,11 +224,11 @@ async fn forgotten_passwords_are_reset_by_email() {
             .contains("Your password has been reset.")
     );
 
-    let user = User::find_by_email(kernel.db(), "arif@example.com")
+    let user = User::find_by_email(kernel.db(), "alex@example.com")
         .await
         .unwrap()
         .unwrap();
-    assert!(user.check_password("baru-rahasia").await);
+    assert!(user.check_password("new-secret").await);
     assert_eq!(
         laptop.get("/api/me").await.status,
         StatusCode::SEE_OTHER,
@@ -238,7 +238,7 @@ async fn forgotten_passwords_are_reset_by_email() {
     let again = client
         .post(
             "/reset-password",
-            &format!("token={token}&email=arif@example.com&password=ketiga-rahasia&password_confirmation=ketiga-rahasia"),
+            &format!("token={token}&email=alex@example.com&password=third-secret&password_confirmation=third-secret"),
         )
         .await;
     assert_eq!(again.location(), Some("/reset-password"), "links work once");
@@ -247,12 +247,12 @@ async fn forgotten_passwords_are_reset_by_email() {
 #[tokio::test]
 async fn reset_links_expire() {
     let kernel = kernel(Auth::new()).await;
-    User::register(kernel.db(), "Arif", "arif@example.com", "lama-rahasia")
+    User::register(kernel.db(), "Alex", "alex@example.com", "old-secret")
         .await
         .unwrap();
     let mut client = Client::new(&kernel);
     client
-        .post("/forgot-password", "email=arif@example.com")
+        .post("/forgot-password", "email=alex@example.com")
         .await;
     let token = link(&kernel)
         .trim_start_matches("/reset-password/")
@@ -270,14 +270,14 @@ async fn reset_links_expire() {
     client
         .post(
             "/reset-password",
-            &format!("token={token}&email=arif@example.com&password=baru-rahasia&password_confirmation=baru-rahasia"),
+            &format!("token={token}&email=alex@example.com&password=new-secret&password_confirmation=new-secret"),
         )
         .await;
-    let user = User::find_by_email(kernel.db(), "arif@example.com")
+    let user = User::find_by_email(kernel.db(), "alex@example.com")
         .await
         .unwrap()
         .unwrap();
-    assert!(user.check_password("lama-rahasia").await);
+    assert!(user.check_password("old-secret").await);
 }
 
 #[tokio::test]
@@ -287,7 +287,7 @@ async fn new_users_verify_their_email_with_a_signed_link() {
     client
         .post(
             "/register",
-            "name=Arif&email=arif@example.com&password=rahasia123&password_confirmation=rahasia123",
+            "name=Alex&email=alex@example.com&password=secret123&password_confirmation=secret123",
         )
         .await;
     assert_eq!(
@@ -319,27 +319,27 @@ async fn new_users_verify_their_email_with_a_signed_link() {
 
     let reply = client.get(&verify).await;
     assert_eq!(reply.location(), Some("/"));
-    assert_eq!(client.get("/members").await.body, "member Arif");
+    assert_eq!(client.get("/members").await.body, "member Alex");
     assert_eq!(
         client.get("/verify-email").await.location(),
         Some("/"),
         "nothing left to verify"
     );
 
-    // Another user can't use Arif's link.
-    User::register(kernel.db(), "Budi", "budi@example.com", "rahasia123")
+    // Another user can't use Alex's link.
+    User::register(kernel.db(), "Ben", "ben@example.com", "secret123")
         .await
         .unwrap();
     let mut other = Client::new(&kernel);
     other
-        .post("/login", "email=budi@example.com&password=rahasia123")
+        .post("/login", "email=ben@example.com&password=secret123")
         .await;
     assert_eq!(other.get(&verify).await.status, StatusCode::FORBIDDEN);
 
     other.post("/email/verification-notification", "").await;
     assert_eq!(
         kernel.mailer().sent().last().unwrap().to,
-        ["budi@example.com"]
+        ["ben@example.com"]
     );
     assert!(
         other
@@ -353,7 +353,7 @@ async fn new_users_verify_their_email_with_a_signed_link() {
 #[tokio::test]
 async fn api_tokens_authenticate_without_cookies_or_csrf() {
     let kernel = kernel(Auth::new()).await;
-    let user = User::register(kernel.db(), "Arif", "arif@example.com", "rahasia123")
+    let user = User::register(kernel.db(), "Alex", "alex@example.com", "secret123")
         .await
         .unwrap();
     let token = user
@@ -375,7 +375,7 @@ async fn api_tokens_authenticate_without_cookies_or_csrf() {
         .await;
     assert_eq!(
         (me.status, me.body.as_str()),
-        (StatusCode::OK, r#"{"name":"Arif"}"#)
+        (StatusCode::OK, r#"{"name":"Alex"}"#)
     );
     let post = api
         .send(
@@ -384,7 +384,7 @@ async fn api_tokens_authenticate_without_cookies_or_csrf() {
                 .unwrap(),
         )
         .await;
-    assert_eq!(post.body, "saved by Arif", "no CSRF token needed");
+    assert_eq!(post.body, "saved by Alex", "no CSRF token needed");
     assert!(
         user.tokens(kernel.db()).await.unwrap()[0]
             .last_used_at
@@ -395,7 +395,7 @@ async fn api_tokens_authenticate_without_cookies_or_csrf() {
         .send(
             bearer(
                 Request::get("/api/me"),
-                &format!("{}|salah", token.token.id),
+                &format!("{}|wrong", token.token.id),
             )
             .body(Body::empty())
             .unwrap(),
@@ -411,7 +411,7 @@ async fn api_tokens_authenticate_without_cookies_or_csrf() {
     // A bad token is a guest, and guarded routes answer 401 rather than a login redirect.
     let forged = api
         .send(
-            bearer(Request::post("/api/notes"), "1|salah")
+            bearer(Request::post("/api/notes"), "1|wrong")
                 .body(Body::empty())
                 .unwrap(),
         )

@@ -82,8 +82,8 @@ fn product(sku: &str, name: &str, price: i64, category_id: Option<i64>) -> Produ
     }
 }
 
-/// Coffee (active) with Kopi Susu 18k and Kopi Hitam 15k; Tea (inactive)
-/// with Teh Tarik 12k; Air Mineral 5k without a category.
+/// Coffee (active) with Milk Coffee 18k and Black Coffee 15k; Tea (inactive)
+/// with Pulled Tea 12k; Mineral Water 5k without a category.
 async fn shop() -> (TestApp, Category, Category) {
     let app = TestApp::new(App::new().migrations(&[SCHEMA])).await;
     let db = app.db();
@@ -108,10 +108,10 @@ async fn shop() -> (TestApp, Category, Category) {
     .await
     .unwrap();
     for p in [
-        product("K1", "Kopi Susu", 18_000, Some(coffee.id)),
-        product("K2", "Kopi Hitam", 15_000, Some(coffee.id)),
-        product("T1", "Teh Tarik", 12_000, Some(tea.id)),
-        product("A1", "Air Mineral", 5_000, None),
+        product("K1", "Milk Coffee", 18_000, Some(coffee.id)),
+        product("K2", "Black Coffee", 15_000, Some(coffee.id)),
+        product("T1", "Pulled Tea", 12_000, Some(tea.id)),
+        product("A1", "Mineral Water", 5_000, None),
     ] {
         Product::create(db, p).await.unwrap();
     }
@@ -126,18 +126,18 @@ fn names(products: &[Product]) -> Vec<&str> {
 async fn grouped_conditions_and_optional_filters() {
     let (app, coffee, _) = shop().await;
     let db = app.db();
-    // category = coffee AND (price < 16000 OR name LIKE '%susu%')
+    // category = coffee AND (price < 16000 OR name LIKE '%milk%')
     let found = Product::query()
         .where_eq("category_id", coffee.id)
         .where_any(|q| {
             q.where_op("price", "<", 16_000)
-                .where_like("name", "%SUSU%")
+                .where_like("name", "%MILK%")
         })
         .order_by("name")
         .get(db)
         .await
         .unwrap();
-    assert_eq!(names(&found), ["Kopi Hitam", "Kopi Susu"]);
+    assert_eq!(names(&found), ["Black Coffee", "Milk Coffee"]);
 
     // (price >= 15000 AND price <= 16000) OR category IS NULL
     let found = Product::query()
@@ -152,9 +152,9 @@ async fn grouped_conditions_and_optional_filters() {
         .get(db)
         .await
         .unwrap();
-    assert_eq!(names(&found), ["Air Mineral", "Kopi Hitam"]);
+    assert_eq!(names(&found), ["Black Coffee", "Mineral Water"]);
 
-    for (search, expected) in [("", 4), ("kopi", 2)] {
+    for (search, expected) in [("", 4), ("coffee", 2)] {
         let found = Product::query()
             .when(!search.is_empty(), |q| {
                 q.where_like("name", format!("%{search}%"))
@@ -207,7 +207,7 @@ async fn grouped_conditions_and_optional_filters() {
         .get(db)
         .await
         .unwrap();
-    assert_eq!(names(&active), ["Kopi Hitam", "Kopi Susu"]);
+    assert_eq!(names(&active), ["Black Coffee", "Milk Coffee"]);
 }
 
 #[renox::test]
@@ -231,7 +231,7 @@ async fn aggregates_and_pluck() {
     );
     assert_eq!(
         Product::query().max::<String, _>(db, "name").await.unwrap(),
-        Some("Teh Tarik".into())
+        Some("Pulled Tea".into())
     );
     let none = Product::where_eq("sku", "nope");
     assert_eq!(none.clone().sum::<i64, _>(db, "price").await.unwrap(), 0);
@@ -261,7 +261,7 @@ async fn bulk_updates_and_counters() {
         .await
         .unwrap();
     let changed = Product::where_eq("category_id", coffee.id)
-        .update(db, &[("stock", &10_i64), ("name", &"Kopi")])
+        .update(db, &[("stock", &10_i64), ("name", &"Coffee")])
         .await
         .unwrap();
     assert_eq!(changed, 2);
@@ -269,7 +269,7 @@ async fn bulk_updates_and_counters() {
         .first_or_404(db)
         .await
         .unwrap();
-    assert_eq!((after.stock, after.name.as_str()), (10, "Kopi"));
+    assert_eq!((after.stock, after.name.as_str()), (10, "Coffee"));
     assert!(after.updated_at >= before.updated_at);
 
     Product::where_eq("sku", "K1")
@@ -313,14 +313,14 @@ async fn first_or_create_chunk_insert_many_and_upsert() {
     let (app, _, _) = shop().await;
     let db = app.db();
     let made = Product::where_eq("sku", "N1")
-        .first_or_create(db, || product("N1", "Nasi", 20_000, None))
+        .first_or_create(db, || product("N1", "Rice", 20_000, None))
         .await
         .unwrap();
     let again = Product::where_eq("sku", "N1")
         .first_or_create(db, || product("N1", "Other", 1, None))
         .await
         .unwrap();
-    assert_eq!((made.id, again.name.as_str()), (again.id, "Nasi"));
+    assert_eq!((made.id, again.name.as_str()), (again.id, "Rice"));
 
     let many: Vec<Product> = (0..2500)
         .map(|i| product(&format!("B{i:04}"), &format!("Bulk {i}"), 1_000 + i, None))
@@ -348,8 +348,8 @@ async fn first_or_create_chunk_insert_many_and_upsert() {
     assert_eq!((seen, batches), (2500, vec![1000, 1000, 500]));
 
     let feed = vec![
-        product("K1", "Kopi Susu Besar", 22_000, None),
-        product("Z9", "Baru", 9_000, None),
+        product("K1", "Large Milk Coffee", 22_000, None),
+        product("Z9", "New", 9_000, None),
     ];
     Product::upsert(db, feed, &["sku"], &["name", "price"])
         .await
@@ -358,7 +358,7 @@ async fn first_or_create_chunk_insert_many_and_upsert() {
         .first_or_404(db)
         .await
         .unwrap();
-    assert_eq!((k1.name.as_str(), k1.price), ("Kopi Susu Besar", 22_000));
+    assert_eq!((k1.name.as_str(), k1.price), ("Large Milk Coffee", 22_000));
     assert!(k1.category_id.is_some(), "columns not in `update` are kept");
     assert!(Product::where_eq("sku", "Z9").exists(db).await.unwrap());
     assert!(
@@ -416,7 +416,7 @@ async fn fetch_as_reads_joins_into_structs_and_tuples() {
         .fetch_optional_as(db)
         .await
         .unwrap();
-    assert_eq!(model.unwrap().name, "Kopi Hitam");
+    assert_eq!(model.unwrap().name, "Black Coffee");
 }
 
 #[renox::test]

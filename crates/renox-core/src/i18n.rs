@@ -1,16 +1,17 @@
 //! Translations for app texts, and the language of each request.
 //!
-//! Texts live in `resources/lang/{locale}.json` (`LANG_PATH`), nested or flat:
+//! Renox ships English texts; an app adds its own languages as
+//! `resources/lang/{locale}.json` files (`LANG_PATH`, e.g. `es.json`), nested or flat:
 //!
 //! ```json
-//! { "produk": { "disimpan": ":nama tersimpan", "jumlah": "Satu produk|:count produk" } }
+//! { "products": { "saved": ":name guardado", "count": "Un producto|:count productos" } }
 //! ```
 //!
 //! ```
 //! # use renox::prelude::*;
-//! // templates: {{ t('produk.disimpan', nama='Kopi') }}  {{ t('produk.jumlah', count=3) }}
+//! // templates: {{ t('products.saved', name='Coffee') }}  {{ t('products.count', count=3) }}
 //! async fn store(lang: Lang, session: Session, back: Back) -> Result<Back> {
-//!     session.flash("status", lang.t("produk.disimpan", &[("nama", &"Kopi")]))?;
+//!     session.flash("status", lang.t("products.saved", &[("name", &"Coffee")]))?;
 //!     Ok(back)
 //! }
 //! # fn demo(session: &Session) -> Result {
@@ -227,8 +228,8 @@ pub(crate) fn builtin_text(locale: &str, key: &str) -> String {
         .map_or_else(|| key.to_owned(), |t| (*t).to_owned())
 }
 
-/// Texts Renox's own templates use (the UI kit), for English and Indonesian;
-/// an app's `lang/*.json` can change them.
+/// Texts Renox's own templates use (the UI kit), in English; an app's
+/// `lang/*.json` can change them or add other languages.
 fn builtin(locale: &str) -> Option<&'static HashMap<&'static str, &'static str>> {
     static EN: std::sync::LazyLock<HashMap<&str, &str>> = std::sync::LazyLock::new(|| {
         HashMap::from([
@@ -315,7 +316,7 @@ fn builtin(locale: &str) -> Option<&'static HashMap<&'static str, &'static str>>
             ("ui.grid.equals", "Equals"),
             (
                 "ui.grid.pattern_hint",
-                "% matches anything: kop% starts with “kop”.",
+                "% matches anything: cof% starts with “cof”.",
             ),
             ("ui.grid.min", "From"),
             ("ui.grid.max", "To"),
@@ -417,205 +418,8 @@ fn builtin(locale: &str) -> Option<&'static HashMap<&'static str, &'static str>>
             ("ui.grid.row_tools", "Row"),
         ])
     });
-    static ID: std::sync::LazyLock<HashMap<&str, &str>> = std::sync::LazyLock::new(|| {
-        HashMap::from([
-            ("ui.optional", "opsional"),
-            ("ui.cancel", "Batal"),
-            ("ui.close", "Tutup"),
-            ("ui.dismiss", "Tutup"),
-            ("ui.more", "Lainnya"),
-            ("ui.skip", "Langsung ke konten"),
-            ("ui.main_navigation", "Utama"),
-            ("ui.errors_title", "Periksa kembali isian yang ditandai."),
-            ("ui.show_password", "Tampilkan kata sandi"),
-            ("ui.hide_password", "Sembunyikan kata sandi"),
-            ("ui.copy", "Salin"),
-            ("ui.copied", "Tersalin"),
-            ("ui.choose_file", "Pilih berkas atau tarik ke sini"),
-            ("ui.choose_files", "Pilih berkas atau tarik ke sini"),
-            ("ui.current_file", "Berkas saat ini"),
-            ("ui.choose_date", "Pilih tanggal"),
-            ("ui.previous_month", "Bulan sebelumnya"),
-            ("ui.next_month", "Bulan berikutnya"),
-            ("ui.search", "Cari"),
-            ("ui.no_results", "Tidak ada yang cocok"),
-            ("ui.remove", "Hapus"),
-            ("ui.add_row", "Tambah baris"),
-            ("ui.move_up", "Pindah ke atas"),
-            ("ui.move_down", "Pindah ke bawah"),
-            ("ui.key", "Kunci"),
-            ("ui.value", "Nilai"),
-            ("ui.back", "Kembali"),
-            ("ui.next", "Lanjut"),
-            ("ui.since.now", "baru saja"),
-            ("ui.since.past", ":time yang lalu"),
-            ("ui.since.future", ":time lagi"),
-            ("ui.since.minutes", ":count menit"),
-            ("ui.since.hours", ":count jam"),
-            ("ui.since.days", ":count hari"),
-            ("ui.since.months", ":count bulan"),
-            ("ui.since.years", ":count tahun"),
-            ("ui.show_more", "Tampilkan :count lagi"),
-            ("ui.yes", "Ya"),
-            ("ui.no", "Tidak"),
-            ("ui.loading", "Memuat…"),
-            ("ui.chart.show_data", "Lihat datanya"),
-            ("ui.chart.other", "Lainnya"),
-            ("ui.stat.vs_previous", "dibanding periode sebelumnya"),
-            ("ui.period.label", "Periode"),
-            ("ui.period.7d", "7 hari"),
-            ("ui.period.30d", "30 hari"),
-            ("ui.period.90d", "90 hari"),
-            ("ui.period.12m", "12 bulan"),
-            ("ui.period.mtd", "Bulan ini"),
-            ("ui.period.ytd", "Tahun ini"),
-            ("ui.notifications.title", "Notifikasi"),
-            ("ui.notifications.bell", "Notifikasi"),
-            ("ui.notifications.unread", ":count belum dibaca"),
-            ("ui.notifications.unread_marker", "belum dibaca"),
-            ("ui.notifications.mark_all_read", "Tandai semua dibaca"),
-            ("ui.notifications.clear", "Hapus semua"),
-            ("ui.notifications.mark_read", "Tandai dibaca"),
-            ("ui.notifications.mark_unread", "Tandai belum dibaca"),
-            ("ui.notifications.delete", "Hapus"),
-            ("ui.notifications.empty", "Belum ada notifikasi"),
-            ("ui.notifications.empty_hint", "Tidak ada yang baru."),
-            ("ui.notifications.see_all", "Lihat semua"),
-            ("ui.notifications.older", "Lebih lama"),
-            ("ui.notifications.newest", "Terbaru"),
-            ("ui.notifications.open", "Buka"),
-            ("ui.notifications.loading", "Memuat…"),
-            ("ui.searching", "Mencari…"),
-            ("ui.load_failed", "Gagal memuat pilihan."),
-            ("ui.add_option", "Tambah “:value”"),
-            ("ui.edit", "Ubah"),
-            (
-                "ui.editing",
-                "Mengubah “:value”: Enter menyimpan, Esc batal.",
-            ),
-            ("ui.save_failed", "Gagal menyimpan."),
-            ("ui.grid.columns", "Kolom"),
-            ("ui.grid.filter", "Saring"),
-            ("ui.grid.apply", "Terapkan"),
-            ("ui.grid.clear", "Hapus"),
-            ("ui.grid.clear_all", "Hapus saringan"),
-            ("ui.grid.contains", "Mengandung"),
-            ("ui.grid.starts", "Diawali"),
-            ("ui.grid.ends", "Diakhiri"),
-            ("ui.grid.equals", "Sama dengan"),
-            (
-                "ui.grid.pattern_hint",
-                "% cocok dengan apa saja: kop% berarti diawali “kop”.",
-            ),
-            ("ui.grid.min", "Dari"),
-            ("ui.grid.max", "Sampai"),
-            ("ui.grid.from", "Dari"),
-            ("ui.grid.to", "Sampai"),
-            ("ui.grid.yes", "Ya"),
-            ("ui.grid.no", "Tidak"),
-            ("ui.grid.rows", "Baris"),
-            ("ui.grid.row_word", "baris|baris"),
-            ("ui.grid.of", "dari"),
-            ("ui.grid.previous", "Halaman sebelumnya"),
-            ("ui.grid.next", "Halaman berikutnya"),
-            ("ui.grid.page", "Halaman"),
-            ("ui.grid.empty", "Tidak ada yang cocok dengan saringan ini."),
-            ("ui.grid.empty_all", "Belum ada data."),
-            ("ui.grid.sort", "Urutkan"),
-            ("ui.grid.show", "Tampilkan di layar ini"),
-            ("ui.grid.freeze", "Bekukan"),
-            ("ui.grid.freeze_left", "Kiri"),
-            ("ui.grid.freeze_none", "Tidak"),
-            ("ui.grid.freeze_right", "Kanan"),
-            ("ui.grid.move_up", "Naikkan"),
-            ("ui.grid.move_down", "Turunkan"),
-            ("ui.grid.reset", "Atur ulang kolom"),
-            ("ui.grid.filtered", "tersaring"),
-            ("ui.grid.loading", "Memuat…"),
-            ("ui.grid.advanced", "Saringan lanjutan"),
-            ("ui.grid.match", "Tampilkan baris yang cocok dengan"),
-            ("ui.grid.match_all", "semua aturan"),
-            ("ui.grid.match_any", "salah satu aturan"),
-            ("ui.grid.add_rule", "Tambah aturan"),
-            ("ui.grid.remove_rule", "Hapus aturan"),
-            ("ui.grid.rule_column", "Kolom"),
-            ("ui.grid.rule_op", "Kondisi"),
-            ("ui.grid.rule_value", "Nilai"),
-            ("ui.grid.rule_word", "aturan|aturan"),
-            ("ui.grid.op.contains", "mengandung"),
-            ("ui.grid.op.not_contains", "tidak mengandung"),
-            ("ui.grid.op.equals", "sama dengan"),
-            ("ui.grid.op.not_equals", "tidak sama dengan"),
-            ("ui.grid.op.starts", "diawali"),
-            ("ui.grid.op.ends", "diakhiri"),
-            ("ui.grid.op.empty", "kosong"),
-            ("ui.grid.op.not_empty", "tidak kosong"),
-            ("ui.grid.op.eq", "="),
-            ("ui.grid.op.ne", "≠"),
-            ("ui.grid.op.gt", ">"),
-            ("ui.grid.op.gte", "≥"),
-            ("ui.grid.op.lt", "<"),
-            ("ui.grid.op.lte", "≤"),
-            ("ui.grid.op.on", "pada"),
-            ("ui.grid.op.before", "sebelum"),
-            ("ui.grid.op.after", "sesudah"),
-            ("ui.grid.op.is_true", "ya"),
-            ("ui.grid.op.is_false", "tidak"),
-            ("ui.grid.op.is", "adalah"),
-            ("ui.grid.op.is_not", "bukan"),
-            ("ui.grid.copy", "Salin"),
-            ("ui.grid.copied", "Tersalin"),
-            ("ui.grid.sum", "Total"),
-            ("ui.grid.average", "Rata-rata"),
-            ("ui.grid.range", "Rentang"),
-            ("ui.grid.count", "Jumlah"),
-            ("ui.grid.group_by", "Kelompok"),
-            ("ui.grid.no_groups", "Tanpa kelompok"),
-            ("ui.grid.all_rows", "Semua baris"),
-            ("ui.grid.group_rows", "Kelompok ini"),
-            ("ui.grid.select_page", "Pilih semua baris di halaman ini"),
-            ("ui.grid.select_row", "Pilih baris"),
-            ("ui.grid.selected", "dipilih"),
-            ("ui.grid.select_matching", "Pilih semua :total yang cocok"),
-            ("ui.grid.select_none", "Batalkan pilihan"),
-            ("ui.grid.actions", "Aksi"),
-            ("ui.grid.confirm", "Lanjutkan"),
-            ("ui.grid.all_matching", "semua yang cocok"),
-            ("ui.grid.search", "Cari"),
-            ("ui.grid.active_filters", "Saringan aktif"),
-            ("ui.grid.open", "Buka"),
-            ("ui.grid.resize", "Lebar kolom"),
-            (
-                "ui.grid.resize_hint",
-                "Seret untuk mengubah lebar, klik dua kali untuk lebar otomatis; seret judul untuk memindah kolom",
-            ),
-            ("ui.grid.export", "Ekspor"),
-            (
-                "ui.grid.export_hint",
-                "Semua baris yang cocok dengan saringan, dengan kolom pilihan Anda.",
-            ),
-            ("ui.grid.print", "Cetak atau simpan sebagai PDF"),
-            ("ui.grid.printed", "dicetak"),
-            ("ui.grid.back", "Kembali"),
-            ("ui.grid.created", "Dibuat"),
-            ("ui.grid.updated", "Terakhir diubah"),
-            ("ui.grid.details", "Detail"),
-            ("ui.grid.edit", "Ubah baris"),
-            ("ui.grid.save", "Simpan"),
-            (
-                "ui.grid.move",
-                "Seret untuk mengurutkan (atau pakai tombol panah)",
-            ),
-            (
-                "ui.grid.sort_to_move",
-                "Urutkan menurut urutan untuk memindah baris",
-            ),
-            ("ui.grid.row_tools", "Baris"),
-        ])
-    });
     match locale {
         "en" => Some(&EN),
-        "id" => Some(&ID),
         _ => None,
     }
 }
@@ -763,9 +567,8 @@ pub(crate) async fn middleware(
 ) -> Response {
     // In a block: nothing borrowing `req` may live across `next.run(req)` (§4.2).
     let locale = {
-        let available = |locale: &str| {
-            matches!(locale, "en" | "id") || state.translator.locales().iter().any(|l| l == locale)
-        };
+        let available =
+            |locale: &str| locale == "en" || state.translator.locales().iter().any(|l| l == locale);
         let chosen = req
             .extensions()
             .get::<Session>()
@@ -794,7 +597,7 @@ pub(crate) async fn middleware(
     res
 }
 
-/// The first language of an `Accept-Language` header (`id-ID,id;q=0.9,
+/// The first language of an `Accept-Language` header (`es-MX,es;q=0.9,
 /// en;q=0.8`) that `available` accepts, by quality: the whole tag
 /// (`pt-br`), then its language (`pt`).
 fn from_accept_language(header: &str, available: impl Fn(&str) -> bool) -> Option<String> {
@@ -832,7 +635,7 @@ pub(crate) fn request_locale(extensions: &axum::http::Extensions, state: &AppSta
 ///
 /// ```
 /// # use renox::prelude::*;
-/// async fn index(lang: Lang) -> String { lang.t("welcome", &[("name", &"Arif")]) }
+/// async fn index(lang: Lang) -> String { lang.t("welcome", &[("name", &"Anna")]) }
 /// ```
 #[derive(Clone)]
 pub struct Lang {
@@ -909,57 +712,57 @@ mod tests {
 
     #[test]
     fn accept_language_picks_the_first_available() {
-        let ours = |l: &str| matches!(l, "en" | "id" | "pt-br");
+        let ours = |l: &str| matches!(l, "en" | "es" | "pt-br");
         assert_eq!(
-            from_accept_language("id-ID,id;q=0.9,en;q=0.8", ours).as_deref(),
-            Some("id")
+            from_accept_language("es-MX,es;q=0.9,en;q=0.8", ours).as_deref(),
+            Some("es")
         );
         assert_eq!(
             from_accept_language("fr, en;q=0.5", ours).as_deref(),
             Some("en")
         );
         assert_eq!(
-            from_accept_language("en;q=0.2, id;q=0.9", ours).as_deref(),
-            Some("id")
+            from_accept_language("en;q=0.2, es;q=0.9", ours).as_deref(),
+            Some("es")
         );
         assert_eq!(
             from_accept_language("PT-BR", ours).as_deref(),
             Some("pt-br")
         );
         assert_eq!(from_accept_language("de, fr;q=0.8", ours), None);
-        assert_eq!(from_accept_language("id;q=0, *", ours), None);
+        assert_eq!(from_accept_language("es;q=0, *", ours), None);
         assert_eq!(from_accept_language("", ours), None);
         assert_eq!(from_accept_language("en;q=abc", ours), None);
     }
 
     #[test]
     fn formats_placeholders_and_plurals() {
-        let p = [("nama", "kopi".to_owned())];
-        assert_eq!(format(":Nama, :nama!", &p, None), "Kopi, kopi!");
+        let p = [("name", "coffee".to_owned())];
+        assert_eq!(format(":Name, :name!", &p, None), "Coffee, coffee!");
         assert_eq!(
-            format("Satu produk|:count produk", &[], Some(1)),
-            "Satu produk"
+            format("One product|:count products", &[], Some(1)),
+            "One product"
         );
         assert_eq!(
-            format("Satu produk|:count produk", &[], Some(4)),
-            "4 produk"
+            format("One product|:count products", &[], Some(4)),
+            "4 products"
         );
         // Like Laravel: 0 and negative counts take the plural form.
         assert_eq!(
-            format("Satu produk|:count produk", &[], Some(0)),
-            "0 produk"
+            format("One product|:count products", &[], Some(0)),
+            "0 products"
         );
         assert_eq!(format("one|:count many", &[], Some(-1)), "-1 many");
         // Without a plural form the text is used as it is.
         assert_eq!(format(":count item", &[], Some(3)), "3 item");
         // Laravel's ranges.
-        let ranged = "{0} Belum ada pesan|[1,5] Ada :count pesan|[6,*] Banyak pesan (:count)";
-        assert_eq!(format(ranged, &[], Some(0)), "Belum ada pesan");
-        assert_eq!(format(ranged, &[], Some(1)), "Ada 1 pesan");
-        assert_eq!(format(ranged, &[], Some(5)), "Ada 5 pesan");
-        assert_eq!(format(ranged, &[], Some(40)), "Banyak pesan (40)");
+        let ranged = "{0} No messages yet|[1,5] :count messages|[6,*] Many messages (:count)";
+        assert_eq!(format(ranged, &[], Some(0)), "No messages yet");
+        assert_eq!(format(ranged, &[], Some(1)), "1 messages");
+        assert_eq!(format(ranged, &[], Some(5)), "5 messages");
+        assert_eq!(format(ranged, &[], Some(40)), "Many messages (40)");
         assert_eq!(
-            format("[*,-1] minus|{0} nol|[1,*] :count", &[], Some(-3)),
+            format("[*,-1] minus|{0} zero|[1,*] :count", &[], Some(-3)),
             "minus"
         );
         // No range matches: the last text.

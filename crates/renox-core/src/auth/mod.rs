@@ -3,32 +3,32 @@
 //!
 //! ```
 //! # #[derive(Model, serde::Serialize, Default)]
-//! # #[model(table = "produk")]
-//! # struct Produk { id: i64, nama: String, harga: i64, kategori: Option<String>, user_id: i64 }
+//! # #[model(table = "products")]
+//! # struct Product { id: i64, name: String, price: i64, category: Option<String>, user_id: i64 }
 //! # use renox::prelude::*;
-//! # impl Policy for Produk { fn allows(&self, user: &User, _: &str) -> bool { self.user_id == user.id } }
+//! # impl Policy for Product { fn allows(&self, user: &User, _: &str) -> bool { self.user_id == user.id } }
 //! # let _ =
 //! App::new()
 //!     .module(Auth::new())                       // /login, /register, /logout
-//!     .gate("admin", |user| user.email.ends_with("@toko.id"))
-//!     .module(Toko)
+//!     .gate("admin", |user| user.email.ends_with("@shop.example"))
+//!     .module(Shop)
 //! # ;
 //!
-//! struct Toko;
+//! struct Shop;
 //!
-//! impl Module for Toko {
-//! #   fn name(&self) -> &'static str { "toko" }
+//! impl Module for Shop {
+//! #   fn name(&self) -> &'static str { "shop" }
 //!     fn routes(&self) -> Routes {
 //!         Routes::new()
-//!             .get("/produk/{id}/edit", edit)
+//!             .get("/products/{id}/edit", edit)
 //!             .require_auth()                    // everything above needs a login
 //!     }
 //! }
 //!
 //! async fn edit(auth: AuthUser, State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
-//!     let produk = Produk::find_or_404(&db, id).await?;
-//!     auth.authorize("update", &produk)?;        // 403 unless the policy allows it
-//!     Ok(view("produk/edit.html", context! { produk }))
+//!     let product = Product::find_or_404(&db, id).await?;
+//!     auth.authorize("update", &product)?;       // 403 unless the policy allows it
+//!     Ok(view("products/edit.html", context! { product }))
 //! }
 //! ```
 
@@ -84,10 +84,10 @@ const INTENDED: &str = "_intended";
 ///
 /// ```
 /// # #[derive(Model, serde::Serialize, Default)]
-/// # #[model(table = "produk")]
-/// # struct Produk { id: i64, nama: String, harga: i64, kategori: Option<String>, user_id: i64 }
+/// # #[model(table = "products")]
+/// # struct Product { id: i64, name: String, price: i64, category: Option<String>, user_id: i64 }
 /// # use renox::prelude::*;
-/// impl Policy for Produk {
+/// impl Policy for Product {
 ///     fn allows(&self, user: &User, ability: &str) -> bool {
 ///         match ability {
 ///             "update" | "delete" => self.user_id == user.id,

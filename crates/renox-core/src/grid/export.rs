@@ -395,14 +395,14 @@ mod tests {
         let urls = urls(
             "/orders",
             &[
-                ("q.name".into(), "kopi susu".into()),
+                ("q.name".into(), "iced coffee".into()),
                 ("per_page".into(), "25".into()),
             ],
             "per_page",
             "export",
         );
-        assert_eq!(urls["csv"], "/orders?q.name=kopi+susu&export=csv");
-        assert_eq!(urls["print"], "/orders?q.name=kopi+susu&export=print");
+        assert_eq!(urls["csv"], "/orders?q.name=iced+coffee&export=csv");
+        assert_eq!(urls["print"], "/orders?q.name=iced+coffee&export=print");
         assert_eq!(urls["xlsx"].is_string(), cfg!(feature = "xlsx"));
     }
 }

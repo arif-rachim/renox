@@ -3,10 +3,10 @@
 //! ```
 //! # use renox::prelude::*;
 //! # use std::time::Duration;
-//! # #[derive(Model, serde::Serialize, serde::Deserialize, Default)] struct Produk { id: i64, nama: String }
+//! # #[derive(Model, serde::Serialize, serde::Deserialize, Default)] struct Product { id: i64, name: String }
 //! # async fn demo(state: AppState) -> Result {
-//! let menu: Vec<Produk> = state.cache.remember("menu", Duration::from_secs(600), || async {
-//!     Produk::query().order_by("nama").get(&state.db).await
+//! let menu: Vec<Product> = state.cache.remember("menu", Duration::from_secs(600), || async {
+//!     Product::query().order_by("name").get(&state.db).await
 //! }).await?;
 //! state.cache.forget("menu").await?;   // after the menu changes
 //! # let _ = menu; Ok(()) }

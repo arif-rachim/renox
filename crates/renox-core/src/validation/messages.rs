@@ -1,21 +1,20 @@
-/// Languages with built-in validation messages, from `APP_LOCALE`.
+/// The language of the built-in validation messages. Renox ships English
+/// only; an app translates the messages in its lang files
+/// (`renox.validation.<key>`, e.g. in `resources/lang/es.json`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub enum Locale {
     /// English (`en`), the default.
     #[default]
     En,
-    /// Indonesian (`id`).
-    Id,
 }
 
 impl Locale {
-    /// `en` or `id`; anything else falls back to English.
+    /// The built-in messages for `value`: English for every locale, since
+    /// other languages come from the app's lang files.
     pub fn parse(value: &str) -> Self {
-        match value.to_ascii_lowercase().as_str() {
-            "id" | "id-id" | "id_id" => Self::Id,
-            _ => Self::En,
-        }
+        let _ = value;
+        Self::En
     }
 }
 
@@ -88,70 +87,6 @@ pub(crate) fn template(locale: Locale, key: &str) -> &'static str {
             "auth.throttle" => "Too many login attempts. Please try again in :seconds seconds.",
             _ => "The :attribute is invalid.",
         },
-        Locale::Id => match key {
-            "required" => ":Attribute wajib diisi.",
-            "min.string" => ":Attribute minimal :min karakter.",
-            "min.numeric" => ":Attribute minimal :min.",
-            "min.array" => ":Attribute minimal berisi :min item.",
-            "max.string" => ":Attribute maksimal :max karakter.",
-            "max.numeric" => ":Attribute maksimal :max.",
-            "max.array" => ":Attribute maksimal berisi :max item.",
-            "between.string" => ":Attribute harus antara :min sampai :max karakter.",
-            "between.numeric" => ":Attribute harus antara :min sampai :max.",
-            "between.array" => ":Attribute harus berisi :min sampai :max item.",
-            "min.file" => ":Attribute minimal :min kilobyte.",
-            "max.file" => ":Attribute maksimal :max kilobyte.",
-            "between.file" => ":Attribute harus antara :min sampai :max kilobyte.",
-            "file" => ":Attribute harus berupa file.",
-            "image" => ":Attribute harus berupa gambar.",
-            "mimes" => ":Attribute harus berupa file bertipe: :values.",
-            "email" => ":Attribute harus berupa alamat email yang valid.",
-            "url" => ":Attribute harus berupa URL yang valid.",
-            "in" => ":Attribute yang dipilih tidak valid.",
-            "confirmed" => "Konfirmasi :attribute tidak cocok.",
-            "password.letters" => ":Attribute harus berisi setidaknya satu huruf.",
-            "password.mixed" => {
-                ":Attribute harus berisi setidaknya satu huruf besar dan satu huruf kecil."
-            }
-            "password.numbers" => ":Attribute harus berisi setidaknya satu angka.",
-            "password.symbols" => ":Attribute harus berisi setidaknya satu simbol.",
-            "current_password" => ":Attribute salah.",
-            "accepted" => ":Attribute harus disetujui.",
-            "unique" => ":Attribute sudah digunakan.",
-            "exists" => ":Attribute yang dipilih tidak valid.",
-            "numeric" => ":Attribute harus berupa angka.",
-            "regex" => "Format :attribute tidak valid.",
-            "digits" => ":Attribute harus :digits digit.",
-            "digits_between" => ":Attribute harus antara :min sampai :max digit.",
-            "date" => ":Attribute bukan tanggal yang valid.",
-            "before" => ":Attribute harus tanggal sebelum :date.",
-            "before_or_equal" => ":Attribute harus tanggal sebelum atau sama dengan :date.",
-            "after" => ":Attribute harus tanggal setelah :date.",
-            "after_or_equal" => ":Attribute harus tanggal setelah atau sama dengan :date.",
-            "not_in" => ":Attribute yang dipilih tidak valid.",
-            "same" => ":Attribute dan :other harus sama.",
-            "different" => ":Attribute dan :other harus berbeda.",
-            "alpha" => ":Attribute hanya boleh berisi huruf.",
-            "alpha_num" => ":Attribute hanya boleh berisi huruf dan angka.",
-            "alpha_dash" => {
-                ":Attribute hanya boleh berisi huruf, angka, tanda hubung dan garis bawah."
-            }
-            "lowercase" => ":Attribute harus huruf kecil.",
-            "uppercase" => ":Attribute harus huruf besar.",
-            "starts_with" => ":Attribute harus diawali salah satu dari: :values.",
-            "ends_with" => ":Attribute harus diakhiri salah satu dari: :values.",
-            "uuid" => ":Attribute harus UUID yang valid.",
-            "ip" => ":Attribute harus alamat IP yang valid.",
-            "size.string" => ":Attribute harus :size karakter.",
-            "size.numeric" => ":Attribute harus :size.",
-            "size.array" => ":Attribute harus berisi :size item.",
-            "size.file" => ":Attribute harus :size kilobyte.",
-            "prohibited" => ":Attribute harus dikosongkan di sini.",
-            "distinct" => ":Attribute sudah ada sebelumnya.",
-            "auth.failed" => "Email atau kata sandi salah.",
-            "auth.throttle" => "Terlalu banyak percobaan masuk. Coba lagi dalam :seconds detik.",
-            _ => ":Attribute tidak valid.",
-        },
     }
 }
 
@@ -188,22 +123,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn renders_both_languages() {
+    fn renders_the_english_messages() {
         let params = [("min", "3".to_owned())];
         assert_eq!(
-            render(template(Locale::En, "min.string"), "nama", &params),
-            "The nama must be at least 3 characters."
+            render(template(Locale::En, "min.string"), "name", &params),
+            "The name must be at least 3 characters."
         );
         assert_eq!(
-            render(template(Locale::Id, "min.string"), "nama", &params),
-            "Nama minimal 3 karakter."
+            render(":Attribute needs :min.", "name", &params),
+            "Name needs 3."
         );
-        assert_eq!(Locale::parse("ID"), Locale::Id);
+        assert_eq!(Locale::parse("es"), Locale::En);
         assert_eq!(Locale::parse("fr"), Locale::En);
     }
 
     #[test]
-    fn every_rule_has_its_own_message_in_both_languages() {
+    fn every_rule_has_its_own_message() {
         for key in [
             "regex",
             "digits",
@@ -235,11 +170,6 @@ mod tests {
             assert_ne!(
                 template(Locale::En, key),
                 "The :attribute is invalid.",
-                "{key}"
-            );
-            assert_ne!(
-                template(Locale::Id, key),
-                ":Attribute tidak valid.",
                 "{key}"
             );
         }

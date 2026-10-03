@@ -297,15 +297,21 @@ mod tests {
 
     #[test]
     fn makes_urls_absolute_and_escapes() {
-        assert_eq!(absolute("https://toko.id/", "/a"), "https://toko.id/a");
-        assert_eq!(absolute("https://toko.id", "a"), "https://toko.id/a");
         assert_eq!(
-            absolute("https://toko.id", "https://cdn.x/y.png"),
+            absolute("https://shop.example/", "/a"),
+            "https://shop.example/a"
+        );
+        assert_eq!(
+            absolute("https://shop.example", "a"),
+            "https://shop.example/a"
+        );
+        assert_eq!(
+            absolute("https://shop.example", "https://cdn.x/y.png"),
             "https://cdn.x/y.png"
         );
         assert_eq!(
-            escape(r#"Kopi & "Teh" <b>"#),
-            "Kopi &amp; &quot;Teh&quot; &lt;b&gt;"
+            escape(r#"Coffee & "Tea" <b>"#),
+            "Coffee &amp; &quot;Tea&quot; &lt;b&gt;"
         );
     }
 }
