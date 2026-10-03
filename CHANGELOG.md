@@ -10,6 +10,23 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### v1.0 · The starter kit and the semver promise (V1e)
+
+- **`rnx new <name> --starter`:** the starter kit (Breeze and Jetstream as the yardstick),
+  written over the plain app: the kit's sidebar layout with the notification bell; `Auth`
+  with email verification, the account pages and notifications, landing on `/dashboard`;
+  roles (`admin`, `member`) with the `Permissions` module, every sign-up a member; a dashboard
+  (sign-ups over a period, a chart, the person's recent activity); a users page where admins
+  change roles (recorded in the activity log); the activity log page (`Audit`, a grid with
+  exports); a `users:admin <email>` command for the first admin; a seeder; seven tests.
+  Works with `--database postgres` and `--tailwind`.
+- **docs/stability.md** states the 1.x promise: code keeps compiling (checked by
+  cargo-semver-checks), deprecation before removal in 2.0, data and sessions survive
+  upgrades, jobs queued by one 1.x release run on later ones, settings keep their names and
+  defaults, security fixes for the previous minor release for six months (SECURITY.md too),
+  the MSRV rises only to a Rust release six months old, generated files are the app's.
+- `tests/cli/run.sh` makes, lints and tests a starter app (CI's `cli` job).
+
 ### v1.0 · The documentation site, the tutorial and the Laravel guide (V1d)
 
 - **`site/`** (package `renox-site`, not published): the documentation site, a Renox app on

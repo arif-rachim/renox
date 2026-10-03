@@ -1,0 +1,17 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import card, link_button, page_header %}
+
+{% block content %}
+<div class="rx-stack">
+  {{ page_header(app.name, subtitle=t('home.tagline')) }}
+  {% call card() %}
+    <p>{{ t('home.running') }}</p>
+    {% if auth.check %}
+    {{ link_button(route('dashboard'), "Go to the dashboard", variant="primary") }}
+    {% else %}
+    <p>{{ link_button(route('register'), "Create an account", variant="primary") }} {{ link_button(route('login'), "Log in") }}</p>
+    {% endif %}
+    <p class="rx-subtitle">{{ t('home.edit') }}</p>
+  {% endcall %}
+</div>
+{% endblock %}

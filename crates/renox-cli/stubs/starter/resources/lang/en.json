@@ -1,0 +1,7 @@
+{
+  "home": {
+    "tagline": "Made with the Renox starter kit.",
+    "running": "Your Renox app is running: sign up, verify your email, and the dashboard opens.",
+    "edit": "Edit resources/views/home/index.html and refresh: templates reload without a rebuild."
+  }
+}

@@ -71,7 +71,9 @@ stash/
 ```
 
 The database is SQLite, in `storage/app.db`, made on first use. Pass `--database postgres` to
-`rnx new` to start on PostgreSQL instead ([postgresql.md](postgresql.md)).
+`rnx new` to start on PostgreSQL instead ([postgresql.md](postgresql.md)). This tutorial
+builds from the plain app; `rnx new stash --starter` would start from the starter kit instead
+(email verification, roles, a dashboard, a users page and the activity log, already written).
 
 Two files are worth reading now. `src/main.rs` is one line:
 

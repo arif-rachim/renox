@@ -40,6 +40,10 @@
   Blade, form requests, middleware, queues…) with the Renox way side by side and what is
   different. Compiled as doctests (`LaravelGuide`).
 - [site/](site): the documentation site, a Renox app that serves these files.
+- `rnx new <name> --starter` (files in crates/renox-cli/stubs/starter/): a whole app to start
+  from: sidebar layout with the notification bell, email verification, roles (`Permissions`),
+  a dashboard, a users page that changes roles, the activity log (`Audit`), `users:admin`,
+  a seeder and tests.
 
 ## Examples (complete apps, tested in CI)
 
