@@ -476,7 +476,7 @@ Every POST, PUT, PATCH and DELETE must carry the session's token; without it the
 - **API tokens** (`Authorization: Bearer`) skip CSRF: browsers never send them on their own.
   A Bearer token that doesn't authenticate gets 401.
 - **No session at all** (a payment gateway): `.without_csrf()` on those routes, and check the
-  request's signature instead. `Routes::webhook::<W>()` does both for you.
+  request's signature instead. `Routes::webhook::<W>("/webhooks/stripe")` does both for you.
 
 ## Method spoofing
 

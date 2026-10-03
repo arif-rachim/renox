@@ -4,7 +4,8 @@ Renox pages are MiniJinja templates sent as HTML, updated in place with htmx. Th
 covers:
 
 - components (macros that see the request);
-- the UI kit that ships with Renox (`renox/ui.html`);
+- the UI kit that ships with Renox (`renox/ui.html`): form fields, the page's frame (navigation
+  bar, sidebar, page headers), themes and type, infolists, actions and dashboards;
 - toasts;
 - fragments and out-of-band swaps;
 - htmx response headers;
@@ -91,15 +92,15 @@ Then import what a page needs:
 | `radio(name, label, options, selected=…, inline=…, columns=…)` | One choice out of a few, all visible, in a `fieldset` with the label as its legend. An option is a value, `[value, label]` or `[value, label, description]`. |
 | `checkbox_list(name, label, options, selected=[…], inline=…, columns=…)` | Several choices: each ticked option sends `name` once, so the form field is a `Vec` with `#[serde(default)]` (nothing ticked sends nothing). |
 | `toggle_buttons(name, label, options, selected=…, multiple=…)` | The options as a row of buttons, the pressed ones filled and checked: one choice (a radio group underneath) or, with `multiple`, several (checkboxes). |
-| `file(name, label, accept=…, multiple=…, preview=…, current=…)` | A drop zone that is also the button; the chosen files are listed under it, images with a thumbnail when `preview`. `current` is the URL of the file stored now. The form needs `enctype="multipart/form-data"`, the field is an `Upload` (`Vec<Upload>` with `multiple`). |
+| `file(name, label, accept=…, multiple=…, preview=…, current=…, current_name=…)` | A drop zone that is also the button; the chosen files are listed under it, images with a thumbnail when `preview`. `current` is the URL of the file stored now (`current_name` the name shown for it). The form needs `enctype="multipart/form-data"`, the field is an `Upload` (`Vec<Upload>` with `multiple`). |
 | `date_picker(name, label, value=…, min=…, max=…)` | A date typed as `2026-10-02` or picked in a calendar (Cally, in a popover under the field, its month named in the page's language). Sent as `YYYY-MM-DD`, like `<input type="date">`: a `NaiveDate`. Without JavaScript it is a text field. |
 | `show_when(field, values)` + `hide_when(field, values)` | Fields shown (or hidden) while another field has one of `values`. Hidden fields are disabled, so the form doesn't send them; check them on the server with `required_if`. Without JavaScript they stay visible. |
 | `select(…, multiple=true, searchable=true)` | Several values (a `Vec`), and a box to type in that filters the options, with the chosen ones as chips. The native select stays underneath: the form sends the same thing, and it works without JavaScript. |
 | `select(…, options_url=…, editable=true)` | The options come from the server as you type (`renox::select`), for lists too long for the page. `editable`: what was typed can be added ("Add “…”") and is chosen at once, and the chosen option can be renamed (the pencil). See "Options from the server" below. |
 | `tags_input(name, label, value=[…], suggestions=[…])` | Free text as chips: Enter or a comma adds one, Backspace in the empty box removes the last. A `Vec<String>`. |
-| `repeater(name, label, rows=[…], min=…, max=…)` with `{% call(row, prefix) %}` | Rows added, removed and moved by the user, each with the fields of the call block, named `name[0][field]` and renumbered as rows move. A `Vec` of a struct, checked with `v.nested`. Adding a row needs JavaScript. |
+| `repeater(name, label, rows=[…], min=…, max=…, item_label=…, add_label=…, reorderable=true)` with `{% call(row, prefix) %}` | Rows added, removed and moved by the user (`reorderable=false` keeps their order), each with the fields of the call block, named `name[0][field]` and renumbered as rows move. A `Vec` of a struct, checked with `v.nested`. Adding a row needs JavaScript. |
 | `key_value(name, label, value=…)` | Pairs of text (a repeater with a key and a value per row): `KeyValues`. |
-| `wizard(id, steps, submit_label)` + `wizard_step(id, key)` | A form in steps. Next checks the step (the browser's rules, then the server's with `data-live-validate`); after a failed submit the first step with an error opens. Without JavaScript all steps show. |
+| `wizard(id, steps, submit_label, back_label=…, next_label=…)` + `wizard_step(id, key, title=…)` | A form in steps. Next checks the step (the browser's rules, then the server's with `data-live-validate`); after a failed submit the first step with an error opens. Without JavaScript all steps show. |
 | `form_grid(columns=2)`, `fieldset(legend, hint=…, columns=…)` | Fields side by side from tablet width up (one column on phones), and a titled group of fields in a long form. A field's `span=2` or `span="full"` makes it wider. |
 
 Every field also takes `id`, `disabled` (the field isn't sent) and `span`; `input` and
@@ -283,7 +284,7 @@ A back office puts its sections down the side instead:
 
 ```html
 <body class="rx-page rx-shell">
-  {% from "renox/ui.html" import sidebar, sidebar_link, sidebar_section, navbar %}
+  {% from "renox/ui.html" import sidebar, sidebar_link, sidebar_section, navbar, notification_bell %}
   {% call sidebar(company.name, href=route('home')) %}
     {{ sidebar_link(route('home'), "Dashboard", active=route_is('home')) }}
     {{ sidebar_link(route('invoices.index'), "Invoices", active=route_is('invoices.*')) }}
@@ -307,7 +308,7 @@ A back office puts its sections down the side instead:
 | `row_actions()` | A table row's buttons at the end of the row; icons only on phones (labels stay for screen readers). |
 | `list(id=…, label=…)` | Rows in a surface, each an `<li>` you write; `rx-list__main` on the part that takes the room left (`rx-list__main--done` strikes it through). Rows can be fragments htmx adds and swaps. |
 | `columns(count=2)` | Columns from tablet width up, one on phones (a photo next to its details). |
-| `card_grid()` + `media_card(href, title, image=…, subtitle=…, note=…, dimmed=…)` | Cards with a picture in a grid that fills the row (each at least 13rem; set `--rx-card-min` for another width). |
+| `card_grid()` + `media_card(href, title, image=…, image_alt="", subtitle=…, note=…, dimmed=…)` | Cards with a picture in a grid that fills the row (each at least 13rem; set `--rx-card-min` for another width). |
 | `link_tabs(items, current=…, label=…)` | Links that look like a segmented control, for sections or filters that are URLs: `items` are `[href, label]` pairs. `tabs` switches panels on one page instead. |
 | `thumbnail(src, alt="", href=…)` | A small square picture, e.g. in a table row. |
 | `progress(value, max=100, label=…, show_value=true)` | A native `<progress>` in the kit's colours, with the percentage next to it. |
@@ -315,8 +316,8 @@ A back office puts its sections down the side instead:
 
 Classes without a macro: `rx-page--fill` on `<body>` makes the page as tall as the screen with
 `<main>` taking the rest (for a data grid that fills the screen, `rx-grid-fill`); `rx-image`
-is a picture as wide as its column. Fields take `hide_label=true` (the label stays for screen
-readers, e.g. a quantity in a table row), and `confirm` takes `cancel_label` ("Keep order")
+is a picture as wide as its column. `input`, `textarea`, `select` and `checkbox` take
+`hide_label=true` (the label stays for screen readers, e.g. a quantity in a table row), and `confirm` takes `cancel_label` ("Keep order")
 and `fields` (hidden values sent with it, `{"status": "cancelled"}`).
 
 Build pages from these and the components above rather than writing your own: an app's

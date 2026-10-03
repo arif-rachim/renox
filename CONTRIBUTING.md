@@ -62,13 +62,20 @@ cargo test --workspace
   Breaking changes go in [CHANGELOG.md](CHANGELOG.md) under "Breaking".
 
 Other CI jobs you can run locally when your change touches their area:
-`tests/chaos/run.sh sqlite|postgres`, the S3 tests (see the top of
-`crates/renox/tests/it/s3.rs`), `cargo hack check -p renox-core -p renox --each-feature
---no-dev-deps` and `cargo deny check`.
+`cargo clippy -p renox --no-default-features -- -D warnings`, the guard against C crypto in
+default builds (`cargo tree -p hello -e normal -i aws-lc-rs` must print nothing),
+`tests/chaos/run.sh sqlite|postgres`, `tests/cli/run.sh sqlite|postgres`, the S3 tests (see
+the top of `crates/renox/tests/it/s3.rs`, and `cargo test -p uploads --features s3`),
+`cargo hack check -p renox-core -p renox --each-feature --no-dev-deps` and `cargo deny check`.
+
+- **UI changes.** Check pages in a real browser (desktop, a phone width, dark mode): several
+  bugs only showed there (see CLAUDE.md §6.4).
 
 ## Style
 
 - Code reads like the code around it: plain names, short functions, comments that say *why*.
+- Everything in the repository is in English: code, comments, docs, example content, tests
+  and commit messages. An example that needs a second language uses Spanish.
 - Docs and messages are in plain English with short sentences. Error messages say what to do
   next (`there is no module `x`; create it with `rnx make:module x``).
 - Commit messages explain what changed and why, with the details a reviewer needs.

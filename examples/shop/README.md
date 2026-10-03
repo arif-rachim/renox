@@ -109,7 +109,7 @@ them to the `sessions` table (tests/shop.rs runs a customer with it). `deploy/` 
   `class_names('product-card', {'product-card--sold-out': product.stock == 0})`.
 - **Redirects by route name.** After checkout, `Redirect::route("orders.show", &[&order.id])?`;
   the admin goes back with `Redirect::route("admin.products.index", &[])?`. The admin nav marks
-  its section with `route_is('admin.products.*')` (`views/admin/_nav.html`).
+  its section with `route_is('admin.products.*')` ([resources/views/admin/_nav.html](resources/views/admin/_nav.html), the kit's `link_tabs`).
 - **Save only what you changed.** A status change uses `order.save_only(db, &["status"])`, so it
   never writes back stale copies of the other columns.
 

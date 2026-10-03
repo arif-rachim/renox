@@ -4,8 +4,9 @@ Who may do what, and to which rows. Renox has one tool per question; this guide 
 reach for each and how they fit together. For the short version of every API, see the
 [cheat-sheet](../CHEATSHEET.md) ("Auth, policies, gates" and "Tenants, roles and permissions").
 Complete apps: [examples/shop](../examples/shop) (an admin role, an audit trail),
-[examples/api](../examples/api) (token abilities), [examples/crud](../examples/crud) (a policy)
-and [examples/teams](../examples/teams) (tenants).
+[examples/api](../examples/api) (token abilities), [examples/crud](../examples/crud) (a policy),
+[examples/teams](../examples/teams) (tenants) and [examples/backoffice](../examples/backoffice)
+(roles made of permissions, `require_permission` per section, an activity log).
 
 | Question | Tool | Where it's checked |
 |---|---|---|

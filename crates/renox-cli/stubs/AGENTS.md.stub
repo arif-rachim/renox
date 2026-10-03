@@ -13,9 +13,15 @@ one Renox version (the `renox` line in `Cargo.toml`); the links below are for th
 - **llms.txt**, a map from every topic to a guide or an example file: {{renox_docs}}/llms.txt
 - **Whole apps:** `examples/shop` shows how everything fits (catalog, cart, checkout in a
   transaction, queued mail, admin); `examples/htmx-recipes` for interactive pages;
-  `examples/relations` for related tables; `examples/grid` for a data grid (filters, search,
-  editing in place, bulk actions, totals, exports). Every example has a README.
-- **Guides:** `docs/relations.md` (relations are explicit: load a page's relations with
+  `examples/relations` for related tables (and a public blog with Markdown, SEO, RSS and a
+  sitemap); `examples/grid` for a data grid (filters, search, editing in place, bulk actions,
+  totals, exports); `examples/backoffice` for a back office (sidebar, grids, invoices, payment
+  webhooks, CSV import, roles, activity log); `examples/teams` for a multi-tenant SaaS.
+  Every example has a README.
+- **Guides:** `docs/routing.md` (routes, groups, middleware, sessions, cookies, signed URLs),
+  `docs/validation.md` (forms, rules, `#[derive(Validate)]`, hooks), `docs/mail.md` (mail and
+  notifications), `docs/scheduling.md` (schedules, events, cache and locks, commands),
+  `docs/relations.md` (relations are explicit: load a page's relations with
   `relations::belongs_to` / `has_many` / `Pivot`, one query each, never one per row),
   `docs/types.md` (form field → Rust type → column), `docs/ui.md` (the UI kit, toasts,
   fragments, live validation), `docs/grid.md` (data grids with `renox::grid`: columns,
@@ -104,16 +110,16 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   A record's page (show) is an infolist, not hand-written markup: `{% call infolist(columns=2) %}`
   with `entry(label, value, format="money"|"date"|"since"|"bool"|…, badge=…)`; prices go
   through `| money` (`APP_CURRENCY`), never a hand-made "Rp" filter.
-  In-app notifications: `to_database` returns a `DatabaseMessage` (title, body, url), and
   Dashboards: `renox::chart::Trend::of(query, "created_at").over(period).sum(&state, "total")`
   with the `Period` extractor, then `stat(…)`, `chart("line", series, format="money")`,
   `widget(…)` and `period_filter(period)` in the template; no chart library.
-  An action that asks for a few values is `{% call action_sheet(id, label, url, title,
+  An action that asks for a few values is `{% call action_sheet(id, label, action, title,
   method="PUT") %}…fields…{% endcall %}`, not a page of its own: the handler returns
   `(Toast, HxRefresh)`, and a 422 stays in the sheet. With one per row, give each sheet and
   its fields their own `id`. Icon-only buttons are `icon_button(icon, label, …)` (the label
   is the accessible name); shortcuts are `key="mod+s"`; a button that can't be used yet
   takes `disabled_reason="…"`.
+  In-app notifications: `to_database` returns a `DatabaseMessage` (title, body, url), and
   `Auth::new().notifications()` + `{{ notification_bell(unread_notifications) }}` in the
   layout gives the list, the badge and live updates (SSE: behind nginx, `proxy_buffering off`).
   Toasts can carry `.body(…)`, `.link(label, url)`, `.seconds(n)`/`.persistent()`.

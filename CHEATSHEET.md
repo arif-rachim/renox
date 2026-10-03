@@ -27,7 +27,7 @@ rnx migrate                          # migrate:status, migrate:fresh --seed, db:
 rnx migrate:rollback --step 2        # the last 2 batches (default 1)
 rnx route:list                       # db:shell, schedule:list, schedule:run NAME, cache:prune, session:prune
 rnx queue:work --queue mail --workers 2  # --once: run what is queued, then stop
-rnx queue:failed                     # queue:retry <id|all>, queue:flush (deletes them)
+rnx queue:failed                     # queue:retry <id|all>, queue:forget <id>, queue:flush (deletes them)
 rnx queue:prune-failed --hours 168   # failed jobs older than that (the default); queue:prune-batches [--hours 24]
 rnx ui:publish                       # the UI kit (components/ui.html + its CSS) into the app; --force replaces
 rnx schedule:work                    # tasks in their own process (SCHEDULER=false for serve)
@@ -218,7 +218,8 @@ e.g. `renox/error.html`, `renox/auth/login.html` (also
 `register`, `forgot-password`, `reset-password`, `verify-email`, `account`, `confirm-password`,
 `layout`), `renox/mail/layout.html`, `renox/mail/button.html`, `renox/mail/components.html`,
 `renox/mail/auth/reset-password.html` / `.txt`, `renox/mail/auth/verify-email.html` / `.txt`,
-`renox/queue/dashboard.html` and `renox/pagination.html`. The pagination macros must be imported:
+`renox/queue/dashboard.html`, `renox/notifications.html`, `renox/grid.html` and
+`renox/pagination.html` (`rnx ui:publish` copies the kit, `renox/ui.html`, as `components/ui.html`). The pagination macros must be imported:
 `{% from "renox/pagination.html" import pagination, simple_pagination %}` (`simple_pagination`
 for a `simple_paginate` page).
 
@@ -257,6 +258,13 @@ fn view_extras(app: App) -> App {
 {{ page_header("Products", subtitle="All items", back=route('home')) }}
 {% call toolbar() %}{{ link_button(route('products.create'), "New product") }}{% endcall %} {# above a table #}
 {# in a table row: {% call row_actions() %}…icon buttons…{% endcall %}; also list(), card_grid() + media_card(href, title, image=…), link_tabs(items, current=…), progress(42) #}
+{# A back office: <body class="rx-page rx-shell">, then {% call sidebar(app.name) %}{{ sidebar_section("Sales") }}{{ sidebar_link(…) }}{% endcall %}
+   and <div class="rx-shell__main">{{ navbar(none, width="full", skip=false) }}<main class="rx-shell__content" id="main">…</main></div>.
+   Also thumbnail(src), menu_button(label) in a menu, hide_label=true on a field (label kept for
+   screen readers), <body class="rx-page rx-page--fill"> for a page that fills the window.
+   Themes: the warm default (Inter + Poppins, served by Renox); data-rx-theme="classic" on <html>
+   for the first look; your CSS uses the type scale: font: var(--rx-type-heading) (also -display,
+   -title, -lead, -body, -label, -note, -caption) and the brand token --rx-accent. #}
 {% from "renox/ui.html" import card, input, select, checkbox, radio, checkbox_list, toggle_buttons, show_when, date_picker, file, tags_input, key_value, repeater, form_grid, button, confirm, table, form_errors %}
 {# Several steps: {% call wizard("id", [["a", "First"], ["b", "Second"]], submit_label="Save") %} with wizard_step("id", "a") blocks #}
 <form method="post" action="/products" data-live-validate novalidate>{{ csrf_field() }}
@@ -711,7 +719,7 @@ async fn edit(state: &AppState, id: i64) -> Result {
 ```
 
 Hooks run for `save`, `create`/`insert`, `save_only`, `save_changes`, `delete` and `force_delete`, not
-for bulk `Query::update`/`delete` or `insert_many`.
+for bulk `Query::update`/`delete`, `insert_many` or `upsert`.
 
 ## Every field type (details in docs/types.md)
 
@@ -1444,7 +1452,7 @@ follow `url`), new ones live over Server-Sent Events (a toast + the badge), and 
 
 Mail views can `{% from "renox/mail/components.html" import button, panel, table, divider %}`:
 `{{ button(url, t('mail.track')) }}`, `{% call panel() %}…{% endcall %}`,
-`{{ table(rows, head=[…], total=[…]) }}`. `state.mail_view_in("id", …)` renders in a given
+`{{ table(rows, head=[…], total=[…]) }}`. `state.mail_view_in("es", …)` renders in a given
 language; `state.lang("es").t(…)` and `renox::i18n::set_current_locale("es")` (for the rest of
 a job) help code outside a request.
 
@@ -1835,7 +1843,7 @@ table, no 4 KB limit, a new id at each login/logout), `MAIL_FROM_ADDRESS`, `MAIL
 `CACHE_STORE` (`memory` | `database`: with several servers, also shares rate limits and the login lock),
 `STORAGE_DISK` (`local` | `s3`, with `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`,
 `S3_SECRET_ACCESS_KEY`, and `STORAGE_URL` for the bucket's public URL), `UPLOAD_MAX_SIZE` (MB, 10),
-`LOG_FORMAT` (`text` | `json`), `LOG_FILE` (append to this file instead of stdout),
+`RUST_LOG` (e.g. `info,sqlx=warn`), `LOG_FORMAT` (`text` | `json`), `LOG_FILE` (append to this file instead of stdout),
 `CSP` (`relaxed` | `strict` | `off`), `TRUSTED_PROXIES` (`127.0.0.1,10.0.0.0/8` or `*`: behind a
 proxy, rate limits, the login lock, logs and the `ClientIp` extractor use `X-Forwarded-For`).
 Timeouts in seconds: `DATABASE_ACQUIRE_TIMEOUT` (5), `DATABASE_STATEMENT_TIMEOUT` (30,

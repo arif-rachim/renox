@@ -8,6 +8,9 @@ Instead, Renox gives you:
 - loaders that fetch the related rows of a whole page in one query;
 - plain SQL, read into structs, when a join is the clearest way.
 
+[`examples/relations`](../examples/relations) shows all of them on a small blog (belongs to,
+has many, a pivot with columns of its own, a polymorphic relation, counts and reports).
+
 The examples below use this schema:
 
 ```sql

@@ -231,7 +231,7 @@ examples/                  workspace members, each with a README.md and its own 
                            Tailwind (resources/css/app.css → committed public/css/app.css)
   grid/                    a sales dashboard on one data grid (renox::grid): phone and desktop
                            columns, filters by kind, frozen columns, grouped headings, sparklines
-  backoffice/              an UMKM back office (Filament's demo as the yardstick): grids,
+  backoffice/              a small business's back office (Filament's demo as the yardstick): grids,
                            invoices issued from a stock ledger, payment pages + webhooks,
                            CSV import, exports from a job, roles, activity log, settings,
                            branded sign-in pages (resources/views/renox/auth/layout.html)
@@ -268,8 +268,10 @@ docs/operations.md         production: timeouts, proxies, /health, failure table
                            with tests/chaos/run.sh), failed jobs/webhooks, backups, deploys
                            without refused connections, sessions, logs, error reports, error
                            pages, the debug inspector (doctest `OperationsGuide`)
-docs/audit/                pre-1.0 audit (2026-09-pre-1.0.md), Laravel parity review
-                           (2026-09-laravel-parity.md) and gap report (2026-09-laravel-gap-report.pdf)
+docs/audit/                pre-1.0 audit (2026-09-pre-1.0.md, closed), Laravel parity review
+                           (2026-10-laravel-parity.md, current as of M32) and its English
+                           summary (2026-10-laravel-gap-report.pdf, printed from HTML by
+                           headless Chrome)
 docs/assets/demo.gif       the README's demo (see §4.10)
 .github/workflows/ci.yml   CI jobs (see §4.11)
 ```
@@ -846,7 +848,7 @@ picks the build, not the terminal.
 
 ## 7. Where things stand (update this section when it changes)
 
-- **All milestones M0–M28 are merged to `main`** (M28e: #84); the owner's B/C/D before
+- **All milestones M0–M32 are merged to `main`** (M32: #108); the owner's B/C/D before
   1.0 were M23–M25. History:
   `CHANGELOG.md` (per milestone) and `ROADMAP.md` (per-milestone notes and decisions).
 - After M17: a docs refresh (#45) and the Laravel parity review with M18–M21 planned (#46).
@@ -1016,6 +1018,11 @@ picks the build, not the terminal.
 - **M32** (English only, asked by the owner: no Indonesian anywhere in the repo, the built-in
   `id` locale dropped, Spanish as the examples' second language; framework tests use
   `crates/renox/tests/lang/es.json`): merged (#108).
+- **Docs refresh after M32** (asked by the owner: the README, the guides and the Laravel parity
+  review, which was still the M17 snapshot): the review rewritten for today
+  (`docs/audit/2026-10-laravel-parity.md`), the Indonesian PDF replaced by an English one,
+  every guide, CHEATSHEET, llms.txt and example README checked against the code: branch
+  `docs-refresh-m32`.
 - **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.
@@ -1024,7 +1031,8 @@ picks the build, not the terminal.
   conversation that planned M26) ranked them: release and docs first, then 2FA and social
   login, then small adds (validation rules like `json`/`gt`/`decimal`/`dimensions`, several
   storage disks, route model binding), then admin, search, realtime (SSE) and billing.
-- As of M28: ~60k lines of Rust in `crates/` (stubs excluded), ~650 `#[test]`/`#[renox::test]`/
-  `#[tokio::test]` functions in `crates/` and `examples/` (plus doctests), and 44 direct
-  dependencies in renox-core (6 optional; pulldown-cmark came with the `markdown` filter, #94).
+- As of M32: ~65k lines of Rust in `crates/` (stubs excluded) and ~16k in the fourteen
+  examples, ~770 `#[test]`/`#[renox::test]`/`#[tokio::test]` functions in `crates/` and
+  `examples/` (plus doctests), and 44 direct dependencies in renox-core (6 optional;
+  pulldown-cmark came with the `markdown` filter, #94).
   Keep dependencies lean and remove unused ones.

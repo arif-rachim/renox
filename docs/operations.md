@@ -5,6 +5,31 @@ dependencies, the proxy in front of it, health checks, backups, and how to recov
 webhooks that failed. For setting up the server itself, see the `deploy/README.md` that
 `rnx make:deploy` writes.
 
+## The app's commands
+
+The app binary is its own command line (`my-app help` lists it; `rnx <command>` runs it through
+`cargo run` while developing). Without a command it runs `serve`: the web server, the queue
+workers and the scheduler.
+
+| Command | What it does |
+|---|---|
+| `migrate`, `migrate:rollback [--step N]`, `migrate:fresh [--seed]`, `migrate:status` | Migrations (see Deploys and migrations). |
+| `db:seed` | Runs the seeders. |
+| `db:shell` | SQL against the app's database (`.tables`, `.quit`), on SQLite or PostgreSQL. |
+| `queue:work [--queue a,b] [--workers N] [--once]` | Workers in a process of their own. |
+| `queue:failed`, `queue:retry <id\|all>`, `queue:forget <id>`, `queue:flush`, `queue:prune-failed [--hours N]`, `queue:prune-batches [--hours N]` | Failed jobs and finished batches (see Failed jobs). |
+| `webhook:failed`, `webhook:retry <id>` | Failed webhook calls (see Failed webhook calls). |
+| `cache:prune`, `session:prune` | Expired cache rows and database sessions. |
+| `schedule:list`, `schedule:run <task>`, `schedule:work` | The scheduler (`schedule:work` when `serve` runs with `SCHEDULER=false`). |
+| `route:list` | Every route with its name, module and guards. |
+| `ui:publish [--force]` | Copies the UI kit into the app (`resources/views/components/ui.html`, `public/css/renox-ui.css`) to change it there. |
+| `down [--secret S] [--retry N]`, `up` | Maintenance mode. |
+| `tokens:prune`, `notifications:prune [--days N]` | Added by the `Auth` module: expired API tokens, read notifications. |
+| `audit:prune [--days N]` | Added by the `Audit` module. |
+
+The app's own commands (`App::command`, `App::typed_command`) sit next to these and can't take
+their names.
+
 ## Timeouts
 
 When something the app depends on stops answering, requests fail quickly instead of piling up.
@@ -194,7 +219,7 @@ sent, so signatures can be checked again.
 **Files.** Uploads live in `STORAGE_PATH/app` (or the S3 bucket). Back that directory up too.
 
 **Keys.** Keep `.env`'s `APP_KEY` with the backups. Without it, sessions end, signed links
-stop working, the app's encrypted cookies (`SetCookie::encrypted`, read with
+(`signed_url`, the local disk's `temporary_url`s, email verification links) stop working, the app's encrypted cookies (`SetCookie::encrypted`, read with
 `Cookies::get_encrypted`) read as missing, and maintenance bypass cookies stop letting people
 through. `Encrypted<T>` model fields, values the app sealed with `state.encrypt`, and
 queued jobs with encrypted
@@ -316,7 +341,9 @@ The flag file lives in `STORAGE_PATH`, so every process that shares that directo
 
 ## Logs
 
-- Logs go to stdout. Their level is set with `RUST_LOG` (e.g. `RUST_LOG=info,sqlx=warn`).
+- Logs go to stdout. Their level is set with `RUST_LOG` (e.g. `RUST_LOG=info,sqlx=warn`). Without
+  it, `serve`, `queue:work` and `schedule:work` log at `info` (`info,renox=debug` with
+  `APP_DEBUG`), and every other command only warnings.
 - `LOG_FORMAT=json` writes one JSON object per line, for Loki, Datadog, CloudWatch or
   `jq`. The request's fields are in `span`:
 

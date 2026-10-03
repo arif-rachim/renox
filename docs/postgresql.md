@@ -9,6 +9,9 @@ outgrows that:
 
 The code stays the same on both: models, the query builder, `renox::db::sql()`, auth, the queue,
 the cache, the scheduler, `db:shell` and `migrate:*` all work on both databases.
+[`examples/postgres`](../examples/postgres) is one app that runs on both (only `DATABASE_URL`
+and one migration file differ), and [`examples/fields`](../examples/fields) maps every field
+type to its column on each.
 
 ## Starting a new app on PostgreSQL
 
@@ -54,9 +57,9 @@ A migration file runs on every database unless there's a version for a specific 
 
 | File | Used on |
 |---|---|
-| `20260101000000_create_produk.up.sql` | every database without its own version |
-| `20260101000000_create_produk.postgres.up.sql` | PostgreSQL |
-| `20260101000000_create_produk.sqlite.up.sql` | SQLite |
+| `20260101000000_create_products.up.sql` | every database without its own version |
+| `20260101000000_create_products.postgres.up.sql` | PostgreSQL |
+| `20260101000000_create_products.sqlite.up.sql` | SQLite |
 
 The same goes for `.down.sql`. A database-specific `up` without its own `down` falls back to the
 plain `.down.sql`, which is usually a plain `DROP TABLE`. The plain `up` may be left out when

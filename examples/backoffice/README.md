@@ -1,6 +1,6 @@
 # Back office example
 
-The back office of a small business (an UMKM): customers, products with a
+The back office of a small business: customers, products with a
 stock ledger, invoices from draft to paid, online payments through Midtrans
 or Xendit, staff with roles, the activity log and the company's settings.
 It is what Filament's demo shows for Laravel, built from Renox's parts: data
@@ -70,9 +70,9 @@ There is no sign-up page: staff are added by an admin. Log in as
 | Staff | `src/app/staff.rs` |
 | Activity log | `src/app/activity.rs` (a model over `audit_logs`) |
 | Settings | `src/app/settings.rs`, shared as `company` (`src/lib.rs`) |
-| Dashboard | `src/app/dashboard.rs`, `dashboard/show.html` |
+| Dashboard | `src/app/dashboard.rs`, `resources/views/dashboard/show.html` |
 | The frame (all from the kit) | `resources/views/layouts/app.html`: `rx-shell`, `sidebar`, `navbar`, `page_header`s in the pages |
-| Branded sign-in | `resources/views/renox/auth/layout.html` (the built-in layout with the brand mark), `layouts/_brand.html` (the settings' colour as the kit's `--rx-accent`) |
+| Branded sign-in | `resources/views/renox/auth/layout.html` (the built-in layout with the brand mark), `resources/views/layouts/_brand.html` (the settings' colour as the kit's `--rx-accent`) |
 | Tests | `tests/backoffice.rs` |
 
 ## Patterns worth copying
