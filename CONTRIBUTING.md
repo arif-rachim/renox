@@ -66,7 +66,9 @@ Other CI jobs you can run locally when your change touches their area:
 default builds (`cargo tree -p hello -e normal -i aws-lc-rs` must print nothing),
 `tests/chaos/run.sh sqlite|postgres`, `tests/cli/run.sh sqlite|postgres`, the S3 tests (see
 the top of `crates/renox/tests/it/s3.rs`, and `cargo test -p uploads --features s3`),
-`cargo hack check -p renox-core -p renox --each-feature --no-dev-deps` and `cargo deny check`.
+`cargo hack check -p renox-core -p renox --each-feature --no-dev-deps`, `cargo deny check`, and
+`cargo semver-checks -p renox-core -p renox --baseline-rev origin/main --release-type minor`
+(public API changes; `cargo install --locked cargo-semver-checks`). Releases: [RELEASING.md](RELEASING.md).
 
 - **UI changes.** Check pages in a real browser (desktop, a phone width, dark mode): several
   bugs only showed there (see CLAUDE.md §6.4).

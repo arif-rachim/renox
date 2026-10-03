@@ -11,6 +11,11 @@ homepage.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
+# docs.rs builds the API reference with these features on, so the PostgreSQL,
+# UUID and Excel APIs are documented too. Not `s3`: it builds aws-lc (C, cmake).
+[package.metadata.docs.rs]
+features = ["postgres", "uuid", "xlsx"]
+
 [features]
 default = ["fake", "http", "server-events"]
 # `renox::fake`, for factories with fake data.

@@ -10,6 +10,25 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+### v1.0 · Release readiness (V1a)
+
+The first step towards 1.0, which the owner started after M34: everything needed to publish
+the crates, without publishing them yet.
+
+- `renox`, `renox-core` and `renox-macros` pin each other exactly (`=` in the workspace's
+  dependencies): they're released in lockstep, as the macros write code against renox-core's
+  items of the same release (docs/stability.md says so).
+- `renox-macros` keeps `renox` as a path-only dev-dependency, like `renox-core`, so
+  `cargo publish` drops it and the publish order (macros → core → renox → cli) has no cycle.
+- docs.rs builds `renox` and `renox-core` with `postgres`, `uuid` and `xlsx`.
+- `rnx new` from an `rnx` installed with `cargo install renox-cli` makes apps depend on that
+  release (`renox = { version = "1.2" }`), with AGENTS.md linking to the docs at its tag; an
+  `rnx` installed from git still pins the commit.
+- A `semver checks` CI job compares pull requests' public API with their base branch
+  (`cargo semver-checks --release-type minor`), informational until the first release.
+- RELEASING.md: the release checklist (crates.io account, `cargo login`, version, changelog,
+  dry runs, publish order, tag, checks, a release candidate first, yanking).
+
 ### M34 · The rest of the parity review's small additions
 
 - `Field::current_password()`: the logged-in user's password (Laravel's `current_password`).

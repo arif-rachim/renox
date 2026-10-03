@@ -7,6 +7,11 @@ commit that `rnx` was built from.
 
 [semantic versioning]: https://semver.org
 
+The crates `renox`, `renox-core` and `renox-macros` are released together with the same
+version and pin each other exactly: the macros write code against renox-core's items of the
+same release. Depend on `renox` only; the other two follow it. `renox-cli` (`rnx`) has the
+same version and makes apps depend on its own release.
+
 ## What 1.x may add without a major release
 
 - **New fields on these structs.** Build them with their constructors, `Default` or

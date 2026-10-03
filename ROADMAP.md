@@ -1571,13 +1571,19 @@ Notes from M34:
       (resource tables and forms); billing later
 
 ### v1.0
-On hold until the owner starts it (M18–M28, which came first, are merged).
+Started by the owner on 2026-10-03, after M34. In steps, one PR each:
+- [x] V1a, release readiness: lockstep versions (`=`), path-only dev-dependencies (no publish
+      cycle), docs.rs metadata, `rnx new` from crates.io, RELEASING.md
+- [x] cargo-semver-checks in CI (moved from M16b): against the base branch with
+      `--release-type minor` until the first release, then against crates.io
+- [ ] V1b, the API audit's fixes (the owner chose all of A and B, except renaming `gate` to
+      `authorize_gate`): enums for settings, `Duration` lifetimes, `Notification` and
+      `Job::failed` signatures, `Upload`/`Migration` encapsulated, no `Locale`, sealed traits…
 - [ ] Documentation site built with Renox: a tutorial, a "Laravel → Renox" guide, the API
       reference; a starter kit; the semver stability guarantee
-- [ ] cargo-semver-checks in CI against the last release (moved from M16b)
 - [ ] Real crates published to crates.io (`renox`, `renox-core`, `renox-macros`, `renox-cli`;
-      only 0.0.1 placeholders exist), then crates.io/docs.rs badges and `cargo install renox-cli`
-      in the README
+      only 0.0.1 placeholders exist; the owner runs `cargo login` and RELEASING.md), then
+      crates.io/docs.rs badges and `cargo install renox-cli` in the README
 
 ### UI kit · Form fields next to Filament's forms
 

@@ -18,12 +18,23 @@ fn main() {
         .or_else(checkout_rev);
     if let Some(rev) = rev {
         println!("cargo:rustc-env=RENOX_GIT_REV={rev}");
+    } else if from_registry() {
+        // `cargo install renox-cli`: new apps depend on this release.
+        println!("cargo:rustc-env=RENOX_FROM_CRATES_IO=1");
     }
     if let Some(dir) = git(&["rev-parse", "--git-dir"]) {
         println!("cargo:rerun-if-changed={dir}/HEAD");
         println!("cargo:rerun-if-changed={dir}/refs/heads");
     }
     println!("cargo:rerun-if-changed=build.rs");
+}
+
+/// `cargo install renox-cli` builds in `~/.cargo/registry/src/<index>/renox-cli-<version>/`.
+fn from_registry() -> bool {
+    std::env::var("CARGO_MANIFEST_DIR").is_ok_and(|dir| {
+        let dir = dir.replace('\\', "/");
+        dir.contains("/registry/src/")
+    })
 }
 
 /// `cargo install --git` builds in `~/.cargo/git/checkouts/<repo>/<short rev>/`,

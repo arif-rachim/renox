@@ -40,7 +40,8 @@ Cargo.toml                 workspace: members crates/*, examples/*, tests/chaos;
                            metadata; rust-version (MSRV); argon2 opt-level for dev builds
 README.md                  front page (compiled as doctests: `ReadMe`)
 ROADMAP.md, CHANGELOG.md   plan + decisions; changes per milestone
-CONTRIBUTING.md            checks every change needs; SECURITY.md: reporting vulnerabilities
+CONTRIBUTING.md            checks every change needs; SECURITY.md: reporting vulnerabilities;
+                           RELEASING.md: publishing to crates.io (the owner runs it)
 CHEATSHEET.md              one-page patterns for app authors/agents (compiled: `CheatSheet`)
 llms.txt                   map for agents: which example/guide file shows what
 deny.toml                  cargo-deny: licenses, advisories, banned crates, sources
@@ -672,7 +673,10 @@ PostgreSQL suite 2.5x slower (reconnects).
   postgres; `tests/chaos/run.sh`), **MSRV (1.94)**, **feature matrix** (`cargo hack check -p
   renox-core -p renox --each-feature --no-dev-deps`), **cli** (sqlite, postgres;
   `tests/cli/run.sh`), **docker** (`make:deploy` image answers `/health`), **s3** (SeaweedFS; renox's `it/s3.rs` and examples/uploads),
-  **cargo-deny**, **coverage** (informational).
+  **cargo-deny**, **coverage** (informational), **semver checks** (pull requests:
+  `cargo semver-checks -p renox-core -p renox --baseline-rev origin/<base> --release-type
+  minor`, informational until the first release; install it with `cargo install --locked
+  cargo-semver-checks` to run it locally).
 - MSRV is `rust-version` in the workspace `Cargo.toml` (1.94, set by sqlx 0.9); the `msrv` job
   uses the same number, so raise both together and note it in CHANGELOG.md.
 - After pushing, watch CI (`gh run watch <id> -R arif-rachim/renox --exit-status`) and tick the
@@ -863,7 +867,7 @@ picks the build, not the terminal.
 
 ## 7. Where things stand (update this section when it changes)
 
-- **All milestones M0–M33 are merged to `main`** (M33: #112; M34 on a branch); the owner's B/C/D before
+- **All milestones M0–M34 are merged to `main`** (M34: #114); the owner's B/C/D before
   1.0 were M23–M25. History:
   `CHANGELOG.md` (per milestone) and `ROADMAP.md` (per-milestone notes and decisions).
 - After M17: a docs refresh (#45) and the Laravel parity review with M18–M21 planned (#46).
@@ -1046,9 +1050,14 @@ picks the build, not the terminal.
   `Validator::finish_for`, session `keep`/`now`, named error bags, `App::mailer` +
   `MAIL_FAILOVER`, `has_many_through`): merged (#114). Async rule checks live in
   `Validator::checks` and run in `finish_with` after the database ones.
-- **Next, the owner's call after M26:** v1.0 (API audit, `cargo-semver-checks`, real
+- **v1.0 started** (the owner, 2026-10-03, after M34). V1a (release readiness: lockstep `=`
+  versions, path-only dev-deps, docs.rs metadata, `rnx new` from crates.io, the semver CI
+  job, RELEASING.md): branch `v1a-release-ready`. Next V1b, the API audit's fixes (the owner
+  chose all A and B findings except `gate` → `authorize_gate`), then the docs site and the
+  publish, which the owner runs (`cargo login`, RELEASING.md).
+- **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
-  Laravel guide, a starter kit). **v1.0 is on hold** until the owner says to start it.
+  Laravel guide, a starter kit). 
 - **Still open** (ROADMAP `- [ ]`): the plugins (`renox-2fa`,
   `renox-oauth`, `renox-admin`, separate crates). A Laravel gap review after M25 (in the
   conversation that planned M26) ranked them: release and docs first, then 2FA and social
