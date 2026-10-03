@@ -1,0 +1,19 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, list, empty %}
+
+{% block seo %}{{ seo(title="Search · Renox") }}{% endblock %}
+
+{% block content %}
+<div class="site-narrow rx-stack">
+  {{ page_header("Search", subtitle=("Pages with “" ~ q ~ "”") if q else "Every word you type must appear on the page.") }}
+  {%- if q and hits %}
+  {% call list(label="Results") %}
+    {%- for hit in hits %}
+    <li><a class="rx-list__main site-hit" href="{{ route('docs.show', hit.slug) }}"><strong>{{ hit.title }}</strong><span class="site-hit__snippet">{{ hit.snippet }}</span></a></li>
+    {%- endfor %}
+  {% endcall %}
+  {%- elif q %}
+  {{ empty("Nothing found", "Try fewer or other words, or browse the guides in the sidebar.") }}
+  {%- endif %}
+</div>
+{% endblock %}

@@ -441,6 +441,8 @@ Not planned: runtime-reflected Eloquent-style models, Redis, and a REPL.
 
 ## Documentation
 
+- [The tutorial](docs/tutorial.md): build one app from `rnx new` to a server, step by step.
+- [Coming from Laravel](docs/laravel.md): each Laravel concept and its Renox counterpart.
 - [CHEATSHEET.md](CHEATSHEET.md): one short, compiled example per task.
 - Guides: [routing and middleware](docs/routing.md), [validation](docs/validation.md),
   [views and the UI kit](docs/ui.md), [the data grid](docs/grid.md), [mail and notifications](docs/mail.md),
@@ -479,7 +481,8 @@ review (after M17), milestones M18–M32 closed its gaps:
 - **M34:** the rest of the review's small additions: `current_password`, the breach check,
   session `keep`/`flash_now`, named error bags, several mailers with failover, `has_many_through`.
 
-Next is 1.0: a documentation site with a tutorial and a Laravel guide, semver checks, and the
+Next is 1.0: the API is audited, semver is checked in CI, and the documentation site
+([`site/`](site), with the tutorial and the Laravel guide) is written; what's left is the
 first real release on crates.io (today's crates there are placeholders, so install from Git
 as above). Until then the API may still change; breaking changes are listed in
 [CHANGELOG.md](CHANGELOG.md).

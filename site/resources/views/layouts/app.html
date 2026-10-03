@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  {% block seo %}{{ seo(title="Renox: Laravel's productivity, Rust's performance") }}{% endblock %}
+  {{ renox_head() }}
+  {{ renox_ui() }}
+  <link rel="stylesheet" href="{{ asset('site.css') }}">
+</head>
+{#- The kit's shell: the guides in a sidebar, the page beside it. -#}
+<body class="rx-page rx-shell">
+  {% from "renox/ui.html" import sidebar, sidebar_link, sidebar_section, navbar %}
+  {% call sidebar("Renox", href=route('home'), label="Documentation") %}
+    {%- for section in nav %}
+    {{ sidebar_section(section.title) }}
+    {%- for page in section.pages %}
+    {{ sidebar_link(route('docs.show', page.slug), page.nav, active=(page.slug == current)) }}
+    {%- endfor %}
+    {%- endfor %}
+  {% endcall %}
+  <div class="rx-shell__main">
+    {% call navbar(none, width="full", skip=false, label="Search and links") %}
+      <form class="site-search" action="{{ route('search') }}" method="get" role="search">
+        <label class="rx-visually-hidden" for="site-search">Search the docs</label>
+        <input class="rx-input" id="site-search" type="search" name="q" placeholder="Search the docs" value="{{ q if q is defined else '' }}">
+      </form>
+      <span class="rx-spacer"></span>
+      <a class="rx-navbar__link" href="{{ repository }}">GitHub</a>
+    {% endcall %}
+    <main class="rx-shell__content" id="main">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</body>
+</html>

@@ -2358,6 +2358,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "renox-site"
+version = "0.0.0"
+dependencies = [
+ "pulldown-cmark",
+ "renox",
+ "serde",
+]
+
+[[package]]
 name = "reqwest"
 version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"

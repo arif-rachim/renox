@@ -25,7 +25,7 @@
   translations (plurals and ranges, the browser's language); session `push`/`increment`;
   factory states and sequences; domain and fallback routes, `Redirect::route`/`intended`,
   `route_is`, `class_names`, `{% break %}`; route model binding (`Found`), view and redirect
-  routes, ETags; `has_many_through`; named error bags; session `keep`/`now`; signed URLs, private files and named disks; CSP, CORS, `xsrf_cookie`,
+  routes, ETags; `has_many_through`; named error bags; session `keep`/`flash_now`; signed URLs, private files and named disks; CSP, CORS, `xsrf_cookie`,
   `TRUSTED_HOSTS` and webhooks; SEO and analytics; tests; form requests (`prepare`, `authorize`, `after`),
   `#[derive(Validate)]` and the full rule list; typed app commands
   (clap) and prompts; stacks (`push`/`stack`);
@@ -33,6 +33,13 @@
   `App::report`, named rate limiters, `/_renox/debug`); configuration (`.env` and your own
   settings).
 - [README.md](README.md): install `rnx`, create and run an app, the generator commands.
+- [docs/tutorial.md](docs/tutorial.md): one app (Stash, a bookmarks app) built step by step, from
+  `rnx new` to a server: model and migration, list page, htmx form, policy, a scheduled mail job,
+  tests and a factory, deploying with systemd. Compiled as doctests (`TutorialGuide`).
+- [docs/laravel.md](docs/laravel.md): Laravel → Renox, concept by concept (artisan, Eloquent,
+  Blade, form requests, middleware, queues…) with the Renox way side by side and what is
+  different. Compiled as doctests (`LaravelGuide`).
+- [site/](site): the documentation site, a Renox app that serves these files.
 
 ## Examples (complete apps, tested in CI)
 

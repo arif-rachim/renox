@@ -52,7 +52,7 @@ crates/renox/              facade crate apps depend on: re-exports renox-core, t
                            ReadMe, CheatSheet, TypesGuide, RelationsGuide, AuthorizationGuide,
                            QueueGuide, UiGuide, GridGuide, ValidationGuide, RoutingGuide,
                            MailGuide, SchedulingGuide, TestingGuide, OperationsGuide,
-                           MacroCompileErrors
+                           TutorialGuide, LaravelGuide, MacroCompileErrors
   tests/it/                ONE integration-test binary (main.rs + a module per area); add new areas
                            as `mod x;` in main.rs. Notable modules: send_handlers.rs (every data
                            API in a routed handler), web_security.rs, data_resilience.rs,
@@ -248,6 +248,12 @@ examples/                  workspace members, each with a README.md and its own 
                            gate_before, Encrypted<String>, a form request checked live, public
                            team pages on their own host (Routes::domain), a wizard with a
                            repeater, a datalist
+site/                      the documentation site (package `renox-site`, publish = false): a Renox
+                           app that compiles the repo's Markdown in (src/content.rs lists the
+                           pages, src/render.rs: pulldown-cmark, anchors, TOC, hidden doctest
+                           lines, links → /docs/{slug} or GitHub), search, sitemap, ETags;
+                           deploy/ has its systemd units. A new guide in docs/ needs a line in
+                           content.rs PAGES (and site/build.rs already watches docs/)
 tests/chaos/               app + run.sh (postgres|sqlite) that the `chaos` CI job injects faults
                            into (docker pause/stop/restart, python3 holding SQLite's lock)
 tests/cli/run.sh           `rnx new` + every `make:*`, then build and test the app (CI `cli`/`docker`)
@@ -264,6 +270,8 @@ docs/scheduling.md         scheduler, events, cache and locks, app commands (doc
                            `SchedulingGuide`)
 docs/testing.md            TestApp: requests, assertions, fakes, time travel, browser tests
                            (doctest `TestingGuide`)
+docs/tutorial.md           one app (Stash) from `rnx new` to deploy (doctest `TutorialGuide`)
+docs/laravel.md            Laravel → Renox, concept by concept (doctest `LaravelGuide`)
 docs/types.md              HTML input ↔ Rust ↔ SQLite ↔ PostgreSQL (doctest `TypesGuide`)
 docs/relations.md          relations without N+1, fetch_as/FromRow (doctest `RelationsGuide`)
 docs/authorization.md      gates, policies, roles/permissions, token abilities, tenants (doctest
@@ -1064,8 +1072,9 @@ picks the build, not the terminal.
   (the should-fix items; the owner chose all but `gate` → `authorize_gate`: the state last in
   every closure, seeders get `AppState`, `disk_named`, builder-only `Factory`, `DateTime`
   timestamps, opaque `Zone`, sealed `Viewer`/`Executor`/`ForeignKey`, `DownOptions`,
-  `retry`/`retry_all`, secrets hidden from `Debug`): branch `v1c-api-should`. Next the docs
-  site and the publish, which the owner runs (`cargo login`, RELEASING.md).
+  `retry`/`retry_all`, secrets hidden from `Debug`): merged (#118). V1d (the docs site `site/`, docs/tutorial.md,
+  docs/laravel.md; the owner hosts it on their own server): branch `v1d-docs-site`. Next a
+  starter kit and the publish, which the owner runs (`cargo login`, RELEASING.md).
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). 
