@@ -396,3 +396,95 @@ async fn the_seeder_uses_factory_states() {
     assert_eq!(premium.first().map(String::as_str), Some("Premium 1"));
     assert_eq!(premium.len(), 5);
 }
+
+#[renox::test]
+async fn the_form_checks_a_field_as_you_type() {
+    let app = TestApp::new(crud::app()).await;
+    let owner = user(&app, "owner@example.com").await;
+    app.acting_as(&owner);
+    // `data-live-validate`: renox.js sends the form with X-Renox-Validate
+    // naming the field; the answer is that field's errors, nothing saved.
+    let res = app
+        .request()
+        .htmx()
+        .header("x-renox-validate", "name")
+        .post("/products", &[("name", ""), ("price", "1000")])
+        .await;
+    res.assert_ok().assert_json_path("field", "name");
+    assert!(!res.json_path("errors").as_array().unwrap().is_empty());
+    let res = app
+        .request()
+        .htmx()
+        .header("x-renox-validate", "name")
+        .post("/products", &[("name", "Kopi"), ("price", "1000")])
+        .await;
+    assert!(res.json_path("errors").as_array().unwrap().is_empty());
+    app.assert_database_count("products", 0).await;
+    app.get("/products/new")
+        .await
+        .assert_see("data-live-validate");
+}
+
+#[renox::test]
+async fn saving_without_changes_says_so() {
+    let app = TestApp::new(crud::app()).await;
+    let owner = user(&app, "owner@example.com").await;
+    let product = Product::create(
+        app.db(),
+        Product {
+            name: "Kopi".into(),
+            price: 1000,
+            ..Product::for_owner(&owner)
+        },
+    )
+    .await
+    .unwrap();
+    app.acting_as(&owner);
+    app.put(
+        &format!("/products/{}", product.id),
+        &[("name", "Kopi"), ("price", "1000")],
+    )
+    .await
+    .assert_redirect("/products");
+    app.get("/products").await.assert_see("Nothing changed.");
+}
+
+#[renox::test]
+async fn only_the_owner_restores_from_the_trash() {
+    let app = TestApp::new(crud::app()).await;
+    let owner = user(&app, "owner@example.com").await;
+    let other = user(&app, "other@example.com").await;
+    let mut product = Product::create(
+        app.db(),
+        Product {
+            name: "Kopi Toraja".into(),
+            ..Product::for_owner(&owner)
+        },
+    )
+    .await
+    .unwrap();
+    product.delete(app.db()).await.unwrap();
+    app.acting_as(&other);
+    app.get("/products/trash")
+        .await
+        .assert_dont_see(&product.name);
+    app.post(&format!("/products/{}/restore", product.id), &[])
+        .await
+        .assert_forbidden();
+    assert_eq!(
+        Product::query().count(app.db()).await.unwrap(),
+        0,
+        "still in the trash"
+    );
+}
+
+#[renox::test]
+async fn the_seeder_fills_the_app_and_can_run_again() {
+    let app = TestApp::new(crud::app()).await;
+    app.kernel().seed().await.unwrap();
+    let seeded = Product::query().count(app.db()).await.unwrap();
+    assert!(seeded > 0);
+    // A second `db:seed` leaves a seeded database as it is.
+    app.kernel().seed().await.unwrap();
+    assert_eq!(Product::query().count(app.db()).await.unwrap(), seeded);
+}

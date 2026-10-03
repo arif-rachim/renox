@@ -110,3 +110,51 @@ async fn a_logged_in_guest_can_open_their_account() {
         .assert_see("Akun kamu")
         .assert_see("budi@example.com");
 }
+
+const PNG: &[u8] = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR not a real image, but it starts like one";
+
+#[renox::test]
+async fn photos_are_checked_by_their_content() {
+    let app = app().await;
+    // A text file named .png is refused (the content is sniffed): the
+    // regression a browser check once caught.
+    app.htmx()
+        .post_multipart(
+            "/entries",
+            &[("name", "Arif"), ("message", "Kopinya enak")],
+            &[("photo", "fake.png", b"just text")],
+        )
+        .await
+        .assert_invalid("photo");
+    app.assert_database_count("entries", 0).await;
+    // A real image is stored and shown.
+    app.post_multipart(
+        "/entries",
+        &[("name", "Arif"), ("message", "Kopinya enak")],
+        &[("photo", "kopi.png", PNG)],
+    )
+    .await
+    .assert_status(303);
+    let photo: String = renox::db::sql("SELECT photo FROM entries")
+        .scalar(app.db())
+        .await
+        .unwrap();
+    assert!(
+        photo.starts_with("public/entries/") && photo.ends_with(".png"),
+        "{photo}"
+    );
+    app.get("/").await.assert_see(".png");
+}
+
+#[renox::test]
+async fn htmx_gets_the_new_list_and_an_event() {
+    let app = app().await;
+    let res = app
+        .htmx()
+        .post("/entries", &[("name", "Budi"), ("message", "Mampir lagi")])
+        .await;
+    res.assert_ok()
+        .assert_header("hx-trigger", "entry-added")
+        .assert_see("Mampir lagi")
+        .assert_dont_see("<html");
+}

@@ -2,21 +2,27 @@
 <html lang="{{ app.locale }}">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
   {#- Title, description, canonical URL and social cards; a page overrides it with
       {% block seo %}{{ seo(title="…", description="…", image="…") }}{% endblock %} -#}
   {% block seo %}{{ seo() }}{% endblock %}
-  <link rel="stylesheet" href="{{ asset('app.css') }}">
   {{ renox_head() }}
+  {#- The UI kit (renox/ui.html): its styles and behavior. -#}
   {{ renox_ui() }}
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
 </head>
 <body class="rx-page">
-  <nav>
-    <a href="{{ route("home") }}"><strong>{{ app.name }}</strong></a>
-  </nav>
-  <main>
-    {% if flash.status %}<p class="flash">{{ flash.status }}</p>{% endif %}
+  <a class="rx-visually-hidden skip" href="#main">Skip to content</a>
+  <header class="bar">
+    <nav class="bar__inner" aria-label="Main">
+      <a class="bar__brand" href="{{ route('home') }}">{{ app.name }}</a>
+    </nav>
+  </header>
+  <main class="rx-container" id="main">
     {% block content %}{% endblock %}
   </main>
+  {#- Toasts from `Toast::success(…)`, after a redirect or an htmx request. -#}
+  {{ toasts() }}
 </body>
 </html>

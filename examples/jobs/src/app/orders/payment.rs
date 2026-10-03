@@ -6,15 +6,10 @@ use std::time::Duration;
 
 use super::{Order, OrderStatus, SendReceipt};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 pub(super) struct PayForm {
+    #[validate(required, max = 100)]
     card_token: String,
-}
-
-impl Validate for PayForm {
-    fn rules(&self, v: &mut Validator) {
-        v.field("card_token", &self.card_token).required().max(100);
-    }
 }
 
 /// The customer pays: the card is charged in the background, then the

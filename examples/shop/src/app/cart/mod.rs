@@ -149,7 +149,7 @@ async fn update(
         .await?;
     item.quantity = form.quantity;
     item.save(&db).await?;
-    Ok(Redirect::to("/cart"))
+    Redirect::route("cart.show", &[])
 }
 
 async fn remove(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Result<Redirect> {
@@ -157,5 +157,5 @@ async fn remove(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Re
         .where_eq("user_id", user.id)
         .delete(&db)
         .await?;
-    Ok(Redirect::to("/cart"))
+    Redirect::route("cart.show", &[])
 }

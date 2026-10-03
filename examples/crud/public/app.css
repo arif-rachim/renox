@@ -8,4 +8,3 @@
 .bar__inner { width: min(100% - 32px, 44rem); margin-inline: auto; min-height: 52px; display: flex; align-items: center; gap: 8px; }
 .bar__brand { font-weight: 700; font-size: 1.0625rem; color: var(--rx-label); text-decoration: none; letter-spacing: -0.02em; }
 .skip:focus { position: fixed !important; top: 8px; left: 8px; width: auto; height: auto; clip: auto; padding: 8px 12px; background: var(--rx-surface); border-radius: 8px; z-index: 100; }
-.pagination { display: flex; gap: 8px; justify-content: center; }

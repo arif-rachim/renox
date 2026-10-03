@@ -48,7 +48,9 @@ async fn index(
     Page(page): Page,
     Query(filter): Query<Filter>,
 ) -> Result<View> {
-    let mut query = Task::query().order_by("due_on").order_by("id");
+    // Tasks without a date last. Spelled out because the databases differ:
+    // SQLite puts NULLs first when ascending, PostgreSQL last.
+    let mut query = Task::query().order_by_raw("due_on IS NULL, due_on, id");
     if let Some(q) = filter.q.as_deref().filter(|q| !q.is_empty()) {
         query = query.where_like("title", format!("%{q}%")); // ignores case on both
     }
@@ -57,19 +59,17 @@ async fn index(
         query = query.where_eq("done", false).where_op("due_on", "<", today);
     }
     let tasks = query.paginate(&db, page, 20).await?;
-    Ok(view("tasks/index.html", context! { tasks, q => filter.q }))
+    Ok(view(
+        "tasks/index.html",
+        context! { tasks, q => filter.q, overdue => filter.overdue == Some(true) },
+    ))
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 struct TaskForm {
+    #[validate(required, max = 200)]
     title: String,
     due_on: Option<NaiveDate>,
-}
-
-impl Validate for TaskForm {
-    fn rules(&self, v: &mut Validator) {
-        v.field("title", &self.title).required().max(200);
-    }
 }
 
 async fn store(State(db): State<Db>, Valid(form): Valid<TaskForm>) -> Result<Redirect> {

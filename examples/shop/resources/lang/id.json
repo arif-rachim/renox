@@ -29,7 +29,23 @@
   "notifications": {
     "placed": "Pesanan #:id diterima",
     "pay": "Bayar :total lewat transfer bank dalam :days hari.",
-    "shipped": "Pesanan #:id sedang dikirim"
+    "shipped": "Pesanan #:id sedang dikirim",
+    "ready": "Pesanan #:id siap diambil",
+    "new_order": "Pesanan baru #:id", "new_order_body": ":total, ke :address",
+    "all_orders": "Semua pesanan"
+  },
+  "mail": {
+    "confirmation": {
+      "subject": "Pesanan #:id diterima", "thanks": "Terima kasih atas pesanan #:id.", "total": "Total",
+      "pay": "Silakan transfer :total dalam :days hari, dengan keterangan pesanan #:id.",
+      "to": "Kami kirim ke: :address",
+      "pickup": "Ambil di toko setelah siap: :address"
+    },
+    "shipped": {
+      "subject": "Pesanan #:id sedang dikirim", "ready_subject": "Pesanan #:id siap diambil",
+      "sent": "Kabar baik: pesanan #:id sedang dikirim ke :address.",
+      "ready": "Kabar baik: pesanan #:id sudah siap. Ambil di toko: :address."
+    }
   },
   "orders": {
     "order": "Pesanan",

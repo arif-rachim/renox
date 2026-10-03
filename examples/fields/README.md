@@ -7,9 +7,15 @@ unsure which type to use.
 
 ```bash
 cd examples/fields
+cp .env.example .env    # optional: the settings this example reads
 cargo run -- migrate
+cargo run -- db:seed             # two products to open and edit
 cargo run                        # http://127.0.0.1:3000
 ```
+
+Try it: add a product with every field filled (a toast says it was created), edit it (a toast
+says "Saved."), open it read-only from the list, and delete it from the list behind the
+confirmation sheet.
 
 For PostgreSQL, set `DATABASE_URL=postgres://...` as in [examples/postgres](../postgres); this
 package already enables renox's `postgres` and `uuid` features.
@@ -18,9 +24,11 @@ package already enables renox's `postgres` and `uuid` features.
 
 | Feature | Where |
 |---|---|
-| The model, the form struct with one comment per input, validation, routes | [src/app/products/mod.rs](src/app/products/mod.rs) |
+| The model, the form struct with one comment per input, validation, routes, toasts after a save or delete | [src/app/products/mod.rs](src/app/products/mod.rs) |
+| The list as a kit `table` (price with the `money` filter, badges for size and availability), an `empty` state, Edit and a `confirm` sheet for Delete | [resources/views/products/index.html](resources/views/products/index.html) |
 | The form on the UI kit: text, textarea, number with a prefix or suffix, a switch, a radio group, a checkbox list, time, datetime-local, a date in the kit's calendar (`date_picker`), the key read-only with a copy button, in a `form_grid` and `fieldset`s | [resources/views/products/form.html](resources/views/products/form.html) |
 | The product read-only, as an infolist: money, numbers with a suffix, Yes/No, a badge with labels, color swatches, tag badges, the specifications as a table, Markdown, dates and `since` | [resources/views/products/show.html](resources/views/products/show.html) |
+| The layout: the kit (`renox_ui()`), a navigation bar, `toasts()` | [resources/views/layouts/app.html](resources/views/layouts/app.html), [public/app.css](public/app.css) |
 | Column types on SQLite and on PostgreSQL | [.up.sql](migrations/20260101000000_create_products_table.up.sql), [.postgres.up.sql](migrations/20260101000000_create_products_table.postgres.up.sql) |
 
 ## Things worth copying
@@ -31,6 +39,9 @@ package already enables renox's `postgres` and `uuid` features.
   pairs, so the order holds in PostgreSQL's `JSONB`). Such a nested name makes `Valid` read
   the whole form as a tree; every other field still parses from its text.
 
+- **Toasts instead of flashed messages.** `store`, `update` and `destroy` return
+  `(Toast::success(…), Redirect::route("products.edit", &[&product.id])?)`: the toast waits in the
+  session and the layout's `{{ toasts() }}` shows it on the next page, once.
 - **A radio group (or a `<select>`) is an enum.** `#[derive(DbEnum)] enum Size` is stored as
   text (`small`, `medium`, `large`); the form lists `Size::ALL` with the kit's `radio`, and an
   unknown value fails validation.
@@ -58,5 +69,6 @@ cargo test -p fields
 
 The tests run on SQLite, or on PostgreSQL with `TEST_DATABASE_URL` set. They post every field,
 check the stored values, and check the edit form shows each value in the format its input
-expects. One test posts an unknown and a repeated color and checks the error lands on the
+expects. Others check the list (a table, or the empty state), the toasts after a create and a
+save, and that Delete removes the row. One test posts an unknown and a repeated color and checks the error lands on the
 item's key (`colors.1`), and in the form's `colors` slot after a plain post.

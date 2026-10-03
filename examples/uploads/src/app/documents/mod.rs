@@ -1,9 +1,11 @@
-//! Made with `rnx make:module documents` and `rnx make:model Document --module documents -m`.
+//! Made with `rnx make:module documents` and `rnx make:migration create_documents_table`.
+//! The `Document` model is written here in the module (its table is
+//! `documents`, named with `#[model(table = …)]`).
 
 use std::time::Duration;
 
-use renox::Download;
 use renox::prelude::*;
+use renox::{Download, Toast};
 use serde::{Deserialize, Serialize};
 
 #[derive(Model, Serialize, Deserialize, Default, Debug, Clone)]
@@ -40,6 +42,8 @@ impl Module for Documents {
             .name("invoices.download")
             .get("/invoices/{id}", view_invoice)
             .name("invoices.show")
+            .delete("/documents/{id}", destroy)
+            .name("documents.destroy")
     }
 }
 
@@ -69,7 +73,7 @@ async fn store_photo(
     State(state): State<AppState>,
     htmx: Htmx,
     Valid(form): Valid<PhotoForm>,
-) -> Result<Response> {
+) -> Result<(Toast, Response)> {
     let count = form.photos.len();
     for (i, photo) in form.photos.iter().enumerate() {
         let key = photo.store_public(&state.storage, "photos").await?;
@@ -80,7 +84,14 @@ async fn store_photo(
         };
         save(&state.db, title, "photo", key, photo).await?;
     }
-    Ok(htmx.redirect("/"))
+    let toast = if count == 1 {
+        Toast::success("Photo uploaded.")
+    } else {
+        Toast::success(format!("{count} photos uploaded."))
+    };
+    // `HX-Redirect` for the htmx form (the browser loads the page anew), a
+    // 303 otherwise. Either way the toast waits in the session for that page.
+    Ok((toast, htmx.redirect(&state.url("home", &[])?)))
 }
 
 #[derive(Deserialize)]
@@ -102,10 +113,13 @@ impl Validate for InvoiceForm {
 async fn store_invoice(
     State(state): State<AppState>,
     Valid(form): Valid<InvoiceForm>,
-) -> Result<Redirect> {
+) -> Result<(Toast, Redirect)> {
     let key = form.invoice.store(&state.storage, "invoices").await?; // private
     save(&state.db, form.title, "invoice", key, &form.invoice).await?;
-    Ok(Redirect::to("/"))
+    Ok((
+        Toast::success("Invoice uploaded. It stays private."),
+        Redirect::route("home", &[])?,
+    ))
 }
 
 async fn save(db: &Db, title: String, kind: &str, file_key: String, upload: &Upload) -> Result {
@@ -146,4 +160,17 @@ async fn view_invoice(State(state): State<AppState>, Path(id): Path<i64>) -> Res
             .await?
             .inline(),
     )
+}
+
+/// Deletes a document and its stored file, behind the kit's `confirm` sheet.
+/// The row goes first: a file left behind by a failed delete is only wasted
+/// space, while a row pointing at a missing file would be a broken link.
+async fn destroy(State(state): State<AppState>, Path(id): Path<i64>) -> Result<(Toast, Redirect)> {
+    let mut document = Document::find_or_404(&state.db, id).await?;
+    document.delete(&state.db).await?;
+    state.storage.delete(&document.file_key).await?;
+    Ok((
+        Toast::success(format!("“{}” deleted.", document.title)),
+        Redirect::route("home", &[])?,
+    ))
 }

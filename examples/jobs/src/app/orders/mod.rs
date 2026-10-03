@@ -121,21 +121,14 @@ impl Module for Orders {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Validate)]
 struct OrderForm {
+    #[validate(required, email)]
     customer_email: String,
+    #[validate(required, max = 100)]
     item: String,
+    #[validate(min = 1)]
     total: i64,
-}
-
-impl Validate for OrderForm {
-    fn rules(&self, v: &mut Validator) {
-        v.field("customer_email", &self.customer_email)
-            .required()
-            .email();
-        v.field("item", &self.item).required().max(100);
-        v.field("total", &self.total).min(1);
-    }
 }
 
 async fn index(State(db): State<Db>) -> Result<View> {
@@ -215,4 +208,15 @@ async fn report_failed(state: AppState, err: Error) {
     if let Err(err) = state.queue_mail(mail).await {
         eprintln!("could not queue the failure alert: {err:?}");
     }
+}
+
+/// An amount the way the `money` template filter writes it (`APP_CURRENCY`,
+/// `Rp 150.000` by default), for mail written in Rust.
+pub fn money(state: &AppState, amount: i64) -> String {
+    renox::format_money(
+        amount as f64,
+        &state.config.currency,
+        None,
+        &state.config.locale,
+    )
 }

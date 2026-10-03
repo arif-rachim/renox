@@ -45,8 +45,9 @@ impl Job for RemindUnpaid {
             &order.customer_email,
             format!("Order #{} is waiting for payment", order.id),
             format!(
-                "Your {} (Rp {}) is ready to ship once paid.",
-                order.item, order.total
+                "Your {} ({}) is ready to ship once paid.",
+                order.item,
+                super::money(&ctx.state, order.total)
             ),
         );
         ctx.state.mailer.send(mail).await

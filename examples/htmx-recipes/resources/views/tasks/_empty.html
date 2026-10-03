@@ -1,0 +1,3 @@
+{#- Shown while the list is empty; row answers resend it out of band, so it
+    hides after the first task is added and comes back after the last goes. -#}
+<p id="empty" class="muted"{% if total %} hidden{% endif %} hx-swap-oob="true">Nothing to do. Add a task.</p>

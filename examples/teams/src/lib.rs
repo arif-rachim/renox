@@ -19,8 +19,9 @@
 //!
 //! Made with `rnx make:module teams`, `rnx make:module projects`,
 //! `rnx make:model Team --module teams --migration`,
-//! `rnx make:model Project --module projects --migration` and
-//! `rnx make:command projects:count --module projects`, then filled in.
+//! `rnx make:model Project --module projects --migration`, then filled in.
+//! `projects:count` is an untyped `App::command` closure (`rnx make:command`
+//! would write a typed one, as examples/hello and examples/crud have).
 //!
 //! ```text
 //! cargo run -- migrate
@@ -71,6 +72,13 @@ pub fn app() -> App {
 /// `rnx db:seed`: two teams, three users (password `password123`), and a few
 /// projects. Alice is in both teams, so she can switch between them.
 async fn seed(db: Db) -> Result {
+    // Seeding twice is harmless: a seeded database stays as it is.
+    if User::find_by_email(&db, "alice@example.com")
+        .await?
+        .is_some()
+    {
+        return Ok(());
+    }
     let alice = User::register(&db, "Alice", "alice@example.com", "password123").await?;
     let bob = User::register(&db, "Bob", "bob@example.com", "password123").await?;
     let carol = User::register(&db, "Carol", "carol@example.com", "password123").await?;

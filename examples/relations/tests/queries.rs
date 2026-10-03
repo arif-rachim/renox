@@ -73,3 +73,38 @@ async fn likes_of_a_page_load_in_one_query_per_type() {
     assert_eq!(latest.iter().filter(|l| l.post.is_some()).count(), 10);
     assert_eq!(latest.iter().filter(|l| l.comment.is_some()).count(), 5);
 }
+
+#[renox::test]
+async fn the_index_runs_the_same_queries_for_any_page_size() {
+    let app = TestApp::new(relations::app()).await;
+    let db = app.db();
+    let add_posts = |from: usize, n: usize| async move {
+        for i in from..from + n {
+            let post = Post {
+                title: format!("Post {i}"),
+                body: "Body.".into(),
+                ..Default::default()
+            };
+            let post = Post::create(db, post).await.unwrap();
+            let comment = Comment {
+                post_id: post.id,
+                author: "Ani".into(),
+                body: "Nice.".into(),
+                ..Default::default()
+            };
+            Comment::create(db, comment).await.unwrap();
+            Like::create(db, Like::on(&post)).await.unwrap();
+        }
+    };
+    add_posts(0, 2).await;
+    let (res, few) = queries(app.get("/")).await;
+    res.assert_ok().assert_see("Post 1");
+    add_posts(2, 8).await;
+    let (res, many) = queries(app.get("/")).await;
+    res.assert_ok().assert_see("Post 9");
+    // A page of 2 posts or of 10: the same statements (no N+1). The
+    // handler's comment counts them: count and page, categories, comment
+    // counts, latest comments, tag links and tags, like counts.
+    assert_eq!(few, many, "the query count grows with the posts");
+    assert!(many <= 10, "{many} statements");
+}

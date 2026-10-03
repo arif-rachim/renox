@@ -53,6 +53,13 @@ pub fn app() -> App {
         .module(Auth::new())
         .module(app::orders::Orders)
         .seeder(|db| async move {
+            // Seeding twice is harmless: a seeded database stays as it is.
+            if User::find_by_email(&db, "demo@example.com")
+                .await?
+                .is_some()
+            {
+                return Ok(());
+            }
             User::register(&db, "Demo", "demo@example.com", "password").await?;
             Order::create_many(&db, 480).await?;
             // Hand-sorted order starts as the order they were made in.

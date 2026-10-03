@@ -89,8 +89,8 @@ impl AppCommand for MakeAdmin {
             Some(email) => email,
             None => renox::prompt::ask("Email of the new admin").await?,
         };
-        let user = User::where_eq("email", &email)
-            .first(&state.db)
+        // Emails are stored lowercased; `find_by_email` matches any case.
+        let user = User::find_by_email(&state.db, &email)
             .await?
             .ok_or_else(|| Error::BadRequest(format!("no user has the email {email}")))?;
         make_admin_of(&state.db, &user).await?;
@@ -100,6 +100,13 @@ impl AppCommand for MakeAdmin {
 }
 
 async fn seed(db: Db) -> Result {
+    // Seeding twice is harmless: a seeded database stays as it is.
+    if User::find_by_email(&db, "admin@example.com")
+        .await?
+        .is_some()
+    {
+        return Ok(());
+    }
     let admin = User::register(&db, "Admin", "admin@example.com", "password123").await?;
     make_admin_of(&db, &admin).await?;
     for name in ["Coffee", "Tea", "Snacks"] {

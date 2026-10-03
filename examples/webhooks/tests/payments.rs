@@ -69,12 +69,16 @@ async fn xendit_paid_invoice_pays_the_order() {
         .post_body("/webhooks/xendit", "application/json", invoice)
         .await
         .assert_status(401);
-    app.request()
-        .without_csrf()
-        .header("x-callback-token", "xnd-token-test")
-        .post_body("/webhooks/xendit", "application/json", invoice)
-        .await
-        .assert_ok();
+    // Xendit retries until it gets a 2xx: the repeat is stored once.
+    for _ in 0..2 {
+        app.request()
+            .without_csrf()
+            .header("x-callback-token", "xnd-token-test")
+            .post_body("/webhooks/xendit", "application/json", invoice)
+            .await
+            .assert_ok();
+    }
+    app.assert_database_count("webhook_calls", 1).await;
     app.run_jobs().await;
     assert_eq!(status(&app).await, ("paid".into(), Some("xendit".into())));
 }
@@ -103,6 +107,8 @@ async fn stripe_completed_checkout_pays_the_order() {
         .await
         .assert_status(401); // replayed
     send(signed("whsec_test", now)).await.assert_ok();
+    send(signed("whsec_test", now)).await.assert_ok(); // repeated: once
+    app.assert_database_count("webhook_calls", 1).await;
     app.run_jobs().await;
     assert_eq!(status(&app).await, ("paid".into(), Some("stripe".into())));
 }
@@ -113,6 +119,79 @@ async fn the_order_page_shows_payment_status() {
     app.get("/")
         .await
         .assert_ok()
-        .assert_see("INV-1")
-        .assert_see("pending");
+        .assert_see(r#"<table class="rx-table">"#)
+        .assert_see("<strong>INV-1</strong>")
+        // The amount through the `money` filter (APP_CURRENCY, IDR by default).
+        .assert_see("Rp 150,000")
+        .assert_see(r#"<span class="rx-badge rx-badge--warning">Pending</span>"#);
+
+    // Paid via Xendit: the badge and the provider follow.
+    app.request()
+        .without_csrf()
+        .header("x-callback-token", "xnd-token-test")
+        .post_body(
+            "/webhooks/xendit",
+            "application/json",
+            r#"{"id":"inv_1","external_id":"INV-1","status":"PAID"}"#,
+        )
+        .await
+        .assert_ok();
+    app.run_jobs().await;
+    app.get("/")
+        .await
+        .assert_see(r#"<span class="rx-badge rx-badge--success">Paid</span>"#)
+        .assert_see(">Xendit<");
+}
+
+#[renox::test]
+async fn the_order_page_says_when_there_are_no_orders() {
+    let app = TestApp::new(webhooks::app()).await;
+    app.get("/")
+        .await
+        .assert_ok()
+        .assert_see("No orders yet")
+        .assert_dont_see("rx-table");
+}
+
+#[renox::test]
+async fn a_missing_secret_refuses_every_call() {
+    // No secrets in the config: nothing can be verified, so every call is
+    // refused like a forged one and nothing is stored.
+    let app = TestApp::new(webhooks::app()).await;
+    let invoice = r#"{"id":"inv_1","external_id":"INV-1","status":"PAID"}"#;
+    let res = app
+        .request()
+        .without_csrf()
+        .header("x-callback-token", "anything")
+        .post_body("/webhooks/xendit", "application/json", invoice)
+        .await;
+    assert_eq!(res.status, StatusCode::UNAUTHORIZED);
+    app.assert_database_count("webhook_calls", 0).await;
+}
+
+#[renox::test]
+async fn a_payment_for_an_unknown_order_is_logged_and_kept() {
+    let app = app().await;
+    let invoice = r#"{"id":"inv_9","external_id":"NOPE-9","status":"PAID"}"#;
+    app.request()
+        .without_csrf()
+        .header("x-callback-token", "xnd-token-test")
+        .post_body("/webhooks/xendit", "application/json", invoice)
+        .await
+        .assert_ok();
+    app.run_jobs().await;
+    // Handled without error (the call is kept for a look); INV-1 untouched.
+    app.assert_database_count("webhook_calls", 1).await;
+    assert_eq!(status(&app).await, ("pending".into(), None));
+}
+
+#[renox::test]
+async fn the_seeder_fills_the_app_and_can_run_again() {
+    let app = TestApp::new(webhooks::app()).await;
+    app.kernel().seed().await.unwrap();
+    let seeded = Order::query().count(app.db()).await.unwrap();
+    assert!(seeded > 0);
+    // A second `db:seed` leaves a seeded database as it is.
+    app.kernel().seed().await.unwrap();
+    assert_eq!(Order::query().count(app.db()).await.unwrap(), seeded);
 }

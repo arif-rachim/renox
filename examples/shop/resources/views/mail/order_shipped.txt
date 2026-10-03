@@ -1,1 +1,1 @@
-Good news: order #{{ order.id }} is on its way to {{ order.address }}.
+{{ t('mail.shipped.ready' if order.pickup else 'mail.shipped.sent', id=order.id, address=order.address) }}

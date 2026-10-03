@@ -29,7 +29,23 @@
   "notifications": {
     "placed": "Order #:id received",
     "pay": "Pay :total by bank transfer within :days days.",
-    "shipped": "Order #:id is on its way"
+    "shipped": "Order #:id is on its way",
+    "ready": "Order #:id is ready for pickup",
+    "new_order": "New order #:id", "new_order_body": ":total, to :address",
+    "all_orders": "All orders"
+  },
+  "mail": {
+    "confirmation": {
+      "subject": "Order #:id received", "thanks": "Thank you for your order #:id.", "total": "Total",
+      "pay": "Please transfer :total within :days days, mentioning order #:id.",
+      "to": "We'll send it to: :address",
+      "pickup": "Pick it up at the store once it's ready: :address"
+    },
+    "shipped": {
+      "subject": "Order #:id is on its way", "ready_subject": "Order #:id is ready for pickup",
+      "sent": "Good news: order #:id is on its way to :address.",
+      "ready": "Good news: order #:id is ready. Pick it up at the store: :address."
+    }
   },
   "orders": {
     "order": "Order",

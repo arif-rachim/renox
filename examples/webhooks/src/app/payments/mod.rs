@@ -1,5 +1,7 @@
-//! Made with `rnx make:module payments` and `rnx make:model Order --module payments -m`;
-//! each provider is one `impl Webhook`.
+//! Made with `rnx make:module payments` and `rnx make:migration create_orders_table`.
+//! The `Order` model is written here in the module (its table is `orders`,
+//! named with `#[model(table = …)]`), and each provider is one `impl Webhook`
+//! in a file of its own (there is no generator for webhooks).
 
 mod midtrans;
 mod stripe;

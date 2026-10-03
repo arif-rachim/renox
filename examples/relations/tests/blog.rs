@@ -357,3 +357,14 @@ async fn deleting_a_parent_deletes_its_likes() {
     beans.delete(db).await.unwrap();
     b.app.assert_database_count("likes", 1).await;
 }
+
+#[renox::test]
+async fn the_seeder_fills_the_app_and_can_run_again() {
+    let app = TestApp::new(relations::app()).await;
+    app.kernel().seed().await.unwrap();
+    let seeded = Post::query().count(app.db()).await.unwrap();
+    assert!(seeded > 0);
+    // A second `db:seed` leaves a seeded database as it is.
+    app.kernel().seed().await.unwrap();
+    assert_eq!(Post::query().count(app.db()).await.unwrap(), seeded);
+}

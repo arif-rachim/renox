@@ -27,7 +27,9 @@ pub fn app() -> App {
     App::new()
         .embed(renox::embedded!())
         .migrations(renox::migrations!())
-        .module(Auth::new())
+        // Staff only: every user is an admin who gets the order mails, so
+        // nobody signs themselves up (`db:seed` makes the admin).
+        .module(Auth::new().without_registration())
         .module(app::orders::Orders)
         .module(renox::queue::Dashboard)
         .gate(renox::queue::DASHBOARD_GATE, |user| {
@@ -37,6 +39,13 @@ pub fn app() -> App {
         // failed scheduled task) also goes to the team's chat.
         .report(post_to_chat)
         .seeder(|db| async move {
+            // Seeding twice is harmless: a seeded database stays as it is.
+            if User::find_by_email(&db, "admin@example.com")
+                .await?
+                .is_some()
+            {
+                return Ok(());
+            }
             User::register(&db, "Admin", "admin@example.com", "password123").await?;
             Ok(())
         })

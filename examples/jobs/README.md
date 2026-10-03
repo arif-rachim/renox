@@ -9,6 +9,7 @@ after another. Read it before adding anything slow to a request.
 
 ```bash
 cd examples/jobs
+cp .env.example .env    # optional: the settings this example reads
 cargo run -- migrate
 cargo run -- db:seed             # admin@example.com / password123
 cargo run                        # http://127.0.0.1:3000
@@ -17,7 +18,8 @@ cargo run                        # http://127.0.0.1:3000
 Queue workers and the scheduler run inside `cargo run`. To run workers on their own, highest
 priority first: `cargo run -- queue:work --queue high,default` (a worker drains `high`, where
 charges and receipts go, before `default`, where reports and statements go).
-Log in as the admin (`/login`) for the staff buttons: "Remind customer" and "Email monthly
+Registration is off (`Auth::new().without_registration()`): every user is an admin who gets
+the order mails, so `db:seed` makes the only one. Log in as the admin (`/login`) for the staff buttons: "Remind customer" and "Email monthly
 statements". On an unpaid order, pick a test card: one that works, one that is declined (the
 order becomes `needs_attention` at once) and one whose gateway times out (three attempts, then
 the same). `cargo run -- queue:failed` lists what failed for good. Mails go to the log (`MAIL_MAILER=log`

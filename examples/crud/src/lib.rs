@@ -3,7 +3,8 @@
 //! them. Deletes are soft: deleted products wait in a trash and can be
 //! restored.
 //!
-//! Run it from this directory: `cargo run -- migrate`, then `cargo run`.
+//! Run it from this directory: `cargo run -- migrate`, `cargo run -- db:seed`
+//! (demo@example.com / password123), then `cargo run`.
 
 use renox::prelude::*;
 
@@ -18,6 +19,13 @@ pub fn app() -> App {
         .module(Auth::new())
         .module(app::products::Products)
         .seeder(|db| async move {
+            // Seeding twice is harmless: a seeded database stays as it is.
+            if User::find_by_email(&db, "demo@example.com")
+                .await?
+                .is_some()
+            {
+                return Ok(());
+            }
             let owner = User::register(&db, "Demo", "demo@example.com", "password123").await?;
             // Factory states: 20 of the owner's products, then 5 costly ones
             // with numbered names (a sequence), each batch in one transaction.

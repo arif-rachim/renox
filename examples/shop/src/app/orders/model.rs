@@ -1,3 +1,7 @@
+//! Orders and their lines. Made with `rnx make:model Order --module orders -m`
+//! and `rnx make:model OrderItem --module orders` (both tables in one
+//! migration).
+
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -22,6 +26,8 @@ pub struct Order {
     /// In rupiah.
     pub total: i64,
     pub address: String,
+    /// Picked up at the store instead of sent.
+    pub pickup: bool,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
 }

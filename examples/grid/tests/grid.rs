@@ -11,6 +11,84 @@ async fn with_orders(n: usize) -> TestApp {
     app
 }
 
+/// Logs a user in: changing orders needs one.
+async fn log_in(app: &TestApp) {
+    let user = User::register(app.db(), "Dewi", "dewi@example.com", "password123")
+        .await
+        .unwrap();
+    app.acting_as(&user);
+}
+
+#[renox::test]
+async fn guests_look_but_dont_change() {
+    let app = with_orders(2).await;
+    let order = Order::query().first(app.db()).await.unwrap().unwrap();
+    let page = app.get("/").await.text();
+    assert!(!page.contains("data-edit="), "no editing for guests");
+    assert!(!page.contains("data-grid-select-all"), "no bulk actions");
+    assert!(!page.contains("data-grid-drag"), "no dragging");
+    let url = format!("/orders/{}", order.id);
+    for res in [
+        app.htmx().patch(&url, &[("customer", "x")]).await,
+        app.htmx().delete(&url).await,
+        app.htmx()
+            .post("/orders/bulk/status/paid", &[("ids", ""), ("all", "true")])
+            .await,
+        app.htmx()
+            .post("/orders/bulk/delete", &[("ids", ""), ("all", "true")])
+            .await,
+        app.htmx()
+            .post("/orders/reorder", &[("ids", ""), ("offset", "0")])
+            .await,
+    ] {
+        // Sent to the login page (htmx: an HX-Redirect), nothing changed.
+        assert!(
+            res.header("hx-redirect")
+                .is_some_and(|to| to.starts_with("/login")),
+            "{} {:?}",
+            res.status,
+            res.header("hx-redirect")
+        );
+    }
+    assert_eq!(Order::query().count(app.db()).await.unwrap(), 2);
+    assert_eq!(
+        Order::find_or_404(app.db(), order.id)
+            .await
+            .unwrap()
+            .customer,
+        order.customer
+    );
+    // Logged in, the tools are there.
+    log_in(&app).await;
+    let page = app.get("/").await.text();
+    assert!(page.contains("data-edit=") && page.contains("data-grid-select-all"));
+}
+
+#[renox::test]
+async fn paid_follows_the_status() {
+    let app = with_orders(4).await;
+    log_in(&app).await;
+    app.htmx()
+        .post("/orders/bulk/status/paid", &[("ids", ""), ("all", "true")])
+        .await
+        .assert_status(204);
+    assert_eq!(
+        Order::where_eq("paid", false)
+            .count(app.db())
+            .await
+            .unwrap(),
+        0
+    );
+    let order = Order::query().first(app.db()).await.unwrap().unwrap();
+    app.htmx()
+        .patch(&format!("/orders/{}", order.id), &[("status", "new")])
+        .await
+        .assert_status(204);
+    let order = Order::find_or_404(app.db(), order.id).await.unwrap();
+    assert!(!order.paid, "a new order isn't paid");
+    assert_eq!(order.updated_by, "Dewi");
+}
+
 #[renox::test]
 async fn the_dashboard_shows_a_page_of_orders() {
     let app = with_orders(60).await;
@@ -134,6 +212,7 @@ async fn cells_are_edited_in_place() {
 #[renox::test]
 async fn rows_are_dragged_into_order() {
     let app = with_orders(3).await;
+    log_in(&app).await;
     let ids: Vec<i64> = Order::query()
         .order_by("id")
         .get(app.db())
@@ -196,6 +275,7 @@ async fn every_filtered_row_exports() {
 #[renox::test]
 async fn bulk_and_row_actions_change_orders() {
     let app = with_orders(30).await;
+    log_in(&app).await;
     let new = Order::where_eq("status", "new")
         .count(app.db())
         .await
@@ -332,4 +412,15 @@ async fn two_grids_page_apart_on_one_page() {
     if unpaid > 10 {
         res.assert_see(&format!("1–10 of {unpaid}"));
     }
+}
+
+#[renox::test]
+async fn the_seeder_fills_the_app_and_can_run_again() {
+    let app = TestApp::new(grid::app()).await;
+    app.kernel().seed().await.unwrap();
+    let seeded = Order::query().count(app.db()).await.unwrap();
+    assert!(seeded > 0);
+    // A second `db:seed` leaves a seeded database as it is.
+    app.kernel().seed().await.unwrap();
+    assert_eq!(Order::query().count(app.db()).await.unwrap(), seeded);
 }

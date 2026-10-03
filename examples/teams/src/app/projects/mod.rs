@@ -62,8 +62,8 @@ impl Validate for ProjectForm {
     }
 }
 
-async fn home() -> Redirect {
-    Redirect::to("/projects")
+async fn home() -> Result<Redirect> {
+    Redirect::route("projects.index", &[])
 }
 
 async fn index(State(db): State<Db>, _team: CurrentTeam) -> Result<View> {
@@ -88,7 +88,7 @@ async fn store(
     let project = Project::create(&db, project).await?;
     Ok((
         Toast::success(format!("“{}” created.", project.name)),
-        Redirect::to("/projects"),
+        Redirect::route("projects.index", &[])?,
     ))
 }
 
@@ -115,7 +115,7 @@ async fn update(
     project.save(&db).await?;
     Ok((
         Toast::success(format!("“{}” saved.", project.name)),
-        Redirect::to("/projects"),
+        Redirect::route("projects.index", &[])?,
     ))
 }
 
@@ -124,6 +124,6 @@ async fn destroy(State(db): State<Db>, Path(id): Path<i64>) -> Result<(Toast, Re
     project.delete(&db).await?;
     Ok((
         Toast::success(format!("“{}” deleted.", project.name)),
-        Redirect::to("/projects"),
+        Redirect::route("projects.index", &[])?,
     ))
 }

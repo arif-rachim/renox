@@ -1385,6 +1385,32 @@ Notes from the docs audit after M28:
   `users`); and the Auth module's `notifications:prune [--days 30]` /
   `auth::prune_read_notifications` delete notifications read long ago.
 
+### M29 · Examples complete
+An audit after M28 (asked by the owner: are the examples complete?) compared every example
+with its README, the features and the common business apps. Three PRs:
+- [x] M29a: the bugs it found (grid edits by guests, jobs' open registration, shop's English-only
+      mail and pickup text, teams' public links, htmx-recipes' plain-form duplicates and
+      repeated rows), tests for every README claim, seeders that run twice, `.env.example`
+      files, fields/webhooks/uploads on the kit, current patterns (`Routes::resource`,
+      `Redirect::route`, derive, `money`)
+- [ ] M29b: `examples/backoffice`, an UMKM back office in the style of Filament's demo: grids
+      everywhere, invoices/POS with line items and printing, Midtrans/Xendit payments end to
+      end, a stock ledger with `lock_for_update`, CSV import from the browser, background
+      exports with a notification, roles/permissions and audit-log screens, settings,
+      email verification and branded auth pages
+- [ ] M29c: smaller extensions (relations as a public blog with Markdown/SEO/RSS/search and
+      Tailwind; an api client page; S3 in uploads; mail attachments and cc in jobs)
+
+Notes from M29a:
+- Guests could change orders in examples/grid since M27: the grid's edit routes had no
+  `require_auth`. Grids now take a `can_edit` flag in the example, the pattern for apps:
+  build the grid with or without its edit tools for the current user.
+- shop's "in the recipient's language" needed a `locale` column on `users`
+  (`Recipient::locale` reads it); without one, a notification is written in the language
+  of the request that caused it (the buyer's, for the admin's "new order").
+- Infinite scroll by page number repeats a row when one is added at the top meanwhile;
+  htmx-recipes pages by id now (`?before=`).
+
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`
       (resource tables and forms); billing later

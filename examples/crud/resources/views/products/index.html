@@ -19,7 +19,7 @@
       <tr>
         <td><strong>{{ product.name }}</strong></td>
         <td class="rx-hide-narrow">{{ badge(product.slug) }}</td>
-        <td class="rx-num">Rp {{ product.price | number }}</td>
+        <td class="rx-num">{{ product.price | money }}</td>
         <td class="rx-num">
           <div class="rx-row rx-row--end">
             {% if can('update', product) %}{{ link_button(route('products.edit', product.id), "Edit", variant="plain", size="small") }}{% endif %}

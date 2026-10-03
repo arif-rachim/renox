@@ -9,6 +9,7 @@ relation (counts included), and reports use the query builder or SQL joins. Read
 
 ```bash
 cd examples/relations
+cp .env.example .env    # optional: the settings this example reads
 cargo run -- migrate
 cargo run -- db:seed             # 3 categories, 5 tags, 24 posts with comments
 cargo run                        # http://127.0.0.1:3000
@@ -40,7 +41,7 @@ cargo run                        # http://127.0.0.1:3000
   `load_for` give `HashMap<id, Vec<…>>`; build what the template needs from them (see `Card`).
 - **The database keeps relations tidy.** Deleting a post deletes its comments and tag links
   (`ON DELETE CASCADE`); deleting a category keeps its posts, without a category (`SET NULL`).
-- **Count, don't load.** `count_many` (and `sum_many` for totals) gives each post its number in
+- **Count, don't load.** `count_many` gives each post its number in
   one `GROUP BY` query, with 0 for posts without comments; loading every comment to call `len()`
   gets slower as comments grow. For the latest comment only, `index` filters `has_many` so it
   loads one row per post.

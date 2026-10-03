@@ -1,9 +1,9 @@
-<p>Thank you for your order #{{ order.id }}.</p>
+<p>{{ t('mail.confirmation.thanks', id=order.id) }}</p>
 <table>
   {% for item in items %}
   <tr><td>{{ item.quantity }} × {{ item.name }}</td><td>{{ (item.price * item.quantity) | money }}</td></tr>
   {% endfor %}
-  <tr><th>Total</th><th>{{ order.total | money }}</th></tr>
+  <tr><th>{{ t('mail.confirmation.total') }}</th><th>{{ order.total | money }}</th></tr>
 </table>
-<p>Please transfer {{ order.total | money }} within 3 days, mentioning order #{{ order.id }}.</p>
-<p>We'll send it to: {{ order.address }}</p>
+<p>{{ t('mail.confirmation.pay', total=order.total | money, days=3, id=order.id) }}</p>
+<p>{{ t('mail.confirmation.pickup' if order.pickup else 'mail.confirmation.to', address=order.address) }}</p>
