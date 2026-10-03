@@ -142,8 +142,12 @@ fn docs_url(rev: Option<&str>) -> String {
 
 /// Renox from crates.io, at this `rnx`'s own version (`cargo install
 /// renox-cli` builds from the registry, without git): a caret requirement,
-/// since a minor release doesn't break apps.
+/// since a minor release doesn't break apps. A pre-release (`1.0.0-rc.1`)
+/// is written whole: Cargo never picks one for `"1.0"`.
 fn registry_dependency(version: &str) -> String {
+    if version.contains('-') {
+        return format!("renox = {{ version = \"{version}\"");
+    }
     let major_minor: Vec<&str> = version.split('.').take(2).collect();
     format!("renox = {{ version = \"{}\"", major_minor.join("."))
 }
@@ -370,6 +374,10 @@ mod tests {
     #[test]
     fn pins_the_git_dependency() {
         assert_eq!(registry_dependency("1.2.3"), "renox = { version = \"1.2\"");
+        assert_eq!(
+            registry_dependency("1.0.0-rc.1"),
+            "renox = { version = \"1.0.0-rc.1\""
+        );
         let rev = "0123456789abcdef0123456789abcdef01234567";
         assert!(git_dependency(Some(rev)).ends_with(&format!("rev = \"{rev}\"")));
         assert!(git_dependency(None).ends_with("branch = \"main\""));

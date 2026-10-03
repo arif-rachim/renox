@@ -1076,9 +1076,10 @@ picks the build, not the terminal.
   timestamps, opaque `Zone`, sealed `Viewer`/`Executor`/`ForeignKey`, `DownOptions`,
   `retry`/`retry_all`, secrets hidden from `Debug`): merged (#118). V1d (the docs site `site/`, docs/tutorial.md,
   docs/laravel.md; the owner hosts it on their own server): merged (#120). V1e
-  (`rnx new --starter`, the 1.x promise in docs/stability.md): branch `v1e-starter-kit`.
-  Left: the publish, which the owner runs (`cargo login`, RELEASING.md), then the badges
-  and `cargo install renox-cli` in the docs.
+  (`rnx new --starter`, the 1.x promise in docs/stability.md): merged (#121). Then the release
+  candidate: version `1.0.0-rc.1` (branch `release-1.0.0-rc.1`), published by the owner's
+  `cargo login` token with each `cargo publish` confirmed by the owner; after it checks out,
+  1.0.0, the badges and `cargo install renox-cli` in the docs.
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). 
