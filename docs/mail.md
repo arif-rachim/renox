@@ -193,8 +193,8 @@ tests), its channels, and one version of the message per channel.
 | Channel | Method | Delivered by |
 |---|---|---|
 | `Channel::Mail` (the default) | `to_mail(&self, to, state) -> Result<Mail>` | `state.mailer`, to `to.email()` |
-| `Channel::Database` | `to_database(&self, to) -> Value` | a row in `notifications` (users only) |
-| `Channel::Custom("whatsapp")` | `to_channel(&self, channel, to) -> Result<Value>` | the handler registered with `App::channel` |
+| `Channel::Database` | `to_database(&self, to, state) -> Result<Value>` | a row in `notifications` (users only) |
+| `Channel::Custom("whatsapp")` | `to_channel(&self, channel, to, state) -> Result<Value>` | the handler registered with `App::channel` |
 
 ```rust
 use renox::prelude::*;

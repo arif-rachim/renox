@@ -1073,7 +1073,7 @@ picks the build, not the terminal.
   every closure, seeders get `AppState`, `disk_named`, builder-only `Factory`, `DateTime`
   timestamps, opaque `Zone`, sealed `Viewer`/`Executor`/`ForeignKey`, `DownOptions`,
   `retry`/`retry_all`, secrets hidden from `Debug`): merged (#118). V1d (the docs site `site/`, docs/tutorial.md,
-  docs/laravel.md; the owner hosts it on their own server): branch `v1d-docs-site`. Next a
+  docs/laravel.md; the owner hosts it on their own server): merged (#120). Next a
   starter kit and the publish, which the owner runs (`cargo login`, RELEASING.md).
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
