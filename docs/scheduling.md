@@ -67,7 +67,7 @@ Each method returns a `ScheduledTask` to narrow or hook into:
   Filters only drop runs: `every_minutes(5, …).between(…)` still runs on the 5-minute marks.
 - **Time zone:** `timezone("Asia/Jakarta")` for this task instead of `APP_TIMEZONE` (also
   `+07:00` or `UTC`).
-- **Hooks:** `on_failure(|state, err| async move { … })` after a run that failed or panicked,
+- **Hooks:** `on_failure(|err, state| async move { … })` after a run that failed or panicked,
   `on_success(|state| async move { … })` after one that succeeded.
 - **Pings** (health checks such as Healthchecks.io, Cronitor or Better Stack):
   `ping_before(url)`, `then_ping(url)` (after every run), `ping_on_success(url)`,

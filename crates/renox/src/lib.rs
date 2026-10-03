@@ -112,6 +112,16 @@ pub struct SchedulingGuide;
 #[doc = include_str!("../../../docs/testing.md")]
 pub struct TestingGuide;
 
+/// Compiles the Rust in docs/tutorial.md as a doctest.
+#[cfg(doctest)]
+#[doc = include_str!("../../../docs/tutorial.md")]
+pub struct TutorialGuide;
+
+/// Compiles the Rust in docs/laravel.md as a doctest.
+#[cfg(doctest)]
+#[doc = include_str!("../../../docs/laravel.md")]
+pub struct LaravelGuide;
+
 /// Compiles the Rust in docs/operations.md as a doctest.
 #[cfg(doctest)]
 #[doc = include_str!("../../../docs/operations.md")]

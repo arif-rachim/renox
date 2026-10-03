@@ -1,0 +1,185 @@
+/* The documentation site: the kit's shell and tokens, plus long-form text
+   (the guides) and a few pieces of its own. Colors come from the kit, so
+   dark mode follows. */
+
+.site-search { flex: 0 1 22rem; min-width: 0; }
+.site-search .rx-input { width: 100%; }
+
+/* A page: the article, and its contents beside it on wide screens. */
+.site-page {
+  display: grid;
+  grid-template-columns: minmax(0, 46rem);
+  gap: 3rem;
+  justify-content: center;
+}
+@media (min-width: 1280px) {
+  .site-page { grid-template-columns: minmax(0, 46rem) 14rem; }
+}
+.site-toc { display: none; }
+@media (min-width: 1280px) {
+  .site-toc {
+    display: block;
+    position: sticky;
+    top: 5rem;
+    align-self: start;
+    max-height: calc(100vh - 6rem);
+    overflow-y: auto;
+    font: var(--rx-type-note);
+  }
+}
+.site-toc__title {
+  font: var(--rx-type-caption);
+  text-transform: var(--rx-caption-case);
+  letter-spacing: var(--rx-caption-tracking);
+  color: var(--rx-secondary-label);
+  margin: 0 0 0.5rem;
+}
+.site-toc ul { list-style: none; margin: 0; padding: 0; }
+.site-toc li { margin: 0.35rem 0; }
+.site-toc a { color: var(--rx-secondary-label); text-decoration: none; }
+.site-toc a:hover { color: var(--rx-accent-text); }
+
+.site-narrow { max-width: 46rem; margin: 0 auto; }
+
+/* Long-form text. */
+.site-prose { font: var(--rx-type-body); color: var(--rx-label); }
+.site-prose > * + * { margin-top: 1rem; }
+.site-prose h2, .site-prose h3, .site-prose h4 {
+  font-family: var(--rx-font-display);
+  color: var(--rx-label);
+  scroll-margin-top: 5rem;
+  position: relative;
+}
+.site-prose h2 { font: var(--rx-type-title); margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--rx-separator); }
+.site-prose h3 { font: var(--rx-type-heading); margin-top: 2rem; }
+.site-prose h4 { font: var(--rx-type-label); margin-top: 1.5rem; }
+.site-anchor {
+  position: absolute;
+  left: -1.1em;
+  color: var(--rx-tertiary-label);
+  text-decoration: none;
+  opacity: 0;
+}
+.site-prose h2:hover .site-anchor, .site-prose h3:hover .site-anchor,
+.site-prose h4:hover .site-anchor, .site-anchor:focus { opacity: 1; }
+.site-prose a { color: var(--rx-accent-text); }
+.site-prose ul, .site-prose ol { padding-left: 1.4rem; }
+.site-prose li + li { margin-top: 0.3rem; }
+.site-prose code {
+  font-family: var(--rx-mono);
+  font-size: 0.88em;
+  background: var(--rx-fill);
+  border-radius: var(--rx-radius-s);
+  padding: 0.1em 0.35em;
+}
+.site-prose pre, .site-quick pre {
+  background: var(--rx-surface);
+  border: 1px solid var(--rx-surface-border);
+  border-radius: var(--rx-radius);
+  padding: 1rem 1.1rem;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+.site-prose pre code, .site-quick pre code { background: none; padding: 0; font-size: inherit; }
+.site-prose blockquote {
+  margin-left: 0;
+  padding: 0.25rem 1rem;
+  border-left: 3px solid var(--rx-accent);
+  color: var(--rx-secondary-label);
+}
+/* Wide tables scroll inside the column instead of widening the page. */
+.site-prose table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font: var(--rx-type-note);
+}
+.site-prose th, .site-prose td {
+  border-bottom: 1px solid var(--rx-separator);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+.site-prose th {
+  font: var(--rx-type-caption);
+  text-transform: var(--rx-caption-case);
+  letter-spacing: var(--rx-caption-tracking);
+  color: var(--rx-secondary-label);
+}
+.site-prose img { max-width: 100%; height: auto; border-radius: var(--rx-radius); }
+.site-prose details {
+  border: 1px solid var(--rx-surface-border);
+  border-radius: var(--rx-radius);
+  padding: 0.75rem 1rem;
+  background: var(--rx-surface);
+}
+.site-prose summary { cursor: pointer; font-weight: 600; }
+.site-prose hr { border: 0; border-top: 1px solid var(--rx-separator); }
+
+/* Previous and next. */
+.site-pager {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--rx-separator);
+}
+.site-pager__link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  text-decoration: none;
+  color: var(--rx-accent-text);
+  font: var(--rx-type-label);
+}
+.site-pager__link--next { text-align: right; margin-left: auto; }
+.site-pager__label {
+  font: var(--rx-type-caption);
+  text-transform: var(--rx-caption-case);
+  letter-spacing: var(--rx-caption-tracking);
+  color: var(--rx-secondary-label);
+}
+.site-edit { font: var(--rx-type-note); margin-top: 1.5rem; }
+
+/* Search results. */
+.site-hit { display: flex; flex-direction: column; gap: 0.25rem; }
+.site-hit__snippet { font: var(--rx-type-note); color: var(--rx-secondary-label); }
+
+/* The home page. */
+.site-home { max-width: 60rem; margin: 0 auto; gap: 2.5rem; }
+.site-hero { padding: 2rem 0 0.5rem; }
+.site-hero__eyebrow {
+  font: var(--rx-type-caption);
+  text-transform: var(--rx-caption-case);
+  letter-spacing: var(--rx-caption-tracking);
+  color: var(--rx-accent-text);
+  margin: 0 0 0.75rem;
+}
+.site-hero__title {
+  font: var(--rx-type-display);
+  letter-spacing: var(--rx-title-tracking);
+  margin: 0 0 1rem;
+  max-width: 22ch;
+}
+.site-hero__lead { font: var(--rx-type-lead); color: var(--rx-secondary-label); max-width: 44rem; margin: 0 0 1.5rem; }
+.site-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 1rem;
+}
+.site-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1rem 1.1rem;
+  background: var(--rx-surface);
+  border: 1px solid var(--rx-surface-border);
+  border-radius: var(--rx-radius-l);
+  color: var(--rx-label);
+  text-decoration: none;
+  box-shadow: var(--rx-shadow);
+}
+.site-card:hover { border-color: var(--rx-accent); }
+.site-card span { font: var(--rx-type-note); color: var(--rx-secondary-label); }
