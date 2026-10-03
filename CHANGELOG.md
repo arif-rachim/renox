@@ -10,6 +10,12 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+## 1.0.0-rc.2 · 2026-10-04
+
+The second release candidate: the same API as rc.1, with `rnx` fixed so a new app passes
+`cargo fmt --check` (#124). Install it with `cargo install renox-cli --version 1.0.0-rc.2`;
+an app made by rc.1 moves over by changing `renox = "1.0.0-rc.1"` to `"1.0.0-rc.2"`.
+
 - **Fixed (#124):** a new app failed `cargo fmt --check` before anyone wrote a line: the
   starter kit's `tests/home.rs` sorted its imports for names before `renox` only
   (`renoxium` failed, `desk` passed), the plain app's `tests/home.rs` had two chains over
