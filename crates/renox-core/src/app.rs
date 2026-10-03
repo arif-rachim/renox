@@ -110,8 +110,12 @@ pub struct App {
     limiters: HashMap<String, crate::rate_limit::LimitRule>,
     detect_locale: bool,
     disks: Vec<(String, DiskSettings)>,
+    mailers: Vec<(String, MailerSettings)>,
     xsrf_cookie: bool,
 }
+
+/// How `App::mailer` gets a mailer's settings once the configuration is loaded.
+type MailerSettings = Box<dyn Fn(&Config) -> crate::mail::MailConfig + Send + Sync>;
 
 /// How `App::disk` gets a disk's settings once the configuration is loaded.
 type DiskSettings = Box<dyn Fn(&Config) -> crate::storage::StorageConfig + Send + Sync>;
@@ -139,6 +143,7 @@ impl App {
             limiters: HashMap::new(),
             detect_locale: false,
             disks: Vec::new(),
+            mailers: Vec::new(),
             xsrf_cookie: false,
         }
     }
@@ -424,6 +429,32 @@ impl App {
         self
     }
 
+    /// Adds a mailer named `name`, e.g. a provider for newsletters or a
+    /// second SMTP account, used with `state.mailer_named(name)` or, by
+    /// listing it in `MAIL_FAILOVER`, when the default mailer fails.
+    /// `settings` runs once the configuration is loaded;
+    /// [`MailConfig::from_env`] reads `<PREFIX>_MAILER`, `_HOST`, …
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// use renox::mail::MailConfig;
+    ///
+    /// # let _ =
+    /// // BACKUP_HOST=smtp.other-provider.com, BACKUP_USERNAME=…; MAIL_FAILOVER=backup
+    /// App::new().mailer("backup", |config| MailConfig::from_env(config, "BACKUP"))
+    /// # ;
+    /// ```
+    ///
+    /// [`MailConfig::from_env`]: crate::mail::MailConfig::from_env
+    pub fn mailer(
+        mut self,
+        name: &str,
+        settings: impl Fn(&Config) -> crate::mail::MailConfig + Send + Sync + 'static,
+    ) -> Self {
+        self.mailers.push((name.to_owned(), Box::new(settings)));
+        self
+    }
+
     /// Adds a storage disk named `name` (letters, digits, `-`, `_`), e.g.
     /// backups on another bucket, read with `state.disk(name)`. `settings`
     /// runs once the configuration is loaded; [`StorageConfig::from_env`]
@@ -495,6 +526,7 @@ impl App {
         };
 
         self.registry.job::<crate::mail::SendMail>();
+        self.registry.job::<crate::mail::SendMailVia>();
         self.registry
             .job::<crate::auth::notifications::SendToChannel>();
         self.registry.job::<crate::webhook::ProcessWebhook>();
@@ -701,10 +733,27 @@ impl App {
         let mut security = crate::security::Security::new(&config, &self.csp, &listing);
         security.xsrf_cookie = self.xsrf_cookie;
         let security = Arc::new(security);
+        let mut mailers = HashMap::new();
+        for (name, settings) in &self.mailers {
+            let mailer =
+                Mailer::open(&settings(&config), &config, &format!("the `{name}` mailer"))?;
+            if mailers.insert(name.clone(), mailer).is_some() {
+                return Err(anyhow!("two mailers are named `{name}` (App::mailer)").into());
+            }
+        }
+        let mut failover = Vec::new();
+        for name in &config.mail.failover {
+            let mailer = mailers.get(name).ok_or_else(|| {
+                anyhow!("MAIL_FAILOVER names `{name}`, but no mailer has that name: add it with App::mailer")
+            })?;
+            failover.push((name.clone(), mailer.clone()));
+        }
+        let mailer = Mailer::from_config(&config)?.with_failover(failover);
         let state = AppState {
             security,
             webhooks: Arc::new(webhooks),
-            mailer: Mailer::from_config(&config)?,
+            mailer,
+            mailers: Arc::new(mailers),
             queue: Queue::new(db.clone(), key.clone()),
             cache: crate::cache::Cache::new(&config.cache_store, db.clone())?,
             storage,

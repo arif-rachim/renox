@@ -121,6 +121,33 @@ The same slot works for both answers: the redirect fills it when the page render
 this themselves, and `form_errors()` lists every error at the top of the form with links to
 the fields ([ui.md](ui.md)).
 
+#### Two forms on one page: error bags
+
+When a page has two plain forms with the same field names (a sign-in form beside a newsletter
+form, both with `email`), give one of them a named bag, as Laravel's error bags do. Its errors
+are then flashed in that bag: `error('email', bag='login')` shows them, `error('email')` (the
+other form) stays empty, and `errors_in('login')` lists them all. The kit's fields take
+`bag="login"`. htmx and JSON answers are the usual 422; a bag only matters to redirects.
+
+```rust
+use renox::prelude::*;
+use serde::Deserialize;
+
+#[derive(Deserialize, Validate)]
+#[validate(bag = "login")] // or `const ERROR_BAG: Option<&'static str> = Some("login");` in `impl Validate`
+struct SignIn {
+    #[validate(required, email)]
+    email: String,
+}
+```
+
+```html
+{{ ui.input("email", "Email", bag="login") }}      {# the sign-in form #}
+{{ ui.input("email", "Your email") }}              {# the newsletter form #}
+```
+
+A `ValidationError` you return yourself goes in a bag with `.in_bag("login")`.
+
 ### Errors found after validation
 
 A check that only the handler can make (stock ran out while the user was typing) returns a
@@ -223,7 +250,7 @@ numbers, items for a `Vec`, kilobytes for an `Upload`.
 | Other fields | `confirmed(&self.password_confirmation)`, `same("email", &self.email)`, `different("old_email", &self.old_email)`, `gt("min_price", &self.min_price)`, `gte(…)`, `lt(…)`, `lte(…)` |
 | Database | `unique(table, column)`, `exists(table, column)`, then `ignore(id)`, `where_eq(column, value)`, `where_null(column)`, `where_not_null(column)` |
 | Files | `image()`, `mimes(&["pdf", "jpg"])`, `dimensions(&Dimensions::new().min_width(1200).ratio(3, 1))` (pixels, read from the image's header), plus the size rules in kilobytes |
-| Passwords | `password(&policy)` with a `Password` policy |
+| Passwords | `password(&policy)` with a `Password` policy (`.uncompromised()` checks known breaches), `current_password()` (the logged-in user's) |
 | Your own | `rule(valid, message)`, `apply(&MyRule)` with a `Rule` |
 
 `gt`, `gte`, `lt` and `lte` compare a field with another one, named in the message: numbers
@@ -331,6 +358,35 @@ impl Validate for PasswordForm {
 
 Renox's own register, reset and account pages use the app's policy, `Password::min(8)` unless
 `Auth::new().password_rules(…)` sets another.
+
+`Password::min(12).uncompromised()` also refuses passwords found in known data breaches, by
+asking [Have I Been Pwned](https://haveibeenpwned.com/API/v3#PwnedPasswords): only the first
+five characters of the password's SHA-1 leave the server (k-anonymity), through
+`state.http`. It runs once the other rules pass. When the service can't be reached the
+password is allowed and a warning logged, so sign-ups keep working. In tests, answer it with
+`app.fake_http()` (see `parity_more.rs` in Renox's tests for an example).
+
+`current_password()` checks a field against the logged-in user's password (Laravel's
+`current_password`), e.g. before changing an email address; it fails when nobody is logged
+in:
+
+```rust
+use renox::prelude::*;
+use serde::Deserialize;
+
+#[derive(Deserialize, Validate)]
+struct ChangeEmail {
+    #[validate(required, email)]
+    email: String,
+    #[validate(required, current_password)]
+    current_password: String,
+}
+```
+
+Both run with the database checks, after the other rules: `Valid<T>` passes them the user
+and the HTTP client. Outside a request, `Validator::finish_for(&state, Some(&user))` does the
+same (`finish(&db)` can't: there's no user, so `current_password` fails, and the breach check
+is skipped).
 
 ### Your own rules
 
@@ -569,7 +625,7 @@ The keys:
 | `confirmed`, `same`, `different`, `distinct` | rules across fields |
 | `unique`, `exists` | database rules |
 | `file`, `image`, `mimes` | uploads |
-| `password.letters`, `password.mixed`, `password.numbers`, `password.symbols` | the `Password` policy |
+| `password.letters`, `password.mixed`, `password.numbers`, `password.symbols`, `password.uncompromised` | the `Password` policy |
 | `invalid` | a value that doesn't parse, of no type above |
 | `auth.failed`, `auth.throttle`, `current_password` | Renox's login and account pages |
 
@@ -714,10 +770,12 @@ async fn invalid_products_are_refused() {
 | `exists:categories,id` | `.exists("categories", "id")` |
 | `tags.*` rules, `distinct` | `v.each("tags", …)`, `v.distinct("tags", …)` |
 | `Password::min(8)->mixedCase()->numbers()->symbols()` | `Password::min(8).mixed_case().numbers().symbols()` |
+| `->uncompromised()`, `current_password` | `.uncompromised()` on the policy, `.current_password()` |
+| Named error bags (`validateWithBag`, `@error('email', 'login')`) | `#[validate(bag = "login")]`, `error('email', bag='login')` |
 | `Rule` classes, closures, `make:rule` | `impl Rule` + `apply`, `rule(valid, message)`, `rnx make:rule` |
 | `nullable` | an `Option<T>` field |
 | `messages()`, `attributes()` | `.message(…)`, `.label(…)`; `renox.validation.*` in lang files |
 | `ValidationException::withMessages([...])` | `Err(ValidationError::new(errors).into())` |
-| `@error('name')`, `old('name')`, `$errors` | `error('name')`, `old('name')`, `errors` |
+| `@error('name')`, `old('name')`, `$errors` | `error('name')`, `old('name')`, `errors` (`errors_in('bag')`) |
 | Precognition | `data-live-validate` |
 | `assertInvalid`, `assertSessionHasErrors` | `assert_invalid` (htmx/JSON); `assert_status(303)` for plain posts |

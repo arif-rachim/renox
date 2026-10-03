@@ -8,16 +8,25 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
     let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
 
     let mut hooks = false;
+    let mut bag: Option<LitStr> = None;
     for attr in input.attrs.iter().filter(|a| a.path().is_ident("validate")) {
         attr.parse_nested_meta(|meta| {
             if meta.path.is_ident("hooks") {
                 hooks = true;
                 Ok(())
+            } else if meta.path.is_ident("bag") {
+                bag = Some(meta.value()?.parse()?);
+                Ok(())
             } else {
-                Err(meta.error("expected `hooks` on the struct (rules go on its fields)"))
+                Err(meta.error(
+                    "expected `hooks` or `bag = \"name\"` on the struct (rules go on its fields)",
+                ))
             }
         })?;
     }
+    let bag = bag.map(|bag| {
+        quote! { const ERROR_BAG: ::core::option::Option<&'static str> = ::core::option::Option::Some(#bag); }
+    });
 
     let Data::Struct(data) = &input.data else {
         return Err(Error::new_spanned(
@@ -106,6 +115,8 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
 
     Ok(quote! {
         impl #impl_generics ::renox::Validate for #ident #type_generics #where_clause {
+            #bag
+
             #[allow(unused_variables)]
             fn rules(&self, v: &mut ::renox::Validator) {
                 #(#statements)*

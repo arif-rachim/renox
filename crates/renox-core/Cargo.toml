@@ -68,6 +68,7 @@ regex = "1.12.2"
 rpassword = "7.5.4"
 serde_html_form = "0.2.8"
 serde_urlencoded = "0.7.1"
+sha1 = "0.11"
 sha2 = "0.11.0"
 sqlx = { version = "0.9.0", default-features = false, features = ["sqlite", "runtime-tokio", "chrono", "json"] }
 uuid = { version = "1", optional = true, features = ["v4", "v7", "serde"] }

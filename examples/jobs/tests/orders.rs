@@ -364,7 +364,7 @@ async fn receipts_jump_ahead_of_reports() {
     assert!(worker.run_next().await.unwrap());
     assert_eq!(app.sent_mail()[0].subject, "Your receipt for order #1");
     assert!(worker.run_next().await.unwrap());
-    assert_eq!(app.sent_mail()[1].subject, "Today's sales");
+    assert_eq!(reports(&app)[0].subject, "Today's sales");
 }
 
 #[renox::test]
@@ -413,8 +413,7 @@ async fn the_daily_report_sums_todays_orders() {
         .await
         .unwrap();
     app.run_jobs().await;
-    let report = app
-        .sent_mail()
+    let report = reports(&app)
         .into_iter()
         .find(|m| m.subject == "Today's sales")
         .unwrap();
@@ -442,8 +441,7 @@ async fn the_weekly_report_covers_seven_days() {
     // checks that the task is registered.
     app.kernel().run_scheduled("weekly-sales").await.unwrap();
     app.run_jobs().await;
-    let report = app
-        .sent_mail()
+    let report = reports(&app)
         .into_iter()
         .find(|m| m.subject == "This week's sales")
         .unwrap();
@@ -469,7 +467,7 @@ async fn a_report_already_running_is_not_sent_twice() {
 
     held.release().await.unwrap();
     app.kernel().run_scheduled("daily-sales").await.unwrap();
-    assert_eq!(app.queued_jobs().await, ["renox.send-mail"]);
+    assert_eq!(app.queued_jobs().await, ["renox.send-mail-via"]);
     assert!(!lock.is_held().await.unwrap(), "released after the run");
 }
 
@@ -664,4 +662,9 @@ async fn mails_carry_copies_replies_and_attachments() {
     let text = String::from_utf8(csv.data.clone()).unwrap();
     assert!(text.starts_with("order,date,item,total\n1,"), "{text}");
     assert!(text.contains(",\"Coffee\",18000"), "{text}");
+}
+
+/// What the `reports` mailer sent (`App::mailer("reports", …)`).
+fn reports(app: &TestApp) -> Vec<renox::mail::Mail> {
+    app.state().mailer_named("reports").unwrap().sent()
 }

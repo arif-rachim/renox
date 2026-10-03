@@ -50,9 +50,9 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     `revealable`: a button that shows the password; `copyable`: a button
     that copies the value. A disabled field isn't sent with the form; a
     readonly one is. -#}
-{% macro input(name, label, type="text", value=none, hint=none, required=false, autocomplete=none, placeholder=none, attrs={}, id=none, prefix=none, suffix=none, datalist=none, disabled=false, readonly=false, span=none, revealable=false, copyable=false, hide_label=false) -%}
+{% macro input(name, label, type="text", value=none, hint=none, required=false, autocomplete=none, placeholder=none, attrs={}, id=none, prefix=none, suffix=none, datalist=none, disabled=false, readonly=false, span=none, revealable=false, copyable=false, hide_label=false, bag=none) -%}
 {%- set id = id or _id(name) %}
-{%- set message = error(name) %}
+{%- set message = error(name, bag=bag) %}
 {%- set affixed = prefix or suffix or revealable or copyable %}
 <div class="{{ _field_class(span) }}">
   {{ _label(id, label, required, hide_label) }}
@@ -92,9 +92,9 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 </div>
 {%- endmacro %}
 
-{% macro textarea(name, label, value=none, rows=4, hint=none, required=false, placeholder=none, attrs={}, id=none, disabled=false, readonly=false, span=none, hide_label=false) -%}
+{% macro textarea(name, label, value=none, rows=4, hint=none, required=false, placeholder=none, attrs={}, id=none, disabled=false, readonly=false, span=none, hide_label=false, bag=none) -%}
 {%- set id = id or _id(name) %}
-{%- set message = error(name) %}
+{%- set message = error(name, bag=bag) %}
 <div class="{{ _field_class(span) }}">
   {{ _label(id, label, required, hide_label) }}
   <textarea class="rx-textarea" id="{{ id }}" name="{{ name }}" rows="{{ rows }}"
@@ -120,9 +120,9 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     failed submit) is looked up (`GET ?values=…`). `editable`: what was
     typed can be added ("Add “…”", `POST label=…`) and is chosen at once,
     and a chosen option can be renamed (`POST _method=PUT value=…&label=…`). -#}
-{% macro select(name, label, options, selected=none, hint=none, required=false, placeholder=none, attrs={}, id=none, disabled=false, span=none, multiple=false, searchable=false, options_url=none, editable=false, hide_label=false) -%}
+{% macro select(name, label, options, selected=none, hint=none, required=false, placeholder=none, attrs={}, id=none, disabled=false, span=none, multiple=false, searchable=false, options_url=none, editable=false, hide_label=false, bag=none) -%}
 {%- set id = id or _id(name) %}
-{%- set message = error(name) %}
+{%- set message = error(name, bag=bag) %}
 {%- if multiple %}
 {%- set current = old(name, []) if has_old() else (selected if selected is defined and selected is not none else []) %}
 {%- if current is string or current is number %}{% set current = [current] %}{% endif %}
@@ -163,9 +163,9 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 {#- A checkbox for a yes/no choice; `switch` looks like iOS' toggle, for
     settings that take effect as a whole ("Email me updates"). After a failed
     submit it shows what was sent: an unticked box stays unticked. -#}
-{% macro checkbox(name, label, checked=false, hint=none, value="on", switch=false, attrs={}, id=none, disabled=false, span=none, hide_label=false) -%}
+{% macro checkbox(name, label, checked=false, hint=none, value="on", switch=false, attrs={}, id=none, disabled=false, span=none, hide_label=false, bag=none) -%}
 {%- set id = id or _id(name) %}
-{%- set message = error(name) %}
+{%- set message = error(name, bag=bag) %}
 {%- set on = (old(name, none) | string == value | string) if has_old() else checked %}
 <div class="{{ _field_class(span) }}">
   <label class="rx-check{% if switch %} rx-check--switch{% endif %}" for="{{ id }}">
@@ -180,9 +180,9 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 {#- Radio groups, checkbox lists and toggle buttons share this: a fieldset
     whose legend is the label, one input per option. `current` is the list
     of values (as strings) to show ticked. -#}
-{%- macro _choice_group(kind, name, label, options, current, hint, required, inline, columns, attrs, id, disabled, span) -%}
+{%- macro _choice_group(kind, name, label, options, current, hint, required, inline, columns, attrs, id, disabled, span, bag=none) -%}
 {%- set id = id or _id(name) %}
-{%- set message = error(name) %}
+{%- set message = error(name, bag=bag) %}
 {%- set type = "radio" if kind in ["radio", "toggle"] else "checkbox" %}
 {%- set toggles = kind in ["toggle", "toggles"] %}
 <fieldset class="{{ _field_class(span) }} rx-fieldset" aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"{% if disabled %} disabled{% endif %}>
@@ -220,32 +220,32 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     short options on one line, `columns` (2 or 3) lays long lists out in
     columns. After a failed submit with none picked, none is checked. More
     than about seven options read better as a `select`. -#}
-{% macro radio(name, label, options, selected=none, hint=none, required=false, inline=false, columns=none, attrs={}, id=none, disabled=false, span=none) -%}
+{% macro radio(name, label, options, selected=none, hint=none, required=false, inline=false, columns=none, attrs={}, id=none, disabled=false, span=none, bag=none) -%}
 {%- set current = old(name, "") if has_old() else (selected if selected is defined and selected is not none else "") %}
-{{ _choice_group("radio", name, label, options, [current | string], hint, required, inline, columns, attrs, id, disabled, span) }}
+{{ _choice_group("radio", name, label, options, [current | string], hint, required, inline, columns, attrs, id, disabled, span, bag) }}
 {%- endmacro %}
 
 {#- Several choices out of a list: each ticked option sends `name` once,
     so the form field is a `Vec` (give it `#[serde(default)]`: nothing
     ticked sends nothing). `selected`: the values ticked at first. Options,
     `inline` and `columns` as for `radio`. -#}
-{% macro checkbox_list(name, label, options, selected=[], hint=none, required=false, inline=false, columns=none, attrs={}, id=none, disabled=false, span=none) -%}
+{% macro checkbox_list(name, label, options, selected=[], hint=none, required=false, inline=false, columns=none, attrs={}, id=none, disabled=false, span=none, bag=none) -%}
 {%- set current = old(name, []) if has_old() else selected %}
 {%- if current is none %}{% set current = [] %}{% elif current is string or current is number %}{% set current = [current] %}{% endif %}
-{{ _choice_group("checkbox", name, label, options, current | map("string") | list, hint, required, inline, columns, attrs, id, disabled, span) }}
+{{ _choice_group("checkbox", name, label, options, current | map("string") | list, hint, required, inline, columns, attrs, id, disabled, span, bag) }}
 {%- endmacro %}
 
 {#- The options as a row of buttons, one pressed: for a few short choices
     that read better side by side ("Pickup", "Courier"). `multiple`: any
     number pressed, sent like a `checkbox_list` (`selected` is then a list). -#}
-{% macro toggle_buttons(name, label, options, selected=none, multiple=false, hint=none, required=false, attrs={}, id=none, disabled=false, span=none) -%}
+{% macro toggle_buttons(name, label, options, selected=none, multiple=false, hint=none, required=false, attrs={}, id=none, disabled=false, span=none, bag=none) -%}
 {%- if multiple %}
 {%- set current = old(name, []) if has_old() else (selected or []) %}
 {%- if current is string or current is number %}{% set current = [current] %}{% endif %}
-{{ _choice_group("toggles", name, label, options, current | map("string") | list, hint, required, false, none, attrs, id, disabled, span) }}
+{{ _choice_group("toggles", name, label, options, current | map("string") | list, hint, required, false, none, attrs, id, disabled, span, bag) }}
 {%- else %}
 {%- set current = old(name, "") if has_old() else (selected if selected is defined and selected is not none else "") %}
-{{ _choice_group("toggle", name, label, options, [current | string], hint, required, false, none, attrs, id, disabled, span) }}
+{{ _choice_group("toggle", name, label, options, [current | string], hint, required, false, none, attrs, id, disabled, span, bag) }}
 {%- endif %}
 {%- endmacro %}
 
@@ -254,9 +254,9 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     stored now, shown above. The form needs enctype="multipart/form-data";
     the form field is an `Option<Upload>` (or `Vec<Upload>` with
     `multiple`). A file is never refilled after a failed submit. -#}
-{% macro file(name, label, accept=none, multiple=false, hint=none, required=false, current=none, current_name=none, preview=false, attrs={}, id=none, disabled=false, span=none) -%}
+{% macro file(name, label, accept=none, multiple=false, hint=none, required=false, current=none, current_name=none, preview=false, attrs={}, id=none, disabled=false, span=none, bag=none) -%}
 {%- set id = id or _id(name) %}
-{%- set message = error(name) %}
+{%- set message = error(name, bag=bag) %}
 <div class="{{ _field_class(span) }}">
   {{ _label(id, label, required) }}
   {%- if current %}
@@ -283,9 +283,9 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 {#- A date field with a calendar beside it: type 2026-10-02, or pick a day.
     Sent as YYYY-MM-DD, like <input type="date"> (a `NaiveDate`). `min` and
     `max` limit the calendar. Without JavaScript it is a plain text field. -#}
-{% macro date_picker(name, label, value=none, min=none, max=none, hint=none, required=false, placeholder="YYYY-MM-DD", attrs={}, id=none, disabled=false, readonly=false, span=none) -%}
+{% macro date_picker(name, label, value=none, min=none, max=none, hint=none, required=false, placeholder="YYYY-MM-DD", attrs={}, id=none, disabled=false, readonly=false, span=none, bag=none) -%}
 {%- set id = id or _id(name) %}
-{%- set message = error(name) %}
+{%- set message = error(name, bag=bag) %}
 {%- set current = old(name, value if value is defined and value is not none else "") | string %}
 {%- if once('rx-calendar') %}{{ renox_calendar() }}{% endif %}
 <div class="{{ _field_class(span) }}">
@@ -333,9 +333,9 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     `name`, so the field is a `Vec<String>` (with `#[serde(default)]`).
     `suggestions`: values offered while typing. Without JavaScript the box
     sends what's typed as one more tag. -#}
-{% macro tags_input(name, label, value=[], suggestions=none, hint=none, required=false, placeholder=none, attrs={}, id=none, disabled=false, span=none) -%}
+{% macro tags_input(name, label, value=[], suggestions=none, hint=none, required=false, placeholder=none, attrs={}, id=none, disabled=false, span=none, bag=none) -%}
 {%- set id = id or _id(name) %}
-{%- set message = error(name) %}
+{%- set message = error(name, bag=bag) %}
 {%- set current = old(name, []) if has_old() else (value if value is defined and value is not none else []) %}
 {%- if current is string or current is number %}{% set current = [current] %}{% endif %}
 <div class="{{ _field_class(span) }}">

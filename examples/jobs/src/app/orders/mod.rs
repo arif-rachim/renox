@@ -192,7 +192,9 @@ async fn sales_report(state: AppState, days: i64, subject: &str, period: &str) -
             "mail/sales",
             context! { count, total, period },
         )?;
-        state.queue_mail(mail).await?;
+        // Reports go out through their own mailer (`App::mailer("reports", …)`
+        // in lib.rs), e.g. an account kept apart from customers' receipts.
+        state.queue_mail_via("reports", mail).await?;
     }
     guard.release().await?;
     Ok(())

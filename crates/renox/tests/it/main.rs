@@ -34,6 +34,7 @@ mod models;
 mod notification_bell;
 mod operations;
 mod parity;
+mod parity_more;
 mod polish;
 #[cfg(feature = "postgres")]
 mod postgres;

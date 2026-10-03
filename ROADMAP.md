@@ -1529,8 +1529,8 @@ API may still change.
 - [x] Several disks: `App::disk`, `state.disk`, `StorageConfig::from_env`
 - [x] `Routes::etag()`, `App::xsrf_cookie()`, `TRUSTED_HOSTS`
 - [x] Examples (crud, relations, backoffice, uploads), guides, the parity review
-- [ ] Still open from the review's small adds: a public `current_password` rule, the HIBP
-      check, several mailers, session `keep`/`now`, named error bags, `hasManyThrough`
+- [x] Still open from the review's small adds after M33 (`current_password`, the HIBP check,
+      several mailers, session `keep`/`now`, named error bags, `hasManyThrough`): done in M34
 
 Notes from M33:
 - `Found` picks the parameter named after the table, else the only one; a parameter named
@@ -1542,6 +1542,28 @@ Notes from M33:
   `String`, and comparing their lengths would surprise.
 - A named local disk serves its public files at `/_renox/disks/<name>/public/…` rather than
   under `/storage`, which belongs to the default disk.
+
+### M34 · The rest of the parity review's small additions
+- [x] `current_password()`, `Password::uncompromised()` (Have I Been Pwned, k-anonymity),
+      `Validator::finish_for`
+- [x] Session `keep` and `now`
+- [x] Named error bags: `Validate::ERROR_BAG`, `#[validate(bag = "…")]`, `error(…, bag=…)`,
+      `errors_in`, `bag=` on the kit's fields
+- [x] Several mailers (`App::mailer`, `MailConfig::from_env`, `mailer_named`,
+      `queue_mail_via`) and `MAIL_FAILOVER`
+- [x] `relations::has_many_through`
+- [x] Examples (jobs, relations), guides, the parity review
+
+Notes from M34:
+- The breach check fails open: a sign-up shouldn't stop because a third-party service is
+  slow. It runs after the other rules, so short passwords never reach it.
+- Failover tries the other mailers' drivers but records the mail as the app's, so the preview
+  page and `app.sent_mail()` show it whoever sent it.
+- An error bag only changes where a redirect flashes the errors; htmx and JSON answers are the
+  usual 422, since their errors are placed in the form that sent them.
+- `MailConfig::from_env` defaults its driver to `MAIL_MAILER`: a named mailer then logs while
+  developing and keeps mail in memory in tests, instead of trying an SMTP server that isn't
+  configured.
 
 ### Plugins (separate crates, after M18)
 - [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`

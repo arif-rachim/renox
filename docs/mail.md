@@ -34,6 +34,38 @@ Any other value fails at boot. The SMTP settings:
 
 Set `APP_URL` to the public address, so links in mails point to the right host.
 
+### More mailers, and failover
+
+`App::mailer(name, settings)` adds a mailer with a name: a newsletter provider, an account
+kept apart from receipts, or a second SMTP provider. `MailConfig::from_env(config, "BACKUP")`
+reads `BACKUP_MAILER` (the app's `MAIL_MAILER` when unset, so `log` while developing and
+`memory` in tests), `BACKUP_HOST`, `_PORT`, `_USERNAME`, `_PASSWORD`, `_ENCRYPTION`,
+`_TIMEOUT` and `BACKUP_FROM_ADDRESS`/`_FROM_NAME` (else `MAIL_FROM_*`).
+
+```rust
+use renox::prelude::*;
+use renox::mail::{Mail, MailConfig};
+
+fn app() -> App {
+    App::new()
+        .mailer("newsletter", |config| MailConfig::from_env(config, "NEWSLETTER"))
+        .mailer("backup", |config| MailConfig::from_env(config, "BACKUP"))
+}
+
+async fn send(state: AppState) -> Result {
+    let news = Mail::new("ann@example.com", "October", "What's new.");
+    state.mailer_named("newsletter")?.send(news.clone()).await?; // now
+    state.queue_mail_via("newsletter", news).await?;             // through the queue
+    Ok(())
+}
+```
+
+`MAIL_FAILOVER=backup` (names from `App::mailer`, comma-separated, tried in order) hands a
+mail on when the default mailer fails, e.g. the main SMTP provider is down: the mail is sent
+by the next one that works, with a warning in the log, and counts as the app's (it's in
+`/_renox/mail` and `app.sent_mail()`). A mail that can't be sent at all, such as one with a
+bad address, isn't handed on. A name that no mailer has fails at boot.
+
 ## Sending a mail
 
 `Mail::new(to, subject, text)` is a plain-text mail; the builder adds the rest. Addresses are
@@ -406,7 +438,8 @@ More in [testing.md](testing.md) ("Jobs, events, notifications, mail, HTTP").
   SMTP server is down or silent, a direct `mailer.send` fails within `MAIL_TIMEOUT`, while
   queued mail and notifications get five attempts and then wait in `failed_jobs` for
   `queue:retry` (see [operations.md](operations.md), the failure table).
-- The built-in password-reset and verification mails are sent directly, in the request.
+- The built-in password-reset and verification mails are sent directly, in the request; a
+  second provider in `MAIL_FAILOVER` keeps them going when the first is down.
 - Prune read notifications (above).
 
 ## Coming from Laravel
@@ -417,6 +450,7 @@ More in [testing.md](testing.md) ("Jobs, events, notifications, mail, HTTP").
 | `Mailable` class + Blade view | `state.mail_view(to, subject, "mail/x", ctx)` (`.html` + `.txt`) |
 | `Mail::to()->cc()->bcc()`, `replyTo`, `from`, `attach` | `Mail` builder: `also_to`, `cc`, `bcc`, `reply_to`, `from`, `attach` |
 | `Mail::send` / `Mail::queue` | `state.mailer.send(mail)` / `state.queue_mail(mail)` |
+| `Mail::mailer('postmark')`, the `failover` transport | `App::mailer(name, …)` + `state.mailer_named(name)` / `queue_mail_via`, `MAIL_FAILOVER` |
 | Markdown mail components (`x-mail::button`, `panel`, `table`) | `renox/mail/components.html`: `button`, `panel`, `table`, `divider` |
 | `Mail::to($u)->locale('es')` | `state.mail_view_in("es", …)` |
 | `php artisan make:mail` | `rnx make:mail` (templates only) |

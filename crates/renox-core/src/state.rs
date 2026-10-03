@@ -26,6 +26,8 @@ pub struct AppState {
     pub db: Db,
     /// Sends mail (`MAIL_MAILER`).
     pub mailer: Mailer,
+    /// The app's other mailers (`App::mailer`), by name.
+    pub(crate) mailers: Arc<std::collections::HashMap<String, Mailer>>,
     /// Dispatches jobs.
     pub queue: Queue,
     /// The cache (`CACHE_STORE`).

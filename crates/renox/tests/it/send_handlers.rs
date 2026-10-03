@@ -7,7 +7,7 @@
 
 use std::time::Duration;
 
-use renox::db::relations::{Pivot, belongs_to, has_many};
+use renox::db::relations::{Pivot, belongs_to, has_many, has_many_through};
 use renox::prelude::*;
 use renox::testing::TestApp;
 
@@ -34,6 +34,18 @@ async fn relations(State(db): State<Db>) -> Result<String> {
     let tags = Tag::query().get(&db).await?;
     let parents = belongs_to::<Note, _, _>(&db, &tags, |t| t.note_id).await?;
     let children = has_many(&db, &notes, Tag::query(), "note_id", |t| t.note_id).await?;
+    // Notes → tags → tags again (by id): only the future's `Send` matters here.
+    let _through = has_many_through(
+        &db,
+        &notes,
+        Tag::query(),
+        "note_id",
+        |t| t.note_id,
+        Tag::query(),
+        "id",
+        |t| t.id,
+    )
+    .await?;
     let linked = NOTE_TAGS.load_for::<Tag, _>(&db, &notes).await?;
     let loaded = NOTE_TAGS
         .load::<Tag>(&db, notes.iter().map(|n| n.id))
