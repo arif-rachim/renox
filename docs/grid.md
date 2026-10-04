@@ -284,7 +284,6 @@ fn orders_grid() -> Grid {
 
 ```rust
 # use renox::prelude::*;
-use renox::Toast;
 use renox::grid::{Column, Grid};
 # #[derive(Model, serde::Serialize, Default)] struct Order { id: i64, customer: String, items: i64 }
 
@@ -368,7 +367,6 @@ fn regions_grid() -> Grid {
 
 ```rust
 # use renox::prelude::*;
-use renox::Toast;
 use renox::grid::{Action, Column, Grid, GridRequest, Selection};
 # #[derive(Model, serde::Serialize, Default)] struct Order { id: i64, status: String }
 

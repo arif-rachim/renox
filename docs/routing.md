@@ -542,7 +542,7 @@ Some words from the table:
 
 ```rust
 use renox::prelude::*;
-use renox::{Download, Toast};
+use renox::Download;
 
 /// After saving: a "Saved" message, and a redirect to the product's page.
 async fn store(session: Session) -> Result<(Toast, Redirect)> {

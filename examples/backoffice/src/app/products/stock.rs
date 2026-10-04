@@ -4,7 +4,6 @@
 //! last unit can't both succeed, on SQLite or PostgreSQL, without reading
 //! the row first.
 
-use renox::Toast;
 use renox::db::Transaction;
 use renox::grid::{Column, Grid};
 use renox::prelude::*;

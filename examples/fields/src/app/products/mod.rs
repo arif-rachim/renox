@@ -3,7 +3,6 @@
 //! its migration) and `rnx make:migration add_tags_and_specs_to_products`.
 //! Each field shows one pairing of HTML input, Rust type and column type.
 
-use renox::Toast;
 use renox::chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use renox::db::Json;
 use renox::prelude::*;

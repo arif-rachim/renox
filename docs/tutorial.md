@@ -1,31 +1,57 @@
 # Build your first Renox app
 
-This tutorial builds one small, real app from an empty directory to a server: **Stash**, a
-place to keep the links you mean to read. Each person who signs up has their own bookmarks,
-saves new ones without a page reload, edits and deletes only their own, and gets a mail every
-Monday listing what they saved that week. It has tests, and it ships as one binary.
+In this tutorial you build one small, real web app, from an empty folder to a server on the
+internet. The app is called **Stash**: a place to keep links you want to read later.
 
-You'll need Rust 1.94 or later. Knowing Laravel helps, but isn't needed: where Renox does
-something differently, the tutorial says so and why. Each step ends with a link to the guide
-that goes deeper.
+When it's done, Stash can:
 
-| Step | You'll use |
+- let people sign up and log in;
+- save a link without reloading the page;
+- let each person edit and delete **only their own** links;
+- send everyone an email every Monday with the links they saved that week;
+- check itself with automatic tests;
+- run on a server as **one single file**.
+
+You don't need to know Laravel or any other web framework. You need Rust 1.94 or later, and a
+little Rust: what a `struct` and a `fn` are, and what `async` and `?` do. Every piece of code
+comes with an explanation of what it does and why.
+
+> [!TIP]
+> Know Laravel already? Look for the **Coming from Laravel** notes: they say where Renox does
+> the same thing, and where it's different. [Coming from Laravel](laravel.md) has the full list.
+
+| Step | What you'll learn |
 |---|---|
-| [1. Create the app](#1-create-the-app) | `rnx new`, `rnx serve`, the generated files |
-| [2. A model and its table](#2-a-model-and-its-table) | `rnx make:model`, a SQL migration, `#[derive(Model)]` |
-| [3. A list page](#3-a-list-page) | a module, routes, `require_auth`, `view()`, the UI kit |
-| [4. A form that saves without a reload](#4-a-form-that-saves-without-a-reload) | `#[derive(Validate)]`, `Valid<T>`, htmx fragments, toasts |
-| [5. Edit and delete, only your own](#5-edit-and-delete-only-your-own) | `Found<T>`, a policy, `Auth` |
-| [6. A weekly digest mail](#6-a-weekly-digest-mail) | a job, a mail view, the scheduler |
-| [7. Tests and demo data](#7-tests-and-demo-data) | factories, a seeder, `TestApp` |
-| [8. Deploy](#8-deploy) | `rnx build`, `rnx make:deploy`, systemd, `.env`, backups |
+| [1. Create the app](#1-create-the-app) | make an app with one command, and what its files are for |
+| [2. A model and its table](#2-a-model-and-its-table) | store bookmarks in a database table |
+| [3. A list page](#3-a-list-page) | show a page with your bookmarks, for logged-in people only |
+| [4. A form that saves without a reload](#4-a-form-that-saves-without-a-reload) | check what people type, and save it |
+| [5. Edit and delete, only your own](#5-edit-and-delete-only-your-own) | decide who may change what |
+| [6. A weekly digest mail](#6-a-weekly-digest-mail) | do work in the background, on a timetable |
+| [7. Tests and demo data](#7-tests-and-demo-data) | check the app automatically, and fill it with fake data |
+| [8. Deploy](#8-deploy) | put the app on a real server |
+
+### Words you'll meet
+
+Web apps have their own words. Here are the ones this tutorial uses, in plain English:
+
+| Word | What it means |
+|---|---|
+| **request** and **response** | The browser asks for a page (a request); your app answers (a response). |
+| **route** | A rule that says "when someone opens `/bookmarks`, run this function". |
+| **handler** | The function a route runs. It gets the request's details and returns the page. |
+| **module** | A folder of code for one feature (here, everything about bookmarks). |
+| **model** | A Rust struct that matches a table in the database: one struct = one row. |
+| **migration** | A small SQL file that creates or changes a table. |
+| **template** (or view) | An HTML file with blanks that the app fills in, like `{{ bookmark.title }}`. |
+| **htmx** | A small script (it comes with Renox) that updates part of a page without a reload. |
 
 ## 1. Create the app
 
-Install `rnx`, Renox's command-line tool (Laravel's `artisan` and installer in one):
+First install `rnx`, Renox's command-line tool. It makes new apps and writes code for you:
 
 ```bash
-cargo install --locked --git https://github.com/arif-rachim/renox renox-cli
+cargo install renox-cli --version 1.0.0-rc.4
 ```
 
 Then make the app and run it:
@@ -36,177 +62,221 @@ cd stash
 rnx serve
 ```
 
-The first build compiles every dependency and takes a few minutes; later ones take seconds
-([development.md](development.md) has tips for faster builds). Open
-<http://127.0.0.1:3000>: a home page with a navigation bar, and **Log in** and **Register**
-buttons that already work. Register an account; you land back on the home page, logged in,
-with your name in a menu on the right.
+What these three commands do:
 
-`rnx serve` keeps watching: change a `.rs` file and it rebuilds and restarts the app; change a
-template and the browser reloads itself, with no rebuild. It also runs the database
-migrations before each start, so you'll rarely run `rnx migrate` by hand.
+- `rnx new stash` makes a folder called `stash` with a working app inside.
+- `cd stash` goes into that folder.
+- `rnx serve` builds the app and starts it.
+
+The first build downloads and compiles everything Renox needs, so it takes a few minutes. After
+that, builds take seconds ([development.md](development.md) has tips to make them faster).
+
+Now open <http://127.0.0.1:3000> in your browser. You'll see a home page with a navigation bar
+and **Log in** and **Register** buttons, and they already work. Register an account: you come back
+to the home page, logged in, with your name in a menu on the right.
+
+> [!NOTE]
+> Leave `rnx serve` running while you work. When you change a `.rs` file, it rebuilds and restarts
+> the app by itself. When you change a template (an `.html` file), the browser reloads by itself.
+> It also updates the database (runs the migrations) before each start.
 
 ### What `rnx new` made
 
 ```text
 stash/
-├── Cargo.toml              one dependency: renox (plus serde)
-├── .env, .env.example      settings: APP_KEY (already generated), DATABASE_URL, MAIL_*…
-├── build.rs                rebuilds when migrations, views or public files change
+├── Cargo.toml              the project's settings; one dependency: renox (plus serde)
+├── .env, .env.example      settings like the database address and the secret key
+├── build.rs                tells Rust to rebuild when migrations, views or public files change
 ├── src/
-│   ├── main.rs             runs the app: also its command line (migrate, queue:work…)
-│   ├── lib.rs              builds the App: its modules, migrations and seeders
+│   ├── main.rs             starts the app
+│   ├── lib.rs              puts the app together: its modules, migrations and seeders
 │   └── app/
-│       ├── mod.rs          lists the modules
-│       └── home/mod.rs     the home page's route and handler
+│       ├── mod.rs          the list of modules
+│       └── home/mod.rs     the home page: its route and its handler
 ├── resources/
-│   ├── views/layouts/app.html   the layout: navigation bar, account menu, toasts
-│   ├── views/home/index.html    the home page
-│   ├── views/errors/default.html  404, 403 and 500 pages, in the layout
+│   ├── views/layouts/app.html     the frame around every page: navigation bar, account menu
+│   ├── views/home/index.html      the home page
+│   ├── views/errors/default.html  the "not found" (404) and "error" (500) pages
 │   └── lang/en.json        the app's texts
 ├── public/app.css          your own styles (the UI kit brings the rest)
 ├── migrations/             SQL migrations (empty for now)
-├── tests/home.rs           tests that boot the whole app
-└── AGENTS.md, CLAUDE.md    a guide for coding assistants working on the app
+├── tests/home.rs           tests that start the whole app and click around
+└── AGENTS.md, CLAUDE.md    notes for AI coding assistants working on the app
 ```
 
-The database is SQLite, in `storage/app.db`, made on first use. Pass `--database postgres` to
-`rnx new` to start on PostgreSQL instead ([postgresql.md](postgresql.md)). This tutorial
-builds from the plain app; `rnx new stash --starter` would start from the starter kit instead
-(email verification, roles, a dashboard, a users page and the activity log, already written).
+The data lives in a **SQLite** database: one file, `storage/app.db`, made the first time it's
+needed. (Want PostgreSQL instead? Run `rnx new stash --database postgres`; see
+[postgresql.md](postgresql.md).)
 
-Two files are worth reading now. `src/main.rs` is one line:
+> [!TIP]
+> `rnx new stash --starter` starts from a bigger app that already has email verification, roles,
+> a dashboard and a users page. This tutorial starts from the plain app, so you see every step.
+
+Two files are worth a look now. The first is `src/main.rs`, which is almost empty:
 
 ```rust,no_run
 # mod stash { pub fn app() -> renox::App { renox::App::new() } }
+/// The program's starting point: build the app (from `src/lib.rs`) and run it.
 fn main() -> renox::Result {
     stash::app().run()
 }
 ```
 
-The app lives in the library, `src/lib.rs`, so that the tests can boot exactly the app
-`main` runs. The binary is also the app's command line: `stash migrate`, `stash queue:work`,
-`stash route:list`. While developing, `rnx <command>` runs it through `cargo run`, so
-`rnx route:list` lists every route with its name and guards.
+Why so short? The real app is built in `src/lib.rs`, so that the tests (step 7) can start
+exactly the same app.
 
-`src/app/home/mod.rs` is a **module**: a name and its routes. A Renox app is a list of modules;
-Laravel keeps routes in `routes/web.php`, Renox keeps each feature's routes next to its
-handlers.
+`run()` does more than start the web server. The app is also its own command-line tool:
+`stash migrate` updates the database, `stash route:list` lists every address the app answers.
+While you develop, type `rnx` in front instead (`rnx route:list`); it builds and runs it for you.
+
+The second file is `src/app/home/mod.rs`, the home page. It's a **module**: a feature's name
+and its routes.
 
 ```rust
 use renox::prelude::*;
 
+/// The home page module. It holds no data, so it's an empty struct.
 pub struct Home;
 
 impl Module for Home {
+    /// The module's name, used in logs and error messages.
     fn name(&self) -> &'static str {
         "home"
     }
 
+    /// The addresses this module answers: `/` runs `index`. The route is
+    /// named "home", so templates can link to it with `route('home')`.
     fn routes(&self) -> Routes {
         Routes::new().get("/", index).name("home")
     }
 }
 
+/// The handler for `/`: fill in the template `home/index.html` and send it.
 async fn index() -> View {
+    // `context! {}` holds the values the template can use; there are none yet.
     view("home/index.html", context! {})
 }
 ```
 
-A handler is a plain async function. It takes what it needs as arguments (the database, the
-logged-in user, a validated form) and returns a response; `view()` renders a MiniJinja
-template, Renox's Blade. More in [routing.md](routing.md).
+The line `use renox::prelude::*;` brings in everything an app usually needs (`Routes`, `View`,
+`view`, `Module` and more), so you don't import them one by one.
+
+A **handler** is a plain `async` function. Its arguments say what it needs (the database, the
+logged-in user, a checked form…) and Renox hands them over. It returns the answer: here a
+`View`, a page made from a template. More about routes and handlers in [routing.md](routing.md).
+
+> [!NOTE]
+> **Coming from Laravel:** there is no `routes/web.php`. Each module keeps its routes next to
+> its handlers. Templates use MiniJinja, which looks a lot like Blade.
 
 ## 2. A model and its table
 
-A bookmark has a title, an address, an optional note, and an owner. Make the module that will
-hold everything about bookmarks, then the model in it:
+A bookmark has a title, an address (URL), an optional note, and an owner. Let `rnx` write the
+code: first a module for everything about bookmarks, then the model in it:
 
 ```bash
 rnx make:module bookmarks
 rnx make:model Bookmark --module bookmarks --migration
 ```
 
-`make:module` wrote `src/app/bookmarks/mod.rs` with a placeholder page and registered the
-module in `src/lib.rs`. `make:model` wrote `src/app/bookmarks/model.rs`, and `--migration`
-added a pair of files in `migrations/`, named after the current time:
-`…_create_bookmarks_table.up.sql` and `.down.sql`.
+What they made:
 
-The generators name a model's table with its plural (`Bookmark` → `bookmarks`,
-`Category` → `categories`) and write it down in the model (`#[model(table = "bookmarks")]`).
-The derive itself never guesses a plural: a struct without `#[model(table = …)]` maps to its
-snake-case name.
+- `make:module bookmarks` wrote `src/app/bookmarks/mod.rs` (with a placeholder page) and added
+  the module to `src/lib.rs`, so the app uses it.
+- `make:model Bookmark` wrote `src/app/bookmarks/model.rs`.
+- `--migration` added two files to `migrations/`, named after the current time:
+  `…_create_bookmarks_table.up.sql` and `…_create_bookmarks_table.down.sql`.
+
+The table is called `bookmarks` (the plural), and the model says so with
+`#[model(table = "bookmarks")]`.
 
 ### The migration
 
-Migrations are plain SQL, not a schema builder: you write the `CREATE TABLE` your database
-runs. Fill in `migrations/<timestamp>_create_bookmarks_table.up.sql`:
+A **migration** is a SQL file that changes the database: here, it creates the table. Renox
+uses plain SQL, the same `CREATE TABLE` you'd type into the database yourself. Fill in
+`migrations/<timestamp>_create_bookmarks_table.up.sql`:
 
 ```sql
+-- A table for the bookmarks: one row per saved link.
 CREATE TABLE "bookmarks" (
+    -- A number the database counts up for each new row: 1, 2, 3…
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    -- Who saved it. Deleting a user deletes their bookmarks too (CASCADE).
     user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     url TEXT NOT NULL,
+    -- No NOT NULL here: the note may be left empty.
     note TEXT,
     created_at TEXT,
     updated_at TEXT
 );
+-- An index makes "the bookmarks of user 7" fast to find.
 CREATE INDEX bookmarks_user_id ON bookmarks (user_id);
 ```
 
-and the `.down.sql` next to it, which `rnx migrate:rollback` runs:
+and the `.down.sql` next to it, which undoes it (`rnx migrate:rollback` runs it):
 
 ```sql
 DROP TABLE "bookmarks";
 ```
 
-The `users` table comes from Renox's `Auth` module, which has its own migrations; they run
-before yours. Deleting a user deletes their bookmarks (`ON DELETE CASCADE`).
+Where does the `users` table come from? From Renox's `Auth` module (the login pages). It has
+its own migrations, and they run before yours.
 
 ### The model
 
-Replace `src/app/bookmarks/model.rs` with:
+A **model** is a Rust struct that matches the table: each field is a column, and each value
+of the struct is one row. Replace `src/app/bookmarks/model.rs` with:
 
 ```rust
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 
+/// One saved link: a row of the `bookmarks` table.
+///
+/// `Model` gives it database methods (`create`, `find`, `save`, `delete`
+/// and queries). `Serialize` lets templates read its fields. `Default`
+/// makes an empty bookmark to start from.
 #[derive(Model, Serialize, Deserialize, Default, Debug, Clone)]
 #[model(table = "bookmarks")]
 pub struct Bookmark {
+    /// The row's number. `0` means "not saved yet".
     pub id: i64,
+    /// The user who saved it.
     pub user_id: i64,
     pub title: String,
     pub url: String,
+    /// `Option` because the column may be empty (`NULL`): `None` means no note.
     pub note: Option<String>,
+    /// Filled in by Renox when the bookmark is first saved.
     pub created_at: Option<DateTime>,
+    /// Filled in by Renox every time the bookmark is saved.
     pub updated_at: Option<DateTime>,
 }
 ```
 
-`#[derive(Model)]` gives the struct `create`, `save`, `delete`, `find` and a query builder
-(`Bookmark::where_eq("user_id", 7).latest().get(&db)`). The fields are the columns:
+With `#[derive(Model)]`, you can now write things like:
 
-- `id: i64` is the key the database counts up; an `id` of `0` means "not saved yet". (For a
-  ULID or UUID key, `rnx make:model Bookmark --key ulid`.)
-- `Option<String>` is a column that may be `NULL`.
-- `created_at` and `updated_at` are filled in when the model is saved.
-- `Serialize` lets templates read the fields; `Default` lets you write
-  `Bookmark { title, ..Default::default() }`.
+- `Bookmark::find(&db, 7)`: get bookmark number 7;
+- `Bookmark::where_eq("user_id", 7).latest().get(&db)`: user 7's bookmarks, newest first;
+- `bookmark.save(&db)` and `bookmark.delete(&db)`.
 
-Unlike Eloquent, a model is a plain struct: no attributes looked up at runtime, and a typo in a
-field is a compile error. Relations are loaded explicitly, a page at a time, which keeps N+1
-queries out ([relations.md](relations.md)).
+A field name that doesn't exist is a compile error, so a typo is caught before the app even
+runs. Loading related rows (say, a bookmark's owner) is done explicitly, one query per page of
+rows; see [relations.md](relations.md).
 
-Save the files and `rnx serve` runs the new migration (or run `rnx migrate`;
-`rnx migrate:status` lists what has run). `rnx db:shell` opens a SQL prompt on the app's
-database if you want to look.
+Save the files. `rnx serve` notices and runs the new migration (or run `rnx migrate`
+yourself; `rnx migrate:status` shows what has run). Curious? `rnx db:shell` opens a SQL prompt
+on the database.
+
+> [!NOTE]
+> **Coming from Laravel:** a model is a plain struct, not an Eloquent class with magic
+> attributes, and migrations are SQL instead of a schema builder.
 
 ## 3. A list page
 
-Now the page that lists your bookmarks. Replace everything in `src/app/bookmarks/mod.rs`
-below the `pub mod model;` line that `make:model` added at the top:
+Now a page that lists your bookmarks. Open `src/app/bookmarks/mod.rs`, keep the `pub mod model;`
+line at the top, and replace everything below the `pub mod model;` line with:
 
 ```rust
 # fn main() {}
@@ -224,6 +294,7 @@ use renox::prelude::*;
 
 use model::Bookmark;
 
+/// Everything about bookmarks: its routes now, more later.
 pub struct Bookmarks;
 
 impl Module for Bookmarks {
@@ -231,6 +302,8 @@ impl Module for Bookmarks {
         "bookmarks"
     }
 
+    /// `GET /bookmarks` shows the list (the `index` handler). Only for
+    /// people who are logged in.
     fn routes(&self) -> Routes {
         Routes::new()
             .resource("/bookmarks", "bookmarks", Resource::new().index(index))
@@ -238,41 +311,50 @@ impl Module for Bookmarks {
     }
 }
 
+/// Shows one page of the logged-in user's bookmarks.
+///
+/// Each argument asks Renox for something: `db` is the database, `user`
+/// the person who is logged in, `page` the page number from the address
+/// (`/bookmarks?page=2`), or 1 when there is none.
 async fn index(State(db): State<Db>, user: AuthUser, Page(page): Page) -> Result<View> {
     let bookmarks = page_of(&db, user.id, page).await?;
+    // Fill in the template with the bookmarks and send the page.
     Ok(view("bookmarks/index.html", context! { bookmarks }))
 }
 
-/// One page of the user's bookmarks, newest first.
+/// One page (20 rows) of the user's bookmarks, newest first.
 async fn page_of(db: &Db, user_id: i64, page: u32) -> Result<Paginated<Bookmark>> {
     Bookmark::where_eq("user_id", user_id).latest().paginate(db, page, 20).await
 }
 # }
 ```
 
-What each piece does:
+Let's go through it:
 
-- `resource("/bookmarks", "bookmarks", …)` adds the routes of a resource, Laravel's
-  `Route::resource`, but only the actions you give it. For now that's `index`: `GET /bookmarks`,
-  named `bookmarks.index`. Templates link to it with `route('bookmarks.index')`.
-- `.require_auth()` guards the routes added before it. A guest is sent to `/login` and, after
-  logging in, back to the page they asked for.
-- The handler's arguments are extractors. `State(db): State<Db>` is the database pool,
-  `AuthUser` the logged-in user (it derefs to `User`, so `user.id` and `user.email` work), and
-  `Page(page)` the `?page=` number, `1` when it's missing.
-- `paginate` runs two queries (the count and the page) and returns a `Paginated` with
-  `items`, `total`, `page` and what page links need.
-- `Result<View>` is `renox::Result`: any error converts with `?`, and becomes the error page
-  (with the error itself while `APP_DEBUG` is on).
+- **`resource("/bookmarks", "bookmarks", …)`** adds the usual addresses of a "resource" (a
+  list, a form to create, a page to edit…), but only the ones you name. For now that's
+  `index`: `GET /bookmarks`, named `bookmarks.index`. A template links to it with
+  `route('bookmarks.index')`, so the address can change later without breaking links.
+- **`.require_auth()`** protects the routes above it. Someone who isn't logged in is sent to
+  `/login`, and comes back here after logging in.
+- **The handler's arguments** are called *extractors*: each one takes something out of the
+  request. `State(db): State<Db>` is the database, `AuthUser` the logged-in user (`user.id`,
+  `user.name`, `user.email`), `Page(page)` the page number.
+- **`paginate`** gets one page of rows, plus the total, so the template can show page links.
+- **`Result<View>`**: the function returns either a page or an error. `?` means "if this
+  failed, stop here and return the error". Renox then shows an error page (with the details
+  while you develop, and without them for visitors).
 
 ### The view
 
-Replace `resources/views/bookmarks/index.html`:
+A **view** (or template) is an HTML file with blanks. `{{ … }}` prints a value, `{% … %}` is
+logic like `if` and `for`. Replace `resources/views/bookmarks/index.html`:
 
 ```html
 {% extends "layouts/app.html" %}
-{#- Imported at the top, outside every block, so that the `bookmarks` block can
-    use them when it's rendered on its own (step 4). -#}
+{#- `extends`: this page goes inside the layout (the navigation bar and the rest).
+    The import below must stay at the top, outside every block, so that the
+    `bookmarks` block can use it when it's rendered on its own (step 4). -#}
 {% from "renox/ui.html" import page_header, list, empty %}
 
 {% block seo %}{{ seo(title="Bookmarks") }}{% endblock %}
@@ -305,11 +387,17 @@ Replace `resources/views/bookmarks/index.html`:
 {% endblock %}
 ```
 
-The page is built from Renox's UI kit (`renox/ui.html`): `page_header` for the title, `list`
-for the rows, `empty` for the "nothing here yet" state. The kit brings the styles, dark mode,
-keyboard support and accessible markup, so `public/app.css` stays empty. MiniJinja escapes
-every value, so a title with `<script>` in it is shown, not run. The full list of components
-is in [ui.md](ui.md).
+What's going on:
+
+- `{% extends "layouts/app.html" %}` puts this page inside the layout, and
+  `{% block content %}` is the part of the layout this page fills in.
+- `page_header`, `list` and `empty` come from Renox's **UI kit** (`renox/ui.html`): ready-made
+  parts for a page's title, a list of rows and the "nothing here yet" message. They bring their
+  own look, dark mode and keyboard support, so you write no CSS. [ui.md](ui.md) lists them all.
+- `{% for bookmark in bookmarks.items %}` repeats the `<li>` for every bookmark, and
+  `{{ bookmark.title }}` prints its title.
+- Values are **escaped**: a title with `<script>` in it shows up as text and never runs.
+- `{% block bookmarks %}` gives the list a name. In step 4, the app sends back just this part.
 
 Last, a link in the navigation bar. In `resources/views/layouts/app.html`, add the section
 links inside the `navbar` call, before the spacer:
@@ -325,17 +413,18 @@ links inside the `navbar` call, before the spacer:
   …
 ```
 
-`auth` is there in every template (`auth.check`, `auth.user.name`), and `route_is` marks the
-link as the current section on every `bookmarks.*` page.
+`auth` is available in every template: `auth.check` is true when someone is logged in, and
+`auth.user.name` is their name. `route_is('bookmarks.*')` highlights the link on every
+bookmarks page.
 
-Reload the browser: **Bookmarks** in the bar leads to an empty list. Log out and open
+Reload the browser: **Bookmarks** in the bar leads to an empty list. Now log out and open
 <http://127.0.0.1:3000/bookmarks>: you're sent to the login page, and back after logging in.
 
 ## 4. A form that saves without a reload
 
-The form goes above the list. It's sent with htmx, which comes bundled with Renox (as does
-Alpine.js): the server answers with the new list, htmx swaps it in, and no JavaScript is
-written by hand.
+Next, a form above the list to save a new link. It's sent with **htmx**: instead of loading a
+whole new page, the browser gets back only the updated list and swaps it in. You write no
+JavaScript for this; htmx comes with Renox.
 
 ### The form and its rules
 
@@ -361,23 +450,36 @@ Add this to `src/app/bookmarks/mod.rs`, with `use renox::Toast;` and
 # async fn page_of(db: &Db, user_id: i64, page: u32) -> Result<Paginated<Bookmark>> {
 #     Bookmark::where_eq("user_id", user_id).latest().paginate(db, page, 20).await
 # }
-/// What the form sends, and the rules it must pass.
+/// What the form sends, and the rules each field must pass.
+///
+/// `Deserialize` reads the form's fields into this struct; `Validate`
+/// turns each `#[validate(…)]` line into a check.
 #[derive(Deserialize, Validate)]
 struct BookmarkForm {
+    /// Must be filled in, at most 200 characters.
     #[validate(required, max = 200)]
     title: String,
+    /// Must be a web address (`http://` or `https://`). The label makes the
+    /// error say "The address field…" instead of "The url field…".
     #[validate(required, url, max = 2000, label = "address")]
     url: String,
+    /// May be left empty (`None`); when it's there, at most 1000 characters.
     #[validate(max = 1000)]
     note: Option<String>,
 }
 
+/// Saves a new bookmark from the form, then answers with the new list.
+///
+/// `Valid(form)` only lets the function run when every rule passed, so
+/// `form` is always good input here. It must be the last argument.
 async fn store(
     State(db): State<Db>,
     user: AuthUser,
     htmx: Htmx,
     Valid(form): Valid<BookmarkForm>,
 ) -> Result<Response> {
+    // Make the row and save it. `..Default::default()` fills in the
+    // fields not named here (`id` and the dates).
     let bookmark = Bookmark::create(
         &db,
         Bookmark {
@@ -389,15 +491,17 @@ async fn store(
         },
     )
     .await?;
+    // A small message that pops up on the page.
     let toast = Toast::success(format!("Saved “{}”.", bookmark.title));
 
     if htmx.request {
-        // htmx swaps in the new list: render only the `bookmarks` block.
+        // htmx sent the form: answer with only the `bookmarks` block of
+        // the page, which htmx swaps in.
         let bookmarks = page_of(&db, user.id, 1).await?;
         let list = view("bookmarks/index.html", context! { bookmarks }).fragment("bookmarks");
         return Ok((toast, list).into_response());
     }
-    // Without JavaScript the form still works: back to the list.
+    // Without JavaScript the form still works: go back to the list.
     Ok((toast, Redirect::route("bookmarks.index", &[])?).into_response())
 }
 # }
@@ -416,25 +520,26 @@ Routes::new()
 # }
 ```
 
+Now `POST /bookmarks` (named `bookmarks.store`) runs `store`.
+
 How it fits together:
 
-- `#[derive(Validate)]` turns each `#[validate(…)]` into rules, much like a Laravel Form
-  Request. `url` accepts only `http://` and `https://` addresses, so nobody can save a
-  `javascript:` link that would run when clicked. `label` is how messages name the field
-  ("The address field is required."), to match the form's "Address"; without it they'd say
-  "url". An empty note arrives as `None`, and
-  `max` checks it only when there is one.
-- `Valid<BookmarkForm>` reads the form, checks the rules, and only then calls the handler: bad
-  input never reaches your code. It must be the last argument, since it reads the request
-  body.
-- When the rules fail, an htmx request gets a `422` with the errors as JSON, and Renox's
-  script puts each one under its field. A plain form post is redirected back with the errors
-  and the old input in the session instead. Either way, `store` doesn't run.
-- `Htmx` tells you whether htmx sent the request. `.fragment("bookmarks")` renders just that
-  block of the template, from the same file as the full page, so there are no partials to
-  keep in sync.
-- `Toast::success` rides along with the response. With htmx it shows at once; after a redirect
-  it waits in the session and `{{ toasts() }}` in the layout shows it on the next page.
+- **The rules** live on the form struct. `url` accepts only `http://` and `https://` addresses,
+  so nobody can save a `javascript:` link that would run code when clicked.
+- **`Valid<BookmarkForm>`** reads the form and checks the rules *before* your function runs.
+  If something is wrong, `store` never runs, and the person sees what to fix:
+  - with htmx, each error appears under its field and the page doesn't move;
+  - with a plain form, the browser goes back to the form, with the errors and with what was
+    typed still filled in.
+- **`Htmx`** tells you whether htmx sent the request (`htmx.request`).
+- **`.fragment("bookmarks")`** sends only the `{% block bookmarks %}` part of the page. It's the
+  same template as the full page, so there's nothing extra to keep in sync.
+- **`Toast::success`** is a short message that pops up. It rides along with the answer; after a
+  redirect it waits for the next page, where `{{ toasts() }}` in the layout shows it.
+
+> [!NOTE]
+> **Coming from Laravel:** the struct with `#[validate(…)]` works like a Form Request, and
+> `.fragment()` replaces the partial views you'd write for Livewire or htmx.
 
 ### The form in the view
 
@@ -459,31 +564,39 @@ import line, and put the form between the `page_header` and `{% block bookmarks 
 </form>
 ```
 
-- `hx-post` sends the form with htmx, and `hx-target`/`hx-swap` replace the whole
-  `<section id="bookmarks">` with the fragment `store` returns.
-- `{{ csrf_field() }}` adds the CSRF token. htmx requests carry it in a header too, so every
-  form and htmx call is protected without more code.
-- The Alpine.js attribute clears the form after a successful save, and only then: a `422`
-  counts as a failure, so what you typed stays for you to fix.
-- `novalidate` leaves the checking to the server, so the messages are the same everywhere.
-  `input` and `textarea` have a slot for their error under the field.
+Line by line:
+
+- `method="post"` and `action` make it a normal form, so it works even without JavaScript.
+- `hx-post` makes htmx send it instead. `hx-target="#bookmarks"` and `hx-swap="outerHTML"`
+  say what to do with the answer: replace the `<section id="bookmarks">` with it.
+- `{{ csrf_field() }}` adds a hidden security token. It proves the form came from your own
+  site, so another website can't post it in your name (this is called CSRF protection).
+- `x-data @htmx:after-request=…` is a little Alpine.js (it also comes with Renox): after a
+  *successful* save, empty the form. When there are errors, what you typed stays.
+- `novalidate` turns off the browser's own checks, so the server's messages are the only ones,
+  and they're the same everywhere.
+- `card`, `input`, `textarea` and `button` come from the UI kit. Each field has a label, and a
+  place under it where its error appears.
 
 Try it. Press **Save** with the form empty: "The title field is required." appears under the
 title, the address gets its own message, and the page doesn't move. Fill it in properly and
-the bookmark appears at the top of the list, with a toast. [validation.md](validation.md) has
-every rule; [ui.md](ui.md) covers fragments, toasts and the other htmx headers.
+the bookmark appears at the top of the list, with a message. [validation.md](validation.md)
+lists every rule; [ui.md](ui.md) explains fragments and messages.
 
 ## 5. Edit and delete, only your own
 
-Every bookmark belongs to someone. The list already shows only yours, but an edit page at
-`/bookmarks/7/edit` could be opened by anyone who guesses the number. A **policy** says who
-may do what to a row:
+Every bookmark belongs to someone. The list only shows yours, but anyone could type the address
+of an edit page, like `/bookmarks/7/edit`, and guess numbers. So the app must check: *is this
+bookmark yours?*
+
+That check lives in a **policy**: a function that answers "may this user do this to this
+bookmark?" Make one, to say who may do what to a row:
 
 ```bash
 rnx make:policy Bookmark --module bookmarks
 ```
 
-Fill in `src/app/bookmarks/policy.rs`:
+The rules are up to you. Fill in `src/app/bookmarks/policy.rs`:
 
 ```rust
 # fn main() {}
@@ -502,9 +615,12 @@ use renox::prelude::*;
 use super::model::Bookmark;
 
 impl Policy for Bookmark {
+    /// May `user` do `ability` ("update", "delete"…) to this bookmark?
     fn allows(&self, user: &User, ability: &str) -> bool {
         match ability {
+            // Only the person who saved it may change or delete it.
             "update" | "delete" => self.user_id == user.id,
+            // Anything else: no.
             _ => false,
         }
     }
@@ -512,8 +628,9 @@ impl Policy for Bookmark {
 # }
 ```
 
-A handler then asks with `user.authorize("update", &bookmark)?`, which answers `403` when the
-policy says no. As in Laravel, anything not allowed is refused.
+A handler then asks: `user.authorize("update", &bookmark)?`. If the policy says no, the handler
+stops there and the visitor gets a **403 Forbidden** page. Anything the policy doesn't allow is
+refused, so forgetting a case is safe.
 
 ### The whole module
 
@@ -543,6 +660,7 @@ use serde::Deserialize;
 
 use model::Bookmark;
 
+/// Everything about bookmarks.
 pub struct Bookmarks;
 
 impl Module for Bookmarks {
@@ -550,6 +668,8 @@ impl Module for Bookmarks {
         "bookmarks"
     }
 
+    /// Every address of the bookmarks, for logged-in people only. The
+    /// comments show the method, the address and the route's name.
     fn routes(&self) -> Routes {
         Routes::new()
             .resource(
@@ -566,7 +686,7 @@ impl Module for Bookmarks {
     }
 }
 
-/// What the form sends, and the rules it must pass.
+/// What the form sends, and the rules each field must pass.
 #[derive(Deserialize, Validate)]
 struct BookmarkForm {
     #[validate(required, max = 200)]
@@ -577,11 +697,13 @@ struct BookmarkForm {
     note: Option<String>,
 }
 
+/// Shows one page of the logged-in user's bookmarks.
 async fn index(State(db): State<Db>, user: AuthUser, Page(page): Page) -> Result<View> {
     let bookmarks = page_of(&db, user.id, page).await?;
     Ok(view("bookmarks/index.html", context! { bookmarks }))
 }
 
+/// Saves a new bookmark from the form, then answers with the new list.
 async fn store(
     State(db): State<Db>,
     user: AuthUser,
@@ -609,22 +731,30 @@ async fn store(
     Ok((toast, Redirect::route("bookmarks.index", &[])?).into_response())
 }
 
-// `Found` loads the bookmark the route's `{id}` names, or answers 404.
+/// Shows the edit form for one bookmark.
+///
+/// `Found<Bookmark>` loads the bookmark whose number is in the address
+/// (`/bookmarks/7/edit` → bookmark 7). If there's no such bookmark, the
+/// visitor gets a 404 page and this function never runs.
 async fn edit(user: AuthUser, Found(bookmark): Found<Bookmark>) -> Result<View> {
+    // Not yours? Stop here with a 403 page.
     user.authorize("update", &bookmark)?;
     Ok(view("bookmarks/edit.html", context! { bookmark }))
 }
 
+/// Saves the edit form's changes, then goes back to the list.
 async fn update(
     State(db): State<Db>,
     user: AuthUser,
     Found(mut bookmark): Found<Bookmark>,
     Valid(form): Valid<BookmarkForm>,
 ) -> Result<(Toast, Redirect)> {
+    // Check first, before changing anything.
     user.authorize("update", &bookmark)?;
     bookmark.title = form.title;
     bookmark.url = form.url;
     bookmark.note = form.note;
+    // Write the changes to the database (and set `updated_at`).
     bookmark.save(&db).await?;
     Ok((
         Toast::success("Bookmark updated."),
@@ -632,6 +762,7 @@ async fn update(
     ))
 }
 
+/// Deletes one bookmark, then goes back to the list.
 async fn destroy(
     State(db): State<Db>,
     user: AuthUser,
@@ -645,27 +776,34 @@ async fn destroy(
     ))
 }
 
-/// One page of the user's bookmarks, newest first.
+/// One page (20 rows) of the user's bookmarks, newest first.
 async fn page_of(db: &Db, user_id: i64, page: u32) -> Result<Paginated<Bookmark>> {
     Bookmark::where_eq("user_id", user_id).latest().paginate(db, page, 20).await
 }
 # }
 ```
 
-- `Found<Bookmark>` is route model binding: it reads the route's parameter (`{id}`), loads the
-  row with that key and answers `404` when there's none. Laravel matches the parameter's name;
-  Renox goes by the type you ask for. A route with several parameters names the one to use
-  after the table: `/lists/{list}/bookmarks/{bookmarks}`.
-- `authorize` comes right after loading, before anything changes. Someone else's bookmark gets
-  a `403` page, in your layout (`resources/views/errors/default.html`).
-- `save` writes every column and sets `updated_at`; `delete` removes the row. Both are methods
-  of the model, as in Eloquent.
-- The update and delete answer with a redirect and a toast, which the list page shows.
+The new ideas:
+
+- **`Found<Bookmark>`** reads the number from the address (the `{id}` part), loads that
+  bookmark, and answers **404 Not Found** when there's none. You don't write that lookup
+  yourself.
+- **`authorize` comes first**, right after loading and before anything changes. Someone
+  else's bookmark gets a 403 page, shown inside your layout
+  (`resources/views/errors/default.html`).
+- **`save`** writes every field back to the row and updates `updated_at`; **`delete`** removes
+  the row.
+- **`(Toast, Redirect)`**: a function can return several things at once. Here: a message, and
+  "go to the list page", where the message then shows.
+
+> [!NOTE]
+> **Coming from Laravel:** `Found<Bookmark>` is route model binding. Laravel matches the
+> parameter's *name*; Renox goes by the *type* you ask for.
 
 ### The edit page and the row buttons
 
-`resources/views/bookmarks/edit.html` is a plain form (no htmx), so you can see the other way
-errors come back:
+Make `resources/views/bookmarks/edit.html`. It's a plain form, without htmx: when something is
+wrong, the browser goes back to the form. That's the other way errors come back:
 
 ```html
 {% extends "layouts/app.html" %}
@@ -693,13 +831,14 @@ errors come back:
 {% endblock %}
 ```
 
-- Browsers only send `GET` and `POST`; `method_field('PUT')` adds a hidden `_method` field and
-  Renox routes the post to `update`, as Laravel does.
-- When the rules fail, the post is redirected back here: `form_errors()` sums the errors up
-  at the top, each field shows its own, and the fields keep what was typed (`old` input wins
-  over `value`).
-- `data-live-validate` checks each field when you leave it, with the same rules on the
-  server, and saves nothing until you press **Save changes**.
+- **`method_field('PUT')`**: browsers can only send forms as `GET` or `POST`. This adds a hidden
+  field that tells Renox "treat this as a `PUT`", so the form reaches `update`.
+- **`form_errors()`** lists all the errors at the top of the form. Each field also shows its
+  own, and keeps what was typed.
+- **`value=bookmark.url`** fills the field with the saved value. After a failed save, what you
+  typed wins over the saved value.
+- **`data-live-validate`** checks each field as soon as you leave it, using the same rules on the
+  server. Nothing is saved until you press **Save changes**.
 
 In `index.html`, give each row its buttons. Add `row_actions`, `link_button` and `confirm` to
 the import line, and replace the `<li>`:
@@ -718,39 +857,52 @@ the import line, and replace the `<li>`:
 </li>
 ```
 
-`confirm` is a **Delete** button that opens a sheet asking first; only the sheet's button
-sends the form, as a `DELETE`. On a phone the row's buttons shrink to icons.
+- **`link_button`** is a link that looks like a button: **Edit** opens the edit page.
+- **`confirm`** is a **Delete** button that first asks "Delete …? This can't be undone." Only
+  the button in that question actually deletes (it sends a `DELETE` request).
+- `~` joins text together in a template (`"delete-" ~ bookmark.id` → `delete-7`).
+- **`row_actions`** puts the buttons at the end of the row; on a phone they shrink to icons.
 
 ### Where to land after logging in
 
-`rnx new` registered Renox's `Auth` module in `src/lib.rs`: the login, registration,
-password-reset and account pages, with Argon2id hashing and a login throttle. After logging
-in it sends people to the `home` route. Send them to their bookmarks instead:
+`rnx new` already added Renox's `Auth` module to `src/lib.rs`. It brings the login,
+registration, password-reset and account pages, stores passwords safely (hashed with
+Argon2id), and slows down people who guess passwords. After logging in, it sends people to the
+`home` route. Send them to their bookmarks instead:
 
 ```rust
 # use renox::prelude::*;
 # let _ = App::new()
+// `.account()` adds the /account page (name, email, password, devices, deleting
+// the account); `.redirect_to(…)` is where people go after logging in.
 .module(Auth::new().account().redirect_to("/bookmarks"))
 # ;
 ```
 
-`.account()` is the `/account` page (name, email, password, other devices, deleting the
-account). [authorization.md](authorization.md) covers gates, roles and API tokens.
+Try it with two accounts (use a private browser window for the second): each person sees only
+their own list, and the second gets a 403 page when opening the first one's
+`/bookmarks/1/edit`. [authorization.md](authorization.md) covers more ways to decide who may do
+what: roles, permissions and API tokens.
 
-Try it with two accounts (a private window for the second): each sees only their own list,
-and the second gets a 403 page for the first one's `/bookmarks/1/edit`.
-
+> [!TIP]
 > **The shortcut.** `rnx make:module bookmarks --resource --fields "title:string url:string
-> note:text"` writes a module like this one in one go: model, migration, factory, form, the
-> seven handlers, views on the UI kit, and tests. Building it by hand once shows you what
-> those files do.
+> note:text"` writes a module like this one in one go: model, migration, form, the seven
+> handlers, the pages and tests. Building it by hand once shows you what those files do.
 
 ## 6. A weekly digest mail
 
-On Monday mornings, each person gets a mail with the links they saved in the past week. Two
-parts do it: a **job** that mails one person, and a **scheduled task** that queues a job for
-each user. Renox's queue lives in your own database and its workers run inside `serve`, as
-does the scheduler: no Redis, no extra process, no cron entry.
+Every Monday morning, each person gets an email with the links they saved that week. Two parts
+do this:
+
+- a **job**: a piece of work that runs in the background, here "mail one person";
+- a **scheduled task**: something that runs on a timetable, here "every Monday at 8:00, make a
+  job for each user".
+
+Why a job per user? Sending mail takes time and can fail. Each job is tried on its own, so one
+failing address doesn't stop the others, and the web pages stay fast.
+
+Renox keeps its list of jobs in your own database, and the workers that run them live inside
+`rnx serve`, as does the scheduler: no Redis, no extra process, no cron entry.
 
 ```bash
 rnx make:job SendDigest --module bookmarks
@@ -779,20 +931,28 @@ use serde::{Deserialize, Serialize};
 
 use super::model::Bookmark;
 
-/// Mails one user the bookmarks they saved in the last seven days.
+/// The job: mail one user the bookmarks they saved in the last seven days.
+///
+/// The queue stores the job as JSON until a worker runs it, so it holds
+/// only the user's id: the worker loads fresh data when it runs.
 #[derive(Serialize, Deserialize)]
 pub struct SendDigest {
     pub user_id: i64,
 }
 
 impl Job for SendDigest {
+    /// The job's name in the database. Don't change it once jobs are queued.
     const NAME: &'static str = "send-digest";
 
+    /// What the worker does. Returning an error means "try again later".
     async fn handle(self, ctx: JobContext) -> Result {
+        // `state` holds the app's shared parts: the database, the mailer…
         let state = &ctx.state;
         let Some(user) = User::find(&state.db, self.user_id).await? else {
             return Ok(()); // the account was deleted after the job was queued
         };
+        // A week ago. `renox::db::now()` is "now" as the app sees it, which
+        // tests can move forward (step 7).
         let since = renox::db::now() - TimeDelta::days(7);
         let bookmarks = Bookmark::where_eq("user_id", user.id)
             .where_op("created_at", ">=", since)
@@ -802,17 +962,19 @@ impl Job for SendDigest {
         if bookmarks.is_empty() {
             return Ok(()); // nothing new: no mail
         }
+        // Fill in the mail templates (`mail/digest.html` and `.txt`)…
         let mail = state.mail_view(
             &user.email,
             "Your week in bookmarks",
             "mail/digest",
             context! { name => user.name, bookmarks },
         )?;
+        // …and send it.
         state.mailer.send(mail).await
     }
 }
 
-/// The scheduled task: a job per user, so one failing mail doesn't hold up the rest.
+/// The scheduled task: queue one `SendDigest` job per user.
 pub async fn send_digests(state: AppState) -> Result {
     for user in User::all(&state.db).await? {
         state.dispatch(SendDigest { user_id: user.id }).await?;
@@ -822,20 +984,20 @@ pub async fn send_digests(state: AppState) -> Result {
 # }
 ```
 
-- A job is a struct the queue stores as JSON, so it holds an id, not the user: the worker
-  loads fresh data when it runs. `NAME` identifies it in the `jobs` table; keep it stable.
-- When `handle` returns an error, the job is retried with a growing delay, three attempts by
-  default; then it lands in `failed_jobs`, where `rnx queue:failed` lists it and
-  `rnx queue:retry` tries it again.
-- `renox::db::now()` is "now" as Renox's clock sees it. Tests can move that clock (step 7),
-  which `chrono::Utc::now()` wouldn't follow.
-- `state.mail_view` renders `mail/digest.html` (and `mail/digest.txt` for the text part)
-  into a `Mail`. In a request you'd rather call `state.queue_mail(mail)`, so the visitor
-  doesn't wait for the mail server; a job is already in the background, so it sends directly.
+What to know about jobs:
+
+- **`state.dispatch(job)`** puts a job on the queue (a table in your database). A worker picks
+  it up a moment later and calls its `handle`.
+- **When `handle` fails**, the job is tried again a bit later, up to three times. After that it
+  goes to the `failed_jobs` table: `rnx queue:failed` lists those, and `rnx queue:retry` tries
+  them again.
+- **Sending mail from a web page?** Use `state.queue_mail(mail)` there, so the visitor doesn't
+  wait for the mail server. A job already runs in the background, so it sends directly.
 
 ### The mail
 
-`make:mail` wrote `resources/views/mail/digest.html` and `digest.txt`. Replace the HTML one:
+`make:mail` wrote `resources/views/mail/digest.html` and `digest.txt`: the same mail as HTML
+(for most mail apps) and as plain text (for the rest). Replace the HTML one:
 
 ```html
 {% extends "renox/mail/layout.html" %}
@@ -864,13 +1026,14 @@ Here's what you saved this week:
 {{ app.url }}/bookmarks
 ```
 
-The layout and the `button` are styled inline, the way mail clients need. [mail.md](mail.md)
-has the other components, attachments and notifications.
+`name` and `bookmarks` are the values the job passed in `context! { … }`. Renox's mail layout and
+`button` are already styled the way mail apps need. [mail.md](mail.md) covers other mail parts,
+attachments and notifications.
 
 ### The schedule
 
-`make:job` also added a `register` method to the module, which registers the job. Add the
-task to it, in `src/app/bookmarks/mod.rs`:
+`make:job` also added a `register` method to the module, which tells the app about the job.
+Add the task to it, in `src/app/bookmarks/mod.rs`:
 
 ```rust
 # fn main() {}
@@ -895,9 +1058,12 @@ impl Module for Bookmarks {
         "bookmarks"
     }
 
+    /// Tells the app about this module's jobs and scheduled tasks.
     fn register(&self, app: &mut Registry) {
+        // Workers can only run jobs they know about.
         app.job::<send_digest::SendDigest>();
-        // Mondays at 08:00, in APP_TIMEZONE.
+        // Mondays at 08:00 (in APP_TIMEZONE), run `send_digests`. The task is
+        // named "weekly-digest", for commands like `rnx schedule:run`.
         app.schedule()
             .weekly_on(Weekday::Mon, "08:00", "weekly-digest", send_digest::send_digests);
     }
@@ -910,27 +1076,28 @@ impl Module for Bookmarks {
 # }
 ```
 
-Times are in `APP_TIMEZONE` from `.env` (`UTC` unless you set one, such as `Europe/Amsterdam`,
-daylight saving included). A job must be registered for a worker to know how to run it; one
-that isn't goes straight to `failed_jobs`, where `rnx queue:retry` can run it once it is.
+Times use `APP_TIMEZONE` from `.env`: `UTC` unless you set one, such as `Europe/Amsterdam`
+(summer time included).
 
-You don't have to wait for Monday. `rnx schedule:list` shows the task and its next run, and
+You don't have to wait for Monday. `rnx schedule:list` shows the task and when it runs next, and
 
 ```bash
 rnx schedule:run weekly-digest
 ```
 
-runs it now. The jobs it queues are picked up by the workers of the running `rnx serve`. With
-`MAIL_MAILER=log` (the default in `.env`) mail goes to the server's log instead of out, and
-while `APP_DEBUG` is on, <http://127.0.0.1:3000/_renox/mail> shows each one as the
-recipient would see it. More on the scheduler in [scheduling.md](scheduling.md), on jobs in
+runs it right now. The running `rnx serve` picks up the jobs it queued.
+
+Where does the mail go? While you develop, `.env` has `MAIL_MAILER=log`: mails are written to
+the server's log instead of being sent. Open <http://127.0.0.1:3000/_renox/mail> to see each one
+as the recipient would. More on the scheduler in [scheduling.md](scheduling.md), and on jobs in
 [queue.md](queue.md).
 
 ## 7. Tests and demo data
 
 ### A factory and a seeder
 
-A factory makes models with fake data, for tests and for a database to click around in:
+A **factory** makes bookmarks filled with made-up data. Make one, for tests and for a database
+to click around in:
 
 ```bash
 rnx make:factory Bookmark --module bookmarks
@@ -957,6 +1124,7 @@ use renox::prelude::*;
 use super::model::Bookmark;
 
 impl Factory for Bookmark {
+    /// A made-up bookmark: a title of 2 to 4 random words and a random address.
     fn definition() -> Self {
         let path: String = Word().fake();
         Bookmark {
@@ -969,11 +1137,12 @@ impl Factory for Bookmark {
 # }
 ```
 
-`Bookmark::factory().count(20).create(&db)` saves twenty; `.state(…)` changes each one first,
-and `.make_one()` gives one without saving it.
+Now you can write `Bookmark::factory().count(20).create(&db)` to save twenty fake bookmarks.
+`.state(…)` changes each one before saving (for example, to set its owner), and `.make_one()`
+gives you one without saving it.
 
-Now `src/lib.rs`, with a seeder and the model exported for the tests (`tests/` can only see
-what the library makes public):
+A **seeder** fills the database with starting data. Replace `src/lib.rs`, with a seeder and the
+model exported for the tests (files in `tests/` can only use what the library makes `pub`):
 
 ```rust
 # fn main() {}
@@ -1004,16 +1173,19 @@ use renox::prelude::*;
 pub use app::bookmarks::model::Bookmark;
 
 /// The application: its modules, migrations and seeders. `main.rs` runs it,
-/// and tests boot it with `renox::testing::TestApp`.
+/// and tests start it with `renox::testing::TestApp`.
 pub fn app() -> App {
     App::new()
+        // Put the templates, texts and public files inside the program.
         .embed(renox::embedded!())
+        // Put the migrations (the files in `migrations/`) inside the program.
         .migrations(renox::migrations!())
         .module(Auth::new().account().redirect_to("/bookmarks"))
         .module(app::home::Home)
         .module(app::bookmarks::Bookmarks)
         // `rnx db:seed`: a demo account with some bookmarks. Running it twice changes nothing.
         .seeder(|state| async move {
+            // Already seeded? Then stop.
             if User::find_by_email(&state.db, "demo@example.com")
                 .await?
                 .is_some()
@@ -1022,6 +1194,7 @@ pub fn app() -> App {
             }
             let demo = User::register(&state.db, "Demo", "demo@example.com", "password123").await?;
             let owner = demo.id;
+            // 25 fake bookmarks, all owned by the demo account.
             Bookmark::factory()
                 .count(25)
                 .state(move |b: &mut Bookmark| b.user_id = owner)
@@ -1032,16 +1205,18 @@ pub fn app() -> App {
 }
 ```
 
-The `mod app;` line stays at the top of the file. Run `rnx db:seed`, log in as
+Keep the `mod app;` line at the top of the file. Run `rnx db:seed`, log in as
 `demo@example.com` with `password123`, and the list has two pages. (`rnx migrate:fresh --seed`
-starts over: it drops every table, migrates and seeds.)
+starts over: it deletes every table, runs the migrations and seeds again.)
 
 ### The tests
 
-`TestApp` boots the whole app in memory: a fresh, migrated database for each test (in-memory
-SQLite), the memory mailer, and no workers or scheduler unless the test runs them. Requests
-go through the same router, sessions and CSRF checks as in production, so a test drives the app
-the way a browser does. Make `tests/bookmarks.rs`:
+A **test** is a function that uses your app and checks the result, automatically. Once
+written, `cargo test` runs them all in seconds, so you know a change didn't break anything.
+
+`TestApp` starts the whole app in memory for each test, with its own empty database. Requests
+go through the same routes, logins and security checks as in a real browser. Make
+`tests/bookmarks.rs`:
 
 ```rust
 # fn main() {}
@@ -1063,25 +1238,29 @@ use renox::testing::TestApp;
 use stash::Bookmark;
 use std::time::Duration;
 
+/// Makes a user with this email address (and the password "password123").
 async fn user(app: &TestApp, email: &str) -> User {
     User::register(app.db(), "Test", email, "password123")
         .await
         .unwrap()
 }
 
+/// Someone who isn't logged in can't see the bookmarks.
 #[renox::test]
 async fn guests_are_sent_to_the_login_page() {
     let app = TestApp::new(stash::app()).await;
     app.get("/bookmarks").await.assert_redirect("/login");
 }
 
+/// A logged-in user saves a bookmark, and it's in the database.
 #[renox::test]
 async fn users_save_bookmarks() {
     let app = TestApp::new(stash::app()).await;
     let ana = user(&app, "ana@example.com").await;
+    // Log in as Ana for the requests that follow.
     app.acting_as(&ana);
 
-    // As htmx sends it: the answer is the list, with the new bookmark.
+    // Post the form as htmx would: the answer is the list, with the new bookmark.
     app.htmx()
         .post(
             "/bookmarks",
@@ -1100,6 +1279,7 @@ async fn users_save_bookmarks() {
     .await;
 }
 
+/// Bad input is refused, and nothing is saved.
 #[renox::test]
 async fn invalid_bookmarks_are_refused() {
     let app = TestApp::new(stash::app()).await;
@@ -1116,6 +1296,7 @@ async fn invalid_bookmarks_are_refused() {
     app.assert_database_count("bookmarks", 0).await;
 }
 
+/// Ben can't touch Ana's bookmark; Ana can edit and delete it.
 #[renox::test]
 async fn only_the_owner_edits_and_deletes() {
     let app = TestApp::new(stash::app()).await;
@@ -1129,6 +1310,7 @@ async fn only_the_owner_edits_and_deletes() {
     let edit = format!("/bookmarks/{}/edit", bookmark.id);
     let member = format!("/bookmarks/{}", bookmark.id);
 
+    // Ben gets "403 Forbidden" for both.
     app.acting_as(&user(&app, "ben@example.com").await);
     app.get(&edit).await.assert_forbidden();
     app.delete(&member).await.assert_forbidden();
@@ -1145,6 +1327,7 @@ async fn only_the_owner_edits_and_deletes() {
     app.assert_database_count("bookmarks", 0).await;
 }
 
+/// The Monday mail goes only to people who saved something that week.
 #[renox::test]
 async fn the_weekly_digest_mails_what_is_new() {
     let app = TestApp::new(stash::app()).await;
@@ -1158,6 +1341,7 @@ async fn the_weekly_digest_mails_what_is_new() {
         .unwrap();
     user(&app, "ben@example.com").await; // saved nothing: gets no mail
 
+    // Run the task now, then the jobs it queued.
     app.kernel().run_scheduled("weekly-digest").await.unwrap();
     assert_eq!(app.run_jobs().await, 2); // a job per user
     app.assert_mail_sent("ana@example.com", "Your week in bookmarks");
@@ -1173,29 +1357,33 @@ async fn the_weekly_digest_mails_what_is_new() {
 }
 ```
 
-Run them with `cargo test`. One test from `rnx new` fails now: `guests_can_register` in
-`tests/home.rs` expects new users to land on `/`. Since step 5 they land on their bookmarks,
+Run them with `cargo test`. One test that came with `rnx new` now fails: `guests_can_register`
+in `tests/home.rs` expects new users to land on `/`. Since step 5 they land on their bookmarks,
 so change its `.assert_redirect("/")` to `.assert_redirect("/bookmarks")`.
 
-A few things to notice:
+The test tools you used:
 
-- `acting_as` logs a user in for the requests that follow; `htmx()` sends the next request as
-  htmx would. `assert_invalid` expects the `422` an htmx form gets, with an error on that field.
-- The CSRF token is sent for you, and the session cookie is kept between requests, so a toast
-  set by one request shows on the next page.
-- The test doesn't start the scheduler: `run_scheduled` runs a task now, `run_jobs` runs what
-  it queued, and the memory mailer keeps what was sent.
-- `travel` moves Renox's clock for what the app does next, so "a week later" takes no time.
+- `#[renox::test]` marks a function as a test (an `async` one).
+- `acting_as(&user)` logs that user in for the next requests; `htmx()` sends the next request
+  the way htmx would.
+- `assert_…` methods check the answer: `assert_redirect("/login")`, `assert_see("text")`,
+  `assert_forbidden()` (a 403), `assert_invalid("title")` (that field had an error). If a check
+  fails, the test fails and tells you what it got instead.
+- `assert_database_has` and `assert_database_count` look in the database.
+- The test doesn't run the scheduler by itself: `run_scheduled` runs a task now, `run_jobs`
+  runs what it queued, and `sent_mail()` lists the mails, which are kept in memory.
+- `travel` moves the app's clock forward, so "eight days later" takes no time at all.
 
-[testing.md](testing.md) lists every assertion, and the fakes for events, notifications and
-HTTP calls.
+[testing.md](testing.md) lists every check, and how to fake mail, events and calls to other
+websites.
 
 ## 8. Deploy
 
-A Renox app deploys as one binary: the views, translations, files in `public/` and migrations
-are compiled into it (that's what `.embed(renox::embedded!())` and `renox::migrations!()` in
-`src/lib.rs` do). Next to it you need a `.env` and a `storage/` directory for the SQLite
-database. The queue workers and the scheduler run in the same process.
+A Renox app goes on a server as **one file**. The templates, texts, public files and migrations
+are all compiled into the program: that's what `.embed(renox::embedded!())` and
+`renox::migrations!()` in `src/lib.rs` do. Next to the program you only need a `.env` file
+(the settings) and a `storage/` folder (for the SQLite database). The job workers and the
+scheduler run inside the same program.
 
 ### Build
 
@@ -1204,23 +1392,28 @@ rnx build          # a release build, copied to dist/stash
 rnx make:deploy    # Dockerfile, deploy/stash.service, deploy/stash.socket, deploy/litestream.yml, deploy/README.md
 ```
 
-Build on the same OS and CPU as the server, or build the Docker image. `deploy/README.md` is
-the full recipe for your app; the short version follows.
+- `rnx build` makes the optimized program, `dist/stash`.
+- `rnx make:deploy` writes ready-made files for the server: a Dockerfile, the systemd service
+  (which starts the app when the server boots, and restarts it if it stops), and backups.
+
+Build on the same kind of system as the server (for example, Linux on an Intel/AMD processor),
+or build the Docker image. `deploy/README.md` is the full recipe for your app; here is the short
+version.
 
 ### On a Linux server with systemd
 
 ```bash
-sudo useradd --system --home /opt/stash stash
+sudo useradd --system --home /opt/stash stash   # a user that only runs the app
 sudo mkdir -p /opt/stash/storage
 sudo cp dist/stash /opt/stash/
 sudo cp .env.example /opt/stash/.env          # then edit it, below
 sudo chown -R stash /opt/stash
 sudo cp deploy/stash.service /etc/systemd/system/
-sudo systemctl enable --now stash
+sudo systemctl enable --now stash              # start it now, and at every boot
 ```
 
-The service runs `stash migrate` before each start, so a deploy is: copy the new binary,
-then `sudo systemctl restart stash`.
+The service runs `stash migrate` before each start. So a new version is just: copy the new
+program over the old one, then `sudo systemctl restart stash`.
 
 ### The production `.env`
 
@@ -1249,14 +1442,20 @@ MAIL_PASSWORD=...
 MAIL_FROM_ADDRESS=hello@stash.example.com
 ```
 
-- `APP_ENV=production` refuses to start without an `APP_KEY`, sends HSTS with an `https://`
-  `APP_URL`, and lets search engines in (anywhere else, pages say `noindex`).
-- `APP_DEBUG=false` hides error details from visitors.
-- `TRUSTED_PROXIES` matters for the login throttle and rate limits: without it every visitor
-  looks like the proxy.
-- `APP_URL` is used in links in mails; an `https://` one also marks cookies `Secure`.
+The important ones:
 
-Put a reverse proxy in front for TLS. With Caddy, the whole configuration is:
+- **`APP_ENV=production`** turns on production behaviour: the app refuses to start without an
+  `APP_KEY`, and lets search engines index it.
+- **`APP_DEBUG=false`** hides error details from visitors (they could reveal how your app works).
+- **`APP_KEY`** is a secret that protects logins. Make a new one for the server, and never share
+  it.
+- **`TRUSTED_PROXIES`** says the web server in front (below) may tell the app each visitor's real
+  address. Without it, every visitor looks the same, and the protection against password
+  guessing would lock everyone out at once.
+- **`APP_URL`** is the address people use; links in mails are built from it.
+
+In front of the app, put a web server that handles HTTPS (the padlock in the browser). With
+Caddy, this is the whole configuration, and it gets the certificate by itself:
 
 ```text
 stash.example.com {
@@ -1266,8 +1465,8 @@ stash.example.com {
 
 ### Restarts without refused connections
 
-A restart closes the port for a second or two. With systemd's socket activation, systemd holds
-the port and queues visitors while the app restarts:
+While the app restarts (a second or two), visitors would get an error. With systemd's
+**socket activation**, systemd holds the port and makes visitors wait until the app is back:
 
 ```bash
 sudo cp deploy/stash.socket /etc/systemd/system/ && sudo systemctl daemon-reload
@@ -1276,31 +1475,39 @@ sudo systemctl enable --now stash.socket
 sudo systemctl start stash
 ```
 
-From then on, `sudo systemctl restart stash` makes connections wait instead of failing. For
-that moment the old code runs against the new migrations, so add columns as nullable or with a
-default, and drop a column only once no deployed code reads it.
+From then on, `sudo systemctl restart stash` makes connections wait instead of failing.
+
+> [!WARNING]
+> For a moment during a restart, the old program runs with the new database. So add new columns
+> as optional (nullable) or with a default value, and only remove a column once no running
+> version uses it.
 
 ### Backups
 
-The database is one file, `storage/app.db`. Litestream copies every change to S3-compatible
-storage (S3, R2, MinIO) as it happens: install it, fill in the bucket in
-`deploy/litestream.yml`, and copy it to `/etc/litestream.yml`; `deploy/README.md` has the
-steps, including restoring onto a new server. For a one-off copy while the app runs, use
-`sqlite3 storage/app.db ".backup backup.db"`, never `cp`. Keep `APP_KEY` with your backups:
-without it, sessions and signed links stop working.
+The whole database is one file, `storage/app.db`. **Litestream** copies every change to cloud
+storage (S3, R2, MinIO) as it happens: install it, fill in your bucket in
+`deploy/litestream.yml`, and copy that file to `/etc/litestream.yml`. `deploy/README.md` has the
+steps, including restoring onto a new server.
 
-`GET /health` answers `200` while the database is reachable, for your uptime monitor.
+For a one-off copy while the app runs, use `sqlite3 storage/app.db ".backup backup.db"`. Never
+plain `cp`: it can copy the file halfway through a write.
+
+> [!IMPORTANT]
+> Keep `APP_KEY` with your backups. Without it, logins, sessions and signed links stop working
+> on the restored server.
+
+`GET /health` answers `200` while the database is reachable: point an uptime monitor at it.
 [operations.md](operations.md) covers timeouts, failed jobs, logs, error reports and running
 several servers.
 
 ## Where to go next
 
-You've used most of what a typical app needs. From here:
+You've built a complete app, and used most of what a typical app needs. From here:
 
-- [CHEATSHEET.md](../CHEATSHEET.md): every common task in a few lines.
-- [examples/crud](../examples/crud): this tutorial's patterns with pagination, soft deletes and
-  model hooks; [examples/shop](../examples/shop): a whole shop with checkout, an admin and
-  translations.
+- [The cheat sheet](../CHEATSHEET.md): every common task in a few lines.
+- [examples/crud](../examples/crud): this tutorial's patterns with pagination, "soft" deletes
+  (a trash bin) and model hooks; [examples/shop](../examples/shop): a whole online shop with a
+  checkout, an admin area and translations.
 - The guides: [routing](routing.md), [validation](validation.md), [views and the UI
   kit](ui.md), [mail and notifications](mail.md), [the queue](queue.md),
   [scheduling](scheduling.md), [relations](relations.md), [testing](testing.md) and

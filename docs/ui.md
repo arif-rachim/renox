@@ -741,7 +741,6 @@ show one, return a `Toast` with the response:
 
 ```rust
 use renox::prelude::*;
-use renox::Toast;
 
 /// Saves (in a real app), then goes back to the list with a "saved" toast.
 async fn save() -> (Toast, Redirect) {
@@ -767,7 +766,7 @@ A toast can carry more: a second line, links, buttons, a duration.
 
 ```rust
 use renox::prelude::*;
-use renox::{Toast, ToastAction};
+use renox::ToastAction;
 
 /// Places an order, then shows a toast with links and an Undo button.
 async fn place() -> (Toast, Redirect) {
@@ -970,7 +969,7 @@ answer with a `ValidationError`, which shows up under its field the same way:
 
 ```rust
 use renox::prelude::*;
-use renox::{HxRefresh, Toast};
+use renox::HxRefresh;
 
 /// The action's form: how much to add (or, if negative, take away).
 #[derive(serde::Deserialize, serde::Serialize)]

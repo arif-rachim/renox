@@ -6,7 +6,6 @@
 
 use std::collections::BTreeMap;
 
-use renox::Toast;
 use renox::auth::send_verification;
 use renox::grid::{Column, Grid, GridRequest};
 use renox::prelude::*;
