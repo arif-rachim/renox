@@ -3,6 +3,12 @@
 Renox aims to be for Rust what Laravel is for PHP: a batteries-included web
 framework where a new app works out of the box.
 
+> **Open work is tracked on GitHub** since 1.0.0-rc.3: issues (bugs, user stories, tasks),
+> milestones (releases) and the project board; see "How work is tracked" in
+> [CONTRIBUTING.md](CONTRIBUTING.md). This file keeps the principles, the record of what each
+> milestone built and the decisions behind it. An unticked box below is history unless an
+> issue links to it.
+
 ## Principles
 
 1. **Convention over configuration.** Folder layout, naming and defaults are decided for you.

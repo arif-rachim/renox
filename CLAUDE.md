@@ -299,6 +299,10 @@ docs/audit/                pre-1.0 audit (2026-09-pre-1.0.md, closed), Laravel p
                            headless Chrome)
 docs/assets/demo.gif       the README's demo (see §4.10)
 .github/workflows/ci.yml   CI jobs (see §4.11)
+.github/ISSUE_TEMPLATE/    issue forms: bug.yml, story.yml (user story + acceptance criteria),
+                           task.yml; config.yml (no blank issues; Discussions, security, docs)
+.github/                   pull_request_template.md (the PR body's sections), dependabot.yml
+                           (grouped cargo/actions updates), release.yml (release-note sections)
 ```
 
 ## 3. Architecture and the decisions behind it
@@ -670,6 +674,15 @@ PostgreSQL suite 2.5x slower (reconnects).
   look changes.
 
 ### 4.11 Git, PRs, CI (how the owner works)
+- **Work starts from a GitHub issue** (since 1.0.0-rc.3; CONTRIBUTING.md "How work is
+  tracked"): a bug, a user story or a task, with labels for type, area and priority, in a
+  milestone, on the project board. Found something while working? Open an issue for it
+  rather than a note here or a ROADMAP checkbox. Branches are `fix/issue-N-…` (bugs) or
+  `feat/issue-N-…`; the PR says `Closes #N` and follows .github/pull_request_template.md.
+  ROADMAP.md keeps principles, milestone records and decisions, not open work.
+- `gh issue edit`/`view` and `gh pr edit` fail on the deprecated Projects (classic) GraphQL
+  field: use REST (`gh api repos/arif-rachim/renox/issues/N/labels`, `…/comments`, `-X PATCH
+  …/pulls/N`). Projects v2 needs the `project` scope (`gh auth refresh -s project`).
 - One branch and one PR per milestone or fix (branch names like `m17b-examples`, `fix-…`). The
   owner reviews and **merges PRs themselves**, then says so ("Done"). Don't merge unless asked.
 - Before starting, check open PRs (`gh pr list -R arif-rachim/renox`) and base new branches on an
