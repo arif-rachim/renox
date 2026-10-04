@@ -2071,6 +2071,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "007d8adb5ddab6f8e3f491ac63566a7d5002cc7ed73901f72057943fa71ae1ae"
 
 [[package]]
+name = "qrcode"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d68782463e408eb1e668cf6152704bd856c78c5b6417adaee3203d8f4c1fc9ec"
+
+[[package]]
 name = "quick-xml"
 version = "0.41.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2275,6 +2281,19 @@ dependencies = [
  "tempfile",
  "tokio",
  "tower",
+]
+
+[[package]]
+name = "renox-2fa"
+version = "1.0.0-rc.3"
+dependencies = [
+ "hmac 0.13.0",
+ "qrcode",
+ "rand 0.10.3",
+ "renox",
+ "serde",
+ "sha1",
+ "tempfile",
 ]
 
 [[package]]

@@ -10,6 +10,15 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **`renox-2fa` (#169), the first plugin crate, started:** `crates/renox-2fa`, versioned with
+  `renox`. `TwoFactor` (a module) brings the `two_factor` table (SQLite and PostgreSQL: one
+  row per user, the TOTP secret sealed with `APP_KEY`, when it was confirmed, the last code
+  used, hashed recovery codes; deleted with its user); `renox_2fa::totp` (RFC 6238 codes,
+  base32, `otpauth://` URIs, one-step clock drift, a code works once), tested against the RFC
+  6238 and RFC 4648 test vectors; `renox_2fa::qr::svg` (the QR code, via the `qrcode` crate,
+  MIT OR Apache-2.0, no image crates). The account page, the login challenge and recovery
+  codes follow (#170–#173).
+
 - **Fixed (#163, again):** opening a new SQLite file from several pools or processes at once
   could still fail with "database is locked". One try could wait out the whole busy timeout
   (five seconds, as long as the budget), leaving no time to try again. The connection that

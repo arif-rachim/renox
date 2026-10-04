@@ -210,6 +210,10 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   tests/                   core-only integration tests (support/mod.rs has a small TestApp)
 crates/renox-macros/       proc macros: derive Model, FromRow, DbEnum, Validate (validate.rs);
                            embedded!(), migrations!(), #[renox::test]
+crates/renox-2fa/          the first plugin (#146), a separate crate versioned with renox:
+                           TwoFactor module, two_factor table (migrations/ there, prefix
+                           00010101000700), totp.rs (RFC 6238 + base32), qr.rs (SVG); its
+                           own tests/ (it can use the macros: it depends on renox)
 crates/renox-cli/          `rnx`: main.rs (key:generate, forwarding), new.rs, serve.rs, make.rs +
                            generate.rs (make:*), scaffold.rs (make:module --resource --fields),
                            deploy.rs (build, make:deploy), tailwind.rs (the pinned

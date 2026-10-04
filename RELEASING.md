@@ -42,6 +42,7 @@ How a release goes to crates.io. Only a maintainer with publish rights on the fo
    cargo publish -p renox-core
    cargo publish -p renox
    cargo publish -p renox-cli
+   cargo publish -p renox-2fa    # plugins depend on renox, so they go after it
    ```
    `renox-core` and `renox-macros` use `renox` only as a path dev-dependency, which
    `cargo publish` leaves out, so the order has no cycle.
