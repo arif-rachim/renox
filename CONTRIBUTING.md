@@ -22,7 +22,7 @@ Everything not done yet lives on GitHub, so there is one place to look:
   `area: db`, …) and the priority (`P1` must, `P2` should, `P3` could). `good first issue`
   marks a small, well-described one.
 - **Milestones** are releases (`1.0.0`, `1.1`, …): what ships together.
-- **[The project board](https://github.com/users/arif-rachim/projects)** shows every open issue
+- **[The project board](https://github.com/users/arif-rachim/projects/2)** shows every open issue
   by status: Backlog, Ready, In progress, In review, Done.
 - **Pull requests** close their issue (`Closes #N` in the description), on a branch named after
   it: `fix/issue-N-short-name` for a bug, `feat/issue-N-short-name` otherwise.
