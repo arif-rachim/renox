@@ -10,6 +10,11 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- Work is tracked on GitHub: issue forms for bugs, user stories (with acceptance criteria)
+  and tasks; a pull request template with the sections every PR has; Dependabot (grouped,
+  weekly for crates, monthly for Actions); release-note sections. CONTRIBUTING.md "How work is
+  tracked"; ROADMAP.md keeps principles, records and decisions, open work moves to issues.
+
 ## 1.0.0-rc.3 · 2026-10-04
 
 The third release candidate: the same API as rc.2, with three fixes found by using it and a CI

@@ -4,12 +4,31 @@ Thanks for helping. Bug reports, docs fixes, examples and code are all welcome.
 
 ## Before you start
 
-- **A bug:** open an issue with the smallest app or test that shows it, what you expected and
-  what happened. For a security problem, see [SECURITY.md](SECURITY.md) instead.
-- **A feature:** open an issue first. Renox keeps a small surface on purpose (see "Not
-  planned" and "Decisions" in [ROADMAP.md](ROADMAP.md)), and it's better to agree on the API
-  before you write it.
+- **A bug:** open an issue with the **Bug** form: the smallest app or test that shows it, what
+  you expected and what happened. For a security problem, see [SECURITY.md](SECURITY.md)
+  instead.
+- **A feature:** open a **User story** first ("As a … I want … so that …", with acceptance
+  criteria). Renox keeps a small surface on purpose (see "Not planned" and "Decisions" in
+  [ROADMAP.md](ROADMAP.md)), and it's better to agree on the API before you write it.
+- **A question or an idea not ready for a story:** [Discussions](https://github.com/arif-rachim/renox/discussions).
 - **Docs and examples:** send a pull request directly.
+
+## How work is tracked
+
+Everything not done yet lives on GitHub, so there is one place to look:
+
+- **Issues** are the work: bugs, user stories (a large feature is an epic whose parts are
+  sub-issues) and tasks. Labels say the type (`bug`, `story`, `task`), the area (`area: cli`,
+  `area: db`, …) and the priority (`P1` must, `P2` should, `P3` could). `good first issue`
+  marks a small, well-described one.
+- **Milestones** are releases (`1.0.0`, `1.1`, …): what ships together.
+- **[The project board](https://github.com/users/arif-rachim/projects)** shows every open issue
+  by status: Backlog, Ready, In progress, In review, Done.
+- **Pull requests** close their issue (`Closes #N` in the description), on a branch named after
+  it: `fix/issue-N-short-name` for a bug, `feat/issue-N-short-name` otherwise.
+- **[ROADMAP.md](ROADMAP.md)** keeps the principles, the record of what each milestone built and
+  why ("Decisions"); new plans start as issues. **[CHANGELOG.md](CHANGELOG.md)** lists what
+  changed in each release.
 
 ## Set up
 
