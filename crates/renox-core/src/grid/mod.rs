@@ -339,7 +339,11 @@ impl Column {
         Self::new(key, label, Kind::Number)
     }
 
-    /// An amount in the smallest unit, shown with thousands separators.
+    /// An amount in the smallest unit (cents, fils), shown in whole units
+    /// of `APP_CURRENCY` with its usual decimals (`400000` fils is `4,000.00`
+    /// in AED, `400,000` in IDR). Summaries and exports show whole units too,
+    /// and range filters take them. An inline edit still sends the stored
+    /// value (the smallest unit).
     pub fn money(key: &str, label: &str) -> Self {
         Self::new(key, label, Kind::Money)
     }
@@ -851,7 +855,7 @@ impl Grid {
         }
         let prefs = load_prefs(request, &self.id).await;
         let state = State_::parse(self, &self.effective_params(request));
-        let query = self.filtered(query, &state, &request.zone);
+        let query = self.filtered(query, &state, request);
         let unsorted = query.clone();
         let query = self.sorted(query, &state);
         let rows = query
@@ -882,6 +886,7 @@ impl Grid {
             related,
             summaries,
             group_summaries,
+            money_decimals: request.money_decimals,
         })
     }
 
@@ -1032,7 +1037,7 @@ impl Grid {
     /// for exports or totals over every filtered row.
     pub fn filter<M: Model>(&self, query: Query<M>, request: &GridRequest) -> Query<M> {
         let state = State_::parse(self, &self.effective_params(request));
-        let query = self.filtered(query, &state, &request.zone);
+        let query = self.filtered(query, &state, request);
         self.sorted(query, &state)
     }
 
@@ -1040,13 +1045,15 @@ impl Grid {
         &self,
         mut query: Query<M>,
         state: &State_,
-        zone: &crate::timezone::Zone,
+        request: &GridRequest,
     ) -> Query<M> {
+        let zone = &request.zone;
+        let money = 10f64.powi(request.money_decimals as i32);
         for (key, filter) in &state.filters {
             let Some(column) = self.find(key) else {
                 continue;
             };
-            query = filter.apply(query, column, zone);
+            query = filter.apply(query, column, zone, money);
         }
         if !state.rules.is_empty() {
             let mut parts = Vec::new();
@@ -1062,7 +1069,7 @@ impl Grid {
                     }
                     Target::Column(_) => continue,
                 };
-                if let Some((sql, values)) = rule.sql(&target, column.kind, zone) {
+                if let Some((sql, values)) = rule.sql(&target, column.kind, zone, money) {
                     parts.push(format!("({sql})"));
                     binds.extend(values);
                 }
@@ -1300,6 +1307,7 @@ impl Filter {
         mut query: Query<M>,
         column: &Column,
         zone: &crate::timezone::Zone,
+        money: f64,
     ) -> Query<M> {
         let key = column.key.as_str();
         let target = column.target::<M>();
@@ -1312,6 +1320,12 @@ impl Filter {
             Kind::Number | Kind::Money => {
                 for (value, op) in [(self.min, ">="), (self.max, "<=")] {
                     let Some(value) = value else { continue };
+                    // Money is typed in whole units and stored in the smallest.
+                    let value = if column.kind == Kind::Money {
+                        smallest_unit(value, money)
+                    } else {
+                        value
+                    };
                     query = if value.fract() == 0.0 && value.abs() < 9e15 {
                         target.compare(query, op, value as i64)
                     } else {
@@ -1587,6 +1601,12 @@ impl State_ {
     }
 }
 
+/// An amount typed in whole units (`40.5`) in the smallest unit (`4050`
+/// for a currency with 2 decimals), rounded so `40.1 * 100` stays `4010`.
+fn smallest_unit(units: f64, scale: f64) -> f64 {
+    (units * scale * 1e6).round() / 1e6
+}
+
 /// The moment the day `day` starts in `zone`: date-time filters take whole
 /// days of `APP_TIMEZONE`, the zone their cells are shown in. When a clock
 /// change skips midnight, the day starts at its first wall-clock time.
@@ -1640,6 +1660,7 @@ impl Rule {
         target: &str,
         kind: Kind,
         zone: &crate::timezone::Zone,
+        money: f64,
     ) -> Option<(String, Vec<DbValue>)> {
         let text = format!("LOWER(CAST({target} AS TEXT))");
         let lower = self.value.to_lowercase();
@@ -1682,6 +1703,11 @@ impl Rule {
                     .parse()
                     .ok()
                     .filter(|n: &f64| n.is_finite())?;
+                let n = if kind == Kind::Money {
+                    smallest_unit(n, money)
+                } else {
+                    n
+                };
                 let op = match self.op.as_str() {
                     "eq" => "=",
                     "ne" => "<>",
@@ -1820,6 +1846,8 @@ pub struct GridRequest {
     user_id: Option<i64>,
     lang: Option<crate::Lang>,
     zone: crate::timezone::Zone,
+    /// `APP_CURRENCY`'s usual decimals: money is stored in its smallest unit.
+    money_decimals: u32,
 }
 
 impl GridRequest {
@@ -1837,6 +1865,9 @@ impl GridRequest {
             user_id: None,
             lang: None,
             zone: crate::timezone::Zone::UTC,
+            money_decimals: crate::view_filters::currency_decimals(
+                &crate::Config::default().currency,
+            ),
         }
     }
 
@@ -1883,6 +1914,7 @@ impl<S: Send + Sync> FromRequestParts<S> for GridRequest {
             user_id: user.map(|u| u.id),
             lang,
             zone: app.config.timezone,
+            money_decimals: crate::view_filters::currency_decimals(&app.config.currency),
         })
     }
 }
@@ -1903,6 +1935,8 @@ pub struct GridPage<M> {
     related: Vec<Map<String, Value>>,
     summaries: BTreeMap<String, Map<String, Value>>,
     group_summaries: BTreeMap<String, Map<String, Value>>,
+    /// `APP_CURRENCY`'s usual decimals, for money columns.
+    money_decimals: u32,
 }
 
 impl<M: Serialize> GridPage<M> {
@@ -1964,7 +1998,15 @@ impl<M: Serialize> GridPage<M> {
                     "pin": pin,
                     "sortable": c.sortable,
                     "filterable": c.filterable,
-                    "decimals": c.decimals,
+                    "decimals": match c.kind {
+                        Kind::Money => Some(c.decimals.map_or(self.money_decimals, u32::from)),
+                        _ => c.decimals.map(u32::from),
+                    },
+                    // Money cells are divided by this: stored in the smallest unit.
+                    "scale": match c.kind {
+                        Kind::Money => 10u64.pow(self.money_decimals),
+                        _ => 1,
+                    },
                     "width": c.width,
                     "numeric": matches!(c.kind, Kind::Number | Kind::Money),
                     "options": c.options.iter().map(|(v, l)| json!({"value": v, "label": l})).collect::<Vec<_>>(),

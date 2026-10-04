@@ -10,6 +10,12 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Fixed (#184):** a grid's `Column::money` showed the stored smallest unit as is, so with
+  `APP_CURRENCY=AED` (or USD, EUR…) 4,000.00 showed as 400,000, in cells, summaries, group
+  subtotals and exports, and `min.`/`max.` filters compared the typed number with cents.
+  Money columns now show whole units with the currency's usual decimals, filters take whole
+  units, and CSV, Excel and print exports match. Currencies without decimals (IDR, JPY) look
+  the same as before. An inline edit still sends the stored value.
 - **Guides for beginners, part 3 (#193):** grid.md, testing.md, postgresql.md, operations.md,
   development.md, stability.md and laravel.md rewritten in plain words; README.md and
   CHEATSHEET.md made plainer (an opening for each section, comments in the samples).

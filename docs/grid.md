@@ -232,7 +232,7 @@ The kind of column decides how values look and which filter the heading gets.
 | Column | Shows | Heading filter |
 |---|---|---|
 | `text` | the text | contains / starts with / ends with / equals, or a pattern with `%` (`cof%`) |
-| `number` (`.decimals(n)`), `money` | right-aligned, with the locale's separators; `money` is an amount in the smallest unit, shown with the `number` filter (no currency symbol, unlike the template filter `money`) | from–to |
+| `number` (`.decimals(n)`), `money` | right-aligned, with the locale's separators; `money` is an amount in the smallest unit (cents, fils), shown in whole units of `APP_CURRENCY` with its usual decimals (`400000` is `4,000.00` in AED, `400,000` in IDR; no currency symbol, unlike the template filter `money`). Summaries and exports show whole units too; an inline edit sends the stored value | from–to (whole units for `money`) |
 | `date`, `datetime` | `2026-03-05`; `datetime` adds the time, shown in `APP_TIMEZONE` | a date range: two date fields and a calendar ([Cally](https://wicky.nillia.ms/cally/), bundled); a `datetime` range takes whole days of `APP_TIMEZONE` |
 | `bool` | Yes / No (`.icons()`: ✓ / ✗) | yes, no |
 | `select(key, label, options)` | the option's label | pick some |
@@ -247,8 +247,10 @@ A few things to know about the table:
   see. For example `("paid", "Paid")`.
 - Text filters ignore case: "cof" finds "Coffee".
 - Every column kind except `tags`, `image` and `custom` can be sorted by clicking its heading.
-- "Smallest unit" for `money` means a whole number of, say, cents. The grid shows that number
-  as it is, with thousands separators and no currency symbol.
+- "Smallest unit" for `money` means you store a whole number of, say, cents. The grid divides
+  it for you and shows whole units of `APP_CURRENCY`: `12550` cents shows as `125.50` in USD.
+  Currencies without decimals (IDR, JPY) show the number as it is. There's no currency symbol,
+  and the from–to filter takes whole units too.
 
 ### Options every column takes
 
@@ -759,7 +761,7 @@ Every value belongs to one grid. With `.prefix("orders")`, each name starts with
 | `search=iced coffee` | the toolbar search; every word must appear in a searchable column |
 | `q.number=A%` | a text filter (`%` makes it a pattern) |
 | `m.number=starts` | how `q.` matches: `contains` (default), `starts`, `ends`, `equals` |
-| `min.total=1000`, `max.total=…` | a number or money range |
+| `min.total=1000`, `max.total=…` | a number or money range (money in whole units: `min.total=40.5` is 4050 cents) |
 | `from.ordered_on=2026-01-01`, `to.ordered_on=…` | a date range (`to` includes its day) |
 | `in.status=paid` (repeated) | select and tags choices; bool uses `in.paid=1` / `in.paid=0` |
 | `group=region` | group by one of `.groups`; empty for no groups |
