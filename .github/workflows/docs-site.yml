@@ -1,0 +1,105 @@
+# The documentation site (site/) on the owner's server, https://renox.renoxium.com:
+# built here on Ubuntu 24.04 (the server's release, so the binary runs there),
+# copied over SSH and restarted. The server is set up once with
+# site/deploy/setup-ubuntu.sh; see site/README.md "Deploying from GitHub".
+#
+# Secrets, in the `docs-site` environment: DOCS_SSH_HOST, DOCS_SSH_KEY (the private
+# key whose public half the setup script trusted) and DOCS_SSH_KNOWN_HOSTS
+# (`ssh-keyscan -t ed25519 <host>`). Until they are set, the deploy is skipped.
+name: Docs site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "site/**"
+      - "README.md"
+      - "CHEATSHEET.md"
+      - "CHANGELOG.md"
+      - "CONTRIBUTING.md"
+      - "SECURITY.md"
+      - "RELEASING.md"
+      - "llms.txt"
+      - "crates/renox-core/**"
+      - "Cargo.lock"
+      - ".github/workflows/docs-site.yml"
+  workflow_dispatch:
+
+# One deploy at a time; a newer push replaces a queued one.
+concurrency:
+  group: docs-site
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment:
+      name: docs-site
+      url: ${{ vars.DOCS_SITE_URL || 'https://renox.renoxium.com' }}
+    env:
+      SITE_URL: ${{ vars.DOCS_SITE_URL || 'https://renox.renoxium.com' }}
+      SSH_HOST: ${{ secrets.DOCS_SSH_HOST }}
+      SSH_USER: ${{ vars.DOCS_SSH_USER || 'deploy' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # The pages are compiled in, so the binary is the whole site.
+      - run: cargo build --release --locked -p renox-site
+
+      - name: Skip until the server is set up
+        id: ready
+        run: |
+          if [ -z "$SSH_HOST" ]; then
+            echo "::notice::DOCS_SSH_HOST isn't set: built, not deployed (site/README.md, Deploying from GitHub)."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: SSH key and the server's host key
+        if: steps.ready.outputs.deploy == 'true'
+        env:
+          KEY: ${{ secrets.DOCS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DOCS_SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          # Pinned: never trust a host key seen for the first time here.
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Copy the binary and restart the site
+        if: steps.ready.outputs.deploy == 'true'
+        run: |
+          ssh_opts=(-i ~/.ssh/deploy -o StrictHostKeyChecking=yes -o BatchMode=yes)
+          scp "${ssh_opts[@]}" target/release/renox-site "$SSH_USER@$SSH_HOST:/opt/renox-site/renox-site.new"
+          # Replace the binary in one step (a rename), then restart: the socket
+          # holds the port, so visitors wait instead of failing.
+          ssh "${ssh_opts[@]}" "$SSH_USER@$SSH_HOST" \
+            'chmod 755 /opt/renox-site/renox-site.new &&
+             mv -f /opt/renox-site/renox-site.new /opt/renox-site/renox-site &&
+             sudo /usr/bin/systemctl restart renox-site.service'
+
+      - name: The site answers
+        if: steps.ready.outputs.deploy == 'true'
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null "$SITE_URL/health"; then
+              curl -fsS -o /dev/null "$SITE_URL/docs/tutorial"
+              echo "$SITE_URL is up"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::$SITE_URL/health didn't answer after the deploy"
+          exit 1
+
+      - name: Forget the key
+        if: always()
+        run: rm -f ~/.ssh/deploy

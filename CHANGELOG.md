@@ -18,6 +18,12 @@ changes by milestone (each one pull request; details in its description and in
   6238 and RFC 4648 test vectors; `renox_2fa::qr::svg` (the QR code, via the `qrcode` crate,
   MIT OR Apache-2.0, no image crates). The account page, the login challenge and recovery
   codes follow (#170–#173).
+- **The docs site's deploys (#141):** https://renox.renoxium.com, on the owner's Ubuntu 24.04
+  server. `site/deploy/setup-ubuntu.sh` sets the server up once (a `renox-site` user, a
+  `deploy` user that may only replace the binary and restart it, a production `.env`, the
+  systemd units, Caddy or an nginx block); `.github/workflows/docs-site.yml` builds the site
+  on Ubuntu 24.04 when the docs change and deploys it over SSH (a pinned host key), then
+  checks `/health`. The site listens on 127.0.0.1:3080.
 
 - **Fixed (#163, again):** opening a new SQLite file from several pools or processes at once
   could still fail with "database is locked". One try could wait out the whole busy timeout
