@@ -29,7 +29,7 @@ Other things to try: `/hello/<name>`, `/language/en` and `/language/es` to switc
 | Texts in English and Spanish; the Spanish file also translates validation messages, field names, the login and account pages and the UI kit's labels | [resources/lang](resources/lang) |
 | The entries table, then a second migration adding `photo` | [migrations](migrations) |
 | The layout: the logged-in user's name links to `/account` (`route('account.show')`) | [resources/views/layouts/app.html](resources/views/layouts/app.html) |
-| The settings the guestbook uses, with comments (every setting: `rnx new`'s `.env.example`) | [.env.example](.env.example) |
+| Every setting, with comments (the same as `rnx new`'s, with the guestbook's values) | [.env.example](.env.example) |
 
 ## Things worth copying
 

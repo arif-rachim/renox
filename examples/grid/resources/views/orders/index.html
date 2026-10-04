@@ -11,7 +11,7 @@
     {%- elif column.key == "fulfilled" -%}
       {{ progress(row.fulfilled, label="Shipped") }}
     {%- elif column.key == "actions" -%}
-      {{ link_button(route('orders.show', {'id': row.id}), "Open", size="small") }}
+      {{ link_button(route('orders.show', row.id), "Open", size="small") }}
     {%- endif -%}
   {% endcall %}
 </main>

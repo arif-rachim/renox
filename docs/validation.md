@@ -84,13 +84,21 @@ What's going on:
 - In messages, the field is called by its *label*. By default the label is the name with `_`
   turned into spaces (`first_name` becomes "first name"). `.label(…)` or a translation can give
   it another one (see "Messages and translations").
+- `.label(…)` only changes the messages of rules written **after** it: a message is made when
+  its rule fails. So call it right after `v.field(…)`. With
+  `v.field("price", &self.price).min(1_000).label("selling price")`, a failed `min` still says
+  "The price must be at least 1000.". (The derive always puts `label` first for you.)
 
 ### The order rules run in
 
 - Rules run in the order you wrote them.
 - A field stops at its first failed rule, so it shows one error at a time.
-- Most rules **skip a missing value**. "Missing" means `None`, or text that is blank once
-  spaces are trimmed. Only `required`, `accepted` and `rule` still run on a missing value.
+- Most rules **skip a missing value**. "Missing" means `None`, text that is blank once
+  spaces are trimmed, or an empty list (`Vec`, `KeyValues`). Only these still run on a missing
+  value: `required` and its conditional forms (`required_if`, `required_with`, …), `accepted`
+  and `accepted_if`, `declined` and `declined_if` (which fail on it), and `rule`.
+- So `v.field("tags", &self.tags).min(1)` passes on an empty list. To ask for at least one
+  item, use `required()`.
 
 That last point matters: `.email()` alone accepts an empty field (it's optional).
 `.required().email()` doesn't.
@@ -109,6 +117,8 @@ That last point matters: `.email()` alone accepts an empty field (it's optional)
 Some details:
 
 - Any other content type gets a `415` error. Broken JSON gets a `400`.
+- A request with a body (a POST, PUT, …) but no `Content-Type` header at all is read as a
+  normal form (urlencoded).
 - Form bodies are read with `serde_html_form`. When a name appears more than once (a
   multi-select, a group of checkboxes), it fills a `Vec<T>`.
 - A form can use nested names like `lines[0][qty]` (the UI kit's `repeater` and `key_value`
@@ -141,7 +151,7 @@ application/json`, or a JSON body. It gets `422 Unprocessable Entity` with the e
 {"message": "The name field is required.", "errors": {"name": ["The name field is required."], "price": ["The selling price must be at least 1000."]}}
 ```
 
-- `message` is the first error.
+- `message` is the first error, taking the fields in alphabetical order (not page order).
 - `errors` lists every field's errors.
 
 The page doesn't reload. Instead, the bundled `renox.js` script (added by `renox_head()`)
@@ -164,8 +174,15 @@ The errors and what was typed are *flashed* to the session, so the form page can
 once.
 
 > [!IMPORTANT]
-> Passwords are never flashed. The fields `password`, `password_confirmation`,
-> `current_password` and `_token` are dropped, so they don't sit in the session.
+> Passwords are never flashed. Every field whose name contains `password` (any case:
+> `password`, `password_confirmation`, `current_password`, `new_password`, also inside nested
+> rows) is dropped, and so is every field whose name starts with `_` (`_token`, `_method`). So
+> they don't sit in the session.
+
+Old input is also capped at about 2 KB, because the session lives in a cookie and browsers drop
+cookies over 4 KB. When the form is bigger, the largest values are dropped first, until the
+rest fits. So a long text in a `<textarea>` may not be filled in again after an error, while the
+short fields are.
 
 In both answers, every field's errors are reported at once, including fields that couldn't be
 read.
@@ -342,8 +359,11 @@ impl Validate for EventForm {
 }
 ```
 
-`.message("…")` replaces the message of the rule just before it (here `between`). The text is
-used exactly as written.
+`.message("…")` replaces the field's error so far, whichever rule made it. Here an empty title
+fails `required` (and `between` is then skipped), and still shows the text written for
+`between` above.
+For `unique`, `exists` and the other checks made later, it replaces the message of the check
+just before it. The text is used exactly as written.
 
 ### Every rule
 
@@ -351,7 +371,8 @@ First, a note on sizes. `min`, `max`, `between` and `size` measure whatever the 
 
 - text: its number of characters;
 - a number: its value;
-- a `Vec`: its number of items;
+- a `Vec`: its number of items (an empty `Vec` counts as missing, so the size rules skip it;
+  add `required()` to ask for at least one);
 - an `Upload` (a file): its size in kilobytes.
 
 | Group | Rules |
@@ -365,7 +386,7 @@ First, a note on sizes. `min`, `max`, `between` and `size` measure whatever the 
 | Choices | `one_of(&[…])` (Laravel's `in`), `none_of(&[…])` (`not_in`) |
 | Other fields | `confirmed(&self.password_confirmation)`, `same("email", &self.email)`, `different("old_email", &self.old_email)`, `gt("min_price", &self.min_price)`, `gte(…)`, `lt(…)`, `lte(…)` |
 | Database | `unique(table, column)`, `exists(table, column)`, then `ignore(id)`, `where_eq(column, value)`, `where_null(column)`, `where_not_null(column)` |
-| Files | `image()`, `mimes(&["pdf", "jpg"])`, `dimensions(&Dimensions::new().min_width(1200).ratio(3, 1))` (pixels, read from the image's header), plus the size rules in kilobytes |
+| Files | `image()`, `mimes(&["pdf", "jpg"])`, `dimensions(&Dimensions::new().min_width(1200).ratio(3, 1))` (pixels, read from the image's header; `Dimensions` has `min_width`, `max_width`, `min_height`, `max_height`, `width`, `height` and `ratio`), plus the size rules in kilobytes |
 | Passwords | `password(&policy)` with a `Password` policy (`.uncompromised()` checks known breaches), `current_password()` (the logged-in user's) |
 | Your own | `rule(valid, message)`, `apply(&MyRule)` with a `Rule` |
 
@@ -427,8 +448,8 @@ Some rules are called on `v`, not on a field:
 ### Which types rules can check
 
 A value a rule can check implements `FieldValue`. These do: `String`, `&str`, the integer and
-float types, `bool`, `NaiveDate`, `NaiveDateTime`, `DateTime<Utc>`, `Upload`, and `Option<T>` /
-`Vec<T>` of those.
+float types, `bool`, `NaiveDate`, `NaiveDateTime`, `DateTime<Utc>`, `Upload`, `KeyValues`, and
+`Option<T>` / `Vec<T>` of those.
 
 ### Database rules: `unique` and `exists`
 
@@ -658,7 +679,7 @@ struct Signup {
 | `required`, `email`, `image`, … | `.required()`, `.email()`, … |
 | `max = 100`, `label = "Full name"`, `message = "…"` | `.max(100)`, `.label("Full name")`, `.message("…")` |
 | `between(3, 280)`, `unique("users", "email")`, `confirmed(&self.x)` | the same call with those arguments |
-| `label = "…"` | always applied first, wherever it's written |
+| `label = "…"` | always applied first, wherever it's written; it names the field's own errors only, while `each` and `distinct` errors keep the default label ("tags #1") |
 | `each(rule, …)` | `v.each(name, &self.field, \|item\| item.rule()…)` |
 | `distinct` | `v.distinct(name, &self.field)` |
 | `rename = "t-shirt"` | the name errors are filed under, when the form's input name differs from the field's (pair it with `#[serde(rename)]`) |
@@ -666,8 +687,9 @@ struct Signup {
 
 Fields without a `#[validate]` attribute have no rules.
 
-Some things the attributes can't say: a rule that depends on another field's value, `nested`,
-or a loop. For those, write `impl Validate` by hand.
+A rule may depend on another field, since the arguments can use `self`:
+`confirmed(&self.password_confirmation)`, `required_if(self.kind == "company")`. What the
+attributes can't say is `nested` or a loop. For those, write `impl Validate` by hand.
 
 ## Hooks: `prepare`, `authorize`, `after`
 
@@ -795,7 +817,7 @@ Browsers send everything as text, and some inputs send odd things. Before the ru
     `lines.1.name`.
   - Names nested deeper than 32 levels are ignored.
 - **Values that can't be read** (`price=abc` for an `i64`, `size=huge` for an enum) become an
-  error on that field ("The price must be a number.", "The selected size is invalid."),
+  error on that field ("The price must be a number.", "The size is invalid."),
   instead of a `400` for the whole request.
   - A stand-in value (an enum's first variant, `0`, `false`) takes its place, so the rest of
     the form can still be read and every other field's rules run.
@@ -821,7 +843,7 @@ A message template can use these placeholders:
 - `:attribute`: the field's label;
 - `:Attribute`: the same, with a capital first letter;
 - the rule's numbers or values: `:min`, `:max`, `:size`, `:digits`, `:date`, `:values`,
-  `:other`.
+  `:other`, `:value` (`multiple_of`), `:decimal` (`decimal`) and `:seconds` (`auth.throttle`).
 
 ### Overriding messages and field names
 
@@ -859,7 +881,7 @@ The keys:
 | `confirmed`, `same`, `different`, `distinct` | rules across fields |
 | `unique`, `exists` | database rules |
 | `file`, `image`, `mimes` | uploads |
-| `password.letters`, `password.mixed`, `password.numbers`, `password.symbols`, `password.uncompromised` | the `Password` policy |
+| `min.string`, `password.letters`, `password.mixed`, `password.numbers`, `password.symbols`, `password.uncompromised` | the `Password` policy (its minimum length uses `min.string`) |
 | `invalid` | a value that can't be read, of no type above |
 | `auth.failed`, `auth.throttle`, `current_password` | Renox's login and account pages |
 
@@ -869,7 +891,9 @@ The first one that exists wins:
 
 1. `.label(…)` (or `label = "…"` with the derive);
 2. the app's `renox.validation.attributes.<field>`;
-3. the field name, with `_` turned into spaces.
+3. for a nested field such as `items.0.name`: the app's `renox.validation.attributes.items.*.name`
+   (numbers become `*`), then the attribute for its last part (`name`);
+4. the field name (for a nested field, its last part), with `_` turned into spaces.
 
 Labels on Renox's own forms give way to the app's translations.
 
@@ -890,7 +914,8 @@ How it works:
 - The script posts the form with the header `X-Renox-Validate: <field>`.
 - `Valid` answers `200 {"field": …, "errors": […]}` with just that field's errors.
 - **Your handler doesn't run**, so nothing is saved.
-- The rules are the form's own, `unique` and `after` included.
+- The rules are the form's own, `unique` included. The `after` hook runs only when the whole
+  form has no errors, so it may not run while other fields are still empty or wrong.
 
 See [ui.md](ui.md), "Live validation".
 

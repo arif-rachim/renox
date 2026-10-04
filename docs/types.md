@@ -40,16 +40,16 @@ columns are what to write in your migration's `CREATE TABLE`, for SQLite or Post
 | `<input>`, `type=email/url/tel/search/password` | `String` | `TEXT` | `TEXT` |
 | `<textarea>` | `String`, or `Option<String>` (empty → `None`) | `TEXT` | `TEXT` |
 | `type=number` | `i64` (use `i64` for whole numbers; PostgreSQL has no unsigned types) | `INTEGER` | `BIGINT` |
-| `type=number`, smaller ranges | `i16`, `i32` (also `i8`, `u8`, `u16`, `u32` on SQLite only: PostgreSQL has no unsigned columns) | `INTEGER` | `SMALLINT`, `INTEGER` |
+| `type=number`, smaller ranges | `i16`, `i32` (also `i8`; `u8`, `u16`, `u32` only in builds without the `postgres` feature, whatever database the app runs on: PostgreSQL has no unsigned columns) | `INTEGER` | `SMALLINT`, `INTEGER` |
 | `type=number step=0.01` (measures) | `f64` | `REAL` | `DOUBLE PRECISION` |
 | `type=number step=0.01`, single precision | `f32` | `REAL` | `REAL` |
 | money | `i64` in the smallest unit (rupiah, cents), never `f64` | `INTEGER` | `BIGINT` |
-| `type=checkbox` (one) | `bool`: `on` (or `1`, `yes`, `checked`) → `true`, unchecked (nothing sent; or `off`, `0`, `no`) → `false` | `INTEGER` 0/1 | `BOOLEAN` |
+| `type=checkbox` (one) | `bool`: with `Valid<T>`, `on` (or `1`, `yes`, `checked`) → `true`, unchecked (nothing sent; or `off`, `0`, `no`) → `false` (see [Checkboxes](#checkboxes)) | `INTEGER` 0/1 | `BOOLEAN` |
 | `<select>` | an enum with `#[derive(DbEnum)]` | `TEXT` | `TEXT` |
 | `<select multiple>`, checkboxes sharing a name | `Vec<String>` with `#[serde(default)]`; stored as `Json<Vec<String>>` | `TEXT` | `JSONB` |
 | `type=date` | `NaiveDate` | `TEXT` | `DATE` |
 | `type=time` | `NaiveTime` | `TEXT` | `TIME` |
-| `type=datetime-local` (no seconds needed) | `NaiveDateTime` | `TEXT` | `TIMESTAMP` |
+| `type=datetime-local` (no seconds needed with `Valid<T>`) | `NaiveDateTime` | `TEXT` | `TIMESTAMP` |
 | (set by Renox) `created_at`, `updated_at` | `Option<DateTime>` (UTC), or a plain `DateTime` | `TEXT` | `TIMESTAMPTZ` |
 | (set by Renox) `deleted_at`, with `#[model(soft_deletes)]` | `Option<DateTime>` (`None` = not deleted) | `TEXT` | `TIMESTAMPTZ` |
 | `type=file` | `Upload`; store it and keep its key as `String` | `TEXT` | `TEXT` |
@@ -78,7 +78,13 @@ Some words in the table, explained:
 - **`Upload`** is a file sent with the form. You store the file, then save its key (a name
   that finds it again) in a `String` column.
 - **`Encrypted<T>`** is scrambled with the app's secret key (`APP_KEY`) before it's stored, so
-  someone who reads the database can't read the value.
+  someone who reads the database can't read the value. In your app it's the plain value again,
+  and it serializes as the plain value too: a model sent as `Json(model)` or passed to a
+  template shows the secret. Only `Debug` hides it (`Encrypted(..)`). Keep such a field out of
+  API answers and views (a separate struct for the output, or `#[serde(skip_serializing)]`).
+- **A model field that isn't a column** gets `#[model(skip)]`: the model never writes it, and
+  after a load it holds its `Default` value. Use it for values you fill in yourself, like a
+  count loaded separately.
 - **UTC** is the world's reference time zone, with no summer time.
 
 ## Enums
@@ -120,12 +126,17 @@ Browsers don't always send what you'd expect. Here is what they send, and how Re
 
 ### Checkboxes
 
-Browsers send only checked checkboxes, and send them as `on`. Renox reads that as `true`, and
-a missing one as `false`.
+Browsers send only checked checkboxes, and send them as `on`. `Valid<T>` (Renox's form checker)
+reads that as `true`, and a missing one as `false`.
 
-A `bool` field also accepts `1`, `yes`, `checked` and `true` (and `off`, `0`, `no`, `false` or
-an empty value for `false`). So a hidden input or an API client (a program, not a browser)
-can send either.
+With `Valid<T>`, a `bool` field also accepts `1`, `yes`, `checked` and `true` (and `off`, `0`,
+`no`, `false` or an empty value for `false`). So a hidden input or an API client (a program,
+not a browser) can send either.
+
+> [!WARNING]
+> This is `Valid<T>`'s work. The plain `Form<T>` extractor (from the prelude) accepts only
+> `true` and `false`: it refuses a checkbox's `on`, and a missing checkbox is an error unless
+> the field has `#[serde(default)]`. Read forms with checkboxes through `Valid<T>`.
 
 ### Lists: multi-selects and checkbox groups
 
@@ -136,8 +147,8 @@ list.
 
 ### Dates and times
 
-`datetime-local` sends `2026-10-01T10:30`, without seconds. Renox accepts it as a
-`NaiveDateTime`.
+`datetime-local` sends `2026-10-01T10:30`, without seconds. `Valid<T>` accepts it as a
+`NaiveDateTime` (it adds `:00`); the plain `Form<T>` refuses it.
 
 To show values back in an edit form, write them as they come. Dates, times and date-times
 serialize in the formats their inputs expect (`2026-10-01`, `07:30:00`,

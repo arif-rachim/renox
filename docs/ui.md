@@ -48,11 +48,28 @@ A **component** is a MiniJinja macro in a file of its own. You import it where y
 Inside a component, the same request helpers work as in the page itself:
 
 - `old()`, `has_old()`, `error()`, `errors`: what the person typed last time, and what was wrong
-  with it;
+  with it; `errors_in('login')` lists every error of a named error bag
+  ([validation.md](validation.md));
 - `t()`, `can()`, `auth`, `request`: translations, permission checks, the logged-in user, and
   the request;
 - `csrf_field()`, `flash`: the hidden security field every form needs, and one-time messages;
+  `csrf_token` is the same token as plain text (for a `<meta>` tag or a script);
+- `method_field('PUT')`: the hidden `_method` field, for a form that sends PUT, PATCH or
+  DELETE;
+- `seo(title=…, description=…, image=…, type=…, canonical=…)`: the page's `<title>`, its
+  description, its canonical link and the tags social sites read. `canonical` is this page's
+  address on `APP_URL` unless you give one;
+- `csp_nonce()`: the page's nonce (a one-time code), for an inline `<script nonce="…">` that
+  the Content Security Policy should allow;
 - `once()`: "only the first time on this page".
+
+And these work in any template:
+
+- `asset('css/app.css')`: the address of a file in `public/`, with `?v=…` added, which
+  changes whenever the file does (so browsers never keep an old copy);
+- `storage_url(key)`: the address of a file stored with `Storage`;
+- `page_url(3)`: this page's address with `page=3`, keeping the rest of the query (`?q=…`);
+  `query_with(period="7d")` does the same for any keys.
 
 Here is a small component, a price field:
 
@@ -181,21 +198,22 @@ field uses a sensible default.
 | `checkbox_list(name, label, options, selected=[…], inline=…, columns=…)` | Several choices. Each ticked option sends `name` once. So the form's field in Rust is a `Vec`, with `#[serde(default)]` (when nothing is ticked, nothing is sent). |
 | `toggle_buttons(name, label, options, selected=…, multiple=…)` | The options as a row of buttons; the pressed ones are filled and checked. Without `multiple`, one choice (a radio group underneath). With `multiple`, several (checkboxes underneath). |
 | `file(name, label, accept=…, multiple=…, preview=…, current=…, current_name=…)` | An upload area: drop files on it, or click it to pick them. The chosen files are listed under it; images get a small picture when `preview` is on. `current` is the URL of the file stored now, and `current_name` the name shown for it. The form needs `enctype="multipart/form-data"`. The Rust field is an `Upload` (a `Vec<Upload>` with `multiple`). |
-| `date_picker(name, label, value=…, min=…, max=…)` | A date: typed as `2026-10-02`, or picked from a calendar. The calendar is Cally, opening in a small box under the field, with the month named in the page's language. The date is sent as `YYYY-MM-DD`, like `<input type="date">`, so the Rust field is a `NaiveDate`. Without JavaScript it is a plain text field. |
+| `date_picker(name, label, value=…, min=…, max=…, placeholder="YYYY-MM-DD", readonly=…)` | A date: typed as `2026-10-02`, or picked from a calendar. The calendar is Cally, opening in a small box under the field, with the month named in the page's language. The date is sent as `YYYY-MM-DD`, like `<input type="date">`, so the Rust field is a `NaiveDate`. Without JavaScript it is a plain text field. |
 | `show_when(field, values)` + `hide_when(field, values)` | Fields shown (or hidden) while another field has one of `values`. Hidden fields are disabled, so the form doesn't send them. Check them on the server with `required_if`. Without JavaScript they stay visible. |
 | `select(…, multiple=true, searchable=true)` | Pick several values (a `Vec`), with a box to type in that filters the options. The chosen ones show as chips (small rounded labels). The browser's own select stays underneath: the form sends the same thing, and it works without JavaScript. |
 | `select(…, options_url=…, editable=true)` | The options come from the server as you type (`renox::select`), for lists too long to put in the page. With `editable`, what was typed can be added ("Add “…”") and is chosen at once, and the chosen option can be renamed (with the pencil). See [Options from the server](#options-from-the-server) below. |
 | `tags_input(name, label, value=[…], suggestions=[…])` | Free text as chips. Enter or a comma adds one; Backspace in the empty box removes the last one. The Rust field is a `Vec<String>`. |
 | `repeater(name, label, rows=[…], min=…, max=…, item_label=…, add_label=…, reorderable=true)` with `{% call(row, prefix) %}` | Rows that people add, remove and move. `reorderable=false` keeps their order fixed. Each row has the fields of the call block, named `name[0][field]`, and they are renumbered when rows move. The Rust field is a `Vec` of a struct, checked with `v.nested`. Adding a row needs JavaScript. |
-| `key_value(name, label, value=…)` | Pairs of text: a repeater with a key and a value on each row. The Rust field is `KeyValues`. |
+| `key_value(name, label, value=…, key_label=…, value_label=…, add_label=…, hint=…)` | Pairs of text: a repeater with a key and a value on each row. `key_label` and `value_label` name the two columns, `add_label` the add button. The Rust field is `KeyValues`. |
 | `wizard(id, steps, submit_label, back_label=…, next_label=…)` + `wizard_step(id, key, title=…)` | A form in steps. Next checks the current step first: the browser's own rules, then the server's (with `data-live-validate`). After a failed submit, the first step with an error opens. Without JavaScript all steps show at once. |
 | `form_grid(columns=2)`, `fieldset(legend, hint=…, columns=…)` | `form_grid` puts fields side by side from tablet width up (one column on phones). `fieldset` is a group of fields with a title, for long forms. A field's `span=2` or `span="full"` makes it wider. |
 
 A few options work on many fields:
 
-- Every field takes `id`, `disabled` (the field isn't sent) and `span`.
-- `input` and `textarea` take `readonly`: the field is shaded and can't be changed, but it is
-  still sent and can be read.
+- Every field takes `id` and `span`.
+- Every field but `repeater` and `key_value` takes `disabled` (the field isn't sent).
+- `input`, `textarea` and `date_picker` take `readonly`: the field is shaded and can't be
+  changed, but it is still sent and can be read.
 - `input` takes `revealable=true`: a button that shows the password. Renox's own sign-in
   pages use it.
 - `input` takes `copyable=true`: a button that copies the value, handy for keys and links.
@@ -389,13 +407,13 @@ The rest of the kit's everyday components:
 | `card(title=…, subtitle=…)`, `group(title=…, footer=…)` | A card is a surface (a white box) for content. A group is an inset list of rows, like the iPhone's Settings. |
 | `alert(message, kind=…, title=…)`, `badge(text, kind=…)` | Kinds: `info`, `success`, `warning`, `error`. An alert has an icon for each kind, so colour is never the only sign. A badge is colour only, so its text must carry the meaning ("Paid", not "●"). |
 | `form_errors(title=…)` | Every error of the last submit, above the form. Each links to its field. |
-| `sheet(id, title, message=…, slide_over=…, width=…, icon=…)` + `open_button(id, label, icon=…, key=…, badge=…)` | A sheet is a modal dialog: a box over the page that you must close before going on. It closes on Esc and on a click outside it (on the backdrop), and focus goes back to the button that opened it. On phones it rises from the bottom edge. `slide_over=true` puts it at the side, full height. `width` is `sm`, `md` (default), `lg` or `xl`. `icon` (`info`, `success`, `warning`, `error`) shows above the title. |
+| `sheet(id, title, message=…, slide_over=…, width=…, icon=…)` + `open_button(id, label, variant="secondary", size=…, icon=…, key=…, badge=…)` | A sheet is a modal dialog: a box over the page that you must close before going on. It closes on Esc and on a click outside it (on the backdrop), and focus goes back to the button that opened it. On phones it rises from the bottom edge. `slide_over=true` puts it at the side, full height. `width` is `sm`, `md` (default), `lg` or `xl`. `icon` (`info`, `success`, `warning`, `error`) shows above the title. Any element with `data-rx-open="<sheet id>"` opens the sheet too, not only `open_button`. A button with `data-rx-close` inside the sheet closes it. |
 | `action_sheet(id, label, action, title, …)` | A button that opens a sheet with a form sent by htmx. See [Actions](#actions). |
 | `confirm(id, label, action, title, message, confirm_label=…, method="DELETE", size=…, icon=…, modal_icon="warning", key=…)` | A destructive action (like delete) that asks first, in a sheet. Cancel has the focus first, so pressing Enter by mistake does nothing harmful. `icon` goes on the button, `modal_icon` above the sheet's title (`none` for no icon). |
 | `menu(label, id=…, variant="secondary", size="small")` + `menu_link(href, label)`, `menu_action(action, label, method="POST", danger=…)`, `menu_separator()` | A drop-down menu of actions. The arrow keys move, Esc closes. `menu_action` sends a form (with `_method` for methods other than POST). |
 | `tabs(id, items, selected=…, label=…)` + `tab_panel(id, key, selected=…)` | A segmented control: tabs that switch between panels on one page. The arrow keys, Home and End move between tabs. |
 | `table(head, caption=…)` | A table in a card. A heading `["Total", "num"]` lines its column up on the right (for numbers), and `["Slug", "hide-narrow"]` hides the column on phones. |
-| `empty(title, message, action_href, action_label)` | What an empty list says, with a link to add the first item. |
+| `empty(title, message=…, action_href=…, action_label=…)` | What an empty list says. With `action_href` (and its `action_label`), it adds a link to add the first item. |
 | `notification_bell(count=none, id="rx-notifications")` | The logged-in user's notifications, in the navigation bar: a badge with the unread count, a panel, and new ones arriving live as toasts. Needs `Auth::new().notifications()`; pass `unread_notifications`. See [docs/mail.md](mail.md#the-bell). |
 
 ### Navigation and page structure
@@ -509,11 +527,23 @@ To change one of those pages, put a file with the same name under
 The kit's own texts ("optional", "Cancel", the error summary's title) are in English. An app
 can change or translate them in `lang/<locale>.json` (for example `es.json` for Spanish):
 
-- the kit: `ui.optional`, `ui.cancel`, `ui.close`, `ui.dismiss`, `ui.more` and
-  `ui.errors_title`;
+- the kit: `ui.optional`, `ui.cancel`, `ui.close`, `ui.dismiss`, `ui.more`, `ui.skip`
+  ("Skip to content"), `ui.main_navigation`, `ui.errors_title`, `ui.loading`, `ui.back` (the
+  wizard and `page_header`'s back link) and `ui.next` (the wizard);
+- the fields: `ui.show_password`, `ui.hide_password`, `ui.copy`, `ui.copied`,
+  `ui.choose_file`, `ui.choose_files`, `ui.current_file`, `ui.choose_date`,
+  `ui.previous_month`, `ui.next_month`, `ui.remove`, `ui.add_row`, `ui.move_up`,
+  `ui.move_down`, `ui.key` and `ui.value`;
+- the searchable select: `ui.search`, `ui.no_results`, `ui.searching`, `ui.load_failed`,
+  `ui.add_option`, `ui.edit`, `ui.editing` and `ui.save_failed`;
 - the infolist: `ui.yes`, `ui.no`, `ui.show_more` and `ui.since.*` (`now`, `past`, `future`,
   `minutes`, `hours`, `days`, `months`, `years`);
+- dashboards: `ui.chart.show_data`, `ui.chart.other`, `ui.stat.vs_previous` and
+  `ui.period.*` (`label`, `7d`, `30d`, `90d`, `12m`, `mtd`, `ytd`);
+- the notification bell: `ui.notifications.*`;
 - the data grid: `ui.grid.*` ([docs/grid.md](grid.md#translations)).
+
+The full list, with the English texts, is in `crates/renox-core/src/i18n.rs` (`builtin`).
 
 ### Changing the kit itself
 
@@ -651,13 +681,13 @@ This card shows an order in two columns:
 | | |
 |---|---|
 | `infolist(columns=1, inline=false)` | The `<dl>` (description list) around the entries. `inline=true` puts each label beside its value (from tablet width up). |
-| `entry(label, value, format=…, …)` | A label and its value. With `{% call entry(label) %}…{% endcall %}` the block is the value. `span=2` or `"full"` makes it wider. `inline=true` puts this label beside its value. `hide_label=true` keeps the label for screen readers only. `hint` adds a line under the value, `tooltip` a title shown on hover. |
+| `entry(label, value, format=…, …)` | A label and its value. With `{% call entry(label) %}…{% endcall %}` the block is the value. `span=2` or `"full"` makes it wider. `inline=true` puts this label beside its value. `hide_label=true` keeps the label for screen readers only. `hint` adds a line under the value, `tooltip` a title shown on hover. `id` sets the entry's `id`, for a link or a script to find it. |
 | `format` | `"date"` and `"datetime"` (with `date_format`, using chrono's codes; in `APP_TIMEZONE`). `"since"`: "3 hours ago", with the date as its tooltip. `"money"`: in `APP_CURRENCY`, or `currency="USD"`. `"number"` (with `decimals`). `"markdown"`. `"bool"`: a check and "Yes", or a cross and "No". `"color"`: a colour sample and its code. `"image"`: a URL (with `image_size`, `circular`). `"key_value"`: pairs or a map, such as `KeyValues`, as a table. |
 | `badge`, `labels` | `badge=true`, a kind (`"success"`), or kinds by value (`{"paid": "success"}`). `labels` gives raw values friendly names (`{"paid": "Paid"}`), with or without a badge. |
 | `url`, `new_tab`, `copyable` | A link; a copy button (it copies the raw value). |
 | `prefix`, `suffix`, `limit`, `words`, `placeholder` | Text before or after the value. At most `limit` letters, or `words` words, then "…". `placeholder` is what an empty value (none, `""`, an empty list) shows instead (by default `—`). |
 | A list as `value` | Each item is formatted the same way. By default they're joined with commas; `list="lines"` puts one per line, `list="bullets"` makes a bullet list. Badges, colour samples and images sit in a row. `limit_list=3` shows three and folds the rest behind "Show 2 more" (a `<details>` element, no script needed). |
-| `repeatable(label, items, columns=1)` with `{% call(item) %}` | A list of records inside the record (an order's lines). Each item is a small infolist with a border, made of the call block's entries. |
+| `repeatable(label, items, columns=1, placeholder="—", span="full", hide_label=…)` with `{% call(item) %}` | A list of records inside the record (an order's lines). Each item is a small infolist with a border, made of the call block's entries. `placeholder` is shown when there are no items. |
 
 For sections and tabs, use the kit's own `card`, `fieldset` and `tabs`, and put an infolist
 in each. examples/shop's order page and examples/fields' product page are built this way.
@@ -811,6 +841,8 @@ That part is a **fragment**.
 
 - `view(…).fragment("rows")` sends only the block named `rows`, for htmx requests.
 - `.also("count")` adds more blocks after it.
+- `.status(StatusCode::CREATED)` sends the page (or the fragment) with another status than
+  200.
 
 An extra block can update a different place on the page. This is an **out-of-band swap**:
 "out of band" means outside the main spot htmx was going to update. Give the extra block's
@@ -840,11 +872,61 @@ So one answer updates the table row and the order count at the top of the page.
 htmx reads special headers in the answer to decide what to do next. In Renox these headers
 are types. Return them in a tuple with the response:
 
-- `HxRetarget("#errors")`: swap the answer into another element;
-- `HxReswap("outerHTML")`: swap it in a different way;
-- `HxPushUrl("/orders?status=open")`: change the address in the browser's address bar;
+- `HxRetarget("#errors".into())`: swap the answer into another element;
+- `HxReswap("outerHTML".into())`: swap it in a different way;
+- `HxPushUrl("/orders?status=open".into())`: change the address in the browser's address bar;
 - `HxRedirect`, `HxRefresh` and `HxTrigger`: go to another page, reload this one, or send an
   event to the page.
+
+Each of them holds a `String`, so write `.into()` after a text in quotes. `HxRetarget`,
+`HxReswap` and `HxPushUrl` aren't in the prelude: import them with
+`use renox::{HxPushUrl, HxReswap, HxRetarget};`.
+
+```rust
+# use renox::prelude::*;
+use renox::{HxReswap, HxRetarget};
+
+/// Puts the order list in place of the whole `#orders` element.
+async fn reload() -> (HxRetarget, HxReswap, View) {
+    (
+        HxRetarget("#orders".into()),
+        HxReswap("outerHTML".into()),
+        view("orders/index.html", context! {}).fragment("orders"),
+    )
+}
+```
+
+### What htmx sent: the `Htmx` extractor
+
+The other way round, `Htmx` (in the prelude) tells a handler what htmx sent with the request.
+Ask for it as an argument. Its fields:
+
+- `request`: `true` when htmx made the request (the `HX-Request` header);
+- `boosted`: `true` when it came from an `hx-boost` link or form, which expects a whole page;
+- `target`: the id of the element the answer goes into (`HX-Target`), if any;
+- `trigger`: the id of the element that started the request (`HX-Trigger`), if any;
+- `current_url`: the address the browser shows now (`HX-Current-URL`), if any.
+
+And two helpers:
+
+- `htmx.wants_fragment()` is `true` for an htmx request that isn't boosted: one that wants a
+  part of the page, not all of it. That's the same test `.fragment(…)` makes.
+- `htmx.redirect("/orders")` goes to another page after a form is sent: an `HX-Redirect`
+  header for htmx (the browser loads the whole page), a `303 See Other` redirect otherwise.
+
+```rust
+# use renox::prelude::*;
+/// Sends only the list to htmx, and the whole page to everyone else.
+async fn index(htmx: Htmx) -> View {
+    let page = view("products/index.html", context! {});
+    if htmx.wants_fragment() { page.fragment("list") } else { page }
+}
+
+/// After saving, goes to the list, whether htmx sent the form or not.
+async fn store(htmx: Htmx) -> Response {
+    htmx.redirect("/products")
+}
+```
 
 ### Going back
 
@@ -870,7 +952,7 @@ Live validation checks a form's fields while people fill it in, before they pres
 Add `data-live-validate` to a form that `Valid<T>` handles. Then:
 
 1. When someone leaves a field, the kit's script sends that field's value (with the rest of
-   the form), with the header `X-Renox-Validate: field`. It sends it again as the field is
+   the form), with the header `X-Renox-Validate: <field name>`. It sends it again as the field is
    corrected.
 2. The `Valid` extractor answers with that field's errors as JSON, and **the handler doesn't
    run**. So nothing is saved until the form is really submitted.
@@ -1010,7 +1092,8 @@ The action sheet's other options:
 
 ### What every button can carry
 
-These work on every button (`button`, `link_button`, `open_button`, `icon_button`):
+These work on every button (`button`, `link_button`, `open_button`, `icon_button`), except
+the disabled reason at the end of the list:
 
 - **An icon** before the label, by name: `icon="plus"`. The kit's icons are `plus`, `edit`,
   `trash`, `check`, `close`, `copy`, `download`, `upload`, `external`, `refresh`, `search`,
@@ -1026,7 +1109,9 @@ These work on every button (`button`, `link_button`, `open_button`, `icon_button
   - The button gets `aria-keyshortcuts`, and its tooltip (or `title`) names the shortcut.
 - **A reason it's disabled**: `disabled_reason="Add a photo first."` The button can still get
   focus and shows the reason as its tooltip (on a tap too), but a click does nothing. Plain
-  `disabled=true` instead takes it out of the tab order entirely.
+  `disabled=true` instead takes it out of the tab order entirely. Only `button` and
+  `icon_button` (without `href`) take `disabled` and `disabled_reason`; `link_button` and
+  `open_button` take neither.
 
 An `icon_button`'s `label` is read out by screen readers. It's also shown as a tooltip after
 a short hover, or at once when the button gets keyboard focus. Any element can have a tooltip
@@ -1133,7 +1218,8 @@ The parts, one by one:
   - A legend for two series or more.
   - A hairline grid; 2 px lines with a dot at the end.
   - Bars at most 24 px wide, with rounded ends.
-  - A doughnut keeps six slices and folds the rest into "Other".
+  - A pie or doughnut shows at most six slices. With more, it keeps the first five and folds
+    the rest into one "Other" slice.
   - The six series colours come in a fixed order, checked for colour blindness in both
     light and dark mode (`--rx-chart-1` … `--rx-chart-6`). A seventh series is grey.
 - **Hover and keyboard.**
@@ -1142,21 +1228,26 @@ The parts, one by one:
   - The chart can take focus, and the arrow keys, Home and End move along it.
   - Every chart also has a "Show the data" table, so no value is only in a colour or a
     tooltip.
-- **`stat(label, value, delta=…, delta_label=…, good="up", trend=…, url=…, hint=…)`** is one
-  figure.
+- **`stat(label, value, delta=…, delta_label=…, good="up", trend=…, url=…, hint=…,
+  decimals=1)`** is one figure.
   - `value` is written as it should read: `total | money`.
   - `delta` is its change in percent, with an arrow and its sign. It's green when it goes the
-    `good` way: `"up"`, `"down"` or `"none"`.
+    `good` way: `"up"`, `"down"` or `"none"`. `decimals` is how many decimals the percent
+    shows (1 by default).
   - `trend` draws a sparkline (a tiny line chart); `url` makes it a link.
   - `stats(columns)` sets stats side by side (two per row on phones).
-- **`dashboard(columns)` + `widget(title, description=…, span=…, url=…, poll=…)`**: cards in
-  a grid (one column on phones; `span=2` or `"full"` for wider cards).
+- **`dashboard(columns)` + `widget(title, description=…, span=…, url=…, poll=…, id=…)`**:
+  cards in a grid (one column on phones; `span=2` or `"full"` for wider cards). `id` names the
+  widget's body (by default it is made from the title).
   - A widget's content is its call block, or what `url` answers (a small template, or a
     `View` fragment).
   - With `url`, the content is loaded after the page, and again every `poll` seconds. The old
     content stays, dimmed, until the new one arrives.
-- **`period_filter(period, options=…)`**: one row of preset periods, over everything it
-  applies to. Its links set `?period=` and keep the rest of the address's query.
+- **`period_filter(selected, options=…, label=…)`**: one row of preset periods, over
+  everything it applies to. `selected` is the handler's `Period` (the one now shown).
+  `options` are `[key, label]` pairs; by default 7 days, 30 days, 90 days, 12 months and this
+  year (`7d`, `30d`, `90d`, `12m`, `ytd`). `label` is the name screen readers say ("Period").
+  Its links set `?period=` and keep the rest of the address's query.
   `query_with(period="7d")` builds such links in any template.
 
 examples/shop's admin dashboard uses all of it: the period, four figures, revenue against

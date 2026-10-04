@@ -219,12 +219,18 @@ and so is `{{ flash.anything }}`.
 
 Every view also gets: `request.path`, `request.query`, `request.route` (the route's name),
 `request.htmx`, `request.boosted` (`hx-boost`), `app.name`, `app.env`,
-`app.debug`, `app.url`, `app.locale`, `auth.check`, `auth.user`, `auth.roles`, `flash`, `errors`, `csrf_token`,
-and the functions `old()`, `has_old()`, `error()`, `csrf_field()`, `method_field()`, `route()`, `asset()`,
-`storage_url()`, `t()`, `can()`, `route_is(pattern, …)`, `class_names(…)`, `page_url(n)`,
+`app.debug`, `app.url`, `app.locale`, `auth.check`, `auth.user`, `auth.roles`, `flash`, `errors`,
+`csrf_token` (the CSRF token as text, for a header or your own hidden field),
+and the functions `old()`, `has_old()`, `error(field)` (also `error(field, bag='login')`),
+`errors_in('login')` (every error of a named bag), `csrf_field()`,
+`method_field('PUT')` (the hidden `_method` field), `route()`, `asset(path)` (a `public/` file's
+URL with `?v=hash`), `storage_url(key)` (a stored file's URL on the default disk),
+`t()`, `can()`, `route_is(pattern, …)`, `class_names(…)`, `page_url(n)` (this page's query
+with `page=n`),
 `query_with(key=value)` (this page's query with those keys set, or removed with `none`; `page` dropped),
 `chart(kind, data, …)` (an SVG chart: line, area, bar, pie, doughnut),
-`renox_head()`, `csp_nonce()`, `seo()`,
+`renox_head()`, `csp_nonce()` (this request's nonce for `<script nonce=…>` under `CSP=strict`),
+`seo(title=…, description=…, image=…, type=…, canonical=…)` (see "SEO and analytics" below),
 `renox_ui()` (the UI kit), `renox_grid()` (the data grid's assets), `renox_calendar()` (the
 date picker's calendar; the kit's `date_picker` adds it once), `sparkline(values)`, `toasts()`, `once(key)`, `stack(name)` and, with `{% call %}`,
 `push(name)` / `prepend(name)`.
@@ -284,8 +290,9 @@ part is a macro: you import it into a template, then call it like a function.
 {# in a table row: {% call row_actions() %}…icon buttons…{% endcall %}; also list(), card_grid() + media_card(href, title, image=…), link_tabs(items, current=…), progress(42) #}
 {# A back office: <body class="rx-page rx-shell">, then {% call sidebar(app.name) %}{{ sidebar_section("Sales") }}{{ sidebar_link(…) }}{% endcall %}
    and <div class="rx-shell__main">{{ navbar(none, width="full", skip=false) }}<main class="rx-shell__content" id="main">…</main></div>.
-   Also thumbnail(src), menu_button(label) in a menu, hide_label=true on a field (label kept for
-   screen readers), <body class="rx-page rx-page--fill"> for a page that fills the window.
+   Also thumbnail(src), menu_button(label) in a menu, hide_label=true on input, textarea,
+   select or checkbox (label kept for screen readers; the other fields don't take it),
+   <body class="rx-page rx-page--fill"> for a page that fills the window.
    Themes: the warm default (Inter + Poppins, served by Renox); data-rx-theme="classic" on <html>
    for the first look; your CSS uses the type scale: font: var(--rx-type-heading) (also -display,
    -title, -lead, -body, -label, -note, -caption) and the brand token --rx-accent. #}
@@ -640,7 +647,9 @@ async fn more_queries(db: &Db) -> Result {
     let moved = db
         .transaction_retrying(3, |tx| {
             // committed on Ok, rolled back on Err, retried on SQLite busy / PostgreSQL conflicts
-            Box::pin(async move { Product::where_eq("id", 1).lock_for_update().count(&mut *tx).await })
+            // A lock covers row-reading calls only (get, first, pluck, select_as, a page's items),
+            // not count, exists, sum/avg/min/max, update, increment or delete.
+            Box::pin(async move { Product::where_eq("id", 1).lock_for_update().first(&mut *tx).await })
         })
         .await?;
     let _ = (today, per_owner, page, feed, sql, values, moved);
@@ -650,9 +659,10 @@ async fn more_queries(db: &Db) -> Result {
 async fn even_more_queries(db: &Db) -> Result {
     let picked = Product::query()
         .where_in("id", [1, 2, 3]) // also where_not_in; an empty list matches nothing
+        // (a list of over 1000 values is sent as one JSON array)
         .where_null("deleted_at")
         .where_any(|any| any.where_eq("price", 0).where_all(|all| all.where_op("price", ">", 100).where_not_null("user_id")))
-        .order_by_desc("price") // also latest() (created_at desc)
+        .order_by_desc("price") // also latest(): created_at DESC, id DESC (id DESC without created_at)
         .offset(20)
         .limit(10)
         .get(db)
@@ -682,6 +692,11 @@ async fn even_more_queries(db: &Db) -> Result {
     Ok(())
 }
 ```
+
+The query builder checks every column name against the model's fields, and `where_op` takes only
+`=`, `!=`, `<>`, `<`, `<=`, `>`, `>=`, `like` and `not like`. Anything else (and an `update` that
+sets `id`) fails when the query runs, with an "invalid query" error. A field marked
+`#[model(skip)]` is not a column: the model never writes it, and it holds `Default` after a load.
 
 Keys other than numbers: the `id` field's type is the key (`rnx make:model Invoice --key ulid
 -m` writes both). `Ulid` and `Uuid` (renox's `uuid` feature, a v7) are made on insert; a `String`
@@ -723,8 +738,9 @@ Generic code over models names the key when it needs one: `fn like<P: Model<Key 
 
 Relations are explicit: a method for one related row, and loaders for a page of rows
 (`relations::belongs_to`, `has_many`, `has_many_through` (a country's orders through its
-customers, two queries), `Pivot` for many-to-many, `count_many`/`sum_many` for
-counts and totals per row; one query each, no N+1). Filter by related rows with
+customers, two queries), `Pivot` for many-to-many (two queries: the pivot rows, then the
+models), `count_many`/`sum_many` for counts and totals per row; the others take one query
+each, no N+1). Filter by related rows with
 `.where_has(Review::where_eq("stars", 5), "product_id")` / `.where_doesnt_have(…)`.
 For joins and reports, use `sql("…").fetch_as::<T>(&db)` with `#[derive(FromRow)]` or a tuple.
 See [docs/relations.md](docs/relations.md): pivot columns (`attach_with`, `load_with_pivot`,
@@ -774,6 +790,7 @@ async fn edit(state: &AppState, id: i64) -> Result {
     post.save_changes(db, &original).await?; // the columns that differ; false if none
     post.api_secret = Encrypted::new("sk_live_123".into()); // sealed (AES-256-GCM, APP_KEY) on save
     let secret: &str = &post.api_secret; // plain when read; Debug prints `Encrypted(..)`
+    // But Serialize writes the plain value: keep such a field out of Json(post) and views.
     // Can't be searched (a fresh nonce per write). For a value outside a model:
     let sealed = state.encrypt("sk_live_123");
     let plain = state.decrypt(&sealed)?; // Err if tampered or another key
@@ -783,7 +800,8 @@ async fn edit(state: &AppState, id: i64) -> Result {
 ```
 
 Hooks run for `save`, `create`/`insert`, `save_only`, `save_changes`, `delete` and `force_delete`, not
-for bulk `Query::update`/`delete`, `insert_many` or `upsert`.
+for `restore` or bulk `Query::update`/`delete`, `insert_many` or `upsert`. `save_changes` runs
+`saving` even when nothing changed; then it skips the query and `saved`.
 
 ## Every field type (details in docs/types.md)
 
@@ -840,6 +858,9 @@ async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
 }
 ```
 
+`paginate`, `simple_paginate` and `cursor_paginate` give at most 1000 rows per page, whatever
+`per_page` asks for.
+
 ## Dashboards: figures and charts (details in docs/ui.md "Dashboards")
 
 Show key figures and charts. Renox draws the charts on the server, so you need no chart
@@ -869,6 +890,8 @@ async fn dashboard(State(state): State<AppState>, period: Period) -> Result<View
 ```html
 {% from "renox/ui.html" import period_filter, stats, stat, dashboard, widget %}
 {{ period_filter(period) }}                   {# links to ?period=…, keeping the query #}
+{# period_filter(selected, options=[["7d", "Week"], …], label=…): selected is the handler's
+   Period; the default options are 7d, 30d, 90d, 12m and ytd; label names the nav for screen readers #}
 {% call stats(4) %}
   {{ stat("Revenue", revenue | money, delta=change, trend=sales.values, url="/orders") }} {# good="down" for costs #}
 {% endcall %}
@@ -927,7 +950,7 @@ the template, `column.key == "_details"`), `Column::editable()` + `.edit_url("/o
 `.bulk_action(Action::new("Delete", url).confirm("Sure?").danger())` +
 `grid.selected(query, &request, &selection)?` (`Form<Selection>`), `.row_action(…)`,
 `Action::link(label, url)` / `.method("POST")`,
-`Column::summary(Summary::Sum)` (footer and group subtotals), `.groups(&["region"])` / `.group_by("region")`,
+`.summary(Summary::Sum)` on a column (footer and group subtotals), `.groups(&["region"])` / `.group_by("region")`,
 `.cards_on_mobile()`, `.badges(&[("paid", "success")])`, `.description("email")`, `.icons()`,
 `Column::image(…).round()`, `.copyable()`, `.link(url)`, `.tooltip(key)`, `.limit(n)`,
 `Column::related(key, label, table, foreign_key, column)`, `Column::count_of(…)`, `Column::sum_of(…)`,
@@ -1135,6 +1158,21 @@ Routes that should ask for the password again (after three hours): `.require_pas
 (the `Auth` module serves `/confirm-password`). Users imported from Laravel keep their bcrypt
 hashes and are moved to Argon2id when they next log in.
 
+The `Auth` module's routes, by name (use them with `route('login')` or `Redirect::route`):
+
+- `login` (GET, POST `/login`), `register` (GET, POST `/register`; not with
+  `.without_registration()`), `logout` (POST `/logout`).
+- `password.request` (GET `/forgot-password`), `password.email` (POST `/forgot-password`),
+  `password.reset` (GET `/reset-password/{token}`), `password.update` (POST `/reset-password`),
+  `password.confirm` (GET, POST `/confirm-password`).
+- `verification.notice` (GET `/verify-email`), `verification.verify`
+  (GET `/verify-email/{id}/{hash}`), `verification.send` (POST `/email/verification-notification`).
+- With `.account()`: `account.show` (GET `/account`), `account.profile` (PUT
+  `/account/profile`), `account.password` (PUT `/account/password`), `account.logout_others`
+  (POST `/account/logout-others`), `account.destroy` (DELETE `/account`).
+- With `.notifications()`: `notifications.index`, `notifications.stream` and the others under
+  `notifications.*`.
+
 ## Auth events and the audit log
 
 Renox announces what happens at login, such as "logged in" or "login failed". Listen to these
@@ -1221,7 +1259,12 @@ fn routes() -> Routes {
 }
 
 async fn setup(db: &Db, user: &User) -> Result {
+    // A role must exist before assign_role / sync_roles: they fail for an unknown name.
     permissions::define_role(db, "editor", &["posts.create", "posts.publish"]).await?; // exactly these
+    permissions::grant(db, "editor", &["posts.delete"]).await?; // add to an existing role
+    permissions::revoke(db, "editor", &["posts.delete"]).await?; // take away
+    let _all = permissions::roles(db).await?; // Vec<(role, its permissions)>, by name
+    let _gone = permissions::delete_role(db, "intern").await?; // users lose it; false if none
     user.assign_role(db, "editor").await?; // also remove_role, sync_roles, roles, permissions
     let token = user.create_token_with(db, "reports", &["orders:read"], None).await?; // limited
     let _ = token.plain;
@@ -1230,7 +1273,9 @@ async fn setup(db: &Db, user: &User) -> Result {
 
 async fn check(user: AuthUser) -> String {
     // allows: gate_before, a gate, then permissions. has_role/has_permission: exactly that.
-    format!("{} {} {}", user.allows("posts.publish"), user.has_role("editor"), user.token_can("orders:read"))
+    // role_names(): the user's roles, loaded with the request.
+    format!("{} {} {} {:?}", user.allows("posts.publish"), user.has_role("editor"),
+        user.token_can("orders:read"), user.role_names())
 }
 
 #[derive(serde::Deserialize)]
@@ -1327,6 +1372,15 @@ async fn report(db: &Db) -> Result {
     let total: i64 = renox::db::sql("SELECT CAST(SUM(price) AS BIGINT) FROM products")
         .scalar(db)
         .await?;
+    // Other readers: fetch_one (an error without a row), fetch_optional, fetch_as::<T> /
+    // fetch_one_as / fetch_optional_as (into a FromRow type or a tuple), scalar_optional
+    // (None without a row), scalars (the first column of every row).
+    let names: Vec<String> = renox::db::sql("SELECT name FROM products").scalars(db).await?;
+    let first = renox::db::sql("SELECT * FROM products").fetch_optional(db).await?;
+    let columns: Vec<String> = match &first {
+        Some(row) => row.columns().into_iter().map(String::from).collect(), // the column names
+        None => Vec::new(),
+    };
 
     let mut tx = db.begin().await?; // pass `&mut tx` wherever `db` goes
     renox::db::sql("UPDATE products SET price = price + ?").bind(1_000).execute(&mut tx).await?;
@@ -1353,7 +1407,7 @@ async fn report(db: &Db) -> Result {
             Ok(n)
         })
         .await?;
-    let _ = (name, raised, bonus);
+    let _ = (name, raised, bonus, names, columns);
     Ok(())
 }
 ```
@@ -1840,6 +1894,8 @@ Google Analytics.
 {% block seo %}{{ seo(title=product.name ~ " · " ~ app.name, description=product.summary,
                       image=storage_url(product.photo), type="product") }}{% endblock %}
 {# → <title>, description, canonical URL, OpenGraph and Twitter card tags #}
+{# canonical= sets the canonical URL (default: this page's path on APP_URL, without the query);
+   a relative image is made absolute on APP_URL #}
 ```
 
 ```rust

@@ -58,6 +58,11 @@ smaller file links faster, and linking is the part of each rebuild you wait for.
 > Need a debugger that shows the values of your variables? Set `debug = true` for a while. It
 > makes builds slower, so switch back when you're done.
 
+> [!TIP]
+> `rnx serve` passes any extra arguments on to `cargo build`. `rnx serve --release` runs the
+> optimised release build: slower to build, but the app runs as fast as on the server. Useful
+> to see how fast a heavy page really is.
+
 ## A faster linker
 
 Linking is most of the time of an incremental rebuild. A faster linker helps on every change.
@@ -96,9 +101,13 @@ Renox's default features (the ones that are on unless you say otherwise) are:
 An app that uses none of them can turn them off:
 
 ```toml
-renox = { git = "…", rev = "…", default-features = false }
+renox = { version = "…", default-features = false }
 # or keep some: default-features = false, features = ["fake"]
 ```
+
+Keep the rest of your `renox` line as `rnx new` wrote it: `version = "…"` when `rnx` came from
+crates.io, `git = "…", rev = "…"` when it came from Git. Only add the `default-features` and
+`features` parts.
 
 `default-features = false` turns all three off. The comment shows how to keep only the ones you
 want: list them in `features`.

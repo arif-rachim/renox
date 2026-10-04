@@ -15,6 +15,7 @@ In this guide:
 - [Sensitive actions](#sensitive-actions-and-the-audit-trail), a
   [second login step](#a-second-login-step-two-factor-authentication) and
   [testing](#testing-authorization)
+- [The `Auth` module's routes](#the-auth-modules-routes): every page and address it adds
 
 Want the short version of every API? See the [cheat-sheet](../CHEATSHEET.md) (the parts "Auth,
 policies, gates" and "Tenants, roles and permissions").
@@ -55,7 +56,7 @@ Complete apps that use these tools:
 | May this user do X to *this* row? | a policy (`impl Policy`) | `user.authorize("update", &row)?`, `can('update', row)` |
 | Which job does the user have? | roles and permissions (the `Permissions` module) | `.require_role`, `.require_permission`, `has_role` |
 | May this user send this form? | `Validate::authorize` (a form request) | the `Valid<T>` extractor: 403 before the rules run |
-| Who may do everything? | `App::gate_before` | asked before every gate, permission and policy |
+| Who may do everything? | `App::gate_before` | asked first by `AuthUser`'s checks (`allows`, `can`, `authorize`, `.require_*`) |
 | What may this API token do? | token abilities | `.require_ability("orders:write")`, `token_can` |
 | Which rows exist for this user at all? | a default scope (tenants) | every query of the model |
 | Is it really them, right now? | `.require_password_confirmed()` | on a route |
@@ -286,6 +287,10 @@ What's going on:
   (`remove_role` takes it away, `sync_roles` sets the exact list).
 - `has_role` and `allows` answer in a handler without a database query.
 
+> [!IMPORTANT]
+> Define a role before you hand it out. `assign_role` and `sync_roles` fail with an error for a
+> role that doesn't exist yet ("there is no role `editor`"); they don't create it.
+
 > [!TIP]
 > Check **permissions** in your code (`require_permission("posts.publish")`) and use roles as
 > bundles of them. Then a new role needs no code change: you just give it permissions.
@@ -297,16 +302,27 @@ More you can do:
 - In templates: `{% if 'editor' in auth.roles %}` and `{% if can('posts.publish') %}`.
 - `permissions::users_with_role(&db, "editor")` lists the users with a role, for example to
   notify every editor.
+- `permissions::grant(&db, "editor", &["posts.delete"])` adds permissions to a role that
+  exists, and `permissions::revoke(&db, "editor", &["posts.delete"])` takes them away. Unlike
+  `define_role`, they leave the role's other permissions alone.
+- `permissions::delete_role(&db, "editor")` deletes a role (its users lose it) and says whether
+  it existed.
+- `permissions::roles(&db)` lists every role with its permissions, for an admin page.
+- `user.role_names()` on an `AuthUser` gives the roles loaded for this request.
 
 ## Super-admins: `gate_before`
 
 Some apps have a person who may do everything: a super-admin. `App::gate_before` is the place for
-that. It is asked **before** every gate, permission and policy check, and returns one of three
-answers:
+that. The checks on an `AuthUser` (the logged-in user of a request) ask it **before** the gate,
+permission or policy itself, and it returns one of three answers:
 
 - `Some(true)`: allow, without asking the check itself;
 - `Some(false)`: deny, without asking the check itself;
 - `None`: no opinion, go on to the check itself.
+
+Those checks are `allows`, `gate`, `allows_async`, `gate_async`, `can` and `authorize` on
+`AuthUser`, the route guards `.require_gate` and `.require_permission`, `can('gate')` in
+templates, and `Can::new` given an `AuthUser` (which `can('update', row)` then reads).
 
 It doesn't answer `require_role` / `has_role`: those mean "has exactly this role". You can base
 it on a role (from the `Permissions` module) or on the user's row, for example a column:
@@ -328,6 +344,11 @@ fn app() -> App {
 request. So they work in `gate_before`, and in `Policy::allows` ("admins may edit any post").
 
 > [!WARNING]
+> A plain `User` skips `gate_before`. `User::can` and `User::authorize` (in a job or a command,
+> say) and `Can::new` given a `&User` ask only the policy. If a super-admin must pass there too,
+> check it in the policy itself.
+
+> [!WARNING]
 > For another user, or outside a request (a job, a command), `has_role` and `has_permission`
 > say `false`. Use the async `user.roles(&db)` there.
 
@@ -337,11 +358,13 @@ Programs that call your API don't log in with a password. They send a **token** 
 `Authorization: Bearer …`. A token can be limited to some **abilities** (like `orders:read`)
 and given an expiry date.
 
-`.require_ability(x)` checks requests made with a token.
+`.require_ability(x)` checks requests made with a token. A guest (no session, no valid token)
+is sent to log in, or gets a 401 from an API. A token without the ability gets a 403.
 
 > [!IMPORTANT]
-> Users logged in with a session pass `.require_ability`, and so do tokens made without
-> abilities. So always put `.require_auth()` (or another guard) next to it.
+> `.require_ability` doesn't make a route token-only. Users logged in with a session pass it,
+> and so do tokens made without abilities and tokens with the `"*"` ability. For a route only
+> programs may call, check `user.token_id()` in the handler: it is `None` for a session login.
 
 ```rust
 use renox::prelude::*;
@@ -370,10 +393,14 @@ What's going on:
   **hash** (a scrambled fingerprint), so nobody can read it back later.
 - A request without a valid token gets a 401. A valid token without the ability gets a 403.
 
-Two more helpers:
+More to know:
 
 - `user.token_can("orders:read")` answers the same question inside a handler.
-- `rnx tokens:prune` deletes expired tokens. Schedule it daily, as examples/api does.
+- The ability `"*"` allows everything: `create_token_with(&db, "admin", &["*"], None)`.
+- A password reset deletes all of the user's API tokens, since whoever reset it may be taking
+  back a stolen account. Programs then need new tokens.
+- `rnx tokens:prune` deletes tokens that expired more than a day ago. Schedule it daily, as
+  examples/api does.
 
 ## Tenants: rows that belong to a team
 
@@ -474,7 +501,13 @@ Things to know:
 
 Some apps ask for one more thing after the password, such as a code from an authenticator app on
 the user's phone. This is called **two-factor authentication** (2FA). A module can add such a
-step (the `renox-2fa` plugin does).
+step.
+
+> [!NOTE]
+> The `renox-2fa` plugin is being built (issues #170 to #173). Today it has its table, the
+> six-digit codes (TOTP) and the QR code, but it doesn't add a second login step yet: adding
+> `TwoFactor::new()` to an app asks nobody for a code. Until it does, write the step yourself
+> as shown below.
 
 In `Module::register`, the module says two things: which users must pass the step, and the route
 where the challenge (the "enter your code" page) lives:
@@ -515,8 +548,9 @@ How the challenge works, step by step:
   doesn't reset the count.
 
 > [!IMPORTANT]
-> API tokens, registration and password resets don't go through the second step. Nor does your
-> own code that calls `renox::auth::login` directly.
+> API tokens and registration don't go through the second step. Nor does your own code that
+> calls `renox::auth::login` directly. A password reset doesn't log anyone in: it sends the user
+> to the login page, where the step applies as usual.
 
 Only one module may set a second step. Two of them, or a challenge route that doesn't exist,
 are errors when the app starts.
@@ -540,6 +574,58 @@ in `Module::register`:
 
 If you replace `renox/auth/account.html` with a page of your own, keep the sections with
 `{% include "renox/auth/account_sections.html" %}`.
+
+## The `Auth` module's routes
+
+`.module(Auth::new())` adds these pages and addresses. Each has a **name**, so you can link to
+it with `route('login')` in a template or `state.url("login", &[])` in Rust, whatever its
+address. Where one name covers two methods, the `GET` shows a page and the `POST` sends its form.
+
+| Method | Address | Name | What it does |
+|---|---|---|---|
+| GET, POST | `/login` | `login` | The login page, and logging in. Guests only. |
+| GET, POST | `/register` | `register` | The sign-up page, and creating the account. Guests only; gone with `.without_registration()`. |
+| POST | `/logout` | `logout` | Logs out this device, then goes to the `home` route (or `/`). |
+| GET | `/forgot-password` | `password.request` | The "forgot your password?" page. Guests only. |
+| POST | `/forgot-password` | `password.email` | Mails a reset link. Guests only. |
+| GET | `/reset-password/{token}` | `password.reset` | The page the reset link opens. Guests only. |
+| POST | `/reset-password` | `password.update` | Sets the new password, then goes to the login page. Guests only. |
+| GET, POST | `/confirm-password` | `password.confirm` | Asks for the password again, for `.require_password_confirmed()`. Logged-in users only. |
+| GET | `/verify-email` | `verification.notice` | "Check your email" for a user who hasn't verified yet. Logged-in users only. |
+| GET | `/verify-email/{id}/{hash}` | `verification.verify` | The signed link from the mail: marks the email verified. Logged-in users only. |
+| POST | `/email/verification-notification` | `verification.send` | Mails the verification link again. Logged-in users only. |
+
+The verification routes are always there. `.verify_email()` makes Renox send the mail when
+someone registers; `.require_verified()` on your routes sends unverified users to
+`verification.notice`.
+
+`.account()` adds the account page. All of these need a logged-in user, and the last two ask for
+the password in the form:
+
+| Method | Address | Name | What it does |
+|---|---|---|---|
+| GET | `/account` | `account.show` | The account page. |
+| PUT | `/account/profile` | `account.profile` | Changes the name and email. |
+| PUT | `/account/password` | `account.password` | Changes the password (this logs out the other devices). |
+| POST | `/account/logout-others` | `account.logout_others` | Logs out every other device. |
+| DELETE | `/account` | `account.destroy` | Deletes the account, then goes to the `home` route (or `/`). |
+
+`.notifications()` adds the in-app notification list behind the UI kit's `notification_bell`.
+All of these need a logged-in user too:
+
+| Method | Address | Name | What it does |
+|---|---|---|---|
+| GET | `/notifications` | `notifications.index` | The list (with htmx, only the bell's panel). |
+| DELETE | `/notifications` | `notifications.clear` | Deletes all of the user's notifications. |
+| GET | `/notifications/stream` | `notifications.stream` | Server-Sent Events: the unread count, and new notifications. |
+| POST | `/notifications/read-all` | `notifications.read_all` | Marks them all read. |
+| POST | `/notifications/{id}/read` | `notifications.read` | Marks one read. |
+| POST | `/notifications/{id}/unread` | `notifications.unread` | Marks one unread. |
+| POST | `/notifications/{id}/open` | `notifications.open` | Marks one read and goes where it points. |
+| DELETE | `/notifications/{id}` | `notifications.destroy` | Deletes one. |
+
+`rnx route:list` prints them all for your app. To change how a page looks, put a file with the
+same name as the built-in one (such as `renox/auth/login.html`) in your views.
 
 ## Testing authorization
 

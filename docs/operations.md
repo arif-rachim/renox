@@ -18,6 +18,7 @@ see the `deploy/README.md` file that `rnx make:deploy` writes for you.
   [Deploys without refused connections](#deploys-without-refused-connections)
 - [Sessions](#sessions), [Scheduled tasks and housekeeping](#scheduled-tasks-and-housekeeping)
   and [Maintenance mode](#maintenance-mode)
+- [All settings](#all-settings)
 - [Logs](#logs), [Error reports](#error-reports), [Error pages](#error-pages) and the
   [Debug inspector](#debug-inspector)
 
@@ -78,12 +79,13 @@ Sometimes a service the app needs stops answering. Without a time limit, every r
 wait for it, and requests would pile up until the app is stuck. With timeouts, requests fail
 quickly instead, and the app keeps going.
 
-All timeouts are in seconds. You set them in `.env`:
+All timeouts are in seconds. You set them in `.env`. (Every setting, with a comment, is in
+the `.env.example` that `rnx new` writes; see also [All settings](#all-settings) below.)
 
 | Setting | Default | What it limits |
 |---|---|---|
 | `DATABASE_ACQUIRE_TIMEOUT` | 5 | How long a query waits for a database connection. After that, the request answers 500 (an error). |
-| `DATABASE_STATEMENT_TIMEOUT` | 30 | How long one PostgreSQL statement may run (`0` = no limit). For a long report, run `SET LOCAL statement_timeout = 0` inside its transaction. |
+| `DATABASE_STATEMENT_TIMEOUT` | 30 | How long one PostgreSQL statement may run (`0` = no limit). It covers commands too: `migrate`, `db:seed`, `db:shell` and `queue:work`. For a long report, run `SET LOCAL statement_timeout = 0` inside its transaction. |
 | `REQUEST_TIMEOUT` | 60 | How long a handler may take to answer (`0` = no limit). After that, the request answers 500. Streaming a response and waiting for a slow visitor's connection don't count. |
 | `MAIL_TIMEOUT` | 10 | How long sending one mail over SMTP may take, from connecting to the last reply. |
 | (fixed) | 2 | How long `/health` waits for the database. |
@@ -94,6 +96,11 @@ All timeouts are in seconds. You set them in `.env`:
 
 Jobs have their own limit: `Job::TIMEOUT` (60 s by default). A job that takes longer is
 stopped and tried again later.
+
+> [!WARNING]
+> On PostgreSQL, a migration is cancelled when one of its statements runs longer than
+> `DATABASE_STATEMENT_TIMEOUT` (a `CREATE INDEX` on a big table, a backfill). Raise the limit
+> for that run only: `DATABASE_STATEMENT_TIMEOUT=0 my-app migrate`.
 
 ### Size limits
 
@@ -131,8 +138,9 @@ also gets and renews the HTTPS certificate by itself.
 ### `TRUSTED_PROXIES`: the visitor's real address
 
 Behind a proxy, every connection seems to come from the proxy's address. The proxy writes the
-visitor's real address in a header called `X-Forwarded-For`. Set `TRUSTED_PROXIES` so the app
-believes that header when it comes from your proxy:
+visitor's real address in a header called `X-Forwarded-For` (or the standard `Forwarded`
+header; the app reads `X-Forwarded-For` first, then `Forwarded`). Set `TRUSTED_PROXIES` so the
+app believes that header when it comes from your proxy:
 
 ```text
 TRUSTED_PROXIES=127.0.0.1          # Caddy or nginx on the same machine
@@ -140,7 +148,17 @@ TRUSTED_PROXIES=10.0.0.0/8         # a load balancer on a private network
 TRUSTED_PROXIES=*                  # whoever connects (a platform whose proxy IPs you can't list)
 ```
 
-Pick the one line that matches your setup. Without this setting:
+Pick the one line that matches your setup. More about the value:
+
+- it is a comma-separated list of addresses and CIDR ranges
+  (`TRUSTED_PROXIES=127.0.0.1,10.0.0.0/8`);
+- with a list, the app walks the forwarded addresses from the nearest hop back, skipping the
+  proxies you listed, and takes the first address that isn't one of them;
+- `*` trusts only the last hop: the address the connecting proxy added;
+- `*` together with addresses (`*,10.0.0.1`), a bad address or a bad prefix stops the app at
+  boot with an error.
+
+Without this setting:
 
 - `Routes::throttle` and named limiters (`throttle_by`) count every guest as one person;
 - the login lock counts per email only;
@@ -232,8 +250,30 @@ Sessions live in their encrypted cookie, or in the `sessions` table with
 `SESSION_DRIVER=database` (see Sessions). Either way, any server can answer any request. You
 don't need "sticky sessions" (sending a visitor always to the same server).
 
-Uploaded files must be on shared storage (`STORAGE_DISK=s3`), or on the one server that has
-the disk.
+Uploaded files must be on shared storage (`STORAGE_DISK=s3`, see [File storage on
+S3](#file-storage-on-s3)), or on the one server that has the disk.
+
+### File storage on S3
+
+S3 storage needs renox's `s3` feature (`features = ["s3"]` in `Cargo.toml`). It works with AWS
+S3 and with services that speak the same language, such as Cloudflare R2 or MinIO. The settings:
+
+| Setting | What it is |
+|---|---|
+| `STORAGE_DISK` | `local` (the default: files in `STORAGE_PATH/app`) or `s3` |
+| `S3_BUCKET` | the bucket's name (required for `s3`) |
+| `S3_REGION` | the region, e.g. `eu-west-1` (`auto` for R2) |
+| `S3_ENDPOINT` | the service's address, for anything that isn't AWS (e.g. `https://<account>.r2.cloudflarestorage.com`) |
+| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | the access key |
+| `STORAGE_URL` | the public address of files under `public/` (the bucket's URL or a CDN) |
+
+A disk added with `App::disk("backups", |config| StorageConfig::from_env(config, "BACKUPS"))`
+reads its own settings, starting with the prefix you give:
+
+- `BACKUPS_DISK` (`local` or `s3`, default `local`), `BACKUPS_PATH` (a local disk's folder,
+  default `STORAGE_PATH/backups`), `BACKUPS_BUCKET` and `BACKUPS_URL`;
+- `BACKUPS_REGION`, `BACKUPS_ENDPOINT`, `BACKUPS_ACCESS_KEY_ID` and
+  `BACKUPS_SECRET_ACCESS_KEY`, which fall back to the `S3_*` settings when unset.
 
 ## `/health`
 
@@ -269,10 +309,10 @@ A **panic** is when Rust code crashes in the middle of running.
 
 | Fault | What the app does |
 |---|---|
-| PostgreSQL stops | Requests get 500 within 5 s, and `/health` 503 within 2 s. When PostgreSQL is back, the app and its workers recover by themselves. No restart needed. |
-| PostgreSQL hangs (paused, or the network is cut) | New requests get 500 within 5 s. A request already waiting on it gets 500 at `REQUEST_TIMEOUT`. |
+| PostgreSQL stops | Requests get 500 within 8 s, and `/health` 503 within 4 s. A request that dispatches a job gets 500 too. When PostgreSQL is back, the app and its workers recover by themselves, and dispatching works again. No restart needed. |
+| PostgreSQL hangs (paused, or the network is cut) | New requests get 500 within 8 s, and `/health` 503 within 4 s. A request already waiting on it gets 500 at `REQUEST_TIMEOUT`. |
 | PostgreSQL restarts while a job runs | The job's result is written once the database is back, or the job is tried again. |
-| SQLite locked by another process (a backup, a `sqlite3` shell) | Reads and `/health` keep working (thanks to SQLite's WAL mode). Writes get 500 after 5 s. Workers try again to write a job's result, so no job is left stuck. |
+| SQLite locked by another process (a backup, a `sqlite3` shell) | Reads and `/health` keep working (thanks to SQLite's WAL mode). Writes get 500 within 9 s while the lock is held (SQLite first waits 5 s for it). Workers try again to write a job's result, so no job is left stuck. |
 | A handler panics | That request gets a 500 error page, and the app keeps serving. |
 | A job panics | The attempt counts as failed and the job is tried again. After the last attempt, it goes to `failed_jobs`. The worker keeps running. |
 | A scheduled task or event listener panics | It's logged. The task runs again at its next time, and the other listeners still run. |
@@ -412,6 +452,8 @@ When you deploy, you usually run `migrate` first. Here is how it behaves:
 - Each migration runs in a transaction, so a failed one leaves nothing behind. Migrations with
   `CREATE INDEX CONCURRENTLY` or a `-- renox:no-transaction` line run without one. Keep those
   to a single change.
+- On PostgreSQL, `DATABASE_STATEMENT_TIMEOUT` (30 s) applies to migrations too. For a slow one,
+  run `DATABASE_STATEMENT_TIMEOUT=0 my-app migrate`.
 - `migrate:status` shows each migration's batch. It also flags migrations that already ran but
   whose file was edited or deleted since.
 
@@ -512,8 +554,10 @@ the server. But:
 Each request reads its row. It writes the row only when the session changed (or once a minute,
 to keep it from expiring).
 
-Switching drivers logs nobody out: a cookie written by the cookie driver is read and moved into
-the table.
+Switching from `cookie` to `database` logs nobody out: a cookie written by the cookie driver is
+read and moved into the table. Switching back, from `database` to `cookie`, ends every session:
+the cookie then holds only an id, which the cookie driver can't use, so everyone has to log in
+again.
 
 Expired rows are deleted now and then by requests, and by `my-app session:prune`
 (`Session::prune_expired(&db)`).
@@ -575,7 +619,29 @@ my-app up
 - `up` turns it off.
 
 The switch is a small file in `STORAGE_PATH`, so every process that shares that directory sees
-it. `/health`, and webhook routes that allow it, keep working.
+it. `/health` and every webhook route keep working, so payment providers' calls are still saved.
+
+> [!NOTE]
+> Maintenance mode only affects web requests. Queue workers and scheduled tasks keep running,
+> and keep writing to the database. To pause them too, stop the app, or start it with
+> `QUEUE_WORKERS=0 SCHEDULER=false` (and stop any separate `queue:work` or `schedule:work`).
+
+## All settings
+
+Every setting is read from the environment or from `.env`, when the app starts. The full list,
+each with a comment and its default, is the `.env.example` that `rnx new` writes (its source is
+[`crates/renox-cli/stubs/env.stub`](../crates/renox-cli/stubs/env.stub)). This guide covers the
+ones for running in production. The others, in short:
+
+| Setting | What it is |
+|---|---|
+| `APP_FALLBACK_LOCALE` | the language used for texts missing in the visitor's language (`en`) |
+| `SESSION_COOKIE` | the session cookie's name (`renox_session`); give each app its own when several share a domain |
+| `VIEWS_PATH`, `LANG_PATH`, `PUBLIC_PATH` | where views, translations and public files are (`resources/views`, `resources/lang`, `public`), relative to the directory the app runs from |
+| `GOOGLE_SITE_VERIFICATION`, `GA4_MEASUREMENT_ID`, `GTM_CONTAINER_ID` | search engine verification and analytics tags, added to pages with `APP_ENV=production` only |
+| `GA4_API_SECRET` | for analytics events sent from the server (`renox::analytics::ServerEvent`) |
+
+Your app's own settings need no code in Renox: `state.config.var("NAME")` reads any of them.
 
 ## Logs
 

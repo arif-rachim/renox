@@ -89,16 +89,21 @@ impl Registration {
 /// Login, registration, password reset and email verification pages, and
 /// the `users`, `password_reset_tokens` and `personal_access_tokens` tables.
 ///
-/// Routes: `login`, `register`, `logout`, `password.request`,
-/// `password.email`, `password.reset`, `password.update`,
-/// `verification.notice`, `verification.verify` and `verification.send`.
+/// Routes: `login`, `register` (unless `without_registration`), `logout`,
+/// `password.request`, `password.email`, `password.reset`,
+/// `password.update`, `password.confirm`, `verification.notice`,
+/// `verification.verify` and `verification.send`. [`Auth::account`] adds
+/// `account.show`, `account.profile`, `account.password`,
+/// `account.logout_others` and `account.destroy`;
+/// [`Auth::notifications`] adds the `notifications.*` routes.
+/// docs/authorization.md lists each one's method and address.
 /// The pages live in `renox/auth/*.html`, inside `renox/auth/layout.html`;
 /// create a file with the same name under your views to replace one.
 ///
 /// Failed logins lock out 5 tries per email and IP a minute, 20 per email in
 /// 15 minutes from any IP, and 50 per IP in 15 minutes for any email (set
-/// `TRUSTED_PROXIES` behind a proxy). Logging out ends every session of the
-/// user, and a new password or a password reset ends the other sessions.
+/// `TRUSTED_PROXIES` behind a proxy). Logging out ends this device's
+/// session only; a new password or a password reset ends the other sessions.
 #[derive(Clone)]
 pub struct Auth {
     password: crate::validation::Password,

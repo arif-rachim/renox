@@ -68,6 +68,10 @@ What these three commands do:
 - `cd stash` goes into that folder.
 - `rnx serve` builds the app and starts it.
 
+An app's name may use lowercase letters, digits, `-` and `_`, and must start with a letter.
+Rust keywords and the names of crates the app uses (`renox`, `serde`, `tokio`, `std`, `test`,
+…) aren't allowed, so `rnx new MyApp` and `rnx new test` fail with a message that says why.
+
 The first build downloads and compiles everything Renox needs, so it takes a few minutes. After
 that, builds take seconds ([development.md](development.md) has tips to make them faster).
 
@@ -86,6 +90,7 @@ to the home page, logged in, with your name in a menu on the right.
 stash/
 ├── Cargo.toml              the project's settings; one dependency: renox (plus serde)
 ├── .env, .env.example      settings like the database address and the secret key
+├── .gitignore              keeps target/, storage/, .env and dist/ out of Git
 ├── build.rs                tells Rust to rebuild when migrations, views or public files change
 ├── src/
 │   ├── main.rs             starts the app
@@ -99,7 +104,7 @@ stash/
 │   ├── views/errors/default.html  the "not found" (404) and "error" (500) pages
 │   └── lang/en.json        the app's texts
 ├── public/app.css          your own styles (the UI kit brings the rest)
-├── migrations/             SQL migrations (empty for now)
+├── migrations/             SQL migrations (empty for now, only a .gitkeep)
 ├── tests/home.rs           tests that start the whole app and click around
 └── AGENTS.md, CLAUDE.md    notes for AI coding assistants working on the app
 ```
@@ -110,7 +115,9 @@ needed. (Want PostgreSQL instead? Run `rnx new stash --database postgres`; see
 
 > [!TIP]
 > `rnx new stash --starter` starts from a bigger app that already has email verification, roles,
-> a dashboard and a users page. This tutorial starts from the plain app, so you see every step.
+> a dashboard and a users page. To be an admin there, register and run
+> `rnx users:admin you@example.com`, or run `rnx db:seed` and log in as `admin@example.com` with
+> the password `password123`. This tutorial starts from the plain app, so you see every step.
 
 Two files are worth a look now. The first is `src/main.rs`, which is almost empty:
 
@@ -989,8 +996,8 @@ What to know about jobs:
 - **`state.dispatch(job)`** puts a job on the queue (a table in your database). A worker picks
   it up a moment later and calls its `handle`.
 - **When `handle` fails**, the job is tried again a bit later, up to three times. After that it
-  goes to the `failed_jobs` table: `rnx queue:failed` lists those, and `rnx queue:retry` tries
-  them again.
+  goes to the `failed_jobs` table: `rnx queue:failed` lists those (each with its id), and
+  `rnx queue:retry <id>` tries one again (`rnx queue:retry all`: every one).
 - **Sending mail from a web page?** Use `state.queue_mail(mail)` there, so the visitor doesn't
   wait for the mail server. A job already runs in the background, so it sends directly.
 
@@ -1389,12 +1396,14 @@ scheduler run inside the same program.
 
 ```bash
 rnx build          # a release build, copied to dist/stash
-rnx make:deploy    # Dockerfile, deploy/stash.service, deploy/stash.socket, deploy/litestream.yml, deploy/README.md
+rnx make:deploy    # Dockerfile, .dockerignore, deploy/stash.service, deploy/stash.socket, deploy/litestream.yml, deploy/README.md
 ```
 
 - `rnx build` makes the optimized program, `dist/stash`.
-- `rnx make:deploy` writes ready-made files for the server: a Dockerfile, the systemd service
-  (which starts the app when the server boots, and restarts it if it stops), and backups.
+- `rnx make:deploy` writes ready-made files for the server: a Dockerfile (and a
+  `.dockerignore`, which keeps `target/`, `.env` and the database out of the image), the
+  systemd service (which starts the app when the server boots, and restarts it if it stops),
+  and backups.
 
 Build on the same kind of system as the server (for example, Linux on an Intel/AMD processor),
 or build the Docker image. `deploy/README.md` is the full recipe for your app; here is the short

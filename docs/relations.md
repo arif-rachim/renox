@@ -220,6 +220,11 @@ Each loader takes the page's rows, so it works the same for `get()`, `paginate()
   products).
 - `Model::find_many(db, ids)` returns the rows with these ids.
 
+The loaders read the related model through its normal query, so its default scope (for example
+the current team) and its soft deletes apply. A parent hidden that way is simply missing from
+the map, like a parent that doesn't exist. `model.refresh(&db)` is different: it reloads the
+row by its id, ignoring the default scope and soft deletes.
+
 ### Keys that aren't numbers
 
 The maps are keyed by the parent's key type (`Model::Key`). Most models use an `i64` key, but
@@ -260,6 +265,10 @@ What each one does:
   That's what you want after a form with one checkbox per tag. It runs in a transaction (all
   the changes happen, or none do).
 - `ids` returns the ids of the tags the product is linked to now.
+
+`attach`, `detach`, `ids`, `attach_with` and `update_pivot` take any database handle, so they
+also run inside your own transaction (`&mut tx`). `sync` and `toggle` take `&Db` only: they open
+a transaction of their own, so they can't be part of yours.
 
 ## Pivot columns
 
@@ -517,15 +526,22 @@ write in Renox.
 | `whereNotIn(fn …)` (sub-query) | `.where_not_in_query(col, Other::query(), "col")` |
 | `whereRaw`, `orderByRaw` | `.where_raw("DATE(created_at) = DATE(?)", [value])`, `.order_by_raw("total DESC")` |
 | `groupBy`, `having`, `selectRaw` | `.group_by(col).having_raw("COUNT(*) > ?", [2]).select_as::<(i64, i64), _>(&db, "col, COUNT(*)")` |
-| `lockForUpdate`, `sharedLock` | `.lock_for_update()` / `.shared_lock()` on `&mut tx` (PostgreSQL; SQLite: `db.begin_immediate()`) |
+| `lockForUpdate`, `sharedLock` | `.lock_for_update()` / `.shared_lock()` on `&mut tx` (PostgreSQL; SQLite: `db.begin_immediate()`). Only calls that read rows lock them: `get`, `first`, `pluck`, `select_as` and a page's items, not `count`, `exists`, `sum`/`avg`/`min`/`max`, `update`, `increment` or `delete` |
 | `firstOrNew`, `updateOrCreate`, `refresh` | `.first_or_new(&db, \|\| new)`, `.update_or_create(&db, \|\| new, \|m\| …)`, `model.refresh(&db)` |
 | `HasUlids`, `HasUuids`, string keys | `id: Ulid` / `id: Uuid` / `id: String` (made on insert, or set by you); `Pivot<Ulid, i64>` |
 | `insert()` of one model with its key | `model.insert(&db)` (always an INSERT; `Model::insert_many` for many rows) |
 | `encrypted` cast | `Encrypted<T>` fields |
 | `DB::transaction` inside a transaction | `tx.savepoint(\|tx\| Box::pin(async move { … }))` |
-| `simplePaginate`, `cursorPaginate` | `.simple_paginate(&db, page, per)` (`simple_pagination` macro), `.cursor_paginate(&db, cursor, per)` (newest id first; the query's own order is ignored) |
+| `simplePaginate`, `cursorPaginate` | `.simple_paginate(&db, page, per)` (`simple_pagination` macro), `.cursor_paginate(&db, cursor, per)` (newest id first; the query's own order is ignored). Like `paginate`, they give at most 1000 rows per page |
 | `DB::transaction(fn, 3)` | `db.retrying(3, \|\| async { let mut tx = db.begin().await?; … })` (borrows from the caller), `db.transaction_retrying(…)`, `db.transaction(…)` |
 | `toSql` | `.to_sql(db.dialect())` |
+
+The builder checks what you give it. Column names must be the model's fields, and `where_op`
+takes only `=`, `!=`, `<>`, `<`, `<=`, `>`, `>=`, `like` and `not like`. Anything else (and an
+`update` that sets `id`) fails when the query runs, with an "invalid query" error, so a name
+from user input can never turn into SQL. A `where_in` list longer than 1000 values is sent as
+one JSON array, so a long list still works. A field marked `#[model(skip)]` isn't a column:
+the model never writes it, and it holds its `Default` value after a load.
 
 A few words from the table, in plain English:
 
@@ -541,7 +557,8 @@ A few words from the table, in plain English:
 - **raw:** `where_raw` and `order_by_raw` take a piece of SQL as you write it. Pass values with
   `?` and a list, never by pasting them into the text.
 - **lock:** `lock_for_update` stops other requests from changing the rows until your
-  transaction ends.
+  transaction ends. It locks the rows a call reads (`get`, `first`…), so a `count` or an
+  `update` with it locks nothing.
 - **transaction:** a group of changes that all happen, or none do. A **savepoint** is a smaller
   transaction inside one: if its part fails, only that part is undone.
 - **cursor pagination:** instead of page numbers, the next page starts after the last row you

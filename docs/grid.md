@@ -138,6 +138,9 @@ What else you can do with the page and the grid:
   the paging. Use it for totals, or for your own export over every filtered row.
 - `GridRequest::new(&db, path, &params)` builds a request by hand, for tests and commands. It
   acts as a guest, in UTC. `request.param("export")` reads one value from the query string.
+  It doesn't read the app's `APP_CURRENCY`: money columns use the decimals of the default
+  currency (IDR, which has none). So with another currency, money columns are scaled wrongly
+  there.
 
 ```rust
 # use renox::prelude::*;
@@ -179,7 +182,7 @@ cell, and gives it two things:
 <main class="rx-grid-fill">
   {% call(row, column) grid(orders) %}
     {% if column.key == "trend" %}<span class="{{ 'rx-up' if row.up else 'rx-down' }}">{{ sparkline(row.trend) }}</span>
-    {% elif column.key == "actions" %}{{ link_button(route('orders.show', {'id': row.id}), "Open", size="small") }}{% endif %}
+    {% elif column.key == "actions" %}{{ link_button(route('orders.show', row.id), "Open", size="small") }}{% endif %}
   {% endcall %}
 </main>
 ```
@@ -606,7 +609,7 @@ What every action can do:
 A **summary** is a figure under a column, like a total. A **group** gathers rows with the same
 value (say, the same region) under a heading of their own.
 
-- `Column::summary(Summary::Sum)` puts a figure in a footer that stays at the bottom of the
+- A column's `.summary(Summary::Sum)` puts a figure in a footer that stays at the bottom of the
   grid. The figure covers every row the filters match, not just the page.
 - `Sum`, `Average` and `Range` (smallest–largest) are for `number` and `money` columns. `Count`
   (rows with a value) works on any column.
@@ -716,8 +719,8 @@ The three formats:
   - UTF-8 with a BOM (a few marker bytes at the start, so Excel reads it as UTF-8);
   - headings like `Amounts / Total` for grouped headings;
   - labels for choices and tags, and numbers without separators;
-  - text that starts with `=`, `+`, `-` or `@` gets a leading `'`, so a spreadsheet doesn't run
-    it as a formula.
+  - text that starts with `=`, `+`, `-`, `@`, a tab or a carriage return gets a leading `'`, so
+    a spreadsheet doesn't run it as a formula (number and money columns are left alone).
 - **Excel** (needs the `xlsx` feature: `renox = { …, features = ["xlsx"] }`; it uses the
   `rust_xlsxwriter` crate):
   - grouped headings merged as on screen;

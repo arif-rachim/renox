@@ -46,9 +46,10 @@ The database is a fresh one for each test: SQLite in memory, or PostgreSQL when
 use renox::prelude::*;
 use renox::testing::TestApp;
 
-/// The app under test: here just Renox's login pages (the `Auth` module).
+/// The app under test: here just Renox's login pages (the `Auth` module), with its
+/// account page (`.account()` adds `/account`).
 fn app() -> App {
-    App::new().module(Auth::new())
+    App::new().module(Auth::new().account())
 }
 
 /// Guests are sent to the login page; a logged-in member sees their account.
@@ -118,12 +119,15 @@ What's going on:
     (here: the key `data`, its first item, that item's `name`);
   - `json_path(path)` reads it;
   - `assert_json(json!({ … }))` checks the body contains the expected keys (other keys may
-    be there too).
+    be there too). Arrays are stricter: they must have the same number of items, in the same
+    order (each item is then checked the same way, so an object in an array may have extra
+    keys).
 - **Views:** `assert_view("products/index.html")` checks the template a page was rendered from.
 
 ## Configuration and the app's parts
 
-`TestApp::new` doesn't read your `.env` file. It starts from `Config::default()`, which has:
+`TestApp::new` doesn't read your `.env` file, with one exception: `TEST_DATABASE_URL` (from the
+environment or `.env`). It starts from `Config::default()`, which has:
 
 - an in-memory database;
 - the memory mailer (mail is kept in a list, not sent);
@@ -186,8 +190,8 @@ pattern several answers, and they're used in turn: the first request gets the fi
   cleared.
 - `confirm_password()` passes `require_password_confirmed` (pages that ask for the password
   again before something risky).
-- `assert_authenticated(Some(&user))` / `assert_authenticated(None)` / `assert_guest()` check
-  who is logged in, if anyone.
+- `assert_authenticated(Some(&user))` checks that this user is logged in,
+  `assert_authenticated(None)` that someone is (any user), and `assert_guest()` that no one is.
 - `assert_session_has("cart")`, `assert_session_missing("cart")` and
   `session_get::<T>("cart")` check and read values in the session.
 - `session_cookie()` and `use_session_cookie(…)` let one test play a second device (say, a
@@ -224,7 +228,7 @@ tools let you run the work, or record it and check it.
 |---|---|
 | `app.queued_jobs()` | The names of the queued jobs. |
 | `app.run_jobs()` | Runs the jobs that are due. |
-| `app.run_all_jobs()` | Also runs delayed jobs and retries still waiting for their backoff (the pause before a failed job is tried again). |
+| `app.run_all_jobs()` | Also runs delayed jobs and retries still waiting for their backoff (the pause before a failed job is tried again), until no job is left. It stops after 1,000 rounds, so a job that queues itself again forever can't hang the test. |
 | `app.fake_events()` | Records events instead of running their listeners. Check them with `assert_emitted::<OrderPlaced>(\|e\| e.id == 7)`, `emitted::<E>()` or `assert_not_emitted::<E>()`. |
 | `app.fake_notifications()` | Records notifications instead of sending them. Check them with `assert_notified(&user, "order-shipped")`, `assert_notified_to("a@b.c", kind)`, `notifications()` or `assert_nothing_notified()`. |
 | `app.sent_mail()`, `app.assert_mail_sent(to, subject)` | The mail sent so far (the test mailer keeps it). |
@@ -255,19 +259,36 @@ What follows the travelled clock: `renox::db::now()`, sessions, signed URLs, the
 cache, rate limits, the login lock and password confirmation. `TestApp`'s own session helpers do
 too: past `SESSION_LIFETIME`, the next request starts a new session with its own CSRF token.
 
+Say the app's billing page asks for the password again (and the app has the `Auth` module, which
+gives the confirm-password page):
+
 ```rust
 # use renox::prelude::*;
-# use std::time::Duration;
-# async fn demo(app: renox::testing::TestApp) {
-app.confirm_password();
-// Jump four hours ahead: the confirmation has run out.
-app.travel(Duration::from_secs(4 * 60 * 60)); // confirmation lasts three hours
-app.delete("/account").await.assert_redirect("/confirm-password");
+# async fn billing() -> &'static str { "Billing" }
+# fn routes() -> Routes {
+Routes::new()
+    .get("/settings/billing", billing)
+    .require_password_confirmed()
 # }
 ```
 
-What's going on: the user confirms their password, then four hours pass. Deleting the account
-needs a fresh confirmation, so the app sends them back to the confirm-password page.
+A test can then check that the confirmation runs out:
+
+```rust
+# use renox::prelude::*;
+# use std::time::Duration;
+# async fn demo(app: renox::testing::TestApp, user: User) {
+app.acting_as(&user).confirm_password();
+app.get("/settings/billing").await.assert_ok();
+// Jump four hours ahead: the confirmation has run out.
+app.travel(Duration::from_secs(4 * 60 * 60)); // confirmation lasts three hours
+app.get("/settings/billing").await.assert_redirect("/confirm-password");
+# }
+```
+
+What's going on: the user logs in and confirms their password, so the billing page opens. Then
+four hours pass. The page needs a fresh confirmation now, so the app sends them to the
+confirm-password page.
 
 > [!IMPORTANT]
 > Travel reaches only time read through Renox: `renox::db::now()` in app code, not

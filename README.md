@@ -50,6 +50,10 @@ rnx new blog && cd blog                        # or: --starter, --database postg
 rnx serve                                      # http://127.0.0.1:3000
 ```
 
+An app's name uses lowercase letters, digits, `-` and `_`, and starts with a letter (`blog`,
+`coffee-shop`). Rust keywords and the names of crates the app uses (`renox`, `serde`, `tokio`,
+`std`, `test`, …) are refused, so `rnx new MyApp` and `rnx new test` fail.
+
 `--version` is needed for now: 1.0 is still a release candidate (a test version before the
 final one), and Cargo only installs one of those when you ask for it by number. For the
 latest `main` instead: `cargo install --locked --git https://github.com/arif-rachim/renox
@@ -62,8 +66,9 @@ Then, in the app:
 2. Make a whole page with a form, a list, validation and tests:
    `rnx make:module posts --resource --fields "title:string body:text published:bool"`.
    `rnx serve` rebuilds and restarts by itself, and the browser reloads when a view changes.
-3. Run the tests with `cargo test`, and see every command with `rnx --help` (Renox's own
-   commands: `rnx help`).
+3. Run the tests with `cargo test`. `rnx --help` lists rnx's own commands (`rnx help` prints
+   the same). The app's commands, built-in and your own, are listed by the app itself:
+   `cargo run -- help`.
 4. Follow [the tutorial](docs/tutorial.md) for the rest:
    models, htmx forms, policies, a scheduled mail, tests and deploying.
 
@@ -73,7 +78,9 @@ page, login and registration, an account page (profile, password, other devices)
 in the layout, its texts in `resources/lang/en.json`, a test in `tests/home.rs`, and an
 `AGENTS.md` and a `CLAUDE.md` for coding agents. `rnx new blog --starter` writes the starter kit
 on top: a sidebar layout with the notification bell, email verification, roles, a dashboard, a
-users page for admins and the activity log, with their tests. With `--database postgres`,
+users page for admins and the activity log, with their tests. To get admin access there, sign
+up at `/register` and run `rnx users:admin you@example.com`, or run `rnx db:seed` and log in as
+`admin@example.com` with the password `password123`. With `--database postgres`,
 create the `blog` and `blog_test` databases first (or edit `.env`).
 
 > [!NOTE]
@@ -324,14 +331,16 @@ type in Rust, templates or the terminal.
   a query builder (OR groups, sub-queries, `where_has`, aggregates, `group_by`/`having`, raw
   fragments, row locks, bulk updates, upserts, `update_or_create`, chunks), pagination (numbered,
   simple or by cursor) and factories with fake data. The key is the `id` field's type: a
-  number the database counts, or a ULID, UUID or string (`rnx make:model Invoice --key ulid`).
+  number the database counts, or a ULID, UUID or string
+  (`rnx make:model Invoice --module invoices --key ulid`; the module must exist).
 - Models can save only what changed (`save_changes`, `save_only`), run hooks (`saving`, `saved`,
   `deleting`, `deleted`), carry a default scope, e.g. the current tenant, that every query
   applies until `unscoped()`, and keep secrets encrypted at rest (`Encrypted<String>` fields,
   sealed with `APP_KEY`). Transactions nest with savepoints (`tx.savepoint(…)`).
 - Relations (links between tables, like a post and its comments) are explicit and N+1-free, so a
   list never runs one extra query per row: `belongs_to`, `has_many`, many-to-many pivots (with
-  pivot columns) and polymorphic `Morph` load a page's related rows in one query each, and
+  pivot columns) and polymorphic `Morph` load a page's related rows in one query each (two for
+  pivots: the pivot rows, then the models), and
   `count_many` / `sum_many` give counts and sums per row ([guide](docs/relations.md)); joins
   read into `#[derive(FromRow)]` structs with `fetch_as`.
 - For anything else there's raw SQL with `?` placeholders, and transactions that can retry on a
@@ -447,8 +456,9 @@ async fn login_page_and_registration_errors() {
 
 ```bash
 rnx make:module products --resource --fields "name:string price:money"  # a whole CRUD with tests
+rnx make:module news --resource --model Article   # when the model's name isn't the module's in the singular
                                                   # also make:model -m, make:policy, make:job, make:factory, make:test…
-rnx make:command orders:close                     # a typed command (clap): --help, checked arguments, prompts
+rnx make:command orders:close --module orders     # a typed command (clap): --help, checked arguments, prompts
 rnx route:list                                    # every route with its name, module and guards
 rnx db:shell                                      # SQL prompt, no sqlite3/psql needed
 rnx build && rnx make:deploy                      # dist/blog + Dockerfile, systemd (+ socket), Litestream
