@@ -10,6 +10,10 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Guides for beginners, part 1 (#193):** routing.md, validation.md and ui.md rewritten in
+  plain words: what the page is for, the words it uses, short paragraphs, "what's going on"
+  after each example, comments in the code samples, and Laravel notes, tips and warnings as
+  callouts. Every heading (and so every link to one) is kept.
 - **The tutorial, for beginners (#192):** docs/tutorial.md rewritten in plain words: what you'll
   build and learn, a table of the words web apps use, a doc comment on every function and
   comments on the lines that need one in every code sample, "what's going on" after each

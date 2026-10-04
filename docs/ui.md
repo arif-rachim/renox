@@ -1,28 +1,60 @@
 # Views, components and the UI kit
 
-Renox pages are MiniJinja templates sent as HTML, updated in place with htmx. This guide
-covers:
+This part of Renox makes the pages people see in their browser. Your Rust code picks a
+template, fills in the blanks, and Renox sends the result as HTML.
 
-- components (macros that see the request);
-- the UI kit that ships with Renox (`renox/ui.html`): form fields, the page's frame (navigation
-  bar, sidebar, page headers), themes and type, infolists, actions and dashboards;
-- toasts;
-- fragments and out-of-band swaps;
-- htmx response headers;
-- data grids (see [docs/grid.md](grid.md));
-- live validation;
-- stacks (`push` / `stack`);
-- Tailwind CSS.
+Renox pages are **MiniJinja templates** (HTML files with blanks). Renox turns them into HTML
+and sends them to the browser. Then **htmx** updates parts of the page in place, without a
+full reload.
+
+### Words you'll meet
+
+| Word | What it means |
+|---|---|
+| **template** (or view) | An HTML file with blanks, like `{{ product.name }}`, that the app fills in. Renox uses MiniJinja for this. |
+| **layout** | The frame around every page: the `<head>`, the navigation bar, the footer. Each page fills in the middle. |
+| **macro** | A small piece of template you can reuse, like a function: you call it with values and it writes HTML. |
+| **component** | A macro kept in a file of its own, such as a price field, and imported where it's used. |
+| **the UI kit** | The set of ready-made components that comes with Renox (`renox/ui.html`): fields, buttons, menus, cards, tables and more. |
+| **htmx** | A small script (it comes with Renox) that sends a request and swaps part of the page with the answer, with no full reload. |
+| **fragment** | A piece of a page (one block of a template) sent alone, for htmx to swap in. |
+| **toast** | A short message that pops up at the edge of the screen ("Product saved.") and goes away. |
+| **Alpine.js** | Another small script that comes with Renox. It adds small bits of behaviour in HTML attributes (open a menu, show a field). |
+| **CSS token** | A named setting for the look, like `--rx-accent` (the accent colour). Change it once and every component follows. |
+
+### In this guide
+
+- [Components](#components-see-the-request): your own reusable pieces, which can see the
+  request (old input, errors, translations).
+- [The UI kit](#the-ui-kit) that ships with Renox (`renox/ui.html`):
+  - form fields;
+  - the page's frame (navigation bar, sidebar, page headers);
+  - themes and type;
+  - infolists (read-only details);
+  - actions and dashboards.
+- [Toasts](#toasts): short pop-up messages.
+- [Fragments and out-of-band swaps](#fragments-and-out-of-band-swaps): sending only part of a
+  page.
+- [htmx response headers](#htmx-response-headers): telling htmx what to do next.
+- Data grids (see [docs/grid.md](grid.md)).
+- [Live validation](#live-validation): checking a form while people fill it in.
+- [Stacks](#stacks) (`push` / `stack`): adding scripts and styles to the layout from a page.
+- [Tailwind CSS](#tailwind-css).
 
 ## Components see the request
 
-A component is a MiniJinja macro in a file of its own, imported where it's used. Inside it,
-the same request helpers work as in the page itself:
+A **component** is a MiniJinja macro in a file of its own. You import it where you use it.
 
-- `old()`, `has_old()`, `error()`, `errors`;
-- `t()`, `can()`, `auth`, `request`;
-- `csrf_field()`, `flash`;
-- `once()`.
+Inside a component, the same request helpers work as in the page itself:
+
+- `old()`, `has_old()`, `error()`, `errors`: what the person typed last time, and what was wrong
+  with it;
+- `t()`, `can()`, `auth`, `request`: translations, permission checks, the logged-in user, and
+  the request;
+- `csrf_field()`, `flash`: the hidden security field every form needs, and one-time messages;
+- `once()`: "only the first time on this page".
+
+Here is a small component, a price field:
 
 ```html
 {# resources/views/components/price_field.html (rnx make:component price_field) #}
@@ -36,22 +68,53 @@ the same request helpers work as in the page itself:
 {%- endmacro %}
 ```
 
+What it does:
+
+- It writes a label and an input.
+- `old(name)` puts back what the person typed, if the form came back with errors.
+- `error(name)` shows the error message for this field, if there is one. It also marks the
+  input as invalid (`aria-invalid`), so screen readers know.
+
+`rnx make:component price_field` writes the empty file for you. A page uses it like this:
+
 ```html
 {% from "components/price_field.html" import price_field %}
 {{ price_field("price", "Price") }}
 ```
 
-`{% if once('datepicker') %}<script …>{% endif %}` is true only the first time a key is asked for
-on a page. Use it for a component's script or style when the component appears several times.
+The first line imports the macro. The second calls it, with the field's name and its label.
+
+### Only once per page
+
+`{% if once('datepicker') %}<script …>{% endif %}` is true only the first time a key is asked
+for on a page. Use it for a component's script or style when the component appears several
+times. That way the script is added once, not once per field.
+
+> [!NOTE]
+> **Coming from Laravel:** components are like Blade components (`<x-input>`), and `once()`
+> is like `@once`. See the table at the [end of this page](#coming-from-laravel).
 
 ## The UI kit
 
-`renox/ui.html` is a set of components built on the Human Interface Guidelines' principles
-(hierarchy, clarity, accessibility), with a warm default look: Inter for text and Poppins for
-titles and figures (both bundled), a paper-white page, white surfaces with a hairline, an
-indigo accent, and a type scale that makes the important thing the largest (see
-[Themes and type](#themes-and-type)). Add its stylesheet and script to the layout, and the
-toast region to the body:
+`renox/ui.html` is a set of ready-made components. You import them into your templates, the
+same way as your own.
+
+The kit follows the principles of Apple's Human Interface Guidelines: hierarchy (the most
+important thing stands out), clarity, and accessibility (it works for everyone, including
+people using a keyboard or a screen reader).
+
+Its default look is called "warm":
+
+- Inter for text, and Poppins for titles and figures (both come with Renox);
+- a paper-white page;
+- white surfaces with a hairline (a very thin border);
+- an indigo accent colour;
+- a type scale that makes the important thing the largest (see
+  [Themes and type](#themes-and-type)).
+
+### Turning the kit on
+
+Add the kit's stylesheet and script to the layout, and the toast region to the body:
 
 ```html
 <head>
@@ -63,6 +126,12 @@ toast region to the body:
   {{ toasts() }}
 </body>
 ```
+
+- `renox_head()` adds what every Renox page needs in `<head>`.
+- `renox_ui()` adds the kit's stylesheet and script.
+- `{{ toasts() }}` is the place where toasts appear.
+
+### A first form
 
 Then import what a page needs:
 
@@ -83,31 +152,58 @@ Then import what a page needs:
 </form>
 ```
 
+What this page shows:
+
+- a card titled "New product";
+- a summary of errors at the top (only after a failed submit);
+- a name field with a hint under it, a size choice, and an on/off switch;
+- a Cancel link and a "Create product" button at the bottom.
+
+Each field comes with its label, its hint and its error message. You don't write that HTML
+yourself.
+
+> [!TIP]
+> `{% call card(…) %} … {% endcall %}` passes everything between the two tags into the
+> component. The card puts it inside itself. Many kit components work this way.
+
+### Form fields
+
+Here is every form field. The arguments with `=…` are optional: leave them out and the
+field uses a sensible default.
+
 | Component | What it is |
 |---|---|
-| `input(name, label, type=…, value=…, hint=…, required=…, autocomplete=…, placeholder=…, attrs={…}, id=…, prefix=…, suffix=…, datalist=[…], disabled=…, readonly=…, span=…)` | A labelled text field with its hint and error. It is refilled after a failed submit, except for passwords. `id` tells apart two fields of the same name on one page. `prefix`/`suffix` join a text to the field ("Rp", "kg"); `datalist` suggests values while accepting any. |
-| `textarea(name, label, value=…, rows=4, hint=…, required=…, placeholder=…, attrs={…})` | The same for longer text. |
-| `select(name, label, options, selected=…, hint=…, required=…, placeholder=…, attrs={…})` | The same for a choice. `options` are values or `[value, label]` pairs. |
-| `checkbox(name, label, checked=…, hint=…, value="on", switch=…, attrs={…})` | A checkbox, or an iOS-style switch for settings. The whole row is the target. After a failed submit it shows what was sent, so an unticked box stays unticked. |
-| `radio(name, label, options, selected=…, inline=…, columns=…)` | One choice out of a few, all visible, in a `fieldset` with the label as its legend. An option is a value, `[value, label]` or `[value, label, description]`. |
-| `checkbox_list(name, label, options, selected=[…], inline=…, columns=…)` | Several choices: each ticked option sends `name` once, so the form field is a `Vec` with `#[serde(default)]` (nothing ticked sends nothing). |
-| `toggle_buttons(name, label, options, selected=…, multiple=…)` | The options as a row of buttons, the pressed ones filled and checked: one choice (a radio group underneath) or, with `multiple`, several (checkboxes). |
-| `file(name, label, accept=…, multiple=…, preview=…, current=…, current_name=…)` | A drop zone that is also the button; the chosen files are listed under it, images with a thumbnail when `preview`. `current` is the URL of the file stored now (`current_name` the name shown for it). The form needs `enctype="multipart/form-data"`, the field is an `Upload` (`Vec<Upload>` with `multiple`). |
-| `date_picker(name, label, value=…, min=…, max=…)` | A date typed as `2026-10-02` or picked in a calendar (Cally, in a popover under the field, its month named in the page's language). Sent as `YYYY-MM-DD`, like `<input type="date">`: a `NaiveDate`. Without JavaScript it is a text field. |
-| `show_when(field, values)` + `hide_when(field, values)` | Fields shown (or hidden) while another field has one of `values`. Hidden fields are disabled, so the form doesn't send them; check them on the server with `required_if`. Without JavaScript they stay visible. |
-| `select(…, multiple=true, searchable=true)` | Several values (a `Vec`), and a box to type in that filters the options, with the chosen ones as chips. The native select stays underneath: the form sends the same thing, and it works without JavaScript. |
-| `select(…, options_url=…, editable=true)` | The options come from the server as you type (`renox::select`), for lists too long for the page. `editable`: what was typed can be added ("Add “…”") and is chosen at once, and the chosen option can be renamed (the pencil). See "Options from the server" below. |
-| `tags_input(name, label, value=[…], suggestions=[…])` | Free text as chips: Enter or a comma adds one, Backspace in the empty box removes the last. A `Vec<String>`. |
-| `repeater(name, label, rows=[…], min=…, max=…, item_label=…, add_label=…, reorderable=true)` with `{% call(row, prefix) %}` | Rows added, removed and moved by the user (`reorderable=false` keeps their order), each with the fields of the call block, named `name[0][field]` and renumbered as rows move. A `Vec` of a struct, checked with `v.nested`. Adding a row needs JavaScript. |
-| `key_value(name, label, value=…)` | Pairs of text (a repeater with a key and a value per row): `KeyValues`. |
-| `wizard(id, steps, submit_label, back_label=…, next_label=…)` + `wizard_step(id, key, title=…)` | A form in steps. Next checks the step (the browser's rules, then the server's with `data-live-validate`); after a failed submit the first step with an error opens. Without JavaScript all steps show. |
-| `form_grid(columns=2)`, `fieldset(legend, hint=…, columns=…)` | Fields side by side from tablet width up (one column on phones), and a titled group of fields in a long form. A field's `span=2` or `span="full"` makes it wider. |
+| `input(name, label, type=…, value=…, hint=…, required=…, autocomplete=…, placeholder=…, attrs={…}, id=…, prefix=…, suffix=…, datalist=[…], disabled=…, readonly=…, span=…)` | A text field with its label, hint and error. After a failed submit it is filled in again with what was typed (but never for passwords). `id` tells two fields with the same name apart on one page. `prefix`/`suffix` put a short text before or after the field ("Rp", "kg"). `datalist` suggests values, but any value is accepted. |
+| `textarea(name, label, value=…, rows=4, hint=…, required=…, placeholder=…, attrs={…})` | The same, for longer text. |
+| `select(name, label, options, selected=…, hint=…, required=…, placeholder=…, attrs={…})` | The same, for a choice from a list. Each option is a value, or a `[value, label]` pair. |
+| `checkbox(name, label, checked=…, hint=…, value="on", switch=…, attrs={…})` | A checkbox, or (with `switch`) an iOS-style on/off switch for settings. The whole row can be clicked. After a failed submit it shows what was sent, so a box that was left unticked stays unticked. |
+| `radio(name, label, options, selected=…, inline=…, columns=…)` | One choice out of a few, all visible at once. They sit in a `fieldset`, with the label as its title (`legend`). An option is a value, `[value, label]` or `[value, label, description]`. |
+| `checkbox_list(name, label, options, selected=[…], inline=…, columns=…)` | Several choices. Each ticked option sends `name` once. So the form's field in Rust is a `Vec`, with `#[serde(default)]` (when nothing is ticked, nothing is sent). |
+| `toggle_buttons(name, label, options, selected=…, multiple=…)` | The options as a row of buttons; the pressed ones are filled and checked. Without `multiple`, one choice (a radio group underneath). With `multiple`, several (checkboxes underneath). |
+| `file(name, label, accept=…, multiple=…, preview=…, current=…, current_name=…)` | An upload area: drop files on it, or click it to pick them. The chosen files are listed under it; images get a small picture when `preview` is on. `current` is the URL of the file stored now, and `current_name` the name shown for it. The form needs `enctype="multipart/form-data"`. The Rust field is an `Upload` (a `Vec<Upload>` with `multiple`). |
+| `date_picker(name, label, value=…, min=…, max=…)` | A date: typed as `2026-10-02`, or picked from a calendar. The calendar is Cally, opening in a small box under the field, with the month named in the page's language. The date is sent as `YYYY-MM-DD`, like `<input type="date">`, so the Rust field is a `NaiveDate`. Without JavaScript it is a plain text field. |
+| `show_when(field, values)` + `hide_when(field, values)` | Fields shown (or hidden) while another field has one of `values`. Hidden fields are disabled, so the form doesn't send them. Check them on the server with `required_if`. Without JavaScript they stay visible. |
+| `select(…, multiple=true, searchable=true)` | Pick several values (a `Vec`), with a box to type in that filters the options. The chosen ones show as chips (small rounded labels). The browser's own select stays underneath: the form sends the same thing, and it works without JavaScript. |
+| `select(…, options_url=…, editable=true)` | The options come from the server as you type (`renox::select`), for lists too long to put in the page. With `editable`, what was typed can be added ("Add “…”") and is chosen at once, and the chosen option can be renamed (with the pencil). See [Options from the server](#options-from-the-server) below. |
+| `tags_input(name, label, value=[…], suggestions=[…])` | Free text as chips. Enter or a comma adds one; Backspace in the empty box removes the last one. The Rust field is a `Vec<String>`. |
+| `repeater(name, label, rows=[…], min=…, max=…, item_label=…, add_label=…, reorderable=true)` with `{% call(row, prefix) %}` | Rows that people add, remove and move. `reorderable=false` keeps their order fixed. Each row has the fields of the call block, named `name[0][field]`, and they are renumbered when rows move. The Rust field is a `Vec` of a struct, checked with `v.nested`. Adding a row needs JavaScript. |
+| `key_value(name, label, value=…)` | Pairs of text: a repeater with a key and a value on each row. The Rust field is `KeyValues`. |
+| `wizard(id, steps, submit_label, back_label=…, next_label=…)` + `wizard_step(id, key, title=…)` | A form in steps. Next checks the current step first: the browser's own rules, then the server's (with `data-live-validate`). After a failed submit, the first step with an error opens. Without JavaScript all steps show at once. |
+| `form_grid(columns=2)`, `fieldset(legend, hint=…, columns=…)` | `form_grid` puts fields side by side from tablet width up (one column on phones). `fieldset` is a group of fields with a title, for long forms. A field's `span=2` or `span="full"` makes it wider. |
 
-Every field also takes `id`, `disabled` (the field isn't sent) and `span`; `input` and
-`textarea` take `readonly` (shaded, but sent and readable). `input` takes `revealable=true` (a
-button that shows the password; Renox's own sign-in pages use it) and `copyable=true` (a button
-that copies the value, for keys and links). The error summary links to each
-field by its name, so a field with its own `id` and a radio group are found too.
+A few options work on many fields:
+
+- Every field takes `id`, `disabled` (the field isn't sent) and `span`.
+- `input` and `textarea` take `readonly`: the field is shaded and can't be changed, but it is
+  still sent and can be read.
+- `input` takes `revealable=true`: a button that shows the password. Renox's own sign-in
+  pages use it.
+- `input` takes `copyable=true`: a button that copies the value, handy for keys and links.
+
+The error summary links to each field by its name. So it finds a field with its own `id`, and
+a radio group, too.
+
+Here are fields side by side, and a group with a title:
 
 ```html
 {% from "renox/ui.html" import input, radio, checkbox_list, form_grid, fieldset %}
@@ -123,8 +219,15 @@ field by its name, so a field with its own `id` and a radio group are found too.
 {% endcall %}
 ```
 
-Rows of fields, as in examples/teams' "New team" wizard: each row's inputs are named
-`invites[0][email]`, `invites[1][email]`…, and `Valid` reads them into a `Vec`.
+Price and weight sit next to each other. City takes the whole row (`span="full"`) and
+suggests three cities. Below, a "Delivery" group asks for a speed (one choice) and extras
+(any number).
+
+### Rows of fields
+
+Some forms have a list inside them: the people to invite to a team, the lines of an order.
+examples/teams' "New team" wizard does this. Each row's input is named `invites[0][email]`,
+`invites[1][email]`, and so on. `Valid` reads them into a `Vec`.
 
 ```html
 {% from "renox/ui.html" import wizard, wizard_step, repeater, input %}
@@ -138,8 +241,15 @@ Rows of fields, as in examples/teams' "New team" wizard: each row's inputs are n
 {% endcall %}
 ```
 
+The wizard has two steps: first the team's name, then its members. In the second step, the
+repeater lets people add up to 10 rows, each with an email field. `prefix` is the row's part
+of the name (`invites[0]`), so `prefix ~ "[email]"` gives `invites[0][email]`.
+
+On the Rust side, the form is a struct with a `Vec` of rows:
+
 ```rust
 # use renox::prelude::*;
+/// The whole "New team" form: a name and a list of invites.
 #[derive(serde::Deserialize)]
 struct NewTeam {
     name: String,
@@ -147,17 +257,20 @@ struct NewTeam {
     invites: Vec<Invite>,
 }
 
+/// One row of the repeater: one person to invite.
 #[derive(serde::Deserialize)]
 struct Invite {
     email: String,
 }
 
+/// The rules for one row.
 impl Validate for Invite {
     fn rules(&self, v: &mut Validator) {
         v.field("email", &self.email).required().email();
     }
 }
 
+/// The rules for the whole form.
 impl Validate for NewTeam {
     fn rules(&self, v: &mut Validator) {
         v.field("name", &self.name).required();
@@ -167,16 +280,24 @@ impl Validate for NewTeam {
 }
 ```
 
+`#[serde(default)]` means "no rows sent" becomes an empty list instead of an error.
+`v.nested` checks every row with `Invite`'s rules. An error in the first row's email is
+stored as `invites.0.email`, and the kit shows it in that row.
+
 ### Options from the server
 
-A select over a long list (customers, categories) asks the server as people type, through
-one URL. In the template, `options` only needs the chosen option(s):
+Some lists are too long to put in the page: all your customers, all your categories. A
+select over such a list asks the server as people type. It uses one URL for everything.
+
+In the template, `options` only needs the option (or options) chosen now:
 
 ```html
 {{ select("category_id", "Category", [[product.category_id, category_name]] if product.category_id else [],
           selected=product.category_id, placeholder="None",
           options_url=route('admin.categories.options'), editable=true) }}
 ```
+
+Here is what the kit sends to that URL, and what the handler answers:
 
 | The kit sends | The handler answers |
 |---|---|
@@ -185,21 +306,29 @@ one URL. In the template, `options` only needs the chosen option(s):
 | `POST label=Juice` (`editable`: "Add “Juice”") | the new option, which is chosen at once |
 | `POST _method=PUT value=4&label=Juice & Smoothies` (`editable`: renaming the chosen one) | the option as saved |
 
-A 422 from `Valid` shows its first message under the field (a name already taken, say), and
-Escape gives up a rename. Who may add or rename is the route's call (examples/shop puts the
-three handlers inside its admin group):
+If adding or renaming fails, a 422 answer from `Valid` (say, "that name is already taken")
+shows its first message under the field. Escape gives up a rename.
+
+Who may add or rename is up to the route. examples/shop puts the three handlers inside its
+admin group, so only admins can.
+
+Here is the handler that answers the `GET`s:
 
 ```rust
 # use renox::prelude::*;
 use renox::select::{OptionQuery, SelectOption};
 
+/// A category of products.
 #[derive(Model, serde::Serialize, Default)]
 struct Category { id: i64, name: String }
 
+/// Answers the select's searches and lookups with a list of options.
 async fn options(State(db): State<Db>, query: OptionQuery) -> Result<Json<Vec<SelectOption>>> {
+    // A lookup asks for options by their values (after a failed submit).
     let rows = if query.is_lookup() {
         Category::query().where_in("id", query.values_as::<i64>()).get(&db).await?
     } else {
+        // A search: the first 20 categories whose name contains what was typed.
         Category::query()
             .where_op("name", "like", format!("%{}%", query.q))
             .order_by("name")
@@ -207,16 +336,19 @@ async fn options(State(db): State<Db>, query: OptionQuery) -> Result<Json<Vec<Se
             .get(&db)
             .await?
     };
+    // Each option is a value (the id) and the label people see (the name).
     Ok(Json(rows.iter().map(|c| SelectOption::new(c.id, &c.name)).collect()))
 }
 // Routes: .get(url, options), .post(url, create), .put(url, rename); the POST and PUT take
 // `Valid<…>` forms with `label` (and `value`), checked like any form (`unique`, `max`).
 ```
 
-Without JavaScript the native select shows only the options in the page.
+Without JavaScript, the browser's own select shows only the options in the page.
 
-A field that depends on another, as in examples/shop's checkout: the address only for the
-courier, required only then.
+### A field that depends on another
+
+Sometimes a field matters only when another field has a certain value. examples/shop's
+checkout asks for an address only for delivery by courier, and requires it only then:
 
 ```html
 {% from "renox/ui.html" import toggle_buttons, show_when, textarea, date_picker %}
@@ -228,9 +360,13 @@ courier, required only then.
 {% endcall %}
 ```
 
+The address and the date show only while "Courier" is pressed. When "Pick up" is pressed,
+they are hidden and not sent. So the server must also know the rule:
+
 ```rust
 # use renox::prelude::*;
 # struct Checkout { delivery: String, address: String }
+/// The checkout form's rules: the address is needed only for the courier.
 impl Validate for Checkout {
     fn rules(&self, v: &mut Validator) {
         // A pickup sends no address at all: the hidden group is disabled.
@@ -239,28 +375,38 @@ impl Validate for Checkout {
 }
 ```
 
+`required_if(…)` makes the field required only when the condition is true.
+
+### Buttons, surfaces and other parts
+
+The rest of the kit's everyday components:
+
 | Component | What it is |
 |---|---|
-| `button(label, variant="primary", type="submit", name=…, value=…, size=…, block=…, attrs={…}, icon=…, badge=…, key=…, disabled=…, disabled_reason=…)` | Variants: `primary`, `secondary`, `plain`, `danger` and `plain-danger`. The button shows a spinner while its form or htmx request is being sent. For `icon`, `badge`, `key` and `disabled_reason` see [Actions](#actions). |
+| `button(label, variant="primary", type="submit", name=…, value=…, size=…, block=…, attrs={…}, icon=…, badge=…, key=…, disabled=…, disabled_reason=…)` | A button. Variants (styles): `primary`, `secondary`, `plain`, `danger` and `plain-danger`. It shows a spinner while its form or htmx request is being sent. For `icon`, `badge`, `key` and `disabled_reason`, see [Actions](#actions). |
 | `link_button(href, label, variant="secondary", size=…, attrs={…}, icon=…, badge=…, key=…, new_tab=…)` | A link that looks like a button. |
-| `icon_button(icon, label, href=…, variant="plain", type="button", size=…, attrs={…}, key=…, badge=…, disabled=…, disabled_reason=…, new_tab=…)` | A button (or, with `href`, a link) showing only an icon; `label` is its accessible name and its tooltip. Variants: `plain`, `primary`, `danger`; `size="small"`. |
-| `card(title=…, subtitle=…)`, `group(title=…, footer=…)` | A surface, and an inset grouped list like Settings. |
-| `alert(message, kind=…, title=…)`, `badge(text, kind=…)` | Kinds: `info`, `success`, `warning`, `error`. An alert has an icon per kind, so color is never the only signal. A badge is color only, so its text must carry the meaning ("Paid", not "●"). |
-| `form_errors(title=…)` | Every error of the last submit, above the form, each linking to its field. |
-| `sheet(id, title, message=…, slide_over=…, width=…, icon=…)` + `open_button(id, label, icon=…, key=…, badge=…)` | A modal dialog. It closes on Esc and on a click on the backdrop, and focus returns to the button that opened it. On phones it rises from the bottom edge. `slide_over=true` puts it at the side, full height; `width` is `sm`, `md` (default), `lg` or `xl`; `icon` (`info`, `success`, `warning`, `error`) shows over the title. |
-| `action_sheet(id, label, action, title, …)` | A button that opens a sheet with a form sent by htmx: see [Actions](#actions). |
-| `confirm(id, label, action, title, message, confirm_label=…, method="DELETE", size=…, icon=…, modal_icon="warning", key=…)` | A destructive action behind a confirmation sheet, with Cancel focused first. `icon` goes on the button, `modal_icon` over the title (`none` for no icon). |
-| `menu(label, id=…, variant="secondary", size="small")` + `menu_link(href, label)`, `menu_action(action, label, method="POST", danger=…)`, `menu_separator()` | A menu of actions: arrow keys move, Esc closes. `menu_action` sends a form (with `_method` for other methods). |
-| `tabs(id, items, selected=…, label=…)` + `tab_panel(id, key, selected=…)` | A segmented control; the arrow keys, Home and End move between tabs. |
-| `table(head, caption=…)` | A table in a card. A heading `["Total", "num"]` right-aligns its column, and `["Slug", "hide-narrow"]` hides it on phones. |
-| `empty(title, message, action_href, action_label)` | What an empty list says, with the way to add the first item. |
-| `notification_bell(count=none, id="rx-notifications")` | The signed-in user's notifications in the navigation bar: a badge with the unread count, a panel, new ones live as toasts. Needs `Auth::new().notifications()`; pass `unread_notifications`. See [docs/mail.md](mail.md#the-bell). |
+| `icon_button(icon, label, href=…, variant="plain", type="button", size=…, attrs={…}, key=…, badge=…, disabled=…, disabled_reason=…, new_tab=…)` | A button that shows only an icon (or, with `href`, a link). `label` is the name screen readers say, and its tooltip. Variants: `plain`, `primary`, `danger`; also `size="small"`. |
+| `card(title=…, subtitle=…)`, `group(title=…, footer=…)` | A card is a surface (a white box) for content. A group is an inset list of rows, like the iPhone's Settings. |
+| `alert(message, kind=…, title=…)`, `badge(text, kind=…)` | Kinds: `info`, `success`, `warning`, `error`. An alert has an icon for each kind, so colour is never the only sign. A badge is colour only, so its text must carry the meaning ("Paid", not "●"). |
+| `form_errors(title=…)` | Every error of the last submit, above the form. Each links to its field. |
+| `sheet(id, title, message=…, slide_over=…, width=…, icon=…)` + `open_button(id, label, icon=…, key=…, badge=…)` | A sheet is a modal dialog: a box over the page that you must close before going on. It closes on Esc and on a click outside it (on the backdrop), and focus goes back to the button that opened it. On phones it rises from the bottom edge. `slide_over=true` puts it at the side, full height. `width` is `sm`, `md` (default), `lg` or `xl`. `icon` (`info`, `success`, `warning`, `error`) shows above the title. |
+| `action_sheet(id, label, action, title, …)` | A button that opens a sheet with a form sent by htmx. See [Actions](#actions). |
+| `confirm(id, label, action, title, message, confirm_label=…, method="DELETE", size=…, icon=…, modal_icon="warning", key=…)` | A destructive action (like delete) that asks first, in a sheet. Cancel has the focus first, so pressing Enter by mistake does nothing harmful. `icon` goes on the button, `modal_icon` above the sheet's title (`none` for no icon). |
+| `menu(label, id=…, variant="secondary", size="small")` + `menu_link(href, label)`, `menu_action(action, label, method="POST", danger=…)`, `menu_separator()` | A drop-down menu of actions. The arrow keys move, Esc closes. `menu_action` sends a form (with `_method` for methods other than POST). |
+| `tabs(id, items, selected=…, label=…)` + `tab_panel(id, key, selected=…)` | A segmented control: tabs that switch between panels on one page. The arrow keys, Home and End move between tabs. |
+| `table(head, caption=…)` | A table in a card. A heading `["Total", "num"]` lines its column up on the right (for numbers), and `["Slug", "hide-narrow"]` hides the column on phones. |
+| `empty(title, message, action_href, action_label)` | What an empty list says, with a link to add the first item. |
+| `notification_bell(count=none, id="rx-notifications")` | The logged-in user's notifications, in the navigation bar: a badge with the unread count, a panel, and new ones arriving live as toasts. Needs `Auth::new().notifications()`; pass `unread_notifications`. See [docs/mail.md](mail.md#the-bell). |
 
 ### Navigation and page structure
 
-The frame of a page comes from the kit too, so an app writes no CSS for its navigation bar,
-its sidebar or its page headings. examples/backoffice (a sidebar), examples/shop (a navigation
-bar with links, a cart count and menus) and every other example are built this way.
+The frame of a page comes from the kit too. So an app writes no CSS for its navigation bar,
+its sidebar or its page headings.
+
+Every example is built this way. examples/backoffice has a sidebar. examples/shop has a
+navigation bar with links, a cart count and menus.
+
+A navigation bar on top looks like this:
 
 ```html
 <body class="rx-page">
@@ -270,6 +416,7 @@ bar with links, a cart count and menus) and every other example are built this w
       {{ nav_link(route('products.index'), "Products", active=route_is('products.*')) }}
       {{ nav_link(route('cart.show'), "Cart", active=route_is('cart.*'), badge=cart_count) }}
     {% endcall %}
+    {# rx-spacer pushes what follows to the right end of the bar #}
     <span class="rx-spacer"></span>
     {% call menu(auth.user.name, id="account-menu", variant="plain") %}
       {{ menu_link(route('account.show'), "Account") }}
@@ -279,6 +426,10 @@ bar with links, a cart count and menus) and every other example are built this w
   <main class="rx-container rx-container--wide" id="main">…</main>
 </body>
 ```
+
+The bar shows the app's name (a link home), two links (Products, and Cart with a count), and
+on the right a menu with the user's name. `active=route_is('products.*')` highlights
+"Products" on every products page.
 
 A back office puts its sections down the side instead:
 
@@ -298,84 +449,127 @@ A back office puts its sections down the side instead:
 </body>
 ```
 
+The sidebar lists Dashboard and Invoices, then an "Admin" heading. The "Staff" link shows only
+to people allowed to manage staff (`can('staff.manage')`). Next to the sidebar, a thin bar on
+top holds the notification bell, and the page's content goes under it.
+
 | Component | What it is |
 |---|---|
-| `navbar(brand, href="/", logo=…, mark=…, width="narrow", label=…, skip=true)` | The bar on top: translucent, sticky, a hairline under it. `brand` links to `href` (`none` for no brand); `logo` is an image URL, `mark=true` the name's first letter in the accent colour. `width` matches the page: `narrow` (`rx-container`), `wide` (`rx-container--wide`) or `full`. It starts with a "Skip to content" link to `#main`. |
-| `nav_links()` + `nav_link(href, label, active=…, badge=…)` | The bar's sections. `active` (usually `route_is('….*')`) marks the current one with `aria-current`; `badge` shows a count. On phones the links get a row of their own that scrolls sideways. |
-| `sidebar(brand, href="/", logo=…, mark=true, label=…, skip=true)` + `sidebar_link(href, label, active=…, badge=…)`, `sidebar_section(title)` | Sections down the side, for back offices: `rx-shell` on `<body>`, the sidebar, then `rx-shell__main` holding a full-width `navbar` and `<main class="rx-shell__content">`. On phones the sidebar becomes a bar of links on top. |
+| `navbar(brand, href="/", logo=…, mark=…, width="narrow", label=…, skip=true)` | The bar on top: see-through, it stays at the top while you scroll ("sticky"), with a hairline under it. `brand` links to `href` (`none` for no brand). `logo` is an image URL; `mark=true` shows the name's first letter in the accent colour. `width` matches the page: `narrow` (`rx-container`), `wide` (`rx-container--wide`) or `full`. It starts with a "Skip to content" link to `#main`, for keyboard users. |
+| `nav_links()` + `nav_link(href, label, active=…, badge=…)` | The bar's sections. `active` (usually `route_is('….*')`) marks the current one, with `aria-current` for screen readers. `badge` shows a count. On phones the links get a row of their own that scrolls sideways. |
+| `sidebar(brand, href="/", logo=…, mark=true, label=…, skip=true)` + `sidebar_link(href, label, active=…, badge=…)`, `sidebar_section(title)` | Sections down the side, for back offices. The page is built like this: `rx-shell` on `<body>`, the sidebar, then `rx-shell__main` holding a full-width `navbar` and `<main class="rx-shell__content">`. On phones the sidebar becomes a bar of links on top. |
 | `page_header(title, subtitle=…, back=…, back_label=…, badge=…, badge_kind=…)` | A page's heading: the title (with a badge), a line under it, a link back (`back`), and the call block's buttons at the end of the row (under the title on phones). |
-| `toolbar()` | Filter fields side by side, wrapping on narrow screens and lined up with their buttons; no "(optional)" marks (filters are all optional). Inside the `<form>`. |
-| `row_actions()` | A table row's buttons at the end of the row; icons only on phones (labels stay for screen readers). |
-| `list(id=…, label=…)` | Rows in a surface, each an `<li>` you write; `rx-list__main` on the part that takes the room left (`rx-list__main--done` strikes it through). Rows can be fragments htmx adds and swaps. |
-| `columns(count=2)` | Columns from tablet width up, one on phones (a photo next to its details). |
-| `card_grid()` + `media_card(href, title, image=…, image_alt="", subtitle=…, note=…, dimmed=…)` | Cards with a picture in a grid that fills the row (each at least 13rem; set `--rx-card-min` for another width). |
-| `link_tabs(items, current=…, label=…)` | Links that look like a segmented control, for sections or filters that are URLs: `items` are `[href, label]` pairs. `tabs` switches panels on one page instead. |
-| `thumbnail(src, alt="", href=…)` | A small square picture, e.g. in a table row. |
-| `progress(value, max=100, label=…, show_value=true)` | A native `<progress>` in the kit's colours, with the percentage next to it. |
-| `menu_button(label, attrs={…}, danger=…)` | A menu item that is a plain button, for what `attrs` make it do (htmx: `hx-get`, `hx-delete`…). |
+| `toolbar()` | Filter fields side by side. They wrap onto more lines on narrow screens, and line up with their buttons. There are no "(optional)" marks, since filters are all optional. Put it inside the `<form>`. |
+| `row_actions()` | A table row's buttons, at the end of the row. On phones only the icons show (the labels stay for screen readers). |
+| `list(id=…, label=…)` | Rows in a surface; each row is an `<li>` you write. Put `rx-list__main` on the part that takes the space left (`rx-list__main--done` strikes it through, for a finished task). Rows can be fragments that htmx adds and swaps. |
+| `columns(count=2)` | Columns from tablet width up, one column on phones (a photo next to its details, say). |
+| `card_grid()` + `media_card(href, title, image=…, image_alt="", subtitle=…, note=…, dimmed=…)` | Cards with a picture, in a grid that fills the row. Each card is at least 13rem wide; set `--rx-card-min` for another width. |
+| `link_tabs(items, current=…, label=…)` | Links that look like a segmented control, for sections or filters that have their own URLs. `items` are `[href, label]` pairs. (`tabs` switches panels on one page instead.) |
+| `thumbnail(src, alt="", href=…)` | A small square picture, for example in a table row. |
+| `progress(value, max=100, label=…, show_value=true)` | A progress bar (the browser's `<progress>`) in the kit's colours, with the percentage next to it. |
+| `menu_button(label, attrs={…}, danger=…)` | A menu item that is a plain button. `attrs` say what it does, usually with htmx (`hx-get`, `hx-delete`…). |
 
-Classes without a macro: `rx-page--fill` on `<body>` makes the page as tall as the screen with
-`<main>` taking the rest (for a data grid that fills the screen, `rx-grid-fill`); `rx-image`
-is a picture as wide as its column. `input`, `textarea`, `select` and `checkbox` take
-`hide_label=true` (the label stays for screen readers, e.g. a quantity in a table row), and `confirm` takes `cancel_label` ("Keep order")
-and `fields` (hidden values sent with it, `{"status": "cancelled"}`).
-Every form field (`input`, `textarea`, `select`, `checkbox`, `radio`, `checkbox_list`,
-`toggle_buttons`, `file`, `date_picker`, `tags_input`) takes `bag="login"` to show the errors
-of a named error bag, for a page with two forms that share field names ([validation.md](validation.md)).
+### More classes and options
 
-Build pages from these and the components above rather than writing your own: an app's
-`public/app.css` holds its brand tokens and what is truly its own (a printed invoice), not a
-navigation bar or a card.
+Some things are classes or options, not macros:
 
-Renox's own pages use the kit too: the sign-in pages (`renox/auth/*`: login, registration,
-password reset, email verification, password confirmation, the account page) and the error
-page. The sign-in pages' layout has `stack('head')` and `stack('scripts')` (Renox's own error
-page has no stacks); to change one of those pages, put a file with the same name under
-`resources/views/renox/auth/`.
+- `rx-page--fill` on `<body>` makes the page as tall as the screen, with `<main>` taking the
+  rest. Use it for a data grid that fills the screen (`rx-grid-fill`).
+- `rx-image` is a picture as wide as its column.
+- `input`, `textarea`, `select` and `checkbox` take `hide_label=true`. The label is hidden on
+  screen but stays for screen readers (for example a quantity field in a table row).
+- `confirm` takes `cancel_label` ("Keep order") and `fields`: hidden values sent with it, such
+  as `{"status": "cancelled"}`.
+- Every form field (`input`, `textarea`, `select`, `checkbox`, `radio`, `checkbox_list`,
+  `toggle_buttons`, `file`, `date_picker`, `tags_input`) takes `bag="login"`. It shows the
+  errors of a named error bag. That's for a page with two forms that share field names
+  ([validation.md](validation.md)).
 
-The kit's own texts ("optional", "Cancel", the error summary's title) come in English. An
-app can change or translate them in `lang/<locale>.json` (e.g. `es.json`), under the keys `ui.optional`,
-`ui.cancel`, `ui.close`, `ui.dismiss`, `ui.more` and `ui.errors_title`; the infolist's under
-`ui.yes`, `ui.no`, `ui.show_more` and `ui.since.*` (`now`, `past`, `future`, `minutes`,
-`hours`, `days`, `months`, `years`). The data grid's texts
-are under `ui.grid.*` ([docs/grid.md](grid.md#translations)).
+> [!TIP]
+> Build pages from these and the components above, instead of writing your own. An app's
+> `public/app.css` holds its brand tokens and what is truly its own (a printed invoice, say),
+> not a navigation bar or a card.
 
-To change the markup or the styles, copy the kit into the app:
+### Renox's own pages
+
+Renox's own pages use the kit too:
+
+- the sign-in pages (`renox/auth/*`): login, registration, password reset, email
+  verification, password confirmation, and the account page;
+- the error page.
+
+The sign-in pages' layout has `stack('head')` and `stack('scripts')` (see [Stacks](#stacks)).
+Renox's own error page has no stacks.
+
+To change one of those pages, put a file with the same name under
+`resources/views/renox/auth/`. Your file is used instead of Renox's.
+
+### The kit's texts
+
+The kit's own texts ("optional", "Cancel", the error summary's title) are in English. An app
+can change or translate them in `lang/<locale>.json` (for example `es.json` for Spanish):
+
+- the kit: `ui.optional`, `ui.cancel`, `ui.close`, `ui.dismiss`, `ui.more` and
+  `ui.errors_title`;
+- the infolist: `ui.yes`, `ui.no`, `ui.show_more` and `ui.since.*` (`now`, `past`, `future`,
+  `minutes`, `hours`, `days`, `months`, `years`);
+- the data grid: `ui.grid.*` ([docs/grid.md](grid.md#translations)).
+
+### Changing the kit itself
+
+To change the kit's HTML or its styles, copy the kit into the app:
 
 ```sh
 rnx make:component --ui   # my-app ui:publish: components/ui.html and public/css/renox-ui.css
 ```
 
-Then import from `"components/ui.html"`, and in the layout load the copied stylesheet and only
-the kit's script, so the styles aren't loaded twice:
+Then import from `"components/ui.html"` instead of `"renox/ui.html"`. In the layout, load the
+copied stylesheet, and only the kit's script, so the styles aren't loaded twice:
 
 ```html
 <link rel="stylesheet" href="{{ asset('css/renox-ui.css') }}">
 {{ renox_ui(styles=false) }}
 ```
 
-Every class starts with `rx-`, and nothing in the kit styles bare elements, so it sits next
-to an app's own CSS. To rebrand it, override the tokens on `:root`, e.g.
-`--rx-accent: #0a7d5a;`.
+> [!WARNING]
+> Once you copy the kit, it's yours: Renox updates no longer change your copy. To only change
+> colours, override tokens instead (next paragraph).
+
+Every class starts with `rx-`, and nothing in the kit styles bare elements (a plain `<h1>` or
+`<a>` with no class). So it sits happily next to an app's own CSS.
+
+To rebrand the kit, override its tokens on `:root`, for example `--rx-accent: #0a7d5a;` for a
+green accent.
 
 ### Themes and type
 
-The look is a set of tokens on `:root` (renox-ui.css): colours, the fonts, radii, shadows,
-the hairline on surfaces, the button shape, and a type scale. The default theme is "warm";
-`data-rx-theme="classic"` on `<html>` brings back the kit's first look (system fonts, Apple's
-web blue, cool greys, pill buttons, no hairlines, no small capitals):
+The look is a set of tokens on `:root` (in renox-ui.css):
+
+- the colours;
+- the fonts;
+- radii (how round the corners are) and shadows;
+- the hairline on surfaces;
+- the button shape;
+- and a type scale (the sizes of text).
+
+The default theme is "warm". `data-rx-theme="classic"` on `<html>` brings back the kit's
+first look: system fonts, Apple's web blue, cool greys, pill-shaped buttons, no hairlines and
+no small capitals.
 
 ```html
 <html lang="{{ app.locale }}" data-rx-theme="classic">
 ```
 
-An app's own `:root` tokens, in a stylesheet after `renox_ui()`, win over either theme, so a
-brand colour stays when the theme changes (examples/shop's brown, examples/backoffice's
-colour from its settings).
+An app's own `:root` tokens, in a stylesheet loaded after `renox_ui()`, win over either
+theme. So a brand colour stays when the theme changes. examples/shop keeps its brown this
+way, and examples/backoffice a colour from its settings.
 
-The type scale has eight roles, each a whole `font` (weight, size, line height, family) in
-`rem`, so it follows the reader's text size. The kit's components use them, and so can an
-app: `font: var(--rx-type-heading)`.
+### The type scale
+
+The type scale has eight roles. Each one is a whole `font` (weight, size, line height,
+family) in `rem`. Because it uses `rem`, it follows the reader's own text size setting.
+
+The kit's components use these roles, and an app can too: `font: var(--rx-type-heading)`.
 
 | Token | For | Warm | Classic |
 |---|---|---|---|
@@ -388,21 +582,35 @@ app: `font: var(--rx-type-heading)`.
 | `--rx-type-note` | hints, descriptions | Inter 400, 13 px | system 400, 13 px |
 | `--rx-type-caption` | small capitals over figures and table columns | Inter 600, 11 px, uppercase | system 500, 13 px |
 
-What the warm theme highlights: a stat's figure is the largest thing on its card (it
-shrinks with the card rather than breaking mid-number) and its change is a tinted pill;
-table and grid headings, stat and infolist labels are small capitals; a table's total row
-and a card's price use the title face.
+(600 and 700 are font weights: how bold the text is. 400 is normal.)
 
-The fonts are SIL Open Font License 1.1 Latin subsets (about 72 KB in all) that Renox serves
-from `/_renox/fonts/…`, cached for good; `renox_ui()` preloads the text font. Other scripts
-fall back to the system font. An app that wants other fonts sets `--rx-font` and
-`--rx-font-display` (and the `--rx-type-*` tokens, which name the family) on `:root`.
+What the warm theme makes stand out:
+
+- A stat's figure is the largest thing on its card. On a small card it shrinks rather than
+  breaking in the middle of the number. Its change is shown in a tinted pill.
+- Table and grid headings, and stat and infolist labels, are in small capitals.
+- A table's total row and a card's price use the title font.
+
+### Fonts
+
+The fonts are Latin subsets under the SIL Open Font License 1.1, about 72 KB in all. Renox
+serves them from `/_renox/fonts/…`, and browsers keep them in their cache for good.
+`renox_ui()` asks the browser to load the text font early (it "preloads" it).
+
+Other writing systems fall back to the system font. An app that wants other fonts sets
+`--rx-font` and `--rx-font-display` on `:root`, and also the `--rx-type-*` tokens, since they
+name the font family.
 
 ### Infolists: read-only details
 
-A record's page (an order, a customer) is labels and values: an infolist, Filament's name for
-it. `infolist` lays the entries out in a grid (one column on phones, `columns` from tablet
-width up), and `entry` formats each value by its kind, so a page doesn't hand-roll its markup:
+A record's page (an order, a customer) is mostly labels and values: "Status: Paid",
+"Total: Rp 75,000". The kit calls this an **infolist**.
+
+- `infolist` lays the entries out in a grid: one column on phones, `columns` from tablet
+  width up.
+- `entry` formats each value by its kind: a date, money, a badge, a link…
+
+So a page doesn't need to write that HTML by hand:
 
 ```html
 {% from "renox/ui.html" import card, infolist, entry, repeatable %}
@@ -425,107 +633,142 @@ width up), and `entry` formats each value by its kind, so a page doesn't hand-ro
 {% endcall %}
 ```
 
+This card shows an order in two columns:
+
+- the status as a coloured badge, with a friendly name ("Waiting for payment");
+- when it was placed, as "3 hours ago";
+- the total as money;
+- the invoice number, with a copy button and a link;
+- up to three tags as badges;
+- the note as Markdown, across the whole width, or "No note";
+- the customer, as a link written by hand;
+- and the order's lines, each in its own small box.
+
+> [!NOTE]
+> **Coming from Laravel:** "infolist" is Filament's name for it, and the kit's version works
+> much the same way.
+
 | | |
 |---|---|
-| `infolist(columns=1, inline=false)` | The `<dl>` around the entries. `inline=true` puts each label beside its value (from tablet width up). |
-| `entry(label, value, format=…, …)` | A label and its value. With `{% call entry(label) %}…{% endcall %}` the block is the value. `span=2` or `"full"` makes it wider, `inline=true` puts this label beside its value, `hide_label=true` keeps the label for screen readers only, `hint` adds a line under the value, `tooltip` a title. |
-| `format` | `"date"`, `"datetime"` (with `date_format`, chrono's codes; in `APP_TIMEZONE`), `"since"` ("3 hours ago", the date as its tooltip), `"money"` (`APP_CURRENCY`, or `currency="USD"`), `"number"` (`decimals`), `"markdown"`, `"bool"` (a check and "Yes", or a cross and "No"), `"color"` (a swatch and the code), `"image"` (a URL; `image_size`, `circular`), `"key_value"` (pairs or a map, such as `KeyValues`, as a table). |
-| `badge`, `labels` | `badge=true`, a kind (`"success"`) or kinds by value (`{"paid": "success"}`); `labels` names raw values (`{"paid": "Paid"}`), with or without a badge. |
+| `infolist(columns=1, inline=false)` | The `<dl>` (description list) around the entries. `inline=true` puts each label beside its value (from tablet width up). |
+| `entry(label, value, format=…, …)` | A label and its value. With `{% call entry(label) %}…{% endcall %}` the block is the value. `span=2` or `"full"` makes it wider. `inline=true` puts this label beside its value. `hide_label=true` keeps the label for screen readers only. `hint` adds a line under the value, `tooltip` a title shown on hover. |
+| `format` | `"date"` and `"datetime"` (with `date_format`, using chrono's codes; in `APP_TIMEZONE`). `"since"`: "3 hours ago", with the date as its tooltip. `"money"`: in `APP_CURRENCY`, or `currency="USD"`. `"number"` (with `decimals`). `"markdown"`. `"bool"`: a check and "Yes", or a cross and "No". `"color"`: a colour sample and its code. `"image"`: a URL (with `image_size`, `circular`). `"key_value"`: pairs or a map, such as `KeyValues`, as a table. |
+| `badge`, `labels` | `badge=true`, a kind (`"success"`), or kinds by value (`{"paid": "success"}`). `labels` gives raw values friendly names (`{"paid": "Paid"}`), with or without a badge. |
 | `url`, `new_tab`, `copyable` | A link; a copy button (it copies the raw value). |
-| `prefix`, `suffix`, `limit`, `words`, `placeholder` | Text around the value; at most `limit` letters or `words` words, then "…"; what an empty value (none, `""`, an empty list) shows instead (`—`). |
-| A list as `value` | Each item is formatted the same way: joined with commas, `list="lines"`, or `list="bullets"`; badges, swatches and images sit in a row. `limit_list=3` shows three and folds the rest behind "Show 2 more" (a `<details>`, no script). |
-| `repeatable(label, items, columns=1)` with `{% call(item) %}` | A list of records inside the record (an order's lines): each item a small bordered infolist of the call block's entries. |
+| `prefix`, `suffix`, `limit`, `words`, `placeholder` | Text before or after the value. At most `limit` letters, or `words` words, then "…". `placeholder` is what an empty value (none, `""`, an empty list) shows instead (by default `—`). |
+| A list as `value` | Each item is formatted the same way. By default they're joined with commas; `list="lines"` puts one per line, `list="bullets"` makes a bullet list. Badges, colour samples and images sit in a row. `limit_list=3` shows three and folds the rest behind "Show 2 more" (a `<details>` element, no script needed). |
+| `repeatable(label, items, columns=1)` with `{% call(item) %}` | A list of records inside the record (an order's lines). Each item is a small infolist with a border, made of the call block's entries. |
 
-Sections and tabs are the kit's own `card`, `fieldset` and `tabs`: put an infolist in each.
-examples/shop's order page and examples/fields' product page are built this way.
+For sections and tabs, use the kit's own `card`, `fieldset` and `tabs`, and put an infolist
+in each. examples/shop's order page and examples/fields' product page are built this way.
 
 ### Formatting values
 
-Every template gets these filters, which the infolist uses too:
+Every template gets these **filters**. A filter changes a value before it's printed, written
+after a `|`: `{{ order.total | money }}`. The infolist uses them too.
 
 | Filter | Gives |
 |---|---|
-| `number`, `number(2)` | `75,000` in `en`, `75.000` in `es` or `de`: the page's locale picks the separators. |
-| `money` | The amount in `APP_CURRENCY` (default `IDR`): `Rp 75,000` (en), `Rp 75.000` (es), `$1,250.50` with `USD`. Keywords: `currency="USD"` for another currency, `decimals=0`, `divide_by=100` for amounts kept in cents. `renox::format_money` does the same in Rust. |
-| `date`, `date('%d/%m/%Y %H:%M')` | A date with chrono's format codes; a moment (`created_at`) in `APP_TIMEZONE`. |
-| `since` | "3 hours ago", "in 2 days", "just now" (translated with `ui.since.*`), from the clock `TestApp::travel` moves. |
-| `words(20)` | The first 20 words, then "…" (`end="…"`). |
-| `markdown` | Markdown (CommonMark, tables, strikethrough, task lists) as HTML. HTML in the text is shown as text, and a link or image to anything but `http(s)`, `mailto`, `tel` or a relative URL points nowhere, so it is safe for what people typed. |
+| `number`, `number(2)` | `75,000` in `en`, `75.000` in `es` or `de`: the page's language picks the separators. |
+| `money` | The amount in `APP_CURRENCY` (default `IDR`): `Rp 75,000` (en), `Rp 75.000` (es), `$1,250.50` with `USD`. Options: `currency="USD"` for another currency, `decimals=0`, `divide_by=100` for amounts stored in cents. `renox::format_money` does the same in Rust. |
+| `date`, `date('%d/%m/%Y %H:%M')` | A date, with chrono's format codes. A moment in time (`created_at`) is shown in `APP_TIMEZONE`. |
+| `since` | "3 hours ago", "in 2 days", "just now" (translated with `ui.since.*`). It uses the clock that `TestApp::travel` moves, so tests can check it. |
+| `words(20)` | The first 20 words, then "…" (change it with `end="…"`). |
+| `markdown` | Markdown (CommonMark, tables, strikethrough, task lists) turned into HTML. HTML inside the text is shown as text. A link or image to anything but `http(s)`, `mailto`, `tel` or a relative URL points nowhere. So it is safe for text that people typed. |
 
 ### Design principles
 
-The kit follows the Human Interface Guidelines' principles. These are the rules its components enforce,
-and worth keeping in an app's own pages:
+The kit follows the principles of the Human Interface Guidelines. These are the rules its
+components follow by themselves. They're worth keeping in an app's own pages too:
 
-- **Hierarchy.**
+- **Hierarchy** (the important thing stands out).
   - One primary button per form or page: the action people came to take.
-  - Destructive actions in lists are red text (`plain-danger`); the filled red button waits in
-    the confirmation sheet.
-  - Secondary text is lighter and smaller, never lighter than WCAG AA allows.
+  - Destructive actions in lists are red text (`plain-danger`). The filled red button waits
+    in the confirmation sheet.
+  - Secondary text is lighter and smaller, but never lighter than WCAG AA allows. (WCAG is
+    the web's accessibility standard; AA is the level most sites aim for.)
 - **Clarity.**
-  - Labels are always visible; placeholders are examples, not labels.
+  - Labels are always visible. Placeholders are examples, not labels.
   - A hint says what's expected before anyone gets it wrong.
-  - Errors are plain sentences next to the field and in a summary above the form.
+  - Errors are plain sentences, next to the field and in a summary above the form.
   - Optional fields are marked, since required ones are the norm.
-- **Feedback.**
+- **Feedback** (people see that something happened).
   - A button shows it's working (a spinner, `aria-busy`) and can't be pressed twice.
   - A toast confirms what happened and names the thing ("“Espresso” moved to the trash").
-  - Success and info toasts leave on their own, but wait while hovered or focused; error
-    toasts stay until dismissed.
-- **Forgiveness.**
+  - Success and info toasts go away by themselves, but wait while the mouse is over them or
+    they have focus. Error toasts stay until dismissed.
+- **Forgiveness** (mistakes are easy to avoid and undo).
   - Destructive actions ask first, with Cancel focused.
-  - Live validation checks a field when it's left, then as it's corrected. It never complains
-    about a field someone is still typing in.
-- **Deference.**
+  - Live validation checks a field when you leave it, then again as you correct it. It never
+    complains about a field someone is still typing in.
+- **Deference** (the design steps back so the content comes first).
   - Content stays plain.
-  - Translucent materials are only for what floats over it: the navigation bar, menus,
-    toasts, the sheet's backdrop.
+  - See-through ("translucent") surfaces are only for what floats over the content: the
+    navigation bar, menus, toasts, and the dark layer behind a sheet.
 - **Accessibility.**
-  - Contrast is at least 4.5:1 for text in both appearances. The default accent, indigo
-    #4F46E5, keeps 6.3:1 under white text (the classic theme's is #0071E3, since Apple's
-    system blue falls short).
-  - Every control has a 44 × 44 pt target and a visible focus ring for keyboards.
+  - Text contrast is at least 4.5:1, in both light and dark mode. The default accent, indigo
+    #4F46E5, keeps 6.3:1 under white text. (The classic theme's is #0071E3, since Apple's
+    system blue falls short.)
+  - Every control has a 44 × 44 pt target (big enough for a finger) and a visible focus ring
+    for keyboard users.
   - Hints and errors are tied to their fields with `aria-describedby`, and errors are
-    announced.
+    announced by screen readers.
   - Menus, tabs and sheets work with the keyboard.
-- **Respect for settings.**
-  - Dark mode follows the system; `data-theme="light|dark"` on `<html>` overrides it.
-  - Reduce Motion stops the animations, Reduce Transparency makes materials solid, and
-    Increase Contrast darkens separators and secondary text.
+- **Respect for settings** (the person's device settings win).
+  - Dark mode follows the system. `data-theme="light|dark"` on `<html>` overrides it.
+  - Reduce Motion stops the animations, Reduce Transparency makes see-through surfaces solid,
+    and Increase Contrast darkens separators and secondary text.
   - Text sizes are in `rem`, so they follow the reader's settings.
-  - Sheet and toast placement respect the notch and the home indicator (safe areas).
+  - Sheets and toasts stay clear of the phone's notch and home indicator (the "safe areas").
 
 ### Error pages
 
-`rnx new` writes `resources/views/errors/default.html`: the layout with the kit's `empty`
-component and a way home, so a 404 or a 403 keeps the navigation bar. `errors/<status>.html`
-replaces it for one status; the page gets `status`, `reason` and `detail` (with `APP_DEBUG`
-also `request_line` and `template`) besides the usual
-globals. Renox's own error page (used when an app has none) is built on the kit too.
+When a page isn't found (404), isn't allowed (403) or something breaks (500), the app shows
+an error page.
+
+`rnx new` writes `resources/views/errors/default.html` for this. It's your layout with the
+kit's `empty` component and a link home, so a 404 or a 403 keeps the navigation bar.
+
+- `errors/<status>.html` (for example `errors/404.html`) replaces it for one status.
+- The page gets `status`, `reason` and `detail`, besides the usual globals. With `APP_DEBUG`
+  on, it also gets `request_line` and `template`.
+- Renox's own error page (used when an app has none) is built on the kit too.
 
 ## Toasts
 
-Return a `Toast` with the response:
+A **toast** is a short message that pops up and then goes away, like "Product saved.". To
+show one, return a `Toast` with the response:
 
 ```rust
 use renox::prelude::*;
 
+/// Saves (in a real app), then goes back to the list with a "saved" toast.
 async fn save() -> (Toast, Redirect) {
     (Toast::success("Product saved."), Redirect::to("/products"))
 }
 ```
 
-After a redirect, the toast waits in the session and `{{ toasts() }}` shows it on the next
-page, once. For an htmx request it rides in `HX-Trigger` (event `renox:toast`) and appears at
-once. Kinds: `success`, `info`, `warning` and `error`; `error` is announced as an alert and
-stays until dismissed.
+The handler returns two things at once (a tuple): the toast and a redirect.
 
-A toast can say more, as Filament's notifications do:
+How it reaches the screen:
+
+- After a redirect, the toast waits in the session. `{{ toasts() }}` shows it on the next
+  page, once.
+- For an htmx request, it rides in the `HX-Trigger` header (as the event `renox:toast`) and
+  appears at once.
+
+Kinds: `success`, `info`, `warning` and `error`. An `error` toast is announced as an alert
+by screen readers, and stays until dismissed.
+
+### A toast that says more
+
+A toast can carry more: a second line, links, buttons, a duration.
 
 ```rust
 use renox::prelude::*;
 use renox::ToastAction;
 
+/// Places an order, then shows a toast with links and an Undo button.
 async fn place() -> (Toast, Redirect) {
     let toast = Toast::success("Order #7 placed")
         .body("We'll email you when it ships.")            // a second, lighter line
@@ -538,26 +781,41 @@ async fn place() -> (Toast, Redirect) {
 }
 ```
 
-- Every action closes the toast. A link goes only to http(s), mailto, tel or a relative URL;
-  an event action dispatches its event on `document` (`detail.toast` is the id), so an htmx
-  element can listen with `hx-trigger="order-undo from:document"`.
-- `seconds(n)` sets how long it stays (errors too); `persistent()` keeps it until dismissed.
-  Every toast waits while hovered or focused.
+> [!NOTE]
+> **Coming from Laravel:** this is like Filament's notifications. Instead of
+> `session()->flash('status')` and a toast library, you return a `Toast`.
+
+The details:
+
+- Every action closes the toast.
+- A link goes only to http(s), mailto, tel or a relative URL.
+- An event action sends ("dispatches") its event on `document`, and `detail.toast` is the
+  toast's id. So an htmx element can listen for it with
+  `hx-trigger="order-undo from:document"`.
+- `seconds(n)` sets how long it stays (for errors too). `persistent()` keeps it until
+  dismissed. Every toast waits while the mouse is over it or it has focus.
 - A toast with an `id` replaces an earlier one with the same id.
 - `{{ toasts(position="bottom-end") }}` moves them: `top` (the default, centred),
   `top-start`, `top-end`, `bottom`, `bottom-start` or `bottom-end`. Phones keep them centred.
-- From the page's own script: `Renox.toast({kind: "success", message: "Copied", body: "…",
+- From the page's own JavaScript: `Renox.toast({kind: "success", message: "Copied", body: "…",
   actions: [{label: "Open", url: "/x"}], duration: 3000, id: "copy"})` and
   `Renox.dismissToast("copy")`.
 
-In-app notifications that stay (a bell in the navigation bar, new ones arriving live) are in
-[mail.md](mail.md#the-bell).
+Toasts go away. For notifications that stay (a bell in the navigation bar, with new ones
+arriving live), see [mail.md](mail.md#the-bell).
 
 ## Fragments and out-of-band swaps
 
-`view(…).fragment("rows")` renders only that block for htmx requests. `.also("count")` adds
-more blocks after it. Give each extra block's root element an `id` and `hx-swap-oob="true"`, and
-htmx swaps it into the element with that id:
+When htmx asks for a page, it often needs only one part of it: the new rows of a table, say.
+That part is a **fragment**.
+
+- `view(…).fragment("rows")` sends only the block named `rows`, for htmx requests.
+- `.also("count")` adds more blocks after it.
+
+An extra block can update a different place on the page. This is an **out-of-band swap**:
+"out of band" means outside the main spot htmx was going to update. Give the extra block's
+outer element an `id` and `hx-swap-oob="true"`. htmx then puts it into the element on the page
+with that same id:
 
 ```html
 {% block rows %}<tr id="order-{{ order.id }}">…</tr>{% endblock %}
@@ -567,26 +825,39 @@ htmx swaps it into the element with that id:
 ```rust
 # use renox::prelude::*;
 # fn demo(count: i64) -> View {
+// Send the `rows` block, plus the `count` block, which htmx swaps into #order-count.
 view("orders/index.html", context! { count }).fragment("rows").also("count")
 # }
 ```
 
+So one answer updates the table row and the order count at the top of the page.
+
+> [!NOTE]
+> **Coming from Laravel:** this is like `@fragment` / `fragments([...])`.
+
 ## htmx response headers
 
-The following types are response parts; return them in a tuple with the response:
+htmx reads special headers in the answer to decide what to do next. In Renox these headers
+are types. Return them in a tuple with the response:
 
-- `HxRetarget("#errors")`: swap into another element;
-- `HxReswap("outerHTML")`: swap another way;
-- `HxPushUrl("/orders?status=open")`: update the address bar;
-- `HxRedirect`, `HxRefresh` and `HxTrigger`.
+- `HxRetarget("#errors")`: swap the answer into another element;
+- `HxReswap("outerHTML")`: swap it in a different way;
+- `HxPushUrl("/orders?status=open")`: change the address in the browser's address bar;
+- `HxRedirect`, `HxRefresh` and `HxTrigger`: go to another page, reload this one, or send an
+  event to the page.
 
-`Back` (in the prelude) is both an extractor and a response: it redirects to the previous page
-(the `Referer`), or to `/` when that is missing or on another site, so it can't be used as an
-open redirect.
+### Going back
+
+`Back` (in the prelude) is both an extractor (an argument the handler asks for) and a
+response. It redirects to the previous page (from the `Referer` header). When there's no
+previous page, or it's on another site, it goes to `/` instead. So nobody can use it to send
+your visitors to a stranger's site (an "open redirect").
 
 ```rust
 # use renox::prelude::*;
+/// Saves (in a real app), flashes "Saved", and goes back to the page the form was on.
 async fn store(back: Back, session: Session) -> Result<Back> {
+    // A flash message lives for one request: the next page can show it.
     session.flash("status", "Saved")?;
     Ok(back)
 }
@@ -594,16 +865,30 @@ async fn store(back: Back, session: Session) -> Result<Back> {
 
 ## Live validation
 
-Add `data-live-validate` to a form that `Valid<T>` handles. The kit's script then sends a
-field's value (with the rest of the form) when the field is left, and again as it's corrected,
-with the header `X-Renox-Validate: field`. The `Valid` extractor answers with that field's
-errors as JSON and **the handler doesn't run**, so nothing is saved until the form is
-submitted. The rules are the form's own, database checks such as `unique` included.
+Live validation checks a form's fields while people fill it in, before they press Submit.
+
+Add `data-live-validate` to a form that `Valid<T>` handles. Then:
+
+1. When someone leaves a field, the kit's script sends that field's value (with the rest of
+   the form), with the header `X-Renox-Validate: field`. It sends it again as the field is
+   corrected.
+2. The `Valid` extractor answers with that field's errors as JSON, and **the handler doesn't
+   run**. So nothing is saved until the form is really submitted.
+3. The kit shows the errors next to the field.
+
+The rules are the form's own, including database checks such as `unique`. You don't write
+them twice.
+
+> [!NOTE]
+> **Coming from Laravel:** this is like Precognition.
 
 ## The current route, conditional classes, loops
 
-A navigation marks the current section with `route_is` (the route's name; `*` stands for
-anything), and `class_names` builds a `class` attribute from the classes whose condition holds:
+A navigation bar marks the current section with `route_is`. It takes the route's name, and
+`*` stands for anything.
+
+`class_names` builds a `class` attribute. It always includes the plain classes, and each
+class in the `{…}` map only when its condition is true:
 
 ```html
 <a href="{{ route('admin.products.index') }}"
@@ -612,24 +897,42 @@ anything), and `class_names` builds a `class` attribute from the classes whose c
 {# request.route is the name itself, e.g. "admin.products.edit" #}
 ```
 
-`route_is` also takes several patterns (`route_is('orders.*', 'checkout')`). In Rust, the
-`CurrentRoute` extractor gives the same (`route.is("admin.*")`, `route.name()`). Loops may stop
-early or skip items with `{% break %}` and `{% continue %}`:
+On any admin products page, this link gets `class="tab tab-active"` and `aria-current`.
+Elsewhere, it's just `class="tab"`.
+
+- `route_is` also takes several patterns: `route_is('orders.*', 'checkout')`.
+- In Rust, the `CurrentRoute` extractor does the same: `route.is("admin.*")`, `route.name()`.
+
+### Loops that stop early
+
+Loops can stop early with `{% break %}`, or skip an item with `{% continue %}`:
 
 ```html
 {% for product in recently_viewed %}{% if loop.index > 4 %}{% break %}{% endif %}…{% endfor %}
 ```
 
-A text that depends on a count uses Laravel's plural ranges in the lang file, `{n}` for exactly
-n, `[a,b]` for a range and `*` for no end: `"{0} Sold out|{1} Only one left|[2,5] Only :count
-left|[6,*] :count in stock"`, printed with `{{ t('products.in_stock', count=product.stock) }}`
-(examples/shop).
+This shows at most four products: on the fifth, the loop stops.
+
+### Texts that depend on a number
+
+Some texts change with a count: "Sold out", "Only one left", "12 in stock". The lang file
+holds all the versions in one line, using Laravel's plural ranges:
+
+- `{n}` for exactly n;
+- `[a,b]` for a range from a to b;
+- `*` for "no end".
+
+For example: `"{0} Sold out|{1} Only one left|[2,5] Only :count
+left|[6,*] :count in stock"`. Print it with
+`{{ t('products.in_stock', count=product.stock) }}` (examples/shop).
 
 ## Actions
 
-Filament's actions as the kit has them: a button that does one thing, often after asking
-for a few values. `action_sheet` is the button, a sheet and the form inside it; the fields
-go in its call block:
+An **action** is a button that does one thing, often after asking for a few values. Think
+"Adjust stock", which asks how many to add or take away.
+
+`action_sheet` is all of it at once: the button, a sheet, and the form inside the sheet. The
+fields go in its call block:
 
 ```html
 {% from "renox/ui.html" import action_sheet, input %}
@@ -640,84 +943,133 @@ go in its call block:
 {% endcall %}
 ```
 
-The form is sent with htmx (`PUT`, `PATCH` and `DELETE` through `_method`). A 422 shows its
-messages under the fields, inside the sheet, which stays open; any other success closes the
-sheet and resets the form (so does Cancel or Esc). The handler is an ordinary one: a `Toast`
-says what happened, and `HxRefresh` reloads the page (the toast waits in the session), or
-`HxTrigger` tells other parts of the page, or, with `target` and `swap`, the response replaces
-part of the page. A check the rules can't make answers with a `ValidationError`, which shows
-up under its field the same way:
+This makes a small "Stock" button with a box icon. Clicking it opens a sheet titled "Adjust
+stock of …", with one number field and an "Adjust stock" button. The form is sent with
+`PUT` to the product's stock route.
+
+> [!NOTE]
+> **Coming from Laravel:** these are Filament's actions, as the kit has them.
+
+What happens when the form is sent:
+
+- It's sent with htmx. `PUT`, `PATCH` and `DELETE` go through `_method`.
+- A 422 answer (the form had errors) shows its messages under the fields, inside the sheet,
+  which stays open.
+- Any other success closes the sheet and resets the form. Cancel and Esc do that too.
+
+The handler is an ordinary one. It can answer with:
+
+- a `Toast`, to say what happened;
+- `HxRefresh`, to reload the page (the toast waits in the session);
+- `HxTrigger`, to tell other parts of the page;
+- or, with `target` and `swap` on the action sheet, HTML that replaces part of the page.
+
+Some checks can't be written as rules, because they need the database. The handler can
+answer with a `ValidationError`, which shows up under its field the same way:
 
 ```rust
 use renox::prelude::*;
 use renox::HxRefresh;
 
+/// The action's form: how much to add (or, if negative, take away).
 #[derive(serde::Deserialize, serde::Serialize)]
 struct StockForm { change: i64 }
 
+/// The form's rules: a number is required, and it can't be 0.
 impl Validate for StockForm {
     fn rules(&self, v: &mut Validator) {
         v.field("change", &self.change).required().rule(self.change != 0, "Type how many.");
     }
 }
 
+/// Changes a product's stock, refuses to go below zero, and reloads the page.
 async fn adjust_stock(Path(id): Path<i64>, Valid(form): Valid<StockForm>) -> Result<(Toast, HxRefresh)> {
     let stock = 3; // the product's, from the database
+    // Taking away more than there is: answer with an error under the "change" field.
     if stock + form.change < 0 {
         let mut errors = Errors::new();
         errors.add("change", format!("Only {stock} in stock to take away."));
         return Err(ValidationError::new(errors).with_input(&form).into());
     }
+    // All good: a toast says what happened, and the page reloads.
     Ok((Toast::success(format!("Product {id}: {} in stock.", stock + form.change)), HxRefresh))
 }
 ```
 
-Its other options: `variant`, `size`, `icon` and `key` for the button; `slide_over`,
-`width` and `modal_icon` for the sheet; `danger=true` for a red submit button;
-`target`/`swap` for htmx; `enctype="multipart/form-data"` for a file field. When the page
-has one per row, give each its own `id` and its fields their own `id=`, as above.
+The action sheet's other options:
 
-What every button (`button`, `link_button`, `open_button`, `icon_button`) can carry:
+- for the button: `variant`, `size`, `icon` and `key`;
+- for the sheet: `slide_over`, `width` and `modal_icon`;
+- `danger=true` for a red submit button;
+- `target`/`swap` for htmx;
+- `enctype="multipart/form-data"` for a file field.
 
-- **An icon** before the label, by name: `icon="plus"`. The kit's icons: `plus`, `edit`,
+> [!IMPORTANT]
+> When a page has one action sheet per row, give each its own `id`, and its fields their own
+> `id=`, as in the example above. Otherwise two rows' sheets get mixed up.
+
+### What every button can carry
+
+These work on every button (`button`, `link_button`, `open_button`, `icon_button`):
+
+- **An icon** before the label, by name: `icon="plus"`. The kit's icons are `plus`, `edit`,
   `trash`, `check`, `close`, `copy`, `download`, `upload`, `external`, `refresh`, `search`,
   `settings`, `more`, `box`, `calendar`, `eye`, `up`, `down`, `prev`, `next`, and the
   status icons `info`, `success`, `warning`, `error`.
-- **A count**: `badge=3` (0 is shown, an empty string or `none` isn't).
-- **A keyboard shortcut**: `key="mod+s"` (`mod` is ⌘ on a Mac and Ctrl elsewhere; also
-  `ctrl`, `alt`, `shift`, and keys like `enter`, `esc`, `backspace`). It clicks the first
-  visible element with that key (inside the open sheet when there is one); a key without
-  `mod`, `ctrl` or `alt` doesn't fire while typing in a field. The button gets
-  `aria-keyshortcuts`, and its tooltip (or `title`) names the shortcut.
-- **A reason it's disabled**: `disabled_reason="Add a photo first."` keeps it focusable and
-  shows the reason as its tooltip (on a tap too), while a click does nothing; plain
-  `disabled=true` takes it out of the tab order.
+- **A count**: `badge=3`. A 0 is shown; an empty string or `none` isn't.
+- **A keyboard shortcut**: `key="mod+s"`.
+  - `mod` is ⌘ on a Mac and Ctrl elsewhere. You can also use `ctrl`, `alt`, `shift`, and keys
+    like `enter`, `esc`, `backspace`.
+  - The shortcut clicks the first visible element with that key (inside the open sheet, when
+    there is one).
+  - A key without `mod`, `ctrl` or `alt` doesn't fire while someone is typing in a field.
+  - The button gets `aria-keyshortcuts`, and its tooltip (or `title`) names the shortcut.
+- **A reason it's disabled**: `disabled_reason="Add a photo first."` The button can still get
+  focus and shows the reason as its tooltip (on a tap too), but a click does nothing. Plain
+  `disabled=true` instead takes it out of the tab order entirely.
 
-An `icon_button`'s `label` is said by screen readers and shown as a tooltip after a short
-hover or at once on keyboard focus. Any element can have a tooltip with `data-rx-tip="…"`.
+An `icon_button`'s `label` is read out by screen readers. It's also shown as a tooltip after
+a short hover, or at once when the button gets keyboard focus. Any element can have a tooltip
+with `data-rx-tip="…"`.
 
-examples/shop's admin product list has all of these: an "Adjust stock" action per row, an
-edit `icon_button`, a "view in the shop" one disabled with a reason for hidden products, and
-the "New product" button on the `n` key; its product form saves on ⌘S / Ctrl+S.
+examples/shop's admin product list has all of these:
+
+- an "Adjust stock" action on each row;
+- an edit `icon_button`;
+- a "view in the shop" button, disabled with a reason for hidden products;
+- the "New product" button on the `n` key.
+
+Its product form also saves on ⌘S / Ctrl+S.
 
 ## Dashboards
 
-Figures, charts and the period they cover, like Filament's widgets, drawn on the server as
-plain HTML and SVG (no chart library, nothing to load):
+A dashboard shows figures, charts and the period of time they cover. Renox draws them on the
+server as plain HTML and SVG (a format for drawings). There's no chart library and nothing
+extra for the browser to load.
+
+> [!NOTE]
+> **Coming from Laravel:** these play the role of Filament's widgets.
+
+First, the handler collects the numbers:
 
 ```rust
 use renox::prelude::*;
 use renox::chart::{Period, Trend};
 
+/// An order.
 #[derive(Model, serde::Serialize, Default)]
 struct Order { id: i64, total: i64, status: String, created_at: Option<renox::db::DateTime> }
 
 // `?period=30d`: 7d, 30d, 90d (any number of days up to 366), 12m (months up
 // to 36), mtd, ytd; 30 days without one.
+/// The dashboard page: sales, sales in the period before, and the number of orders.
 async fn dashboard(State(state): State<AppState>, period: Period) -> Result<View> {
+    // A query for paid orders, made fresh each time it's needed.
     let paid = || Order::where_eq("status", "paid");
+    // The sum of `total` per day (or month) in the chosen period, and in the one before.
     let sales = Trend::of(paid(), "created_at").over(period).sum(&state, "total").await?;
     let before = Trend::of(paid(), "created_at").over(period.previous()).sum(&state, "total").await?;
+    // How many paid orders there were per day (or month).
     let orders = Trend::of(paid(), "created_at").over(period).count(&state).await?;
     Ok(view("dashboard.html", context! {
         period,
@@ -728,6 +1080,8 @@ async fn dashboard(State(state): State<AppState>, period: Period) -> Result<View
     }))
 }
 ```
+
+`Period` reads the period from the address (`?period=30d`). Then the template draws them:
 
 ```html
 {% from "renox/ui.html" import period_filter, stats, stat, dashboard, widget %}
@@ -745,64 +1099,106 @@ async fn dashboard(State(state): State<AppState>, period: Period) -> Result<View
 {% endcall %}
 ```
 
-- **`Trend::of(query, column)`** places a model's rows in time by a date-time column and
-  gives a `Series` per day (up to 92 days, and `mtd`) or per month: `count`, `sum(column)`
-  or `average(column)`. The query's conditions apply; days are cut in `APP_TIMEZONE` (at its
-  offset at the end of the period); empty days are 0. `Period::previous()` is the period
-  just before, as long, for `Series::change_from` (a percent). A `Series` is `labels`
-  (`2026-10-02`, or `2026-10` per month), `values`, `total()` and `named(…)`; build one by
-  hand with `Series::new(labels, values)`.
-- **`chart(kind, data, …)`**: `line`, `area`, `bar` (`stacked=true`) or `pie`/`doughnut`.
-  `data` is a `Series`, a list of numbers, or a list of series (`{name, values}` maps);
-  or pass `labels=…` with `series=[…]` or `values=[…]`. Options: `format` (`number`,
-  `money` in `APP_CURRENCY` or `currency=…`, `percent`), `decimals`, `height` (240 px),
-  `title` (for screen readers), `name` (one series' name), `x_format` (chrono's codes for
-  date labels; else `Oct 2`, `Oct 2026`), `legend=false`, `table=false`, `id`.
-- **How they read.** One axis that starts at 0 with clean ticks (`12.5K`, or `2,5M` where
-  the locale writes a decimal comma); a legend for two series or more; hairline grid; 2 px lines with a dot at the
-  end; bars at most 24 px wide with rounded ends; a doughnut keeps six slices and folds the
-  rest into "Other". The six series colours come in a fixed order checked for colour
-  blindness in both appearances (`--rx-chart-1` … `--rx-chart-6`; a seventh series is grey).
-- **Hover and keyboard.** A crosshair and one tooltip with every series at the nearest date
-  (line, area), or per bar and per slice; the chart takes focus and the arrow keys, Home and
-  End move along it. Every chart also has a "Show the data" table, so no value is only in a
-  colour or a tooltip.
-- **`stat(label, value, delta=…, delta_label=…, good="up", trend=…, url=…, hint=…)`**: a
-  figure (`value` as it should read: `total | money`), its change in percent with an arrow
-  and its sign (green when it goes the `good` way, "up", "down" or "none"), a sparkline of
-  `trend`, a link. `stats(columns)` sets them side by side (two per row on phones).
+This page shows, from top to bottom:
+
+- a row of buttons to pick the period;
+- a row of figures: the revenue (with its change and a small trend line) and the refunds
+  (where going down is good);
+- a grid of cards: a sales chart, the orders "by status" (loaded from another URL and
+  refreshed every 60 seconds), and a bar chart of orders across the full width.
+
+The parts, one by one:
+
+- **`Trend::of(query, column)`** places a model's rows in time, by a date-time column.
+  - It gives a `Series` per day (for up to 92 days, and for `mtd`) or per month.
+  - It can `count`, `sum(column)` or `average(column)`.
+  - The query's conditions apply.
+  - Days are cut in `APP_TIMEZONE` (at its offset at the end of the period). Empty days are 0.
+  - `Period::previous()` is the period just before, as long, for `Series::change_from` (a
+    percent).
+  - A `Series` has `labels` (`2026-10-02`, or `2026-10` per month), `values`, `total()` and
+    `named(…)`. Build one by hand with `Series::new(labels, values)`.
+- **`chart(kind, data, …)`** draws a chart.
+  - Kinds: `line`, `area`, `bar` (`stacked=true` piles bars on top of each other), or
+    `pie`/`doughnut`.
+  - `data` is a `Series`, a list of numbers, or a list of series (`{name, values}` maps).
+    Or pass `labels=…` with `series=[…]` or `values=[…]`.
+  - Options: `format` (`number`, `money` in `APP_CURRENCY` or `currency=…`, `percent`),
+    `decimals`, `height` (240 px), `title` (for screen readers), `name` (one series' name),
+    `x_format` (chrono's codes for date labels; otherwise `Oct 2`, `Oct 2026`),
+    `legend=false`, `table=false`, `id`.
+- **How the charts look.**
+  - One axis that starts at 0, with clean tick labels (`12.5K`, or `2,5M` where the language
+    writes a decimal comma).
+  - A legend for two series or more.
+  - A hairline grid; 2 px lines with a dot at the end.
+  - Bars at most 24 px wide, with rounded ends.
+  - A doughnut keeps six slices and folds the rest into "Other".
+  - The six series colours come in a fixed order, checked for colour blindness in both
+    light and dark mode (`--rx-chart-1` … `--rx-chart-6`). A seventh series is grey.
+- **Hover and keyboard.**
+  - On line and area charts, a crosshair and one tooltip with every series at the nearest
+    date. On bars and slices, a tooltip for each.
+  - The chart can take focus, and the arrow keys, Home and End move along it.
+  - Every chart also has a "Show the data" table, so no value is only in a colour or a
+    tooltip.
+- **`stat(label, value, delta=…, delta_label=…, good="up", trend=…, url=…, hint=…)`** is one
+  figure.
+  - `value` is written as it should read: `total | money`.
+  - `delta` is its change in percent, with an arrow and its sign. It's green when it goes the
+    `good` way: `"up"`, `"down"` or `"none"`.
+  - `trend` draws a sparkline (a tiny line chart); `url` makes it a link.
+  - `stats(columns)` sets stats side by side (two per row on phones).
 - **`dashboard(columns)` + `widget(title, description=…, span=…, url=…, poll=…)`**: cards in
-  a grid (one column on phones; `span=2` or `"full"`). A widget's content is its call block,
-  or what `url` answers (a small template, or a `View` fragment), loaded after the page and
-  again every `poll` seconds; the old content stays, dimmed, until the new one arrives.
-- **`period_filter(period, options=…)`**: one row of presets over everything it scopes
-  (`?period=`, keeping the rest of the query: `query_with(period="7d")` builds such links
-  in any template).
+  a grid (one column on phones; `span=2` or `"full"` for wider cards).
+  - A widget's content is its call block, or what `url` answers (a small template, or a
+    `View` fragment).
+  - With `url`, the content is loaded after the page, and again every `poll` seconds. The old
+    content stays, dimmed, until the new one arrives.
+- **`period_filter(period, options=…)`**: one row of preset periods, over everything it
+  applies to. Its links set `?period=` and keep the rest of the address's query.
+  `query_with(period="7d")` builds such links in any template.
 
 examples/shop's admin dashboard uses all of it: the period, four figures, revenue against
-the period before, orders per day, and orders by status loaded on their own every minute.
+the period before, orders per day, and orders by status, loaded on their own every minute.
 
 ## Data grids
 
-`renox::grid` is a server-side data grid for dashboards and back offices: a table that fills
-its container, with a filter in every heading, sorting, pagination, frozen columns, grouped
-headings, columns each user picks per screen size, editing in place, actions on selected rows,
-summaries, groups and exports. It is defined in Rust and drawn with the `grid` macro of
-`renox/grid.html`. [docs/grid.md](grid.md) is its guide, and examples/grid a dashboard built on
-it. `{{ sparkline(values) }}` (a small line or bar chart as inline SVG) works in any template,
+`renox::grid` is a data grid for dashboards and back offices: a big table that works on the
+server. It fills its container and has:
+
+- a filter in every column heading, sorting and pagination;
+- frozen columns (they stay put when you scroll sideways) and grouped headings;
+- columns each user picks, per screen size;
+- editing in place, and actions on selected rows;
+- summaries, groups and exports.
+
+You define it in Rust and draw it with the `grid` macro of `renox/grid.html`.
+[docs/grid.md](grid.md) is its guide, and examples/grid is a dashboard built on it.
+
+`{{ sparkline(values) }}` (a small line or bar chart as inline SVG) works in any template,
 not only in a grid.
+
+> [!NOTE]
+> **Coming from Laravel:** this plays the role of Filament's tables.
 
 ## Stacks
 
-A page or a component often needs something in another part of the layout: a script at the end
-of `<body>`, a style or a `<meta>` in `<head>`. The layout names the places with `stack`, and
-anything rendered for the page adds to them with `push`:
+A page or a component often needs to add something to another part of the layout: a script
+at the end of `<body>`, or a style or a `<meta>` tag in `<head>`.
+
+Stacks solve this. The layout names the places with `stack`. Anything rendered for the page
+adds to them with `push`.
+
+The layout:
 
 ```html
 {# layouts/app.html (rnx new's layout has both) #}
 <head>… {{ stack('head') }}</head>
 <body>… {{ stack('scripts') }}</body>
 ```
+
+A component that needs a script:
 
 ```html
 {# components/chart.html #}
@@ -814,43 +1210,73 @@ anything rendered for the page adds to them with `push`:
 {%- endmacro %}
 ```
 
+The `<canvas>` goes where the component is used. The `<script>` goes to the end of `<body>`,
+where the layout has `stack('scripts')`.
+
+The rules:
+
 - `push(name)` adds to the end of the stack, `prepend(name)` to the front.
-- `once='key'` adds it only the first time that key is pushed to that stack on the page, however
-  many charts there are.
-- Pushes work from the page's blocks, from included templates and from imported components,
-  and they reach a stack that was rendered earlier (the head): the layout's head is written
-  before the page's blocks run, so `stack` leaves a marker that's filled in once the page is
-  done.
-- htmx fragments (`.fragment("rows")`) have no layout, so what they push goes nowhere. Put a
-  fragment's script in the fragment itself.
+- `once='key'` adds it only the first time that key is pushed to that stack on the page. So
+  the script is added once, however many charts there are.
+- Pushes work from the page's blocks, from included templates and from imported components.
+- They even reach a stack that was written earlier, such as the one in `<head>`. The layout's
+  head is written before the page's blocks run, so `stack` leaves a marker that is filled in
+  once the page is done.
 - Error pages (`errors/*.html`) have stacks too. Mails don't.
+
+> [!WARNING]
+> htmx fragments (`.fragment("rows")`) have no layout, so what they push goes nowhere. Put a
+> fragment's script in the fragment itself.
+
+> [!NOTE]
+> **Coming from Laravel:** this is `@push('scripts')` / `@stack('scripts')`, `@pushOnce`
+> and `@prepend`.
 
 ## Tailwind CSS
 
-`rnx new shop --tailwind` sets it up; for an existing app, create `resources/css/app.css`:
+Tailwind is a CSS tool: you style things with small classes like `mt-4` (margin on top) or
+`text-sm` (small text), and it builds a stylesheet with just the classes you used.
+
+`rnx new shop --tailwind` sets it up in a new app. For an existing app, create
+`resources/css/app.css`:
 
 ```css
 @import "tailwindcss";
 @source "../views";
 ```
 
-and link the output in the layout: `<link rel="stylesheet" href="{{ asset('css/app.css') }}">`.
+The first line brings in Tailwind. The second tells it to look for class names in your
+templates.
 
-- `rnx serve` runs Tailwind in watch mode next to the app: it rebuilds `public/css/app.css` when
-  a view changes, and the page reloads.
-- `rnx build` builds it minified before compiling, so an embedded binary carries it. `rnx tailwind`
-  builds it once (`--minify`, `--watch`).
-- There's no Node: `rnx` downloads Tailwind's standalone CLI (v4, the version `rnx` pins) once into
-  your cache and checks its SHA-256. `rnx tailwind:install` does it ahead of time;
-  `TAILWIND_BIN=/path/to/tailwindcss` uses another binary, `RNX_CACHE_DIR` moves the cache.
-- Commit `public/css/app.css`: the Dockerfile from `make:deploy` builds the app without
-  Tailwind.
-- The kit's `rx-*` rules sit outside Tailwind's cascade layers, so the components keep their
-  look, and utilities (`mt-4`, `text-sm`, `md:grid-cols-2`) lay out around them. Tailwind's reset
-  changes bare elements (headings, lists, links without a class) in your own markup; style those
-  with utilities or the kit's classes (`rx-title`, `rx-link`).
+Then link the output in the layout: `<link rel="stylesheet" href="{{ asset('css/app.css') }}">`.
+
+How it runs:
+
+- `rnx serve` runs Tailwind in watch mode next to the app. It rebuilds `public/css/app.css`
+  when a view changes, and the page reloads.
+- `rnx build` builds it minified (made as small as possible) before compiling, so an
+  embedded binary carries it. `rnx tailwind` builds it once (`--minify`, `--watch`).
+- There's no Node.js needed. `rnx` downloads Tailwind's standalone program (v4, the version
+  `rnx` pins) once into your cache, and checks its SHA-256 (a fingerprint that proves it's
+  the right file). `rnx tailwind:install` does that ahead of time.
+  `TAILWIND_BIN=/path/to/tailwindcss` uses another binary, and `RNX_CACHE_DIR` moves the
+  cache.
+
+> [!IMPORTANT]
+> Commit `public/css/app.css` to git. The Dockerfile from `make:deploy` builds the app
+> without Tailwind, so it needs the built file.
+
+Tailwind and the kit together:
+
+- The kit's `rx-*` rules sit outside Tailwind's cascade layers (its system for deciding which
+  rule wins). So the components keep their look, and utilities (`mt-4`, `text-sm`,
+  `md:grid-cols-2`) lay things out around them.
+- Tailwind's reset changes bare elements (headings, lists, links without a class) in your own
+  markup. Style those with utilities, or with the kit's classes (`rx-title`, `rx-link`).
 
 ## Coming from Laravel
+
+If you know Laravel, this table maps what you know to Renox:
 
 | Laravel | Renox |
 |---|---|
