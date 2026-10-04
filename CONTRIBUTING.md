@@ -71,7 +71,9 @@ cargo test --workspace
   one), and their examples run as doctests.
   A new API also gets a line in [CHEATSHEET.md](CHEATSHEET.md) (compiled as a doctest too).
 - **Generators.** A change to `rnx new` or `rnx make:*` must keep `tests/cli/run.sh` passing:
-  it builds and tests an app made with every generator.
+  it builds and tests an app made with every generator, and (with SQLite) serves it and uses
+  it over HTTP with `tests/cli/smoke.py`: pages, a `--resource` module's forms, the starter
+  kit's sign-up and roles.
 - **The tutorial.** `tests/tutorial/run.sh` follows docs/tutorial.md the way a reader does and
   checks the result (fmt, clippy, tests, seeding, the app running). Run it after changing the
   tutorial, a generator it uses, or anything its app relies on.

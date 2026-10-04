@@ -10,6 +10,14 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **`tests/cli/smoke.py`** (#142), run by tests/cli/run.sh: the generated apps are used over
+  HTTP the way a browser does (cookies, CSRF tokens, Referer). Every GET page answers a guest
+  and a logged-in user without a server error; a `--resource` module is created (an invalid
+  form first: errors and old input), listed, shown, edited (an unticked checkbox must store
+  false, checked in the database) and deleted, with its toasts and a 404. On the starter app:
+  sign-up lands on email verification, the seeded admin uses the dashboard, users page and
+  activity log and changes a member's roles (recorded), and a member gets 403.
+
 - **Fixed (#160):** with serde_html_form 0.4 (#137), an unchecked checkbox no longer read as
   `false`: its field was "required" or kept its old value. `Valid<T>` recognises the bool
   error by its wording, which 0.4 changed (`expected "true", "on" or "false"`); both wordings
