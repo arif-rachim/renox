@@ -1,4 +1,4 @@
-//! The site's icons: line icons from Lucide (https://lucide.dev, ISC
+//! The site's icons: line icons from Lucide (<https://lucide.dev>, ISC
 //! license), inlined so a page needs no icon font or extra request. Templates
 //! call `icon("name")`; the Markdown renderer uses [`svg`] for callouts and
 //! code panels. Icons are decorative (`aria-hidden`): the text beside them
