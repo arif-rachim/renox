@@ -10,6 +10,9 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Guides for beginners, part 3 (#193):** grid.md, testing.md, postgresql.md, operations.md,
+  development.md, stability.md and laravel.md rewritten in plain words; README.md and
+  CHEATSHEET.md made plainer (an opening for each section, comments in the samples).
 - **Guides for beginners, part 2 (#193):** relations.md, types.md, authorization.md, queue.md,
   mail.md and scheduling.md rewritten in plain words, like part 1.
 - **Guides for beginners, part 1 (#193):** routing.md, validation.md and ui.md rewritten in

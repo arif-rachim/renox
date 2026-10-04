@@ -1,60 +1,135 @@
 # Faster builds while developing
 
-Rust compiles everything before the first page appears. After that, `rnx serve` rebuilds only
-your crate on each change, and templates, translations and `public/` files reload without a
-build. These settings make both steps quicker.
+This page helps you wait less while you work on a Renox app. It explains why Rust builds take
+time, what `rnx new` already does about it, and a few extra things you can turn on.
+
+Here is the short version. Rust has to turn your code and all the libraries it uses into a
+program before the first page appears. That first build is slow. After that, `rnx serve` only
+rebuilds **your** code when you change it. Templates, translations and files in `public/` don't
+need a build at all: they reload by themselves. The settings below make both kinds of build
+quicker.
+
+### In this guide
+
+- [What `rnx new` already does](#what-rnx-new-already-does): two speed-ups every new app has.
+- [A faster linker](#a-faster-linker): speed up the last step of every build.
+- [Fewer dependencies](#fewer-dependencies): build less code by turning off parts you don't use.
+- [Sharing compiled dependencies](#sharing-compiled-dependencies): reuse work between apps.
+- [Docker](#docker): keep Docker builds quick.
+
+### Words you'll meet
+
+| Word | What it means |
+|---|---|
+| **compile** | Turn Rust source code into machine code the computer can run. |
+| **link** | The last step of a build: glue all the compiled pieces into one program file. |
+| **crate** | A Rust package. Your app is a crate; Renox and the libraries it uses are crates too. |
+| **dependency** | A crate your app uses. Each one has to be compiled at least once. |
+| **incremental rebuild** | A rebuild after a small change, where only the changed crate is compiled again. |
+| **profile** | A set of build settings. `dev` is used while you develop; `release` for the server. |
+| **opt-level** | How hard the compiler works to make code fast. `0` builds quickly but runs slowly; `3` is the fastest code. |
+| **debug info** | Extra data in the program that tells tools which line of source each piece came from. |
+| **feature** | A switch in `Cargo.toml` that turns an optional part of a crate on or off. |
 
 ## What `rnx new` already does
 
-- **Argon2 and BLAKE2 are optimised in dev builds** (`[profile.dev.package.argon2]` and
-  `[profile.dev.package.blake2]`, both `opt-level = 3`; Argon2 hashes with BLAKE2). Password
-  hashing is slow on purpose, and very slow unoptimised; every login test would pay for it.
-- **Debug info is only line tables** (`[profile.dev] debug = "line-tables-only"`). Backtraces
-  keep file and line numbers, while binaries are much smaller and linking, the part of each
-  rebuild you wait for, is faster. Use `debug = true` when you need a debugger that shows
-  variables.
+Every app made by `rnx new` comes with two speed-ups in its `Cargo.toml`.
+
+### Fast password hashing in dev builds
+
+**Argon2 and BLAKE2 are optimised in dev builds.** The settings are
+`[profile.dev.package.argon2]` and `[profile.dev.package.blake2]`, both with `opt-level = 3`.
+(Argon2 uses BLAKE2 inside, so both need it.)
+
+Why? Argon2 turns passwords into hashes, and it is slow on purpose, to make guessing passwords
+hard. Without optimisation it becomes *very* slow. Every login in every test would pay for it.
+With these two lines, only these two crates are optimised, and the rest of the dev build stays
+quick to compile.
+
+### Smaller debug info
+
+**Debug info is only line tables** (`[profile.dev] debug = "line-tables-only"`).
+
+That means the program still knows the file and line number of each piece of code, so a crash
+report (a backtrace) still points to the right line. But the program file is much smaller. A
+smaller file links faster, and linking is the part of each rebuild you wait for.
+
+> [!TIP]
+> Need a debugger that shows the values of your variables? Set `debug = true` for a while. It
+> makes builds slower, so switch back when you're done.
 
 ## A faster linker
 
-Linking is most of an incremental rebuild. With [mold](https://github.com/rui314/mold) (Linux) or
-lld, add `.cargo/config.toml` to the app:
+Linking is most of the time of an incremental rebuild. A faster linker helps on every change.
+
+On Linux, install [mold](https://github.com/rui314/mold) (or lld), then add a file
+`.cargo/config.toml` to the app:
 
 ```toml
+# Use clang to drive the link, and tell it to use mold (Linux, 64-bit Intel/AMD)
 [target.x86_64-unknown-linux-gnu]
 linker = "clang"
 rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 ```
 
-On macOS the default linker (ld-prime) is already fast. On Windows, use `rust-lld`:
-`rustflags = ["-C", "link-arg=-fuse-ld=lld"]` for `x86_64-pc-windows-msvc`.
+This tells Rust: "when you build for 64-bit Linux, use `clang` to link, and let it call mold".
+
+On other systems:
+
+- **macOS:** the default linker (ld-prime) is already fast. Nothing to do.
+- **Windows:** use `rust-lld`. Add `rustflags = ["-C", "link-arg=-fuse-ld=lld"]` for the
+  target `x86_64-pc-windows-msvc`.
 
 ## Fewer dependencies
 
-Renox's default features are `fake` (the `renox::fake` re-export used by factories), `http`
-(real requests for `state.http`, which brings reqwest; the test fake works without it) and
-`server-events` (`analytics::ServerEvent`, which needs `http`). An app that uses none of them
-can drop them:
+Less code to compile means faster builds. Renox has some parts you can switch off with
+**features**.
+
+Renox's default features (the ones that are on unless you say otherwise) are:
+
+| Feature | What it gives you |
+|---|---|
+| `fake` | The `renox::fake` re-export, used by factories to make fake test data. |
+| `http` | Real web requests for `state.http`. It brings in the reqwest crate. The test fake works without it. |
+| `server-events` | `analytics::ServerEvent`. It needs `http`. |
+
+An app that uses none of them can turn them off:
 
 ```toml
 renox = { git = "…", rev = "…", default-features = false }
 # or keep some: default-features = false, features = ["fake"]
 ```
 
-`postgres`, `s3`, `uuid` and `xlsx` (Excel exports of data grids) are off unless you turn them
-on. `s3` is the heaviest: it turns on object_store's `aws` feature, which brings reqwest and
-aws-lc-rs (a C crypto library); it is not the AWS SDK.
+`default-features = false` turns all three off. The comment shows how to keep only the ones you
+want: list them in `features`.
 
-TLS uses rustls with the `ring` provider, so no C crypto library (aws-lc) is compiled; only
-SQLite's C source is.
+Some features are **off** unless you turn them on: `postgres`, `s3`, `uuid` and `xlsx` (Excel
+exports of data grids).
+
+> [!NOTE]
+> `s3` is the heaviest. It turns on object_store's `aws` feature, which brings in reqwest and
+> aws-lc-rs (a crypto library written in C). It is not the AWS SDK.
+
+For secure connections (TLS), Renox uses rustls with the `ring` provider. So no C crypto
+library (aws-lc) is compiled. The only C code that gets compiled is SQLite's.
 
 ## Sharing compiled dependencies
 
-Several apps on one machine can share compiled dependencies with
-[sccache](https://github.com/mozilla/sccache) (`RUSTC_WRAPPER=sccache`). The first build of each
-app then reuses the others' work.
+Do you have several Rust apps on one machine? They can share compiled dependencies with
+[sccache](https://github.com/mozilla/sccache). Turn it on by setting the environment variable
+`RUSTC_WRAPPER=sccache`.
+
+sccache keeps a copy of everything it compiles. When the first build of another app needs the
+same crate, it reuses that copy instead of compiling it again.
 
 ## Docker
 
-The Dockerfile from `rnx make:deploy` builds dependencies in their own layer (cargo-chef). Docker
-reuses that layer until `Cargo.toml` or `Cargo.lock` change, so after a code change only your
-crate is compiled. Commit `Cargo.lock`.
+The Dockerfile that `rnx make:deploy` writes builds your dependencies in their own **layer**
+(a saved step of a Docker build), using a tool called cargo-chef.
+
+Docker reuses that layer until `Cargo.toml` or `Cargo.lock` change. So after a change to your
+code, only your own crate is compiled, not every dependency again.
+
+> [!IMPORTANT]
+> Commit `Cargo.lock` to your repository. It records the exact version of every dependency,
+> so the dependency layer is built from the same versions each time.

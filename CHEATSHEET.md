@@ -1,10 +1,18 @@
 # Renox cheat-sheet
 
-This page shows the most common patterns, one short example each, written the recommended way.
-Every Rust block below is compiled by `cargo test --doc -p renox`, so none of them can drift out of
-date. For whole apps, see [`examples/`](examples) (the list is in [llms.txt](llms.txt)).
+This page is a quick reference: one short example for each common task, written the way Renox
+recommends. It's for when you know roughly what you want and need to see how it's written.
+Every Rust example below is compiled and checked by `cargo test --doc -p renox`, so none of
+them can drift out of date. For whole apps, see [`examples/`](examples) (the list is in
+[llms.txt](llms.txt)).
+
+> [!TIP]
+> New to Renox? Start with [the tutorial](docs/tutorial.md). It builds one small app step by
+> step and explains every word. Come back here when you need a reminder.
 
 ## Commands
+
+`rnx` is Renox's command-line tool. Type these in a terminal, inside your app's folder.
 
 ```bash
 rnx new shop                         # or: --database postgres, --tailwind (Tailwind CSS, no Node)
@@ -44,12 +52,16 @@ running them in separate processes.
 
 ## App, module, routes (details in [docs/routing.md](docs/routing.md))
 
+An app is made of modules, and each module is one feature (here, products). Its routes say
+which function (a handler) answers which address (URL).
+
 ```rust
 use renox::prelude::*;
 use renox::clap;
 use renox::command::AppCommand;
 use std::time::Duration;
 
+/// Builds the whole app. `src/main.rs` runs it, and tests start it too.
 pub fn app() -> App {
     App::new()
         .embed(renox::embedded!())         // views, lang files, public/ inside the binary
@@ -58,6 +70,7 @@ pub fn app() -> App {
         .module(Products)
 }
 
+/// One feature of the app: everything about products.
 pub struct Products;
 
 impl Module for Products {
@@ -65,6 +78,7 @@ impl Module for Products {
         "products"
     }
 
+    /// The URLs this module answers, and the handler that runs for each.
     fn routes(&self) -> Routes {
         let public = Routes::new()
             .get("/products", index).name("products.index")
@@ -106,10 +120,12 @@ impl Module for Products {
     }
 }
 
+/// A handler: it answers a request with a page (a view) and the values it shows.
 async fn index() -> View {
     view("products/index.html", context! { title => "Products" })
 }
 
+/// `Path(id)` reads the `{id}` part of the URL, such as 7 in `/products/7`.
 async fn show(Path(id): Path<i64>) -> Result<View> {
     abort_if(id > 1_000_000, StatusCode::NOT_FOUND, "No such product.")?; // a status with a message
     Ok(view("products/show.html", context! { id }))
@@ -172,6 +188,9 @@ and is still alive across an `.await`. Collect into a `Vec` first, then await. A
 
 ## Views (MiniJinja)
 
+Views (templates) are HTML files with blanks the app fills in. `{{ … }}` prints a value,
+`{% … %}` runs logic such as `if` and `for`, and `{# … #}` is a comment.
+
 ```html
 {% extends "layouts/app.html" %}
 {% block content %}
@@ -228,6 +247,7 @@ for a `simple_paginate` page).
 use renox::prelude::*;
 use renox::view::ViewContext;
 
+/// Adds a template filter, and a value every view can use.
 fn view_extras(app: App) -> App {
     app.templates(|env| {
         // Your own filters and functions (MiniJinja's API).
@@ -248,6 +268,9 @@ fn view_extras(app: App) -> App {
 ```
 
 ## Components and the UI kit (details in docs/ui.md)
+
+The UI kit is a set of ready-made page parts: fields, buttons, menus, tables and more. Each
+part is a macro: you import it into a template, then call it like a function.
 
 ```html
 {# layout: {{ renox_head() }}{{ renox_ui() }} in <head>, <body class="rx-page">, {{ toasts() }} #}
@@ -337,6 +360,9 @@ classes keep working next to the utilities.
 
 ## Your own shared values and middleware
 
+Give every handler the same service (here, a payment client), and run your own code around
+each request. Code that runs around requests is called middleware.
+
 ```rust
 use renox::prelude::*;
 use renox::Provided;
@@ -346,6 +372,7 @@ use renox::axum::middleware::{Next, from_fn};
 #[derive(Clone)]
 struct Payments { api_key: String }
 
+/// `Provided<T>` hands the handler the value given to `App::provide`.
 async fn pay(payments: Provided<Payments>) -> String {
     // In jobs, listeners, commands and tasks: state.provided::<Payments>()
     format!("key starts with {}", &payments.api_key[..3])
@@ -354,6 +381,7 @@ async fn pay(payments: Provided<Payments>) -> String {
 #[derive(Clone)]
 struct Plan(&'static str);
 
+/// A middleware: code that runs before and after the handler of each request.
 async fn stamp(user: Option<AuthUser>, req: Request, next: Next) -> Response {
     renox::context::set(Plan(if user.is_some() { "member" } else { "guest" }));
     let mut res = next.run(req).await; // runs after the session and user are loaded
@@ -366,6 +394,7 @@ async fn plan(renox::context::Current(plan): renox::context::Current<Plan>) -> &
     plan.0
 }
 
+/// Registers the shared value and the middleware on the app.
 fn wiring(app: App) -> App {
     let _ = plan;
     app.provide(Payments { api_key: "sk_test_123".into() })
@@ -380,10 +409,14 @@ fn plan_routes() -> Routes {
 
 ## Form + validation (details in [docs/validation.md](docs/validation.md))
 
+Validation checks what people send before your code uses it. Write the rules once; `Valid<T>`
+runs them and, when something is wrong, shows the errors next to the fields.
+
 ```rust
 use renox::prelude::*;
 use serde::Deserialize;
 
+/// What the form sends: one field per input, matched by the input's `name`.
 #[derive(Deserialize)]
 struct ProductForm {
     name: String,
@@ -399,6 +432,7 @@ struct ProductForm {
     photos: Vec<Upload>, // <input type="file" name="photos" multiple>
 }
 
+/// The rules each field must pass. One field can have several rules in a row.
 impl Validate for ProductForm {
     fn rules(&self, v: &mut Validator) {
         v.field("name", &self.name).required().max(100).unique("products", "name");
@@ -440,6 +474,7 @@ struct ContactForm {
 // errors and old input; an HTMX post gets a 422 and the errors appear next to
 // the fields. Every field's errors show at once, even when one doesn't parse.
 async fn store(session: Session, Valid(form): Valid<ProductForm>) -> Result<Redirect> {
+    // Here `form` has passed every rule.
     let _ = form.name;
     session.flash("status", "Saved.")?; // session.keep(&["status"]) carries it one more request;
     Ok(Redirect::to("/products"))       // session.flash_now(key, value) shows one on this page only
@@ -466,7 +501,9 @@ struct SignIn {
 </form>
 ```
 
-A form request (Laravel's `FormRequest`): three optional hooks around the rules.
+A form request (Laravel's `FormRequest`) adds three optional steps around the rules: tidy the
+input first (`prepare`), check the user may send it (`authorize`), and run extra checks at the
+end (`after`).
 
 ```rust
 use renox::prelude::*;
@@ -490,7 +527,7 @@ impl Validate for Invite {
 }
 ```
 
-The same form for create and edit, with the row's id in a hidden input:
+One form can serve both "create" and "edit". The row's id travels in a hidden input:
 
 ```rust
 use renox::prelude::*;
@@ -516,6 +553,10 @@ impl Validate for ProductForm {
 
 ## Model, migration, queries
 
+A migration is a SQL file that creates or changes a table. A model is a Rust struct that
+matches the table: one struct is one row. The query builder finds and changes rows without
+writing SQL by hand.
+
 ```sql
 -- migrations/20260101000000_create_products_table.up.sql
 -- (PostgreSQL: *.postgres.up.sql with BIGINT GENERATED BY DEFAULT AS IDENTITY, TIMESTAMPTZ)
@@ -532,6 +573,7 @@ CREATE TABLE products (
 use renox::prelude::*;
 use serde::Serialize;
 
+/// One row of the `products` table. Each field is the column with the same name.
 #[derive(Model, Serialize, Default, Debug, Clone)]
 #[model(table = "products", soft_deletes)]
 struct Product {
@@ -545,9 +587,11 @@ struct Product {
 }
 
 async fn queries(db: &Db) -> Result {
+    // Insert a row; `create` returns it with its new id.
     let mut tea = Product::create(db, Product { name: "Tea".into(), price: 9_000, ..Default::default() }).await?;
     tea.price = 10_000;
     tea.save(db).await?; // UPDATE; sets updated_at
+    // Read the rows that match, sorted by name, at most 10.
     let cheap = Product::query()
         .where_op("price", "<", 20_000)
         .where_like("name", "%tea%") // ignores case
@@ -688,6 +732,9 @@ See [docs/relations.md](docs/relations.md): pivot columns (`attach_with`, `load_
 
 ## Model hooks, partial saves, encrypted values
 
+Run your own code just before or after a model is saved or deleted (hooks), save only some
+columns, and keep secrets encrypted in the database.
+
 ```rust
 use renox::db::{Encrypted, ModelHooks};
 use renox::prelude::*;
@@ -740,6 +787,9 @@ for bulk `Query::update`/`delete`, `insert_many` or `upsert`.
 
 ## Every field type (details in docs/types.md)
 
+Which Rust type to use for each kind of form field, and the column that stores it (SQLite /
+PostgreSQL).
+
 ```rust
 use renox::chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use renox::db::Json;
@@ -775,6 +825,8 @@ struct ProductForm {
 
 ## Pagination
 
+Show a long list one page at a time. `Page` reads the page number from `?page=` in the URL.
+
 ```rust
 use renox::prelude::*;
 #[derive(Model, serde::Serialize, Default)]
@@ -782,12 +834,16 @@ use renox::prelude::*;
 struct Product { id: i64, name: String }
 
 async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
+    // 20 rows per page, newest first, with the total count for the page links.
     let products = Product::query().latest().paginate(&db, page, 20).await?;
     Ok(view("products/index.html", context! { products })) // products.items, .total, …
 }
 ```
 
 ## Dashboards: figures and charts (details in docs/ui.md "Dashboards")
+
+Show key figures and charts. Renox draws the charts on the server, so you need no chart
+library.
 
 ```rust
 use renox::prelude::*;
@@ -827,6 +883,9 @@ async fn dashboard(State(state): State<AppState>, period: Period) -> Result<View
 
 ## Data grid (details in [docs/grid.md](docs/grid.md), example in examples/grid)
 
+A data grid is a table with filters, sorting and pages, all kept in the URL. You describe the
+columns in Rust, and the template draws the table.
+
 ```rust
 use renox::grid::{Column, Grid, GridRequest};
 use renox::prelude::*;
@@ -834,6 +893,7 @@ use renox::prelude::*;
 #[model(table = "orders")]
 struct Order { id: i64, number: String, status: String, total: i64 }
 
+/// Describes the grid once: its columns, how each is shown, and the default sort.
 fn orders_grid() -> Grid {
     Grid::new("orders")
         .title("Orders")
@@ -844,6 +904,7 @@ fn orders_grid() -> Grid {
         .sort_by("-total")
 }
 
+/// `GridRequest` reads the visitor's filters, sort and page from the URL.
 async fn index(request: GridRequest) -> Result<View> {
     let page = orders_grid().page(Order::query(), &request).await?; // filters, sort, page from ?query
     Ok(view("orders/index.html", context! { orders => page }))
@@ -874,6 +935,9 @@ the template, `column.key == "_details"`), `Column::editable()` + `.edit_url("/o
 
 ## Seeders and factories
 
+A factory makes models filled with fake data. A seeder uses it to fill the database with
+demo data (`rnx db:seed`).
+
 ```rust
 use renox::fake::{Fake, faker::lorem::en::Word};
 use renox::prelude::*;
@@ -882,6 +946,7 @@ use renox::prelude::*;
 #[model(table = "products")]
 struct Product { id: i64, name: String, price: i64 }
 
+/// How to make one product with fake data.
 impl Factory for Product {
     fn definition() -> Self {
         Product { name: Word().fake(), price: (5_000..50_000).fake(), ..Default::default() }
@@ -931,12 +996,16 @@ async fn in_a_test(db: &Db) -> Result {
 
 ## Auth, policies, gates
 
+Auth (authentication) answers "who are you?": logging in and out. Policies and gates answer
+"what may you do?".
+
 ```rust
 use renox::prelude::*;
 #[derive(Model, serde::Serialize, Default)]
 #[model(table = "products")]
 struct Product { id: i64, user_id: i64 }
 
+/// A policy: who may do what with one product.
 impl Policy for Product {
     fn allows(&self, user: &User, ability: &str) -> bool {
         match ability {
@@ -957,6 +1026,7 @@ async fn edit(user: AuthUser, Found(product): Found<Product>) -> Result<View> {
     Ok(view("products/edit.html", context! { product }))
 }
 
+/// Gates are named checks that don't belong to one model, such as "is this an admin?".
 fn gates(app: App) -> App {
     // A gate on a column the app added to `users`; for roles use the `Permissions` module
     // (below, "Tenants, roles and permissions") and docs/authorization.md.
@@ -1067,6 +1137,9 @@ hashes and are moved to Argon2id when they next log in.
 
 ## Auth events and the audit log
 
+Renox announces what happens at login, such as "logged in" or "login failed". Listen to these
+events, or add the `Audit` module to write them to a log.
+
 ```rust
 use renox::prelude::*;
 use renox::audit::{self, Audit, Entry};
@@ -1100,6 +1173,9 @@ async fn refund(State(db): State<Db>, user: AuthUser, ClientIp(ip): ClientIp) ->
 `rnx audit:prune --days 365` deletes older entries.
 
 ## Tenants, roles and permissions
+
+A tenant is one customer's own space, such as a team, whose data others must not see. Roles
+and permissions say who may do what.
 
 ```rust
 use renox::prelude::*;
@@ -1178,6 +1254,9 @@ In templates: `{% if can('posts.publish') %}` (a gate or a permission) and `auth
 
 ## HTMX
 
+htmx updates part of a page without a reload. A handler can answer with just one block of the
+page, and send htmx headers that say what should happen next.
+
 ```rust
 use renox::prelude::*;
 use renox::{HxPushUrl, HxReswap, HxRetarget};
@@ -1232,10 +1311,14 @@ themselves. Errors of list items (`photos.1`, `tags.0`) show at the list's input
 
 ## Raw SQL and transactions (SQLite and PostgreSQL)
 
+When the query builder isn't enough, write SQL yourself, with `?` where each value goes. A
+transaction groups changes so that either all of them happen, or none.
+
 ```rust
 use renox::prelude::*;
 
 async fn report(db: &Db) -> Result {
+    // `.bind` fills in each `?` in order, safely: a value can never change the SQL.
     let rows = renox::db::sql("SELECT name, price FROM products WHERE price < ?")
         .bind(20_000)
         .fetch_all(db)
@@ -1286,6 +1369,9 @@ Migrations run in a transaction each. A migration with `CREATE INDEX CONCURRENTL
 
 ## Jobs, events, schedule, mail (details in [docs/queue.md](docs/queue.md) and [docs/scheduling.md](docs/scheduling.md))
 
+A job is work done in the background, such as sending a mail, so the page answers fast. An
+event says "this happened", and listeners react to it. The schedule runs tasks at set times.
+
 ```rust
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -1296,6 +1382,7 @@ struct SendReceipt {
     order_id: i64, // keep jobs small: ids, not whole models
 }
 
+/// A job: Renox stores it in the `jobs` table, and a worker runs `handle` soon after.
 impl Job for SendReceipt {
     const NAME: &'static str = "send-receipt";
     const QUEUE: &'static str = "mail";                // default "default"; queue:work --queue mail
@@ -1324,6 +1411,7 @@ struct OrderPlaced {
 
 impl Event for OrderPlaced {}
 
+/// Registers the job, a listener for the event, and the scheduled tasks.
 fn background(app: App) -> App {
     app.job::<SendReceipt>()
         .listen(|event: OrderPlaced, state| async move {
@@ -1399,11 +1487,15 @@ task or listener doesn't stop the others.
 
 ## Mail and notifications (details in [docs/mail.md](docs/mail.md))
 
+Mails are built from templates. A notification is one message that can go out through
+several channels: mail, the database (an inbox in the app), or your own, such as WhatsApp.
+
 ```rust
 use renox::prelude::*;
 use renox::auth::{Channel, DatabaseMessage, Notification, Recipient};
 use renox::mail::Mail;
 
+/// Builds a mail from a template, adds recipients and a PDF, and queues it.
 async fn send_invoice(state: &AppState, pdf: Vec<u8>) -> Result {
     let mail = state
         .mail_view("ben@example.com", "Invoice INV-001", "mail/invoice", context! {})? // .html + .txt
@@ -1422,6 +1514,7 @@ async fn send_invoice(state: &AppState, pdf: Vec<u8>) -> Result {
 
 struct OrderShipped { order_id: i64 }
 
+/// One message, sent through every channel that `channels` returns.
 impl Notification for OrderShipped {
     fn kind(&self) -> &'static str { "order-shipped" }
     fn channels(&self, to: &Recipient) -> Vec<Channel> {
@@ -1483,6 +1576,8 @@ a job) help code outside a request.
 
 ## Calling other services (HTTP)
 
+Call another service's API with `state.http`. In tests, a fake answers instead.
+
 ```rust
 use renox::prelude::*;
 use std::time::Duration;
@@ -1513,6 +1608,8 @@ without a fake fail, so tests never reach the network. Scheduled tasks can ping 
 
 ## Cookies and downloads
 
+Set and read cookies, and send a file for the browser to show or save.
+
 ```rust
 use renox::prelude::*;
 use renox::{Cookies, Download, SetCookie};
@@ -1537,11 +1634,16 @@ async fn invoice(State(state): State<AppState>) -> Result<Download> {
 
 ## Cache, session, uploads, translations
 
+The cache keeps results you don't want to work out again. The session remembers things about
+one visitor between pages. Uploads are files sent with a form. Translations show the app in
+the visitor's language.
+
 ```rust
 use renox::prelude::*;
 use std::time::Duration;
 
 async fn misc(State(state): State<AppState>, session: Session, lang: Lang) -> Result<String> {
+    // Read from the cache, or run the query and keep its answer for 60 seconds.
     let count: i64 = state
         .cache
         .remember("products.count", Duration::from_secs(60), || async {
@@ -1559,6 +1661,7 @@ async fn misc(State(state): State<AppState>, session: Session, lang: Lang) -> Re
     let files = state.storage.list("invoices/2026").await?; // key, size, modified; any depth
     state.storage.copy("public/a.png", "public/b.png").await?; // also rename (move), size, delete_all(prefix)
     let _ = (visits, first, otp, files);
+    // The session belongs to this visitor only, and lasts from one request to the next.
     session.put("cart", vec![1, 2, 3])?;
     session.push("cart", 4)?; // appends to the list (makes one if needed)
     let visits_here = session.increment("visits", 1)?; // 1, 2, …
@@ -1608,6 +1711,9 @@ and Laravel's ranges pick by count (`{n}` exactly, `[a,b]`, `*` for open):
 
 ## Signed URLs and private files
 
+A signed URL is a link with a secret stamp: if someone changes it, or it expires, it stops
+working. Use it to share something private without asking for a login.
+
 ```rust
 use renox::prelude::*;
 use renox::signed::ValidSignature;
@@ -1631,6 +1737,9 @@ async fn private_file(State(state): State<AppState>) -> Result<Redirect> {
 
 ## More disks
 
+A disk is a place to keep files: a folder on the server, or an S3 bucket. Next to the default
+disk, you can add more, each with a name.
+
 ```rust
 use renox::prelude::*;
 use renox::storage::StorageConfig;
@@ -1649,6 +1758,10 @@ async fn save(State(state): State<AppState>) -> Result<String> {
 ```
 
 ## Security: CSP, CORS, webhooks
+
+Renox turns on the browser's protections for you. These examples change them where an app
+needs to: allow scripts from another site (CSP), let another site call your API (CORS), and
+accept posts from other services without a CSRF token.
 
 ```rust
 use renox::prelude::*;
@@ -1680,8 +1793,9 @@ fn routes() -> Routes {
 }
 ```
 
-A payment gateway's webhook: verified, stored once per event, processed in the queue
-(`webhook:failed`, `webhook:retry <id>`):
+A webhook is a message another service sends to your app, such as a payment gateway saying "this
+invoice was paid". Renox checks it really came from them, stores each event once and handles
+it in the queue (`webhook:failed`, `webhook:retry <id>`):
 
 ```rust
 use renox::prelude::*;
@@ -1719,6 +1833,9 @@ expressions must stay simple (move statements into `Alpine.data(...)`).
 
 ## SEO and analytics
 
+SEO tags help search engines and link previews show your pages well. Analytics events go to
+Google Analytics.
+
 ```html
 {% block seo %}{{ seo(title=product.name ~ " · " ~ app.name, description=product.summary,
                       image=storage_url(product.photo), type="product") }}{% endblock %}
@@ -1754,6 +1871,9 @@ are added (with the CSP nonce and sources) only in production; elsewhere pages s
 
 ## Tests
 
+`TestApp` starts your whole app inside a test, with no real server. Send requests the way a
+browser would, then check the answers.
+
 ```rust
 use renox::prelude::*;
 use renox::testing::TestApp;
@@ -1764,6 +1884,7 @@ fn app() -> App {
 
 #[renox::test]
 async fn members_only() {
+    // Start the app with a fresh database, then add a user to it.
     let app = TestApp::new(app()).await; // in-memory SQLite (or TEST_DATABASE_URL), migrated
     let user = User::register(app.db(), "Anna", "anna@example.com", "password123").await.unwrap();
 
@@ -1840,12 +1961,16 @@ request (or any future) runs.
 
 ## Errors, logs and debugging
 
+Find out what went wrong: each request has an id in its log lines, errors can be sent to a
+service you choose, and `/_renox/debug` shows recent requests while you develop.
+
 ```rust
 use renox::prelude::*;
 use renox::RequestId;
 use renox::rate_limit::Limit;
 use renox::report::ErrorReport;
 
+/// `RequestId` is this request's id, the same one its log lines carry.
 async fn show(id: RequestId) -> String {
     format!("request {id}") // also the response's X-Request-Id and every log line's `id`
 }
@@ -1877,6 +2002,9 @@ fn app() -> App {
 
 ## Configuration (`.env`)
 
+Settings live in the `.env` file, one `NAME=value` per line. These are the ones Renox reads
+(defaults in parentheses):
+
 `APP_ENV` (`local` | `production` | `testing`; also `dev`/`development`, `prod`, `test`; any other
 value, such as `staging`, stops the app at boot), `APP_KEY` (`rnx key:generate`; required in
 production), `APP_DEBUG` (on by default in `local`), `APP_NAME`, `APP_URL`, `APP_HOST` (an IP
@@ -1907,6 +2035,7 @@ Your own settings are plain `.env` lines, read with `config.var`. In tests, set 
 use renox::prelude::*;
 
 async fn pay(State(state): State<AppState>) -> Result<String> {
+    // Read your own setting from `.env`; stop with a clear message when it's missing.
     let key = state
         .config
         .var("MIDTRANS_KEY") // None when missing or empty

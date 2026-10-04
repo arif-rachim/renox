@@ -1,82 +1,190 @@
 # Stability and versions
 
-From 1.0, Renox follows [semantic versioning]. Code that compiles against `renox = "1.x"` keeps
-compiling on every later 1.x release, except where this page says otherwise. Until 1.0, breaking
-changes are listed in each release's notes. New apps made by `rnx new` are pinned to the Renox
-commit that `rnx` was built from.
+This page tells you what can change when you upgrade Renox, and what can't. In short: from 1.0,
+any 1.x upgrade should just work, and the few exceptions are listed here.
+
+### In this guide
+
+- [The promise](#the-promise): what every 1.x release keeps working.
+- [What 1.x may add without a major release](#what-1x-may-add-without-a-major-release): things that may grow, and how to write code that doesn't mind.
+- [Public dependencies](#public-dependencies): other crates you can see through Renox's API.
+- [Also outside the promise](#also-outside-the-promise): what may change in any release.
+
+### Words you'll meet
+
+| Word | What it means |
+|---|---|
+| **crate** | A Rust package. Renox is made of a few crates; your app is one too. |
+| **version number** | Three numbers, like `1.4.2`: **major**.**minor**.**patch**. |
+| **semver** (semantic versioning) | A rule for version numbers: the major number goes up only when an upgrade can break your code. |
+| **breaking change** | A change that can make your code stop compiling, or stop working as before. |
+| **minor release** | A release like 1.4 → 1.5. It may add things, but must not break anything. |
+| **major release** | A release like 1.x → 2.0. It may break things, and the changelog tells you how to move over. |
+| **public API** | Everything your code can use: types, functions, methods, macros, settings. |
+| **deprecated** | Marked as "still works, but please use this other thing". The compiler warns you. |
+| **`#[non_exhaustive]`** | A Rust marker on a struct or enum that says "this may get more fields or variants later". |
+| **MSRV** | Minimum supported Rust version: the oldest Rust that can build Renox. |
+| **dependency** | Another crate that Renox (or your app) uses. |
+
+### Versions in short
+
+From 1.0, Renox follows [semantic versioning]. That means: code that compiles against
+`renox = "1.x"` keeps compiling on every later 1.x release, except where this page says
+otherwise.
+
+Before 1.0, breaking changes were allowed. Each release's notes list them.
+
+New apps made by `rnx new` depend on the Renox version of the `rnx` that made them. An `rnx`
+installed from crates.io writes that version (`renox = "1.0.0-rc.4"`, or `"1.2"` for a final
+release, which lets `cargo update` take fixes and new features but never a breaking change). An
+`rnx` built from a Git checkout pins the app to that exact commit instead, so the Renox code
+doesn't change by itself.
 
 [semantic versioning]: https://semver.org
 
-The crates `renox`, `renox-core` and `renox-macros` are released together with the same
-version and pin each other exactly: the macros write code against renox-core's items of the
-same release. Depend on `renox` only; the other two follow it. `renox-cli` (`rnx`) has the
-same version and makes apps depend on its own release.
+### Which crate to depend on
+
+Renox is three library crates: `renox`, `renox-core` and `renox-macros`.
+
+- They are released together, always with the same version number.
+- They pin each other exactly. That's because the macros write code that uses renox-core's
+  items from the same release.
+- **Depend on `renox` only.** The other two come along with it.
+
+`renox-cli` (the `rnx` tool) has the same version too. The apps it makes depend on its own
+release of Renox.
 
 ## The promise
 
-From 1.0.0, for every 1.x release:
+From 1.0.0, every 1.x release keeps these promises.
 
-- **Your code keeps compiling.** Public items aren't removed, renamed or changed in a breaking
-  way. CI runs [cargo-semver-checks] on every pull request; from 1.0 it compares with the
-  latest release on crates.io, so an accidental break fails the build before it ships.
-- **Deprecated first, removed only in 2.0.** An item that is replaced gets `#[deprecated]`
-  with a note naming its replacement, for at least one minor release, and stays until the next
-  major release.
-- **Your data keeps working.** Framework tables only change through new migrations (never an
-  edited one), so `migrate` after an upgrade is enough. Sessions, encrypted columns, signed URLs,
-  API tokens and password hashes made by one 1.x release are read by every later one, so an
-  upgrade logs nobody out. Jobs queued by one 1.x release run on later ones (a rolling deploy
-  can have both versions on one queue).
-- **Your settings keep their meaning.** A `.env` setting keeps its name and its default; a new
-  setting comes with a default that keeps the old behaviour.
-- **Fixes go to the latest minor release.** Security fixes also go to the minor release before
-  it for six months after its successor ships (see [SECURITY.md](../SECURITY.md)).
+**Your code keeps compiling.** Public items aren't removed, renamed or changed in a breaking
+way.
 
-A change that would break any of this waits for 2.0, and CHANGELOG.md lists it with a way to
-move over. Bug fixes are the exception: when Renox did something it documented it wouldn't
-(accepting an invalid value, say), a minor release may make it stop, and the changelog marks it.
+To catch mistakes, CI (the checks that run on every change to Renox) runs [cargo-semver-checks]
+on every pull request. From 1.0 it compares the code with the latest release on crates.io. So
+an accidental break fails the build before it ships.
+
+**Deprecated first, removed only in 2.0.** When an item is replaced, it gets `#[deprecated]`,
+with a note naming its replacement. It stays deprecated for at least one minor release, and it
+stays in Renox until the next major release.
+
+**Your data keeps working.**
+
+- Framework tables only change through new migrations (never by editing an old one). So after
+  an upgrade, running `migrate` is enough.
+- Sessions, encrypted columns, signed URLs, API tokens and password hashes made by one 1.x
+  release can be read by every later one. So an upgrade logs nobody out.
+- Jobs queued by one 1.x release run on later ones. That matters for a rolling deploy, where the
+  old and new versions share one queue for a while.
+
+**Your settings keep their meaning.** A `.env` setting keeps its name and its default. A new
+setting comes with a default that keeps the old behaviour.
+
+**Fixes go to the latest minor release.** Security fixes also go to the minor release before it,
+for six months after the newer one ships (see [SECURITY.md](../SECURITY.md)).
+
+### When a change would break the promise
+
+A change that would break any of this waits for 2.0. CHANGELOG.md then lists it, with a way to
+move over.
+
+> [!NOTE]
+> Bug fixes are the exception. Say Renox accepted an invalid value, while its docs said it
+> wouldn't. A minor release may make it stop, and the changelog marks the change.
 
 [cargo-semver-checks]: https://github.com/obi1kenobi/cargo-semver-checks
 
 ## What 1.x may add without a major release
 
-- **New fields on these structs.** Build them with their constructors, `Default` or
-  `TestApp::with_config(app, |c| …)`, not with struct literals:
-  - `Config`, `MailConfig`, `StorageConfig`, `AnalyticsConfig`
-  - `Mail`, `User`, `Paginated`, `SimplePage`, `CursorPage`, `RouteInfo`, `MigrationStatus`,
-    `FailedJob`, `audit::AuditLog`, the `auth::events` structs
-  - `DatabaseNotification`, `AccessToken`, `NewToken`
-  - `WebhookRequest`, `WebhookCall`, `JobContext`, `Htmx`, `Down`, `analytics::Event`
-  - `view::ViewContext`, `auth::Registration`, `auth::Recipient`, `mail::Attachment`
-  - `Toast`, `ToastAction`, `auth::DatabaseMessage`, `auth::PendingLogin`, `chart::Series`, `report::ErrorReport`, `report::RequestReport`, `validation::FormContext`,
-    `rate_limit::LimitRequest`, `SentNotification`, `db::InvalidUlid`, `grid::Grid`,
-    `grid::Column`, `grid::GridPrefs`, `grid::RowOrder`,
-    `grid::Action`, `grid::Selection`, `storage::FileInfo`, `queue::BatchStatus`,
-    `queue::QueueCounts`, `queue::QueueStats` (the dashboard's), `http::SentRequest`,
-    `select::SelectOption` (use `SelectOption::new`), `select::OptionQuery`, `Upload` (use
-    `Upload::new`), `db::Migration` (use `Migration::new(..).sqlite(..).postgres(..)`)
-- **New variants on these enums.** A `match` on them needs a `_` arm:
-  - `Error`, `Environment`, `CspMode`, `Channel`, `DbValue`, `Inspected` (a `Rule`
-    matching on `Inspected` needs a `_` arm), `ToastKind`, `chart::Bucket`, `report::ReportKind`, `grid::Kind`, `grid::Summary`
-  - the settings: `SessionDriver`, `LogFormat`, `CacheStore`, `mail::MailDriver`,
-    `mail::MailEncryption`, `storage::DiskDriver`, and `webhook::WebhookStatus`
-- **New fields on this enum variant.** A pattern on it needs `..`:
-  - `Inspected::File { image, .. }` (it gained `dimensions` in M33)
-- New methods, functions, modules, template functions, validation rules, CLI commands and `.env`
-  settings (always with defaults).
-- New provided methods and associated constants with defaults on traits you implement
-  (`Model`, `Notification`, `ModelHooks`, `validation::ValidateHooks`, `Validate::ERROR_BAG`, …); `FromRow` stays one method. `db::Number` is sealed: only `i64`
-  and `f64`. `db::ModelKey` is sealed too (`i64`, `Ulid`, `Uuid`, `String`), so new key types
-  and new methods on it aren't breaking, and so is `RedirectExt` (only for axum's `Redirect`).
+Adding things is not a breaking change, as long as your code is written to expect it. This
+section lists what may grow, and the small habits that keep your code safe.
 
-`Dialect` is deliberately not in that list. Supporting a third database would change the SQL every
-app writes, so it would come with a major release.
+Most of these types are marked `#[non_exhaustive]`. The compiler then makes you write your code
+in the safe way, so you can't get it wrong by accident.
+
+### New fields on structs
+
+**New fields on these structs.** Build them with their constructors, `Default` or
+`TestApp::with_config(app, |c| …)`, not with struct literals.
+
+A struct literal is when you write every field out, like `Config { name: …, port: … }`. If a
+new field is added later, that line stops compiling. A constructor or `Default` fills in the new
+field for you.
+
+- `Config`, `MailConfig`, `StorageConfig`, `AnalyticsConfig`
+- `Mail`, `User`, `Paginated`, `SimplePage`, `CursorPage`, `RouteInfo`, `MigrationStatus`,
+  `FailedJob`, `audit::AuditLog`, the `auth::events` structs
+- `DatabaseNotification`, `AccessToken`, `NewToken`
+- `WebhookRequest`, `WebhookCall`, `JobContext`, `Htmx`, `Down`, `analytics::Event`
+- `view::ViewContext`, `auth::Registration`, `auth::Recipient`, `mail::Attachment`
+- `Toast`, `ToastAction`, `auth::DatabaseMessage`, `auth::PendingLogin`, `chart::Series`,
+  `report::ErrorReport`, `report::RequestReport`, `validation::FormContext`,
+  `rate_limit::LimitRequest`, `SentNotification`, `db::InvalidUlid`, `grid::Grid`,
+  `grid::Column`, `grid::GridPrefs`, `grid::RowOrder`,
+  `grid::Action`, `grid::Selection`, `storage::FileInfo`, `queue::BatchStatus`,
+  `queue::QueueCounts`, `queue::QueueStats` (the dashboard's), `http::SentRequest`,
+  `select::SelectOption` (use `SelectOption::new`), `select::OptionQuery`, `Upload` (use
+  `Upload::new`), `db::Migration` (use `Migration::new(..).sqlite(..).postgres(..)`)
+
+### New variants on enums
+
+**New variants on these enums.** A `match` on them needs a `_` arm.
+
+A `_` arm is the "anything else" case at the end of a `match`. With it, your `match` still
+compiles when a new variant appears.
+
+- `Error`, `Environment`, `CspMode`, `Channel`, `DbValue`, `Inspected` (a `Rule`
+  matching on `Inspected` needs a `_` arm), `ToastKind`, `chart::Bucket`, `report::ReportKind`,
+  `grid::Kind`, `grid::Summary`
+- the settings: `SessionDriver`, `LogFormat`, `CacheStore`, `mail::MailDriver`,
+  `mail::MailEncryption`, `storage::DiskDriver`, and `webhook::WebhookStatus`
+
+### New fields on an enum variant
+
+**New fields on this enum variant.** A pattern on it needs `..`.
+
+`..` in a pattern means "and any other fields". With it, the pattern still matches when a field
+is added.
+
+- `Inspected::File { image, .. }` (it gained `dimensions` in M33)
+
+### New methods, functions and settings
+
+1.x may also add new methods, functions, modules, template functions, validation rules, CLI
+commands and `.env` settings. New settings always come with defaults.
+
+### New trait methods with defaults
+
+1.x may add new provided methods and associated constants, with defaults, on traits you
+implement. Examples: `Model`, `Notification`, `ModelHooks`, `validation::ValidateHooks`,
+`Validate::ERROR_BAG`, and so on.
+
+(A **provided method** is a trait method that already has a body. You don't have to write it,
+so a new one doesn't break your `impl`.)
+
+`FromRow` stays one method.
+
+### Sealed traits
+
+Some traits are **sealed**: only Renox can implement them. That lets Renox add to them without
+breaking anyone.
+
+- `db::Number` is sealed: only `i64` and `f64`.
+- `db::ModelKey` is sealed too (`i64`, `Ulid`, `Uuid`, `String`). So new key types and new
+  methods on it aren't breaking.
+- So is `RedirectExt` (only for axum's `Redirect`).
+
+### Why `Dialect` isn't on the list
+
+`Dialect` (the list of supported databases) is deliberately not in that list. Supporting a third
+database would change the SQL every app writes, so it would come with a major release.
 
 ## Public dependencies
 
-Some crates show up in Renox's API. When one of them makes a breaking release, Renox moves to it
-in a **major** release (or keeps the old one), so that `renox = "1"` never breaks your code
-because of a dependency.
+Some other crates show up in Renox's API: you use their types when you use Renox. When one of
+them makes a breaking release, Renox moves to it in a **major** release (or keeps the old one).
+That way `renox = "1"` never breaks your code because of a dependency.
 
 | Crate | Where it shows up |
 |---|---|
@@ -91,33 +199,50 @@ because of a dependency.
 | `fake` (5) | `Factory` definitions, re-exported as `renox::fake` |
 | `uuid` (1) | `Uuid` model keys and fields, re-exported as `renox::uuid` (the `uuid` feature) |
 
-**`sqlx` is not part of the stable API.**
+"Re-exported as `renox::axum`" means you can reach that crate through Renox, without adding it
+to your own `Cargo.toml`.
+
+### sqlx
+
+**`sqlx` is not part of the stable API.** sqlx is the database library Renox uses inside.
+
 - Database errors are Renox's own `db::DbError`. Rows are `db::Row`, and values go through
   `ToDbValue`/`FromDb`.
-- For anything Renox doesn't cover, these escape hatches hand out sqlx's own types:
+- For anything Renox doesn't cover, some **escape hatches** hand out sqlx's own types:
   `Db::sqlite()`, `Db::postgres()`, `Row::sqlite()`, `Row::postgres()`, `DbError::sqlx()` and the
   re-export `renox::db::sqlx`.
 - Renox may move to a new sqlx version in a minor release. Code that uses the escape hatches may
   then need a change.
-- `FromDb` and `RowIndex` are implemented for whatever sqlx can decode, through sqlx's traits.
-  The promise covers the types Renox lists: the integer and float types, `bool`, `String`,
-  `Vec<u8>`, the chrono date and time types, `Option<T>` of those, `db::Json<T>`,
-  `db::Encrypted<T>`, `db::Ulid`, `Uuid` (the `uuid` feature) and `#[derive(DbEnum)]` enums;
-  column names (`&str`) and positions (`usize`) for `RowIndex`. A type of your own made
-  decodable by implementing sqlx's traits works too, but is an escape hatch: a sqlx upgrade
-  may need it changed.
+
+> [!WARNING]
+> `FromDb` and `RowIndex` are implemented for whatever sqlx can decode, through sqlx's traits.
+> The promise only covers the types Renox lists:
+>
+> - for `FromDb`: the integer and float types, `bool`, `String`, `Vec<u8>`, the chrono date and
+>   time types, `Option<T>` of those, `db::Json<T>`, `db::Encrypted<T>`, `db::Ulid`, `Uuid`
+>   (the `uuid` feature) and `#[derive(DbEnum)]` enums;
+> - for `RowIndex`: column names (`&str`) and positions (`usize`).
+>
+> A type of your own, made decodable by implementing sqlx's traits, works too. But it is an
+> escape hatch: a sqlx upgrade may need it changed.
 
 ## Also outside the promise
 
-- Items marked `#[doc(hidden)]` (used by Renox's own macros), such as `Model`'s `values`,
-  `set_id`, `touch` and `set_deleted_at`: implement `Model` with `#[derive(Model)]`.
-- The HTML of the built-in pages under `renox/…` (override them in your views to fix their
-  markup). For the UI kit (`renox/ui.html`), the macro names and keyword arguments, the `rx-*`
-  class names apps use and the `--rx-*` tokens are kept; its inner markup may change.
-  `rnx make:component --ui` copies the kit into the app to freeze it.
-- The exact wording of built-in messages.
-- The minimum supported Rust version (MSRV), now Rust 1.94 (`rust-version` in `Cargo.toml`,
-  checked in CI): it may rise in a minor release, to a Rust release at least six months old,
-  and CHANGELOG.md says so.
-- What `rnx new` and the `rnx make:*` generators write. Generated files are yours: a newer
-  `rnx` may write them differently (the starter kit too), but never changes files you have.
+These things may change in any release, even a minor one.
+
+- **Hidden items.** Items marked `#[doc(hidden)]` are used by Renox's own macros. Examples are
+  `Model`'s `values`, `set_id`, `touch` and `set_deleted_at`. Implement `Model` with
+  `#[derive(Model)]`, not by hand.
+- **The HTML of the built-in pages** under `renox/…`. To fix their markup, override them in
+  your views.
+- **The inside of the UI kit.** For the UI kit (`renox/ui.html`), these are kept: the macro
+  names and keyword arguments, the `rx-*` class names apps use, and the `--rx-*` tokens. Its
+  inner markup may change. (`rnx make:component --ui` copies the kit into your app, to freeze
+  it as it is.)
+- **The exact wording of built-in messages.**
+- **The minimum supported Rust version (MSRV).** It is now Rust 1.94 (`rust-version` in
+  `Cargo.toml`, checked in CI). It may rise in a minor release, but only to a Rust release at
+  least six months old, and CHANGELOG.md says so.
+- **What `rnx new` and the `rnx make:*` generators write.** Generated files are yours. A newer
+  `rnx` may write them differently (the starter kit too), but it never changes files you
+  already have.

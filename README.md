@@ -4,26 +4,35 @@
 
 [![CI](https://github.com/arif-rachim/renox/actions/workflows/ci.yml/badge.svg)](https://github.com/arif-rachim/renox/actions/workflows/ci.yml) [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license) [![crates.io](https://img.shields.io/crates/v/renox.svg?include_prereleases)](https://crates.io/crates/renox) [![docs.rs](https://docs.rs/renox/badge.svg)](https://docs.rs/renox) ![Rust: 1.94 or later](https://img.shields.io/badge/rust-1.94%2B-dea584.svg)
 
-Renox is a batteries-included web framework for Rust: Axum underneath, HTMX and Alpine.js in the
-browser, SQLite (or PostgreSQL) for data. Everything a typical app needs comes in one `renox`
-dependency.
+A web framework is a toolbox for building websites and web apps, so you don't start from zero.
+Renox is one for Rust, and it is "batteries included": the pieces most apps need (pages,
+forms, logins, a database, email, background jobs) come in the box and fit together.
 
-**Read the docs at [renox.renoxium.com](https://renox.renoxium.com)**: start with
-[the tutorial](docs/tutorial.md), or [coming from Laravel](docs/laravel.md); every guide is
-listed under [Documentation](#documentation). API reference: [docs.rs/renox](https://docs.rs/renox).
+Under the hood, Renox uses well-known parts. Axum is the web server library. HTMX and
+Alpine.js are two small scripts that make pages update in the browser without a reload.
+SQLite (or PostgreSQL) stores the data. You add one dependency, `renox`, and you get all of it.
+
+**Read the docs at [renox.renoxium.com](https://renox.renoxium.com).** New here? Start with
+[the tutorial](docs/tutorial.md): it builds one small app step by step and explains every word.
+Already know Laravel? Read [coming from Laravel](docs/laravel.md); every guide is listed under
+[Documentation](#documentation). API reference: [docs.rs/renox](https://docs.rs/renox).
 
 ## Why Renox
 
-- **One binary to deploy.** `rnx build` compiles your views, translations, CSS/JS and migrations
-  into a single executable. Copy it and a `.env` to a server and you're done. There's no Node
-  build, no Redis and no separate worker process. `rnx make:deploy` writes the Dockerfile, a
-  systemd unit and Litestream backups for the SQLite file.
-- **Laravel's workflow, in Rust.** Generators, migrations, models and factories, validation, login
-  and registration, policies, queues, a scheduler, mail, notifications, cache, file storage
-  (local or S3/R2), translations and test helpers are all built in and all fit together.
-- **HTMX-first.** Pages are rendered on the server. Validation errors show up next to the fields
-  and fragments swap in without writing any JavaScript. htmx and Alpine.js are bundled, and a
-  Content-Security-Policy is on by default.
+- **One binary to deploy.** A binary is a single program file. `rnx build` packs your pages
+  (views), translations, CSS/JS and database changes (migrations) into that one file. Copy it
+  and a `.env` settings file to a server, and you're done. You don't need Node, Redis or a
+  separate program for background jobs. `rnx make:deploy` writes the Dockerfile, a systemd
+  unit and Litestream backups for the SQLite file.
+- **Laravel's workflow, in Rust.** Laravel is a popular PHP framework, loved for how quickly
+  you can build with it. Renox follows its way of working. Generators (commands that write
+  starter code for you), migrations, models and factories, validation, login and registration,
+  policies, queues, a scheduler, mail, notifications, cache, file storage (local or S3/R2),
+  translations and test helpers are all built in, and they all fit together.
+- **HTMX-first.** The server builds each page as HTML. When someone types something wrong,
+  the error shows up next to the field. Parts of a page (fragments) update in place, and you
+  don't write any JavaScript for that. htmx and Alpine.js come bundled, and a
+  Content-Security-Policy (a browser rule that blocks injected scripts) is on by default.
 
 ![A guestbook form: invalid input shows errors inline, a valid post appears in the list, all without a page reload](docs/assets/demo.gif)
 
@@ -41,13 +50,15 @@ rnx new blog && cd blog                        # or: --starter, --database postg
 rnx serve                                      # http://127.0.0.1:3000
 ```
 
-`--version` is needed while 1.0 is a release candidate (Cargo only picks a pre-release when
-asked). For the latest `main` instead: `cargo install --locked --git
-https://github.com/arif-rachim/renox renox-cli`.
+`--version` is needed for now: 1.0 is still a release candidate (a test version before the
+final one), and Cargo only installs one of those when you ask for it by number. For the
+latest `main` instead: `cargo install --locked --git https://github.com/arif-rachim/renox
+renox-cli`.
 
 Then, in the app:
 
-1. Open <http://127.0.0.1:3000>, register an account, and you are logged in.
+1. Open <http://127.0.0.1:3000>, register an account, and you are logged in. (Login and
+   registration already work in a new app.)
 2. Make a whole page with a form, a list, validation and tests:
    `rnx make:module posts --resource --fields "title:string body:text published:bool"`.
    `rnx serve` rebuilds and restarts by itself, and the browser reloads when a view changes.
@@ -56,7 +67,8 @@ Then, in the app:
 4. Follow [the tutorial](docs/tutorial.md) for the rest:
    models, htmx forms, policies, a scheduled mail, tests and deploying.
 
-The new app has a layout built with the UI kit (navigation bar, account menu, toasts), a home
+The new app has a layout built with the UI kit, Renox's ready-made page parts (navigation bar,
+account menu, toasts: small pop-up messages), a home
 page, login and registration, an account page (profile, password, other devices), an error page
 in the layout, its texts in `resources/lang/en.json`, a test in `tests/home.rs`, and an
 `AGENTS.md` and a `CLAUDE.md` for coding agents. `rnx new blog --starter` writes the starter kit
@@ -64,13 +76,16 @@ on top: a sidebar layout with the notification bell, email verification, roles, 
 users page for admins and the activity log, with their tests. With `--database postgres`,
 create the `blog` and `blog_test` databases first (or edit `.env`).
 
-The first build compiles every dependency and takes a few minutes; see
-[docs/development.md](docs/development.md) for faster builds.
+> [!NOTE]
+> The first build compiles every dependency and takes a few minutes. Later builds take
+> seconds. See [docs/development.md](docs/development.md) for faster builds.
 
 ## Use Renox with Claude Code (or another coding agent)
 
-Renox is written to be easy for coding agents: one way to do each thing, generators for the
-boilerplate, and docs that are compiled in CI so they match the code.
+A coding agent is an AI assistant that writes code in your project. Renox is made to be easy
+for them: there is one way to do each thing, generators write the repetitive code
+(boilerplate), and the docs' code examples are compiled in CI (the automatic checks on every
+change), so they always match the real code.
 
 **In an app made by `rnx new`, there is nothing to set up.** The app has an `AGENTS.md` (read by
 Codex, Cursor, Copilot, Gemini CLI and others) and a `CLAUDE.md` that imports it (read by Claude
@@ -147,7 +162,9 @@ Tips:
 
 ## A taste
 
-A form that validates in Rust, saves a row, and returns just the updated list to htmx:
+Here is a small guestbook. A form is checked (validated) in Rust, a new row is saved in the
+database, and only the updated list is sent back, so htmx swaps it into the page without a
+reload:
 
 ```rust
 use renox::prelude::*;
@@ -169,8 +186,11 @@ impl Validate for EntryForm {
 
 // Bad input never gets here: htmx gets a 422 and the errors appear next to the fields.
 async fn store(State(db): State<Db>, Valid(form): Valid<EntryForm>) -> Result<View> {
+    // Save the new entry as a row in the `entries` table.
     Entry::create(&db, Entry { name: form.name, message: form.message, ..Default::default() }).await?;
+    // Read every entry back, newest first.
     let entries = Entry::query().latest().get(&db).await?;
+    // Render only the template's `entries` block; htmx puts it into the page.
     Ok(view("guestbook.html", context! { entries }).fragment("entries"))
 }
 
@@ -196,48 +216,60 @@ impl Module for Guestbook {
 
 ## Feature tour
 
+Everything below is built in. Click a heading to open it. Words in `code` are the names you
+type in Rust, templates or the terminal.
+
 <details>
 <summary><b>Web</b>: routes, sessions, CSRF, security headers</summary>
 
-- Routes are grouped in modules and in prefixed groups (`Routes::group("/admin", "admin.", …)`),
-  with names (`route('products.edit', id)` in templates),
-  guards (`.require_auth()`, `.guest_only()`, `.require_verified()`, `.require_gate("admin")`,
+- Routes (rules like "when someone opens `/products`, run this function") are grouped in
+  modules and in prefixed groups (`Routes::group("/admin", "admin.", …)`), with names
+  (`route('products.edit', id)` in templates), guards that decide who may open them
+  (`.require_auth()`, `.guest_only()`, `.require_verified()`, `.require_gate("admin")`,
   `.require_role(…)`, `.require_permission(…)`, `.require_ability(…)` for API tokens,
-  `.require_password_confirmed()`) and rate limits (`.throttle(60, Duration::from_secs(60))`, or
-  a named limiter that picks the limit per user or API key: `.throttle_by("api")`).
+  `.require_password_confirmed()`) and rate limits that cap how often someone may call them
+  (`.throttle(60, Duration::from_secs(60))`, or a named limiter that picks the limit per user or
+  API key: `.throttle_by("api")`).
 - Routes for other hosts (`Routes::domain("{account}.example.com", …)`), a fallback for what
   nothing else answers, redirects by route name (`Redirect::route`, `Redirect::intended`), and
   the current route in views (`route_is('admin.*')`) and handlers (`CurrentRoute`).
 - Route model binding: `Found(post): Found<Post>` loads the row `{post}`, `{id}` or `{slug}`
   names (404 if there's none, within the tenant's default scope). Pages without a handler
   (`.view("/about", "about.html")`, `.redirect(…)`), and `.etag()` for 304s on feeds and lists.
-- Encrypted cookie sessions (or `SESSION_DRIVER=database`), flash messages, old input and
-  list/counter helpers (`session.push`, `session.increment`) come built in. CSRF protection is
-  automatic for forms and htmx.
-- `_method` spoofing lets plain forms send PUT and DELETE.
+- Sessions (what the app remembers about a visitor between pages) live in an encrypted cookie
+  (or the database with `SESSION_DRIVER=database`). Flash messages (shown once, on the next
+  page), old input (what the visitor typed, kept after an error) and list/counter helpers
+  (`session.push`, `session.increment`) come built in. CSRF protection, which stops other sites
+  from sending forms in your visitors' name, is automatic for forms and htmx.
+- `_method` spoofing lets plain HTML forms, which can only send GET and POST, send PUT and
+  DELETE.
 - Security headers and a Content-Security-Policy are on by default, CORS can be enabled per
   route, `TRUSTED_HOSTS` refuses other hosts, and `App::xsrf_cookie()` hands the CSRF token to
   JavaScript clients as Laravel's `XSRF-TOKEN` cookie.
-- Webhooks from payment gateways and other services (`impl Webhook`, `.webhook::<W>(path)`):
+- Webhooks (messages another service sends to your app, like "this order was paid") from
+  payment gateways and other services (`impl Webhook`, `.webhook::<W>(path)`):
   signature checks (HMAC, Stripe-style), each event stored and processed once in the queue,
   with `webhook:retry` when something failed.
 - Maintenance mode (`my-app down --secret …`) and `/health` are included.
 - Plain and encrypted cookies (`Cookies`, `SetCookie`), downloads and streamed responses
   (`Download`), and `abort(StatusCode::GONE, "…")` for any status with a message.
-- Your own middleware (`App::layer`, `Routes::route_layer`), shared services (`App::provide`),
-  template filters (`App::templates`), data for every view (`App::share`) and async gates.
+- Your own middleware, code that runs around every request (`App::layer`,
+  `Routes::route_layer`), shared services (`App::provide`), template filters (`App::templates`),
+  data for every view (`App::share`) and async gates.
 </details>
 
 <details>
 <summary><b>Views & HTMX</b>: MiniJinja templates, fragments, Alpine.js</summary>
 
-- Layouts, blocks and macros come from MiniJinja. Templates reload on refresh while you develop.
-- `.fragment("block")` answers htmx with just one block. `HxTrigger`, `HxRedirect` and `Back`
-  cover the rest.
+- Templates are HTML files with blanks the app fills in. Renox uses MiniJinja for them, with
+  layouts, blocks and macros. While you develop, templates reload when you refresh the page.
+- `.fragment("block")` answers htmx with just one block of the page, not the whole page.
+  `HxTrigger`, `HxRedirect` and `Back` cover the rest.
 - `{{ csrf_field() }}`, `{{ method_field('PUT') }}`, `old()`, `error()`, `t()` and `route()` work
   in every template (`route('products.index', q=q)` adds a query string), `can('update', product)` on models the handler wrapped with `Can::new`, and
   `pagination(products)` once imported from `renox/pagination.html`.
-- `asset('app.css')` adds a content hash (`?v=…`), so assets can be cached for a year.
+- `asset('app.css')` adds a content hash (`?v=…`) that changes when the file changes, so
+  browsers can keep (cache) assets for a year and still get new versions.
 - Stacks: a page or component pushes a script or a `<meta>` into the layout's
   `{{ stack('scripts') }}` / `{{ stack('head') }}`, once if asked (`{% call push('scripts', once='chart') %}`).
 - Tailwind CSS without Node: `rnx new --tailwind`, and `rnx serve` / `rnx build` run Tailwind's
@@ -284,9 +316,11 @@ impl Module for Guestbook {
 - Every form field type maps to a Rust type and a column on both databases: checkboxes, selects
   (`#[derive(DbEnum)]`), multi-selects (`Json<Vec<_>>`), dates, times, JSON, UUIDs
   ([docs/types.md](docs/types.md)).
-- Plain SQL migrations run in batches (`migrate`, `migrate:rollback`, `migrate:fresh --seed`),
-  with per-database files when SQL differs.
-- `#[derive(Model)]` gives you `create`, `save`, `delete` (with optional soft deletes), `find_or_404`,
+- Migrations (small files that create or change tables) are plain SQL and run in batches
+  (`migrate`, `migrate:rollback`, `migrate:fresh --seed`), with per-database files when SQL
+  differs.
+- A model is a Rust struct that matches a table: one struct is one row. `#[derive(Model)]`
+  gives it `create`, `save`, `delete` (with optional soft deletes), `find_or_404`,
   a query builder (OR groups, sub-queries, `where_has`, aggregates, `group_by`/`having`, raw
   fragments, row locks, bulk updates, upserts, `update_or_create`, chunks), pagination (numbered,
   simple or by cursor) and factories with fake data. The key is the `id` field's type: a
@@ -295,10 +329,11 @@ impl Module for Guestbook {
   `deleting`, `deleted`), carry a default scope, e.g. the current tenant, that every query
   applies until `unscoped()`, and keep secrets encrypted at rest (`Encrypted<String>` fields,
   sealed with `APP_KEY`). Transactions nest with savepoints (`tx.savepoint(…)`).
-- Relations are explicit and N+1-free: `belongs_to`, `has_many`, many-to-many pivots (with pivot
-  columns) and polymorphic `Morph` load a page's related rows in one query each, and `count_many` /
-  `sum_many` give counts and sums per row ([guide](docs/relations.md)); joins read into
-  `#[derive(FromRow)]` structs with `fetch_as`.
+- Relations (links between tables, like a post and its comments) are explicit and N+1-free, so a
+  list never runs one extra query per row: `belongs_to`, `has_many`, many-to-many pivots (with
+  pivot columns) and polymorphic `Morph` load a page's related rows in one query each, and
+  `count_many` / `sum_many` give counts and sums per row ([guide](docs/relations.md)); joins
+  read into `#[derive(FromRow)]` structs with `fetch_as`.
 - For anything else there's raw SQL with `?` placeholders, and transactions that can retry on a
   busy database (`db.transaction_retrying(3, …)`): `renox::db::sql("…").bind(x).fetch_all(&db)`.
 - SQLite is the default. PostgreSQL is one feature flag away, with the same code
@@ -308,7 +343,8 @@ impl Module for Guestbook {
 <details>
 <summary><b>Validation, auth & authorization</b></summary>
 
-- `Valid<T>` validates forms, JSON bodies and query strings with rules such as `required`,
+- Validation checks what people send before your code uses it. `Valid<T>` validates forms,
+  JSON bodies and query strings with rules such as `required`,
   `required_if`, `email`, `between`, `matches` (regex), `digits`, dates (`before`, `after`),
   `unique`, `exists`, `same`, `gt`/`lt` against another field, `decimal`, `alpha_dash`, `uuid`,
   `json`, `timezone`, `size`, `image`, `mimes`, `dimensions` (pixels) and `current_password`, per item of
@@ -318,7 +354,8 @@ impl Module for Guestbook {
 - Form requests: `prepare` tidies the input, `authorize` answers 403 before any rule, and
   `after` runs checks that need the database, with errors shown like a rule's.
 - `Auth::new()` adds login, registration, logout, remember me, password reset and email
-  verification, with Argon2id hashing and login throttling, on pages built with the UI kit;
+  verification, with Argon2id password hashing (passwords are stored scrambled, never as typed)
+  and login throttling, on pages built with the UI kit;
   `.account()` adds a profile page
   (email change with re-verification, password, "log out other devices", delete account).
   Logout ends only this device. Password rules come from `Password::min(12).mixed_case()…`
@@ -329,23 +366,26 @@ impl Module for Guestbook {
   records them, plus your own entries (`audit::record`).
 - API tokens (`Authorization: Bearer`) with abilities and expiry serve mobile apps and
   integrations.
-- Policies and gates: `user.authorize("update", &product)?` in handlers, `can(...)` in views,
-  `App::gate_before` for super-admins, and an opt-in `Permissions` module with roles and
-  permissions (`user.assign_role(db, "editor")`, `.require_role("editor")`).
+- Policies and gates, the rules for who may do what: `user.authorize("update", &product)?` in
+  handlers, `can(...)` in views, `App::gate_before` for super-admins, and an opt-in
+  `Permissions` module with roles and permissions (`user.assign_role(db, "editor")`,
+  `.require_role("editor")`).
 </details>
 
 <details>
 <summary><b>Background work</b>: queue, scheduler, events, mail, notifications</summary>
 
-- The job queue lives in your own database, with retries, backoff and `queue:failed` / `queue:retry`.
+- The job queue holds work to do in the background (like sending a mail), so pages answer
+  fast. It lives in your own database, with retries, backoff and `queue:failed` / `queue:retry`.
   On PostgreSQL, workers on several servers never take the same job. Queues drain in priority
   order (`--queue high,default`); jobs can be unique, encrypted, rate limited or kept from
   overlapping, have a `failed` hook, and run in chains or in batches with progress.
-- The scheduler (`every_minutes(5, …)`, `daily_at("02:00", …)`, `cron("30 9 * * 1-5", …)`,
-  `weekly_on`, `monthly_on`, with `weekdays()`, `between(…)`, `on_failure(…)`) runs inside
-  `serve` in `APP_TIMEZONE` or a task's own IANA zone, daylight saving included, and each run is
-  claimed once when several servers share the database.
-- Events and listeners are included.
+- The scheduler runs tasks at set times (`every_minutes(5, …)`, `daily_at("02:00", …)`,
+  `cron("30 9 * * 1-5", …)`, `weekly_on`, `monthly_on`, with `weekdays()`, `between(…)`,
+  `on_failure(…)`). It runs inside `serve` in `APP_TIMEZONE` or a task's own IANA zone, daylight
+  saving included, and each run is claimed once when several servers share the database.
+- Events and listeners are included: one part of the app announces "this happened", and
+  other parts react.
 - Mail comes from templates, with a text version, several recipients, cc/bcc, reply-to and
   attachments, SMTP in production and a preview page at `/_renox/mail` while developing. More
   mailers by name (`App::mailer`), and `MAIL_FAILOVER` to a second provider when the first
@@ -367,12 +407,13 @@ impl Module for Guestbook {
 - Uploads are ordinary form fields, checked by their content. They're stored locally or on S3/R2,
   with signed temporary URLs; `storage.list`, `copy` and `rename` work on both. More disks,
   each with a name (`App::disk("backups", …)`, `state.disk_named("backups")`), sit next to the default.
-- The cache (`remember`, `put`, `forget`, `add`, `pull`, `increment`) is kept in memory or in the
-  database, with atomic locks (`state.cache.lock("stock:42", ttl)`) that hold across servers on
-  the database store.
-- Each visitor gets their own locale (chosen, or their browser's with `App::detect_locale()`),
-  from `resources/lang/*.json`, with `t()`, plurals and Laravel's plural ranges. Renox's own
-  texts are English; the same files translate them (`ui.*`, `renox.auth.*`, `renox.validation.*`).
+- The cache keeps results you don't want to work out again (`remember`, `put`, `forget`, `add`,
+  `pull`, `increment`). It lives in memory or in the database, with atomic locks
+  (`state.cache.lock("stock:42", ttl)`) that hold across servers on the database store.
+- Each visitor gets their own locale, the language the app speaks to them (chosen, or their
+  browser's with `App::detect_locale()`), from `resources/lang/*.json`, with `t()`, plurals and
+  Laravel's plural ranges. Renox's own texts are English; the same files translate them (`ui.*`,
+  `renox.auth.*`, `renox.validation.*`).
 </details>
 
 <details>
@@ -447,7 +488,7 @@ Sentry or a chat channel. Error pages use the app's layout. While developing,
 | Jobs | Queue in your database (SQLite or PostgreSQL), run inside the same binary | Queue in Redis, PostgreSQL or SQLite, or in-process tasks | Up to you |
 | Auth, mail, uploads, i18n | Built in, with pages and translations | Mailers and storage built in; auth comes with the SaaS starter | Assemble from crates |
 | Deploy | One binary with its assets + `.env`; Dockerfile, systemd, Litestream generated | Binary + config; Dockerfile, nginx or AWS Lambda generated | Up to you |
-| Maturity | Pre-1.0, installed from Git, one maintainer | Released on crates.io, larger community | Mature, widely used |
+| Maturity | 1.0 release candidates on crates.io, one maintainer | Released on crates.io, larger community | Mature, widely used |
 
 Choose **Loco** if you prefer Rails conventions, SeaORM or a JavaScript front end. Choose
 **Axum on its own** if you want to assemble every piece yourself. Choose **Renox** if you want
