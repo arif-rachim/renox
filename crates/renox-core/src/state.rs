@@ -53,6 +53,8 @@ pub struct AppState {
     pub(crate) gates: Gates,
     pub(crate) async_gates: Arc<std::collections::HashMap<String, crate::auth::AsyncGate>>,
     pub(crate) throttle: Arc<LoginThrottle>,
+    /// A module's second login step (`Registry::second_factor`).
+    pub(crate) second_factor: Option<Arc<crate::auth::second_factor::SecondFactor>>,
     /// `App::detect_locale`: the browser's `Accept-Language` picks the locale.
     pub(crate) detect_locale: bool,
     pub(crate) security: Arc<crate::security::Security>,

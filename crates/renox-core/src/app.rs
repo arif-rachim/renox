@@ -556,9 +556,16 @@ impl App {
             channels,
             reporters,
             permissions,
+            second_factor,
+            duplicate_second_factor,
         } = self.registry;
         if let Some(name) = duplicate_job {
             return Err(anyhow!("job `{name}` is registered twice").into());
+        }
+        if duplicate_second_factor {
+            return Err(
+                anyhow!("two modules set a second login step (`Registry::second_factor`)").into(),
+            );
         }
         check_commands(&commands)?;
         schedule.check()?;
@@ -792,6 +799,7 @@ impl App {
             shares: Arc::new(shares),
             channels: Arc::new(channels),
             reporters: Arc::new(reporters),
+            second_factor: second_factor.map(Arc::new),
             limiters: Arc::new(
                 self.limiters
                     .into_iter()
@@ -802,6 +810,15 @@ impl App {
             throttle: Arc::new(LoginThrottle::new(shared_counters.clone())),
             detect_locale: self.detect_locale,
         };
+        if let Some(second) = &state.second_factor
+            && state.url(&second.challenge, &[]).is_err()
+        {
+            return Err(anyhow!(
+                "the second login step's challenge route `{}` doesn't exist",
+                second.challenge
+            )
+            .into());
+        }
 
         let public = embedded.map(|e| e.public);
         let default = build_router(router, state.clone(), public, fallback);
