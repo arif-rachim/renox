@@ -10,6 +10,17 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **CI (#142, #143):** `tests/cli/run.sh` uses the generated apps over HTTP, as a browser does
+  (`tests/cli/smoke.py`: forms read off the pages, CSRF and `_method` fields, the session
+  cookie): a `--resource` module is registered for, created, shown, edited (also with an
+  invalid value) and deleted; the starter app's sign-up lands on email verification, the
+  seeded admin sees `/users` and `/activity`, the member gets 403. It also makes apps with
+  the `rnx new` options people combine, with names before and after "renox": plain,
+  `--tailwind`, `--starter --tailwind`, and `--starter` with the database; each passes
+  `cargo fmt --check`, clippy and its tests. The `cli` job's postgres run now runs the tests,
+  the commands and the HTTP checks against a PostgreSQL service (`E2E_POSTGRES`), where it
+  only built before.
+
 - **Fixed (#160):** with serde_html_form 0.4 (#137), an unchecked checkbox no longer read as
   `false`: its field was "required" or kept its old value. `Valid<T>` recognises the bool
   error by its wording, which 0.4 changed (`expected "true", "on" or "false"`); both wordings

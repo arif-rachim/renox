@@ -260,7 +260,9 @@ site/                      the documentation site (package `renox-site`, publish
                            account's user site maps project sites to a personal domain)
 tests/chaos/               app + run.sh (postgres|sqlite) that the `chaos` CI job injects faults
                            into (docker pause/stop/restart, python3 holding SQLite's lock)
-tests/cli/run.sh           `rnx new` + every `make:*`, then build and test the app (CI `cli`/`docker`)
+tests/cli/run.sh           `rnx new` + every `make:*`, the option matrix (plain, --tailwind,
+                           --starter, names on both sides of "renox"), fmt/clippy/tests, and
+                           smoke.py over HTTP (CI `cli`/`docker`)
 tests/tutorial/           run.sh + follow.py: docs/tutorial.md followed as a reader does (steps
                            found by their lead-in sentence, never line numbers), then fmt,
                            clippy, the tutorial's tests, seed, the app answering (CI `tutorial`).
@@ -629,8 +631,16 @@ PostgreSQL suite 2.5x slower (reconnects).
   past the newest migration.
 - `tests/cli/run.sh [postgres]` makes an app with every generator and builds/tests it
   (`FROM_GIT=1 DOCKER=1` for the Docker job). **Add every new `make:*` there.**
-  With sqlite it also makes `rnx new site --tailwind` (downloads the pinned Tailwind CLI with
-  `curl`, so it needs the network) and runs `rnx tailwind --minify` and the app's tests.
+  It also makes apps with the option combinations people use, with names before and after
+  "renox" (#143): `atlas` (plain), `studio` (`--starter`, with the database) and, with
+  sqlite, `site` (`--tailwind`: downloads the pinned Tailwind CLI with `curl`, so it needs
+  the network) and `desk` (`--starter --tailwind`); each passes `cargo fmt --check`, clippy
+  and its tests (the every-generator app skips clippy: its output is dead code until used).
+  Then `tests/cli/smoke.py` uses the running apps over HTTP like a browser (#142): forms read
+  off the pages with their CSRF and `_method` fields, a `--resource` module registered,
+  created, shown, edited and deleted, the starter's sign-up, admin and member. On postgres,
+  `E2E_POSTGRES=postgres://…:5432` (CI sets it) runs all of that against that server (each
+  app in a fresh `renox_e2e_<app>` database, tests in `renox_test`); without it, build only.
 - Every `.rs` file a command writes or edits goes through `format::touched` (in
   `write_new` and the in-place edits of generate.rs, and `rnx new`'s stubs); `main` runs
   rustfmt on them at the end, one file at a time through stdin (with a path, rustfmt
