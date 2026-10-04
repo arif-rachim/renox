@@ -14,6 +14,13 @@ changes by milestone (each one pull request; details in its description and in
   build and learn, a table of the words web apps use, a doc comment on every function and
   comments on the lines that need one in every code sample, "what's going on" after each
   sample, and callouts for Laravel users, tips and warnings. It installs `rnx` from crates.io.
+- **`Toast` is in the prelude (#175):** `use renox::prelude::*;` now brings `Toast`, which
+  nearly every handler that changes something returns (`HxRefresh` already was). The
+  examples, the generators and the guides drop their `use renox::Toast;`; an existing one
+  still compiles.
+- **Docs links (#141):** the crates' `homepage` is now https://renox.renoxium.com, and the
+  README, llms.txt and new apps' `AGENTS.md` point readers there.
+
 ## 1.0.0-rc.4 · 2026-10-04
 
 The fourth release candidate: fixes found by using rc.3, and two extension points for

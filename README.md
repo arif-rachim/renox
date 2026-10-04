@@ -8,9 +8,9 @@ Renox is a batteries-included web framework for Rust: Axum underneath, HTMX and 
 browser, SQLite (or PostgreSQL) for data. Everything a typical app needs comes in one `renox`
 dependency.
 
-**Start with [the tutorial](docs/tutorial.md)**, or [coming from Laravel](docs/laravel.md);
-every guide is listed under [Documentation](#documentation). API reference:
-[docs.rs/renox](https://docs.rs/renox).
+**Read the docs at [renox.renoxium.com](https://renox.renoxium.com)**: start with
+[the tutorial](docs/tutorial.md), or [coming from Laravel](docs/laravel.md); every guide is
+listed under [Documentation](#documentation). API reference: [docs.rs/renox](https://docs.rs/renox).
 
 ## Why Renox
 
@@ -544,7 +544,8 @@ Not planned: runtime-reflected Eloquent-style models, Redis, and a REPL.
 ## Documentation
 
 The files below are also a documentation site with search, built with Renox itself
-([`site/`](site)); it will be online at Renox's own address.
+([`site/`](site)): **[renox.renoxium.com](https://renox.renoxium.com)**, rebuilt whenever they
+change on `main`.
 
 - [The tutorial](docs/tutorial.md): build one app from `rnx new` to a server, step by step.
 - [Coming from Laravel](docs/laravel.md): each Laravel concept and its Renox counterpart.

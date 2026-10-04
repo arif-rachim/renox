@@ -4,10 +4,10 @@
 
 use std::time::Duration;
 
+use renox::ToastAction;
 use renox::auth::{Channel, DatabaseMessage, Notification, Recipient};
 use renox::prelude::*;
 use renox::testing::TestApp;
-use renox::{Toast, ToastAction};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 struct OrderShipped {

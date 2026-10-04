@@ -313,7 +313,7 @@ Anything axum turns into a response, and Renox's own:
 
 ```rust
 use renox::prelude::*;
-use renox::{Download, Toast};
+use renox::Download;
 
 async fn store(session: Session) -> Result<(Toast, Redirect)> {
     session.flash("status", "Saved")?; // or a toast, which needs no template code
