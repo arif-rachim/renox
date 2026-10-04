@@ -375,7 +375,9 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
   apps don't need sqlx directly. The primary key column is always `id`; its type is the key
   (`Model::Key`, sealed `ModelKey`: `i64`, `Ulid`, `Uuid`, `String`, M22); an empty key (`0`,
   nil, `""`) = unsaved, ULIDs/UUID v7s are made on insert. Table name =
-  snake_case struct name (no pluralisation: not every language plurals with "s"). The query
+  snake_case struct name (no pluralisation in the derive: not every language plurals with
+  "s"); the generators write the plural explicitly (`make:model`, `--resource`: the model's
+  name through `scaffold::plural`, #127), as the docs and examples have it. The query
   builder validates column names against `COLUMNS` and operators against a whitelist, so SQL
   injection via names is an error.
 - **Relations are explicit loaders, no lazy relations** (`db::relations`: `belongs_to`,

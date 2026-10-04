@@ -203,6 +203,37 @@ fn singular(word: &str) -> String {
     }
 }
 
+/// The plural of a snake_case name's last word, for table names
+/// (`waitlist_signup` → `waitlist_signups`, `category` → `categories`); the
+/// inverse of `singular`. Words already plural, or with no plural, stay.
+pub(crate) fn plural(name: &str) -> String {
+    let (head, word) = match name.rsplit_once('_') {
+        Some((head, word)) => (format!("{head}_"), word),
+        None => (String::new(), name),
+    };
+    let unchanged = [
+        "news",
+        "staff",
+        "data",
+        "media",
+        "series",
+        "info",
+        "equipment",
+    ];
+    let word = if unchanged.contains(&word) || (word.ends_with('s') && singular(word) != word) {
+        word.to_owned()
+    } else if let Some(stem) = word.strip_suffix('y')
+        && !stem.ends_with(['a', 'e', 'i', 'o', 'u'])
+    {
+        format!("{stem}ies")
+    } else if word.ends_with(['s', 'x', 'z']) || word.ends_with("ch") || word.ends_with("sh") {
+        format!("{word}es")
+    } else {
+        format!("{word}s")
+    };
+    format!("{head}{word}")
+}
+
 /// The app's crate name, from its Cargo.toml (`-` becomes `_`).
 pub(crate) fn crate_name(root: &Path) -> Result<String> {
     let manifest = fs::read_to_string(root.join("Cargo.toml"))?;
@@ -231,7 +262,10 @@ pub fn resource(root: &Path, name: &str, model: Option<&str>, fields: Option<&st
         );
     }
     let path = module.to_kebab_case();
-    let table = module.clone();
+    // The model's table, plural, as `make:model` names it (#127): the module
+    // only names the routes and pages (`news` with `--model Article` →
+    // `articles`; `products` → `Product` → `products`).
+    let table = plural(&model.to_snake_case());
     let title = module.to_title_case();
     let fields = parse_fields(fields.unwrap_or(""))?;
     let crate_name = crate_name(root)?;
@@ -786,6 +820,32 @@ mod tests {
     }
 
     #[test]
+    fn names_become_plural() {
+        for (single, plural_) in [
+            ("product", "products"),
+            ("category", "categories"),
+            ("box", "boxes"),
+            ("class", "classes"),
+            ("batch", "batches"),
+            ("wish", "wishes"),
+            ("day", "days"),
+            ("waitlist_signup", "waitlist_signups"),
+            ("stock_movement", "stock_movements"),
+            ("order", "orders"),
+            ("user", "users"),
+            ("news", "news"),
+            ("staff", "staff"),
+            ("products", "products"),
+        ] {
+            assert_eq!(plural(single), plural_, "{single}");
+        }
+        // Round trip with `singular`, which `--resource` uses on module names.
+        for word in ["product", "category", "box", "class", "batch", "address"] {
+            assert_eq!(singular(&plural(word)), word);
+        }
+    }
+
+    #[test]
     fn plurals_become_singular() {
         for (plural, single) in [
             ("products", "product"),
@@ -861,7 +921,22 @@ mod tests {
         let error = resource(dir.path(), "news", None, None).unwrap_err();
         assert!(error.to_string().contains("--model"), "{error}");
         resource(dir.path(), "news", Some("article"), Some("title body:text")).unwrap();
-        assert!(read(&dir, "src/app/news/model.rs").contains("pub struct Article"));
+        let model = read(&dir, "src/app/news/model.rs");
+        assert!(model.contains("pub struct Article"));
+        // The model's table, not the module's (#127).
+        assert!(model.contains(r#"#[model(table = "articles")]"#), "{model}");
+        let migrations: Vec<String> = fs::read_dir(dir.path().join("migrations"))
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert!(
+            migrations
+                .iter()
+                .all(|name| name.contains("_create_articles_table.")),
+            "{migrations:?}"
+        );
+        resource(dir.path(), "product", Some("item"), Some("name")).unwrap();
+        assert!(read(&dir, "src/app/product/model.rs").contains(r#"table = "items""#));
         assert!(resource(dir.path(), "bad name!", None, None).is_err());
     }
 }
