@@ -237,6 +237,7 @@ fn builtin(locale: &str) -> Option<&'static HashMap<&'static str, &'static str>>
             ("ui.cancel", "Cancel"),
             ("ui.close", "Close"),
             ("ui.dismiss", "Dismiss"),
+            ("ui.request_failed", "That didn't work. Try again."),
             ("ui.more", "More"),
             ("ui.skip", "Skip to content"),
             ("ui.main_navigation", "Main"),

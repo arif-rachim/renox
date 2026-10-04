@@ -415,6 +415,7 @@ The rest of the kit's everyday components:
 | `table(head, caption=…)` | A table in a card. A heading `["Total", "num"]` lines its column up on the right (for numbers), and `["Slug", "hide-narrow"]` hides the column on phones. |
 | `empty(title, message=…, action_href=…, action_label=…)` | What an empty list says. With `action_href` (and its `action_label`), it adds a link to add the first item. |
 | `notification_bell(count=none, id="rx-notifications")` | The logged-in user's notifications, in the navigation bar: a badge with the unread count, a panel, and new ones arriving live as toasts. Needs `Auth::new().notifications()`; pass `unread_notifications`. See [docs/mail.md](mail.md#the-bell). |
+| `event_stream()` | Opens the same live stream on a page without the bell, so the app's events (`state.broadcast(…)`) arrive as DOM events. Nothing for guests. See [docs/mail.md](mail.md#your-own-live-events). |
 
 ### Navigation and page structure
 
@@ -830,6 +831,51 @@ The details:
 - From the page's own JavaScript: `Renox.toast({kind: "success", message: "Copied", body: "…",
   actions: [{label: "Open", url: "/x"}], duration: 3000, id: "copy"})` and
   `Renox.dismissToast("copy")`.
+
+### A button that sends a request
+
+A link only goes somewhere. A **request action** does something: "Undo", "Retry", "Approve".
+It sends a `POST`, `PUT`, `PATCH` or `DELETE` to a path of your app, with the CSRF token, and
+stays on the page.
+
+```rust
+use renox::prelude::*;
+use renox::ToastAction;
+
+/// Archives an order (htmx), with an Undo button in the toast.
+async fn archive(Path(id): Path<i64>) -> Toast {
+    // … archive …
+    Toast::info(format!("Order #{id} archived"))
+        .action(ToastAction::delete("Undo", format!("/orders/{id}/archive")))
+}
+
+/// What Undo sends: `DELETE /orders/{id}/archive`. The answer is a toast too.
+async fn unarchive(Path(id): Path<i64>) -> Toast {
+    // … restore …
+    Toast::success(format!("Order #{id} is back"))
+}
+```
+
+The details:
+
+- `ToastAction::post(label, url)`, `put`, `patch` and `delete` make one. In JSON (for
+  `Renox.toast` or a stored notification) it is `{"label": "Undo", "url": "/orders/7/archive",
+  "method": "DELETE"}`.
+- Only paths of your own site (`/orders/7`) are sent, never another address: the request
+  carries the CSRF token, which must not leave the site. Others aren't shown.
+- renox-ui.js sends it with htmx, swapping nothing. So answer it like any htmx request that
+  doesn't swap: a `Toast` (a `204` carrying it), `(Toast, HxRefresh)` to reload the page, an
+  `HxRedirect`, or an `HxTrigger` for an event of your own. A plain `Redirect` would be followed
+  quietly, and its toast lost.
+- If the request fails (a 4xx or 5xx, or no network) and the answer brought no toast of its
+  own, the page shows an error toast: "That didn't work. Try again." (`ui.request_failed`).
+- The same button works in the bell's list (a `DatabaseMessage` action); without JavaScript
+  it is a plain form there.
+- From the page's own JavaScript: `Renox.request("POST", "/orders/7/retry")`.
+- A toast pushed from the server to open pages (`state.broadcast_to(user_id, "renox:toast",
+  json!({ "toasts": [toast] }))`, see [mail.md](mail.md#your-own-live-events)) can carry one
+  too: [examples/jobs](../examples/jobs) tells the staff about a failed charge with a
+  "Reopen" button.
 
 Toasts go away. For notifications that stay (a bell in the navigation bar, with new ones
 arriving live), see [mail.md](mail.md#the-bell).

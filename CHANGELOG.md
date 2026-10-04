@@ -27,6 +27,29 @@ changes by milestone (each one pull request; details in its description and in
   first until the user sorts. `migrate:fresh` drops virtual tables first. New consts
   `Model::SEARCHABLE` and `Model::SEARCH_LANGUAGE` (with defaults). Guide: docs/search.md;
   examples/relations' blog search uses it.
+- **Live pages (#151):** three additions around the notification bell.
+  - `rnx new my-app --notifications`: the plain app with `Auth::new().notifications()` and
+    the kit's `notification_bell` in its layout's bar, and a test for it (the starter kit
+    already had them).
+  - The app's own events over the bell's Server-Sent Events stream:
+    `state.broadcast(event, data)` (every open page) and `state.broadcast_to(user_id, event,
+    data)` (one user's pages) arrive as DOM events on `document`, for
+    `hx-trigger="order-updated from:document"`, Alpine's `x-on:….document` or a script;
+    `renox:toast` with `{"toasts": [toast]}` shows toasts. Pages without the bell open the
+    stream with the kit's new `event_stream()`; one stream per page either way. Broadcasts
+    are fire-and-forget and stay in the process that sends them (not stored, not seen by
+    other servers or a separate `queue:work`): docs/mail.md "Your own live events" says
+    when to store a database notification instead. Tests: `TestApp::fake_broadcasts`,
+    `broadcasts`, `assert_broadcast` and `SentBroadcast`.
+  - Toast actions that send a request: `ToastAction::post`, `put`, `patch` and `delete` (the
+    new `method` field) make a button that sends it through htmx with the CSRF token, only
+    to the site's own paths; a failure without a toast of its own shows "That didn't work.
+    Try again." (`ui.request_failed`). They work in stored notifications too (a form in the
+    bell's list) and from scripts (`Renox.request(method, url)`). New toasts from the bell's
+    stream now also show the notification's own actions.
+  - examples/jobs uses all three: the bell, `order-updated` broadcasts that reload the staff's
+    order list, and a failed charge broadcast as a toast whose "Reopen" button posts to
+    `/orders/{id}/reopen`.
 - **`rnx new` (#221):** the AGENTS.md of a new app says exactly where Renox's docs are offline:
   for an `rnx` from crates.io, the `git clone --depth 1 --branch v<version> …` of the app's
   version (the downloaded crates hold only the source); for a Git pin, Cargo's checkout of that

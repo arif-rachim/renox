@@ -16,6 +16,9 @@
 </form>
 
 <h2 class="rx-card__title">Orders</h2>
+{#- Live for logged-in staff: the jobs broadcast `order-updated` (state.broadcast) over the
+    bell's stream, and this list reloads itself. Guests see changes on the next page. -#}
+<div id="orders" hx-get="{{ route('home') }}" hx-trigger="order-updated from:document" hx-select="#orders" hx-target="this" hx-swap="outerHTML">
 {% if orders %}
 {% call table(["Order", ["Total", "num"], "Status", ""], caption="Orders") %}
   {% for order in orders %}
@@ -40,6 +43,9 @@
         </form>
         {% endif %}
       {% endcall %}
+      {% elif order.status == "needs_attention" and auth.check %}
+        {#- The same request the failed-charge toast's "Reopen" sends; the answer is a toast. #}
+        {{ button("Reopen", variant="secondary", type="button", size="small", attrs={"hx-post": route('orders.reopen', order.id), "hx-swap": "none"}) }}
       {% endif %}
     </td>
   </tr>
@@ -48,6 +54,7 @@
 {% else %}
 {{ empty("No orders yet", "Place one above.") }}
 {% endif %}
+</div>
 
 {% if auth.check %}
 {% call card(title="Staff") %}

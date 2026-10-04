@@ -231,6 +231,7 @@ tools let you run the work, or record it and check it.
 | `app.run_all_jobs()` | Also runs delayed jobs and retries still waiting for their backoff (the pause before a failed job is tried again), until no job is left. It stops after 1,000 rounds, so a job that queues itself again forever can't hang the test. |
 | `app.fake_events()` | Records events instead of running their listeners. Check them with `assert_emitted::<OrderPlaced>(\|e\| e.id == 7)`, `emitted::<E>()` or `assert_not_emitted::<E>()`. |
 | `app.fake_notifications()` | Records notifications instead of sending them. Check them with `assert_notified(&user, "order-shipped")`, `assert_notified_to("a@b.c", kind)`, `notifications()` or `assert_nothing_notified()`. |
+| `app.fake_broadcasts()` | Records `state.broadcast` / `broadcast_to` instead of sending them to open pages. Check them with `assert_broadcast("order-updated", \|b\| b.data["id"] == 7)` or `broadcasts()` (each a `SentBroadcast`: `user_id`, `event`, `data`). |
 | `app.sent_mail()`, `app.assert_mail_sent(to, subject)` | The mail sent so far (the test mailer keeps it). |
 | `app.fake_http()` | Answers `state.http` requests with fakes and records them. A request without a fake is an error, so nothing reaches the network. |
 | `app.kernel().run_scheduled("report")` | Runs a scheduled task now. |

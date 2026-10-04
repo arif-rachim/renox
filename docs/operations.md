@@ -218,6 +218,12 @@ Each open stream asks the database for news every 15 seconds (two small queries 
 It also checks at once when something changes in the same process. When the app shuts down
 gracefully, it ends them all.
 
+The app's own live events (`state.broadcast`, see [mail.md](mail.md#your-own-live-events)) use
+the same streams but aren't stored: they reach only the pages connected to the process that
+sends them. With several servers, or with workers in a separate `queue:work` process, pages
+connected elsewhere miss them. Keep broadcasts for "look again" hints, and store a database
+notification for anything someone must see.
+
 ### `APP_URL`
 
 Also set `APP_URL` to the public `https://` address, so links in mails point to the right place.
