@@ -24,6 +24,8 @@ How a release goes to crates.io. Only a maintainer with publish rights on the fo
    `renox-core` and `renox-macros` under `[workspace.dependencies]` (written `=1.2.0`: the
    three crates are released in lockstep and pin each other exactly, since the macros write
    code against renox-core's items of the same release).
+   While 1.0 is a release candidate, the install lines name the version too: `README.md`
+   and `docs/tutorial.md` (`cargo install renox-cli --version …`).
 3. **The changelog.** In `CHANGELOG.md`, rename "Unreleased" to `## 1.2.0 · 2026-11-01` (the
    version and the date) and start a new empty "Unreleased" above it.
 4. **Check everything** (as in [CONTRIBUTING.md](CONTRIBUTING.md)), then a dry run of the
