@@ -10,6 +10,10 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Guides for beginners, part 1 (#193):** routing.md, validation.md and ui.md rewritten in
+  plain words: what the page is for, the words it uses, short paragraphs, "what's going on"
+  after each example, comments in the code samples, and Laravel notes, tips and warnings as
+  callouts. Every heading (and so every link to one) is kept.
 ## 1.0.0-rc.4 · 2026-10-04
 
 The fourth release candidate: fixes found by using rc.3, and two extension points for
