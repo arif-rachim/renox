@@ -1326,6 +1326,113 @@ impl Module for Pets {
     }
 }
 
+/// The pets table behind a default scope: no rows without a current owner
+/// (as a tenant scope with no tenant), the owner's with one (#185).
+#[derive(Model, serde::Serialize, Default, Debug, Clone)]
+#[model(table = "grid_pets", default_scope = "owners_pets")]
+struct ScopedPet {
+    id: i64,
+    owner_id: Option<i64>,
+    name: String,
+    weight: i64,
+    born: Option<NaiveDate>,
+}
+
+#[derive(Clone)]
+struct CurrentOwner(i64);
+
+fn owners_pets(query: renox::db::Query<ScopedPet>) -> renox::db::Query<ScopedPet> {
+    match renox::context::get::<CurrentOwner>() {
+        Some(owner) => query.where_eq("owner_id", owner.0),
+        None => query.none(),
+    }
+}
+
+struct ScopedPets;
+
+impl Module for ScopedPets {
+    fn name(&self) -> &'static str {
+        "scoped-pets"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new()
+            // Staff see every pet: an unscoped query.
+            .get("/staff/pets", |request: GridRequest| async move {
+                let grid = pets_grid().exports();
+                if let Some(file) = grid.export(ScopedPet::unscoped(), &request).await? {
+                    return Ok::<_, Error>(file);
+                }
+                let page = grid.page(ScopedPet::unscoped(), &request).await?;
+                Ok(view("orders.html", context! { orders => page }).into_response())
+            })
+            // An owner sees their own, through the scope.
+            .get(
+                "/owners/{owner}/pets",
+                |Path(owner): Path<i64>, request: GridRequest| async move {
+                    renox::context::set(CurrentOwner(owner));
+                    let page = pets_grid().page(ScopedPet::query(), &request).await?;
+                    Ok::<_, Error>(view("orders.html", context! { orders => page }))
+                },
+            )
+    }
+}
+
+#[renox::test]
+async fn related_columns_fill_in_on_unscoped_queries_of_scoped_models() {
+    let (_, views) = pets_app().await;
+    let app = TestApp::with_config(App::new().migrations(&[PETS]).module(ScopedPets), |c| {
+        c.views_path = views.path().to_path_buf()
+    })
+    .await;
+    let anna = GridOwner::create(
+        app.db(),
+        GridOwner {
+            name: "Anna".into(),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let ben = GridOwner::create(
+        app.db(),
+        GridOwner {
+            name: "Ben".into(),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    for (owner, name) in [(anna.id, "Kiki"), (ben.id, "Rex")] {
+        // Saved through the unscoped model of the same table.
+        GridPet::create(
+            app.db(),
+            GridPet {
+                owner_id: Some(owner),
+                name: name.into(),
+                weight: 1,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    let staff = app.get("/staff/pets").await.text();
+    assert_eq!(cells(&staff, "name"), ["Kiki", "Rex"]);
+    assert_eq!(cells(&staff, "owner"), ["Anna", "Ben"]);
+    let csv = app.get("/staff/pets?export=csv").await.text();
+    assert!(
+        csv.contains("Kiki,Anna") && csv.contains("Rex,Ben"),
+        "{csv}"
+    );
+
+    // The scope still decides the rows of a scoped query.
+    let own = app.get(&format!("/owners/{}/pets", anna.id)).await.text();
+    assert_eq!(cells(&own, "name"), ["Kiki"]);
+    assert_eq!(cells(&own, "owner"), ["Anna"]);
+}
+
 async fn pets_app() -> (TestApp, tempfile::TempDir) {
     let (_, views) = app().await; // for its views
     let app = TestApp::with_config(App::new().migrations(&[PETS]).module(Pets), |c| {

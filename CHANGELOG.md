@@ -10,6 +10,11 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Fixed (#185):** a grid's `Column::related` (and `count_of`/`sum_of`) cells were empty
+  when the page's query was `Model::unscoped()` of a model with a default scope, as staff
+  pages over tenant data are, and in exports too: the related values were read again through
+  the scope, which outside a tenant gives no rows. They're now read for exactly the rows the
+  page shows, without the scope.
 - **Fixed (#184):** a grid's `Column::money` showed the stored smallest unit as is, so with
   `APP_CURRENCY=AED` (or USD, EUR…) 4,000.00 showed as 400,000, in cells, summaries, group
   subtotals and exports, and `min.`/`max.` filters compared the typed number with cents.

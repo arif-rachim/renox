@@ -675,6 +675,8 @@ Good to know:
 - They are SQL subqueries (small queries inside the main one). So they sort, filter, search and
   take advanced-filter rules like other columns.
 - A page fetches each one in a single query, not one query per row.
+- That query reads exactly the rows the page shows, without the model's default scope. So a
+  staff page over tenant data, which starts from `Model::unscoped()`, still fills them in.
 - Table and column names may only have letters, digits and `_`.
 
 > [!WARNING]
