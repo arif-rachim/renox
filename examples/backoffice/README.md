@@ -37,9 +37,17 @@ There is no sign-up page: staff are added by an admin. Log in as
   invoice paid and the cashiers' bell rings.
 - **Stock.** A product's page shows its ledger. "Adjust stock" receives
   deliveries, writes off damage, or sets the count from the shelf; stock
-  never goes below zero. Products → Import reads a CSV file
-  (`sku,name,price,stock`), a savepoint per line: bad lines are skipped and
-  listed, the rest land.
+  never goes below zero. Products → More → "Import from CSV…" reads a CSV
+  file (`sku,name,price,stock`; "Download the CSV template" gives an empty
+  one) with `renox::import`: each row is checked with `ProductRow`'s rules,
+  like a form, and the good rows land in one transaction, a savepoint each.
+  Refused rows stay listed in the sheet with their row numbers and why.
+- **Actions with more to them.** "New product" is a two-step wizard in a
+  sheet (`wizard_action`): Next checks the step with the server's rules, and
+  an error found at the end opens the step it belongs to. A product's "⋯"
+  menu (`action_group`) has "Duplicate", the new-product form filled from a
+  copy (`Product::replicate`), and "Export ledger", the product's ledger as
+  CSV (`Grid::export_as`). The product grid has "Duplicate" as a row action.
 - **Export in the background.** On Invoices, filter (say, Status = Issued),
   tick "select all matching" and choose "Export in the background". A job
   makes the CSV with the grid's filters and stores it on a disk of its own
@@ -68,7 +76,8 @@ There is no sign-up page: staff are added by an admin. Log in as
 | Payments | `src/app/invoices/payments.rs` (payment pages, webhooks, `mark_paid`) |
 | Exports | `src/app/invoices/export.rs` (`ExportInvoices` job, `ExportReady`) |
 | Stock ledger | `src/app/products/stock.rs` (`change`, `StockMovement`) |
-| CSV import | `src/app/products/import.rs` |
+| CSV import | `src/app/products/import.rs` (`renox::import`, `ProductRow`), the `import_action` in `resources/views/products/index.html` |
+| Wizard, action group, duplicate | `resources/views/products/index.html` (`wizard_action`, `action_group`), `show.html`, `replicate.html`; `replicate` and `export_ledger` in `src/app/products/mod.rs` |
 | Staff | `src/app/staff.rs` |
 | Activity log | `src/app/activity.rs` (a model over `audit_logs`) |
 | Settings | `src/app/settings.rs`, shared as `company` (`src/lib.rs`) |

@@ -153,7 +153,12 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            (Column::summary), groups/group_by; cards_on_mobile and cell kinds
                            (image, color, badges, icons, description, tooltip, wrap, limit,
                            link, copyable); related/count_of/sum_of, advanced_filter,
-                           remember, poll; export.rs: CSV, Excel (`xlsx`), print page
+                           remember, poll; export.rs: CSV, Excel (`xlsx`), print page,
+                           export_as (any query) + ExportFormat
+  src/import.rs            renox::import: Import (CSV → rows checked as forms via
+                           validation::extract::parse_pairs, written in savepoints),
+                           ImportReport (IntoResponse: toast or views/import_report.html),
+                           template()
   src/mail.rs              Mail (recipients, cc/bcc/reply_to/from, attachments), Mailer
                            (smtp/log/memory, MAIL_FAILOVER), named mailers (App::mailer,
                            mailer_named, queue_mail_via), mail_view, queue_mail, /_renox/mail

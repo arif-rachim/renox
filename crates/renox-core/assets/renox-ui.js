@@ -373,22 +373,44 @@
   // An action sheet's form: a success closes the sheet (a 422 isn't one:
   // renox.js shows its errors in the form); closing it any way resets the
   // form and clears its errors, so the next open starts fresh.
+  // A wizard in the form starts over at its first step; an import's report
+  // goes away.
   function clearActionForm(form) {
     form.reset();
     form.querySelectorAll("[data-renox-error]").forEach(function (el) { el.remove(); });
     form.querySelectorAll("[data-error-for]").forEach(function (el) { el.textContent = ""; });
     form.querySelectorAll("[aria-invalid]").forEach(function (el) { el.removeAttribute("aria-invalid"); });
+    form.querySelectorAll("[data-rx-action-result]").forEach(function (el) { el.innerHTML = ""; });
+    form.querySelectorAll("[data-rx-wizard][data-rx-ready]").forEach(function (wizard) { showStep(wizard, 0, false); });
   }
   document.addEventListener("htmx:afterRequest", function (event) {
     var form = event.target;
-    if (!form.matches || !form.matches("form[data-rx-action]") || !event.detail.successful) return;
+    if (!form.matches || !form.matches("form[data-rx-action]")) return;
+    if (!event.detail.successful) {
+      // A 422 after a wizard's last step: show the first step with an error.
+      var wizard = form.querySelector("[data-rx-wizard][data-rx-ready]");
+      var panels = wizard ? wizardParts(wizard).panels : [];
+      var bad = panels.findIndex(function (p) { return p.querySelector('[aria-invalid="true"]'); });
+      if (bad >= 0) {
+        showStep(wizard, bad, false);
+        var invalid = panels[bad].querySelector('[aria-invalid="true"]');
+        if (invalid) invalid.focus();
+      }
+      return;
+    }
+    // An answer that asks to stay (an import's report of refused rows).
+    if (form.querySelector("[data-rx-keep-open]")) return;
     var dialog = form.closest("dialog");
     if (dialog && dialog.open) dialog.close();
     else clearActionForm(form);
   });
   document.addEventListener("close", function (event) {
     var form = event.target.querySelector && event.target.querySelector("form[data-rx-action]");
-    if (form) clearActionForm(form);
+    if (!form) return;
+    // Some rows of an import went in: the page shows them after the sheet.
+    var reload = form.querySelector("[data-rx-refresh-on-close]");
+    clearActionForm(form);
+    if (reload) location.reload();
   }, true);
 
   document.addEventListener("close", function (event) {
@@ -417,6 +439,12 @@
     if (!list) return;
     closeMenus(list);
     list.hidden = false;
+    // Hangs from the button's right edge; on a narrow screen, never past
+    // the left one.
+    list.style.right = "";
+    // (measured from the menu's box: the list's own grows in as it opens)
+    var left = list.parentElement.getBoundingClientRect().right - list.offsetWidth;
+    if (left < 8) list.style.right = (left - 8) + "px";
     button.setAttribute("aria-expanded", "true");
     var items = menuItems(list);
     var target = focusLast ? items[items.length - 1] : items[0];
@@ -492,7 +520,19 @@
     }
 
     var opener = target.closest("[data-rx-open]");
-    if (opener) { event.preventDefault(); openSheet(opener.getAttribute("data-rx-open"), opener); return; }
+    if (opener) {
+      event.preventDefault();
+      var sheetId = opener.getAttribute("data-rx-open");
+      // From a menu (an action group): the menu closes, and the sheet gives
+      // the focus back to the menu's button.
+      var owner = opener.closest("[data-rx-menu]");
+      if (owner && opener.closest('[role="menu"]')) {
+        closeMenus(null);
+        opener = owner.querySelector("[aria-haspopup='menu']") || opener;
+      }
+      openSheet(sheetId, opener);
+      return;
+    }
 
     var closer = target.closest("[data-rx-close]");
     if (closer) { var d = closer.closest("dialog"); if (d) d.close(); return; }

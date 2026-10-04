@@ -10,6 +10,33 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Actions beyond one step (#153, Filament's as the yardstick):**
+  - `action_group` in the UI kit: several actions behind one button (a "⋯" icon button, or a
+    labelled one), keyboard-usable like every kit menu. Menu items take an `icon`;
+    `menu_link(…, download=true)` for a file, `menu_open(id, label)` opens a sheet (the menu
+    closes, focus goes back to its button), `menu_section(title)` names a group of items.
+    `action_sheet` and `confirm` take `button=false`, for sheets opened from a group.
+  - `wizard_action`: a `wizard` in an action sheet, sent with htmx; Next checks the step with
+    the server's rules (live validation), a 422 after the last step opens the step with the
+    first error, closing the sheet starts over. `wizard(…, cancel=true)` adds a Cancel button.
+  - `renox::import`: `Import::csv(bytes).run(&state, |tx, row: T| …)` reads a CSV file (RFC
+    4180, a BOM, `;` with `.delimiter`), checks each row as a form of `T` (its rules, messages
+    in `.lang(&lang)`, `prepare` and `after` hooks), and writes the good rows in one
+    transaction with a savepoint each; `.all_or_nothing()`, `.rename`, `.headers`,
+    `.max_rows` (10,000 by default). The `ImportReport` answers a handler: a toast and
+    `HX-Refresh` when every row went in, else `renox/import_report.html`, the refused rows
+    with their row numbers and messages. `renox::import::template` makes the empty file to fill
+    in. The kit's `import_action` is the sheet for it.
+  - `Model::replicate()`: an unsaved copy (no id, no `deleted_at`, `Option` timestamps
+    emptied), for a "Duplicate" form or a copy saved in code. The derive writes a hidden
+    `forget_timestamps`.
+  - `Grid::export_as(query, ExportFormat, &request)`: any query as CSV, Excel or a print page,
+    outside the grid's page, in the grid's default columns. `ExportFormat` (`Csv`, `Xlsx`,
+    `Print`) reads from a route parameter.
+  - examples/backoffice: "New product" is a wizard, the product list's "More" group holds the
+    import (now on `renox::import`, its refused rows listed in the sheet) and its template, a
+    product's page has "Duplicate" and "Export ledger", and the grid a "Duplicate" row action.
+    The store answers `HxRedirect` to the new product.
 - **`rnx new` (#221):** the AGENTS.md of a new app says exactly where Renox's docs are offline:
   for an `rnx` from crates.io, the `git clone --depth 1 --branch v<version> …` of the app's
   version (the downloaded crates hold only the source); for a Git pin, Cargo's checkout of that

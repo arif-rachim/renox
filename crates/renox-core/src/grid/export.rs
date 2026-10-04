@@ -5,7 +5,7 @@ use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
 
-use super::{Column, Grid, GridRequest, Kind, Pin, header_rows, load_prefs};
+use super::{Column, Grid, GridPrefs, GridRequest, Kind, Pin, header_rows, load_prefs};
 use crate::db::{Model, Query};
 use crate::{Error, Result};
 
@@ -65,6 +65,11 @@ impl Grid {
         let Some(format) = request.param(&self.name("export")) else {
             return Ok(None);
         };
+        let Some(format) = ExportFormat::parse(format) else {
+            return Err(Error::BadRequest(format!(
+                "`{format}` isn't an export (csv, xlsx, print)"
+            )));
+        };
         let prefs = load_prefs(request, &self.id).await;
         let wide = prefs
             .wide
@@ -75,11 +80,54 @@ impl Grid {
             .into_iter()
             .filter(|(c, _)| c.kind != Kind::Custom && wide.contains(&c.key))
             .collect();
-        let items = self
-            .filter(query, request)
-            .limit(MAX_EXPORT_ROWS)
-            .get(&request.db)
-            .await?;
+        let query = self.filter(query, request);
+        self.file(&columns, query, format, request).await.map(Some)
+    }
+
+    /// Every row `query` matches as a file, outside the grid's page: an
+    /// "Export" action on a record's page or in a menu (the grid's own
+    /// export menu uses [`Grid::export`]). The grid's columns that show by
+    /// default on wide screens, in their order; the request's filters,
+    /// sort and the user's column choices don't apply (sort the query
+    /// yourself). Up to [`MAX_EXPORT_ROWS`] rows.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// use renox::grid::{Column, ExportFormat, Grid, GridRequest};
+    /// # #[derive(Model, serde::Serialize, Default)] struct Movement { id: i64, product_id: i64, quantity: i64 }
+    /// fn ledger() -> Grid {
+    ///     Grid::new("ledger").column(Column::number("quantity", "Quantity"))
+    /// }
+    ///
+    /// // GET /products/{id}/ledger.csv
+    /// async fn export_ledger(Path(id): Path<i64>, request: GridRequest) -> Result<Response> {
+    ///     let movements = Movement::where_eq("product_id", id).order_by("id");
+    ///     ledger().export_as(movements, ExportFormat::Csv, &request).await
+    /// }
+    /// ```
+    pub async fn export_as<M: Model + Serialize>(
+        &self,
+        query: Query<M>,
+        format: ExportFormat,
+        request: &GridRequest,
+    ) -> Result<Response> {
+        let shown = self.default_visible(false);
+        let columns: Vec<(&Column, Option<Pin>)> = self
+            .ordered(&GridPrefs::default())
+            .into_iter()
+            .filter(|(c, _)| c.kind != Kind::Custom && shown.contains(&c.key))
+            .collect();
+        self.file(&columns, query, format, request).await
+    }
+
+    async fn file<M: Model + Serialize>(
+        &self,
+        columns: &[(&Column, Option<Pin>)],
+        query: Query<M>,
+        format: ExportFormat,
+        request: &GridRequest,
+    ) -> Result<Response> {
+        let items = query.limit(MAX_EXPORT_ROWS).get(&request.db).await?;
         let related = self.related_values(&request.db, &items).await?;
         let rows: Vec<Map<String, Value>> = items
             .iter()
@@ -96,23 +144,23 @@ impl Grid {
         let today = crate::db::now().format("%Y-%m-%d").to_string();
         let name = format!("{}-{today}", self.id);
         let table = Table {
-            columns: &columns,
+            columns,
             rows: &rows,
             request,
         };
-        let response = match format {
-            "csv" => crate::Download::bytes(
+        Ok(match format {
+            ExportFormat::Csv => crate::Download::bytes(
                 format!("{name}.csv"),
                 "text/csv; charset=utf-8",
                 table.csv(),
             )
             .into_response(),
-            "xlsx" => xlsx(&table, &name)?,
-            "print" => crate::view(
+            ExportFormat::Xlsx => xlsx(&table, &name)?,
+            ExportFormat::Print => crate::view(
                 "renox/grid_print.html",
                 minijinja::context! {
                     title => self.title.clone().unwrap_or_else(|| self.id.clone()),
-                    header => header_rows(&columns),
+                    header => header_rows(columns),
                     columns => columns.iter().map(|(c, _)| json!({
                         "key": c.key,
                         "label": c.label,
@@ -127,13 +175,39 @@ impl Grid {
                 },
             )
             .into_response(),
-            other => {
-                return Err(Error::BadRequest(format!(
-                    "`{other}` isn't an export (csv, xlsx, print)"
-                )));
-            }
-        };
-        Ok(Some(response))
+        })
+    }
+}
+
+/// The file an export makes. `Xlsx` needs renox's `xlsx` feature (without
+/// it the export answers 400). It reads from a route or query string as
+/// `csv`, `xlsx` or `print`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+#[non_exhaustive]
+pub enum ExportFormat {
+    /// CSV with a byte order mark, so Excel reads it as UTF-8.
+    Csv,
+    /// An Excel workbook (the `xlsx` feature).
+    Xlsx,
+    /// A page to print (or save as PDF from the browser).
+    Print,
+}
+
+impl ExportFormat {
+    /// `csv`, `xlsx` or `print`.
+    pub fn parse(text: &str) -> Option<Self> {
+        match text {
+            "csv" => Some(Self::Csv),
+            "xlsx" => Some(Self::Xlsx),
+            "print" => Some(Self::Print),
+            _ => None,
+        }
+    }
+
+    /// Whether this build can make it (`Xlsx` needs the `xlsx` feature).
+    pub fn available(self) -> bool {
+        self != Self::Xlsx || cfg!(feature = "xlsx")
     }
 }
 

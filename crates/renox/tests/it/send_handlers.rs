@@ -508,6 +508,55 @@ async fn factories(State(db): State<Db>, session: Session) -> Result<String> {
     Ok(format!("{} {pushed}", notes.len()))
 }
 
+/// #153: an import (a closure per row, after the rows' rules), an export
+/// of a query outside the grid's page and a replicated model.
+#[derive(serde::Deserialize, Validate)]
+struct NoteRow {
+    #[validate(required, max = 50)]
+    body: String,
+    #[validate(min = 0)]
+    stars: Option<i64>,
+}
+
+async fn imports(
+    State(state): State<AppState>,
+    request: renox::grid::GridRequest,
+    lang: Lang,
+) -> Result<String> {
+    use renox::grid::{Column, ExportFormat, Grid};
+    let suffix = String::from("!");
+    let report = renox::import::Import::csv("body,stars\nimported,2\n,1\nimported,3\n")
+        .lang(&lang)
+        .run(&state, move |tx, row: NoteRow| {
+            let body = format!("{}{suffix}", row.body);
+            Box::pin(async move {
+                Note::create(
+                    tx,
+                    Note {
+                        body,
+                        stars: row.stars.unwrap_or(0),
+                        ..Default::default()
+                    },
+                )
+                .await?;
+                Ok(())
+            })
+        })
+        .await?;
+    let copy = Note::find_or_404(&state.db, 1).await?.replicate();
+    let file = Grid::new("notes")
+        .column(Column::text("body", "Body"))
+        .export_as(Note::query(), ExportFormat::Csv, &request)
+        .await?;
+    Ok(format!(
+        "{} {} {} {}",
+        report.imported,
+        report.failed.len(),
+        copy.id,
+        file.status().as_u16()
+    ))
+}
+
 struct Handlers;
 
 /// M27a: a data grid's page and its filtered query.
@@ -545,6 +594,7 @@ impl Module for Handlers {
             .get("/sealed", sealed)
             .get("/factories", factories)
             .get("/grid", grid)
+            .get("/imports", imports)
     }
 }
 
@@ -593,4 +643,9 @@ async fn data_apis_work_in_routed_handlers() {
         .assert_see("borrowed s3cret");
     app.get("/factories").await.assert_ok().assert_see("2 1");
     app.get("/grid?min.stars=0").await.assert_ok();
+    // One row imported, a blank body and a repeat refused.
+    app.get("/imports")
+        .await
+        .assert_ok()
+        .assert_see("1 2 0 200");
 }

@@ -132,7 +132,8 @@ field for you.
   `grid::Action`, `grid::Selection`, `storage::FileInfo`, `queue::BatchStatus`,
   `queue::QueueCounts`, `queue::QueueStats` (the dashboard's), `http::SentRequest`,
   `select::SelectOption` (use `SelectOption::new`), `select::OptionQuery`, `Upload` (use
-  `Upload::new`), `db::Migration` (use `Migration::new(..).sqlite(..).postgres(..)`)
+  `Upload::new`), `db::Migration` (use `Migration::new(..).sqlite(..).postgres(..)`),
+  `import::ImportReport`, `import::FailedRow`
 
 ### New variants on enums
 
@@ -143,7 +144,7 @@ compiles when a new variant appears.
 
 - `Error`, `Environment`, `CspMode`, `Channel`, `DbValue`, `Inspected` (a `Rule`
   matching on `Inspected` needs a `_` arm), `ToastKind`, `chart::Bucket`, `report::ReportKind`,
-  `grid::Kind`, `grid::Summary`
+  `grid::Kind`, `grid::Summary`, `grid::ExportFormat`
 - the settings: `SessionDriver`, `LogFormat`, `CacheStore`, `mail::MailDriver`,
   `mail::MailEncryption`, `storage::DiskDriver`, and `webhook::WebhookStatus`
 

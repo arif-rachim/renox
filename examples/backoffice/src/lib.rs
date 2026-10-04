@@ -11,7 +11,10 @@
 //!   whose webhook marks them paid;
 //! - a stock ledger: every change to a product's stock is a row, written in
 //!   the same transaction, and stock never goes below zero;
-//! - products imported from a CSV file in the browser, a savepoint per line;
+//! - products imported from a CSV file in the browser (`renox::import`: each
+//!   row checked with a form's rules, a savepoint per row), added through a
+//!   two-step wizard, duplicated (`Model::replicate`), and a product's ledger
+//!   exported as CSV (`Grid::export_as`);
 //! - exports of the filtered invoices made in the background, with a
 //!   notification (the bell) holding the link when the file is ready;
 //! - staff with roles and permissions (admin, cashier, warehouse), added by

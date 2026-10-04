@@ -373,13 +373,12 @@ async fn products_import_from_csv_line_by_line() {
             &[("file", "products.csv", csv.as_bytes())],
         )
         .await;
-    res.assert_ok();
-    // The toast waits for the refreshed page (HxRefresh).
-    app.get("/products")
-        .await
-        .assert_see("1 added, 1 updated, 2 skipped.")
-        .assert_see("line 4: `BAD SKU` isn&#x27;t a SKU")
-        .assert_see("line 5: `pricey` isn&#x27;t a price");
+    // Rows 4 and 5 refused, with the rules' messages; the report stays in
+    // the sheet (renox::import's ImportReport).
+    res.assert_ok()
+        .assert_see("2 imported, 2 rows left out.")
+        .assert_see(r#"<td class="rx-num">4</td><td>The sku may only contain letters, numbers, dashes and underscores.</td>"#)
+        .assert_see(r#"<td class="rx-num">5</td><td>The price must be a number.</td>"#);
 
     let coffee = Product::where_eq("sku", "COFFEE")
         .first(app.db())
@@ -403,6 +402,75 @@ async fn products_import_from_csv_line_by_line() {
         .post_multipart("/products/import", &[], &[("file", "x.exe", b"MZ")])
         .await
         .assert_invalid("file");
+}
+
+#[renox::test]
+async fn new_products_duplicates_and_the_ledger_export() {
+    let app = app().await;
+    let coffee = product(&app, "COFFEE", 50_000, 10).await;
+    staff(&app, "warehouse").await;
+    // The wizard's page and the product's action group.
+    app.get("/products")
+        .await
+        .assert_see(r#"data-rx-open="new-product""#)
+        .assert_see(r#"data-rx-open="import-products""#)
+        .assert_see("Download the CSV template");
+    app.get(&format!("/products/{}", coffee.id))
+        .await
+        .assert_see(r#"aria-label="Actions""#)
+        .assert_see(&format!("/products/{}/replicate", coffee.id))
+        .assert_see(&format!("/products/{}/ledger.csv", coffee.id));
+
+    // A 422 names the second step's field; a success goes to the product.
+    app.htmx()
+        .post(
+            "/products",
+            &[("sku", "TEA"), ("name", "Tea"), ("price", "-1")],
+        )
+        .await
+        .assert_invalid("price");
+    let res = app
+        .htmx()
+        .post(
+            "/products",
+            &[
+                ("sku", "tea"),
+                ("name", "Tea"),
+                ("price", "18000"),
+                ("opening_stock", "3"),
+            ],
+        )
+        .await;
+    let tea = Product::where_eq("sku", "TEA")
+        .first(app.db())
+        .await
+        .unwrap()
+        .unwrap();
+    res.assert_ok()
+        .assert_header("hx-redirect", &format!("/products/{}", tea.id));
+    assert_eq!(tea.stock, 3);
+
+    // Duplicate: the form filled from a copy, without the unique SKU.
+    app.get(&format!("/products/{}/replicate", coffee.id))
+        .await
+        .assert_ok()
+        .assert_see("A copy of Product COFFEE (COFFEE)")
+        .assert_see(r#"value="Product COFFEE (copy)""#)
+        .assert_see(r#"value="50000""#)
+        .assert_dont_see(r#"value="COFFEE""#);
+
+    // The ledger as CSV, outside the grid's page.
+    let csv = app
+        .get(&format!("/products/{}/ledger.csv", coffee.id))
+        .await;
+    csv.assert_ok()
+        .assert_header("content-type", "text/csv; charset=utf-8");
+    let text = csv.text();
+    assert!(text.starts_with("\u{feff}When,Reason,"), "{text}");
+    assert!(text.contains(",Received,"), "{text}");
+
+    let template = app.get("/products/import/template.csv").await;
+    assert_eq!(template.text(), "\u{feff}sku,name,price,stock\r\n");
 }
 
 #[renox::test]
