@@ -10,6 +10,14 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+## 1.0.0-rc.3 · 2026-10-04
+
+The third release candidate: the same API as rc.2, with three fixes found by using it and a CI
+job that follows the tutorial. Install it with `cargo install renox-cli --version 1.0.0-rc.3`;
+an rc.2 app moves over by changing `renox = "1.0.0-rc.2"` to `"1.0.0-rc.3"`. Files the
+generators already wrote are the app's and don't change: only new `rnx make:model` and
+`--resource` runs name their tables in the plural (#127).
+
 - **Fixed:** `TestApp::travel` didn't reach jobs: `run_jobs()` ran each job in a task of its
   own (`tokio::spawn`), which starts without the task-local clock offset, so a job saw the
   real time. Jobs, their `failed` hooks, webhook handlers and scheduled runs now keep the
