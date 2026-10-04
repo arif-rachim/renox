@@ -10,6 +10,18 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Fixed:** `TestApp::travel` didn't reach jobs: `run_jobs()` ran each job in a task of its
+  own (`tokio::spawn`), which starts without the task-local clock offset, so a job saw the
+  real time. Jobs, their `failed` hooks, webhook handlers and scheduled runs now keep the
+  clock of the code that started them (`clock::carry`). Found by following the tutorial: its
+  digest test, which travels a week, failed.
+- docs/tutorial.md: the code is as rustfmt prints it (a reader's `cargo fmt --check` failed
+  on the seeder and the tests), and the address field is labelled "address" so its messages
+  match the form ("The address field is required.", not "url").
+- **`tests/tutorial/run.sh`** (CI job `tutorial`): follows the tutorial step by step, as a
+  reader does (steps found by their sentences, `rnx` commands from its bash blocks), then
+  runs `cargo fmt --check`, clippy, the tutorial's tests, migrate, the seeder twice, and
+  checks the app answers. A tutorial that can no longer be followed fails CI.
 - **Fixed (#127):** `rnx make:model --migration` named the table after the model in the
   singular (`WaitlistSignup` → `waitlist_signup`), unlike `--resource`, the docs and the
   examples. `make:model` now writes the plural (`waitlist_signups`, `categories`) in both

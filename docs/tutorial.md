@@ -366,7 +366,7 @@ Add this to `src/app/bookmarks/mod.rs`, with `use renox::Toast;` and
 struct BookmarkForm {
     #[validate(required, max = 200)]
     title: String,
-    #[validate(required, url, max = 2000)]
+    #[validate(required, url, max = 2000, label = "address")]
     url: String,
     #[validate(max = 1000)]
     note: Option<String>,
@@ -420,7 +420,9 @@ How it fits together:
 
 - `#[derive(Validate)]` turns each `#[validate(…)]` into rules, much like a Laravel Form
   Request. `url` accepts only `http://` and `https://` addresses, so nobody can save a
-  `javascript:` link that would run when clicked. An empty note arrives as `None`, and
+  `javascript:` link that would run when clicked. `label` is how messages name the field
+  ("The address field is required."), to match the form's "Address"; without it they'd say
+  "url". An empty note arrives as `None`, and
   `max` checks it only when there is one.
 - `Valid<BookmarkForm>` reads the form, checks the rules, and only then calls the handler: bad
   input never reaches your code. It must be the last argument, since it reads the request
@@ -569,7 +571,7 @@ impl Module for Bookmarks {
 struct BookmarkForm {
     #[validate(required, max = 200)]
     title: String,
-    #[validate(required, url, max = 2000)]
+    #[validate(required, url, max = 2000, label = "address")]
     url: String,
     #[validate(max = 1000)]
     note: Option<String>,
@@ -1012,7 +1014,10 @@ pub fn app() -> App {
         .module(app::bookmarks::Bookmarks)
         // `rnx db:seed`: a demo account with some bookmarks. Running it twice changes nothing.
         .seeder(|state| async move {
-            if User::find_by_email(&state.db, "demo@example.com").await?.is_some() {
+            if User::find_by_email(&state.db, "demo@example.com")
+                .await?
+                .is_some()
+            {
                 return Ok(());
             }
             let demo = User::register(&state.db, "Demo", "demo@example.com", "password123").await?;
@@ -1059,7 +1064,9 @@ use stash::Bookmark;
 use std::time::Duration;
 
 async fn user(app: &TestApp, email: &str) -> User {
-    User::register(app.db(), "Test", email, "password123").await.unwrap()
+    User::register(app.db(), "Test", email, "password123")
+        .await
+        .unwrap()
 }
 
 #[renox::test]
@@ -1076,12 +1083,21 @@ async fn users_save_bookmarks() {
 
     // As htmx sends it: the answer is the list, with the new bookmark.
     app.htmx()
-        .post("/bookmarks", &[("title", "The Rust Book"), ("url", "https://doc.rust-lang.org/book/")])
+        .post(
+            "/bookmarks",
+            &[
+                ("title", "The Rust Book"),
+                ("url", "https://doc.rust-lang.org/book/"),
+            ],
+        )
         .await
         .assert_ok()
         .assert_see("The Rust Book");
-    app.assert_database_has("bookmarks", &[("title", &"The Rust Book"), ("user_id", &ana.id)])
-        .await;
+    app.assert_database_has(
+        "bookmarks",
+        &[("title", &"The Rust Book"), ("user_id", &ana.id)],
+    )
+    .await;
 }
 
 #[renox::test]
@@ -1090,7 +1106,10 @@ async fn invalid_bookmarks_are_refused() {
     app.acting_as(&user(&app, "ana@example.com").await);
 
     app.htmx()
-        .post("/bookmarks", &[("title", ""), ("url", "javascript:alert(1)")])
+        .post(
+            "/bookmarks",
+            &[("title", ""), ("url", "javascript:alert(1)")],
+        )
         .await
         .assert_invalid("title")
         .assert_invalid("url");
@@ -1115,9 +1134,12 @@ async fn only_the_owner_edits_and_deletes() {
     app.delete(&member).await.assert_forbidden();
 
     app.acting_as(&ana);
-    app.put(&member, &[("title", "Renamed"), ("url", "https://example.com")])
-        .await
-        .assert_redirect("/bookmarks");
+    app.put(
+        &member,
+        &[("title", "Renamed"), ("url", "https://example.com")],
+    )
+    .await
+    .assert_redirect("/bookmarks");
     app.get("/bookmarks").await.assert_see("Bookmark updated."); // the toast
     app.delete(&member).await.assert_redirect("/bookmarks");
     app.assert_database_count("bookmarks", 0).await;

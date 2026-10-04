@@ -356,7 +356,7 @@ impl Job for ProcessWebhook {
         };
         let id = call.id;
         // Its own task, so a panicking handler marks the call failed too.
-        let outcome = match tokio::spawn(handle(call, ctx)).await {
+        let outcome = match tokio::spawn(crate::clock::carry(handle(call, ctx))).await {
             Ok(outcome) => outcome,
             Err(join) => Err(anyhow!(
                 "the webhook handler panicked: {}",

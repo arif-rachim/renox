@@ -160,6 +160,21 @@ jobs:
       # A new app with every generator's output must build and pass its tests.
       - run: tests/cli/run.sh ${{ matrix.database }}
 
+  tutorial:
+    name: tutorial (docs/tutorial.md, followed step by step)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target/tutorial"
+      # A reader who follows the tutorial must end up with an app that passes
+      # cargo fmt --check, clippy and the tests the tutorial writes, and runs.
+      - run: tests/tutorial/run.sh
+
   docker:
     name: docker (make:deploy)
     runs-on: ubuntu-latest
