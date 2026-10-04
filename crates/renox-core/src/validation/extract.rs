@@ -446,6 +446,13 @@ fn expected_variant(message: &str) -> Option<String> {
     (!first.is_empty()).then(|| first.to_owned())
 }
 
+/// Whether `message` is serde_html_form's "this isn't a bool": 0.2 says
+/// "provided string was not `true` or `false`" (as does `nested.rs`), 0.4
+/// says `invalid value: string "", expected "true", "on" or "false"` (#160).
+fn is_bool_error(message: &str) -> bool {
+    message.contains("`true` or `false`") || message.contains("expected \"true\"")
+}
+
 /// Rewrites what browsers send into what Rust types parse, once per field:
 /// a checkbox's `on` (or `1`, `yes`) is `true`, an unchecked one (missing)
 /// is `false`; `<input type="datetime-local">` leaves out the seconds.
@@ -461,7 +468,7 @@ fn coerce_browser_value(
     }
     let mut changed = false;
     for (_, value) in filled.iter_mut().filter(|(k, _)| k == path) {
-        let new = if message.contains("`true` or `false`") {
+        let new = if is_bool_error(message) {
             match value.trim().to_ascii_lowercase().as_str() {
                 "on" | "1" | "yes" | "checked" => Some("true".to_owned()),
                 "" | "off" | "0" | "no" => Some("false".to_owned()),
@@ -658,6 +665,18 @@ mod tests {
     }
 
     #[test]
+    fn bool_errors_are_recognised_in_either_wording() {
+        assert!(is_bool_error("provided string was not `true` or `false`"));
+        assert!(is_bool_error(
+            r#"invalid value: string "", expected "true", "on" or "false""#
+        ));
+        assert!(!is_bool_error("invalid digit found in string"));
+        // What serde_html_form says today, whichever version Cargo picked.
+        let err = serde_html_form::from_str::<Browser>("agree=&news=&starts_at=x").unwrap_err();
+        assert!(is_bool_error(&err.to_string()), "{err}");
+    }
+
+    #[test]
     fn reads_what_browsers_send() {
         // A checked checkbox sends "on", an unchecked one nothing;
         // datetime-local has no seconds; multi-selects repeat the name.
@@ -674,6 +693,14 @@ mod tests {
         assert!(form.tags.is_empty());
         let errors = parse_browser("agree=maybe&starts_at=soon").unwrap_err();
         assert!(errors.has("agree") && errors.has("starts_at"));
+        // A box sent empty or "off" (a hidden input before the checkbox, or a
+        // script) is unchecked. serde_html_form 0.4 words the bool error
+        // differently from 0.2, and the rewrite must catch both (#160).
+        for unchecked in ["agree=on&news=", "agree=on&news=off", "agree=on&news=0"] {
+            let form = parse_browser(&format!("{unchecked}&starts_at=2026-10-01T10%3A30"))
+                .unwrap_or_else(|errors| panic!("{unchecked}: {errors:?}"));
+            assert!(form.agree && !form.news, "{unchecked}");
+        }
     }
 
     #[test]

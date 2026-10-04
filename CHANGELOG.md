@@ -10,6 +10,13 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Fixed (#160):** with serde_html_form 0.4 (#137), an unchecked checkbox no longer read as
+  `false`: its field was "required" or kept its old value. `Valid<T>` recognises the bool
+  error by its wording, which 0.4 changed (`expected "true", "on" or "false"`); both wordings
+  are recognised now, with a test that asks the installed serde_html_form.
+- **Fixed (#158):** the MSRV CI job is back on Rust 1.94 (Dependabot's #135 had moved it to
+  1.120); Dependabot ignores that action (#156).
+
 - Work is tracked on GitHub: issue forms for bugs, user stories (with acceptance criteria)
   and tasks; a pull request template with the sections every PR has; Dependabot (grouped,
   weekly for crates, monthly for Actions); release-note sections. CONTRIBUTING.md "How work is
