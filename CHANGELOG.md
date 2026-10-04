@@ -10,6 +10,13 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Fixed (#127):** `rnx make:model --migration` named the table after the model in the
+  singular (`WaitlistSignup` → `waitlist_signup`), unlike `--resource`, the docs and the
+  examples. `make:model` now writes the plural (`waitlist_signups`, `categories`) in both
+  `#[model(table = …)]` and the migration. `make:module <name> --resource --model <Model>`
+  names the table after the model as well (`news --model Article` → `articles`, it was
+  `news`); with the usual plural module (`products`) nothing changes. `rnx make:migration
+  create_x_table` keeps the name it is given.
 - **Fixed (#128):** a kit `card` stretched to its row's height (two cards side by side in a
   grid, one longer than the other) put the extra space between its title and its body, so
   the shorter card's body sat lower than its neighbour's. `.rx-card` now has

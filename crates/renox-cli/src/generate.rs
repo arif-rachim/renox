@@ -316,11 +316,14 @@ pub fn model(
 ) -> Result<()> {
     check_name(name)?;
     let pascal = name.to_upper_camel_case();
-    let table = name.to_snake_case();
-    let module = module.map_or_else(|| table.clone(), |m| m.to_snake_case());
+    let snake = name.to_snake_case();
+    // Tables are plural, as `make:module --resource`, the docs and the
+    // examples have them (#127): `WaitlistSignup` → `waitlist_signups`.
+    let table = crate::scaffold::plural(&snake);
+    let module = module.map_or_else(|| snake.clone(), |m| m.to_snake_case());
     let dir = module_dir(root, &module)?;
     let file = if dir.join("model.rs").exists() {
-        table.clone()
+        snake.clone()
     } else {
         "model".into()
     };
@@ -827,14 +830,24 @@ mod tests {
         module(dir.path(), "product").unwrap();
         model(dir.path(), "Product", None, true, crate::KeyType::Integer).unwrap();
         let code = read(&dir, "src/app/product/model.rs");
+        // Plural tables, as `--resource` and the docs have them (#127).
         assert!(
-            code.contains(r#"#[model(table = "product")]"#)
-                && code.contains("pub struct Product {")
+            code.contains(r#"#[model(table = "products")]"#)
+                && code.contains("pub struct Product {"),
+            "{code}"
         );
-        let migrations: Vec<_> = fs::read_dir(dir.path().join("migrations"))
+        let mut migrations: Vec<String> = fs::read_dir(dir.path().join("migrations"))
             .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
             .collect();
+        migrations.sort();
         assert_eq!(migrations.len(), 2, "up and down");
+        assert!(
+            migrations[0].ends_with("_create_products_table.down.sql"),
+            "{migrations:?}"
+        );
+        let up = read(&dir, &format!("migrations/{}", migrations[1]));
+        assert!(up.contains(r#"CREATE TABLE "products""#), "{up}");
 
         model(
             dir.path(),
@@ -861,6 +874,19 @@ mod tests {
         assert!(
             dir.path().join("src/app/product/category.rs").exists(),
             "model.rs is taken"
+        );
+        assert!(read(&dir, "src/app/product/category.rs").contains(r#"table = "categories""#));
+        model(
+            dir.path(),
+            "WaitlistSignup",
+            Some("product"),
+            false,
+            crate::KeyType::Integer,
+        )
+        .unwrap();
+        assert!(
+            read(&dir, "src/app/product/waitlist_signup.rs")
+                .contains(r#"#[model(table = "waitlist_signups")]"#)
         );
 
         job(dir.path(), "MailReceipt", "product").unwrap();
