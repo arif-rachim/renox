@@ -261,9 +261,9 @@ site/                      the documentation site (package `renox-site`, publish
                            app that compiles the repo's Markdown in (src/content.rs lists the
                            pages, src/render.rs: pulldown-cmark, anchors, TOC, hidden doctest
                            lines, links → /docs/{slug} or GitHub), search, sitemap, ETags;
-                           deploy/ has its systemd units and setup-ubuntu.sh (run once on the
-                           owner's server); .github/workflows/docs-site.yml deploys it to
-                           https://renox.renoxium.com over SSH (#141). A new guide in docs/ needs a line in
+                           deploy/ has its systemd units; .github/workflows/release-site.yml
+                           builds it for https://renox.renoxium.com, whose server pulls
+                           each new build (#141). A new guide in docs/ needs a line in
                            content.rs PAGES (and site/build.rs already watches docs/).
                            The owner hosts it on their own server (not GitHub Pages: the
                            account's user site maps project sites to a personal domain)
@@ -738,8 +738,9 @@ PostgreSQL suite 2.5x slower (reconnects).
   postgres; `tests/chaos/run.sh`), **MSRV (1.94)**, **feature matrix** (`cargo hack check -p
   renox-core -p renox --each-feature --no-dev-deps`), **cli** (sqlite, postgres;
   `tests/cli/run.sh`), **tutorial** (`tests/tutorial/run.sh`), **docker** (`make:deploy` image answers `/health`), **s3** (SeaweedFS; renox's `it/s3.rs` and examples/uploads),
-  **cargo-deny**, **coverage** (informational); a separate workflow, **Docs site**
-  (docs-site.yml: on pushes to main that touch the docs, deploys site/ to the owner's server),
+  **cargo-deny**, **coverage** (informational); a separate workflow, **Release build (site)**
+  (release-site.yml: on pushes to main that touch the docs, builds site/ for the owner's server,
+  which pulls it),
   **semver checks** (pull requests:
   `cargo semver-checks -p renox-core -p renox --baseline-rev origin/<base> --release-type
   minor`, informational until the first release; install it with `cargo install --locked
