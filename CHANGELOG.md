@@ -10,6 +10,14 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **`renox-2fa` (#169), the first plugin crate, started:** `crates/renox-2fa`, versioned with
+  `renox`. `TwoFactor` (a module) brings the `two_factor` table (SQLite and PostgreSQL: one
+  row per user, the TOTP secret sealed with `APP_KEY`, when it was confirmed, the last code
+  used, hashed recovery codes; deleted with its user); `renox_2fa::totp` (RFC 6238 codes,
+  base32, `otpauth://` URIs, one-step clock drift, a code works once), tested against the RFC
+  6238 and RFC 4648 test vectors; `renox_2fa::qr::svg` (the QR code, via the `qrcode` crate,
+  MIT OR Apache-2.0, no image crates). The account page, the login challenge and recovery
+  codes follow (#170–#173).
 - **The docs site's deploys (#141):** https://renox.renoxium.com, on the owner's Ubuntu 24.04
   server. `site/deploy/setup-ubuntu.sh` sets the server up once (a `renox-site` user, a
   `deploy` user that may only replace the binary and restart it, a production `.env`, the
