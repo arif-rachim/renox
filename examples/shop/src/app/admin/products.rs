@@ -4,7 +4,6 @@
 //! `rnx make:module admin --resource`-style handlers written by hand under
 //! the admin group (`super::routes`).
 
-use renox::Toast;
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 

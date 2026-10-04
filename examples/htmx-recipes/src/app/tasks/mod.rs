@@ -8,7 +8,7 @@
 use renox::fake::Fake;
 use renox::fake::faker::lorem::en::Sentence;
 use renox::prelude::*;
-use renox::{HxReswap, HxRetarget, Toast};
+use renox::{HxReswap, HxRetarget};
 use serde::{Deserialize, Serialize};
 
 /// Rows per page (and per infinite-scroll load).

@@ -5,7 +5,6 @@
 //! savepoint per line, so a bad line is skipped and reported, and the rest
 //! still land.
 
-use renox::Toast;
 use renox::prelude::*;
 use serde::Deserialize;
 

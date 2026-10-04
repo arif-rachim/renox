@@ -13,6 +13,23 @@ changes by milestone (each one pull request; details in its description and in
 - **Guides for beginners, part 3 (#193):** grid.md, testing.md, postgresql.md, operations.md,
   development.md, stability.md and laravel.md rewritten in plain words; README.md and
   CHEATSHEET.md made plainer (an opening for each section, comments in the samples).
+- **Guides for beginners, part 2 (#193):** relations.md, types.md, authorization.md, queue.md,
+  mail.md and scheduling.md rewritten in plain words, like part 1.
+- **Guides for beginners, part 1 (#193):** routing.md, validation.md and ui.md rewritten in
+  plain words: what the page is for, the words it uses, short paragraphs, "what's going on"
+  after each example, comments in the code samples, and Laravel notes, tips and warnings as
+  callouts. Every heading (and so every link to one) is kept.
+- **The tutorial, for beginners (#192):** docs/tutorial.md rewritten in plain words: what you'll
+  build and learn, a table of the words web apps use, a doc comment on every function and
+  comments on the lines that need one in every code sample, "what's going on" after each
+  sample, and callouts for Laravel users, tips and warnings. It installs `rnx` from crates.io.
+- **`Toast` is in the prelude (#175):** `use renox::prelude::*;` now brings `Toast`, which
+  nearly every handler that changes something returns (`HxRefresh` already was). The
+  examples, the generators and the guides drop their `use renox::Toast;`; an existing one
+  still compiles.
+- **Docs links (#141):** the crates' `homepage` is now https://renox.renoxium.com, and the
+  README, llms.txt and new apps' `AGENTS.md` point readers there.
+
 ## 1.0.0-rc.4 · 2026-10-04
 
 The fourth release candidate: fixes found by using rc.3, and two extension points for

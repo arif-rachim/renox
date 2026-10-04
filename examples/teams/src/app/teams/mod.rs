@@ -3,10 +3,10 @@
 
 pub mod model;
 
+use renox::DomainParams;
 use renox::db::Encrypted;
 use renox::prelude::*;
 use renox::validation::FormContext;
-use renox::{DomainParams, Toast};
 use serde::Deserialize;
 
 use super::tenancy::{CurrentTeam, SESSION_KEY};

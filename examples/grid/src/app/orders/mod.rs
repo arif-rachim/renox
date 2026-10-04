@@ -7,7 +7,6 @@
 
 pub mod model;
 
-use renox::Toast;
 use renox::chrono::NaiveDate;
 use renox::grid::{Action, Column, Grid, GridRequest, RowOrder, Selection, Summary};
 use renox::prelude::*;

@@ -836,7 +836,6 @@ Details: [ui.md](ui.md).
 The handler that renders a page can also answer an htmx request with just one block of it:
 
 ```rust
-use renox::Toast;
 use renox::prelude::*;
 
 /// One handler for both: htmx gets a block of the page, a normal post gets a redirect.

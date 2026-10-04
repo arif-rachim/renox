@@ -8,9 +8,9 @@ pub mod import;
 pub mod model;
 pub mod policy;
 
+use renox::Resource;
 use renox::prelude::*;
 use renox::validation::ValidateHooks;
-use renox::{Resource, Toast};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 

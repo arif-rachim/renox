@@ -436,7 +436,6 @@ Editing in place means changing a value right in the grid, without opening a for
 
 ```rust
 # use renox::prelude::*;
-use renox::Toast;
 use renox::grid::{Column, Grid};
 # #[derive(Model, serde::Serialize, Default)] struct Order { id: i64, customer: String, items: i64 }
 
@@ -552,7 +551,6 @@ Actions are buttons that do something to rows: mark them paid, delete them, and 
 
 ```rust
 # use renox::prelude::*;
-use renox::Toast;
 use renox::grid::{Action, Column, Grid, GridRequest, Selection};
 # #[derive(Model, serde::Serialize, Default)] struct Order { id: i64, status: String }
 

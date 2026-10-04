@@ -13,7 +13,6 @@ pub mod checkout;
 pub mod model;
 pub mod notifications;
 
-use renox::Toast;
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 
