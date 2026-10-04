@@ -2285,7 +2285,7 @@ dependencies = [
 
 [[package]]
 name = "renox-2fa"
-version = "1.0.0-rc.3"
+version = "1.0.0-rc.4"
 dependencies = [
  "hmac 0.13.0",
  "qrcode",
