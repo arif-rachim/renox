@@ -1,321 +1,249 @@
 #!/usr/bin/env python3
-"""Uses an app made by `rnx new` over HTTP, the way a person in a browser does.
+"""Drives an app made by `rnx` over HTTP, the way a person in a browser does (#142).
 
-The generated apps' own tests drive them through `TestApp`; this script talks to the
-running server instead: it reads the forms off the pages (their action, method,
-`_method` and CSRF fields), keeps the session cookie, follows redirects, and checks
-what the next page says. A generator that writes code which compiles and passes its
-own tests but doesn't work in a browser fails here.
+    tests/cli/smoke.py resources <base url> <sqlite file> <app binary>
+    tests/cli/smoke.py starter   <base url> <sqlite file> <app binary>
 
-    tests/cli/smoke.py resource <base url> <path>   # a `make:module --resource` module
-    tests/cli/smoke.py starter <base url>           # an app made by `rnx new --starter`
+`resources`: the app tests/cli/run.sh makes with every generator. Every GET page answers
+without a server error, as a guest and logged in; the `products` module from
+`make:module products --resource --fields …` is created, shown, edited (unticking a checkbox
+must store false) and deleted through its forms, with CSRF, validation errors and toasts.
 
-Run by tests/cli/run.sh after it starts the app. Only the standard library is used.
+`starter`: an app from `rnx new --starter`. Sign-up lands on email verification; the seeded
+admin sees the dashboard, the users page and the activity log and changes a member's roles;
+the member gets 403 on the admin pages.
+
+Standard library only. A failure says which step and shows the response.
 """
 
-import html
 import http.cookiejar
 import re
+import sqlite3
+import subprocess
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
-from html.parser import HTMLParser
-
-STEP = "start"
 
 
-def fail(message, page=None):
-    print(f"\nsmoke: FAIL at step {STEP!r}: {message}", file=sys.stderr)
-    if page is not None:
-        print(f"  {page.status} {page.url}", file=sys.stderr)
-        print(page.text[:2000], file=sys.stderr)
-    sys.exit(1)
+def fail(step, response=None):
+    detail = ""
+    if response is not None:
+        detail = f"\n  status {response.status}, location {response.location!r}\n  body: {response.text[:600]!r}"
+    sys.exit(f"smoke: {step}{detail}")
 
 
-def step(name):
-    global STEP
-    STEP = name
-    print(f"--   {name}")
+class Response:
+    def __init__(self, status, headers, body):
+        self.status = status
+        self.location = headers.get("Location")
+        self.text = body.decode("utf-8", "replace")
 
-
-class Forms(HTMLParser):
-    """Every <form> on a page: its attributes and the fields it would send."""
-
-    def __init__(self):
-        super().__init__(convert_charrefs=True)
-        self.forms = []
-        self.form = None
-        self.textarea = None
-        self.select = None
-
-    def handle_starttag(self, tag, attrs):
-        a = dict(attrs)
-        if tag == "form":
-            self.form = {"action": a.get("action", ""), "method": a.get("method", "get"),
-                         "fields": {}, "names": []}
-            self.forms.append(self.form)
-            return
-        if self.form is None:
-            return
-        name = a.get("name")
-        if tag == "input" and name:
-            kind = a.get("type", "text")
-            self.form["names"].append(name)
-            if kind in ("checkbox", "radio"):
-                if "checked" in a:
-                    self.form["fields"][name] = a.get("value", "on")
-            elif kind not in ("submit", "button", "file"):
-                self.form["fields"][name] = a.get("value", "")
-        elif tag == "textarea" and name:
-            self.form["names"].append(name)
-            self.form["fields"][name] = ""
-            self.textarea = name
-        elif tag == "select" and name:
-            self.form["names"].append(name)
-            self.select = name
-        elif tag == "option" and self.select:
-            if "selected" in a or self.select not in self.form["fields"]:
-                self.form["fields"][self.select] = a.get("value", "")
-
-    def handle_data(self, data):
-        if self.textarea:
-            self.form["fields"][self.textarea] += data
-
-    def handle_endtag(self, tag):
-        if tag == "form":
-            self.form = None
-        elif tag == "textarea":
-            self.textarea = None
-        elif tag == "select":
-            self.select = None
-
-
-class Page:
-    def __init__(self, status, url, text):
-        self.status, self.url, self.text = status, url, text
-
-    @property
     def path(self):
-        return urllib.parse.urlparse(self.url).path
+        """The redirect's path (Location may be absolute)."""
+        return urllib.parse.urlparse(self.location or "").path
 
-    def forms(self):
-        parser = Forms()
-        parser.feed(self.text)
-        return parser.forms
 
-    def form(self, action=None, method=None, field=None):
-        """The first form with that action, spoofed method (`_method`) or field."""
-        for form in self.forms():
-            if action is not None and urllib.parse.urlparse(form["action"]).path != action:
-                continue
-            if method is not None and form["fields"].get("_method", "").upper() != method:
-                continue
-            if field is not None and field not in form["names"]:
-                continue
-            return form
-        fail(f"no form (action={action}, method={method}, field={field}) on the page", self)
-
-    def see(self, text):
-        if text not in html.unescape(self.text):
-            fail(f"expected to see {text!r}", self)
-        return self
-
-    def dont_see(self, text):
-        if text in html.unescape(self.text):
-            fail(f"expected not to see {text!r}", self)
-        return self
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
 
 
 class Browser:
+    """One visitor: a cookie jar, and the CSRF token of the last page."""
+
     def __init__(self, base):
         self.base = base.rstrip("/")
-        self.cookies = http.cookiejar.CookieJar()
-        self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(self.cookies))
+        self.opener = urllib.request.build_opener(
+            urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()), NoRedirect)
+        self.token = None
+        self.page = None  # the last page shown, sent as Referer like a browser does
 
-    def request(self, path, data=None):
-        url = path if path.startswith("http") else self.base + path
-        body = urllib.parse.urlencode(data).encode() if data is not None else None
-        req = urllib.request.Request(url, data=body, headers={"Accept": "text/html"})
+    def request(self, method, path, form=None):
+        data = None
+        if form is not None:
+            pairs = list(form) if isinstance(form, list) else list(form.items())
+            if self.token:
+                pairs.append(("_token", self.token))
+            data = urllib.parse.urlencode(pairs).encode()
+        req = urllib.request.Request(self.base + path, data=data, method=method)
+        if data is not None:
+            req.add_header("Content-Type", "application/x-www-form-urlencoded")
+        if self.page:
+            req.add_header("Referer", self.page)
         try:
             with self.opener.open(req, timeout=30) as res:
-                return Page(res.status, res.geturl(), res.read().decode("utf-8", "replace"))
+                response = Response(res.status, res.headers, res.read())
         except urllib.error.HTTPError as err:
-            return Page(err.code, err.geturl(), err.read().decode("utf-8", "replace"))
+            response = Response(err.code, err.headers, err.read())
+        if method == "GET" and response.status == 200:
+            self.page = self.base + path
+        token = re.search(r'name="csrf-token" content="([^"]+)"', response.text)
+        if token:
+            self.token = token.group(1)
+        return response
 
-    def get(self, path, status=200):
-        page = self.request(path)
-        if status is not None and page.status != status:
-            fail(f"GET {path} answered {page.status}, not {status}", page)
-        return page
+    def get(self, path):
+        return self.request("GET", path)
 
-    def submit(self, form, values=None, status=200):
-        """Sends a form as the browser would (POST with its hidden fields), after
-        following the redirect it answers with."""
-        fields = dict(form["fields"])
-        for name, value in (values or {}).items():
-            if value is None:
-                fields.pop(name, None)
-            else:
-                fields[name] = value
-        action = form["action"] or "/"
-        if form["method"].lower() == "get":
-            page = self.request(action + "?" + urllib.parse.urlencode(fields))
-        else:
-            page = self.request(action, fields)
-        if status is not None and page.status != status:
-            fail(f"{form['method'].upper()} {action} ended at {page.status}, not {status}", page)
-        return page
+    def post(self, path, form):
+        return self.request("POST", path, form)
+
+    def follow(self, response):
+        """GET where a redirect points (as the browser would next)."""
+        return self.get(response.path() + (f"?{urllib.parse.urlparse(response.location).query}"
+                                           if "?" in (response.location or "") else ""))
 
 
-def register(browser, name, email):
-    page = browser.get("/register")
-    return browser.submit(page.form(action="/register"), {
+def expect(step, response, status, location=None, see=None, dont_see=None):
+    if response.status != status:
+        fail(f"{step}: expected {status}", response)
+    if location is not None and response.path() != location:
+        fail(f"{step}: expected a redirect to {location}", response)
+    for text in [see] if isinstance(see, str) else (see or []):
+        if text not in response.text:
+            fail(f"{step}: the page should show {text!r}", response)
+    for text in [dont_see] if isinstance(dont_see, str) else (dont_see or []):
+        if text in response.text:
+            fail(f"{step}: the page shouldn't show {text!r}", response)
+    print(f"ok   {step}")
+    return response
+
+
+def get_routes(binary):
+    """GET routes without parameters, from the app's own `route:list`."""
+    out = subprocess.run([binary, "route:list"], capture_output=True, text=True, check=True).stdout
+    routes = []
+    for line in out.splitlines()[1:]:
+        cells = line.split()
+        if len(cells) >= 2 and "GET" in cells[0] and "{" not in cells[1]:
+            routes.append(cells[1])
+    if not routes:
+        sys.exit(f"smoke: route:list listed no GET routes:\n{out}")
+    return routes
+
+
+def every_page_answers(browser, routes, who):
+    for path in routes:
+        # Renox's own pages, and server-sent event streams (they never end).
+        if path.startswith("/_renox/") or path.endswith("/stream") or path == "/logout":
+            continue
+        response = browser.get(path)
+        if response.status >= 500:
+            fail(f"GET {path} as {who}: a server error", response)
+    print(f"ok   every GET page answers {who} without a server error ({len(routes)} routes)")
+
+
+def register(browser, name, email, home):
+    browser.get("/register")
+    response = browser.post("/register", {
         "name": name, "email": email,
-        "password": "correct-horse-battery", "password_confirmation": "correct-horse-battery",
-    })
+        "password": "secret-password-42", "password_confirmation": "secret-password-42"})
+    return expect(f"register {email}", response, 303, location=home)
 
 
-def login(browser, email, password):
-    page = browser.get("/login")
-    return browser.submit(page.form(action="/login"), {"email": email, "password": password})
+def login(browser, email, password, home):
+    browser.get("/login")
+    response = browser.post("/login", {"email": email, "password": password})
+    return expect(f"log in as {email}", response, 303, location=home)
 
 
-def example_value(name):
-    """A value a person might type, by the field's name."""
-    if name.endswith("_on") or name.endswith("date"):
-        return "2026-10-04"
-    if name.endswith("_at"):
-        return "2026-10-04T09:30"
-    if name in ("price", "amount", "total", "quantity", "stock") or name.endswith("_id"):
-        return "12500" if not name.endswith("_id") else "1"
-    if name in ("active",) or name.startswith("is_"):
-        return "on"
-    if name == "email":
-        return "smoke@example.com"
-    return f"Smoke {name}"
+def resources(base, database, binary):
+    routes = get_routes(binary)
+    guest = Browser(base)
+    every_page_answers(guest, routes, "a guest")
+    expect("a guest is sent to log in", guest.get("/products"), 303, location="/login")
+
+    me = Browser(base)
+    register(me, "Ana", "ana@example.com", "/")
+    every_page_answers(me, routes, "a logged-in user")
+
+    expect("the list starts empty", me.get("/products"), 200, see="Nothing here yet")
+    expect("the create form", me.get("/products/new"), 200, see=['name="name"', 'name="price"'])
+
+    # A form with errors goes back, with the messages and what was typed.
+    bad = me.post("/products", {"name": "", "price": "abc", "notes": "kept", "due_on": "2026-12-01"})
+    expect("an invalid form goes back", bad, 303, location="/products/new")
+    expect("…and shows the errors and the old input", me.follow(bad), 200,
+           see=["The name field is required.", "kept"])
+
+    saved = me.post("/products", {"name": "Widget", "price": "1250", "notes": "First one",
+                                  "active": "on", "due_on": "2026-12-01"})
+    expect("a valid form saves", saved, 303, location="/products")
+    listing = expect("…and the list shows it, with a toast", me.follow(saved), 200,
+                     see=["Widget", "Saved."])
+    edit = re.search(r'href="(?:[^"]*?)/products/(\d+)/edit"', listing.text)
+    if not edit:
+        fail("the list has no edit link", listing)
+    record = edit.group(1)
+
+    expect("the record's page", me.get(f"/products/{record}"), 200, see="Widget")
+    expect("the edit form is filled in", me.get(f"/products/{record}/edit"), 200,
+           see=['value="Widget"', 'name="_method"'])
+
+    # Unticked: the checkbox isn't sent at all; it must be stored as false (#160).
+    updated = me.post(f"/products/{record}", [("_method", "PUT"), ("name", "Gadget"),
+                                               ("price", "700"), ("notes", "Second thoughts"),
+                                               ("due_on", "2027-01-15")])
+    expect("the edit saves", updated, 303, location=f"/products/{record}")
+    expect("…and the page shows the change", me.follow(updated), 200,
+           see=["Gadget", "Changes saved."], dont_see="Widget")
+    row = sqlite3.connect(database).execute(
+        "SELECT name, price, active, due_on FROM products WHERE id = ?", (record,)).fetchone()
+    if row is None or row[0] != "Gadget" or row[1] != 700 or row[2] not in (0, "0") \
+            or not str(row[3]).startswith("2027-01-15"):
+        sys.exit(f"smoke: the row after the edit is {row!r}: expected Gadget, 700, the unticked box false, 2027-01-15")
+    print("ok   …and the row has the new values, the unticked box stored as false")
+
+    deleted = me.post(f"/products/{record}", {"_method": "DELETE"})
+    expect("delete", deleted, 303, location="/products")
+    expect("…and the list is empty again", me.follow(deleted), 200,
+           see=["Deleted.", "Nothing here yet"], dont_see="Gadget")
+    expect("a record that doesn't exist is a 404", me.get(f"/products/{record}"), 404)
+
+    # Another --resource module, made without --fields.
+    expect("the tags module answers", me.get("/tags"), 200)
+    expect("its create form", me.get("/tags/new"), 200)
 
 
-def resource(base, path):
-    """Register, then list, create, show, edit and delete one record."""
-    browser = Browser(base)
+def starter(base, database, binary):
+    routes = get_routes(binary)
+    every_page_answers(Browser(base), routes, "a guest")
 
-    step(f"a guest is sent to /login from {path}")
-    page = browser.get(path)
-    if page.path != "/login":
-        fail(f"a guest reached {page.path}", page)
+    newcomer = Browser(base)
+    register(newcomer, "Nia", "nia@example.com", "/dashboard")
+    expect("a new account verifies its email first", newcomer.get("/dashboard"), 303,
+           location="/verify-email")
+    expect("the verification page", newcomer.get("/verify-email"), 200)
 
-    step("register (a form with its CSRF token)")
-    page = register(browser, "Smoke Tester", f"smoke{path.replace('/', '-')}@example.com")
-    if page.path in ("/register", "/login"):
-        fail(f"registering ended on {page.path}", page)
-
-    step(f"the empty list at {path}")
-    page = browser.get(path)
-    if page.path != path:
-        fail(f"a registered person was sent to {page.path}", page)
-
-    step(f"the form at {path}/new")
-    page = browser.get(f"{path}/new")
-    form = page.form(action=path)
-    editable = [n for n in form["names"] if not n.startswith("_")]
-    if not editable:
-        fail("the new form has no fields", page)
-    values = {n: example_value(n) for n in editable}
-    first = editable[0]
-
-    step("create (POST, redirected back)")
-    page = browser.submit(form, values)
-    page = browser.get(path).see(values[first])
-
-    step("show the record")
-    created = None
-    for link in sorted(set(_links(page.text, path)), key=len):
-        rest = link[len(path) + 1:]
-        if rest and "/" not in rest and rest != "new":
-            created = link
-            break
-    if not created:
-        fail(f"no link to the record under {path}/…", page)
-    browser.get(created).see(values[first])
-
-    step("edit (PUT through _method)")
-    page = browser.get(f"{created}/edit")
-    form = page.form(action=created, method="PUT")
-    renamed = values[first] + " (edited)"
-    browser.submit(form, {first: renamed})
-    browser.get(created).see(renamed)
-
-    step("an invalid edit is refused and keeps the old value")
-    page = browser.get(f"{created}/edit")
-    browser.submit(page.form(action=created, method="PUT"), {first: ""}, status=None)
-    browser.get(created).see(renamed)
-
-    step("delete (DELETE through _method)")
-    page = browser.get(created)
-    form = page.form(action=created, method="DELETE")
-    browser.submit(form)
-    browser.get(path).dont_see(renamed)
-    browser.get(created, status=404)
-
-    step("log out")
-    page = browser.get(path)
-    browser.submit(page.form(action="/logout"))
-    if browser.get(path).path != "/login":
-        fail("still logged in after logging out")
-
-
-def _links(text, prefix):
-    for href in re.findall(r'href="([^"]+)"', text):
-        href = html.unescape(href)
-        if href.startswith(prefix + "/"):
-            yield href.split("?")[0].split("#")[0]
-
-
-def starter(base):
-    """Sign-up lands on email verification; the seeded admin sees /users and /activity,
-    the seeded member gets 403."""
-    step("sign up lands on the email verification page")
-    browser = Browser(base)
-    page = register(browser, "New Person", "new-person@example.com")
-    if "verif" not in page.path:
-        fail(f"sign-up landed on {page.path}, not the verification notice", page)
-    page = browser.get("/dashboard", status=None)
-    if "verif" not in page.path:
-        fail(f"an unverified person reached {page.path}", page)
-
-    step("the seeded admin sees the dashboard, /users and /activity")
+    subprocess.run([binary, "db:seed"], check=True, capture_output=True)
     admin = Browser(base)
-    page = login(admin, "admin@example.com", "password123")
-    if page.path != "/dashboard":
-        fail(f"the admin landed on {page.path}", page)
-    admin.get("/users").see("member@example.com")
-    admin.get("/activity")
+    login(admin, "admin@example.com", "password123", "/dashboard")
+    every_page_answers(admin, routes, "the admin")
+    expect("the admin's dashboard", admin.get("/dashboard"), 200, see="Welcome back")
+    users = expect("the users page", admin.get("/users"), 200, see="member@example.com")
+    expect("the activity log", admin.get("/activity"), 200, see="auth.login")
 
-    step("the seeded member gets 403 at /users and /activity")
+    member_id = sqlite3.connect(database).execute(
+        "SELECT id FROM users WHERE email = 'member@example.com'").fetchone()[0]
+    if f"/users/{member_id}/roles" not in users.text:
+        fail("the users page has no roles form for the member", users)
+    changed = admin.post(f"/users/{member_id}/roles", [("_method", "PUT"), ("roles", "member")])
+    if changed.status not in (200, 303):
+        fail("the admin changes a member's roles", changed)
+    print("ok   the admin changes a member's roles")
+    expect("…and the change is in the activity log", admin.get("/activity"), 200,
+           see="user.roles_changed")
+
     member = Browser(base)
-    page = login(member, "member@example.com", "password123")
-    if page.path != "/dashboard":
-        fail(f"the member landed on {page.path}", page)
-    member.get("/users", status=403)
-    member.get("/activity", status=403)
-
-    step("a wrong password is refused")
-    stranger = Browser(base)
-    page = login(stranger, "admin@example.com", "wrong-password")
-    if stranger.get("/dashboard", status=None).path != "/login":
-        fail("a wrong password logged in", page)
-
-
-def main(args):
-    if len(args) >= 3 and args[0] == "resource":
-        resource(args[1], args[2])
-    elif len(args) >= 2 and args[0] == "starter":
-        starter(args[1])
-    else:
-        sys.exit(__doc__)
-    print(f"smoke: {args[0]} ok")
+    login(member, "member@example.com", "password123", "/dashboard")
+    expect("a member's dashboard", member.get("/dashboard"), 200)
+    expect("a member can't open the users page", member.get("/users"), 403)
+    expect("…or the activity log", member.get("/activity"), 403)
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    if len(sys.argv) != 5 or sys.argv[1] not in ("resources", "starter"):
+        sys.exit(__doc__)
+    {"resources": resources, "starter": starter}[sys.argv[1]](*sys.argv[2:])
+    print(f"smoke: {sys.argv[1]} passed")

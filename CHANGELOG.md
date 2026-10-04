@@ -10,16 +10,18 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
-- **CI (#142, #143):** `tests/cli/run.sh` uses the generated apps over HTTP, as a browser does
-  (`tests/cli/smoke.py`: forms read off the pages, CSRF and `_method` fields, the session
-  cookie): a `--resource` module is registered for, created, shown, edited (also with an
-  invalid value) and deleted; the starter app's sign-up lands on email verification, the
-  seeded admin sees `/users` and `/activity`, the member gets 403. It also makes apps with
-  the `rnx new` options people combine, with names before and after "renox": plain,
-  `--tailwind`, `--starter --tailwind`, and `--starter` with the database; each passes
-  `cargo fmt --check`, clippy and its tests. The `cli` job's postgres run now runs the tests,
-  the commands and the HTTP checks against a PostgreSQL service (`E2E_POSTGRES`), where it
-  only built before.
+- **CI (#143):** `tests/cli/run.sh` also makes apps with the `rnx new` options people
+  combine, with names before and after "renox": plain, `--tailwind`, `--starter --tailwind`,
+  and `--starter` with the database; each passes `cargo fmt --check`, clippy and its tests.
+  The `cli` job's postgres run now runs the apps' tests and commands against a PostgreSQL
+  service (`E2E_POSTGRES`), where it only built before. `__pycache__/` is ignored.
+- **`tests/cli/smoke.py`** (#142), run by tests/cli/run.sh: the generated apps are used over
+  HTTP the way a browser does (cookies, CSRF tokens, Referer). Every GET page answers a guest
+  and a logged-in user without a server error; a `--resource` module is created (an invalid
+  form first: errors and old input), listed, shown, edited (an unticked checkbox must store
+  false, checked in the database) and deleted, with its toasts and a 404. On the starter app:
+  sign-up lands on email verification, the seeded admin uses the dashboard, users page and
+  activity log and changes a member's roles (recorded), and a member gets 403.
 
 - **Fixed (#160):** with serde_html_form 0.4 (#137), an unchecked checkbox no longer read as
   `false`: its field was "required" or kept its old value. `Valid<T>` recognises the bool
