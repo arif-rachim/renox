@@ -10,6 +10,10 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **The tutorial, for beginners (#192):** docs/tutorial.md rewritten in plain words: what you'll
+  build and learn, a table of the words web apps use, a doc comment on every function and
+  comments on the lines that need one in every code sample, "what's going on" after each
+  sample, and callouts for Laravel users, tips and warnings. It installs `rnx` from crates.io.
 ## 1.0.0-rc.4 · 2026-10-04
 
 The fourth release candidate: fixes found by using rc.3, and two extension points for
