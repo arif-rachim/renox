@@ -99,8 +99,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      # Keep in step with `rust-version` in Cargo.toml.
-      - uses: dtolnay/rust-toolchain@1.120
+      # Keep in step with `rust-version` in Cargo.toml. A Rust version, not an action
+      # release: Dependabot must not bump it (#156, #158).
+      - uses: dtolnay/rust-toolchain@1.94
       - uses: Swatinem/rust-cache@v2
       - run: cargo check --workspace --all-targets --all-features
 
