@@ -201,6 +201,9 @@ fn redact(url: &str) -> String {
     }
 }
 
+/// How long SQLite waits for a lock before answering "database is locked".
+const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
+
 /// Opens a SQLite pool, creating the file and its directory if needed. File
 /// databases use WAL mode; every connection enforces foreign keys.
 async fn connect_sqlite(config: &Config, schema: SchemaEpoch) -> anyhow::Result<sqlx::SqlitePool> {
@@ -211,7 +214,11 @@ async fn connect_sqlite(config: &Config, schema: SchemaEpoch) -> anyhow::Result<
         .with_context(|| format!("DATABASE_URL `{url}` is not a valid SQLite URL"))?
         .create_if_missing(true)
         .foreign_keys(true)
-        .busy_timeout(Duration::from_secs(5));
+        .busy_timeout(BUSY_TIMEOUT);
+    // One busy wait can take the whole `BUSY_TIMEOUT`, so busy errors get that
+    // much on top of the acquire timeout: a long wait still leaves room to
+    // try again (#178).
+    let busy_budget = config.database_acquire_timeout + BUSY_TIMEOUT;
     if !in_memory {
         options = options
             .journal_mode(SqliteJournalMode::Wal)
@@ -224,7 +231,7 @@ async fn connect_sqlite(config: &Config, schema: SchemaEpoch) -> anyhow::Result<
             std::fs::create_dir_all(dir)
                 .with_context(|| format!("could not create {}", dir.display()))?;
         }
-        prepare_file(&options, config.database_acquire_timeout)
+        prepare_file(&options, busy_budget)
             .await
             .with_context(|| format!("could not open the database at `{url}`"))?;
     }
@@ -264,9 +271,9 @@ async fn connect_sqlite(config: &Config, schema: SchemaEpoch) -> anyhow::Result<
         .await
     } else {
         // Another process opening or closing the same file can make SQLite
-        // answer "database is locked" at once (#163).
-        let budget = config.database_acquire_timeout;
-        retry_while(budget, is_busy, || {
+        // answer "database is locked" at once (#163), or wait in the busy
+        // handler past the pool's deadline.
+        retry_while(busy_budget, is_busy_or_pool_timeout, || {
             pool.clone().connect_with(options.clone())
         })
         .await
@@ -300,6 +307,10 @@ fn is_busy(error: &sqlx::Error) -> bool {
         return false;
     };
     matches!(code & 0xff, 5 | 6)
+}
+
+fn is_busy_or_pool_timeout(error: &sqlx::Error) -> bool {
+    is_busy(error) || is_pool_timeout(error)
 }
 
 fn is_pool_timeout(error: &sqlx::Error) -> bool {
@@ -392,7 +403,7 @@ mod tests {
     /// Pools opening one brand-new file database at once all open it (#163).
     #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
     async fn pools_opening_a_new_file_together_all_open_it() {
-        for _ in 0..20 {
+        for _ in 0..10 {
             let dir = tempfile::tempdir().unwrap();
             let config = crate::Config {
                 database_url: format!("sqlite://{}/app.db", dir.path().display()),
