@@ -1105,8 +1105,10 @@ picks the build, not the terminal.
   2026-10-03; renox.dev is taken).
   Then #124 (new apps failed `cargo fmt --check`): `rnx` formats what it writes, merged
   (#125); GitHub Pages switched off (2026-10-04). Release candidate `1.0.0-rc.2` with that
-  fix: branch `release-1.0.0-rc.2`. Left: 1.0.0 when the owner is happy with the rc (ask
-  before every `cargo publish`).
+  fix: published 2026-10-04 (#126, tag `v1.0.0-rc.2`). Then #127 → #129 (plural tables),
+  #128 → #130 (another session), #131 (the tutorial followed in CI; `clock::carry`), and
+  `1.0.0-rc.3` with them: branch `release-1.0.0-rc.3`. Left: 1.0.0 when the owner is happy
+  with the rc (ask before every `cargo publish`).
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). 

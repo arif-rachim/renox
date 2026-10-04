@@ -1602,8 +1602,13 @@ Started by the owner on 2026-10-03, after M34. In steps, one PR each:
 - [x] The README's quick start from crates.io and its "Use Renox with Claude Code" section
 - [ ] The docs site online on the owner's server, at Renox's own domain (GitHub Pages was
       tried and dropped: the account maps project sites to a personal domain)
-- [ ] `1.0.0-rc.2`: `rnx` formats what it writes (#124, #125); the version and changelog
-      (branch `release-1.0.0-rc.2`), published once the owner confirms
+- [x] `1.0.0-rc.2`: `rnx` formats what it writes (#124, #125); published 2026-10-04 (#126,
+      tag `v1.0.0-rc.2`), checked from crates.io (fmt and tests of new apps)
+- [x] The tutorial followed in CI (`tests/tutorial/`, #131), which found that
+      `TestApp::travel` didn't reach jobs; plural tables from the generators (#127, #129); the
+      kit's stretched card (#128, #130)
+- [ ] `1.0.0-rc.3` with those fixes (branch `release-1.0.0-rc.3`), published once the owner
+      confirms
 - [ ] 1.0.0
 - [ ] Real crates published to crates.io (`renox`, `renox-core`, `renox-macros`, `renox-cli`;
       only 0.0.1 placeholders exist before the release candidate; the owner runs `cargo login` and RELEASING.md), then
