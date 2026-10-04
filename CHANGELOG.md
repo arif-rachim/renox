@@ -50,6 +50,10 @@ changes by milestone (each one pull request; details in its description and in
   the pool's acquire timeout. A file database is now opened once with a plain connection
   before its pool, and both that connection and the pool retry "database is locked" until
   `DATABASE_ACQUIRE_TIMEOUT` has passed.
+- **Docs (#174):** the CHEATSHEET promised that a checkbox's `on` reads as `true` without
+  saying only `Valid<T>` does that; the prelude's `Form<T>` (axum's) answers 422. The
+  CHEATSHEET, docs/validation.md "Browser values" and a new app's AGENTS.md now say to read
+  forms with `Valid<T>` even when they have no rules; a test pins both behaviours.
 
 ## 1.0.0-rc.3 · 2026-10-04
 

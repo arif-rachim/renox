@@ -766,7 +766,7 @@ struct Product {
 
 #[derive(Deserialize)]
 struct ProductForm {
-    available: bool,     // "on" → true; unchecked (not sent) → false
+    available: bool,     // "on" → true; unchecked (not sent) → false (Valid<T> only: Form<T> refuses "on")
     #[serde(default)]
     colors: Vec<String>, // colors=black&colors=red; nothing chosen → []
     size: Size,          // "huge" → a validation error, reported with the others

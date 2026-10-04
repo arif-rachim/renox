@@ -555,7 +555,10 @@ impl ValidateHooks for ProductForm {
 ## Browser values
 
 Browsers send everything as text, and send some inputs oddly. Before the rules run, `Valid`
-smooths that over:
+smooths that over. Only `Valid` does: the prelude's `Form<T>` is axum's and reads the body as it
+is, so a ticked checkbox's `on` in a `bool` field answers 422. A form with no rules (a toggle, a
+filter, a settings switch) still uses `Valid<T>`, with `#[derive(Deserialize, Validate)]` and no
+`#[validate]` attributes.
 
 - **Empty inputs count as missing**, as in Laravel. An `Option<T>` field left empty is `None`.
   A `String` left empty is `""`, and only `required` complains about it. A number, date or

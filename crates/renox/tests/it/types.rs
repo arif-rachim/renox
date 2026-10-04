@@ -229,3 +229,44 @@ async fn forms_send_every_input_type() {
         .await
         .assert_invalid("status");
 }
+
+#[derive(Deserialize, Validate)]
+struct Toggle {
+    #[serde(default)]
+    active: bool,
+}
+
+struct Toggles;
+
+impl Module for Toggles {
+    fn name(&self) -> &'static str {
+        "toggles"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new()
+            .post("/form", |Form(t): Form<Toggle>| async move {
+                t.active.to_string()
+            })
+            .post("/valid", |Valid(t): Valid<Toggle>| async move {
+                Ok::<_, Error>(t.active.to_string())
+            })
+    }
+}
+
+/// A ticked checkbox sends `on`: `Valid<T>` reads it as `true` even without
+/// rules, while the prelude's `Form<T>` (axum's) refuses it, as docs/validation.md
+/// "Browser values" says (#174).
+#[renox::test]
+async fn only_valid_reads_a_ticked_checkbox() {
+    let app = TestApp::new(App::new().module(Toggles)).await;
+
+    let res = app.post("/valid", &[("active", "on")]).await;
+    res.assert_ok();
+    assert_eq!(res.text(), "true");
+    assert_eq!(app.post("/valid", &[]).await.text(), "false");
+
+    app.post("/form", &[("active", "on")])
+        .await
+        .assert_status(422);
+}
