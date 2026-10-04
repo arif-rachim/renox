@@ -988,13 +988,15 @@ impl Grid {
             })
             .collect();
         let keys: Vec<M::Key> = ids.iter().filter_map(|id| id.parse().ok()).collect();
+        // Unscoped: the ids come from the rows the caller's own query returned,
+        // so a default scope (none outside a tenant context) mustn't drop them.
         for column in columns {
             let Target::Expr(expr) = column.target::<M>() else {
                 continue;
             };
             let numeric = matches!(column.kind, Kind::Number | Kind::Money);
             let values: BTreeMap<String, Value> = if numeric {
-                M::query()
+                M::unscoped()
                     .where_in("id", keys.clone())
                     .select_as::<(String, Option<f64>), _>(
                         db,
@@ -1012,7 +1014,7 @@ impl Grid {
                     })
                     .collect()
             } else {
-                M::query()
+                M::unscoped()
                     .where_in("id", keys.clone())
                     .select_as::<(String, Option<String>), _>(
                         db,
