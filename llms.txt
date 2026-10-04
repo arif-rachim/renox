@@ -7,6 +7,8 @@
 
 ## Start here
 
+- https://renox.renoxium.com: these files as a website with search (the latest `main`).
+
 - [CHEATSHEET.md](CHEATSHEET.md): the common patterns, 5–20 lines each and compiled as doctests:
   `rnx` commands; modules, routes, path parameters, route groups and guards (auth, verified,
   guest, throttle); views, template globals and overriding built-in pages; `App::share` and
