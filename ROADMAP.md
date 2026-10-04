@@ -1573,8 +1573,8 @@ Notes from M34:
   configured.
 
 ### Plugins (separate crates, after M18)
-- [ ] `renox-oauth` (social login), `renox-2fa` (TOTP and recovery codes), `renox-admin`
-      (resource tables and forms); billing later
+- [x] `renox-2fa` (TOTP and recovery codes): #146 (#169–#173), docs/two-factor.md
+- [ ] `renox-oauth` (social login), `renox-admin` (resource tables and forms); billing later
 
 ### v1.0
 Started by the owner on 2026-10-03, after M34. In steps, one PR each:

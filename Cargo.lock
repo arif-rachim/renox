@@ -2293,6 +2293,7 @@ dependencies = [
  "renox",
  "serde",
  "sha1",
+ "sha2 0.11.0",
  "tempfile",
 ]
 
@@ -3110,6 +3111,7 @@ name = "teams"
 version = "0.0.0"
 dependencies = [
  "renox",
+ "renox-2fa",
  "serde",
 ]
 

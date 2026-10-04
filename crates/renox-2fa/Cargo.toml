@@ -17,6 +17,8 @@ renox.workspace = true
 hmac = "0.13.0"
 sha1 = "0.11"
 rand = "0.10.3"
+# Recovery codes are kept as SHA-256 hashes (the version renox-core uses).
+sha2 = "0.11.0"
 serde = { version = "1.0.229", features = ["derive"] }
 # The QR code an authenticator app scans, drawn as SVG (no image crates).
 qrcode = { version = "0.14.1", default-features = false, features = ["svg"] }

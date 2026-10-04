@@ -211,9 +211,14 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
 crates/renox-macros/       proc macros: derive Model, FromRow, DbEnum, Validate (validate.rs);
                            embedded!(), migrations!(), #[renox::test]
 crates/renox-2fa/          the first plugin (#146), a separate crate versioned with renox:
-                           TwoFactor module, two_factor table (migrations/ there, prefix
-                           00010101000700), totp.rs (RFC 6238 + base32), qr.rs (SVG); its
-                           own tests/ (it can use the macros: it depends on renox)
+                           TwoFactor module (lib.rs: second_factor, account_section, its
+                           views registered in `templates` unless the app has a file of the
+                           name, events to the audit log when `audit_logs` exists),
+                           handlers.rs (/two-factor/*), views/, two_factor table
+                           (migrations/ there, prefix 00010101000700), totp.rs (RFC 6238 +
+                           base32), recovery.rs (8 codes, SHA-256), qr.rs (SVG); its own
+                           tests/ (it can use the macros: it depends on renox); guide
+                           docs/two-factor.md (doctested from lib.rs `Guide`)
 crates/renox-cli/          `rnx`: main.rs (key:generate, forwarding), new.rs, serve.rs, make.rs +
                            generate.rs (make:*), scaffold.rs (make:module --resource --fields),
                            deploy.rs (build, make:deploy), tailwind.rs (the pinned
@@ -1164,8 +1169,8 @@ picks the build, not the terminal.
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). 
-- **Still open** (ROADMAP `- [ ]`): the plugins (`renox-2fa`,
-  `renox-oauth`, `renox-admin`, separate crates). A Laravel gap review after M25 (in the
+- **Still open** (ROADMAP `- [ ]`): the plugins (`renox-oauth`, `renox-admin`, separate
+  crates; `renox-2fa` is done, #146). A Laravel gap review after M25 (in the
   conversation that planned M26) ranked them: release and docs first, then 2FA and social
   login, then small adds (validation rules like `json`/`gt`/`decimal`/`dimensions`, several
   storage disks, route model binding), then admin, search, realtime (SSE) and billing.
