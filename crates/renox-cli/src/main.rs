@@ -47,6 +47,10 @@ enum Command {
         /// page and the activity log in a sidebar layout.
         #[arg(long)]
         starter: bool,
+        /// The notification bell in the navigation bar: in-app
+        /// notifications, live (the starter kit always has it).
+        #[arg(long)]
+        notifications: bool,
     },
     /// Run the app, rebuilding and restarting it when source files change.
     Serve {
@@ -247,6 +251,7 @@ fn run(command: Command) -> Result<()> {
             database,
             tailwind,
             starter,
+            notifications,
         } => new::run(
             &name,
             renox_path.as_deref(),
@@ -254,6 +259,7 @@ fn run(command: Command) -> Result<()> {
                 database,
                 tailwind,
                 starter,
+                notifications,
             },
         ),
         Command::Tailwind { watch, minify } => tailwind::run(&app_root()?, watch, minify),
@@ -478,13 +484,21 @@ mod tests {
     fn commands_parse_with_their_options() {
         assert!(matches!(
             parse(&["new", "shop", "--database", "postgres", "--tailwind"]),
-            Command::New { name, database: Database::Postgres, tailwind: true, renox_path: None, starter: false } if name == "shop"
+            Command::New { name, database: Database::Postgres, tailwind: true, renox_path: None, starter: false, notifications: false } if name == "shop"
         ));
         assert!(matches!(
             parse(&["new", "shop", "--starter"]),
             Command::New {
                 starter: true,
                 tailwind: false,
+                ..
+            }
+        ));
+        assert!(matches!(
+            parse(&["new", "shop", "--notifications"]),
+            Command::New {
+                notifications: true,
+                starter: false,
                 ..
             }
         ));

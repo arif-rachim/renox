@@ -18,6 +18,13 @@
 //!         .seconds(8); // or .persistent(): stays until dismissed
 //!     (toast, Redirect::to("/orders"))
 //! }
+//!
+//! async fn archive() -> Toast {
+//!     // … archive …
+//!     // A button that sends `DELETE /orders/7/archive` (htmx, with the CSRF
+//!     // token); that handler answers with a toast of its own, `HxRefresh`, …
+//!     Toast::info("Order #7 archived").action(ToastAction::delete("Undo", "/orders/7/archive"))
+//! }
 //! ```
 //!
 //! Errors stay until dismissed; the others leave after a while (longer for
@@ -29,6 +36,11 @@
 //! htmx request gets it at once (in `HX-Trigger`), unless it redirects or
 //! refreshes (`HxRedirect`, `HxRefresh`), which also wait for the next page.
 //! Put `{{ toasts() }}` in the layout, once, and `{{ renox_ui() }}` in its head.
+//!
+//! A request action ([`ToastAction::post`], `put`, `patch`, `delete`) is
+//! sent as an htmx request that swaps nothing: answer it with a [`Toast`]
+//! (a `204` carrying it), `HxTrigger`, `HxRedirect` or `HxRefresh`. If it
+//! fails without a toast of its own, the page shows an error toast.
 
 use axum::response::{IntoResponse, IntoResponseParts, Response, ResponseParts};
 use serde::{Deserialize, Serialize};
@@ -93,6 +105,11 @@ pub struct ToastAction {
     /// `hx-trigger="order-undo from:document"`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub event: Option<String>,
+    /// Sends a request with this method (`POST`, `PUT`, `PATCH` or
+    /// `DELETE`) to `url` instead of following it, with the CSRF token.
+    /// Only this site's own paths (`/…`) are sent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub method: Option<String>,
     /// Opens the link in a new tab.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub new_tab: bool,
@@ -105,7 +122,46 @@ impl ToastAction {
             label: label.into(),
             url: Some(url.into()),
             event: None,
+            method: None,
             new_tab: false,
+        }
+    }
+
+    /// A button sending `POST url` (see [`ToastAction::method`](ToastAction#structfield.method)).
+    pub fn post(label: impl Into<String>, url: impl Into<String>) -> Self {
+        Self::request("POST", label, url)
+    }
+
+    /// A button sending `PUT url`.
+    pub fn put(label: impl Into<String>, url: impl Into<String>) -> Self {
+        Self::request("PUT", label, url)
+    }
+
+    /// A button sending `PATCH url`.
+    pub fn patch(label: impl Into<String>, url: impl Into<String>) -> Self {
+        Self::request("PATCH", label, url)
+    }
+
+    /// A button sending `DELETE url`.
+    pub fn delete(label: impl Into<String>, url: impl Into<String>) -> Self {
+        Self::request("DELETE", label, url)
+    }
+
+    fn request(method: &str, label: impl Into<String>, url: impl Into<String>) -> Self {
+        Self {
+            method: Some(method.to_owned()),
+            ..Self::link(label, url)
+        }
+    }
+
+    /// Whether it can be shown: a link to a harmless URL, a request to one
+    /// of this site's paths, or an event.
+    pub(crate) fn is_safe(&self) -> bool {
+        match (&self.method, self.url.as_deref()) {
+            (Some(method), Some(url)) => request_method(method).is_some() && local_url(url),
+            (Some(_), None) => false,
+            (None, Some(url)) => safe_url(url),
+            (None, None) => self.event.is_some(),
         }
     }
 
@@ -116,6 +172,7 @@ impl ToastAction {
             label: label.into(),
             url: None,
             event: Some(name.into()),
+            method: None,
             new_tab: false,
         }
     }
@@ -233,17 +290,27 @@ pub(crate) const POSITIONS: &[&str] = &[
     "bottom-end",
 ];
 
+/// The toast region's texts, in the page's language.
+pub(crate) struct RegionTexts {
+    /// The close button's label.
+    pub(crate) dismiss: String,
+    /// The error toast of a request action that failed.
+    pub(crate) failed: String,
+}
+
 /// The toast region's markup, with the toasts waiting in `waiting`. The
 /// bundled renox.js adds the ones htmx responses bring, and dismisses.
-pub(crate) fn region(waiting: &[Toast], dismiss: &str, position: &str) -> String {
+pub(crate) fn region(waiting: &[Toast], texts: &RegionTexts, position: &str) -> String {
     let position = if POSITIONS.contains(&position) {
         position
     } else {
         "top"
     };
+    let dismiss = texts.dismiss.as_str();
     let mut out = format!(
-        r#"<div class="rx-toasts rx-toasts--{position}" data-renox-toasts data-dismiss-label="{}" aria-live="polite" aria-relevant="additions">"#,
-        escape(dismiss)
+        r#"<div class="rx-toasts rx-toasts--{position}" data-renox-toasts data-dismiss-label="{}" data-failed-label="{}" aria-live="polite" aria-relevant="additions">"#,
+        escape(dismiss),
+        escape(&texts.failed)
     );
     for toast in waiting {
         out.push_str(&toast_html(toast, dismiss));
@@ -291,7 +358,16 @@ pub(crate) fn toast_html(toast: &Toast, dismiss: &str) -> String {
 
 fn action_html(action: &ToastAction) -> String {
     let label = escape(&action.label);
-    if let Some(url) = action.url.as_deref().filter(|url| safe_url(url)) {
+    if !action.is_safe() {
+        return String::new();
+    }
+    if let (Some(method), Some(url)) = (action.method.as_deref(), action.url.as_deref()) {
+        let method = request_method(method).unwrap_or("POST");
+        format!(
+            r#"<button type="button" class="rx-toast__action" data-rx-request="{}" data-rx-method="{method}" data-renox-dismiss>{label}</button>"#,
+            escape(url)
+        )
+    } else if let Some(url) = action.url.as_deref() {
         let target = if action.new_tab {
             r#" target="_blank" rel="noopener""#
         } else {
@@ -309,6 +385,24 @@ fn action_html(action: &ToastAction) -> String {
     } else {
         String::new()
     }
+}
+
+/// The method of a request action, upper-cased, if it is one renox-ui.js
+/// sends (`GET` is a link).
+pub(crate) fn request_method(method: &str) -> Option<&'static str> {
+    ["POST", "PUT", "PATCH", "DELETE"]
+        .into_iter()
+        .find(|known| known.eq_ignore_ascii_case(method))
+}
+
+/// Whether `url` is a path on this site (`/orders/7`, not `//other.site`):
+/// where a request carrying the CSRF token may go.
+pub(crate) fn local_url(url: &str) -> bool {
+    let cleaned: String = url
+        .chars()
+        .filter(|c| !c.is_ascii_control() && !c.is_whitespace())
+        .collect();
+    cleaned.starts_with('/') && !cleaned.starts_with("//") && !cleaned.starts_with("/\\")
 }
 
 /// Whether `url` is http(s), mailto, tel or relative: what a link built
@@ -388,8 +482,47 @@ mod tests {
             serde_json::to_string(&old).unwrap(),
             r#"{"kind":"info","message":"Hi"}"#
         );
-        assert!(region(&[], "x", "bottom-end").contains("rx-toasts--bottom-end"));
-        assert!(region(&[], "x", "nowhere").contains("rx-toasts--top"));
+        let texts = RegionTexts {
+            dismiss: "x".into(),
+            failed: "Didn't \"work\"".into(),
+        };
+        assert!(region(&[], &texts, "bottom-end").contains("rx-toasts--bottom-end"));
+        let html = region(&[], &texts, "nowhere");
+        assert!(html.contains("rx-toasts--top"), "{html}");
+        assert!(
+            html.contains(r#"data-failed-label="Didn&#x27;t &quot;work&quot;""#),
+            "{html}"
+        );
+    }
+
+    #[test]
+    fn request_actions_go_to_this_site_only() {
+        let toast = Toast::info("Archived")
+            .action(ToastAction::delete("Undo", "/orders/7/archive"))
+            .action(ToastAction::post("Retry", "/orders/7/retry"))
+            .action(ToastAction::put("Elsewhere", "https://evil.example/x"))
+            .action(ToastAction::patch("Sneaky", "//evil.example/x"))
+            .action(ToastAction::post("Backslash", "/\\evil.example/x"));
+        let html = toast_html(&toast, "x");
+        assert!(
+            html.contains(r#"<button type="button" class="rx-toast__action" data-rx-request="/orders/7/archive" data-rx-method="DELETE" data-renox-dismiss>Undo</button>"#),
+            "{html}"
+        );
+        assert!(html.contains(r#"data-rx-request="/orders/7/retry" data-rx-method="POST""#));
+        for bad in ["Elsewhere", "Sneaky", "Backslash", "evil"] {
+            assert!(!html.contains(bad), "{bad}: {html}");
+        }
+        // A method that isn't a request's isn't shown, and links stay links.
+        let mut odd = ToastAction::post("Odd", "/x");
+        odd.method = Some("TRACE".into());
+        assert!(!odd.is_safe());
+        assert_eq!(request_method("delete"), Some("DELETE"));
+        assert!(ToastAction::link("Out", "https://renox.dev").is_safe());
+        // In JSON (htmx triggers, stored notifications) it is the method.
+        assert_eq!(
+            serde_json::to_string(&ToastAction::delete("Undo", "/a")).unwrap(),
+            r#"{"label":"Undo","url":"/a","method":"DELETE"}"#
+        );
     }
 
     #[test]

@@ -28,6 +28,7 @@ travel through your own channels such as WhatsApp or SMS.
 - [The preview page](#the-preview-page): see the mails your app sent while you develop.
 - [Notifications](#notifications): one message, several channels.
 - [Database notifications](#database-notifications): the in-app list and the bell icon.
+- [Your own live events](#your-own-live-events): push events from the server to open pages.
 - [Testing](#testing) and [In production](#in-production).
 
 Under the hood, Renox sends email with [lettre](https://lettre.rs) over SMTP. The secure
@@ -507,7 +508,9 @@ fn app() -> App {
 }
 ```
 
-Then put the bell in your layout's navigation bar (the kit's `navbar`, see [ui.md](ui.md)):
+A new app can start with both: `rnx new my-app --notifications` turns them on and puts the bell
+in the layout (the starter kit, `rnx new --starter`, always has it). In an existing app, put
+the bell in your layout's navigation bar (the kit's `navbar`, see [ui.md](ui.md)):
 
 ```html
 {% from "renox/ui.html" import navbar, notification_bell %}
@@ -527,6 +530,10 @@ What you get:
   or unread and to delete it. On top are "Mark all as read" and "Clear all".
 - **Opening one.** Clicking its title (when it has a `url`) marks it read and follows the
   link. Esc or a click outside closes the panel.
+- **Buttons that do something.** A `DatabaseMessage` action made with
+  `ToastAction::post(label, "/orders/7/approve")` (or `put`, `patch`, `delete`) is a button
+  that sends that request, with the CSRF token, instead of a link. See
+  [ui.md](ui.md#toasts) for what the handler answers. Only this site's own paths are sent.
 - **Live updates.** While a page is open, new notifications arrive by themselves. The page
   keeps a **Server-Sent Events** stream open (`/notifications/stream`): a connection the server
   can keep pushing messages down. Each new notification shows as a toast (a small pop-up) with
@@ -633,6 +640,71 @@ fn app() -> App {
 
 Deleting a user's account deletes their notifications too.
 
+## Your own live events
+
+The same stream can carry **your app's own events**: "order #7 was paid", "the export is
+ready", "someone else edited this page". The page gets each one as a DOM event on `document`,
+which htmx, Alpine or a script can listen to. No JavaScript of your own is needed.
+
+```rust
+use renox::prelude::*;
+
+/// Marks an order paid, and tells every open page so its list can reload.
+async fn mark_paid(State(state): State<AppState>, Path(id): Path<i64>) -> Result<Toast> {
+    // … save the order …
+    state.broadcast("order-updated", json!({ "id": id, "status": "paid" }))?;
+    Ok(Toast::success(format!("Order #{id} paid")))
+}
+
+/// Tells one user, on every page they have open, that their export is ready.
+fn export_ready(state: &AppState, user_id: i64, url: &str) -> Result {
+    // `renox:toast` is the event toasts arrive with: this shows one, with a link.
+    let toast = Toast::success("Your export is ready").link("Download", url);
+    state.broadcast_to(user_id, "renox:toast", json!({ "toasts": [toast] }))
+}
+```
+
+What's going on:
+
+- `state.broadcast(event, data)` goes to every open page; `state.broadcast_to(user_id, event,
+  data)` only to that user's pages (every tab and device). `data` is anything serde can turn
+  into JSON. The name may use letters, digits, `-`, `_`, `:` and `.`; anything else is an error.
+- The page needs the stream: the bell (`notification_bell`) opens it, and so does
+  `{{ event_stream() }}` from `renox/ui.html` on pages without a bell. Both need
+  `Auth::new().notifications()`, and both are for logged-in users only. One page opens one
+  stream, whatever it has.
+- On the page, listen as to any DOM event (`event.detail` is the data):
+
+```html
+{# htmx: reload the list when an order changes #}
+<div id="orders" hx-get="{{ route('orders.index') }}" hx-trigger="order-updated from:document"
+     hx-select="#orders" hx-swap="outerHTML">…</div>
+
+{# Alpine #}
+<span x-data="{ status: 'unpaid' }" x-on:order-updated.document="status = $event.detail.status" x-text="status"></span>
+```
+
+**The limits, honestly.** A broadcast is fire-and-forget:
+
+- **Nothing is stored.** A page that isn't connected at that moment never gets it: a closed
+  tab, a laptop asleep, or the few seconds while a stream reconnects (each stream ends after
+  five minutes and the browser opens a new one).
+- **Only this process.** Broadcasts travel inside the server process that sends them. The
+  queue workers and the scheduler that run inside `serve` are in that process, so their
+  broadcasts arrive. A separate `queue:work` process, a command, or a second server behind a
+  load balancer has its own streams: its broadcasts don't reach pages connected elsewhere.
+  (Database notifications don't have this limit, because every stream also reads the table
+  every 15 seconds; broadcasts aren't in a table.)
+- **No promise of order across lagging pages.** A page that falls far behind (hundreds of
+  events at once) skips some.
+
+So use broadcasts for "look again" hints and short-lived news, where missing one only means
+the page shows it on the next load. For what someone must see, store a database notification
+(`state.notify`): it waits in the bell until read, and arrives from any process.
+
+The stream's wire format, if you read it yourself: an SSE event named `broadcast` whose data is
+`{"event": "order-updated", "data": {…}}`. renox-ui.js turns it into the DOM event.
+
 ## Testing
 
 In tests, nothing should really be sent. `TestApp` uses the `memory` mailer, which keeps every
@@ -682,6 +754,11 @@ async fn mail_and_notifications() {
 }
 ```
 
+Broadcasts have a fake too: after `app.fake_broadcasts()`, `state.broadcast(…)` is recorded
+instead of sent, `app.broadcasts()` lists them, and
+`app.assert_broadcast("order-updated", |b| b.data["id"] == 7)` checks one (`b.user_id` is
+`Some(id)` for `broadcast_to`).
+
 More in [testing.md](testing.md) ("Jobs, events, notifications, mail, HTTP").
 
 ## In production
@@ -721,5 +798,8 @@ If you know Laravel, this table maps what you know to Renox. If you don't, you c
 | `$user->notifications`, `unreadNotifications`, `markAsRead`, `markAsUnread` | `user.notifications(&db, n)`, `notifications_before`, `unread_notifications`, `mark_notification_read`, `mark_notification_unread`, `mark_all_notifications_read`, `delete_notification`, `delete_notifications` |
 | Filament's `Notification::make()->title()->body()->sendToDatabase($user)` | `DatabaseMessage::success(title).body(…).url(…)` from `to_database` |
 | Filament's database notifications modal, polling or Echo | `Auth::new().notifications()` + `notification_bell(unread_notifications)`, Server-Sent Events |
+| Broadcasting with Echo (`broadcast()`, `ShouldBroadcastNow`, private user channels) | `state.broadcast(event, data)` / `broadcast_to(user_id, …)` over the same stream, as DOM events (one process; nothing stored) |
+| Filament's notification actions (`->button()->dispatch()` / `->url()`) | `ToastAction::post` / `put` / `patch` / `delete`, `ToastAction::link`, `ToastAction::event` |
 | `model:prune` on notifications | `notifications:prune --days 30` |
 | `Mail::fake()`, `Notification::fake()`, `assertSentTo` | memory mailer + `sent_mail()` / `assert_mail_sent`, `fake_notifications()` + `assert_notified` / `assert_notified_to` |
+| `Event::fake()` + `assertDispatched` for broadcasts | `fake_broadcasts()` + `assert_broadcast` / `broadcasts()` |

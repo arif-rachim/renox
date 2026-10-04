@@ -45,7 +45,8 @@
 - `rnx new <name> --starter` (files in crates/renox-cli/stubs/starter/): a whole app to start
   from: sidebar layout with the notification bell, email verification, roles (`Permissions`),
   a dashboard, a users page that changes roles, the activity log (`Audit`), `users:admin`,
-  a seeder and tests.
+  a seeder and tests. `rnx new <name> --notifications`: the plain app with the bell
+  (`Auth::new().notifications()` and `notification_bell` in its layout).
 
 ## Examples (complete apps, tested in CI)
 
@@ -189,8 +190,12 @@ Every example has a README.md that walks through it.
   as a batch with an htmx progress bar. The charge calls the payment gateway with `state.http`
   (a sandbox route stands in for it; the tests use `app.fake_http()`), and the admin sees the
   queue dashboard. `App::report` posts errors to a chat webhook. Mail extras: a CSV
-  attachment and a `bcc` on the statements, `reply_to` on receipts, `cc` on the warehouse mail. Tests travel past backoffs
-  and `UNIQUE_FOR`, and fake events and notifications. [src/app/orders/mod.rs](examples/jobs/src/app/orders/mod.rs),
+  attachment and a `bcc` on the statements, `reply_to` on receipts, `cc` on the warehouse mail.
+  Live staff pages: the bell (`Auth::new().notifications()`), the jobs `state.broadcast`
+  `order-updated` (the orders list reloads with `hx-trigger="order-updated from:document"`),
+  and a failed charge arrives as a `renox:toast` broadcast whose "Reopen" button is a request
+  action (`ToastAction::post`, answered with a `Toast`). Tests travel past backoffs
+  and `UNIQUE_FOR`, and fake events, notifications and broadcasts (`fake_broadcasts`). [src/app/orders/mod.rs](examples/jobs/src/app/orders/mod.rs),
   [payment.rs](examples/jobs/src/app/orders/payment.rs),
   [remind.rs](examples/jobs/src/app/orders/remind.rs),
   [statements.rs](examples/jobs/src/app/orders/statements.rs),
@@ -295,7 +300,8 @@ Every example has a README.md that walks through it.
 - [docs/mail.md](docs/mail.md): mail (drivers, views, attachments, queued mail, the preview) and
   notifications (mail, database, custom channels, `DatabaseMessage`, the in-app inbox and the
   kit's live notification bell (`Auth::new().notifications()`, Server-Sent Events), pruning,
-  testing).
+  testing), and the app's own live events over that stream (`state.broadcast`,
+  `broadcast_to`, `event_stream()`, and their limits).
 - [docs/scheduling.md](docs/scheduling.md): the scheduler (cron, time zones, several servers,
   housekeeping tasks), events and listeners, the cache and locks, app commands and prompts.
 - [docs/queue.md](docs/queue.md): jobs, retries and `failed`, `dispatch_in`, priority, unique
