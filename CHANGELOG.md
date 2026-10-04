@@ -14,6 +14,15 @@ changes by milestone (each one pull request; details in its description and in
   for an `rnx` from crates.io, the `git clone --depth 1 --branch v<version> …` of the app's
   version (the downloaded crates hold only the source); for a Git pin, Cargo's checkout of that
   commit; for `--renox-path`, the local checkout.
+- **Two-factor authentication (#146, #170–#173):** the `renox-2fa` crate is finished. With
+  `.module(TwoFactor::new())` next to `Auth::new().account()`, users turn it on from `/account`
+  (their password, a QR code, a code to confirm), get eight recovery codes shown once, and are
+  asked for a code after their password from then on (`Registry::second_factor`): codes from
+  the step before or after now are accepted, each works once, wrong ones count towards the
+  login throttle. New recovery codes and turning it off ask for the password too. Events
+  `TwoFactorEnabled`, `TwoFactorDisabled`, `RecoveryCodeUsed`, recorded by the `Audit` module
+  when the app has it. The pages can be replaced from the app's views. Guide:
+  docs/two-factor.md (on the docs site); examples/teams uses it.
 - **Docs match the code (#208–#217, #219):** the docs-gap audit's 140 items fixed across the
   README, CHEATSHEET, llms.txt, SECURITY, RELEASING, CONTRIBUTING, every guide in docs/, the
   AGENTS.md and .env new apps get, the examples' READMEs and renox-2fa's README. Among them:

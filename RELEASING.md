@@ -22,10 +22,10 @@ All five share the workspace's version and are released together.
    jobs and the semver checks.
 2. **Choose the version** (see [docs/stability.md](docs/stability.md)): a fix is a patch,
    anything new a minor, a breaking change a major. Set it in the workspace `Cargo.toml` in
-   four places that must agree: `[workspace.package] version` and the `version` of `renox`,
-   `renox-core` and `renox-macros` under `[workspace.dependencies]` (written `=1.2.0`: the
-   three crates are released in lockstep and pin each other exactly, since the macros write
-   code against renox-core's items of the same release).
+   five places that must agree: `[workspace.package] version` and the `version` of `renox`,
+   `renox-core`, `renox-macros` and `renox-2fa` under `[workspace.dependencies]` (written
+   `=1.2.0`: the crates are released in lockstep and pin each other exactly, since the macros
+   write code against renox-core's items of the same release).
    While 1.0 is a release candidate, other places name the version too; change all of them:
    - the install lines in `README.md` (quick start) and `docs/tutorial.md`
      (`cargo install renox-cli --version …`);

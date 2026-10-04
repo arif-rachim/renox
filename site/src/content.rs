@@ -153,6 +153,14 @@ pub static PAGES: &[Page] = &[
         "Decide who may see or change what."
     ),
     page!(
+        "two-factor",
+        "Two-factor authentication",
+        Guides,
+        "lock",
+        "docs/two-factor.md",
+        "A code from a phone app after the password, with the renox-2fa crate."
+    ),
+    page!(
         "queue",
         "The queue",
         Guides,

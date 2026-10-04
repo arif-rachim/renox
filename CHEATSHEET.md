@@ -1123,7 +1123,9 @@ async fn sign_in(State(state): State<AppState>, session: Session, Form(f): Form<
     Ok(Redirect::to("/dashboard"))
 }
 
-// A second login step (two-factor authentication), from a module's `register`:
+// Two-factor authentication ready-made: the `renox-2fa` crate, `.module(TwoFactor::new())`
+// next to `Auth::new().account()` (docs/two-factor.md). Or a second step of your own,
+// from a module's `register`:
 // `app.second_factor("otp.challenge", |user, _state| async move { Ok(needs_code(&user)) });`
 // its challenge handler calls `renox::auth::pending_login(&session)`, checks the code,
 // then `renox::auth::complete_login(&state, &session, &pending, ip)` (docs/authorization.md).

@@ -4,7 +4,8 @@ The official pattern for a multi-tenant SaaS. Users belong to teams (as an owner
 pick a current team, and only ever see that team's projects. Handlers never filter by team: the
 current team lives in `renox::context`, and the `Project` model's default scope reads it. Also
 shows a super-admin through `App::gate_before`, a team secret stored encrypted and revealed only
-after the password is confirmed, and the account pages from `Auth::new().account()`.
+after the password is confirmed, and the account pages from `Auth::new().account()` with
+two-factor authentication from the `renox-2fa` plugin crate.
 
 ```bash
 cd examples/teams
@@ -23,6 +24,7 @@ Globex, Carol is a member of Acme. With `SUPER_ADMINS` set, Alice also sees `/ad
 
 | Feature | Where |
 |---|---|
+| Two-factor authentication: `.module(renox_2fa::TwoFactor::new())`; turned on from `/account` (a QR code, a code, recovery codes), then asked for after the password | [src/lib.rs](src/lib.rs), [docs/two-factor.md](../../docs/two-factor.md) |
 | Wiring: `Auth::new().account()`, the modules, the tenancy layer, the shared `team`, `gate_before`, the `projects:count` command, the seeder | [src/lib.rs](src/lib.rs) |
 | The current team: session → membership check → `renox::context`, an extractor, a policy | [src/app/tenancy.rs](src/app/tenancy.rs) |
 | `Team`, the `team_user` pivot with a `role` (`MEMBERS`, `USER_TEAMS`), the secret helpers | [src/app/teams/model.rs](src/app/teams/model.rs) |
