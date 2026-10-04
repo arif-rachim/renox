@@ -119,7 +119,10 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   through `| money` (`APP_CURRENCY`), never a hand-made "Rp" filter.
   Dashboards: `renox::chart::Trend::of(query, "created_at").over(period).sum(&state, "total")`
   with the `Period` extractor, then `stat(…)`, `chart("line", series, format="money")`,
-  `widget(…)` and `period_filter(period)` in the template; no chart library.
+  `widget(…)` and `period_filter(period)` in the template (presets, `12w` per week, and a
+  custom date range it reads as `?period=custom&from=…&to=…`); no chart library.
+  `chart("scatter"|"bubble", points=[{x, y, size, label}], x_title=…, y_title=…)` for
+  points; never parse `?from=`/`?to=` by hand for the period.
   An action that asks for a few values is `{% call action_sheet(id, label, action, title,
   method="PUT") %}…fields…{% endcall %}`, not a page of its own: the handler returns
   `(Toast, HxRefresh)`, and a 422 stays in the sheet. With one per row, give each sheet and

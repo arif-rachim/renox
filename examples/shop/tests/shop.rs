@@ -749,7 +749,23 @@ async fn the_dashboard_shows_figures_and_charts_for_a_period() {
         .assert_see(r#"<figure class="rx-chart rx-chart--line""#)
         .assert_see("This period")
         .assert_see(r#"<figure class="rx-chart rx-chart--bar""#)
-        .assert_see(r#"hx-get="/admin/widgets/statuses" hx-trigger="load, every 60s""#);
+        .assert_see(r#"hx-get="/admin/widgets/statuses" hx-trigger="load, every 60s""#)
+        // Products sold as bubbles (price, units, revenue), orders as points.
+        .assert_see(r#"<figure class="rx-chart rx-chart--bubble rx-chart--points""#)
+        .assert_see(r#"<tr><th scope="row">Coffee Latte</th><td class="rx-num">Rp 25,000</td><td class="rx-num">2</td><td class="rx-num">Rp 50,000</td></tr>"#)
+        .assert_see(r#"<figure class="rx-chart rx-chart--scatter rx-chart--points""#)
+        .assert_see(&format!(r#"<tr><th scope="row">Order #{}</th><td class="rx-num">2</td><td class="rx-num">Rp 50,000</td></tr>"#, paid.id));
+    // Twelve weeks, per week; a custom range of dates from the filter.
+    app.get("/admin?period=12w")
+        .await
+        .assert_see(r#"aria-current="page">12 weeks</a>"#)
+        .assert_see(r#"<p class="rx-stat__value">Rp 50,000</p>"#);
+    let today = renox::db::now().date_naive();
+    let yesterday = today.pred_opt().unwrap();
+    app.get(&format!("/admin?period=custom&from={yesterday}&to={today}"))
+        .await
+        .assert_see(r#"<summary class="rx-period__toggle" aria-current="true">"#)
+        .assert_see(r#"<p class="rx-stat__value">Rp 50,000</p>"#);
     app.htmx()
         .get("/admin/widgets/statuses")
         .await
@@ -761,7 +777,8 @@ async fn the_dashboard_shows_figures_and_charts_for_a_period() {
     app.acting_as(&boss); // the session ran out meanwhile
     app.get("/admin?period=7d")
         .await
-        .assert_see(r#"<p class="rx-stat__value">Rp 0</p>"#);
+        .assert_see(r#"<p class="rx-stat__value">Rp 0</p>"#)
+        .assert_see("No sales in this period");
     app.get("/admin?period=90d")
         .await
         .assert_see(r#"<p class="rx-stat__value">Rp 50,000</p>"#);

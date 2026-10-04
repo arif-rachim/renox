@@ -1078,15 +1078,45 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 {#- The period every figure and chart below it shows: links that set
     `?period=` (the `renox::chart::Period` extractor) and keep the rest of
     the query. `selected` is the handler's `Period`; `options` are [key,
-    label] pairs (7d, 30d, 90d, 12m, ytd by default). -#}
-{% macro period_filter(selected, options=none, label=none) -%}
+    label] pairs (7d, 30d, 90d, 12m, ytd by default). `custom=true` adds a
+    "Custom" button opening a small form with two dates, sent as
+    `?period=custom&from=…&to=…` (a range the extractor refuses shows a
+    message here and gives the default period). -#}
+{% macro period_filter(selected, options=none, label=none, custom=true) -%}
 {%- set options = options or [["7d", t('ui.period.7d')], ["30d", t('ui.period.30d')], ["90d", t('ui.period.90d')], ["12m", t('ui.period.12m')], ["ytd", t('ui.period.ytd')]] %}
+{%- set selected = selected | string %}
+{%- set is_custom = ".." in selected %}
+{%- set query = (request.query if request and request.query else "") | string %}
+{%- set refused = "period=custom" in query and not is_custom %}
 <nav class="rx-period" aria-label="{{ label or t('ui.period.label') }}">
   <div class="rx-segmented">
     {%- for option in options %}
-    <a class="rx-segmented__item" href="{{ query_with(period=option[0]) }}"{% if option[0] == selected %} aria-current="page"{% endif %}>{{ option[1] }}</a>
+    <a class="rx-segmented__item" href="{{ query_with(period=option[0], from=none, to=none) }}"{% if option[0] == selected %} aria-current="page"{% endif %}>{{ option[1] }}</a>
     {%- endfor %}
   </div>
+  {%- if custom %}
+  {%- set sent = namespace(from="", to="") %}
+  {%- if is_custom %}{% set sent.from = selected[:10] %}{% set sent.to = selected[12:] %}
+  {%- elif refused %}{% for pair in query | split("&") %}{% if pair[:5] == "from=" %}{% set sent.from = pair[5:] %}{% elif pair[:3] == "to=" %}{% set sent.to = pair[3:] %}{% endif %}{% endfor %}
+  {%- endif %}
+  <details class="rx-period__custom" data-rx-period{% if refused %} open{% endif %}>
+    <summary class="rx-period__toggle"{% if is_custom %} aria-current="true"{% endif %}>{{ _icon("calendar") }}<span>
+      {%- if is_custom %}<span class="rx-visually-hidden">{{ t('ui.period.custom_label') }}: </span>{{ sent.from | date('%b %-d') }} – {{ sent.to | date('%b %-d, %Y') }}{% else %}{{ t('ui.period.custom') }}{% endif -%}
+    </span></summary>
+    <form class="rx-period__form" method="get" aria-label="{{ t('ui.period.custom_label') }}">
+      {{ query_fields("period", "from", "to") }}
+      <input type="hidden" name="period" value="custom">
+      <div class="rx-period__dates">
+        {{ date_picker("from", t('ui.period.from'), value=sent.from, id="rx-period-from", required=true) }}
+        {{ date_picker("to", t('ui.period.to'), value=sent.to, id="rx-period-to", required=true) }}
+      </div>
+      {%- if refused %}
+      <p class="rx-error" role="alert">{{ t('ui.period.invalid') }}</p>
+      {%- endif %}
+      {{ button(t('ui.period.apply'), size="small") }}
+    </form>
+  </details>
+  {%- endif %}
 </nav>
 {%- endmacro %}
 

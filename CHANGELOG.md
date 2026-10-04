@@ -10,6 +10,16 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Dashboards (#152):** `chart("scatter", …)` and `chart("bubble", …)` place points by two
+  numbers (a bubble's area by a third), with axes fitted to the data, `x_title`/`y_title`
+  (also on line, area and bar charts), `x_format`/`size_format`, a tooltip per point (the
+  arrow keys move between points) and the data table. `period_filter` has a "Custom" button:
+  two of the kit's date fields sent as `?period=custom&from=…&to=…` (keyboard-usable; a refused
+  range shows a message), and `custom=false` to leave it out. `Period::between`,
+  `Period::weeks` (`12w`), `Period::per`, `Period::is_custom`, `Bucket::Week`: `Trend` sums
+  per ISO week (Monday to Sunday in `APP_TIMEZONE`, labelled by the Monday) on SQLite and
+  PostgreSQL. A new template function `query_fields(…)` writes the page's query as hidden
+  inputs. examples/shop's dashboard uses them.
 - **`rnx new` (#221):** the AGENTS.md of a new app says exactly where Renox's docs are offline:
   for an `rnx` from crates.io, the `git clone --depth 1 --branch v<version> …` of the app's
   version (the downloaded crates hold only the source); for a Git pin, Cargo's checkout of that

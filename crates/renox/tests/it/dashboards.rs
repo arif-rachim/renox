@@ -106,6 +106,9 @@ impl Module for Pages {
                 view("page.html", context! { period, sales })
             })
             .get("/bad-kind", || async { view("bad.html", context! {}) })
+            .get("/bad-points", || async {
+                view("bad_points.html", context! {})
+            })
     }
 }
 
@@ -126,7 +129,10 @@ const PAGE: &str = r##"{% from "renox/ui.html" import stats, stat, dashboard, wi
 <div id="bars">{{ chart("bar", labels=["A", "B"], series=[{"name": "Coffee", "values": [1, 2]}, {"name": "Tea", "values": [3, -1]}], stacked=true) }}</div>
 <div id="grouped">{{ chart("bar", labels=["A", "B"], series=[{"name": "Coffee", "values": [1, 2]}, {"name": "Tea", "values": [3, none]}], height=160) }}</div>
 <div id="pie">{{ chart("doughnut", labels=["a", "b", "c", "d", "e", "f", "g"], values=[10, 20, 30, 10, 10, 10, 10], title="Mix") }}</div>
-<div id="month">{{ chart("bar", labels=["2026-08", "2026-09"], values=[1, 2], x_format="%m/%Y") }}</div>"##;
+<div id="month">{{ chart("bar", labels=["2026-08", "2026-09"], values=[1, 2], x_format="%m/%Y") }}</div>
+<div id="scatter">{{ chart("scatter", [{"name": "Coffee", "points": [[10, 52], [20.5, 87], {"x": 30, "y": 60, "label": "Latte"}]}, {"name": "Tea", "points": [[15, 70], ["x", 1]]}], x_title="Price", y_title="Sold") }}</div>
+<div id="bubble">{{ chart("bubble", points=[{"x": 1000, "y": 5, "size": 400, "label": "Mug"}, {"x": 25000, "y": 12, "size": 100, "label": "Beans"}, [5000, 9]], x_format="money", size_title="Revenue", size_format="money", title="Products") }}</div>
+<div id="end"></div>"##;
 
 async fn app(timezone: &str, locale: &str) -> (TestApp, tempfile::TempDir) {
     let views = tempfile::tempdir().unwrap();
@@ -134,6 +140,11 @@ async fn app(timezone: &str, locale: &str) -> (TestApp, tempfile::TempDir) {
     std::fs::write(
         views.path().join("bad.html"),
         r#"{{ chart("radar", [1]) }}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        views.path().join("bad_points.html"),
+        r#"{{ chart("scatter", labels=["a"], points=[[1, 2]]) }}"#,
     )
     .unwrap();
     let (path, timezone, locale) = (
@@ -336,7 +347,8 @@ async fn charts_stats_and_widgets_render() {
         "{pie}"
     );
     assert!(pie.contains(r#"<span class="rx-chart__name">Other</span><span class="rx-chart__value">20 <span class="rx-chart__share">20.0%</span>"#), "{pie}");
-    let month = &html[html.find(r#"<div id="month">"#).unwrap()..];
+    let month = &html
+        [html.find(r#"<div id="month">"#).unwrap()..html.find(r#"<div id="scatter">"#).unwrap()];
     assert!(month.contains(">08/2026</span>"), "{month}");
 
     app.get("/bad-kind").await.assert_status(500);
@@ -359,4 +371,224 @@ async fn dashboards_speak_the_apps_language() {
     ] {
         assert!(html.contains(needle), "missing {needle}");
     }
+}
+
+#[renox::test]
+async fn trends_count_per_week_from_monday_in_app_timezone() {
+    use renox::chrono::Datelike;
+    let (app, _views) = app("+07:00", "en").await;
+    let zone: Zone = "+07:00".parse().unwrap();
+    let period = Period::weeks(4);
+    // Local midnight of the Monday three weeks before this week's.
+    let (start, _) = period.range(zone);
+    let this_monday = start + Duration::weeks(3);
+    // Just after this Monday's local midnight counts this week; just
+    // before (Sunday night), the week before.
+    sale(&app, "paid", 10, this_monday + Duration::minutes(30)).await;
+    sale(&app, "paid", 20, this_monday - Duration::minutes(30)).await;
+    sale(&app, "paid", 40, start + Duration::days(3)).await;
+    // The Monday a week before the first: the period before (four weeks back,
+    // to the same weekday as today).
+    sale(
+        &app,
+        "paid",
+        80,
+        start - Duration::days(7) + Duration::hours(1),
+    )
+    .await;
+    let json = app
+        .get("/trend?period=4w")
+        .await
+        .assert_ok()
+        .json::<renox::serde_json::Value>();
+    assert_eq!(json["period"], "4w");
+    let labels: Vec<String> = renox::serde_json::from_value(json["sum"]["labels"].clone()).unwrap();
+    assert_eq!(labels, period.labels(zone));
+    assert_eq!(
+        renox::chrono::NaiveDate::parse_from_str(&labels[0], "%Y-%m-%d")
+            .unwrap()
+            .weekday(),
+        renox::chrono::Weekday::Mon
+    );
+    assert_eq!(
+        json["sum"]["values"],
+        renox::serde_json::json!([40.0, 0.0, 20.0, 10.0])
+    );
+    assert_eq!(json["count"]["values"][3], 1.0);
+    let change = json["change"].as_f64().unwrap();
+    assert!(
+        (change - (70.0 - 80.0) / 80.0 * 100.0).abs() < 1e-9,
+        "{change}"
+    );
+}
+
+#[renox::test]
+async fn custom_ranges_come_from_the_query() {
+    let (app, _views) = app("UTC", "en").await;
+    let today = renox::db::now().date_naive();
+    let noon = |days_ago: i64| {
+        (today - Duration::days(days_ago))
+            .and_hms_opt(12, 0, 0)
+            .unwrap()
+            .and_utc()
+    };
+    sale(&app, "paid", 100, noon(7)).await;
+    sale(&app, "paid", 50, noon(2)).await; // after the range
+    sale(&app, "paid", 25, noon(12)).await; // in the five days before it
+    let (from, to) = (today - Duration::days(9), today - Duration::days(5));
+    let url = format!("/trend?q=x&period=custom&from={from}&to={to}");
+    let json = app
+        .get(&url)
+        .await
+        .assert_ok()
+        .json::<renox::serde_json::Value>();
+    assert_eq!(json["period"], format!("{from}..{to}"));
+    assert_eq!(json["sum"]["labels"].as_array().unwrap().len(), 5);
+    assert_eq!(json["sum"]["labels"][0], from.to_string());
+    assert_eq!(json["sum"]["values"][2], 100.0);
+    assert_eq!(json["total"], 100.0);
+    assert_eq!(json["change"], 300.0);
+    // The key works as `?period=` too.
+    app.get(&format!("/trend?period={from}..{to}"))
+        .await
+        .assert_json_path("total", 100.0);
+    // Ranges it refuses give the default 30 days.
+    for bad in [
+        format!("period=custom&from={to}&to={from}"),
+        "period=custom&from=2026-02-30&to=2026-03-01".to_owned(),
+        "period=custom&from=2020-01-01&to=2026-01-01".to_owned(),
+        "period=custom".to_owned(),
+    ] {
+        app.get(&format!("/trend?{bad}"))
+            .await
+            .assert_json_path("period", "30d");
+    }
+}
+
+#[renox::test]
+async fn the_period_filter_picks_a_custom_range() {
+    let (app, _views) = app("UTC", "en").await;
+    // Nothing custom yet: a closed "Custom" button.
+    let html = app.get("/page").await.text();
+    assert!(
+        html.contains(r#"<details class="rx-period__custom" data-rx-period>"#),
+        "{html}"
+    );
+    assert!(
+        html.contains("</svg><span>Custom</span></summary>"),
+        "{html}"
+    );
+
+    // A custom range: the button says which, the form has its dates and
+    // keeps the other filters; presets drop the dates.
+    let html = app
+        .get("/page?q=coffee+beans&period=custom&from=2026-09-01&to=2026-09-30&page=2")
+        .await
+        .assert_ok()
+        .text();
+    let has = |needle: &str| assert!(html.contains(needle), "missing {needle}\n{html}");
+    has(r#"<summary class="rx-period__toggle" aria-current="true">"#);
+    has(r#"<span class="rx-visually-hidden">Custom range: </span>Sep 1 – Sep 30, 2026</span>"#);
+    has(r#"<input type="hidden" name="q" value="coffee beans">"#);
+    has(r#"<input type="hidden" name="period" value="custom">"#);
+    has(r#"id="rx-period-from" name="from" type="text""#);
+    has(r#"value="2026-09-01""#);
+    has(r#"value="2026-09-30""#);
+    has(r#"href="?q=coffee+beans&amp;period=7d">7 days</a>"#);
+    assert!(!html.contains(r#"name="page""#) && !html.contains(r#"role="alert""#));
+    assert!(
+        !html.contains(r#"aria-current="page""#),
+        "no preset is current"
+    );
+
+    // A range the extractor refuses: the form opens with what was sent and
+    // a message; the default period shows.
+    let html = app
+        .get("/page?period=custom&from=2026-09-30&to=2026-09-01")
+        .await
+        .text();
+    assert!(
+        html.contains(r#"<details class="rx-period__custom" data-rx-period open>"#),
+        "{html}"
+    );
+    assert!(html.contains(r#"<p class="rx-error" role="alert">Choose a start date"#));
+    assert!(html.contains(r#"value="2026-09-30""#));
+    assert!(html.contains(r#"aria-current="page">30 days</a>"#));
+}
+
+#[renox::test]
+async fn scatter_and_bubble_charts_render() {
+    let (app, _views) = app("UTC", "en").await;
+    let html = app.get("/page").await.assert_ok().text();
+    let scatter = &html
+        [html.find(r#"<div id="scatter">"#).unwrap()..html.find(r#"<div id="bubble">"#).unwrap()];
+    let has = |part: &str, needle: &str| assert!(part.contains(needle), "missing {needle}\n{part}");
+    has(
+        scatter,
+        r#"<figure class="rx-chart rx-chart--scatter rx-chart--points" data-rx-chart=""#,
+    );
+    // Two series: a legend with round keys and a series column.
+    has(
+        scatter,
+        r#"<span class="rx-chart__key rx-chart__key--dot rx-series-2" aria-hidden="true"></span>Tea"#,
+    );
+    has(scatter, r#"<th scope="col" class="rx-num">Series</th>"#);
+    // Four points (one without numbers is left out), the axes titled.
+    assert_eq!(
+        scatter.matches(r#"<span class="rx-chart__point "#).count(),
+        4
+    );
+    has(scatter, r#"aria-label="Coffee, Tea: Sold by Price""#);
+    has(
+        scatter,
+        r#"rx-chart__axis-title--y" aria-hidden="true">Sold</p>"#,
+    );
+    has(
+        scatter,
+        r#"rx-chart__axis-title--x" aria-hidden="true">Price</p>"#,
+    );
+    // Axes fit the data (x 10–30, y 50–90), not from 0; vertical rules too.
+    has(
+        scatter,
+        r#"class="rx-chart__point rx-series-1" data-index="0" style="left: 0%; bottom: 5%""#,
+    );
+    has(
+        scatter,
+        r#"<span class="rx-chart__rule rx-chart__rule--x" style="left: 100%">"#,
+    );
+    has(scatter, r#">90</span>"#);
+    // Values as the data needs them, in the tooltips and the table.
+    has(
+        scatter,
+        "&quot;rows&quot;:[[&quot;Price&quot;,&quot;20.5&quot;]",
+    );
+    has(
+        scatter,
+        r#"<tr><th scope="row">Latte</th><td class="rx-num">Coffee</td><td class="rx-num">30.0</td><td class="rx-num">60</td></tr>"#,
+    );
+
+    let bubble =
+        &html[html.find(r#"<div id="bubble">"#).unwrap()..html.find(r#"<div id="end">"#).unwrap()];
+    has(bubble, r#"rx-chart rx-chart--bubble rx-chart--points"#);
+    has(
+        bubble,
+        r#"<figcaption class="rx-visually-hidden">Products</figcaption>"#,
+    );
+    // Sizes by area, the biggest drawn first (so small ones stay on top).
+    let first = &bubble[bubble.find(r#"<span class="rx-chart__point "#).unwrap()..];
+    assert!(
+        first[..first.find("</span>").unwrap()].contains("--rx-point: 40px"),
+        "{first}"
+    );
+    has(bubble, "--rx-point: 23px");
+    has(bubble, "--rx-point: 6px");
+    has(bubble, r#"<th scope="col" class="rx-num">Revenue</th>"#);
+    has(
+        bubble,
+        r#"<tr><th scope="row">Beans</th><td class="rx-num">Rp 25,000</td><td class="rx-num">12</td><td class="rx-num">Rp 100</td></tr>"#,
+    );
+    assert!(!bubble.contains("rx-chart__legend"), "one series: {bubble}");
+
+    // `labels=` is not a scatter chart's.
+    app.get("/bad-points").await.assert_status(500);
 }
