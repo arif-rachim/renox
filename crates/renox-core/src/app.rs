@@ -558,6 +558,7 @@ impl App {
             permissions,
             second_factor,
             duplicate_second_factor,
+            mut account_sections,
         } = self.registry;
         if let Some(name) = duplicate_job {
             return Err(anyhow!("job `{name}` is registered twice").into());
@@ -800,6 +801,10 @@ impl App {
             channels: Arc::new(channels),
             reporters: Arc::new(reporters),
             second_factor: second_factor.map(Arc::new),
+            account_sections: {
+                account_sections.sort_by_key(|section| section.order);
+                Arc::new(account_sections)
+            },
             limiters: Arc::new(
                 self.limiters
                     .into_iter()

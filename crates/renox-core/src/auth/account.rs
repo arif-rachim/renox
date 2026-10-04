@@ -152,15 +152,62 @@ pub(super) async fn confirm(
     Ok(go(&htmx, to))
 }
 
-async fn show(Extension(settings): Extension<Arc<Settings>>, user: AuthUser, lang: Lang) -> View {
-    view(
+/// A section another module adds to `/account` (`Registry::account_section`).
+pub(crate) struct AccountSection {
+    template: String,
+    pub(crate) order: i32,
+    data: SectionFn,
+}
+
+type SectionFn = Arc<
+    dyn Fn(
+            User,
+            AppState,
+        )
+            -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<serde_json::Value>> + Send>>
+        + Send
+        + Sync,
+>;
+
+pub(crate) fn section<F, Fut>(template: &str, order: i32, data: F) -> AccountSection
+where
+    F: Fn(User, AppState) -> Fut + Send + Sync + 'static,
+    Fut: std::future::Future<Output = Result<serde_json::Value>> + Send + 'static,
+{
+    AccountSection {
+        template: template.to_owned(),
+        order,
+        data: Arc::new(move |user, state| Box::pin(data(user, state))),
+    }
+}
+
+async fn show(
+    Extension(settings): Extension<Arc<Settings>>,
+    State(state): State<AppState>,
+    user: AuthUser,
+    lang: Lang,
+) -> Result<View> {
+    // Read what each section needs first: the closures borrow nothing across
+    // the awaits, so the handler's future stays `Send`.
+    let registered: Vec<(String, SectionFn)> = state
+        .account_sections
+        .iter()
+        .map(|section| (section.template.clone(), section.data.clone()))
+        .collect();
+    let mut sections = Vec::with_capacity(registered.len());
+    for (template, data) in registered {
+        let data = data(user.user().clone(), state.clone()).await?;
+        sections.push(context! { template, data });
+    }
+    Ok(view(
         "renox/auth/account.html",
         context! {
             text => texts(&lang),
             user => user.user(),
             verify_email => settings.verify_email,
+            sections,
         },
-    )
+    ))
 }
 
 #[derive(Deserialize)]

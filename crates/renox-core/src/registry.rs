@@ -26,6 +26,8 @@ pub struct Registry {
     /// A second login step (`second_factor`), and whether two modules set one.
     pub(crate) second_factor: Option<crate::auth::second_factor::SecondFactor>,
     pub(crate) duplicate_second_factor: bool,
+    /// Sections other modules add to the `/account` page.
+    pub(crate) account_sections: Vec<crate::auth::account::AccountSection>,
 }
 
 impl Registry {
@@ -166,6 +168,46 @@ impl Registry {
         self.second_factor = Some(crate::auth::second_factor::second_factor(
             challenge, required,
         ));
+        self
+    }
+
+    /// Adds a section to the `Auth` module's `/account` page (with
+    /// `Auth::new().account()`), such as two-factor authentication or linked
+    /// logins. `template` is rendered with the page's context; `data` runs
+    /// for the logged-in user on every visit, and the template reads what it
+    /// returns as `section.data`. Sections show in `order` (then in the order
+    /// they were added), after the built-in cards and before "Delete account".
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// struct Pin;
+    ///
+    /// impl Module for Pin {
+    ///     fn name(&self) -> &'static str {
+    ///         "pin"
+    ///     }
+    ///
+    ///     fn register(&self, app: &mut Registry) {
+    ///         app.templates(|env| {
+    ///             env.add_template(
+    ///                 "pin/account.html",
+    ///                 r#"<section id="pin">PIN {{ "on" if section.data.on else "off" }}</section>"#,
+    ///             )
+    ///             .unwrap();
+    ///         });
+    ///         app.account_section("pin/account.html", 10, |user, _state| async move {
+    ///             Ok(json!({ "on": user.extra.contains_key("pin") }))
+    ///         });
+    ///     }
+    /// }
+    /// ```
+    pub fn account_section<F, Fut>(&mut self, template: &str, order: i32, data: F) -> &mut Self
+    where
+        F: Fn(crate::auth::User, AppState) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<serde_json::Value>> + Send + 'static,
+    {
+        self.account_sections
+            .push(crate::auth::account::section(template, order, data));
         self
     }
 

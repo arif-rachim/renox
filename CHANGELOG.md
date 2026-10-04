@@ -10,6 +10,13 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Account page sections (#168):** a module adds a card to `/account` with
+  `Registry::account_section(template, order, |user, state| …)`; the template reads what the
+  closure returns as `section.data`. They show after the built-in cards, before "Delete
+  account"; a page that replaces `renox/auth/account.html` keeps them with
+  `{% include "renox/auth/account_sections.html" %}`. For `renox-2fa` (#146) and
+  `renox-oauth` (#147).
+
 - **A second login step (#167):** a module can ask for something after the password, such as
   a code from an authenticator app (the coming `renox-2fa`, #146).
   `Registry::second_factor(challenge_route, |user, state| …)` says who must pass it; the
