@@ -44,6 +44,12 @@ changes by milestone (each one pull request; details in its description and in
   the first connection within the pool's acquire timeout, which is capped at 2 s for in-memory
   databases. Opening now tries again until `DATABASE_ACQUIRE_TIMEOUT` has passed; queries keep
   the 2 s cap, so a test waiting on its own transaction still fails fast.
+- **Fixed (#163):** processes opening a brand-new SQLite file database together (`serve` and
+  `route:list` right after `migrate` made the file) could fail with "database is locked" or
+  "pool timed out": creating the file and switching it to WAL take an exclusive lock, inside
+  the pool's acquire timeout. A file database is now opened once with a plain connection
+  before its pool, and both that connection and the pool retry "database is locked" until
+  `DATABASE_ACQUIRE_TIMEOUT` has passed.
 
 ## 1.0.0-rc.3 · 2026-10-04
 
