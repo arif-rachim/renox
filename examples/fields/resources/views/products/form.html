@@ -1,10 +1,11 @@
 {% extends "layouts/app.html" %}
-{% from "renox/ui.html" import card, input, textarea, checkbox, radio, checkbox_list, tags_input, key_value, date_picker, form_grid, fieldset, form_errors, button, link_button %}
+{% from "renox/ui.html" import card, input, checkbox, radio, checkbox_list, tags_input, key_value, date_picker, form_grid, fieldset, form_errors, button, link_button %}
 
 {#- The kit's fields show the old input after a failed save, else the value
     given here (the stored one). The value formats match what the inputs
     expect: dates as 2026-10-01, times as 08:00:00, date-times as
     2026-10-01T10:30:00. -#}
+{% from "renox-editors/editors.html" import rich_editor, markdown_editor, code_editor %}
 {% macro value(name) %}{{ product[name] if product and product[name] is not none else '' }}{% endmacro %}
 
 {% block content %}
@@ -18,7 +19,8 @@
       {{ input("key", "Product ID", value=product.id, readonly=true, copyable=true, span="full", hint="A UUID v7, made on insert.") }}
       {%- endif %}
       {{ input("name", "Name", value=value('name'), required=true, span="full") }}
-      {{ textarea("description", "Description", value=value('description'), span="full") }}
+      {#- renox-editors: Markdown with a toolbar and a preview, sent as typed. -#}
+      {{ markdown_editor("description", "Description", value=value('description'), rows=5, span="full", hint="Markdown: **bold**, _italic_, lists, links.") }}
       {{ input("stock", "Stock", type="number", value=value('stock'), required=true, attrs={"min": 0}) }}
       {{ input("weight_kg", "Weight", type="number", value=value('weight_kg'), required=true, suffix="kg", attrs={"step": "0.01", "min": 0}) }}
       {{ input("price", "Price", type="number", value=value('price'), required=true, prefix="Rp", attrs={"min": 0}) }}
@@ -36,6 +38,9 @@
       {{ tags_input("tags", "Tags", value=product.tags if product else [], suggestions=["organic", "single origin", "decaf"],
                     hint="Press Enter or a comma after each.") }}
       {{ key_value("specs", "Specifications", value=product.specs if product else none, key_label="Name", add_label="Add a specification") }}
+      {#- renox-editors: rich text (HTML, cleaned on the server) and code. -#}
+      {{ rich_editor("details", "Details", value=product.details if product else none, hint="Shown on the product's page.") }}
+      {{ code_editor("settings", "Settings", value=value('settings'), language="json", rows=6, placeholder='{"grind": "fine"}', hint="JSON.") }}
     {% endcall %}
 
     {% call fieldset("Dates", columns=2) %}

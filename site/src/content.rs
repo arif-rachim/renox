@@ -161,6 +161,14 @@ pub static PAGES: &[Page] = &[
         "A code from a phone app after the password, with the renox-2fa crate."
     ),
     page!(
+        "editors",
+        "Rich text, Markdown and code editors",
+        Guides,
+        "pencil",
+        "docs/editors.md",
+        "Editor fields for formatted text, Markdown and code, with the renox-editors crate."
+    ),
+    page!(
         "queue",
         "The queue",
         Guides,

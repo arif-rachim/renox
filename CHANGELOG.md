@@ -10,6 +10,26 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Editors (#149, #150):** a new plugin crate, `renox-editors` (same version as `renox`):
+  `.module(Editors::new())`, then `rich_editor` (Trix 2.1.19), `markdown_editor` (a toolbar and
+  a Preview rendered by the `markdown` filter on the server) and `code_editor` (CodeJar 4.3.0
+  with Prism 1.30.0 colours) from `renox-editors/editors.html`. Each sends a plain form field,
+  so `Valid<T>`, old input, errors, hints and live validation work as for the kit's fields.
+  Rich text is read as `RichText`, cleaned on the server with ammonia (an allowlist of
+  formatting tags; links only to http(s), mailto and tel), and its rules count letters, not
+  tags; the `rich_text` filter cleans stored HTML again when shown; `sanitize(html)` for other
+  HTML. `code_entry` shows code coloured, read-only and copyable in an infolist (maps and lists
+  as indented JSON). The scripts load only on pages with an editor, as one JavaScript module
+  that loads each library when needed, and work under `CSP=strict`. Guide: docs/editors.md;
+  examples/fields uses all four.
+- **Entry actions (#150):** the kit's `entry` takes `prefix_actions` and `suffix_actions`:
+  buttons beside the value that link (`url`), post a small form (`action`, with `method`) or
+  carry htmx attributes (`attrs`). Entries without them render as before.
+- **`Registry::asset` (#149):** a module serves a file compiled into its crate (a script, a
+  stylesheet) the way Renox serves its own: in front of sessions, CSRF and maintenance mode
+  (no cookie), with a year-long immutable cache. The path must start with `/`; two files at
+  one path stop the app at boot.
+
 - **`rnx new` (#221):** the AGENTS.md of a new app says exactly where Renox's docs are offline:
   for an `rnx` from crates.io, the `git clone --depth 1 --branch v<version> …` of the app's
   version (the downloaded crates hold only the source); for a Git pin, Cargo's checkout of that

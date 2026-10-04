@@ -1,12 +1,14 @@
 //! Made with `rnx make:module products`, then
 //! `rnx make:model Product --module products -m --key uuid` (a `Uuid` key and
-//! its migration) and `rnx make:migration add_tags_and_specs_to_products`.
+//! its migration), `rnx make:migration add_tags_and_specs_to_products` and
+//! `rnx make:migration add_details_and_settings_to_products`.
 //! Each field shows one pairing of HTML input, Rust type and column type.
 
 use renox::chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use renox::db::Json;
 use renox::prelude::*;
 use renox::uuid::Uuid;
+use renox_editors::RichText;
 use serde::{Deserialize, Serialize};
 
 /// One choice of a few: the kit's `radio` group, stored as text (`small`,
@@ -41,6 +43,11 @@ pub struct Product {
     /// Pairs typed by the user ("Origin": "Aceh"): `KeyValues`, stored as a
     /// JSON list of `[key, value]` pairs, so their order holds.
     pub specs: Json<KeyValues>,
+    /// Rich text from the rich text editor: HTML, cleaned when the form
+    /// was read (`RichText`), shown with the `rich_text` filter.
+    pub details: Option<String>,
+    /// JSON typed in the code editor, kept as the text it was typed as.
+    pub settings: Option<String>,
     pub opens_at: Option<NaiveTime>,
     pub launch_at: Option<NaiveDateTime>,
     pub released_on: Option<NaiveDate>,
@@ -51,7 +58,7 @@ pub struct Product {
 #[derive(Deserialize, Serialize)]
 struct ProductForm {
     name: String,                // <input>
-    description: Option<String>, // <textarea>, empty → None
+    description: Option<String>, // the Markdown editor (a <textarea>), empty → None
     stock: i64,                  // <input type="number">
     weight_kg: f64,              // <input type="number" step="0.01">
     price: i64,                  // <input type="number" step="1">
@@ -69,6 +76,12 @@ struct ProductForm {
     // parses from its text.
     #[serde(default)]
     specs: KeyValues,
+    // The rich text editor (renox-editors): HTML in a hidden input, cleaned
+    // as it is read. An emptied editor still sends markup, so `RichText`
+    // tells "no text" apart for the rules.
+    details: Option<RichText>,
+    // The code editor: the text as typed (JSON here).
+    settings: Option<String>,
 }
 
 impl Validate for ProductForm {
@@ -86,6 +99,9 @@ impl Validate for ProductForm {
         v.field("tags", &self.tags).max(5);
         v.each("tags", &self.tags, |tag| tag.max(20));
         v.field("specs", &self.specs).max(8);
+        // Letters of text, not of markup.
+        v.field("details", &self.details).max(5000);
+        v.field("settings", &self.settings).json().max(5000);
     }
 }
 
@@ -101,6 +117,12 @@ impl ProductForm {
         product.colors = Json(self.colors);
         product.tags = Json(self.tags);
         product.specs = Json(self.specs);
+        // An emptied editor (`<div><br></div>`) stores nothing.
+        product.details = self
+            .details
+            .filter(|details| !details.is_empty())
+            .map(RichText::into_string);
+        product.settings = self.settings;
         product.opens_at = self.opens_at;
         product.launch_at = self.launch_at;
         product.released_on = self.released_on;

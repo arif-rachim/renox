@@ -69,7 +69,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            storage, translator, listeners, key, gates/async gates, shares,
                            channels, provided values, throttle, security, webhooks, live
   src/module.rs            Module trait: name, routes, migrations, register
-  src/registry.rs          Registry: jobs, listeners, schedule, commands, channels, shares, templates
+  src/registry.rs          Registry: jobs, listeners, schedule, commands, channels, shares, templates,
+                           assets (`Registry::asset`: files served before the session)
   src/routing.rs           Routes builder (get/post/…/name/group/require_auth/guest_only/
                            require_verified/throttle/cors/route_layer/merge/domain/fallback),
                            RouteTable + URLs (name_of for route_is), CurrentRoute
@@ -219,6 +220,15 @@ crates/renox-2fa/          the first plugin (#146), a separate crate versioned w
                            base32), recovery.rs (8 codes, SHA-256), qr.rs (SVG); its own
                            tests/ (it can use the macros: it depends on renox); guide
                            docs/two-factor.md (doctested from lib.rs `Guide`)
+crates/renox-editors/      the editors plugin (#149, #150): Editors module (lib.rs: views
+                           registered in `templates`, the `rich_text` filter, POST
+                           /_renox/editors/preview), rich_text.rs (RichText, sanitize:
+                           ammonia allowlist), assets.rs (files served with
+                           `Registry::asset`), views/editors.html (rich_editor,
+                           markdown_editor, code_editor, code_entry), assets/editors.js (one
+                           module that imports Trix / Prism + CodeJar when a page needs them)
+                           and editors.css, assets/vendor/ (pinned files + NOTICE + licences);
+                           guide docs/editors.md (doctested from lib.rs `Guide`)
 crates/renox-cli/          `rnx`: main.rs (key:generate, forwarding), new.rs, serve.rs, make.rs +
                            generate.rs (make:*), scaffold.rs (make:module --resource --fields),
                            deploy.rs (build, make:deploy), tailwind.rs (the pinned

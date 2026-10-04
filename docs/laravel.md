@@ -1336,7 +1336,8 @@ address, loads that page of orders, and passes it to the template.
 |---|---|
 | Tables | `renox::grid` + `renox/grid.html`: filters, search, bulk and row actions, summaries, groups, exports (CSV, Excel, print), inline editing, reordering ([grid.md](grid.md)) |
 | Forms | the kit's fields: `select` (searchable, options from the server), `date_picker`, `file`, `tags_input`, `repeater`, `key_value`, `wizard`, `show_when` |
-| Infolists | `infolist`, `entry`, `repeatable` |
+| Rich text, Markdown and code editors | `rich_editor`, `markdown_editor`, `code_editor` from the `renox-editors` crate ([editors.md](editors.md)) |
+| Infolists | `infolist`, `entry` (with `prefix_actions`/`suffix_actions`), `repeatable`; `code_entry` from `renox-editors` |
 | Actions and modals | `action_sheet`, `slide_over`, `confirm`, `icon_button`, keyboard shortcuts |
 | Notifications | `Toast` and the `notification_bell` over Server-Sent Events |
 | Widgets | `stat`/`stats`, `chart(…)`, `renox::chart::Trend` |
