@@ -3,8 +3,20 @@
 # tests the result, so generated code that doesn't compile fails CI.
 #
 #   tests/cli/run.sh            # sqlite
-#   tests/cli/run.sh postgres   # `rnx new --database postgres` (build only)
-#   KEEP=1 tests/cli/run.sh     # keep the app and print where it is
+#   tests/cli/run.sh postgres   # `rnx new --database postgres` (build and lint only)
+#   KEEP=1 tests/cli/run.sh     # keep the apps and print where they are
+#
+#   E2E_POSTGRES=postgres://postgres:postgres@localhost:5432 tests/cli/run.sh postgres
+#       With a PostgreSQL server there, the postgres apps also run their tests (in
+#       fresh schemas of its `renox_test` database) and their commands, each app in its
+#       own database `renox_e2e_<app>` (dropped and created again). The HTTP checks
+#       (tests/cli/smoke.py) read the app's SQLite file, so they run with sqlite only.
+#
+# Apps are made with the `rnx new` options people combine, and names on both sides of
+# "renox" (where imports sort: #124): shop (every generator), atlas (plain), site
+# (--tailwind), studio (--starter, with the database), desk (--starter --tailwind).
+# Each must pass cargo fmt --check, clippy (but shop, whose generated items are dead code
+# until used) and its tests (#143).
 #
 #   FROM_GIT=1 DOCKER=1 tests/cli/run.sh
 #       The app depends on Renox from GitHub, pinned to this checkout's commit
@@ -21,7 +33,7 @@ WORK=$(mktemp -d)
 export CARGO_TARGET_DIR=${CARGO_TARGET_DIR:-$REPO/target/cli-e2e}
 cleanup() {
     if [ -n "${SERVER:-}" ]; then kill "$SERVER" 2>/dev/null || true; fi
-    if [ -n "${KEEP:-}" ]; then echo "app kept in $WORK/shop"; else rm -rf "$WORK"; fi
+    if [ -n "${KEEP:-}" ]; then echo "apps kept in $WORK"; else rm -rf "$WORK"; fi
 }
 trap cleanup EXIT
 
@@ -44,17 +56,47 @@ smoke() {
     SERVER=
 }
 
+# Whether the apps can run (tests, commands): always on SQLite, on PostgreSQL only with
+# a server in E2E_POSTGRES.
+runs() { [ "$DATABASE" = sqlite ] || [ -n "${E2E_POSTGRES:-}" ]; }
+
+# `rnx new <name> [options]` in $WORK, against this checkout (or GitHub with FROM_GIT).
+new_app() {
+    local name=$1
+    shift
+    cd "$WORK"
+    if [ -n "${FROM_GIT:-}" ]; then
+        "$RNX" new "$name" "$@"
+    else
+        "$RNX" new "$name" --renox-path "$REPO" "$@"
+    fi
+    cd "$name"
+}
+
+# On PostgreSQL, points the app at its own fresh database (DATABASE_URL wins over
+# .env) and its tests at E2E_POSTGRES's renox_test database.
+use_database() {
+    if [ "$DATABASE" = postgres ] && [ -n "${E2E_POSTGRES:-}" ]; then
+        psql -q "$E2E_POSTGRES/postgres" -c "DROP DATABASE IF EXISTS renox_e2e_$1" \
+            -c "CREATE DATABASE renox_e2e_$1"
+        export DATABASE_URL="$E2E_POSTGRES/renox_e2e_$1"
+        export TEST_DATABASE_URL="$E2E_POSTGRES/renox_test"
+    fi
+}
+
+# What a new app's own CI would run: formatting, lints and its tests.
+check_app() {
+    cargo fmt --check
+    cargo clippy --all-targets -- -D warnings
+    if runs; then cargo test; else cargo build --all-targets; fi
+}
+
 cargo build -q -p renox-cli
 RNX="$CARGO_TARGET_DIR/debug/rnx"
 
 step "rnx new shop --database $DATABASE"
-cd "$WORK"
-if [ -n "${FROM_GIT:-}" ]; then
-    "$RNX" new shop --database "$DATABASE"
-else
-    "$RNX" new shop --renox-path "$REPO" --database "$DATABASE"
-fi
-cd shop
+new_app shop --database "$DATABASE"
+use_database shop
 grep '^renox' Cargo.toml
 
 step "no template placeholder left in the new app"
@@ -101,9 +143,11 @@ cp "$WORK/env.bak" .env
 step "cargo fmt --check (what rnx new and every generator wrote)"
 cargo fmt --check
 
+# No clippy here: each generator's output stands alone, unused (dead code until the
+# app uses it). The apps below are linted.
 step "cargo build and test"
 cargo build --all-targets
-if [ "$DATABASE" = sqlite ]; then
+if runs; then
     cargo test
     step "the app's own commands"
     cargo run -q -- migrate
@@ -119,8 +163,10 @@ if [ "$DATABASE" = sqlite ]; then
     grep -q 'Usage: catalog:import' "$WORK/err.txt"
     cargo run -q -- route:list
 
-    step "the app over HTTP: every page, a --resource module's forms (tests/cli/smoke.py)"
-    smoke 3191 resources
+    if [ "$DATABASE" = sqlite ]; then
+        step "the app over HTTP: every page, a --resource module's forms (tests/cli/smoke.py)"
+        smoke 3191 resources
+    fi
 
     cargo run -q -- db:seed
     cargo run -q -- ui:publish
@@ -155,42 +201,41 @@ if [ -n "${DOCKER:-}" ]; then
     docker image ls "$IMAGE" --format 'image size: {{.Size}}'
 fi
 
+step "rnx new atlas --database $DATABASE (plain, a name before \"renox\": #124)"
+new_app atlas --database "$DATABASE"
+use_database atlas
+check_app
+
 if [ "$DATABASE" = sqlite ]; then
     step "rnx new site --tailwind (downloads the pinned Tailwind CLI once)"
-    cd "$WORK"
-    if [ -n "${FROM_GIT:-}" ]; then
-        "$RNX" new site --tailwind
-    else
-        "$RNX" new site --renox-path "$REPO" --tailwind
-    fi
-    cd site
+    new_app site --tailwind
     test -f resources/css/app.css
     test ! -e public/app.css
     grep -q "asset('css/app.css')" resources/views/layouts/app.html
     grep -q 'text-emerald-700' public/css/app.css # built from the views
     "$RNX" tailwind --minify
     grep -q 'text-emerald-700' public/css/app.css
-    cargo test
+    check_app
+
+    step "rnx new desk --starter --tailwind (a name before \"renox\")"
+    new_app desk --starter --tailwind
+    test -f resources/css/app.css
+    check_app
 fi
 
 step "rnx new studio --starter --database $DATABASE (a name after \"renox\": #124)"
-cd "$WORK"
-if [ -n "${FROM_GIT:-}" ]; then
-    "$RNX" new studio --starter --database "$DATABASE"
-else
-    "$RNX" new studio --starter --database "$DATABASE" --renox-path "$REPO"
-fi
-cd studio
+new_app studio --starter --database "$DATABASE"
+use_database studio
 test -f src/app/users/mod.rs
 grep -q '.module(Permissions)' src/lib.rs
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-if [ "$DATABASE" = sqlite ]; then
-    cargo test
+check_app
+if runs; then
     cargo run --quiet -- migrate
 
-    step "the starter app over HTTP: sign-up, verification, roles (tests/cli/smoke.py)"
-    smoke 3192 starter
+    if [ "$DATABASE" = sqlite ]; then
+        step "the starter app over HTTP: sign-up, verification, roles (tests/cli/smoke.py)"
+        smoke 3192 starter
+    fi
 
     cargo run --quiet -- db:seed
     cargo run --quiet -- users:admin member@example.com
@@ -198,7 +243,9 @@ fi
 
 echo
 if [ "$DATABASE" = sqlite ]; then
-    echo "cli e2e: the generated app builds, passes its tests and runs its commands"
+    echo "cli e2e: the generated apps are formatted, lint-free, pass their tests, run their commands and work over HTTP"
+elif runs; then
+    echo "cli e2e ($DATABASE): the generated apps are formatted, lint-free, pass their tests and run their commands"
 else
-    echo "cli e2e ($DATABASE): the generated app builds"
+    echo "cli e2e ($DATABASE): the generated apps are formatted, lint-free and build"
 fi

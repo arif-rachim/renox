@@ -263,7 +263,8 @@ tests/chaos/               app + run.sh (postgres|sqlite) that the `chaos` CI jo
 tests/cli/run.sh           `rnx new` + every `make:*`, then build and test the app (CI `cli`/`docker`);
                            with SQLite it serves the apps and drives them with tests/cli/smoke.py
                            (every GET page, a `--resource` module's forms, the starter's sign-up,
-                           verification and roles over HTTP, #142)
+                           verification and roles over HTTP, #142), and the `rnx new` option matrix (plain, --tailwind, --starter, names
+                           on both sides of "renox", #143)
 tests/tutorial/           run.sh + follow.py: docs/tutorial.md followed as a reader does (steps
                            found by their lead-in sentence, never line numbers), then fmt,
                            clippy, the tutorial's tests, seed, the app answering (CI `tutorial`).
@@ -632,8 +633,16 @@ PostgreSQL suite 2.5x slower (reconnects).
   past the newest migration.
 - `tests/cli/run.sh [postgres]` makes an app with every generator and builds/tests it
   (`FROM_GIT=1 DOCKER=1` for the Docker job). **Add every new `make:*` there.**
-  With sqlite it also makes `rnx new site --tailwind` (downloads the pinned Tailwind CLI with
-  `curl`, so it needs the network) and runs `rnx tailwind --minify` and the app's tests.
+  It also makes apps with the option combinations people use, with names before and after
+  "renox" (#143): `atlas` (plain), `studio` (`--starter`, with the database) and, with
+  sqlite, `site` (`--tailwind`: downloads the pinned Tailwind CLI with `curl`, so it needs
+  the network) and `desk` (`--starter --tailwind`); each passes `cargo fmt --check`, clippy
+  and its tests (the every-generator app skips clippy: its output is dead code until used).
+  With SQLite, `tests/cli/smoke.py` serves the shop and starter apps and drives them over
+  HTTP (#142; it reads their SQLite file, so not on PostgreSQL). On postgres,
+  `E2E_POSTGRES=postgres://…:5432` (CI sets it) runs the apps' tests and commands against
+  that server (each app in a fresh `renox_e2e_<app>` database, tests in `renox_test`);
+  without it, build and lint only.
 - Every `.rs` file a command writes or edits goes through `format::touched` (in
   `write_new` and the in-place edits of generate.rs, and `rnx new`'s stubs); `main` runs
   rustfmt on them at the end, one file at a time through stdin (with a path, rustfmt

@@ -10,6 +10,11 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **CI (#143):** `tests/cli/run.sh` also makes apps with the `rnx new` options people
+  combine, with names before and after "renox": plain, `--tailwind`, `--starter --tailwind`,
+  and `--starter` with the database; each passes `cargo fmt --check`, clippy and its tests.
+  The `cli` job's postgres run now runs the apps' tests and commands against a PostgreSQL
+  service (`E2E_POSTGRES`), where it only built before. `__pycache__/` is ignored.
 - **`tests/cli/smoke.py`** (#142), run by tests/cli/run.sh: the generated apps are used over
   HTTP the way a browser does (cookies, CSRF tokens, Referer). Every GET page answers a guest
   and a logged-in user without a server error; a `--resource` module is created (an invalid
