@@ -306,7 +306,7 @@ impl Worker {
                     };
                     let hook = (handler.failed)(plain, ctx, failure.error);
                     let hook = crate::context::scope_app(self.state.clone(), hook);
-                    if tokio::spawn(hook).await.is_err() {
+                    if tokio::spawn(crate::clock::carry(hook)).await.is_err() {
                         tracing::error!(job = %job.job, id = job.id, "the job's failed hook panicked");
                     }
                 }
@@ -331,7 +331,7 @@ impl Worker {
         };
         let run = (handler.run)(payload, ctx);
         let run = crate::context::scope_app(self.state.clone(), run);
-        let mut task = tokio::spawn(run);
+        let mut task = tokio::spawn(crate::clock::carry(run));
         match tokio::time::timeout(handler.timeout, &mut task).await {
             Ok(Ok(Ok(()))) => Outcome::Done,
             Ok(Ok(Err(err))) => Outcome::Failed(Failure {

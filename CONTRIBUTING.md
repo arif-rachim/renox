@@ -53,6 +53,9 @@ cargo test --workspace
   A new API also gets a line in [CHEATSHEET.md](CHEATSHEET.md) (compiled as a doctest too).
 - **Generators.** A change to `rnx new` or `rnx make:*` must keep `tests/cli/run.sh` passing:
   it builds and tests an app made with every generator.
+- **The tutorial.** `tests/tutorial/run.sh` follows docs/tutorial.md the way a reader does and
+  checks the result (fmt, clippy, tests, seeding, the app running). Run it after changing the
+  tutorial, a generator it uses, or anything its app relies on.
 - **Docs and examples in step.** When a change adds or changes behaviour, update what
   describes it: [CHEATSHEET.md](CHEATSHEET.md), [README.md](README.md) (feature tour),
   [llms.txt](llms.txt), the guides in `docs/` (operations: new commands, tables that grow,

@@ -58,3 +58,12 @@ pub(crate) fn with_offset_sync<T>(seconds: i64, f: impl FnOnce() -> T) -> T {
 pub(crate) async fn with_offset<F: Future>(seconds: i64, fut: F) -> F::Output {
     OFFSET.scope(seconds, fut).await
 }
+
+/// `fut` on this task's clock, for code moved to a task of its own:
+/// `tokio::spawn` starts without task-locals, so a job run by
+/// `TestApp::run_jobs` after `travel` ran on the real clock. Wrap what is
+/// spawned: `tokio::spawn(clock::carry(run))`.
+pub(crate) fn carry<F: Future>(fut: F) -> impl Future<Output = F::Output> {
+    let offset = OFFSET.try_with(|o| *o).unwrap_or(0);
+    OFFSET.scope(offset, fut)
+}

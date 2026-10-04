@@ -84,6 +84,22 @@ impl Module for Things {
 
     fn register(&self, app: &mut Registry) {
         app.listen(|_: Ordered, _| async { panic!("listeners don't run while events are faked") });
+        app.job::<NoteTheTime>();
+    }
+}
+
+/// When a job last ran, by its own clock.
+static JOB_RAN_AT: std::sync::Mutex<Option<DateTime>> = std::sync::Mutex::new(None);
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct NoteTheTime;
+
+impl Job for NoteTheTime {
+    const NAME: &'static str = "note-the-time";
+
+    async fn handle(self, _ctx: JobContext) -> Result {
+        *JOB_RAN_AT.lock().unwrap() = Some(renox::db::now());
+        Ok(())
     }
 }
 
@@ -180,6 +196,12 @@ async fn time_travel_moves_the_clock_for_requests_and_jobs() {
     assert!((71..=73).contains(&moved), "{moved}");
     let inside = app.at_travelled_time(async { renox::db::now() }).await;
     assert!((inside - before.to_utc()).num_hours() >= 71);
+    // A job runs in a task of its own, and still at the travelled time: a
+    // task-local clock offset isn't inherited by `tokio::spawn`.
+    app.state().dispatch(NoteTheTime).await.unwrap();
+    assert_eq!(app.run_jobs().await, 1);
+    let ran_at = JOB_RAN_AT.lock().unwrap().expect("the job ran");
+    assert!((ran_at - before.to_utc()).num_hours() >= 71, "{ran_at}");
     app.travel_back();
     let back = now(app.get("/now").await.text());
     assert!((back - before).num_hours() < 1);

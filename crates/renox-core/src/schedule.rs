@@ -603,7 +603,7 @@ impl Schedule {
                     continue;
                 }
                 let (task, state) = (task.clone(), state.clone());
-                tokio::spawn(async move {
+                tokio::spawn(crate::clock::carry(async move {
                     // Clears `running` however the run ends, panics included.
                     let _running = Running(task.running.clone());
                     if !claim(&state, &task.name, slot, task.when.claim_for()).await {
@@ -612,7 +612,7 @@ impl Schedule {
                     }
                     tracing::info!(task = %task.name, "scheduled task started");
                     let _ = task.execute(state).await;
-                });
+                }));
             }
         }
     }

@@ -261,6 +261,10 @@ site/                      the documentation site (package `renox-site`, publish
 tests/chaos/               app + run.sh (postgres|sqlite) that the `chaos` CI job injects faults
                            into (docker pause/stop/restart, python3 holding SQLite's lock)
 tests/cli/run.sh           `rnx new` + every `make:*`, then build and test the app (CI `cli`/`docker`)
+tests/tutorial/           run.sh + follow.py: docs/tutorial.md followed as a reader does (steps
+                           found by their lead-in sentence, never line numbers), then fmt,
+                           clippy, the tutorial's tests, seed, the app answering (CI `tutorial`).
+                           Changing a tutorial step's wording may need follow.py changed too
 docs/ui.md                 components, the UI kit, toasts, fragments, htmx headers, live
                            validation, stacks, Tailwind (doctest `UiGuide`)
 docs/grid.md               the data grid (renox::grid): columns, filters, actions, summaries,
@@ -699,7 +703,7 @@ PostgreSQL suite 2.5x slower (reconnects).
   aws-lc-rs`, doc), **test** on Ubuntu/macOS/Windows, **test (PostgreSQL)**, **chaos** (sqlite,
   postgres; `tests/chaos/run.sh`), **MSRV (1.94)**, **feature matrix** (`cargo hack check -p
   renox-core -p renox --each-feature --no-dev-deps`), **cli** (sqlite, postgres;
-  `tests/cli/run.sh`), **docker** (`make:deploy` image answers `/health`), **s3** (SeaweedFS; renox's `it/s3.rs` and examples/uploads),
+  `tests/cli/run.sh`), **tutorial** (`tests/tutorial/run.sh`), **docker** (`make:deploy` image answers `/health`), **s3** (SeaweedFS; renox's `it/s3.rs` and examples/uploads),
   **cargo-deny**, **coverage** (informational), **semver checks** (pull requests:
   `cargo semver-checks -p renox-core -p renox --baseline-rev origin/<base> --release-type
   minor`, informational until the first release; install it with `cargo install --locked
@@ -965,6 +969,9 @@ picks the build, not the terminal.
   travelling: in-memory rate limits and the login lock used `Instant` (now `clock::Stamp`), and
   `TestApp`'s session helpers read the cookie on the real clock (now the travelled one, via
   `clock::with_offset_sync`). Anything timed in memory must use `clock`, not `Instant`.
+  The offset is a task-local, which `tokio::spawn` doesn't inherit: wrap spawned app code in
+  `clock::carry(fut)` (the worker's jobs and hooks, webhook handlers, scheduled runs), or
+  travel doesn't reach it (found by the tutorial e2e, 2026-10-04).
 - **After M21, small fixes:** `/favicon.ico` answers 204 unless the app ships one (#67; every
   example logged a 404 console error when run in a browser); the workspace dev profile uses
   `debug = "line-tables-only"` (#68, after two OOM kills during workspace builds).
