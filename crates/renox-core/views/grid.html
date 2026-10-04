@@ -42,7 +42,7 @@
 {%- macro _value(column, value) -%}
 {%- if value is not defined or value is none or value == "" -%}<span class="rx-grid__none" aria-label="—"></span>
 {%- elif column.kind == "number" -%}{{ value | number(column.decimals or 0) }}
-{%- elif column.kind == "money" -%}{{ value | number }}
+{%- elif column.kind == "money" -%}{{ (value / column.scale) | number(column.decimals) }}
 {%- elif column.kind == "date" -%}{{ value | date }}
 {%- elif column.kind == "date_time" -%}{{ value | date("%Y-%m-%d %H:%M") }}
 {%- elif column.kind == "bool" and column.icons -%}
@@ -128,11 +128,13 @@
 {%- macro _figures(column, figures) -%}
 {%- if figures and column.summaries %}
 {%- set d = column.decimals or 0 %}
+{#- Money is stored in the smallest unit and shown in whole units. #}
+{%- set s = column.scale or 1 %}
 {%- for kind in column.summaries %}
 <span class="rx-grid__figure"><span class="rx-grid__figure-label">{{ t('ui.grid.' ~ kind) }}</span>
-{%- if kind == "sum" %}{{ figures.sum | number(d) if figures.sum is not none else "—" }}
-{%- elif kind == "average" %}{{ figures.average | number(d if d > 0 or column.kind == "money" else 1) if figures.average is not none else "—" }}
-{%- elif kind == "range" %}{% if figures.min is not none %}{{ figures.min | number(d) }} – {{ figures.max | number(d) }}{% else %}—{% endif %}
+{%- if kind == "sum" %}{{ (figures.sum / s) | number(d) if figures.sum is not none else "—" }}
+{%- elif kind == "average" %}{{ (figures.average / s) | number(d if d > 0 or column.kind == "money" else 1) if figures.average is not none else "—" }}
+{%- elif kind == "range" %}{% if figures.min is not none %}{{ (figures.min / s) | number(d) }} – {{ (figures.max / s) | number(d) }}{% else %}—{% endif %}
 {%- else %}{{ figures.count | number }}{% endif %}</span>
 {%- endfor %}
 {%- endif %}

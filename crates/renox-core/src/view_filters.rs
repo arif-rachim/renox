@@ -77,7 +77,33 @@ pub(crate) fn money(
 /// `$1,250.50`, `€1.250,50` in `de` (what the `money` template filter
 /// uses). An unknown code is written before the amount (`CHF 12.00`).
 pub fn format_money(amount: f64, code: &str, decimals: Option<u32>, locale: &str) -> String {
-    let (symbol, usual) = match code {
+    let (symbol, usual) = currency(code);
+    let figures = format_number(amount.abs(), decimals.unwrap_or(usual), locale);
+    let sign = if amount < 0.0 && figures.chars().any(|c| c.is_ascii_digit() && c != '0') {
+        "-"
+    } else {
+        ""
+    };
+    // `Rp 75.000`, `RM 12.00`, but `$75.00`.
+    let space = if symbol.ends_with(|c: char| c.is_ascii_alphabetic()) {
+        " "
+    } else {
+        ""
+    };
+    format!("{sign}{symbol}{space}{figures}")
+}
+
+/// The decimals a currency is usually written with: 2 for `USD` or `AED`,
+/// 0 for `IDR` or `JPY`. An amount in the smallest unit is divided by
+/// `10^decimals` to give whole units.
+pub(crate) fn currency_decimals(code: &str) -> u32 {
+    currency(code).1
+}
+
+/// A currency's symbol and usual decimals (the code itself and 2 when it
+/// isn't one of the listed ones).
+fn currency(code: &str) -> (&str, u32) {
+    match code {
         "IDR" => ("Rp", 0),
         "USD" => ("$", 2),
         "EUR" => ("€", 2),
@@ -94,20 +120,7 @@ pub fn format_money(amount: f64, code: &str, decimals: Option<u32>, locale: &str
         "PHP" => ("₱", 2),
         "VND" => ("₫", 0),
         other => (other, 2),
-    };
-    let figures = format_number(amount.abs(), decimals.unwrap_or(usual), locale);
-    let sign = if amount < 0.0 && figures.chars().any(|c| c.is_ascii_digit() && c != '0') {
-        "-"
-    } else {
-        ""
-    };
-    // `Rp 75.000`, `RM 12.00`, but `$75.00`.
-    let space = if symbol.ends_with(|c: char| c.is_ascii_alphabetic()) {
-        " "
-    } else {
-        ""
-    };
-    format!("{sign}{symbol}{space}{figures}")
+    }
 }
 
 /// `n` with `decimals` decimals and the locale's separators: `75.000` in

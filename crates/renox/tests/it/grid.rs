@@ -108,6 +108,11 @@ async fn app() -> (TestApp, tempfile::TempDir) {
 
 /// The orders app with `APP_TIMEZONE` set to `timezone`.
 async fn app_in(timezone: &str) -> (TestApp, tempfile::TempDir) {
+    app_with(timezone, "IDR").await
+}
+
+/// The orders app with `APP_TIMEZONE` and `APP_CURRENCY` set.
+async fn app_with(timezone: &str, currency: &str) -> (TestApp, tempfile::TempDir) {
     let views = tempfile::tempdir().unwrap();
     std::fs::write(
         views.path().join("orders.html"),
@@ -123,6 +128,7 @@ async fn app_in(timezone: &str) -> (TestApp, tempfile::TempDir) {
         |c| {
             c.views_path = views.path().to_path_buf();
             c.timezone = timezone.parse().unwrap();
+            c.currency = currency.into();
         },
     )
     .await;
@@ -199,6 +205,40 @@ fn numbers(html: &str) -> Vec<String> {
             Some(text_of(text))
         })
         .collect()
+}
+
+/// #184: money is stored in the smallest unit (cents for USD) and shown,
+/// filtered and exported in whole units of `APP_CURRENCY`.
+#[renox::test]
+async fn money_is_shown_and_filtered_in_whole_units() {
+    let (app, _views) = app_with("UTC", "USD").await;
+    // SO-003's total is 30,000 cents: $300.00.
+    let html = app.get("/orders?q.number=SO-003").await.text();
+    assert!(html.contains(">300.00<"), "{html}");
+    assert!(!html.contains("30,000"), "{html}");
+    // Range filters take dollars: 120 to 300 is SO-002 (12,000) and SO-003.
+    assert_eq!(
+        rows(&app, "min.total=120&max.total=300").await,
+        ["SO-003", "SO-002"]
+    );
+    assert_eq!(
+        rows(&app, "min.total=299.99&max.total=300").await,
+        ["SO-003"]
+    );
+    // The advanced filter too.
+    assert_eq!(
+        rows(&app, "r.0.c=total&r.0.o=gte&r.0.v=450").await,
+        ["XX-105"]
+    );
+    // Exports: CSV keeps the decimals, print uses the separators.
+    let csv = app.get("/exports?q.number=XX-105&export=csv").await.text();
+    assert!(
+        csv.contains("XX-105,Paid,Yes,Online,450.00,2026-03-31"),
+        "{csv}"
+    );
+    app.get("/exports?q.number=XX-105&export=print")
+        .await
+        .assert_see(r#"<td class="num">450.00</td>"#);
 }
 
 async fn rows(app: &TestApp, query: &str) -> Vec<String> {

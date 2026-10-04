@@ -145,6 +145,21 @@ struct Table<'a> {
 }
 
 impl Table<'_> {
+    /// A number as the grid shows it, with its decimals: money is divided
+    /// from the smallest unit into whole units of `APP_CURRENCY`.
+    fn figure(&self, column: &Column, n: f64) -> (f64, Option<u32>) {
+        match column.kind {
+            Kind::Money => {
+                let decimals = self.request.money_decimals;
+                (
+                    n / 10f64.powi(decimals as i32),
+                    Some(column.decimals.map_or(decimals, u32::from)),
+                )
+            }
+            _ => (n, column.decimals.map(u32::from)),
+        }
+    }
+
     fn yes_no(&self, yes: bool) -> String {
         let key = if yes { "ui.grid.yes" } else { "ui.grid.no" };
         match &self.request.lang {
@@ -176,8 +191,8 @@ impl Table<'_> {
             Some(Value::Number(n)) if column.kind == Kind::Bool => {
                 self.yes_no(n.as_i64() != Some(0))
             }
-            Some(Value::Number(n)) => match (column.decimals, n.as_f64()) {
-                (Some(d), Some(f)) => format!("{f:.*}", usize::from(d)),
+            Some(Value::Number(n)) => match n.as_f64().map(|f| self.figure(column, f)) {
+                Some((f, Some(d))) => format!("{f:.*}", d as usize),
                 _ => n.to_string(),
             },
             Some(Value::String(s)) => match column.kind {
@@ -203,7 +218,8 @@ impl Table<'_> {
                     .lang
                     .as_ref()
                     .map_or("en", |l| l.locale.as_str());
-                crate::view_filters::format_number(n, column.decimals.map_or(0, u32::from), locale)
+                let (n, decimals) = self.figure(column, n);
+                crate::view_filters::format_number(n, decimals.unwrap_or(0), locale)
             }
             _ => self.text(column, value),
         }
@@ -312,7 +328,12 @@ fn xlsx(table: &Table<'_>, name: &str) -> Result<Response> {
             }
         }
     }
-    let money = Format::new().set_num_format("#,##0");
+    let decimals = table.request.money_decimals as usize;
+    let money = Format::new().set_num_format(if decimals == 0 {
+        "#,##0".to_owned()
+    } else {
+        format!("#,##0.{}", "0".repeat(decimals))
+    });
     let date = Format::new().set_num_format("yyyy-mm-dd");
     let moment = Format::new().set_num_format("yyyy-mm-dd hh:mm");
     for (i, row) in table.rows.iter().enumerate() {
@@ -325,7 +346,10 @@ fn xlsx(table: &Table<'_>, name: &str) -> Result<Response> {
                 (Kind::Number | Kind::Money, Some(Value::Number(n))) => {
                     let n = n.as_f64().unwrap_or_default();
                     match (column.kind, column.decimals) {
-                        (Kind::Money, _) => sheet.write_number_with_format(r, c, n, &money),
+                        (Kind::Money, _) => {
+                            let (n, _) = table.figure(column, n);
+                            sheet.write_number_with_format(r, c, n, &money)
+                        }
                         (_, Some(d)) if d > 0 => sheet.write_number_with_format(
                             r,
                             c,
