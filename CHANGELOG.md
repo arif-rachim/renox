@@ -10,6 +10,11 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Fixed (#128):** a kit `card` stretched to its row's height (two cards side by side in a
+  grid, one longer than the other) put the extra space between its title and its body, so
+  the shorter card's body sat lower than its neighbour's. `.rx-card` now has
+  `align-content: start`: the card keeps its own spacing and the extra height stays below.
+
 ## 1.0.0-rc.2 · 2026-10-04
 
 The second release candidate: the same API as rc.1, with `rnx` fixed so a new app passes
