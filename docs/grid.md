@@ -1,10 +1,21 @@
 # Data grids
 
-`renox::grid` is a table for dashboards and back offices. It fills its container: only the rows
-scroll, while the toolbar and the pagination stay in place, on a phone too. Each heading has a
-filter that suits its column. Pages, sorting and filters are handled on the server and kept in
-the URL, so a filtered page has a link of its own. examples/grid is a sales dashboard built
-on it. This guide covers:
+A data grid is a table of records (orders, customers, products…) that people can sort, filter,
+search, edit and export. `renox::grid` gives you one, ready to drop into a dashboard or a back
+office (the pages where staff manage the business).
+
+Here is what it does for you:
+
+- It fills the space around it. Only the rows scroll; the toolbar on top and the page buttons
+  at the bottom stay put, on a phone too.
+- Each column heading has a filter that fits the column: a text box for names, a date range for
+  dates, and so on.
+- The server does the paging, sorting and filtering, and keeps them in the page's address
+  (the URL). So a filtered page has a link of its own that you can bookmark or send.
+
+`examples/grid` in the repository is a sales dashboard built on it.
+
+### In this guide
 
 - defining a grid, the handler and the template;
 - the kinds of columns and what they show;
@@ -17,11 +28,31 @@ on it. This guide covers:
 - several grids on one page, the query string, translations;
 - how it maps to Laravel and Filament.
 
+### Words you'll meet
+
+| Word | What it means |
+|---|---|
+| **handler** | The Rust function that runs when someone opens a page, and returns the page. |
+| **template** | An HTML file with blanks that the app fills in. The grid is drawn by one. |
+| **macro** | A reusable piece of template, called like a function: `grid(orders)`. |
+| **extractor** | A handler argument that Renox fills in from the request, like `GridRequest`. |
+| **query** | A database question built in Rust, like `Order::query()` ("all orders"). |
+| **query string** | The part of a URL after `?`, like `?page=2&sort=-total`. The grid keeps its state there. |
+| **model** | A Rust struct that matches a database table: one value = one row. |
+| **toast** | A small message that pops up in a corner of the page, like "Order saved." |
+| **chip** | A small rounded label. The grid shows one per active filter, with a × to remove it. |
+
+> [!NOTE]
+> **Coming from Laravel:** the grid plays the part of Filament's tables. The last section,
+> [Coming from Laravel and Filament](#coming-from-laravel-and-filament), maps one to the other.
+
 ## Defining a grid
 
-A grid is a `Grid` value: an id, columns and options. Building one is cheap, so a function that
-returns it is the usual place for one. The handler, the export and the bulk actions can all
-call that function.
+A grid is a `Grid` value. It has three parts: an id, a list of columns, and some options.
+
+Building a `Grid` is cheap, so the usual place for one is a small function that returns it.
+Then the page's handler, the export and the bulk actions can all call that same function and
+get the same grid.
 
 ```rust
 # use renox::prelude::*;
@@ -30,6 +61,7 @@ use renox::grid::{Column, Grid, GridRequest};
 # struct Order { id: i64, number: String, customer: String, status: String, total: i64,
 #     ordered_on: renox::chrono::NaiveDate, trend: renox::db::Json<Vec<i64>> }
 
+/// The orders grid: its id, its columns and how it's sorted at first.
 fn orders_grid() -> Grid {
     Grid::new("orders")
         .title("Orders")
@@ -43,7 +75,10 @@ fn orders_grid() -> Grid {
         .sort_by("-ordered_on")
 }
 
+/// The page that shows the grid.
 async fn index(request: GridRequest) -> Result<View> {
+    // Get one page of orders, with the filters and sort from the URL applied.
+    // Then add an `up` value to each row: did the trend go up this week?
     let page = orders_grid()
         .page(Order::query(), &request)
         .await?
@@ -52,35 +87,57 @@ async fn index(request: GridRequest) -> Result<View> {
 }
 ```
 
-- `Grid::new(id)`: the id may only have letters, digits, `_` and `-` (at most 64). It keys each
-  user's column choices and the element's id (`grid-orders`). `page` returns an error for any
-  other id.
+What's going on:
+
+- `orders_grid()` lists the columns, left to right. Each column gets a key (the model's field,
+  like `"number"`) and a heading label (like `"Order"`).
+- `index` is the handler. It asks the grid for one page of orders and hands it to the template.
+- The calls after each column (`.frozen()`, `.mobile()`, `.under(…)`) are column options. They
+  are explained in [Columns](#columns).
+
+The grid's own options:
+
+- `Grid::new(id)` names the grid. The id may only have letters, digits, `_` and `-`, and at
+  most 64 of them. It is used to store each user's column choices, and for the HTML element's
+  id (`grid-orders`). With any other id, `page` returns an error.
 - `.title("Orders")` puts a heading above the grid, next to the row count.
-- `.per_page(n)` sets the rows per page before the user picks a size (default 25, clamped to
-  1–500). The page-size menu offers 10, 25, 50 and 100, plus `n`.
-- `.sort_by("-ordered_on")` sets the order before the user sorts: a column key, with `-` in
-  front for descending, or several keys separated by commas (`"region,city,-total"`). Ties are
-  always broken by `id`.
-- `grid.id()` and `grid.columns()` read the definition back. `column.key()` and `column.kind()`
-  (a `Kind`) do the same for a column.
+- `.per_page(n)` sets how many rows a page has before the user picks a size. The default is 25,
+  and `n` is kept between 1 and 500. The page-size menu offers 10, 25, 50 and 100, plus `n`.
+- `.sort_by("-ordered_on")` sets the order before the user sorts. Give a column key, with `-` in
+  front for descending (biggest or newest first). You can give several keys, separated by
+  commas: `"region,city,-total"`. When two rows tie, `id` always decides.
+- `grid.id()` and `grid.columns()` read the definition back. For one column, `column.key()` and
+  `column.kind()` (a `Kind`) do the same.
 
 ## The handler
 
-`GridRequest` is an extractor. It holds the query string, the session, the logged-in user
-(for their column choices) and the database. `grid.page(query, &request)` applies the
-request's filters, search, sort and page to `query` and returns a `GridPage`, which you pass
-to the view as it is. Any `Query` works as the starting point, so the grid shows only what
-the query allows (`Order::query().where_eq("team_id", team)`, or a default scope).
+`GridRequest` is an extractor: put it in your handler's arguments and Renox fills it in. It
+holds what the grid needs from the request:
 
-- `page.extend(|order| json!({ … }))` adds values to each row that aren't columns of the model,
-  such as a chart's points or a link. The values must be an object, and its keys join the row's.
-  `custom` columns read them.
-- `page.items()` returns the models on the page, and `page.total()` the number of rows that
-  match the filters across all pages.
-- `grid.filter(query, &request)` returns the same filters and sort as a `Query`, for totals or
-  your own export over every filtered row.
-- `GridRequest::new(&db, path, &params)` builds a request for tests and commands (a guest,
-  UTC). `request.param("export")` reads one query string value.
+- the query string (the filters, sort and page the user picked);
+- the session (where a guest's choices are kept);
+- the logged-in user (for their column choices);
+- the database.
+
+`grid.page(query, &request)` does the work. It takes your `query`, applies the request's
+filters, search, sort and page to it, and returns a `GridPage`. Pass the `GridPage` to the
+view as it is.
+
+Any `Query` works as the starting point. The grid only ever shows what that query allows. For
+example, `Order::query().where_eq("team_id", team)` shows only one team's orders, and a model's
+default scope applies too.
+
+What else you can do with the page and the grid:
+
+- `page.extend(|order| json!({ … }))` adds values to each row that aren't columns of the
+  model, such as a chart's points or a link. The values must be a JSON object; its keys are
+  added to the row's own. `custom` columns read them.
+- `page.items()` returns the models on this page. `page.total()` returns how many rows match
+  the filters, across all pages.
+- `grid.filter(query, &request)` returns a `Query` with the same filters and sort, but without
+  the paging. Use it for totals, or for your own export over every filtered row.
+- `GridRequest::new(&db, path, &params)` builds a request by hand, for tests and commands. It
+  acts as a guest, in UTC. `request.param("export")` reads one value from the query string.
 
 ```rust
 # use renox::prelude::*;
@@ -90,20 +147,31 @@ use renox::grid::{Column, Grid, GridRequest};
 #     Grid::new("orders").column(Column::select("status", "Status", [("new", "New"), ("paid", "Paid")]))
 # }
 # async fn demo(db: Db) -> Result {
+// A request as if the URL were /orders?in.status=paid&sort=-id
 let request = GridRequest::new(&db, "/orders", &[("in.status", "paid"), ("sort", "-id")]);
 let page = orders_grid().page(Order::query(), &request).await?;
 println!("{} of {} paid orders on this page", page.items().len(), page.total());
+// The same filter as a plain query: count every paid order, not just one page.
 let paid = orders_grid().filter(Order::query(), &request).count(&db).await?;
 # let _ = paid;
 # Ok(())
 # }
 ```
 
+What's going on: we build a request that filters on status "paid" and sorts by newest id. Then
+we get one page of matching orders, and finally count all of them with `filter`.
+
 ## The template
 
-The `grid` macro of `renox/grid.html` draws a page. A call block draws the `custom` columns:
-it gets the row (the model's fields, the related values and what `extend` added) and the
-column.
+The template draws the grid with the `grid` macro from `renox/grid.html`.
+
+Most columns draw themselves. `custom` columns are different: you draw them, in a **call
+block** (`{% call … %} … {% endcall %}`). The grid runs the call block once for each custom
+cell, and gives it two things:
+
+- `row`: the row's values (the model's fields, the values from related tables, and what
+  `extend` added);
+- `column`: the column being drawn (`column.key` tells you which one).
 
 ```html
 {% from "renox/grid.html" import grid %}
@@ -116,32 +184,50 @@ column.
 </main>
 ```
 
+What's going on: for the `trend` column, the block draws a small chart, colored by whether the
+trend went up. For the `actions` column, it draws an "Open" button that links to the order.
+
+More about the template:
+
 - Without a call block, `custom` columns stay empty: `{{ grid(orders) }}`.
-- `grid(page, tools=…)` puts your own HTML in the toolbar, next to the grid's own buttons, for
-  example a "New" button. Capture it with a block `set`, so it isn't escaped:
+- `grid(page, tools=…)` puts your own HTML in the toolbar, next to the grid's own buttons. A
+  "New" button is a common example. Capture the HTML with a block `set`, so it isn't escaped
+  (shown as text instead of HTML):
 
   ```html
   {% set new_order %}{{ link_button(route('orders.create'), "New order", variant="primary", size="small") }}{% endset %}
   {% call(row, column) grid(orders, tools=new_order) %}…{% endcall %}
   ```
 
-- The call block is also asked for two special keys. `column.key == "_details"` is the row's
-  details (see [Row details](#row-details)). `column.key == "_empty"` gives the buttons under
-  an empty grid's message (see [Empty grids](#empty-grids)).
-- The macro adds the grid's stylesheet and script itself (`renox_grid()`). The layout should
-  have `{{ renox_ui() }}` (the grid uses the kit's buttons) and `{{ toasts() }}` (for actions
-  and edits that answer with a `Toast`).
-- The grid needs the element around it to have a height. Put `rx-page--fill` on `<body>` (the
-  page as tall as the screen, its `<main>` taking the rest under the kit's `navbar`) and
-  `rx-grid-fill` on the `<main>`, as examples/grid does.
-- `{{ sparkline(values) }}` draws a small chart as inline SVG: a line, or bars with
-  `kind="bars"`. `width` and `height` are in pixels (96 × 28 by default), and `label` is what
-  screen readers hear (by default "first → last"). It uses the text color, so `rx-up` or
-  `rx-down` around it colors it.
+- The call block is also asked for two special keys:
+  - `column.key == "_details"` is the row's details (see [Row details](#row-details)).
+  - `column.key == "_empty"` gives the buttons under an empty grid's message (see
+    [Empty grids](#empty-grids)).
+- The macro adds the grid's stylesheet and script itself (`renox_grid()`). Your layout (the
+  frame around every page) should have:
+  - `{{ renox_ui() }}`, because the grid uses the UI kit's buttons;
+  - `{{ toasts() }}`, for actions and edits that answer with a `Toast`.
+
+> [!IMPORTANT]
+> The grid needs the element around it to have a height, or it has nothing to fill. Put
+> `rx-page--fill` on `<body>` (this makes the page as tall as the screen, with its `<main>`
+> taking the rest under the kit's `navbar`) and `rx-grid-fill` on the `<main>`, as
+> examples/grid does.
+
+### Sparklines
+
+`{{ sparkline(values) }}` draws a small chart as inline SVG (a picture made of HTML-like tags,
+right in the page):
+
+- It draws a line, or bars with `kind="bars"`.
+- `width` and `height` are in pixels (96 × 28 by default).
+- `label` is what screen readers say out loud (by default "first → last").
+- It uses the text color, so wrapping it in `rx-up` or `rx-down` colors it.
 
 ## Columns
 
-Each constructor takes the model's column key and the heading's label.
+Each column constructor takes two things: the model's column key, and the heading's label.
+The kind of column decides how values look and which filter the heading gets.
 
 | Column | Shows | Heading filter |
 |---|---|---|
@@ -155,52 +241,70 @@ Each constructor takes the model's column key and the heading's label.
 | `color` | a swatch of the CSS color, with its code | like text |
 | `custom` | whatever the call block draws | none |
 
-`options` are `(value, label)` pairs. Text filters ignore case. Every column kind except
-`tags`, `image` and `custom` can be sorted by clicking its heading.
+A few things to know about the table:
 
-What every column takes:
+- `options` are `(value, label)` pairs: the value stored in the database, and the text people
+  see. For example `("paid", "Paid")`.
+- Text filters ignore case: "cof" finds "Coffee".
+- Every column kind except `tags`, `image` and `custom` can be sorted by clicking its heading.
+- "Smallest unit" for `money` means a whole number of, say, cents. The grid shows that number
+  as it is, with thousands separators and no currency symbol.
+
+### Options every column takes
 
 - `.sortable(false)` and `.filterable(false)` turn off the heading's sort or filter. `custom`
   columns never have either.
-- `.mobile()` shows the column on phones (under 768 px) until the user picks otherwise. When no
-  column has it, the first three visible columns show. `.hidden()` hides the column on wide
-  screens too, until the user turns it on.
+- `.mobile()` shows the column on phones (screens under 768 px wide) until the user picks
+  otherwise. When no column has it, the first three visible columns show. `.hidden()` hides the
+  column on wide screens too, until the user turns it on.
 - `.frozen()` and `.frozen_right()` keep the column at the left or right edge while the grid
-  scrolls sideways (a column of actions on the right, for example).
-- `.under(["Amounts"])` puts the column under a grouped heading. Headings can nest
-  (`.under(["Sales", "Q1"])`). Neighbouring columns under the same headings share them, and a
-  grouped heading never spans a frozen edge.
+  scrolls sideways. A column of actions on the right is a typical use.
+- `.under(["Amounts"])` puts the column under a grouped heading: one wider heading above
+  several columns. Headings can nest (`.under(["Sales", "Q1"])`). Neighbouring columns under the
+  same headings share them. A grouped heading never spans a frozen edge.
 - `.width("14rem")` gives a minimum width in CSS units. `.decimals(n)` shows a number with
   exactly `n` decimals.
 - `.badges(&[("paid", "success"), ("cancelled", "danger")])` shows `text`, `select` and `tags`
-  values as badges. The tones are `success`, `warning`, `danger`, `info` and `neutral`. Values
-  not listed get a neutral badge, and `.badges(&[])` makes every value a neutral badge.
-- `.description("email")` shows another of the row's values in small type under this one, and
-  `.tooltip("email")` shows it on hover.
-- `.wrap()` lets long text wrap instead of widening the column. `.limit(40)` cuts text with `…`
-  (the whole text shows on hover).
-- `.link("/orders/{id}")` makes the value a link (`{id}` is the row's id). `.copyable()` adds a
-  copy button.
+  values as badges (small colored labels). The tones are `success`, `warning`, `danger`,
+  `info` and `neutral`. Values not listed get a neutral badge, and `.badges(&[])` makes every
+  value a neutral badge.
+- `.description("email")` shows another of the row's values in small type under this one.
+  `.tooltip("email")` shows it when the mouse rests on the cell instead.
+- `.wrap()` lets long text wrap onto more lines instead of widening the column. `.limit(40)`
+  cuts text after 40 characters with `…` (the whole text shows on hover).
+- `.link("/orders/{id}")` makes the value a link (`{id}` becomes the row's id). `.copyable()`
+  adds a copy button.
 - `.searchable()`, `.editable()`, `.merge()` and `.summary(…)` are covered below.
 
 ## Filters, search and chips
 
-Each filterable heading opens a filter that suits its kind (the table above). All filters must
-hold at once. On top of them:
+Each filterable heading opens a filter that suits its kind (see the table above). When several
+filters are set, a row must pass all of them to show.
 
-- **Search.** Columns marked `.searchable()` put a search box in the toolbar. Every word typed
-  must appear in one of those columns (as text, in any case). The grid searches as you type.
+On top of the heading filters, there are:
+
+- **Search.** If any columns are marked `.searchable()`, a search box appears in the toolbar.
+  Every word typed must appear in one of those columns (as text, upper or lower case). The grid
+  searches as you type.
 - **Chips.** The active filters, the advanced filter's rules and the search show as chips under
   the toolbar. × clears one, and "Clear filters" clears them all.
-- **Only the grid's columns count.** The server reads only names that belong to the grid's
-  filterable columns and their kind (and the query builder checks column names again).
-  Anything else in the query string is ignored, not an error.
+
+> [!NOTE]
+> **Only the grid's columns count.** The server reads only names that belong to the grid's
+> filterable columns, and only the filters that fit each column's kind. (The query builder
+> also checks column names again.) Anything else in the query string is ignored, not an error.
+> So a user can't filter on a column you didn't put in the grid.
 
 ### The advanced filter
 
-`.advanced_filter()` adds a button to the toolbar that opens a list of rules. Each rule is a
-column, a condition that fits the column's kind, and a value. The rows must match all of the
-rules, or any of them.
+Heading filters are always "this AND that". For anything more, `.advanced_filter()` adds a
+button to the toolbar. It opens a list of **rules**. Each rule has three parts:
+
+1. a column;
+2. a condition that fits the column's kind (like "greater than" for a number);
+3. a value.
+
+The rows must match **all** of the rules, or **any** of them: the user picks.
 
 | Column kind | Conditions (`r.N.o`) |
 |---|---|
@@ -210,40 +314,72 @@ rules, or any of them.
 | bool | `is_true`, `is_false` |
 | select | `is`, `is_not`, `empty`, `not_empty` |
 
-The rules live in the query string, as `match=any&r.0.c=total&r.0.o=gt&r.0.v=1000`, and apply
-together with the headings' filters. There are at most 20 rules. A rule on an unknown column,
-with a condition its kind doesn't have, or with a value that doesn't fit (a number that isn't
-one) is dropped.
+(`eq` is "equals", `ne` "not equal", `gt` "greater than", `gte` "greater than or equal",
+`lt` "less than", `lte` "less than or equal".)
+
+The rules live in the query string, like this: `match=any&r.0.c=total&r.0.o=gt&r.0.v=1000`
+("any rule may match; rule 0: column `total`, condition `gt`, value 1000"). They apply together
+with the headings' filters.
+
+There are at most 20 rules. A rule is dropped (left out quietly) when:
+
+- its column is unknown;
+- its condition doesn't exist for that column's kind;
+- its value doesn't fit (for example, a number that isn't one).
 
 ## Sorting and pages
 
-A click on a sortable heading sorts by it ascending, a second click descending, and a third
-returns to the grid's own order. `sort=-total`
-in the query string sorts descending. Any sortable column is accepted, and so is `id` (`sort=id`
-or `sort=-id`). Empty values sort last in either direction, on SQLite and PostgreSQL alike.
-The pagination at the bottom has the page-size menu.
+Click a sortable heading to sort by it:
+
+- first click: ascending (smallest or oldest first);
+- second click: descending;
+- third click: back to the grid's own order.
+
+In the query string, `sort=-total` sorts by `total`, descending. Any sortable column is accepted,
+and so is `id` (`sort=id` or `sort=-id`).
+
+Empty values sort last in either direction, on SQLite and PostgreSQL alike.
+
+The page buttons at the bottom also have the page-size menu.
 
 ## The user's choices
 
-The column menu (top right) shows and hides columns for the current screen size, moves them,
-and freezes them at the left or right edge. With a mouse, a heading can also be dragged to move
-its column. Dragging a heading's edge resizes the column, a double-click on the edge restores
-the automatic width, and the arrow keys resize it once the edge has focus. "Reset columns"
+Each user can arrange the grid the way they like. The column menu (top right) can:
+
+- show and hide columns, for the current screen size;
+- move columns;
+- freeze them at the left or right edge.
+
+With a mouse, people can also:
+
+- drag a heading to move its column;
+- drag a heading's edge to resize the column;
+- double-click the edge to get the automatic width back.
+
+Once a heading's edge has keyboard focus, the arrow keys resize the column. "Reset columns"
 returns to the grid's defaults.
 
-- A logged-in user's choices are kept in `grid_preferences` (every app has the table), and a
-  guest's in the session.
+Where the choices are kept:
+
+- A logged-in user's choices are kept in the `grid_preferences` table (every app has it). A
+  guest's are kept in the session.
 - The page saves them with `POST /_renox/grid/{grid}/prefs` (a JSON `GridPrefs`).
-  `DELETE /_renox/grid/{grid}/prefs` forgets them (what "Reset columns" does).
-- `GridPrefs` has `order`, `left`, `right` (frozen columns), `compact` and `wide` (the columns
-  shown under and over 768 px) and `widths` (CSS pixels, 40 to 2000). `None` means the grid's
-  default. `grid::save_prefs` writes them for a user, for example as a seeder's default:
+  `DELETE /_renox/grid/{grid}/prefs` forgets them; that's what "Reset columns" does.
+- `GridPrefs` has these fields. `None` in any of them means "use the grid's default".
+  - `order`: the column order;
+  - `left`, `right`: the columns frozen at each edge;
+  - `compact` and `wide`: the columns shown under and over 768 px;
+  - `widths`: column widths in CSS pixels, 40 to 2000.
+
+`grid::save_prefs` writes them for a user. For example, a seeder (code that fills the database
+with starting data) can give a user a default set of columns:
 
 ```rust
 # use renox::prelude::*;
 use renox::grid::{self, GridPrefs};
 # async fn demo(db: Db, user_id: i64) -> Result {
 let mut prefs = GridPrefs::default();
+// On wide screens, show only these three columns.
 prefs.wide = Some(vec!["number".into(), "customer".into(), "total".into()]);
 grid::save_prefs(&db, user_id, "orders", &prefs).await?;
 # Ok(())
@@ -252,17 +388,28 @@ grid::save_prefs(&db, user_id, "orders", &prefs).await?;
 
 ### Remembering filters
 
-`.remember()` keeps the filters, the search, the sort, the grouping and the page size in the
-session, so coming back to the page shows the grid as the user left it (and a cleared filter
-stays cleared). The grid's form then sends `state=1`. A request with `state` saves its values,
-and a request without it uses the saved ones. A link into a remembered grid that carries its
-own filters should therefore include `state=1`.
+By default, leaving the page and coming back starts the grid fresh. `.remember()` changes that.
+It keeps the filters, the search, the sort, the grouping and the page size in the session. So
+coming back shows the grid as the user left it (and a filter they cleared stays cleared).
+
+How it works:
+
+- The grid's form then sends `state=1`.
+- A request **with** `state` saves its values.
+- A request **without** it uses the saved ones.
+
+> [!TIP]
+> A link into a remembered grid that carries its own filters should include `state=1`.
+> Without it, the grid uses the remembered values (when there are any) instead of the link's.
 
 ## Row details
+
+A row can do something when it's clicked: open a page, or open a details panel under it.
 
 ```rust
 # use renox::prelude::*;
 use renox::grid::{Column, Grid};
+/// A grid whose rows open a details panel when clicked.
 fn orders_grid() -> Grid {
     Grid::new("orders")
         .column(Column::text("number", "Order"))
@@ -272,15 +419,20 @@ fn orders_grid() -> Grid {
 }
 ```
 
-- `.row_url("/orders/{id}")` makes a click on a row (outside its buttons and links) open the
-  URL. Ctrl/Cmd-click opens it in a new tab, and Enter opens a focused row.
-- `.audit()` makes a click on a row (or the chevron in the row tools) open a row under it with
-  the audit values the row has: `created_by`, `created_at`, `updated_by` and `updated_at`.
-- `.details()` adds what the call block draws for `column.key == "_details"`, after the audit
-  values when there are any.
-- With details, a click on the row opens them, and `row_url` becomes a link in the row tools.
+- `.row_url("/orders/{id}")` makes a click on a row (anywhere outside its buttons and links)
+  open that URL. Ctrl-click (Cmd-click on a Mac) opens it in a new tab, and Enter opens the row
+  that has keyboard focus.
+- `.audit()` makes a click on a row (or on the chevron in the row tools) open a panel under it.
+  The panel shows the row's audit values (who changed it, and when), if it has them:
+  `created_by`, `created_at`, `updated_by` and `updated_at`.
+- `.details()` adds to that panel whatever the call block draws for
+  `column.key == "_details"`, after the audit values when there are any.
+- With details on, a click on the row opens the details, and `row_url` becomes a link in the
+  row tools instead.
 
 ## Editing in place
+
+Editing in place means changing a value right in the grid, without opening a form page.
 
 ```rust
 # use renox::prelude::*;
@@ -288,6 +440,7 @@ use renox::Toast;
 use renox::grid::{Column, Grid};
 # #[derive(Model, serde::Serialize, Default)] struct Order { id: i64, customer: String, items: i64 }
 
+/// A grid with two editable columns, saved through `edit_url`.
 fn orders_grid() -> Grid {
     Grid::new("orders")
         .column(Column::text("customer", "Name").editable())
@@ -304,8 +457,10 @@ struct OrderEdit {
     items: Option<i64>,
 }
 
+/// Saves an edit from the grid. Renox checks the rules first (`Valid`).
 async fn update(State(db): State<Db>, Path(id): Path<i64>, Valid(edit): Valid<OrderEdit>) -> Result<Toast> {
     let mut order = Order::find_or_404(&db, id).await?;
+    // Change only the fields that were sent; leave the others alone.
     if let Some(customer) = edit.customer {
         order.customer = customer;
     }
@@ -313,48 +468,72 @@ async fn update(State(db): State<Db>, Path(id): Path<i64>, Valid(edit): Valid<Or
         order.items = items;
     }
     order.save(&db).await?;
+    // The grid shows this message and reloads its page.
     Ok(Toast::success("Order saved."))
 }
 ```
 
-- An editable cell opens an editor for its kind on a double-click, Enter or F2. Enter, or
-  leaving the cell, saves; Escape cancels.
+What's going on: two columns are marked `.editable()`, and `.edit_url(…)` says where to send
+changes. The `update` handler receives only the fields that changed, checks them, saves the
+order and answers with a toast.
+
+How people edit:
+
+- Double-click an editable cell, or press Enter or F2 on it, to open an editor that suits its
+  kind. Enter, or leaving the cell, saves. Escape cancels.
 - The pencil in the row tools edits all of the row's editable cells at once (✓ saves, ✕
   cancels).
+
+What gets sent:
+
 - Saving sends `PATCH {edit_url}` with only the edited fields, as a form (`customer=…`,
-  `tags=a&tags=b`, `paid=true`). A 2xx answer (a `Toast` shows) reloads the grid's page. A 422
-  from `Valid<T>` shows the errors in the cells.
-- Cells are editable only when the grid has an `edit_url`. `custom` and merged columns can't be
-  edited.
+  `tags=a&tags=b`, `paid=true`).
+- A 2xx answer (a success; its `Toast` shows) reloads the grid's page.
+- A 422 answer from `Valid<T>` (the rules failed) shows the errors in the cells.
+
+> [!WARNING]
+> Cells are editable only when the grid has an `edit_url`. `custom` and merged columns can't be
+> edited.
 
 ## Row order
 
-`.reorder("position", "/orders/reorder")` lets rows be put in order while the grid is sorted
-by that column ascending (`sort=position`). The handle in the row tools drags a row, with a
-mouse or by touch, and the arrow keys move it. The page's new order is posted as
-`ids=4,2,9&offset=25`, which `RowOrder::save` writes in one transaction (`updated_at` is left
-alone). When the grid is sorted any other way, or grouped, the handle is off.
+Sometimes rows have an order that people set by hand, kept in a number column such as
+`position`. `.reorder("position", "/orders/reorder")` lets people drag rows into order.
+
+- It works while the grid is sorted by that column, ascending (`sort=position`). When the grid
+  is sorted any other way, or grouped, the drag handle is off.
+- The handle in the row tools drags a row, with a mouse or by touch. The arrow keys move it too.
+- The page's new order is posted to the URL as `ids=4,2,9&offset=25`.
+- `RowOrder::save` writes it in one transaction (all at once, or not at all). It leaves
+  `updated_at` alone.
 
 ```rust
 # use renox::prelude::*;
 use renox::grid::RowOrder;
 # #[derive(Model, serde::Serialize, Default)] struct Order { id: i64, position: i64 }
+/// Receives the new order of a page of rows and saves it in `position`.
 async fn reorder(State(db): State<Db>, Form(order): Form<RowOrder>) -> Result<StatusCode> {
     order.save::<Order>(&db, "position").await?;
+    // 204 No Content: it worked, and there's nothing to send back.
     Ok(StatusCode::NO_CONTENT)
 }
 ```
 
 ## Merged cells
 
-`.merge()` on a column draws one cell for neighbouring rows with the same value. Merged columns
-nest from left to right: a column merges only within the groups of the merged columns before
-it (Region, then City). Sort by them, as in `sort_by("region,city")`. Merging is off while rows
-can be dragged and while rows are grouped, and merged columns aren't editable.
+`.merge()` on a column draws one tall cell for neighbouring rows that have the same value. For
+example, ten orders from "North" in a row show "North" once.
+
+- Merged columns nest from left to right: a column merges only inside the groups of the merged
+  columns before it (Region, then City).
+- Sort by them, as in `sort_by("region,city")`, so equal values sit next to each other.
+- Merging is off while rows can be dragged and while rows are grouped.
+- Merged columns aren't editable.
 
 ```rust
 # use renox::prelude::*;
 use renox::grid::{Column, Grid};
+/// Orders by region and city, with equal regions and cities merged.
 fn regions_grid() -> Grid {
     Grid::new("regions")
         .column(Column::text("region", "Region").merge()) // equal neighbours share a cell...
@@ -366,12 +545,18 @@ fn regions_grid() -> Grid {
 
 ## Actions and selection
 
+Actions are buttons that do something to rows: mark them paid, delete them, and so on.
+
+- A **row action** works on one row. It lives in the row's ⋯ menu.
+- A **bulk action** works on all the rows the user has selected with checkboxes.
+
 ```rust
 # use renox::prelude::*;
 use renox::Toast;
 use renox::grid::{Action, Column, Grid, GridRequest, Selection};
 # #[derive(Model, serde::Serialize, Default)] struct Order { id: i64, status: String }
 
+/// A grid with two bulk actions and two actions in each row's menu.
 fn orders_grid() -> Grid {
     Grid::new("orders")
         .column(Column::text("status", "Status"))
@@ -381,7 +566,9 @@ fn orders_grid() -> Grid {
         .row_action(Action::new("Delete", "/orders/{id}").method("DELETE").confirm("Delete this order?").danger())
 }
 
+/// The "Mark paid" bulk action: sets the status of every selected order.
 async fn mark_paid(State(db): State<Db>, request: GridRequest, Form(selection): Form<Selection>) -> Result<Toast> {
+    // `selected` gives a query for exactly the chosen rows; `update` changes them all.
     let changed = orders_grid()
         .selected(Order::query(), &request, &selection)?
         .update(&db, &[("status", &"paid")])
@@ -390,49 +577,78 @@ async fn mark_paid(State(db): State<Db>, request: GridRequest, Form(selection): 
 }
 ```
 
-- `.bulk_action(…)` puts a checkbox at the start of each row and one for the whole page in the
-  heading. Selecting rows shows the actions over the grid. Once the whole page is selected,
-  "Select all N matching" selects every row the filters match.
-- A bulk action sends `ids=4,7` and `all=true|false` to its URL, with the grid's query string.
-  Read them with `Form<Selection>`. `grid.selected(query, &request, &selection)?` is the query
-  for exactly those rows, or for every row the filters match when `all` is set.
-- `.row_action(…)` puts actions in each row's ⋯ menu. `{id}` in the URL is the row's id.
-- `Action::new(label, url)` sends a request (`POST` unless `.method("PATCH" | "PUT" |
-  "DELETE")` says otherwise). `Action::link(label, url)` is a plain link. `.confirm("…")` asks
-  first in a dialog, and `.danger()` shows the action in red.
+How bulk actions work:
+
+- `.bulk_action(…)` puts a checkbox at the start of each row, and one in the heading for the
+  whole page. Selecting rows shows the actions above the grid.
+- Once the whole page is selected, "Select all N matching" selects every row the filters
+  match, on every page.
+- A bulk action sends `ids=4,7` and `all=true|false` to its URL, along with the grid's query
+  string. Read them with `Form<Selection>`.
+- `grid.selected(query, &request, &selection)?` is the query for exactly those rows. When `all`
+  is set, it's every row the filters match.
+
+How row actions work:
+
+- `.row_action(…)` puts actions in each row's ⋯ menu. `{id}` in the URL becomes the row's id.
+
+What every action can do:
+
+- `Action::new(label, url)` sends a request. It's a `POST` unless `.method("PATCH" | "PUT" |
+  "DELETE")` says otherwise.
+- `Action::link(label, url)` is a plain link.
+- `.confirm("…")` asks first, in a dialog.
+- `.danger()` shows the action in red.
 - After a 2xx answer (a `Toast` shows), the grid reloads its page.
 
 ## Summaries and groups
 
+A **summary** is a figure under a column, like a total. A **group** gathers rows with the same
+value (say, the same region) under a heading of their own.
+
 - `Column::summary(Summary::Sum)` puts a figure in a footer that stays at the bottom of the
-  grid. The figure covers every row the filters match, not just the page. `Sum`, `Average` and
-  `Range` (smallest–largest) are for `number` and `money` columns. `Count` (rows with a value)
-  works on any column. A column can have several (`.summary(Summary::Sum).summary(Summary::Average)`);
-  a summary that doesn't fit its column is ignored.
+  grid. The figure covers every row the filters match, not just the page.
+- `Sum`, `Average` and `Range` (smallest–largest) are for `number` and `money` columns. `Count`
+  (rows with a value) works on any column.
+- A column can have several (`.summary(Summary::Sum).summary(Summary::Average)`). A summary that
+  doesn't fit its column is ignored.
 - `.groups(&["region", "status"])` adds a "Group" choice to the toolbar, and
-  `.group_by("region")` starts grouped. Rows come group by group, each with a heading that
-  shows the value and the row count (a click folds the group), and a subtotal row with the
-  group's own summaries. Group by the model's own columns.
+  `.group_by("region")` starts out grouped.
+- Grouped rows come group by group. Each group has a heading that shows its value and its row
+  count (a click folds the group away), and a subtotal row with the group's own summaries.
+- Group by the model's own columns.
 - Merged cells and dragging rows are off while the grid is grouped.
 
 ## Empty grids
 
-`.empty_state("No orders yet", Some("Orders show up here as customers buy."))` says what goes
-in a grid that has no rows yet. The call block can add buttons for `column.key == "_empty"`. A
-filtered grid with no rows says nothing matches and offers to clear the filters.
+`.empty_state("No orders yet", Some("Orders show up here as customers buy."))` says what to show
+in a grid that has no rows yet: a heading, and an optional line under it.
+
+The call block can add buttons there, for `column.key == "_empty"` (a "New order" button, for
+example).
+
+A grid that is empty because of its filters is different: it says nothing matches, and offers
+to clear the filters.
 
 ## Cards on phones
 
-`.cards_on_mobile()` turns each row into a card under 768 px. A card shows the columns picked
-for small screens as label and value, with the row tools underneath. Sorting and the column
-filters move into the toolbar, since the headings are hidden there. Wider screens keep the
-table.
+Wide tables are hard to read on a small screen. `.cards_on_mobile()` turns each row into a card
+on screens under 768 px wide.
+
+- A card shows the columns picked for small screens, each as a label and a value, with the row
+  tools underneath.
+- The headings are hidden there, so sorting and the column filters move into the toolbar.
+- Wider screens keep the table.
 
 ## Columns from other tables
+
+A column can show data from another table, without you writing a join (SQL that combines
+tables).
 
 ```rust
 # use renox::prelude::*;
 use renox::grid::{Column, Grid};
+/// Orders, plus three columns computed from other tables.
 fn orders_grid() -> Grid {
     Grid::new("orders")
         .column(Column::text("number", "Order"))
@@ -445,27 +661,39 @@ fn orders_grid() -> Grid {
 }
 ```
 
-- `Column::related` shows a value of the row this one belongs to. It behaves like a text
-  column; `.numeric()` makes it a number (filtered with a range).
-- `Column::count_of` counts the rows that point at this one, and `Column::sum_of` adds up one
-  of their columns. Both are number columns.
-- They are SQL subqueries, so they sort, filter, search and take advanced-filter rules like
-  other columns. A page fetches each one in a single query. Table and column names may only
-  have letters, digits and `_`.
-- `.summary(…)` does nothing on these columns (summaries cover only the model's own columns),
-  and they can't be grouped by. `tags` filters also need a column of the model itself.
+What's going on:
+
+- `Column::related` shows a value from the row this one belongs to: here, the tier of the
+  order's customer. It behaves like a text column; `.numeric()` makes it a number column
+  (filtered with a from–to range).
+- `Column::count_of` counts the rows that point at this one: here, the order's notes.
+- `Column::sum_of` adds up one column of those rows: here, the weight of the order's lines.
+  Both `count_of` and `sum_of` are number columns.
+
+Good to know:
+
+- They are SQL subqueries (small queries inside the main one). So they sort, filter, search and
+  take advanced-filter rules like other columns.
+- A page fetches each one in a single query, not one query per row.
+- Table and column names may only have letters, digits and `_`.
+
+> [!WARNING]
+> `.summary(…)` does nothing on these columns (summaries cover only the model's own columns),
+> and they can't be grouped by. `tags` filters also need a column of the model itself.
 
 ## Exports
 
-`.exports()` adds an export menu to the toolbar. The handler answers its links before it draws
-the page:
+`.exports()` adds an export menu to the toolbar. Its links come back to the same handler, with
+`?export=…` in the URL. So the handler checks for an export first, before it draws the page:
 
 ```rust
 # use renox::prelude::*;
 # use renox::grid::{Column, Grid, GridRequest};
 # #[derive(Model, serde::Serialize, Default)] struct Order { id: i64, number: String }
 # fn orders_grid() -> Grid { Grid::new("orders").column(Column::text("number", "Order")).exports() }
+/// The grid's page, which also answers the export menu's links.
 async fn index(request: GridRequest) -> Result<Response> {
+    // If the URL asks for an export, send the file instead of the page.
     if let Some(file) = orders_grid().export(Order::query(), &request).await? {
         return Ok(file); // ?export=csv|xlsx|print
     }
@@ -474,35 +702,56 @@ async fn index(request: GridRequest) -> Result<Response> {
 }
 ```
 
-Each export holds every row the filters match, up to `grid::MAX_EXPORT_ROWS` (100,000), sorted
-as on screen. It has the columns the user shows on wide screens; `custom` columns are left out.
+What goes into an export:
 
-- **CSV**: UTF-8 with a BOM (so Excel reads it), headings like `Amounts / Total`, labels for
-  choices and tags, and numbers without separators. Text that starts with `=`, `+`, `-` or `@`
-  gets a leading `'`, so a spreadsheet doesn't run it as a formula.
-- **Excel** (the `xlsx` feature: `renox = { …, features = ["xlsx"] }`, through
-  `rust_xlsxwriter`): grouped headings merged as on screen, numbers and dates stored as numbers
-  and dates, and the headings and frozen-left columns frozen. Without the feature the menu has
-  no Excel link, and `export=xlsx` is a 400.
-- **Print**: a plain page (headings repeated on every printed page, landscape) with a button to
-  print or save as PDF.
+- every row the filters match (not just the page), up to `grid::MAX_EXPORT_ROWS` (100,000);
+- sorted as on screen;
+- the columns the user shows on wide screens. `custom` columns are left out.
+
+The three formats:
+
+- **CSV** (a plain text file that spreadsheets open):
+  - UTF-8 with a BOM (a few marker bytes at the start, so Excel reads it as UTF-8);
+  - headings like `Amounts / Total` for grouped headings;
+  - labels for choices and tags, and numbers without separators;
+  - text that starts with `=`, `+`, `-` or `@` gets a leading `'`, so a spreadsheet doesn't run
+    it as a formula.
+- **Excel** (needs the `xlsx` feature: `renox = { …, features = ["xlsx"] }`; it uses the
+  `rust_xlsxwriter` crate):
+  - grouped headings merged as on screen;
+  - numbers and dates stored as real numbers and dates;
+  - the headings and the frozen-left columns stay frozen.
+
+  Without the feature, the menu has no Excel link, and `export=xlsx` answers 400 (bad request).
+- **Print**: a plain page with a button to print it or save it as a PDF. It prints landscape,
+  with the headings repeated on every printed page.
 
 ## Polling
 
-`.poll(30)` reloads the grid's page every 30 seconds (at least 5) while the tab is visible and
-nobody is editing, selecting or filtering in it.
+Polling means checking again and again for new data. `.poll(30)` reloads the grid's page every
+30 seconds (the smallest you can set is 5).
+
+It only reloads while the browser tab is visible, and while nobody is editing, selecting or
+filtering in the grid, so it never interrupts the user.
 
 ## Several grids on a page
 
-`.prefix("orders")` puts a prefix on the grid's query string names: `orders.page`,
-`orders.q.number`, and so on. Each grid keeps the page's other query string values (another
-grid's, a tab's) in its own links and forms, so the grids page and filter independently. Give
-each grid its own id as well.
+Two grids on one page would fight over the same names in the query string (both want `page`,
+for example). `.prefix("orders")` fixes that: it puts a prefix on the grid's query string names,
+so they become `orders.page`, `orders.q.number`, and so on.
+
+Each grid also keeps the page's other query string values (another grid's, a tab's) in its own
+links and forms. So the grids page and filter independently.
+
+> [!IMPORTANT]
+> Give each grid its own id as well, not just its own prefix.
 
 ## The query string
 
-Every value below belongs to one grid. With `.prefix("orders")`, each name starts with
-`orders.`.
+This table lists every value the grid reads from the URL. You rarely write them by hand, but
+they're handy for links ("show the paid orders") and for tests.
+
+Every value belongs to one grid. With `.prefix("orders")`, each name starts with `orders.`.
 
 | Name | What it does |
 |---|---|
@@ -525,12 +774,24 @@ Only the grid's columns filter or sort. Anything else is ignored.
 ## Translations
 
 The grid's texts (the toolbar, the filters, the column menu, the advanced filter's conditions,
-the pagination) come in English. An app changes or translates them in `lang/<locale>.json` under
-`ui.grid.*`, for example `ui.grid.columns`, `ui.grid.filter`, `ui.grid.search`,
-`ui.grid.clear_all`, `ui.grid.empty`, `ui.grid.row_word` (`"row|rows"`) or `ui.grid.op.contains`.
+the page buttons) come in English.
+
+To change them, or translate them into another language, add keys under `ui.grid.*` to your
+app's `lang/<locale>.json` (for example `lang/es.json` for Spanish). Some of the keys:
+
+- `ui.grid.columns`, `ui.grid.filter`, `ui.grid.search`;
+- `ui.grid.clear_all`, `ui.grid.empty`;
+- `ui.grid.row_word` (`"row|rows"`: the word for one row, then for several);
+- `ui.grid.op.contains` (the name of a filter condition).
+
 The full list is in `crates/renox-core/src/i18n.rs`.
 
 ## Coming from Laravel and Filament
+
+> [!NOTE]
+> **Coming from Laravel:** Filament is a popular Laravel package for admin pages, and its
+> tables are what Renox's grid is measured against. If you know Filament, this table says what
+> each of its table features is called in Renox. If you don't, you can skip it.
 
 | Filament tables | Renox |
 |---|---|

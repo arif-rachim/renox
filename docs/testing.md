@@ -1,50 +1,121 @@
 # Testing a Renox app
 
-Tests boot the whole app in memory with `TestApp` and talk to it like a browser does: requests
-go through the same router, middleware, sessions and CSRF checks as in production. The database
-is in-memory SQLite, or PostgreSQL when `TEST_DATABASE_URL` is set, and it is migrated for each
-test.
+Tests are small programs that check your app for you. You run them with `cargo test`, and they
+tell you at once if a change broke something, so you don't have to click through every page by
+hand. This guide shows how to write them with `TestApp`.
+
+### In this guide
+
+- a first test: start the app, open a page, check the answer;
+- sending requests and checking responses;
+- changing the settings, and faking outside services;
+- logging in and checking the session;
+- checking the database, and filling it with fake rows;
+- jobs, events, notifications, mail and commands;
+- moving the clock forward;
+- testing in a real browser.
+
+### Words you'll meet
+
+| Word | What it means |
+|---|---|
+| **test** | A function marked `#[renox::test]`. It passes if it runs to the end, and fails if something panics. |
+| **assert** | A check. `assert_ok()` says "the page must have loaded fine"; if it didn't, the test fails with a message. |
+| **request** and **response** | The browser asks for a page (a request); your app answers (a response). |
+| **status** | A number in every response: 200 means OK, 303 a redirect, 404 not found, 422 invalid input. |
+| **middleware** | Code that runs around every request: sessions, login, security checks. |
+| **session** | What the app remembers about one visitor between requests, like who is logged in. |
+| **CSRF token** | A secret code every form must send back, so other sites can't post forms as your users. |
+| **migration** | A SQL file that creates or changes a table. |
+| **fake** | A stand-in that records what your app does (like sending mail) instead of really doing it. |
+| **htmx** | A small script that updates part of a page without a reload. Its requests get some different answers. |
+
+### A first test
+
+`TestApp` starts your whole app inside the test, with no real server and no browser. You then
+talk to it the way a browser does.
+
+Every request goes through the same router (the part that picks a handler for each address),
+the same middleware, sessions and CSRF checks as in production. So a passing test means the real
+app works the same way.
+
+The database is a fresh one for each test: SQLite in memory, or PostgreSQL when
+`TEST_DATABASE_URL` is set. The migrations run on it before the test starts.
 
 ```rust
 use renox::prelude::*;
 use renox::testing::TestApp;
 
+/// The app under test: here just Renox's login pages (the `Auth` module).
 fn app() -> App {
     App::new().module(Auth::new())
 }
 
+/// Guests are sent to the login page; a logged-in member sees their account.
 #[renox::test]
 async fn members_see_their_account() {
+    // Start the app, with a fresh database.
     let app = TestApp::new(app()).await;
+    // Make a user to log in with.
     let user = User::register(app.db(), "Ana", "ana@example.com", "password123").await.unwrap();
+    // Not logged in yet: the account page must redirect to /login.
     app.get("/account").await.assert_redirect("/login");
+    // Log in as Ana, then open the page again.
     app.acting_as(&user);
     app.get("/account").await.assert_ok().assert_see("ana@example.com");
 }
 ```
 
-`rnx make:test checkout` writes a test file to start from. `rnx make:module products --resource`
-writes the tests of a whole resource (create, list, show, edit, update, delete, invalid input).
+What's going on:
+
+- `#[renox::test]` marks the function as a test. Use it instead of `#[tokio::test]`.
+- `TestApp::new(app())` boots the app.
+- `app.get("/account")` opens a page, like typing the address in a browser. It returns the
+  response, and the `assert_…` methods check it.
+- `acting_as(&user)` logs the user in, without filling in the login form.
+
+> [!TIP]
+> You don't have to start from an empty file. `rnx make:test checkout` writes a test file to
+> start from. `rnx make:module products --resource` writes the tests of a whole resource
+> (create, list, show, edit, update, delete, invalid input).
+
+> [!NOTE]
+> **Coming from Laravel:** this is Laravel's feature tests: `$this->get(…)->assertOk()`
+> becomes `app.get(…).await.assert_ok()`, and `actingAs` becomes `acting_as`.
 
 ## Requests and responses
 
+### Sending requests
+
 - **Requests:** `get`, `post(uri, &[(field, value)])`, `put`, `patch`, `delete`, `post_json`,
-  `post_multipart`, `post_body`.
-- **Request options:** `app.htmx()` sends as htmx does; `app.request().header(…)` adds headers,
-  `.json()` asks for JSON (`Accept: application/json`, so a guest gets a 401 and invalid input a
-  422 instead of redirects), and `.without_csrf()` sends without the token. `app.csrf_token()`
-  is the session's token, for a request you build yourself.
+  `post_multipart`, `post_body`. A `post` sends a form: a list of field names and values.
+- **Request options:**
+  - `app.htmx()` sends the request the way htmx does.
+  - `app.request().header(…)` adds headers (extra details sent with a request).
+  - `.json()` asks for JSON (it sends `Accept: application/json`). Then a guest gets a 401 and
+    invalid input a 422, instead of redirects.
+  - `.without_csrf()` sends without the CSRF token. (`TestApp` sends it for you otherwise.)
+  - `app.csrf_token()` is the session's token, for a request you build yourself.
+
+### Checking responses
+
 - **Status:** `assert_ok`, `assert_status(n)`, `assert_redirect(to)`, `assert_hx_redirect(to)`,
   `assert_not_found`, `assert_forbidden`, `assert_unauthorized`.
-- **Body:** `assert_see` / `assert_dont_see` (HTML as sent, escaped), `assert_invalid("field")`,
-  `assert_header`, `text()`, `json::<T>()`, `header(name)` (`Option<&str>`). The fields `status`,
-  `headers`, `body` and `view` are public too.
-- **Invalid input:** `assert_invalid("field")` expects a 422 with an error on that field, which
-  only htmx and JSON requests get: send with `app.htmx()` or `app.request().json()`. A plain form
-  post is answered with a 303 back to the form (errors and old input flashed), so for that one
-  check `assert_status(303)`, then `get` the form and `assert_see` the message.
+- **Body** (the page or data that came back):
+  - `assert_see` / `assert_dont_see` look for text in the HTML exactly as it was sent. Special
+    characters are escaped there (`&` is `&amp;`), so write them that way.
+  - `assert_invalid("field")`, `assert_header`.
+  - `text()` returns the body as text, `json::<T>()` reads it as JSON, and `header(name)`
+    returns a header (`Option<&str>`).
+  - The fields `status`, `headers`, `body` and `view` are public too.
+- **Invalid input:** `assert_invalid("field")` expects a 422 with an error on that field.
+  - Only htmx and JSON requests get a 422, so send with `app.htmx()` or `app.request().json()`.
+  - A plain form post is answered differently: with a 303 back to the form (the errors and the
+    old input are flashed, which means kept in the session for the next page). So for that
+    one, check `assert_status(303)`, then `get` the form and `assert_see` the message.
 - **JSON:**
-  - `assert_json_path("data.0.name", "Coffee")` checks the value at a path of keys and indexes;
+  - `assert_json_path("data.0.name", "Coffee")` checks the value at a path of keys and indexes
+    (here: the key `data`, its first item, that item's `name`);
   - `json_path(path)` reads it;
   - `assert_json(json!({ … }))` checks the body contains the expected keys (other keys may
     be there too).
@@ -52,18 +123,32 @@ writes the tests of a whole resource (create, list, show, edit, update, delete, 
 
 ## Configuration and the app's parts
 
-`TestApp::new` starts from `Config::default()` (in-memory database, the memory mailer, no
-workers or scheduler, debug on) and doesn't read `.env`. Change it with
-`TestApp::with_config(app, |c| …)`; `app.state()` is the `AppState` handlers get,
-`app.db()` its database and `app.mailer()` its mailer (`mailer().sent()` lists the mail).
+`TestApp::new` doesn't read your `.env` file. It starts from `Config::default()`, which has:
+
+- an in-memory database;
+- the memory mailer (mail is kept in a list, not sent);
+- no queue workers and no scheduler (so nothing runs in the background by surprise);
+- debug on.
+
+Change any of it with `TestApp::with_config(app, |c| …)`.
+
+To reach the app's parts from a test:
+
+- `app.state()` is the `AppState` that handlers get;
+- `app.db()` is its database;
+- `app.mailer()` is its mailer (`mailer().sent()` lists the mail).
+
+The test below changes two settings, then fakes an outside web service:
 
 ```rust
 use renox::prelude::*;
 use renox::http::FakeResponse;
 use renox::testing::TestApp;
 
+/// Reads a setting of the test's own, and fakes an outside web service.
 #[renox::test]
 async fn rates_come_from_the_api() {
+    // Start with a setting of our own, and with debug off.
     let app = TestApp::with_config(App::new(), |c| {
         c.vars.insert("RATES_KEY".into(), "test-key".into()); // what config.var reads
         c.debug = false; // production error pages
@@ -71,45 +156,75 @@ async fn rates_come_from_the_api() {
     .await;
     assert_eq!(app.state().config.var("RATES_KEY").as_deref(), Some("test-key"));
 
+    // From here on, web requests get fake answers instead of reaching the internet.
     let http = app.fake_http(); // `*` matches anything; "POST https://…" for one method
     http.on("https://api.example.com/*", FakeResponse::json(200, json!({ "idr": 16000.0 })));
     let res = app.state().http.get("https://api.example.com/rates").send().await.unwrap();
     assert_eq!(res.status(), 200);
+    // Check which requests were sent, and how many.
     http.assert_sent(|r| r.method == "GET" && r.url.starts_with("https://api.example.com/rates"));
     http.assert_not_sent(|r| r.method == "POST");
     http.assert_sent_count(1); // http.sent() lists them: method, url, headers, body, json()
 }
 ```
 
-Also `FakeResponse::text(status, body)`, `FakeResponse::status(n)`, `.header(…)`, and
-`FakeResponse::connection_error()`; several answers for one pattern are given in turn.
+What's going on:
+
+- `with_config` sets an app-specific value (`RATES_KEY`) and turns debug off, so errors show
+  the production error pages.
+- `fake_http()` stops real web requests. `http.on(pattern, answer)` says what to answer for
+  addresses that match the pattern.
+- `assert_sent`, `assert_not_sent` and `assert_sent_count` check what the app asked for.
+
+Other fake answers: `FakeResponse::text(status, body)`, `FakeResponse::status(n)`,
+`.header(…)`, and `FakeResponse::connection_error()` (as if the service were down). Give one
+pattern several answers, and they're used in turn: the first request gets the first, and so on.
 
 ## Session and login
 
-- `acting_as(&user)` logs in; `logout()` forgets the session; `confirm_password()` passes
-  `require_password_confirmed`.
-- `assert_authenticated(Some(&user))` / `assert_authenticated(None)` / `assert_guest()`.
-- `assert_session_has("cart")`, `assert_session_missing("cart")`, `session_get::<T>("cart")`.
-- `session_cookie()` and `use_session_cookie(…)` play a second device.
+- `acting_as(&user)` logs in. `logout()` forgets the session, like a browser with its cookies
+  cleared.
+- `confirm_password()` passes `require_password_confirmed` (pages that ask for the password
+  again before something risky).
+- `assert_authenticated(Some(&user))` / `assert_authenticated(None)` / `assert_guest()` check
+  who is logged in, if anyone.
+- `assert_session_has("cart")`, `assert_session_missing("cart")` and
+  `session_get::<T>("cart")` check and read values in the session.
+- `session_cookie()` and `use_session_cookie(…)` let one test play a second device (say, a
+  phone and a laptop logged in as the same user).
 
 ## The database
 
-- `assert_database_has("orders", &[("status", &"paid")])`, `assert_database_missing(…)`,
-  `assert_database_count("orders", 3)`.
-- `renox::db::capture_queries(future)` returns what the future ran, requests included, so a
-  test can catch an N+1:
+- `assert_database_has("orders", &[("status", &"paid")])` checks a matching row exists,
+  `assert_database_missing(…)` that none does, and `assert_database_count("orders", 3)` how
+  many rows a table has.
+- `renox::db::capture_queries(future)` returns every SQL query the future ran, requests
+  included. A test can use it to catch an N+1: a page that runs one more query for every row,
+  so it gets slower the more rows there are:
   `let (res, queries) = capture_queries(app.get("/posts")).await; assert!(queries.len() <= 3);`
-- Factories fill tables: `Product::factory().create_one(app.db()).await`, `Product::factory().count(20).create(app.db()).await`, or with states and sequences: `Product::factory().count(3).state(sold_out)
-  .sequence(|i, p| p.name = format!("Coffee {i}")).create(app.db()).await` (`make()` for unsaved
-  models; `factory().state(…).make_one()` / `.create_one(db)` for a single one).
+
+### Factories
+
+Factories fill tables with made-up rows, so a test doesn't have to type every field:
+
+- one row: `Product::factory().create_one(app.db()).await`;
+- twenty rows: `Product::factory().count(20).create(app.db()).await`;
+- with states (named changes, like `sold_out`) and sequences (a change that differs per row):
+  `Product::factory().count(3).state(sold_out).sequence(|i, p| p.name = format!("Coffee {i}")).create(app.db()).await`;
+- `make()` instead of `create(…)` builds unsaved models;
+- for a single one: `factory().state(…).make_one()` / `.create_one(db)`.
 
 ## Jobs, events, notifications, mail, HTTP
+
+Apps do work outside the request too: jobs (tasks put in a queue to run in the background),
+events, mail, scheduled tasks and commands. In a test nothing runs in the background, so these
+tools let you run the work, or record it and check it.
 
 | Tool | What it does |
 |---|---|
 | `app.queued_jobs()` | The names of the queued jobs. |
 | `app.run_jobs()` | Runs the jobs that are due. |
-| `app.run_all_jobs()` | Also runs delayed jobs and retries still waiting for their backoff. |
+| `app.run_all_jobs()` | Also runs delayed jobs and retries still waiting for their backoff (the pause before a failed job is tried again). |
 | `app.fake_events()` | Records events instead of running their listeners. Check them with `assert_emitted::<OrderPlaced>(\|e\| e.id == 7)`, `emitted::<E>()` or `assert_not_emitted::<E>()`. |
 | `app.fake_notifications()` | Records notifications instead of sending them. Check them with `assert_notified(&user, "order-shipped")`, `assert_notified_to("a@b.c", kind)`, `notifications()` or `assert_nothing_notified()`. |
 | `app.sent_mail()`, `app.assert_mail_sent(to, subject)` | The mail sent so far (the test mailer keeps it). |
@@ -119,35 +234,52 @@ Also `FakeResponse::text(status, body)`, `FakeResponse::status(n)`, `.header(…
 | `renox::prompt::answering(["a.csv", "yes"], app.kernel().call("products:import", [""; 0])).await` | Runs a command that asks questions (`renox::prompt::ask`, `confirm`, …), answering them in order. |
 | `my_app::app().run_args(["migrate:status"]).await` | Runs any command the binary has, built-ins included (`migrate`, `queue:failed`, `down`…), as `my-app migrate:status` would. Give the app a file database: each call boots it anew. |
 
+> [!WARNING]
+> `run_args` boots a new app on every call. With an in-memory database, each boot gets an
+> empty one, so give the app a file database for these tests.
+
 ## Time
 
-`app.travel(Duration::from_secs(3600))` moves the clock forward for what the `TestApp` does
-next: requests, `run_jobs` and `run_all_jobs`. `renox::db::now()`, sessions, signed URLs, the
-queue, the cache, rate limits, the login lock and password confirmation all follow it, and
-so do `TestApp`'s own session helpers (past `SESSION_LIFETIME`, the next request starts a new
-session with its own CSRF token). `app.at_travelled_time(fut)` runs other code, such as a
-model call, a scheduled task (`app.kernel().run_scheduled(..)`) or a command, at that time.
-`app.travel_back()` returns to the present. Travel adds up.
+Some things depend on time: a session that ends after two hours, a password confirmation that
+lasts three. Waiting for real in a test would be far too slow. Instead, `TestApp` can move its
+clock forward. This is called **travel**.
 
-Travel reaches only time read through Renox: `renox::db::now()` in app code, not
-`SystemTime::now()` or `chrono::Utc::now()`. Prefer it to rewriting `created_at` with SQL or
-sleeping; examples/shop, jobs, api and hello show it.
+- `app.travel(Duration::from_secs(3600))` moves the clock one hour forward for what the
+  `TestApp` does next: requests, `run_jobs` and `run_all_jobs`.
+- `app.at_travelled_time(fut)` runs other code at that time, such as a model call, a scheduled
+  task (`app.kernel().run_scheduled(..)`) or a command.
+- `app.travel_back()` returns to the present.
+- Travel adds up: two hours, then one more, is three hours ahead.
+
+What follows the travelled clock: `renox::db::now()`, sessions, signed URLs, the queue, the
+cache, rate limits, the login lock and password confirmation. `TestApp`'s own session helpers do
+too: past `SESSION_LIFETIME`, the next request starts a new session with its own CSRF token.
 
 ```rust
 # use renox::prelude::*;
 # use std::time::Duration;
 # async fn demo(app: renox::testing::TestApp) {
 app.confirm_password();
+// Jump four hours ahead: the confirmation has run out.
 app.travel(Duration::from_secs(4 * 60 * 60)); // confirmation lasts three hours
 app.delete("/account").await.assert_redirect("/confirm-password");
 # }
 ```
 
+What's going on: the user confirms their password, then four hours pass. Deleting the account
+needs a fresh confirmation, so the app sends them back to the confirm-password page.
+
+> [!IMPORTANT]
+> Travel reaches only time read through Renox: `renox::db::now()` in app code, not
+> `SystemTime::now()` or `chrono::Utc::now()`. Use travel rather than rewriting `created_at`
+> with SQL or sleeping; examples/shop, jobs, api and hello show it.
+
 ## Browser tests
 
-Most of an app is covered by `TestApp` requests. For what only a browser shows (a sheet opening,
-live validation, a layout at phone width), serve the app on a real port and drive a browser over
-the Chrome DevTools Protocol:
+Most of an app is covered by `TestApp` requests. Some things only a real browser shows: a sheet
+(a panel that slides in) opening, live validation as you type, a layout at phone width. For
+those, serve the app on a real port and drive a browser over the Chrome DevTools Protocol (CDP:
+the way programs remote-control Chrome).
 
 ```rust
 # async fn demo(app: renox::testing::TestApp) {
@@ -157,14 +289,20 @@ let url = app.serve().await; // http://127.0.0.1:PORT, until the test ends
 # let _ = url; }
 ```
 
-Renox's own browser checks run headless Chrome with `--remote-debugging-port` and a short script
-per page. The steps:
+`app.serve()` starts a real server on a free port and returns its address. The server keeps
+running until the test ends.
+
+Renox's own browser checks run headless Chrome (Chrome without a window) with
+`--remote-debugging-port`, and a short script per page. The steps:
 
 1. Log in through the form, then open the page.
-2. Do what a person would: click, type, press keys with `Input.dispatchKeyEvent` (synthetic
-   events don't trigger every handler).
-3. Read the DOM, and take screenshots at 1100 px, 390 px (a phone) and in dark mode.
-4. Check the console for errors and CSP violations.
+2. Do what a person would: click, type, press keys with `Input.dispatchKeyEvent`. (Events made
+   up by a script don't trigger every handler, so real key presses are safer.)
+3. Read the DOM (the page as the browser built it), and take screenshots at 1100 px, 390 px (a
+   phone) and in dark mode.
+4. Check the console for errors and CSP violations (scripts or styles the page's security
+   policy blocked).
 
-Look at the screenshots, not only the numbers: layout problems (an element pushed off screen, a
-misaligned dialog) pass every assertion.
+> [!TIP]
+> Look at the screenshots, not only the numbers. Layout problems (an element pushed off
+> screen, a misaligned dialog) pass every assertion.

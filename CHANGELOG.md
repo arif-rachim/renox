@@ -10,6 +10,9 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Guides for beginners, part 3 (#193):** grid.md, testing.md, postgresql.md, operations.md,
+  development.md, stability.md and laravel.md rewritten in plain words; README.md and
+  CHEATSHEET.md made plainer (an opening for each section, comments in the samples).
 ## 1.0.0-rc.4 · 2026-10-04
 
 The fourth release candidate: fixes found by using rc.3, and two extension points for
