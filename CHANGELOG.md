@@ -10,6 +10,8 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Guides for beginners, part 2 (#193):** relations.md, types.md, authorization.md, queue.md,
+  mail.md and scheduling.md rewritten in plain words, like part 1.
 - **Guides for beginners, part 1 (#193):** routing.md, validation.md and ui.md rewritten in
   plain words: what the page is for, the words it uses, short paragraphs, "what's going on"
   after each example, comments in the code samples, and Laravel notes, tips and warnings as
