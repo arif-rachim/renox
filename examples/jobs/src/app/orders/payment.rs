@@ -1,3 +1,4 @@
+use renox::ToastAction;
 use renox::mail::Mail;
 use renox::prelude::*;
 use renox::queue::Middleware;
@@ -44,8 +45,34 @@ pub(super) async fn pay(
         .then(NotifyWarehouse { order_id: id })
         .dispatch()
         .await?;
+    order_updated(&state, id, OrderStatus::Processing)?;
     session.flash("status", "Thanks! We're charging your card.")?;
     Ok(Redirect::to("/"))
+}
+
+/// Tells the staff's open pages that an order changed: the orders table
+/// listens with `hx-trigger="order-updated from:document"` and reloads.
+/// Fire-and-forget: a page that isn't open just shows the new status later.
+pub(super) fn order_updated(state: &AppState, id: i64, status: OrderStatus) -> Result {
+    state.broadcast("order-updated", json!({ "id": id, "status": status }))
+}
+
+/// Staff give a flagged order another go: back to unpaid, so the customer
+/// can pay again. Sent by the failed-charge toast's "Reopen" button and the
+/// row's button, both with htmx: the answer is a toast.
+pub(super) async fn reopen(State(state): State<AppState>, Path(id): Path<i64>) -> Result<Toast> {
+    Order::find_or_404(&state.db, id).await?;
+    let reopened = Order::where_eq("id", id)
+        .where_eq("status", OrderStatus::NeedsAttention)
+        .update(&state.db, &[("status", &OrderStatus::Unpaid)])
+        .await?;
+    if reopened == 0 {
+        return Ok(Toast::warning(format!(
+            "Order #{id} doesn't need attention."
+        )));
+    }
+    order_updated(&state, id, OrderStatus::Unpaid)?;
+    Ok(Toast::success(format!("Order #{id} is unpaid again.")))
 }
 
 /// Charges the card through the payment gateway.
@@ -83,7 +110,8 @@ impl Job for ChargePayment {
         }
         gateway::charge(&ctx.state, &order, &self.card_token).await?;
         order.status = OrderStatus::Paid;
-        order.save_only(db, &["status"]).await
+        order.save_only(db, &["status"]).await?;
+        order_updated(&ctx.state, order.id, OrderStatus::Paid)
     }
 
     /// Runs once, after the last attempt (or at once for a declined card):
@@ -100,6 +128,17 @@ async fn needs_attention(state: &AppState, order_id: i64, error: &str) -> Result
     Order::where_eq("id", order_id)
         .update(&state.db, &[("status", &OrderStatus::NeedsAttention)])
         .await?;
+    order_updated(state, order_id, OrderStatus::NeedsAttention)?;
+    // The staff watching the shop hear it now, with a button that sends a
+    // request (POST, with the CSRF token) rather than following a link.
+    let toast = Toast::error(format!("Payment for order #{order_id} failed"))
+        .body(error)
+        .action(ToastAction::post(
+            "Reopen",
+            format!("/orders/{order_id}/reopen"),
+        ))
+        .id(format!("order-{order_id}-failed"));
+    state.broadcast("renox:toast", json!({ "toasts": [toast] }))?;
     for admin in User::all(&state.db).await? {
         let mail = Mail::new(
             &admin.email,

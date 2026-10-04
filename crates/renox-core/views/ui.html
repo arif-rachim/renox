@@ -1016,6 +1016,14 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 {%- endif %}
 {%- endmacro %}
 
+{#- The notifications stream without the bell, so the app's own events
+    (`state.broadcast(…)`) reach this page as DOM events on `document`.
+    Needs `Auth::new().notifications()`; nothing for guests. A page with
+    `notification_bell` has the stream already (one per page either way). -#}
+{% macro event_stream() -%}
+{%- if auth.check %}<span hidden data-rx-event-stream="{{ route('notifications.stream') }}"></span>{% endif %}
+{%- endmacro %}
+
 {#- Dashboards (docs/ui.md "Dashboards"): figures, charts, a period. The
     charts themselves come from the `chart(kind, data, …)` function. -#}
 

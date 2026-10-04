@@ -65,9 +65,25 @@
     return /^(https?|mailto|tel)$/.test(cleaned.slice(0, colon));
   }
 
+  // A path on this site (not `//other.site`): where a request with the
+  // CSRF token may go.
+  function localUrl(url) {
+    var cleaned = String(url || "").replace(/[\u0000-\u0020\u007f]/g, "");
+    return cleaned.charAt(0) === "/" && cleaned.charAt(1) !== "/" && cleaned.charAt(1) !== "\\";
+  }
+
+  var METHODS = ["POST", "PUT", "PATCH", "DELETE"];
+
   function toastAction(action) {
     var el;
-    if (action.url && safeUrl(action.url)) {
+    var method = String(action.method || "").toUpperCase();
+    if (action.method) {
+      if (METHODS.indexOf(method) < 0 || !localUrl(action.url)) return null;
+      el = document.createElement("button");
+      el.type = "button";
+      el.setAttribute("data-rx-request", action.url);
+      el.setAttribute("data-rx-method", method);
+    } else if (action.url && safeUrl(action.url)) {
       el = document.createElement("a");
       el.href = action.url;
       if (action.new_tab) { el.target = "_blank"; el.rel = "noopener"; }
@@ -84,7 +100,52 @@
     return el;
   }
 
-  // {kind, message, body?, actions?: [{label, url | event, new_tab?}],
+  function failedLabel() {
+    return region().getAttribute("data-failed-label") || "That didn't work. Try again.";
+  }
+  function hasToast(trigger) { return !!trigger && trigger.indexOf("renox:toast") >= 0; }
+
+  // A request action that failed (sent from the toast region) and brought no
+  // toast of its own: say so.
+  document.addEventListener("htmx:afterRequest", function (event) {
+    var elt = event.detail.elt;
+    if (!elt || !elt.hasAttribute || !elt.hasAttribute("data-renox-toasts") || event.detail.successful) return;
+    var xhr = event.detail.xhr;
+    if (!hasToast(xhr && xhr.getResponseHeader("HX-Trigger"))) showToast({ kind: "error", message: failedLabel() });
+  });
+
+  // A request action (ToastAction::post …): sent with htmx, swapping
+  // nothing, so the answer's HX-Trigger (its toasts), HX-Redirect or
+  // HX-Refresh do the rest. The source is the toast region, which stays on
+  // the page (the toast itself is gone by the time the answer comes).
+  // A failure without a toast of its own shows an error toast.
+  function sendRequest(method, url) {
+    method = String(method || "POST").toUpperCase();
+    if (METHODS.indexOf(method) < 0 || !localUrl(url)) return;
+    var source = region();
+    if (window.htmx) {
+      window.htmx.ajax(method, url, { source: source, target: source, swap: "none" });
+      return;
+    }
+    var failed = failedLabel();
+    fetch(url, { method: method, credentials: "same-origin", headers: { "HX-Request": "true", "X-CSRF-Token": csrf() } }).then(function (res) {
+      var redirect = res.headers.get("HX-Redirect");
+      if (redirect) { window.location.href = redirect; return; }
+      if (res.headers.get("HX-Refresh") === "true") { window.location.reload(); return; }
+      var trigger = res.headers.get("HX-Trigger");
+      if (trigger) {
+        try {
+          var events = JSON.parse(trigger);
+          Object.keys(events).forEach(function (name) { document.dispatchEvent(new CustomEvent(name, { detail: events[name] })); });
+        } catch (e) {
+          trigger.split(",").forEach(function (name) { document.dispatchEvent(new CustomEvent(name.trim())); });
+        }
+      }
+      if (!res.ok && !hasToast(trigger)) showToast({ kind: "error", message: failed });
+    }, function () { showToast({ kind: "error", message: failed }); });
+  }
+
+  // {kind, message, body?, actions?: [{label, url | event, method?, new_tab?}],
   // duration? (ms, 0 = stays), id?}: the same shape as `Toast` in Rust.
   function showToast(toast) {
     var kind = ICONS[toast.kind] ? toast.kind : "info";
@@ -144,11 +205,34 @@
   // Renox.dismissToast("order-7").
   window.Renox = window.Renox || {};
   window.Renox.toast = showToast;
+  // Renox.request("POST", "/orders/7/retry"): what a request action does.
+  window.Renox.request = sendRequest;
   window.Renox.dismissToast = function (id) {
     document.querySelectorAll("[data-toast-id]").forEach(function (toast) {
       if (toast.getAttribute("data-toast-id") === String(id)) dismiss(toast);
     });
   };
+
+  // ---------- The notifications stream ----------
+
+  // One Server-Sent Events stream per page (`/notifications/stream`), shared
+  // by the bell and `event_stream()`. The app's own events
+  // (`state.broadcast(…)`) arrive as `broadcast` and are dispatched on
+  // `document` under their own name, with their data as `detail`.
+  var stream = null;
+  function openStream(url) {
+    if (stream || !url || !window.EventSource) return stream;
+    stream = new EventSource(url);
+    stream.addEventListener("broadcast", function (event) {
+      var message;
+      try { message = JSON.parse(event.data); } catch (e) { return; }
+      if (!message || typeof message.event !== "string") return;
+      document.dispatchEvent(new CustomEvent(message.event, { detail: message.data }));
+    });
+    window.addEventListener("pagehide", function () { stream.close(); });
+    return stream;
+  }
+  window.Renox.stream = function () { return stream; };
 
   // ---------- Notification bell ----------
 
@@ -226,19 +310,19 @@
       if (event.key === "Escape" && !panel.hidden) { event.stopPropagation(); close(true); }
     });
 
-    if (!window.EventSource) return;
-    var stream = new EventSource(bell.getAttribute("data-stream"));
-    stream.addEventListener("count", function (event) { setCount(event.data); });
-    stream.addEventListener("notification", function (event) {
+    var events = openStream(bell.getAttribute("data-stream"));
+    if (!events) return;
+    events.addEventListener("count", function (event) { setCount(event.data); });
+    events.addEventListener("notification", function (event) {
       var n;
       try { n = JSON.parse(event.data); } catch (e) { return; }
+      var actions = n.url ? [{ label: bell.getAttribute("data-open-label") || "Open", url: n.url }] : [];
       showToast({
         kind: n.status, message: n.title, body: n.body, id: "rx-notification-" + n.id,
-        actions: n.url ? [{ label: bell.getAttribute("data-open-label") || "Open", url: n.url }] : []
+        actions: actions.concat(n.actions || [])
       });
       if (!panel.hidden) load(bell.getAttribute("data-panel")).catch(function () {});
     });
-    window.addEventListener("pagehide", function () { stream.close(); });
   }
 
   // ---------- Charts (chart(…)) ----------
@@ -602,6 +686,13 @@
       var field = fieldNamed(summaryLink.getAttribute("data-rx-field"), summaryLink.closest("form"));
       if (field) { event.preventDefault(); field.focus(); field.scrollIntoView({ block: "center", behavior: reduceMotion ? "auto" : "smooth" }); }
       return;
+    }
+
+    // A request action, in a toast or in the notification list.
+    var requester = target.closest("[data-rx-request]");
+    if (requester) {
+      event.preventDefault();
+      sendRequest(requester.getAttribute("data-rx-method"), requester.getAttribute("data-rx-request"));
     }
 
     var dismisser = target.closest("[data-renox-dismiss]");
@@ -1830,6 +1921,7 @@
     scope.querySelectorAll("[data-rx-repeater]").forEach(limits);
     scope.querySelectorAll("[data-rx-wizard]").forEach(setupWizard);
     scope.querySelectorAll("[data-rx-bell]").forEach(setupBell);
+    scope.querySelectorAll("[data-rx-event-stream]").forEach(function (el) { openStream(el.getAttribute("data-rx-event-stream")); });
     if (root.matches && root.matches("[data-rx-chart]")) setupChart(root);
     scope.querySelectorAll("[data-rx-chart]").forEach(setupChart);
     if (root.matches && root.matches("[data-rx-key]")) setupKey(root);

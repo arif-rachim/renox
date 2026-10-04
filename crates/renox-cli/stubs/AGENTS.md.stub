@@ -132,7 +132,17 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   In-app notifications: `to_database` returns `Ok(DatabaseMessage…into())` (title, body, url), and
   `Auth::new().notifications()` + `{{ notification_bell(unread_notifications) }}` in the
   layout gives the list, the badge and live updates (SSE: behind nginx, `proxy_buffering off`).
-  Toasts can carry `.body(…)`, `.link(label, url)`, `.seconds(n)`/`.persistent()`.
+  Toasts can carry `.body(…)`, `.link(label, url)`, `.seconds(n)`/`.persistent()`, and a
+  button that sends a request (`ToastAction::post(label, "/own/path")`, `put`, `patch`,
+  `delete`): it goes through htmx, so answer with a `Toast` or `(Toast, HxRefresh)`, not a
+  `Redirect` (its toast would be lost).
+  Live updates without JavaScript of your own: `state.broadcast("order-updated", json!(…))`
+  (or `broadcast_to(user_id, …)`) reaches the open pages of logged-in users as a DOM event
+  (`hx-trigger="order-updated from:document"`); `"renox:toast"` with `{"toasts": [toast]}`
+  shows toasts. It needs the bell or `{{ event_stream() }}` on the page. Fire-and-forget,
+  this process only (not a separate `queue:work`, not other servers): use a database
+  notification for anything that must arrive. Tests: `app.fake_broadcasts()` +
+  `app.assert_broadcast(event, |b| …)`.
 - `user.has_role("admin")` on a plain `User` (policies, `gate_before`) only knows the current
   request's user; in jobs and commands use `user.roles(&db).await`.
 - For a transaction that must be retried on conflicts and borrow locals, use
@@ -214,7 +224,8 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   see the moved clock; code called directly (a task, a model method, `app.kernel().call`)
   needs `app.at_travelled_time(future)`.
 - Faking in tests: `app.fake_events()` records events without running listeners
-  (`assert_emitted::<OrderPlaced>(|e| …)`); `app.fake_notifications()` records notifications
+  (`assert_emitted::<OrderPlaced>(|e| …)`); `app.fake_broadcasts()` records `state.broadcast`;
+  `app.fake_notifications()` records notifications
   without mail, jobs or rows (`assert_notified(&user, "kind")`); `app.fake_http()` answers
   `state.http`.
 - `v.each("tags", &self.tags, |t| t.required().max(20))` keys errors `tags.0`, `tags.1`…:

@@ -106,6 +106,59 @@ const STARTER: &[(&str, &str)] = &[
     ),
 ];
 
+/// `--notifications` on the plain app (the starter kit has them already):
+/// `Auth::new().notifications()`, the bell in the layout's bar, and a test.
+fn with_notifications(file: &str, contents: &str) -> String {
+    let edits: &[(&str, &str)] = match file {
+        "src/lib.rs" => &[(
+            "        .module(renox::auth::Auth::new().account()) // login, register, /account\n",
+            "        // Login, register, /account, and the notification bell (/notifications).\n        \
+             .module(renox::auth::Auth::new().account().notifications())\n",
+        )],
+        "resources/views/layouts/app.html" => &[
+            (
+                "menu_separator, link_button %}",
+                "menu_separator, link_button, notification_bell %}",
+            ),
+            (
+                "    {% if auth.check %}\n",
+                "    {% if auth.check %}\n      \
+                 {#- In-app notifications: a badge, a panel, new ones live (docs/mail.md). -#}\n      \
+                 {{ notification_bell(unread_notifications) }}\n",
+            ),
+        ],
+        "tests/home.rs" => &[("", NOTIFICATIONS_TEST)],
+        _ => &[],
+    };
+    let mut contents = contents.to_owned();
+    for (old, new) in edits {
+        if old.is_empty() {
+            contents.push_str(new);
+        } else {
+            assert!(contents.contains(old), "{file} lost `{old}`");
+            contents = contents.replacen(old, new, 1);
+        }
+    }
+    contents
+}
+
+/// The test `--notifications` adds to `tests/home.rs`.
+const NOTIFICATIONS_TEST: &str = r#"
+#[renox::test]
+async fn the_bell_shows_notifications() {
+    let app = TestApp::new({{crate_name}}::app()).await;
+    let user = User::register(app.db(), "Anna", "anna@example.com", "secret123")
+        .await
+        .unwrap();
+    app.acting_as(&user);
+    app.get("/").await.assert_ok().assert_see("data-rx-bell");
+    app.get("/notifications")
+        .await
+        .assert_ok()
+        .assert_see("No notifications");
+}
+"#;
+
 /// The files of a new app: the stubs, with the starter kit's over them.
 fn files(starter: bool) -> Vec<(&'static str, &'static str)> {
     let kit: &[(&str, &str)] = if starter { STARTER } else { &[] };
@@ -187,6 +240,8 @@ pub struct Options {
     pub database: Database,
     pub tailwind: bool,
     pub starter: bool,
+    /// The notification bell in the plain app (the starter kit has it).
+    pub notifications: bool,
 }
 
 pub fn run(name: &str, renox_path: Option<&Path>, options: Options) -> Result<()> {
@@ -199,6 +254,7 @@ fn run_in(parent: &Path, name: &str, renox_path: Option<&Path>, options: Options
         database,
         tailwind,
         starter,
+        notifications,
     } = options;
     validate_name(name)?;
     let root = &parent.join(name);
@@ -256,6 +312,11 @@ fn run_in(parent: &Path, name: &str, renox_path: Option<&Path>, options: Options
     let key = crate::generate_key();
 
     for (file, contents) in files(starter) {
+        let contents = if notifications && !starter {
+            with_notifications(file, contents)
+        } else {
+            contents.to_owned()
+        };
         let contents = contents
             .replace("{{name}}", name)
             .replace("{{title}}", &title(name))
@@ -435,6 +496,7 @@ mod tests {
         database: Database::Sqlite,
         tailwind: false,
         starter: false,
+        notifications: false,
     };
 
     /// A written file with `\n` line ends (Windows checkouts give the stubs `\r\n`).
@@ -529,6 +591,44 @@ mod tests {
         assert!(tests.contains("use desk::roles"), "{tests}");
     }
 
+    #[test]
+    fn notifications_put_the_bell_in_the_plain_app() {
+        let dir = tempfile::tempdir().unwrap();
+        let bell = Options {
+            notifications: true,
+            ..SQLITE
+        };
+        run_in(dir.path(), "relay", None, bell).unwrap();
+        let root = dir.path().join("relay");
+        let lib = read_lf(root.join("src/lib.rs"));
+        assert!(
+            lib.contains(".module(renox::auth::Auth::new().account().notifications())\n"),
+            "{lib}"
+        );
+        let layout = read_lf(root.join("resources/views/layouts/app.html"));
+        assert!(
+            layout.contains("link_button, notification_bell %}")
+                && layout.contains("{{ notification_bell(unread_notifications) }}"),
+            "{layout}"
+        );
+        let tests = read_lf(root.join("tests/home.rs"));
+        assert!(
+            tests.contains("relay::app()") && tests.contains("fn the_bell_shows_notifications"),
+            "{tests}"
+        );
+        // Without the option, none of it; the starter kit has its own bell.
+        run_in(dir.path(), "plain", None, SQLITE).unwrap();
+        let layout = read_lf(dir.path().join("plain/resources/views/layouts/app.html"));
+        assert!(!layout.contains("notification_bell"));
+        let kit = Options {
+            starter: true,
+            ..bell
+        };
+        run_in(dir.path(), "kit", None, kit).unwrap();
+        let layout = read_lf(dir.path().join("kit/resources/views/layouts/app.html"));
+        assert_eq!(layout.matches("{{ notification_bell(").count(), 1);
+    }
+
     /// The `.rs` files under `dir`.
     fn rust_files(dir: &Path) -> Vec<std::path::PathBuf> {
         let mut files = Vec::new();
@@ -557,14 +657,20 @@ mod tests {
             return;
         }
         let dir = tempfile::tempdir().unwrap();
-        for (name, starter) in [
-            ("aardvark", false),
-            ("aardvark-kit", true),
-            ("zebra", false),
-            ("zebra-kit", true),
-            ("renoxium", true),
+        for (name, starter, notifications) in [
+            ("aardvark", false, false),
+            ("aardvark-kit", true, false),
+            ("aardvark-bell", false, true),
+            ("zebra", false, false),
+            ("zebra-kit", true, false),
+            ("zebra-bell", false, true),
+            ("renoxium", true, false),
         ] {
-            let options = Options { starter, ..SQLITE };
+            let options = Options {
+                starter,
+                notifications,
+                ..SQLITE
+            };
             run_in(dir.path(), name, None, options).unwrap();
             let files = rust_files(&dir.path().join(name));
             let output = std::process::Command::new("rustfmt")

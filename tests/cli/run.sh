@@ -13,8 +13,9 @@
 #       (tests/cli/smoke.py) read the app's SQLite file, so they run with sqlite only.
 #
 # Apps are made with the `rnx new` options people combine, and names on both sides of
-# "renox" (where imports sort: #124): shop (every generator), atlas (plain), site
-# (--tailwind), studio (--starter, with the database), desk (--starter --tailwind).
+# "renox" (where imports sort: #124): shop (every generator), atlas (plain), pulse
+# (--notifications), site (--tailwind), studio (--starter, with the database), desk
+# (--starter --tailwind).
 # Each must pass cargo fmt --check, clippy (but shop, whose generated items are dead code
 # until used) and its tests (#143).
 #
@@ -204,6 +205,13 @@ fi
 step "rnx new atlas --database $DATABASE (plain, a name before \"renox\": #124)"
 new_app atlas --database "$DATABASE"
 use_database atlas
+check_app
+
+step "rnx new pulse --notifications --database $DATABASE (the bell in the plain app: #151)"
+new_app pulse --notifications --database "$DATABASE"
+use_database pulse
+grep -q '.notifications())' src/lib.rs
+grep -q 'notification_bell(unread_notifications)' resources/views/layouts/app.html
 check_app
 
 if [ "$DATABASE" = sqlite ]; then

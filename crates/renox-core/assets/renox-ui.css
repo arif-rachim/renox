@@ -262,6 +262,8 @@
 .rx-subtitle { color: var(--rx-secondary-label); font-size: var(--rx-text-subhead); margin: 0; }
 .rx-link { color: var(--rx-accent-text); text-decoration: none; border-radius: 4px; }
 .rx-link:hover { text-decoration: underline; }
+.rx-link--button { appearance: none; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+.rx-link--button:focus-visible { outline: 2px solid var(--rx-accent); outline-offset: 2px; }
 
 /* ---------- Navigation: navbar, sidebar, shell, page header ---------- */
 
