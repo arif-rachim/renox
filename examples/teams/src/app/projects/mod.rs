@@ -3,7 +3,6 @@
 
 pub mod model;
 
-use renox::Toast;
 use renox::prelude::*;
 use serde::Deserialize;
 

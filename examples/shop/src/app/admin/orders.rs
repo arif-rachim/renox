@@ -2,7 +2,6 @@
 //! trail, and status changes (pay, ship, cancel) that are audited and tell
 //! the customer.
 
-use renox::Toast;
 use renox::audit::{self, Entry};
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};

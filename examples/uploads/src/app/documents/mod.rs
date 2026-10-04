@@ -4,9 +4,9 @@
 
 use std::time::Duration;
 
+use renox::Download;
 use renox::prelude::*;
 use renox::validation::Dimensions;
-use renox::{Download, Toast};
 use serde::{Deserialize, Serialize};
 
 #[derive(Model, Serialize, Deserialize, Default, Debug, Clone)]

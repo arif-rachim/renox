@@ -10,6 +10,10 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **`Toast` is in the prelude (#175):** `use renox::prelude::*;` now brings `Toast`, which
+  nearly every handler that changes something returns (`HxRefresh` already was). The
+  examples, the generators and the guides drop their `use renox::Toast;`; an existing one
+  still compiles.
 - **Docs links (#141):** the crates' `homepage` is now https://renox.renoxium.com, and the
   README, llms.txt and new apps' `AGENTS.md` point readers there.
 ## 1.0.0-rc.4 · 2026-10-04

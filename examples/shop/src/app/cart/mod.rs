@@ -4,7 +4,6 @@
 //! Made with `rnx make:module cart` and `rnx make:model CartItem --module cart -m`,
 //! then filled in.
 
-use renox::Toast;
 use renox::db::relations::belongs_to;
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
