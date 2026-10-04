@@ -1034,6 +1034,8 @@ async fn sign_in(State(state): State<AppState>, session: Session, Form(f): Form<
 // `app.second_factor("otp.challenge", |user, _state| async move { Ok(needs_code(&user)) });`
 // its challenge handler calls `renox::auth::pending_login(&session)`, checks the code,
 // then `renox::auth::complete_login(&state, &session, &pending, ip)` (docs/authorization.md).
+// A card on /account from a module: `app.account_section("pin/account.html", 10,
+// |user, _state| async move { Ok(json!({ "on": true })) })`, read as `section.data`.
 
 async fn sign_out(State(db): State<Db>, session: Session) -> Result<Redirect> {
     renox::auth::logout(&db, &session).await?; // this device (a copied cookie dies too)

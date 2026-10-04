@@ -33,6 +33,8 @@
   {% endcall %}
 </form>
 
+{% include "renox/auth/account_sections.html" %}
+
 {#- Destructive: red text here, the filled red button only in the sheet,
     which asks for the password (docs/ui.md). -#}
 {% call card(title=text.delete_title, subtitle=text.delete_intro) %}

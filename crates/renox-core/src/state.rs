@@ -55,6 +55,8 @@ pub struct AppState {
     pub(crate) throttle: Arc<LoginThrottle>,
     /// A module's second login step (`Registry::second_factor`).
     pub(crate) second_factor: Option<Arc<crate::auth::second_factor::SecondFactor>>,
+    /// Sections other modules add to `/account` (`Registry::account_section`).
+    pub(crate) account_sections: Arc<Vec<crate::auth::account::AccountSection>>,
     /// `App::detect_locale`: the browser's `Accept-Language` picks the locale.
     pub(crate) detect_locale: bool,
     pub(crate) security: Arc<crate::security::Security>,
