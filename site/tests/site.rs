@@ -19,6 +19,21 @@ fn hrefs(html: &str) -> Vec<String> {
         .collect()
 }
 
+/// The text of some HTML, without its tags (code is split into colour spans).
+fn text_of(html: &str) -> String {
+    let mut text = String::new();
+    let mut in_tag = false;
+    for c in html.chars() {
+        match c {
+            '<' => in_tag = true,
+            '>' if in_tag => in_tag = false,
+            c if !in_tag => text.push(c),
+            _ => {}
+        }
+    }
+    text
+}
+
 /// The `id`s in a page's HTML.
 fn ids(html: &str) -> HashSet<String> {
     html.split(" id=\"")
@@ -84,7 +99,7 @@ async fn links_between_pages_land_on_a_heading_that_exists() {
 async fn doctest_setup_lines_are_not_shown() {
     let site = site().await;
     for page in PAGES {
-        let html = site.get(&format!("/docs/{}", page.slug)).await.text();
+        let html = text_of(&site.get(&format!("/docs/{}", page.slug)).await.text());
         for hidden in ["\n# use renox", "\n# async fn", "# Ok(())"] {
             assert!(
                 !html.contains(hidden),
@@ -120,4 +135,33 @@ async fn the_sitemap_lists_every_page() {
             page.slug
         );
     }
+}
+
+#[renox::test]
+async fn code_is_shown_in_coloured_panels() {
+    let site = site().await;
+    let html = site.get("/docs/tutorial").await.text();
+    assert!(html.contains("<div class=\"site-code\" data-language=\"rust\">"));
+    assert!(html.contains("<div class=\"site-code\" data-language=\"bash\">"));
+    assert!(html.contains("<span class=\"hl-kw\">fn</span>"));
+    assert!(html.contains("data-copy hidden"));
+    // Every page's code is coloured, never left as bare `<pre><code>`.
+    for page in PAGES {
+        let html = site.get(&format!("/docs/{}", page.slug)).await.text();
+        assert_eq!(
+            html.matches("<pre>").count(),
+            html.matches("<div class=\"site-code\"").count(),
+            "{}",
+            page.slug
+        );
+    }
+}
+
+#[renox::test]
+async fn the_home_page_installs_this_version() {
+    let site = site().await;
+    site.get("/").await.assert_see(&format!(
+        "renox-cli <span class=\"hl-attr\">--version</span> {}",
+        env!("CARGO_PKG_VERSION")
+    ));
 }

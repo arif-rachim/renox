@@ -3,40 +3,42 @@
 {% block seo %}{{ seo(title="Renox: Laravel's productivity, Rust's performance", description="A batteries-included web framework for Rust: Axum, HTMX and Alpine.js, SQLite or PostgreSQL, deployed as one binary.") }}{% endblock %}
 
 {% block content %}
-<div class="site-home rx-stack">
+<div class="site-home">
   <section class="site-hero">
-    <p class="site-hero__eyebrow">A web framework for Rust</p>
-    <h1 class="site-hero__title">Laravel's productivity, Rust's performance, one binary to deploy.</h1>
-    <p class="site-hero__lead">Routing, sessions, a model layer and migrations, validation, auth,
-      a queue and a scheduler, mail, storage, a UI kit and a data grid: everything a business
-      app needs, in one <code>renox</code> dependency. Pages are rendered on the server and
-      htmx swaps them in, with no Node build.</p>
-    <div class="rx-row">
-      <a class="rx-button rx-button--primary" href="{{ route('docs.show', 'tutorial') }}"><span class="rx-button__label">Start the tutorial</span></a>
-      <a class="rx-button rx-button--secondary" href="{{ route('docs.show', 'laravel') }}"><span class="rx-button__label">Coming from Laravel</span></a>
+    <div class="site-hero__text">
+      <p class="site-hero__eyebrow">{{ icon("rocket") }}A web framework for Rust</p>
+      <h1 class="site-hero__title">Build web apps in Rust, <em>the easy way.</em></h1>
+      <p class="site-hero__lead">Pages, forms, logins, a database, emails and background jobs:
+        everything a web app needs comes in one <code>renox</code> dependency. You write
+        Rust and HTML; Renox does the plumbing, and your whole app ships as one file.</p>
+      <div class="site-hero__actions">
+        <a class="rx-button rx-button--primary" href="{{ route('docs.show', 'tutorial') }}"><span class="rx-button__icon" aria-hidden="true">{{ icon("graduation-cap") }}</span><span class="rx-button__label">Start the tutorial</span></a>
+        <a class="rx-button rx-button--secondary" href="{{ route('docs.show', 'overview') }}"><span class="rx-button__icon" aria-hidden="true">{{ icon("compass") }}</span><span class="rx-button__label">What's in the box</span></a>
+        <a class="rx-button rx-button--plain" href="{{ route('docs.show', 'laravel') }}"><span class="rx-button__icon" aria-hidden="true">{{ icon("arrow-right-left") }}</span><span class="rx-button__label">Coming from Laravel</span></a>
+      </div>
+    </div>
+    <div class="site-hero__code" aria-labelledby="quick-start">
+      <h2 class="site-home__heading" id="quick-start">{{ icon("terminal") }}Three commands to a running app</h2>
+      {{ quick_start | safe }}
+      <p class="site-home__note">{{ icon("bot") }}<span>Using Claude Code or another coding agent? Every new app has an
+        <code>AGENTS.md</code> and a <code>CLAUDE.md</code> that teach it Renox;
+        <a href="{{ route('docs.show', 'overview') }}#use-renox-with-claude-code-or-another-coding-agent">see how</a>.</span></p>
     </div>
   </section>
 
-  <section class="site-quick" aria-labelledby="quick-start">
-    <h2 class="rx-card__title" id="quick-start">Quick start</h2>
-    <pre><code class="language-bash">cargo install renox-cli --version 1.0.0-rc.3   # installs `rnx`
-rnx new blog &amp;&amp; cd blog                          # or: --starter, --database postgres, --tailwind
-rnx serve                                        # http://127.0.0.1:3000</code></pre>
-    <p class="rx-subtitle">Using Claude Code or another coding agent? Every new app has an
-      <code>AGENTS.md</code> and a <code>CLAUDE.md</code> that tell it how Renox works; see
-      <a href="{{ route('docs.show', 'overview') }}#use-renox-with-claude-code-or-another-coding-agent">the overview</a>.</p>
-  </section>
-
-  <section aria-labelledby="explore">
-    <h2 class="rx-card__title" id="explore">Explore</h2>
+  {%- for section in nav %}
+  <section class="site-home__section" aria-labelledby="section-{{ loop.index }}">
+    <h2 class="site-home__heading" id="section-{{ loop.index }}">{{ icon(section.icon) }}{{ section.title }}</h2>
     <div class="site-cards">
-      <a class="site-card" href="{{ route('docs.show', 'overview') }}"><strong>Overview</strong><span>What's in the box, with a short taste of the code.</span></a>
-      <a class="site-card" href="{{ route('docs.show', 'tutorial') }}"><strong>Tutorial</strong><span>Build a whole app, from <code>rnx new</code> to a server.</span></a>
-      <a class="site-card" href="{{ route('docs.show', 'cheatsheet') }}"><strong>Cheat sheet</strong><span>Every common pattern in a few lines.</span></a>
-      <a class="site-card" href="{{ route('docs.show', 'ui') }}"><strong>The UI kit</strong><span>Forms, tables, sheets, dashboards and the page frame.</span></a>
-      <a class="site-card" href="{{ route('docs.show', 'grid') }}"><strong>The data grid</strong><span>Filament-style tables: filters, actions, summaries, exports.</span></a>
-      <a class="site-card" href="{{ route('docs.show', 'operations') }}"><strong>In production</strong><span>One binary, systemd, backups, logs and error reports.</span></a>
+      {%- for page in section.pages %}
+      <a class="site-card" href="{{ route('docs.show', page.slug) }}">
+        <span class="site-card__icon">{{ icon(page.icon) }}</span>
+        <strong>{{ page.nav }}</strong>
+        <span class="site-card__blurb">{{ page.blurb }}</span>
+      </a>
+      {%- endfor %}
     </div>
   </section>
+  {%- endfor %}
 </div>
 {% endblock %}

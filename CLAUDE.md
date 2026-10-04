@@ -260,7 +260,10 @@ examples/                  workspace members, each with a README.md and its own 
 site/                      the documentation site (package `renox-site`, publish = false): a Renox
                            app that compiles the repo's Markdown in (src/content.rs lists the
                            pages, src/render.rs: pulldown-cmark, anchors, TOC, hidden doctest
-                           lines, links → /docs/{slug} or GitHub), search, sitemap, ETags;
+                           lines, links → /docs/{slug} or GitHub, callouts, code panels),
+                           src/highlight.rs (its own syntax colours, no dependency),
+                           src/icons.rs (Lucide SVGs, `icon()` in templates; each page in
+                           content.rs has an icon and a one-line blurb), search, sitemap, ETags;
                            deploy/ has its systemd units; .github/workflows/release-site.yml
                            builds it for https://renox.renoxium.com, whose server pulls
                            each new build (#141). A new guide in docs/ needs a line in

@@ -12,6 +12,15 @@ pub enum Section {
 impl Section {
     pub const ALL: [Section; 3] = [Section::Start, Section::Guides, Section::Project];
 
+    /// The section's icon (a name from `icons.rs`).
+    pub fn icon(self) -> &'static str {
+        match self {
+            Section::Start => "rocket",
+            Section::Guides => "book-open",
+            Section::Project => "package",
+        }
+    }
+
     pub fn title(self) -> &'static str {
         match self {
             Section::Start => "Start here",
@@ -29,17 +38,24 @@ pub struct Page {
     /// The name in the sidebar (the page's own title is its first heading).
     pub nav: &'static str,
     pub section: Section,
+    /// Its icon (a name from `icons.rs`).
+    pub icon: &'static str,
+    /// What the page is for, in one plain sentence: under its title, and in
+    /// search results and the home page.
+    pub blurb: &'static str,
     /// The file in the repository, for "Edit on GitHub" and link rewriting.
     pub path: &'static str,
     pub markdown: &'static str,
 }
 
 macro_rules! page {
-    ($slug:literal, $nav:literal, $section:ident, $path:literal) => {
+    ($slug:literal, $nav:literal, $section:ident, $icon:literal, $path:literal, $blurb:literal) => {
         Page {
             slug: $slug,
             nav: $nav,
             section: Section::$section,
+            icon: $icon,
+            blurb: $blurb,
             path: $path,
             markdown: include_str!(concat!("../../", $path)),
         }
@@ -48,69 +64,190 @@ macro_rules! page {
 
 /// Every page, in sidebar order.
 pub static PAGES: &[Page] = &[
-    page!("overview", "Overview", Start, "README.md"),
-    page!("tutorial", "Tutorial", Start, "docs/tutorial.md"),
-    page!("laravel", "Coming from Laravel", Start, "docs/laravel.md"),
-    page!("cheatsheet", "Cheat sheet", Start, "CHEATSHEET.md"),
+    page!(
+        "overview",
+        "Overview",
+        Start,
+        "compass",
+        "README.md",
+        "What Renox is, what comes in the box, and a first taste of the code."
+    ),
+    page!(
+        "tutorial",
+        "Tutorial",
+        Start,
+        "graduation-cap",
+        "docs/tutorial.md",
+        "Build a small app step by step, from an empty folder to a running server."
+    ),
+    page!(
+        "laravel",
+        "Coming from Laravel",
+        Start,
+        "arrow-right-left",
+        "docs/laravel.md",
+        "Know Laravel? Each idea you know, and its name in Renox."
+    ),
+    page!(
+        "cheatsheet",
+        "Cheat sheet",
+        Start,
+        "list-checks",
+        "CHEATSHEET.md",
+        "The most common things you'll write, a few lines each."
+    ),
     page!(
         "routing",
         "Routing and middleware",
         Guides,
-        "docs/routing.md"
+        "route",
+        "docs/routing.md",
+        "Which code answers which web address, and what runs before it."
     ),
     page!(
         "validation",
         "Forms and validation",
         Guides,
-        "docs/validation.md"
+        "square-check",
+        "docs/validation.md",
+        "Read what people type into forms, and check it before you use it."
     ),
-    page!("ui", "Views and the UI kit", Guides, "docs/ui.md"),
-    page!("grid", "The data grid", Guides, "docs/grid.md"),
+    page!(
+        "ui",
+        "Views and the UI kit",
+        Guides,
+        "layout-dashboard",
+        "docs/ui.md",
+        "Build pages from templates and ready-made parts: buttons, forms, tables."
+    ),
+    page!(
+        "grid",
+        "The data grid",
+        Guides,
+        "table",
+        "docs/grid.md",
+        "A table of records people can sort, filter, search and export."
+    ),
     page!(
         "relations",
         "Models and relations",
         Guides,
-        "docs/relations.md"
+        "database",
+        "docs/relations.md",
+        "Save data in tables and load the rows that belong together."
     ),
-    page!("types", "Field types", Guides, "docs/types.md"),
+    page!(
+        "types",
+        "Field types",
+        Guides,
+        "type",
+        "docs/types.md",
+        "Which Rust type to use for each kind of form field and table column."
+    ),
     page!(
         "authorization",
         "Authorization and tenants",
         Guides,
-        "docs/authorization.md"
+        "shield-check",
+        "docs/authorization.md",
+        "Decide who may see or change what."
     ),
-    page!("queue", "The queue", Guides, "docs/queue.md"),
-    page!("mail", "Mail and notifications", Guides, "docs/mail.md"),
+    page!(
+        "queue",
+        "The queue",
+        Guides,
+        "layers",
+        "docs/queue.md",
+        "Do slow work in the background, so pages stay fast."
+    ),
+    page!(
+        "mail",
+        "Mail and notifications",
+        Guides,
+        "mail",
+        "docs/mail.md",
+        "Send emails and in-app messages to your users."
+    ),
     page!(
         "scheduling",
         "Scheduler, events, cache",
         Guides,
-        "docs/scheduling.md"
+        "clock",
+        "docs/scheduling.md",
+        "Run tasks on a timetable, react to things that happen, remember results."
     ),
-    page!("testing", "Testing", Guides, "docs/testing.md"),
-    page!("postgresql", "PostgreSQL", Guides, "docs/postgresql.md"),
+    page!(
+        "testing",
+        "Testing",
+        Guides,
+        "flask",
+        "docs/testing.md",
+        "Check that your app works, automatically, every time you change it."
+    ),
+    page!(
+        "postgresql",
+        "PostgreSQL",
+        Guides,
+        "hard-drive",
+        "docs/postgresql.md",
+        "Use PostgreSQL instead of SQLite when one server isn't enough."
+    ),
     page!(
         "operations",
         "Running in production",
         Guides,
-        "docs/operations.md"
+        "server",
+        "docs/operations.md",
+        "Put your app on a real server and keep it healthy."
     ),
     page!(
         "development",
         "Faster builds",
         Guides,
-        "docs/development.md"
+        "zap",
+        "docs/development.md",
+        "Make compiling quicker while you work."
     ),
     page!(
         "stability",
         "Stability and versions",
         Project,
-        "docs/stability.md"
+        "anchor",
+        "docs/stability.md",
+        "What may change between versions, and what won't."
     ),
-    page!("changelog", "Changelog", Project, "CHANGELOG.md"),
-    page!("contributing", "Contributing", Project, "CONTRIBUTING.md"),
-    page!("security", "Security", Project, "SECURITY.md"),
-    page!("releasing", "Releasing", Project, "RELEASING.md"),
+    page!(
+        "changelog",
+        "Changelog",
+        Project,
+        "history",
+        "CHANGELOG.md",
+        "Everything that changed, version by version."
+    ),
+    page!(
+        "contributing",
+        "Contributing",
+        Project,
+        "git-pull-request",
+        "CONTRIBUTING.md",
+        "How to help: report a problem, or send a change."
+    ),
+    page!(
+        "security",
+        "Security",
+        Project,
+        "lock",
+        "SECURITY.md",
+        "How to tell us about a security problem, privately."
+    ),
+    page!(
+        "releasing",
+        "Releasing",
+        Project,
+        "package",
+        "RELEASING.md",
+        "How a new version is published."
+    ),
 ];
 
 /// The page with this slug.

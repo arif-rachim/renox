@@ -10,6 +10,12 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Docs site (#189, #190, #191):** code samples in coloured panels (a small highlighter in
+  `site/src/highlight.rs` for Rust, templates, shell, TOML, SQL, JSON, PHP, CSS and config
+  files, rendered on the server), JetBrains Mono, a copy button; the pages use the whole
+  window with no sideways scrolling on phones; icons for every page (Lucide, inlined),
+  a page header with what the page is for and its reading time, `> [!TIP]`-style
+  callouts, and a new home page. The quick start shows the workspace's version.
 - **`renox-2fa` (#169), the first plugin crate, started:** `crates/renox-2fa`, versioned with
   `renox`. `TwoFactor` (a module) brings the `two_factor` table (SQLite and PostgreSQL: one
   row per user, the TOTP secret sealed with `APP_KEY`, when it was confirmed, the last code
