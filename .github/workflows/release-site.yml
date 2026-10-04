@@ -5,7 +5,7 @@ name: Release build (site)
 # CI holds no server keys.
 on:
   push:
-    branches: [main, site-release-build]
+    branches: [main]
     paths:
       - "site/**"
       - "docs/**"

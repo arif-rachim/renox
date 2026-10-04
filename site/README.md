@@ -26,42 +26,22 @@ the commit it was built from.
 | Long-form text styles | [public/site.css](public/site.css) |
 | Every page renders, links land on headings that exist | [tests/site.rs](tests/site.rs) |
 
-## Deploying from GitHub
+## Where it runs
 
-The site runs at **https://renox.renoxium.com**, on the owner's Ubuntu 24.04 server.
-[`.github/workflows/docs-site.yml`](../.github/workflows/docs-site.yml) builds it on Ubuntu
-24.04 whenever the docs change on `main` (or from the Actions tab: "Docs site", Run workflow),
-copies the binary over SSH, restarts it and checks `/health`.
+The site runs at **https://renox.renoxium.com**, on the owner's Ubuntu 24.04 server, which
+pulls its releases; GitHub holds no key to the server.
 
-Once, to set it up:
+- [`.github/workflows/release-site.yml`](../.github/workflows/release-site.yml) ("Release
+  build (site)") builds `renox-site` on Ubuntu 24.04 (the server's release, so glibc matches)
+  when `site/`, `docs/`, `crates/` or the root Markdown change on `main`, and uploads the
+  stripped binary as the artifact `renox-site-<sha>` (with `REVISION` and a sha256), kept 30
+  days. It also runs from the Actions tab (Run workflow).
+- Every five minutes the server looks for a newer `renox-site-<sha>` artifact from `main`,
+  checks its sha256, installs it next to the previous releases, restarts the site (socket
+  activation: visitors wait, nobody is refused) and checks `/health`. When `/health` fails it
+  goes back to the previous release and skips that commit until a newer one is built.
 
-1. A key for GitHub Actions to deploy with (on your own machine):
-
-   ```bash
-   ssh-keygen -t ed25519 -N "" -C renox-docs-deploy -f renox-docs-deploy
-   ```
-
-2. The DNS: an `A` (and `AAAA`) record for `renox.renoxium.com` to the server.
-3. On the server, as root (it reads `renox-docs-deploy.pub`'s content):
-
-   ```bash
-   curl -fsSL https://raw.githubusercontent.com/arif-rachim/renox/main/site/deploy/setup-ubuntu.sh \
-       | sudo DOMAIN=renox.renoxium.com DEPLOY_KEY="$(cat renox-docs-deploy.pub)" bash
-   ```
-
-   It makes a `renox-site` user that runs the site and a `deploy` user that may only replace
-   the binary and restart it, writes `/opt/renox-site/.env` (production, a new `APP_KEY`,
-   port 3080, `TRUSTED_HOSTS`), installs the systemd service and socket, and sets up the web
-   server: Caddy (installed if there's neither Caddy nor nginx; it fetches the HTTPS
-   certificate itself), or a server block printed for an existing nginx.
-4. In GitHub, Settings → Environments → New environment `docs-site`, with the secrets
-   `DOCS_SSH_HOST` (the server), `DOCS_SSH_KEY` (the content of `renox-docs-deploy`, the
-   private key) and `DOCS_SSH_KNOWN_HOSTS` (the output of `ssh-keyscan -t ed25519
-   <server>`: the server's key is pinned, never trusted on first sight). Optional
-   variables: `DOCS_SSH_USER` (`deploy`) and `DOCS_SITE_URL`.
-5. Actions → "Docs site" → Run workflow, for the first deploy.
-
-Until the secrets exist, the workflow builds the site and skips the deploy.
+So a change to the docs is live a few minutes after it's merged.
 
 ## By hand
 
