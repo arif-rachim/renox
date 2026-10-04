@@ -10,6 +10,10 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **`rnx new` (#221):** the AGENTS.md of a new app says exactly where Renox's docs are offline:
+  for an `rnx` from crates.io, the `git clone --depth 1 --branch v<version> …` of the app's
+  version (the downloaded crates hold only the source); for a Git pin, Cargo's checkout of that
+  commit; for `--renox-path`, the local checkout.
 - **Docs match the code (#208–#217, #219):** the docs-gap audit's 140 items fixed across the
   README, CHEATSHEET, llms.txt, SECURITY, RELEASING, CONTRIBUTING, every guide in docs/, the
   AGENTS.md and .env new apps get, the examples' READMEs and renox-2fa's README. Among them:

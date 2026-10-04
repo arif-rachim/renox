@@ -140,6 +140,35 @@ fn docs_url(rev: Option<&str>) -> String {
     format!("{RENOX_GIT}/blob/{}", rev.unwrap_or("main"))
 }
 
+/// AGENTS.md's offline line for an app on a local checkout: everything is there.
+fn path_offline(checkout: &str) -> String {
+    format!(
+        "Offline, everything (the source, the cheat sheet, llms.txt, the guides and the \
+         examples) is in the local Renox checkout this app uses: `{checkout}`."
+    )
+}
+
+/// AGENTS.md's offline line for an app pinned to a Git commit: Cargo's checkout
+/// of the repository has everything.
+fn git_offline(rev: Option<&str>) -> String {
+    let dir = rev.map_or("*", |rev| &rev[..7.min(rev.len())]);
+    format!(
+        "Offline, everything (the source, the cheat sheet, llms.txt, the guides and the \
+         examples) is in the checkout Cargo downloaded: `~/.cargo/git/checkouts/renox-*/{dir}/`."
+    )
+}
+
+/// AGENTS.md's offline line for an app on crates.io: the downloaded crates
+/// hold only the source, so it names the clone of this exact version.
+fn registry_offline(version: &str) -> String {
+    format!(
+        "Offline, Renox's source is in the crates Cargo downloaded: \
+         `~/.cargo/registry/src/*/renox-core-{version}/`. For the cheat sheet, llms.txt, the \
+         guides and the examples of this version: \
+         `git clone --depth 1 --branch v{version} {RENOX_GIT}`."
+    )
+}
+
 /// Renox from crates.io, at this `rnx`'s own version (`cargo install
 /// renox-cli` builds from the registry, without git): a caret requirement,
 /// since a minor release doesn't break apps. A pre-release (`1.0.0-rc.1`)
@@ -195,7 +224,7 @@ fn run_in(parent: &Path, name: &str, renox_path: Option<&Path>, options: Options
             (
                 format!("renox = {{ path = {:?}", crate_dir.display().to_string()),
                 docs_url(None),
-                format!("the local Renox checkout this app uses: `{checkout}`"),
+                path_offline(&checkout),
             )
         }
         None if rev.is_none() && option_env!("RENOX_FROM_CRATES_IO").is_some() => {
@@ -203,22 +232,10 @@ fn run_in(parent: &Path, name: &str, renox_path: Option<&Path>, options: Options
             (
                 registry_dependency(version),
                 format!("{RENOX_GIT}/blob/v{version}"),
-                format!(
-                    "the crates Cargo downloaded: `~/.cargo/registry/src/*/renox-core-{version}/`"
-                ),
+                registry_offline(version),
             )
         }
-        None => (
-            git_dependency(rev),
-            docs_url(rev),
-            match rev {
-                Some(rev) => format!(
-                    "the checkout Cargo downloaded: `~/.cargo/git/checkouts/renox-*/{}/`",
-                    &rev[..7.min(rev.len())]
-                ),
-                None => "the checkout Cargo downloaded: `~/.cargo/git/checkouts/renox-*/*/`".into(),
-            },
-        ),
+        None => (git_dependency(rev), docs_url(rev), git_offline(rev)),
     };
     let dependency = match database {
         Database::Sqlite => format!("{dependency} }}"),
@@ -244,7 +261,7 @@ fn run_in(parent: &Path, name: &str, renox_path: Option<&Path>, options: Options
             .replace("{{title}}", &title(name))
             .replace("{{renox_dependency}}", &dependency)
             .replace("{{renox_docs}}", &docs)
-            .replace("{{renox_source}}", &source)
+            .replace("{{renox_offline}}", &source)
             .replace("{{crate_name}}", &crate_name)
             .replace("{{database_url}}", &database_url)
             .replace("{{test_database_url}}", &test_database_url);
@@ -388,6 +405,30 @@ mod tests {
             format!("https://github.com/arif-rachim/renox/blob/{rev}")
         );
         assert!(docs_url(None).ends_with("/blob/main"));
+    }
+
+    #[test]
+    fn agents_md_says_where_the_docs_are_offline() {
+        // crates.io: only the source is downloaded, so the exact clone is named (#221).
+        let registry = registry_offline("1.2.3");
+        assert!(
+            registry.contains(
+                "`git clone --depth 1 --branch v1.2.3 https://github.com/arif-rachim/renox`"
+            ),
+            "{registry}"
+        );
+        assert!(registry.contains("renox-core-1.2.3/"));
+        // Git: the checkout of that commit has everything.
+        let git = git_offline(Some("0123456789abcdef"));
+        assert!(git.contains("checkouts/renox-*/0123456/"), "{git}");
+        assert!(!git.contains("git clone"));
+        assert!(git_offline(None).contains("checkouts/renox-*/*/"));
+        // A local checkout.
+        let path = path_offline("/src/renox");
+        assert!(
+            path.contains("`/src/renox`") && !path.contains("git clone"),
+            "{path}"
+        );
     }
 
     const SQLITE: Options = Options {
