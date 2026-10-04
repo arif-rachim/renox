@@ -67,6 +67,11 @@ pub struct TypesGuide;
 #[doc = include_str!("../../../docs/relations.md")]
 pub struct RelationsGuide;
 
+/// Compiles the Rust in docs/search.md as a doctest.
+#[cfg(doctest)]
+#[doc = include_str!("../../../docs/search.md")]
+pub struct SearchGuide;
+
 /// Compiles the Rust in docs/authorization.md as a doctest.
 #[cfg(doctest)]
 #[doc = include_str!("../../../docs/authorization.md")]
@@ -191,6 +196,22 @@ pub struct CheatSheet;
 /// #[derive(Model)]
 /// #[model(soft_deletes)]
 /// struct NoDeletedAt { id: i64 }
+/// ```
+///
+/// `search` names the model's own columns:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model)]
+/// #[model(search = "title, bodyy")]
+/// struct Post { id: i64, title: String, body: String }
+/// ```
+///
+/// `search_language` is a plain lowercase name:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model)]
+/// #[model(search = "title", search_language = "english'; --")]
+/// struct Post { id: i64, title: String }
 /// ```
 ///
 /// Unknown attributes are refused:

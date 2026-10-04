@@ -10,6 +10,23 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Full-text search (#154):** one API on SQLite FTS5 and PostgreSQL `tsvector` (Laravel
+  Scout's database engine). `#[model(search = "title, body")]` names the searched columns
+  (the first weighs most in the ranking; `search_language = "simple"`, `"spanish"`, … changes
+  the stemming from English); `renox::db::search::migration::<Post>(name)` is the migration
+  that creates the index (an external-content FTS5 table with insert/update/delete triggers,
+  or a generated `search_vector` column with a GIN index) and fills it from existing rows.
+  `Model::search(words)` / `Query::search` give the matches best first, and combine with
+  filters, default scopes, soft deletes and pagination; `Query::where_search` and
+  `Query::order_by_relevance` are the two halves. Every word must match, as a word, a prefix
+  or another form of it; only letters and digits of the input are used, bound as one value,
+  so search syntax in user input is plain text. The database keeps the index current on
+  every write (bulk updates, `insert_many` and raw SQL included, which skip model hooks);
+  `renox::db::search::rebuild::<Post>(&db)` refills it. The data grid's search box uses the
+  index when the grid's model has one (also for columns the grid doesn't show), best match
+  first until the user sorts. `migrate:fresh` drops virtual tables first. New consts
+  `Model::SEARCHABLE` and `Model::SEARCH_LANGUAGE` (with defaults). Guide: docs/search.md;
+  examples/relations' blog search uses it.
 - **`rnx new` (#221):** the AGENTS.md of a new app says exactly where Renox's docs are offline:
   for an `rnx` from crates.io, the `git clone --depth 1 --branch v<version> …` of the app's
   version (the downloaded crates hold only the source); for a Git pin, Cargo's checkout of that

@@ -746,6 +746,53 @@ For joins and reports, use `sql("…").fetch_as::<T>(&db)` with `#[derive(FromRo
 See [docs/relations.md](docs/relations.md): pivot columns (`attach_with`, `load_with_pivot`,
 `toggle`) and polymorphic relations (`Morph`) are there too.
 
+## Full-text search (details in [docs/search.md](docs/search.md))
+
+Find rows by the words in them, best matches first, on SQLite (FTS5) and PostgreSQL
+(`tsvector`) alike. Name the columns on the model, add the index's migration, then search.
+
+```rust
+use renox::prelude::*;
+use serde::{Deserialize, Serialize};
+
+#[derive(Model, Serialize, Default)]
+#[model(table = "posts", search = "title, body")] // the title weighs more
+struct Post {
+    id: i64,
+    title: String,
+    body: String,
+    published: bool,
+}
+
+fn app() -> App {
+    App::new()
+        .migrations(renox::migrations!())
+        // After the migration creating `posts`: an FTS5 table + triggers on
+        // SQLite, a generated column + GIN index on PostgreSQL.
+        .migrations(&[renox::db::search::migration::<Post>("20260104000000_search_posts")])
+}
+
+#[derive(Deserialize)]
+struct Search {
+    q: Option<String>,
+}
+
+async fn index(State(db): State<Db>, Page(page): Page, Query(s): Query<Search>) -> Result<View> {
+    let q = s.q.unwrap_or_default(); // user input is safe: only its words are used
+    let posts = Post::search(&q) // every word, prefixes ("cof" → coffee), word forms
+        .where_eq("published", true)
+        .latest() // ties: newest first
+        .paginate(&db, page, 20)
+        .await?;
+    Ok(view("posts/index.html", context! { posts, q }))
+}
+```
+
+`where_search(q)` filters without ranking, `order_by_relevance(q)` ranks only. The database
+keeps the index current on every write (bulk updates and raw SQL too).
+`#[model(search_language = "simple")]` turns English stemming off (PostgreSQL also takes
+`spanish`, `german`, …). A data grid over a searchable model searches through the index.
+
 ## Model hooks, partial saves, encrypted values
 
 Run your own code just before or after a model is saved or deleted (hooks), save only some

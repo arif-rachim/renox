@@ -64,6 +64,29 @@ enum Filter {
         sub_column: String,
         filters: Vec<Filter>,
     },
+    /// A full-text search on a model's index, already rendered per
+    /// database (`search::filter_sql`), with one `?`.
+    Search { sqlite: String, postgres: String },
+}
+
+/// One `ORDER BY` term.
+#[derive(Clone)]
+enum Order {
+    /// SQL without values.
+    Sql(String),
+    /// Full-text relevance (`search::rank_sql`) per database, with one `?`
+    /// in `order_binds`.
+    Relevance { sqlite: String, postgres: String },
+}
+
+impl Order {
+    fn render(&self, dialect: Dialect) -> &str {
+        match (self, dialect) {
+            (Order::Sql(sql), _) => sql,
+            (Order::Relevance { sqlite, .. }, Dialect::Sqlite) => sqlite,
+            (Order::Relevance { postgres, .. }, Dialect::Postgres) => postgres,
+        }
+    }
 }
 
 impl Filter {
@@ -122,6 +145,10 @@ impl Filter {
                     quote(table)
                 )
             }
+            Filter::Search { sqlite, postgres } => match dialect {
+                Dialect::Sqlite => sqlite.clone(),
+                Dialect::Postgres => postgres.clone(),
+            },
         }
     }
 }
@@ -188,7 +215,9 @@ pub struct Query<M> {
     group: Vec<String>,
     having: Vec<String>,
     having_binds: Vec<DbValue>,
-    order: Vec<String>,
+    order: Vec<Order>,
+    /// Values of the `ORDER BY` terms, bound after the WHERE and HAVING ones.
+    order_binds: Vec<DbValue>,
     limit: Option<u64>,
     offset: Option<u64>,
     lock: Option<&'static str>,
@@ -206,6 +235,7 @@ impl<M> Clone for Query<M> {
             having: self.having.clone(),
             having_binds: self.having_binds.clone(),
             order: self.order.clone(),
+            order_binds: self.order_binds.clone(),
             limit: self.limit,
             offset: self.offset,
             lock: self.lock,
@@ -225,6 +255,7 @@ impl<M: Model> Query<M> {
             having: Vec::new(),
             having_binds: Vec::new(),
             order: Vec::new(),
+            order_binds: Vec::new(),
             limit: None,
             offset: None,
             lock: None,
@@ -493,10 +524,77 @@ impl<M: Model> Query<M> {
         if condition { add(self) } else { self }
     }
 
+    /// The rows matching a full-text search, best matches first (as
+    /// [`where_search`](Self::where_search) then
+    /// [`order_by_relevance`](Self::order_by_relevance)); more `order_by`
+    /// calls break ties. The model needs `#[model(search = "…")]` and its
+    /// index: see [`renox::db::search`](super::search). A text without any
+    /// word changes nothing.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// #[derive(Model, serde::Serialize, Default)]
+    /// #[model(table = "posts", search = "title, body", soft_deletes)]
+    /// struct Post {
+    ///     id: i64,
+    ///     title: String,
+    ///     body: String,
+    ///     author_id: i64,
+    ///     deleted_at: Option<DateTime>,
+    /// }
+    ///
+    /// # async fn demo(db: Db, q: String) -> Result {
+    /// let page = Post::query()
+    ///     .where_eq("author_id", 7)
+    ///     .search(&q)
+    ///     .order_by_desc("id")
+    ///     .paginate(&db, 1, 20)
+    ///     .await?;
+    /// # let _ = page; Ok(()) }
+    /// ```
+    pub fn search(self, words: &str) -> Self {
+        self.where_search(words).order_by_relevance(words)
+    }
+
+    /// Keeps the rows matching a full-text search (every word, as a word
+    /// or the start of one), without ordering them. User input is safe
+    /// here: only its words reach the database, bound as a value.
+    pub fn where_search(mut self, words: &str) -> Self {
+        if let Some(problem) = super::search::unsearchable::<M>() {
+            self.error.get_or_insert(problem);
+            return self;
+        }
+        if let Some(terms) = super::search::terms(words) {
+            self.filters.push(Filter::Search {
+                sqlite: super::search::filter_sql::<M>(Dialect::Sqlite),
+                postgres: super::search::filter_sql::<M>(Dialect::Postgres),
+            });
+            self.binds.push(DbValue::Text(terms));
+        }
+        self
+    }
+
+    /// Sorts by how well rows match a full-text search, best first (rows
+    /// that don't match last); call `order_by` after it to break ties.
+    pub fn order_by_relevance(mut self, words: &str) -> Self {
+        if let Some(problem) = super::search::unsearchable::<M>() {
+            self.error.get_or_insert(problem);
+            return self;
+        }
+        if let Some(terms) = super::search::terms(words) {
+            self.order.push(Order::Relevance {
+                sqlite: super::search::rank_sql::<M>(Dialect::Sqlite),
+                postgres: super::search::rank_sql::<M>(Dialect::Postgres),
+            });
+            self.order_binds.push(DbValue::Text(terms));
+        }
+        self
+    }
+
     /// Sorts by `column`, ascending; call again to add tie-breakers.
     pub fn order_by(mut self, column: &str) -> Self {
         if let Some(column) = self.column(column) {
-            self.order.push(format!("{column} ASC"));
+            self.order.push(Order::Sql(format!("{column} ASC")));
         }
         self
     }
@@ -504,7 +602,7 @@ impl<M: Model> Query<M> {
     /// Sorts by `column`, descending; call again to add tie-breakers.
     pub fn order_by_desc(mut self, column: &str) -> Self {
         if let Some(column) = self.column(column) {
-            self.order.push(format!("{column} DESC"));
+            self.order.push(Order::Sql(format!("{column} DESC")));
         }
         self
     }
@@ -560,7 +658,7 @@ impl<M: Model> Query<M> {
     /// An `ORDER BY` term in SQL, e.g. `"total DESC, id"` (no values; never
     /// from user input).
     pub fn order_by_raw(mut self, sql: &str) -> Self {
-        self.order.push(sql.to_owned());
+        self.order.push(Order::Sql(sql.to_owned()));
         self
     }
 
@@ -665,7 +763,8 @@ impl<M: Model> Query<M> {
         );
         sql.push_str(&self.group_sql());
         if !self.order.is_empty() {
-            sql.push_str(&format!(" ORDER BY {}", self.order.join(", ")));
+            let terms: Vec<&str> = self.order.iter().map(|o| o.render(dialect)).collect();
+            sql.push_str(&format!(" ORDER BY {}", terms.join(", ")));
         }
         match (self.limit, self.offset) {
             (Some(limit), Some(offset)) => sql.push_str(&format!(" LIMIT {limit} OFFSET {offset}")),
@@ -695,11 +794,24 @@ impl<M: Model> Query<M> {
         sql
     }
 
-    /// The query's values in the order its SQL uses them.
+    /// The query's values in the order its SQL uses them (without the
+    /// `ORDER BY` ones: see `select_binds`).
     fn all_binds(&self) -> Vec<DbValue> {
         let mut binds = self.binds.clone();
         binds.extend(self.having_binds.iter().cloned());
         binds
+    }
+
+    /// The values of a SELECT with its `ORDER BY` (`select_columns_sql`).
+    fn select_binds(&self) -> Vec<DbValue> {
+        let mut binds = self.all_binds();
+        binds.extend(self.order_binds.iter().cloned());
+        binds
+    }
+
+    fn clear_order(&mut self) {
+        self.order.clear();
+        self.order_binds.clear();
     }
 
     /// Records an error if `column` isn't one of the model's.
@@ -711,7 +823,7 @@ impl<M: Model> Query<M> {
     /// The SELECT this query runs and its values, e.g. to log or debug it.
     pub fn to_sql(&self, dialect: Dialect) -> Result<(String, Vec<DbValue>)> {
         self.check()?;
-        Ok((self.select_sql(dialect), self.all_binds()))
+        Ok((self.select_sql(dialect), self.select_binds()))
     }
 
     /// Selects `columns` (SQL, e.g. `"user_id, COUNT(*) AS orders"`) of the
@@ -739,7 +851,7 @@ impl<M: Model> Query<M> {
         let db = db.into_conn();
         let statement = self.select_columns_sql(db.dialect(), columns);
         Ok(sql(statement)
-            .bind_all(self.all_binds())
+            .bind_all(self.select_binds())
             .fetch_as(db)
             .await?)
     }
@@ -754,7 +866,7 @@ impl<M: Model> Query<M> {
         aggregate: &str,
     ) -> Result<Vec<(String, Option<f64>)>> {
         self.check()?;
-        self.order.clear();
+        self.clear_order();
         self.group = vec!["1".to_owned()];
         self.having.clear();
         self.having_binds.clear();
@@ -852,7 +964,7 @@ impl<M: Model> Query<M> {
         let db = db.into_conn();
         let statement = self.select_columns_sql(db.dialect(), &column);
         Ok(sql(statement)
-            .bind_all(self.all_binds())
+            .bind_all(self.select_binds())
             .scalars(db)
             .await?)
     }
@@ -979,7 +1091,7 @@ impl<M: Model> Query<M> {
         let mut seen = 0_u64;
         loop {
             let mut page = self.clone();
-            page.order.clear();
+            page.clear_order();
             page.limit = None;
             page.offset = None;
             if let Some(last) = last.take() {
@@ -1003,7 +1115,7 @@ impl<M: Model> Query<M> {
         self.check()?;
         let db = db.into_conn();
         let rows = sql(self.select_sql(db.dialect()))
-            .bind_all(self.all_binds())
+            .bind_all(self.select_binds())
             .fetch_all(db)
             .await?;
         Ok(rows
@@ -1108,7 +1220,7 @@ impl<M: Model> Query<M> {
             };
             self = self.where_op("id", "<", after);
         }
-        self.order.clear();
+        self.clear_order();
         let mut items = self
             .order_by_desc("id")
             .limit(u64::from(per_page) + 1)

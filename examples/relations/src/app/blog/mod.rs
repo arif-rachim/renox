@@ -8,7 +8,8 @@
 //!
 //! It is also a public blog: bodies are Markdown (the `markdown` filter),
 //! each post has its own title and description for search engines
-//! (`seo()`), the posts are searchable (`?q=`), and there is an RSS feed
+//! (`seo()`), the posts are searchable (`?q=`, full-text: `Post::search`),
+//! and there is an RSS feed
 //! (`/feed.xml`) and a sitemap (`/sitemap.xml`, `renox::seo::Sitemap`). The
 //! pages are styled with Tailwind (resources/css/app.css, built by
 //! `rnx tailwind` into public/css/app.css).
@@ -96,22 +97,17 @@ struct Search {
 /// 10 posts with their categories, comment counts, latest comments, tags
 /// and like counts in 8 queries in all (count and page, categories, comment
 /// counts, latest comments, tag links and tags, like counts), whatever the
-/// page size. `?q=` keeps the posts whose title or body has every word.
+/// page size. `?q=` keeps the posts whose title or body has every word
+/// (or a longer form of it: "roast" finds "roasting"), best match first.
 async fn index(
     State(db): State<Db>,
     Page(page): Page,
     Query(search): Query<Search>,
 ) -> Result<View> {
     let q = search.q.unwrap_or_default().trim().to_owned();
-    let mut query = Post::query().latest();
-    for word in q.split_whitespace().take(5) {
-        let pattern = format!("%{word}%");
-        query = query.where_any(|any| {
-            any.where_like("title", pattern.clone())
-                .where_like("body", pattern)
-        });
-    }
-    let posts = query.paginate(&db, page, 10).await?;
+    // Full-text: best matches first, then the newest. Without words (no
+    // `q`), every post, newest first.
+    let posts = Post::search(&q).latest().paginate(&db, page, 10).await?;
     let categories = belongs_to::<Category, _, _>(&db, &posts.items, |p| p.category_id).await?;
     // `withCount`: one GROUP BY query; posts without comments get 0.
     let counts = count_many(&db, &posts.items, Comment::query(), "post_id").await?;

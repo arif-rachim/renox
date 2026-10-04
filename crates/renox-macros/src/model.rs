@@ -23,6 +23,8 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
     let mut soft_deletes = false;
     let mut default_scope: Option<syn::Path> = None;
     let mut hooks = false;
+    let mut search: Option<LitStr> = None;
+    let mut search_language: Option<LitStr> = None;
     for attr in input.attrs.iter().filter(|a| a.path().is_ident("model")) {
         attr.parse_nested_meta(|meta| {
             if meta.path.is_ident("table") {
@@ -37,9 +39,15 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
             } else if meta.path.is_ident("default_scope") {
                 default_scope = Some(meta.value()?.parse::<LitStr>()?.parse()?);
                 Ok(())
+            } else if meta.path.is_ident("search") {
+                search = Some(meta.value()?.parse::<LitStr>()?);
+                Ok(())
+            } else if meta.path.is_ident("search_language") {
+                search_language = Some(meta.value()?.parse::<LitStr>()?);
+                Ok(())
             } else {
                 Err(meta.error(
-                    "expected `table = \"...\"`, `soft_deletes`, `hooks` or `default_scope = \"path::to::fn\"`",
+                    "expected `table = \"...\"`, `soft_deletes`, `hooks`, `default_scope = \"path::to::fn\"`, `search = \"col, col\"` or `search_language = \"...\"`",
                 ))
             }
         })?;
@@ -101,6 +109,57 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
         .filter(|f| !f.skip)
         .map(|f| f.name.as_str())
         .collect();
+
+    let mut searchable: Vec<String> = Vec::new();
+    if let Some(lit) = &search {
+        for name in lit.value().split(',').map(str::trim) {
+            if name.is_empty() {
+                continue;
+            }
+            if name == "id" || !columns.contains(&name) {
+                return Err(Error::new_spanned(
+                    lit,
+                    format!("`search`: `{name}` isn't a text column of this model"),
+                ));
+            }
+            if searchable.iter().any(|s| s == name) {
+                return Err(Error::new_spanned(
+                    lit,
+                    format!("`search`: `{name}` is listed twice"),
+                ));
+            }
+            searchable.push(name.to_owned());
+        }
+        if searchable.is_empty() {
+            return Err(Error::new_spanned(
+                lit,
+                "`search` needs at least one column: `search = \"title, body\"`",
+            ));
+        }
+    }
+    let search_const = (!searchable.is_empty()).then(|| {
+        quote! { const SEARCHABLE: &'static [&'static str] = &[#(#searchable),*]; }
+    });
+    let language_const = match &search_language {
+        Some(lit) => {
+            let language = lit.value();
+            if language.is_empty() || !language.chars().all(|c| c.is_ascii_lowercase() || c == '_')
+            {
+                return Err(Error::new_spanned(
+                    lit,
+                    "`search_language` is a lowercase name such as `english` or `simple`",
+                ));
+            }
+            if searchable.is_empty() {
+                return Err(Error::new_spanned(
+                    lit,
+                    "`search_language` needs `search = \"…\"` too",
+                ));
+            }
+            Some(quote! { const SEARCH_LANGUAGE: &'static str = #language; })
+        }
+        None => None,
+    };
 
     let from_row = fields.iter().map(|f| {
         let (ident, name) = (&f.ident, &f.name);
@@ -177,6 +236,8 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
             const TABLE: &'static str = #table;
             const COLUMNS: &'static [&'static str] = &[#(#columns),*];
             const SOFT_DELETES: bool = #soft_deletes;
+            #search_const
+            #language_const
 
             type Key = #key_type;
 

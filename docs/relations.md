@@ -512,6 +512,7 @@ write in Renox.
 | `increment` / `decrement` | `.increment(&db, "stock", -1)` |
 | `firstOrFail`, `firstOrCreate` | `.first_or_404(&db)`, `.first_or_create(&db, \|\| new)` |
 | `chunk` | `.chunk(&db, 1000, \|rows\| async { … })` (in id order; the query's own order and limit are ignored) |
+| Scout's `Post::search('…')` | `Post::search(&q)` on a model with `#[model(search = "…")]`; `.where_search`, `.order_by_relevance` ([search.md](search.md)) |
 | `insert([...])`, `upsert` | `Model::insert_many(&db, rows)`, `Model::upsert(&db, rows, &["sku"], &["qty"])` |
 | `with('category')` | `relations::belongs_to` / `has_many` / `Pivot::load_for` (above) |
 | pivot `withPivot`, `withTimestamps`, `toggle`, `updateExistingPivot` | `Pivot::with_timestamps()`, `attach_with`, `load_with_pivot::<T, Row>`, `toggle`, `update_pivot` |

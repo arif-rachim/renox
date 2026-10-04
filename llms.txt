@@ -141,7 +141,8 @@ Every example has a README.md that walks through it.
   report, likes on posts and comments through a polymorphic `Morph`, and reports as SQL joins
   with `fetch_as`; tests/queries.rs counts queries to prove no N+1. Also a public blog:
   Markdown bodies (`markdown` filter in Tailwind's `prose`), `seo()` per post with
-  `Post::summary` as the description, `?q=` search (`where_any` + `where_like`), an RSS feed
+  `Post::summary` as the description, `?q=` full-text search (`#[model(search = "title, body")]`,
+  `renox::db::search::migration::<Post>` in lib.rs, `Post::search(&q).latest()`), an RSS feed
   and a `Sitemap` with `.etag()` (304s), the post page loaded with `Found<Post>`, a category's
   latest comments through its posts (`has_many_through`); pages on the UI kit with Tailwind's `prose` for the bodies
   (resources/css/app.css → public/css/app.css, built with `rnx tailwind --minify` and
@@ -304,6 +305,12 @@ Every example has a README.md that walks through it.
 - [docs/relations.md](docs/relations.md): relations without N+1 (`belongs_to`, `has_many`, `Pivot`
   with pivot columns, polymorphic `Morph`), keys other than integers (`Pivot<Ulid, i64>`), joins
   with `fetch_as` and `#[derive(FromRow)]`, the query builder mapped to Laravel's.
+- [docs/search.md](docs/search.md): full-text search with one API on SQLite FTS5 and
+  PostgreSQL `tsvector`: `#[model(search = "title, body", search_language = "…")]`,
+  `renox::db::search::migration::<M>(name)` (the index: FTS5 table + triggers, or a generated
+  column + GIN index), `Model::search`, `Query::search`/`where_search`/`order_by_relevance`,
+  what matches (every word, prefixes, stemming; user input safe), ranking, `rebuild`, the
+  grid's search box on a searchable model; mapped to Laravel Scout.
 - [docs/stability.md](docs/stability.md): what semver covers, which types may grow
   (`#[non_exhaustive]`), public dependencies (axum yes, sqlx only through escape hatches).
 - `rnx make:deploy` writes `deploy/README.md` (Docker, systemd, Litestream backups).
