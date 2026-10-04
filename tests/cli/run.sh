@@ -20,11 +20,29 @@ WORK=$(mktemp -d)
 # Reuse the workspace's build of Renox's dependencies.
 export CARGO_TARGET_DIR=${CARGO_TARGET_DIR:-$REPO/target/cli-e2e}
 cleanup() {
+    if [ -n "${SERVER:-}" ]; then kill "$SERVER" 2>/dev/null || true; fi
     if [ -n "${KEEP:-}" ]; then echo "app kept in $WORK/shop"; else rm -rf "$WORK"; fi
 }
 trap cleanup EXIT
 
 step() { printf '\n== %s\n' "$*"; }
+
+# Serves the app in this directory on $1 and drives it with tests/cli/smoke.py $2 (#142).
+smoke() {
+    local port=$1 scenario=$2 binary
+    binary="$CARGO_TARGET_DIR/debug/$(basename "$(pwd)")"
+    APP_PORT=$port QUEUE_WORKERS=0 SCHEDULER=false "$binary" > "$WORK/$scenario.log" 2>&1 &
+    SERVER=$!
+    for _ in $(seq 1 100); do
+        curl -sf -o /dev/null "http://127.0.0.1:$port/health" && break
+        sleep 0.2
+    done
+    python3 "$REPO/tests/cli/smoke.py" "$scenario" "http://127.0.0.1:$port" storage/app.db "$binary" \
+        || { echo "--- the app's log"; tail -n 40 "$WORK/$scenario.log"; exit 1; }
+    kill "$SERVER"
+    wait "$SERVER" 2>/dev/null || true
+    SERVER=
+}
 
 cargo build -q -p renox-cli
 RNX="$CARGO_TARGET_DIR/debug/rnx"
@@ -100,6 +118,10 @@ if [ "$DATABASE" = sqlite ]; then
     fi
     grep -q 'Usage: catalog:import' "$WORK/err.txt"
     cargo run -q -- route:list
+
+    step "the app over HTTP: every page, a --resource module's forms (tests/cli/smoke.py)"
+    smoke 3191 resources
+
     cargo run -q -- db:seed
     cargo run -q -- ui:publish
     test -f resources/views/components/ui.html
@@ -166,6 +188,10 @@ cargo clippy --all-targets -- -D warnings
 if [ "$DATABASE" = sqlite ]; then
     cargo test
     cargo run --quiet -- migrate
+
+    step "the starter app over HTTP: sign-up, verification, roles (tests/cli/smoke.py)"
+    smoke 3192 starter
+
     cargo run --quiet -- db:seed
     cargo run --quiet -- users:admin member@example.com
 fi

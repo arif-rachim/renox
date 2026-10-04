@@ -260,7 +260,10 @@ site/                      the documentation site (package `renox-site`, publish
                            account's user site maps project sites to a personal domain)
 tests/chaos/               app + run.sh (postgres|sqlite) that the `chaos` CI job injects faults
                            into (docker pause/stop/restart, python3 holding SQLite's lock)
-tests/cli/run.sh           `rnx new` + every `make:*`, then build and test the app (CI `cli`/`docker`)
+tests/cli/run.sh           `rnx new` + every `make:*`, then build and test the app (CI `cli`/`docker`);
+                           with SQLite it serves the apps and drives them with tests/cli/smoke.py
+                           (every GET page, a `--resource` module's forms, the starter's sign-up,
+                           verification and roles over HTTP, #142)
 tests/tutorial/           run.sh + follow.py: docs/tutorial.md followed as a reader does (steps
                            found by their lead-in sentence, never line numbers), then fmt,
                            clippy, the tutorial's tests, seed, the app answering (CI `tutorial`).
