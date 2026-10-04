@@ -671,7 +671,9 @@ PostgreSQL suite 2.5x slower (reconnects).
   with Loco/Axum, then status. Keep claims true (checked against the code). Since
   1.0.0-rc.1 it has the crates.io/docs.rs badges, installs from crates.io (`--version` while
   1.0 is a release candidate) and has a "Use Renox with Claude Code" section. Its docs links
-  are repository files until the docs site has its own address; then point them there.
+  stay repository files (they work on GitHub and crates.io, and the site rewrites them to its
+  own pages); the top and "Documentation" point readers at https://renox.renoxium.com (#141),
+  which is also the crates' `homepage`.
 - `CHEATSHEET.md` is compiled: every ```rust block must build on its own (visible `use` lines, no
   `# ` hidden lines since GitHub shows them; define items only, no top-level statements, so the
   doctest's `main` does nothing). Check with `cargo test --doc -p renox`.
@@ -1149,8 +1151,8 @@ picks the build, not the terminal.
   `cargo install renox-cli --version 1.0.0-rc.1` + `rnx new` checked). Then the README's
   start and coding-agent sections: merged (#123). GitHub Pages was tried and dropped
   (the owner's account serves project sites on a personal domain): the docs site runs on the
-  owner's own server, built with Renox, once they have a domain (renox.rs was free on
-  2026-10-03; renox.dev is taken).
+  owner's own server, built with Renox: https://renox.renoxium.com since 2026-10-04 (#141;
+  the server pulls each build of `.github/workflows/release-site.yml`).
   Then #124 (new apps failed `cargo fmt --check`): `rnx` formats what it writes, merged
   (#125); GitHub Pages switched off (2026-10-04). Release candidate `1.0.0-rc.2` with that
   fix: published 2026-10-04 (#126, tag `v1.0.0-rc.2`). Then #127 → #129 (plural tables),

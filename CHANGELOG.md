@@ -10,6 +10,8 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Docs links (#141):** the crates' `homepage` is now https://renox.renoxium.com, and the
+  README, llms.txt and new apps' `AGENTS.md` point readers there.
 ## 1.0.0-rc.4 · 2026-10-04
 
 The fourth release candidate: fixes found by using rc.3, and two extension points for
