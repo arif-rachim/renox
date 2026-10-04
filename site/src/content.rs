@@ -137,6 +137,14 @@ pub static PAGES: &[Page] = &[
         "Save data in tables and load the rows that belong together."
     ),
     page!(
+        "search",
+        "Full-text search",
+        Guides,
+        "search",
+        "docs/search.md",
+        "Find records by the words in them, best matches first."
+    ),
+    page!(
         "types",
         "Field types",
         Guides,

@@ -558,9 +558,12 @@ async fn drop_all_sqlite(pool: &sqlx::SqlitePool) -> anyhow::Result<()> {
     use sqlx::{AssertSqlSafe, Row};
 
     let mut conn = pool.acquire().await?;
+    // Virtual tables (full-text search) first: dropping one drops its
+    // shadow tables, which are listed too.
     let objects = sqlx::query(
         "SELECT type, name FROM sqlite_master \
-         WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%'",
+         WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' \
+         ORDER BY CASE WHEN sql LIKE 'CREATE VIRTUAL TABLE%' THEN 0 ELSE 1 END, rowid",
     )
     .fetch_all(&mut *conn)
     .await?;
