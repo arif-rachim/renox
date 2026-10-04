@@ -1180,7 +1180,7 @@ In templates: `{% if can('posts.publish') %}` (a gate or a permission) and `auth
 
 ```rust
 use renox::prelude::*;
-use renox::{HxPushUrl, HxReswap, HxRetarget, Toast};
+use renox::{HxPushUrl, HxReswap, HxRetarget};
 
 // A form posted with hx-post gets just the `list` block of the page back;
 // a normal request gets the whole page.

@@ -509,7 +509,6 @@ Return a `Toast` with the response:
 
 ```rust
 use renox::prelude::*;
-use renox::Toast;
 
 async fn save() -> (Toast, Redirect) {
     (Toast::success("Product saved."), Redirect::to("/products"))
@@ -525,7 +524,7 @@ A toast can say more, as Filament's notifications do:
 
 ```rust
 use renox::prelude::*;
-use renox::{Toast, ToastAction};
+use renox::ToastAction;
 
 async fn place() -> (Toast, Redirect) {
     let toast = Toast::success("Order #7 placed")
@@ -651,7 +650,7 @@ up under its field the same way:
 
 ```rust
 use renox::prelude::*;
-use renox::{HxRefresh, Toast};
+use renox::HxRefresh;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 struct StockForm { change: i64 }

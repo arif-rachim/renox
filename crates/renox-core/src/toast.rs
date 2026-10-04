@@ -3,7 +3,7 @@
 //!
 //! ```
 //! # use renox::prelude::*;
-//! use renox::{Toast, ToastAction};
+//! use renox::ToastAction;
 //!
 //! async fn save() -> (Toast, Redirect) {
 //!     // … save …

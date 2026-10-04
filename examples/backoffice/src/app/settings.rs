@@ -2,7 +2,6 @@
 //! struct (missing keys take the defaults), edited on `/settings` by staff
 //! with `settings.manage`. Shared with every view as `company`.
 
-use renox::Toast;
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 

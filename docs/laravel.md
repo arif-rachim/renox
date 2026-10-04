@@ -581,7 +581,6 @@ Breeze's Blade components and Filament's forms give you. Views get the data you 
 The handler that renders a page can also answer an htmx request with just one block of it:
 
 ```rust
-use renox::Toast;
 use renox::prelude::*;
 
 async fn add_todo(htmx: Htmx) -> Result<Response> {

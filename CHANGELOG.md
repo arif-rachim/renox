@@ -10,6 +10,10 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **`Toast` is in the prelude (#175):** `use renox::prelude::*;` now brings `Toast`, which
+  nearly every handler that changes something returns (`HxRefresh` already was). The
+  examples, the generators and the guides drop their `use renox::Toast;`; an existing one
+  still compiles.
 ## 1.0.0-rc.4 · 2026-10-04
 
 The fourth release candidate: fixes found by using rc.3, and two extension points for
