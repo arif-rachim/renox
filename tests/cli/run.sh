@@ -51,19 +51,19 @@ fi
 
 step "every generator"
 "$RNX" make:module catalog
-"$RNX" make:model Product --module catalog --migration
+"$RNX" make:model Book --module catalog --migration
 "$RNX" make:module stock_movement
 "$RNX" make:model StockMovement -m
 "$RNX" make:model Invoice --module catalog --key ulid -m
 "$RNX" make:model Supplier --module catalog --key string -m
 "$RNX" make:job SendReceipt --module catalog
 "$RNX" make:command catalog:import --module catalog
-"$RNX" make:policy Product --module catalog
+"$RNX" make:policy Book --module catalog
 "$RNX" make:mail order_shipped
 "$RNX" make:migration add_sku_to_products
 "$RNX" make:module products --resource --fields "name:string price:money notes:text active:bool due_on:date"
 "$RNX" make:module tags --resource
-"$RNX" make:factory Product --module catalog
+"$RNX" make:factory Book --module catalog
 "$RNX" make:seeder DemoData
 "$RNX" make:test Checkout
 "$RNX" make:notification OrderShipped --module catalog
