@@ -214,6 +214,58 @@ async fn a_declined_card_stops_the_chain_and_flags_the_order() {
 }
 
 #[renox::test]
+async fn staff_pages_hear_about_a_failed_charge_and_can_reopen_it() {
+    let app = app().await;
+    app.fake_broadcasts();
+    gateway(
+        &app,
+        FakeResponse::json(402, json!({ "error": "card_declined" })),
+    );
+    place(&app).await;
+    app.post("/orders/1/pay", &[("card_token", "tok_declined")])
+        .await;
+    app.run_jobs().await;
+
+    // The open pages hear each change, and get a toast with a request button.
+    app.assert_broadcast("order-updated", |b| {
+        b.data == json!({ "id": 1, "status": "processing" })
+    })
+    .assert_broadcast("order-updated", |b| b.data["status"] == "needs_attention")
+    .assert_broadcast("renox:toast", |b| {
+        let toast = &b.data["toasts"][0];
+        toast["message"] == "Payment for order #1 failed"
+            && toast["actions"][0]
+                == json!({ "label": "Reopen", "url": "/orders/1/reopen", "method": "POST" })
+    });
+
+    // What the button sends: staff only, an htmx request answered with a toast.
+    let guest = app.htmx().post("/orders/1/reopen", &[]).await;
+    assert_eq!(guest.header("hx-redirect"), Some("/login"));
+    app.acting_as(&admin(&app).await);
+    app.get("/")
+        .await
+        .assert_see(r#"hx-trigger="order-updated from:document""#)
+        .assert_see(r#"hx-post="/orders/1/reopen""#)
+        .assert_see("data-rx-bell");
+    let res = app.htmx().post("/orders/1/reopen", &[]).await;
+    res.assert_status(204);
+    assert!(
+        res.header("hx-trigger")
+            .unwrap()
+            .contains("Order #1 is unpaid again.")
+    );
+    assert_eq!(order(&app, 1).await.status, OrderStatus::Unpaid);
+    app.assert_broadcast("order-updated", |b| b.data["status"] == "unpaid");
+    // Pressed twice (the toast and the row): the second one says so.
+    let res = app.htmx().post("/orders/1/reopen", &[]).await;
+    assert!(
+        res.header("hx-trigger")
+            .unwrap()
+            .contains("doesn't need attention")
+    );
+}
+
+#[renox::test]
 async fn the_failed_hook_runs_after_the_last_attempt() {
     let app = app().await;
     gateway(&app, FakeResponse::connection_error());

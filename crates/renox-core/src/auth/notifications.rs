@@ -348,17 +348,28 @@ impl DatabaseNotification {
 /// Wakes the open notification streams (`/notifications/stream`) of one
 /// user when something changed for them in this process; streams also look
 /// at the table every few seconds, for changes made by other servers or by
-/// `queue:work`.
+/// `queue:work`. It also carries the app's own events
+/// ([`AppState::broadcast`]) to the streams open in this process.
 pub(crate) struct Hub {
     tx: tokio::sync::broadcast::Sender<Signal>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Signal {
     /// Something changed for this user.
     User(i64),
+    /// An app event for one user's streams, or (`None`) for every stream.
+    Event(Option<i64>, Arc<Broadcast>),
     /// The server is shutting down.
     Stop,
+}
+
+/// An app event on its way to the open pages: its DOM event name and its
+/// data, already JSON.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct Broadcast {
+    pub(crate) event: String,
+    pub(crate) data: String,
 }
 
 impl Hub {
@@ -371,6 +382,11 @@ impl Hub {
     /// Tells `user_id`'s streams to look now.
     pub(crate) fn touch(&self, user_id: i64) {
         let _ = self.tx.send(Signal::User(user_id));
+    }
+
+    /// Sends an app event to `user_id`'s streams, or to every stream.
+    pub(crate) fn event(&self, user_id: Option<i64>, event: Broadcast) {
+        let _ = self.tx.send(Signal::Event(user_id, Arc::new(event)));
     }
 
     /// Ends every stream, so a graceful shutdown doesn't wait for them.
@@ -432,7 +448,79 @@ fn ordered(notification: &impl Notification, to: &Recipient) -> Vec<Channel> {
     channels
 }
 
+/// Whether `name` can be a DOM event name sent to pages: letters, digits
+/// and `-`, `_`, `:`, `.` (what `hx-trigger` and Alpine's `x-on` can name).
+fn event_name(name: &str) -> Result<&str> {
+    let valid = !name.is_empty()
+        && name.len() <= 100
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | ':' | '.'));
+    if valid {
+        Ok(name)
+    } else {
+        Err(anyhow!(
+            "`{name}` can't be a broadcast event's name: use letters, digits, `-`, `_`, `:` and `.`"
+        )
+        .into())
+    }
+}
+
 impl AppState {
+    /// Sends the DOM event `event`, with `data` as its `detail`, to every
+    /// page open in this process with a notification stream (the UI kit's
+    /// `notification_bell` or `event_stream()`, which need
+    /// `Auth::new().notifications()`), whoever is logged in there.
+    ///
+    /// Pages listen as to any DOM event on `document`: htmx with
+    /// `hx-trigger="order-updated from:document"`, Alpine with
+    /// `x-on:order-updated.document="…"`, a script with
+    /// `document.addEventListener("order-updated", e => e.detail)`. The
+    /// event `renox:toast` with `{"toasts": [toast]}` shows toasts.
+    ///
+    /// It is fire-and-forget: nothing is stored, and pages that aren't
+    /// connected at that moment (closed, reconnecting, open on another
+    /// server, or a `queue:work` process sent it) never get it. Use a
+    /// database notification ([`AppState::notify`]) for what must arrive.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # fn demo(state: AppState, user: User) -> Result {
+    /// state.broadcast("order-updated", json!({ "id": 7, "status": "paid" }))?;
+    /// // Only Ana's pages (any tab, any device on this server):
+    /// state.broadcast_to(user.id, "renox:toast", json!({ "toasts": [Toast::info("Export ready")] }))?;
+    /// # Ok(()) }
+    /// ```
+    pub fn broadcast(&self, event: &str, data: impl Serialize) -> Result {
+        self.send_broadcast(None, event, data)
+    }
+
+    /// [`AppState::broadcast`] to the pages of one user (by id) only.
+    pub fn broadcast_to(&self, user_id: i64, event: &str, data: impl Serialize) -> Result {
+        self.send_broadcast(Some(user_id), event, data)
+    }
+
+    fn send_broadcast(&self, user_id: Option<i64>, event: &str, data: impl Serialize) -> Result {
+        let event = event_name(event)?.to_owned();
+        let data = serde_json::to_value(&data).map_err(anyhow::Error::from)?;
+        let sent = crate::SentBroadcast {
+            user_id,
+            event,
+            data,
+        };
+        if self.fakes.record_broadcast(sent.clone()) {
+            return Ok(());
+        }
+        self.notification_hub.event(
+            user_id,
+            Broadcast {
+                event: sent.event,
+                data: sent.data.to_string(),
+            },
+        );
+        Ok(())
+    }
+
     fn channel(&self, name: &str) -> Result<ChannelFn> {
         self.channels.get(name).cloned().ok_or_else(|| {
             anyhow!("no `{name}` notification channel: register it with `App::channel`").into()

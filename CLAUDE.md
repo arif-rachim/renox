@@ -136,7 +136,9 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            abilities, prune), LoginThrottle (pair/account/IP), notifications
                            (Recipient, Channel::Custom, notify/notify_later,
                            SendToChannel job, DatabaseMessage, Hub), inbox.rs (the
-                           notifications.* routes and the SSE stream of `.notifications()`)
+                           notifications.* routes and the SSE stream of `.notifications()`,
+                           which also carries `AppState::broadcast` events through the
+                           in-process `Hub`)
   src/audit.rs             Audit module (audit_logs table, records auth events), audit::record,
                            audit:prune
   src/context.rs           renox::context: task-local values per request/job/task/command
@@ -661,7 +663,7 @@ PostgreSQL suite 2.5x slower (reconnects).
 - `tests/cli/run.sh [postgres]` makes an app with every generator and builds/tests it
   (`FROM_GIT=1 DOCKER=1` for the Docker job). **Add every new `make:*` there.**
   It also makes apps with the option combinations people use, with names before and after
-  "renox" (#143): `atlas` (plain), `studio` (`--starter`, with the database) and, with
+  "renox" (#143): `atlas` (plain), `pulse` (`--notifications`, #151), `studio` (`--starter`, with the database) and, with
   sqlite, `site` (`--tailwind`: downloads the pinned Tailwind CLI with `curl`, so it needs
   the network) and `desk` (`--starter --tailwind`); each passes `cargo fmt --check`, clippy
   and its tests (the every-generator app skips clippy: its output is dead code until used).

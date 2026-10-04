@@ -16,7 +16,7 @@ use serde_json::Value;
 use tokio::sync::broadcast::error::RecvError;
 
 use super::AuthUser;
-use super::notifications::{DatabaseNotification, Signal};
+use super::notifications::{Broadcast, DatabaseNotification, Signal};
 use crate::htmx::{Back, Htmx};
 use crate::toast::{ToastAction, ToastKind, safe_url};
 use crate::view::{View, view};
@@ -94,7 +94,8 @@ impl From<DatabaseNotification> for Item {
                 .map(|m| m.actions)
                 .unwrap_or_default()
                 .into_iter()
-                .filter(|a| a.url.as_deref().is_some_and(safe_url))
+                // Links and requests (stored data has no page to send events to).
+                .filter(|a| a.url.is_some() && a.is_safe())
                 .collect(),
             title,
             url,
@@ -239,7 +240,9 @@ struct Watch {
 
 /// `GET /notifications/stream`: Server-Sent Events. `count` (the unread
 /// count) first and whenever it changes; `notification` (the new one as
-/// JSON, shaped like the list's items) when one arrives.
+/// JSON, shaped like the list's items) when one arrives; `broadcast`
+/// (`{"event": name, "data": …}`) for the app's own events
+/// (`AppState::broadcast`), which renox-ui.js dispatches on `document`.
 async fn events(
     State(state): State<AppState>,
     user: AuthUser,
@@ -272,6 +275,12 @@ async fn events(
             let woken = tokio::select! {
                 signal = watch.rx.recv() => match signal {
                     Ok(Signal::User(id)) => id == watch.user_id,
+                    Ok(Signal::Event(to, event)) => {
+                        if to.is_none_or(|id| id == watch.user_id) {
+                            watch.pending.push_back(broadcast_event(&event));
+                        }
+                        false
+                    }
                     Ok(Signal::Stop) | Err(RecvError::Closed) => return None,
                     // Missed some: look anyway.
                     Err(RecvError::Lagged(_)) => true,
@@ -285,6 +294,16 @@ async fn events(
         }
     });
     Ok(Sse::new(events).keep_alive(KeepAlive::default()))
+}
+
+/// An app event as the stream sends it: its name and data in one JSON
+/// object, so the page needs one listener for all of them.
+fn broadcast_event(event: &Broadcast) -> Event {
+    // `data` is JSON already: put it in as it is.
+    let name = serde_json::to_string(&event.event).unwrap_or_default();
+    Event::default()
+        .event("broadcast")
+        .data(format!(r#"{{"event":{name},"data":{}}}"#, event.data))
 }
 
 impl Watch {

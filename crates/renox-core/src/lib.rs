@@ -154,7 +154,7 @@ pub(crate) use routing::RouteTable;
 pub use routing::{CurrentRoute, RouteInfo, Routes};
 pub use session::Session;
 pub use state::AppState;
-pub use state::SentNotification;
+pub use state::{SentBroadcast, SentNotification};
 pub use toast::{Toast, ToastAction, ToastKind};
 pub use upload::Upload;
 pub use validation::{Errors, KeyValues, Valid, Validate, ValidationError, Validator};

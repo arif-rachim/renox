@@ -34,6 +34,11 @@ impl Notification for OrderShipped {
                 .url(format!("/orders/{}", self.order))
                 .link("Track", "https://track.example.com/7")
                 .action(ToastAction::link("Bad", "javascript:alert(1)"))
+                .action(ToastAction::delete(
+                    "Cancel",
+                    format!("/orders/{}", self.order),
+                ))
+                .action(ToastAction::post("Steal", "https://evil.example/x"))
                 .with("order_id", self.order)
                 .into(),
         )
@@ -87,6 +92,11 @@ impl Module for Pages {
                     "ok",
                 )
             })
+            .post("/archive", || async {
+                Toast::info("Archived").action(ToastAction::delete("Undo", "/archive"))
+            })
+            // What the toast's "Undo" sends: an htmx request, answered with a toast.
+            .delete("/archive", || async { Toast::success("Restored") })
     }
 }
 
@@ -144,6 +154,24 @@ async fn toasts_carry_a_body_actions_a_duration_and_a_position() {
         !trigger.contains("body") && !trigger.contains("duration"),
         "{trigger}"
     );
+
+    // A request action: its method and path go to the page's script.
+    let res = app.htmx().post("/archive", &[]).await;
+    res.assert_status(204);
+    let trigger = res.header("hx-trigger").unwrap().to_owned();
+    assert!(
+        trigger.contains(r#""actions":[{"label":"Undo","method":"DELETE","url":"/archive"}]"#),
+        "{trigger}"
+    );
+    // The request it sends (htmx, with the CSRF token TestApp adds): its answer's toast.
+    let res = app.htmx().delete("/archive").await;
+    res.assert_status(204);
+    assert!(res.header("hx-trigger").unwrap().contains("Restored"));
+    // On the next page (a plain form post) it is a button carrying the same.
+    app.post("/archive", &[]).await;
+    app.get("/bell").await.assert_see(
+        r#"<button type="button" class="rx-toast__action" data-rx-request="/archive" data-rx-method="DELETE" data-renox-dismiss>Undo</button>"#,
+    );
 }
 
 #[renox::test]
@@ -192,6 +220,11 @@ async fn the_list_shows_marks_deletes_and_opens_notifications() {
         .assert_see(">Order #7 shipped</button>")
         .assert_see("It arrives in 2–3 days.")
         .assert_see(r#"href="https://track.example.com/7""#)
+        // A request action is a form (sent by renox-ui.js with htmx, or plainly
+        // without script); one to another site isn't shown.
+        .assert_see(r#"<form method="post" action="/orders/7"><input type="hidden" name="_token""#)
+        .assert_see(r#"<input type="hidden" name="_method" value="DELETE"><button class="rx-link rx-link--button" type="submit" data-rx-request="/orders/7" data-rx-method="DELETE">Cancel</button></form>"#)
+        .assert_dont_see("evil.example")
         .assert_see("<p class=\"rx-notification__title\">Your weekly report is ready</p>")
         .assert_see("rx-notification--success rx-notification--unread")
         .assert_see("just now</time>")
@@ -373,4 +406,75 @@ async fn new_notifications_arrive_over_server_sent_events() {
     let id = ana.notifications(app.db(), 1).await.unwrap()[0].id;
     app.post(&format!("/notifications/{id}/read"), &[]).await;
     read_until(&mut stream, &mut seen, "event: count\ndata: 0\n\n").await;
+
+    // The app's own events: Ben's don't come here, everyone's and Ana's do.
+    let state = app.state();
+    state
+        .broadcast_to(ben.id, "order-updated", json!({ "id": 9 }))
+        .unwrap();
+    state
+        .broadcast("order-updated", json!({ "id": 7, "status": "paid" }))
+        .unwrap();
+    state
+        .broadcast_to(
+            ana.id,
+            "renox:toast",
+            json!({ "toasts": [Toast::info("Export ready")] }),
+        )
+        .unwrap();
+    read_until(&mut stream, &mut seen, "Export ready").await;
+    assert!(
+        seen.contains(
+            "event: broadcast\ndata: {\"event\":\"order-updated\",\"data\":{\"id\":7,\"status\":\"paid\"}}\n"
+        ),
+        "{seen}"
+    );
+    assert!(
+        seen.contains(r#"data: {"event":"renox:toast","data":{"toasts":[{"kind":"info","message":"Export ready"}]}}"#),
+        "{seen}"
+    );
+    assert!(!seen.contains(r#""id":9"#), "{seen}");
+    // Names a page can listen to; anything else is an error.
+    for bad in ["", "two words", "a\nb", "<x>"] {
+        assert!(state.broadcast(bad, json!(null)).is_err(), "{bad:?}");
+    }
+}
+
+#[renox::test]
+async fn tests_can_record_broadcasts() {
+    let (app, _dir) = app(true, true).await;
+    app.fake_broadcasts();
+    app.state()
+        .broadcast_to(7, "order-updated", json!({ "id": 3 }))
+        .unwrap();
+    app.assert_broadcast("order-updated", |b| {
+        b.user_id == Some(7) && b.data["id"] == 3
+    });
+    assert_eq!(app.broadcasts().len(), 1);
+}
+
+#[renox::test]
+async fn pages_without_the_bell_can_open_the_stream() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("bell.html"),
+        r#"{% from "renox/ui.html" import event_stream %}<main>{{ event_stream() }}</main>{{ toasts() }}"#,
+    )
+    .unwrap();
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(
+        App::new().module(Auth::new().notifications()).module(Pages),
+        move |c| c.views_path = path,
+    )
+    .await;
+    // Guests have no stream.
+    app.get("/bell")
+        .await
+        .assert_dont_see("data-rx-event-stream")
+        .assert_see(r#"data-failed-label="That didn&#x27;t work. Try again.""#);
+    let ana = user(&app, "ana@example.com").await;
+    app.acting_as(&ana);
+    app.get("/bell")
+        .await
+        .assert_see(r#"<span hidden data-rx-event-stream="/notifications/stream"></span>"#);
 }

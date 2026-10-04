@@ -254,6 +254,49 @@ impl TestApp {
         self
     }
 
+    /// Records what `state.broadcast(…)` and `broadcast_to(…)` send from
+    /// now on, instead of sending it to the open pages.
+    pub fn fake_broadcasts(&self) -> &Self {
+        let mut sent = self
+            .state()
+            .fakes
+            .broadcasts
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        sent.get_or_insert_with(Vec::new);
+        self
+    }
+
+    /// The broadcasts recorded since `fake_broadcasts`, oldest first.
+    pub fn broadcasts(&self) -> Vec<crate::SentBroadcast> {
+        let sent = self
+            .state()
+            .fakes
+            .broadcasts
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        sent.iter().flatten().cloned().collect()
+    }
+
+    /// Panics unless an `event` whose data passes `check` was broadcast
+    /// (to anyone) since `fake_broadcasts`.
+    #[track_caller]
+    pub fn assert_broadcast(
+        &self,
+        event: &str,
+        check: impl Fn(&crate::SentBroadcast) -> bool,
+    ) -> &Self {
+        let sent = self.broadcasts();
+        assert!(
+            sent.iter().any(|b| b.event == event && check(b)),
+            "no matching `{event}` was broadcast; sent: {:?}",
+            sent.iter()
+                .map(|b| (b.event.as_str(), b.data.to_string()))
+                .collect::<Vec<_>>()
+        );
+        self
+    }
+
     /// Panics unless no notification was recorded since `fake_notifications`.
     #[track_caller]
     pub fn assert_nothing_notified(&self) -> &Self {
