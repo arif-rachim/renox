@@ -5,7 +5,7 @@
 Description=Renox documentation site (listening socket)
 
 [Socket]
-ListenStream=127.0.0.1:3000
+ListenStream=127.0.0.1:3080
 Backlog=4096
 
 [Install]
