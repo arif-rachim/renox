@@ -17,7 +17,7 @@ proc-macro = true
 heck = "0.5.0"
 proc-macro2 = "1.0.107"
 quote = "1.0.47"
-syn = { version = "2", features = ["full"] }
+syn = { version = "3", features = ["full"] }
 
 [dev-dependencies]
 # The examples in the docs use the macros through `renox`, as apps do. Path
