@@ -9,13 +9,23 @@ use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 
 pub mod content;
+pub mod highlight;
+pub mod icons;
 pub mod render;
 
 use content::{PAGES, Section};
 use render::{RENDERED, REPOSITORY};
 
 pub fn app() -> App {
-    App::new().embed(renox::embedded!()).module(Docs)
+    App::new()
+        .embed(renox::embedded!())
+        .templates(|env| {
+            // `{{ icon("search") }}`: an inline SVG (icons.rs).
+            env.add_function("icon", |name: String| {
+                renox::minijinja::Value::from_safe_string(icons::svg(&name))
+            });
+        })
+        .module(Docs)
 }
 
 struct Docs;
@@ -49,6 +59,7 @@ impl Module for Docs {
 #[derive(Serialize)]
 struct NavSection {
     title: &'static str,
+    icon: &'static str,
     pages: Vec<NavPage>,
 }
 
@@ -56,6 +67,8 @@ struct NavSection {
 struct NavPage {
     slug: &'static str,
     nav: &'static str,
+    icon: &'static str,
+    blurb: &'static str,
 }
 
 fn navigation() -> Vec<NavSection> {
@@ -63,22 +76,46 @@ fn navigation() -> Vec<NavSection> {
         .iter()
         .map(|section| NavSection {
             title: section.title(),
+            icon: section.icon(),
             pages: PAGES
                 .iter()
                 .filter(|page| page.section == *section)
                 .map(|page| NavPage {
                     slug: page.slug,
                     nav: page.nav,
+                    icon: page.icon,
+                    blurb: page.blurb,
                 })
                 .collect(),
         })
         .collect()
 }
 
+/// The quick start on the home page, for the version this site documents
+/// (the site shares the workspace's version).
+fn quick_start() -> String {
+    let version = env!("CARGO_PKG_VERSION");
+    format!(
+        "# 1. Install `rnx`, Renox's command-line tool\n\
+         cargo install renox-cli --version {version}\n\
+         \n\
+         # 2. Make a new app called \"blog\" and go into its folder\n\
+         rnx new blog && cd blog\n\
+         \n\
+         # 3. Run it, then open http://127.0.0.1:3000\n\
+         rnx serve\n"
+    )
+}
+
 async fn home() -> View {
     view(
         "home.html",
-        context! { nav => navigation(), current => "", repository => REPOSITORY },
+        context! {
+            nav => navigation(),
+            current => "",
+            repository => REPOSITORY,
+            quick_start => render::code_panel("bash", &quick_start()),
+        },
     )
 }
 
@@ -92,7 +129,7 @@ async fn show(Path(slug): Path<String>) -> Result<View> {
     let previous = index.checked_sub(1).map(|i| &PAGES[i]);
     let next = PAGES.get(index + 1);
     let link = |page: Option<&content::Page>| {
-        page.map(|page| context! { slug => page.slug, nav => page.nav })
+        page.map(|page| context! { slug => page.slug, nav => page.nav, icon => page.icon })
     };
     Ok(view(
         "page.html",
@@ -100,6 +137,10 @@ async fn show(Path(slug): Path<String>) -> Result<View> {
             nav => navigation(),
             current => page.slug,
             title => &rendered.title,
+            page_icon => page.icon,
+            blurb => page.blurb,
+            section => page.section.title(),
+            minutes => rendered.minutes,
             html => &rendered.html,
             toc => &rendered.toc,
             source => format!("{REPOSITORY}/blob/main/{}", page.path),
@@ -121,6 +162,7 @@ struct SearchQuery {
 #[derive(Serialize)]
 struct Hit {
     slug: &'static str,
+    icon: &'static str,
     title: String,
     snippet: String,
 }
@@ -156,6 +198,7 @@ fn find(q: &str) -> Vec<Hit> {
                 in_title * 1000 + count,
                 Hit {
                     slug: page.slug,
+                    icon: page.icon,
                     title: rendered.title.clone(),
                     snippet: snippet(&rendered.text, &words[0]),
                 },

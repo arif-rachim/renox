@@ -5,10 +5,14 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 
-use pulldown_cmark::{CodeBlockKind, CowStr, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
+use pulldown_cmark::{
+    BlockQuoteKind, CodeBlockKind, CowStr, Event, HeadingLevel, Options, Parser, Tag, TagEnd,
+};
 use serde::Serialize;
 
 use crate::content::{PAGES, Page, page_for_path};
+use crate::highlight;
+use crate::icons;
 
 /// The repository, for files that aren't pages.
 pub const REPOSITORY: &str = "https://github.com/arif-rachim/renox";
@@ -32,6 +36,8 @@ pub struct Rendered {
     /// The words of the page (no code), for search.
     #[serde(skip)]
     pub text: String,
+    /// About how long reading it takes, in minutes.
+    pub minutes: usize,
 }
 
 /// Every page, rendered at first use.
@@ -43,15 +49,17 @@ pub fn render(page: &Page) -> Rendered {
     let options = Options::ENABLE_TABLES
         | Options::ENABLE_STRIKETHROUGH
         | Options::ENABLE_TASKLISTS
-        | Options::ENABLE_FOOTNOTES;
+        | Options::ENABLE_FOOTNOTES
+        // `> [!TIP]` callouts, as GitHub shows them.
+        | Options::ENABLE_GFM;
     let events: Vec<Event> = Parser::new_ext(page.markdown, options).collect();
     let mut out: Vec<Event> = Vec::with_capacity(events.len());
     let mut title = None;
     let mut toc = Vec::new();
     let mut ids = HashSet::new();
     let mut text = String::new();
-    let mut rust_block = false;
-    let mut in_code = false;
+    // The code block being read: its language and its text so far.
+    let mut code: Option<(String, String)> = None;
     let mut i = 0;
     while i < events.len() {
         match &events[i] {
@@ -89,32 +97,52 @@ pub fn render(page: &Page) -> Rendered {
                 continue;
             }
             Event::Start(Tag::CodeBlock(kind)) => {
-                in_code = true;
                 let language = match kind {
                     CodeBlockKind::Fenced(info) => {
                         info.split([',', ' ']).next().unwrap_or_default().to_owned()
                     }
                     CodeBlockKind::Indented => String::new(),
                 };
-                rust_block = language == "rust" || language.is_empty() && is_doctest(kind);
-                let language = if language.is_empty() {
+                // A fence with no language is a doctest: Rust.
+                let language = if language.is_empty() && is_doctest(kind) {
+                    "rust".into()
+                } else if language.is_empty() {
                     "text".into()
                 } else {
                     language
                 };
-                out.push(Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(
-                    CowStr::from(language),
-                ))));
+                code = Some((language, String::new()));
+            }
+            Event::Text(body) if code.is_some() => {
+                if let Some((_, text)) = code.as_mut() {
+                    text.push_str(body);
+                }
             }
             Event::End(TagEnd::CodeBlock) => {
-                in_code = false;
-                rust_block = false;
-                out.push(events[i].clone());
+                if let Some((language, text)) = code.take() {
+                    let text = if language == "rust" {
+                        without_hidden_lines(&text)
+                    } else {
+                        text
+                    };
+                    out.push(Event::Html(CowStr::from(code_panel(&language, &text))));
+                }
             }
-            Event::Text(body) if in_code && rust_block => {
-                out.push(Event::Text(CowStr::from(without_hidden_lines(body))));
+            Event::Start(Tag::BlockQuote(kind)) => {
+                let html = match callout(*kind) {
+                    Some((class, icon, title)) => format!(
+                        "<div class=\"site-callout site-callout--{class}\">\
+                         <p class=\"site-callout__title\">{}{title}</p>",
+                        icons::svg(icon)
+                    ),
+                    None => "<div class=\"site-callout site-callout--quote\">".to_owned(),
+                };
+                out.push(Event::Html(CowStr::from(html)));
             }
-            Event::Text(words) | Event::Code(words) if !in_code => {
+            Event::End(TagEnd::BlockQuote(_)) => {
+                out.push(Event::Html(CowStr::from("</div>")));
+            }
+            Event::Text(words) | Event::Code(words) => {
                 text.push_str(words);
                 text.push(' ');
                 out.push(events[i].clone());
@@ -125,12 +153,64 @@ pub fn render(page: &Page) -> Rendered {
     }
     let mut html = String::new();
     pulldown_cmark::html::push_html(&mut html, out.into_iter());
+    // About 200 words a minute, and longer for code.
+    let words = text.split_whitespace().count() + code_lines(page.markdown) * 3;
     Rendered {
         title: title.unwrap_or_else(|| page.nav.to_owned()),
         html,
         toc,
         text,
+        minutes: (words / 200).max(1),
     }
+}
+
+/// How many lines of code a Markdown file has, roughly (its fenced lines).
+fn code_lines(markdown: &str) -> usize {
+    let mut fenced = false;
+    let mut lines = 0;
+    for line in markdown.lines() {
+        if line.trim_start().starts_with("```") {
+            fenced = !fenced;
+        } else if fenced {
+            lines += 1;
+        }
+    }
+    lines
+}
+
+/// A code sample as a panel: a bar with its language and a copy button
+/// (shown by site.js when the browser can copy), then the coloured code.
+pub fn code_panel(language: &str, code: &str) -> String {
+    let code = code.strip_suffix('\n').unwrap_or(code);
+    let label = highlight::label(language);
+    let icon = if label == "Terminal" || label == "Console" {
+        "terminal"
+    } else {
+        "code"
+    };
+    format!(
+        "<div class=\"site-code\" data-language=\"{language}\">\
+         <div class=\"site-code__bar\"><span class=\"site-code__lang\">{}{label}</span>\
+         <button class=\"site-code__copy\" type=\"button\" data-copy hidden>{}{}\
+         <span class=\"site-code__copy-label\" aria-live=\"polite\">Copy</span></button></div>\
+         <pre><code class=\"language-{language}\">{}</code></pre></div>",
+        icons::svg(icon),
+        icons::svg("copy"),
+        icons::svg("check"),
+        highlight::highlight(language, code),
+    )
+}
+
+/// A callout's class, icon and title: GitHub's `> [!NOTE]` kinds. A plain
+/// quote has none.
+fn callout(kind: Option<BlockQuoteKind>) -> Option<(&'static str, &'static str, &'static str)> {
+    Some(match kind? {
+        BlockQuoteKind::Tip => ("tip", "lightbulb", "Tip"),
+        BlockQuoteKind::Important => ("important", "circle-alert", "Important"),
+        BlockQuoteKind::Warning => ("warning", "triangle-alert", "Watch out"),
+        BlockQuoteKind::Caution => ("caution", "octagon-alert", "Careful"),
+        BlockQuoteKind::Note => ("note", "info", "Note"),
+    })
 }
 
 fn heading_number(level: HeadingLevel) -> u8 {
@@ -318,6 +398,33 @@ mod tests {
     fn doctest_setup_lines_are_hidden() {
         let code = "# use renox::prelude::*;\nfn main() {}\n    # let x = 1;\n#\n## not hidden\n";
         assert_eq!(without_hidden_lines(code), "fn main() {}\n# not hidden\n");
+    }
+
+    #[test]
+    fn callouts_and_code_panels() {
+        let page = Page {
+            slug: "t",
+            nav: "T",
+            section: crate::content::Section::Start,
+            icon: "compass",
+            blurb: "",
+            path: "docs/t.md",
+            markdown: "# T\n\n> [!TIP]\n> Try it.\n\n> Just a quote.\n\n```\n# use x;\nlet a = 1;\n```\n",
+        };
+        let html = render(&page).html;
+        assert!(
+            html.contains("<div class=\"site-callout site-callout--tip\">"),
+            "{html}"
+        );
+        assert!(html.contains("Tip</p>"));
+        assert!(html.contains("<p>Try it.</p>"));
+        assert!(html.contains("<div class=\"site-callout site-callout--quote\">"));
+        // A fence with no language is a doctest: Rust, setup lines hidden.
+        assert!(html.contains("data-language=\"rust\""));
+        assert!(
+            html.contains("<span class=\"hl-kw\">let</span> a = <span class=\"hl-num\">1</span>;")
+        );
+        assert!(!html.contains("use x"));
     }
 
     #[test]
