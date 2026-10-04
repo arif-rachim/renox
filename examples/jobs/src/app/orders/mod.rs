@@ -72,6 +72,8 @@ impl Module for Orders {
         let staff = Routes::new()
             .post("/orders/{id}/remind", remind::remind)
             .name("orders.remind")
+            .post("/orders/{id}/reopen", payment::reopen)
+            .name("orders.reopen")
             .post("/statements", statements::store)
             .name("statements.store")
             .get("/statements/{id}", statements::show)

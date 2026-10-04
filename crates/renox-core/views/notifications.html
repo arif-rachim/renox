@@ -42,7 +42,12 @@
         {%- if n.body %}<p class="rx-notification__body">{{ n.body }}</p>{% endif %}
         <p class="rx-notification__meta"><time datetime="{{ n.created_at }}" title="{{ n.created_at | date('%Y-%m-%d %H:%M') }}">{{ n.created_at | since }}</time>{% if not n.read %}<span class="rx-notification__dot" aria-hidden="true"></span><span class="rx-visually-hidden">, {{ t('ui.notifications.unread_marker') }}</span>{% endif %}</p>
         {%- if n.actions %}
-        <div class="rx-notification__actions">{% for a in n.actions %}<a class="rx-link" href="{{ a.url }}"{% if a.new_tab %} target="_blank" rel="noopener"{% endif %}>{{ a.label }}</a>{% endfor %}</div>
+        <div class="rx-notification__actions">{% for a in n.actions %}
+          {%- if a.method %}
+          {#- A request (ToastAction::post …): renox-ui.js sends it with htmx; without script the form does. #}
+          <form method="post" action="{{ a.url }}">{{ csrf_field() }}{% if a.method != "POST" %}{{ method_field(a.method) }}{% endif %}<button class="rx-link rx-link--button" type="submit" data-rx-request="{{ a.url }}" data-rx-method="{{ a.method }}">{{ a.label }}</button></form>
+          {%- else %}<a class="rx-link" href="{{ a.url }}"{% if a.new_tab %} target="_blank" rel="noopener"{% endif %}>{{ a.label }}</a>{% endif %}
+        {%- endfor %}</div>
         {%- endif %}
       </div>
       <div class="rx-notification__tools">

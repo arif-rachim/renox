@@ -1039,9 +1039,14 @@ fn globals(
     let old_input = session.cloned();
     let has_old = session.is_some_and(Session::has_old_input);
     let toast_session = session.cloned();
-    let dismiss_label = state
-        .translator
-        .get(locale, &state.config.fallback_locale, "ui.dismiss");
+    let toast_texts = crate::toast::RegionTexts {
+        dismiss: state
+            .translator
+            .get(locale, &state.config.fallback_locale, "ui.dismiss"),
+        failed: state
+            .translator
+            .get(locale, &state.config.fallback_locale, "ui.request_failed"),
+    };
     let seen = std::sync::Mutex::new(std::collections::HashSet::<String>::new());
     let user = current_user.as_ref().and_then(|c| c.user.clone());
     let roles = current_user
@@ -1169,7 +1174,7 @@ fn globals(
                 .unwrap_or_default();
             Ok::<_, minijinja::Error>(Value::from_safe_string(crate::toast::region(
                 &waiting,
-                &dismiss_label,
+                &toast_texts,
                 position.as_deref().unwrap_or("top"),
             )))
         }),

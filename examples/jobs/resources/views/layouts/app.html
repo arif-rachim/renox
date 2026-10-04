@@ -13,10 +13,12 @@
   <link rel="stylesheet" href="{{ asset('app.css') }}">
 </head>
 <body class="rx-page">
-  {% from "renox/ui.html" import navbar, menu, menu_action, link_button, alert %}
+  {% from "renox/ui.html" import navbar, menu, menu_action, link_button, alert, notification_bell %}
   {% call navbar(app.name, href=route('home')) %}
     <span class="rx-spacer"></span>
     {% if auth.check %}
+      {#- New orders, and the stream that brings order changes live (orders/index.html). -#}
+      {{ notification_bell(unread_notifications) }}
       {% call menu(auth.user.name, id="account-menu", variant="plain") %}
         {{ menu_action(route('logout'), "Log out") }}
       {% endcall %}
