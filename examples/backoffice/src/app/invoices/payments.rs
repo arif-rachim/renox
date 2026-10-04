@@ -9,10 +9,10 @@
 //! `XENDIT_CALLBACK_TOKEN`. `MIDTRANS_URL` and `XENDIT_URL` point at the
 //! sandbox by default.
 
+use renox::HxRefresh;
 use renox::auth::{Channel, DatabaseMessage, Notification, Recipient, permissions};
 use renox::prelude::*;
 use renox::webhook;
-use renox::{HxRefresh, Toast};
 use serde::Deserialize;
 use std::time::Duration;
 

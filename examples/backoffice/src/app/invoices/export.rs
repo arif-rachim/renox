@@ -4,7 +4,6 @@
 //! from them), stores it, and tells the user through the bell, with a link
 //! that works for a day (`Storage::temporary_url`).
 
-use renox::Toast;
 use renox::auth::{Channel, DatabaseMessage, Notification, Recipient};
 use renox::grid::{GridRequest, Selection};
 use renox::prelude::*;

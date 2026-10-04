@@ -44,8 +44,8 @@ pub mod prelude {
     pub use renox_core::webhook::{Webhook, WebhookCall, WebhookRequest};
     pub use renox_core::{
         App, AppState, Back, Config, Environment, Error, Errors, Htmx, HxRedirect, HxRefresh,
-        HxTrigger, Module, Resource, Result, Routes, Session, Valid, Validate, ValidationError,
-        Validator, View, context, view,
+        HxTrigger, Module, Resource, Result, Routes, Session, Toast, Valid, Validate,
+        ValidationError, Validator, View, context, view,
     };
     pub use renox_core::{AuthUser, ClientIp, KeyValues, Lang, Policy, Registry, Upload};
     pub use renox_core::{RedirectExt, abort, abort_if, abort_unless};

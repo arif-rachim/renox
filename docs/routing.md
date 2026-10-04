@@ -1,12 +1,46 @@
 # Routing, middleware and requests
 
-How a request reaches your code and what it can carry on the way: routes and their names,
-the extractors a handler takes, the responses it returns, the middleware around it, and the
-session, CSRF, cookie and signed-URL plumbing underneath. For the short version of every API,
-see the [cheat-sheet](../CHEATSHEET.md) ("App, module, routes", "Your own shared values and
-middleware", "Cookies and downloads", "Signed URLs and private files" and "Security").
-Forms and their rules have their own guide ([validation.md](validation.md)), and so do htmx
-responses and toasts ([ui.md](ui.md)) and who may do what ([authorization.md](authorization.md)).
+This guide is about the road a visit takes through your app. Someone opens an address in their
+browser; Renox finds the function that answers it, hands that function what it asks for, and
+sends its answer back.
+
+On the way, you'll see:
+
+- how to give addresses to your pages (**routes**) and give those routes names;
+- what a **handler** (the function that answers) can ask for, and what it can send back;
+- how to run code around many routes at once (**middleware**), for example "logged-in users
+  only";
+- the plumbing underneath: **sessions**, **CSRF** protection, **cookies** and **signed URLs**.
+
+### Words you'll meet
+
+| Word | What it means |
+|---|---|
+| **request** and **response** | The browser asks for something (a request); your app answers (a response). |
+| **route** | A rule like "when someone opens `/products` with GET, run this function". |
+| **HTTP method** | The kind of request: `GET` reads a page, `POST` sends a form, `PUT`/`PATCH` change something, `DELETE` removes it. |
+| **handler** | The `async` function a route runs. It returns the answer. |
+| **module** | A piece of your app for one feature (say, products): its routes and more. |
+| **extractor** | A handler argument that pulls something out of the request: the logged-in user, a form, a number from the address. |
+| **middleware** (or **layer**) | Code that runs before and after a handler, for many routes at once. |
+| **guard** | Middleware that lets some visitors through and turns others away. |
+| **session** | What the app remembers about one visitor between requests (their cart, that they're logged in). |
+| **cookie** | A small piece of text the browser stores and sends back with every request. |
+| **CSRF** | An attack where another website makes your browser send a form to this app. A secret token stops it. |
+| **signed URL** | A link with a seal on it: if someone changes it, or it's too old, it stops working. |
+| **status code** | A number in every response: 200 is "OK", 404 "not found", 403 "not allowed", 500 "the app broke". |
+
+For the short version of every API, see the [cheat-sheet](../CHEATSHEET.md) (the sections "App,
+module, routes", "Your own shared values and middleware", "Cookies and downloads", "Signed URLs
+and private files" and "Security").
+
+Some topics have their own guides:
+
+- forms and the rules that check them: [validation.md](validation.md);
+- htmx responses and toasts (small pop-up messages): [ui.md](ui.md);
+- who may do what: [authorization.md](authorization.md).
+
+### Quick lookup
 
 | You want to… | Use |
 |---|---|
@@ -22,27 +56,41 @@ responses and toasts ([ui.md](ui.md)) and who may do what ([authorization.md](au
 | Remember something per visitor | `Session` (`put`, `flash`, `push`, `increment`) |
 | A link that can't be altered | `state.signed_url(…)` + `ValidSignature` |
 
+(CRUD means Create, Read, Update, Delete: the usual things you do with a list of records.)
+
 ## Apps, modules and routes
 
-An app is a list of modules; a module is a name, its routes, its migrations and the jobs,
-listeners and commands it registers. `route:list` shows which module each route came from.
+A Renox app is a list of **modules**. Each module is one feature of the app. A module has:
+
+- a name;
+- its routes;
+- its migrations (the SQL files that make its database tables);
+- the jobs, listeners and commands it registers (background work; see the other guides).
+
+The command `route:list` shows every route, and which module it came from.
+
+Here is an app with two modules: Renox's own login pages, and a `Products` module of yours.
 
 ```rust
 use renox::prelude::*;
 
+/// Builds the whole app: a list of modules.
 pub fn app() -> App {
     App::new()
         .module(Auth::new()) // Renox's login, registration and password pages
         .module(Products)
 }
 
+/// The products feature. It holds no data, so it's an empty struct.
 pub struct Products;
 
 impl Module for Products {
+    /// The module's name, shown by `route:list` and in logs.
     fn name(&self) -> &'static str {
         "products"
     }
 
+    /// The addresses this module answers, and the handler each one runs.
     fn routes(&self) -> Routes {
         Routes::new()
             .get("/products", index).name("products.index")
@@ -54,38 +102,68 @@ impl Module for Products {
     }
 }
 
+/// `GET /products`: a page made from a template.
 async fn index() -> View {
     view("products/index.html", context! {})
 }
 
+/// `GET /products/7`: `Path` reads the `{id}` part of the address as a number.
 async fn show(Path(id): Path<i64>) -> String {
     format!("product {id}")
 }
 
+/// `POST /products`: after saving, send the browser back to the list.
 async fn store() -> Redirect {
     Redirect::to("/products")
 }
 
+/// `PUT` or `PATCH /products/7`: change product 7.
 async fn update(Path(id): Path<i64>) -> String {
     format!("updated {id}")
 }
 
+/// `DELETE /products/7`: answer "204 No Content", a success with nothing to show.
 async fn destroy(Path(id): Path<i64>) -> StatusCode {
     let _ = id;
     StatusCode::NO_CONTENT
 }
 ```
 
-- `src/main.rs` is only `fn main() -> renox::Result { my_app::app().run() }`; the app lives in
-  the library so tests can boot it. The binary is also the app's CLI (`migrate`, `route:list`,
-  `down`, …).
-- `.name("…")` names the route added just before it. Use dotted names (`products.show`), as
-  Laravel does.
-- `.route(path, method_router)` takes any axum method router, e.g.
-  `renox::axum::routing::get(show).post(update)`; `route:list` shows its method as `*`.
-- A group's index is `.get("/", …)`, never `""` (which panics).
+What's going on:
+
+- `.get("/products", index)` means: a GET request for `/products` runs the `index` function.
+  `.post`, `.put`, `.patch` and `.delete` do the same for the other HTTP methods.
+- `{id}` in a path is a blank that matches one part of the address: `/products/7` fills it with
+  `7`. `{*rest}` is a wildcard: it matches everything after it, slashes included.
+- A handler returns its answer. Here that's a `View` (a page from a template), a `String`
+  (plain text), a `Redirect` (go to another address) or a `StatusCode` alone.
+
+A few more things to know:
+
+- `src/main.rs` only says `fn main() -> renox::Result { my_app::app().run() }`. The app itself
+  lives in the library (`src/lib.rs`), so tests can start the very same app.
+- The program is also the app's command-line tool: `migrate`, `route:list`, `down`, …
+- `.name("…")` names the route added just before it. Use dotted names, like `products.show`.
+  With a name, you can link to a route without typing its path (see
+  [Route URLs](#route-urls-and-the-current-route) below).
+- `.route(path, method_router)` takes any axum method router, for example
+  `renox::axum::routing::get(show).post(update)`. (axum is the library Renox is built on.)
+  `route:list` shows the method of such a route as `*`.
+
+> [!WARNING]
+> Inside a group, the group's own index page is `.get("/", …)`. Never write `""`: it panics.
+
+> [!NOTE]
+> **Coming from Laravel:** route names are dotted, as in Laravel. There is no `routes/web.php`:
+> each module keeps its routes next to its handlers.
 
 ### Groups, resources and merging
+
+Three tools help when you have many routes:
+
+- a **resource** makes the usual list/show/create/edit/delete routes in one go;
+- a **group** puts a shared prefix in front of a set of paths and names;
+- **merge** joins two sets of routes into one.
 
 ```rust
 use renox::prelude::*;
@@ -98,7 +176,9 @@ use renox::prelude::*;
 # async fn update(Path(id): Path<i64>) -> String { id.to_string() }
 # async fn destroy(Path(id): Path<i64>) -> String { id.to_string() }
 # async fn dashboard() -> &'static str { "" }
+/// The shop's product routes plus an admin area, joined into one set.
 fn routes() -> Routes {
+    // A resource: each action you give it becomes one route, with a name.
     let shop = Routes::new().resource(
         "/products",
         "products",
@@ -111,6 +191,7 @@ fn routes() -> Routes {
             .update(update)   // PUT and PATCH /products/{id}  products.update
             .destroy(destroy), // DELETE /products/{id}      products.destroy
     );
+    // A group: every path inside starts with /admin, every name with "admin.".
     let admin = Routes::new().group(
         "/admin", // path prefix: starts with `/`, never ends with one
         "admin.", // name prefix
@@ -122,14 +203,25 @@ fn routes() -> Routes {
 }
 ```
 
-A resource has only the actions you give it. `rnx make:module products --resource` writes one
-with its handlers, views and tests.
+What's going on:
 
-Pages that need no handler (Laravel's `Route::view` and `Route::redirect`):
+- The resource made seven routes, and the comments show each one's method, path and name.
+- A resource has only the actions you give it. Leave out `.edit(…)` and there's no edit page.
+- The group's `"/"` became `/admin`, and its name `dashboard` became `admin.dashboard`.
+- `.require_auth()` is a guard ("logged-in users only"). Here it covers only the group's routes.
+- `merge` keeps each route's name and layers.
+
+> [!TIP]
+> `rnx make:module products --resource` writes a whole resource for you: its handlers, views and
+> tests.
+
+Some pages need no handler at all: a page that only shows a template, or an old address that
+should send people to a new one.
 
 ```rust
 use renox::prelude::*;
 
+/// Routes that need no handler of their own.
 fn routes() -> Routes {
     Routes::new()
         .view("/about", "pages/about.html").name("about") // GET, rendered with the globals
@@ -138,30 +230,58 @@ fn routes() -> Routes {
 }
 ```
 
+What's going on:
+
+- `.view` answers GET with a template. The template still gets the usual global values (the
+  ones every page gets, like the app's name and the logged-in user).
+- `.redirect` sends any method to another address with status 302 ("found it over there, for
+  now").
+- `.permanent_redirect` uses 301 ("moved for good"). Browsers and search engines remember it.
+
+> [!NOTE]
+> **Coming from Laravel:** these are Laravel's `Route::view` and `Route::redirect`.
+
 ### Other hosts and the fallback
 
-`Routes::domain` serves routes only on hosts matching a pattern; `{name}` matches one label of
-the host and is read with `DomainParams`. A host that matches a domain gets that domain's
-routes only (plus Renox's own: `/health`, the scripts, public files), never the others; every
-other host gets the routes without a domain. So `/` can be a different page on each host.
+The **host** is the name part of an address: in `https://acme.example.com/`, the host is
+`acme.example.com`. One app can answer several hosts, with different pages on each.
+
+`Routes::domain` serves some routes only on hosts that match a pattern. In the pattern,
+`{name}` matches one label of the host (one piece between dots). You read it with the
+`DomainParams` extractor.
+
+The rules:
+
+- A host that matches a domain gets **only** that domain's routes. It also gets Renox's own
+  (`/health`, the scripts, public files), but never the other routes.
+- Every other host gets the routes without a domain.
+
+So `/` can be a different page on each host.
+
+The **fallback** is what answers when nothing else does.
 
 ```rust
 use renox::prelude::*;
 use renox::DomainParams;
 use renox::axum::http::Uri;
 
+/// The home page of the main site.
 async fn home() -> &'static str {
     "the main site"
 }
 
+/// The home page of a team's own host, like `acme.example.com`.
 async fn team_home(domain: DomainParams) -> String {
+    // "account" is the `{account}` part of the host: "acme" for acme.example.com.
     format!("Welcome to {}", domain.get("account").unwrap_or("?"))
 }
 
+/// Answers when no route matches: a 404 with a friendlier message.
 async fn missing(uri: Uri) -> (StatusCode, String) {
     (StatusCode::NOT_FOUND, format!("Nothing at {}. Try the search.", uri.path()))
 }
 
+/// The main site's routes, the team hosts' routes, and the fallback.
 fn routes() -> Routes {
     Routes::new()
         .get("/", home).name("home")
@@ -170,12 +290,31 @@ fn routes() -> Routes {
 }
 ```
 
-- Matching uses the `Host` header. Behind a proxy, pass it through (Caddy does; nginx needs
-  `proxy_set_header Host $host`).
-- One fallback per app, or one per domain inside `Routes::domain`.
+What's going on:
+
+- `example.com/` shows "the main site".
+- `acme.example.com/` shows "Welcome to acme".
+- An address nothing answers (no route, no public file) runs `missing` instead of showing the
+  usual 404 page.
+
+Good to know:
+
+- Matching uses the `Host` header, which the browser sends with every request.
+- There is one fallback per app, or one per domain inside `Routes::domain`.
 - [examples/teams](../examples/teams) serves public team pages on their own host.
 
+> [!WARNING]
+> Behind a proxy (a server like Caddy or nginx in front of your app), the proxy must pass the
+> `Host` header through. Caddy does. nginx needs `proxy_set_header Host $host`.
+
+> [!NOTE]
+> **Coming from Laravel:** this is `Route::domain` and `Route::fallback`. One difference: a host
+> that matches a domain gets that domain's routes only. It never falls through to the others.
+
 ### Route URLs and the current route
+
+Once a route has a name, you can build its address from the name. If you later change the
+path, the links follow by themselves.
 
 | Where | Path of a named route |
 |---|---|
@@ -183,31 +322,56 @@ fn routes() -> Routes {
 | Handlers, jobs, commands | `state.url("products.show", &[&id])?`, `state.absolute_url(…)` (with `APP_URL`) |
 | Redirects | `Redirect::route("products.show", &[&id])?` |
 
-Parameters fill the `{…}` placeholders in order and are percent-encoded; a missing or extra
-one is an error, as is an unknown name. Which route is answering:
+How the arguments work:
+
+- They fill the `{…}` blanks of the path, in order.
+- They are percent-encoded: characters that aren't safe in an address (like spaces) are
+  written as codes such as `%20`.
+- A missing argument, an extra one, or an unknown route name is an error.
+- `state.absolute_url` gives the full address, starting with `APP_URL` (like
+  `https://example.com/products/42`).
+
+You can also ask which route is answering right now:
 
 ```rust
 use renox::prelude::*;
 use renox::CurrentRoute;
 
+/// Shows the route that is answering this request.
 async fn menu(route: CurrentRoute) -> String {
     // The matched route's name and path pattern; `*` in `is` stands for anything.
     format!("{} {} {}", route.name().unwrap_or("-"), route.path().unwrap_or("-"), route.is("admin.*"))
 }
 
+/// Builds the address of product `id` from the route's name.
 async fn links(State(state): State<AppState>, Path(id): Path<i64>) -> Result<String> {
     state.url("products.show", &[&id]) // "/products/42"
 }
 ```
 
-In templates: `{% if route_is('admin.*') %}` (several patterns allowed) and `request.route`.
-`my-app route:list` (or `rnx route:list`) prints every route with its method, path, name,
-module and guards (`auth`, `throttle:60/60s`, …), plus the domain when there are domains.
+In templates, use `{% if route_is('admin.*') %}` (you can pass several patterns) and
+`request.route`. That's handy for highlighting the current page in a menu.
+
+To see every route, run `my-app route:list` (or `rnx route:list` while you develop). It prints
+each route's method, path, name, module and guards (`auth`, `throttle:60/60s`, …). When there
+are domains, it shows the domain too.
+
+> [!NOTE]
+> **Coming from Laravel:** `route_is` is `request()->routeIs()`, `CurrentRoute` is
+> `Route::currentRouteName()`, and `route:list` works like `php artisan route:list`.
 
 ## What a handler can take
 
-Handlers are async functions whose arguments are extractors. Order doesn't matter, except that
-something that reads the body (`Valid<T>`, `Form`, `Json`) must come last.
+A handler is an `async` function. Each of its arguments is an **extractor**: a type that says
+"give me this part of the request". Renox fills them in before the handler runs. If one can't
+be filled (say, the visitor isn't logged in), Renox answers for you and the handler doesn't
+run.
+
+The order of the arguments doesn't matter, with one exception.
+
+> [!IMPORTANT]
+> An extractor that reads the request's body (`Valid<T>`, `Form`, `Json`) must be the **last**
+> argument. The body can only be read once.
 
 | Extractor | Gives | Notes |
 |---|---|---|
@@ -229,20 +393,34 @@ something that reads the body (`Valid<T>`, `Form`, `Json`) must come last.
 | `renox::signed::ValidSignature` | proof the URL was signed and hasn't expired | 403 otherwise |
 | `State<AppState>` | the whole app: `db`, `config`, `cache`, `storage`, `url`, … | `State<Db>` for just the database |
 
+A few words from the table, explained:
+
+- The **query string** is the part of an address after `?`: in `/search?q=shoes`, it's
+  `q=shoes`. "Deserialized" means Renox turns it into your struct.
+- The **body** is the data a form or a script sends with a POST.
+- **Locale** is the visitor's language, like `en` or `es`.
+- An **API client** is a program (not a person in a browser) that talks to your app, usually
+  in JSON.
+
+Here is a handler that asks for many things at once:
+
 ```rust
 use renox::prelude::*;
 use renox::{Provided, RequestId};
 
+/// The search form's fields, read from the query string (`?q=…`).
 #[derive(serde::Deserialize)]
 struct Filter {
     q: Option<String>,
 }
 
+/// Settings for a payment service, given to the app once at start-up.
 #[derive(Clone)]
 struct Payments {
     api_key: String,
 }
 
+/// Each argument is an extractor; Renox fills them all in before this runs.
 async fn search(
     user: Option<AuthUser>,
     Query(filter): Query<Filter>,
@@ -261,20 +439,51 @@ async fn search(
     )
 }
 
+/// Builds the app and hands it a `Payments` value that handlers can ask for.
 fn app() -> App {
     // `Provided<T>` in handlers; `state.provided::<T>()` in jobs, listeners and commands.
     App::new().provide(Payments { api_key: "sk_test_123".into() })
 }
 ```
 
+What's going on:
+
+- `Option<AuthUser>` is the logged-in user, or `None` for a guest. Plain `AuthUser` would send
+  guests to the login page instead.
+- `Query(filter)` reads `?q=…` into the `Filter` struct. `q` is an `Option`, so it may be left
+  out.
+- `ClientIp`, `RequestId` and `Lang` give the visitor's IP address, this request's id and the
+  visitor's language.
+- `Provided<Payments>` gives the value passed to `App::provide`. That's how you share your own
+  things (a client for a payment service, settings) with every handler.
+
+> [!NOTE]
+> **Coming from Laravel:** `App::provide` + `Provided<T>` stand in for service container
+> bindings. `Query<T>` and `ClientIp` are `$request->query()` and `$request->ip()`.
+
 ### Route model binding: `Found<M>`
 
-`Found(product): Found<Product>` loads the row a route parameter names, or answers 404 like a
-missing route. The parameter is the one named after the model's table (`{product}` for
-`Product`), else the route's only one. It is read as the model's key (`{product}`, `{id}`, a
-ULID or UUID too), or matched against a column when its name is one (`/blog/{slug}` finds the
-post whose `slug` matches). The query is the model's own, so a default scope (the current
-team) and soft deletes apply: another team's id, or a trashed row, is a 404.
+Many routes are about one row of a table: `/posts/7` shows post 7. `Found<M>` loads that row
+for you. ("Route model binding" is the name for this: the route's parameter is bound to a
+model.)
+
+`Found(product): Found<Product>` loads the row the route parameter names. If there is no such
+row, the answer is a 404, just like an address with no route.
+
+Which parameter does it use?
+
+- The one named after the model's table: `{product}` for `Product`.
+- Otherwise, the route's only parameter.
+
+How is the value read?
+
+- As the model's key: `{product}`, `{id}`, and ULID or UUID keys too.
+- Or, when the parameter's name is a column, by that column: `/blog/{slug}` finds the post
+  whose `slug` matches.
+
+The query is the model's own, so its rules apply. A default scope (for example, "only the
+current team's rows") and soft deletes (rows marked as deleted but kept) still count: another
+team's id, or a deleted row, is a 404.
 
 ```rust
 use renox::prelude::*;
@@ -292,11 +501,18 @@ async fn by_slug(Found(post): Found<Post>) -> String {
 }
 ```
 
-Authorization stays in the handler (`user.authorize("update", &post)?`), as with `find_or_404`.
+> [!IMPORTANT]
+> `Found` only loads the row. Checking whether this user may see or change it is still the
+> handler's job (`user.authorize("update", &post)?`), as with `find_or_404`. See
+> [authorization.md](authorization.md).
+
+> [!NOTE]
+> **Coming from Laravel:** this is route model binding. Laravel's `{post:slug}` becomes a
+> parameter named after the column, such as `{slug}`.
 
 ## What a handler can return
 
-Anything axum turns into a response, and Renox's own:
+A handler can return anything axum knows how to turn into a response, plus Renox's own types:
 
 | Return | Response |
 |---|---|
@@ -311,16 +527,31 @@ Anything axum turns into a response, and Renox's own:
 | `HxRedirect`, `HxRefresh`, `HxTrigger`, `HxRetarget`, `HxReswap`, `HxPushUrl` | htmx response headers; see [ui.md](ui.md) |
 | `Err(…)` from `Result<T>` | an error page (`errors/{status}.html`), or JSON for API clients |
 
+Some words from the table:
+
+- A **303 redirect** tells the browser "now go to this other address with GET". It's the usual
+  answer after a form is saved.
+- **`Redirect::intended`**: say a guest opens `/dashboard` and gets sent to the login page.
+  After logging in, `intended` takes them back to `/dashboard`. It works once, and only for an
+  address on your own site; if there is none, it goes to the fallback you give it.
+- **`Back`** returns to the page the visitor came from (the `Referer` header). If that's
+  missing or on another site, it goes to `/`.
+- A **fragment** is one block of a template, sent alone so htmx can swap just that part of the
+  page. `.also(…)` sends extra pieces to swap elsewhere on the page ("out-of-band").
+- To return two things at once (a toast and a redirect), put them in a tuple.
+
 ```rust
 use renox::prelude::*;
-use renox::{Download, Toast};
+use renox::Download;
 
+/// After saving: a "Saved" message, and a redirect to the product's page.
 async fn store(session: Session) -> Result<(Toast, Redirect)> {
     session.flash("status", "Saved")?; // or a toast, which needs no template code
     let _back = Redirect::intended(&session, "/products");
     Ok((Toast::success("Product saved."), Redirect::route("products.show", &[&42])?))
 }
 
+/// Sends invoice `id` as a PDF, shown in the browser instead of saved.
 async fn invoice(State(state): State<AppState>, Path(id): Path<i64>) -> Result<Download> {
     abort_if(id <= 0, StatusCode::NOT_FOUND, "No such invoice.")?; // any status with a message
     Download::from_storage(&state.storage, &format!("invoices/{id}.pdf"), "invoice.pdf")
@@ -328,59 +559,96 @@ async fn invoice(State(state): State<AppState>, Path(id): Path<i64>) -> Result<D
         .map(Download::inline) // a missing key is a 404
 }
 
+/// A tiny JSON answer: `{"ok": true}`.
 async fn ping() -> Json<serde_json::Value> {
     Json(json!({ "ok": true }))
 }
 ```
 
-A filename given to `Download` is made safe for `Content-Disposition`. `abort(status, msg)`,
-`abort_if` and `abort_unless` stop a handler with a status and a message visitors see.
+What's going on:
+
+- `store` returns a toast and a redirect together. The toast shows on the page the redirect
+  leads to.
+- `invoice` stops early with a 404 when the id makes no sense, then sends the file from
+  storage. If the file isn't there, that's a 404 too.
+- `ping` returns JSON, as an API would.
+
+Good to know:
+
+- A filename given to `Download` is made safe for the `Content-Disposition` header (the header
+  that tells the browser the file's name).
+- `abort(status, msg)`, `abort_if` and `abort_unless` stop a handler with a status and a
+  message that visitors see.
+
+> [!NOTE]
+> **Coming from Laravel:** `Redirect::route`, `Redirect::intended` and `Back` are
+> `redirect()->route()`, `->intended()` and `back()`. `Download` is `response()->download()`.
 
 ## Middleware
 
+**Middleware** is code that runs around a handler: before it, after it, or both. It's the
+place for things that many routes share, like "only for logged-in users" or "add this header
+to every answer". Middleware is also called a **layer**, because each one wraps the ones
+inside it, like the layers of an onion.
+
 ### The order around your handler
 
-Every request passes these, outermost first. You rarely need the details; they explain what
-your own middleware can rely on.
+Every request passes through these layers, outermost first. You rarely need the details. They
+tell you what your own middleware can count on.
 
 1. **Security headers** (nosniff, Referrer-Policy, X-Frame-Options, HSTS, the CSP) and the
-   client IP.
-2. **Method spoofing**: a POST with `_method=PUT|PATCH|DELETE` is routed as that method.
-3. **Request id**, then the request's log span; then the **body limit** (`UPLOAD_MAX_SIZE`).
+   client IP. (These headers tell browsers to block common tricks; the CSP, or Content
+   Security Policy, says which scripts a page may run.)
+2. **Method spoofing**: a POST with `_method=PUT|PATCH|DELETE` is routed as that method (see
+   [Method spoofing](#method-spoofing)).
+3. **Request id**, then the request's log span (the request's details, attached to its log
+   lines); then the **body limit** (`UPLOAD_MAX_SIZE`).
 4. Renox's scripts, `/health`, `/robots.txt`, `/favicon.ico` and the local disk's public files
    answer here, before sessions and maintenance mode.
-5. The request's context (`renox::context`), the **session**, the **locale**, the **user**
-   (from the session or an `Authorization: Bearer` token), **CSRF**, **views** (renders `View`s
-   and error pages), **maintenance mode**, and a guard that turns a panic or a run past
-   `REQUEST_TIMEOUT` into a 500 page.
+5. Then, in this order:
+   - the request's context (`renox::context`);
+   - the **session**;
+   - the **locale** (the visitor's language);
+   - the **user** (from the session or an `Authorization: Bearer` token);
+   - **CSRF**;
+   - **views** (renders `View`s and error pages);
+   - **maintenance mode**;
+   - a guard that turns a panic or a run past `REQUEST_TIMEOUT` into a 500 page.
 6. Your `App::layer` layers, first added = outermost.
 7. The route's own layers (guards, throttles, `route_layer`), then the handler.
 
-So an `App::layer` middleware already sees the session, `AuthUser`, `Lang` and the context,
-and its response still gets the security headers and error pages.
+What this means for you: an `App::layer` middleware already sees the session, `AuthUser`,
+`Lang` and the context. And its response still gets the security headers and the error pages.
 
 ### Your own middleware
 
-Write a function with axum's `from_fn` signature. `App::layer` wraps every route of the app's
-modules; `Routes::route_layer` wraps only the routes added **before** it in that `Routes`, like
-every guard below.
+A middleware is a function with axum's `from_fn` signature: it takes extractors (if any), the
+request, and `next`, which runs the rest. Then you attach it in one of two ways:
+
+- `App::layer` wraps every route of the app's modules.
+- `Routes::route_layer` wraps only the routes added **before** it in that `Routes`. Every
+  guard below works the same way.
 
 ```rust
 use renox::prelude::*;
 use renox::axum::extract::Request;
 use renox::axum::middleware::{Next, from_fn};
 
+/// Middleware: adds an `x-visitor` header saying "member" or "guest" to the answer.
 async fn stamp(user: Option<AuthUser>, req: Request, next: Next) -> Response {
     let mut res = next.run(req).await; // the handler (and inner layers) run here
+    // From here on, the handler has answered; we can change its response.
     let who = if user.is_some() { "member" } else { "guest" };
     res.headers_mut().insert("x-visitor", who.parse().unwrap());
     res
 }
 
+/// Wraps every route of the app in `stamp`.
 fn app() -> App {
     App::new().layer(from_fn(stamp)) // every route
 }
 
+/// Wraps only `/reports` in `stamp`.
 fn routes() -> Routes {
     Routes::new()
         .get("/reports", || async { "reports" })
@@ -389,16 +657,40 @@ fn routes() -> Routes {
 }
 ```
 
-Don't keep a closure that borrows `req` alive across `next.run(req).await` (scope it in a
-block), or the handler future isn't `Send` and won't compile as a route. To hand a value to
-handlers, use `renox::context::set(value)` in the middleware and the `Current<T>` extractor
-(see [authorization.md](authorization.md) "Tenants").
+What's going on:
+
+- Code before `next.run(req).await` runs before the handler; code after it runs after.
+- `app()` puts `stamp` around every route.
+- In `routes()`, `stamp` covers `/reports` but not `/about`, because `/about` comes after the
+  `route_layer` line.
+
+> [!WARNING]
+> Don't keep a closure that borrows `req` alive across `next.run(req).await` (put it in its own
+> `{ … }` block so it ends first). Otherwise the handler's future isn't `Send`, and it won't
+> compile as a route.
+
+> [!TIP]
+> To hand a value from middleware to handlers, call `renox::context::set(value)` in the
+> middleware and take the `Current<T>` extractor in the handler (see
+> [authorization.md](authorization.md) "Tenants").
+
+> [!NOTE]
+> **Coming from Laravel:** global middleware (`Kernel::$middleware`) is `App::layer(from_fn(…))`.
+> Route middleware is `.route_layer(…)`, written after the routes.
 
 ### Guards
 
-Each covers the routes added before it, so put it after them. Guests asking for a page are
-sent to the `login` route (and back afterwards, through `Redirect::intended`); API clients
-(`Accept: application/json` or an `Authorization` header) get 401 JSON instead.
+A **guard** is middleware that decides who gets in.
+
+> [!IMPORTANT]
+> Each guard covers the routes added **before** it, so put it after them.
+
+What happens to visitors who are turned away:
+
+- Guests asking for a page are sent to the `login` route, and back again after they log in
+  (through `Redirect::intended`).
+- API clients (requests with `Accept: application/json` or an `Authorization` header) get a 401
+  JSON answer instead.
 
 | Guard | Lets through | Others |
 |---|---|---|
@@ -410,12 +702,16 @@ sent to the `login` route (and back afterwards, through `Redirect::intended`); A
 | `.require_ability("orders:write")` | API tokens with the ability; sessions and unrestricted tokens | 403 |
 | `.require_password_confirmed()` | users who typed their password in the last three hours | → `/confirm-password` |
 
+(A **gate** is a named yes/no rule, like "may manage billing". Roles, permissions and token
+abilities are explained in [authorization.md](authorization.md).)
+
 ```rust
 use renox::prelude::*;
 
 # async fn index() -> &'static str { "" }
 # async fn store() -> &'static str { "" }
 # async fn login() -> &'static str { "" }
+/// Three sets of routes, each with its own guard, joined at the end.
 fn routes() -> Routes {
     let public = Routes::new().get("/posts", index);
     let members = Routes::new().post("/posts", store).require_auth(); // POST /posts only
@@ -424,14 +720,34 @@ fn routes() -> Routes {
 }
 ```
 
-A route added after a guard in the same `Routes` is **not** covered. Splitting routes into
-separate `Routes` values and merging them, as above, keeps that visible.
+What's going on:
+
+- Anyone can read `/posts`.
+- Only logged-in users can send a new post (`POST /posts`).
+- Only guests see `/signin`; a logged-in user is sent to `home`.
+
+> [!WARNING]
+> A route added **after** a guard in the same `Routes` is **not** covered. Splitting routes into
+> separate `Routes` values and merging them, as above, makes that easy to see.
+
+> [!NOTE]
+> **Coming from Laravel:** the `auth`, `guest`, `verified`, `can:` and `password.confirm`
+> middleware are `.require_auth()`, `.guest_only()`, `.require_verified()`, `.require_gate(…)`
+> and `.require_password_confirmed()`.
 
 ### Rate limits
 
-`.throttle(max, per)` counts per logged-in user, or per IP for guests; over the limit the
-answer is 429 with `Retry-After`, and allowed responses carry `X-RateLimit-Limit` and
-`X-RateLimit-Remaining`. For limits that depend on the request, name a limiter:
+A **rate limit** caps how often someone may call a route, say 60 times a minute. It protects
+your app from scripts that hammer it.
+
+`.throttle(max, per)` counts per logged-in user, or per IP address for guests.
+
+- Over the limit, the answer is **429 Too Many Requests**, with a `Retry-After` header that
+  says how long to wait.
+- Allowed answers carry `X-RateLimit-Limit` and `X-RateLimit-Remaining` headers.
+
+When the limit should depend on the request (partners get more, guests less), give a limiter
+a name:
 
 ```rust
 use renox::prelude::*;
@@ -440,6 +756,7 @@ use std::time::Duration;
 
 # async fn orders() -> &'static str { "" }
 # async fn login() -> &'static str { "" }
+/// Defines a limiter called "api" with a different limit for each kind of visitor.
 fn app() -> App {
     App::new().rate_limiter("api", |req| match req.user {
         Some(user) if user.has_role("partner") => Limit::none(),
@@ -448,6 +765,7 @@ fn app() -> App {
     })
 }
 
+/// One route uses the named limiter; the other a simple 5-per-minute limit.
 fn routes() -> Routes {
     Routes::new()
         .get("/api/orders", orders).throttle_by("api")
@@ -455,29 +773,60 @@ fn routes() -> Routes {
 }
 ```
 
-A rule sees `req.user`, `req.ip`, `req.method`, `req.path` and `req.headers`. Counters live in
-memory, so each server counts on its own; with `CACHE_STORE=database` they are shared
-through the `cache` table (and so is the login lock).
+What's going on:
+
+- Partners have no limit, other logged-in users get 600 a minute, guests 60 a minute.
+- `.by(…)` sets what to count by. Here, guests are counted by their IP address.
+- `/api/orders` uses the "api" limiter. `/contact` allows 5 posts a minute.
+
+A rule can look at `req.user`, `req.ip`, `req.method`, `req.path` and `req.headers`.
+
+> [!NOTE]
+> The counters live in memory, so each server counts on its own. With `CACHE_STORE=database`,
+> they are shared between servers through the `cache` table (and so is the login lock, which
+> blocks someone after too many wrong passwords).
+
+> [!NOTE]
+> **Coming from Laravel:** `throttle:60,1` is `.throttle(60, Duration::from_secs(60))`, and
+> `RateLimiter::for` is `App::rate_limiter` + `.throttle_by`.
 
 ### CORS
 
-`.cors(&["https://app.example.com"])` (or `&["*"]`) lets browsers on those origins `fetch` the
-routes added before it: preflights are answered and the `Access-Control-Allow-*` headers
-added. For credentials or other headers, build a `renox::cors::CorsLayer` and pass it to
+Browsers stop a page on one site from reading answers from another site, unless that other
+site says it's fine. **CORS** (Cross-Origin Resource Sharing) is how a site says so. An
+**origin** is a site's scheme and host, like `https://app.example.com`.
+
+`.cors(&["https://app.example.com"])` (or `&["*"]` for any origin) lets browsers on those
+origins `fetch` the routes added before it. Renox answers the browser's "preflight" check (a
+question it asks before the real request) and adds the `Access-Control-Allow-*` headers.
+
+For credentials (cookies) or other headers, build a `renox::cors::CorsLayer` and pass it to
 `.cors_layer(…)`.
+
+> [!NOTE]
+> **Coming from Laravel:** this replaces `config/cors.php`.
 
 ### ETags
 
-`.etag()` gives the routes added before it an `ETag` header, a hash of the page as it is sent,
-and answers **304 Not Modified** without the body when the browser's `If-None-Match` names it:
-for feeds, sitemaps, catalogues and API lists that are fetched again and again but rarely
-change. Only `GET`/`HEAD` answers with status 200 and a body of at most 2 MB get one.
+An **ETag** is a fingerprint of a page. The browser keeps it, and next time asks "has the page
+changed since this fingerprint?". If not, the app answers "no" without sending the page again,
+which saves time and data.
+
+`.etag()` gives the routes added before it an `ETag` header: a hash of the page as it is sent.
+When the browser's `If-None-Match` header names that same hash, the answer is
+**304 Not Modified**, with no body.
+
+It's made for feeds, sitemaps, catalogues and API lists that are fetched again and again but
+rarely change.
+
+Only these answers get one: `GET`/`HEAD` requests, status 200, and a body of at most 2 MB.
 
 ```rust
 use renox::prelude::*;
 # async fn feed() -> &'static str { "" }
 # async fn sitemap() -> &'static str { "" }
 
+/// A feed and a sitemap, both with ETags.
 fn routes() -> Routes {
     Routes::new()
         .get("/feed.xml", feed)
@@ -486,16 +835,32 @@ fn routes() -> Routes {
 }
 ```
 
+> [!NOTE]
+> **Coming from Laravel:** this is the `SetCacheHeaders` middleware with `etag`.
+
 ## Sessions
 
-`Session` is the visitor's session. By default it's an encrypted, signed cookie (key derived
-from `APP_KEY`), so it needs no database; keep it small (browsers drop cookies over 4 KB, and
-Renox logs a warning). `SESSION_DRIVER=database` keeps only an id in the cookie and the data in
-the `sessions` table; prune expired rows with `my-app session:prune`.
+The web forgets: each request arrives on its own. A **session** is how the app remembers one
+visitor from one request to the next: that they're logged in, what's in their cart, a message
+to show on the next page.
+
+`Session` is the visitor's session, as an extractor.
+
+Where the session is kept:
+
+- **By default, in a cookie.** The cookie is encrypted and signed, with a key made from
+  `APP_KEY`: the visitor can't read it or change it. It needs no database.
+- **With `SESSION_DRIVER=database`**, the cookie holds only an id, and the data lives in the
+  `sessions` table. Remove expired rows with `my-app session:prune`.
+
+> [!WARNING]
+> Keep a cookie session small. Browsers drop cookies over 4 KB, and Renox logs a warning when a
+> session gets that big.
 
 ```rust
 use renox::prelude::*;
 
+/// Shows the main things a session can do.
 async fn cart(session: Session) -> Result<String> {
     session.put("cart", vec![1, 2, 3])?;
     session.push("recent", 42)?;                 // append to a list
@@ -506,6 +871,14 @@ async fn cart(session: Session) -> Result<String> {
     Ok(format!("{visits} {cart:?} {coupon:?}"))
 }
 ```
+
+What's going on:
+
+- `put` stores a value under a name; `get` reads it back (`None` if it isn't there).
+- `push` adds to a list; `increment` adds to a number and returns the new total.
+- `pull` reads a value and removes it.
+- `flash` stores a value for the next request only, like "Added to the cart" shown after a
+  redirect.
 
 | Method | Does |
 |---|---|
@@ -518,140 +891,242 @@ async fn cart(session: Session) -> Result<String> {
 | `set_lifetime(duration)` | this session lasts longer than `SESSION_LIFETIME` |
 | `token`, `regenerate_token`, `flush` | the CSRF token; a new one; empty everything |
 
-- Lifetime: `SESSION_LIFETIME` minutes of inactivity (120). "Remember me" on Renox's login
-  page sets `REMEMBER_LIFETIME` (30 days) with `set_lifetime`.
+How long a session lasts, and what logging in and out does:
+
+- A session ends after `SESSION_LIFETIME` minutes without a visit (120).
+- "Remember me" on Renox's login page makes it last `REMEMBER_LIFETIME` instead (30 days),
+  using `set_lifetime`.
 - Logging in and out gives the session a new id (with the database driver) and a new CSRF
-  token. Logging out ends this device's session (the user's other devices stay logged in;
-  `auth::logout_other_devices` ends those); changing the password ends the others.
-- In templates: `flash.status`, `old('email')`, `errors`, `csrf_field()`.
+  token.
+- Logging out ends the session on **this** device only. The user's other devices stay logged
+  in; `auth::logout_other_devices` ends those.
+- Changing the password ends the user's other sessions.
+
+In templates: `flash.status`, `old('email')`, `errors`, `csrf_field()`.
+
+> [!NOTE]
+> **Coming from Laravel:** `session()->put/push/increment/flash` are
+> `Session::put/push/increment/flash`.
 
 ## CSRF
 
-Every POST, PUT, PATCH and DELETE must carry the session's token; without it the answer is
+Imagine a bad website with a hidden form that posts to your app's "delete my account" page.
+If you're logged in, your browser would send your cookie along. That's a **CSRF** attack
+(Cross-Site Request Forgery).
+
+The fix: every form carries a secret **token** that only your app's own pages know. Every
+POST, PUT, PATCH and DELETE must carry the session's token. Without it, the answer is
 **419 Page Expired**.
 
-- **Forms:** `{{ csrf_field() }}` inside the `<form>` (a hidden `_token` field; urlencoded and
-  multipart both work).
+How to send the token, depending on what sends the request:
+
+- **Forms:** put `{{ csrf_field() }}` inside the `<form>`. It adds a hidden `_token` field.
+  Both normal (urlencoded) and file-upload (multipart) forms work.
 - **htmx:** nothing to do. `{{ renox_head() }}` puts the token in a `<meta name="csrf-token">`
-  and Renox's script sends it as `X-CSRF-Token` on every htmx request.
-- **`fetch`:** send the `X-CSRF-Token` header yourself (read the meta tag).
-- **API tokens** (`Authorization: Bearer`) skip CSRF: browsers never send them on their own.
-  A Bearer token that doesn't authenticate gets 401.
-- **No session at all** (a payment gateway): `.without_csrf()` on those routes, and check the
-  request's signature instead. `Routes::webhook::<W>("/webhooks/stripe")` does both for you.
-- **A JavaScript client on the same site** (axios, a small SPA): `App::new().xsrf_cookie()`
-  also sends the token as an `XSRF-TOKEN` cookie that scripts can read, and accepts it back in
-  an `X-XSRF-TOKEN` header, as Laravel does. axios sends it by itself.
+  tag, and Renox's script sends it as `X-CSRF-Token` on every htmx request.
+- **`fetch`:** send the `X-CSRF-Token` header yourself (read it from the meta tag).
+- **API tokens** (`Authorization: Bearer`) skip CSRF: browsers never send them on their own,
+  so the attack can't happen. A Bearer token that doesn't log anyone in gets 401.
+- **No session at all** (for example, a payment gateway calling your app): use
+  `.without_csrf()` on those routes, and check the request's signature instead.
+  `Routes::webhook::<W>("/webhooks/stripe")` does both for you.
+- **A JavaScript client on the same site** (axios, a small single-page app):
+  `App::new().xsrf_cookie()` also sends the token as an `XSRF-TOKEN` cookie that scripts can
+  read, and accepts it back in an `X-XSRF-TOKEN` header, as Laravel does. axios sends it by
+  itself.
+
+> [!NOTE]
+> **Coming from Laravel:** `@csrf` is `{{ csrf_field() }}`, `VerifyCsrfToken::$except` is
+> `.without_csrf()`, and the `XSRF-TOKEN` cookie is `App::xsrf_cookie()`.
 
 ## Method spoofing
 
-HTML forms can only GET and POST. A POST with `_method=PUT|PATCH|DELETE` (a form field, or the
-`X-HTTP-Method-Override` header) is routed as that method; it happens before routing, so
-`.put(…)` and `.delete(…)` routes match. htmx can send the real method (`hx-delete`).
+HTML forms can only send GET and POST. So how does a form send a PUT or a DELETE? It pretends
+("spoofs").
+
+A POST with `_method=PUT|PATCH|DELETE` is routed as that method. The `_method` can be a form
+field or the `X-HTTP-Method-Override` header. This happens before routing, so your `.put(…)`
+and `.delete(…)` routes match.
 
 ```html
+{# A form that updates a product: it's sent as POST, but routed as PUT. #}
 <form method="post" action="{{ route('products.update', product.id) }}">
   {{ csrf_field() }}{{ method_field('PUT') }}
   …
 </form>
 ```
 
+`{{ method_field('PUT') }}` adds the hidden `_method` field.
+
+> [!TIP]
+> htmx doesn't need this: it can send the real method (`hx-delete`).
+
+> [!NOTE]
+> **Coming from Laravel:** `@method('PUT')` is `{{ method_field('PUT') }}`.
+
 ## Cookies
 
-The session covers most needs. For a cookie of your own (a theme, a consent banner), read with
-the `Cookies` extractor and set with `SetCookie` in the response:
+The session covers most needs. For a cookie of your own (a colour theme, a "cookies OK"
+banner), read it with the `Cookies` extractor and set it by returning `SetCookie` in the
+response:
 
 ```rust
 use renox::prelude::*;
 use renox::{Cookies, SetCookie};
 use std::time::Duration;
 
+/// Sets a `theme` cookie that lasts a year, then goes to the home page.
 async fn remember_theme(State(state): State<AppState>) -> (SetCookie, Redirect) {
     let cookie = SetCookie::new(&state, "theme", "dark").max_age(Duration::from_secs(365 * 86_400));
     (cookie, Redirect::to("/"))
 }
 
+/// Reads the `theme` cookie ("" when there is none).
 async fn theme(cookies: Cookies) -> String {
     cookies.get("theme").unwrap_or_default()
 }
 
+/// Reads and sets an encrypted cookie: the browser can't read or change it.
 async fn secret(State(state): State<AppState>, cookies: Cookies) -> (SetCookie, String) {
     let seen = cookies.get_encrypted("seen").unwrap_or_default(); // tampered: None
     (SetCookie::encrypted(&state, "seen", "yes"), seen)
 }
 ```
 
-Defaults: `Path=/`, `HttpOnly`, `SameSite=Lax`, `Secure` when `APP_URL` is https, until the
-browser closes. Change them with `max_age`, `path`, `readable_by_scripts` (no `HttpOnly`) and
-`strict` (`SameSite=Strict`); `SetCookie::remove(&state, name)` deletes one.
-`SetCookie::encrypted` seals the value with `APP_KEY`: the browser can neither read nor
-change it.
+A new cookie starts with these settings:
+
+- `Path=/`: sent with every address on the site;
+- `HttpOnly`: page scripts can't read it;
+- `SameSite=Lax`: not sent along when another site posts a form to yours;
+- `Secure` when `APP_URL` is https: sent only over https;
+- it lasts until the browser closes.
+
+Change them with:
+
+- `max_age` (how long it lasts);
+- `path`;
+- `readable_by_scripts` (no `HttpOnly`);
+- `strict` (`SameSite=Strict`).
+
+`SetCookie::remove(&state, name)` deletes a cookie. `SetCookie::encrypted` seals the value with
+`APP_KEY`: the browser can neither read nor change it. If someone tampers with it,
+`get_encrypted` gives `None`.
+
+> [!NOTE]
+> **Coming from Laravel:** `Cookie::queue` and encrypted cookies are `SetCookie::new` /
+> `SetCookie::encrypted`, read with `Cookies`.
 
 ## Signed URLs
 
-A signed URL can't be altered and expires: download links in mail, unsubscribe links,
-one-off invitations.
+A **signed URL** is a link with a seal. Nobody can change it without breaking the seal, and it
+stops working after a while. Use it for download links in mail, unsubscribe links and one-off
+invitations.
 
 ```rust
 use renox::prelude::*;
 use renox::signed::ValidSignature;
 use std::time::Duration;
 
+/// The route that the signed link points to.
 fn routes() -> Routes {
     Routes::new().get("/invoices/{id}", show_invoice).name("invoices.show")
 }
 
+/// Makes a signed link to invoice `id`.
 async fn share(State(state): State<AppState>, Path(id): Path<i64>) -> Result<String> {
     // An absolute URL (with APP_URL) valid for an hour.
     state.signed_url("invoices.show", &[&id], Duration::from_secs(3600))
 }
 
+/// Shows the invoice, but only through a valid signed link.
 async fn show_invoice(_: ValidSignature, Path(id): Path<i64>) -> String {
     format!("Invoice {id}") // an altered or expired link gets 403
 }
 ```
 
-The signature covers the path and expiry (HMAC-SHA256 with `APP_KEY`), so the link carries no
-other query string. `state.sign_path(path, ttl)` signs a path that isn't a named route.
-Rotating `APP_KEY` invalidates every link. Private storage files get temporary links with
-`state.storage.temporary_url(…)`.
+What's going on:
+
+- `share` makes a full link to `/invoices/{id}` that works for one hour.
+- `show_invoice` takes `ValidSignature`. With a changed or expired link, Renox answers 403 and
+  the handler never runs.
+
+Good to know:
+
+- The signature covers the path and the expiry time (it's an HMAC-SHA256 made with `APP_KEY`).
+  So the link can't carry any other query string.
+- `state.sign_path(path, ttl)` signs a path that isn't a named route.
+- Changing (rotating) `APP_KEY` breaks every signed link already sent.
+- Private storage files get temporary links with `state.storage.temporary_url(…)`.
+
+> [!NOTE]
+> **Coming from Laravel:** `URL::temporarySignedRoute` and the `signed` middleware are
+> `state.signed_url(…)` and `ValidSignature`.
 
 ## Maintenance mode
+
+When you update the app, you may want to close it for a moment and show "back soon" to
+everyone.
 
 ```text
 my-app down --secret s3cr3t --retry 60   # every request answers 503 (Retry-After: 60)
 my-app up                                # back to normal
 ```
 
-The 503 uses `errors/503.html` (or the built-in error page). Visiting `/s3cr3t` sets a cookie
-that lets you in while the site is down. `/health`, Renox's scripts and webhook routes keep
-working. The state is the file `storage/framework/down`, so every process on the machine sees
-it.
+While the app is down:
+
+- Every request gets **503 Service Unavailable**, using `errors/503.html` (or the built-in
+  error page). `Retry-After: 60` tells clients to try again in 60 seconds.
+- Visiting `/s3cr3t` (your secret) sets a cookie that lets **you** in, so you can check the
+  site.
+- `/health`, Renox's scripts and webhook routes keep working.
+
+"Down" is a file, `storage/framework/down`, so every process on the machine sees it.
+
+> [!NOTE]
+> **Coming from Laravel:** this is `php artisan down --secret`.
 
 ## Request ids and client IPs
 
-- **Request id:** every request gets one, kept from an incoming `X-Request-Id` when it looks
-  sane (8 to 64 letters, digits, `.`, `_`, `-`) or made up. It is on the response's
-  `X-Request-Id`, in every log line of the request and in error reports; read it with the
-  `RequestId` extractor to show it on an error page.
-- **Client IP:** behind Caddy, nginx or a load balancer every connection comes from the proxy,
-  which passes the visitor's address in `X-Forwarded-For` or `Forwarded`. Those headers are
-  believed only from `TRUSTED_PROXIES` (addresses and CIDR ranges, or `*` for whoever
-  connects, e.g. a platform's load balancer). `ClientIp`, rate limits, the login lock and the
-  logs all use the same address.
+**Request id.** Every request gets an id, so you can find all the log lines of one request.
+
+- If the request arrives with an `X-Request-Id` header that looks sane (8 to 64 letters,
+  digits, `.`, `_`, `-`), Renox keeps it. Otherwise it makes one up.
+- The id is sent back in the response's `X-Request-Id` header, written in every log line of the
+  request, and included in error reports.
+- Read it with the `RequestId` extractor, for example to show it on an error page.
+
+**Client IP.** Behind Caddy, nginx or a load balancer, every connection seems to come from
+that proxy. The proxy passes the visitor's real address in an `X-Forwarded-For` or `Forwarded`
+header.
+
+Anyone could send those headers, though. So Renox believes them only from `TRUSTED_PROXIES`:
+addresses and CIDR ranges (a way to write a block of addresses, like `10.0.0.0/8`), or `*` for
+whoever connects (for example, a hosting platform's load balancer).
 
 ```text
 TRUSTED_PROXIES=127.0.0.1,10.0.0.0/8
 ```
 
-- **Trusted hosts:** with `TRUSTED_HOSTS=example.com,*.example.com`, a request for any other
-  host gets a 400, so links built from the `Host` header (password reset mails, redirects)
-  can't point at someone else's site. `APP_URL`'s host is always allowed, and `/health`
-  answers whatever the host, since load balancers check it by IP. Unset: any host.
+`ClientIp`, rate limits, the login lock and the logs all use this same address.
+
+**Trusted hosts.** With `TRUSTED_HOSTS=example.com,*.example.com`, a request for any other host
+gets a 400. This matters because some links are built from the `Host` header (password reset
+mails, redirects): without the check, a trick request could make them point at someone else's
+site.
+
+- `APP_URL`'s host is always allowed.
+- `/health` answers whatever the host, since load balancers check it by IP address.
+- When `TRUSTED_HOSTS` is not set, any host is allowed.
 
 See [operations.md](operations.md) for timeouts, proxies and `/health` in production.
 
+> [!NOTE]
+> **Coming from Laravel:** `TrustProxies` is `TRUSTED_PROXIES`, and `TrustHosts` is
+> `TRUSTED_HOSTS`.
+
 ## Coming from Laravel
+
+If you know Laravel, this table maps what you know to Renox:
 
 | Laravel | Renox |
 |---|---|

@@ -3,9 +3,9 @@
 //! `icon_button`, and what every button can carry: an icon, a count, a
 //! keyboard shortcut and a reason it is disabled.
 
+use renox::HxRefresh;
 use renox::prelude::*;
 use renox::testing::TestApp;
-use renox::{HxRefresh, Toast};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]

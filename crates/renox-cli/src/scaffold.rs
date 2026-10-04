@@ -532,7 +532,6 @@ const MODULE: &str = r#"//! Made with `rnx make:module __module__ --resource`: l
 
 pub mod model;
 
-use renox::Toast;
 use renox::prelude::*;
 __date_use__use serde::Deserialize;
 

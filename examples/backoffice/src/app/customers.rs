@@ -3,7 +3,6 @@
 //! (the kit's `action_sheet`). How many invoices each has and what they
 //! owe come from the `invoices` table (`Column::count_of`, `sum_of`).
 
-use renox::Toast;
 use renox::grid::{Column, Grid, GridRequest};
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};

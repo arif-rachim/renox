@@ -3,7 +3,7 @@
 
 use renox::prelude::*;
 use renox::testing::TestApp;
-use renox::{HxPushUrl, HxReswap, HxRetarget, Toast};
+use renox::{HxPushUrl, HxReswap, HxRetarget};
 
 #[derive(serde::Deserialize)]
 struct Signup {
