@@ -275,6 +275,7 @@ tr.rx-grid__group-row[hidden], tr[data-in-group][hidden] { display: none; }
 .rx-grid__menu-item { width: 100%; border: 0; background: none; font: inherit; text-align: start; cursor: pointer; }
 .rx-grid__menu-item.rx-grid__menu-item--danger { color: var(--rx-danger-text); }
 .rx-grid__dialog {
+  margin: auto; /* not left to the browser: resets like Tailwind's set margin 0 */
   border: 0; border-radius: var(--rx-radius-l); padding: 20px; max-width: min(420px, calc(100vw - 32px));
   background: var(--rx-surface-raised); color: var(--rx-label); box-shadow: var(--rx-shadow-raised);
 }

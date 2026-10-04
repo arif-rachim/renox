@@ -15,6 +15,10 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    # `dtolnay/rust-toolchain@<version>` picks a Rust version, not an action release: the
+    # MSRV job pins 1.94 on purpose (rust-version in Cargo.toml), and the others use @stable.
+    ignore:
+      - dependency-name: dtolnay/rust-toolchain
     groups:
       actions:
         patterns: ["*"]
