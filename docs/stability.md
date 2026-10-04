@@ -127,7 +127,7 @@ field for you.
 - `view::ViewContext`, `auth::Registration`, `auth::Recipient`, `mail::Attachment`
 - `Toast`, `ToastAction`, `auth::DatabaseMessage`, `auth::PendingLogin`, `chart::Series`,
   `report::ErrorReport`, `report::RequestReport`, `validation::FormContext`,
-  `rate_limit::LimitRequest`, `SentNotification`, `db::InvalidUlid`, `grid::Grid`,
+  `rate_limit::LimitRequest`, `SentNotification`, `SentBroadcast`, `db::InvalidUlid`, `grid::Grid`,
   `grid::Column`, `grid::GridPrefs`, `grid::RowOrder`,
   `grid::Action`, `grid::Selection`, `storage::FileInfo`, `queue::BatchStatus`,
   `queue::QueueCounts`, `queue::QueueStats` (the dashboard's), `http::SentRequest`,

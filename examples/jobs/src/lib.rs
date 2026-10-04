@@ -7,6 +7,9 @@
 //! day's sales on weekday evenings and the week's on Monday mornings
 //! (Jakarta time), guarded by a cache lock and with an alert when they fail.
 //! Errors that need a person also go to a chat webhook (`App::report`).
+//! Logged-in staff see order changes live: the jobs broadcast them to the
+//! open pages (`state.broadcast`), and a failed charge arrives as a toast
+//! whose "Reopen" button sends a request (`ToastAction::post`).
 //!
 //! All of it runs inside `cargo run` (queue workers and the scheduler are
 //! part of `serve`). With `MAIL_MAILER=log` the mails go to the log, and
@@ -29,7 +32,9 @@ pub fn app() -> App {
         .migrations(renox::migrations!())
         // Staff only: every user is an admin who gets the order mails, so
         // nobody signs themselves up (`db:seed` makes the admin).
-        .module(Auth::new().without_registration())
+        // `.notifications()`: the bell in the bar, and the stream that
+        // carries `state.broadcast(…)` to the staff's open pages.
+        .module(Auth::new().without_registration().notifications())
         .module(app::orders::Orders)
         .module(renox::queue::Dashboard)
         .gate(renox::queue::DASHBOARD_GATE, |user| {

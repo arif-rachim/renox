@@ -1400,8 +1400,11 @@ async fn after_toggle() -> (Toast, HxRetarget, HxReswap, HxPushUrl, View) {
     (
         // Also info, warning, error (errors stay until dismissed); .body("…"),
         // .link("View", "/orders/7"), .action(ToastAction::event("Undo", "undo")),
+        // .action(ToastAction::delete("Undo", "/orders/7/archive")) (a request with the CSRF
+        // token, own paths only; answer it with a Toast / HxRefresh / HxRedirect),
         // .seconds(8) / .persistent(), .id("x"). Layout: toasts(position="bottom-end").
-        // In page scripts: Renox.toast({kind, message, body, actions}), Renox.dismissToast(id).
+        // In page scripts: Renox.toast({kind, message, body, actions}), Renox.dismissToast(id),
+        // Renox.request("POST", "/orders/7/retry").
         Toast::success("Order updated"),
         HxRetarget("#orders".into()),
         HxReswap("outerHTML".into()),
@@ -1690,7 +1693,21 @@ The bell: `App::new().module(Auth::new().notifications())`, then in the layout's
 a badge, a panel of the latest (mark read/unread, delete, mark all read, clear, open = read +
 follow `url`), new ones live over Server-Sent Events (a toast + the badge), and the page
 `notifications.index` without JavaScript. Behind nginx: `proxy_buffering off` for
-`/notifications/stream`.
+`/notifications/stream`. A new app with it: `rnx new my-app --notifications`.
+
+Your own live events over the same stream (DOM events on `document`; the page needs the bell
+or `{{ event_stream() }}`; this process only, nothing stored, so missed by pages not open):
+
+```rust
+use renox::prelude::*;
+
+fn order_paid(state: &AppState, buyer_id: i64) -> Result {
+    // Every open page: <div hx-get="/orders" hx-trigger="order-updated from:document" …>
+    state.broadcast("order-updated", json!({ "id": 7, "status": "paid" }))?;
+    // One user's pages; `renox:toast` shows toasts.
+    state.broadcast_to(buyer_id, "renox:toast", json!({ "toasts": [Toast::success("Paid")] }))
+}
+```
 
 Mail views can `{% from "renox/mail/components.html" import button, panel, table, divider %}`:
 `{{ button(url, t('mail.track')) }}`, `{% call panel() %}…{% endcall %}`,
@@ -2057,7 +2074,7 @@ impl Event for OrderPlaced {}
 #[renox::test]
 async fn test_tools() {
     let app = TestApp::new(App::new().module(Auth::new())).await;
-    app.fake_events().fake_notifications(); // record instead of running / sending
+    app.fake_events().fake_notifications().fake_broadcasts(); // record instead of running / sending
     let res = app.get("/login").await;
     res.assert_view("renox/auth/login.html");
     app.assert_guest().assert_session_missing("cart");
@@ -2066,6 +2083,7 @@ async fn test_tools() {
     app.assert_not_emitted::<OrderPlaced>().assert_nothing_notified();
     // JSON: res.assert_json_path("data.0.name", "Coffee"), res.assert_json(json!({ "total": 2 }))
     // Events/notifications: app.assert_emitted::<OrderPlaced>(|e| e.id == 7), app.assert_notified(&user, "kind")
+    // Broadcasts: app.assert_broadcast("order-updated", |b| b.data["id"] == 7), app.broadcasts()
     // A real server for a browser test: let url = app.serve().await;
 }
 ```

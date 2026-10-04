@@ -43,6 +43,7 @@ shows the queue: jobs waiting, throughput, failed jobs (retry or forget them) an
 | Mail templates: the receipt (HTML and text) and the sales report | [resources/views/mail](resources/views/mail) |
 | The queue dashboard and the gate that lets the admin see it | [src/lib.rs](src/lib.rs) |
 | `post_to_chat`: an `App::report` reporter that posts errors to a chat webhook | [src/lib.rs](src/lib.rs) |
+| Live staff pages: the bell, `order_updated` (`state.broadcast`), the failed-charge toast with a "Reopen" request button, `reopen` | [src/app/orders/payment.rs](src/app/orders/payment.rs), [resources/views/orders/index.html](resources/views/orders/index.html), [layouts/app.html](resources/views/layouts/app.html) |
 
 ## Things worth copying
 
@@ -91,10 +92,24 @@ shows the queue: jobs waiting, throughput, failed jobs (retry or forget them) an
   are also `.catch` and `.finally`). The page reads `state.queue.batch_status(id)` and its
   `progress()`; htmx polls it with `hx-trigger="every 1s"` and gets only the `progress` block
   (`view(..).fragment("progress")`), which stops polling when the batch is finished.
+- **Pages that keep up by themselves.** Logged in, the staff have the bell
+  (`Auth::new().notifications()` + `notification_bell`), and with it a live stream. Each job
+  that changes an order calls `state.broadcast("order-updated", json!({ "id": …, "status": … }))`,
+  and the orders list listens with `hx-trigger="order-updated from:document"` and reloads
+  itself: pay with the declined card and watch the row turn `needs_attention` without
+  reloading. Broadcasts are fire-and-forget and stay in this process: they reach the pages
+  because the workers run inside `cargo run`; a separate `queue:work` process wouldn't reach
+  them (the database notifications still would, within 15 seconds).
+- **A toast with a button that does something.** The `failed` hook also broadcasts a toast,
+  `Toast::error("Payment for order #7 failed").action(ToastAction::post("Reopen", "/orders/7/reopen"))`.
+  Its button sends the POST with htmx and the CSRF token; `reopen` answers with a `Toast` (a
+  `204` carrying it), never a `Redirect`, and broadcasts `order-updated` so the list follows.
+  The row's own "Reopen" button (`hx-post`, `hx-swap="none"`) sends the same request. The
+  tests record broadcasts with `app.fake_broadcasts()` and check them with
+  `assert_broadcast`.
 - **One notification, two channels.** `NewOrder` returns `Channel::Mail` and
   `Channel::Database`; the database row, a `DatabaseMessage` (title, body and the order's
-  keys), shows up in `user.unread_notifications(&db)` (and in the UI kit's
-  `notification_bell` of an app with `Auth::new().notifications()`).
+  keys), shows up in `user.unread_notifications(&db)` and in the bell.
 - **Scheduled tasks are plain functions.** `daily_sales` is registered with
   `daily_at("21:00", ...)` narrowed by `.weekdays()` and `.timezone("Asia/Jakarta")` (instead
   of `APP_TIMEZONE`, with DST handled for zones that have it); `weekly_sales` uses a cron

@@ -88,11 +88,26 @@ pub struct SentNotification {
     pub to: crate::auth::Recipient,
 }
 
-/// Recorders for `TestApp::fake_events` and `fake_notifications`.
+/// An event a test recorded instead of sending it to the open pages
+/// (`TestApp::fake_broadcasts`, `AppState::broadcast`).
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct SentBroadcast {
+    /// The user whose pages it was for; `None` for every page.
+    pub user_id: Option<i64>,
+    /// The DOM event's name.
+    pub event: String,
+    /// Its data (the DOM event's `detail`).
+    pub data: serde_json::Value,
+}
+
+/// Recorders for `TestApp::fake_events`, `fake_notifications` and
+/// `fake_broadcasts`.
 #[derive(Default)]
 pub(crate) struct Fakes {
     pub events: std::sync::Mutex<Option<Vec<Box<dyn std::any::Any + Send>>>>,
     pub notifications: std::sync::Mutex<Option<Vec<SentNotification>>>,
+    pub broadcasts: std::sync::Mutex<Option<Vec<SentBroadcast>>>,
 }
 
 impl Fakes {
@@ -102,6 +117,18 @@ impl Fakes {
         match events.as_mut() {
             Some(list) => {
                 list.push(Box::new(event));
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Records a broadcast if broadcasts are faked; returns whether it did.
+    pub(crate) fn record_broadcast(&self, broadcast: SentBroadcast) -> bool {
+        let mut sent = self.broadcasts.lock().unwrap_or_else(|e| e.into_inner());
+        match sent.as_mut() {
+            Some(list) => {
+                list.push(broadcast);
                 true
             }
             None => false,
