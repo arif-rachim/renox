@@ -1,39 +1,87 @@
 # Authorization: gates, policies, roles, tokens and tenants
 
-Who may do what, and to which rows. Renox has one tool per question; this guide shows when to
-reach for each and how they fit together. For the short version of every API, see the
-[cheat-sheet](../CHEATSHEET.md) ("Auth, policies, gates" and "Tenants, roles and permissions").
-Complete apps: [examples/shop](../examples/shop) (an admin role, an audit trail),
-[examples/api](../examples/api) (token abilities), [examples/crud](../examples/crud) (a policy),
-[examples/teams](../examples/teams) (tenants) and [examples/backoffice](../examples/backoffice)
-(roles made of permissions, `require_permission` per section, an activity log).
+Your app knows *who* someone is once they log in. This guide is about the next question: what
+that person **may** see or change. Renox has one small tool for each kind of question, and this
+page shows when to reach for each one and how they fit together.
+
+In this guide:
+
+- [Gates](#gates-may-this-user-do-x): "may this user do X at all?"
+- [Policies](#policies-may-this-user-do-x-to-this-row): "may this user do X to *this* row?"
+- [Roles and permissions](#roles-and-permissions): jobs like "editor", and what each job allows
+- [Super-admins](#super-admins-gate_before): one person who may do everything
+- [API tokens and abilities](#api-tokens-and-abilities): limits for programs that call your API
+- [Tenants](#tenants-rows-that-belong-to-a-team): keeping each team's data apart
+- [Sensitive actions](#sensitive-actions-and-the-audit-trail), a
+  [second login step](#a-second-login-step-two-factor-authentication) and
+  [testing](#testing-authorization)
+
+Want the short version of every API? See the [cheat-sheet](../CHEATSHEET.md) (the parts "Auth,
+policies, gates" and "Tenants, roles and permissions").
+
+Complete apps that use these tools:
+
+- [examples/shop](../examples/shop): an admin role and an audit trail;
+- [examples/api](../examples/api): token abilities;
+- [examples/crud](../examples/crud): a policy;
+- [examples/teams](../examples/teams): tenants;
+- [examples/backoffice](../examples/backoffice): roles made of permissions,
+  `require_permission` per section, and an activity log.
+
+### Words you'll meet
+
+| Word | What it means |
+|---|---|
+| **authentication** | Finding out *who* someone is: logging in. |
+| **authorization** | Deciding what that person *may do*. This guide is about this one. |
+| **guest** | A visitor who isn't logged in. |
+| **gate** | A named yes/no question about the user, like "may they see reports?". |
+| **policy** | Rules on a model that answer per row, like "may this user edit *this* invoice?". |
+| **ability** | The name of an action you ask about, like `"view"`, `"update"` or `"orders:read"`. |
+| **role** | A job someone has in your app, like "editor" or "admin". |
+| **permission** | One thing a role allows, like `posts.publish`. A role is a bundle of them. |
+| **token** | A long secret string a program sends instead of logging in with a password. |
+| **tenant** | A customer whose data must stay apart from others: a team, a shop, a school. |
+| **401** | The answer "you're not logged in" (an HTTP status code). |
+| **403** | The answer "Forbidden": we know who you are, but you may not do this. |
+| **404** | The answer "Not Found": as far as you can tell, this row doesn't exist. |
+
+### Which tool answers which question
 
 | Question | Tool | Where it's checked |
 |---|---|---|
-| Is someone logged in? | `AuthUser`, `.require_auth()` | extractor, route |
-| May this user do X at all? | a gate (`App::gate`, `gate_async`) | `.require_gate("x")`, `user.gate_async("x").await?`; sync gates only: `user.gate("x")?`, `can('x')` |
+| Is someone logged in? | `AuthUser`, `.require_auth()` | in a handler's arguments, or on a route |
+| May this user do X at all? | a gate (`App::gate`, `gate_async`) | `.require_gate("x")`, `user.gate_async("x").await?`; for sync gates only: `user.gate("x")?`, `can('x')` |
 | May this user do X to *this* row? | a policy (`impl Policy`) | `user.authorize("update", &row)?`, `can('update', row)` |
 | Which job does the user have? | roles and permissions (the `Permissions` module) | `.require_role`, `.require_permission`, `has_role` |
-| May this user send this form? | `Validate::authorize` (a form request) | the `Valid<T>` extractor: 403 before the rules |
-| Who may do everything? | `App::gate_before` | before every gate, permission and policy |
+| May this user send this form? | `Validate::authorize` (a form request) | the `Valid<T>` extractor: 403 before the rules run |
+| Who may do everything? | `App::gate_before` | asked before every gate, permission and policy |
 | What may this API token do? | token abilities | `.require_ability("orders:write")`, `token_can` |
 | Which rows exist for this user at all? | a default scope (tenants) | every query of the model |
-| Is it really them, right now? | `.require_password_confirmed()` | route |
+| Is it really them, right now? | `.require_password_confirmed()` | on a route |
 | Who did it? | the `Audit` module | `audit::record` |
 
 ## Gates: "may this user do X?"
 
-A gate is a named yes/no about the user alone. Use one when the answer doesn't depend on a
-particular row. A gate is sync (it sees the `User`), or async with the app's state when it
-needs the database:
+A **gate** is a named yes/no question about the user alone. Use one when the answer doesn't
+depend on a particular row. "May this user see the reports page?" is a gate. "May this user edit
+invoice 7?" is not (that's a [policy](#policies-may-this-user-do-x-to-this-row)).
+
+There are two kinds of gate:
+
+- a **sync** gate is a plain closure that sees the `User`;
+- an **async** gate also gets the app's state, so it can ask the database.
 
 ```rust
 use renox::prelude::*;
 
+/// Builds the app and defines two gates on it.
 fn app() -> App {
     App::new()
         .module(Auth::new())
+        // A sync gate: only people with an @example.com address may see reports.
         .gate("reports", |user| user.email.ends_with("@example.com"))
+        // An async gate: asks the database whether the user owns billing.
         .gate_async("billing", |user, state| async move {
             let owners: i64 = renox::db::sql("SELECT COUNT(*) FROM billing_owners WHERE user_id = ?")
                 .bind(user.id)
@@ -43,6 +91,7 @@ fn app() -> App {
         })
 }
 
+/// Protects a route with a gate.
 fn routes() -> Routes {
     // Guests are sent to log in, other users get 403. Like every guard, it covers the routes
     // added before it.
@@ -51,33 +100,56 @@ fn routes() -> Routes {
         .require_gate("reports")
 }
 
+/// Asks the gates inside a handler instead.
 async fn invoices(user: AuthUser) -> Result<String> {
     user.gate_async("billing").await?; // 403 unless allowed; `allows_async` for a bool
+    // `allows` gives a plain true or false instead of stopping with a 403.
     Ok(format!("reports too: {}", user.allows("reports")))
 }
 ```
 
-In templates, `{% if can('reports') %}` asks a gate (or a permission of that name).
+What's going on:
 
-`can('x')` in templates and `user.gate("x")` / `user.allows("x")` are synchronous, so they answer
-only gates made with `App::gate` and permissions: for a gate made with `gate_async` they say no
-(unless `gate_before` answers first). Ask an async gate with `.require_gate("x")` on the route or
-`user.gate_async("x")` / `user.allows_async("x")` in the handler (these two answer plain gates
-too); to show something in a page by an async gate, ask it in the handler and pass the answer to
-the view.
+- `.gate("reports", …)` gives the question a name, `"reports"`, and the closure answers it.
+- `.require_gate("reports")` on the routes says "only users the gate allows may open these".
+- In a handler, `user.gate_async("billing").await?` stops with a 403 when the answer is no.
+  If you'd rather get a `bool` and decide yourself, use `allows_async`.
+
+In templates, `{% if can('reports') %}` asks a gate (or a permission with that name).
+
+### Sync and async gates in templates
+
+There is a catch with async gates. `can('x')` in templates, and `user.gate("x")` /
+`user.allows("x")` in Rust, are **synchronous**: they can't wait for the database. So they only
+answer gates made with `App::gate`, and permissions.
+
+For a gate made with `gate_async`, they say **no** (unless `gate_before` answers first).
+
+To ask an async gate, use one of these:
+
+- `.require_gate("x")` on the route;
+- `user.gate_async("x")` or `user.allows_async("x")` in the handler. These two answer plain
+  gates too.
+
+> [!TIP]
+> Want to show or hide something in a page based on an async gate? Ask the gate in the handler
+> and pass the answer to the view as a value.
 
 ## Policies: "may this user do X to this row?"
 
-A policy lives on the model and answers per row, usually by ownership:
+A **policy** lives on the model. It answers per row, usually by checking who owns the row:
 
 ```rust
 use renox::prelude::*;
 
+/// An invoice: a row of the `invoices` table.
 #[derive(Model, serde::Serialize, Default)]
 #[model(table = "invoices")]
 struct Invoice { id: i64, user_id: i64, paid: bool }
 
+/// The invoice's policy: who may do what to one invoice.
 impl Policy for Invoice {
+    /// Answers "may `user` do `ability` to this invoice?".
     fn allows(&self, user: &User, ability: &str) -> bool {
         match ability {
             "view" => self.user_id == user.id,
@@ -87,12 +159,14 @@ impl Policy for Invoice {
     }
 }
 
+/// The edit page of one invoice.
 async fn edit(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Result<View> {
     let invoice = Invoice::find_or_404(&db, id).await?;
     user.authorize("update", &invoice)?; // 403 unless allowed
     Ok(view("invoices/edit.html", context! { invoice }))
 }
 
+/// The list of the user's invoices.
 async fn index(State(db): State<Db>, user: AuthUser) -> Result<View> {
     // For `{% if can('update', invoice) %}` in the view, wrap each row with its answers.
     let invoices: Vec<_> = Invoice::where_eq("user_id", user.id)
@@ -105,23 +179,40 @@ async fn index(State(db): State<Db>, user: AuthUser) -> Result<View> {
 }
 ```
 
-A policy can check roles too: `has_role` on the `User` it gets reads the roles the request
-loaded (the `Permissions` module), so "accountants see every invoice" sits in `allows`
+What's going on:
+
+- `allows` gets the user and an **ability** (a name like `"view"` or `"update"`) and returns
+  `true` or `false`. Here, you may view your own invoices, and update them only while unpaid.
+  Any other ability is a no.
+- `user.authorize("update", &invoice)?` asks the policy. When the answer is no, the `?` stops
+  the handler and the visitor gets a 403.
+- Templates can't run the policy themselves. So in `index`, `Can::new` wraps each invoice with
+  the answers for the abilities you list (`&["update"]`). Then `{% if can('update', invoice) %}`
+  in the view reads them.
+
+### Policies that check roles
+
+A policy can check roles too. `has_role` on the `User` it gets reads the roles the request
+already loaded (with the [`Permissions` module](#roles-and-permissions)). So a rule like
+"accountants see every invoice" fits in `allows`
 ([examples/shop](../examples/shop/src/app/orders/model.rs) does this for its admins):
 
 ```rust
 use renox::prelude::*;
 
+/// An invoice, with only the fields this example needs.
 #[derive(Model, serde::Serialize, Default)]
 #[model(table = "invoices")]
 struct Invoice { id: i64, user_id: i64 }
 
 impl Policy for Invoice {
+    /// The owner may view the invoice, and so may every accountant.
     fn allows(&self, user: &User, ability: &str) -> bool {
         ability == "view" && (self.user_id == user.id || user.has_role("accountant"))
     }
 }
 
+/// Shows one invoice to the people allowed to see it.
 async fn show(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Result<View> {
     let invoice = Invoice::find_or_404(&db, id).await?;
     user.authorize("view", &invoice)?; // the owner or an accountant
@@ -129,27 +220,41 @@ async fn show(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Resu
 }
 ```
 
-Outside a request (a job, a command) the roles aren't loaded and `has_role` says `false`; ask
-`user.roles(&db)` there.
+> [!WARNING]
+> Outside a request (in a job or a command) the roles aren't loaded, so `has_role` says
+> `false`. Ask `user.roles(&db)` there instead.
 
-A form can ask too, before its rules run: `Validate::authorize` gets a `FormContext` (the state
-and the user), and `false` answers 403 (the CHEATSHEET's "Form + validation" shows a form
-request).
+### Forms can ask too
+
+A form can check the user before its rules run. `Validate::authorize` gets a `FormContext` (the
+app's state and the user). If it returns `false`, the answer is a 403. The CHEATSHEET's "Form +
+validation" part shows such a form (Laravel calls it a "form request").
 
 ## Roles and permissions
 
-The opt-in `Permissions` module stores roles, the permissions each role grants, and who has
-which role (tables `roles`, `permissions`, `permission_role`, `role_user`). It loads the
-user's roles and permissions once per request, so the checks below cost no query.
+A **role** is a job someone has, like "editor". A **permission** is one thing a role allows, like
+`posts.publish`.
+
+The `Permissions` module stores all of this. It's opt-in: you add it when you want it. It keeps:
+
+- the roles;
+- the permissions each role grants;
+- who has which role.
+
+These live in the tables `roles`, `permissions`, `permission_role` and `role_user`. The module
+loads the user's roles and permissions once per request, so the checks below cost no extra
+database query.
 
 ```rust
 use renox::prelude::*;
 use renox::auth::{Permissions, permissions};
 
+/// Turns the `Permissions` module on, next to `Auth`.
 fn app() -> App {
     App::new().module(Auth::new()).module(Permissions)
 }
 
+/// One route for editors, one for anyone allowed to publish.
 fn routes() -> Routes {
     let drafts = Routes::new().get("/drafts", || async { "drafts" }).require_role("editor");
     let publish = Routes::new()
@@ -166,51 +271,82 @@ async fn setup(db: &Db, user: &User) -> Result {
     Ok(())
 }
 
+/// Checks a role and a permission inside a handler.
 async fn check(user: AuthUser) -> String {
     // `allows` asks gate_before, then a gate of that name, then the permissions.
     format!("{} {}", user.has_role("editor"), user.allows("posts.publish"))
 }
 ```
 
-- Prefer permissions in checks (`require_permission("posts.publish")`) and roles as bundles of
-  them; then a new role needs no code change. A role with no permissions (`&[]`) is fine when the
-  app only checks the role itself, as examples/shop does with `admin`.
+What's going on:
+
+- `.require_role("editor")` lets only editors open `/drafts`.
+- `.require_permission("posts.publish")` lets in anyone whose roles grant that permission.
+- `define_role` makes the "editor" role with two permissions. `assign_role` gives it to a user
+  (`remove_role` takes it away, `sync_roles` sets the exact list).
+- `has_role` and `allows` answer in a handler without a database query.
+
+> [!TIP]
+> Check **permissions** in your code (`require_permission("posts.publish")`) and use roles as
+> bundles of them. Then a new role needs no code change: you just give it permissions.
+> A role with no permissions (`&[]`) is fine when the app only checks the role itself, as
+> examples/shop does with `admin`.
+
+More you can do:
+
 - In templates: `{% if 'editor' in auth.roles %}` and `{% if can('posts.publish') %}`.
-- `permissions::users_with_role(&db, "editor")` lists the users with a role, e.g. to notify
-  every editor.
+- `permissions::users_with_role(&db, "editor")` lists the users with a role, for example to
+  notify every editor.
 
 ## Super-admins: `gate_before`
 
-`App::gate_before` is asked before every gate, permission and policy check. It returns
-`Some(true)` (allow), `Some(false)` (deny) or `None` (go on to the check itself). It doesn't
-answer `require_role` / `has_role`, which mean exactly that role. Base it on a role (the
-`Permissions` module) or on the user row, e.g. a column:
+Some apps have a person who may do everything: a super-admin. `App::gate_before` is the place for
+that. It is asked **before** every gate, permission and policy check, and returns one of three
+answers:
+
+- `Some(true)`: allow, without asking the check itself;
+- `Some(false)`: deny, without asking the check itself;
+- `None`: no opinion, go on to the check itself.
+
+It doesn't answer `require_role` / `has_role`: those mean "has exactly this role". You can base
+it on a role (from the `Permissions` module) or on the user's row, for example a column:
 
 ```rust
 use renox::prelude::*;
 
+/// Lets super-admins through every gate, permission and policy.
 fn app() -> App {
     App::new()
         .module(Auth::new())
+        // `then_some(true)` gives Some(true) for a super-admin, and None for everyone else.
         .gate_before(|user, _ability| user.has_role("super-admin").then_some(true))
         // or: (user.get::<bool>("super_admin") == Some(true)).then_some(true)
 }
 ```
 
 `User::has_role` and `User::has_permission` answer from the roles loaded for the current
-request, so they work in `gate_before` and in `Policy::allows` ("admins may edit any post").
-For another user, or outside a request (a job, a command), they say `false`: use the async
-`user.roles(&db)` there.
+request. So they work in `gate_before`, and in `Policy::allows` ("admins may edit any post").
+
+> [!WARNING]
+> For another user, or outside a request (a job, a command), `has_role` and `has_permission`
+> say `false`. Use the async `user.roles(&db)` there.
 
 ## API tokens and abilities
 
-Tokens (`Authorization: Bearer …`) can be limited to abilities and given an expiry.
-`.require_ability(x)` checks requests made with a token; session users and tokens made without
-abilities pass, so put `.require_auth()` (or another guard) next to it:
+Programs that call your API don't log in with a password. They send a **token** in a header:
+`Authorization: Bearer …`. A token can be limited to some **abilities** (like `orders:read`)
+and given an expiry date.
+
+`.require_ability(x)` checks requests made with a token.
+
+> [!IMPORTANT]
+> Users logged in with a session pass `.require_ability`, and so do tokens made without
+> abilities. So always put `.require_auth()` (or another guard) next to it.
 
 ```rust
 use renox::prelude::*;
 
+/// Makes a token that may only read orders, and stops working in 30 days.
 async fn issue(State(db): State<Db>, user: AuthUser) -> Result<String> {
     let in_30_days = renox::db::now() + renox::chrono::Duration::days(30);
     let token = user
@@ -219,6 +355,7 @@ async fn issue(State(db): State<Db>, user: AuthUser) -> Result<String> {
     Ok(token.plain) // shown once; only its hash is stored
 }
 
+/// Reading orders needs `orders:read`; creating one needs `orders:write`.
 fn api() -> Routes {
     let read = Routes::new().get("/api/orders", || async { "[]" }).require_ability("orders:read");
     let write = Routes::new().post("/api/orders", || async { "{}" }).require_ability("orders:write");
@@ -226,26 +363,41 @@ fn api() -> Routes {
 }
 ```
 
-`user.token_can("orders:read")` answers in a handler; `rnx tokens:prune` deletes expired
-tokens (schedule it daily, as examples/api does).
+What's going on:
+
+- `create_token_with` makes a token named "reporting" with one ability and an expiry date.
+- `token.plain` is the token itself. You can show it only once: the database keeps just its
+  **hash** (a scrambled fingerprint), so nobody can read it back later.
+- A request without a valid token gets a 401. A valid token without the ability gets a 403.
+
+Two more helpers:
+
+- `user.token_can("orders:read")` answers the same question inside a handler.
+- `rnx tokens:prune` deletes expired tokens. Schedule it daily, as examples/api does.
 
 ## Tenants: rows that belong to a team
 
-In a multi-tenant app most rows belong to a team (or a shop, a school…), and one missing
-`where team_id = ?` leaks another customer's data. A **default scope** makes the filter part of
-the model, so handlers can't forget it:
+In a **multi-tenant** app, many customers share one app and one database. Most rows belong to a
+team (or a shop, a school…). One forgotten `where team_id = ?` would show one customer another
+customer's data.
+
+A **default scope** fixes that. It makes the filter part of the model, so handlers can't forget
+it:
 
 ```rust
 use renox::prelude::*;
 use renox::axum::{extract::Request, middleware::{Next, from_fn}};
 
+/// The team the current request works for.
 #[derive(Clone)]
 struct CurrentTeam(i64);
 
+/// A project belongs to one team. Every query goes through `team_only`.
 #[derive(Model, serde::Serialize, Default)]
 #[model(table = "projects", default_scope = "team_only")]
 struct Project { id: i64, team_id: i64, name: String }
 
+/// The default scope: adds "only this team's rows" to every query of `Project`.
 fn team_only(query: renox::db::Query<Project>) -> renox::db::Query<Project> {
     match renox::context::get::<CurrentTeam>() {
         Some(team) => query.where_eq("team_id", team.0),
@@ -261,51 +413,76 @@ async fn pick_team(user: Option<AuthUser>, req: Request, next: Next) -> Response
     next.run(req).await
 }
 
+/// Adds `pick_team` as a layer, so it runs before every handler.
 fn app() -> App {
     App::new().module(Auth::new()).layer(from_fn(pick_team))
 }
 
+/// Shows one project of the current team.
 async fn show(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
     // Another team's project id is a 404: the scope is part of the query.
     let project = Project::find_or_404(&db, id).await?;
     Ok(view("projects/show.html", context! { project }))
 }
 
+/// Counts the projects of every team, skipping the scope.
 async fn count_all(db: &Db) -> Result<u64> {
     Project::unscoped().count(db).await // admin code and commands that must see every team
 }
 ```
 
-- `query()`, `find`, `all`, `where_eq` and the relation loaders apply the scope; `unscoped()`
-  skips it. Saving and deleting a loaded model work by its id.
-- Validate the team the user asks for before putting it in the context (is the user a member?).
+What's going on:
+
+- `default_scope = "team_only"` tells the model to pass every query through `team_only`.
+- `renox::context` is a small box of values that belongs to one request. The middleware
+  `pick_team` puts the user's team in it; `team_only` reads it back.
+- With no team in the box, `query.none()` returns no rows at all. This is called **failing
+  closed**: when in doubt, show nothing.
+- In `show`, a project id from another team simply isn't found, so the visitor gets a 404.
+
+Things to know:
+
+- `query()`, `find`, `all`, `where_eq` and the relation loaders apply the scope. `unscoped()`
+  skips it. Saving and deleting a model you already loaded work by its id.
+- Check the team the user asks for before you put it in the context: is the user really a member?
   [examples/teams](../examples/teams) keeps the current team in the session and checks the
   membership in the middleware.
-- Every request, job, scheduled task and app command starts with an empty context. A job for a
-  team carries the team id in its payload and calls `renox::context::set(CurrentTeam(id))`
-  first; a `tokio::spawn`ed task starts without one (wrap it in `renox::context::scope`).
 - Uniqueness is per team too: `.unique("projects", "name").ignore(id).where_eq("team_id", team)`.
-- Bulk `Query::update` / `delete` start from `query()`, so they are scoped as well; raw
-  `renox::db::sql(…)` is not.
+
+> [!WARNING]
+> Every request, job, scheduled task and app command starts with an **empty** context. A job for
+> a team carries the team id in its payload and calls `renox::context::set(CurrentTeam(id))`
+> first. A task started with `tokio::spawn` starts without one too: wrap it in
+> `renox::context::scope`.
+
+> [!WARNING]
+> Bulk `Query::update` / `delete` start from `query()`, so they are scoped as well. Raw
+> `renox::db::sql(…)` is **not** scoped: there you must add the team filter yourself.
 
 ## Sensitive actions and the audit trail
 
-- `.require_password_confirmed()` asks for the password again (at most every three hours)
-  before routes such as billing, API keys or deleting a team.
-- The opt-in `Audit` module records logins, failed logins and account changes by itself;
-  record the app's own actions with `audit::record(&db, Entry::new("order.refunded")
-  .user(id).subject("orders", order_id).ip(ip))`, and read them back with `for_subject`,
-  `for_user` or `latest`. `rnx audit:prune --days 365` trims the table.
+- `.require_password_confirmed()` asks for the password again before routes such as billing, API
+  keys or deleting a team. It asks at most every three hours.
+- The opt-in `Audit` module keeps a record of who did what (an **audit trail**). It records
+  logins, failed logins and account changes by itself.
+- Record your app's own actions with `audit::record(&db, Entry::new("order.refunded")
+  .user(id).subject("orders", order_id).ip(ip))`.
+- Read them back with `for_subject`, `for_user` or `latest`.
+- `rnx audit:prune --days 365` trims old rows from the table.
 
 ## A second login step (two-factor authentication)
 
-A module can add a step after the password, such as a code from an authenticator app (the
-`renox-2fa` plugin does). In `Module::register` it says which users must pass it and where the
-challenge is:
+Some apps ask for one more thing after the password, such as a code from an authenticator app on
+the user's phone. This is called **two-factor authentication** (2FA). A module can add such a
+step (the `renox-2fa` plugin does).
+
+In `Module::register`, the module says two things: which users must pass the step, and the route
+where the challenge (the "enter your code" page) lives:
 
 ```rust
 use renox::prelude::*;
 
+/// A module that asks some users for a PIN after their password.
 struct Pin;
 
 impl Module for Pin {
@@ -313,6 +490,7 @@ impl Module for Pin {
         "pin"
     }
 
+    /// Registers the second login step with the app.
     fn register(&self, app: &mut Registry) {
         // After the right password, these users go to the `pin.challenge` route
         // instead of being logged in.
@@ -323,39 +501,62 @@ impl Module for Pin {
 }
 ```
 
-- The login waits in the session for ten minutes: `renox::auth::pending_login(&session)` gives
-  it to the challenge's handler (`user_id`, `remember`), or `None` once it has expired.
-- The handler checks the code, then calls `renox::auth::complete_login(&state, &session,
-  &pending, ip)`: it logs in as the login page would (a new session id, "remember me", the
-  password counted as confirmed, `LoggedIn`) and returns where to go, or `None` if the user
-  changed their password meanwhile.
-- A wrong code: `pending.failed(&state, ip)` counts it towards the login throttle and fires
-  `LoginFailed`; `pending.locked_out(&state, ip)` says how long to wait. The throttle is only
-  cleared once the step is passed, so knowing the password doesn't reset the count.
-- API tokens, registration and password resets don't go through it; nor does your own code
-  that calls `renox::auth::login` directly. One module may set a second step; two, or a
-  challenge route that doesn't exist, are errors at boot.
+How the challenge works, step by step:
 
-The module documentation of `renox::auth::second_factor` has a whole challenge handler.
+- **The login waits** in the session for ten minutes. `renox::auth::pending_login(&session)`
+  gives it to the challenge's handler (`user_id`, `remember`), or `None` once it has expired.
+- **A right code:** the handler calls `renox::auth::complete_login(&state, &session, &pending,
+  ip)`. That logs the user in just as the login page would: a new session id, "remember me", the
+  password counted as confirmed, and the `LoggedIn` event. It returns where to go next, or
+  `None` if the user changed their password in the meantime.
+- **A wrong code:** `pending.failed(&state, ip)` counts it towards the login throttle (the limit
+  on login attempts) and fires `LoginFailed`. `pending.locked_out(&state, ip)` says how long to
+  wait. The throttle is only cleared once the step is passed, so knowing the password alone
+  doesn't reset the count.
+
+> [!IMPORTANT]
+> API tokens, registration and password resets don't go through the second step. Nor does your
+> own code that calls `renox::auth::login` directly.
+
+Only one module may set a second step. Two of them, or a challenge route that doesn't exist,
+are errors when the app starts.
+
+The module documentation of `renox::auth::second_factor` shows a whole challenge handler.
 
 ### A section on the account page
 
-The same module usually lets users turn its step on and off from `/account`
-(`Auth::new().account()`): `app.account_section(template, order, |user, state| async { … })`
-in `Module::register` adds a card there. The template (added with `app.templates`, or a file
-in the app's views) is rendered with the page's context (`user`, `text`) and reads what the
-closure returned as `section.data`. Sections show in `order`, after the built-in cards and
-before "Delete account". A page of your own that replaces `renox/auth/account.html` keeps
-them with `{% include "renox/auth/account_sections.html" %}`.
+A module like this usually lets users turn its step on and off from the account page,
+`/account` (`Auth::new().account()`).
+
+To add a card there, call `app.account_section(template, order, |user, state| async { … })`
+in `Module::register`:
+
+- **`template`** is the card's template. Add it with `app.templates`, or as a file in the app's
+  views. It's rendered with the page's context (`user`, `text`), and reads what the closure
+  returned as `section.data`.
+- **`order`** places the card. Sections show in `order`, after the built-in cards and before
+  "Delete account".
+- **The closure** loads the data the card shows.
+
+If you replace `renox/auth/account.html` with a page of your own, keep the sections with
+`{% include "renox/auth/account_sections.html" %}`.
 
 ## Testing authorization
 
-`TestApp::acting_as(&user)` logs a user in, `confirm_password()` lets it through
-`require_password_confirmed`; `assert_forbidden()`, `assert_not_found()` and
-`assert_redirect("/login")` check the refusals. Test the negative cases: another user's row,
-another team's row, a token without the ability, a guest.
+Renox's `TestApp` has helpers for this:
+
+- `TestApp::acting_as(&user)` logs a user in.
+- `confirm_password()` lets it through `require_password_confirmed`.
+- `assert_forbidden()`, `assert_not_found()` and `assert_redirect("/login")` check the refusals.
+
+> [!TIP]
+> Test the "no" cases, not just the "yes" ones: another user's row, another team's row, a token
+> without the ability, a guest.
 
 ## Coming from Laravel
+
+> [!NOTE]
+> **Coming from Laravel:** each Laravel tool has a Renox counterpart. This table maps them.
 
 | Laravel | Renox |
 |---|---|

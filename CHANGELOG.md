@@ -10,6 +10,8 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Guides for beginners, part 2 (#193):** relations.md, types.md, authorization.md, queue.md,
+  mail.md and scheduling.md rewritten in plain words, like part 1.
 ## 1.0.0-rc.4 · 2026-10-04
 
 The fourth release candidate: fixes found by using rc.3, and two extension points for
