@@ -10,6 +10,13 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Fixed (#163, again):** opening a new SQLite file from several pools or processes at once
+  could still fail with "database is locked". One try could wait out the whole busy timeout
+  (five seconds, as long as the budget), leaving no time to try again. The connection that
+  switches the file to WAL now waits 100 ms per try, retries are jittered (25–75 ms) so
+  processes that collided don't collide again, and opening tries at least three times. The
+  error now says which step failed ("switching it to WAL").
+
 - **A second login step (#167):** a module can ask for something after the password, such as
   a code from an authenticator app (the coming `renox-2fa`, #146).
   `Registry::second_factor(challenge_route, |user, state| …)` says who must pass it; the

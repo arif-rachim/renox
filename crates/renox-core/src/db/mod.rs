@@ -226,7 +226,9 @@ async fn connect_sqlite(config: &Config, schema: SchemaEpoch) -> anyhow::Result<
         }
         prepare_file(&options, config.database_acquire_timeout)
             .await
-            .with_context(|| format!("could not open the database at `{url}`"))?;
+            .with_context(|| {
+                format!("could not open the database at `{url}` (switching it to WAL)")
+            })?;
     }
 
     // Each connection to `:memory:` is a separate database, so keep exactly one.
@@ -285,6 +287,10 @@ async fn connect_sqlite(config: &Config, schema: SchemaEpoch) -> anyhow::Result<
 async fn prepare_file(options: &SqliteConnectOptions, budget: Duration) -> Result<(), sqlx::Error> {
     use sqlx::{ConnectOptions, Connection};
 
+    // A short busy wait per try: connections switching a new file to WAL
+    // together can each wait for the others' lock, and with the usual five
+    // seconds the first try alone used up the whole budget (#163).
+    let options = options.clone().busy_timeout(Duration::from_millis(100));
     let conn = retry_while(budget, is_busy, || options.connect()).await?;
     conn.close().await
 }
@@ -307,8 +313,8 @@ fn is_pool_timeout(error: &sqlx::Error) -> bool {
 }
 
 /// Runs `open` again, after a short pause, while it fails with an error
-/// `retryable` accepts and `budget` hasn't passed since the first try; any
-/// other result is returned as it is.
+/// `retryable` accepts and `budget` hasn't passed since the first try (but at
+/// least three times); any other result is returned as it is.
 async fn retry_while<T, F>(
     budget: Duration,
     retryable: fn(&sqlx::Error) -> bool,
@@ -318,11 +324,17 @@ where
     F: std::future::Future<Output = Result<T, sqlx::Error>>,
 {
     let start = tokio::time::Instant::now();
+    let mut tries = 0;
     loop {
+        tries += 1;
         match open().await {
-            Err(e) if retryable(&e) && start.elapsed() < budget => {
+            // At least three tries: one try can wait out a whole busy timeout
+            // (as long as the budget) before it fails (#163).
+            Err(e) if retryable(&e) && (start.elapsed() < budget || tries < 3) => {
                 tracing::debug!("opening the database failed ({e}); trying again");
-                tokio::time::sleep(Duration::from_millis(50)).await;
+                // 25–75 ms, so processes that collided don't collide again.
+                let jitter = u64::from(rand::random::<u8>()) * 50 / 255;
+                tokio::time::sleep(Duration::from_millis(25 + jitter)).await;
             }
             result => return result,
         }
@@ -439,7 +451,13 @@ mod tests {
         })
         .await;
         assert!(matches!(opened, Err(sqlx::Error::PoolTimedOut)));
-        assert_eq!(tries.load(Ordering::SeqCst), 1, "no retry past the budget");
+        // Three tries even with no budget left: one try can take a whole busy
+        // timeout, which used to leave no time to try again (#163).
+        assert_eq!(
+            tries.load(Ordering::SeqCst),
+            3,
+            "three tries, then no retry past the budget"
+        );
 
         let tries = AtomicU32::new(0);
         let opened: Result<(), _> =
