@@ -10,12 +10,31 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+## 1.0.0-rc.4 · 2026-10-04
+
+The fourth release candidate: fixes found by using rc.3, and two extension points for
+plugins. Install it with `cargo install renox-cli --version 1.0.0-rc.4`; an rc.3 app moves
+over by changing `renox = "1.0.0-rc.3"` to `"1.0.0-rc.4"`. Nothing in the API changed
+incompatibly.
+
+- For rc.3 apps: the kit's sheets and dialogs sit in the middle again under Tailwind's reset
+  (#133), and an app no longer fails to start now and then with "pool timed out" or
+  "database is locked" on SQLite (#144, #163, #178).
+- For plugins: `Registry::second_factor` (a step after the password, #167) and
+  `Registry::account_section` (cards on `/account`, #168), which `renox-2fa` (#146) is built
+  on.
+- In the repository, not yet on crates.io: `crates/renox-2fa` (#169), the first plugin
+  crate, and the docs site's deploys (#141) and new look (#189–#191).
+- Dependencies: `syn` 3 (renox-macros) and `serde_html_form` 0.4; the checkbox regression the
+  latter brought (#160) was fixed before this release.
+
 - **Docs site (#189, #190, #191):** code samples in coloured panels (a small highlighter in
   `site/src/highlight.rs` for Rust, templates, shell, TOML, SQL, JSON, PHP, CSS and config
   files, rendered on the server), JetBrains Mono, a copy button; the pages use the whole
   window with no sideways scrolling on phones; icons for every page (Lucide, inlined),
   a page header with what the page is for and its reading time, `> [!TIP]`-style
   callouts, and a new home page. The quick start shows the workspace's version.
+
 - **`renox-2fa` (#169), the first plugin crate, started:** `crates/renox-2fa`, versioned with
   `renox`. `TwoFactor` (a module) brings the `two_factor` table (SQLite and PostgreSQL: one
   row per user, the TOTP secret sealed with `APP_KEY`, when it was confirmed, the last code

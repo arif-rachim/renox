@@ -1613,7 +1613,9 @@ Started by the owner on 2026-10-03, after M34. In steps, one PR each:
 - [x] The tutorial followed in CI (`tests/tutorial/`, #131), which found that
       `TestApp::travel` didn't reach jobs; plural tables from the generators (#127, #129); the
       kit's stretched card (#128, #130)
-- [ ] `1.0.0-rc.3` with those fixes (branch `release-1.0.0-rc.3`), published once the owner
+- [x] `1.0.0-rc.3` with those fixes: published 2026-10-04 (#132, tag `v1.0.0-rc.3`)
+- [ ] `1.0.0-rc.4`: the fixes found using rc.3 (#133, #144, #163, #178) and the extension
+      points for plugins (#167, #168); branch `release-1.0.0-rc.4`, published once the owner
       confirms
 - [ ] 1.0.0
 - [ ] Real crates published to crates.io (`renox`, `renox-core`, `renox-macros`, `renox-cli`;
