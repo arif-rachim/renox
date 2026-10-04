@@ -431,6 +431,9 @@
   box-shadow: var(--rx-shadow);
   padding: var(--rx-space-5);
   display: grid;
+  /* Rows keep their own height when a grid row stretches the card, so the
+     extra space goes below the body, not between the title and the body. */
+  align-content: start;
   gap: var(--rx-space-4);
 }
 .rx-card > p, .rx-card > div > p:first-child { margin: 0; }

@@ -368,4 +368,16 @@ mod ui_tests {
         assert!(tags.starts_with("<link rel=\"preload\""), "{tags}");
         assert!(tags.contains("<link rel=\"stylesheet\""), "{tags}");
     }
+
+    /// A card stretched to its row's height keeps its title next to its body (#128).
+    #[test]
+    fn a_stretched_card_keeps_its_rows_at_the_top() {
+        let start = super::UI_CSS
+            .find("\n.rx-card {")
+            .expect("the .rx-card rule");
+        let rule = &super::UI_CSS[start..];
+        let rule = &rule[..rule.find('}').unwrap()];
+        assert!(rule.contains("display: grid;"), "{rule}");
+        assert!(rule.contains("align-content: start;"), "{rule}");
+    }
 }

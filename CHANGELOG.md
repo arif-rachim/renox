@@ -17,6 +17,10 @@ changes by milestone (each one pull request; details in its description and in
   names the table after the model as well (`news --model Article` → `articles`, it was
   `news`); with the usual plural module (`products`) nothing changes. `rnx make:migration
   create_x_table` keeps the name it is given.
+- **Fixed (#128):** a kit `card` stretched to its row's height (two cards side by side in a
+  grid, one longer than the other) put the extra space between its title and its body, so
+  the shorter card's body sat lower than its neighbour's. `.rx-card` now has
+  `align-content: start`: the card keeps its own spacing and the extra height stays below.
 
 ## 1.0.0-rc.2 · 2026-10-04
 
