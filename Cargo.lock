@@ -2268,7 +2268,7 @@ dependencies = [
 
 [[package]]
 name = "renox"
-version = "1.0.0-rc.3"
+version = "1.0.0-rc.4"
 dependencies = [
  "anyhow",
  "axum",
@@ -2298,7 +2298,7 @@ dependencies = [
 
 [[package]]
 name = "renox-cli"
-version = "1.0.0-rc.3"
+version = "1.0.0-rc.4"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -2314,7 +2314,7 @@ dependencies = [
 
 [[package]]
 name = "renox-core"
-version = "1.0.0-rc.3"
+version = "1.0.0-rc.4"
 dependencies = [
  "anyhow",
  "argon2",
@@ -2366,7 +2366,7 @@ dependencies = [
 
 [[package]]
 name = "renox-macros"
-version = "1.0.0-rc.3"
+version = "1.0.0-rc.4"
 dependencies = [
  "heck",
  "proc-macro2",

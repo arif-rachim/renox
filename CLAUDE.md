@@ -1155,7 +1155,9 @@ picks the build, not the terminal.
   (#125); GitHub Pages switched off (2026-10-04). Release candidate `1.0.0-rc.2` with that
   fix: published 2026-10-04 (#126, tag `v1.0.0-rc.2`). Then #127 → #129 (plural tables),
   #128 → #130 (another session), #131 (the tutorial followed in CI; `clock::carry`), and
-  `1.0.0-rc.3` with them: branch `release-1.0.0-rc.3`. Left: 1.0.0 when the owner is happy
+  `1.0.0-rc.3` with them: published 2026-10-04 (#132). Then the work moved to GitHub
+  issues and the project board (#134); fixes #133/#144/#160/#163/#178 and the plugin extension
+  points #167/#168, released as `1.0.0-rc.4`: branch `release-1.0.0-rc.4`. Left: 1.0.0 when the owner is happy
   with the rc (ask before every `cargo publish`).
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
