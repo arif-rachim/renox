@@ -380,4 +380,19 @@ mod ui_tests {
         assert!(rule.contains("display: grid;"), "{rule}");
         assert!(rule.contains("align-content: start;"), "{rule}");
     }
+
+    /// The kit's dialogs centre themselves, so a `* { margin: 0 }` reset such as
+    /// Tailwind's preflight doesn't leave them in the top-left corner (#133).
+    #[test]
+    fn dialogs_set_their_own_margin() {
+        for (css, selector) in [
+            (super::UI_CSS, "\n.rx-sheet {"),
+            (super::GRID_CSS, "\n.rx-grid__dialog {"),
+        ] {
+            let start = css.find(selector).expect(selector);
+            let rule = &css[start..];
+            let rule = &rule[..rule.find('}').unwrap()];
+            assert!(rule.contains("margin: auto;"), "{rule}");
+        }
+    }
 }

@@ -14,6 +14,11 @@ changes by milestone (each one pull request; details in its description and in
   and tasks; a pull request template with the sections every PR has; Dependabot (grouped,
   weekly for crates, monthly for Actions); release-note sections. CONTRIBUTING.md "How work is
   tracked"; ROADMAP.md keeps principles, records and decisions, open work moves to issues.
+- **Fixed (#133):** with `rnx new --tailwind` (or any `* { margin: 0 }` reset), the kit's
+  sheets and confirm dialogs (`sheet`, `action_sheet`, `confirm`) and the data grid's confirm
+  dialog opened in the top-left corner: they relied on the browser's own `margin: auto` for
+  modal dialogs, which any author rule beats. `.rx-sheet` and `.rx-grid__dialog` now set
+  `margin: auto` themselves; slide-overs and the phone bottom sheet keep their own margins.
 
 ## 1.0.0-rc.3 · 2026-10-04
 

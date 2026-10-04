@@ -1181,6 +1181,9 @@ a.rx-stat:focus-visible { outline: 2px solid var(--rx-accent); outline-offset: 2
 /* ---------- Sheet (modal dialog) ---------- */
 
 .rx-sheet {
+  /* Centred by its own rule: a reset like Tailwind's preflight (margin 0
+     on every element) beats the browser's margin: auto for modal dialogs. */
+  margin: auto;
   border: 0; padding: 0; width: min(100% - 2 * var(--rx-space-4), 30rem); max-height: min(100dvh - 4rem, 44rem);
   border-radius: var(--rx-radius-l); background: var(--rx-surface-raised); color: var(--rx-label);
   box-shadow: var(--rx-shadow-raised); font-family: var(--rx-font);
