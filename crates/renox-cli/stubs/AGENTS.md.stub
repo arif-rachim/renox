@@ -28,7 +28,8 @@ one Renox version (the `renox` line in `Cargo.toml`); the links below are for th
   filters, search, editing, actions, summaries, exports), `docs/testing.md` (TestApp, fakes, time travel),
   `docs/authorization.md` (gates, policies, roles, token abilities, tenants), `docs/queue.md`
   (jobs, retries, chains, batches), `docs/postgresql.md`, `docs/operations.md` (production).
-- Offline, the same files are in {{renox_source}}.
+- Offline, the same files are in {{renox_source}}. To read them as a website (with search),
+  https://renox.renoxium.com shows the latest version.
 
 ## Generators
 
