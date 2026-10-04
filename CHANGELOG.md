@@ -19,6 +19,11 @@ changes by milestone (each one pull request; details in its description and in
   dialog opened in the top-left corner: they relied on the browser's own `margin: auto` for
   modal dialogs, which any author rule beats. `.rx-sheet` and `.rx-grid__dialog` now set
   `margin: auto` themselves; slide-overs and the phone bottom sheet keep their own margins.
+- **Fixed (#144):** on a busy machine, booting an app on an in-memory SQLite database (every
+  `TestApp`) could fail with "pool timed out while waiting for an open connection": sqlx opens
+  the first connection within the pool's acquire timeout, which is capped at 2 s for in-memory
+  databases. Opening now tries again until `DATABASE_ACQUIRE_TIMEOUT` has passed; queries keep
+  the 2 s cap, so a test waiting on its own transaction still fails fast.
 
 ## 1.0.0-rc.3 · 2026-10-04
 
