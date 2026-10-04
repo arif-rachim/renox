@@ -338,6 +338,16 @@ impl Module for Pin {
 
 The module documentation of `renox::auth::second_factor` has a whole challenge handler.
 
+### A section on the account page
+
+The same module usually lets users turn its step on and off from `/account`
+(`Auth::new().account()`): `app.account_section(template, order, |user, state| async { … })`
+in `Module::register` adds a card there. The template (added with `app.templates`, or a file
+in the app's views) is rendered with the page's context (`user`, `text`) and reads what the
+closure returned as `section.data`. Sections show in `order`, after the built-in cards and
+before "Delete account". A page of your own that replaces `renox/auth/account.html` keeps
+them with `{% include "renox/auth/account_sections.html" %}`.
+
 ## Testing authorization
 
 `TestApp::acting_as(&user)` logs a user in, `confirm_password()` lets it through

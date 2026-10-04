@@ -16,6 +16,12 @@ changes by milestone (each one pull request; details in its description and in
   switches the file to WAL now waits 100 ms per try, retries are jittered (25–75 ms) so
   processes that collided don't collide again, and opening tries at least three times. The
   error now says which step failed ("switching it to WAL").
+- **Account page sections (#168):** a module adds a card to `/account` with
+  `Registry::account_section(template, order, |user, state| …)`; the template reads what the
+  closure returns as `section.data`. They show after the built-in cards, before "Delete
+  account"; a page that replaces `renox/auth/account.html` keeps them with
+  `{% include "renox/auth/account_sections.html" %}`. For `renox-2fa` (#146) and
+  `renox-oauth` (#147).
 
 - **A second login step (#167):** a module can ask for something after the password, such as
   a code from an authenticator app (the coming `renox-2fa`, #146).
@@ -65,7 +71,8 @@ changes by milestone (each one pull request; details in its description and in
   "pool timed out": creating the file and switching it to WAL take an exclusive lock, inside
   the pool's acquire timeout. A file database is now opened once with a plain connection
   before its pool, and both that connection and the pool retry "database is locked" until
-  `DATABASE_ACQUIRE_TIMEOUT` has passed.
+  `DATABASE_ACQUIRE_TIMEOUT` has passed. (#178: plus one busy wait, 5 s, so a long wait for
+  the lock still leaves time for another try; the pool's open also retries a pool timeout.)
 - **Docs (#174):** the CHEATSHEET promised that a checkbox's `on` reads as `true` without
   saying only `Valid<T>` does that; the prelude's `Form<T>` (axum's) answers 422. The
   CHEATSHEET, docs/validation.md "Browser values" and a new app's AGENTS.md now say to read

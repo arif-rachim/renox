@@ -126,7 +126,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   src/auth/                User, hashing (Argon2id + bcrypt import), login/logout (per device),
                            change_password, CurrentUser middleware, AuthUser, guards, Access::check,
                            Policy/gates (mod.rs), Auth module + pages (module.rs), account.rs
-                           (account pages, password confirmation), passwords.rs (reset),
+                           (account pages and the sections modules add to them, #168; password
+                           confirmation), passwords.rs (reset),
                            permissions.rs (Permissions module: roles, permissions), events.rs
                            (LoggedIn, LoginFailed, …), second_factor.rs (Registry::second_factor:
                            a module's step after the password; pending_login/complete_login,
@@ -804,6 +805,14 @@ Parsed in `crates/renox-core/src/config.rs`; defaults in parentheses.
   from `http://127.0.0.1:9222/json`, then `Page.navigate`, `Runtime.evaluate` (fill inputs, click,
   read DOM) and `Page.captureScreenshot`. This found bugs unit tests missed (§6.4). A sandboxed
   `<iframe>` (mail preview) can't be read from the parent: check it via screenshot.
+
+- **Other agent sessions use this checkout too** (2026-10-04: a session working on another
+  project ran `git checkout origin/main` here, and a commit landed on a detached HEAD; it
+  also builds into the same `target/`, so a test binary looked fresh but lacked the new
+  module). Work on an issue in its own worktree with its own target directory:
+  `git worktree add -b feat/issue-N-… <scratchpad>/wt-N origin/main`, and
+  `CARGO_TARGET_DIR=/home/developer/workspace/renox-target-wt` for its builds. Check
+  `git branch --show-current` before committing.
 
 ### 6.2 `rnx serve` restart loop
 The `notify` watcher reports **OPEN** events (inotify `OPEN` is in notify 8's mask), so `cargo build`
