@@ -888,7 +888,9 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 {%- endmacro %}
 
 {%- macro _menu_label(label, icon) -%}
-{%- if icon %}<span class="rx-menu__icon" aria-hidden="true">{{ _icon(icon) }}</span>{% endif %}<span>{{ label }}</span>
+{#- Without an icon the label is plain text, as before icons existed (apps'
+    pages and tests keep their markup). -#}
+{%- if icon %}<span class="rx-menu__icon" aria-hidden="true">{{ _icon(icon) }}</span><span>{{ label }}</span>{% else %}{{ label }}{% endif %}
 {%- endmacro -%}
 
 {#- A link in a menu. `download=true`: a file to save (an export), the
