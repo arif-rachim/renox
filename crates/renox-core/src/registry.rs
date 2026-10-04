@@ -23,6 +23,9 @@ pub struct Registry {
     pub(crate) reporters: Vec<crate::report::ReportFn>,
     /// The `Permissions` module is on: load each user's roles.
     pub(crate) permissions: bool,
+    /// A second login step (`second_factor`), and whether two modules set one.
+    pub(crate) second_factor: Option<crate::auth::second_factor::SecondFactor>,
+    pub(crate) duplicate_second_factor: bool,
 }
 
 impl Registry {
@@ -143,6 +146,26 @@ impl Registry {
             name.to_owned(),
             crate::auth::notifications::channel_fn(send),
         );
+        self
+    }
+
+    /// Adds a second step to logging in, such as two-factor authentication;
+    /// see [`crate::auth::second_factor`]. After the right password, a user
+    /// for whom `required` answers `true` isn't logged in yet: the browser
+    /// goes to the route named `challenge`, whose handler checks the code and
+    /// calls [`crate::auth::complete_login`]. One module may set it; a second
+    /// one is an error at boot.
+    pub fn second_factor<F, Fut>(&mut self, challenge: &str, required: F) -> &mut Self
+    where
+        F: Fn(crate::auth::User, AppState) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<bool>> + Send + 'static,
+    {
+        if self.second_factor.is_some() {
+            self.duplicate_second_factor = true;
+        }
+        self.second_factor = Some(crate::auth::second_factor::second_factor(
+            challenge, required,
+        ));
         self
     }
 

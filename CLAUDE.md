@@ -128,7 +128,9 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            Policy/gates (mod.rs), Auth module + pages (module.rs), account.rs
                            (account pages, password confirmation), passwords.rs (reset),
                            permissions.rs (Permissions module: roles, permissions), events.rs
-                           (LoggedIn, LoginFailed, …), verification, tokens.rs (API tokens,
+                           (LoggedIn, LoginFailed, …), second_factor.rs (Registry::second_factor:
+                           a module's step after the password; pending_login/complete_login,
+                           #167), verification, tokens.rs (API tokens,
                            abilities, prune), LoginThrottle (pair/account/IP), notifications
                            (Recipient, Channel::Custom, notify/notify_later,
                            SendToChannel job, DatabaseMessage, Hub), inbox.rs (the

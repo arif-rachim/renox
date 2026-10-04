@@ -48,7 +48,7 @@ move over. Bug fixes are the exception: when Renox did something it documented i
   - `DatabaseNotification`, `AccessToken`, `NewToken`
   - `WebhookRequest`, `WebhookCall`, `JobContext`, `Htmx`, `Down`, `analytics::Event`
   - `view::ViewContext`, `auth::Registration`, `auth::Recipient`, `mail::Attachment`
-  - `Toast`, `ToastAction`, `auth::DatabaseMessage`, `chart::Series`, `report::ErrorReport`, `report::RequestReport`, `validation::FormContext`,
+  - `Toast`, `ToastAction`, `auth::DatabaseMessage`, `auth::PendingLogin`, `chart::Series`, `report::ErrorReport`, `report::RequestReport`, `validation::FormContext`,
     `rate_limit::LimitRequest`, `SentNotification`, `db::InvalidUlid`, `grid::Grid`,
     `grid::Column`, `grid::GridPrefs`, `grid::RowOrder`,
     `grid::Action`, `grid::Selection`, `storage::FileInfo`, `queue::BatchStatus`,

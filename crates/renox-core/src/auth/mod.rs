@@ -39,6 +39,7 @@ mod module;
 pub mod notifications;
 mod passwords;
 pub mod permissions;
+pub mod second_factor;
 mod throttle;
 mod tokens;
 mod user;
@@ -63,6 +64,7 @@ pub use notifications::{
     prune_read_notifications,
 };
 pub use permissions::Permissions;
+pub use second_factor::{PendingLogin, complete_login, pending_login};
 pub(crate) use throttle::LoginThrottle;
 pub use tokens::{AccessToken, NewToken, prune_expired_tokens};
 pub use user::{User, hash_password, needs_rehash, verify_password};
