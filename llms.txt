@@ -326,6 +326,7 @@ Every example has a README.md that walks through it.
   `audit.rs`, `context.rs`, `queue/`, `schedule.rs` + `timezone.rs`, `cache.rs`, `view.rs`,
   `grid/` (the data grid and its exports), `testing.rs`.
 - `crates/renox-cli`: `rnx`; `stubs/` holds the files `rnx new` writes.
-- `crates/renox-2fa`: the optional two-factor plugin crate (same version as `renox`), in
-  progress: its table, TOTP (`totp.rs`) and QR code (`qr.rs`); no account page or login step
-  yet.
+- `crates/renox-2fa`: the optional two-factor plugin crate (same version as `renox`): the
+  module (`lib.rs`: the second login step, the account card, events to the audit log), its
+  pages (`handlers.rs`, `views/`), TOTP (`totp.rs`), recovery codes (`recovery.rs`), the QR
+  code (`qr.rs`). Guide: [docs/two-factor.md](docs/two-factor.md); used in examples/teams.

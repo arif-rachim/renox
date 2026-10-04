@@ -371,6 +371,9 @@ type in Rust, templates or the terminal.
   (`.uncompromised()` refuses passwords from known breaches, asking Have I Been Pwned by hash
   prefix), and
   users imported from Laravel log in with their bcrypt hashes.
+- Two-factor authentication from the `renox-2fa` crate: one module, and users turn on codes
+  from an authenticator app on their account page, with recovery codes
+  ([guide](docs/two-factor.md)).
 - Auth events (`LoggedIn`, `LoginFailed`, `Registered`, …) and an opt-in `Audit` module that
   records them, plus your own entries (`audit::record`).
 - API tokens (`Authorization: Bearer`) with abilities and expiry serve mobile apps and
@@ -605,6 +608,7 @@ change on `main`.
   [views and the UI kit](docs/ui.md), [the data grid](docs/grid.md), [mail and notifications](docs/mail.md),
   [scheduler, events, cache and commands](docs/scheduling.md), [testing](docs/testing.md),
   [relations](docs/relations.md), [authorization and tenants](docs/authorization.md),
+  [two-factor authentication](docs/two-factor.md),
   [the queue](docs/queue.md), [field types](docs/types.md),
   [PostgreSQL](docs/postgresql.md), [production](docs/operations.md),
   [faster builds](docs/development.md), [stability and versions](docs/stability.md).

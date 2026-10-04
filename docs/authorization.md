@@ -503,11 +503,11 @@ Some apps ask for one more thing after the password, such as a code from an auth
 the user's phone. This is called **two-factor authentication** (2FA). A module can add such a
 step.
 
-> [!NOTE]
-> The `renox-2fa` plugin is being built (issues #170 to #173). Today it has its table, the
-> six-digit codes (TOTP) and the QR code, but it doesn't add a second login step yet: adding
-> `TwoFactor::new()` to an app asks nobody for a code. Until it does, write the step yourself
-> as shown below.
+> [!TIP]
+> For codes from an authenticator app, use the `renox-2fa` crate: one module adds the account
+> card, the QR code, the challenge and recovery codes, built on this extension point. See
+> [two-factor.md](two-factor.md). Read on to write a second step of your own (a PIN, a code
+> by mail…).
 
 In `Module::register`, the module says two things: which users must pass the step, and the route
 where the challenge (the "enter your code" page) lives:

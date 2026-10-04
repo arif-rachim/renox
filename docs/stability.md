@@ -54,10 +54,10 @@ Renox is three library crates: `renox`, `renox-core` and `renox-macros`.
 `renox-cli` (the `rnx` tool) has the same version too. The apps it makes depend on its own
 release of Renox.
 
-`renox-2fa` is an optional plugin crate: two-factor sign-in for apps that want it. It is released
-at the same version as `renox` and depends on it. You add it yourself, next to `renox`. It is
-still being built: it has its table, the codes and the QR code, but no account page or login
-step yet.
+`renox-2fa` is an optional plugin crate: two-factor authentication for apps that want it
+([two-factor.md](two-factor.md)). It is released at the same version as `renox` and depends on
+it. You add it yourself, next to `renox`. Its public items (the module, its events, the
+`TwoFactorCredential` model, `totp`, `recovery` and `qr`) follow the same promise as Renox's.
 
 ## The promise
 

@@ -578,3 +578,42 @@ async fn the_seeder_fills_the_app_and_can_run_again() {
         seeded
     );
 }
+
+/// renox-2fa: turned on from the account page, then asked for at login.
+#[renox::test]
+async fn two_factor_authentication_is_offered_and_asked_for() {
+    let w = world().await;
+    w.app.acting_as(&w.alice);
+    w.app
+        .get("/account")
+        .await
+        .assert_see("Two-factor authentication");
+    w.app.confirm_password();
+    w.app
+        .post("/two-factor/enable", &[])
+        .await
+        .assert_redirect("/two-factor/setup");
+    let secret = renox_2fa::TwoFactorCredential::of(w.app.db(), w.alice.id)
+        .await
+        .unwrap()
+        .unwrap()
+        .secret
+        .to_string();
+    let step = renox_2fa::totp::step_at(renox::db::now().timestamp());
+    let code = renox_2fa::totp::code_at(&secret, step).unwrap();
+    w.app
+        .post("/two-factor/confirm", &[("code", code.as_str())])
+        .await
+        .assert_redirect("/two-factor/recovery-codes");
+    w.app.post("/logout", &[]).await;
+    w.app
+        .post(
+            "/login",
+            &[
+                ("email", w.alice.email.as_str()),
+                ("password", "password123"),
+            ],
+        )
+        .await
+        .assert_redirect("/two-factor/challenge");
+}

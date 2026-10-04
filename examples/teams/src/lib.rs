@@ -15,7 +15,8 @@
 //! - A super-admin through `App::gate_before` (the emails in `SUPER_ADMINS`).
 //! - A team secret in an `Encrypted<String>` field, shown only after the
 //!   password is confirmed (`require_password_confirmed`).
-//! - Account pages from `Auth::new().account()`.
+//! - Account pages from `Auth::new().account()`, with two-factor
+//!   authentication from the `renox-2fa` plugin crate.
 //!
 //! Made with `rnx make:module teams`, `rnx make:module projects`,
 //! `rnx make:model Team --module teams --migration`,
@@ -43,6 +44,8 @@ pub fn app() -> App {
         .embed(renox::embedded!())
         .migrations(renox::migrations!())
         .module(Auth::new().account()) // login, register, and /account
+        // Two-factor authentication, turned on from /account (renox-2fa).
+        .module(renox_2fa::TwoFactor::new())
         .module(app::teams::Teams)
         .module(app::projects::Projects)
         .module(app::admin::Admin)
