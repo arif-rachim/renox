@@ -348,6 +348,10 @@ A notification is a struct that implements the `Notification` trait. It has:
 | `Channel::Database` | `to_database(&self, to, state) -> Result<Value>` | a row in the `notifications` table (users only) |
 | `Channel::Custom("whatsapp")` | `to_channel(&self, channel, to, state) -> Result<Value>` | the function you registered with `App::channel` |
 
+> [!WARNING]
+> `to_mail` has no useful default: unless you write it, it returns an error. A notification
+> left on the default channel (`Channel::Mail`) without its own `to_mail` fails when it's sent.
+
 Here is a full example: a notification that goes by mail, to the in-app list, and, for people
 with a WhatsApp number, by WhatsApp.
 
@@ -540,7 +544,7 @@ The routes, all for logged-in users only:
 | Route name | Address | What it does |
 |---|---|---|
 | `notifications.index` | `GET /notifications` | The page. With an `HX-Request` header (an htmx request), the panel alone. |
-| `notifications.stream` | | The live stream. |
+| `notifications.stream` | `GET /notifications/stream` | The live stream. |
 | `notifications.read`, `notifications.unread`, `notifications.open` | `POST /notifications/{id}/…` | Mark one read, mark it unread, open it. |
 | `notifications.destroy` | `DELETE /notifications/{id}` | Delete one. |
 | `notifications.read_all` | `POST /notifications/read-all` | Mark all as read. |
@@ -651,7 +655,9 @@ use renox::testing::TestApp;
 struct Hello;
 
 impl Notification for Hello {
-    fn kind(&self) -> &'static str { "hello" } // mail only, by default
+    // Mail only, by default. It has no `to_mail`, so sending it for real would fail;
+    // here it's faked, so it is only recorded.
+    fn kind(&self) -> &'static str { "hello" }
 }
 
 /// Checks a queued mail, then a faked notification.

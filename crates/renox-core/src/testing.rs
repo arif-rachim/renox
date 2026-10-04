@@ -122,9 +122,11 @@ impl TestApp {
     /// ```
     /// # use renox::prelude::*;
     /// # use std::time::Duration;
-    /// # async fn demo(app: renox::testing::TestApp) {
+    /// # async fn demo(app: renox::testing::TestApp, user: User) {
+    /// // The app guards `/settings/billing` with `.require_password_confirmed()`.
+    /// app.acting_as(&user).confirm_password();
     /// app.travel(Duration::from_secs(3 * 60 * 60)); // past the password confirmation
-    /// app.get("/account/delete").await.assert_redirect("/confirm-password");
+    /// app.get("/settings/billing").await.assert_redirect("/confirm-password");
     /// # }
     /// ```
     pub fn travel(&self, by: std::time::Duration) -> &Self {

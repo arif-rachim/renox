@@ -1,5 +1,7 @@
-//! Two-factor authentication for Renox apps: a code from an authenticator
-//! app (TOTP, RFC 6238) after the password, and one-time recovery codes.
+//! Two-factor authentication for Renox apps, in progress: a code from an
+//! authenticator app (TOTP, RFC 6238) after the password, and one-time
+//! recovery codes. Today it brings the table, the codes and the QR code; it
+//! doesn't ask anyone for a code yet.
 //!
 //! ```
 //! use renox::prelude::*;
@@ -7,14 +9,14 @@
 //!
 //! # let _ =
 //! App::new()
-//!     .module(Auth::new().account()) // the account page, where users turn it on
+//!     .module(Auth::new().account()) // the account page, where users will turn it on
 //!     .module(TwoFactor::new())
 //! # ;
 //! ```
 //!
-//! This crate is being built in steps (#146): the table, the codes and the QR
-//! code are here; turning it on from the account page, the login challenge
-//! and recovery codes follow.
+//! This crate is being built in steps (#146, #170–#173): the table, the codes
+//! and the QR code are here; turning it on from the account page, the login
+//! challenge and recovery codes follow.
 
 use renox::db::Migration;
 use renox::prelude::*;

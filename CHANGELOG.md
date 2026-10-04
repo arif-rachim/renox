@@ -10,6 +10,15 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Docs match the code (#208–#217, #219):** the docs-gap audit's 140 items fixed across the
+  README, CHEATSHEET, llms.txt, SECURITY, RELEASING, CONTRIBUTING, every guide in docs/, the
+  AGENTS.md and .env new apps get, the examples' READMEs and renox-2fa's README. Among them:
+  `make:command`/`make:model` examples that failed without `--module`, test examples that
+  needed `.account()`, `HxRetarget("…")` needing `.into()`, row locks that only apply to
+  row-reading calls, `SET LOCAL statement_timeout`, maintenance mode not pausing jobs, the
+  `Auth` module's routes, and renox-2fa described as in progress.
+- **Fixed (#218):** examples/grid's Open links pointed at `/orders/%7B…%7D` (`route()` was
+  given a map); they now use the id.
 - **Fixed (#185):** a grid's `Column::related` (and `count_of`/`sum_of`) cells were empty
   when the page's query was `Model::unscoped()` of a model with a default scope, as staff
   pages over tenant data are, and in exports too: the related values were read again through

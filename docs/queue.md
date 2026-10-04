@@ -127,12 +127,19 @@ Jobs sometimes fail: a mail server is down, an API answers slowly. Here's what R
 - **Then it waits and tries again.** The wait is `backoff(attempt)`: 10 seconds × the attempt
   number by default. It keeps trying up to `MAX_ATTEMPTS`.
 - **Out of attempts:** the job moves to `failed_jobs` (it has failed for good), and its
-  `failed` hook runs once.
+  `failed` hook runs once. The error is also sent to your error reporters (`App::report`).
+- **Jobs that can't run at all** fail for good on the first try, with no retries: a job whose
+  name has no registered job type, and a payload that can't be read back (it doesn't decode as
+  the struct, or it was sealed with another `APP_KEY`).
 - **No retries for hopeless errors:** an error made with `Error::permanent(e)` skips the
   retries. Retrying can't fix a bad card number.
 - **A worker that dies mid-job** (a crash, `SIGKILL`) leaves the job reserved (marked as taken).
   Another worker takes it again after 15 minutes, or after `TIMEOUT` + 1 minute for longer
   jobs.
+- **A worker that dies during the last attempt:** the job has no attempts left, so a worker
+  later moves it to `failed_jobs` with the error "the worker stopped during the last attempt".
+  In this case the `failed` hook does **not** run and no error report is sent; only an error
+  line is logged. Check `queue:failed` after a crash.
 
 > [!TIP]
 > Because a job may run more than once, try to make it **idempotent**: safe to run twice. For
@@ -147,6 +154,17 @@ Commands for failed jobs:
 | `queue:forget ID` | deletes one |
 | `queue:flush` | deletes them all |
 | `queue:prune-failed --hours 168` | deletes the ones older than that |
+
+The same things from code, on `state.queue`:
+
+- `failed()` lists the failed jobs (`FailedJob`: id, queue, job, payload, error, failed_at);
+- `retry(id)` and `retry_all()` put them back in the queue;
+- `forget_failed(id)` deletes one, `flush_failed()` deletes them all;
+- `pending()` counts the jobs waiting or running;
+- `recent_batches(n)` returns the newest `n` batches with their progress.
+
+Inside `handle`, `ctx.attempt` is the attempt number (1 on the first try) and `ctx.id` is the
+job's id (0 when it runs through `dispatch_sync`).
 
 Here's a job that sets its own backoff, refuses to retry bad input, and does something when it
 fails for good:
@@ -278,14 +296,18 @@ Sometimes a job should not run twice, or not too often. Renox has three tools fo
 
 **Unique jobs.** Give the job `UNIQUE_FOR`. Then a second dispatch, while a job with the same
 `unique_id` is still queued or running, doesn't add another job: it returns the id of the one
-already queued. Think of a "remind me" button pressed twice.
+already queued. Think of a "remind me" button pressed twice. The claim is dropped when the job
+finishes, and in any case after `UNIQUE_FOR`, even if the job is still waiting.
 
 **Middleware.** These checks run before each attempt. A job that can't run yet is put back in
 the queue, without using up one of its attempts:
 
-- `Middleware::without_overlapping(key)`: only one job with that key runs at a time;
+- `Middleware::without_overlapping(key)`: only one job with that key runs at a time. A job that
+  would overlap is put back for 5 seconds; change that with `.release_after(wait)`;
 - `Middleware::rate_limited(key, max, per)`: at most `max` attempts per time window, for
-  example to stay inside another service's limit (its quota).
+  example to stay inside another service's limit (its quota). The window is fixed (it starts
+  over every `per`, it doesn't slide) and is at least 1 second; a job over the limit is put back
+  until the window ends.
 
 > [!WARNING]
 > Both middlewares keep their notes in the cache. With `CACHE_STORE=memory`, they only work
@@ -340,7 +362,7 @@ its payload is stored sealed (encrypted) with `APP_KEY`, in `jobs` and in `faile
 
 > [!WARNING]
 > A payload sealed with another key can't be opened, so the job fails for good. Keep `APP_KEY`
-> the same (see operations.md, "Keys").
+> the same (see the "Keys" paragraph in [operations.md, Backups](operations.md#backups)).
 
 ## Chains and batches
 
@@ -428,7 +450,8 @@ Two more:
 - `app.queued_jobs()` lists what was queued (names, in order).
 - `app.run_jobs().await` runs every job that is due, until none is left. That includes the next
   job of a chain and a batch's callbacks. A retry still waiting for its backoff is not due.
-- `app.run_all_jobs().await` runs delayed jobs and retries too.
+- `app.run_all_jobs().await` runs delayed jobs and retries too. It stops after 1,000 rounds, so a
+  job that keeps queuing itself can't hang the test.
 - `state.dispatch_sync(job)` runs one job now, in the caller.
 
 Then check what the job did: the rows it wrote, or the mail it sent with `app.sent_mail()`.

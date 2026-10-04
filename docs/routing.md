@@ -211,6 +211,10 @@ What's going on:
 - `.require_auth()` is a guard ("logged-in users only"). Here it covers only the group's routes.
 - `merge` keeps each route's name and layers.
 
+> [!WARNING]
+> `group` panics when the routes inside it have a `.domain(…)` or a `.fallback(…)`: put those
+> outside the group. `merge` panics when both sides have a fallback.
+
 > [!TIP]
 > `rnx make:module products --resource` writes a whole resource for you: its handlers, views and
 > tests.
@@ -380,7 +384,7 @@ The order of the arguments doesn't matter, with one exception.
 | `Query<T>` | the query string, deserialized | axum's; `Option` fields for optional ones |
 | `Valid<T>` | a validated form, JSON body or (for GET) query string | errors: redirect back, or 422 for htmx/JSON; see [validation.md](validation.md) |
 | `Form<T>`, `Json<T>` | the body, unvalidated | axum's |
-| `AuthUser` | the logged-in user (derefs to `User`) | guests: redirect to `login`, or 401 JSON for API clients; `Option<AuthUser>` for either |
+| `AuthUser` | the logged-in user (derefs to `User`) | guests: redirect to `login`, or 401 JSON for API clients (`Accept: application/json`, a JSON body or an `Authorization` header); `Option<AuthUser>` for either |
 | `Session` | the visitor's session | below |
 | `Htmx` | `request`, `boosted`, `target`, `trigger`, `current_url` | see [ui.md](ui.md) |
 | `Lang` | the request's locale (`lang.locale`), `t`, `choice` | |
@@ -522,7 +526,7 @@ A handler can return anything axum knows how to turn into a response, plus Renox
 | `Redirect::intended(&session, "/dashboard")` | 303 to the page a guard sent the user away from (once, same site only), else the fallback |
 | `Back` (extractor and response) | 303 to the `Referer`, or `/` when it's missing or on another site |
 | `Json(json!({…}))`, `String`, `Html(…)`, `StatusCode` | axum's |
-| `renox::Download` | a file: `bytes`, `file` (streamed), `from_storage`, `stream`; `.inline()` to show it in the browser |
+| `renox::Download` | a file: `bytes`, `file` (streamed), `from_storage`, `stream`; `.inline()` to show it in the browser (never for HTML, XML or JavaScript, which are always downloads) |
 | `renox::Toast::success("…")` in a tuple | a toast with the response (or the next page after a redirect) |
 | `HxRedirect`, `HxRefresh`, `HxTrigger`, `HxRetarget`, `HxReswap`, `HxPushUrl` | htmx response headers; see [ui.md](ui.md) |
 | `Err(…)` from `Result<T>` | an error page (`errors/{status}.html`), or JSON for API clients |
@@ -603,9 +607,12 @@ tell you what your own middleware can count on.
    [Method spoofing](#method-spoofing)).
 3. **Request id**, then the request's log span (the request's details, attached to its log
    lines); then the **body limit** (`UPLOAD_MAX_SIZE`).
-4. Renox's scripts, `/health`, `/robots.txt`, `/favicon.ico` and the local disk's public files
-   answer here, before sessions and maintenance mode.
+4. Renox's scripts, `/health`, `/robots.txt`, `/favicon.ico`, the live-reload stream
+   (`/_renox/live`, only while debugging locally) and the local disk's public files answer here,
+   before sessions and maintenance mode.
 5. Then, in this order:
+   - the debug inspector, which records each request for `/_renox/debug` (only with
+     `APP_DEBUG` on and `APP_ENV=local`; it skips `/_renox/*` addresses);
    - the request's context (`renox::context`);
    - the **session**;
    - the **locale** (the visitor's language);
@@ -687,19 +694,21 @@ A **guard** is middleware that decides who gets in.
 
 What happens to visitors who are turned away:
 
-- Guests asking for a page are sent to the `login` route, and back again after they log in
-  (through `Redirect::intended`).
-- API clients (requests with `Accept: application/json` or an `Authorization` header) get a 401
-  JSON answer instead.
+- Guests asking for a page are sent to the `login` route. For a GET request, Renox remembers
+  the page, and `Redirect::intended` takes them back to it after they log in (a guest who sent a
+  form isn't sent back to it). An htmx request gets an `HX-Redirect` header instead of a
+  redirect, so the whole page goes to the login page.
+- API clients (requests with `Accept: application/json`, a JSON body or an `Authorization`
+  header) get a 401 JSON answer instead.
 
 | Guard | Lets through | Others |
 |---|---|---|
 | `.require_auth()` | logged-in users | guests → `login` |
-| `.require_verified()` | users with a verified email | → `verification.notice` |
+| `.require_verified()` | users with a verified email | guests → `login`; others → `verification.notice`, or 403 JSON for JSON and API-token requests |
 | `.guest_only()` | guests (login, register pages) | users → `home` |
-| `.require_gate("x")` | users a gate (or permission) allows | 403 |
-| `.require_role("admin")`, `.require_permission("x")` | the `Permissions` module | 403 |
-| `.require_ability("orders:write")` | API tokens with the ability; sessions and unrestricted tokens | 403 |
+| `.require_gate("x")` | users a gate (or permission) allows | guests → `login`; others 403 |
+| `.require_role("admin")`, `.require_permission("x")` | the `Permissions` module | guests → `login`; others 403 |
+| `.require_ability("orders:write")` | API tokens with the ability; sessions and unrestricted tokens | guests → `login`; others 403 |
 | `.require_password_confirmed()` | users who typed their password in the last three hours | → `/confirm-password` |
 
 (A **gate** is a named yes/no rule, like "may manage billing". Roles, permissions and token
@@ -779,7 +788,19 @@ What's going on:
 - `.by(…)` sets what to count by. Here, guests are counted by their IP address.
 - `/api/orders` uses the "api" limiter. `/contact` allows 5 posts a minute.
 
+A `Limit` is one of:
+
+- `Limit::per_minute(n)`: at most `n` requests a minute;
+- `Limit::per_hour(n)`: at most `n` an hour;
+- `Limit::per(n, duration)`: at most `n` per any length of time (`n` is at least 1, the time at
+  least a second);
+- `Limit::none()`: no limit.
+
 A rule can look at `req.user`, `req.ip`, `req.method`, `req.path` and `req.headers`.
+
+> [!WARNING]
+> `.throttle_by("api")` needs an `App::rate_limiter("api", …)`. Without one, the app stops at
+> start-up with an error naming the route.
 
 > [!NOTE]
 > The counters live in memory, so each server counts on its own. With `CACHE_STORE=database`,
@@ -799,6 +820,14 @@ site says it's fine. **CORS** (Cross-Origin Resource Sharing) is how a site says
 `.cors(&["https://app.example.com"])` (or `&["*"]` for any origin) lets browsers on those
 origins `fetch` the routes added before it. Renox answers the browser's "preflight" check (a
 question it asks before the real request) and adds the `Access-Control-Allow-*` headers.
+
+What `.cors` allows:
+
+- the methods GET, POST, PUT, PATCH, DELETE and OPTIONS;
+- only the request headers `Content-Type`, `Authorization`, `Accept` and `X-CSRF-Token` (not
+  `X-XSRF-TOKEN`);
+- no cookies;
+- browsers may keep the preflight's answer for an hour.
 
 For credentials (cookies) or other headers, build a `renox::cors::CorsLayer` and pass it to
 `.cors_layer(…)`.
@@ -851,7 +880,8 @@ Where the session is kept:
 - **By default, in a cookie.** The cookie is encrypted and signed, with a key made from
   `APP_KEY`: the visitor can't read it or change it. It needs no database.
 - **With `SESSION_DRIVER=database`**, the cookie holds only an id, and the data lives in the
-  `sessions` table. Remove expired rows with `my-app session:prune`.
+  `sessions` table. About one request in 50 also deletes expired rows in the background;
+  `my-app session:prune` does it on demand (handy for a quiet app, or on a schedule).
 
 > [!WARNING]
 > Keep a cookie session small. Browsers drop cookies over 4 KB, and Renox logs a warning when a
@@ -876,19 +906,20 @@ What's going on:
 
 - `put` stores a value under a name; `get` reads it back (`None` if it isn't there).
 - `push` adds to a list; `increment` adds to a number and returns the new total.
-- `pull` reads a value and removes it.
+- `pull` reads a value and removes it. `pull` and `remove` only touch values stored with
+  `put` (or `push`, `increment`): a flashed value stays, and `pull` on it gives `None`.
 - `flash` stores a value for the next request only, like "Added to the cart" shown after a
   redirect.
 
 | Method | Does |
 |---|---|
-| `get`, `has`, `put`, `remove`, `pull` | read and write values (any `Serialize` type) |
+| `get`, `has`, `put`, `remove`, `pull` | read and write values (any `Serialize` type); `get` and `has` also see flashed values, `remove` and `pull` don't |
 | `push`, `increment` | append to a list; add to a number |
 | `flash`, `reflash`, `flashed` | values for the next request only ("Saved!" after a redirect) |
 | `keep(&["status"])`, `flash_now(key, value)` | keep some flashed values for one more request; a flash value for the page rendered now only (Laravel's `flash()->now()`) |
-| `old(field)`, `errors()` | the previous form's input and validation errors (filled by `Valid<T>`) |
+| `old(field)`, `errors()` | the previous form's input and validation errors (filled by `Valid<T>`; what old input keeps is in [validation.md](validation.md#answer-2-plain-form-posts-get-a-redirect-back)) |
 | `has_old_input` | whether the previous request flashed its input (a failed submit), even with no field in it |
-| `set_lifetime(duration)` | this session lasts longer than `SESSION_LIFETIME` |
+| `set_lifetime(duration)` | this session uses this lifetime instead of `SESSION_LIFETIME` (whole minutes, rounded up, at least one) |
 | `token`, `regenerate_token`, `flush` | the CSRF token; a new one; empty everything |
 
 How long a session lasts, and what logging in and out does:
@@ -918,6 +949,9 @@ The fix: every form carries a secret **token** that only your app's own pages kn
 POST, PUT, PATCH and DELETE must carry the session's token. Without it, the answer is
 **419 Page Expired**.
 
+To find the `_token` field, Renox reads the form's body first. A normal form over 2 MB (or a
+file-upload form over `UPLOAD_MAX_SIZE`) gets **400** "The form is too large." instead.
+
 How to send the token, depending on what sends the request:
 
 - **Forms:** put `{{ csrf_field() }}` inside the `<form>`. It adds a hidden `_token` field.
@@ -929,7 +963,8 @@ How to send the token, depending on what sends the request:
   so the attack can't happen. A Bearer token that doesn't log anyone in gets 401.
 - **No session at all** (for example, a payment gateway calling your app): use
   `.without_csrf()` on those routes, and check the request's signature instead.
-  `Routes::webhook::<W>("/webhooks/stripe")` does both for you.
+  `Routes::webhook::<W>("/webhooks/stripe")` does both for you. It also needs
+  `app.webhook::<W>()` in the module's `register`; without it, the app stops at start-up.
 - **A JavaScript client on the same site** (axios, a small single-page app):
   `App::new().xsrf_cookie()` also sends the token as an `XSRF-TOKEN` cookie that scripts can
   read, and accepts it back in an `X-XSRF-TOKEN` header, as Laravel does. axios sends it by

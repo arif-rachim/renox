@@ -143,6 +143,11 @@ async fn an_order_opens_from_its_row() {
         .assert_ok()
         .assert_see(&order.number);
     app.get("/orders/999").await.assert_not_found();
+    // The rows' links lead there (#218: `route()` was given a map, which it
+    // wrote into the path as text).
+    let link = format!("href=\"/orders/{}\"", order.id);
+    app.get("/").await.assert_see(&link);
+    app.get("/regions?state=1").await.assert_see(&link);
 }
 
 #[renox::test]

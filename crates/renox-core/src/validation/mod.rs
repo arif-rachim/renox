@@ -662,7 +662,10 @@ impl Field<'_> {
         !self.failed && self.value != Inspected::Missing
     }
 
-    /// Replaces the message of the rule just before it.
+    /// Replaces this field's error so far with `message`: the error of the
+    /// rule just before it, or of any earlier rule that failed (only one error
+    /// is kept per field). A database or async check just before it gets the
+    /// message when it fails.
     pub fn message(self, message: impl Into<String>) -> Self {
         let message = message.into();
         if let Some(i) = self.last_pending {

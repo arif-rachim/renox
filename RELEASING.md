@@ -1,12 +1,14 @@
 # Releasing Renox
 
-How a release goes to crates.io. Only a maintainer with publish rights on the four crates
-(`renox`, `renox-core`, `renox-macros`, `renox-cli`) can do it.
+How a release goes to crates.io. Only a maintainer with publish rights on the five crates
+(`renox`, `renox-core`, `renox-macros`, `renox-cli` and the plugin `renox-2fa`) can do it.
+All five share the workspace's version and are released together.
 
 ## Before the first release
 
 - A crates.io account with a **verified email address** (crates.io refuses to publish without
-  one), and publish rights on the four names (the 0.0.1 placeholders reserved them).
+  one), and publish rights on the five names (0.0.1 placeholders reserved the first four; a
+  name's first `cargo publish` creates it and gives the publisher those rights).
 - `cargo login` on the machine that publishes. The token stays in `~/.cargo/credentials.toml`:
   never put it in the repository, an issue, a chat or an environment variable that a script
   prints.
@@ -24,18 +26,25 @@ How a release goes to crates.io. Only a maintainer with publish rights on the fo
    `renox-core` and `renox-macros` under `[workspace.dependencies]` (written `=1.2.0`: the
    three crates are released in lockstep and pin each other exactly, since the macros write
    code against renox-core's items of the same release).
-   While 1.0 is a release candidate, the install lines name the version too: `README.md`
-   and `docs/tutorial.md` (`cargo install renox-cli --version …`).
+   While 1.0 is a release candidate, other places name the version too; change all of them:
+   - the install lines in `README.md` (quick start) and `docs/tutorial.md`
+     (`cargo install renox-cli --version …`);
+   - the `git clone --branch v…` line in `README.md` ("Use Renox with Claude Code");
+   - the version in `README.md`'s "Status" section;
+   - the example dependency line in `docs/stability.md` (`renox = "…"`).
+   `grep -rn "1.0.0-rc" README.md docs` finds them.
 3. **The changelog.** In `CHANGELOG.md`, rename "Unreleased" to `## 1.2.0 · 2026-11-01` (the
    version and the date) and start a new empty "Unreleased" above it.
 4. **Check everything** (as in [CONTRIBUTING.md](CONTRIBUTING.md)), then a dry run of the
-   first two crates:
+   crates that don't need another Renox crate on crates.io first:
    ```bash
    cargo publish --dry-run -p renox-macros
    cargo publish --dry-run -p renox-core
+   cargo publish --dry-run -p renox-cli
    ```
-   `renox` and `renox-cli` can't be dry-run before `renox-core` is on crates.io: they depend on
-   it.
+   (`renox-cli` doesn't depend on the other Renox crates.) `renox` can't be dry-run before
+   this version of `renox-core` and `renox-macros` is on crates.io, and `renox-2fa` not
+   before `renox` is: they depend on them.
 5. **Commit and merge** the version and changelog as a pull request, as for any change.
 6. **Publish in this order** from an up-to-date `main` (each waits until the previous one is in
    the index):
@@ -51,7 +60,8 @@ How a release goes to crates.io. Only a maintainer with publish rights on the fo
 7. **Tag the commit:** `git tag v1.2.0 && git push origin v1.2.0`. Apps made by
    `rnx new` from crates.io link their `AGENTS.md` to the docs at that tag.
 8. **Check the release:**
-   - docs.rs shows `renox` and `renox-core` (built with `postgres`, `uuid` and `xlsx`);
+   - docs.rs shows `renox` and `renox-core` (built with `postgres`, `uuid` and `xlsx`), and
+     `renox-2fa`;
    - `cargo install renox-cli` then `rnx new demo`: `demo/Cargo.toml` has
      `renox = { version = "1.2" }` and `cargo test` passes in it.
 9. **A GitHub release** for the tag, with the version's changelog section as its notes.
@@ -68,6 +78,6 @@ How a release goes to crates.io. Only a maintainer with publish rights on the fo
 
 ## A broken release
 
-Yank it (`cargo yank --version 1.2.0 -p renox-core`, and the others of that version), fix
+Yank it (`cargo yank --version 1.2.0 renox-core`, and the other four of that version), fix
 it, and publish the next patch version. A yanked version stays for apps that already lock it,
 but new apps don't get it. Never reuse a version number.

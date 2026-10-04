@@ -6,7 +6,7 @@
   {#- `details()`: what opens under a row after the audit fields. -#}
   {% call(row, column) grid(orders) %}
     {%- if column.key == "_details" -%}
-      <a href="{{ route('orders.show', {'id': row.id}) }}">{{ row.number }}</a> · {{ row.email }} · {{ row.items }} items
+      <a href="{{ route('orders.show', row.id) }}">{{ row.number }}</a> · {{ row.email }} · {{ row.items }} items
     {%- endif -%}
   {% endcall %}
 </main>

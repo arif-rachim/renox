@@ -243,9 +243,9 @@ one process runs each slot.
 When a task returns an error, or panics:
 
 1. the error is written to the log;
-2. `on_failure` runs;
-3. the error goes to every **reporter** you added with `App::report`. It arrives as an
-   `ErrorReport` with `kind: ReportKind::ScheduledTask` and the task's name in `source`.
+2. the error goes to every **reporter** you added with `App::report`. It arrives as an
+   `ErrorReport` with `kind: ReportKind::ScheduledTask` and the task's name in `source`;
+3. `on_failure` runs.
 
 For example, to post it to a chat:
 

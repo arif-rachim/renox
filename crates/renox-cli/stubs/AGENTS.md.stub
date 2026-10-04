@@ -22,14 +22,20 @@ one Renox version (the `renox` line in `Cargo.toml`); the links below are for th
   `docs/validation.md` (forms, rules, `#[derive(Validate)]`, hooks), `docs/mail.md` (mail and
   notifications), `docs/scheduling.md` (schedules, events, cache and locks, commands),
   `docs/relations.md` (relations are explicit: load a page's relations with
-  `relations::belongs_to` / `has_many` / `Pivot`, one query each, never one per row),
+  `relations::belongs_to` / `has_many` / `Pivot`, one query each (two for a pivot), never one
+  per row),
   `docs/types.md` (form field → Rust type → column), `docs/ui.md` (the UI kit, toasts,
   fragments, live validation), `docs/grid.md` (data grids with `renox::grid`: columns,
   filters, search, editing, actions, summaries, exports), `docs/testing.md` (TestApp, fakes, time travel),
   `docs/authorization.md` (gates, policies, roles, token abilities, tenants), `docs/queue.md`
   (jobs, retries, chains, batches), `docs/postgresql.md`, `docs/operations.md` (production).
-- Offline, the same files are in {{renox_source}}. To read them as a website (with search),
-  https://renox.renoxium.com shows the latest version.
+- Offline, Renox's source is in {{renox_source}}. When Renox comes from Git (a `git` or `path`
+  `renox` line in `Cargo.toml`), that folder also has the cheat sheet, llms.txt, the guides and
+  the examples. When it comes from crates.io (a `version` line), it has only the source: clone
+  the repository at that version for the rest, e.g.
+  `git clone --depth 1 --branch v1.2.3 https://github.com/arif-rachim/renox`, where the tag is
+  what `cargo tree -p renox --depth 0` prints after `renox` (e.g. `v1.2.3`). To read the docs
+  as a website (with search), https://renox.renoxium.com shows the latest version.
 
 ## Generators
 
@@ -39,12 +45,12 @@ Prefer them over writing boilerplate by hand:
 rnx make:module products                               # src/app/products + view + registration
 rnx make:module products --resource --fields "name:string price:money"  # a whole CRUD, with tests
 rnx make:model Product --module products --migration   # model + migrations/*.sql
-rnx make:model Invoice --key ulid --migration          # id: Ulid (also uuid, string)
+rnx make:model Invoice --module billing --key ulid -m  # id: Ulid (also uuid, string)
 rnx make:policy Product --module products
 rnx make:job SendReceipt --module products             # registered in the module's register()
 rnx make:command products:import --module products     # typed (clap); rnx products:import --help
 rnx make:mail order_shipped
-rnx make:migration add_stock_to_products
+rnx make:migration add_stock_to_products               # in migrations/ (--path DIR: elsewhere)
 rnx make:factory Product --module products             # also make:seeder, make:test
 rnx make:notification OrderShipped --module orders     # also make:event, make:rule
 rnx make:middleware StampRequests                      # also make:component
@@ -168,7 +174,7 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   `Storage` built by hand.
 - Layers such as `.etag()`, `.throttle(…)` and `.require_auth()` cover only the routes added
   before them: give such routes a `Routes` group of their own and `merge` it.
-- Commands: `rnx make:command orders:close` writes a typed one (a clap struct with
+- Commands: `rnx make:command orders:close --module orders` writes a typed one (a clap struct with
   `impl AppCommand`, registered with `app.typed_command::<T>()`); ask for missing values with
   `renox::prompt::ask/confirm/secret/choice`, and answer them in tests with
   `renox::prompt::answering([...], app.kernel().call(...))`.

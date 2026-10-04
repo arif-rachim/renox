@@ -39,9 +39,10 @@ package already enables renox's `postgres` and `uuid` features.
   pairs, so the order holds in PostgreSQL's `JSONB`). Such a nested name makes `Valid` read
   the whole form as a tree; every other field still parses from its text.
 
-- **Toasts instead of flashed messages.** `store`, `update` and `destroy` return
-  `(Toast::success(…), Redirect::route("products.edit", &[&product.id])?)`: the toast waits in the
-  session and the layout's `{{ toasts() }}` shows it on the next page, once.
+- **Toasts instead of flashed messages.** `store` and `update` return
+  `(Toast::success(…), Redirect::route("products.edit", &[&product.id])?)`, and `destroy`
+  returns `(Toast::success(…), Redirect::route("home", &[])?)`, since the product is gone. The
+  toast waits in the session and the layout's `{{ toasts() }}` shows it on the next page, once.
 - **A radio group (or a `<select>`) is an enum.** `#[derive(DbEnum)] enum Size` is stored as
   text (`small`, `medium`, `large`); the form lists `Size::ALL` with the kit's `radio`, and an
   unknown value fails validation.

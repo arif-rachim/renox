@@ -114,21 +114,31 @@ Already have an app on SQLite? Four steps move it to PostgreSQL.
 ## Migrations
 
 A migration file runs on every database, unless there is a version written for one database.
-When a migration runs, `renox::migrations!()` picks the right file by its name:
+`renox::migrations!()` reads the `migrations` folder. To read another folder, give its path
+from the crate's root: `renox::migrations!("db/migrations")`. When a migration runs, Renox picks
+the right file by its name:
 
 | File | Used on |
 |---|---|
 | `20260101000000_create_products.up.sql` | every database without its own version |
 | `20260101000000_create_products.postgres.up.sql` | PostgreSQL |
 | `20260101000000_create_products.sqlite.up.sql` | SQLite |
+| `20260101000000_create_products.sql` | every database without its own version; it can't be undone (no `down`) |
+| `20260101000000_create_products.postgres.sql`, `….sqlite.sql` | that database only; can't be undone either |
 
-`.down.sql` files (the ones that undo a migration) work the same way.
+`.down.sql` files (the ones that undo a migration) work the same way, with one catch: a
+database's own `down` is used only together with its own `up`.
 
-Two more rules:
+The rules in full:
 
 - A database-specific `up` without its own `down` uses the plain `.down.sql`. That is usually
   just a `DROP TABLE`, which is the same on both.
+- A database-specific `down` without its own `up` (say, a `.postgres.down.sql` next to a plain
+  `.up.sql`) is ignored: rolling back runs the plain `.down.sql`. When the undo differs on one
+  database, give that database its own `up` as well.
 - You may leave out the plain `up` when both databases have their own.
+- A migration without any `down` can't be rolled back (see `migrate:rollback` in
+  [operations.md](operations.md#deploys-and-migrations)).
 
 ### SQL that differs between the two
 
@@ -156,9 +166,20 @@ These are the same on both: plain `TEXT`, `NOT NULL`, `UNIQUE`,
 
 Each migration runs inside a transaction: if one statement fails, none of it is kept.
 
-There is one exception. `CREATE INDEX CONCURRENTLY` (which builds an index without blocking
-the table) can't run in a transaction. So a migration that uses it runs without one, statement
-by statement. A migration with a `-- renox:no-transaction` line does the same.
+A migration runs **without** that transaction when any of these is true:
+
+- it has a line that is exactly `-- renox:no-transaction`;
+- it starts its own transaction (a `BEGIN`, `BEGIN TRANSACTION` or `BEGIN IMMEDIATE`
+  statement), so it decides itself what to commit;
+- it contains ` CONCURRENTLY ` (as in `CREATE INDEX CONCURRENTLY`, which builds an index without
+  blocking the table and can't run in a transaction).
+
+How such a migration then runs:
+
+- On PostgreSQL, a migration with ` CONCURRENTLY ` is split and sent statement by statement.
+- Any other one is sent as one script. On PostgreSQL, a script of several statements still
+  runs as one implicit transaction (unless it has its own `BEGIN` … `COMMIT`). On SQLite, each
+  statement is kept as soon as it runs.
 
 > [!IMPORTANT]
 > Keep such a migration to that one change. If it fails halfway, the statements that already
@@ -229,6 +250,11 @@ need `SCHEDULER=false` on the extra servers for that.
 else changes them until your transaction ends. They add `FOR UPDATE` / `FOR SHARE` on PostgreSQL
 and do nothing on SQLite. SQLite locks the whole database for a write instead.
 
+Only calls that read rows take the lock: `get`, `first`, `pluck`, `select_as` and the items of
+a `paginate`. `count`, `exists`, `sum` and the other aggregates, `update`, `increment` and
+`delete` ignore it. So to lock a row and then change it, read it with
+`.lock_for_update().first(&mut tx)` first.
+
 > [!TIP]
 > On SQLite, start the transaction with `db.begin_immediate()`. It then takes the write lock
 > before it reads, which gives you the same safety.
@@ -275,9 +301,15 @@ empty `shop_test` database. `--rm` removes it when you stop it.
 ## Moving the data
 
 Migrations create the tables, but they don't copy your rows. You copy the data separately,
-once, while the app is in *maintenance mode* (it shows "back soon" and accepts no changes):
+once, while nothing writes to the old database.
 
-1. Run `my-app down` on the old server, then copy `storage/app.db` (the SQLite file).
+1. Stop the app on the old server, then copy `storage/app.db` (the SQLite file).
+
+   > [!WARNING]
+   > `my-app down` (maintenance mode) is not enough on its own. It only stops visitors' pages:
+   > queue workers and scheduled tasks keep running and writing, and webhook calls still
+   > arrive. If the app must stay up, run it with `QUEUE_WORKERS=0 SCHEDULER=false` as well,
+   > and copy the file with `sqlite3 storage/app.db ".backup app-copy.db"` instead of `cp`.
 2. Create the tables on PostgreSQL:
    `DATABASE_URL=postgres://… my-app migrate`.
 3. Copy the rows. [pgloader](https://pgloader.io) does this in one step. Its **data only**
@@ -294,8 +326,9 @@ once, while the app is in *maintenance mode* (it shows "back soon" and accepts n
 
    What to know about this step:
 
-   - Timestamps written by Renox are ISO 8601 text (like `2026-10-04T12:00:00Z`). PostgreSQL
-     reads them into `TIMESTAMPTZ` as they are.
+   - Timestamps written by Renox are text like `2026-10-04 12:00:00.123456+00:00` (date, time
+     with up to six decimals, and the offset). PostgreSQL reads them into `TIMESTAMPTZ` as they
+     are.
    - Booleans stored as 0/1 need a `CAST` rule, like the one above. Renox's own
      `job_batches.allow_failures` is `INTEGER` on SQLite and `BOOLEAN` on PostgreSQL. Add a
      rule like it for each boolean column of your own tables.
@@ -314,8 +347,15 @@ stop that from holding up your app's requests forever:
 | `DATABASE_STATEMENT_TIMEOUT` | how long one statement may run | 30 s |
 | `REQUEST_TIMEOUT` | how long a request may take before it gets an answer | 60 s |
 
-`DATABASE_STATEMENT_TIMEOUT=0` means no limit. Use it, for example, for a long report job, or
-run `SET statement_timeout` inside that job's transaction instead.
+`DATABASE_STATEMENT_TIMEOUT=0` means no limit, for the whole app. To lift the limit for one
+long report job only, run `SET LOCAL statement_timeout = 0` inside that job's transaction.
+(A plain `SET` would stay on the pooled connection after the transaction, so later queries
+would keep the changed limit.)
+
+The statement limit is set on every connection, so it also covers commands: `migrate`,
+`db:seed`, `db:shell` and `queue:work`. A migration that runs longer than 30 s (a big
+`CREATE INDEX`, a backfill) is cancelled. Raise the limit for that run only:
+`DATABASE_STATEMENT_TIMEOUT=0 my-app migrate`.
 
 `rnx make:deploy` writes the same files as for SQLite: a Dockerfile, a systemd unit and a
 socket unit. To use PostgreSQL:

@@ -40,6 +40,16 @@ git clone https://github.com/arif-rachim/renox && cd renox
 cargo test --workspace
 ```
 
+To try a change to the framework or the generators in a real app, make the app against your
+checkout with `rnx new --renox-path DIR`: its `Cargo.toml` then uses the checkout's
+`crates/renox` as a path dependency, so it sees your changes without a commit. Make it outside
+the checkout (an app inside it would land in the workspace):
+
+```bash
+cargo build -p renox-cli                                  # in the checkout
+cd .. && renox/target/debug/rnx new demo --renox-path renox
+```
+
 [CLAUDE.md](CLAUDE.md) describes the architecture, the conventions and the problems solved so
 far. Read it before changing anything large; it's written for human contributors as much as
 for coding agents.

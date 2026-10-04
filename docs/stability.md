@@ -54,6 +54,11 @@ Renox is three library crates: `renox`, `renox-core` and `renox-macros`.
 `renox-cli` (the `rnx` tool) has the same version too. The apps it makes depend on its own
 release of Renox.
 
+`renox-2fa` is an optional plugin crate: two-factor sign-in for apps that want it. It is released
+at the same version as `renox` and depends on it. You add it yourself, next to `renox`. It is
+still being built: it has its table, the codes and the QR code, but no account page or login
+step yet.
+
 ## The promise
 
 From 1.0.0, every 1.x release keeps these promises.
@@ -117,6 +122,8 @@ field for you.
   `FailedJob`, `audit::AuditLog`, the `auth::events` structs
 - `DatabaseNotification`, `AccessToken`, `NewToken`
 - `WebhookRequest`, `WebhookCall`, `JobContext`, `Htmx`, `Down`, `analytics::Event`
+- `auth::Can<T>` (use `Can::new`), `schedule::UpcomingRun`, `maintenance::DownOptions` (use
+  `DownOptions::new()` or `Default`)
 - `view::ViewContext`, `auth::Registration`, `auth::Recipient`, `mail::Attachment`
 - `Toast`, `ToastAction`, `auth::DatabaseMessage`, `auth::PendingLogin`, `chart::Series`,
   `report::ErrorReport`, `report::RequestReport`, `validation::FormContext`,
@@ -174,6 +181,8 @@ breaking anyone.
 - `db::ModelKey` is sealed too (`i64`, `Ulid`, `Uuid`, `String`). So new key types and new
   methods on it aren't breaking.
 - So is `RedirectExt` (only for axum's `Redirect`).
+- `db::Executor` is sealed: only `&Db` and `&mut Transaction`.
+- `db::relations::ForeignKey` is sealed: only a key type or an `Option` of one.
 
 ### Why `Dialect` isn't on the list
 
@@ -191,12 +200,12 @@ That way `renox = "1"` never breaks your code because of a dependency.
 | `axum` (0.8) | Handlers and extractors (`Query`, `Form`, `Json`, `State`), `Routes::route(MethodRouter)`, `From<axum::Router>`, `Kernel::router()`, re-exported as `renox::axum`. The prelude's `Path` is Renox's own `renox::Path` (a 404 when a value doesn't parse) |
 | `clap` (4) | `command::AppCommand` (a `clap::Parser`), re-exported as `renox::clap` |
 | `anyhow` (1) | `Error::Internal`, `Error::permanent`, re-exported as `renox::anyhow` |
-| `tower` / `tower-http` (0.5 / 0.7) | `Routes::route_layer(L)`, `Routes::cors_layer(CorsLayer)` (`renox::cors`) |
+| `tower` / `tower-http` (0.5 / 0.7) | `App::layer(L)`, `Routes::route_layer(L)`, `Routes::cors_layer(CorsLayer)` (`renox::cors`) |
 | `minijinja` (2) | `context!`, template values, `App::templates` / `Registry::templates` (a `minijinja::Environment`), re-exported as `renox::minijinja` |
 | `tokio` (1), `serde` (1), `serde_json` (1), `chrono` (0.4) | Re-exported and used throughout |
 | `bytes` (1) | `Bytes` in `Storage::put`/`get`, `Upload::bytes`, `WebhookRequest::body`, `Download::bytes` (as `axum::body::Bytes`) |
 | `http` (1) | `HeaderMap`, `Method`, `StatusCode` in `FormContext`, `WebhookRequest`, `TestResponse` (as `axum::http`) |
-| `fake` (5) | `Factory` definitions, re-exported as `renox::fake` |
+| `fake` (5) | `Factory` definitions, re-exported as `renox::fake` (the `fake` feature, on by default) |
 | `uuid` (1) | `Uuid` model keys and fields, re-exported as `renox::uuid` (the `uuid` feature) |
 
 "Re-exported as `renox::axum`" means you can reach that crate through Renox, without adding it

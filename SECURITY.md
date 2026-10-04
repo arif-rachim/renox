@@ -21,13 +21,14 @@ release on crates.io) gets security fixes. From 1.0, the latest minor release of
 current major version does, and so does the minor release before it for six months after
 its successor ships (see [docs/stability.md](docs/stability.md)).
 
-Apps made by `rnx new` are pinned to a Renox commit. To get a fix, move that pin (or the
-version) forward and run `cargo update -p renox`.
+Apps made by `rnx new` depend on a Renox version (or, for an `rnx` built from Git, a
+commit). To get a fix, move that version (or the commit pin) forward and run
+`cargo update -p renox`.
 
 ## What's in scope
 
-Anything in this repository: the `renox`, `renox-core`, `renox-macros` and `renox-cli`
-crates, the templates and assets they ship, the files `rnx new` and `rnx make:*` write
+Anything in this repository: the `renox`, `renox-core`, `renox-macros`, `renox-cli` and
+`renox-2fa` crates, the templates and assets they ship, the files `rnx new` and `rnx make:*` write
 (Dockerfile, systemd unit, …), and the examples when they show a pattern apps would copy.
 
 Problems in a dependency (axum, sqlx, rustls, …) should go to that project. If Renox uses
