@@ -10,6 +10,63 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **Fixed (#127):** `rnx make:model --migration` named the table after the model in the
+  singular (`WaitlistSignup` → `waitlist_signup`), unlike `--resource`, the docs and the
+  examples. `make:model` now writes the plural (`waitlist_signups`, `categories`) in both
+  `#[model(table = …)]` and the migration. `make:module <name> --resource --model <Model>`
+  names the table after the model as well (`news --model Article` → `articles`, it was
+  `news`); with the usual plural module (`products`) nothing changes. `rnx make:migration
+  create_x_table` keeps the name it is given.
+
+## 1.0.0-rc.2 · 2026-10-04
+
+The second release candidate: the same API as rc.1, with `rnx` fixed so a new app passes
+`cargo fmt --check` (#124). Install it with `cargo install renox-cli --version 1.0.0-rc.2`;
+an app made by rc.1 moves over by changing `renox = "1.0.0-rc.1"` to `"1.0.0-rc.2"`.
+
+- **Fixed (#124):** a new app failed `cargo fmt --check` before anyone wrote a line: the
+  starter kit's `tests/home.rs` sorted its imports for names before `renox` only
+  (`renoxium` failed, `desk` passed), the plain app's `tests/home.rs` had two chains over
+  rustfmt's width, and almost every `rnx make:*` generator wrote or edited files rustfmt
+  would change (where a `mod` line or `.module(…)` lands depends on the name). `rnx new` and
+  every `rnx make:*` now put the Rust files they wrote or edited through rustfmt (each file
+  on its own, so the rest of the app is left alone; the app's `rustfmt.toml` applies;
+  nothing happens without rustfmt), and both stubs are formatted as they are.
+- README: install from crates.io, the first steps after `rnx new`, and how to use Renox with
+  Claude Code or another coding agent (the `AGENTS.md`/`CLAUDE.md` every new app has, and a
+  snippet for other projects). The crates.io and docs.rs badges.
+- The docs site: search results styled as the list they are; an empty favicon (no 404 in
+  the console).
+
+## 1.0.0-rc.1 · 2026-10-03
+
+The first release on crates.io, a release candidate for 1.0.0: `renox`, `renox-core`,
+`renox-macros` and `renox-cli`, all at this version. Everything below, from M0 to the v1.0
+steps, is in it. Try it with `cargo install renox-cli --version 1.0.0-rc.1`; apps made by
+that `rnx new` depend on `renox = "1.0.0-rc.1"` (Cargo picks a pre-release only when asked).
+If nothing turns up, the same code becomes 1.0.0, and the semver promise
+([docs/stability.md](docs/stability.md)) starts there.
+
+- `rnx new` from crates.io writes a pre-release version whole (`"1.0.0-rc.1"`, not `"1.0"`,
+  which would never pick it).
+
+### v1.0 · The starter kit and the semver promise (V1e)
+
+- **`rnx new <name> --starter`:** the starter kit (Breeze and Jetstream as the yardstick),
+  written over the plain app: the kit's sidebar layout with the notification bell; `Auth`
+  with email verification, the account pages and notifications, landing on `/dashboard`;
+  roles (`admin`, `member`) with the `Permissions` module, every sign-up a member; a dashboard
+  (sign-ups over a period, a chart, the person's recent activity); a users page where admins
+  change roles (recorded in the activity log); the activity log page (`Audit`, a grid with
+  exports); a `users:admin <email>` command for the first admin; a seeder; seven tests.
+  Works with `--database postgres` and `--tailwind`.
+- **docs/stability.md** states the 1.x promise: code keeps compiling (checked by
+  cargo-semver-checks), deprecation before removal in 2.0, data and sessions survive
+  upgrades, jobs queued by one 1.x release run on later ones, settings keep their names and
+  defaults, security fixes for the previous minor release for six months (SECURITY.md too),
+  the MSRV rises only to a Rust release six months old, generated files are the app's.
+- `tests/cli/run.sh` makes, lints and tests a starter app (CI's `cli` job).
+
 ### v1.0 · The documentation site, the tutorial and the Laravel guide (V1d)
 
 - **`site/`** (package `renox-site`, not published): the documentation site, a Renox app on

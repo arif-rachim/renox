@@ -71,7 +71,9 @@ stash/
 ```
 
 The database is SQLite, in `storage/app.db`, made on first use. Pass `--database postgres` to
-`rnx new` to start on PostgreSQL instead ([postgresql.md](postgresql.md)).
+`rnx new` to start on PostgreSQL instead ([postgresql.md](postgresql.md)). This tutorial
+builds from the plain app; `rnx new stash --starter` would start from the starter kit instead
+(email verification, roles, a dashboard, a users page and the activity log, already written).
 
 Two files are worth reading now. `src/main.rs` is one line:
 
@@ -122,18 +124,18 @@ hold everything about bookmarks, then the model in it:
 
 ```bash
 rnx make:module bookmarks
-rnx make:model Bookmark --module bookmarks
-rnx make:migration create_bookmarks_table
+rnx make:model Bookmark --module bookmarks --migration
 ```
 
 `make:module` wrote `src/app/bookmarks/mod.rs` with a placeholder page and registered the
-module in `src/lib.rs`. `make:model` wrote `src/app/bookmarks/model.rs`, and `make:migration`
-wrote a pair of files in `migrations/`, named after the current time.
+module in `src/lib.rs`. `make:model` wrote `src/app/bookmarks/model.rs`, and `--migration`
+added a pair of files in `migrations/`, named after the current time:
+`…_create_bookmarks_table.up.sql` and `.down.sql`.
 
-`make:model Bookmark -m` makes the migration too, but it names the table `bookmark`: Renox
-never pluralises names (not every language makes plurals with an "s"), so a table is called
-what its model is called unless you say otherwise. This tutorial uses the plural, which is
-why the migration was made separately.
+The generators name a model's table with its plural (`Bookmark` → `bookmarks`,
+`Category` → `categories`) and write it down in the model (`#[model(table = "bookmarks")]`).
+The derive itself never guesses a plural: a struct without `#[model(table = …)]` maps to its
+snake-case name.
 
 ### The migration
 

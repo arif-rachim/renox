@@ -51,19 +51,19 @@ fi
 
 step "every generator"
 "$RNX" make:module catalog
-"$RNX" make:model Product --module catalog --migration
+"$RNX" make:model Book --module catalog --migration
 "$RNX" make:module stock_movement
 "$RNX" make:model StockMovement -m
 "$RNX" make:model Invoice --module catalog --key ulid -m
 "$RNX" make:model Supplier --module catalog --key string -m
 "$RNX" make:job SendReceipt --module catalog
 "$RNX" make:command catalog:import --module catalog
-"$RNX" make:policy Product --module catalog
+"$RNX" make:policy Book --module catalog
 "$RNX" make:mail order_shipped
 "$RNX" make:migration add_sku_to_products
 "$RNX" make:module products --resource --fields "name:string price:money notes:text active:bool due_on:date"
 "$RNX" make:module tags --resource
-"$RNX" make:factory Product --module catalog
+"$RNX" make:factory Book --module catalog
 "$RNX" make:seeder DemoData
 "$RNX" make:test Checkout
 "$RNX" make:notification OrderShipped --module catalog
@@ -79,6 +79,9 @@ mv .env "$WORK/env.bak"
 grep -q '^APP_KEY=base64:' .env
 grep -q '^DATABASE_URL=' .env # the rest comes from .env.example
 cp "$WORK/env.bak" .env
+
+step "cargo fmt --check (what rnx new and every generator wrote)"
+cargo fmt --check
 
 step "cargo build and test"
 cargo build --all-targets
@@ -146,6 +149,25 @@ if [ "$DATABASE" = sqlite ]; then
     "$RNX" tailwind --minify
     grep -q 'text-emerald-700' public/css/app.css
     cargo test
+fi
+
+step "rnx new studio --starter --database $DATABASE (a name after \"renox\": #124)"
+cd "$WORK"
+if [ -n "${FROM_GIT:-}" ]; then
+    "$RNX" new studio --starter --database "$DATABASE"
+else
+    "$RNX" new studio --starter --database "$DATABASE" --renox-path "$REPO"
+fi
+cd studio
+test -f src/app/users/mod.rs
+grep -q '.module(Permissions)' src/lib.rs
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+if [ "$DATABASE" = sqlite ]; then
+    cargo test
+    cargo run --quiet -- migrate
+    cargo run --quiet -- db:seed
+    cargo run --quiet -- users:admin member@example.com
 fi
 
 echo

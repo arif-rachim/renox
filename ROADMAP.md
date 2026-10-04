@@ -1590,9 +1590,23 @@ Started by the owner on 2026-10-03, after M34. In steps, one PR each:
       docs/tutorial.md (Stash, a bookmarks app, `rnx new` to deploy) and docs/laravel.md,
       both compiled as doctests (`TutorialGuide`, `LaravelGuide`). The API reference is
       docs.rs, linked from the site once crates are published
-- [ ] A starter kit; the semver stability guarantee
+- [x] V1e, the starter kit: `rnx new --starter` (stubs/starter/: sidebar layout, email
+      verification, roles with `Permissions`, dashboard, users page, activity log,
+      `users:admin`, seeder, tests; in tests/cli/run.sh), and the semver promise in
+      docs/stability.md ("The promise": deprecation policy, data compatibility across 1.x,
+      support window for the previous minor, MSRV rule) with SECURITY.md's supported versions
+- [x] `1.0.0-rc.1`: the version set and the changelog dated (#122), published on
+      2026-10-03 after the owner confirmed, tag `v1.0.0-rc.1`; checked: docs.rs built,
+      `cargo install renox-cli --version 1.0.0-rc.1`, `rnx new` (plain and `--starter`) pass
+      their tests against the published crates
+- [x] The README's quick start from crates.io and its "Use Renox with Claude Code" section
+- [ ] The docs site online on the owner's server, at Renox's own domain (GitHub Pages was
+      tried and dropped: the account maps project sites to a personal domain)
+- [ ] `1.0.0-rc.2`: `rnx` formats what it writes (#124, #125); the version and changelog
+      (branch `release-1.0.0-rc.2`), published once the owner confirms
+- [ ] 1.0.0
 - [ ] Real crates published to crates.io (`renox`, `renox-core`, `renox-macros`, `renox-cli`;
-      only 0.0.1 placeholders exist; the owner runs `cargo login` and RELEASING.md), then
+      only 0.0.1 placeholders exist before the release candidate; the owner runs `cargo login` and RELEASING.md), then
       crates.io/docs.rs badges and `cargo install renox-cli` in the README
 
 ### UI kit · Form fields next to Filament's forms

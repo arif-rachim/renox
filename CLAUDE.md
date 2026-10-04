@@ -213,6 +213,8 @@ crates/renox-cli/          `rnx`: main.rs (key:generate, forwarding), new.rs, se
                            standalone CLI: download via curl + SHA-256 check, build/watch; used by
                            new --tailwind, serve, build)
   build.rs                 sets RENOX_GIT_REV (the commit `rnx new` pins apps to)
+  stubs/starter/           `rnx new --starter`: the starter kit's files, written over the
+                           stubs below (same path) or next to them (`STARTER` in new.rs)
   stubs/                   the files `rnx new` writes (Cargo.toml.stub, env.stub, build.rs, src/,
                            resources/, migrations/, tests/, AGENTS.md.stub + CLAUDE.md.stub: the
                            new app's agent guide, named .stub so agents in this repo don't load
@@ -253,7 +255,9 @@ site/                      the documentation site (package `renox-site`, publish
                            pages, src/render.rs: pulldown-cmark, anchors, TOC, hidden doctest
                            lines, links → /docs/{slug} or GitHub), search, sitemap, ETags;
                            deploy/ has its systemd units. A new guide in docs/ needs a line in
-                           content.rs PAGES (and site/build.rs already watches docs/)
+                           content.rs PAGES (and site/build.rs already watches docs/).
+                           The owner hosts it on their own server (not GitHub Pages: the
+                           account's user site maps project sites to a personal domain)
 tests/chaos/               app + run.sh (postgres|sqlite) that the `chaos` CI job injects faults
                            into (docker pause/stop/restart, python3 holding SQLite's lock)
 tests/cli/run.sh           `rnx new` + every `make:*`, then build and test the app (CI `cli`/`docker`)
@@ -371,7 +375,9 @@ plain `from_fn` middlewares with no state parameter and can be added from `Modul
   apps don't need sqlx directly. The primary key column is always `id`; its type is the key
   (`Model::Key`, sealed `ModelKey`: `i64`, `Ulid`, `Uuid`, `String`, M22); an empty key (`0`,
   nil, `""`) = unsaved, ULIDs/UUID v7s are made on insert. Table name =
-  snake_case struct name (no pluralisation: not every language plurals with "s"). The query
+  snake_case struct name (no pluralisation in the derive: not every language plurals with
+  "s"); the generators write the plural explicitly (`make:model`, `--resource`: the model's
+  name through `scaffold::plural`, #127), as the docs and examples have it. The query
   builder validates column names against `COLUMNS` and operators against a whitelist, so SQL
   injection via names is an error.
 - **Relations are explicit loaders, no lazy relations** (`db::relations`: `belongs_to`,
@@ -617,6 +623,12 @@ PostgreSQL suite 2.5x slower (reconnects).
   (`FROM_GIT=1 DOCKER=1` for the Docker job). **Add every new `make:*` there.**
   With sqlite it also makes `rnx new site --tailwind` (downloads the pinned Tailwind CLI with
   `curl`, so it needs the network) and runs `rnx tailwind --minify` and the app's tests.
+- Every `.rs` file a command writes or edits goes through `format::touched` (in
+  `write_new` and the in-place edits of generate.rs, and `rnx new`'s stubs); `main` runs
+  rustfmt on them at the end, one file at a time through stdin (with a path, rustfmt
+  follows `mod` lines into the rest of the crate). New apps and generator output must pass
+  `cargo fmt --check`: tests/cli/run.sh checks it, and new.rs has a test with names on both
+  sides of `renox` (#124). A new place that writes Rust files must call `touched`.
 - `rnx new` pins `rev` from `renox-cli/build.rs` (`git rev-parse HEAD`, else the cargo checkout
   directory's short rev). Testing it through `cargo install --git` needs the change committed,
   since that builds the committed tree.
@@ -624,8 +636,10 @@ PostgreSQL suite 2.5x slower (reconnects).
 ### 4.10 Docs and examples for app authors and agents
 - `README.md` is compiled (`ReadMe`): keep its Rust blocks complete. It's the front page, so it
   sells: tagline, why, GIF, 3-line quick start, a short taste, fold-out feature tour, comparison
-  with Loco/Axum, then status. Keep claims true (checked against the code) and keep the
-  crates.io/docs.rs badges out until real crates are published (install stays `--git`).
+  with Loco/Axum, then status. Keep claims true (checked against the code). Since
+  1.0.0-rc.1 it has the crates.io/docs.rs badges, installs from crates.io (`--version` while
+  1.0 is a release candidate) and has a "Use Renox with Claude Code" section. Its docs links
+  are repository files until the docs site has its own address; then point them there.
 - `CHEATSHEET.md` is compiled: every ```rust block must build on its own (visible `use` lines, no
   `# ` hidden lines since GitHub shows them; define items only, no top-level statements, so the
   doctest's `main` does nothing). Check with `cargo test --doc -p renox`.
@@ -1073,8 +1087,19 @@ picks the build, not the terminal.
   every closure, seeders get `AppState`, `disk_named`, builder-only `Factory`, `DateTime`
   timestamps, opaque `Zone`, sealed `Viewer`/`Executor`/`ForeignKey`, `DownOptions`,
   `retry`/`retry_all`, secrets hidden from `Debug`): merged (#118). V1d (the docs site `site/`, docs/tutorial.md,
-  docs/laravel.md; the owner hosts it on their own server): merged (#120). Next a
-  starter kit and the publish, which the owner runs (`cargo login`, RELEASING.md).
+  docs/laravel.md; the owner hosts it on their own server): merged (#120). V1e
+  (`rnx new --starter`, the 1.x promise in docs/stability.md): merged (#121). Then the release
+  candidate `1.0.0-rc.1`: merged (#122), published to crates.io on 2026-10-03 with the
+  owner's `cargo login` token after the owner confirmed (tag `v1.0.0-rc.1`; docs.rs built,
+  `cargo install renox-cli --version 1.0.0-rc.1` + `rnx new` checked). Then the README's
+  start and coding-agent sections: merged (#123). GitHub Pages was tried and dropped
+  (the owner's account serves project sites on a personal domain): the docs site runs on the
+  owner's own server, built with Renox, once they have a domain (renox.rs was free on
+  2026-10-03; renox.dev is taken).
+  Then #124 (new apps failed `cargo fmt --check`): `rnx` formats what it writes, merged
+  (#125); GitHub Pages switched off (2026-10-04). Release candidate `1.0.0-rc.2` with that
+  fix: branch `release-1.0.0-rc.2`. Left: 1.0.0 when the owner is happy with the rc (ask
+  before every `cargo publish`).
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). 

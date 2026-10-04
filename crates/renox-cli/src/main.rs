@@ -1,6 +1,7 @@
 //! `rnx`: the command-line tool for the Renox web framework.
 
 mod deploy;
+mod format;
 mod generate;
 mod make;
 mod new;
@@ -42,6 +43,10 @@ enum Command {
         /// Style pages with Tailwind CSS (its standalone CLI, no Node) next to the UI kit.
         #[arg(long)]
         tailwind: bool,
+        /// The starter kit: email verification, roles, a dashboard, the users
+        /// page and the activity log in a sidebar layout.
+        #[arg(long)]
+        starter: bool,
     },
     /// Run the app, rebuilding and restarting it when source files change.
     Serve {
@@ -226,13 +231,31 @@ enum Command {
 }
 
 fn main() -> Result<()> {
-    match Cli::parse().command {
+    let result = run(Cli::parse().command);
+    // The Rust files the command wrote, in rustfmt's style (format.rs).
+    if result.is_ok() {
+        format::format_touched();
+    }
+    result
+}
+
+fn run(command: Command) -> Result<()> {
+    match command {
         Command::New {
             name,
             renox_path,
             database,
             tailwind,
-        } => new::run(&name, renox_path.as_deref(), database, tailwind),
+            starter,
+        } => new::run(
+            &name,
+            renox_path.as_deref(),
+            new::Options {
+                database,
+                tailwind,
+                starter,
+            },
+        ),
         Command::Tailwind { watch, minify } => tailwind::run(&app_root()?, watch, minify),
         Command::TailwindInstall => {
             println!("{}", tailwind::binary()?.display());
@@ -455,7 +478,15 @@ mod tests {
     fn commands_parse_with_their_options() {
         assert!(matches!(
             parse(&["new", "shop", "--database", "postgres", "--tailwind"]),
-            Command::New { name, database: Database::Postgres, tailwind: true, renox_path: None } if name == "shop"
+            Command::New { name, database: Database::Postgres, tailwind: true, renox_path: None, starter: false } if name == "shop"
+        ));
+        assert!(matches!(
+            parse(&["new", "shop", "--starter"]),
+            Command::New {
+                starter: true,
+                tailwind: false,
+                ..
+            }
         ));
         assert!(matches!(
             parse(&["make:model", "Order", "-m", "--key", "ulid"]),

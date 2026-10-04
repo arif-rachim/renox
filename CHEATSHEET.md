@@ -8,6 +8,7 @@ date. For whole apps, see [`examples/`](examples) (the list is in [llms.txt](llm
 
 ```bash
 rnx new shop                         # or: --database postgres, --tailwind (Tailwind CSS, no Node)
+rnx new desk --starter               # the starter kit: verification, roles, dashboard, users, activity log
 rnx key:generate                     # APP_KEY into .env (made from .env.example if missing); --show only prints it
 rnx serve                            # run, rebuild and reload on changes
 rnx make:module products             # routes + view, registered in src/lib.rs

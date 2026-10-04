@@ -2,11 +2,15 @@
 
 **Laravel's productivity, Rust's performance, one binary to deploy.**
 
-[![CI](https://github.com/arif-rachim/renox/actions/workflows/ci.yml/badge.svg)](https://github.com/arif-rachim/renox/actions/workflows/ci.yml) [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license) [![Status: pre-1.0](https://img.shields.io/badge/status-pre--1.0-orange.svg)](ROADMAP.md) ![Rust: 1.94 or later](https://img.shields.io/badge/rust-1.94%2B-dea584.svg)
+[![CI](https://github.com/arif-rachim/renox/actions/workflows/ci.yml/badge.svg)](https://github.com/arif-rachim/renox/actions/workflows/ci.yml) [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license) [![crates.io](https://img.shields.io/crates/v/renox.svg?include_prereleases)](https://crates.io/crates/renox) [![docs.rs](https://docs.rs/renox/badge.svg)](https://docs.rs/renox) ![Rust: 1.94 or later](https://img.shields.io/badge/rust-1.94%2B-dea584.svg)
 
 Renox is a batteries-included web framework for Rust: Axum underneath, HTMX and Alpine.js in the
 browser, SQLite (or PostgreSQL) for data. Everything a typical app needs comes in one `renox`
 dependency.
+
+**Start with [the tutorial](docs/tutorial.md)**, or [coming from Laravel](docs/laravel.md);
+every guide is listed under [Documentation](#documentation). API reference:
+[docs.rs/renox](https://docs.rs/renox).
 
 ## Why Renox
 
@@ -27,23 +31,119 @@ dependency.
 
 ## Quick start
 
-You need Rust 1.94 or later.
+You need Rust 1.94 or later ([rustup](https://rustup.rs) installs it) and a C compiler (for
+SQLite; on Linux `build-essential` or your distribution's equivalent, on macOS
+`xcode-select --install`).
 
 ```bash
-cargo install --locked --git https://github.com/arif-rachim/renox renox-cli   # installs `rnx`
-rnx new blog && cd blog                                             # or: --database postgres, --tailwind
-rnx serve                                                           # http://127.0.0.1:3000
+cargo install renox-cli --version 1.0.0-rc.2   # installs `rnx`, Renox's command-line tool
+rnx new blog && cd blog                        # or: --starter, --database postgres, --tailwind
+rnx serve                                      # http://127.0.0.1:3000
 ```
+
+`--version` is needed while 1.0 is a release candidate (Cargo only picks a pre-release when
+asked). For the latest `main` instead: `cargo install --locked --git
+https://github.com/arif-rachim/renox renox-cli`.
+
+Then, in the app:
+
+1. Open <http://127.0.0.1:3000>, register an account, and you are logged in.
+2. Make a whole page with a form, a list, validation and tests:
+   `rnx make:module posts --resource --fields "title:string body:text published:bool"`.
+   `rnx serve` rebuilds and restarts by itself, and the browser reloads when a view changes.
+3. Run the tests with `cargo test`, and see every command with `rnx --help` (Renox's own
+   commands: `rnx help`).
+4. Follow [the tutorial](docs/tutorial.md) for the rest:
+   models, htmx forms, policies, a scheduled mail, tests and deploying.
 
 The new app has a layout built with the UI kit (navigation bar, account menu, toasts), a home
 page, login and registration, an account page (profile, password, other devices), an error page
-in the layout, its texts in `resources/lang/en.json`, a test in `tests/home.rs`, and an `AGENTS.md` for
-coding agents. With `--database postgres`, create the
-`blog` and `blog_test` databases first (or edit `.env`).
+in the layout, its texts in `resources/lang/en.json`, a test in `tests/home.rs`, and an
+`AGENTS.md` and a `CLAUDE.md` for coding agents. `rnx new blog --starter` writes the starter kit
+on top: a sidebar layout with the notification bell, email verification, roles, a dashboard, a
+users page for admins and the activity log, with their tests. With `--database postgres`,
+create the `blog` and `blog_test` databases first (or edit `.env`).
 
-`rnx serve` rebuilds and restarts on Rust changes, and the browser reloads itself when a view
-changes. The first build compiles every dependency and takes a few minutes; see
+The first build compiles every dependency and takes a few minutes; see
 [docs/development.md](docs/development.md) for faster builds.
+
+## Use Renox with Claude Code (or another coding agent)
+
+Renox is written to be easy for coding agents: one way to do each thing, generators for the
+boilerplate, and docs that are compiled in CI so they match the code.
+
+**In an app made by `rnx new`, there is nothing to set up.** The app has an `AGENTS.md` (read by
+Codex, Cursor, Copilot, Gemini CLI and others) and a `CLAUDE.md` that imports it (read by Claude
+Code). They tell the agent which `rnx make:*` generators to use, where the cheat sheet, guides
+and examples of *the Renox version the app uses* are, the app's layout, and the traps agents
+have hit. Start the agent in the app's folder:
+
+```bash
+cd blog
+claude      # or your agent of choice
+```
+
+and ask for what you want, for example:
+
+> Add products with a name, a price and a photo: a list with search and pagination, a form
+> that validates, only admins may edit. Use the generators, then write tests and run
+> `cargo test`.
+
+**In another project, or when the agent doesn't know Renox yet,** point it at the docs. Put
+this in the project's `CLAUDE.md` (or `AGENTS.md`):
+
+```markdown
+This app uses Renox, a Laravel-like Rust web framework (https://github.com/arif-rachim/renox).
+Before writing Renox code, read
+https://raw.githubusercontent.com/arif-rachim/renox/main/llms.txt: it maps every topic to the
+guide or example that shows the official way (its links are paths in that repository).
+Prefer `rnx make:*` generators, `use renox::prelude::*`, and the UI kit (`renox/ui.html`) for
+pages. Run `cargo test` after changes.
+```
+
+**Claude Code, set up once per app** (optional, both make it faster):
+
+1. Give it Renox's docs and examples on disk, at the version your app uses, so it reads them
+   instead of fetching or guessing:
+
+   ```bash
+   git clone --depth 1 --branch v1.0.0-rc.2 https://github.com/arif-rachim/renox ~/src/renox
+   claude --add-dir ~/src/renox     # or, inside a session: /add-dir ~/src/renox
+   ```
+
+2. Let it build, test and run the generators without asking each time, in the app's
+   `.claude/settings.json` (commit it, so the whole team gets it):
+
+   ```json
+   {
+     "permissions": {
+       "allow": [
+         "Bash(cargo build:*)",
+         "Bash(cargo check:*)",
+         "Bash(cargo clippy:*)",
+         "Bash(cargo test:*)",
+         "Bash(cargo fmt:*)",
+         "Bash(rnx make:module:*)",
+         "Bash(rnx make:model:*)",
+         "Bash(rnx make:migration:*)",
+         "Bash(rnx migrate)",
+         "Bash(rnx migrate:status)"
+       ]
+     }
+   }
+   ```
+
+   `name:*` allows every command that starts with `name`, so `rnx migrate` is listed exactly:
+   commands that drop data or reach the outside world (`rnx migrate:fresh`, `rnx db:seed`,
+   deploys) are better left to ask.
+
+Tips:
+- [llms.txt](llms.txt) and the [cheat sheet](CHEATSHEET.md) are the cheapest way in:
+  short, and every Rust example in them compiles.
+- Renox's source is on disk after the first build (`~/.cargo/registry/src/*/renox-core-*/`), so
+  an agent can read the real code instead of guessing.
+- Ask for tests with every change: `renox::testing::TestApp` drives the app without a server,
+  so `cargo test` checks pages, forms, mail and jobs in seconds.
 
 ## A taste
 
@@ -333,7 +433,8 @@ Sentry or a chat channel. Error pages use the app's layout. While developing,
 - [CHEATSHEET.md](CHEATSHEET.md) has every common pattern in a few lines, and it's compiled in CI,
   so it can't go stale.
 - [llms.txt](llms.txt) maps each topic to the one example file that shows it.
-- Apps made by `rnx new` include an `AGENTS.md` that tells an assistant how the project works.
+- Apps made by `rnx new` include an `AGENTS.md` (and a `CLAUDE.md` importing it) that tells an
+  assistant how the project works; see [Use Renox with Claude Code](#use-renox-with-claude-code-or-another-coding-agent).
 </details>
 
 ## How it compares
@@ -422,7 +523,8 @@ out of the box.
 | Gates and policies | `App::gate`, `impl Policy`, `user.authorize(…)`, `.require_gate(…)` |
 | spatie/laravel-permission | the `Permissions` module: `assign_role`, `has_permission`, `.require_role(…)` |
 | Global scopes (tenancy) | `#[model(default_scope = "…")]` with `renox::context` |
-| Breeze / Sanctum | `Auth::new().account()` (pages included) / API tokens with abilities (`create_token_with`, `.require_ability(…)`) |
+| Breeze / Jetstream | `rnx new --starter`: email verification, roles, a dashboard, the users page and the activity log; or `Auth::new().account()` alone |
+| Sanctum | API tokens with abilities (`create_token_with`, `.require_ability(…)`) |
 | `Cache::lock` | `state.cache.lock(name, ttl)` |
 | Queues, mail, notifications, scheduler | `impl Job`, `mail_view`, `impl Notification`, `app.schedule()` |
 | Horizon | the queue dashboard: `.module(renox::queue::Dashboard)` |
@@ -441,6 +543,9 @@ Not planned: runtime-reflected Eloquent-style models, Redis, and a REPL.
 
 ## Documentation
 
+The files below are also a documentation site with search, built with Renox itself
+([`site/`](site)); it will be online at Renox's own address.
+
 - [The tutorial](docs/tutorial.md): build one app from `rnx new` to a server, step by step.
 - [Coming from Laravel](docs/laravel.md): each Laravel concept and its Renox counterpart.
 - [CHEATSHEET.md](CHEATSHEET.md): one short, compiled example per task.
@@ -452,11 +557,14 @@ Not planned: runtime-reflected Eloquent-style models, Redis, and a REPL.
   [PostgreSQL](docs/postgresql.md), [production](docs/operations.md),
   [faster builds](docs/development.md), [stability and versions](docs/stability.md).
 - [llms.txt](llms.txt): a map of the docs and examples for coding agents.
+- The API reference: [docs.rs/renox](https://docs.rs/renox).
 - [ROADMAP.md](ROADMAP.md) and [CHANGELOG.md](CHANGELOG.md).
 
 ## Status
 
-Renox is **pre-1.0**. The [Laravel parity review](docs/audit/2026-10-laravel-parity.md)
+Renox **1.0.0-rc.2**, the release candidate for 1.0, is on crates.io (`renox`,
+`renox-core`, `renox-macros`, `renox-cli`). If nothing turns up, the same code becomes 1.0.0,
+and from there Renox follows semver ([docs/stability.md](docs/stability.md)). The [Laravel parity review](docs/audit/2026-10-laravel-parity.md)
 compares it with Laravel and Filament feature by feature, as of October 2026. Since the first
 review (after M17), milestones M18–M32 closed its gaps:
 
@@ -481,15 +589,13 @@ review (after M17), milestones M18–M32 closed its gaps:
 - **M34:** the rest of the review's small additions: `current_password`, the breach check,
   session `keep`/`flash_now`, named error bags, several mailers with failover, `has_many_through`.
 
-Next is 1.0: the API is audited, semver is checked in CI, and the documentation site
-([`site/`](site), with the tutorial and the Laravel guide) is written; what's left is the
-first real release on crates.io (today's crates there are placeholders, so install from Git
-as above). Until then the API may still change; breaking changes are listed in
-[CHANGELOG.md](CHANGELOG.md).
+Then v1.0: the API audit and its fixes, semver checks in CI, the documentation site with the
+tutorial and the Laravel guide, the starter kit (`rnx new --starter`) and the 1.x promise.
+Breaking changes up to the release candidate are listed in [CHANGELOG.md](CHANGELOG.md).
 
-`rnx new` pins your app to the Renox commit your `rnx` was built from
-(`renox = { git = …, rev = "…" }`). To upgrade, reinstall `rnx` or move the `rev`, then read the
-changelog.
+An app made by `rnx` from crates.io depends on that release (`renox = { version = "…" }`); to
+upgrade, raise the version and read the changelog. An `rnx` installed from Git pins its apps
+to the commit it was built from (`renox = { git = …, rev = "…" }`) instead.
 
 Every change is tested in CI on Linux, macOS and Windows, on SQLite and PostgreSQL, against a
 real S3 server, with a chaos test, the minimum Rust version, every Cargo feature on its own, and

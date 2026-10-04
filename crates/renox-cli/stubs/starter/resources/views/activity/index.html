@@ -1,0 +1,9 @@
+{% extends "layouts/app.html" %}
+{% from "renox/grid.html" import grid %}
+{% from "renox/ui.html" import page_header %}
+
+{% block seo %}{{ seo(title="Activity") }}{% endblock %}
+{% block content %}
+{{ page_header("Activity", subtitle="Logins, account changes and role changes.") }}
+{{ grid(activity) }}
+{% endblock %}

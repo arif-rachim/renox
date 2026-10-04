@@ -1,0 +1,37 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, stats, stat, dashboard, widget, period_filter, empty, list %}
+
+{% block seo %}{{ seo(title="Dashboard") }}{% endblock %}
+{% block content %}
+{{ page_header("Dashboard", subtitle="Welcome back, " ~ auth.user.name ~ ".") }}
+<div class="rx-row">
+  {#- One period for the figures and the chart (`?period=`). -#}
+  {{ period_filter(period) }}
+</div>
+
+{% call stats(3) %}
+  {{ stat("New sign-ups", signups_total | number, delta=signups_change, trend=signups.values) }}
+  {{ stat("Users", users | number, url=route('users.index') if can('users.manage') else none) }}
+  {{ stat("Unread notifications", unread | number, url=route('notifications.index')) }}
+{% endcall %}
+
+{% call dashboard(2) %}
+  {% call widget("Sign-ups", description="New accounts per day in this period") %}
+    {{ chart("bar", signups, name="Sign-ups", title="Sign-ups", height=180) }}
+  {% endcall %}
+  {% call widget("Your recent activity") %}
+    {% if activity %}
+    {% call list(label="Your recent activity") %}
+      {% for entry in activity %}
+      <li><div class="rx-list__main">
+        <span>{{ entry.action }}</span>
+        <span class="rx-subtitle">{{ entry.created_at | since }}{% if entry.ip %} · {{ entry.ip }}{% endif %}</span>
+      </div></li>
+      {% endfor %}
+    {% endcall %}
+    {% else %}
+    {{ empty("Nothing yet", "Logins and account changes show up here.") }}
+    {% endif %}
+  {% endcall %}
+{% endcall %}
+{% endblock %}

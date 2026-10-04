@@ -12,6 +12,32 @@ version and pin each other exactly: the macros write code against renox-core's i
 same release. Depend on `renox` only; the other two follow it. `renox-cli` (`rnx`) has the
 same version and makes apps depend on its own release.
 
+## The promise
+
+From 1.0.0, for every 1.x release:
+
+- **Your code keeps compiling.** Public items aren't removed, renamed or changed in a breaking
+  way. CI runs [cargo-semver-checks] on every pull request; from 1.0 it compares with the
+  latest release on crates.io, so an accidental break fails the build before it ships.
+- **Deprecated first, removed only in 2.0.** An item that is replaced gets `#[deprecated]`
+  with a note naming its replacement, for at least one minor release, and stays until the next
+  major release.
+- **Your data keeps working.** Framework tables only change through new migrations (never an
+  edited one), so `migrate` after an upgrade is enough. Sessions, encrypted columns, signed URLs,
+  API tokens and password hashes made by one 1.x release are read by every later one, so an
+  upgrade logs nobody out. Jobs queued by one 1.x release run on later ones (a rolling deploy
+  can have both versions on one queue).
+- **Your settings keep their meaning.** A `.env` setting keeps its name and its default; a new
+  setting comes with a default that keeps the old behaviour.
+- **Fixes go to the latest minor release.** Security fixes also go to the minor release before
+  it for six months after its successor ships (see [SECURITY.md](../SECURITY.md)).
+
+A change that would break any of this waits for 2.0, and CHANGELOG.md lists it with a way to
+move over. Bug fixes are the exception: when Renox did something it documented it wouldn't
+(accepting an invalid value, say), a minor release may make it stop, and the changelog marks it.
+
+[cargo-semver-checks]: https://github.com/obi1kenobi/cargo-semver-checks
+
 ## What 1.x may add without a major release
 
 - **New fields on these structs.** Build them with their constructors, `Default` or
@@ -91,4 +117,7 @@ because of a dependency.
   `rnx make:component --ui` copies the kit into the app to freeze it.
 - The exact wording of built-in messages.
 - The minimum supported Rust version (MSRV), now Rust 1.94 (`rust-version` in `Cargo.toml`,
-  checked in CI): it may rise in a minor release, and CHANGELOG.md says so.
+  checked in CI): it may rise in a minor release, to a Rust release at least six months old,
+  and CHANGELOG.md says so.
+- What `rnx new` and the `rnx make:*` generators write. Generated files are yours: a newer
+  `rnx` may write them differently (the starter kit too), but never changes files you have.
