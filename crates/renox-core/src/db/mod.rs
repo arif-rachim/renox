@@ -224,6 +224,9 @@ async fn connect_sqlite(config: &Config, schema: SchemaEpoch) -> anyhow::Result<
             std::fs::create_dir_all(dir)
                 .with_context(|| format!("could not create {}", dir.display()))?;
         }
+        prepare_file(&options, config.database_acquire_timeout)
+            .await
+            .with_context(|| format!("could not open the database at `{url}`"))?;
     }
 
     // Each connection to `:memory:` is a separate database, so keep exactly one.
@@ -255,17 +258,60 @@ async fn connect_sqlite(config: &Config, schema: SchemaEpoch) -> anyhow::Result<
         // busy machine that can take longer than the 2 s above: try again until
         // the configured timeout has passed.
         let budget = config.database_acquire_timeout;
-        retry_pool_timeouts(budget, || pool.clone().connect_with(options.clone())).await
+        retry_while(budget, is_pool_timeout, || {
+            pool.clone().connect_with(options.clone())
+        })
+        .await
     } else {
-        pool.connect_with(options).await
+        // Another process opening or closing the same file can make SQLite
+        // answer "database is locked" at once (#163).
+        let budget = config.database_acquire_timeout;
+        retry_while(budget, is_busy, || {
+            pool.clone().connect_with(options.clone())
+        })
+        .await
     };
     pool.with_context(|| format!("could not open the database at `{url}`"))
 }
 
-/// Runs `open` again while it fails with a pool timeout and `budget` hasn't
-/// passed since the first try; any other result is returned as it is.
-async fn retry_pool_timeouts<T, F>(
+/// Opens a file database once before its pool does, so the file exists and is
+/// in WAL mode. Switching to WAL takes an exclusive lock, so processes opening
+/// a brand-new file together (`serve` and `route:list`, say) contend for it:
+/// SQLite answers some of them "database is locked" at once, and a wait in the
+/// busy handler could outlast the pool's acquire timeout (#163). Busy errors
+/// are retried until `budget` has passed; this one connection has no acquire
+/// deadline. Once the file is in WAL mode, the pool's connections don't need
+/// the exclusive lock.
+async fn prepare_file(options: &SqliteConnectOptions, budget: Duration) -> Result<(), sqlx::Error> {
+    use sqlx::{ConnectOptions, Connection};
+
+    let conn = retry_while(budget, is_busy, || options.connect()).await?;
+    conn.close().await
+}
+
+/// Whether SQLite answered `SQLITE_BUSY` or `SQLITE_LOCKED` (or one of their
+/// extended codes).
+fn is_busy(error: &sqlx::Error) -> bool {
+    let Some(code) = error
+        .as_database_error()
+        .and_then(|e| e.code())
+        .and_then(|code| code.parse::<i32>().ok())
+    else {
+        return false;
+    };
+    matches!(code & 0xff, 5 | 6)
+}
+
+fn is_pool_timeout(error: &sqlx::Error) -> bool {
+    matches!(error, sqlx::Error::PoolTimedOut)
+}
+
+/// Runs `open` again, after a short pause, while it fails with an error
+/// `retryable` accepts and `budget` hasn't passed since the first try; any
+/// other result is returned as it is.
+async fn retry_while<T, F>(
     budget: Duration,
+    retryable: fn(&sqlx::Error) -> bool,
     mut open: impl FnMut() -> F,
 ) -> Result<T, sqlx::Error>
 where
@@ -274,8 +320,9 @@ where
     let start = tokio::time::Instant::now();
     loop {
         match open().await {
-            Err(sqlx::Error::PoolTimedOut) if start.elapsed() < budget => {
-                tracing::debug!("opening the in-memory database timed out; trying again");
+            Err(e) if retryable(&e) && start.elapsed() < budget => {
+                tracing::debug!("opening the database failed ({e}); trying again");
+                tokio::time::sleep(Duration::from_millis(50)).await;
             }
             result => return result,
         }
@@ -340,13 +387,39 @@ mod tests {
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::time::Duration;
 
-    use super::retry_pool_timeouts;
+    use super::{is_pool_timeout, retry_while};
+
+    /// Pools opening one brand-new file database at once all open it (#163).
+    #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+    async fn pools_opening_a_new_file_together_all_open_it() {
+        for _ in 0..20 {
+            let dir = tempfile::tempdir().unwrap();
+            let config = crate::Config {
+                database_url: format!("sqlite://{}/app.db", dir.path().display()),
+                database_acquire_timeout: Duration::from_secs(5),
+                ..crate::Config::default()
+            };
+            let opening: Vec<_> = (0..8)
+                .map(|_| {
+                    let config = config.clone();
+                    tokio::spawn(async move {
+                        super::connect_sqlite(&config, Default::default())
+                            .await
+                            .map(|_| ())
+                    })
+                })
+                .collect();
+            for task in opening {
+                task.await.unwrap().expect("every pool opens the new file");
+            }
+        }
+    }
 
     /// A slow first connection doesn't fail an in-memory app's boot (#144).
     #[tokio::test]
     async fn opening_retries_pool_timeouts_within_the_budget() {
         let tries = AtomicU32::new(0);
-        let opened = retry_pool_timeouts(Duration::from_secs(30), || async {
+        let opened = retry_while(Duration::from_secs(30), is_pool_timeout, || async {
             match tries.fetch_add(1, Ordering::SeqCst) {
                 0 | 1 => Err(sqlx::Error::PoolTimedOut),
                 _ => Ok("pool"),
@@ -360,7 +433,7 @@ mod tests {
     #[tokio::test]
     async fn opening_gives_up_after_the_budget_and_on_other_errors() {
         let tries = AtomicU32::new(0);
-        let opened: Result<(), _> = retry_pool_timeouts(Duration::ZERO, || async {
+        let opened: Result<(), _> = retry_while(Duration::ZERO, is_pool_timeout, || async {
             tries.fetch_add(1, Ordering::SeqCst);
             Err(sqlx::Error::PoolTimedOut)
         })
@@ -369,11 +442,12 @@ mod tests {
         assert_eq!(tries.load(Ordering::SeqCst), 1, "no retry past the budget");
 
         let tries = AtomicU32::new(0);
-        let opened: Result<(), _> = retry_pool_timeouts(Duration::from_secs(30), || async {
-            tries.fetch_add(1, Ordering::SeqCst);
-            Err(sqlx::Error::PoolClosed)
-        })
-        .await;
+        let opened: Result<(), _> =
+            retry_while(Duration::from_secs(30), is_pool_timeout, || async {
+                tries.fetch_add(1, Ordering::SeqCst);
+                Err(sqlx::Error::PoolClosed)
+            })
+            .await;
         assert!(matches!(opened, Err(sqlx::Error::PoolClosed)));
         assert_eq!(
             tries.load(Ordering::SeqCst),
