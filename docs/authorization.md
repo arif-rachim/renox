@@ -297,6 +297,47 @@ async fn count_all(db: &Db) -> Result<u64> {
   .user(id).subject("orders", order_id).ip(ip))`, and read them back with `for_subject`,
   `for_user` or `latest`. `rnx audit:prune --days 365` trims the table.
 
+## A second login step (two-factor authentication)
+
+A module can add a step after the password, such as a code from an authenticator app (the
+`renox-2fa` plugin does). In `Module::register` it says which users must pass it and where the
+challenge is:
+
+```rust
+use renox::prelude::*;
+
+struct Pin;
+
+impl Module for Pin {
+    fn name(&self) -> &'static str {
+        "pin"
+    }
+
+    fn register(&self, app: &mut Registry) {
+        // After the right password, these users go to the `pin.challenge` route
+        // instead of being logged in.
+        app.second_factor("pin.challenge", |user, _state| async move {
+            Ok(user.extra.contains_key("pin"))
+        });
+    }
+}
+```
+
+- The login waits in the session for ten minutes: `renox::auth::pending_login(&session)` gives
+  it to the challenge's handler (`user_id`, `remember`), or `None` once it has expired.
+- The handler checks the code, then calls `renox::auth::complete_login(&state, &session,
+  &pending, ip)`: it logs in as the login page would (a new session id, "remember me", the
+  password counted as confirmed, `LoggedIn`) and returns where to go, or `None` if the user
+  changed their password meanwhile.
+- A wrong code: `pending.failed(&state, ip)` counts it towards the login throttle and fires
+  `LoginFailed`; `pending.locked_out(&state, ip)` says how long to wait. The throttle is only
+  cleared once the step is passed, so knowing the password doesn't reset the count.
+- API tokens, registration and password resets don't go through it; nor does your own code
+  that calls `renox::auth::login` directly. One module may set a second step; two, or a
+  challenge route that doesn't exist, are errors at boot.
+
+The module documentation of `renox::auth::second_factor` has a whole challenge handler.
+
 ## Testing authorization
 
 `TestApp::acting_as(&user)` logs a user in, `confirm_password()` lets it through

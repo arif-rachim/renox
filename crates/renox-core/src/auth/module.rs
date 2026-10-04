@@ -457,6 +457,18 @@ async fn store_login(
     };
     user.rehash_if_needed(&state.db, &form.password).await?;
 
+    // A second step (two-factor authentication) first: the login waits in
+    // the session. The throttle isn't cleared until it's passed, so knowing
+    // the password doesn't reset the count of wrong codes.
+    if let Some(second) = &state.second_factor
+        && (second.required)(user.clone(), state.clone()).await?
+    {
+        let to = after_login(&state, &settings, &session);
+        super::second_factor::begin(&session, &user, &form.email, form.remember.is_some(), to)?;
+        let challenge = state.url(&second.challenge, &[])?;
+        return Ok(go(&htmx, challenge));
+    }
+
     state.throttle.clear(&form.email, ip).await;
     let remember = form
         .remember

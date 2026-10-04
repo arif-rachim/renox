@@ -43,6 +43,7 @@ mod queue;
 mod requests;
 #[cfg(feature = "s3")]
 mod s3;
+mod second_factor;
 mod secrets;
 mod security;
 mod send_handlers;

@@ -10,6 +10,15 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **A second login step (#167):** a module can ask for something after the password, such as
+  a code from an authenticator app (the coming `renox-2fa`, #146).
+  `Registry::second_factor(challenge_route, |user, state| …)` says who must pass it; the
+  login then waits in the session for ten minutes (`auth::pending_login`) and the browser
+  goes to the challenge, whose handler finishes it with `auth::complete_login`. Wrong codes
+  count towards the login throttle (`PendingLogin::failed`, `locked_out`), which isn't
+  cleared until the step is passed. Two second steps, or a challenge route that doesn't
+  exist, fail at boot.
+
 - **CI (#143):** `tests/cli/run.sh` also makes apps with the `rnx new` options people
   combine, with names before and after "renox": plain, `--tailwind`, `--starter --tailwind`,
   and `--starter` with the database; each passes `cargo fmt --check`, clippy and its tests.

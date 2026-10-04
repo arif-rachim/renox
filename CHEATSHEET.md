@@ -1030,6 +1030,11 @@ async fn sign_in(State(state): State<AppState>, session: Session, Form(f): Form<
     Ok(Redirect::to("/dashboard"))
 }
 
+// A second login step (two-factor authentication), from a module's `register`:
+// `app.second_factor("otp.challenge", |user, _state| async move { Ok(needs_code(&user)) });`
+// its challenge handler calls `renox::auth::pending_login(&session)`, checks the code,
+// then `renox::auth::complete_login(&state, &session, &pending, ip)` (docs/authorization.md).
+
 async fn sign_out(State(db): State<Db>, session: Session) -> Result<Redirect> {
     renox::auth::logout(&db, &session).await?; // this device (a copied cookie dies too)
     Ok(Redirect::to("/"))
