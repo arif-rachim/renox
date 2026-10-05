@@ -966,4 +966,175 @@ mod tests {
         assert!(body.contains("{{ old(name) }}") && body.contains("{{ error(name) }}"));
         assert!(component(dir.path(), "PriceTag").is_err(), "no overwrite");
     }
+
+    // #248: the generators the tests above don't call, and the helpers'
+    // other branches.
+
+    #[test]
+    fn factories_seeders_and_tests() {
+        let dir = app();
+        module(dir.path(), "product").unwrap();
+        model(
+            dir.path(),
+            "Product",
+            Some("product"),
+            false,
+            crate::KeyType::Integer,
+        )
+        .unwrap();
+        factory(dir.path(), "Product", "product").unwrap();
+        let code = read(&dir, "src/app/product/product_factory.rs");
+        assert!(code.contains("impl Factory for Product {"), "{code}");
+        assert!(code.contains("use super::model::Product;"), "{code}");
+        assert!(read(&dir, "src/app/product/mod.rs").contains("pub mod product_factory;"));
+        let err = factory(dir.path(), "Product", "nope").unwrap_err();
+        assert!(
+            err.to_string().contains("there is no module `nope`"),
+            "{err}"
+        );
+
+        // An app built in main.rs (older apps): the seeder goes there.
+        seeder(dir.path(), "DemoData").unwrap();
+        assert!(
+            read(&dir, "src/seeders/demo_data.rs").contains("pub async fn run(state: AppState)")
+        );
+        assert_eq!(read(&dir, "src/seeders/mod.rs"), "pub mod demo_data;\n");
+        let main = read(&dir, "src/main.rs");
+        assert!(main.starts_with("mod app;\nmod seeders;\n"), "{main}");
+        assert!(
+            main.contains(
+                "        .module(app::product::Product)\n        .seeder(seeders::demo_data::run)\n"
+            ),
+            "{main}"
+        );
+        // A second seeder: the mod line and the call aren't repeated.
+        seeder(dir.path(), "MoreData").unwrap();
+        let main = read(&dir, "src/main.rs");
+        assert_eq!(main.matches("mod seeders;").count(), 1, "{main}");
+        assert_eq!(main.matches(".seeder(seeders::demo_data::run)").count(), 1);
+
+        fs::write(
+            dir.path().join("Cargo.toml"),
+            "[package]\nname = \"my-shop\"\n",
+        )
+        .unwrap();
+        test(dir.path(), "Checkout").unwrap();
+        let code = read(&dir, "tests/checkout.rs");
+        assert!(code.contains("TestApp::new(my_shop::app())"), "{code}");
+        assert!(code.contains("async fn checkout_works()"), "{code}");
+        assert!(test(dir.path(), "Checkout").is_err(), "never overwrites");
+    }
+
+    #[test]
+    fn notifications_events_rules_and_middleware() {
+        let dir = app();
+        module(dir.path(), "orders").unwrap();
+        notification(dir.path(), "OrderShipped", "orders").unwrap();
+        let code = read(&dir, "src/app/orders/order_shipped.rs");
+        assert!(
+            code.contains(r#""order-shipped""#)
+                && code.contains("impl Notification for OrderShipped")
+        );
+        // The first event adds `register` before `routes`; the next one
+        // goes into it.
+        event(dir.path(), "OrderPlaced", "orders").unwrap();
+        event(dir.path(), "OrderPaid", "orders").unwrap();
+        let module = read(&dir, "src/app/orders/mod.rs");
+        let register = module
+            .find("fn register(&self, app: &mut Registry) {")
+            .unwrap();
+        assert!(
+            register < module.find("fn routes(&self) -> Routes {").unwrap(),
+            "{module}"
+        );
+        assert!(
+            module.contains("app.listen(|event: order_placed::OrderPlaced"),
+            "{module}"
+        );
+        assert!(
+            module.contains("app.listen(|event: order_paid::OrderPaid"),
+            "{module}"
+        );
+        assert_eq!(module.matches("fn register").count(), 1);
+        rule(dir.path(), "TaxId", "orders").unwrap();
+        assert!(read(&dir, "src/app/orders/tax_id.rs").contains("impl Rule for TaxId"));
+        assert!(rule(dir.path(), "self", "orders").is_err(), "a keyword");
+        assert!(
+            rule(dir.path(), "9lives", "orders").is_err(),
+            "starts with a digit"
+        );
+
+        // An app built in lib.rs (apps from `rnx new`): the middleware goes there.
+        fs::write(
+            dir.path().join("src/lib.rs"),
+            "mod app;\n\npub fn app() -> renox::App {\n    renox::App::new()\n        .module(app::home::Home)\n}\n",
+        )
+        .unwrap();
+        middleware(dir.path(), "StampRequests").unwrap();
+        let lib = read(&dir, "src/lib.rs");
+        assert!(lib.contains("mod middleware;"), "{lib}");
+        assert!(
+            lib.contains(
+                ".layer(renox::axum::middleware::from_fn(middleware::stamp_requests::handle))"
+            ),
+            "{lib}"
+        );
+        assert!(!read(&dir, "src/main.rs").contains("middleware"));
+    }
+
+    #[test]
+    fn registration_hints_when_the_files_dont_look_generated() {
+        let dir = app();
+        // No `.module(` line: the call is printed, the file left alone.
+        fs::write(dir.path().join("src/main.rs"), "fn main() {}\n").unwrap();
+        seeder(dir.path(), "Demo").unwrap();
+        assert_eq!(read(&dir, "src/main.rs"), "mod seeders;\nfn main() {}\n");
+        // A module file with neither `register` nor `routes`.
+        fs::write(dir.path().join("src/app/home/mod.rs"), "pub struct Home;\n").unwrap();
+        event(dir.path(), "Visited", "home").unwrap();
+        let module = read(&dir, "src/app/home/mod.rs");
+        assert!(!module.contains("app.listen"), "{module}");
+        assert!(module.contains("pub mod visited;"));
+        // No app file at all.
+        fs::remove_file(dir.path().join("src/main.rs")).unwrap();
+        register_call(&app_file(dir.path()), ".seeder(x)").unwrap();
+        assert!(!dir.path().join("src/main.rs").exists());
+    }
+
+    #[test]
+    fn uuid_keys_and_files_that_exist() {
+        let dir = app();
+        model(
+            dir.path(),
+            "Ticket",
+            Some("home"),
+            false,
+            crate::KeyType::Uuid,
+        )
+        .unwrap();
+        // The module's first model is model.rs; the next ones are named.
+        let code = read(&dir, "src/app/home/model.rs");
+        assert!(
+            code.contains("use renox::uuid::Uuid;") && code.contains("pub id: Uuid,"),
+            "{code}"
+        );
+        model(
+            dir.path(),
+            "Code",
+            Some("home"),
+            false,
+            crate::KeyType::String,
+        )
+        .unwrap();
+        assert!(read(&dir, "src/app/home/code.rs").contains("pub id: String,"));
+        // Every generator refuses to overwrite.
+        job(dir.path(), "SendReceipt", "home").unwrap();
+        assert!(job(dir.path(), "SendReceipt", "home").is_err());
+        mail(dir.path(), "Welcome").unwrap();
+        assert!(mail(dir.path(), "Welcome").is_err());
+        policy(dir.path(), "Ticket", "home").unwrap();
+        assert!(policy(dir.path(), "Ticket", "home").is_err());
+        command(dir.path(), "tickets:close", "home").unwrap();
+        assert!(command(dir.path(), "tickets:close", "home").is_err());
+    }
 }
