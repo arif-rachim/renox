@@ -409,8 +409,10 @@ mod tests {
     #[tokio::test]
     async fn store_keeps_the_file_private() {
         let dir = tempfile::tempdir().unwrap();
-        let mut config = crate::Config::default();
-        config.storage_path = dir.path().to_path_buf();
+        let config = crate::Config {
+            storage_path: dir.path().to_path_buf(),
+            ..Default::default()
+        };
         let storage = crate::storage::Storage::from_config(&config).unwrap();
         let file = Upload::new("a.txt", "text/plain", b"hi".to_vec());
         let key = file.store(&storage, "/notes/").await.unwrap();

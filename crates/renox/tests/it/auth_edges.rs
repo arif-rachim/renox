@@ -389,7 +389,7 @@ impl renox::auth::Notification for Quiet {
     fn channels(&self, _to: &renox::auth::Recipient) -> Vec<renox::auth::Channel> {
         vec![
             renox::auth::Channel::Database,
-            renox::auth::Channel::Custom("sms".into()),
+            renox::auth::Channel::Custom("sms"),
         ]
     }
 }
