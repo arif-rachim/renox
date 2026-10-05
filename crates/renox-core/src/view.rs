@@ -1079,7 +1079,7 @@ fn globals(
     let user = current_user.as_ref().and_then(|c| c.user.clone());
     let roles = current_user
         .as_ref()
-        .map(|c| c.grants.roles.clone())
+        .map(|c| c.grants.roles())
         .unwrap_or_default();
     let gate_user = current_user.and_then(|c| Some((c.user?, c.gates, c.grants)));
     // Errors flashed in a named bag (`Validate::ERROR_BAG`) are shown only

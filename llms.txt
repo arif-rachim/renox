@@ -17,7 +17,9 @@
   cursor pagination, transactions with retries); model keys other than integers (`Ulid`,
   `Uuid`, `String`, `rnx make:model --key`); every field type; pagination; data grids; seeders and factories; auth,
   policies, gates, API tokens and your own login; tenants (`renox::context`, default scopes),
-  roles and permissions, route guards for gates/roles/permissions/token abilities; the account
+  roles and permissions (also per store/team with dates: `assign_role_in`, `Scope`,
+  `permissions::set_scope`, `has_permission_in`, `scopes_with`), route guards for
+  gates/roles/permissions/token abilities; the account
   page, password rules and confirmation, per-device logout; auth events and the audit log;
   model hooks, partial saves (`save_only`, `save_changes`) and encrypted fields
   (`Encrypted<T>`); HTMX; raw SQL and transactions (savepoints); jobs (priority, unique, encrypted, middleware, chains, batches), events and
@@ -297,8 +299,9 @@ Every example has a README.md that walks through it.
 - [docs/types.md](docs/types.md): every Rust field type with its form input and its SQLite and
   PostgreSQL column (`DbEnum`, `Json<T>`, dates and times, money, UUID).
 - [docs/authorization.md](docs/authorization.md): which tool answers which question (gates,
-  policies, the `Permissions` module, `gate_before`, token abilities, tenants with default
-  scopes and `renox::context`, password confirmation, the audit log), mapped to Laravel's.
+  policies, the `Permissions` module, roles per branch (a role in one store, with dates),
+  `gate_before`, token abilities, tenants with default scopes and `renox::context`, password
+  confirmation, the audit log), mapped to Laravel's.
 - [docs/testing.md](docs/testing.md): `TestApp` requests and assertions (JSON paths, views,
   session, login), the database, jobs, event and notification fakes, HTTP fakes, time travel,
   counting queries, a browser-test recipe.

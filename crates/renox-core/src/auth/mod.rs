@@ -65,6 +65,7 @@ pub use notifications::{
     Channel, DatabaseMessage, DatabaseNotification, Notification, Recipient,
     prune_read_notifications,
 };
+pub(crate) use permissions::Grants;
 pub use permissions::Permissions;
 pub use second_factor::{PendingLogin, complete_login, pending_login};
 pub(crate) use throttle::LoginThrottle;
@@ -206,7 +207,7 @@ impl Access {
         }
         match self.gates.get(name) {
             Some(check) => check(user),
-            None => grants.permissions.contains(name),
+            None => grants.has_permission(name),
         }
     }
 }
@@ -224,14 +225,17 @@ impl User {
     /// `Policy::allows` and `App::gate_before` ("admins may do anything").
     /// It is `false` for any other user, and outside a request (a job, a
     /// command): use the async `user.roles(&db)` there.
+    ///
+    /// Global roles count, plus those given in the request's scope
+    /// (`permissions::set_scope`), within their dates.
     pub fn has_role(&self, role: &str) -> bool {
-        current_grants(self.id).is_some_and(|g| g.roles.iter().any(|r| r == role))
+        current_grants(self.id).is_some_and(|g| g.has_role(role))
     }
 
     /// Like [`User::has_role`], for a permission granted by one of the
     /// user's roles.
     pub fn has_permission(&self, permission: &str) -> bool {
-        current_grants(self.id).is_some_and(|g| g.permissions.contains(permission))
+        current_grants(self.id).is_some_and(|g| g.has_permission(permission))
     }
 }
 
@@ -246,13 +250,6 @@ fn current_grants(user_id: i64) -> Option<Arc<Grants>> {
         .map(|current| current.grants)
 }
 
-/// The current user's roles and permissions (`Permissions` module), loaded
-/// once per request.
-#[derive(Default, Debug)]
-pub(crate) struct Grants {
-    pub roles: Vec<String>,
-    pub permissions: std::collections::HashSet<String>,
-}
 pub(crate) type AsyncGate = Arc<
     dyn Fn(
             User,
@@ -288,6 +285,8 @@ pub struct AuthUser {
     token_id: Option<i64>,
     abilities: Option<Arc<Vec<String>>>,
     grants: Arc<Grants>,
+    /// `role_names`, worked out the first time it's asked.
+    role_names: std::sync::OnceLock<Vec<String>>,
 }
 
 impl Deref for AuthUser {
@@ -315,21 +314,48 @@ impl AuthUser {
             .is_none_or(|list| list.iter().any(|a| a == ability || a == "*"))
     }
 
-    /// Whether the user has `role` (the `Permissions` module).
+    /// Whether the user has `role` (the `Permissions` module): a global
+    /// role, or one given in the request's scope (`permissions::set_scope`),
+    /// within its dates.
     pub fn has_role(&self, role: &str) -> bool {
-        self.grants.roles.iter().any(|r| r == role)
+        self.grants.has_role(role)
     }
 
     /// Whether one of the user's roles grants `permission` (the
-    /// `Permissions` module). `allows(permission)` also asks
-    /// `App::gate_before`.
+    /// `Permissions` module; the same roles as `has_role`).
+    /// `allows(permission)` also asks `App::gate_before`.
     pub fn has_permission(&self, permission: &str) -> bool {
-        self.grants.permissions.contains(permission)
+        self.grants.has_permission(permission)
     }
 
-    /// The user's roles (the `Permissions` module).
+    /// Whether the user has `role` globally or in `scope` (the record's,
+    /// not the request's), within its dates.
+    pub fn has_role_in(&self, role: &str, scope: &permissions::Scope) -> bool {
+        self.grants.has_role_in(role, Some(scope))
+    }
+
+    /// Whether a global role of the user, or one given in `scope` (the
+    /// record's, not the request's), grants `permission` now; for
+    /// policies and handlers that work on one record.
+    pub fn has_permission_in(&self, permission: &str, scope: &permissions::Scope) -> bool {
+        self.grants.has_permission_in(permission, Some(scope))
+    }
+
+    /// The records of model `M` in which the user holds `permission`:
+    /// `Scopes::All` when a global role grants it, else their keys. See
+    /// [`User::scopes_with`].
+    pub fn scopes_with<M: crate::db::Model>(
+        &self,
+        permission: &str,
+    ) -> permissions::Scopes<M::Key> {
+        self.grants.scopes_with::<M>(permission)
+    }
+
+    /// The user's roles (the `Permissions` module) in effect: the global
+    /// ones plus those in the request's scope, sorted, as they were the
+    /// first time this was asked.
     pub fn role_names(&self) -> &[String] {
-        &self.grants.roles
+        self.role_names.get_or_init(|| self.grants.roles())
     }
 
     /// Whether the policy of `target` allows `ability` (after
@@ -378,7 +404,7 @@ impl AuthUser {
         if let Some(allowed) = self.before(gate) {
             return Ok(allowed);
         }
-        if self.gates.gates.contains_key(gate) || self.grants.permissions.contains(gate) {
+        if self.gates.gates.contains_key(gate) || self.grants.has_permission(gate) {
             return Ok(self.allows(gate));
         }
         let Some(state) = &self.state else {
@@ -436,6 +462,7 @@ fn current(extensions: &axum::http::Extensions) -> Option<AuthUser> {
         token_id: current.token_id,
         abilities: current.abilities.clone(),
         grants: current.grants.clone(),
+        role_names: std::sync::OnceLock::new(),
     })
 }
 

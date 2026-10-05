@@ -65,6 +65,7 @@ the queue workers and the scheduler.
 | `down [--secret S] [--retry N]`, `up` | Maintenance mode. |
 | `tokens:prune`, `notifications:prune [--days N]` | Added by the `Auth` module: deletes expired API tokens and read notifications. |
 | `audit:prune [--days N]` | Added by the `Audit` module. |
+| `permissions:prune [--days N]` | Added by the `Permissions` module: deletes role assignments that ended more than N days ago (30). |
 
 You can add your own commands (`App::command`, `App::typed_command`). They sit next to these,
 but they can't use the same names.
@@ -600,6 +601,7 @@ commands, so it calls the function.)
 | `cache` (database store) | expired entries | itself, at most once an hour per process; `cache:prune` (`state.cache.prune()`) when you ask |
 | `personal_access_tokens` | expired API tokens | `tokens:prune` (Auth module): tokens that expired more than a day ago (`renox::auth::prune_expired_tokens(&state.db, grace)`) |
 | `audit_logs` | every audited action (Audit module) | `audit:prune --days 365` (`renox::audit::prune(&state.db, age)`) |
+| `role_user` | role assignments with an end date (`assign_role_in(…).until(…)`, Permissions module) | `permissions:prune --days 30` (`renox::auth::permissions::prune_ended_assignments(&state.db, age)`); ended ones already don't count |
 | `revoked_sessions` | logouts | itself, on each logout |
 | `sessions` (`SESSION_DRIVER=database`) | visits | itself, now and then; `session:prune` (`Session::prune_expired(&state.db)`) when you ask |
 | `failed_jobs` | jobs that failed for good | `queue:prune-failed --hours 168` (`state.queue.prune_failed(age)`), `queue:flush` (see Failed jobs) |

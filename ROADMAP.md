@@ -1921,6 +1921,15 @@ Notes:
   event's time (`synced_at`) so a late, older event changes nothing. Xendit can't prorate,
   change an interval or resume: canceling stops its charges at once and access lasts to the
   period's end.
+- **Roles per branch (#244) scope the assignment, not the role:** a role grants the same
+  permissions everywhere; `role_user` rows gain `scope_type` (the model's table) + `scope_id`
+  (its key as text) and optional `starts_at`/`ends_at`. A global row has empty strings, not
+  NULLs, so (role, user, scope) stays unique on both databases and old rows need no change.
+  The auth middleware still loads the grants once per request (every assignment not ended
+  yet), and each check filters them by `permissions::set_scope` (read from `renox::context`)
+  and `db::now()` at check time, since the app's scope middleware runs after the auth one and
+  `TestApp::travel` must reach the dates. Ended rows are ignored, and pruned by
+  `permissions:prune`.
 
 ## Not planned
 

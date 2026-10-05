@@ -1439,6 +1439,13 @@ fn framework_routes(config: &Config) -> Vec<RouteInfo> {
 }
 
 fn print_routes(routes: &[RouteInfo]) {
+    print!("{}", route_table(routes));
+}
+
+/// `route:list`'s table.
+fn route_table(routes: &[RouteInfo]) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::new();
     let with_domains = routes.iter().any(|r| r.domain.is_some());
     let rows: Vec<Vec<String>> = routes
         .iter()
@@ -1448,7 +1455,17 @@ fn print_routes(routes: &[RouteInfo]) {
                 r.path.clone(),
                 r.name.clone().unwrap_or_default(),
                 r.module.clone(),
-                r.middleware.join(", "),
+                r.middleware
+                    .iter()
+                    .map(|guard| {
+                        if is_role_guard(guard) {
+                            format!("{guard}*")
+                        } else {
+                            guard.clone()
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", "),
             ];
             if with_domains {
                 row.insert(0, r.domain.clone().unwrap_or_default());
@@ -1474,8 +1491,24 @@ fn print_routes(routes: &[RouteInfo]) {
             .zip(&widths)
             .map(|(cell, width)| format!("{cell:<width$}", width = *width))
             .collect();
-        println!("{}", line.join("  ").trim_end());
+        let _ = writeln!(out, "{}", line.join("  ").trim_end());
     }
+    if routes
+        .iter()
+        .flat_map(|r| &r.middleware)
+        .any(|g| is_role_guard(g))
+    {
+        out.push_str(
+            "\n* role and permission guards count the user's global roles plus the roles \
+             given in the request's active scope (permissions::set_scope).\n",
+        );
+    }
+    out
+}
+
+/// A `role:` or `permission:` guard, which counts scoped roles too.
+fn is_role_guard(guard: &str) -> bool {
+    guard.starts_with("role:") || guard.starts_with("permission:")
 }
 
 fn print_done(verb: &str, names: &[String]) {
@@ -1936,4 +1969,38 @@ async fn shutdown_signal() {
         _ = terminate => {},
     }
     tracing::info!("shutdown signal received");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn route(path: &str, middleware: &[&str]) -> RouteInfo {
+        RouteInfo {
+            method: "GET".into(),
+            path: path.into(),
+            name: None,
+            module: "app".into(),
+            middleware: middleware.iter().map(|m| (*m).to_owned()).collect(),
+            domain: None,
+        }
+    }
+
+    #[test]
+    fn route_list_says_role_guards_count_the_active_scope() {
+        let plain = route_table(&[route("/", &["auth"])]);
+        assert!(!plain.contains('*'), "{plain}");
+        let table = route_table(&[
+            route("/orders", &["auth", "permission:orders.view"]),
+            route("/drafts", &["role:editor"]),
+            route("/admin", &["gate:admin"]),
+        ]);
+        assert!(table.contains("auth, permission:orders.view*"), "{table}");
+        assert!(table.contains("role:editor*"), "{table}");
+        assert!(table.contains("gate:admin\n"), "{table}");
+        assert!(
+            table.contains("active scope (permissions::set_scope)"),
+            "{table}"
+        );
+    }
 }

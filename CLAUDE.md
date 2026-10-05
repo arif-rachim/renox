@@ -133,7 +133,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            Policy/gates (mod.rs), Auth module + pages (module.rs), account.rs
                            (account pages and the sections modules add to them, #168; password
                            confirmation), passwords.rs (reset),
-                           permissions.rs (Permissions module: roles, permissions), events.rs
+                           permissions.rs (Permissions module: roles, permissions, roles
+                           per scope with dates: Scope, set_scope, #244), events.rs
                            (LoggedIn, LoginFailed, …), second_factor.rs (Registry::second_factor:
                            a module's step after the password; pending_login/complete_login,
                            #167), external.rs (sign_in / register_verified /
@@ -628,13 +629,15 @@ A setting that takes one of a few words (`SESSION_DRIVER=database`) is an enum m
 Durations are `Duration` fields even when `.env` has minutes or seconds.
 
 ### 4.5 Migrations owned by the framework
-Names start with `0001…` so they sort before app migrations (`2026…`). There are seventeen:
+Names start with `0001…` so they sort before app migrations (`2026…`). There are eighteen:
 - Auth module (`auth/module.rs` `MIGRATIONS`): `00010101000000_create_users_table`,
   `…000001_create_password_reset_tokens_table`, `…000002_create_personal_access_tokens_table`,
   `…000003_create_notifications_table`, `…000004_add_sessions_revoked_at_to_users`,
   `…000005_add_abilities_to_personal_access_tokens`, `…000006_create_revoked_sessions_table`.
 - Permissions module (`auth/permissions.rs`): `00010101000500_create_roles_and_permissions_tables`
-  (roles, permissions, permission_role, role_user).
+  (roles, permissions, permission_role, role_user) and `00010101000510_add_scope_to_role_user`
+  (scope_type/scope_id, '' for global, and starts_at/ends_at; SQLite rebuilds the table to
+  replace its UNIQUE, so it is a `Migration` literal with its own PostgreSQL down, #244).
 - Audit module (`audit.rs`): `00010101000600_create_audit_logs_table`.
 - Every app (registered in `App::boot`; eight, which tests/it/database.rs lists):
   `00010101000100_create_jobs_table`, `00010101000110_add_chains_and_batches_to_jobs` and
@@ -1288,6 +1291,15 @@ picks the build, not the terminal.
   settings computes the id in a route layer and passes it in a header (billing's webhook.rs).
   `FakeHttp` answers in turn but repeats the last one: queue every answer a test needs before
   the first call, or a single answer keeps being given.
+- **#244, roles per branch** (a role given in one record and for a period: `Scope`,
+  `assign_role_in(..).from(..).until(..)`, `remove_role_in`, `sync_roles_in`, `assignments`,
+  `users_with_role_in`, `permissions::set_scope` in `renox::context`, `has_role_in`/
+  `has_permission_in`, `scopes_with` + `Scopes::apply` for default scopes,
+  `permissions:prune`, `route:list` marks role/permission guards with `*`): branch
+  `ccr-f926b004-17j95n`. `Grants` (permissions.rs) holds every assignment not ended at load
+  time and filters by the active scope and `db::now()` at each check; `AuthUser::role_names`
+  is worked out the first time it's asked. The global `assign_role`/`remove_role`/`sync_roles`
+  and `users_with_role` only touch global rows.
 - **Still open** (ROADMAP `- [ ]`): none of the plugins; `renox-2fa` (#146),
   `renox-oauth` (#147), `renox-admin` (#148) and `renox-billing` (#155) are done. A Laravel gap review after M25 (in the
   conversation that planned M26) ranked them: release and docs first, then 2FA and social

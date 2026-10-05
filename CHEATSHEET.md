@@ -1444,6 +1444,58 @@ impl Validate for ProjectForm {
 }
 ```
 
+Roles per store (branch, team), with dates: the role means the same everywhere, only its
+assignment is scoped. Each request picks its store; checks count global roles plus the store's.
+
+```rust
+use renox::prelude::*;
+use renox::auth::permissions::{self, Scope, Scopes};
+use renox::axum::{extract::Request, middleware::Next};
+
+#[derive(Model, serde::Serialize, Default)]
+#[model(table = "stores")]
+struct Store { id: i64 }
+
+#[derive(Model, serde::Serialize, Default)]
+#[model(table = "orders", default_scope = "my_stores")]
+struct Order { id: i64, store_id: i64, pickup_store_id: i64 }
+
+// Rows of the stores where the request's user may see orders (all for a global role).
+fn my_stores(query: renox::db::Query<Order>) -> renox::db::Query<Order> {
+    permissions::scopes_with::<Store>("orders.view").apply(query, &["store_id", "pickup_store_id"])
+}
+
+async fn give(db: &Db, user: &User, store: &Store) -> Result {
+    let until = renox::db::now() + renox::chrono::Duration::days(14);
+    user.assign_role_in(db, "manager", &Scope::of(store)).until(until).await?; // .from(date) too
+    user.sync_roles_in(db, &["clerk"], &Scope::of_id::<Store>(2)).await?; // also remove_role_in
+    let _list = user.assignments(db).await?; // role, scope, starts_at, ends_at
+    let _managers = permissions::users_with_role_in(db, "manager", &Scope::of(store)).await?;
+    Ok(())
+}
+
+// An App::layer (before the guards): this request works in the session's store.
+async fn pick_store(session: Session, req: Request, next: Next) -> Response {
+    if let Some(id) = session.get::<i64>("store_id") { // checked when it was chosen
+        permissions::set_scope(Scope::of_id::<Store>(id));
+    }
+    next.run(req).await
+}
+
+impl Policy for Order { // a row's own store, not the request's
+    fn allows(&self, user: &User, _ability: &str) -> bool {
+        user.has_permission_in("orders.refund", &Scope::of_id::<Store>(self.store_id))
+    }
+}
+
+fn stores(user: &AuthUser) -> Vec<i64> {
+    match user.scopes_with::<Store>("orders.view") { Scopes::All => vec![], Scopes::Only(ids) => ids }
+}
+```
+
+`rnx permissions:prune --days 30` deletes assignments that ended over 30 days ago (ended ones
+already don't count).
+
 In templates: `{% if can('posts.publish') %}` (a gate or a permission) and `auth.roles`.
 `rnx tokens:prune` deletes API tokens that expired more than a day ago, and
 `rnx notifications:prune --days 30` notifications read more than 30 days ago (unread ones stay).

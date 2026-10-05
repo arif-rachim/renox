@@ -46,6 +46,7 @@ mod queue;
 mod requests;
 #[cfg(feature = "s3")]
 mod s3;
+mod scoped_roles;
 mod search;
 mod second_factor;
 mod secrets;

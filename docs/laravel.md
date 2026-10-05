@@ -932,6 +932,10 @@ More auth:
   `Can::new(post, user, &["update"])`, then write `{% if can('update', post) %}`.
 - Roles and permissions: `user.assign_role(&db, "editor")`, `has_role`, `has_permission`,
   `.require_role(…)`, `.require_permission(…)`.
+- spatie's Teams (`setPermissionsTeamId`) and Bouncer's scopes are roles given in one record:
+  `user.assign_role_in(&db, "manager", &Scope::of(&store))` (with `.from` / `.until` dates),
+  `permissions::set_scope(…)` per request (like `setPermissionsTeamId` in a middleware),
+  `has_permission_in` for one row and `scopes_with` for lists.
 - `logoutOtherDevices` is `auth::logout_other_devices`. Logout ends this device only.
 - Users imported from Laravel keep their bcrypt hashes, and move to Argon2id at their next
   login.

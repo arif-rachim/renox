@@ -9,6 +9,8 @@ In this guide:
 - [Gates](#gates-may-this-user-do-x): "may this user do X at all?"
 - [Policies](#policies-may-this-user-do-x-to-this-row): "may this user do X to *this* row?"
 - [Roles and permissions](#roles-and-permissions): jobs like "editor", and what each job allows
+- [Roles per branch](#roles-per-branch-a-role-in-one-store-for-a-while): a role in one store,
+  for a while (scoped roles with dates)
 - [Super-admins](#super-admins-gate_before): one person who may do everything
 - [API tokens and abilities](#api-tokens-and-abilities): limits for programs that call your API
 - [Tenants](#tenants-rows-that-belong-to-a-team): keeping each team's data apart
@@ -55,6 +57,7 @@ Complete apps that use these tools:
 | May this user do X at all? | a gate (`App::gate`, `gate_async`) | `.require_gate("x")`, `user.gate_async("x").await?`; for sync gates only: `user.gate("x")?`, `can('x')` |
 | May this user do X to *this* row? | a policy (`impl Policy`) | `user.authorize("update", &row)?`, `can('update', row)` |
 | Which job does the user have? | roles and permissions (the `Permissions` module) | `.require_role`, `.require_permission`, `has_role` |
+| Which job does the user have in *this* store? | roles in a scope (`assign_role_in`, `permissions::set_scope`) | the same checks, plus `has_permission_in`, `scopes_with` |
 | May this user send this form? | `Validate::authorize` (a form request) | the `Valid<T>` extractor: 403 before the rules run |
 | Who may do everything? | `App::gate_before` | asked first by `AuthUser`'s checks (`allows`, `can`, `authorize`, `.require_*`) |
 | What may this API token do? | token abilities | `.require_ability("orders:write")`, `token_can` |
@@ -309,6 +312,168 @@ More you can do:
   it existed.
 - `permissions::roles(&db)` lists every role with its permissions, for an admin page.
 - `user.role_names()` on an `AuthUser` gives the roles loaded for this request.
+
+## Roles per branch: a role in one store, for a while
+
+In a business with several stores (branches, teams, projects), a person is often a **manager in
+one store and a clerk in another**, or covers a store for two weeks. That's still role-based
+access (RBAC), with two attributes on each assignment (ABAC): **where** it counts and **when**.
+
+A role means the same everywhere: "manager" grants the same permissions in every store. What
+changes is who has it where. So only the assignment gets a scope and dates:
+
+```rust
+use renox::prelude::*;
+use renox::auth::permissions::{self, Scope};
+use renox::axum::{extract::Request, middleware::{Next, from_fn}};
+
+/// A store (branch) of the business.
+#[derive(Model, serde::Serialize, Default)]
+#[model(table = "stores")]
+struct Store { id: i64, name: String }
+
+/// Ana manages the north store, and covers the south one for two weeks.
+async fn setup(db: &Db, ana: &User, north: &Store, south: &Store) -> Result {
+    permissions::define_role(db, "manager", &["orders.refund", "stock.adjust"]).await?;
+    ana.assign_role_in(db, "manager", &Scope::of(north)).await?;
+    let start = renox::db::now();
+    ana.assign_role_in(db, "manager", &Scope::of(south))
+        .from(start)
+        .until(start + renox::chrono::Duration::days(14))
+        .await?;
+    Ok(())
+}
+
+/// Picks the store this request works in, after checking the user may work there.
+async fn pick_store(user: Option<AuthUser>, session: Session, req: Request, next: Next) -> Response {
+    if let (Some(user), Some(store)) = (&user, session.get::<i64>("store_id")) {
+        // The user's own stores: any role there, or a global one.
+        let scope = Scope::of_id::<Store>(store);
+        if user.has_role_in("manager", &scope) || user.has_role_in("clerk", &scope) {
+            permissions::set_scope(scope);
+        }
+    }
+    next.run(req).await
+}
+
+fn app() -> App {
+    App::new()
+        .module(Auth::new())
+        .module(permissions::Permissions)
+        .layer(from_fn(pick_store))
+}
+
+/// Refunds need `orders.refund` in the store the request works in.
+fn routes() -> Routes {
+    Routes::new()
+        .post("/orders/{id}/refund", || async { "refunded" })
+        .require_permission("orders.refund")
+}
+```
+
+What's going on:
+
+- `Scope::of(&store)` names one record: its model's table and its key (`stores`, `7`). Use
+  `Scope::of_id::<Store>(7)` when you only have the id.
+- `assign_role_in` gives a role there. `.from(date)` and `.until(date)` are optional: before
+  `from` and from `until` on, the assignment simply doesn't count. Giving the same role in the
+  same store again replaces its dates.
+- `permissions::set_scope(scope)` tells this request which store it works in, like the current
+  team in [Tenants](#tenants-rows-that-belong-to-a-team). From then on `require_role`,
+  `require_permission`, `has_role`, `has_permission`, `allows` and `can()` in templates count the
+  user's **global** roles plus the roles **in that store** that are within their dates.
+- With no scope set, only global roles count, exactly as before. An app that never gives a role
+  in a scope sees no change.
+
+> [!IMPORTANT]
+> Set the scope before the guards run: in an `App::layer`, as above, or in a route layer added
+> after the `.require_permission(…)` it should cover (layers added later run first). The roles
+> are loaded once per request (all of them, with their stores and dates) and filtered at each
+> check, so a scope set late in the request still counts. `rnx route:list` marks role and
+> permission guards with `*` to say they count the active scope.
+
+### Checking one record: `has_permission_in`
+
+A policy decides about one row, which belongs to its own store, whatever store the request
+works in. Ask about that store:
+
+```rust
+use renox::prelude::*;
+use renox::auth::permissions::Scope;
+
+#[derive(Model, serde::Serialize, Default)]
+#[model(table = "stores")]
+struct Store { id: i64 }
+
+#[derive(Model, serde::Serialize, Default)]
+#[model(table = "orders")]
+struct Order { id: i64, store_id: i64 }
+
+impl Policy for Order {
+    fn allows(&self, user: &User, ability: &str) -> bool {
+        let store = Scope::of_id::<Store>(self.store_id);
+        match ability {
+            "refund" => user.has_permission_in("orders.refund", &store),
+            _ => user.has_permission_in("orders.view", &store),
+        }
+    }
+}
+```
+
+`has_permission_in` (and `has_role_in`) count global roles plus the roles given in that store.
+Like `has_permission`, they answer from the roles loaded for the current request.
+
+### Lists: `scopes_with`
+
+"Show the orders of every store where I may see orders" needs the list of stores.
+`user.scopes_with::<Store>("orders.view")` answers `Scopes::All` when a global role grants the
+permission, else `Scopes::Only(ids)`. A default scope has no user at hand, so
+`permissions::scopes_with::<Store>(…)` asks for the logged-in user of the request, and
+`Scopes::apply` turns the answer into a filter on one or more columns:
+
+```rust
+use renox::prelude::*;
+use renox::auth::permissions;
+
+#[derive(Model, serde::Serialize, Default)]
+#[model(table = "stores")]
+struct Store { id: i64 }
+
+/// A transfer of stock is seen by the store it leaves and the store it goes to.
+#[derive(Model, serde::Serialize, Default)]
+#[model(table = "transfers", default_scope = "my_stores")]
+struct Transfer { id: i64, from_store_id: i64, to_store_id: i64 }
+
+/// `from_store_id IN (my stores) OR to_store_id IN (my stores)`; everything for a
+/// global role; nothing without a user (fails closed).
+fn my_stores(query: renox::db::Query<Transfer>) -> renox::db::Query<Transfer> {
+    permissions::scopes_with::<Store>("transfers.view")
+        .apply(query, &["from_store_id", "to_store_id"])
+}
+```
+
+`apply` is a shortcut for `query.where_any(|q| q.where_in("from_store_id", ids.clone())
+.where_in("to_store_id", ids))`, which you can write yourself for other shapes.
+
+### Managing assignments
+
+- `user.assign_role_in(&db, role, &scope)` (with `.from` / `.until`), `user.remove_role_in(&db,
+  role, &scope)`, and `user.sync_roles_in(&db, &[roles], &scope)` (exactly these roles in that
+  store; other stores stay).
+- `assign_role`, `remove_role` and `sync_roles` are about **global** roles and leave roles in a
+  store alone. `Scope::global()` with `assign_role_in` gives a global role with dates
+  ("admin until Friday").
+- `user.assignments(&db)` lists every role the user has, with its `scope`, `starts_at` and
+  `ends_at`, for an account or admin page.
+- `permissions::users_with_role_in(&db, "manager", &scope)` lists who has the role in a store now
+  (given there, or globally), for example to notify its managers. `users_with_role` lists the
+  global ones.
+- Ended assignments stop counting by themselves. `rnx permissions:prune --days 30` deletes the
+  ones that ended more than 30 days ago; schedule it if the table grows.
+
+> [!NOTE]
+> Permissions stay global: there's no "may refund in store 1 only" without a role. Make a role
+> for it and give that role in store 1.
 
 ## Super-admins: `gate_before`
 
@@ -675,6 +840,7 @@ Renox's `TestApp` has helpers for this:
 | FormRequest `authorize()` | `impl Validate { async fn authorize(&self, form: &FormContext) }`, or `#[derive(Validate)]` + `#[validate(hooks)]` + `impl ValidateHooks` |
 | spatie `User::role('x')->get()` | `permissions::users_with_role(&db, "x")` |
 | spatie/laravel-permission | the `Permissions` module |
+| spatie Teams (`setPermissionsTeamId`), Bouncer scopes (`Bouncer::scope()->to(…)`) | `assign_role_in(&db, role, &Scope::of(&store))` + `permissions::set_scope` |
 | Sanctum abilities, `tokenCan` | `create_token_with`, `.require_ability(…)`, `token_can` |
 | Global scopes (`addGlobalScope`), tenancy packages | `#[model(default_scope = "…")]` + `renox::context` |
 | `password.confirm` middleware | `.require_password_confirmed()` |

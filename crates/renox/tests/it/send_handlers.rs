@@ -198,6 +198,34 @@ async fn access(State(db): State<Db>, user: AuthUser, session: Session) -> Resul
     user.remove_role(&db, "editor").await?;
     let roles = user.roles(&db).await?;
     let all = permissions::roles(&db).await?;
+    // Roles in one record (#244).
+    let store = permissions::Scope::of_id::<Note>(1);
+    permissions::set_scope(store.clone());
+    user.assign_role_in(&db, "editor", &store)
+        .from(renox::db::now())
+        .until(renox::db::now() + renox::chrono::Duration::days(1))
+        .await?;
+    user.assign_role_in(&db, "editor", &permissions::Scope::of(&Note::default()))
+        .await?;
+    user.remove_role_in(&db, "editor", &store).await?;
+    user.sync_roles_in(&db, &["editor"], &store).await?;
+    let assignments = user.assignments(&db).await?;
+    let managers = permissions::users_with_role_in(&db, "editor", &store).await?;
+    permissions::prune_ended_assignments(&db, Duration::from_secs(60)).await?;
+    let mine = permissions::scopes_with::<Note>("posts.publish");
+    let scoped = Note::query().where_eq("stars", 1);
+    let _narrowed = user
+        .scopes_with::<Note>("posts.publish")
+        .apply(scoped, &["id"])
+        .count(&db)
+        .await?;
+    let _checks = (
+        user.has_permission_in("posts.publish", &store),
+        user.has_role_in("editor", &store),
+        mine.is_empty(),
+        assignments.len() + managers.len(),
+    );
+    permissions::clear_scope();
     permissions::delete_role(&db, "editor").await?;
     user.create_token_with(&db, "t", &["a"], None).await?;
     renox::auth::prune_expired_tokens(&db, Duration::from_secs(60)).await?;
