@@ -458,3 +458,54 @@ async fn uncompromised_allows_the_password_when_the_service_cant_be_reached() {
         .await
         .assert_ok();
 }
+
+/// #256: when every mailer in the failover list fails too, the last error
+/// comes back. Also SMTP over TLS with credentials, and MAIL_PORT that isn't
+/// a number (`{PREFIX}_PORT`).
+#[renox::test]
+async fn failover_that_runs_out_returns_the_last_error() {
+    let down = |config: &mut MailConfig, port: u16| {
+        config.mailer = renox::mail::MailDriver::Smtp;
+        config.host = "127.0.0.1".into();
+        config.port = Some(port);
+        config.encryption = renox::mail::MailEncryption::None;
+        config.timeout = std::time::Duration::from_secs(2);
+    };
+    let app = TestApp::with_config(
+        App::new().mailer("backup", move |_| {
+            let mut backup = MailConfig::default();
+            down(&mut backup, 10);
+            backup.encryption = renox::mail::MailEncryption::Tls;
+            backup.username = Some("app".into());
+            backup.password = Some("secret".into());
+            Ok(backup)
+        }),
+        move |c| {
+            down(&mut c.mail, 9);
+            c.mail.failover = vec!["backup".into()];
+        },
+    )
+    .await;
+    let err = app
+        .state()
+        .mailer
+        .send(Mail::new("ann@example.com", "Receipt", "Thanks."))
+        .await
+        .unwrap_err();
+    let shown = format!("{err:?}");
+    assert!(!shown.contains("secret"), "{shown}");
+
+    let err = MailConfig::from_env(
+        &{
+            let mut c = Config::default();
+            c.vars.insert("REPORTS_PORT".into(), "twenty-five".into());
+            c
+        },
+        "REPORTS",
+    )
+    .unwrap_err();
+    assert!(
+        format!("{err:?}").contains("REPORTS_PORT must be a number, got `twenty-five`"),
+        "{err:?}"
+    );
+}

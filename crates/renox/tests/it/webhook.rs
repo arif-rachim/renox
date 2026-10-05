@@ -230,3 +230,46 @@ async fn a_webhook_route_needs_its_registration() {
         "{err:?}"
     );
 }
+
+/// #256: a provider without an event id in the body, and the processing job
+/// meeting a call whose provider is gone.
+#[renox::test]
+async fn calls_without_an_id_and_calls_for_a_provider_thats_gone() {
+    let app = app().await;
+    let body = r#"{"id": "  ", "order": "A-1"}"#;
+    send(&app, body, &webhook::hmac_sha256_hex(SECRET, body))
+        .await
+        .assert_status(400)
+        .assert_see("the webhook has no event id");
+
+    // A stored call whose provider this app no longer registers.
+    let body = r#"{"id": "evt_gone", "order": "A-2"}"#;
+    send(&app, body, &webhook::hmac_sha256_hex(SECRET, body))
+        .await
+        .assert_ok();
+    renox::db::sql("UPDATE webhook_calls SET provider = ?")
+        .bind("gone")
+        .execute(app.db())
+        .await
+        .unwrap();
+    app.run_jobs().await;
+    let id: i64 = renox::db::sql("SELECT id FROM webhook_calls")
+        .scalar(app.db())
+        .await
+        .unwrap();
+    let call = WebhookCall::find(app.db(), id).await.unwrap().unwrap();
+    assert_eq!(call.status, webhook::WebhookStatus::Failed);
+    assert_eq!(
+        call.error.as_deref(),
+        Some("no webhook `gone` is registered")
+    );
+    assert_eq!(call.text().unwrap(), body);
+    assert!(call.form::<Vec<(String, String)>>().is_ok());
+
+    // A missing secret names the variable.
+    let err = webhook::secret(app.state(), "PAY_SECRET").unwrap_err();
+    assert!(
+        format!("{err:?}").contains("set PAY_SECRET in .env"),
+        "{err:?}"
+    );
+}

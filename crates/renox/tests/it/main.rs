@@ -13,6 +13,7 @@ mod auth_edges;
 mod auth_email;
 mod authorization;
 mod background;
+mod background_edges;
 mod background_resilience;
 mod commands;
 mod dashboards;
