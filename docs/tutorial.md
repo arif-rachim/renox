@@ -51,7 +51,7 @@ Web apps have their own words. Here are the ones this tutorial uses, in plain En
 First install `rnx`, Renox's command-line tool. It makes new apps and writes code for you:
 
 ```bash
-cargo install renox-cli --version 1.0.0-rc.4
+cargo install renox-cli --version 1.0.0-rc.5
 ```
 
 Then make the app and run it:

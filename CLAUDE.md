@@ -1257,7 +1257,9 @@ picks the build, not the terminal.
   #128 → #130 (another session), #131 (the tutorial followed in CI; `clock::carry`), and
   `1.0.0-rc.3` with them: published 2026-10-04 (#132). Then the work moved to GitHub
   issues and the project board (#134); fixes #133/#144/#160/#163/#178 and the plugin extension
-  points #167/#168, released as `1.0.0-rc.4`: branch `release-1.0.0-rc.4`. Left: 1.0.0 when the owner is happy
+  points #167/#168, released as `1.0.0-rc.4` (tag `v1.0.0-rc.4`). Then #219, #226, the
+  plugins renox-oauth/-admin/-billing (#147/#148/#155) and roles per branch (#244), with the
+  workspace set to `1.0.0-rc.5` (published when the owner runs `cargo publish`). Left: 1.0.0 when the owner is happy
   with the rc (ask before every `cargo publish`).
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
