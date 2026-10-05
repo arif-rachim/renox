@@ -32,6 +32,8 @@ export class Browser {
       '--no-first-run',
       '--no-default-browser-check',
       '--window-size=1280,900',
+      // A mouse that hovers, as on a desktop (headless has neither).
+      '--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4',
       '--remote-debugging-port=0',
       `--user-data-dir=${profile}`,
       'about:blank',
@@ -85,6 +87,8 @@ export class Browser {
       deviceScaleFactor: 1,
       mobile: width < 600,
     });
+    // A phone-width page is a touch screen.
+    if (width < 600) await page.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
     return page;
   }
 
@@ -126,9 +130,10 @@ export class Page {
         for (const listener of this.listeners) listener(message);
       }
     });
-    this.on('Runtime.exceptionThrown', ({ exceptionDetails: d }) =>
-      this.problems.push(`exception: ${d.exception?.description || d.text}`),
-    );
+    this.on('Runtime.exceptionThrown', ({ exceptionDetails: d }) => {
+      const where = d.url ? ` (${d.url.split('/').pop()}:${d.lineNumber + 1}:${d.columnNumber + 1})` : '';
+      this.problems.push(`exception: ${d.exception?.description || d.text}${where}`);
+    });
     this.on('Runtime.consoleAPICalled', ({ type, args }) => {
       if (type === 'error' || type === 'assert') {
         this.problems.push(`console.${type}: ${args.map((a) => a.value ?? a.description).join(' ')}`);
@@ -216,23 +221,39 @@ export class Page {
     await sleep(80);
   }
 
-  /** The centre of the first element matching `selector`, scrolled into view. */
-  async point(selector) {
-    const box = await this.eval((s) => {
-      const el = document.querySelector(s);
-      if (!el) return null;
-      el.scrollIntoView({ block: 'center', inline: 'center' });
-      const r = el.getBoundingClientRect();
-      return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height };
-    }, selector);
-    if (!box) throw new Error(`no element ${selector}`);
-    if (!box.w || !box.h) throw new Error(`${selector} isn't visible`);
-    return box;
+  /**
+   * The centre of the first element matching `selector`, scrolled into view;
+   * waits for it to exist and be visible (pages redraw parts of themselves).
+   */
+  async point(selector, { timeout = TIMEOUT } = {}) {
+    const until = Date.now() + timeout;
+    let box;
+    for (;;) {
+      box = await this.eval((s) => {
+        const el = document.querySelector(s);
+        if (!el) return null;
+        el.scrollIntoView({ block: 'center', inline: 'center' });
+        const r = el.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height };
+      }, selector);
+      if (box && box.w && box.h) return box;
+      if (Date.now() > until) break;
+      await sleep(50);
+    }
+    throw new Error(box ? `${selector} isn't visible` : `no element ${selector}`);
   }
 
   /** A real mouse click in the middle of the element. */
   async click(selector) {
     const { x, y } = await this.point(selector);
+    for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
+      await this.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 });
+    }
+    await sleep(30);
+  }
+
+  /** A click at a point of the window (e.g. an empty corner, to click "outside"). */
+  async clickAt(x, y) {
     for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
       await this.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 });
     }
