@@ -1,12 +1,13 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-{% from "renox/ui.html" import group, link_button, tabs, tab_panel, stats, stat, dashboard, widget, period_filter, badge %}
+{% from "renox/ui.html" import group, link_button, tabs, tab_panel, stats, stat, dashboard, widget, period_filter, badge, empty %}
 <h1 class="rx-title">Admin</h1>
 {% include "admin/_nav.html" %}
 <div class="rx-row">
-  {#- One period for every figure and chart below (`?period=`, renox::chart::Period). -#}
-  {{ period_filter(period) }}
+  {#- One period for every figure and chart below (`?period=`, renox::chart::Period):
+      presets (12 weeks is per week), or "Custom" for two dates. -#}
+  {{ period_filter(period, options=[["7d", t('ui.period.7d')], ["30d", t('ui.period.30d')], ["12w", t('ui.period.12w')], ["12m", t('ui.period.12m')], ["ytd", t('ui.period.ytd')]]) }}
   {{ link_button(route('admin.orders.index', status='pending'), pending ~ " pending order" ~ ("" if pending == 1 else "s"), size="small") }}
 </div>
 
@@ -26,6 +27,17 @@
   {{ widget("Orders by status", url=route('admin.widgets.statuses'), poll=60, id="order-statuses") }}
   {% call widget("Orders", description="Paid and shipped", span="full") %}
     {{ chart("bar", orders, name="Orders", title="Orders", height=180) }}
+  {% endcall %}
+  {#- Points from the handler: {x, y, size, label} maps. -#}
+  {% call widget("Products sold", description="Price against units; the bigger the bubble, the more revenue", span=2) %}
+    {% if products %}
+    {{ chart("bubble", points=products, title="Products sold", x_title="Price", y_title="Units", size_title="Revenue", x_format="money", size_format="money", height=220) }}
+    {% else %}{{ empty("No sales in this period") }}{% endif %}
+  {% endcall %}
+  {% call widget("Order sizes", description="Items against total, per order") %}
+    {% if order_sizes %}
+    {{ chart("scatter", points=order_sizes, title="Order sizes", x_title="Items", y_title="Total", format="money", height=220) }}
+    {% else %}{{ empty("No sales in this period") }}{% endif %}
   {% endcall %}
 {% endcall %}
 

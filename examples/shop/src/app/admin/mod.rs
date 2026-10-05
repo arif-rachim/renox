@@ -5,8 +5,11 @@
 //! Deleting a product asks for the password again
 //! (`.require_password_confirmed()`, the `Auth` module's `/confirm-password`).
 //! The dashboard's figures and charts come from `renox::chart` (`Trend` over
-//! the `Period` in `?period=`); the orders-by-status chart loads on its own
-//! and refreshes every minute (the kit's `widget(url=…, poll=60)`).
+//! the `Period` in `?period=`: a preset such as `12w`, per week, or a custom
+//! range from the period filter's dates); the orders-by-status chart loads
+//! on its own and refreshes every minute (the kit's `widget(url=…, poll=60)`).
+//! A bubble chart places the products sold by price and units (the bubble is
+//! their revenue), a scatter chart the orders by items and total.
 //!
 //! Made with `rnx make:module admin`.
 
@@ -19,7 +22,7 @@ use renox::chart::{Period, Series, Trend};
 use renox::prelude::*;
 
 use crate::app::catalog::model::Product;
-use crate::app::orders::model::{Order, OrderStatus};
+use crate::app::orders::model::{Order, OrderItem, OrderStatus};
 
 pub struct AdminPanel;
 
@@ -120,6 +123,42 @@ async fn dashboard(State(state): State<AppState>, user: AuthUser, period: Period
         .limit(10)
         .get(&db)
         .await?;
+    // Each product sold in the period: its price, how many, for how much.
+    let (start, end) = period.range(state.config.timezone);
+    let in_period = || {
+        sold()
+            .where_op("created_at", ">=", start)
+            .where_op("created_at", "<", end)
+    };
+    let sales: Vec<(String, i64, i64, i64)> = OrderItem::query()
+        .where_in_query("order_id", in_period(), "id")
+        .group_by("name")
+        .select_as(
+            &db,
+            "name, CAST(MAX(price) AS BIGINT), CAST(SUM(quantity) AS BIGINT), CAST(SUM(price * quantity) AS BIGINT)",
+        )
+        .await?;
+    let products: Vec<_> = sales
+        .into_iter()
+        .map(|(name, price, units, revenue)| {
+            renox::serde_json::json!({ "x": price, "y": units, "size": revenue, "label": name })
+        })
+        .collect();
+    // Each order: how many items, and its total.
+    let items: Vec<(i64, i64, i64)> = OrderItem::query()
+        .where_in_query("order_id", in_period(), "id")
+        .group_by("order_id")
+        .select_as(
+            &db,
+            "order_id, CAST(SUM(quantity) AS BIGINT), CAST(SUM(price * quantity) AS BIGINT)",
+        )
+        .await?;
+    let order_sizes: Vec<_> = items
+        .into_iter()
+        .map(|(id, quantity, total)| {
+            renox::serde_json::json!({ "x": quantity, "y": total, "label": format!("Order #{id}") })
+        })
+        .collect();
     let notifications = user.notifications(&db, 10).await?;
     user.mark_all_notifications_read(&db).await?;
     // Who did what lately: logins (recorded by the `Audit` module itself)
@@ -148,6 +187,8 @@ async fn dashboard(State(state): State<AppState>, user: AuthUser, period: Period
             revenue_labels => revenue.labels.clone(),
             revenue,
             orders,
+            products,
+            order_sizes,
         },
     ))
 }
