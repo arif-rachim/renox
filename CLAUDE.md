@@ -5,7 +5,8 @@ repo, and every trap hit so far, so you don't have to rediscover them.
 
 **Read next**, depending on the task:
 - `ROADMAP.md`: the plan, per-milestone notes and the "Decisions" section.
-- `CHANGELOG.md`: what changed, milestone by milestone.
+- `CHANGELOG.md`: what changed, milestone by milestone. **Read only: agents never edit it, nor
+  `README.md` (§4.11).**
 - `CONTRIBUTING.md`: the checks every change needs. `SECURITY.md`: how vulnerabilities are reported.
   `RELEASING.md`: how a release goes to crates.io (the owner publishes).
 - `CHEATSHEET.md` and `llms.txt`: the app author's view (patterns, and which example shows what).
@@ -498,7 +499,8 @@ outgrow one server. `Db` is Renox's own type (`db/conn.rs`): a private enum over
 - Handlers return `renox::Result<T>`; any `anyhow`-compatible error converts with `?`.
 - New public structs/enums that may grow get `#[non_exhaustive]` and a line in docs/stability.md
   (also keep its public-dependency list in sync when adding re-exports).
-- When a public API changes, fix CHEATSHEET.md, README.md, llms.txt and the examples in the same PR.
+- When a public API changes, fix CHEATSHEET.md, llms.txt, the guides and the examples in the same
+  PR (not README.md or CHANGELOG.md: §4.11).
 
 ### 4.2 Handler futures must be `Send`
 axum needs `Send` handler futures, and rustc (issue #100013) can't prove it when a generic future
@@ -677,7 +679,8 @@ PostgreSQL suite 2.5x slower (reconnects).
   since that builds the committed tree.
 
 ### 4.10 Docs and examples for app authors and agents
-- `README.md` is compiled (`ReadMe`): keep its Rust blocks complete. It's the front page, so it
+- `README.md`: agents don't edit it (§4.11); the owner keeps it. What follows is for the owner.
+  It is compiled (`ReadMe`): keep its Rust blocks complete. It's the front page, so it
   sells: tagline, why, GIF, 3-line quick start, a short taste, fold-out feature tour, comparison
   with Loco/Axum, then status. Keep claims true (checked against the code). Since
   1.0.0-rc.1 it has the crates.io/docs.rs badges, installs from crates.io (`--version` while
@@ -725,11 +728,17 @@ PostgreSQL suite 2.5x slower (reconnects).
 - Before starting, check open PRs (`gh pr list -R arif-rachim/renox`) and base new branches on an
   up-to-date `main`. **Don't stack PRs** on unmerged branches (§6.3): push the next branch, but open
   its PR only after the previous one is merged.
-- Each milestone PR also updates: `CHANGELOG.md` (under "Unreleased", a `### Mxx · title`
-  section; breaking changes marked), ROADMAP checkboxes and notes (tick only what is in the
+- **Never edit `CHANGELOG.md` or the root `README.md`** (the owner's rule, 2026-10-05): every
+  PR touched the same "Unreleased" lines and the same guide list, so every merge left the other
+  open PRs in conflict. Leave both files exactly as they are on `main`, even when a feature or a
+  breaking change would belong there; say it in the PR description instead (the owner keeps
+  those two files). This overrides every other line in this file that says to update them.
+  Example READMEs (`examples/*/README.md`, a crate's own README) are not covered and are still
+  kept in step.
+- Each milestone PR also updates: ROADMAP checkboxes and notes (tick only what is in the
   code, with the API names the code uses), §7 of this file, `llms.txt`, and the example READMEs
-  when examples change. Also check, and update when the milestone touches them: `README.md`
-  (feature tour, Laravel table, status), `docs/operations.md` (commands, tables to prune, what
+  when examples change. Also check, and update when the milestone touches them:
+  `docs/operations.md` (commands, tables to prune, what
   `APP_KEY` protects, failure table), the other guides in `docs/`, the counts in §4.5/§7,
   `crates/renox-cli/stubs/AGENTS.md.stub` (traps for app agents) and `env.stub`, and the
   examples: an example that works around something the milestone adds should use the new API,
@@ -762,7 +771,7 @@ PostgreSQL suite 2.5x slower (reconnects).
   minor`, informational until the first release; install it with `cargo install --locked
   cargo-semver-checks` to run it locally).
 - MSRV is `rust-version` in the workspace `Cargo.toml` (1.94, set by sqlx 0.9); the `msrv` job
-  uses the same number, so raise both together and note it in CHANGELOG.md.
+  uses the same number, so raise both together and note it in the PR description.
 - After pushing, watch CI (`gh run watch <id> -R arif-rachim/renox --exit-status`) and tick the
   "CI green" box in the PR body.
 
