@@ -14,6 +14,8 @@ use crate::db::Dialect;
 /// their reservation extended (`extend_reservation`).
 const RESERVATION: i64 = 15 * 60;
 const POLL: Duration = Duration::from_secs(1);
+/// The error a job gets when its last attempt never finished.
+const CRASHED: &str = "the worker stopped during the last attempt (crash, kill or out of memory)";
 
 struct Reserved {
     id: i64,
@@ -289,30 +291,36 @@ impl Worker {
             }
             Outcome::Failed(failure) => {
                 tracing::error!(job = %job.job, id = job.id, error = %failure.error, "job failed for good");
-                let report = crate::report::ErrorReport::new(
-                    &self.state,
-                    crate::report::ReportKind::Job,
-                    failure.error.lines().next().unwrap_or_default().to_owned(),
-                    failure.error.clone(),
-                    Some(format!("{} #{}", job.job, job.id)),
-                );
-                crate::report::send(&self.state, report);
-                if let (Some(handler), Ok(plain)) = (&handler, plain) {
-                    let ctx = JobContext {
-                        state: self.state.clone(),
-                        attempt: job.attempts,
-                        id: job.id,
-                        batch_id: job.batch_id.or(job.callback_of),
-                    };
-                    let hook = (handler.failed)(plain, ctx, failure.error);
-                    let hook = crate::context::scope_app(self.state.clone(), hook);
-                    if tokio::spawn(crate::clock::carry(hook)).await.is_err() {
-                        tracing::error!(job = %job.job, id = job.id, "the job's failed hook panicked");
-                    }
-                }
+                self.failed_for_good(&job, plain.ok(), failure.error).await;
             }
         }
         Ok(true)
+    }
+
+    /// Reports a job that failed for good (`App::report`) and runs its
+    /// `failed` hook (when its handler is known and its payload opens).
+    async fn failed_for_good(&self, job: &Reserved, plain: Option<String>, error: String) {
+        let report = crate::report::ErrorReport::new(
+            &self.state,
+            crate::report::ReportKind::Job,
+            error.lines().next().unwrap_or_default().to_owned(),
+            error.clone(),
+            Some(format!("{} #{}", job.job, job.id)),
+        );
+        crate::report::send(&self.state, report);
+        if let (Some(handler), Some(plain)) = (self.handlers.get(job.job.as_str()), plain) {
+            let ctx = JobContext {
+                state: self.state.clone(),
+                attempt: job.attempts,
+                id: job.id,
+                batch_id: job.batch_id.or(job.callback_of),
+            };
+            let hook = (handler.failed)(plain, ctx, error);
+            let hook = crate::context::scope_app(self.state.clone(), hook);
+            if tokio::spawn(crate::clock::carry(hook)).await.is_err() {
+                tracing::error!(job = %job.job, id = job.id, "the job's failed hook panicked");
+            }
+        }
     }
 
     /// One attempt, in its own task so a panic is a failed attempt, not a
@@ -449,6 +457,7 @@ impl Worker {
         .bind(now - RESERVATION)
         .fetch_all(&mut tx)
         .await?;
+        let mut swept = Vec::new();
         for row in &rows {
             let job = Reserved {
                 id: row.try_get("id")?,
@@ -461,12 +470,7 @@ impl Worker {
                 batch_id: row.try_get("batch_id")?,
                 callback_of: row.try_get("callback_of")?,
             };
-            fail(
-                &mut tx,
-                &job,
-                "the worker stopped during the last attempt (crash, kill or out of memory)",
-            )
-            .await?;
+            fail(&mut tx, &job, CRASHED).await?;
             if let Some(batch) = job.batch_id {
                 super::batch_job_done(&mut tx, batch, true).await?;
             }
@@ -478,8 +482,15 @@ impl Worker {
                 super::release_unique(&mut tx, &key).await?;
             }
             tracing::error!(job = %job.job, "job's last attempt never finished; moved to failed_jobs");
+            swept.push(job);
         }
         tx.commit().await?;
+        // Like a last attempt that returned an error: reported, and the
+        // job's `failed` hook runs.
+        for job in swept {
+            let plain = self.state.queue.open(&job.payload).ok();
+            self.failed_for_good(&job, plain, CRASHED.to_owned()).await;
+        }
         Ok(())
     }
 

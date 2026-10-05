@@ -138,8 +138,8 @@ Jobs sometimes fail: a mail server is down, an API answers slowly. Here's what R
   jobs.
 - **A worker that dies during the last attempt:** the job has no attempts left, so a worker
   later moves it to `failed_jobs` with the error "the worker stopped during the last attempt".
-  In this case the `failed` hook does **not** run and no error report is sent; only an error
-  line is logged. Check `queue:failed` after a crash.
+  As for any job that fails for good, its `failed` hook then runs once (in the worker that
+  found it) and the error goes to your error reporters (`App::report`).
 
 > [!TIP]
 > Because a job may run more than once, try to make it **idempotent**: safe to run twice. For

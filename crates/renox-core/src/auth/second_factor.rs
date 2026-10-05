@@ -8,6 +8,8 @@
 //! minutes) and the browser goes to the challenge. The challenge's handler
 //! checks the code and calls [`complete_login`], which logs in exactly as the
 //! login page would have (and sends the user where they were going).
+//! Registration asks the same question about the new user, so a step every
+//! user must pass isn't skipped by signing up.
 //!
 //! ```
 //! use renox::auth::{complete_login, pending_login};

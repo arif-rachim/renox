@@ -69,6 +69,19 @@ impl Job for Panicky {
     }
 }
 
+/// Logs its `failed` hook, to see that a crashed last attempt runs it.
+#[derive(Serialize, Deserialize)]
+struct Remembered;
+impl Job for Remembered {
+    const NAME: &'static str = "probe-remembered";
+    async fn handle(self, ctx: JobContext) -> Result {
+        log(&ctx.state, "remembered ran").await
+    }
+    async fn failed(self, ctx: JobContext, error: String) {
+        let _ = log(&ctx.state, &format!("failed hook: {error}")).await;
+    }
+}
+
 /// Takes longer than it's allowed to be reserved (TIMEOUT > RESERVATION = 15 min).
 #[derive(Serialize, Deserialize)]
 struct LongJob;
@@ -87,6 +100,7 @@ async fn kernel_cfg(config: Config) -> Kernel {
         .job::<Greet>()
         .job::<Panicky>()
         .job::<LongJob>()
+        .job::<Remembered>()
         .boot()
         .await
         .unwrap();
@@ -228,6 +242,46 @@ async fn crashed_final_attempt_is_not_run_again() {
         log.is_empty(),
         "ran attempt max+1 (a poison job that kills workers runs forever)"
     );
+}
+
+/// A last attempt that never finished fails the job like one that returned
+/// an error: its `failed` hook runs and it is reported (#219).
+#[renox::test]
+async fn a_crashed_last_attempt_runs_the_failed_hook_and_is_reported() {
+    let reports: Arc<Mutex<Vec<String>>> = Arc::default();
+    let seen = reports.clone();
+    let k = App::with_config(config())
+        .job::<Remembered>()
+        .report(move |report, _state| {
+            let seen = seen.clone();
+            async move { seen.lock().unwrap().push(report.message) }
+        })
+        .boot()
+        .await
+        .unwrap();
+    k.migrate().await.unwrap();
+    create_log(k.db()).await;
+    k.state().dispatch(Remembered).await.unwrap();
+    renox::db::sql("UPDATE jobs SET attempts = max_attempts, reserved_at = ?")
+        .bind(renox::chrono::Utc::now().timestamp() - 3600)
+        .execute(k.db())
+        .await
+        .unwrap();
+    k.run_jobs().await.unwrap();
+    let log = logged(k.db()).await;
+    assert_eq!(log.len(), 1, "{log:?}");
+    assert!(
+        log[0].starts_with("failed hook: the worker stopped"),
+        "{log:?}"
+    );
+    assert_eq!(scalar(k.db(), "SELECT COUNT(*) FROM failed_jobs").await, 1);
+    let until = Instant::now() + Duration::from_secs(5);
+    while reports.lock().unwrap().is_empty() && Instant::now() < until {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    let reports = reports.lock().unwrap();
+    assert_eq!(reports.len(), 1, "{reports:?}");
+    assert!(reports[0].contains("the worker stopped"), "{reports:?}");
 }
 
 #[renox::test]

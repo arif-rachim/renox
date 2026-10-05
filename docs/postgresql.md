@@ -134,8 +134,8 @@ The rules in full:
 - A database-specific `up` without its own `down` uses the plain `.down.sql`. That is usually
   just a `DROP TABLE`, which is the same on both.
 - A database-specific `down` without its own `up` (say, a `.postgres.down.sql` next to a plain
-  `.up.sql`) is ignored: rolling back runs the plain `.down.sql`. When the undo differs on one
-  database, give that database its own `up` as well.
+  `.up.sql`) doesn't compile: `migrations!` refuses it, since it would never run. When the undo
+  differs on one database, give that database its own `up` as well.
 - You may leave out the plain `up` when both databases have their own.
 - A migration without any `down` can't be rolled back (see `migrate:rollback` in
   [operations.md](operations.md#deploys-and-migrations)).
@@ -171,12 +171,12 @@ A migration runs **without** that transaction when any of these is true:
 - it has a line that is exactly `-- renox:no-transaction`;
 - it starts its own transaction (a `BEGIN`, `BEGIN TRANSACTION` or `BEGIN IMMEDIATE`
   statement), so it decides itself what to commit;
-- it contains ` CONCURRENTLY ` (as in `CREATE INDEX CONCURRENTLY`, which builds an index without
+- it contains the word `CONCURRENTLY` (as in `CREATE INDEX CONCURRENTLY`, which builds an index without
   blocking the table and can't run in a transaction).
 
 How such a migration then runs:
 
-- On PostgreSQL, a migration with ` CONCURRENTLY ` is split and sent statement by statement.
+- On PostgreSQL, a migration with the word `CONCURRENTLY` is split and sent statement by statement.
 - Any other one is sent as one script. On PostgreSQL, a script of several statements still
   runs as one implicit transaction (unless it has its own `BEGIN` … `COMMIT`). On SQLite, each
   statement is kept as soon as it runs.

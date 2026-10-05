@@ -130,9 +130,15 @@ What's going on:
 environment or `.env`). It starts from `Config::default()`, which has:
 
 - an in-memory database;
+- `APP_ENV=testing` (so `SESSION_DRIVER=database` keeps sessions in memory, where the session
+  helpers read them);
 - the memory mailer (mail is kept in a list, not sent);
 - no queue workers and no scheduler (so nothing runs in the background by surprise);
-- debug on.
+- debug on;
+- a 30-second wait for a database connection (the `.env` default is 5: parallel tests open many
+  SQLite files at once; an in-memory database still gives up after 2 seconds).
+
+Every other setting has the default `.env.example` lists.
 
 Change any of it with `TestApp::with_config(app, |c| …)`.
 

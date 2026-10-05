@@ -40,7 +40,7 @@ columns are what to write in your migration's `CREATE TABLE`, for SQLite or Post
 | `<input>`, `type=email/url/tel/search/password` | `String` | `TEXT` | `TEXT` |
 | `<textarea>` | `String`, or `Option<String>` (empty → `None`) | `TEXT` | `TEXT` |
 | `type=number` | `i64` (use `i64` for whole numbers; PostgreSQL has no unsigned types) | `INTEGER` | `BIGINT` |
-| `type=number`, smaller ranges | `i16`, `i32` (also `i8`; `u8`, `u16`, `u32` only in builds without the `postgres` feature, whatever database the app runs on: PostgreSQL has no unsigned columns) | `INTEGER` | `SMALLINT`, `INTEGER` |
+| `type=number`, smaller ranges | `i16`, `i32` (also `i8` on SQLite: on PostgreSQL `i8` reads only the one-byte `"CHAR"` type, not `SMALLINT`; `u8`, `u16`, `u32` only in builds without the `postgres` feature, whatever database the app runs on: PostgreSQL has no unsigned columns) | `INTEGER` | `SMALLINT`, `INTEGER` |
 | `type=number step=0.01` (measures) | `f64` | `REAL` | `DOUBLE PRECISION` |
 | `type=number step=0.01`, single precision | `f32` | `REAL` | `REAL` |
 | money | `i64` in the smallest unit (rupiah, cents), never `f64` | `INTEGER` | `BIGINT` |
@@ -56,7 +56,7 @@ columns are what to write in your migration's `CREATE TABLE`, for SQLite or Post
 | the kit's `tags_input` | `Vec<String>` with `#[serde(default)]`; stored as `Json<Vec<String>>` | `TEXT` | `JSONB` |
 | the kit's `key_value` (`meta[0][key]`, `meta[0][value]`) | `KeyValues` with `#[serde(default)]`; stored as `Json<KeyValues>` (a list of pairs, so the order holds) | `TEXT` | `JSONB` |
 | the kit's `repeater` (`lines[0][name]`, `lines[0][qty]`) | `Vec<Line>` of a `Deserialize` struct, checked with `v.nested("lines", &self.lines)` | (a table of its own, or `Json<Vec<Line>>`) | |
-| (structured data) | `Json<T>` for any serde type, or `serde_json::Value` | `TEXT` | `JSONB` (or `JSON`, `TEXT`) |
+| (structured data) | `Json<T>` for any serde type (`Json<serde_json::Value>` for free-form data) | `TEXT` | `JSONB` (or `JSON`, `TEXT`); a bare `serde_json::Value` field needs `JSONB` or `JSON` |
 | (public ids) | `uuid::Uuid`, with renox's `uuid` feature (`renox::uuid::Uuid`) | `BLOB` | `UUID` |
 | (sortable public ids) | `renox::db::Ulid` | `TEXT` | `TEXT` |
 | (bytes) | `Vec<u8>` | `BLOB` | `BYTEA` |

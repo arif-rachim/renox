@@ -1032,6 +1032,44 @@ async fn a_panicking_or_slow_handler_answers_500_and_the_app_keeps_serving() {
     app.get("/ok").await.assert_ok();
 }
 
+/// A request stuck before its handler (database sessions waiting for a
+/// connection) still ends near `REQUEST_TIMEOUT`, not at the pool's acquire
+/// timeout (#219).
+#[renox::test]
+async fn request_timeout_also_bounds_the_session_layer() {
+    if std::env::var("TEST_DATABASE_URL").is_ok() {
+        return; // needs the one-connection SQLite pool below
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let url = format!("sqlite://{}", dir.path().join("app.db").display());
+    let app = TestApp::with_config(App::new().module(Faulty), |c| {
+        c.request_timeout = Some(Duration::from_secs(1));
+        c.session_driver = renox::SessionDriver::Database;
+        c.database_url = url;
+        c.database_pool_size = 1;
+        c.database_acquire_timeout = Duration::from_secs(20);
+        // Under `testing`, database sessions live in memory; this needs the table.
+        c.env = Environment::Local;
+    })
+    .await;
+    app.get("/ok").await.assert_ok(); // a session row and its cookie
+    let held = app.db().begin().await.unwrap(); // the pool's only connection
+    let started = Instant::now();
+    let res = app.get("/ok").await;
+    assert_eq!(res.status, StatusCode::INTERNAL_SERVER_ERROR);
+    assert!(
+        started.elapsed() < Duration::from_secs(6),
+        "{:?}",
+        started.elapsed()
+    );
+    assert!(
+        started.elapsed() >= Duration::from_secs(1),
+        "it waited for the session"
+    );
+    drop(held);
+    app.get("/ok").await.assert_ok();
+}
+
 #[renox::test]
 async fn a_no_transaction_migration_runs_outside_the_wrapper() {
     const MARKED: Migration = Migration::new(

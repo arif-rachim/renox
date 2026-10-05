@@ -289,8 +289,8 @@ filters are set, a row must pass all of them to show.
 On top of the heading filters, there are:
 
 - **Search.** If any columns are marked `.searchable()`, a search box appears in the toolbar.
-  Every word typed must appear in one of those columns (as text, upper or lower case). The grid
-  searches as you type. When the grid's model has a full-text index
+  Every word typed must appear in one of those columns (as text, upper or lower case); only the
+  first eight words count. The grid searches as you type. When the grid's model has a full-text index
   (`#[model(search = "title, body")]`, [search.md](search.md)), the box searches through it:
   all the index's columns count, also those the grid doesn't show, words match their prefixes
   and other forms, and rows come best match first until the user sorts by a heading.
@@ -591,8 +591,9 @@ How bulk actions work:
   match, on every page.
 - A bulk action sends `ids=4,7` and `all=true|false` to its URL, along with the grid's query
   string. Read them with `Form<Selection>`.
-- `grid.selected(query, &request, &selection)?` is the query for exactly those rows. When `all`
-  is set, it's every row the filters match.
+- `grid.selected(query, &request, &selection)?` is the query for exactly those rows (at most
+  10,000 ticked ids are read; more need `all`). When `all` is set, it's every row the filters
+  match.
 
 How row actions work:
 

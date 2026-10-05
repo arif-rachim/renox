@@ -102,10 +102,10 @@ pub fn expand(input: TokenStream) -> Result<TokenStream> {
             ("postgres", &set.postgres),
             ("", &set.plain),
         ] {
-            if files.down.is_some()
-                && files.up.is_none()
-                && (dialect.is_empty() || set.plain.up.is_none())
-            {
+            // A database's own `down` is used only with its own `up`: next to
+            // a plain `up` it would be ignored, and rolling back would run the
+            // plain `down` instead, so it's refused.
+            if files.down.is_some() && files.up.is_none() {
                 let dot = if dialect.is_empty() {
                     String::new()
                 } else {
@@ -113,7 +113,10 @@ pub fn expand(input: TokenStream) -> Result<TokenStream> {
                 };
                 return Err(Error::new(
                     Span::call_site(),
-                    format!("migration `{name}` has a {dot}.down.sql but no {dot}.up.sql in {dir}"),
+                    format!(
+                        "migration `{name}` has a {dot}.down.sql but no {dot}.up.sql in {dir} \
+                         (a database's own down is used only with its own up)"
+                    ),
                 ));
             }
         }

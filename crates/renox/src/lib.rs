@@ -250,5 +250,16 @@ pub struct CheatSheet;
 /// #[derive(FromRow)]
 /// struct Row { value: NotAColumn }
 /// ```
+///
+/// A database's own `.down.sql` without its own `.up.sql` (here a
+/// `.postgres.down.sql` next to a plain `.up.sql`) would be ignored, so
+/// `migrations!` refuses it:
+/// ```compile_fail
+/// let _ = renox::migrations!("tests/migrations_bad_down");
+/// ```
+/// …while a directory without that mistake compiles:
+/// ```
+/// let _ = renox::migrations!("tests/migrations_types");
+/// ```
 #[cfg(doctest)]
 pub struct MacroCompileErrors;

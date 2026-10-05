@@ -137,7 +137,13 @@ impl Security {
         let csrf_exempt = routes
             .iter()
             .filter(|route| route.middleware.iter().any(|m| m == "no-csrf"))
-            .map(|route| (route.method.clone(), route.path.clone()))
+            // A resource's update route is listed as `PUT|PATCH`.
+            .flat_map(|route| {
+                route
+                    .method
+                    .split('|')
+                    .map(|method| (method.to_owned(), route.path.clone()))
+            })
             .collect();
         let webhook_paths = routes
             .iter()

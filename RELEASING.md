@@ -4,17 +4,19 @@ How a release goes to crates.io. Only a maintainer with publish rights on the si
 (`renox`, `renox-core`, `renox-macros`, `renox-cli` and the plugins `renox-2fa` and
 `renox-editors`) can do it. All six share the workspace's version and are released together.
 
-## Before the first release
+## The machine that publishes
 
 - A crates.io account with a **verified email address** (crates.io refuses to publish without
-  one), and publish rights on the five names (0.0.1 placeholders reserved the first four; a
-  name's first `cargo publish` creates it and gives the publisher those rights).
+  one), and publish rights on the six names. The release candidates (`1.0.0-rc.1` to `rc.4`)
+  created them; a new crate (a new plugin) gets its name at its first `cargo publish`, which
+  gives the publisher those rights.
 - `cargo login` on the machine that publishes. The token stays in `~/.cargo/credentials.toml`:
   never put it in the repository, an issue, a chat or an environment variable that a script
   prints.
-- A first release candidate is worth it: publish `1.0.0-rc.1`, check that docs.rs builds the
-  API reference and that `cargo install renox-cli && rnx new demo` works from crates.io, then
-  publish `1.0.0`. Cargo never picks a pre-release unless asked (`renox = "1.0.0-rc.1"`).
+- A release candidate is worth it before a big release: publish `x.y.0-rc.1`, check that
+  docs.rs builds the API reference and that `cargo install renox-cli --version x.y.0-rc.1 &&
+  rnx new demo` works from crates.io, then publish `x.y.0`. Cargo never picks a pre-release
+  unless asked (`renox = "1.0.0-rc.1"`).
 
 ## Every release
 

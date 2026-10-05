@@ -1163,6 +1163,11 @@ fn inherited_listener() -> Result<Option<TcpListener>> {
 }
 
 /// Built-in commands; an app command can't take one of these names.
+///
+/// The list is the 1.0 set and stays as it is through 1.x (docs/stability.md):
+/// refusing a name an app already uses would stop that app from booting. A
+/// command added in 1.x must let an app command of the same name run in its
+/// place instead of joining this list.
 const BUILT_IN_COMMANDS: &[&str] = &[
     "serve",
     "migrate",
@@ -1519,6 +1524,33 @@ async fn guard(
     })
 }
 
+/// How much longer than `REQUEST_TIMEOUT` the outer limit (`backstop`) waits,
+/// so a slow handler still gets the inner one's error page.
+const BACKSTOP_GRACE: Duration = Duration::from_secs(1);
+
+/// `REQUEST_TIMEOUT` around the session, i18n, auth, CSRF and view layers:
+/// `guard` only covers the handler, so a hang before it (database sessions
+/// on a database that stopped answering) would otherwise go unbounded.
+/// Answers a plain 500 a little after the handler's own limit.
+async fn backstop(
+    limit: Option<Duration>,
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use axum::response::IntoResponse;
+    let Some(limit) = limit else {
+        return next.run(req).await;
+    };
+    match tokio::time::timeout(limit + BACKSTOP_GRACE, next.run(req)).await {
+        Ok(res) => res,
+        Err(_) => Error::Internal(anyhow!(
+            "the request took longer than REQUEST_TIMEOUT ({}s) before reaching its handler",
+            limit.as_secs()
+        ))
+        .into_response(),
+    }
+}
+
 /// Adds a module's routes; what axum refuses to merge is a boot error.
 fn merge_routes(
     router: Router<AppState>,
@@ -1688,6 +1720,11 @@ fn build_router(
         .layer(from_fn_with_state(
             state.clone(),
             crate::context::middleware,
+        ))
+        .layer(from_fn(
+            move |req: axum::extract::Request, next: axum::middleware::Next| {
+                backstop(request_timeout, req, next)
+            },
         ))
         // `/_renox/debug`: around it all, so the session's and user's SQL count.
         .layer(from_fn_with_state(

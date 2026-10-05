@@ -278,3 +278,34 @@ async fn misconfigured_steps_fail_at_boot() {
         .await;
     assert!(format!("{:?}", missing.err().unwrap()).contains("`missing.challenge` doesn't exist"));
 }
+
+/// A step the module asks of every matching user also follows registration:
+/// signing up doesn't skip it (#219).
+#[renox::test]
+async fn registration_goes_through_the_step_too() {
+    let (app, _, _) = app().await;
+    app.fake_events();
+    let form = |name: &'static str, email: &'static str| {
+        [
+            ("name", name),
+            ("email", email),
+            ("password", PASSWORD),
+            ("password_confirmation", PASSWORD),
+        ]
+    };
+    app.post("/register", &form("Guarded", "new-guarded@example.com"))
+        .await
+        .assert_redirect("/code");
+    app.get("/account").await.assert_redirect("/login");
+    assert!(app.emitted::<LoggedIn>().is_empty());
+    app.post("/code", &[("code", CODE)])
+        .await
+        .assert_redirect("/");
+    app.get("/account").await.assert_ok();
+
+    app.post("/logout", &[]).await;
+    app.post("/register", &form("Plain", "new-plain@example.com"))
+        .await
+        .assert_redirect("/");
+    app.get("/account").await.assert_ok();
+}

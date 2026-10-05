@@ -33,6 +33,17 @@ impl Module for Site {
             )
             .merge(
                 Routes::new()
+                    .resource(
+                        "/feeds",
+                        "feeds",
+                        Resource::new()
+                            .store(|| async { "stored" })
+                            .update(|| async { "updated" }),
+                    )
+                    .without_csrf(),
+            )
+            .merge(
+                Routes::new()
                     .get("/api/stock", || async { "12" })
                     .post("/api/stock", || async { "saved" })
                     .cors(&["https://app.example.com"]),
@@ -206,6 +217,31 @@ async fn webhooks_skip_csrf_but_nothing_else_does() {
         .find(|r| r.path == "/webhooks/pay")
         .unwrap();
     assert_eq!(webhook.middleware, ["no-csrf"]);
+}
+
+/// A resource's `update` route answers PUT and PATCH (listed as `PUT|PATCH`):
+/// `.without_csrf()` exempts both methods (#219).
+#[renox::test]
+async fn a_resource_update_without_csrf_skips_it_for_put_and_patch() {
+    let (app, _dir) = app(|_| {}, |a| a).await;
+    app.request()
+        .without_csrf()
+        .post("/feeds", &[])
+        .await
+        .assert_ok()
+        .assert_see("stored");
+    app.request()
+        .without_csrf()
+        .put("/feeds/1", &[])
+        .await
+        .assert_ok()
+        .assert_see("updated");
+    app.request()
+        .without_csrf()
+        .patch("/feeds/1", &[])
+        .await
+        .assert_ok()
+        .assert_see("updated");
 }
 
 async fn raw(kernel: &Kernel, req: Request<Body>) -> axum::http::Response<Body> {

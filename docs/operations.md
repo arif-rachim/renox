@@ -86,7 +86,7 @@ the `.env.example` that `rnx new` writes; see also [All settings](#all-settings)
 |---|---|---|
 | `DATABASE_ACQUIRE_TIMEOUT` | 5 | How long a query waits for a database connection. After that, the request answers 500 (an error). |
 | `DATABASE_STATEMENT_TIMEOUT` | 30 | How long one PostgreSQL statement may run (`0` = no limit). It covers commands too: `migrate`, `db:seed`, `db:shell` and `queue:work`. For a long report, run `SET LOCAL statement_timeout = 0` inside its transaction. |
-| `REQUEST_TIMEOUT` | 60 | How long a handler may take to answer (`0` = no limit). After that, the request answers 500. Streaming a response and waiting for a slow visitor's connection don't count. |
+| `REQUEST_TIMEOUT` | 60 | How long a handler may take to answer (`0` = no limit). After that, the request answers 500. Work before the handler (loading the session and the user) is bounded too, one second later. Streaming a response and waiting for a slow visitor's connection don't count. |
 | `MAIL_TIMEOUT` | 10 | How long sending one mail over SMTP may take, from connecting to the last reply. |
 | (fixed) | 2 | How long `/health` waits for the database. |
 | (fixed) | 5 | How long SQLite waits for another writer to finish (`busy_timeout`). |
@@ -568,8 +568,8 @@ again.
 Expired rows are deleted now and then by requests, and by `my-app session:prune`
 (`Session::prune_expired(&db)`).
 
-In tests (`APP_ENV=testing`), database sessions are kept in memory, so `TestApp`'s session
-helpers keep working.
+In tests (`APP_ENV=testing`), database sessions are kept in memory instead of the `sessions`
+table, so `TestApp`'s session helpers keep working.
 
 ## Scheduled tasks and housekeeping
 

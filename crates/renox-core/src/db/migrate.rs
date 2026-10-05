@@ -167,7 +167,7 @@ fn runs_outside_transaction(sql: &str) -> bool {
         return true;
     }
     let upper = sql.to_ascii_uppercase();
-    upper.contains(" CONCURRENTLY ")
+    uses_concurrently(sql)
         || upper.split(';').any(|statement| {
             let statement = statement.trim();
             statement == "BEGIN"
@@ -176,11 +176,18 @@ fn runs_outside_transaction(sql: &str) -> bool {
         })
 }
 
+/// Whether `sql` has the word `CONCURRENTLY`, whatever surrounds it (a
+/// space, a newline, a tab).
+fn uses_concurrently(sql: &str) -> bool {
+    sql.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+        .any(|word| word.eq_ignore_ascii_case("CONCURRENTLY"))
+}
+
 /// Runs `sql` outside the migration transaction. PostgreSQL runs a
 /// multi-statement script as one implicit transaction, which `CONCURRENTLY`
 /// refuses, so there such a script runs one statement at a time.
 async fn run_each(db: &Db, sql: &str) -> Result<(), super::DbError> {
-    if db.dialect() == Dialect::Postgres && sql.to_ascii_uppercase().contains(" CONCURRENTLY ") {
+    if db.dialect() == Dialect::Postgres && uses_concurrently(sql) {
         for statement in statements(sql) {
             script(db, statement).await?;
         }
@@ -663,6 +670,20 @@ mod tests {
         ));
         assert!(!runs_outside_transaction(
             "CREATE TABLE begin_log (id INT);"
+        ));
+    }
+
+    /// `CONCURRENTLY` followed by a newline or a tab counts too (#219).
+    #[test]
+    fn concurrently_is_found_whatever_follows_it() {
+        assert!(runs_outside_transaction(
+            "CREATE INDEX CONCURRENTLY\n    users_email ON users (email);"
+        ));
+        assert!(runs_outside_transaction(
+            "create index\tconcurrently\tx ON t (a);"
+        ));
+        assert!(!runs_outside_transaction(
+            "CREATE TABLE concurrently_log (id INT);"
         ));
     }
 

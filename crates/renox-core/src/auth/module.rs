@@ -590,11 +590,22 @@ async fn store_register(
     if settings.verify_email {
         verification::send_verification(&state, &user).await?;
     }
-    login(&session, &user, None)?;
     let event = Registered {
         user_id: user.id,
         email: user.email.clone(),
     };
+    // A module whose second step every user must pass (not only the ones
+    // who set it up) gets it here too, as at the login page.
+    if let Some(second) = &state.second_factor
+        && (second.required)(user.clone(), state.clone()).await?
+    {
+        let to = after_login(&state, &settings, &session);
+        super::second_factor::begin(&session, &user, &user.email, false, to)?;
+        announce(&state, event).await;
+        let challenge = state.url(&second.challenge, &[])?;
+        return Ok(go(&htmx, challenge));
+    }
+    login(&session, &user, None)?;
     announce(&state, event).await;
     Ok(go(&htmx, after_login(&state, &settings, &session)))
 }

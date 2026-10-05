@@ -631,54 +631,73 @@ impl sqlx::Encode<'_, Postgres> for UntypedNull {
 }
 
 /// Rewrites `?` placeholders as PostgreSQL's `$1`, `$2`, …, skipping quoted
-/// strings, quoted identifiers and comments.
+/// strings (`'…'`, `E'…'` with backslash escapes, dollar-quoted `$$…$$` and
+/// `$tag$…$tag$`), quoted identifiers and comments.
 #[cfg(any(feature = "postgres", test))]
 pub(crate) fn numbered_placeholders(sql: &str) -> Cow<'_, str> {
     if !sql.contains('?') {
         return Cow::Borrowed(sql);
     }
+    // Every delimiter is ASCII, so byte offsets always fall between characters.
+    let bytes = sql.as_bytes();
+    let ident = |b: u8| b.is_ascii_alphanumeric() || b == b'_' || b == b'$';
     let mut out = String::with_capacity(sql.len() + 8);
-    let mut chars = sql.chars().peekable();
     let mut n = 0;
-    while let Some(c) = chars.next() {
-        out.push(c);
-        match c {
-            '\'' | '"' => {
-                // A doubled quote inside is an escaped quote: the loop ends
-                // at the first one and the next iteration opens a new run.
-                for inner in chars.by_ref() {
-                    out.push(inner);
-                    if inner == c {
-                        break;
-                    }
+    let mut copied = 0; // `sql[..copied]` is in `out`
+    let mut i = 0;
+    while i < bytes.len() {
+        let at = i;
+        let end = match bytes[i] {
+            quote @ (b'\'' | b'"') => {
+                // `E'…'` (or `e'…'`): a backslash escapes the next character.
+                let escapes = quote == b'\''
+                    && i > 0
+                    && matches!(bytes[i - 1], b'E' | b'e')
+                    && (i < 2 || !ident(bytes[i - 2]));
+                let mut j = i + 1;
+                // A doubled quote inside is an escaped quote: the loop ends at
+                // the first one and the next one opens a new run.
+                while j < bytes.len() && bytes[j] != quote {
+                    j += if escapes && bytes[j] == b'\\' { 2 } else { 1 };
+                }
+                j + 1
+            }
+            b'-' if bytes.get(i + 1) == Some(&b'-') => {
+                sql[i..].find('\n').map_or(bytes.len(), |nl| i + nl + 1)
+            }
+            b'/' if bytes.get(i + 1) == Some(&b'*') => sql[i + 2..]
+                .find("*/")
+                .map_or(bytes.len(), |e| i + 2 + e + 2),
+            b'$' if i == 0 || !ident(bytes[i - 1]) => {
+                // `$tag$` opens a dollar-quoted string (the tag may be empty
+                // and doesn't start with a digit, unlike `$1`), closed by the
+                // same `$tag$`.
+                let tag_len = bytes[i + 1..]
+                    .iter()
+                    .take_while(|b| b.is_ascii_alphanumeric() || **b == b'_')
+                    .count();
+                let starts_with_digit = bytes.get(i + 1).is_some_and(u8::is_ascii_digit);
+                if !starts_with_digit && bytes.get(i + 1 + tag_len) == Some(&b'$') {
+                    let tag = &sql[i..i + tag_len + 2];
+                    sql[i + tag.len()..]
+                        .find(tag)
+                        .map_or(bytes.len(), |e| i + tag.len() + e + tag.len())
+                } else {
+                    i + 1
                 }
             }
-            '-' if chars.peek() == Some(&'-') => {
-                for inner in chars.by_ref() {
-                    out.push(inner);
-                    if inner == '\n' {
-                        break;
-                    }
-                }
-            }
-            '/' if chars.peek() == Some(&'*') => {
-                let mut prev = '\0';
-                for inner in chars.by_ref() {
-                    out.push(inner);
-                    if prev == '*' && inner == '/' {
-                        break;
-                    }
-                    prev = inner;
-                }
-            }
-            '?' => {
+            b'?' => {
                 n += 1;
-                out.pop();
+                out.push_str(&sql[copied..i]);
                 out.push_str(&format!("${n}"));
+                copied = i + 1;
+                i + 1
             }
-            _ => {}
-        }
+            _ => i + 1,
+        };
+        i = end.min(bytes.len()).max(at + 1);
     }
+    out.push_str(&sql[copied..]);
     Cow::Owned(out)
 }
 
@@ -1018,5 +1037,27 @@ mod tests {
             "SELECT 'it''s ?' WHERE y = $1"
         );
         assert_eq!(numbered_placeholders("SELECT 1"), "SELECT 1");
+    }
+
+    /// PostgreSQL's other string forms keep their `?` (#219).
+    #[test]
+    fn skips_dollar_quoted_and_escaped_strings() {
+        assert_eq!(
+            numbered_placeholders("SELECT $$why?$$, $fn$ a ? b $fn$ WHERE x = ?"),
+            "SELECT $$why?$$, $fn$ a ? b $fn$ WHERE x = $1"
+        );
+        assert_eq!(
+            numbered_placeholders(r"SELECT E'it\'s ?', e'\\' WHERE y = ? AND z = ?"),
+            r"SELECT E'it\'s ?', e'\\' WHERE y = $1 AND z = $2"
+        );
+        // A plain string keeps its backslash; `$1` and `a$b` aren't quotes.
+        assert_eq!(
+            numbered_placeholders(r"SELECT '\', a$b$ FROM t WHERE c = ?"),
+            r"SELECT '\', a$b$ FROM t WHERE c = $1"
+        );
+        assert_eq!(
+            numbered_placeholders("SELECT 'é?' WHERE ü = ?"),
+            "SELECT 'é?' WHERE ü = $1"
+        );
     }
 }

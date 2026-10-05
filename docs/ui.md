@@ -197,7 +197,7 @@ field uses a sensible default.
 | `radio(name, label, options, selected=…, inline=…, columns=…)` | One choice out of a few, all visible at once. They sit in a `fieldset`, with the label as its title (`legend`). An option is a value, `[value, label]` or `[value, label, description]`. |
 | `checkbox_list(name, label, options, selected=[…], inline=…, columns=…)` | Several choices. Each ticked option sends `name` once. So the form's field in Rust is a `Vec`, with `#[serde(default)]` (when nothing is ticked, nothing is sent). |
 | `toggle_buttons(name, label, options, selected=…, multiple=…)` | The options as a row of buttons; the pressed ones are filled and checked. Without `multiple`, one choice (a radio group underneath). With `multiple`, several (checkboxes underneath). |
-| `file(name, label, accept=…, multiple=…, preview=…, current=…, current_name=…)` | An upload area: drop files on it, or click it to pick them. The chosen files are listed under it; images get a small picture when `preview` is on. `current` is the URL of the file stored now, and `current_name` the name shown for it. The form needs `enctype="multipart/form-data"`. The Rust field is an `Upload` (a `Vec<Upload>` with `multiple`). |
+| `file(name, label, accept=…, multiple=…, preview=…, current=…, current_name=…)` | An upload area: drop files on it, or click it to pick them. The chosen files are listed under it; images get a small picture when `preview` is on. `current` is the URL of the file stored now, and `current_name` the name shown for it. The form needs `enctype="multipart/form-data"`. The Rust field is an `Upload` when the file is required, an `Option<Upload>` when it may be left out (an edit form keeping the current file), and a `Vec<Upload>` with `multiple`. |
 | `date_picker(name, label, value=…, min=…, max=…, placeholder="YYYY-MM-DD", readonly=…)` | A date: typed as `2026-10-02`, or picked from a calendar. The calendar is Cally, opening in a small box under the field, with the month named in the page's language. The date is sent as `YYYY-MM-DD`, like `<input type="date">`, so the Rust field is a `NaiveDate`. Without JavaScript it is a plain text field. |
 | `show_when(field, values)` + `hide_when(field, values)` | Fields shown (or hidden) while another field has one of `values`. Hidden fields are disabled, so the form doesn't send them. Check them on the server with `required_if`. Without JavaScript they stay visible. |
 | `select(…, multiple=true, searchable=true)` | Pick several values (a `Vec`), with a box to type in that filters the options. The chosen ones show as chips (small rounded labels). The browser's own select stays underneath: the form sends the same thing, and it works without JavaScript. |
@@ -898,7 +898,7 @@ arriving live), see [mail.md](mail.md#the-bell).
 When htmx asks for a page, it often needs only one part of it: the new rows of a table, say.
 That part is a **fragment**.
 
-- `view(…).fragment("rows")` sends only the block named `rows`, for htmx requests.
+- `view(…).fragment("rows")` sends only the block named `rows`, for htmx requests that aren't boosted (`hx-boost` requests get the whole page, since htmx swaps the body).
 - `.also("count")` adds more blocks after it.
 - `.status(StatusCode::CREATED)` sends the page (or the fragment) with another status than
   200.

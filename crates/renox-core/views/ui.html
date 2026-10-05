@@ -252,7 +252,8 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 {#- A file field: a drop zone that is also the button, the chosen files
     listed under it (`preview` shows images). `current`: the URL of the file
     stored now, shown above. The form needs enctype="multipart/form-data";
-    the form field is an `Option<Upload>` (or `Vec<Upload>` with
+    the form field is an `Upload`, an `Option<Upload>` when it may be left
+    out (or `Vec<Upload>` with
     `multiple`). A file is never refilled after a failed submit. -#}
 {% macro file(name, label, accept=none, multiple=false, hint=none, required=false, current=none, current_name=none, preview=false, attrs={}, id=none, disabled=false, span=none, bag=none) -%}
 {%- set id = id or _id(name) %}

@@ -169,6 +169,10 @@ is added.
 1.x may also add new methods, functions, modules, template functions, validation rules, CLI
 commands and `.env` settings. New settings always come with defaults.
 
+A command your app binary gets in 1.x never stops your app from booting: an app command
+(`App::command`) with the same name keeps running in its place. Only the 1.0 built-ins
+(`migrate`, `queue:work`, … as `help` lists them) are names an app command can't take.
+
 ### New trait methods with defaults
 
 1.x may add new provided methods and associated constants, with defaults, on traits you
