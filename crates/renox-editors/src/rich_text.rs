@@ -362,4 +362,28 @@ mod tests {
             r#""<b>Hi</b>""#
         );
     }
+
+    // #261: every entity form the plain text understands, what it keeps as
+    // written, and the conversions.
+    #[test]
+    fn entities_in_plain_text() {
+        let html = "<p>&gt; &quot;a&quot; &apos;b&apos; x&nbsp;y &#39;c&#39; &#x27;d&#X27; &bogus; AT&T &averyveryverylongname;</p>";
+        assert_eq!(
+            RichText::new(html).text(),
+            "> \"a\" 'b' x\u{a0}y 'c' 'd' &bogus; AT&T &averyveryverylongname;"
+        );
+        assert_eq!(text_of("&#xZZ; &#;"), "&#xZZ; &#;");
+    }
+
+    #[test]
+    fn conversions_debug_display_and_storage() {
+        let from_str: RichText = "<p>Hi<script>x</script></p>".into();
+        let from_string: RichText = String::from("<p>Hi</p>").into();
+        assert_eq!(from_str.as_str(), from_string.as_str(), "both sanitized");
+        assert_eq!(from_str.to_string(), "<p>Hi</p>");
+        assert!(format!("{from_str:?}").contains("<p>Hi</p>"));
+        let plain: String = from_str.clone().into();
+        assert_eq!(plain, from_str.clone().into_string());
+        assert!(matches!(from_str.to_db_value(), renox::db::DbValue::Text(t) if t == "<p>Hi</p>"));
+    }
 }

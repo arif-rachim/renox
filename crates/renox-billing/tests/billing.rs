@@ -1054,3 +1054,243 @@ async fn deleting_an_account_cancels_its_subscription() {
     app.assert_database_count("subscriptions", 0).await;
     app.assert_database_count("billing_customers", 0).await;
 }
+
+// ---------- #259: the paths no test had reached ----------
+
+/// Ana, on Xendit's monthly `local` plan (activated by its webhook).
+async fn on_xendit(app: &TestApp) -> User {
+    let ana = user(app, "Ana").await;
+    let metadata = json!({ "renox_billable": format!("user:{}", ana.id), "renox_name": "default", "renox_plan": "local" });
+    xendit_webhook(
+        app,
+        "recurring.plan.activated",
+        "2026-10-05T10:00:00Z",
+        json!({ "id": "repl_9", "customer_id": "cust-9", "status": "ACTIVE", "currency": "IDR", "amount": 99_000, "metadata": metadata }),
+    )
+    .await
+    .assert_ok();
+    app.run_jobs().await;
+    ana
+}
+
+fn with_local_plus() -> Billing {
+    billing().plan(
+        Plan::new("local-plus", "Local plus")
+            .price(149_000, "IDR", Interval::Month)
+            .via("xendit"),
+    )
+}
+
+#[renox::test]
+async fn xendit_swaps_between_plans_of_the_same_interval() {
+    let app = app_with(with_local_plus()).await;
+    let ana = on_xendit(&app).await;
+    let http = app.fake_http();
+    http.on(
+        &format!("PATCH {XENDIT}/recurring/plans/repl_9"),
+        FakeResponse::json(200, json!({ "id": "repl_9", "status": "ACTIVE" })),
+    );
+    app.post("/billing/swap/local-plus", &[])
+        .await
+        .assert_redirect("/account");
+    let body = http.sent()[0].json();
+    assert_eq!(body["amount"], 149_000);
+    assert_eq!(body["currency"], "IDR");
+    assert_eq!(body["metadata"]["renox_plan"], "local-plus");
+    assert_eq!(latest(&app, &ana).await.plan, "local-plus");
+}
+
+#[renox::test]
+async fn xendit_cancels_at_once() {
+    let app = app().await;
+    let ana = on_xendit(&app).await;
+    app.fake_http().on(
+        &format!("POST {XENDIT}/recurring/plans/repl_9/deactivate"),
+        FakeResponse::json(200, json!({ "id": "repl_9", "status": "INACTIVE" })),
+    );
+    let canceled = renox_billing::Billing::of(app.state(), &ana)
+        .cancel_now()
+        .await
+        .unwrap();
+    assert_eq!(canceled.status, SubscriptionStatus::Canceled);
+    assert!(!canceled.on_grace_period());
+    // Nothing left to resume.
+    assert!(
+        !renox_billing::Billing::of(app.state(), &ana)
+            .can_resume()
+            .await
+            .unwrap()
+    );
+}
+
+#[renox::test]
+async fn a_failed_xendit_cycle_reports_the_payment() {
+    let app = app().await;
+    let ana = on_xendit(&app).await;
+    app.fake_events();
+    xendit_webhook(
+        &app,
+        "recurring.cycle.failed",
+        "2026-11-05T10:00:00Z",
+        json!({ "id": "rpcyc_8", "plan_id": "repl_9", "status": "FAILED", "amount": 99_000, "currency": "IDR" }),
+    )
+    .await
+    .assert_ok();
+    app.run_jobs().await;
+    assert_eq!(latest(&app, &ana).await.status, SubscriptionStatus::PastDue);
+    app.assert_emitted::<PaymentFailed>(|e| e.gateway == "xendit");
+}
+
+#[renox::test]
+async fn a_gateway_that_refuses_asks_the_user_to_try_again() {
+    let app = app().await;
+    user(&app, "Ana").await;
+    let http = app.fake_http();
+    http.on(
+        &format!("POST {STRIPE}/customers"),
+        FakeResponse::json(
+            402,
+            json!({ "error": { "message": "Your card was declined." } }),
+        ),
+    );
+    // The page asks to try again (the toast waits for the next page), and
+    // shows nothing of the gateway's keys.
+    app.htmx()
+        .post("/billing/checkout/basic", &[])
+        .await
+        .assert_hx_redirect("/billing");
+    app.get("/billing")
+        .await
+        .assert_see("The payment provider didn&#x27;t answer. Please try again.")
+        .assert_dont_see("sk_test");
+}
+
+/// A gateway of the app's own that keeps the trait's defaults.
+struct Manual;
+
+impl renox_billing::Gateway for Manual {
+    fn name(&self) -> &str {
+        "manual"
+    }
+    fn label(&self) -> &str {
+        "Bank transfer"
+    }
+    fn configured(&self, _config: &Config) -> bool {
+        true
+    }
+    fn create_customer<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _owner: &'a renox_billing::Owner,
+    ) -> renox_billing::BoxFuture<'a, Result<String>> {
+        Box::pin(async { Ok("manual-1".into()) })
+    }
+    fn checkout<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _request: &'a renox_billing::CheckoutRequest,
+    ) -> renox_billing::BoxFuture<'a, Result<renox_billing::Checkout>> {
+        Box::pin(async { Ok(renox_billing::Checkout::redirect("/pay-by-transfer")) })
+    }
+    fn swap<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _subscription: &'a Subscription,
+        _plan: &'a Plan,
+        _prorate: bool,
+    ) -> renox_billing::BoxFuture<'a, Result<renox_billing::Remote>> {
+        Box::pin(async { Err(Error::BadRequest("no".into())) })
+    }
+    fn cancel<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _subscription: &'a Subscription,
+        _at_period_end: bool,
+    ) -> renox_billing::BoxFuture<'a, Result<renox_billing::Remote>> {
+        Box::pin(async { Err(Error::BadRequest("no".into())) })
+    }
+    fn verify_webhook(
+        &self,
+        _config: &Config,
+        _headers: &renox::axum::http::HeaderMap,
+        _body: &[u8],
+    ) -> Result {
+        Ok(())
+    }
+    fn parse_webhook(&self, _body: &[u8]) -> Result<Vec<renox_billing::Notice>> {
+        Ok(Vec::new())
+    }
+}
+
+#[renox::test]
+async fn a_gateway_of_the_apps_own_gets_the_defaults() {
+    use renox_billing::Gateway;
+    let app = app().await;
+    assert!(!Manual.prorates() && !Manual.resumes());
+    let err = Manual
+        .resume(app.state(), &Subscription::default())
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(err, Error::BadRequest(ref m) if m == "Bank transfer can't resume a canceled subscription: subscribe again"),
+        "{err:?}"
+    );
+    // The event id: the `webhook-id` header, else the body's `id`, else a hash.
+    let mut headers = renox::axum::http::HeaderMap::new();
+    headers.insert("webhook-id", " evt_9 ".parse().unwrap());
+    assert_eq!(Manual.webhook_event_id(&headers, b"{}").unwrap(), "evt_9");
+    let none = renox::axum::http::HeaderMap::new();
+    assert_eq!(
+        Manual
+            .webhook_event_id(&none, br#"{"id": "evt_1"}"#)
+            .unwrap(),
+        "evt_1"
+    );
+    assert!(
+        Manual
+            .webhook_event_id(&none, br#"{"id": ""}"#)
+            .unwrap()
+            .starts_with("sha256:")
+    );
+    assert!(matches!(
+        Manual.webhook_event_id(&none, b"not json"),
+        Err(Error::BadRequest(_))
+    ));
+}
+
+/// A failed payment is written to the audit log when the app keeps one.
+#[renox::test]
+async fn failed_payments_go_to_the_audit_log() {
+    let app = TestApp::with_config(
+        App::new()
+            .module(Auth::new().account())
+            .module(renox::audit::Audit)
+            .module(billing())
+            .module(Area),
+        |config| {
+            config
+                .vars
+                .insert("XENDIT_SECRET_KEY".into(), "xnd_development_1".into());
+            config
+                .vars
+                .insert("XENDIT_CALLBACK_TOKEN".into(), "callback-token".into());
+        },
+    )
+    .await;
+    on_xendit(&app).await;
+    xendit_webhook(
+        &app,
+        "recurring.cycle.retrying",
+        "2026-11-05T10:00:00Z",
+        json!({ "id": "rpcyc_7", "plan_id": "repl_9", "status": "RETRYING", "amount": 99_000, "currency": "IDR" }),
+    )
+    .await
+    .assert_ok();
+    app.run_jobs().await;
+    let entries: i64 = renox::db::sql("SELECT COUNT(*) FROM audit_logs WHERE action = ?")
+        .bind("billing.payment_failed")
+        .scalar(app.db())
+        .await
+        .unwrap();
+    assert_eq!(entries, 1);
+}

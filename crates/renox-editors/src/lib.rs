@@ -142,3 +142,23 @@ fn code_text(value: minijinja::Value) -> String {
 #[cfg(doctest)]
 #[doc = include_str!("../../../docs/editors.md")]
 pub struct Guide;
+
+#[cfg(test)]
+mod tests {
+    use super::{code_text, minijinja};
+
+    // #261: what a code entry shows for nothing, text and other values.
+    #[test]
+    fn code_entries_show_text_json_or_nothing() {
+        assert_eq!(code_text(minijinja::Value::UNDEFINED), "");
+        assert_eq!(code_text(minijinja::Value::from(())), "");
+        assert_eq!(
+            code_text(minijinja::Value::from("let x = 1;")),
+            "let x = 1;"
+        );
+        let shown = code_text(minijinja::Value::from_serialize(
+            renox::serde_json::json!({ "a": 1 }),
+        ));
+        assert!(shown.contains("\"a\": 1"), "{shown}");
+    }
+}
