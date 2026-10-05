@@ -1,7 +1,8 @@
 //! Dashboards: numbers over time from the database ([`Trend`] over a
 //! [`Period`], giving a [`Series`]), and the `chart(…)` template function
-//! that draws them (line, area, bar, pie, doughnut) as plain HTML and SVG,
-//! with the UI kit's `stat`, `widget` and `period_filter` around them.
+//! that draws them (line, area, bar, pie, doughnut, and scatter or bubble
+//! charts of points) as plain HTML and SVG, with the UI kit's `stat`,
+//! `widget` and `period_filter` around them.
 //!
 //! ```
 //! # use renox::prelude::*;
@@ -10,7 +11,8 @@
 //! #[derive(Model, serde::Serialize, Default)]
 //! struct Order { id: i64, total: i64, status: String, created_at: Option<renox::db::DateTime> }
 //!
-//! // `?period=30d` (7d, 30d, 90d, 12m, mtd, ytd; 30 days without one).
+//! // `?period=30d` (7d, 30d, 90d, 12w, 12m, mtd, ytd, or
+//! // `?period=custom&from=2026-09-01&to=2026-09-30`; 30 days without one).
 //! async fn dashboard(State(state): State<AppState>, period: Period) -> Result<View> {
 //!     let paid = || Order::where_eq("status", "paid");
 //!     let sales = Trend::of(paid(), "created_at").over(period).sum(&state, "total").await?;
@@ -53,30 +55,47 @@ use crate::view_filters::{format_money, format_number};
 use crate::{AppState, Result};
 
 /// How long a dashboard looks back: `7d`, `30d`, `90d` (any number of days
-/// up to 366), `12m` (months up to 36), `mtd` (this month so far) or `ytd`
-/// (this year so far), in `APP_TIMEZONE`. As an extractor it reads
-/// `?period=`, else 30 days; it serializes as its key (`"30d"`), which
-/// the kit's `period_filter` takes.
+/// up to 366), `12w` (weeks up to 104), `12m` (months up to 36), `mtd` (this
+/// month so far), `ytd` (this year so far), or a custom range of dates
+/// (`2026-09-01..2026-09-30`, both days included, at most 1,096 days), in
+/// `APP_TIMEZONE`.
+///
+/// As an extractor it reads `?period=`, or `?period=custom&from=2026-09-01&to=2026-09-30`
+/// (what the kit's `period_filter` sends for a custom range); anything it
+/// can't read (an unknown key, a date that isn't one, `from` after `to`, a
+/// range over three years) gives the default, 30 days. It serializes as its
+/// key (`"30d"`, `"2026-09-01..2026-09-30"`), which `period_filter` takes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Period {
     span: Span,
     back: u32,
+    per: Option<Bucket>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Span {
     Days(u32),
+    Weeks(u32),
     Months(u32),
     MonthToDate,
     YearToDate,
+    /// The first day and the day after the last.
+    Between(NaiveDate, NaiveDate),
 }
 
-/// The step of a [`Series`]: one value per day or per month.
+/// The longest custom range, in days (three years and a leap day).
+const MAX_RANGE_DAYS: i64 = 1096;
+
+/// The step of a [`Series`]: one value per day, week or month.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Bucket {
     /// Labels `2026-10-02`.
     Day,
+    /// Labels `2026-09-28`: the Monday each week starts on (ISO 8601
+    /// weeks, Monday to Sunday, in `APP_TIMEZONE`). The first and last
+    /// weeks of a period may be cut short by it.
+    Week,
     /// Labels `2026-10`.
     Month,
 }
@@ -88,39 +107,60 @@ impl Default for Period {
 }
 
 impl Period {
+    fn of(span: Span) -> Self {
+        Self {
+            span,
+            back: 0,
+            per: None,
+        }
+    }
+
     /// The last `n` days, today included.
     pub fn days(n: u32) -> Self {
-        Self {
-            span: Span::Days(n.clamp(1, 366)),
-            back: 0,
-        }
+        Self::of(Span::Days(n.clamp(1, 366)))
+    }
+
+    /// The last `n` weeks, this one so far included: from the Monday `n - 1`
+    /// weeks before this week's Monday, to today. Per week.
+    pub fn weeks(n: u32) -> Self {
+        Self::of(Span::Weeks(n.clamp(1, 104)))
     }
 
     /// The last `n` months, this one included.
     pub fn months(n: u32) -> Self {
-        Self {
-            span: Span::Months(n.clamp(1, 36)),
-            back: 0,
-        }
+        Self::of(Span::Months(n.clamp(1, 36)))
     }
 
     /// This month so far.
     pub fn month_to_date() -> Self {
-        Self {
-            span: Span::MonthToDate,
-            back: 0,
-        }
+        Self::of(Span::MonthToDate)
     }
 
     /// This year so far.
     pub fn year_to_date() -> Self {
-        Self {
-            span: Span::YearToDate,
-            back: 0,
-        }
+        Self::of(Span::YearToDate)
     }
 
-    /// `"7d"`, `"12m"`, `"mtd"`, `"ytd"`; `None` for anything else.
+    /// From `from` to `to`, both days included (local days in
+    /// `APP_TIMEZONE`). `None` when `from` is after `to` or the range is
+    /// longer than 1,096 days (three years).
+    pub fn between(from: NaiveDate, to: NaiveDate) -> Option<Self> {
+        let end = to.succ_opt()?;
+        let days = (end - from).num_days();
+        (1..=MAX_RANGE_DAYS)
+            .contains(&days)
+            .then(|| Self::of(Span::Between(from, end)))
+    }
+
+    /// The same period, but per `bucket` instead of the step it picks
+    /// itself ([`bucket`](Period::bucket)): `Period::days(90).per(Bucket::Week)`.
+    pub fn per(mut self, bucket: Bucket) -> Self {
+        self.per = Some(bucket);
+        self
+    }
+
+    /// `"7d"`, `"12w"`, `"12m"`, `"mtd"`, `"ytd"` or `"2026-09-01..2026-09-30"`;
+    /// `None` for anything else.
     pub fn parse(key: &str) -> Option<Self> {
         let key = key.trim().to_ascii_lowercase();
         match key.as_str() {
@@ -128,28 +168,65 @@ impl Period {
             "ytd" => return Some(Self::year_to_date()),
             _ => {}
         }
+        if let Some((from, to)) = key.split_once("..") {
+            return Self::between(date(from)?, date(to)?);
+        }
         let (number, unit) = key.split_at(key.len().checked_sub(1)?);
         let n: u32 = number.parse().ok()?;
         match unit {
             "d" if (1..=366).contains(&n) => Some(Self::days(n)),
+            "w" if (1..=104).contains(&n) => Some(Self::weeks(n)),
             "m" if (1..=36).contains(&n) => Some(Self::months(n)),
             _ => None,
         }
     }
 
-    /// The key it parses from: `"30d"`.
-    pub fn key(&self) -> String {
-        match self.span {
-            Span::Days(n) => format!("{n}d"),
-            Span::Months(n) => format!("{n}m"),
-            Span::MonthToDate => "mtd".into(),
-            Span::YearToDate => "ytd".into(),
+    /// The period a query string asks for: `period=7d`, or
+    /// `period=custom&from=…&to=…`.
+    fn from_query(query: &str) -> Option<Self> {
+        let mut period = None;
+        let (mut from, mut to) = (None, None);
+        for (key, value) in form_urlencoded::parse(query.as_bytes()) {
+            match &*key {
+                "period" if period.is_none() => period = Some(value.into_owned()),
+                "from" if from.is_none() => from = Some(value.into_owned()),
+                "to" if to.is_none() => to = Some(value.into_owned()),
+                _ => {}
+            }
+        }
+        let period = period?;
+        if period.trim().eq_ignore_ascii_case("custom") {
+            Self::between(date(from.as_deref()?)?, date(to.as_deref()?)?)
+        } else {
+            Self::parse(&period)
         }
     }
 
+    /// The key it parses from: `"30d"`, or `"2026-09-01..2026-09-30"` for a
+    /// custom range.
+    pub fn key(&self) -> String {
+        match self.span {
+            Span::Days(n) => format!("{n}d"),
+            Span::Weeks(n) => format!("{n}w"),
+            Span::Months(n) => format!("{n}m"),
+            Span::MonthToDate => "mtd".into(),
+            Span::YearToDate => "ytd".into(),
+            Span::Between(start, end) => format!(
+                "{}..{}",
+                start.format("%Y-%m-%d"),
+                (end - Duration::days(1)).format("%Y-%m-%d")
+            ),
+        }
+    }
+
+    /// Whether it is a custom range of dates ([`between`](Period::between)).
+    pub fn is_custom(&self) -> bool {
+        matches!(self.span, Span::Between(..))
+    }
+
     /// The period just before, as long: the 30 days before the last 30, last
-    /// month to the same day, last year to the same day. For comparisons
-    /// ([`Series::change_from`]).
+    /// month to the same day, last year to the same day, as many days just
+    /// before a custom range. For comparisons ([`Series::change_from`]).
     pub fn previous(self) -> Self {
         Self {
             back: self.back + 1,
@@ -157,11 +234,22 @@ impl Period {
         }
     }
 
-    /// Per day up to 92 days (and month to date), else per month.
+    /// Per day up to 92 days (and month to date), per week for `12w`-style
+    /// periods and custom ranges up to 26 weeks, else per month; or what
+    /// [`per`](Period::per) set.
     pub fn bucket(&self) -> Bucket {
+        if let Some(bucket) = self.per {
+            return bucket;
+        }
         match self.span {
             Span::Days(n) if n <= 92 => Bucket::Day,
             Span::MonthToDate => Bucket::Day,
+            Span::Weeks(_) => Bucket::Week,
+            Span::Between(start, end) => match (end - start).num_days() {
+                ..=92 => Bucket::Day,
+                93..=182 => Bucket::Week,
+                _ => Bucket::Month,
+            },
             _ => Bucket::Month,
         }
     }
@@ -174,6 +262,11 @@ impl Period {
             Span::Days(n) => {
                 let end = today + Duration::days(1) - Duration::days(i64::from(n * back));
                 (end - Duration::days(i64::from(n)), end)
+            }
+            Span::Weeks(n) => {
+                let shift = Duration::days(7 * i64::from(n * back));
+                let start = monday_of(today) - Duration::days(7 * i64::from(n - 1));
+                (start - shift, today + Duration::days(1) - shift)
             }
             Span::Months(n) => {
                 let this_month = first_of_month(today);
@@ -193,6 +286,10 @@ impl Period {
                 let next = NaiveDate::from_ymd_opt(year + 1, 1, 1).unwrap_or(today);
                 (start, (start + Duration::days(length)).min(next))
             }
+            Span::Between(start, end) => {
+                let shift = (end - start) * back as i32;
+                (start - shift, end - shift)
+            }
         }
     }
 
@@ -202,8 +299,8 @@ impl Period {
         (moment(zone, start), moment(zone, end))
     }
 
-    /// The labels of its buckets, in order: `2026-10-02` per day, `2026-10`
-    /// per month.
+    /// The labels of its buckets, in order: `2026-10-02` per day, the
+    /// week's Monday (`2026-09-28`) per week, `2026-10` per month.
     pub fn labels(&self, zone: Zone) -> Vec<String> {
         let (start, end) = self.days_in(zone);
         let mut labels = Vec::new();
@@ -213,6 +310,13 @@ impl Period {
                 while day < end && labels.len() < 400 {
                     labels.push(day.format("%Y-%m-%d").to_string());
                     day += Duration::days(1);
+                }
+            }
+            Bucket::Week => {
+                let mut week = monday_of(start);
+                while week < end && labels.len() < 400 {
+                    labels.push(week.format("%Y-%m-%d").to_string());
+                    week += Duration::days(7);
                 }
             }
             Bucket::Month => {
@@ -241,15 +345,25 @@ impl<S: Send + Sync> FromRequestParts<S> for Period {
         _: &S,
     ) -> std::result::Result<Self, Self::Rejection> {
         let query = parts.uri.query().unwrap_or_default();
-        Ok(form_urlencoded::parse(query.as_bytes())
-            .find(|(key, _)| key == "period")
-            .and_then(|(_, value)| Period::parse(&value))
-            .unwrap_or_default())
+        Ok(Period::from_query(query).unwrap_or_default())
     }
+}
+
+/// `2026-09-01`, strictly.
+fn date(text: &str) -> Option<NaiveDate> {
+    let text = text.trim();
+    (text.len() == 10)
+        .then(|| NaiveDate::parse_from_str(text, "%Y-%m-%d").ok())
+        .flatten()
 }
 
 fn first_of_month(day: NaiveDate) -> NaiveDate {
     day.with_day(1).unwrap_or(day)
+}
+
+/// The Monday of `day`'s ISO week.
+fn monday_of(day: NaiveDate) -> NaiveDate {
+    day - Duration::days(i64::from(day.weekday().num_days_from_monday()))
 }
 
 fn add_months(day: NaiveDate, months: i32) -> NaiveDate {
@@ -311,10 +425,12 @@ impl Series {
 }
 
 /// A [`Series`] from a model's rows: how many (`count`), or the `sum` or
-/// `average` of a column, per day or month of a [`Period`], by the moment
-/// in `column` (a `DateTime` column such as `created_at`). The query's
-/// conditions apply (`Order::where_eq("status", "paid")`); days are cut in
-/// `APP_TIMEZONE`, at its offset at the end of the period.
+/// `average` of a column, per day, week or month of a [`Period`] (its
+/// [`bucket`](Period::bucket)), by the moment in `column` (a `DateTime`
+/// column such as `created_at`). The query's conditions apply
+/// (`Order::where_eq("status", "paid")`); days are cut in `APP_TIMEZONE`, at
+/// its offset at the end of the period, and weeks run Monday to Sunday in
+/// those local days (labelled by their Monday).
 pub struct Trend<M> {
     query: Query<M>,
     column: String,
@@ -362,15 +478,31 @@ impl<M: Model> Trend<M> {
         let (start, end) = self.period.range(zone);
         // Days are cut at the zone's offset at the end of the period.
         let minutes = zone.offset_at(end.timestamp()) / 60;
-        let month = self.period.bucket() == Bucket::Month;
-        let bucket = move |dialect: Dialect| match dialect {
-            Dialect::Sqlite => format!(
+        let step = self.period.bucket();
+        // The moment moved to local time, then cut to its day, the Monday of
+        // its week (SQLite: on to the next Sunday, back six days), or month.
+        let bucket = move |dialect: Dialect| match (dialect, step) {
+            (Dialect::Sqlite, Bucket::Week) => {
+                format!("date({column}, '{minutes:+} minutes', 'weekday 0', '-6 days')")
+            }
+            (Dialect::Sqlite, step) => format!(
                 "strftime('{}', {column}, '{minutes:+} minutes')",
-                if month { "%Y-%m" } else { "%Y-%m-%d" }
+                if step == Bucket::Month {
+                    "%Y-%m"
+                } else {
+                    "%Y-%m-%d"
+                }
             ),
-            Dialect::Postgres => format!(
+            (Dialect::Postgres, Bucket::Week) => format!(
+                "to_char(date_trunc('week', ({column} AT TIME ZONE 'UTC') + interval '{minutes} minutes'), 'YYYY-MM-DD')"
+            ),
+            (Dialect::Postgres, step) => format!(
                 "to_char(({column} AT TIME ZONE 'UTC') + interval '{minutes} minutes', '{}')",
-                if month { "YYYY-MM" } else { "YYYY-MM-DD" }
+                if step == Bucket::Month {
+                    "YYYY-MM"
+                } else {
+                    "YYYY-MM-DD"
+                }
             ),
         };
         let condition = format!("{column} >= ? AND {column} < ?");
@@ -634,9 +766,18 @@ impl Formatter {
 /// Clean ticks from `lo` to `hi` (0 always included): about four steps of
 /// 1, 2, 2.5 or 5 × 10ⁿ.
 fn scale(lo: f64, hi: f64) -> (f64, f64, f64) {
-    let (mut lo, mut hi) = (lo.min(0.0), hi.max(0.0));
+    nice(lo.min(0.0), hi.max(0.0))
+}
+
+/// Clean ticks covering `lo` to `hi`, without forcing 0 in.
+fn nice(mut lo: f64, mut hi: f64) -> (f64, f64, f64) {
     if (hi - lo).abs() < f64::EPSILON {
-        hi = lo + 1.0;
+        if lo == 0.0 {
+            hi = lo + 1.0;
+        } else {
+            let pad = lo.abs() / 10.0;
+            (lo, hi) = (lo - pad, hi + pad);
+        }
     }
     let raw = (hi - lo) / 4.0;
     let magnitude = 10f64.powf(raw.log10().floor());
@@ -688,42 +829,75 @@ pub(crate) fn chart(
         let legend: Option<bool> = kwargs.get("legend")?;
         let table: Option<bool> = kwargs.get("table")?;
         let x_format: Option<String> = kwargs.get("x_format")?;
+        let x_title: Option<String> = kwargs.get("x_title")?;
+        let y_title: Option<String> = kwargs.get("y_title")?;
         let id: Option<String> = kwargs.get("id")?;
         let locale = locale(state);
         let title = title.unwrap_or_default();
-        let data = read_data(data, &kwargs, &title)?;
-        kwargs.assert_all_used()?;
-        let formatter = Formatter {
+        let currency = currency_kw
+            .map(|c| c.trim().to_ascii_uppercase())
+            .unwrap_or_else(|| currency.clone());
+        let formatter = |format: Option<String>, decimals: Option<u32>| Formatter {
             format: format.unwrap_or_else(|| "number".into()),
             decimals,
-            currency: currency_kw
-                .map(|c| c.trim().to_ascii_uppercase())
-                .unwrap_or_else(|| currency.clone()),
+            currency: currency.clone(),
             locale: locale.clone(),
         };
-        let options = Options {
+        let mut options = Options {
             kind: kind.clone(),
-            title,
+            title: title.clone(),
             height: height.unwrap_or(240).clamp(80, 800),
             stacked: stacked.unwrap_or(false),
             legend: legend.unwrap_or(true),
             table: table.unwrap_or(true),
-            labels: data
-                .labels
-                .iter()
-                .map(|l| display_label(l, x_format.as_deref()))
-                .collect(),
+            labels: Vec::new(),
             id,
             show_data: text(state, "ui.chart.show_data", &locale),
             other: text(state, "ui.chart.other", &locale),
+            series_head: text(state, "ui.chart.series", &locale),
+            axes: text(state, "ui.chart.axes", &locale),
+            x_title,
+            y_title,
         };
         let html = match kind.as_str() {
-            "line" | "area" | "bar" => render_xy(&data, &options, &formatter),
-            "pie" | "doughnut" => render_pie(&data, &options, &formatter),
+            "scatter" | "bubble" => {
+                let size_format: Option<String> = kwargs.get("size_format")?;
+                let size_title: Option<String> = kwargs.get("size_title")?;
+                let clouds = read_points(data, &kwargs, &title)?;
+                kwargs.assert_all_used()?;
+                let all = || clouds.iter().flat_map(|c| c.points.iter());
+                let formats = Formats {
+                    x: formatter(x_format, auto_decimals(all().map(|p| p.x))),
+                    y: formatter(
+                        format,
+                        decimals.or_else(|| auto_decimals(all().map(|p| p.y))),
+                    ),
+                    size: formatter(size_format, auto_decimals(all().filter_map(|p| p.size))),
+                    size_title: size_title.unwrap_or_else(|| text(state, "ui.chart.size", &locale)),
+                };
+                render_points(&clouds, &options, &formats)
+            }
+            "line" | "area" | "bar" | "pie" | "doughnut" => {
+                let data = read_data(data, &kwargs, &title)?;
+                kwargs.assert_all_used()?;
+                options.labels = data
+                    .labels
+                    .iter()
+                    .map(|l| display_label(l, x_format.as_deref()))
+                    .collect();
+                let formatter = formatter(format, decimals);
+                if kind == "pie" || kind == "doughnut" {
+                    render_pie(&data, &options, &formatter)
+                } else {
+                    render_xy(&data, &options, &formatter)
+                }
+            }
             other => {
                 return Err(Error::new(
                     ErrorKind::InvalidOperation,
-                    format!("chart: unknown kind `{other}` (line, area, bar, pie or doughnut)"),
+                    format!(
+                        "chart: unknown kind `{other}` (line, area, bar, pie, doughnut, scatter or bubble)"
+                    ),
                 ));
             }
         };
@@ -742,6 +916,13 @@ struct Options {
     id: Option<String>,
     show_data: String,
     other: String,
+    /// The data table's heading over series names.
+    series_head: String,
+    /// `:y by :x`, for a scatter chart's accessible name.
+    axes: String,
+    /// The axes' titles, shown along them.
+    x_title: Option<String>,
+    y_title: Option<String>,
 }
 
 /// The data the page's script reads for tooltips (and a table reads too).
@@ -875,6 +1056,7 @@ fn render_xy(data: &Data, options: &Options, formatter: &Formatter) -> String {
             .collect();
         legend(&mut out, &names, if bar { "box" } else { "line" });
     }
+    y_title(&mut out, options);
     let _ = write!(
         out,
         r#"<div class="rx-chart__frame" style="--rx-chart-h: {}px"><div class="rx-chart__y" aria-hidden="true">"#,
@@ -1095,6 +1277,7 @@ fn render_xy(data: &Data, options: &Options, formatter: &Formatter) -> String {
         );
     }
     out.push_str("</div></div>");
+    x_title(&mut out, options);
 
     let heads: Vec<String> = data.series.iter().map(|s| s.name.clone()).collect();
     let rows: Vec<(String, Vec<String>)> = (0..n)
@@ -1241,6 +1424,470 @@ fn render_pie(data: &Data, options: &Options, formatter: &Formatter) -> String {
     out
 }
 
+/// The y axis' title, over the axis.
+fn y_title(out: &mut String, options: &Options) {
+    if let Some(title) = options.y_title.as_deref().filter(|t| !t.is_empty()) {
+        let _ = write!(
+            out,
+            r#"<p class="rx-chart__axis-title rx-chart__axis-title--y" aria-hidden="true">{}</p>"#,
+            escape(title)
+        );
+    }
+}
+
+/// The x axis' title, under its labels.
+fn x_title(out: &mut String, options: &Options) {
+    if let Some(title) = options.x_title.as_deref().filter(|t| !t.is_empty()) {
+        let _ = write!(
+            out,
+            r#"<p class="rx-chart__axis-title rx-chart__axis-title--x" aria-hidden="true">{}</p>"#,
+            escape(title)
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Scatter and bubble charts.
+
+/// One point of a scatter (x, y) or bubble (x, y, size) chart.
+struct Point {
+    x: f64,
+    y: f64,
+    size: Option<f64>,
+    label: Option<String>,
+}
+
+/// The points of one series.
+struct Cloud {
+    name: String,
+    points: Vec<Point>,
+}
+
+/// `[x, y]`, `[x, y, size]` or `{x, y, size, label}`; `None` without both
+/// numbers.
+fn point_of(value: &Value) -> Option<Point> {
+    if value.kind() == ValueKind::Map {
+        return Some(Point {
+            x: attr(value, "x").as_ref().and_then(number_of)?,
+            y: attr(value, "y").as_ref().and_then(number_of)?,
+            size: attr(value, "size").as_ref().and_then(number_of),
+            label: attr(value, "label").map(|l| {
+                l.as_str()
+                    .map(str::to_owned)
+                    .unwrap_or_else(|| l.to_string())
+            }),
+        });
+    }
+    let items: Vec<Value> = value.try_iter().ok()?.collect();
+    Some(Point {
+        x: number_of(items.first()?)?,
+        y: number_of(items.get(1)?)?,
+        size: items.get(2).and_then(number_of),
+        label: None,
+    })
+}
+
+fn points_of(value: &Value) -> Vec<Point> {
+    match value.try_iter() {
+        Ok(items) if value.kind() == ValueKind::Seq => {
+            items.filter_map(|item| point_of(&item)).collect()
+        }
+        _ => Vec::new(),
+    }
+}
+
+/// A series `{name, points}`, or a list of points.
+fn cloud_of(value: &Value, fallback: &str) -> Cloud {
+    if value.kind() == ValueKind::Map {
+        Cloud {
+            name: attr(value, "name")
+                .and_then(|n| n.as_str().map(str::to_owned))
+                .unwrap_or_else(|| fallback.to_owned()),
+            points: attr(value, "points")
+                .map(|p| points_of(&p))
+                .unwrap_or_default(),
+        }
+    } else {
+        Cloud {
+            name: fallback.to_owned(),
+            points: points_of(value),
+        }
+    }
+}
+
+/// The points of `chart("scatter" | "bubble", …)`: `data` (a series with
+/// `points`, a list of them, or a list of points), `series=[…]`,
+/// `points=[…]`.
+fn read_points(
+    data: Option<Value>,
+    kwargs: &Kwargs,
+    title: &str,
+) -> std::result::Result<Vec<Cloud>, Error> {
+    let series: Option<Value> = kwargs.get("series")?;
+    let points: Option<Value> = kwargs.get("points")?;
+    let name: Option<String> = kwargs.get("name")?;
+    let fallback = name.clone().unwrap_or_else(|| title.to_owned());
+    let mut clouds = Vec::new();
+    let list_of_series = |value: &Value, clouds: &mut Vec<Cloud>| {
+        if let Ok(items) = value.try_iter() {
+            for (i, item) in items.enumerate() {
+                clouds.push(cloud_of(&item, &format!("{} {}", fallback, i + 1)));
+            }
+        }
+    };
+    match data {
+        Some(data) if data.kind() == ValueKind::Map => match attr(&data, "series") {
+            Some(series) => list_of_series(&series, &mut clouds),
+            None => clouds.push(cloud_of(&data, &fallback)),
+        },
+        Some(data) if data.kind() == ValueKind::Seq => {
+            // A list of series has maps with `points`; a list of points has
+            // pairs, triples or maps with `x`.
+            let first = data.try_iter().ok().and_then(|mut items| items.next());
+            if first.is_some_and(|v| v.kind() == ValueKind::Map && attr(&v, "points").is_some()) {
+                list_of_series(&data, &mut clouds);
+            } else {
+                clouds.push(cloud_of(&data, &fallback));
+            }
+        }
+        _ => {}
+    }
+    if let Some(series) = series {
+        list_of_series(&series, &mut clouds);
+    }
+    if let Some(points) = points {
+        clouds.push(Cloud {
+            name: fallback.clone(),
+            points: points_of(&points),
+        });
+    }
+    if let Some(name) = name
+        && clouds.len() == 1
+    {
+        clouds[0].name = name;
+    }
+    Ok(clouds)
+}
+
+/// As many decimals as the values need, up to 2.
+fn auto_decimals(values: impl Iterator<Item = f64>) -> Option<u32> {
+    let mut decimals = 0;
+    for value in values {
+        let fract = (value.abs() * 100.0).round() as i64 % 100;
+        if fract % 10 != 0 {
+            return Some(2);
+        }
+        if fract != 0 {
+            decimals = 1;
+        }
+    }
+    Some(decimals)
+}
+
+/// How a scatter or bubble chart's values read.
+struct Formats {
+    x: Formatter,
+    y: Formatter,
+    size: Formatter,
+    size_title: String,
+}
+
+/// The tooltips' data for points.
+#[derive(Serialize)]
+struct HoverPoints<'a> {
+    kind: &'a str,
+    points: Vec<HoverPoint>,
+}
+
+#[derive(Serialize)]
+struct HoverPoint {
+    /// The point's label, or "".
+    title: String,
+    /// Its series' name with more than one series, or "".
+    name: String,
+    slot: String,
+    /// `[axis title, value]`.
+    rows: Vec<(String, String)>,
+    /// Where it is, in percent of the plot.
+    left: f64,
+    bottom: f64,
+}
+
+/// The value range of points, padded for bubbles so they stay inside, with
+/// 0 in when the data starts near it.
+fn point_scale(values: impl Iterator<Item = f64>, pad: bool) -> (f64, f64, f64) {
+    let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
+    for v in values {
+        lo = lo.min(v);
+        hi = hi.max(v);
+    }
+    if !lo.is_finite() {
+        return scale(0.0, 0.0);
+    }
+    if pad {
+        // Room around the data, but not across 0 (no "-20 units").
+        let room = ((hi - lo) * 0.08).max(hi.abs().max(lo.abs()) * 0.02);
+        lo = if lo >= 0.0 {
+            (lo - room).max(0.0)
+        } else {
+            lo - room
+        };
+        hi = if hi <= 0.0 {
+            (hi + room).min(0.0)
+        } else {
+            hi + room
+        };
+    }
+    if lo >= 0.0 && lo <= hi * 0.25 {
+        lo = 0.0;
+    }
+    if hi <= 0.0 && hi >= lo * 0.25 {
+        hi = 0.0;
+    }
+    nice(lo, hi)
+}
+
+fn ticks(lo: f64, hi: f64, step: f64) -> Vec<f64> {
+    let mut ticks = Vec::new();
+    let mut tick = lo;
+    while tick <= hi + step / 2.0 && ticks.len() < 12 {
+        ticks.push(tick);
+        tick += step;
+    }
+    ticks
+}
+
+fn render_points(clouds: &[Cloud], options: &Options, formats: &Formats) -> String {
+    let bubble = options.kind == "bubble";
+    let all = || clouds.iter().flat_map(|c| c.points.iter());
+    let (x_lo, x_hi, x_step) = point_scale(all().map(|p| p.x), bubble);
+    let (y_lo, y_hi, y_step) = point_scale(all().map(|p| p.y), bubble);
+    let px = |v: f64| (v - x_lo) / (x_hi - x_lo) * 100.0;
+    let py = |v: f64| (v - y_lo) / (y_hi - y_lo) * 100.0;
+    // Bubbles: the area follows the size, up to 40 px across, 6 px at least.
+    let biggest = all()
+        .filter_map(|p| p.size)
+        .fold(0.0f64, |a, b| a.max(b.abs()));
+    let diameter = |size: Option<f64>| {
+        let share = match (size, biggest > 0.0) {
+            (Some(size), true) => (size.abs() / biggest).sqrt(),
+            _ => 0.0,
+        };
+        (6.0 + share * 34.0).round()
+    };
+    let x_name = options.x_title.clone().unwrap_or_else(|| "x".into());
+    let y_name = options.y_title.clone().unwrap_or_else(|| "y".into());
+    let several = clouds.len() > 1;
+
+    // Every point, left to right, as the arrow keys visit them.
+    let mut order: Vec<(usize, &Point)> = clouds
+        .iter()
+        .enumerate()
+        .flat_map(|(s, c)| c.points.iter().map(move |p| (s, p)))
+        .collect();
+    order.sort_by(|a, b| a.1.x.total_cmp(&b.1.x).then(a.1.y.total_cmp(&b.1.y)));
+
+    let rows_of = |point: &Point| {
+        let mut rows = vec![
+            (x_name.clone(), formats.x.full(point.x)),
+            (y_name.clone(), formats.y.full(point.y)),
+        ];
+        if bubble && let Some(size) = point.size {
+            rows.push((formats.size_title.clone(), formats.size.full(size)));
+        }
+        rows
+    };
+    let hover = HoverPoints {
+        kind: &options.kind,
+        points: order
+            .iter()
+            .map(|(s, point)| HoverPoint {
+                title: point.label.clone().unwrap_or_default(),
+                name: if several {
+                    clouds[*s].name.clone()
+                } else {
+                    String::new()
+                },
+                slot: slot(*s),
+                rows: rows_of(point),
+                left: (px(point.x) * 100.0).round() / 100.0,
+                bottom: (py(point.y) * 100.0).round() / 100.0,
+            })
+            .collect(),
+    };
+    let json = serde_json::to_string(&hover).unwrap_or_default();
+    let mut out = String::new();
+    let _ = write!(
+        out,
+        r#"<figure class="rx-chart rx-chart--{kind} rx-chart--points"{id} data-rx-chart="{json}">"#,
+        kind = escape(&options.kind),
+        id = options
+            .id
+            .as_deref()
+            .map(|id| format!(r#" id="{}""#, escape(id)))
+            .unwrap_or_default(),
+        json = escape(&json),
+    );
+    if !options.title.is_empty() {
+        let _ = write!(
+            out,
+            r#"<figcaption class="rx-visually-hidden">{}</figcaption>"#,
+            escape(&options.title)
+        );
+    }
+    if options.legend && several {
+        let names: Vec<(usize, &str)> = clouds
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (i, c.name.as_str()))
+            .collect();
+        legend(&mut out, &names, "dot");
+    }
+    y_title(&mut out, options);
+    let _ = write!(
+        out,
+        r#"<div class="rx-chart__frame" style="--rx-chart-h: {}px"><div class="rx-chart__y" aria-hidden="true">"#,
+        options.height
+    );
+    let y_ticks = ticks(y_lo, y_hi, y_step);
+    for t in &y_ticks {
+        let _ = write!(
+            out,
+            r#"<span style="bottom: {}%">{}</span>"#,
+            pct(py(*t)),
+            escape(&formats.y.tick(*t))
+        );
+    }
+    let label = if options.title.is_empty() {
+        clouds
+            .iter()
+            .map(|c| c.name.as_str())
+            .filter(|n| !n.is_empty())
+            .collect::<Vec<_>>()
+            .join(", ")
+    } else {
+        options.title.clone()
+    };
+    let label = match (&options.x_title, &options.y_title) {
+        (Some(x), Some(y)) => {
+            let axes = options.axes.replace(":y", y).replace(":x", x);
+            if label.is_empty() {
+                axes
+            } else {
+                format!("{label}: {axes}")
+            }
+        }
+        _ => label,
+    };
+    let _ = write!(
+        out,
+        r#"</div><div class="rx-chart__plot" tabindex="0" role="img" aria-label="{}"><div class="rx-chart__grid" aria-hidden="true">"#,
+        escape(&label)
+    );
+    for t in &y_ticks {
+        let base = if t.abs() < y_step / 1e6 {
+            " rx-chart__rule--base"
+        } else {
+            ""
+        };
+        let _ = write!(
+            out,
+            r#"<span class="rx-chart__rule{base}" style="bottom: {}%"></span>"#,
+            pct(py(*t))
+        );
+    }
+    let x_ticks = ticks(x_lo, x_hi, x_step);
+    for t in &x_ticks {
+        let base = if t.abs() < x_step / 1e6 {
+            " rx-chart__rule--base"
+        } else {
+            ""
+        };
+        let _ = write!(
+            out,
+            r#"<span class="rx-chart__rule rx-chart__rule--x{base}" style="left: {}%"></span>"#,
+            pct(px(*t))
+        );
+    }
+    out.push_str(r#"</div><div class="rx-chart__points" aria-hidden="true">"#);
+    // Big bubbles first, so small ones stay on top and reachable.
+    let mut drawn: Vec<(usize, &(usize, &Point))> = order.iter().enumerate().collect();
+    if bubble {
+        drawn.sort_by(|a, b| {
+            let size = |p: &Point| p.size.map(f64::abs).unwrap_or(0.0);
+            size(b.1.1).total_cmp(&size(a.1.1))
+        });
+    }
+    for (index, (s, point)) in drawn {
+        let size = if bubble {
+            format!("; --rx-point: {}px", diameter(point.size))
+        } else {
+            String::new()
+        };
+        let _ = write!(
+            out,
+            r#"<span class="rx-chart__point {}" data-index="{index}" style="left: {}%; bottom: {}%{size}"></span>"#,
+            slot(*s),
+            pct(px(point.x)),
+            pct(py(point.y)),
+        );
+    }
+    out.push_str(r#"</div><div class="rx-chart__tip" hidden></div></div>"#);
+    out.push_str(r#"<div class="rx-chart__x" aria-hidden="true">"#);
+    for (shown, t) in x_ticks.iter().enumerate() {
+        let narrow = if shown % 2 == 1 && shown + 1 < x_ticks.len() {
+            " rx-chart__x--odd"
+        } else {
+            ""
+        };
+        let _ = write!(
+            out,
+            r#"<span class="{narrow}" style="left: {}%">{}</span>"#,
+            pct(px(*t)),
+            escape(&formats.x.tick(*t))
+        );
+    }
+    out.push_str("</div></div>");
+    x_title(&mut out, options);
+
+    let mut heads = Vec::new();
+    if several {
+        heads.push(options.series_head.clone());
+    }
+    heads.push(x_name.clone());
+    heads.push(y_name.clone());
+    if bubble {
+        heads.push(formats.size_title.clone());
+    }
+    let rows: Vec<(String, Vec<String>)> = order
+        .iter()
+        .enumerate()
+        .map(|(i, (s, point))| {
+            let mut cells = Vec::new();
+            if several {
+                cells.push(clouds[*s].name.clone());
+            }
+            cells.push(formats.x.full(point.x));
+            cells.push(formats.y.full(point.y));
+            if bubble {
+                cells.push(
+                    point
+                        .size
+                        .map(|v| formats.size.full(v))
+                        .unwrap_or_else(|| "—".into()),
+                );
+            }
+            (
+                point.label.clone().unwrap_or_else(|| (i + 1).to_string()),
+                cells,
+            )
+        })
+        .collect();
+    table(&mut out, options, &heads, &rows);
+    out.push_str("</figure>");
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1250,7 +1897,18 @@ mod tests {
         assert_eq!(Period::parse("30d"), Some(Period::days(30)));
         assert_eq!(Period::parse("12M").map(|p| p.key()), Some("12m".into()));
         assert_eq!(Period::parse("ytd"), Some(Period::year_to_date()));
-        for bad in ["", "0d", "400d", "40m", "7w", "d", "-3d"] {
+        for bad in [
+            "",
+            "0d",
+            "400d",
+            "40m",
+            "105w",
+            "d",
+            "-3d",
+            "2026-09-30..2026-09-01",
+            "2020-01-01..2026-01-01",
+            "2026-9-1..2026-09-30",
+        ] {
             assert_eq!(Period::parse(bad), None, "{bad}");
         }
         assert_eq!(Period::days(30).bucket(), Bucket::Day);
@@ -1273,6 +1931,95 @@ mod tests {
         );
     }
 
+    fn day(text: &str) -> NaiveDate {
+        NaiveDate::parse_from_str(text, "%Y-%m-%d").unwrap()
+    }
+
+    #[test]
+    fn custom_ranges_parse_and_step_back() {
+        let range = Period::between(day("2026-09-01"), day("2026-09-30")).unwrap();
+        assert!(range.is_custom() && !Period::days(30).is_custom());
+        assert_eq!(range.key(), "2026-09-01..2026-09-30");
+        assert_eq!(Period::parse(&range.key()), Some(range));
+        assert_eq!(
+            range.days_in(Zone::UTC),
+            (day("2026-09-01"), day("2026-10-01"))
+        );
+        // The period before: as many days, just before.
+        assert_eq!(
+            range.previous().days_in(Zone::UTC),
+            (day("2026-08-02"), day("2026-09-01"))
+        );
+        // One day is fine; backwards or over three years is not.
+        assert!(Period::between(day("2026-09-01"), day("2026-09-01")).is_some());
+        assert!(Period::between(day("2026-09-02"), day("2026-09-01")).is_none());
+        assert!(Period::between(day("2024-01-01"), day("2026-12-31")).is_some());
+        assert!(Period::between(day("2024-01-01"), day("2027-01-01")).is_none());
+        // From a query string.
+        let query = "q=x&period=custom&from=2026-09-01&to=2026-09-30";
+        assert_eq!(Period::from_query(query), Some(range));
+        assert_eq!(
+            Period::from_query("period=12w").map(|p| p.key()),
+            Some("12w".into())
+        );
+        for bad in [
+            "period=custom",
+            "period=custom&from=2026-09-01",
+            "period=custom&from=2026-09-31&to=2026-10-01",
+            "period=custom&from=2026-10-01&to=2026-09-01",
+            "from=2026-09-01&to=2026-09-30",
+        ] {
+            assert_eq!(Period::from_query(bad), None, "{bad}");
+        }
+        // Per day up to 92 days, per week up to 26 weeks, then per month.
+        let span = |days: i64| {
+            let from = day("2026-01-01");
+            Period::between(from, from + Duration::days(days - 1))
+                .unwrap()
+                .bucket()
+        };
+        assert_eq!(
+            (span(92), span(93), span(182), span(183)),
+            (Bucket::Day, Bucket::Week, Bucket::Week, Bucket::Month)
+        );
+    }
+
+    #[test]
+    fn weeks_start_on_monday() {
+        assert_eq!(monday_of(day("2026-10-04")), day("2026-09-28")); // a Sunday
+        assert_eq!(monday_of(day("2026-09-28")), day("2026-09-28"));
+        let weeks = Period::weeks(4);
+        assert_eq!(weeks.bucket(), Bucket::Week);
+        let (start, end) = weeks.days_in(Zone::UTC);
+        assert_eq!(start.weekday(), chrono::Weekday::Mon);
+        assert!((end - start).num_days() > 21 && (end - start).num_days() <= 28);
+        let labels = weeks.labels(Zone::UTC);
+        assert_eq!(labels.len(), 4);
+        assert_eq!(labels[0], start.format("%Y-%m-%d").to_string());
+        // The four weeks before end where these start, at the same weekday.
+        let (before_start, before_end) = weeks.previous().days_in(Zone::UTC);
+        assert_eq!(
+            (before_start, end - before_end),
+            (start - Duration::days(28), Duration::days(28))
+        );
+        // A custom range per week: the first label is the Monday before.
+        let range = Period::between(day("2026-09-02"), day("2026-09-30"))
+            .unwrap()
+            .per(Bucket::Week);
+        assert_eq!(
+            range.labels(Zone::UTC),
+            [
+                "2026-08-31",
+                "2026-09-07",
+                "2026-09-14",
+                "2026-09-21",
+                "2026-09-28"
+            ]
+        );
+        assert_eq!(range.previous().bucket(), Bucket::Week);
+        assert_eq!(Period::days(365).per(Bucket::Day).bucket(), Bucket::Day);
+    }
+
     #[test]
     fn series_add_up_and_compare() {
         let now = Series::new(vec!["a".into(), "b".into()], vec![30.0, 30.0]);
@@ -1291,6 +2038,24 @@ mod tests {
         assert_eq!(scale(0.0, 1234.0), (0.0, 1500.0, 500.0));
         assert_eq!(scale(-30.0, 70.0), (-50.0, 75.0, 25.0));
         assert_eq!(scale(0.0, 0.0), (0.0, 1.0, 0.25));
+        // Scatter axes needn't start at 0, unless the data comes close.
+        assert_eq!(
+            point_scale([52.0, 87.0].into_iter(), false),
+            (50.0, 90.0, 10.0)
+        );
+        assert_eq!(
+            point_scale([3.0, 87.0].into_iter(), false),
+            (0.0, 100.0, 25.0)
+        );
+        assert_eq!(point_scale([-5.0, -80.0].into_iter(), false).1, 0.0);
+        assert_eq!(point_scale(std::iter::empty(), true), (0.0, 1.0, 0.25));
+        assert_eq!(
+            auto_decimals([1.0, 2.5].into_iter()),
+            Some(1),
+            "as many decimals as needed"
+        );
+        assert_eq!(auto_decimals([1.25].into_iter()), Some(2));
+        assert_eq!(auto_decimals([3.0].into_iter()), Some(0));
     }
 
     #[test]

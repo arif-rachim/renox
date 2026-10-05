@@ -175,6 +175,7 @@ async fn trends(State(state): State<AppState>, period: renox::chart::Period) -> 
         .sum(&state, "stars")
         .await?;
     let average = Trend::of(Note::query(), "created_at")
+        .over(renox::chart::Period::days(90).per(renox::chart::Bucket::Week))
         .average(&state, "stars")
         .await?;
     Ok(format!(

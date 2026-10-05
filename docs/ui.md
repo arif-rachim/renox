@@ -1212,7 +1212,9 @@ async fn dashboard(State(state): State<AppState>, period: Period) -> Result<View
 }
 ```
 
-`Period` reads the period from the address (`?period=30d`). Then the template draws them:
+`Period` reads the period from the address: a preset (`?period=30d`, `12w`, `12m`, `ytd`…) or
+a custom range (`?period=custom&from=2026-09-01&to=2026-09-30`, what `period_filter`'s
+"Custom" form sends). Then the template draws them:
 
 ```html
 {% from "renox/ui.html" import period_filter, stats, stat, dashboard, widget %}
@@ -1241,23 +1243,52 @@ This page shows, from top to bottom:
 The parts, one by one:
 
 - **`Trend::of(query, column)`** places a model's rows in time, by a date-time column.
-  - It gives a `Series` per day (for up to 92 days, and for `mtd`) or per month.
+  - It gives a `Series` per day (for up to 92 days, and for `mtd`), per week (for `12w`-style
+    periods, and custom ranges up to 26 weeks) or per month. `period.per(Bucket::Week)` picks
+    the step yourself: `Period::days(90).per(Bucket::Week)`.
   - It can `count`, `sum(column)` or `average(column)`.
   - The query's conditions apply.
   - Days are cut in `APP_TIMEZONE` (at its offset at the end of the period). Empty days are 0.
+  - Weeks are ISO weeks: Monday to Sunday, in those same local days. Each is labelled by its
+    Monday (`2026-09-28`, shown as `Sep 28`). `12w` starts on the Monday eleven weeks before
+    this week's and ends today; in a custom range the first and last weeks may be cut short
+    by the range.
   - `Period::previous()` is the period just before, as long, for `Series::change_from` (a
-    percent).
-  - A `Series` has `labels` (`2026-10-02`, or `2026-10` per month), `values`, `total()` and
-    `named(…)`. Build one by hand with `Series::new(labels, values)`.
+    percent). For a custom range that's as many days, just before it.
+  - `Period::between(from, to)` is a custom range in code (both days included, at most
+    three years; `None` otherwise). Its key is `2026-09-01..2026-09-30`, which `?period=`
+    takes too. A range the extractor refuses (`from` after `to`, a date that isn't one, more
+    than three years) gives the default 30 days.
+  - A `Series` has `labels` (`2026-10-02`, the Monday per week, or `2026-10` per month),
+    `values`, `total()` and `named(…)`. Build one by hand with `Series::new(labels, values)`.
 - **`chart(kind, data, …)`** draws a chart.
-  - Kinds: `line`, `area`, `bar` (`stacked=true` piles bars on top of each other), or
-    `pie`/`doughnut`.
+  - Kinds: `line`, `area`, `bar` (`stacked=true` piles bars on top of each other),
+    `pie`/`doughnut`, or `scatter`/`bubble` (below).
   - `data` is a `Series`, a list of numbers, or a list of series (`{name, values}` maps).
     Or pass `labels=…` with `series=[…]` or `values=[…]`.
   - Options: `format` (`number`, `money` in `APP_CURRENCY` or `currency=…`, `percent`),
     `decimals`, `height` (240 px), `title` (for screen readers), `name` (one series' name),
     `x_format` (chrono's codes for date labels; otherwise `Oct 2`, `Oct 2026`),
-    `legend=false`, `table=false`, `id`.
+    `x_title` and `y_title` (shown along the axes), `legend=false`, `table=false`, `id`.
+- **Scatter and bubble charts** place points by two numbers (and a bubble's size by a third):
+  ```html
+  {{ chart("scatter", points=orders, x_title="Items", y_title="Total", format="money") }}
+  {{ chart("bubble", points=products, x_title="Price", y_title="Units", size_title="Revenue",
+           x_format="money", size_format="money") }}
+  ```
+  - A point is `{x, y, size, label}` (a map from the handler, e.g. `json!({…})`), or `[x, y]`
+    and `[x, y, size]`. A point without both numbers is left out.
+  - Several series: `series=[{"name": "Coffee", "points": […]}, …]` (or the same list as
+    `data`), each in its own colour with a legend.
+  - `format` is for y, `x_format` for x and `size_format` for sizes: `number`, `money` or
+    `percent`. Numbers get as many decimals as the data needs (up to 2) unless `decimals` says.
+  - The axes fit the data (they start at 0 only when the data comes close to it), with
+    grid lines both ways.
+  - A bubble's area follows its size (6 to 40 px across); bubbles are see-through with a
+    solid edge, and small ones are drawn over big ones.
+  - The tooltip names the point (`label`), its series, and each value with its axis title;
+    the arrow keys move from point to point, left to right. The "Show the data" table lists
+    every point.
 - **How the charts look.**
   - One axis that starts at 0, with clean tick labels (`12.5K`, or `2,5M` where the language
     writes a decimal comma).
@@ -1289,15 +1320,26 @@ The parts, one by one:
     `View` fragment).
   - With `url`, the content is loaded after the page, and again every `poll` seconds. The old
     content stays, dimmed, until the new one arrives.
-- **`period_filter(selected, options=…, label=…)`**: one row of preset periods, over
-  everything it applies to. `selected` is the handler's `Period` (the one now shown).
+- **`period_filter(selected, options=…, label=…, custom=true)`**: one row of preset periods,
+  over everything it applies to. `selected` is the handler's `Period` (the one now shown).
   `options` are `[key, label]` pairs; by default 7 days, 30 days, 90 days, 12 months and this
-  year (`7d`, `30d`, `90d`, `12m`, `ytd`). `label` is the name screen readers say ("Period").
-  Its links set `?period=` and keep the rest of the address's query.
-  `query_with(period="7d")` builds such links in any template.
+  year (`7d`, `30d`, `90d`, `12m`, `ytd`; `12w`, 12 weeks, is another). `label` is the name
+  screen readers say ("Period"). Its links set `?period=` and keep the rest of the address's
+  query. `query_with(period="7d")` builds such links in any template.
+  - Next to the presets, a "Custom" button opens a small form with two of the kit's date
+    fields (typed, or picked in the calendar) and "Apply". It sends
+    `?period=custom&from=…&to=…`, keeping the rest of the query (`query_fields(…)`, below).
+  - The button shows the range while one is chosen (`Sep 1 – Sep 30, 2026`). A range the
+    extractor refuses opens the form again with what was typed and a message.
+  - It works from the keyboard: Enter on the button opens it and puts the cursor in the first
+    date, Tab moves on, Escape (or a click elsewhere) closes it.
+  - `custom=false` leaves the button out.
+  - `query_fields("period", "from", "to")` writes the current query as hidden inputs, without
+    `page` and the keys named, for any GET form that should keep the page's other filters.
 
-examples/shop's admin dashboard uses all of it: the period, four figures, revenue against
-the period before, orders per day, and orders by status, loaded on their own every minute.
+examples/shop's admin dashboard uses all of it: the period (with 12 weeks and a custom
+range), four figures, revenue against the period before, orders per day, orders by status
+(loaded on their own every minute), products sold as bubbles and orders as a scatter chart.
 
 ## Data grids
 

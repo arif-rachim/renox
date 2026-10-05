@@ -337,6 +337,7 @@
     var plot = figure.querySelector(".rx-chart__plot");
     var tip = figure.querySelector(".rx-chart__tip");
     var cross = figure.querySelector(".rx-chart__cross");
+    if (data.points) { setupPoints(figure, data.points, plot, tip); return; }
     if (!plot || !tip || !data.labels || !data.labels.length) return;
     var n = data.labels.length;
     var pie = data.kind === "pie" || data.kind === "doughnut";
@@ -441,6 +442,129 @@
       show(next);
     });
   }
+
+  // Scatter and bubble charts: the tooltip of the point nearest the pointer
+  // (within reach of its edge), or of the one the arrow keys reach, left to
+  // right.
+  function setupPoints(figure, points, plot, tip) {
+    var n = points.length;
+    if (!plot || !tip || !n) return;
+    var marks = [];
+    figure.querySelectorAll(".rx-chart__point").forEach(function (el) {
+      marks[parseInt(el.getAttribute("data-index"), 10)] = el;
+    });
+    var current = -1;
+
+    function text(tag, className, value) {
+      var el = document.createElement(tag);
+      el.className = className;
+      el.textContent = value;
+      return el;
+    }
+
+    function show(i) {
+      current = i;
+      var point = points[i];
+      tip.textContent = "";
+      if (point.title) tip.appendChild(text("p", "rx-chart__tip-label", point.title));
+      if (point.name) {
+        var series = text("p", "rx-chart__tip-row", "");
+        var mark = text("span", "rx-chart__key rx-chart__key--dot " + point.slot, "");
+        series.appendChild(mark);
+        series.appendChild(text("span", "rx-chart__tip-name", point.name));
+        tip.appendChild(series);
+      }
+      point.rows.forEach(function (pair) {
+        var line = text("p", "rx-chart__tip-row", "");
+        line.appendChild(text("span", "rx-chart__tip-name", pair[0]));
+        line.appendChild(text("span", "rx-chart__tip-value", pair[1]));
+        tip.appendChild(line);
+      });
+      tip.hidden = false;
+      marks.forEach(function (el, k) {
+        if (!el) return;
+        if (k === i) el.setAttribute("data-on", ""); else el.removeAttribute("data-on");
+      });
+      var width = plot.clientWidth, height = plot.clientHeight;
+      var x = point.left / 100 * width, y = (1 - point.bottom / 100) * height;
+      var reach = (marks[i] ? marks[i].offsetWidth / 2 : 4) + 8;
+      var left = x + reach;
+      if (left + tip.offsetWidth > width) left = x - reach - tip.offsetWidth;
+      tip.style.left = Math.max(left, 0) + "px";
+      var top = y - tip.offsetHeight / 2;
+      tip.style.top = Math.min(Math.max(top, 0), Math.max(height - tip.offsetHeight, 0)) + "px";
+    }
+
+    function hide() {
+      current = -1;
+      tip.hidden = true;
+      marks.forEach(function (el) { if (el) el.removeAttribute("data-on"); });
+    }
+
+    plot.addEventListener("pointermove", function (event) {
+      var rect = plot.getBoundingClientRect();
+      var px = event.clientX - rect.left, py = event.clientY - rect.top;
+      var best = -1, bestDistance = Infinity;
+      points.forEach(function (point, i) {
+        var dx = point.left / 100 * rect.width - px;
+        var dy = (1 - point.bottom / 100) * rect.height - py;
+        var distance = Math.sqrt(dx * dx + dy * dy);
+        var reach = (marks[i] ? marks[i].offsetWidth / 2 : 4) + 16;
+        if (distance <= reach && distance < bestDistance) { best = i; bestDistance = distance; }
+      });
+      if (best < 0) hide(); else if (best !== current) show(best);
+    });
+    plot.addEventListener("pointerleave", hide);
+    plot.addEventListener("blur", hide);
+    plot.addEventListener("focus", function () { show(current < 0 ? 0 : current); });
+    plot.addEventListener("keydown", function (event) {
+      var next = current < 0 ? 0 : current;
+      if (event.key === "ArrowLeft" || event.key === "ArrowDown") next = Math.max(next - 1, 0);
+      else if (event.key === "ArrowRight" || event.key === "ArrowUp") next = Math.min(next + 1, n - 1);
+      else if (event.key === "Home") next = 0;
+      else if (event.key === "End") next = n - 1;
+      else if (event.key === "Escape") { hide(); return; }
+      else return;
+      event.preventDefault();
+      show(next);
+    });
+  }
+
+  // ---------- The period filter's custom range (period_filter) ----------
+
+  // Its panel stays on screen and, opened from its button, takes focus;
+  // Escape (outside the calendar) closes it back to the button, and so does
+  // a click elsewhere.
+  document.addEventListener("click", function (event) {
+    var summary = event.target.closest && event.target.closest("details[data-rx-period] > summary");
+    if (summary) summary.parentElement._rxOpenedHere = true;
+    document.querySelectorAll("details[data-rx-period][open]").forEach(function (details) {
+      if (!details.contains(event.target)) details.open = false;
+    });
+  });
+  document.addEventListener("toggle", function (event) {
+    var details = event.target;
+    if (!details.matches || !details.matches("details[data-rx-period]") || !details.open) return;
+    var form = details.querySelector(".rx-period__form");
+    if (!form) return;
+    form.style.left = "";
+    var rect = form.getBoundingClientRect();
+    var over = rect.right - (document.documentElement.clientWidth - 16);
+    if (over > 0) form.style.left = -Math.max(Math.min(over, rect.left - 16), 0) + "px";
+    if (details._rxOpenedHere) {
+      details._rxOpenedHere = false;
+      var first = form.querySelector("input:not([type=hidden])");
+      if (first) first.focus();
+    }
+  }, true);
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape") return;
+    var details = event.target.closest && event.target.closest("details[data-rx-period][open]");
+    if (!details || details.querySelector(":popover-open")) return;
+    details.open = false;
+    var summary = details.querySelector("summary");
+    if (summary) summary.focus();
+  });
 
   // ---------- Sheets (dialogs) ----------
 

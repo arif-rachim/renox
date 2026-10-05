@@ -66,8 +66,9 @@ Every example has a README.md that walks through it.
   (checkout: `toggle_buttons` + `show_when` + `required_if` for courier or pickup; the admin's
   category in a `select` whose options come from the server, added and renamed in place
   (`renox::select`, admin/categories.rs); its dashboard with `renox::chart` (`Period`,
-  `Trend`), `period_filter`, `stats`/`stat`, `chart` line/bar/doughnut and a lazy, polled
-  `widget`, then the kit's `tabs`/`tab_panel`; its product list with an "Adjust stock"
+  `Trend`), `period_filter` (with `12w` per week and a custom date range), `stats`/`stat`,
+  `chart` line/bar/doughnut, bubble (products: price, units, revenue) and scatter (orders)
+  and a lazy, polled `widget`, then the kit's `tabs`/`tab_panel`; its product list with an "Adjust stock"
   `action_sheet` per row (admin/products.rs `adjust_stock`: `Toast` + `HxRefresh`, a
   `ValidationError` for its own check), `icon_button`s (one disabled with a reason), `n`
   for a new product and ⌘S / Ctrl+S on the form (`key=`); the
@@ -283,8 +284,9 @@ Every example has a README.md that walks through it.
   `link_tabs`, `thumbnail`, `progress`, `rx-page--fill`: build pages from these, not app CSS;
   themes and the type scale: the warm default, `data-rx-theme="classic"`, `--rx-type-*`),
   the filters `number`, `money` (`APP_CURRENCY`), `date`, `since`, `words`, `markdown`,
-  dashboards (`renox::chart`: `Period`, `Trend`, `Series`; `chart(…)`, `stat`, `stats`,
-  `dashboard`, `widget`, `period_filter`), and its
+  dashboards (`renox::chart`: `Period` with presets, weeks and custom ranges, `Trend` per
+  day/week/month, `Series`; `chart(…)` line/area/bar/pie/doughnut/scatter/bubble, `stat`,
+  `stats`, `dashboard`, `widget`, `period_filter` with its custom range, `query_fields`), and its
   design rules, toasts (a body, links, a duration, an id, a position, `Renox.toast`), out-of-band
   fragments, htmx headers, live validation.
 - [docs/grid.md](docs/grid.md): data grids (`renox::grid` + `renox/grid.html`): columns and their
