@@ -420,6 +420,32 @@ async fn search_finds_every_word_in_titles_and_bodies() {
         .assert_see("No posts with “nothing-like-this”");
     // Odd input is only text to look for: no error.
     b.app.get("/?q=%25_%27").await.assert_ok();
+    b.app.get("/?q=%22OR%22+NEAR(*").await.assert_ok();
+}
+
+#[renox::test]
+async fn search_puts_the_best_match_first() {
+    let b = blog().await;
+    // Newer, but "beans" is only in its body.
+    Post::create(
+        b.app.db(),
+        Post {
+            title: "Grinders".into(),
+            body: "Fresh beans want a burr grinder.".into(),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let text = b.app.get("/?q=bean").await.assert_ok().text();
+    let (beans, grinders) = (
+        text.find(">Beans<").unwrap(),
+        text.find(">Grinders<").unwrap(),
+    );
+    assert!(beans < grinders, "the title match comes first");
+    // Without a search, the newest first.
+    let text = b.app.get("/").await.text();
+    assert!(text.find(">Grinders<").unwrap() < text.find(">Beans<").unwrap());
 }
 
 #[renox::test]

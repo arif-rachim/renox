@@ -14,7 +14,10 @@ pub struct Category {
 }
 
 #[derive(Model, Serialize, Deserialize, Default, Debug, Clone)]
-#[model(table = "posts")]
+/// Searchable by title and body (full-text, the title weighing more):
+/// `Post::search(&q)`. The index is made by the migration
+/// `renox::db::search::migration::<Post>` in lib.rs.
+#[model(table = "posts", search = "title, body")]
 pub struct Post {
     pub id: i64,
     /// The foreign key is a plain field: `belongs to` a category.

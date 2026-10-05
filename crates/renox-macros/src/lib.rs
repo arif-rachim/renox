@@ -36,6 +36,10 @@ use syn::{DeriveInput, parse_macro_input};
 ///   `String`, see `renox::db::ModelKey`).
 /// - `created_at` / `updated_at` fields are filled on save.
 /// - `soft_deletes` needs a `deleted_at: Option<DateTime>` field.
+/// - `search = "title, body"` names the text columns full-text search looks
+///   in (`Model::search`, `renox::db::search`), most important first;
+///   `search_language = "simple"` changes the language from `english`.
+/// - `default_scope = "path::to::fn"` and `hooks`: see `renox::db::Model`.
 #[proc_macro_derive(Model, attributes(model))]
 pub fn derive_model(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);

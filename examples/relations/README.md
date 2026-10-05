@@ -44,7 +44,7 @@ cargo run                        # http://127.0.0.1:3000
 |---|---|---|
 | Markdown bodies | `{{ post.body \| markdown }}` inside Tailwind's `prose` (raw HTML in a body shows as text) | [show.html](resources/views/blog/show.html) |
 | A title and description per post for search engines and link previews | `{% block seo %}{{ seo(title=…, description=…, type="article") }}{% endblock %}`; the description is `Post::summary` (the first paragraph without Markdown marks) | `show`, [model.rs](src/app/blog/model.rs) |
-| Search | `?q=`: each word must be in the title or the body (`where_any` + `where_like`); pages keep `q` | `index` |
+| Search | `?q=`: full-text over titles and bodies (`#[model(search = "title, body")]`, the index made by `renox::db::search::migration::<Post>` in [lib.rs](src/lib.rs)), every word or a longer form of it, best match first (`Post::search(&q).latest()`); pages keep `q` | `index` |
 | RSS 2.0 at `/feed.xml`, linked from every page's `<head>` | XML written by the handler, escaped by `xml()` | `feed` |
 | `/sitemap.xml` | `renox::seo::Sitemap`; its route is named `sitemap`, so `robots.txt` points at it in production | `sitemap` |
 | 304s for feed readers and crawlers | `.etag()` on a group of just those two routes: an `ETag` on each, and `304 Not Modified` without the body when nothing changed | `routes` |

@@ -38,6 +38,11 @@ pub fn app() -> App {
     App::new()
         .embed(renox::embedded!())
         .migrations(renox::migrations!())
+        // The posts' full-text index (an FTS5 table kept current by
+        // triggers), after the migration that creates `posts`.
+        .migrations(&[renox::db::search::migration::<Post>(
+            "20260104000000_search_posts",
+        )])
         .module(app::blog::Blog)
         .seeder(seed)
 }

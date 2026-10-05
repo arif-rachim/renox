@@ -15,6 +15,7 @@ mod paginate;
 mod query;
 mod query_log;
 pub mod relations;
+pub mod search;
 mod value;
 
 use std::str::FromStr;
