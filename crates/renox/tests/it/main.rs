@@ -4,6 +4,7 @@
 
 mod account_sections;
 mod accounts;
+mod action_kinds;
 mod actions;
 mod api_foundations;
 mod auth;

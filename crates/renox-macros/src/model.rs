@@ -194,6 +194,13 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
             quote! { self.#ident = now; }
         }
     });
+    // `replicate()`: a copy gets new timestamps when it is saved.
+    let forget_timestamps = ["created_at", "updated_at"].map(|name| {
+        column(name).filter(|f| is_option(&f.ty)).map(|f| {
+            let ident = &f.ident;
+            quote! { self.#ident = ::core::option::Option::None; }
+        })
+    });
     let set_deleted_at = deleted_at.filter(|_| soft_deletes).map(|f| {
         let ident = &f.ident;
         quote! {
@@ -258,6 +265,10 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
             fn touch(&mut self, now: ::renox::db::DateTime, creating: bool) {
                 #created
                 #updated
+            }
+
+            fn forget_timestamps(&mut self) {
+                #(#forget_timestamps)*
             }
 
             #set_deleted_at

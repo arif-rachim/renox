@@ -73,6 +73,38 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
     /// Updates `deleted_at` if the model has it.
     #[doc(hidden)]
     fn set_deleted_at(&mut self, _at: Option<DateTime>) {}
+    /// Empties `created_at` / `updated_at` when they are `Option`s.
+    #[doc(hidden)]
+    fn forget_timestamps(&mut self) {}
+
+    /// A copy of the model that isn't saved yet (Laravel's `replicate`):
+    /// the same values, with an unsaved id, no `deleted_at` and, when they
+    /// are `Option`s, no timestamps, so `save` inserts a new row. Change
+    /// what must differ (a unique SKU, a name) before saving it, or show it
+    /// in the "new" form for someone to finish ("Duplicate").
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # #[derive(Model, serde::Serialize, Default, Clone)]
+    /// # #[model(table = "products")]
+    /// # struct Product { id: i64, sku: String, name: String, created_at: Option<DateTime> }
+    /// # async fn demo(db: Db) -> Result {
+    /// let original = Product::find_or_404(&db, 1).await?;
+    /// let mut copy = original.replicate();
+    /// copy.sku = format!("{}-COPY", original.sku);
+    /// copy.save(&db).await?; // a new row, with its own id
+    /// # Ok(()) }
+    /// ```
+    fn replicate(&self) -> Self
+    where
+        Self: Clone,
+    {
+        let mut copy = self.clone();
+        copy.set_id(Self::Key::default());
+        copy.set_deleted_at(None);
+        copy.forget_timestamps();
+        copy
+    }
 
     /// Conditions every query of this model starts with, e.g. the current
     /// tenant, read from [`renox::context`](mod@crate::context). `query()`,

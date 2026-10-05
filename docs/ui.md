@@ -31,7 +31,7 @@ full reload.
   - the page's frame (navigation bar, sidebar, page headers);
   - themes and type;
   - infolists (read-only details);
-  - actions and dashboards.
+  - actions (action groups, wizards, import, duplicate, export) and dashboards.
 - [Toasts](#toasts): short pop-up messages.
 - [Fragments and out-of-band swaps](#fragments-and-out-of-band-swaps): sending only part of a
   page.
@@ -410,7 +410,8 @@ The rest of the kit's everyday components:
 | `sheet(id, title, message=…, slide_over=…, width=…, icon=…)` + `open_button(id, label, variant="secondary", size=…, icon=…, key=…, badge=…)` | A sheet is a modal dialog: a box over the page that you must close before going on. It closes on Esc and on a click outside it (on the backdrop), and focus goes back to the button that opened it. On phones it rises from the bottom edge. `slide_over=true` puts it at the side, full height. `width` is `sm`, `md` (default), `lg` or `xl`. `icon` (`info`, `success`, `warning`, `error`) shows above the title. Any element with `data-rx-open="<sheet id>"` opens the sheet too, not only `open_button`. A button with `data-rx-close` inside the sheet closes it. |
 | `action_sheet(id, label, action, title, …)` | A button that opens a sheet with a form sent by htmx. See [Actions](#actions). |
 | `confirm(id, label, action, title, message, confirm_label=…, method="DELETE", size=…, icon=…, modal_icon="warning", key=…)` | A destructive action (like delete) that asks first, in a sheet. Cancel has the focus first, so pressing Enter by mistake does nothing harmful. `icon` goes on the button, `modal_icon` above the sheet's title (`none` for no icon). |
-| `menu(label, id=…, variant="secondary", size="small")` + `menu_link(href, label)`, `menu_action(action, label, method="POST", danger=…)`, `menu_separator()` | A drop-down menu of actions. The arrow keys move, Esc closes. `menu_action` sends a form (with `_method` for methods other than POST). |
+| `menu(label, id=…, variant="secondary", size="small")` + `menu_link(href, label, icon=…, download=…, new_tab=…)`, `menu_action(action, label, method="POST", danger=…, icon=…)`, `menu_open(id, label)`, `menu_section(title)`, `menu_separator()` | A drop-down menu of actions. The arrow keys move, Esc closes. `menu_action` sends a form (with `_method` for methods other than POST); `menu_open` opens a sheet. |
+| `action_group(label=none, icon=none)`, `wizard_action(…)`, `import_action(…)` | Several actions behind one button, an action with steps, a CSV import. See [Actions](#action-groups). |
 | `tabs(id, items, selected=…, label=…)` + `tab_panel(id, key, selected=…)` | A segmented control: tabs that switch between panels on one page. The arrow keys, Home and End move between tabs. |
 | `table(head, caption=…)` | A table in a card. A heading `["Total", "num"]` lines its column up on the right (for numbers), and `["Slug", "hide-narrow"]` hides the column on phones. |
 | `empty(title, message=…, action_href=…, action_label=…)` | What an empty list says. With `action_href` (and its `action_label`), it adds a link to add the first item. |
@@ -1184,6 +1185,190 @@ examples/shop's admin product list has all of these:
 
 Its product form also saves on ⌘S / Ctrl+S.
 
+### Action groups
+
+When a page has more actions than it has room for, put the rarer ones behind one button.
+`action_group` is a `menu` made for that (Filament's ActionGroup): with no label it's a "⋯"
+icon button that screen readers call "Actions".
+
+```html
+{% from "renox/ui.html" import action_group, menu_link, menu_open, menu_action, menu_separator, confirm %}
+{% call action_group() %}
+  {{ menu_link(route('products.replicate', product.id), "Duplicate", icon="copy") }}
+  {{ menu_link(route('products.ledger', product.id), "Export ledger", icon="download", download=true) }}
+  {{ menu_action(route('products.archive', product.id), "Archive") }}
+  {{ menu_separator() }}
+  {{ menu_open("delete-product", "Delete", icon="trash", danger=true) }}
+{% endcall %}
+{{ confirm("delete-product", "Delete", route('products.destroy', product.id),
+           "Delete " ~ product.name ~ "?", "This can't be undone.", button=false) }}
+```
+
+- `action_group("More")` shows a labelled button instead; `icon` changes the icon.
+- Its items: `menu_link` (a link; `download=true` for a file to save, `new_tab=true`),
+  `menu_action` (sends a form), `menu_button` (a button with htmx `attrs`), `menu_open`
+  (opens a sheet), `menu_separator()`, and `menu_section(title)` around items that belong
+  together. Each takes an `icon`; `danger=true` shows it in red.
+- `menu_open(id, label)` opens a sheet made elsewhere on the page with `button=false`:
+  an `action_sheet`, `confirm`, `wizard_action` or `import_action` without its own button.
+  The menu closes, and when the sheet closes the focus goes back to the group's button.
+- The keyboard works as in every kit menu: Enter, Space or ↓ opens it on the first item,
+  ↑ on the last; the arrows, Home and End move; Esc closes it and returns to the button.
+
+### An action with steps
+
+`wizard_action` is an `action_sheet` whose form is a [`wizard`](#form-fields): one step at a
+time, Next checks the step's fields (with the server's rules too: the form is
+`data-live-validate`, `live=false` turns that off), and the last step's button sends the
+form with htmx.
+
+```html
+{% from "renox/ui.html" import wizard_action, wizard_step, input %}
+{% call wizard_action("new-product", "New product", route('products.store'), "New product",
+                      [["details", "Details"], ["stock", "Price and stock"]],
+                      submit_label="Add product", variant="primary", icon="plus") %}
+  {% call wizard_step("new-product", "details") %}
+    {{ input("sku", "SKU", required=true, id="new-product-sku") }}
+    {{ input("name", "Name", required=true, id="new-product-name") }}
+  {% endcall %}
+  {% call wizard_step("new-product", "stock") %}
+    {{ input("price", "Price", type="number", required=true, id="new-product-price") }}
+  {% endcall %}
+{% endcall %}
+```
+
+The handler is the same as for any form. A 422 after the last step opens the first step with
+an error and focuses the field, so a SKU someone else took in the meantime sends the user back
+to step 1. A success closes the sheet; closing it any way starts the wizard over.
+
+### Import
+
+`renox::import` reads a CSV file row by row, **as if each row were a form**: the columns, named
+by the file's first line, fill a struct with `Deserialize` and `Validate`, and its rules (and
+its `prepare` and `after` hooks) check the row. Rows that pass are written by your closure in
+one transaction, a savepoint each, so a row the database refuses (a unique index, a foreign
+key) undoes only its own writes. The others are reported with their row number, as a
+spreadsheet counts (the line of column names is row 1).
+
+```rust
+# use renox::prelude::*;
+use renox::import::{Import, ImportReport};
+# #[derive(Model, serde::Serialize, Default)]
+# #[model(table = "products")]
+# struct Product { id: i64, sku: String, name: String, price: i64 }
+
+/// One row: `sku,name,price`.
+#[derive(serde::Deserialize, Validate)]
+struct ProductRow {
+    #[validate(required, max = 30, alpha_dash)]
+    sku: String,
+    #[validate(required, max = 100)]
+    name: String,
+    #[validate(required, min = 0)]
+    price: i64,
+}
+
+/// The import sheet's form: one CSV file.
+#[derive(serde::Deserialize, Validate)]
+struct ImportForm {
+    #[validate(required, mimes(&["csv", "txt"]))]
+    file: Option<Upload>,
+}
+
+async fn import(
+    State(state): State<AppState>,
+    lang: Lang,
+    Valid(form): Valid<ImportForm>,
+) -> Result<ImportReport> {
+    let file = form.file.ok_or(Error::NotFound)?;
+    Import::csv(file.bytes())
+        .lang(&lang) // the rules' messages in the user's language
+        .run(&state, |tx, row: ProductRow| {
+            Box::pin(async move {
+                let product = Product { sku: row.sku, name: row.name, price: row.price, ..Default::default() };
+                Product::create(tx, product).await?;
+                Ok(())
+            })
+        })
+        .await
+}
+
+/// The sheet's "Download a template" link: the columns, nothing else.
+async fn template() -> renox::Download {
+    renox::import::template("products.csv", &["sku", "name", "price"])
+}
+```
+
+The page's side is `import_action`, a sheet with a file field and room for the report:
+
+```html
+{% from "renox/ui.html" import import_action %}
+{{ import_action("import-products", "Import", route('products.import'), "Import products",
+                 columns=["sku", "name", "price"], template_url=route('products.template')) }}
+```
+
+What the person sees:
+
+- Every row imported: the sheet closes, the page reloads, and a toast says how many.
+- Some rows refused: a table of row numbers and messages appears in the sheet, which stays
+  open. Closing it reloads the page, if some rows went in.
+- A file that can't be read (not UTF-8 text, no rows, too many rows) is an error under the
+  file field, like any other.
+
+`Import`'s options:
+
+- `.all_or_nothing()`: one bad row and nothing is written;
+- `.delimiter(';')`: for files from a spreadsheet set to a European language;
+- `.headers(&["sku", "name"])`: for a file without a line of column names;
+- `.rename("Description", "name")`: a column under another name. Headings are matched
+  ignoring case, and spaces and dashes become `_` ("Unit price" fills `unit_price`);
+- `.max_rows(n)`: 10,000 by default;
+- `.user(&user)`: the user that the rows' `after` hooks see.
+
+The `ImportReport` has `imported`, `failed` (each with `row` and `errors`), `is_clean()` and
+`summary()`, for a command or a job that imports without a page. Rows are checked before the
+transaction starts, so a `unique` rule can't see a repeat within the same file: the database's
+unique index catches that one, and the report says the row repeats a unique value.
+
+### Duplicate (replicate)
+
+`Model::replicate()` copies a record into one that isn't saved yet: the same values, with no
+id, no `deleted_at` and no timestamps. Show it in the "new" form for someone to finish:
+
+```rust
+# use renox::prelude::*;
+# #[derive(Model, serde::Serialize, Default, Clone)]
+# #[model(table = "products")]
+# struct Product { id: i64, sku: String, name: String, price: i64 }
+/// GET /products/{id}/replicate: the new-product form, filled from a copy.
+async fn replicate(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
+    let original = Product::find_or_404(&db, id).await?;
+    let mut product = original.replicate();
+    product.sku.clear(); // unique: the person types a new one
+    product.name = format!("{} (copy)", original.name);
+    Ok(view("products/replicate.html", context! { original, product }))
+}
+```
+
+The form's fields take their values from it (`input("name", "Name", value=product.name)`) and
+post to the ordinary "store" route. Code that saves the copy itself calls `copy.save(&db)`. In a
+data grid, it's a row action: `Action::link("Duplicate", "/products/{id}/replicate")`.
+
+### Export
+
+Data grids export what they show ([docs/grid.md](grid.md#exports)). For a file outside a grid's
+page, such as one product's ledger from its page, `Grid::export_as` takes any query and a
+format. The grid only says which columns: those shown by default, in their order. See
+[docs/grid.md](grid.md#exports-outside-the-grids-page).
+
+```html
+{{ menu_link(route('products.ledger', product.id), "Export ledger (CSV)", icon="download", download=true) }}
+```
+
+examples/backoffice uses all of these: "New product" is a `wizard_action`, "More" on the
+product list is an `action_group` with the `import_action` and its template, and a product's
+page has an action group with "Duplicate" and "Export ledger".
+
 ## Dashboards
 
 A dashboard shows figures, charts and the period of time they cover. Renox draws them on the
@@ -1484,3 +1669,5 @@ If you know Laravel, this table maps what you know to Renox:
 | `@break` / `@continue` in `@foreach` | `{% break %}` / `{% continue %}` |
 | `back()` / `redirect()->back()` | the `Back` extractor, returned as the response |
 | Filament's tables | `renox::grid` ([docs/grid.md](grid.md)) |
+| Filament's ActionGroup, wizard actions | `action_group`, `wizard_action` |
+| Filament's ImportAction, ReplicateAction, ExportAction | `renox::import` + `import_action`, `Model::replicate`, `Grid::export_as` |

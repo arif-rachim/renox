@@ -29,8 +29,8 @@ use crate::{AppState, Error};
 pub struct Valid<T>(pub T);
 
 /// Built-in messages in the request's language, with the app's overrides.
-struct Messages {
-    texts: crate::i18n::Texts,
+pub(crate) struct Messages {
+    pub(crate) texts: crate::i18n::Texts,
 }
 
 impl Messages {
@@ -47,7 +47,7 @@ impl Messages {
     }
 }
 
-enum Parsed<T> {
+pub(crate) enum Parsed<T> {
     /// Parsed, possibly with placeholders standing in for fields that
     /// didn't parse; `Errors` holds those fields' errors.
     Ok(T, Errors),
@@ -255,7 +255,7 @@ async fn read_multipart(
     Ok((pairs, uploads))
 }
 
-fn parse_pairs<T: DeserializeOwned>(
+pub(crate) fn parse_pairs<T: DeserializeOwned>(
     pairs: Vec<(String, String)>,
     uploads: &HashMap<String, Upload>,
     locale: &Messages,

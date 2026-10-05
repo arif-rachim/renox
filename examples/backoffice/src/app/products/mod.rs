@@ -1,12 +1,15 @@
 //! Products: a grid with the stock level (a custom cell), prices edited in
-//! place, bulk "activate" and "deactivate", a "New product" sheet and a CSV
-//! import (`import.rs`). A product's page shows its stock ledger
-//! (`stock.rs`), with "Adjust stock" for staff with `stock.adjust`.
+//! place, bulk "activate" and "deactivate", a "New product" wizard (the
+//! kit's `wizard_action`) and a CSV import (`import.rs`, the kit's
+//! `import_action`). A product's page shows its stock ledger (`stock.rs`),
+//! with "Adjust stock" for staff with `stock.adjust`, and an action group:
+//! "Duplicate" (`Model::replicate` into the new-product form) and "Export
+//! ledger" (`Grid::export_as`, a CSV outside the grid's page).
 
 pub mod import;
 pub mod stock;
 
-use renox::grid::{Action, Column, Grid, GridRequest, Selection};
+use renox::grid::{Action, Column, ExportFormat, Grid, GridRequest, Selection};
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -80,6 +83,7 @@ pub fn grid(user: &AuthUser) -> Grid {
         return grid;
     }
     grid.edit_url("/products/{id}")
+        .row_action(Action::link("Duplicate", "/products/{id}/replicate"))
         .bulk_action(Action::new("Activate", "/products/bulk/active/1"))
         .bulk_action(Action::new("Deactivate", "/products/bulk/active/0"))
 }
@@ -127,11 +131,39 @@ pub struct ProductForm {
     pub opening_stock: Option<i64>,
 }
 
+/// "Duplicate": the new-product form, filled from a copy of this product
+/// (`replicate()`: no id, no timestamps). The SKU must be unique, so it
+/// starts empty.
+pub(super) async fn replicate(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
+    let original = Product::find_or_404(&db, id).await?;
+    let mut copy = original.replicate();
+    copy.sku.clear();
+    copy.name = format!("{} (copy)", original.name);
+    Ok(view(
+        "products/replicate.html",
+        context! { original, product => copy },
+    ))
+}
+
+/// "Export ledger": every movement of one product as CSV, outside the
+/// ledger grid's page (its filters don't apply).
+pub(super) async fn export_ledger(
+    State(db): State<Db>,
+    Path(id): Path<i64>,
+    request: GridRequest,
+) -> Result<Response> {
+    let product = Product::find_or_404(&db, id).await?;
+    let movements = stock::StockMovement::where_eq("product_id", product.id).order_by_desc("id");
+    stock::ledger_grid()
+        .export_as(movements, ExportFormat::Csv, &request)
+        .await
+}
+
 pub(super) async fn store(
     State(db): State<Db>,
     user: AuthUser,
     Valid(form): Valid<ProductForm>,
-) -> Result<(Toast, HxRefresh)> {
+) -> Result<(Toast, HxRedirect)> {
     let mut tx = db.begin().await?;
     let product = Product::create(
         &mut tx,
@@ -160,9 +192,10 @@ pub(super) async fn store(
         .await?;
     }
     tx.commit().await?;
+    // To the new product's page, from the wizard or the "Duplicate" form.
     Ok((
         Toast::success(format!("{} added.", product.name)),
-        HxRefresh,
+        HxRedirect(format!("/products/{}", product.id)),
     ))
 }
 

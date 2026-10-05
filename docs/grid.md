@@ -734,6 +734,41 @@ The three formats:
 - **Print**: a plain page with a button to print it or save it as a PDF. It prints landscape,
   with the headings repeated on every printed page.
 
+### Exports outside the grid's page
+
+`Grid::export_as(query, format, &request)` makes the same files from any query, without the
+grid's page: an "Export" link on a record's page, in an [action group](ui.md#action-groups), or
+behind its own route. It always answers with the file.
+
+```rust
+# use renox::prelude::*;
+use renox::grid::{Column, ExportFormat, Grid, GridRequest};
+# #[derive(Model, serde::Serialize, Default)]
+# #[model(table = "stock_movements")]
+# struct StockMovement { id: i64, product_id: i64, quantity: i64, note: String }
+fn ledger() -> Grid {
+    Grid::new("ledger")
+        .column(Column::number("quantity", "Change"))
+        .column(Column::text("note", "Note"))
+}
+
+/// GET /products/{id}/ledger.csv: one product's movements, newest first.
+async fn export_ledger(Path(id): Path<i64>, request: GridRequest) -> Result<Response> {
+    let movements = StockMovement::where_eq("product_id", id).order_by_desc("id");
+    ledger().export_as(movements, ExportFormat::Csv, &request).await
+}
+```
+
+- The columns are the ones the grid shows by default on wide screens, in their order
+  (`hidden()` and `custom` columns are left out). The user's column choices, the URL's
+  filters and its sort don't apply: the query decides which rows and in what order.
+- `ExportFormat` is `Csv`, `Xlsx` (the `xlsx` feature) or `Print`. It reads from a route
+  parameter too, so `GET /orders/export/{format}` with `Path(format): Path<ExportFormat>` takes
+  `csv`, `xlsx` or `print` (anything else is a 404). `ExportFormat::Xlsx.available()` says
+  whether this build can make Excel files.
+- A large export can run in a job instead: examples/backoffice's invoices build a
+  `GridRequest::new(…)` there and store the file.
+
 ## Polling
 
 Polling means checking again and again for new data. `.poll(30)` reloads the grid's page every

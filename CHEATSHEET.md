@@ -336,6 +336,18 @@ part is a macro: you import it into a template, then call it like a function.
 {{ icon_button("edit", "Edit Coffee", href="/products/7/edit") }}       {# label = aria-label + tooltip #}
 {{ button("Save", key="mod+s", icon="check") }}                        {# ⌘S / Ctrl+S; also badge=3 #}
 {{ button("Publish", disabled_reason="Add a photo first.") }}          {# focusable, reason as tooltip #}
+{# More actions behind one "⋯" button (label → a labelled button); menu_open opens a sheet made with button=false #}
+{% from "renox/ui.html" import action_group, menu_link, menu_open, wizard_action, wizard_step, import_action %}
+{% call action_group() %}
+  {{ menu_link(route('products.replicate', 7), "Duplicate", icon="copy") }}
+  {{ menu_link(route('products.ledger', 7), "Export ledger", icon="download", download=true) }}
+  {{ menu_open("import-products", "Import…", icon="upload") }} {# also menu_action, menu_section(title) #}
+{% endcall %}
+{{ import_action("import-products", "Import", route('products.import'), "Import products", columns=["sku", "name"], template_url=route('products.template'), button=false) }}
+{% call wizard_action("new-product", "New product", route('products.store'), "New product", [["a", "Details"], ["b", "Price"]], submit_label="Add") %}
+  {% call wizard_step("new-product", "a") %}{{ input("name", "Name", id="np-name") }}{% endcall %}
+  {% call wizard_step("new-product", "b") %}{{ input("price", "Price", type="number", id="np-price") }}{% endcall %}
+{% endcall %} {# a 422 opens the step with the error #}
 
 {# Read-only details (an infolist): labels and values, formatted #}
 {% from "renox/ui.html" import infolist, entry, repeatable %}
@@ -370,6 +382,61 @@ part is a macro: you import it into a template, then call it like a function.
    </body>; any page, block or component adds to them, even after the head was rendered: #}
 {% call push('scripts', once='chart') %}<script src="{{ asset('chart.js') }}" nonce="{{ csp_nonce() }}"></script>{% endcall %}
 {% call prepend('head') %}<meta name="robots" content="noindex">{% endcall %}
+```
+
+Import, duplicate and export (Filament's import, replicate and export actions):
+
+```rust
+use renox::grid::{Column, ExportFormat, Grid, GridRequest};
+use renox::import::{Import, ImportReport};
+use renox::prelude::*;
+
+#[derive(Model, serde::Serialize, Default, Clone)]
+#[model(table = "products")]
+pub struct Product { pub id: i64, pub sku: String, pub name: String }
+
+/// One CSV row, checked like a form (its rules, prepare and after hooks).
+#[derive(serde::Deserialize, Validate)]
+pub struct ProductRow {
+    #[validate(required, alpha_dash)]
+    pub sku: String,
+    #[validate(required, max = 100)]
+    pub name: String,
+}
+
+#[derive(serde::Deserialize, Validate)]
+pub struct ImportForm {
+    #[validate(required, mimes(&["csv", "txt"]))]
+    pub file: Option<Upload>,
+}
+
+/// Good rows written in one transaction (a savepoint each); the answer is a toast, or the
+/// refused rows with their row numbers in the import_action sheet.
+/// Also .all_or_nothing(), .delimiter(';'), .rename("Description", "name"), .max_rows(n).
+pub async fn import(State(state): State<AppState>, lang: Lang, Valid(form): Valid<ImportForm>) -> Result<ImportReport> {
+    let file = form.file.ok_or(Error::NotFound)?;
+    Import::csv(file.bytes()).lang(&lang).run(&state, |tx, row: ProductRow| Box::pin(async move {
+        Product::create(tx, Product { sku: row.sku, name: row.name, ..Default::default() }).await?;
+        Ok(())
+    })).await
+}
+
+pub async fn template() -> renox::Download {
+    renox::import::template("products.csv", &["sku", "name"])
+}
+
+/// "Duplicate": a copy with no id and no timestamps, for the new-product form.
+pub async fn replicate(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
+    let mut product = Product::find_or_404(&db, id).await?.replicate();
+    product.sku.clear();
+    Ok(view("products/create.html", context! { product }))
+}
+
+/// A file of any query, outside a grid's page (the grid only names the columns).
+pub async fn export(Path(format): Path<ExportFormat>, request: GridRequest) -> Result<Response> {
+    let grid = Grid::new("products").column(Column::text("sku", "SKU")).column(Column::text("name", "Name"));
+    grid.export_as(Product::query().order_by("name"), format, &request).await
+}
 ```
 
 Tailwind: `rnx new shop --tailwind` (or create `resources/css/app.css` with
@@ -1014,7 +1081,8 @@ More: `.audit()` (who changed a row, under it), `.details()` (a row opens detail
 the template, `column.key == "_details"`), `Column::editable()` + `.edit_url("/orders/{id}")`
 (PATCH, `Valid<T>` with `Option` fields), `.reorder("position", url)` + `RowOrder::save`,
 `Column::merge()` with `sort_by("region,city")`, `.exports()` + `grid.export(query, &request)`
-(CSV, Excel with the `xlsx` feature, a print page), `Column::searchable()` (the search box),
+(CSV, Excel with the `xlsx` feature, a print page), `grid.export_as(query, ExportFormat::Csv, &request)`
+(any query as a file, outside the grid's page), `Column::searchable()` (the search box),
 `.row_url("/orders/{id}")`, `.empty_state(…)`, `.prefix("orders")` for two grids on a page,
 `.bulk_action(Action::new("Delete", url).confirm("Sure?").danger())` +
 `grid.selected(query, &request, &selection)?` (`Form<Selection>`), `.row_action(…)`,

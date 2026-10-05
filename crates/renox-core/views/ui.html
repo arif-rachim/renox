@@ -432,8 +432,10 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     Next checks the step's fields (the browser's rules, then the server's
     when the form has data-live-validate) before moving on; after a failed
     submit the first step with an error opens. Without JavaScript every
-    step shows at once, with the submit button at the end. -#}
-{% macro wizard(id, steps, submit_label, back_label=none, next_label=none) -%}
+    step shows at once, with the submit button at the end. `cancel=true`
+    adds a Cancel button that closes the sheet the wizard is in (see
+    `wizard_action`). -#}
+{% macro wizard(id, steps, submit_label, back_label=none, next_label=none, cancel=false, cancel_label=none) -%}
 <div class="rx-wizard" id="{{ id }}" data-rx-wizard>
   <ol class="rx-wizard__steps">
     {%- for step in steps %}
@@ -442,6 +444,9 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
   </ol>
   <div class="rx-wizard__panels">{{ caller() }}</div>
   <div class="rx-wizard__nav">
+    {%- if cancel %}
+    <button class="rx-button rx-button--plain" type="button" data-rx-close><span class="rx-button__label">{{ cancel_label or t('ui.cancel') }}</span></button>
+    {%- endif %}
     <button class="rx-button rx-button--secondary" type="button" data-rx-wizard-back><span class="rx-button__label">{{ back_label or t('ui.back') }}</span></button>
     <span class="rx-spacer"></span>
     <button class="rx-button rx-button--primary" type="button" data-rx-wizard-next><span class="rx-button__label">{{ next_label or t('ui.next') }}</span></button>
@@ -756,9 +761,11 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     form.
     {% call action_sheet("restock-7", "Restock", route('stock.update', 7), "Restock Coffee", method="PUT") %}
       {{ input("quantity", "Quantity", type="number", required=true) }}
-    {% endcall %} -#}
-{% macro action_sheet(id, label, action, title, description=none, submit_label=none, method="POST", variant="secondary", size=none, icon=none, key=none, slide_over=false, width=none, modal_icon=none, danger=false, target=none, swap=none, enctype=none) -%}
-{{ open_button(id, label, variant=variant, size=size, icon=icon, key=key) }}
+    {% endcall %}
+    `button=false` leaves out the button, for a sheet opened from an
+    `action_group` (`menu_open(id, label)`) or any `data-rx-open="id"`. -#}
+{% macro action_sheet(id, label, action, title, description=none, submit_label=none, method="POST", variant="secondary", size=none, icon=none, key=none, slide_over=false, width=none, modal_icon=none, danger=false, target=none, swap=none, enctype=none, button=true) -%}
+{% if button %}{{ open_button(id, label, variant=variant, size=size, icon=icon, key=key) }}{% endif %}
 <dialog class="rx-sheet{% if slide_over %} rx-sheet--side{% endif %}{% if width %} rx-sheet--{{ width }}{% endif %}" id="{{ id }}" aria-labelledby="{{ id }}-title"{% if description %} aria-describedby="{{ id }}-message"{% endif %}>
   <form class="rx-sheet__inner" method="post" action="{{ action }}" hx-post="{{ action }}" hx-swap="{{ swap or 'none' }}"{% if target %} hx-target="{{ target }}"{% endif %}{% if enctype %} enctype="{{ enctype }}" hx-encoding="{{ enctype }}"{% endif %} data-rx-action novalidate>
     {{ csrf_field() }}{% if method | upper != "POST" %}{{ method_field(method) }}{% endif %}
@@ -778,8 +785,8 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     Cancel is focused first, and only the sheet's button sends the form. -#}
 {#- `cancel_label` names the button that keeps things as they are ("Keep
     order"); `fields` are hidden values sent with the form ({"status": "cancelled"}). -#}
-{% macro confirm(id, label, action, title, message, confirm_label=none, method="DELETE", size=none, icon=none, modal_icon="warning", key=none, cancel_label=none, fields={}) -%}
-{{ open_button(id, label, variant="plain-danger", size=size, icon=icon, key=key) }}
+{% macro confirm(id, label, action, title, message, confirm_label=none, method="DELETE", size=none, icon=none, modal_icon="warning", key=none, cancel_label=none, fields={}, button=true) -%}
+{% if button %}{{ open_button(id, label, variant="plain-danger", size=size, icon=icon, key=key) }}{% endif %}
 <dialog class="rx-sheet" id="{{ id }}" aria-labelledby="{{ id }}-title" aria-describedby="{{ id }}-message" role="alertdialog">
   <div class="rx-sheet__inner">
     {%- if modal_icon %}<span class="rx-sheet__icon rx-sheet__icon--{{ modal_icon }}" aria-hidden="true">{{ _icon(modal_icon) }}</span>{% endif %}
@@ -797,6 +804,80 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 </dialog>
 {%- endmacro %}
 
+{#- An action whose form has steps (Filament's wizard actions): the
+    button opens a sheet holding a `wizard`, sent with htmx like an
+    `action_sheet`. Next checks the step's fields (with the server's rules
+    too: `live=true` makes the form data-live-validate); a 422 after the
+    last step opens the first step with an error. A success closes the
+    sheet, and closing it starts over at the first step.
+    {% call wizard_action("new-product", "New product", route('products.store'), "New product",
+         [["details", "Details"], ["stock", "Price and stock"]], submit_label="Add product") %}
+      {% call wizard_step("new-product", "details") %}…{% endcall %}
+      {% call wizard_step("new-product", "stock") %}…{% endcall %}
+    {% endcall %} -#}
+{% macro wizard_action(id, label, action, title, steps, submit_label=none, description=none, method="POST", variant="secondary", size=none, icon=none, key=none, slide_over=false, width=none, live=true, target=none, swap=none, enctype=none, button=true) -%}
+{%- set body = caller() %}
+{% if button %}{{ open_button(id, label, variant=variant, size=size, icon=icon, key=key) }}{% endif %}
+<dialog class="rx-sheet rx-sheet--wizard{% if slide_over %} rx-sheet--side{% endif %} rx-sheet--{{ width or 'lg' }}" id="{{ id }}" aria-labelledby="{{ id }}-title"{% if description %} aria-describedby="{{ id }}-message"{% endif %}>
+  <form class="rx-sheet__inner" method="post" action="{{ action }}" hx-post="{{ action }}" hx-swap="{{ swap or 'none' }}"{% if target %} hx-target="{{ target }}"{% endif %}{% if enctype %} enctype="{{ enctype }}" hx-encoding="{{ enctype }}"{% endif %}{% if live %} data-live-validate{% endif %} data-rx-action novalidate>
+    {{ csrf_field() }}{% if method | upper != "POST" %}{{ method_field(method) }}{% endif %}
+    <h2 class="rx-sheet__title" id="{{ id }}-title">{{ title }}</h2>
+    {%- if description %}<p class="rx-sheet__message" id="{{ id }}-message">{{ description }}</p>{% endif %}
+    <div class="rx-sheet__body">
+      {%- call wizard(id ~ "-wizard", steps, submit_label or label, cancel=true) %}{{ body }}{% endcall %}
+    </div>
+  </form>
+</dialog>
+{%- endmacro %}
+
+{#- An import (Filament's import action): a sheet with a CSV file field
+    sent with htmx to `action`, whose handler answers with
+    `renox::import::ImportReport`. Every row imported: a toast and the page
+    reloads. Some rows refused: their row numbers and errors show in the
+    sheet, which stays open. `columns` lists the file's columns for the
+    reader, `template_url` links to an empty file to fill in
+    (`renox::import::template`). A file that can't be read shows its error
+    under the field. `button=false` for a sheet opened from an
+    `action_group`.
+    {{ import_action("import-products", "Import", route('products.import'), "Import products",
+       columns=["sku", "name", "price"], template_url=route('products.template')) }} -#}
+{% macro import_action(id, label, action, title, description=none, columns=none, template_url=none, submit_label=none, accept=".csv,text/csv", name="file", variant="secondary", size=none, icon="upload", key=none, button=true) -%}
+{% call action_sheet(id, label, action, title, description=description, submit_label=submit_label or label, variant=variant, size=size, icon=icon, key=key, enctype="multipart/form-data", target="#" ~ id ~ "-result", swap="innerHTML", button=button, width="lg") %}
+  {%- if columns %}<p class="rx-hint rx-import__columns">{{ t('ui.import.columns') }} {% for column in columns %}<code>{{ column }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+  {%- if template_url %}<p class="rx-import__template"><a class="rx-link" href="{{ template_url }}" download>{{ _icon("download") }} {{ t('ui.import.template') }}</a></p>{% endif %}
+  {{ file(name, t('ui.import.file'), accept=accept, required=true, id=id ~ "-file") }}
+  <div class="rx-import__result" id="{{ id }}-result" data-rx-action-result aria-live="polite"></div>
+{% endcall %}
+{%- endmacro %}
+
+{#- Several actions behind one button (Filament's ActionGroup): links,
+    forms and items that open sheets, in a menu that arrow keys, Home, End
+    and Esc move through. No `label`: an icon button ("more", or `icon`)
+    named `t('ui.actions')` for screen readers.
+    {% call action_group() %}
+      {{ menu_link(route('products.replicate', product.id), "Duplicate", icon="copy") }}
+      {{ menu_open("adjust-stock", "Adjust stock", icon="edit") }}
+      {{ menu_link(route('products.ledger', product.id), "Export ledger", icon="download", download=true) }}
+      {{ menu_separator() }}
+      {{ menu_open("delete-product", "Delete", danger=true, icon="trash") }}
+    {% endcall %}
+    The sheets an item opens sit outside the group, with `button=false`:
+    `action_sheet(…, button=false)`, `confirm(…, button=false)`,
+    `wizard_action(…, button=false)`, `import_action(…, button=false)`.
+    `menu_section(title)` names a part of the menu. -#}
+{% macro action_group(label=none, id=none, icon=none, variant="secondary", size="small") -%}
+{%- set text = label or t('ui.actions') %}
+{%- set menu_id = id or ("rx-actions-" ~ (text | lower | replace(" ", "-"))) %}
+<div class="rx-menu rx-action-group" data-rx-menu>
+  {%- if label %}
+  <button class="rx-button rx-button--{{ variant }}{% if size %} rx-button--{{ size }}{% endif %}" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="{{ menu_id }}">{% if icon %}<span class="rx-button__icon" aria-hidden="true">{{ _icon(icon) }}</span>{% endif %}<span class="rx-button__label">{{ label }}</span><span class="rx-button__chevron" aria-hidden="true"><svg viewBox="0 0 12 8" width="10" height="7"><path d="M1 1.5l5 5 5-5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+  {%- else %}
+  <button class="rx-icon-button rx-icon-button--{{ 'plain' if variant == 'secondary' else variant }}{% if size %} rx-icon-button--{{ size }}{% endif %}" type="button" aria-label="{{ text }}" data-rx-tip="{{ text }}" aria-haspopup="menu" aria-expanded="false" aria-controls="{{ menu_id }}">{{ _icon(icon or "more") }}</button>
+  {%- endif %}
+  <div class="rx-menu__list" id="{{ menu_id }}" role="menu" aria-label="{{ text }}" hidden>{{ caller() }}</div>
+</div>
+{%- endmacro %}
+
 {#- A menu of actions: `{% call menu(t('ui.more')) %}{{ menu_link("/x", "Edit") }}{% endcall %}` -#}
 {% macro menu(label, id=none, variant="secondary", size="small") -%}
 {%- set menu_id = id or ("rx-menu-" ~ (label | lower | replace(" ", "-"))) %}
@@ -806,19 +887,39 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 </div>
 {%- endmacro %}
 
-{% macro menu_link(href, label) -%}
-<a class="rx-menu__item" role="menuitem" href="{{ href }}">{{ label }}</a>
+{%- macro _menu_label(label, icon) -%}
+{#- Without an icon the label is plain text, as before icons existed (apps'
+    pages and tests keep their markup). -#}
+{%- if icon %}<span class="rx-menu__icon" aria-hidden="true">{{ _icon(icon) }}</span><span>{{ label }}</span>{% else %}{{ label }}{% endif %}
+{%- endmacro -%}
+
+{#- A link in a menu. `download=true`: a file to save (an export), the
+    page stays; `new_tab=true`: opens in a new tab. `icon`: a kit icon. -#}
+{% macro menu_link(href, label, icon=none, download=false, new_tab=false, danger=false) -%}
+<a class="rx-menu__item{% if danger %} rx-menu__item--danger{% endif %}" role="menuitem" href="{{ href }}"{% if download %} download{% endif %}{% if new_tab %} target="_blank" rel="noopener"{% endif %}>{{ _menu_label(label, icon) }}</a>
+{%- endmacro %}
+
+{#- A menu item that opens the sheet `id` (an `action_sheet`, `confirm`,
+    `wizard_action` or `import_action` made with `button=false`); closing
+    the sheet puts the focus back on the menu's button. -#}
+{% macro menu_open(id, label, icon=none, danger=false) -%}
+<button class="rx-menu__item{% if danger %} rx-menu__item--danger{% endif %}" role="menuitem" type="button" data-rx-open="{{ id }}" aria-haspopup="dialog">{{ _menu_label(label, icon) }}</button>
+{%- endmacro %}
+
+{#- A titled part of a menu: `{% call menu_section("Export") %}…{% endcall %}`. -#}
+{% macro menu_section(title) -%}
+<div class="rx-menu__section" role="group" aria-label="{{ title }}"><div class="rx-menu__heading" aria-hidden="true">{{ title }}</div>{{ caller() }}</div>
 {%- endmacro %}
 
 {#- A menu item that sends a form (POST, or `method` through _method). -#}
 {#- A menu item that is a plain button, for what `attrs` make it do, such as
     htmx: `menu_button("Edit", attrs={"hx-get": url, "hx-target": "closest li"})`. -#}
-{% macro menu_button(label, attrs={}, danger=false) -%}
-<button class="rx-menu__item{% if danger %} rx-menu__item--danger{% endif %}" role="menuitem" type="button"{{ _attrs(attrs) }}>{{ label }}</button>
+{% macro menu_button(label, attrs={}, danger=false, icon=none) -%}
+<button class="rx-menu__item{% if danger %} rx-menu__item--danger{% endif %}" role="menuitem" type="button"{{ _attrs(attrs) }}>{{ _menu_label(label, icon) }}</button>
 {%- endmacro %}
 
-{% macro menu_action(action, label, method="POST", danger=false) -%}
-<form method="post" action="{{ action }}" role="none">{{ csrf_field() }}{% if method | upper != "POST" %}{{ method_field(method) }}{% endif %}<button class="rx-menu__item{% if danger %} rx-menu__item--danger{% endif %}" role="menuitem" type="submit">{{ label }}</button></form>
+{% macro menu_action(action, label, method="POST", danger=false, icon=none) -%}
+<form method="post" action="{{ action }}" role="none">{{ csrf_field() }}{% if method | upper != "POST" %}{{ method_field(method) }}{% endif %}<button class="rx-menu__item{% if danger %} rx-menu__item--danger{% endif %}" role="menuitem" type="submit">{{ _menu_label(label, icon) }}</button></form>
 {%- endmacro %}
 
 {% macro menu_separator() -%}<div class="rx-menu__separator" role="separator"></div>{%- endmacro %}
