@@ -2050,6 +2050,15 @@ impl Webhook for Xendit {
 // Module::register: app.webhook::<Xendit>();
 ```
 
+Subscriptions ready-made (Laravel's Cashier): the `renox-billing` crate,
+`.module(Billing::new().plan(Plan::new("pro", "Pro").price(1_900, "USD", Interval::Month).trial_days(14)).stripe().xendit())`
+with `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `XENDIT_SECRET_KEY`,
+`XENDIT_CALLBACK_TOKEN`. It brings a plans page (`/billing`), a card on `/account`, the
+gateways' webhooks (`/billing/webhooks/{gateway}`), `Billing::of(&state, &user)` with
+`subscribed()`, `on_trial()`, `checkout(plan)`, `swap(plan)`, `cancel()`, `resume()`, and the
+guards `.require_subscription()` / `.require_plan(&["pro"])` (`use renox_billing::SubscriptionRoutes`)
+([docs/billing.md](docs/billing.md), examples/billing).
+
 With `CSP=strict`, an inline script needs `<script nonce="{{ csp_nonce() }}">`, and Alpine
 expressions must stay simple (move statements into `Alpine.data(...)`).
 

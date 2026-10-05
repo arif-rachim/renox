@@ -486,8 +486,9 @@ impl App {
 
     /// Makes `value` available everywhere the app runs: `Provided<T>` in
     /// handlers, `state.provided::<T>()` in jobs, listeners, commands and
-    /// scheduled tasks. One value per type; a second one replaces the first.
-    /// See [`crate::Provided`].
+    /// scheduled tasks. One value per type; a second one replaces the first,
+    /// and it wins over a module's ([`Registry::provide`]). See
+    /// [`crate::Provided`].
     pub fn provide<T: Send + Sync + 'static>(mut self, value: T) -> Self {
         self.provided
             .insert(std::any::TypeId::of::<T>(), Arc::new(value));
@@ -561,7 +562,10 @@ impl App {
             mut account_sections,
             auth,
             assets: static_assets,
+            provided: mut module_provided,
         } = self.registry;
+        // The app's own `App::provide` values win over the modules'.
+        module_provided.extend(self.provided);
         check_assets(&static_assets)?;
         let static_assets: Arc<[crate::registry::StaticAsset]> = static_assets.into();
         if let Some(name) = duplicate_job {
@@ -816,7 +820,7 @@ impl App {
                     .map(|(name, rule)| (name, crate::rate_limit::NamedLimiter::new(rule)))
                     .collect(),
             ),
-            provided: Arc::new(self.provided),
+            provided: Arc::new(module_provided),
             throttle: Arc::new(LoginThrottle::new(shared_counters.clone())),
             detect_locale: self.detect_locale,
         };

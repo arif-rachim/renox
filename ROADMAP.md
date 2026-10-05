@@ -1600,7 +1600,24 @@ Notes from M34:
   `admin.{slug}.*`, views `renox-admin/*.html` (+ `renox-admin/{slug}/cells.html` for custom
   columns); examples/admin. In renox-core: `Column::label`/`options`,
   `renox::currency_decimals`, and `GridRequest` reads the whole path in a `Routes::group`
-- [ ] billing later
+- [x] `renox-billing` (subscriptions, Laravel's Cashier): #155, docs/billing.md;
+  `Billing::new().plan(Plan::new(key, label).price(amount, currency, Interval::Month)
+  .trial_days(n).feature(…).via(gateway).price_id(gateway, id)).stripe().xendit()
+  .gateway(…).generic_trials().without_proration().redirect_to(…)`; `Billing::of(&state,
+  &billable)` → `Customer` (`named`, `subscription`, `subscriptions`, `subscribed`,
+  `subscribed_to`, `on_trial`, `on_grace_period`, `trial_available`, `customer_id`,
+  `checkout`, `start_trial`, `swap`, `cancel`, `cancel_now`, `can_resume`, `resume`);
+  `Billable`/`Owner` (users, or a team); the `Gateway` trait (`create_customer`, `checkout`,
+  `swap`, `cancel`, `resume`, `verify_webhook`, `webhook_event_id`, `parse_webhook` →
+  `Notice::Subscription(Remote)`/`Notice::Payment(Payment)`), `Stripe` (Checkout Sessions,
+  prorated swaps, cancel/resume, `Stripe-Signature`) and `Xendit` (recurring plans,
+  `x-callback-token`); the `subscriptions` and `billing_customers` tables (prefix
+  00010101000900); webhooks at `/billing/webhooks/{gateway}` through `renox::webhook`
+  (once per event, older events ignored by `synced_at`); `SubscriptionRoutes`
+  (`require_subscription`, `require_plan`); pages `billing.*` (`billing/plans.html`, an
+  account section `billing/section.html`); events `SubscriptionCreated`/`Updated`/
+  `Canceled`, `PaymentSucceeded`/`Failed`; examples/billing. In renox-core:
+  `Registry::provide`
 
 ### v1.0
 Started by the owner on 2026-10-03, after M34. In steps, one PR each:
@@ -1894,6 +1911,16 @@ Notes:
   (`Default`) record for the list-level questions. Pages are the crate's templates, replaced
   by app files of the same name, rather than generated code: `make:module --resource` stays
   the way to own the pages.
+- **Billing (#155) uses Stripe and Xendit**, not Midtrans, for Indonesia: Xendit has recurring
+  plans that keep the customer's card or e-wallet and charge each cycle themselves, where
+  Midtrans' subscriptions need a saved card token the app collects first. Plans are declared in
+  code (no plans table), amounts in the currency's smallest unit; Stripe charges the Price
+  named for the plan (`STRIPE_PRICE_<KEY>`), Xendit the plan's amount. Subscriptions arrive by
+  webhook (the checkout makes nothing): the subscription carries the owner, name and plan as
+  metadata, so any event can make or find its row, and each row keeps the newest gateway
+  event's time (`synced_at`) so a late, older event changes nothing. Xendit can't prorate,
+  change an interval or resume: canceling stops its charges at once and access lasts to the
+  period's end.
 
 ## Not planned
 

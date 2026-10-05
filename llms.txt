@@ -150,6 +150,15 @@ Every example has a README.md that walks through it.
   [resources/products.rs](examples/admin/src/resources/products.rs),
   [resources/customers.rs](examples/admin/src/resources/customers.rs),
   [tests/admin.rs](examples/admin/tests/admin.rs)
+- [examples/billing](examples/billing) ([README](examples/billing/README.md)): subscriptions
+  with the `renox-billing` crate for a small writing app: three plans in code (Basic and Pro
+  through Stripe, Pro in IDR through Xendit), trials without a payment method, the module's
+  plans page and account card, pages guarded with `require_subscription` and `require_plan`,
+  `Billing::of(&state, &user)` on the home page, and a mail on `PaymentFailed`; tests with a
+  fake Stripe and signed webhooks.
+  [lib.rs](examples/billing/src/lib.rs),
+  [pages.rs](examples/billing/src/pages.rs),
+  [tests/billing.rs](examples/billing/tests/billing.rs)
 - [examples/relations](examples/relations) ([README](examples/relations/README.md)): relations on a blog: belongs to, has many, many to many through a
   pivot (`Pivot::sync` from checkboxes, `inverse()`) with pivot columns (a pinned flag and
   timestamps: `attach_with`, `update_pivot`, `load_with_pivot`), a page loaded without N+1
@@ -313,6 +322,13 @@ Every example has a README.md that walks through it.
   `impl AdminResource` (columns, fields, `fill`, `rules`, `entries`, `filters`, `actions`,
   `query`, `grid`, `allows`), the abilities the model's `Policy` is asked, soft deletes and
   the trash, exports, the routes `admin.{slug}.*`, replacing the panel's templates.
+- [docs/billing.md](docs/billing.md): the renox-billing crate: `Billing` (plans, `stripe()`,
+  `xendit()`, `generic_trials`, `without_proration`), `Plan` (price in the smallest unit,
+  `trial_days`, `via`, `price_id` / `STRIPE_PRICE_<KEY>`), setting up Stripe and Xendit,
+  `Billing::of(&state, &user)` (`subscribed`, `on_trial`, `checkout`, `swap`, `cancel`,
+  `resume`…), `require_subscription`/`require_plan`, the webhooks (verified, once per event,
+  out-of-order safe), its events, billing a team (`Billable`), another gateway (`Gateway`),
+  replacing the pages, testing with `fake_http` and signed webhooks.
 - [docs/editors.md](docs/editors.md): the renox-editors crate: `rich_editor` (Trix; read as
   `RichText`, cleaned with ammonia; shown with `| rich_text`), `markdown_editor` (toolbar and
   a server-rendered preview), `code_editor` (CodeJar + Prism), `code_entry`; how the files load.
@@ -394,3 +410,14 @@ Every example has a README.md that walks through it.
   model's `Policy`), `views/` (`renox-admin/layout.html`, `dashboard.html`, `index.html`,
   `form.html`, `fields.html`, `show.html`). Guide: [docs/admin.md](docs/admin.md); used in
   examples/admin.
+- `crates/renox-billing`: the optional subscriptions plugin crate (same version as `renox`),
+  Laravel's Cashier: the `Billing` module (`lib.rs`: plans, gateways, the provided settings,
+  the account section, the listeners: a deleted account's subscriptions end, audit entries),
+  `Plan`/`Interval` (`plan.rs`), `Customer`/`Billable`/`Owner` (`customer.rs`), the
+  `Gateway` trait with `Remote`, `Notice`, `Payment`, `Checkout`, `CheckoutRequest`
+  (`gateway.rs`), `stripe.rs`, `xendit.rs`, `Subscription`/`BillingCustomer`/
+  `SubscriptionStatus` (`model.rs`, tables `subscriptions` and `billing_customers`), how a
+  `Remote` becomes a row and events (`sync.rs`), the webhook (`webhook.rs`: one route,
+  `/billing/webhooks/{gateway}`, through `renox::webhook`), the pages (`handlers.rs`,
+  `views/plans.html`, `views/section.html`), the guards (`guard.rs`). Guide:
+  [docs/billing.md](docs/billing.md); used in examples/billing.

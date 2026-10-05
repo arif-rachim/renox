@@ -33,6 +33,8 @@ pub struct Registry {
     pub(crate) auth: Option<std::sync::Arc<crate::auth::module::Settings>>,
     /// Files modules serve as they are (`asset`): path, content type, body.
     pub(crate) assets: Vec<StaticAsset>,
+    /// Values modules provide (`provide`), under the app's own `App::provide`.
+    pub(crate) provided: HashMap<TypeId, std::sync::Arc<dyn std::any::Any + Send + Sync>>,
 }
 
 /// A file a module serves as it is (`Registry::asset`).
@@ -271,6 +273,40 @@ impl Registry {
         Fut: Future<Output = ()> + Send + 'static,
     {
         self.reporters.push(crate::report::report_fn(reporter));
+        self
+    }
+
+    /// Makes `value` available everywhere the app runs, as
+    /// [`App::provide`](crate::App::provide) does: `Provided<T>` in handlers,
+    /// `state.provided::<T>()` in jobs, listeners, webhooks and commands. For
+    /// a module's settings that code without a request needs (a payment
+    /// module's plans in its webhook handler). One value per type; a value
+    /// the app gives with `App::provide` wins.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// struct Plans(Vec<&'static str>);
+    ///
+    /// struct Billing;
+    ///
+    /// impl Module for Billing {
+    ///     fn name(&self) -> &'static str {
+    ///         "billing"
+    ///     }
+    ///
+    ///     fn register(&self, app: &mut Registry) {
+    ///         app.provide(Plans(vec!["basic", "pro"]));
+    ///     }
+    /// }
+    ///
+    /// async fn in_a_job(state: AppState) {
+    ///     let plans = state.provided::<Plans>().expect("the Billing module is on");
+    /// #   let _ = plans;
+    /// }
+    /// ```
+    pub fn provide<T: Send + Sync + 'static>(&mut self, value: T) -> &mut Self {
+        self.provided
+            .insert(TypeId::of::<T>(), std::sync::Arc::new(value));
         self
     }
 

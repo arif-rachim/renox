@@ -29,8 +29,10 @@ commit). To get a fix, move that version (or the commit pin) forward and run
 
 Anything in this repository: the `renox`, `renox-core`, `renox-macros`, `renox-cli`,
 `renox-2fa`, `renox-editors` (including the HTML cleaning of rich text), `renox-oauth`
-(social login: `state`, PKCE, linking accounts by email) and `renox-admin` (the admin panel:
-who may open it, the policy checks before every page and action) crates, the
+(social login: `state`, PKCE, linking accounts by email), `renox-admin` (the admin panel:
+who may open it, the policy checks before every page and action) and `renox-billing`
+(subscriptions: the payment gateways' webhook signatures, who may change a subscription)
+crates, the
 templates and assets they ship, the files `rnx new` and `rnx make:*` write
 (Dockerfile, systemd unit, …), and the examples when they show a pattern apps would copy.
 

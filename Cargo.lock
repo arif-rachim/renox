@@ -308,6 +308,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "billing"
+version = "0.0.0"
+dependencies = [
+ "renox",
+ "renox-billing",
+]
+
+[[package]]
 name = "bitflags"
 version = "2.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2426,6 +2434,15 @@ version = "1.0.0-rc.4"
 dependencies = [
  "renox",
  "serde",
+]
+
+[[package]]
+name = "renox-billing"
+version = "1.0.0-rc.4"
+dependencies = [
+ "renox",
+ "serde",
+ "tracing",
 ]
 
 [[package]]

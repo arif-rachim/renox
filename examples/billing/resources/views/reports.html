@@ -1,0 +1,6 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, card %}
+{% block content %}
+{{ page_header("Reports", subtitle="For every plan.") }}
+{% call card() %}<p>Words written this month: 12,480.</p>{% endcall %}
+{% endblock %}

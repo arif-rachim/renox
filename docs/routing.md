@@ -459,7 +459,9 @@ What's going on:
 - `ClientIp`, `RequestId` and `Lang` give the visitor's IP address, this request's id and the
   visitor's language.
 - `Provided<Payments>` gives the value passed to `App::provide`. That's how you share your own
-  things (a client for a payment service, settings) with every handler.
+  things (a client for a payment service, settings) with every handler. A module provides
+  its own from `register` with `app.provide(…)` (`Registry::provide`); the app's value of the
+  same type wins.
 
 > [!NOTE]
 > **Coming from Laravel:** `App::provide` + `Provided<T>` stand in for service container

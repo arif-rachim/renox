@@ -411,6 +411,10 @@ stays failed until you run `webhook:retry`.
 
 The saved payload is the exact body the provider sent, so its signature can be checked again.
 
+The `renox-billing` crate's webhooks (Stripe, Xendit) are saved under the provider `billing`,
+with event ids like `stripe:evt_…`. Retrying one is safe: applying an event twice changes
+nothing, and an event older than what a subscription already shows is ignored.
+
 ## Backups
 
 A backup is only useful if it has everything you need to start again. Here is what to keep.
@@ -603,6 +607,7 @@ commands, so it calls the function.)
 | `webhook_calls` | every received webhook | nothing yet: delete old `processed` rows yourself if it matters |
 | `notifications` | every database notification | `notifications:prune --days 30` (Auth module): notifications read more than that long ago; unread ones stay (`renox::auth::prune_read_notifications(&state.db, age)`). A user's rows are also deleted with the user (`ON DELETE CASCADE`) |
 | `grid_preferences` | one small row per user and data grid | `User::delete_account` (the account page's "delete account") deletes the user's rows. The table has no foreign key to `users` (every app has it, not every app has `users`), so an app that deletes users another way must delete these rows too |
+| `subscriptions`, `billing_customers` (`renox-billing`) | every subscription an owner takes (kept as history) | nothing: they're small. The account page's "delete account" cancels the user's running subscriptions at the gateway and deletes their rows (a listener on `AccountDeleted`); an app that deletes users (or teams) another way must do the same |
 
 Each function returns how many rows it deleted. Where the command takes `--hours` or `--days`,
 the function takes a `std::time::Duration`.

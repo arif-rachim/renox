@@ -409,3 +409,35 @@ async fn a_file_path_is_checked_at_boot() {
         .unwrap();
     assert!(format!("{err:?}").contains("must start with `/`"));
 }
+
+/// A module's settings, provided to the whole app.
+struct Plans(Vec<&'static str>);
+
+struct Billing;
+
+impl Module for Billing {
+    fn name(&self) -> &'static str {
+        "billing"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new().get("/plans", |plans: Provided<Plans>| async move {
+            plans.0.0.join(",")
+        })
+    }
+
+    fn register(&self, app: &mut Registry) {
+        app.provide(Plans(vec!["basic", "pro"]));
+    }
+}
+
+#[renox::test]
+async fn modules_provide_values_and_the_app_overrides_them() {
+    let app = TestApp::new(App::new().module(Billing)).await;
+    app.get("/plans").await.assert_ok().assert_see("basic,pro");
+    let plans = app.state().provided::<Plans>().unwrap();
+    assert_eq!(plans.0, ["basic", "pro"]);
+
+    let app = TestApp::new(App::new().module(Billing).provide(Plans(vec!["team"]))).await;
+    app.get("/plans").await.assert_see("team");
+}

@@ -35,7 +35,7 @@ all of the first kind:
   Filament's demo is (M29b).
 - **For HTML-over-the-wire business and SaaS apps on one server or a few**, a Laravel developer
   now finds an equivalent for nearly everything they use daily. What is left in code is small:
-  search, broadcasting and billing (social login and 2FA are done as plugins, `renox-oauth` and `renox-2fa`; M33 and M34 closed the
+  search and broadcasting (social login, 2FA and billing are done as plugins, `renox-oauth`, `renox-2fa` and `renox-billing`; M33 and M34 closed the
   small adds: route model binding, most missing rules, the breach check, several disks and
   mailers, ETags, the `XSRF-TOKEN` cookie, trusted hosts, error bags, `has_many_through`).
 - **What really separates Renox from Laravel now is maturity:** no release (crates.io holds
@@ -255,7 +255,7 @@ New rows:
 | Queued listeners | `ShouldQueue` listeners | listeners run in-process; a listener dispatches a job | 🟡 | Min | – |
 | Webhooks in | Spatie webhook-client | `Webhook` trait, verified, stored, retried (`webhook:retry`) | ✅ | – | before M17 |
 | Search | Scout (Meilisearch, Algolia, database) | `where_like` (ILIKE on PostgreSQL), the grid's `searchable`; no full-text index driver | ❌ | Maj for some | open |
-| Billing | Cashier (Stripe, Paddle) | Midtrans/Xendit/Stripe webhooks and payment pages in examples; no subscriptions | ❌ | Maj for SaaS | open |
+| Billing | Cashier (Stripe, Paddle) | the `renox-billing` crate: plans in code, trials (also without a payment method), swap (prorated at Stripe), cancel with a grace period, resume, `require_subscription`, verified and idempotent webhooks; Stripe and Xendit, another gateway is one `Gateway` impl | ✅ | – | #155 |
 | Feature flags | Pennant | none (a setting or a gate) | ❌ | Min | open |
 
 ## 5. Views and frontend
@@ -342,6 +342,7 @@ New rows:
 7. **Realtime (Min–Maj):** general SSE broadcasting from the notification `Hub` pattern
    (WebSockets stay not planned).
 8. **Billing (Maj for SaaS):** subscriptions over Stripe or local gateways; feature flags.
+   Subscriptions done (#155): `renox-billing` with Stripe and Xendit, docs/billing.md.
 
 Not planned, unchanged: a schema builder, Redis, WebSockets, Livewire/Inertia-style SPAs,
 serverless, a REPL.
@@ -363,7 +364,7 @@ In the order the owner ranked the open work (CLAUDE.md §7, "Still open"):
 4. **Admin:** `renox-admin` done (#148), next to the kit, the grid and the generators;
    editors done as a plugin (`renox-editors`); global search left.
 5. **Search, realtime, billing:** a search interface over FTS5/`tsvector`; SSE broadcasting
-   generalised from `auth::notifications::Hub`; billing last.
+   generalised from `auth::notifications::Hub`; billing done (`renox-billing`, #155).
 
 The September version of this review (`2026-09-laravel-parity.md`) is in git history; this file
 replaces it. [2026-10-laravel-gap-report.pdf](2026-10-laravel-gap-report.pdf) is a short summary of it.

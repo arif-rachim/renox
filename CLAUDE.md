@@ -10,7 +10,7 @@ repo, and every trap hit so far, so you don't have to rediscover them.
 - `CONTRIBUTING.md`: the checks every change needs. `SECURITY.md`: how vulnerabilities are reported.
   `RELEASING.md`: how a release goes to crates.io (the owner publishes).
 - `CHEATSHEET.md` and `llms.txt`: the app author's view (patterns, and which example shows what).
-- `docs/*.md`: guides (routing, validation, types, relations, authorization, queue, mail, scheduling, ui, grid, testing, PostgreSQL, operations, development, stability, and the plugins: two-factor, editors, oauth, admin).
+- `docs/*.md`: guides (routing, validation, types, relations, authorization, queue, mail, scheduling, ui, grid, testing, PostgreSQL, operations, development, stability, and the plugins: two-factor, editors, oauth, admin, billing).
 - `docs/audit/`: the pre-1.0 audit (finding IDs W*, D*, A* used in ROADMAP M13/M14).
 
 ## 1. What Renox is
@@ -71,7 +71,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            channels, provided values, throttle, security, webhooks, live
   src/module.rs            Module trait: name, routes, migrations, register
   src/registry.rs          Registry: jobs, listeners, schedule, commands, channels, shares, templates,
-                           assets (`Registry::asset`: files served before the session)
+                           assets (`Registry::asset`: files served before the session),
+                           provide (a module's values for `state.provided`, under the app's)
   src/routing.rs           Routes builder (get/post/…/name/group/require_auth/guest_only/
                            require_verified/throttle/cors/route_layer/merge/domain/fallback),
                            RouteTable + URLs (name_of for route_is), CurrentRoute
@@ -268,6 +269,25 @@ crates/renox-admin/        the admin panel plugin (#148, Filament's resources): 
                            form, fields, show; renox-admin/{slug}/cells.html from the app for
                            custom columns); its own tests/ (+ tests/migrations); guide
                            docs/admin.md (doctested from lib.rs `Guide`)
+crates/renox-billing/      the subscriptions plugin (#155, Laravel's Cashier): Billing module
+                           (lib.rs: plans, gateways, `Setup` given to the app with
+                           `Registry::provide`, the account section, listeners: AccountDeleted
+                           cancels at the gateway and deletes the rows, audit entries; views
+                           registered in `templates` unless the app has a file of the name),
+                           plan.rs (Plan, Interval), customer.rs (Billing::of → Customer,
+                           Billable, Owner `kind:id`), gateway.rs (Gateway trait, BoxFuture,
+                           Remote: only what's set changes a row, Notice, Payment, Checkout,
+                           CheckoutRequest), stripe.rs (Checkout Sessions, Subscriptions API,
+                           Stripe-Signature), xendit.rs (recurring plans, x-callback-token),
+                           model.rs (Subscription, BillingCustomer, SubscriptionStatus;
+                           tables `subscriptions` + `billing_customers`, prefix
+                           00010101000900), sync.rs (apply a Remote: metadata or customer →
+                           owner, `synced_at` orders webhooks, events), webhook.rs (one
+                           Webhook `billing` at /billing/webhooks/{gateway}; a route layer
+                           names the gateway and the event id in headers, the event id stored
+                           as `{gateway}:{id}`), handlers.rs (billing.* pages), guard.rs
+                           (SubscriptionRoutes); its own tests/ on FakeHttp + signed
+                           webhooks; guide docs/billing.md (doctested from lib.rs `Guide`)
 crates/renox-cli/          `rnx`: main.rs (key:generate, forwarding), new.rs, serve.rs, make.rs +
                            generate.rs (make:*), scaffold.rs (make:module --resource --fields),
                            deploy.rs (build, make:deploy), tailwind.rs (the pinned
@@ -315,6 +335,9 @@ examples/                  workspace members, each with a README.md and its own 
   admin/                   an admin panel made by renox-admin from three models (products with
                            soft deletes, categories, customers), two roles, an app-drawn
                            custom column (resources/views/renox-admin/products/cells.html)
+  billing/                 subscriptions made with renox-billing: three plans (Stripe, and
+                           Xendit in IDR), trials without a card, require_subscription /
+                           require_plan pages, a mail on PaymentFailed
 site/                      the documentation site (package `renox-site`, publish = false): a Renox
                            app that compiles the repo's Markdown in (src/content.rs lists the
                            pages, src/render.rs: pulldown-cmark, anchors, TOC, hidden doctest
@@ -363,6 +386,7 @@ docs/authorization.md      gates, policies, roles/permissions, token abilities, 
                            `AuthorizationGuide`)
 docs/oauth.md              social login with renox-oauth (doctest: renox-oauth's `Guide`)
 docs/admin.md              the admin panel with renox-admin (doctest: renox-admin's `Guide`)
+docs/billing.md            subscriptions with renox-billing (doctest: renox-billing's `Guide`)
 docs/queue.md              jobs, retries, priority, unique, middleware, chains, batches (doctest
                            `QueueGuide`)
 docs/postgresql.md         PostgreSQL guide for app authors
@@ -1255,8 +1279,17 @@ picks the build, not the terminal.
   URLs checked inside a group are worth a test).
   Template context keys named like a request global (`can`, `auth`, `errors`…) are hidden
   by the global (`merge_maps`, the last map wins): the panel passes `allowed`, not `can`.
-- **Still open** (ROADMAP `- [ ]`): billing later; the plugins `renox-2fa` (#146),
-  `renox-oauth` (#147) and `renox-admin` (#148) are done. A Laravel gap review after M25 (in the
+- **#155, `renox-billing`** (subscriptions: `Billing::new().plan(…).stripe().xendit()`,
+  `Billing::of(&state, &user)` with `subscribed`/`checkout`/`swap`/`cancel`/`resume`, the
+  `Gateway` trait, Stripe and Xendit, webhooks through `renox::webhook`, guards, pages;
+  examples/billing): branch `ccr-f926b004-17j95n`. It added `Registry::provide` to renox-core
+  (a module's settings for code without a request: `Webhook::verify`/`handle` get only the
+  state). `Webhook::event_id` gets no state either: a plugin whose webhooks depend on its
+  settings computes the id in a route layer and passes it in a header (billing's webhook.rs).
+  `FakeHttp` answers in turn but repeats the last one: queue every answer a test needs before
+  the first call, or a single answer keeps being given.
+- **Still open** (ROADMAP `- [ ]`): none of the plugins; `renox-2fa` (#146),
+  `renox-oauth` (#147), `renox-admin` (#148) and `renox-billing` (#155) are done. A Laravel gap review after M25 (in the
   conversation that planned M26) ranked them: release and docs first, then 2FA and social
   login, then small adds (validation rules like `json`/`gt`/`decimal`/`dimensions`, several
   storage disks, route model binding), then admin, search, realtime (SSE) and billing.

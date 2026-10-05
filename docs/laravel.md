@@ -1364,7 +1364,7 @@ list.
 | Livewire, Inertia | not planned | htmx + Alpine; for a SPA, a JSON API with tokens (`examples/api`) |
 | Fortify 2FA, Socialite | `renox-2fa` and `renox-oauth` (optional plugin crates) | `renox-2fa`: TOTP turned on from `/account`, the code after the password, recovery codes ([two-factor.md](two-factor.md)); `renox-oauth`: Google and GitHub (another provider is one `Provider` impl), PKCE, linking by verified email, link and unlink from `/account` ([oauth.md](oauth.md)) |
 | Scout | the database engine, built in | `#[model(search = "title, body")]`, `renox::db::search::migration`, `Post::search(&q)`: SQLite FTS5 or PostgreSQL `tsvector`, kept current by the database, ranked, also behind the grid's search box ([search.md](search.md)); no Algolia/Meilisearch engines |
-| Cashier | open | payment pages and verified webhooks (Midtrans, Xendit, Stripe) in `examples/backoffice` and `examples/webhooks` |
+| Cashier | the `renox-billing` crate (an optional plugin) | `Billing::new().plan(…).stripe().xendit()`: plans declared in code, trials (also without a payment method), `swap`, `cancel` with a grace period, `resume`, `require_subscription`, the gateways' webhooks verified and applied once; Stripe and Xendit (another gateway is one `Gateway` impl) ([billing.md](billing.md), `examples/billing`). One-off payment pages and webhooks by hand: `examples/backoffice`, `examples/webhooks` |
 | Pennant feature flags | open | a setting or a gate |
 | Several guards / user tables | one `users` table | roles from the `Permissions` module |
 | Queued listeners | not built in | a listener that dispatches a job |
@@ -1509,4 +1509,4 @@ a warning before that. Store ids in the session, not whole objects, or use
   [operations](operations.md), [PostgreSQL](postgresql.md).
 - The examples ([llms.txt](../llms.txt) says which shows what): `crud` is the reference CRUD
   module, `shop` a whole shop, `backoffice` the Filament-style admin, `admin` a panel made by
-  `renox-admin`.
+  `renox-admin`, `billing` subscriptions with `renox-billing`.

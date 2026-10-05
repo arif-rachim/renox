@@ -193,6 +193,14 @@ pub static PAGES: &[Page] = &[
         "A back office generated from your models, with the renox-admin crate."
     ),
     page!(
+        "billing",
+        "Billing",
+        Guides,
+        "credit-card",
+        "docs/billing.md",
+        "Charge for plans with trials, upgrades and cancellations, with the renox-billing crate."
+    ),
+    page!(
         "queue",
         "The queue",
         Guides,
