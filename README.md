@@ -296,10 +296,7 @@ type in Rust, templates or the terminal.
     fields shown only when another has a value, and nested form names
     (`lines[0][qty]`) read into a `Vec` of structs;
   - infolists for a record's page: labels and values formatted as money (`APP_CURRENCY`),
-    dates, "3 hours ago", badges, Yes/No, swatches, pairs or Markdown, with buttons beside a
-    value;
-  - rich text, Markdown and code editors, and code shown coloured, from the `renox-editors`
-    crate, with rich text cleaned on the server ([guide](docs/editors.md));
+    dates, "3 hours ago", badges, Yes/No, swatches, pairs or Markdown;
   - keyboard support and WCAG AA contrast;
   - toasts (`Toast::success(…)`, with a body, links, a duration and a position) and live
     validation.
@@ -618,7 +615,6 @@ change on `main`.
   [scheduler, events, cache and commands](docs/scheduling.md), [testing](docs/testing.md),
   [relations](docs/relations.md), [full-text search](docs/search.md),
   [authorization and tenants](docs/authorization.md), [two-factor authentication](docs/two-factor.md),
-  [editors](docs/editors.md),
   [the queue](docs/queue.md), [field types](docs/types.md),
   [PostgreSQL](docs/postgresql.md), [production](docs/operations.md),
   [faster builds](docs/development.md), [stability and versions](docs/stability.md).
