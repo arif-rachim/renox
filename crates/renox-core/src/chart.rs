@@ -2075,4 +2075,108 @@ mod tests {
         assert_eq!(f("en").tick(750.0), "750");
         assert_eq!(f("en").tick(2_000_000_000.0), "2B");
     }
+
+    // #255: "so far" periods on awkward days, and charts with awkward data.
+
+    /// Runs `f` with the clock on `date` at noon UTC.
+    fn on<T>(date: &str, f: impl FnOnce() -> T) -> T {
+        let at = day(date)
+            .and_hms_opt(12, 0, 0)
+            .unwrap()
+            .and_utc()
+            .timestamp();
+        let now = chrono::Utc::now().timestamp();
+        crate::clock::with_offset_sync(at - now, f)
+    }
+
+    #[test]
+    fn month_and_year_to_date_compare_with_as_many_days_before() {
+        let zone = Zone::UTC;
+        let mtd = Period::month_to_date();
+        assert_eq!(mtd.key(), "mtd");
+        assert_eq!(mtd.bucket(), Bucket::Day);
+        // The 31st: the month so far is the whole month; the month before
+        // (February) is cut at its own end.
+        on("2026-03-31", || {
+            assert_eq!(mtd.days_in(zone), (day("2026-03-01"), day("2026-04-01")));
+            assert_eq!(
+                mtd.previous().days_in(zone),
+                (day("2026-02-01"), day("2026-03-01"))
+            );
+        });
+        // 29 February: the year so far is 60 days; the year before has
+        // as many days, from 1 January.
+        on("2024-02-29", || {
+            let ytd = Period::year_to_date();
+            assert_eq!(ytd.days_in(zone), (day("2024-01-01"), day("2024-03-01")));
+            assert_eq!(
+                ytd.previous().days_in(zone),
+                (day("2023-01-01"), day("2023-03-02"))
+            );
+        });
+        // The last day of a leap year: the year before is cut at its end.
+        on("2024-12-31", || {
+            assert_eq!(
+                Period::year_to_date().previous().days_in(zone),
+                (day("2023-01-01"), day("2024-01-01"))
+            );
+        });
+    }
+
+    fn render(source: &str) -> String {
+        let mut env = minijinja::Environment::new();
+        env.add_function("chart", chart("USD".into()));
+        env.render_str(source, minijinja::context! {})
+            .unwrap_or_else(|err| panic!("{err:#}"))
+    }
+
+    #[test]
+    fn awkward_data_still_draws() {
+        // A gap in a line, values all below zero, all the same.
+        let gap =
+            render(r#"{{ chart("line", labels=["a", "b", "c", "d"], values=[1, none, 3, 4]) }}"#);
+        assert!(gap.contains("<figure class=\"rx-chart"), "{gap}");
+        for source in [
+            r#"{{ chart("bar", [-5, -2, -9]) }}"#,
+            r#"{{ chart("line", [3, 3, 3]) }}"#,
+            r#"{{ chart("line", [0, 0]) }}"#,
+        ] {
+            assert!(
+                render(source).contains("<figure class=\"rx-chart"),
+                "{source}"
+            );
+        }
+        // More series than colours: the rest share one.
+        let many = render(
+            r#"{{ chart("line", labels=["a"], series=[{"name": "1", "values": [1]}, {"name": "2", "values": [1]}, {"name": "3", "values": [1]}, {"name": "4", "values": [1]}, {"name": "5", "values": [1]}, {"name": "6", "values": [1]}, {"name": "7", "values": [1]}]) }}"#,
+        );
+        assert!(many.contains("rx-series-other"), "{many}");
+    }
+
+    #[test]
+    fn pies_skip_empty_slices_and_draw_a_whole_one_as_a_circle() {
+        let pie = render(r#"{{ chart("pie", labels=["none", "all"], values=[0, 5]) }}"#);
+        assert!(
+            pie.contains(r#"<circle class="rx-chart__slice rx-series-2""#),
+            "{pie}"
+        );
+        assert!(!pie.contains("rx-chart__hole"));
+        assert!(pie.contains(r#"aria-label="none, all""#), "{pie}");
+        let ring = render(r#"{{ chart("doughnut", labels=["all"], values=[5], legend=false) }}"#);
+        assert!(ring.contains("rx-chart__hole"), "{ring}");
+        assert!(!ring.contains("rx-chart__legend"));
+        let empty = render(r#"{{ chart("pie", labels=["a"], values=[0]) }}"#);
+        assert!(!empty.contains("rx-chart__slice"), "{empty}");
+    }
+
+    #[test]
+    fn scatter_with_negative_values_only() {
+        let html = render(r#"{{ chart("scatter", points=[[-5, -10], [-1, -3]]) }}"#);
+        // The axes reach below the lowest point and up to zero.
+        assert!(
+            html.contains(r#"<span style="bottom: 0%">-10</span>"#),
+            "{html}"
+        );
+        assert!(html.contains(r#"style="left: 100%">0</span>"#), "{html}");
+    }
 }
