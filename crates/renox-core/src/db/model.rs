@@ -45,6 +45,16 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
     /// sees columns the struct doesn't list, and queries may filter on them.
     /// The built-in `User` does this to keep the app's own columns.
     const SELECT_ALL: bool = false;
+    /// The text columns full-text search looks in, most important first
+    /// (they weigh more in the ranking); empty: the model can't be
+    /// searched. Set it with `#[model(search = "title, body")]`; see
+    /// [`renox::db::search`](super::search).
+    const SEARCHABLE: &'static [&'static str] = &[];
+    /// The language full-text search stems words for: `english` (the
+    /// default) or a PostgreSQL text search configuration such as `simple`
+    /// (no stemming) or `spanish`. Set it with
+    /// `#[model(search_language = "simple")]`.
+    const SEARCH_LANGUAGE: &'static str = "english";
 
     /// The type of the `id` field.
     type Key: ModelKey;
@@ -167,6 +177,25 @@ pub trait Model: super::FromRow + Sized + Send + Sync + Unpin + 'static {
                 .await?;
             Ok(())
         }
+    }
+
+    /// The rows matching a full-text search, best matches first:
+    /// shorthand for `query().search(words)`. The model needs
+    /// `#[model(search = "…")]` and its index (see
+    /// [`renox::db::search`](super::search)).
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// #[derive(Model, serde::Serialize, Default)]
+    /// #[model(table = "posts", search = "title, body")]
+    /// struct Post { id: i64, title: String, body: String }
+    ///
+    /// # async fn demo(db: Db, q: String) -> Result {
+    /// let posts = Post::search(&q).limit(20).get(&db).await?;
+    /// # let _ = posts; Ok(()) }
+    /// ```
+    fn search(words: &str) -> Query<Self> {
+        Self::query().search(words)
     }
 
     /// Shorthand for `query().where_eq(column, value)`.

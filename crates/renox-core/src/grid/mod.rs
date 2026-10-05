@@ -475,6 +475,13 @@ impl Column {
     /// The toolbar's search box looks in this column (as text, ignoring
     /// case). The box shows when a column is searchable. Not for custom
     /// columns.
+    ///
+    /// When the grid's model has a full-text index (`#[model(search = …)]`,
+    /// see [`renox::db::search`](crate::db::search)), the box searches
+    /// through it instead: every column of the index counts (also those the
+    /// grid doesn't show), words match their other forms and prefixes, and
+    /// rows come best match first until the user sorts. Searchable columns
+    /// outside the index are still matched as text.
     pub fn searchable(mut self) -> Self {
         self.searchable = self.kind != Kind::Custom;
         self
@@ -1082,20 +1089,27 @@ impl Grid {
             }
         }
         if let Some(search) = &state.search {
+            // A model with a full-text index (`#[model(search = …)]`) is
+            // searched through it; the searchable columns it doesn't cover
+            // (related values, other columns) with LIKE.
+            let indexed = !M::SEARCHABLE.is_empty();
             let columns: Vec<String> = self
                 .columns
                 .iter()
                 .filter(|c| c.searchable)
                 .filter_map(|c| match c.target::<M>() {
                     Target::Expr(expr) => Some(expr),
+                    Target::Column(key) if indexed && M::SEARCHABLE.contains(&key.as_str()) => None,
                     Target::Column(key) if M::COLUMNS.contains(&key.as_str()) => {
                         Some(format!("\"{key}\""))
                     }
                     Target::Column(_) => None,
                 })
                 .collect();
-            if !columns.is_empty() {
-                // Every word somewhere in the searchable columns.
+            if indexed && columns.is_empty() {
+                query = query.where_search(search);
+            } else if indexed || !columns.is_empty() {
+                // Every word somewhere: in the index or a searchable column.
                 for word in search.split_whitespace().take(8) {
                     let pattern = format!("%{}%", word.to_lowercase());
                     let sql = columns
@@ -1103,7 +1117,14 @@ impl Grid {
                         .map(|target| format!("LOWER(CAST({target} AS TEXT)) LIKE ?"))
                         .collect::<Vec<_>>()
                         .join(" OR ");
-                    query = query.where_raw(&sql, vec![pattern; columns.len()]);
+                    query = if indexed {
+                        query.where_any(|q| {
+                            q.where_search(word)
+                                .where_raw(&sql, vec![pattern.clone(); columns.len()])
+                        })
+                    } else {
+                        query.where_raw(&sql, vec![pattern; columns.len()])
+                    };
                 }
             }
         }
@@ -1127,6 +1148,17 @@ impl Grid {
             keys.retain(|(k, _)| k != group);
             keys.insert(0, (group.clone(), desc));
         }
+        // Searching a model with a full-text index, without a sort of the
+        // user's: best matches first (inside the groups, when grouped).
+        let mut relevance = match &state.search {
+            Some(search) if state.defaulted && !M::SEARCHABLE.is_empty() => Some(search),
+            _ => None,
+        };
+        if state.group.is_none()
+            && let Some(search) = relevance.take()
+        {
+            query = query.order_by_relevance(search);
+        }
         for (key, desc) in &keys {
             let dir = if *desc { "DESC" } else { "ASC" };
             // Empty values last either way, on both databases (PostgreSQL
@@ -1141,6 +1173,10 @@ impl Grid {
                 _ if *desc => query.order_by_desc(key),
                 _ => query.order_by(key),
             };
+            // After the group's key.
+            if let Some(search) = relevance.take() {
+                query = query.order_by_relevance(search);
+            }
         }
         if keys.iter().any(|(key, _)| key == "id") {
             query

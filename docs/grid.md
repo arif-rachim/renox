@@ -290,7 +290,10 @@ On top of the heading filters, there are:
 
 - **Search.** If any columns are marked `.searchable()`, a search box appears in the toolbar.
   Every word typed must appear in one of those columns (as text, upper or lower case). The grid
-  searches as you type.
+  searches as you type. When the grid's model has a full-text index
+  (`#[model(search = "title, body")]`, [search.md](search.md)), the box searches through it:
+  all the index's columns count, also those the grid doesn't show, words match their prefixes
+  and other forms, and rows come best match first until the user sorts by a heading.
 - **Chips.** The active filters, the advanced filter's rules and the search show as chips under
   the toolbar. × clears one, and "Clear filters" clears them all.
 

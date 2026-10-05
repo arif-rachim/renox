@@ -1013,6 +1013,9 @@
 .rx-chart__key { flex: none; display: inline-block; background: var(--rx-series); }
 .rx-chart__key--line { width: 14px; height: 2px; border-radius: 1px; }
 .rx-chart__key--box { width: 10px; height: 10px; border-radius: 3px; }
+.rx-chart__key--dot { width: 10px; height: 10px; border-radius: 50%; }
+.rx-chart__axis-title { margin: 0; font-size: 11px; line-height: 1.3; color: var(--rx-secondary-label); }
+.rx-chart__axis-title--x { text-align: center; margin-top: calc(-1 * var(--rx-space-2)); }
 .rx-chart__frame { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: var(--rx-chart-h, 240px) auto; column-gap: var(--rx-space-2); }
 .rx-chart__y { position: relative; min-width: 2rem; font-size: 11px; color: var(--rx-secondary-label); font-variant-numeric: tabular-nums; }
 .rx-chart__y span { position: absolute; right: 0; transform: translateY(50%); white-space: nowrap; line-height: 1; }
@@ -1021,6 +1024,14 @@
 .rx-chart__grid { position: absolute; inset: 0; }
 .rx-chart__rule { position: absolute; left: 0; right: 0; border-top: 1px solid var(--rx-chart-grid); }
 .rx-chart__rule--base { border-top-color: var(--rx-chart-base); }
+.rx-chart__rule--x { top: 0; bottom: 0; right: auto; width: 0; border-top: 0; border-left: 1px solid var(--rx-chart-grid); }
+.rx-chart__rule--x.rx-chart__rule--base { border-left-color: var(--rx-chart-base); }
+/* Scatter and bubble points: round at any width; bubbles see-through with a
+   solid edge, so overlaps still read. */
+.rx-chart__points { position: absolute; inset: 0; pointer-events: none; }
+.rx-chart__point { position: absolute; width: var(--rx-point, 9px); height: var(--rx-point, 9px); box-sizing: border-box; border-radius: 50%; background: var(--rx-series); box-shadow: 0 0 0 1.5px var(--rx-chart-surface); transform: translate(-50%, 50%); }
+.rx-chart--bubble .rx-chart__point { background: color-mix(in srgb, var(--rx-series) 40%, transparent); border: 1.5px solid var(--rx-series); box-shadow: none; }
+.rx-chart__point[data-on] { z-index: 1; box-shadow: 0 0 0 2px var(--rx-chart-surface), 0 0 0 4px var(--rx-series); }
 .rx-chart__svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .rx-chart__line { fill: none; stroke: var(--rx-series); stroke-width: 2px; stroke-linejoin: round; stroke-linecap: round; }
 .rx-chart__area { fill: var(--rx-series); opacity: 0.12; stroke: none; }
@@ -1047,8 +1058,8 @@
 .rx-chart__tip-name { color: var(--rx-secondary-label); }
 .rx-chart__x { grid-column: 2; position: relative; height: 1.6em; margin-top: 6px; font-size: 11px; color: var(--rx-secondary-label); }
 .rx-chart__x span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
-.rx-chart--line .rx-chart__x span:first-child, .rx-chart--area .rx-chart__x span:first-child { transform: none; }
-.rx-chart--line .rx-chart__x span:last-child, .rx-chart--area .rx-chart__x span:last-child { transform: translateX(-100%); }
+.rx-chart--line .rx-chart__x span:first-child, .rx-chart--area .rx-chart__x span:first-child, .rx-chart--points .rx-chart__x span:first-child { transform: none; }
+.rx-chart--line .rx-chart__x span:last-child, .rx-chart--area .rx-chart__x span:last-child, .rx-chart--points .rx-chart__x span:last-child { transform: translateX(-100%); }
 @media (max-width: 36rem) { .rx-chart__x .rx-chart__x--odd { display: none; } }
 .rx-chart__table > summary { cursor: pointer; font-size: var(--rx-text-footnote); color: var(--rx-accent-text); width: fit-content; border-radius: 4px; }
 .rx-chart__table > summary:focus-visible { outline: 2px solid var(--rx-accent); outline-offset: 2px; }
@@ -1128,6 +1139,25 @@ a.rx-stat:focus-visible { outline: 2px solid var(--rx-accent); outline-offset: 2
 @media (max-width: 36rem) { .rx-period .rx-segmented__item { padding: 6px 10px; } .rx-stat__value { font-size: 1.375rem; } }
 .rx-segmented__item[aria-current="page"] { background: var(--rx-surface-raised); box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 3px 1px rgba(0, 0, 0, 0.04); font-weight: 600; }
 .rx-segmented__item:focus-visible { outline: 2px solid var(--rx-accent); outline-offset: 1px; }
+/* The custom range: a button next to the presets opening a small form. */
+.rx-period__custom { position: relative; display: inline-block; vertical-align: middle; margin: 4px 0 4px var(--rx-space-1); }
+.rx-period__toggle {
+  list-style: none; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 12px;
+  border-radius: 9px; background: var(--rx-fill); color: var(--rx-label); font-size: var(--rx-text-subhead); font-weight: 500;
+  white-space: nowrap; cursor: pointer; user-select: none;
+}
+.rx-period__toggle::-webkit-details-marker { display: none; }
+.rx-period__toggle svg { width: 16px; height: 16px; flex: none; }
+.rx-period__toggle[aria-current] { background: var(--rx-surface-raised); box-shadow: 0 0 0 2px var(--rx-fill), 0 3px 8px rgba(0, 0, 0, 0.12); font-weight: 600; }
+.rx-period__toggle:focus-visible { outline: 2px solid var(--rx-accent); outline-offset: 2px; }
+.rx-period__form {
+  position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; width: min(19rem, calc(100vw - 2rem)); box-sizing: border-box;
+  display: grid; gap: var(--rx-space-3); padding: var(--rx-space-4); background: var(--rx-surface-raised); color: var(--rx-label);
+  border: 0.5px solid var(--rx-separator); border-radius: var(--rx-radius-s); box-shadow: var(--rx-shadow-raised);
+}
+.rx-period__dates { display: grid; gap: var(--rx-space-3); }
+.rx-period__form .rx-error:empty { display: none; }
+.rx-period__form > .rx-button { justify-self: end; }
 
 /* Renox's pagination links (renox/pagination.html). */
 .rx-page .pagination { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
@@ -1395,7 +1425,7 @@ a.rx-stat:focus-visible { outline: 2px solid var(--rx-accent); outline-offset: 2
   .rx-switch::after { background: CanvasText; }
   .rx-swatch { forced-color-adjust: none; border: 1px solid CanvasText; }
   .rx-bell__badge { forced-color-adjust: none; border: 1px solid CanvasText; }
-  .rx-chart__key, .rx-chart__bar, .rx-chart__slice, .rx-chart__dot, .rx-chart__line, .rx-chart__area { forced-color-adjust: none; }
+  .rx-chart__key, .rx-chart__bar, .rx-chart__slice, .rx-chart__dot, .rx-chart__point, .rx-chart__line, .rx-chart__area { forced-color-adjust: none; }
   .rx-stat, .rx-widget { border: 1px solid CanvasText; }
   .rx-bell__panel { border: 1px solid CanvasText; }
   .rx-notification--unread { border-left: 4px solid Highlight; }

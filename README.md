@@ -343,6 +343,11 @@ type in Rust, templates or the terminal.
   pivots: the pivot rows, then the models), and
   `count_many` / `sum_many` give counts and sums per row ([guide](docs/relations.md)); joins
   read into `#[derive(FromRow)]` structs with `fetch_as`.
+- Full-text search over a model's columns, ranked, on both databases (SQLite FTS5, PostgreSQL
+  `tsvector`): `#[model(search = "title, body")]`, a migration from
+  `renox::db::search::migration::<Post>`, then `Post::search(&q)` with any other filter and
+  pagination; the database keeps the index current, and the data grid's search box uses it
+  ([guide](docs/search.md)).
 - For anything else there's raw SQL with `?` placeholders, and transactions that can retry on a
   busy database (`db.transaction_retrying(3, …)`): `renox::db::sql("…").bind(x).fetch_all(&db)`.
 - SQLite is the default. PostgreSQL is one feature flag away, with the same code
@@ -577,6 +582,7 @@ out of the box.
 | Gates and policies | `App::gate`, `impl Policy`, `user.authorize(…)`, `.require_gate(…)` |
 | spatie/laravel-permission | the `Permissions` module: `assign_role`, `has_permission`, `.require_role(…)` |
 | Global scopes (tenancy) | `#[model(default_scope = "…")]` with `renox::context` |
+| Scout (database engine) | `#[model(search = "title, body")]` and `Post::search(&q)` ([docs/search.md](docs/search.md)) |
 | Breeze / Jetstream | `rnx new --starter`: email verification, roles, a dashboard, the users page and the activity log; or `Auth::new().account()` alone |
 | Sanctum | API tokens with abilities (`create_token_with`, `.require_ability(…)`) |
 | `Cache::lock` | `state.cache.lock(name, ttl)` |
@@ -607,8 +613,8 @@ change on `main`.
 - Guides: [routing and middleware](docs/routing.md), [validation](docs/validation.md),
   [views and the UI kit](docs/ui.md), [the data grid](docs/grid.md), [mail and notifications](docs/mail.md),
   [scheduler, events, cache and commands](docs/scheduling.md), [testing](docs/testing.md),
-  [relations](docs/relations.md), [authorization and tenants](docs/authorization.md),
-  [two-factor authentication](docs/two-factor.md),
+  [relations](docs/relations.md), [full-text search](docs/search.md),
+  [authorization and tenants](docs/authorization.md), [two-factor authentication](docs/two-factor.md),
   [the queue](docs/queue.md), [field types](docs/types.md),
   [PostgreSQL](docs/postgresql.md), [production](docs/operations.md),
   [faster builds](docs/development.md), [stability and versions](docs/stability.md).

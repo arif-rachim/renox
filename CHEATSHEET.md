@@ -228,7 +228,8 @@ URL with `?v=hash`), `storage_url(key)` (a stored file's URL on the default disk
 `t()`, `can()`, `route_is(pattern, …)`, `class_names(…)`, `page_url(n)` (this page's query
 with `page=n`),
 `query_with(key=value)` (this page's query with those keys set, or removed with `none`; `page` dropped),
-`chart(kind, data, …)` (an SVG chart: line, area, bar, pie, doughnut),
+`query_fields("key", …)` (this page's query as hidden inputs, without `page` and those keys, for GET forms),
+`chart(kind, data, …)` (an SVG chart: line, area, bar, pie, doughnut, scatter, bubble),
 `renox_head()`, `csp_nonce()` (this request's nonce for `<script nonce=…>` under `CSP=strict`),
 `seo(title=…, description=…, image=…, type=…, canonical=…)` (see "SEO and analytics" below),
 `renox_ui()` (the UI kit), `renox_grid()` (the data grid's assets), `renox_calendar()` (the
@@ -813,6 +814,53 @@ For joins and reports, use `sql("…").fetch_as::<T>(&db)` with `#[derive(FromRo
 See [docs/relations.md](docs/relations.md): pivot columns (`attach_with`, `load_with_pivot`,
 `toggle`) and polymorphic relations (`Morph`) are there too.
 
+## Full-text search (details in [docs/search.md](docs/search.md))
+
+Find rows by the words in them, best matches first, on SQLite (FTS5) and PostgreSQL
+(`tsvector`) alike. Name the columns on the model, add the index's migration, then search.
+
+```rust
+use renox::prelude::*;
+use serde::{Deserialize, Serialize};
+
+#[derive(Model, Serialize, Default)]
+#[model(table = "posts", search = "title, body")] // the title weighs more
+struct Post {
+    id: i64,
+    title: String,
+    body: String,
+    published: bool,
+}
+
+fn app() -> App {
+    App::new()
+        .migrations(renox::migrations!())
+        // After the migration creating `posts`: an FTS5 table + triggers on
+        // SQLite, a generated column + GIN index on PostgreSQL.
+        .migrations(&[renox::db::search::migration::<Post>("20260104000000_search_posts")])
+}
+
+#[derive(Deserialize)]
+struct Search {
+    q: Option<String>,
+}
+
+async fn index(State(db): State<Db>, Page(page): Page, Query(s): Query<Search>) -> Result<View> {
+    let q = s.q.unwrap_or_default(); // user input is safe: only its words are used
+    let posts = Post::search(&q) // every word, prefixes ("cof" → coffee), word forms
+        .where_eq("published", true)
+        .latest() // ties: newest first
+        .paginate(&db, page, 20)
+        .await?;
+    Ok(view("posts/index.html", context! { posts, q }))
+}
+```
+
+`where_search(q)` filters without ranking, `order_by_relevance(q)` ranks only. The database
+keeps the index current on every write (bulk updates and raw SQL too).
+`#[model(search_language = "simple")]` turns English stemming off (PostgreSQL also takes
+`spanish`, `german`, …). A data grid over a searchable model searches through the index.
+
 ## Model hooks, partial saves, encrypted values
 
 Run your own code just before or after a model is saved or deleted (hooks), save only some
@@ -940,7 +988,10 @@ use renox::chart::{Period, Trend};
 #[derive(Model, serde::Serialize, Default)]
 struct Order { id: i64, total: i64, status: String, created_at: Option<renox::db::DateTime> }
 
-// ?period=7d|30d|90d|12m|mtd|ytd (Period: 30 days by default; serializes as "30d").
+// ?period=7d|30d|90d|12w|12m|mtd|ytd, or ?period=custom&from=2026-09-01&to=2026-09-30
+// (Period: 30 days by default, also for a refused range; serializes as "30d" or
+// "2026-09-01..2026-09-30"). Per day up to 92 days, per week (Monday-based ISO weeks,
+// labelled by the Monday) for 12w, else per month; period.per(Bucket::Week) picks the step.
 async fn dashboard(State(state): State<AppState>, period: Period) -> Result<View> {
     let paid = || Order::where_eq("status", "paid");
     let sales = Trend::of(paid(), "created_at").over(period).sum(&state, "total").await?; // or count / average
@@ -950,6 +1001,8 @@ async fn dashboard(State(state): State<AppState>, period: Period) -> Result<View
         revenue => sales.total(),
         change => sales.change_from(&before), // percent, or None
         sales => sales.named("Sales"),         // {name, labels (2026-10-02 / 2026-10), values}
+        // Points for scatter/bubble charts: [{x, y, size, label}], e.g. from select_as.
+        products => [renox::serde_json::json!({ "x": 25_000, "y": 12, "size": 300_000, "label": "Latte" })],
     }))
 }
 ```
@@ -957,8 +1010,9 @@ async fn dashboard(State(state): State<AppState>, period: Period) -> Result<View
 ```html
 {% from "renox/ui.html" import period_filter, stats, stat, dashboard, widget %}
 {{ period_filter(period) }}                   {# links to ?period=…, keeping the query #}
-{# period_filter(selected, options=[["7d", "Week"], …], label=…): selected is the handler's
-   Period; the default options are 7d, 30d, 90d, 12m and ytd; label names the nav for screen readers #}
+{# period_filter(selected, options=[["7d", "Week"], …], label=…, custom=true): selected is the handler's
+   Period; the default options are 7d, 30d, 90d, 12m and ytd; label names the nav for screen readers;
+   "Custom" opens two date fields sent as ?period=custom&from=…&to=… (custom=false hides it) #}
 {% call stats(4) %}
   {{ stat("Revenue", revenue | money, delta=change, trend=sales.values, url="/orders") }} {# good="down" for costs #}
 {% endcall %}
@@ -969,6 +1023,10 @@ async fn dashboard(State(state): State<AppState>, period: Period) -> Result<View
   {{ widget("By status", url=route('dashboard.statuses'), poll=60) }} {# loaded after the page, every 60 s #}
 {% endcall %}
 {{ chart("bar", labels=["Coffee", "Tea"], series=[{"name": "2025", "values": [3, 5]}, {"name": "2026", "values": [4, 6]}]) }}
+{# points: {x, y, size, label} maps, or [x, y] / [x, y, size]; several series: series=[{"name": …, "points": […]}] #}
+{{ chart("scatter", points=orders, x_title="Items", y_title="Total", format="money") }}
+{{ chart("bubble", points=products, x_title="Price", y_title="Units", size_title="Revenue",
+         x_format="money", size_format="money") }} {# format is y's; x_format / size_format: number, money, percent #}
 ```
 
 ## Data grid (details in [docs/grid.md](docs/grid.md), example in examples/grid)

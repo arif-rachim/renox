@@ -114,7 +114,9 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            relations.rs (belongs_to/has_many/has_many_through/Pivot/Morph), value.rs (DbValue),
                            paginate.rs, migrate.rs (migrator), factory.rs, json.rs, error.rs,
                            query_log.rs (capture_queries: a task-local statement log, also
-                           feeding /_renox/debug)
+                           feeding /_renox/debug), search.rs (full-text search: the index
+                           migration (FTS5 + triggers / generated tsvector + GIN), the
+                           filter and rank SQL behind Query::search, rebuild)
   src/path.rs              renox::Path: axum's Path with a 404 (not 400) when a value won't parse
                            (a parameter the route lacks is a 500); Found<M> (route model binding:
                            the parameter named after the table, else the only one; by key or
@@ -310,6 +312,8 @@ docs/tutorial.md           one app (Stash) from `rnx new` to deploy (doctest `Tu
 docs/laravel.md            Laravel → Renox, concept by concept (doctest `LaravelGuide`)
 docs/types.md              HTML input ↔ Rust ↔ SQLite ↔ PostgreSQL (doctest `TypesGuide`)
 docs/relations.md          relations without N+1, fetch_as/FromRow (doctest `RelationsGuide`)
+docs/search.md             full-text search: #[model(search)], the index migration, ranking
+                           (doctest `SearchGuide`)
 docs/authorization.md      gates, policies, roles/permissions, token abilities, tenants (doctest
                            `AuthorizationGuide`)
 docs/queue.md              jobs, retries, priority, unique, middleware, chains, batches (doctest

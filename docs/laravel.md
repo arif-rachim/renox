@@ -1358,7 +1358,7 @@ list.
 | MySQL, several connections, read/write split | SQLite and PostgreSQL, one `Db` per app | `renox::db::sql` for reports; a second sqlx pool by hand if you must |
 | Livewire, Inertia | not planned | htmx + Alpine; for a SPA, a JSON API with tokens (`examples/api`) |
 | Fortify 2FA, Socialite | `renox-2fa` (an optional plugin crate); `renox-oauth` planned | `renox-2fa`: TOTP turned on from `/account`, the code after the password, recovery codes ([two-factor.md](two-factor.md)); no social login yet |
-| Scout | open | `where_like` (case-insensitive), the grid's search; FTS5 or `tsvector` through raw SQL |
+| Scout | the database engine, built in | `#[model(search = "title, body")]`, `renox::db::search::migration`, `Post::search(&q)`: SQLite FTS5 or PostgreSQL `tsvector`, kept current by the database, ranked, also behind the grid's search box ([search.md](search.md)); no Algolia/Meilisearch engines |
 | Cashier | open | payment pages and verified webhooks (Midtrans, Xendit, Stripe) in `examples/backoffice` and `examples/webhooks` |
 | Pennant feature flags | open | a setting or a gate |
 | Several guards / user tables | one `users` table | roles from the `Permissions` module |

@@ -267,6 +267,30 @@ impl Views {
                     Ok(Value::from(format!("?{}", url.finish())))
                 },
             );
+            // The current URL's query string as hidden inputs, without `page`
+            // and the keys named: `query_fields("period", "from", "to")`, so
+            // a GET form keeps the page's other filters.
+            env.add_function(
+                "query_fields",
+                |state: &minijinja::State, except: minijinja::value::Rest<String>| -> Value {
+                    let query = state
+                        .lookup("request")
+                        .and_then(|request| request.get_attr("query").ok())
+                        .and_then(|query| query.as_str().map(str::to_owned))
+                        .unwrap_or_default();
+                    let mut html = String::new();
+                    for (key, value) in form_urlencoded::parse(query.as_bytes()) {
+                        if key != "page" && !except.iter().any(|k| *k == key) {
+                            html.push_str(&format!(
+                                r#"<input type="hidden" name="{}" value="{}">"#,
+                                crate::toast::escape(&key),
+                                crate::toast::escape(&value)
+                            ));
+                        }
+                    }
+                    Value::from_safe_string(html)
+                },
+            );
             env.add_function("method_field", |method: String| {
                 let method: String = method.chars().filter(char::is_ascii_alphabetic).collect();
                 Value::from_safe_string(format!(

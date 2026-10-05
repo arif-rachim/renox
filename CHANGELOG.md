@@ -10,33 +10,33 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
-- **Actions beyond one step (#153, Filament's as the yardstick):**
-  - `action_group` in the UI kit: several actions behind one button (a "⋯" icon button, or a
-    labelled one), keyboard-usable like every kit menu. Menu items take an `icon`;
-    `menu_link(…, download=true)` for a file, `menu_open(id, label)` opens a sheet (the menu
-    closes, focus goes back to its button), `menu_section(title)` names a group of items.
-    `action_sheet` and `confirm` take `button=false`, for sheets opened from a group.
-  - `wizard_action`: a `wizard` in an action sheet, sent with htmx; Next checks the step with
-    the server's rules (live validation), a 422 after the last step opens the step with the
-    first error, closing the sheet starts over. `wizard(…, cancel=true)` adds a Cancel button.
-  - `renox::import`: `Import::csv(bytes).run(&state, |tx, row: T| …)` reads a CSV file (RFC
-    4180, a BOM, `;` with `.delimiter`), checks each row as a form of `T` (its rules, messages
-    in `.lang(&lang)`, `prepare` and `after` hooks), and writes the good rows in one
-    transaction with a savepoint each; `.all_or_nothing()`, `.rename`, `.headers`,
-    `.max_rows` (10,000 by default). The `ImportReport` answers a handler: a toast and
-    `HX-Refresh` when every row went in, else `renox/import_report.html`, the refused rows
-    with their row numbers and messages. `renox::import::template` makes the empty file to fill
-    in. The kit's `import_action` is the sheet for it.
-  - `Model::replicate()`: an unsaved copy (no id, no `deleted_at`, `Option` timestamps
-    emptied), for a "Duplicate" form or a copy saved in code. The derive writes a hidden
-    `forget_timestamps`.
-  - `Grid::export_as(query, ExportFormat, &request)`: any query as CSV, Excel or a print page,
-    outside the grid's page, in the grid's default columns. `ExportFormat` (`Csv`, `Xlsx`,
-    `Print`) reads from a route parameter.
-  - examples/backoffice: "New product" is a wizard, the product list's "More" group holds the
-    import (now on `renox::import`, its refused rows listed in the sheet) and its template, a
-    product's page has "Duplicate" and "Export ledger", and the grid a "Duplicate" row action.
-    The store answers `HxRedirect` to the new product.
+- **Dashboards (#152):** `chart("scatter", …)` and `chart("bubble", …)` place points by two
+  numbers (a bubble's area by a third), with axes fitted to the data, `x_title`/`y_title`
+  (also on line, area and bar charts), `x_format`/`size_format`, a tooltip per point (the
+  arrow keys move between points) and the data table. `period_filter` has a "Custom" button:
+  two of the kit's date fields sent as `?period=custom&from=…&to=…` (keyboard-usable; a refused
+  range shows a message), and `custom=false` to leave it out. `Period::between`,
+  `Period::weeks` (`12w`), `Period::per`, `Period::is_custom`, `Bucket::Week`: `Trend` sums
+  per ISO week (Monday to Sunday in `APP_TIMEZONE`, labelled by the Monday) on SQLite and
+  PostgreSQL. A new template function `query_fields(…)` writes the page's query as hidden
+  inputs. examples/shop's dashboard uses them.
+- **Full-text search (#154):** one API on SQLite FTS5 and PostgreSQL `tsvector` (Laravel
+  Scout's database engine). `#[model(search = "title, body")]` names the searched columns
+  (the first weighs most in the ranking; `search_language = "simple"`, `"spanish"`, … changes
+  the stemming from English); `renox::db::search::migration::<Post>(name)` is the migration
+  that creates the index (an external-content FTS5 table with insert/update/delete triggers,
+  or a generated `search_vector` column with a GIN index) and fills it from existing rows.
+  `Model::search(words)` / `Query::search` give the matches best first, and combine with
+  filters, default scopes, soft deletes and pagination; `Query::where_search` and
+  `Query::order_by_relevance` are the two halves. Every word must match, as a word, a prefix
+  or another form of it; only letters and digits of the input are used, bound as one value,
+  so search syntax in user input is plain text. The database keeps the index current on
+  every write (bulk updates, `insert_many` and raw SQL included, which skip model hooks);
+  `renox::db::search::rebuild::<Post>(&db)` refills it. The data grid's search box uses the
+  index when the grid's model has one (also for columns the grid doesn't show), best match
+  first until the user sorts. `migrate:fresh` drops virtual tables first. New consts
+  `Model::SEARCHABLE` and `Model::SEARCH_LANGUAGE` (with defaults). Guide: docs/search.md;
+  examples/relations' blog search uses it.
 - **Live pages (#151):** three additions around the notification bell.
   - `rnx new my-app --notifications`: the plain app with `Auth::new().notifications()` and
     the kit's `notification_bell` in its layout's bar, and a test for it (the starter kit
