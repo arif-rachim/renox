@@ -1574,6 +1574,9 @@ Notes from M34:
 
 ### Plugins (separate crates, after M18)
 - [x] `renox-2fa` (TOTP and recovery codes): #146 (#169–#173), docs/two-factor.md
+- [x] `renox-editors` (rich text, Markdown and code editors, `code_entry`): #149, #150,
+  docs/editors.md; the kit's entries got `prefix_actions`/`suffix_actions` and modules
+  `Registry::asset` with it
 - [ ] `renox-oauth` (social login), `renox-admin` (resource tables and forms); billing later
 
 ### v1.0

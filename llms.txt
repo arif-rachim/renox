@@ -232,9 +232,11 @@ Every example has a README.md that walks through it.
   switch, radio → `DbEnum`, checkbox list → `Json<Vec<String>>`, time, datetime-local, date)
   on the UI kit (`prefix`/`suffix`, `radio`, `checkbox_list`, `date_picker`, a `copyable` key,
   `tags_input` → `Json<Vec<String>>`, `key_value` → `Json<KeyValues>` (a nested form),
-  `form_grid`, `fieldset`)
+  `form_grid`, `fieldset`; the renox-editors crate's `markdown_editor`, `rich_editor` →
+  `RichText` and `code_editor` → JSON text)
   saved and shown back in the edit form, and read-only on the product page (an infolist:
-  money, number, bool, badges, color swatches, key_value, Markdown, dates, `since`), on
+  money, number, bool, badges, color swatches, key_value, Markdown, rich text with
+  `rich_text`, `code_entry`, entries with `suffix_actions`, dates, `since`), on
   SQLite and PostgreSQL; list items checked
   with `each` + `one_of` and `distinct`; products keyed by `id: Uuid` (a model key other than
   an integer, M22). The mapping table is
@@ -278,7 +280,8 @@ Every example has a README.md that walks through it.
   session, login), the database, jobs, event and notification fakes, HTTP fakes, time travel,
   counting queries, a browser-test recipe.
 - [docs/ui.md](docs/ui.md): components that see the request, the UI kit (`renox/ui.html`: fields,
-  buttons, cards, sheets, menus, tabs, tables, infolists: `infolist`/`entry`/`repeatable`;
+  buttons, cards, sheets, menus, tabs, tables, infolists: `infolist`/`entry`/`repeatable`,
+  buttons beside an entry's value with `prefix_actions`/`suffix_actions`;
   the page's frame: `navbar`/`nav_links`/`nav_link`, `sidebar` + `rx-shell` for back
   offices, `page_header`, `toolbar`, `row_actions`, `list`, `card_grid`/`media_card`,
   `link_tabs`, `thumbnail`, `progress`, `rx-page--fill`: build pages from these, not app CSS;
@@ -289,6 +292,9 @@ Every example has a README.md that walks through it.
   `stats`, `dashboard`, `widget`, `period_filter` with its custom range, `query_fields`), and its
   design rules, toasts (a body, links, a duration, an id, a position, `Renox.toast`), out-of-band
   fragments, htmx headers, live validation.
+- [docs/editors.md](docs/editors.md): the renox-editors crate: `rich_editor` (Trix; read as
+  `RichText`, cleaned with ammonia; shown with `| rich_text`), `markdown_editor` (toolbar and
+  a server-rendered preview), `code_editor` (CodeJar + Prism), `code_entry`; how the files load.
 - [docs/grid.md](docs/grid.md): data grids (`renox::grid` + `renox/grid.html`): columns and their
   kinds, filters per heading, search, filter chips, the advanced filter, preferences (per user
   or in the session), details under a row, editing in place, reordering rows, merged cells,
@@ -345,3 +351,9 @@ Every example has a README.md that walks through it.
   module (`lib.rs`: the second login step, the account card, events to the audit log), its
   pages (`handlers.rs`, `views/`), TOTP (`totp.rs`), recovery codes (`recovery.rs`), the QR
   code (`qr.rs`). Guide: [docs/two-factor.md](docs/two-factor.md); used in examples/teams.
+- `crates/renox-editors`: the optional editors plugin crate (same version as `renox`): the
+  `Editors` module (`lib.rs`: its views, the `rich_text` filter, the Markdown preview route,
+  its files served with `Registry::asset`), `RichText` and `sanitize` (`rich_text.rs`, ammonia),
+  `assets.rs` (URLs and the tags), `views/editors.html` (`rich_editor`, `markdown_editor`,
+  `code_editor`, `code_entry`), `assets/editors.js|css` and the vendored Trix, Prism and CodeJar
+  (`assets/vendor/NOTICE`). Guide: [docs/editors.md](docs/editors.md); used in examples/fields.

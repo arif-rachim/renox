@@ -975,6 +975,13 @@
 .rx-entry__value:has(> .rx-entry__copy) { flex-wrap: nowrap; }
 .rx-entry__copied { min-width: 0; overflow-wrap: anywhere; }
 .rx-entry__copy svg { width: 16px; height: 16px; }
+/* Buttons beside an entry's value (`prefix_actions`, `suffix_actions`). */
+.rx-entry__actions { display: inline-flex; align-items: center; gap: var(--rx-space-1); flex: none; margin: -4px 0; }
+.rx-entry__action-form { display: contents; }
+.rx-entry--actions > .rx-entry__value { flex-wrap: nowrap; }
+.rx-entry--actions > .rx-entry__value > .rx-entry__copied,
+.rx-entry--actions > .rx-entry__value > .rx-entry__items,
+.rx-entry--actions > .rx-entry__value > .rx-link { min-width: 0; }
 @media (pointer: coarse) { .rx-entry__copy { width: var(--rx-target); height: var(--rx-target); margin: -10px 0; } }
 .rx-entry__pairs { flex-basis: 100%; background: transparent; }
 .rx-entry__pairs th { text-align: left; font-weight: 500; color: var(--rx-secondary-label); width: 35%; font-size: var(--rx-text-subhead); white-space: normal; }

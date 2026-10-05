@@ -347,7 +347,18 @@ part is a macro: you import it into a template, then call it like a function.
   {{ entry("Tags", order.tags, badge=true, limit_list=3) }} {# lists: list="lines" / "bullets" #}
   {% call entry("Customer") %}<a href="{{ route('customers.show', order.customer_id) }}">{{ order.customer }}</a>{% endcall %}
   {% call(line) repeatable("Items", order.lines, columns=3) %}{{ entry("Product", line.name) }}{% endcall %}
+  {# Buttons beside a value: url (a link), action (a posted form, method="DELETE"…) or attrs (htmx) #}
+  {{ entry("Email", user.email, suffix_actions=[{"label": "Edit", "icon": "edit", "url": route('users.edit', user.id)}]) }}
 {% endcall %}
+
+{# Rich text, Markdown and code editors, and a code entry: the renox-editors crate,
+   .module(renox_editors::Editors::new()) (docs/editors.md). Each sends a plain field. #}
+{% from "renox-editors/editors.html" import rich_editor, markdown_editor, code_editor, code_entry %}
+{{ rich_editor("body", "Body", value=post.body, required=true) }}   {# HTML: read it as RichText #}
+{{ markdown_editor("notes", "Notes", value=post.notes) }}           {# toolbar + Preview #}
+{{ code_editor("config", "Config", value=post.config, language="json") }}
+{{ post.body | rich_text }}                                         {# stored HTML, cleaned again #}
+{{ code_entry("Payload", call.payload, language="json") }}          {# in an infolist: coloured, copyable #}
 {# Your own: rnx make:component price_tag -> components/price_tag.html, a macro that can use
    old(), error(), t(), can(), auth, csrf_field() like the page. rnx make:component --ui copies
    the kit into the app. {% if once('x') %} renders once per page.

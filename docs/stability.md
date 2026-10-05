@@ -59,6 +59,13 @@ release of Renox.
 it. You add it yourself, next to `renox`. Its public items (the module, its events, the
 `TwoFactorCredential` model, `totp`, `recovery` and `qr`) follow the same promise as Renox's.
 
+`renox-editors` is another optional plugin crate: rich text, Markdown and code editor fields
+and a code entry ([editors.md](editors.md)), at the same version as `renox`. Its public items
+(the `Editors` module, `RichText`, `sanitize`, the library version constants) and its
+template macros' arguments follow the same promise. Which tags `sanitize` keeps may shrink in
+any release if one turns out to be unsafe; the versions of the bundled JavaScript libraries
+may change in minor releases. It depends publicly on no other crate.
+
 ## The promise
 
 From 1.0.0, every 1.x release keeps these promises.
