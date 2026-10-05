@@ -9,6 +9,7 @@ mod actions;
 mod api_foundations;
 mod assertion_messages;
 mod auth;
+mod auth_edges;
 mod auth_email;
 mod authorization;
 mod background;
