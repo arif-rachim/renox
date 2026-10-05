@@ -130,7 +130,9 @@ fn with_notifications(file: &str, contents: &str) -> String {
         "tests/home.rs" => &[("", NOTIFICATIONS_TEST)],
         _ => &[],
     };
-    let mut contents = contents.to_owned();
+    // A checkout with CRLF endings (Git on Windows) compiles the stubs in
+    // with them; the edits look for `\n`.
+    let mut contents = contents.replace("\r\n", "\n");
     for (old, new) in edits {
         if old.is_empty() {
             contents.push_str(new);
@@ -589,6 +591,18 @@ mod tests {
         assert!(root.join("src/app/users/mod.rs").is_file());
         let tests = fs::read_to_string(root.join("tests/home.rs")).unwrap();
         assert!(tests.contains("use desk::roles"), "{tests}");
+    }
+
+    #[test]
+    fn notifications_edit_stubs_checked_out_with_crlf() {
+        // Git on Windows checks the stubs out with CRLF endings (#151's
+        // edits failed there).
+        let lib = "fn app() {\r\n        .module(renox::auth::Auth::new().account()) // login, register, /account\r\n}\r\n";
+        let edited = with_notifications("src/lib.rs", lib);
+        assert!(
+            edited.contains(".module(renox::auth::Auth::new().account().notifications())\n"),
+            "{edited}"
+        );
     }
 
     #[test]
