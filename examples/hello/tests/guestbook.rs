@@ -195,3 +195,29 @@ async fn htmx_gets_the_new_list_and_an_event() {
         .assert_see("Back again")
         .assert_dont_see("<html");
 }
+
+/// `embedded!()` walks resources/views (nested), resources/lang and public,
+/// so a release build carries every file (#258).
+#[test]
+fn the_release_build_embeds_every_resource() {
+    let embedded = renox::embedded!();
+    let views: Vec<&str> = embedded.views.iter().map(|(name, _)| *name).collect();
+    assert!(views.contains(&"layouts/app.html"), "{views:?}");
+    assert!(
+        views.iter().any(|v| v.starts_with("guestbook/")),
+        "{views:?}"
+    );
+    let lang: Vec<&str> = embedded.lang.iter().map(|(name, _)| *name).collect();
+    assert_eq!(lang, ["en.json", "es.json"]);
+    assert!(
+        embedded
+            .public
+            .iter()
+            .any(|(name, bytes)| *name == "app.css" && !bytes.is_empty())
+    );
+    assert!(
+        views
+            .iter()
+            .all(|v| !v.split('/').any(|part| part.starts_with('.')))
+    );
+}

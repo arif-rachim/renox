@@ -261,5 +261,135 @@ pub struct CheatSheet;
 /// ```
 /// let _ = renox::migrations!("tests/migrations_types");
 /// ```
+///
+/// A migration needs a plain `.up.sql`, or one for each database (here only
+/// `.sqlite.up.sql`):
+/// ```compile_fail
+/// let _ = renox::migrations!("tests/migrations_sqlite_only");
+/// ```
+///
+/// `embedded!()` takes no arguments:
+/// ```compile_fail
+/// let _ = renox::embedded!("resources");
+/// ```
+///
+/// `Model` is derived for structs with named fields:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model)]
+/// enum NotAModel { A }
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model)]
+/// struct Tuple(i64, String);
+/// ```
+///
+/// A field takes only `#[model(skip)]`:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model)]
+/// struct Post { id: i64, #[model(hidden)] title: String }
+/// ```
+/// …and a skipped field anywhere is fine:
+/// ```
+/// # use renox::prelude::*;
+/// #[derive(Model)]
+/// struct Post { id: i64, #[model(skip)] cached: String, title: String }
+/// assert_eq!(Post::COLUMNS, &["id", "title"]);
+/// ```
+///
+/// `search` lists each column once, at least one, and never `id`:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model)]
+/// #[model(search = "title, title")]
+/// struct Post { id: i64, title: String }
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model)]
+/// #[model(search = " , ")]
+/// struct Post { id: i64, title: String }
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model)]
+/// #[model(search = "id")]
+/// struct Post { id: i64, title: String }
+/// ```
+///
+/// `search_language` needs `search`:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(Model)]
+/// #[model(search_language = "simple")]
+/// struct Post { id: i64, title: String }
+/// ```
+///
+/// `Validate` takes `hooks` and `bag` on the struct, nothing else:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(serde::Deserialize, Validate)]
+/// #[validate(strict)]
+/// struct Form { name: String }
+/// ```
+/// …and needs named fields:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(serde::Deserialize, Validate)]
+/// struct Form(String);
+/// ```
+/// `rename` is `rename = "field"`, and `each` a list of rules:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(serde::Deserialize, Validate)]
+/// struct Form { #[validate(rename("other"))] name: String }
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(serde::Deserialize, Validate)]
+/// struct Form { #[validate(each = "required")] tags: Vec<String> }
+/// ```
+/// A raw identifier compiles (it's checked as `type`; see `it/derive_validate.rs`):
+/// ```
+/// # use renox::prelude::*;
+/// #[derive(serde::Deserialize, Validate)]
+/// struct Form { #[validate(required)] r#type: String }
+/// ```
+///
+/// `DbEnum` is for enums, each text used once, with `rename` only:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(DbEnum)]
+/// struct NotAnEnum { a: i64 }
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(DbEnum)]
+/// enum Status { Open, #[db(rename = "open")] Opened }
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(DbEnum)]
+/// enum Status { #[db(label = "Open")] Open }
+/// ```
+///
+/// `FromRow` is for plain structs, with `skip` or `rename` only:
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(FromRow)]
+/// struct Row<T> { value: T }
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(FromRow)]
+/// enum Row { A }
+/// ```
+/// ```compile_fail
+/// # use renox::prelude::*;
+/// #[derive(FromRow)]
+/// struct Row { #[row(default)] value: i64 }
+/// ```
 #[cfg(doctest)]
 pub struct MacroCompileErrors;

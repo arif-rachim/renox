@@ -235,3 +235,23 @@ async fn without_detect_locale_the_header_is_ignored() {
             .is_none_or(|v| !v.contains("Accept-Language"))
     );
 }
+
+/// A raw identifier field is checked (and named in errors) as its plain name.
+#[derive(serde::Deserialize, Validate)]
+struct Kind {
+    #[validate(required)]
+    r#type: String,
+}
+
+#[renox::test]
+async fn raw_identifiers_are_validated_under_their_plain_name() {
+    let app = TestApp::new(App::new()).await;
+    let errors = Validator::rules_of(&Kind {
+        r#type: String::new(),
+    })
+    .finish(app.db())
+    .await
+    .unwrap();
+    assert!(errors.has("type"), "{errors:?}");
+    assert!(!errors.has("r#type"));
+}
