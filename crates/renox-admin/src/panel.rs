@@ -540,13 +540,14 @@ fn done(htmx: &Htmx, toast: Toast, to: &str) -> Response {
 
 /// Reads and checks the form, after the user was let in: `Valid<T>`'s
 /// answer (errors, or a live-validation reply) when it isn't valid.
-async fn read_form<F>(state: &AppState, req: Request) -> std::result::Result<F, Response>
+async fn read_form<F>(state: &AppState, req: Request) -> std::result::Result<F, Box<Response>>
 where
     F: serde::de::DeserializeOwned + Validate + Send,
 {
     Valid::<F>::from_request(req, state)
         .await
         .map(|Valid(form)| form)
+        .map_err(Box::new)
 }
 
 async fn dashboard(
@@ -660,7 +661,7 @@ async fn store<R: AdminResource>(
     cx.authorize(&user, "create", None)?;
     let form: R::Form = match read_form(&state, req).await {
         Ok(form) => form,
-        Err(answer) => return Ok(answer),
+        Err(answer) => return Ok(*answer),
     };
     let rules = cx.rules(&form, None);
     check(&state.db, rules).await?;
@@ -774,7 +775,7 @@ async fn update<R: AdminResource>(
     cx.authorize(&user, "update", Some(&record))?;
     let form: R::Form = match read_form(&state, req).await {
         Ok(form) => form,
-        Err(answer) => return Ok(answer),
+        Err(answer) => return Ok(*answer),
     };
     let rules = cx.rules(&form, Some(&record));
     check(&state.db, rules).await?;

@@ -198,7 +198,13 @@ async fn entries_carry_actions_beside_their_value() {
     }
     let path = dir.path().to_path_buf();
     let app = TestApp::with_config(App::new().module(Actions), move |c| c.views_path = path).await;
-    let html = app.get("/actions").await.assert_ok().text();
+    // Git on Windows checks the kit out with CRLF line endings.
+    let html = app
+        .get("/actions")
+        .await
+        .assert_ok()
+        .text()
+        .replace("\r\n", "\n");
     let has = |needle: &str| assert!(html.contains(needle), "missing {needle}\n{html}");
     has(r#"<div class="rx-entry rx-entry--actions">"#);
     has(r#"<span class="rx-entry__actions rx-entry__actions--prefix">"#);

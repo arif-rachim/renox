@@ -342,7 +342,7 @@ async fn password_check(
     state: &AppState,
     user: &User,
     req: axum::extract::Request,
-) -> std::result::Result<PasswordCheck, Response> {
+) -> std::result::Result<PasswordCheck, Box<Response>> {
     let has_password = user.has_password();
     crate::validation::extract::validate_request(req, state, move |form: &PasswordCheck, _, v| {
         if has_password {
@@ -354,6 +354,7 @@ async fn password_check(
     })
     .await
     .map(|(form, _)| form)
+    .map_err(Box::new)
 }
 
 async fn update_password(
@@ -421,7 +422,7 @@ async fn logout_others(
     }
     let form = match password_check(&state, user.user(), req).await {
         Ok(form) => form,
-        Err(rejection) => return Ok(rejection),
+        Err(rejection) => return Ok(*rejection),
     };
     check_typed(user.user(), &form.password, "password", &lang).await?;
     logout_other_devices(&state.db, &session, user.user()).await?;
@@ -443,7 +444,7 @@ async fn destroy(
     }
     let form = match password_check(&state, user.user(), req).await {
         Ok(form) => form,
-        Err(rejection) => return Ok(rejection),
+        Err(rejection) => return Ok(*rejection),
     };
     check_typed(user.user(), &form.password, "password", &lang).await?;
     user.delete_account(&state.db).await?;
