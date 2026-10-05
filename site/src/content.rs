@@ -185,6 +185,14 @@ pub static PAGES: &[Page] = &[
         "Editor fields for formatted text, Markdown and code, with the renox-editors crate."
     ),
     page!(
+        "admin",
+        "Admin panel",
+        Guides,
+        "panel-left",
+        "docs/admin.md",
+        "A back office generated from your models, with the renox-admin crate."
+    ),
+    page!(
         "queue",
         "The queue",
         Guides,

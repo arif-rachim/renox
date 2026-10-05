@@ -106,8 +106,9 @@ The grid's own options:
 - `.sort_by("-ordered_on")` sets the order before the user sorts. Give a column key, with `-` in
   front for descending (biggest or newest first). You can give several keys, separated by
   commas: `"region,city,-total"`. When two rows tie, `id` always decides.
-- `grid.id()` and `grid.columns()` read the definition back. For one column, `column.key()` and
-  `column.kind()` (a `Kind`) do the same.
+- `grid.id()` and `grid.columns()` read the definition back. For one column, `column.key()`,
+  `column.label()`, `column.kind()` (a `Kind`) and `column.options()` (a select's or tags'
+  choices) do the same.
 
 ## The handler
 

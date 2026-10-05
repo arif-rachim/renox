@@ -1284,7 +1284,10 @@ Details: [operations.md](operations.md).
 
 ## Filament → the UI kit and the grid
 
-Filament's panels are declared at run time. In Renox, they are generated once and then edited:
+Filament's panels are declared at run time. In Renox there are two ways. The `renox-admin`
+crate does the same: a resource declares its grid columns, its form fields and its policy
+once, and the panel gives it a list, forms, a view page, filters, bulk actions and exports
+([admin.md](admin.md), `examples/admin`). Or the pages are generated once and then edited:
 `rnx make:module orders --resource --fields "…"` writes the model, form, pages and tests on the
 kit. `examples/backoffice` is built the way Filament's demo is.
 
@@ -1342,6 +1345,7 @@ address, loads that page of orders, and passes it to the template.
 | Notifications | `Toast` and the `notification_bell` over Server-Sent Events |
 | Widgets | `stat`/`stats`, `chart(…)`, `renox::chart::Trend` |
 | Panel navigation | `navbar`, `sidebar` + `rx-shell`, `page_header` |
+| Resources (`ProductResource`), policies, `DeleteBulkAction`, `TrashedFilter` | `impl AdminResource` with the `renox-admin` crate: columns, fields, `filters`, `actions`, the model's `Policy`, soft deletes ([admin.md](admin.md)) |
 
 Details: [ui.md](ui.md) and [grid.md](grid.md).
 
@@ -1504,4 +1508,5 @@ a warning before that. Store ids in the session, not whole objects, or use
   [scheduling](scheduling.md), [ui](ui.md), [grid](grid.md), [testing](testing.md),
   [operations](operations.md), [PostgreSQL](postgresql.md).
 - The examples ([llms.txt](../llms.txt) says which shows what): `crud` is the reference CRUD
-  module, `shop` a whole shop, `backoffice` the Filament-style admin.
+  module, `shop` a whole shop, `backoffice` the Filament-style admin, `admin` a panel made by
+  `renox-admin`.

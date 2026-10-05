@@ -161,7 +161,7 @@ pub use upload::Upload;
 pub use validation::{Errors, KeyValues, Valid, Validate, ValidationError, Validator};
 pub(crate) use view::Views;
 pub use view::{View, view};
-pub use view_filters::{format_money, format_number};
+pub use view_filters::{currency_decimals, format_money, format_number};
 
 pub use minijinja::context;
 

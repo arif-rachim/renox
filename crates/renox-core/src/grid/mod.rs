@@ -508,6 +508,17 @@ impl Column {
     pub fn kind(&self) -> Kind {
         self.kind
     }
+
+    /// The column's heading.
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    /// The `(value, label)` choices of a `select` or `tags` column (empty
+    /// for the other kinds).
+    pub fn options(&self) -> &[(String, String)] {
+        &self.options
+    }
 }
 
 /// A data grid's definition: its columns and defaults. Cheap to build, so
@@ -1944,9 +1955,16 @@ impl<S: Send + Sync> FromRequestParts<S> for GridRequest {
         .ok()
         .flatten();
         let lang = crate::Lang::from_request_parts(parts, state).await.ok();
+        // The whole path: inside a `Routes::group` the router sees it
+        // without the group's prefix, and the grid's links need it all.
+        let path = parts
+            .extensions
+            .get::<axum::extract::OriginalUri>()
+            .map_or_else(|| parts.uri.path(), |original| original.0.path())
+            .to_owned();
         Ok(Self {
             params,
-            path: parts.uri.path().to_owned(),
+            path,
             db: app.db.clone(),
             session,
             user_id: user.map(|u| u.id),

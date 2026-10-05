@@ -73,6 +73,14 @@ events) follow the same promise. `Profile`, `Token`, `TokenRequest` and the even
 `#[non_exhaustive]`; `Provider` may get new methods with default bodies in minor releases. The
 endpoints and scopes Google and GitHub use may change when the providers change them.
 
+`renox-admin` is the optional admin panel plugin crate ([admin.md](admin.md)), at the same
+version as `renox`. Its public items (the `Admin` module, the `AdminResource` trait, `Field`,
+`FieldKind`, `Entry`, `Filter`, `AdminAction`, `ActionContext`) follow the same promise.
+`Field`, `FieldKind`, `Entry` and `ActionContext` are `#[non_exhaustive]`; `AdminResource` may
+get new methods with default bodies in minor releases. The templates' markup and the values
+they receive may change in minor releases; an app that replaced one keeps its own. It
+depends publicly on `renox` (its grid's `Column` and `Grid`, `Query`, `Validator`).
+
 ## The promise
 
 From 1.0.0, every 1.x release keeps these promises.

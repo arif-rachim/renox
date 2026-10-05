@@ -1093,6 +1093,13 @@ the template, `column.key == "_details"`), `Column::editable()` + `.edit_url("/o
 `Column::related(key, label, table, foreign_key, column)`, `Column::count_of(…)`, `Column::sum_of(…)`,
 `.advanced_filter()`, `.remember()`, `.poll(30)`.
 
+A whole admin panel over your models (Filament's resources): the `renox-admin` crate,
+`.module(Admin::new().authorize(|user| user.has_role("staff")).resource(ProductResource))`
+with `impl AdminResource for ProductResource` (`type Model`, `type Form`, `columns()` as
+above, `fields()` with `Field::text`/`select`/`money`/`belongs_to`…, `fill`), and the model's
+`Policy` asked for `viewAny`, `create`, `update`, `delete`… ([docs/admin.md](docs/admin.md),
+examples/admin).
+
 ## Seeders and factories
 
 A factory makes models filled with fake data. A seeder uses it to fill the database with

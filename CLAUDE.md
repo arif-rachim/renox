@@ -10,7 +10,7 @@ repo, and every trap hit so far, so you don't have to rediscover them.
 - `CONTRIBUTING.md`: the checks every change needs. `SECURITY.md`: how vulnerabilities are reported.
   `RELEASING.md`: how a release goes to crates.io (the owner publishes).
 - `CHEATSHEET.md` and `llms.txt`: the app author's view (patterns, and which example shows what).
-- `docs/*.md`: guides (routing, validation, types, relations, authorization, queue, mail, scheduling, ui, grid, testing, PostgreSQL, operations, development, stability, and the plugins: two-factor, editors, oauth).
+- `docs/*.md`: guides (routing, validation, types, relations, authorization, queue, mail, scheduling, ui, grid, testing, PostgreSQL, operations, development, stability, and the plugins: two-factor, editors, oauth, admin).
 - `docs/audit/`: the pre-1.0 audit (finding IDs W*, D*, A* used in ROADMAP M13/M14).
 
 ## 1. What Renox is
@@ -253,6 +253,21 @@ crates/renox-oauth/        the social login plugin (#147): OAuth module (lib.rs:
                            model.rs (OAuthAccount, `oauth_accounts`, prefix 00010101000800,
                            no tokens stored); its own tests/ on FakeHttp; guide docs/oauth.md
                            (doctested from lib.rs `Guide`)
+crates/renox-admin/        the admin panel plugin (#148, Filament's resources): Admin module
+                           (lib.rs: path, title, authorize/gate, resources; views registered
+                           in `templates` unless the app has a file of the name),
+                           resource.rs (AdminResource trait: Model + Policy + Default, Form:
+                           Validate + Serialize, columns/fields/fill/rules/entries/filters/
+                           actions/query/grid/allows; AdminAction, ActionContext, Filter,
+                           BoxFuture), field.rs (Field, FieldKind), entry.rs (Entry),
+                           panel.rs (routes `admin.{slug}.*` in a Routes::group, generic
+                           handlers behind `Extension(Ctx<R>)`; the panel's gate then the
+                           resource's `allows` before `Valid<T>` is read; bulk/row actions
+                           with the built-ins delete/restore/force-delete; the trash is
+                           `?filter=trashed`), views/ (renox-admin/layout, dashboard, index,
+                           form, fields, show; renox-admin/{slug}/cells.html from the app for
+                           custom columns); its own tests/ (+ tests/migrations); guide
+                           docs/admin.md (doctested from lib.rs `Guide`)
 crates/renox-cli/          `rnx`: main.rs (key:generate, forwarding), new.rs, serve.rs, make.rs +
                            generate.rs (make:*), scaffold.rs (make:module --resource --fields),
                            deploy.rs (build, make:deploy), tailwind.rs (the pinned
@@ -297,6 +312,9 @@ examples/                  workspace members, each with a README.md and its own 
                            team pages on their own host (Routes::domain), a wizard with a
                            repeater, a datalist; renox-2fa and renox-oauth (Google/GitHub when
                            their *_CLIENT_ID/_SECRET are set)
+  admin/                   an admin panel made by renox-admin from three models (products with
+                           soft deletes, categories, customers), two roles, an app-drawn
+                           custom column (resources/views/renox-admin/products/cells.html)
 site/                      the documentation site (package `renox-site`, publish = false): a Renox
                            app that compiles the repo's Markdown in (src/content.rs lists the
                            pages, src/render.rs: pulldown-cmark, anchors, TOC, hidden doctest
@@ -344,6 +362,7 @@ docs/authorization.md      gates, policies, roles/permissions, token abilities, 
                            second login step, logging in another way (doctest
                            `AuthorizationGuide`)
 docs/oauth.md              social login with renox-oauth (doctest: renox-oauth's `Guide`)
+docs/admin.md              the admin panel with renox-admin (doctest: renox-admin's `Guide`)
 docs/queue.md              jobs, retries, priority, unique, middleware, chains, batches (doctest
                            `QueueGuide`)
 docs/postgresql.md         PostgreSQL guide for app authors
@@ -1225,8 +1244,19 @@ picks the build, not the terminal.
   `password`: the account page lets them set one and asks them for a recent confirmation
   instead of a password), and the login/register/confirm pages'
   `{% include "renox/auth/login_options.html" ignore missing %}`.
-- **Still open** (ROADMAP `- [ ]`): the plugins (`renox-admin`, a separate crate;
-  `renox-2fa` (#146) and `renox-oauth` (#147) are done). A Laravel gap review after M25 (in the
+- **#148, `renox-admin`** (the admin panel: `Admin::new().authorize(…).resource(…)`,
+  `impl AdminResource` with grid columns, form fields, filters, actions and the model's
+  `Policy`; lists, forms, view pages, the trash, exports; examples/admin): branch
+  `ccr-f926b004-17j95n`. It added to renox-core `Column::label`/`options` and
+  `renox::currency_decimals`, and fixed `GridRequest`'s path inside a `Routes::group`
+  (axum's nesting strips the prefix from `uri.path()`; it reads `OriginalUri` now, so a
+  grid's form, links and exports keep `/admin/products`). Other code that reads
+  `uri().path()` in a nested route sees the shorter path too (`FormContext::path`; signed
+  URLs checked inside a group are worth a test).
+  Template context keys named like a request global (`can`, `auth`, `errors`…) are hidden
+  by the global (`merge_maps`, the last map wins): the panel passes `allowed`, not `can`.
+- **Still open** (ROADMAP `- [ ]`): billing later; the plugins `renox-2fa` (#146),
+  `renox-oauth` (#147) and `renox-admin` (#148) are done. A Laravel gap review after M25 (in the
   conversation that planned M26) ranked them: release and docs first, then 2FA and social
   login, then small adds (validation rules like `json`/`gt`/`decimal`/`dimensions`, several
   storage disks, route model binding), then admin, search, realtime (SSE) and billing.

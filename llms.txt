@@ -139,6 +139,17 @@ Every example has a README.md that walks through it.
   [staff.rs](examples/backoffice/src/app/staff.rs),
   [layouts/app.html](examples/backoffice/resources/views/layouts/app.html),
   [tests/backoffice.rs](examples/backoffice/tests/backoffice.rs)
+- [examples/admin](examples/admin) ([README](examples/admin/README.md)): an admin panel made by
+  the `renox-admin` crate from three models, with no page written by hand: each resource
+  declares its grid columns (`Column::related`, `count_of`, a `custom` column drawn by the
+  app's `renox-admin/products/cells.html`), its form fields (`Field::belongs_to`, `money`,
+  `toggle`, `date`, …), a record-aware unique rule (`rules` with `.ignore(id)`), named
+  filters as tabs, `AdminAction`s ("Publish", also a row action), soft deletes with the
+  trash, and its model's `Policy` over two roles (the `Permissions` module).
+  [lib.rs](examples/admin/src/lib.rs),
+  [resources/products.rs](examples/admin/src/resources/products.rs),
+  [resources/customers.rs](examples/admin/src/resources/customers.rs),
+  [tests/admin.rs](examples/admin/tests/admin.rs)
 - [examples/relations](examples/relations) ([README](examples/relations/README.md)): relations on a blog: belongs to, has many, many to many through a
   pivot (`Pivot::sync` from checkboxes, `inverse()`) with pivot columns (a pinned flag and
   timestamps: `attach_with`, `update_pivot`, `load_with_pivot`), a page loaded without N+1
@@ -298,6 +309,10 @@ Every example has a README.md that walks through it.
   `stats`, `dashboard`, `widget`, `period_filter` with its custom range, `query_fields`), and its
   design rules, toasts (a body, links, a duration, an id, a position, `Renox.toast`), out-of-band
   fragments, htmx headers, live validation.
+- [docs/admin.md](docs/admin.md): the renox-admin crate: `Admin` (path, title, `authorize`),
+  `impl AdminResource` (columns, fields, `fill`, `rules`, `entries`, `filters`, `actions`,
+  `query`, `grid`, `allows`), the abilities the model's `Policy` is asked, soft deletes and
+  the trash, exports, the routes `admin.{slug}.*`, replacing the panel's templates.
 - [docs/editors.md](docs/editors.md): the renox-editors crate: `rich_editor` (Trix; read as
   `RichText`, cleaned with ammonia; shown with `| rich_text`), `markdown_editor` (toolbar and
   a server-rendered preview), `code_editor` (CodeJar + Prism), `code_entry`; how the files load.
@@ -370,3 +385,12 @@ Every example has a README.md that walks through it.
   (`provider.rs`), `google.rs`, `github.rs`, `OAuthAccount` (`model.rs`, `oauth_accounts`).
   Logs in through `renox::auth::sign_in` / `register_verified` / `confirm_identity`
   (renox-core `auth/external.rs`). Guide: [docs/oauth.md](docs/oauth.md); used in examples/teams.
+- `crates/renox-admin`: the optional admin panel plugin crate (same version as `renox`),
+  Filament's resources: the `Admin` module (`lib.rs`: path, title, `authorize`/`gate`, the
+  views registered unless the app has a file of the name), the `AdminResource` trait with
+  `AdminAction`, `ActionContext`, `Filter` (`resource.rs`), `Field`/`FieldKind` (`field.rs`),
+  `Entry` (`entry.rs`), the routes and pages (`panel.rs`: dashboard, list with exports and
+  bulk/row actions, create/store, show, edit/update, destroy, the trash; every page asks the
+  model's `Policy`), `views/` (`renox-admin/layout.html`, `dashboard.html`, `index.html`,
+  `form.html`, `fields.html`, `show.html`). Guide: [docs/admin.md](docs/admin.md); used in
+  examples/admin.

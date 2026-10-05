@@ -1,0 +1,31 @@
+{#- A record's view page (renox-admin/show.html): its entries in the kit's
+    infolist, with Edit and Delete (or Restore for a deleted record). -#}
+{% extends "renox-admin/layout.html" %}
+{% from "renox/ui.html" import page_header, card, infolist, entry, link_button, confirm, button, alert %}
+
+{% block title %}{{ title }} · {{ admin.title }}{% endblock %}
+
+{% block content %}
+{% call page_header(title, back=resource.index_url, back_label=resource.plural_label, badge=("Deleted" if deleted else none), badge_kind="error") %}
+  {%- if allowed.update %}{{ link_button(edit_url, "Edit", variant="primary", icon="edit", key="e") }}{% endif %}
+  {%- if allowed.restore %}
+  <form method="post" action="{{ restore_url }}">{{ csrf_field() }}{{ button("Restore", variant="secondary", icon="refresh") }}</form>
+  {%- endif %}
+  {%- if allowed.delete %}
+  {{ confirm("rx-admin-delete", "Delete", url, "Delete this " ~ (resource.label | lower) ~ "?", ("It goes to the trash, where it can be restored." if soft else "This can't be undone."), icon="trash") }}
+  {%- endif %}
+  {%- if allowed.force_delete %}
+  {{ confirm("rx-admin-force-delete", "Delete for good", force_delete_url, "Delete this " ~ (resource.label | lower) ~ " for good?", "This can't be undone.", method="POST", icon="trash") }}
+  {%- endif %}
+{% endcall %}
+{%- if deleted %}{{ alert("This " ~ (resource.label | lower) ~ " is in the trash.", kind="warning") }}{% endif %}
+{% call card() %}
+  {% call infolist(columns=2) %}
+    {%- for e in entries %}
+    {%- set value = record[e.key] if record[e.key] is defined else none %}
+    {%- if e.format == "money" and value is number %}{% set value = value / admin.money_divisor %}{% endif %}
+    {{ entry(e.label, value, format=e.format, badge=(true if e.badge else none), labels=(e.labels if e.labels else none), copyable=e.copyable, span=e.span) }}
+    {%- endfor %}
+  {% endcall %}
+{% endcall %}
+{% endblock %}

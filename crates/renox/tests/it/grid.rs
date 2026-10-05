@@ -72,6 +72,8 @@ impl Module for Orders {
             .get("/orders", index)
             .get("/totals", totals)
             .get("/exports", exports)
+            // A grid in a group: its links keep the group's prefix.
+            .group("/back", "back.", Routes::new().get("/exports", exports))
     }
 }
 
@@ -400,6 +402,24 @@ async fn the_macro_draws_headings_cells_and_controls() {
     app.get("/orders?q.number=nothing")
         .await
         .assert_see("Nothing matches these filters.");
+}
+
+#[renox::test]
+async fn a_grid_in_a_group_links_to_its_whole_path() {
+    let (app, _views) = app().await;
+    let html = app
+        .get("/back/exports?sort=-total")
+        .await
+        .assert_ok()
+        .text();
+    // The form and the export menu point at /back/exports, not /exports
+    // (which the router sees inside the group).
+    assert!(
+        html.contains(r#"method="get" action="/back/exports""#),
+        "{html}"
+    );
+    assert!(html.contains("/back/exports?"), "{html}");
+    assert!(!html.contains(r#"action="/exports""#), "{html}");
 }
 
 #[renox::test]

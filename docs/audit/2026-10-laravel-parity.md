@@ -46,7 +46,8 @@ all of the first kind:
   `make:module --resource --fields` and `examples/backoffice` already give what Filament's
   panels give, except that pages are written (or generated once) instead of declared as a
   "resource" at run time. A plugin that turns a model into a whole admin section is still
-  a convenience worth having, but it is no longer a gap that blocks an admin app.
+  a convenience worth having, but it is no longer a gap that blocks an admin app. (Done
+  since: `renox-admin`, #148.)
 
 ## Changes since the September review
 
@@ -263,7 +264,7 @@ New rows:
 |---|---|---|---|---|---|
 | Components that see the request | `<x-input>` with `old()`, `$errors` | imported macros see `old`, `error`, `t`, `csrf_field`, `auth`, `request` (`RequestGlobal`) | ✅ | – | M21b |
 | UI kit and `make:component` | Flux, Filament, Breeze | the kit (`renox/ui.html`, 64 macros), `make:component`, `ui:publish` | ✅ | – | M21b, post-M28, M30 |
-| Admin / CRUD scaffolding | Filament, Nova | `make:module --resource --fields`, the grid, the kit, `examples/backoffice` | 🟡 | Min | M21c, M27–M30 |
+| Admin / CRUD scaffolding | Filament, Nova | the `renox-admin` crate (resources declared once), `make:module --resource --fields`, the grid, the kit, `examples/backoffice` | ✅ | – | M21c, M27–M30, #148 |
 | Toasts over htmx | Filament notifications | `Toast` (body, actions, duration, id, position), `Renox.toast` | ✅ | – | M21b, post-M28 (#96) |
 | `@push`/`@stack`/`@once` | yes | `push`, `prepend`, `stack`, `once` | ✅ | – | M21e |
 | Error pages in the app layout | full context | `errors/{status}.html` with the page globals and `App::share` values | ✅ | – | M21d, M21h |
@@ -286,7 +287,7 @@ New rows (Filament as the yardstick):
 | Widgets | stats, charts | `stat`/`stats`/`dashboard`/`widget`/`period_filter`, `chart(…)` (SVG, no library), `renox::chart` (`Period`, `Trend`, `Series`) | ✅ | – | post-M28 (#97) |
 | Panel navigation | panels | `navbar`, `sidebar` + `rx-shell`, `page_header`, `toolbar`, `link_tabs`, `list`, `card_grid` | ✅ | – | M30 |
 | Themes | themes, colours | warm default, `data-rx-theme="classic"`, `--rx-*` tokens and type scale, bundled Inter/Poppins | ✅ | – | M31 |
-| Resources declared at run time | `Resource` classes | pages are generated once (`make:module --resource`) and edited | 🟡 | Min | plugin `renox-admin` |
+| Resources declared at run time | `Resource` classes | `renox-admin`: `impl AdminResource` (columns, fields, filters, actions, the model's policy), or pages generated once (`make:module --resource`) and edited | ✅ | – | #148 |
 | Global search | yes | none | ❌ | Min | open |
 | Demo app | Filament demo | `examples/backoffice` (invoices, stock ledger, payments, import, exports, roles, activity log) | ✅ | – | M29b |
 
@@ -333,8 +334,9 @@ New rows:
    routes, `current_password`, the breach check, several mailers and failover, session
    `keep`/`now`, error bags, `has_many_through`). Left, all minor: polymorphic many-to-many;
    a row stream; cache tags; queued listeners; Slack/SMS channels; HTTP API mail drivers.
-5. **Admin (Min):** `renox-admin`, a resource declared at run time over the grid and kit;
-   global search; rich text/Markdown/code editors as plugins.
+5. **Admin (Min):** `renox-admin`, a resource declared at run time over the grid and kit.
+   Done (#148): docs/admin.md. Left: global search; rich text/Markdown/code editors are
+   done as a plugin (`renox-editors`).
 6. **Search (Maj for some):** a Scout-like full-text interface (SQLite FTS5, PostgreSQL
    `tsvector`, an external engine).
 7. **Realtime (Min–Maj):** general SSE broadcasting from the notification `Hub` pattern
@@ -358,8 +360,8 @@ In the order the owner ranked the open work (CLAUDE.md §7, "Still open"):
 3. **Small adds:** done in M33 and M34. What's left is minor and can wait for users to ask:
    polymorphic many-to-many, a row stream, cache tags, queued listeners, HTTP API mail
    drivers.
-4. **Admin:** decide whether `renox-admin` is still worth a crate once the kit, grid and
-   generators are released; global search and editors as plugins.
+4. **Admin:** `renox-admin` done (#148), next to the kit, the grid and the generators;
+   editors done as a plugin (`renox-editors`); global search left.
 5. **Search, realtime, billing:** a search interface over FTS5/`tsvector`; SSE broadcasting
    generalised from `auth::notifications::Hub`; billing last.
 

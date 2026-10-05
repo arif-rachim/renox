@@ -95,8 +95,14 @@ pub fn format_money(amount: f64, code: &str, decimals: Option<u32>, locale: &str
 
 /// The decimals a currency is usually written with: 2 for `USD` or `AED`,
 /// 0 for `IDR` or `JPY`. An amount in the smallest unit is divided by
-/// `10^decimals` to give whole units.
-pub(crate) fn currency_decimals(code: &str) -> u32 {
+/// `10^decimals` to give whole units (as the data grid's `money` columns
+/// do).
+///
+/// ```
+/// assert_eq!(renox::currency_decimals("USD"), 2);
+/// assert_eq!(renox::currency_decimals("IDR"), 0);
+/// ```
+pub fn currency_decimals(code: &str) -> u32 {
     currency(code).1
 }
 

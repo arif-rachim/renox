@@ -1,0 +1,31 @@
+{#- A resource's create and edit page (renox-admin/form.html). Sent with
+    htmx: errors show under their fields (422), a success goes back to the
+    list with a toast. Without JavaScript it is a plain form. -#}
+{% extends "renox-admin/layout.html" %}
+{% from "renox/ui.html" import page_header, card, form_grid, form_errors, button, link_button, confirm %}
+{% from "renox-admin/fields.html" import field %}
+
+{% block title %}{{ title }} · {{ admin.title }}{% endblock %}
+
+{% block content %}
+{% call page_header(title, back=resource.index_url, back_label=resource.plural_label) %}
+  {%- if delete %}
+  {{ confirm("rx-admin-delete", "Delete", delete.url, "Delete this " ~ (delete.label | lower) ~ "?", ("It goes to the trash, where it can be restored." if delete.soft else "This can't be undone."), icon="trash") }}
+  {%- endif %}
+{% endcall %}
+<form method="post" action="{{ action }}" hx-post="{{ action }}" hx-swap="none" data-live-validate novalidate>
+  {{ csrf_field() }}{% if method != "POST" %}{{ method_field(method) }}{% endif %}
+  {{ form_errors() }}
+  {% call card() %}
+    {% call form_grid(2) %}
+      {%- for f in fields %}
+      {{ field(f, currency=admin.currency) }}
+      {%- endfor %}
+    {% endcall %}
+    <div class="rx-row">
+      {{ button(submit_label, key="mod+s") }}
+      {{ link_button(resource.index_url, "Cancel", variant="plain") }}
+    </div>
+  {% endcall %}
+</form>
+{% endblock %}

@@ -1587,7 +1587,20 @@ Notes from M34:
   `confirm_identity`, `User::has_password` (passwordless users: an empty `password`; the
   account page lets them set one and confirms them another way), and the login pages'
   `renox/auth/login_options.html`; used in examples/teams
-- [ ] `renox-admin` (resource tables and forms); billing later
+- [x] `renox-admin` (resource tables and forms): #148, docs/admin.md;
+  `Admin::new().path(…).title(…).authorize(…)/gate(…).resource(…)`, the `AdminResource`
+  trait (`Model`, `Form`, `label`, `plural_label`, `slug`, `navigation_group`,
+  `record_title`, `columns` → grid `Column`s, `fields` → `Field`s (`text`, `email`,
+  `password`, `url`, `tel`, `textarea`, `number`, `money`, `date`, `datetime`, `select`,
+  `checkbox`, `toggle`, `belongs_to`), `fill`, `rules` (record-aware, e.g.
+  `unique(…).ignore(id)`), `entries` → `Entry`s (the view page), `filters` → `Filter`s
+  (tabs), `actions` → `AdminAction`s (bulk, `.row()`), `query`, `grid`, `allows` (the
+  model's `Policy`: `viewAny`, `view`, `create`, `update`, `delete`, `deleteAny`,
+  `restore(Any)`, `forceDelete(Any)`)), soft deletes with a trash, exports, routes
+  `admin.{slug}.*`, views `renox-admin/*.html` (+ `renox-admin/{slug}/cells.html` for custom
+  columns); examples/admin. In renox-core: `Column::label`/`options`,
+  `renox::currency_decimals`, and `GridRequest` reads the whole path in a `Routes::group`
+- [ ] billing later
 
 ### v1.0
 Started by the owner on 2026-10-03, after M34. In steps, one PR each:
@@ -1873,6 +1886,14 @@ Notes:
   `User::has_password` is false), sets one on `/account` without a current one, and proves who
   they are with a linked provider where others type their password. Provider tokens aren't
   stored: the crate is for logging in, not for calling the providers' APIs.
+- **The admin panel (#148) is declared at run time, without a proc macro:** a resource is a
+  trait impl naming its model and its form type; the form's `Validate` rules check it
+  (`Valid<T>`, run after the panel's authorization), and `fill` copies it into the record.
+  Nobody may open the panel until `Admin::authorize` says who may; inside it, every page and
+  action asks the model's `Policy` with Laravel's ability names, with a blank
+  (`Default`) record for the list-level questions. Pages are the crate's templates, replaced
+  by app files of the same name, rather than generated code: `make:module --resource` stays
+  the way to own the pages.
 
 ## Not planned
 

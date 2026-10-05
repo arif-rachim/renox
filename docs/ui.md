@@ -714,7 +714,7 @@ after a `|`: `{{ order.total | money }}`. The infolist uses them too.
 | Filter | Gives |
 |---|---|
 | `number`, `number(2)` | `75,000` in `en`, `75.000` in `es` or `de`: the page's language picks the separators. |
-| `money` | The amount in `APP_CURRENCY` (default `IDR`): `Rp 75,000` (en), `Rp 75.000` (es), `$1,250.50` with `USD`. Options: `currency="USD"` for another currency, `decimals=0`, `divide_by=100` for amounts stored in cents. `renox::format_money` does the same in Rust. |
+| `money` | The amount in `APP_CURRENCY` (default `IDR`): `Rp 75,000` (en), `Rp 75.000` (es), `$1,250.50` with `USD`. Options: `currency="USD"` for another currency, `decimals=0`, `divide_by=100` for amounts stored in cents. `renox::format_money` does the same in Rust; `renox::currency_decimals("USD")` (2) is a currency's usual decimals. |
 | `date`, `date('%d/%m/%Y %H:%M')` | A date, with chrono's format codes. A moment in time (`created_at`) is shown in `APP_TIMEZONE`. |
 | `since` | "3 hours ago", "in 2 days", "just now" (translated with `ui.since.*`). It uses the clock that `TestApp::travel` moves, so tests can check it. |
 | `words(20)` | The first 20 words, then "…" (change it with `end="…"`). |
