@@ -153,14 +153,14 @@ async fn logging_out_an_older_session_ends_all_of_the_users_sessions() {
     // The other device's session (same user) is over too.
     app.use_session_cookie(other_device);
     app.get("/who").await.assert_see("guest");
-    let revoked: Option<DateTime> =
-        renox::db::sql("SELECT sessions_revoked_at FROM users WHERE id = ?")
-            .bind(ann.id)
-            .scalar_optional(app.db())
-            .await
-            .unwrap()
-            .flatten();
-    assert!(revoked.is_some());
+    let revoked: i64 = renox::db::sql(
+        "SELECT COUNT(*) FROM users WHERE id = ? AND sessions_revoked_at IS NOT NULL",
+    )
+    .bind(ann.id)
+    .scalar(app.db())
+    .await
+    .unwrap();
+    assert_eq!(revoked, 1);
 }
 
 #[renox::test]

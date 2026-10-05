@@ -188,3 +188,45 @@ impl ToDbValue for DbValue {
         self.clone()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    // #254: every variant as JSON (User's extra columns and the grid show
+    // them this way), and the less common ToDbValue impls.
+    #[test]
+    fn every_value_has_a_json_form() {
+        let at = chrono::DateTime::parse_from_rfc3339("2026-10-01T09:30:00Z").unwrap();
+        let local = at.naive_utc();
+        let cases = [
+            (DbValue::Null, json!(null)),
+            (DbValue::Integer(7), json!(7)),
+            (DbValue::Real(1.5), json!(1.5)),
+            (DbValue::Text("a".into()), json!("a")),
+            (DbValue::Blob(vec![1, 2]), json!([1, 2])),
+            (DbValue::Bool(true), json!(true)),
+            (DbValue::DateTime(at), json!("2026-10-01T09:30:00+00:00")),
+            (DbValue::NaiveDateTime(local), json!("2026-10-01T09:30:00")),
+            (DbValue::Date(local.date()), json!("2026-10-01")),
+            (DbValue::Time(local.time()), json!("09:30:00")),
+            (DbValue::Json(json!({"a": 1})), json!({"a": 1})),
+            (
+                DbValue::Encrypted(super::super::encrypted::Unsealed("secret".into())),
+                json!("[encrypted]"),
+            ),
+        ];
+        for (value, expected) in cases {
+            assert_eq!(value.to_json(), expected, "{value:?}");
+        }
+    }
+
+    #[test]
+    fn floats_times_and_bytes_become_values() {
+        assert!(matches!(1.5f32.to_db_value(), DbValue::Real(v) if v == 1.5));
+        let time = chrono::NaiveTime::from_hms_opt(9, 30, 0).unwrap();
+        assert!(matches!(time.to_db_value(), DbValue::Time(t) if t == time));
+        assert!(matches!(vec![1u8, 2].to_db_value(), DbValue::Blob(b) if b == [1, 2]));
+    }
+}
