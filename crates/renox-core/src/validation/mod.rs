@@ -891,36 +891,36 @@ impl Field<'_> {
         self
     }
 
-    /// A date before `limit` (a `NaiveDate`, `NaiveDateTime` or `DateTime`),
-    /// e.g. `.before(today)` for a birth date.
+    /// A date before `limit` (a `NaiveDate`, `NaiveDateTime` or `DateTime`,
+    /// or text such as `"2026-01-01"`), e.g. `.before(today)` for a birth date.
     pub fn before(self, limit: impl FieldValue) -> Self {
-        match limit.inspect() {
-            Inspected::Date(limit) => self.date_rule("before", limit, |d, l| d < l),
-            _ => self,
+        match limit_date(&limit) {
+            Some(limit) => self.date_rule("before", limit, |d, l| d < l),
+            None => self,
         }
     }
 
     /// A date on or before `limit`.
     pub fn before_or_equal(self, limit: impl FieldValue) -> Self {
-        match limit.inspect() {
-            Inspected::Date(limit) => self.date_rule("before_or_equal", limit, |d, l| d <= l),
-            _ => self,
+        match limit_date(&limit) {
+            Some(limit) => self.date_rule("before_or_equal", limit, |d, l| d <= l),
+            None => self,
         }
     }
 
     /// A date after `limit`, e.g. `.after(self.start)` for an end date.
     pub fn after(self, limit: impl FieldValue) -> Self {
-        match limit.inspect() {
-            Inspected::Date(limit) => self.date_rule("after", limit, |d, l| d > l),
-            _ => self,
+        match limit_date(&limit) {
+            Some(limit) => self.date_rule("after", limit, |d, l| d > l),
+            None => self,
         }
     }
 
     /// A date on or after `limit`.
     pub fn after_or_equal(self, limit: impl FieldValue) -> Self {
-        match limit.inspect() {
-            Inspected::Date(limit) => self.date_rule("after_or_equal", limit, |d, l| d >= l),
-            _ => self,
+        match limit_date(&limit) {
+            Some(limit) => self.date_rule("after_or_equal", limit, |d, l| d >= l),
+            None => self,
         }
     }
 
@@ -1787,6 +1787,16 @@ fn decimal_places(text: &str) -> Option<usize> {
         && all_digits(fraction)
         && !(digits.contains('.') && fraction.is_empty()))
     .then_some(fraction.len())
+}
+
+/// The date a date rule compares with: a date value, or text that reads as
+/// one (`"2026-01-01"`). Anything else leaves the rule out.
+fn limit_date(limit: &impl FieldValue) -> Option<NaiveDateTime> {
+    match limit.inspect() {
+        Inspected::Date(date) => Some(date),
+        Inspected::Text(text) => parse_date(text.trim()),
+        _ => None,
+    }
 }
 
 /// The value as a number: a number, or text that reads as a finite one.

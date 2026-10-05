@@ -443,3 +443,18 @@ async fn has_many_through_reaches_grandchildren_in_two_queries() {
     assert_eq!(ids(2), [102]);
     assert!(ids(3).is_empty(), "no customers, no sales");
 }
+
+/// #250: a breach check that can't connect at all (not just an error
+/// status) also lets the password through.
+#[renox::test]
+async fn uncompromised_allows_the_password_when_the_service_cant_be_reached() {
+    let app = TestApp::new(App::new().module(Forms)).await;
+    app.fake_http().on(
+        "https://api.pwnedpasswords.com/*",
+        FakeResponse::connection_error(),
+    );
+    app.htmx()
+        .post("/sign-up", &[("password", "password")])
+        .await
+        .assert_ok();
+}

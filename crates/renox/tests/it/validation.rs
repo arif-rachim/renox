@@ -687,3 +687,319 @@ async fn the_derive_takes_the_new_rules_too() {
         Some("The exact must have 0-2 decimal places.")
     );
 }
+
+/// #250: rules and branches no test had reached.
+#[renox::test]
+async fn the_rules_no_test_had_reached() {
+    use renox::chrono::NaiveDate;
+    use renox::validation::{Dimensions, Password};
+    let oct_1 = NaiveDate::from_ymd_opt(2026, 10, 1).unwrap();
+    let noon = oct_1.and_hms_opt(12, 30, 0).unwrap();
+    let errors = errors_of(|v| {
+        // Dates: on or before, a time in the message, text limits, non-dates.
+        v.field("due", &"2026-10-02").before_or_equal(oct_1);
+        v.field("due_ok", &"2026-10-01").before_or_equal(oct_1);
+        v.field("meet", &"2026-10-01 13:00").before(noon);
+        v.field("ends", &"2026-02-01").before("2026-01-01");
+        v.field("ends_ok", &"2026-02-01")
+            .after_or_equal("2026-02-01");
+        v.field("starts", &"soon").after(oct_1);
+        v.field("unlimited", &"2026-02-01").before("whenever"); // not a date: no rule
+        v.field("logged", &noon).after(noon);
+        // Presence.
+        v.field("vat", &"").required_unless(false);
+        v.field("vat_ok", &"").required_unless(true);
+        v.field("code", &"").required_with(&"+62");
+        v.field("code_ok", &"")
+            .required_with(&Option::<String>::None);
+        v.field("new_email", &"a@b.c").different("email", &"a@b.c");
+        v.field("new_ok", &"a@b.c").different("email", &"x@y.z");
+        v.field("marketing", &true).declined_if(true);
+        v.field("marketing_ok", &true).declined_if(false);
+        v.field("zero_ok", &0).declined();
+        v.field("one", &1).declined();
+        v.field("list", &vec!["yes"]).declined();
+        // Passwords and images.
+        v.field("password", &"12345678")
+            .password(&Password::min(8).letters());
+        v.field("password_ok", &"1234abcd")
+            .password(&Password::min(8).letters());
+        let banner = Some(png(1200, 600));
+        v.field("wide", &banner)
+            .dimensions(&Dimensions::new().max_width(1000));
+        v.field("short", &banner)
+            .dimensions(&Dimensions::new().min_height(700));
+        v.field("tall", &banner)
+            .dimensions(&Dimensions::new().max_height(500));
+        v.field("exact_ok", &banner)
+            .dimensions(&Dimensions::new().width(1200).height(600));
+        v.field("width", &banner)
+            .dimensions(&Dimensions::new().width(100));
+        v.field("height", &banner)
+            .dimensions(&Dimensions::new().height(100));
+        // Patterns that don't compile fail the field (and are logged).
+        v.field("sku", &"A-1").matches("(");
+        v.field("sku2", &"A-1").not_matches("(");
+        // Sizes and comparisons.
+        v.field("flag_ok", &true).min(1); // not measurable: no rule
+        v.field("picked", &vec![1, 2]).gt("offered", &vec![1, 2, 3]);
+        v.field("picked_ok", &vec![1, 2, 3, 4])
+            .gt("offered", &vec![1, 2, 3]);
+        v.field("mixed", &5).gt("offered", &vec![1]);
+        v.field("price", &12.5).decimal(2, 2);
+        v.field("price_ok", &12.25).decimal(2, 2);
+        v.field("pin_ok", &123).digits(3);
+        v.field("pin", &123).digits(4);
+        v.field("range", &12345).digits_between(2, 4);
+        v.field("mac_ok", &"00:1A:2B:3C:4D:5E").mac_address();
+        v.field("mac_dash_ok", &"00-1a-2b-3c-4d-5e").mac_address();
+        // An error no rule covers.
+        v.error("terms", "Read the terms first.");
+    })
+    .await;
+
+    let expect = [
+        (
+            "due",
+            "The due must be a date before or equal to 2026-10-01.",
+        ),
+        ("meet", "The meet must be a date before 2026-10-01 12:30."),
+        ("ends", "The ends must be a date before 2026-01-01."),
+        ("starts", "The starts is not a valid date."),
+        (
+            "logged",
+            "The logged must be a date after 2026-10-01 12:30.",
+        ),
+        ("vat", "The vat field is required."),
+        ("code", "The code field is required."),
+        ("new_email", "The new email and email must be different."),
+        ("marketing", "The marketing must be declined."),
+        ("one", "The one must be declined."),
+        ("list", "The list must be declined."),
+        ("password", "The password must contain at least one letter."),
+        ("wide", "The wide has invalid image dimensions."),
+        ("short", "The short has invalid image dimensions."),
+        ("tall", "The tall has invalid image dimensions."),
+        ("width", "The width has invalid image dimensions."),
+        ("height", "The height has invalid image dimensions."),
+        ("sku", "The sku format is invalid."),
+        ("sku2", "The sku2 format is invalid."),
+        ("picked", "The picked must have more items than offered."),
+        ("mixed", "The mixed must be greater than offered."),
+        ("price", "The price must have 2 decimal places."),
+        ("pin", "The pin must be 4 digits."),
+        ("range", "The range must be between 2 and 4 digits."),
+        ("terms", "Read the terms first."),
+    ];
+    for (field, message) in expect {
+        assert_eq!(errors.first(field), Some(message), "{field}");
+    }
+    for field in [
+        "due_ok",
+        "ends_ok",
+        "unlimited",
+        "vat_ok",
+        "code_ok",
+        "new_ok",
+        "marketing_ok",
+        "zero_ok",
+        "password_ok",
+        "exact_ok",
+        "flag_ok",
+        "picked_ok",
+        "price_ok",
+        "pin_ok",
+        "mac_ok",
+        "mac_dash_ok",
+    ] {
+        assert!(!errors.has(field), "{field}: {:?}", errors.first(field));
+    }
+}
+
+/// Date rules on `NaiveDateTime` and `DateTime<Utc>` values (#250).
+#[renox::test]
+async fn date_rules_read_date_time_values() {
+    use renox::chrono::{NaiveDate, TimeZone, Utc};
+    let limit = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let naive = limit.and_hms_opt(9, 0, 0).unwrap();
+    let utc = Utc.with_ymd_and_hms(2025, 12, 31, 9, 0, 0).unwrap();
+    let errors = errors_of(|v| {
+        v.field("naive", &naive).before(limit);
+        v.field("utc_ok", &utc).before(limit);
+        v.field("utc", &utc).after(limit);
+    })
+    .await;
+    assert_eq!(
+        errors.first("naive"),
+        Some("The naive must be a date before 2026-01-01.")
+    );
+    assert!(!errors.has("utc_ok"));
+    assert_eq!(
+        errors.first("utc"),
+        Some("The utc must be a date after 2026-01-01.")
+    );
+}
+
+#[derive(Deserialize, Validate)]
+#[validate(hooks)]
+struct Quiet {
+    #[validate(required)]
+    name: String,
+}
+
+// Every hook left to its default: nothing tidied, everyone allowed, no
+// extra checks.
+impl renox::validation::ValidateHooks for Quiet {}
+
+#[derive(Deserialize)]
+struct Line {
+    email: String,
+}
+
+impl Validate for Line {
+    fn rules(&self, v: &mut Validator) {
+        v.field("email", &self.email)
+            .exists("users", "email")
+            .message("No such customer.");
+    }
+}
+
+#[derive(Deserialize)]
+struct Lines {
+    lines: Vec<Line>,
+}
+
+impl Validate for Lines {
+    fn rules(&self, v: &mut Validator) {
+        v.nested("lines", &self.lines);
+    }
+}
+
+struct Checks;
+
+impl Module for Checks {
+    fn name(&self) -> &'static str {
+        "checks"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new()
+            .post(
+                "/quiet",
+                |Valid(form): Valid<Quiet>| async move { form.name },
+            )
+            .post("/lines", |Valid(form): Valid<Lines>| async move {
+                format!("{} lines", form.lines.len())
+            })
+            .get("/in-lang", |State(db): State<Db>, lang: Lang| async move {
+                let mut v = Validator::new().in_lang(&lang);
+                v.field("name", &"").required();
+                let errors = v.finish(&db).await?;
+                Ok::<_, Error>(errors.first("name").unwrap_or_default().to_owned())
+            })
+            .get("/verified", |State(db): State<Db>| async move {
+                let mut v = Validator::new();
+                v.field("email", &"ann@example.com")
+                    .exists("users", "email")
+                    .where_not_null("email_verified_at");
+                let errors = v.finish(&db).await?;
+                Ok::<_, Error>(errors.first("email").unwrap_or("ok").to_owned())
+            })
+            .get("/as-error", || async {
+                let mut errors = Errors::new();
+                errors.add("name", "Taken.");
+                let err = Error::from(errors.clone());
+                let shown = format!("{err:?}");
+                assert!(shown.contains("validation failed"), "{shown}");
+                Err::<String, _>(Error::Validation(ValidationError::from(errors)))
+            })
+    }
+}
+
+async fn checks() -> renox::testing::TestApp {
+    renox::testing::TestApp::with_config(App::new().module(Auth::new()).module(Checks), |c| {
+        c.lang_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/lang")
+    })
+    .await
+}
+
+#[renox::test]
+async fn default_hooks_change_nothing() {
+    let app = checks().await;
+    app.htmx()
+        .post("/quiet", &[("name", "  Ann ")])
+        .await
+        .assert_ok()
+        .assert_see("  Ann ");
+    app.htmx()
+        .post("/quiet", &[("name", "")])
+        .await
+        .assert_invalid("name");
+}
+
+#[renox::test]
+async fn nested_rows_run_their_database_checks_with_their_messages() {
+    let app = checks().await;
+    User::register(app.db(), "Ann", "ann@example.com", "password123")
+        .await
+        .unwrap();
+    let res = app
+        .htmx()
+        .post(
+            "/lines",
+            &[
+                ("lines[0][email]", "ann@example.com"),
+                ("lines[1][email]", "nobody@example.com"),
+            ],
+        )
+        .await;
+    res.assert_invalid("lines.1.email");
+    let body: serde_json::Value = res.json();
+    assert_eq!(body["errors"]["lines.1.email"][0], "No such customer.");
+    assert!(body["errors"].get("lines.0.email").is_none());
+}
+
+#[renox::test]
+async fn validators_built_in_a_handler_speak_the_requests_language() {
+    let app = checks().await;
+    app.get("/in-lang")
+        .await
+        .assert_see("The name field is required.");
+    // The app's locale in Spanish: the lang file's message and field name.
+    let es =
+        renox::testing::TestApp::with_config(App::new().module(Auth::new()).module(Checks), |c| {
+            c.lang_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/lang");
+            c.locale = "es".into();
+        })
+        .await;
+    es.get("/in-lang")
+        .await
+        .assert_see("El campo nombre es obligatorio.");
+}
+
+#[renox::test]
+async fn exists_can_require_a_column_to_be_set() {
+    let app = checks().await;
+    User::register(app.db(), "Ann", "ann@example.com", "password123")
+        .await
+        .unwrap();
+    app.get("/verified")
+        .await
+        .assert_see("The selected email is invalid.");
+    renox::db::sql("UPDATE users SET email_verified_at = ?")
+        .bind(renox::db::now())
+        .execute(app.db())
+        .await
+        .unwrap();
+    app.get("/verified").await.assert_see("ok");
+}
+
+#[renox::test]
+async fn errors_turn_into_a_422() {
+    let app = checks().await;
+    app.request()
+        .json()
+        .get("/as-error")
+        .await
+        .assert_invalid("name");
+}

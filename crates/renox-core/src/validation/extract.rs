@@ -730,4 +730,148 @@ mod tests {
         assert_eq!(input["tag"], serde_json::json!(["a", "b"]));
         assert_eq!(input["price"], "");
     }
+
+    // #250: JSON bodies and nested forms beyond the happy path.
+
+    fn errors<T: DeserializeOwned>(parsed: Parsed<T>) -> Errors {
+        match parsed {
+            Parsed::Ok(_, errors) | Parsed::Invalid(errors) => errors,
+        }
+    }
+
+    #[test]
+    fn a_json_body_must_be_an_object() {
+        for body in [&b"[1, 2]"[..], b"\"name\"", b"42"] {
+            match parse_json::<Form>(body, &plain()) {
+                Err(Error::BadRequest(message)) => {
+                    assert_eq!(message, "The JSON body must be an object.")
+                }
+                Err(other) => panic!("{other:?}"),
+                Ok(_) => panic!("accepted a body that isn't an object"),
+            }
+        }
+        assert!(matches!(
+            parse_json::<Form>(b"{", &plain()),
+            Err(Error::BadRequest(m)) if m.starts_with("Invalid JSON")
+        ));
+    }
+
+    #[derive(Deserialize, Debug)]
+    #[serde(deny_unknown_fields)]
+    #[allow(dead_code)]
+    struct Strict {
+        name: String,
+    }
+
+    #[test]
+    fn an_unknown_json_field_is_reported_under_its_name() {
+        let (parsed, _) = parse_json::<Strict>(br#"{"name": "a", "extra": 1}"#, &plain()).unwrap();
+        let errors = errors(parsed);
+        assert_eq!(errors.first("extra"), Some("The extra is invalid."));
+    }
+
+    #[test]
+    fn errors_at_the_root_name_the_field_or_the_form() {
+        // A missing field reported at the root is that field's error.
+        let errors = field_error(".", "missing field `name`", false, &plain());
+        assert_eq!(errors.first("name"), Some("The name field is required."));
+        // Anything else at the root belongs to the whole form.
+        let errors = field_error(".", "invalid type: sequence", false, &plain());
+        assert!(errors.has("_form"), "{errors:?}");
+        // A missing field inside an object keeps its path.
+        let errors = field_error("address", "missing field `city`", false, &plain());
+        assert_eq!(
+            errors.first("address.city"),
+            Some("The city field is required.")
+        );
+    }
+
+    #[derive(Deserialize, Debug)]
+    #[allow(dead_code)]
+    struct Address {
+        city: String,
+        zip: i64,
+    }
+
+    #[derive(Deserialize, Debug)]
+    #[allow(dead_code)]
+    struct Shipping {
+        address: Address,
+    }
+
+    #[test]
+    fn json_errors_inside_an_object_name_the_nested_field() {
+        let (parsed, _) =
+            parse_json::<Shipping>(br#"{"address": {"city": "Bandung", "zip": "x"}}"#, &plain())
+                .unwrap();
+        let errors = errors(parsed);
+        assert!(errors.has("address.zip"), "{errors:?}");
+        // A field missing inside an object can't be put back at the top:
+        // it's reported, not retried forever.
+        let (parsed, _) = parse_json::<Shipping>(br#"{"address": {"zip": 1}}"#, &plain()).unwrap();
+        assert!(!errors_of_parsed_is_empty(parsed));
+    }
+
+    fn errors_of_parsed_is_empty<T>(parsed: Parsed<T>) -> bool {
+        match parsed {
+            Parsed::Ok(_, errors) => errors.is_empty(),
+            Parsed::Invalid(_) => false,
+        }
+    }
+
+    #[derive(Deserialize, Debug)]
+    #[allow(dead_code)]
+    struct Line {
+        name: String,
+        qty: i64,
+    }
+
+    #[derive(Deserialize, Debug)]
+    #[allow(dead_code)]
+    struct Order {
+        title: String,
+        lines: Vec<Line>,
+    }
+
+    fn nested_errors<T: DeserializeOwned>(body: &str) -> Errors {
+        let pairs = form_urlencoded::parse(body.as_bytes())
+            .into_owned()
+            .collect();
+        errors(parse_pairs::<T>(pairs, &HashMap::new(), &plain()).0)
+    }
+
+    #[test]
+    fn nested_forms_put_back_missing_fields_at_every_level() {
+        // `title` (top level) and `lines[0][qty]` are missing: both are put
+        // back empty, so text reaches the rules as "" and a number is
+        // "required".
+        let errors = nested_errors::<Order>("lines%5B0%5D%5Bname%5D=Tea");
+        assert!(!errors.has("title"), "{errors:?}");
+        assert_eq!(
+            errors.first("lines.0.qty"),
+            Some("The qty field is required.")
+        );
+        // A wrong type deep down is named by its full path.
+        let errors =
+            nested_errors::<Order>("title=T&lines%5B0%5D%5Bname%5D=Tea&lines%5B0%5D%5Bqty%5D=lots");
+        assert_eq!(
+            errors.first("lines.0.qty"),
+            Some("The qty must be a number.")
+        );
+    }
+
+    #[derive(Deserialize, Debug)]
+    #[serde(deny_unknown_fields)]
+    #[allow(dead_code)]
+    struct StrictOrder {
+        lines: Vec<Line>,
+    }
+
+    #[test]
+    fn an_unknown_nested_field_is_reported_under_its_name() {
+        let errors = nested_errors::<StrictOrder>(
+            "lines%5B0%5D%5Bname%5D=Tea&lines%5B0%5D%5Bqty%5D=1&extra%5Bx%5D=1",
+        );
+        assert_eq!(errors.first("extra"), Some("The extra is invalid."));
+    }
 }
