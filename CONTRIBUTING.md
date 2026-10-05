@@ -107,6 +107,20 @@ the top of `crates/renox/tests/it/s3.rs`, and `cargo test -p uploads --features 
 `cargo semver-checks -p renox-core -p renox --baseline-rev origin/main --release-type minor`
 (public API changes; `cargo install --locked cargo-semver-checks`). Releases: [RELEASING.md](RELEASING.md).
 
+- **Coverage.** The `coverage` CI job measures every library crate, the CLI and the macros,
+  on SQLite (with the `xlsx` feature) and on PostgreSQL, merged; its HTML report is an
+  artifact of the run. To measure locally (in its own target directory, one run at a time):
+  ```bash
+  rustup component add llvm-tools-preview && cargo install --locked cargo-llvm-cov
+  cargo llvm-cov --no-report -p renox -p renox-core -p renox-cli -p renox-macros \
+      -p renox-2fa -p renox-oauth -p renox-admin -p renox-billing -p renox-editors --features renox/xlsx
+  TEST_DATABASE_URL=postgres://postgres:postgres@localhost:55432/renox_test cargo llvm-cov --no-report \
+      -p renox -p renox-core -p renox-cli -p renox-2fa -p renox-oauth -p renox-admin \
+      -p renox-billing -p renox-editors --features renox/postgres
+  cargo llvm-cov report --html
+  ```
+  New code comes with tests that run it; check the report for the files you touched.
+
 - **UI changes.** Check pages in a real browser (desktop, a phone width, dark mode): several
   bugs only showed there (see CLAUDE.md §6.4).
 

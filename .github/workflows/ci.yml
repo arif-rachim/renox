@@ -254,6 +254,19 @@ jobs:
   coverage:
     name: coverage
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: renox_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -263,10 +276,30 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-llvm-cov
-      # Informational: the summary is in the job's log and summary page.
-      - run: cargo llvm-cov -p renox -p renox-core -p renox-cli --summary-only | tee coverage.txt
+      # Informational (#247): every library crate, the CLI and the macros
+      # (measured while the test crates compile), on SQLite with Excel
+      # exports, then again on PostgreSQL; the two runs are merged. Doctests
+      # aren't counted on stable.
+      - run: >-
+          cargo llvm-cov --no-report
+          -p renox -p renox-core -p renox-cli -p renox-macros
+          -p renox-2fa -p renox-oauth -p renox-admin -p renox-billing -p renox-editors
+          --features renox/xlsx
+      - run: >-
+          cargo llvm-cov --no-report
+          -p renox -p renox-core -p renox-cli
+          -p renox-2fa -p renox-oauth -p renox-admin -p renox-billing -p renox-editors
+          --features renox/postgres
+        env:
+          TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/renox_test
+      - run: cargo llvm-cov report --summary-only | tee coverage.txt
+      - run: cargo llvm-cov report --html --output-dir coverage-html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: coverage-html/html
       - run: |
-          echo '### Line coverage' >> "$GITHUB_STEP_SUMMARY"
+          echo '### Line coverage (SQLite + PostgreSQL)' >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          tail -n 40 coverage.txt >> "$GITHUB_STEP_SUMMARY"
+          cat coverage.txt >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
