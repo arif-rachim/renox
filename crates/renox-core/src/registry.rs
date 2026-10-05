@@ -28,6 +28,9 @@ pub struct Registry {
     pub(crate) duplicate_second_factor: bool,
     /// Sections other modules add to the `/account` page.
     pub(crate) account_sections: Vec<crate::auth::account::AccountSection>,
+    /// The `Auth` module's settings, for other ways of logging in
+    /// (`auth::sign_in`, `auth::register_verified`).
+    pub(crate) auth: Option<std::sync::Arc<crate::auth::module::Settings>>,
     /// Files modules serve as they are (`asset`): path, content type, body.
     pub(crate) assets: Vec<StaticAsset>,
 }

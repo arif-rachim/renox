@@ -5,7 +5,8 @@ pick a current team, and only ever see that team's projects. Handlers never filt
 current team lives in `renox::context`, and the `Project` model's default scope reads it. Also
 shows a super-admin through `App::gate_before`, a team secret stored encrypted and revealed only
 after the password is confirmed, and the account pages from `Auth::new().account()` with
-two-factor authentication from the `renox-2fa` plugin crate.
+two-factor authentication from the `renox-2fa` plugin crate and "Continue with Google / GitHub"
+from the `renox-oauth` plugin crate.
 
 ```bash
 cd examples/teams
@@ -25,6 +26,7 @@ Globex, Carol is a member of Acme. With `SUPER_ADMINS` set, Alice also sees `/ad
 | Feature | Where |
 |---|---|
 | Two-factor authentication: `.module(renox_2fa::TwoFactor::new())`; turned on from `/account` (a QR code, a code, recovery codes), then asked for after the password | [src/lib.rs](src/lib.rs), [docs/two-factor.md](../../docs/two-factor.md) |
+| Social login: `.module(renox_oauth::OAuth::new().google().github())`; each provider's button shows once its `*_CLIENT_ID`/`*_CLIENT_SECRET` are in `.env` (see `.env.example`); linked logins on `/account` | [src/lib.rs](src/lib.rs), [docs/oauth.md](../../docs/oauth.md) |
 | Wiring: `Auth::new().account()`, the modules, the tenancy layer, the shared `team`, `gate_before`, the `projects:count` command, the seeder | [src/lib.rs](src/lib.rs) |
 | The current team: session → membership check → `renox::context`, an extractor, a policy | [src/app/tenancy.rs](src/app/tenancy.rs) |
 | `Team`, the `team_user` pivot with a `role` (`MEMBERS`, `USER_TEAMS`), the secret helpers | [src/app/teams/model.rs](src/app/teams/model.rs) |
@@ -89,6 +91,7 @@ cargo test -p teams
 [tests/teams.rs](tests/teams.rs) covers isolation between teams (lists, edit/update/delete by id),
 switching (and being refused a team you're not in), falling back when removed from a team,
 unique names per team, the fail-closed scope without a team, the unscoped counts and command,
-the super-admin, adding members, the encrypted secret with its password confirmation, and the
+the super-admin, adding members, the encrypted secret with its password confirmation, two-factor
+authentication, a sign-up with GitHub (faked with `fake_http`), and the
 public pages (per host, with counts but no project names, an unknown team a 404, other paths
 redirected, a second "Acme" getting `acme-2`).

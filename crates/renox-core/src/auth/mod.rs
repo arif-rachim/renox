@@ -34,8 +34,9 @@
 
 pub(crate) mod account;
 pub mod events;
+mod external;
 mod inbox;
-mod module;
+pub(crate) mod module;
 pub mod notifications;
 mod passwords;
 pub mod permissions;
@@ -58,6 +59,7 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Redirect, Response};
 
 pub(crate) use account::require_password_confirmed;
+pub use external::{confirm_identity, register_verified, registration_open, sign_in};
 pub use module::{Auth, Registration};
 pub use notifications::{
     Channel, DatabaseMessage, DatabaseNotification, Notification, Recipient,

@@ -47,6 +47,14 @@ pub(crate) fn mark_confirmed(session: &Session) -> Result {
     session.put(CONFIRMED_AT, unix_now())
 }
 
+/// Where to go once the password is confirmed: the page that asked, else `/`.
+pub(crate) fn confirmed_destination(session: &Session) -> String {
+    session
+        .pull::<String>(CONFIRM_INTENDED)
+        .filter(|path| crate::htmx::is_local_path(path))
+        .unwrap_or_else(|| "/".into())
+}
+
 /// Whether the password was typed in the last three hours.
 pub(crate) fn recently_confirmed(session: &Session) -> bool {
     session
@@ -145,11 +153,7 @@ pub(super) async fn confirm(
 ) -> Result<Response> {
     check_password(user.user(), &form.password, "password", &lang).await?;
     mark_confirmed(&session)?;
-    let to = session
-        .pull::<String>(CONFIRM_INTENDED)
-        .filter(|path| crate::htmx::is_local_path(path))
-        .unwrap_or_else(|| "/".into());
-    Ok(go(&htmx, to))
+    Ok(go(&htmx, confirmed_destination(&session)))
 }
 
 /// A section another module adds to `/account` (`Registry::account_section`).
@@ -204,6 +208,7 @@ async fn show(
         context! {
             text => texts(&lang),
             user => user.user(),
+            has_password => user.has_password(),
             verify_email => settings.verify_email,
             sections,
         },
@@ -279,18 +284,76 @@ async fn update_profile(
 
 #[derive(Deserialize)]
 struct PasswordForm {
+    /// Not on the form of a user without a password.
+    #[serde(default)]
     current_password: String,
     password: String,
     password_confirmation: Option<String>,
 }
 
 impl Validate for PasswordForm {
-    fn rules(&self, v: &mut Validator) {
-        let current = label(v, "current_password");
-        v.field("current_password", &self.current_password)
-            .fallback_label(current)
-            .required();
+    fn rules(&self, _v: &mut Validator) {}
+}
+
+/// The password typed to confirm an action on the account page (none for
+/// a user without one).
+#[derive(Deserialize)]
+struct PasswordCheck {
+    #[serde(default)]
+    password: String,
+}
+
+impl Validate for PasswordCheck {
+    fn rules(&self, _v: &mut Validator) {}
+}
+
+/// A user without a password (a social login) proves who they are with a
+/// recent confirmation instead (logging in, or `/confirm-password` another
+/// way): without one, the browser goes to `/confirm-password` and comes
+/// back to the account page.
+fn needs_confirmation(
+    state: &AppState,
+    session: &Session,
+    user: &User,
+    htmx: &Htmx,
+) -> Option<Response> {
+    if user.has_password() || recently_confirmed(session) {
+        return None;
     }
+    if let Ok(account) = state.url("account.show", &[]) {
+        let _ = session.put(CONFIRM_INTENDED, account);
+    }
+    let confirm = state
+        .url("password.confirm", &[])
+        .unwrap_or_else(|_| "/confirm-password".into());
+    Some(go(htmx, confirm))
+}
+
+/// Checks the typed password of a user who has one.
+async fn check_typed(user: &User, typed: &str, field: &str, lang: &Lang) -> Result {
+    if user.has_password() {
+        check_password(user, typed, field, lang).await?;
+    }
+    Ok(())
+}
+
+/// Validates a [`PasswordCheck`]: the password is required when the user has one.
+async fn password_check(
+    state: &AppState,
+    user: &User,
+    req: axum::extract::Request,
+) -> std::result::Result<PasswordCheck, Response> {
+    let has_password = user.has_password();
+    crate::validation::extract::validate_request(req, state, move |form: &PasswordCheck, _, v| {
+        if has_password {
+            let password = label(v, "password");
+            v.field("password", &form.password)
+                .fallback_label(password)
+                .required();
+        }
+    })
+    .await
+    .map(|(form, _)| form)
 }
 
 async fn update_password(
@@ -302,11 +365,21 @@ async fn update_password(
     lang: Lang,
     req: axum::extract::Request,
 ) -> Result<Response> {
+    if let Some(confirm) = needs_confirmation(&state, &session, user.user(), &htmx) {
+        return Ok(confirm);
+    }
     let policy = settings.password.clone();
+    let has_password = user.has_password();
     let validated = crate::validation::extract::validate_request(
         req,
         &state,
         move |form: &PasswordForm, _, v| {
+            if has_password {
+                let current = label(v, "current_password");
+                v.field("current_password", &form.current_password)
+                    .fallback_label(current)
+                    .required();
+            }
             let password = label(v, "password");
             v.field("password", &form.password)
                 .fallback_label(password)
@@ -320,7 +393,7 @@ async fn update_password(
         Ok((form, _)) => form,
         Err(rejection) => return Ok(rejection),
     };
-    check_password(
+    check_typed(
         user.user(),
         &form.current_password,
         "current_password",
@@ -341,9 +414,16 @@ async fn logout_others(
     session: Session,
     htmx: Htmx,
     lang: Lang,
-    crate::validation::Valid(form): crate::validation::Valid<ConfirmForm>,
+    req: axum::extract::Request,
 ) -> Result<Response> {
-    check_password(user.user(), &form.password, "password", &lang).await?;
+    if let Some(confirm) = needs_confirmation(&state, &session, user.user(), &htmx) {
+        return Ok(confirm);
+    }
+    let form = match password_check(&state, user.user(), req).await {
+        Ok(form) => form,
+        Err(rejection) => return Ok(rejection),
+    };
+    check_typed(user.user(), &form.password, "password", &lang).await?;
     logout_other_devices(&state.db, &session, user.user()).await?;
     announce(&state, OtherDevicesLoggedOut { user_id: user.id }).await;
     session.flash("status", &texts(&lang)["other_devices_logged_out"])?;
@@ -356,9 +436,16 @@ async fn destroy(
     session: Session,
     htmx: Htmx,
     lang: Lang,
-    crate::validation::Valid(form): crate::validation::Valid<ConfirmForm>,
+    req: axum::extract::Request,
 ) -> Result<Response> {
-    check_password(user.user(), &form.password, "password", &lang).await?;
+    if let Some(confirm) = needs_confirmation(&state, &session, user.user(), &htmx) {
+        return Ok(confirm);
+    }
+    let form = match password_check(&state, user.user(), req).await {
+        Ok(form) => form,
+        Err(rejection) => return Ok(rejection),
+    };
+    check_typed(user.user(), &form.password, "password", &lang).await?;
     user.delete_account(&state.db).await?;
     session.flush();
     let event = AccountDeleted {

@@ -35,7 +35,7 @@ all of the first kind:
   Filament's demo is (M29b).
 - **For HTML-over-the-wire business and SaaS apps on one server or a few**, a Laravel developer
   now finds an equivalent for nearly everything they use daily. What is left in code is small:
-  social login (a plugin; 2FA is done in `renox-2fa`), search, broadcasting and billing (M33 and M34 closed the
+  search, broadcasting and billing (social login and 2FA are done as plugins, `renox-oauth` and `renox-2fa`; M33 and M34 closed the
   small adds: route model binding, most missing rules, the breach check, several disks and
   mailers, ETags, the `XSRF-TOKEN` cookie, trusted hosts, error bags, `has_many_through`).
 - **What really separates Renox from Laravel now is maturity:** no release (crates.io holds
@@ -210,7 +210,7 @@ New rows:
 | Encryption API, encrypted fields | `Crypt`, casts | `state.encrypt`/`decrypt`, `Encrypted<T>` | ✅ | – | M19b, M23 |
 | Importing Laravel users | bcrypt, `needsRehash` | bcrypt verified, rehashed to Argon2id at login | ✅ | – | M18b |
 | 2FA (TOTP, recovery codes) | Fortify | the `renox-2fa` crate: TOTP from `/account`, the challenge, recovery codes, events and the audit log | ✅ | – | #146 |
-| Social login | Socialite | none | ❌ | **Maj** | plugin `renox-oauth` |
+| Social login | Socialite | the `renox-oauth` crate: Google, GitHub and a `Provider` trait, PKCE, linking by verified email, link/unlink from `/account` | ✅ | – | #147 |
 | Several user types / guards | several providers | one `users` table + roles | ❌ | Min | "one table + roles" |
 | Teams | Jetstream | `examples/teams` (default scopes, context, roles, domains); not a module | 🟡 | Min | M18a, M24 |
 | Impersonation, HTTP Basic, OAuth2 server | packages, Passport | none (`http` client has `basic_auth`, the server doesn't) | ❌/⛔ | Min | – |
@@ -327,7 +327,7 @@ New rows:
    audit, the docs site with a tutorial and a "Laravel → Renox" guide, the starter kit, the
    support policy and the semver promise (docs/stability.md, SECURITY.md).
 2. **2FA (Maj):** TOTP and recovery codes (`renox-2fa`). Done (#146): docs/two-factor.md.
-3. **Social login (Maj):** OAuth providers (`renox-oauth`).
+3. **Social login (Maj):** OAuth providers (`renox-oauth`). Done (#147): docs/oauth.md.
 4. **Small adds (Min):** M33 and M34 closed the list the review started with (validation
    rules, route model binding, disks, `XSRF-TOKEN`, ETags, trusted hosts, view/redirect
    routes, `current_password`, the breach check, several mailers and failover, session

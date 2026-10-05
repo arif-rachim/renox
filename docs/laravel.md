@@ -1358,7 +1358,7 @@ list.
 | Tinker | not planned | `db:shell` for SQL, and your own commands (`App::command`, `typed_command`) for code |
 | MySQL, several connections, read/write split | SQLite and PostgreSQL, one `Db` per app | `renox::db::sql` for reports; a second sqlx pool by hand if you must |
 | Livewire, Inertia | not planned | htmx + Alpine; for a SPA, a JSON API with tokens (`examples/api`) |
-| Fortify 2FA, Socialite | `renox-2fa` (an optional plugin crate); `renox-oauth` planned | `renox-2fa`: TOTP turned on from `/account`, the code after the password, recovery codes ([two-factor.md](two-factor.md)); no social login yet |
+| Fortify 2FA, Socialite | `renox-2fa` and `renox-oauth` (optional plugin crates) | `renox-2fa`: TOTP turned on from `/account`, the code after the password, recovery codes ([two-factor.md](two-factor.md)); `renox-oauth`: Google and GitHub (another provider is one `Provider` impl), PKCE, linking by verified email, link and unlink from `/account` ([oauth.md](oauth.md)) |
 | Scout | the database engine, built in | `#[model(search = "title, body")]`, `renox::db::search::migration`, `Post::search(&q)`: SQLite FTS5 or PostgreSQL `tsvector`, kept current by the database, ranked, also behind the grid's search box ([search.md](search.md)); no Algolia/Meilisearch engines |
 | Cashier | open | payment pages and verified webhooks (Midtrans, Xendit, Stripe) in `examples/backoffice` and `examples/webhooks` |
 | Pennant feature flags | open | a setting or a gate |

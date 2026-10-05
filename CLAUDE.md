@@ -10,7 +10,7 @@ repo, and every trap hit so far, so you don't have to rediscover them.
 - `CONTRIBUTING.md`: the checks every change needs. `SECURITY.md`: how vulnerabilities are reported.
   `RELEASING.md`: how a release goes to crates.io (the owner publishes).
 - `CHEATSHEET.md` and `llms.txt`: the app author's view (patterns, and which example shows what).
-- `docs/*.md`: guides (routing, validation, types, relations, authorization, queue, mail, scheduling, ui, grid, testing, PostgreSQL, operations, development, stability).
+- `docs/*.md`: guides (routing, validation, types, relations, authorization, queue, mail, scheduling, ui, grid, testing, PostgreSQL, operations, development, stability, and the plugins: two-factor, editors, oauth).
 - `docs/audit/`: the pre-1.0 audit (finding IDs W*, D*, A* used in ROADMAP M13/M14).
 
 ## 1. What Renox is
@@ -135,7 +135,9 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            permissions.rs (Permissions module: roles, permissions), events.rs
                            (LoggedIn, LoginFailed, …), second_factor.rs (Registry::second_factor:
                            a module's step after the password; pending_login/complete_login,
-                           #167), verification, tokens.rs (API tokens,
+                           #167), external.rs (sign_in / register_verified /
+                           registration_open / confirm_identity: logging in another way than
+                           the password, for renox-oauth, #147), verification, tokens.rs (API tokens,
                            abilities, prune), LoginThrottle (pair/account/IP), notifications
                            (Recipient, Channel::Custom, notify/notify_later,
                            SendToChannel job, DatabaseMessage, Hub), inbox.rs (the
@@ -239,6 +241,18 @@ crates/renox-editors/      the editors plugin (#149, #150): Editors module (lib.
                            module that imports Trix / Prism + CodeJar when a page needs them)
                            and editors.css, assets/vendor/ (pinned files + NOTICE + licences);
                            guide docs/editors.md (doctested from lib.rs `Guide`)
+crates/renox-oauth/        the social login plugin (#147): OAuth module (lib.rs: providers,
+                           `oauth_providers` shared with every view for the buttons, the
+                           account section, events to the audit log when `audit_logs`
+                           exists, views registered in `templates` unless the app has a file
+                           of the name: renox/auth/login_options.html, oauth/section.html),
+                           handlers.rs (/auth/{provider}/redirect|callback, DELETE
+                           /auth/{provider}; state + PKCE S256 in the session key `_oauth`,
+                           single use; linking rules), provider.rs (Provider trait, BoxFuture,
+                           Credentials, Token, Profile, exchange_code), google.rs, github.rs,
+                           model.rs (OAuthAccount, `oauth_accounts`, prefix 00010101000800,
+                           no tokens stored); its own tests/ on FakeHttp; guide docs/oauth.md
+                           (doctested from lib.rs `Guide`)
 crates/renox-cli/          `rnx`: main.rs (key:generate, forwarding), new.rs, serve.rs, make.rs +
                            generate.rs (make:*), scaffold.rs (make:module --resource --fields),
                            deploy.rs (build, make:deploy), tailwind.rs (the pinned
@@ -281,7 +295,8 @@ examples/                  workspace members, each with a README.md and its own 
   teams/                   multi-tenant SaaS on the UI kit: default scopes, renox::context,
                            gate_before, Encrypted<String>, a form request checked live, public
                            team pages on their own host (Routes::domain), a wizard with a
-                           repeater, a datalist
+                           repeater, a datalist; renox-2fa and renox-oauth (Google/GitHub when
+                           their *_CLIENT_ID/_SECRET are set)
 site/                      the documentation site (package `renox-site`, publish = false): a Renox
                            app that compiles the repo's Markdown in (src/content.rs lists the
                            pages, src/render.rs: pulldown-cmark, anchors, TOC, hidden doctest
@@ -325,8 +340,10 @@ docs/types.md              HTML input ↔ Rust ↔ SQLite ↔ PostgreSQL (doctes
 docs/relations.md          relations without N+1, fetch_as/FromRow (doctest `RelationsGuide`)
 docs/search.md             full-text search: #[model(search)], the index migration, ranking
                            (doctest `SearchGuide`)
-docs/authorization.md      gates, policies, roles/permissions, token abilities, tenants (doctest
+docs/authorization.md      gates, policies, roles/permissions, token abilities, tenants, the
+                           second login step, logging in another way (doctest
                            `AuthorizationGuide`)
+docs/oauth.md              social login with renox-oauth (doctest: renox-oauth's `Guide`)
 docs/queue.md              jobs, retries, priority, unique, middleware, chains, batches (doctest
                            `QueueGuide`)
 docs/postgresql.md         PostgreSQL guide for app authors
@@ -1199,8 +1216,17 @@ picks the build, not the terminal.
 - **Earlier plan for v1.0:** v1.0 (API audit, `cargo-semver-checks`, real
   crates.io releases (the owner runs `cargo login`), a docs site with a tutorial and a
   Laravel guide, a starter kit). 
-- **Still open** (ROADMAP `- [ ]`): the plugins (`renox-oauth`, `renox-admin`, separate
-  crates; `renox-2fa` is done, #146). A Laravel gap review after M25 (in the
+- **#147, `renox-oauth`** (social login: Google, GitHub, the `Provider` trait, PKCE + a
+  single-use `state` in the session, linking only by a verified address and never to an
+  account whose own address is unverified, unlink never removes the last way in): branch
+  `ccr-f926b004-17j95n`. It added to renox-core `auth::sign_in`, `register_verified`,
+  `registration_open`, `confirm_identity` (auth/external.rs; the `Auth` module's settings now
+  ride in `AppState::auth`), `User::has_password` (users made by a social login have an empty
+  `password`: the account page lets them set one and asks them for a recent confirmation
+  instead of a password), and the login/register/confirm pages'
+  `{% include "renox/auth/login_options.html" ignore missing %}`.
+- **Still open** (ROADMAP `- [ ]`): the plugins (`renox-admin`, a separate crate;
+  `renox-2fa` (#146) and `renox-oauth` (#147) are done). A Laravel gap review after M25 (in the
   conversation that planned M26) ranked them: release and docs first, then 2FA and social
   login, then small adds (validation rules like `json`/`gt`/`decimal`/`dimensions`, several
   storage disks, route model binding), then admin, search, realtime (SSE) and billing.

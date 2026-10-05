@@ -28,7 +28,8 @@ commit). To get a fix, move that version (or the commit pin) forward and run
 ## What's in scope
 
 Anything in this repository: the `renox`, `renox-core`, `renox-macros`, `renox-cli`,
-`renox-2fa` and `renox-editors` crates (including the HTML cleaning of rich text), the
+`renox-2fa`, `renox-editors` (including the HTML cleaning of rich text) and `renox-oauth`
+(social login: `state`, PKCE, linking accounts by email) crates, the
 templates and assets they ship, the files `rnx new` and `rnx make:*` write
 (Dockerfile, systemd unit, …), and the examples when they show a pattern apps would copy.
 

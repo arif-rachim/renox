@@ -1268,6 +1268,11 @@ async fn sign_in(State(state): State<AppState>, session: Session, Form(f): Form<
 // then `renox::auth::complete_login(&state, &session, &pending, ip)` (docs/authorization.md).
 // A card on /account from a module: `app.account_section("pin/account.html", 10,
 // |user, _state| async move { Ok(json!({ "on": true })) })`, read as `section.data`.
+// Social login ready-made: the `renox-oauth` crate, `.module(OAuth::new().google().github())`
+// with GOOGLE_CLIENT_ID/_SECRET, GITHUB_CLIENT_ID/_SECRET (docs/oauth.md). A login of your
+// own once you know who it is: `let to = renox::auth::sign_in(&state, &session, &user,
+// false, ip).await?;` (the second step included); `renox::auth::register_verified` makes an
+// account without a password (`user.has_password()` is false).
 
 async fn sign_out(State(db): State<Db>, session: Session) -> Result<Redirect> {
     renox::auth::logout(&db, &session).await?; // this device (a copied cookie dies too)

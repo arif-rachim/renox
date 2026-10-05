@@ -559,6 +559,7 @@ impl App {
             second_factor,
             duplicate_second_factor,
             mut account_sections,
+            auth,
             assets: static_assets,
         } = self.registry;
         check_assets(&static_assets)?;
@@ -808,6 +809,7 @@ impl App {
                 account_sections.sort_by_key(|section| section.order);
                 Arc::new(account_sections)
             },
+            auth,
             limiters: Arc::new(
                 self.limiters
                     .into_iter()

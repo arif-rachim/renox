@@ -169,6 +169,14 @@ pub static PAGES: &[Page] = &[
         "A code from a phone app after the password, with the renox-2fa crate."
     ),
     page!(
+        "oauth",
+        "Social login",
+        Guides,
+        "log-in",
+        "docs/oauth.md",
+        "Sign in with Google or GitHub, linked to your users, with the renox-oauth crate."
+    ),
+    page!(
         "editors",
         "Rich text, Markdown and code editors",
         Guides,

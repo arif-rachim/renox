@@ -17,8 +17,10 @@
 
 <form method="post" action="{{ route('account.password') }}" hx-post="{{ route('account.password') }}">
   {{ csrf_field() }}{{ method_field('PUT') }}
-  {% call card(title=text.password_title) %}
-    {{ input("current_password", text.current_password, type="password", revealable=true, required=true, autocomplete="current-password") }}
+  {#- A user made by a social login has no password yet: they choose one
+      without a current one (after confirming it's them, see docs/oauth.md). -#}
+  {% call card(title=text.password_title if has_password else text.set_password_title, subtitle=none if has_password else text.set_password_intro) %}
+    {% if has_password %}{{ input("current_password", text.current_password, type="password", revealable=true, required=true, autocomplete="current-password") }}{% endif %}
     {{ input("password", text.new_password, type="password", revealable=true, required=true, autocomplete="new-password") }}
     {{ input("password_confirmation", text.password_confirmation, type="password", revealable=true, required=true, autocomplete="new-password") }}
     <div class="rx-card__footer">{{ button(text.save, variant="secondary") }}</div>
@@ -28,7 +30,7 @@
 <form method="post" action="{{ route('account.logout_others') }}" hx-post="{{ route('account.logout_others') }}">
   {{ csrf_field() }}
   {% call card(title=text.other_devices_title, subtitle=text.other_devices_intro) %}
-    {{ input("password", text.password, type="password", revealable=true, required=true, autocomplete="current-password", id="rx-password-others") }}
+    {% if has_password %}{{ input("password", text.password, type="password", revealable=true, required=true, autocomplete="current-password", id="rx-password-others") }}{% endif %}
     <div class="rx-card__footer">{{ button(text.other_devices_button, variant="secondary") }}</div>
   {% endcall %}
 </form>
@@ -43,7 +45,7 @@
 {% call sheet("delete-account", text.delete_title, text.delete_confirm) %}
   <form method="post" action="{{ route('account.destroy') }}" hx-post="{{ route('account.destroy') }}" class="rx-stack">
     {{ csrf_field() }}{{ method_field('DELETE') }}
-    {{ input("password", text.password, type="password", revealable=true, required=true, autocomplete="current-password", id="rx-password-delete") }}
+    {% if has_password %}{{ input("password", text.password, type="password", revealable=true, required=true, autocomplete="current-password", id="rx-password-delete") }}{% endif %}
     <div class="rx-sheet__actions">
       <button class="rx-button rx-button--secondary" type="button" data-rx-close autofocus><span class="rx-button__label">{{ t('ui.cancel') }}</span></button>
       {{ button(text.delete_button, variant="danger") }}

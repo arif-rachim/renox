@@ -363,3 +363,10 @@ Every example has a README.md that walks through it.
   `assets.rs` (URLs and the tags), `views/editors.html` (`rich_editor`, `markdown_editor`,
   `code_editor`, `code_entry`), `assets/editors.js|css` and the vendored Trix, Prism and CodeJar
   (`assets/vendor/NOTICE`). Guide: [docs/editors.md](docs/editors.md); used in examples/fields.
+- `crates/renox-oauth`: the optional social login plugin crate (same version as `renox`): the
+  `OAuth` module (`lib.rs`: the buttons' `oauth_providers`, the account card, events to the
+  audit log), the routes (`handlers.rs`: redirect with `state` + PKCE, callback, unlink;
+  linking by verified email), the `Provider` trait with `Profile`, `Token`, `Credentials`
+  (`provider.rs`), `google.rs`, `github.rs`, `OAuthAccount` (`model.rs`, `oauth_accounts`).
+  Logs in through `renox::auth::sign_in` / `register_verified` / `confirm_identity`
+  (renox-core `auth/external.rs`). Guide: [docs/oauth.md](docs/oauth.md); used in examples/teams.

@@ -507,7 +507,7 @@ step.
 > For codes from an authenticator app, use the `renox-2fa` crate: one module adds the account
 > card, the QR code, the challenge and recovery codes, built on this extension point. See
 > [two-factor.md](two-factor.md). Read on to write a second step of your own (a PIN, a code
-> by mail…).
+> by mail…). Social logins (`renox-oauth`, [oauth.md](oauth.md)) go through the same step.
 
 In `Module::register`, the module says two things: which users must pass the step, and the route
 where the challenge (the "enter your code" page) lives:
@@ -574,6 +574,29 @@ in `Module::register`:
 
 If you replace `renox/auth/account.html` with a page of your own, keep the sections with
 `{% include "renox/auth/account_sections.html" %}`.
+
+### Logging in another way
+
+A module that proves who someone is without their password (a social login, a link sent by
+mail) logs them in with the same rules as the login page:
+
+- **`renox::auth::sign_in(&state, &session, &user, remember, ip)`** logs `user` in and returns
+  where to send the browser: the page that asked for a login, else `Auth::redirect_to`, else
+  `home`. When the second step applies to the user, the login waits for it instead, and the
+  address is the challenge's.
+- **`renox::auth::register_verified(&state, name, email, &[("provider", "google")])`** makes an
+  account for an address another service verified: no password, the address verified, then
+  `Auth::on_registered` (the extra pairs are in its `Registration`) and `Registered`.
+  `renox::auth::registration_open(&state)` says whether sign-ups are allowed at all.
+- **`renox::auth::confirm_identity(&session)`** counts as typing the password at
+  `/confirm-password`, and returns the page that asked for it.
+
+Such a user has no password: `password` is empty, which no typed password matches, and
+`user.has_password()` is `false`. On `/account` they choose one without a "current password",
+and the actions that ask for a password ask for a recent confirmation instead.
+The login, register and confirm-password pages include `renox/auth/login_options.html` when a
+module provides it (with `page` set to `login`, `register` or `confirm`), for its buttons.
+The `renox-oauth` crate is built on these ([oauth.md](oauth.md)).
 
 ## The `Auth` module's routes
 

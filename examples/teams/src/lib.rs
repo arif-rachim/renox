@@ -17,6 +17,8 @@
 //!   password is confirmed (`require_password_confirmed`).
 //! - Account pages from `Auth::new().account()`, with two-factor
 //!   authentication from the `renox-2fa` plugin crate.
+//! - "Continue with Google / GitHub" from the `renox-oauth` plugin crate,
+//!   on when `GOOGLE_CLIENT_ID`/`_SECRET` or `GITHUB_CLIENT_ID`/`_SECRET` are set.
 //!
 //! Made with `rnx make:module teams`, `rnx make:module projects`,
 //! `rnx make:model Team --module teams --migration`,
@@ -46,6 +48,10 @@ pub fn app() -> App {
         .module(Auth::new().account()) // login, register, and /account
         // Two-factor authentication, turned on from /account (renox-2fa).
         .module(renox_2fa::TwoFactor::new())
+        // Social login (renox-oauth): buttons on the login and register pages,
+        // linked logins on /account. Each provider is off until its
+        // credentials are in `.env`.
+        .module(renox_oauth::OAuth::new().google().github())
         .module(app::teams::Teams)
         .module(app::projects::Projects)
         .module(app::admin::Admin)

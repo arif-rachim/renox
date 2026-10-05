@@ -244,6 +244,14 @@ impl User {
         Ok(())
     }
 
+    /// Whether the user has a password. Users made by a social login
+    /// (`auth::register_verified`, the `renox-oauth` crate) don't: their
+    /// `password` is empty, which no typed password matches, until they
+    /// choose one with "Forgot your password?".
+    pub fn has_password(&self) -> bool {
+        !self.password.is_empty()
+    }
+
     /// Whether `password` matches the stored hash (Argon2id or an imported bcrypt one).
     pub async fn check_password(&self, password: &str) -> bool {
         verify_password(password, &self.password).await

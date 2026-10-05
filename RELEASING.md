@@ -1,13 +1,14 @@
 # Releasing Renox
 
-How a release goes to crates.io. Only a maintainer with publish rights on the six crates
-(`renox`, `renox-core`, `renox-macros`, `renox-cli` and the plugins `renox-2fa` and
-`renox-editors`) can do it. All six share the workspace's version and are released together.
+How a release goes to crates.io. Only a maintainer with publish rights on the seven crates
+(`renox`, `renox-core`, `renox-macros`, `renox-cli` and the plugins `renox-2fa`,
+`renox-editors` and `renox-oauth`) can do it. All seven share the workspace's version and are
+released together.
 
 ## The machine that publishes
 
 - A crates.io account with a **verified email address** (crates.io refuses to publish without
-  one), and publish rights on the six names. The release candidates (`1.0.0-rc.1` to `rc.4`)
+  one), and publish rights on the seven names. The release candidates (`1.0.0-rc.1` to `rc.4`)
   created them; a new crate (a new plugin) gets its name at its first `cargo publish`, which
   gives the publisher those rights.
 - `cargo login` on the machine that publishes. The token stays in `~/.cargo/credentials.toml`:
@@ -24,8 +25,8 @@ How a release goes to crates.io. Only a maintainer with publish rights on the si
    jobs and the semver checks.
 2. **Choose the version** (see [docs/stability.md](docs/stability.md)): a fix is a patch,
    anything new a minor, a breaking change a major. Set it in the workspace `Cargo.toml` in
-   six places that must agree: `[workspace.package] version` and the `version` of `renox`,
-   `renox-core`, `renox-macros`, `renox-2fa` and `renox-editors` under `[workspace.dependencies]` (written
+   seven places that must agree: `[workspace.package] version` and the `version` of `renox`,
+   `renox-core`, `renox-macros`, `renox-2fa`, `renox-editors` and `renox-oauth` under `[workspace.dependencies]` (written
    `=1.2.0`: the crates are released in lockstep and pin each other exactly, since the macros
    write code against renox-core's items of the same release).
    While 1.0 is a release candidate, other places name the version too; change all of them:
@@ -45,8 +46,8 @@ How a release goes to crates.io. Only a maintainer with publish rights on the si
    cargo publish --dry-run -p renox-cli
    ```
    (`renox-cli` doesn't depend on the other Renox crates.) `renox` can't be dry-run before
-   this version of `renox-core` and `renox-macros` is on crates.io, and `renox-2fa` and
-   `renox-editors` not before `renox` is: they depend on them.
+   this version of `renox-core` and `renox-macros` is on crates.io, and `renox-2fa`,
+   `renox-editors` and `renox-oauth` not before `renox` is: they depend on them.
 5. **Commit and merge** the version and changelog as a pull request, as for any change.
 6. **Publish in this order** from an up-to-date `main` (each waits until the previous one is in
    the index):
@@ -57,6 +58,7 @@ How a release goes to crates.io. Only a maintainer with publish rights on the si
    cargo publish -p renox-cli
    cargo publish -p renox-2fa    # plugins depend on renox, so they go after it
    cargo publish -p renox-editors
+   cargo publish -p renox-oauth
    ```
    `renox-core` and `renox-macros` use `renox` only as a path dev-dependency, which
    `cargo publish` leaves out, so the order has no cycle.
@@ -64,7 +66,7 @@ How a release goes to crates.io. Only a maintainer with publish rights on the si
    `rnx new` from crates.io link their `AGENTS.md` to the docs at that tag.
 8. **Check the release:**
    - docs.rs shows `renox` and `renox-core` (built with `postgres`, `uuid` and `xlsx`), and
-     `renox-2fa` and `renox-editors`;
+     `renox-2fa`, `renox-editors` and `renox-oauth`;
    - `cargo install renox-cli` then `rnx new demo`: `demo/Cargo.toml` has
      `renox = { version = "1.2" }` and `cargo test` passes in it.
 9. **A GitHub release** for the tag, with the version's changelog section as its notes.

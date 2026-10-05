@@ -1577,7 +1577,17 @@ Notes from M34:
 - [x] `renox-editors` (rich text, Markdown and code editors, `code_entry`): #149, #150,
   docs/editors.md; the kit's entries got `prefix_actions`/`suffix_actions` and modules
   `Registry::asset` with it
-- [ ] `renox-oauth` (social login), `renox-admin` (resource tables and forms); billing later
+- [x] `renox-oauth` (social login): #147, docs/oauth.md; `OAuth::new().google().github()
+  .provider(…)`, the `Provider` trait (`authorize_endpoint`, `token_endpoint`, `scopes`,
+  `authorize_params`, `exchange` with the standard `exchange_code`, `profile` → `Profile`),
+  `Credentials::from_config`, `oauth.redirect`/`oauth.callback`/`oauth.unlink`, PKCE (S256)
+  and a single-use session-bound `state`, the `oauth_accounts` table (`OAuthAccount`, no
+  tokens), linking by verified email only, `AccountLinked`/`AccountUnlinked`/`LoggedInWith`;
+  in renox-core: `auth::sign_in`, `register_verified`, `registration_open`,
+  `confirm_identity`, `User::has_password` (passwordless users: an empty `password`; the
+  account page lets them set one and confirms them another way), and the login pages'
+  `renox/auth/login_options.html`; used in examples/teams
+- [ ] `renox-admin` (resource tables and forms); billing later
 
 ### v1.0
 Started by the owner on 2026-10-03, after M34. In steps, one PR each:
@@ -1857,6 +1867,12 @@ Notes:
   directly through `db.sqlite()` / `db.postgres()`.
 - **Service container:** replaced by typed `AppState` and extractors.
 - **No REPL:** `rnx db:shell`, and app commands (`App::command`, M14a) instead of Tinker.
+- **Social login (#147) links accounts only by a verified address**, and never to an account
+  whose own address is unverified (someone may have registered it in another person's name);
+  a user it makes has an empty `password` (no column, no flag: no typed password matches it,
+  `User::has_password` is false), sets one on `/account` without a current one, and proves who
+  they are with a linked provider where others type their password. Provider tokens aren't
+  stored: the crate is for logging in, not for calling the providers' APIs.
 
 ## Not planned
 

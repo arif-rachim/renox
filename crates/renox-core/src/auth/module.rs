@@ -29,17 +29,17 @@ const MIGRATIONS: &[Migration] = &[
     crate::db::framework_migration!("auth", "00010101000006_create_revoked_sessions_table"),
 ];
 
-pub(super) struct Settings {
+pub(crate) struct Settings {
     pub(super) password: crate::validation::Password,
-    registration: bool,
+    pub(super) registration: bool,
     redirect_to: Option<String>,
     pub(super) verify_email: bool,
     rules: Option<RulesFn>,
-    on_registered: Option<RegisteredFn>,
+    pub(super) on_registered: Option<RegisteredFn>,
 }
 
 type RulesFn = Arc<dyn Fn(&Registration, &mut Validator) + Send + Sync>;
-type RegisteredFn = Arc<
+pub(super) type RegisteredFn = Arc<
     dyn Fn(
             AppState,
             User,
@@ -55,7 +55,7 @@ type RegisteredFn = Arc<
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Registration {
-    fields: serde_json::Map<String, Value>,
+    pub(super) fields: serde_json::Map<String, Value>,
 }
 
 impl Registration {
@@ -232,6 +232,17 @@ impl Auth {
         self.redirect_to = Some(path.to_owned());
         self
     }
+
+    fn settings(&self) -> Settings {
+        Settings {
+            password: self.password.clone(),
+            registration: self.registration,
+            redirect_to: self.redirect_to.clone(),
+            verify_email: self.verify_email,
+            rules: self.rules.clone(),
+            on_registered: self.on_registered.clone(),
+        }
+    }
 }
 
 impl Default for Auth {
@@ -250,6 +261,8 @@ impl Module for Auth {
     }
 
     fn register(&self, app: &mut crate::Registry) {
+        // For other ways of logging in (a social login): `auth::sign_in`.
+        app.auth = Some(Arc::new(self.settings()));
         if self.notifications {
             app.share(
                 "unread_notifications",
@@ -290,14 +303,7 @@ impl Module for Auth {
     }
 
     fn routes(&self) -> Routes {
-        let settings = Arc::new(Settings {
-            password: self.password.clone(),
-            registration: self.registration,
-            redirect_to: self.redirect_to.clone(),
-            verify_email: self.verify_email,
-            rules: self.rules.clone(),
-            on_registered: self.on_registered.clone(),
-        });
+        let settings = Arc::new(self.settings());
 
         let mut guest = Routes::new()
             .get("/login", show_login)
@@ -366,7 +372,7 @@ fn message(lang: &Lang, key: &str, params: &[(&str, String)]) -> String {
     crate::i18n::format(&template, params, None)
 }
 
-fn after_login(state: &AppState, settings: &Settings, session: &Session) -> String {
+pub(super) fn after_login(state: &AppState, settings: &Settings, session: &Session) -> String {
     let fallback = settings
         .redirect_to
         .clone()
@@ -669,6 +675,8 @@ pub(super) fn text() -> Value {
         "email_unverified": "Your new email address isn't verified yet: check your inbox.",
         "save": "Save",
         "password_title": "Change password",
+        "set_password_title": "Set a password",
+        "set_password_intro": "You log in with a linked account. Choose a password to log in with it too.",
         "current_password": "Current password",
         "new_password": "New password",
         "password_changed": "Your password is changed. Your other devices are logged out.",

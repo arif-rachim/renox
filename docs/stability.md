@@ -66,6 +66,13 @@ template macros' arguments follow the same promise. Which tags `sanitize` keeps 
 any release if one turns out to be unsafe; the versions of the bundled JavaScript libraries
 may change in minor releases. It depends publicly on no other crate.
 
+`renox-oauth` is the optional social login plugin crate ([oauth.md](oauth.md)), at the same
+version as `renox`. Its public items (the `OAuth` module, the `Provider` trait, `Profile`,
+`Token`, `TokenRequest`, `Credentials`, `Google`, `GitHub`, the `OAuthAccount` model and its
+events) follow the same promise. `Profile`, `Token`, `TokenRequest` and the events are
+`#[non_exhaustive]`; `Provider` may get new methods with default bodies in minor releases. The
+endpoints and scopes Google and GitHub use may change when the providers change them.
+
 ## The promise
 
 From 1.0.0, every 1.x release keeps these promises.

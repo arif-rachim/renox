@@ -617,3 +617,63 @@ async fn two_factor_authentication_is_offered_and_asked_for() {
         .await
         .assert_redirect("/two-factor/challenge");
 }
+
+/// renox-oauth: "Continue with GitHub" makes an account (without a password)
+/// for a new person, and their account page lists the linked login.
+#[renox::test]
+async fn social_login_signs_up_a_new_person() {
+    use renox::http::FakeResponse;
+
+    let w = world_with(|config| {
+        config.vars.insert("GITHUB_CLIENT_ID".into(), "id".into());
+        config
+            .vars
+            .insert("GITHUB_CLIENT_SECRET".into(), "secret".into());
+    })
+    .await;
+    // Only GitHub has credentials here.
+    w.app
+        .get("/login")
+        .await
+        .assert_see("href=\"/auth/github/redirect\"")
+        .assert_dont_see("/auth/google/redirect");
+
+    // GitHub, faked: no network in tests.
+    let http = w.app.fake_http();
+    http.on(
+        "POST https://github.com/login/oauth/access_token",
+        FakeResponse::json(200, json!({ "access_token": "token" })),
+    );
+    http.on(
+        "https://api.github.com/user",
+        FakeResponse::json(200, json!({ "id": 7, "login": "dana", "name": "Dana" })),
+    );
+    http.on(
+        "https://api.github.com/user/emails",
+        FakeResponse::json(
+            200,
+            json!([{ "email": "dana@example.com", "primary": true, "verified": true }]),
+        ),
+    );
+    let to_github = w.app.get("/auth/github/redirect").await;
+    let location = to_github.header("location").unwrap();
+    let state = location
+        .split(['?', '&'])
+        .find_map(|pair| pair.strip_prefix("state="))
+        .unwrap();
+    w.app
+        .get(&format!("/auth/github/callback?code=c&state={state}"))
+        .await
+        .assert_status(303);
+    let dana = User::find_by_email(w.app.db(), "dana@example.com")
+        .await
+        .unwrap()
+        .unwrap();
+    w.app.assert_authenticated(Some(&dana));
+    assert!(!dana.has_password());
+    w.app
+        .get("/account")
+        .await
+        .assert_see("Linked accounts")
+        .assert_see("Set a password");
+}

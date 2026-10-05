@@ -187,6 +187,11 @@ pub(crate) fn begin(
     session.put(PENDING, stored)
 }
 
+/// Drops a login waiting for its second step (another login replaced it).
+pub(crate) fn clear(session: &Session) {
+    session.remove(PENDING);
+}
+
 /// The login waiting for its second step in this session, if there is one
 /// and it is less than ten minutes old.
 pub fn pending_login(session: &Session) -> Option<PendingLogin> {

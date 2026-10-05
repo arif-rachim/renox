@@ -22,6 +22,7 @@ mod direct;
 mod dx;
 mod embed;
 mod extension_points;
+mod external_login;
 mod forms;
 mod grid;
 mod i18n;

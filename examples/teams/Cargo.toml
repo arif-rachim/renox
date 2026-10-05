@@ -7,4 +7,5 @@ publish = false
 [dependencies]
 renox.workspace = true
 renox-2fa.workspace = true
+renox-oauth.workspace = true
 serde = { version = "1.0.229", features = ["derive"] }

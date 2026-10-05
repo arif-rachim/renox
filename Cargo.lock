@@ -2501,6 +2501,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "renox-oauth"
+version = "1.0.0-rc.4"
+dependencies = [
+ "base64 0.23.1",
+ "form_urlencoded",
+ "renox",
+ "serde",
+ "sha2 0.11.0",
+ "tracing",
+]
+
+[[package]]
 name = "renox-site"
 version = "1.0.0-rc.4"
 dependencies = [
@@ -3260,6 +3272,7 @@ version = "0.0.0"
 dependencies = [
  "renox",
  "renox-2fa",
+ "renox-oauth",
  "serde",
 ]
 
