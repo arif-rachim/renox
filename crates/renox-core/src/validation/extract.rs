@@ -199,11 +199,18 @@ where
     if let Some(field) = live_field {
         // `items[0][name]` from the page; its errors are keyed `items.0.name`.
         let key = nested::normalize(&field);
+        // A list's own errors, or its items' (`tags.0`, `tags.1`) when
+        // the field is the list: `each(…)` rules report on the items.
+        let item = |name: &str| {
+            name.strip_prefix(key.as_str())
+                .and_then(|rest| rest.strip_prefix('.'))
+                .is_some_and(|rest| !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_digit()))
+        };
         let messages: Vec<String> = errors
             .iter()
-            .find(|(name, _)| *name == key)
-            .map(|(_, messages)| messages.to_vec())
-            .unwrap_or_default();
+            .filter(|(name, _)| *name == key || item(name))
+            .flat_map(|(_, messages)| messages.iter().cloned())
+            .collect();
         let body = serde_json::json!({ "field": field, "errors": messages });
         return Err((axum::http::StatusCode::OK, axum::Json(body)).into_response());
     }
