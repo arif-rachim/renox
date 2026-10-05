@@ -122,7 +122,16 @@ the top of `crates/renox/tests/it/s3.rs`, and `cargo test -p uploads --features 
   New code comes with tests that run it; check the report for the files you touched.
 
 - **UI changes.** Check pages in a real browser (desktop, a phone width, dark mode): several
-  bugs only showed there (see CLAUDE.md §6.4).
+  bugs only showed there (see CLAUDE.md §6.4). A change to renox.js, the UI kit, the data grid
+  or the editors gets a test in `tests/browser/` (headless Chrome over the DevTools protocol,
+  Node 24, no npm packages): `tests/browser/run.sh`, or one file with
+  `tests/browser/run.sh grid`. CI's `browser` job runs them all.
+- **Processes.** `tests/process/run.sh` runs the app binary and `rnx` as real processes:
+  stopping on signals with a request in flight, `queue:work`, `schedule:work` twice on one
+  database, systemd's socket, `LOG_FORMAT`/`LOG_FILE`, `db:shell` and prompts from a pipe and
+  a terminal, `rnx serve` restarting (and keeping the old app on a failed build), and every
+  example binary served and asked for its pages. Run it after changing `serve`, the commands,
+  logging or an example; `tests/process/run.sh fixture` or `examples` runs one half.
 
 ## Style
 

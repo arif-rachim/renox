@@ -100,9 +100,77 @@ impl Module for Pages {
                 (Toast::success(format!("{} saved.", form.from)), "ok")
             })
             .get("/stock", || async { "stock page" })
+            // A request still running when the server is told to stop.
+            .get("/pause", || async {
+                renox::tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+                "finished"
+            })
+    }
+}
+
+/// Appends `line` to the file `FIXTURE_LOG` names, for tests/process to read.
+fn note(line: &str) {
+    use std::io::Write;
+    if let Ok(path) = std::env::var("FIXTURE_LOG")
+        && let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+    {
+        let _ = writeln!(file, "{line}");
+    }
+}
+
+/// A job that notes it ran.
+#[derive(Serialize, Deserialize)]
+struct Touch {
+    n: u32,
+}
+
+impl Job for Touch {
+    const NAME: &'static str = "fixture-touch";
+    async fn handle(self, _ctx: JobContext) -> Result {
+        note(&format!("job {}", self.n));
+        Ok(())
     }
 }
 
 fn main() -> Result {
-    App::new().module(Pages).run()
+    let mut app = App::new()
+        .module(Pages)
+        .job::<Touch>()
+        // `jobs:push 3`: queues three Touch jobs.
+        .command("jobs:push", "Queues Touch jobs", |args, state| async move {
+            let count: u32 = args
+                .positional()
+                .first()
+                .and_then(|n| n.parse().ok())
+                .unwrap_or(1);
+            for n in 1..=count {
+                state.dispatch(Touch { n }).await?;
+            }
+            Ok(())
+        })
+        // `ask:me`: asks every kind of question and prints the answers.
+        .command("ask:me", "Asks questions", |_args, _state| async move {
+            let name = renox::prompt::ask("Name?").await?;
+            let sure = renox::prompt::confirm("Sure?", false).await?;
+            let size = renox::prompt::choice("Size?", &["small", "large"], None).await?;
+            let secret = renox::prompt::secret("Secret?").await?;
+            println!(
+                "answers: {name} | {sure} | {size} | {} characters",
+                secret.len()
+            );
+            Ok(())
+        });
+    // A task every second, only when asked (tests/process).
+    if std::env::var("FIXTURE_TICK").is_ok() {
+        app = app.schedule(|s| {
+            s.every(std::time::Duration::from_secs(1), "tick", |_state| async {
+                note("tick");
+                Ok(())
+            });
+        });
+    }
+    app.run()
 }

@@ -320,16 +320,46 @@ let url = app.serve().await; // http://127.0.0.1:PORT, until the test ends
 `app.serve()` starts a real server on a free port and returns its address. The server keeps
 running until the test ends.
 
-Renox's own browser checks run headless Chrome (Chrome without a window) with
-`--remote-debugging-port`, and a short script per page. The steps:
+Renox tests its own JavaScript this way, in `tests/browser/` (run them with
+`tests/browser/run.sh`, or one file: `tests/browser/run.sh grid`). It is a small harness you
+can copy into an app: Node's own test runner and WebSocket speaking CDP to headless Chrome
+(Chrome without a window), with no npm packages.
 
-1. Log in through the form, then open the page.
-2. Do what a person would: click, type, press keys with `Input.dispatchKeyEvent`. (Events made
-   up by a script don't trigger every handler, so real key presses are safer.)
-3. Read the DOM (the page as the browser built it), and take screenshots at 1100 px, 390 px (a
-   phone) and in dark mode.
-4. Check the console for errors and CSP violations (scripts or styles the page's security
-   policy blocked).
+- `lib/cdp.mjs` starts Chrome with a throwaway profile and gives each test a fresh page:
+  `goto`, real mouse clicks, typing (`Input.insertText`), key presses
+  (`Input.dispatchKeyEvent`: events made up by a script don't trigger every handler),
+  `waitFor` a condition, `settle` until htmx is idle. It collects console errors, uncaught
+  exceptions and CSP violations (scripts or styles the page's security policy blocked), and
+  `assertClean()` fails the test when there are any.
+- `lib/app.mjs` starts an app binary on a free port with its own database and storage,
+  migrated and seeded, and stops it.
+
+```js
+test('a 422 keeps what was typed', () =>
+  browser.with(async (page) => {
+    await page.goto(`${app.url}/products/new`);
+    await page.type('[name=price]', '-5');
+    await page.click('form button[type=submit]');
+    await page.waitFor(() => document.querySelector('[name=price]').getAttribute('aria-invalid'));
+    assert.equal(await page.eval(() => document.querySelector('[name=price]').value), '-5');
+    page.assertClean({ allow: [/422/] });
+  }));
+```
+
+Things that cost time to find:
+
+- Close every page (`browser.with` does it, even when the test fails): each open tab keeps its
+  live-reload stream, and Chrome allows six connections per host, so later pages hang.
+- Headless Chrome has no mouse that hovers (`(hover: hover)` is false), so hover-only behaviour
+  (tooltips) never runs. Start it with
+  `--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4`.
+- The browser checks `required` and `type="email"` itself and won't send an invalid form. To
+  test the server's errors, give the form `novalidate` (the kit's sheets have it).
+- `hx-confirm` opens a native `confirm()` that blocks the page; accept it with
+  `Page.handleJavaScriptDialog` (the harness does, and records it in `page.dialogs`).
+- Take screenshots at 1100 px, 390 px (a phone) and in dark mode, and look at them: layout
+  problems (an element pushed off screen, a misaligned dialog) pass every assertion. The
+  harness saves one for every test that fails.
 
 > [!TIP]
 > Look at the screenshots, not only the numbers. Layout problems (an element pushed off

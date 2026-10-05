@@ -1832,6 +1832,11 @@ Notes:
 
 ## Decisions
 
+- **Browser tests on Node's own test runner and raw CDP** (#262, 2026-10): `tests/browser/`
+  drives headless Chrome over the DevTools protocol with Node 24's `node:test` and global
+  `WebSocket`, no npm packages, rather than a Rust CDP client (a large dev-dependency tree) or
+  Playwright (npm, browsers to download). The harness is small enough to copy into an app.
+  Process e2e (`tests/process/`) is Python like `tests/cli/smoke.py`.
 - **Markdown in templates:** `pulldown-cmark` without its default features renders it; instead
   of a sanitizer (ammonia pulls in html5ever) raw HTML events become text and link and image
   URLs other than http(s), mailto, tel and relative ones become `#`. That is enough because

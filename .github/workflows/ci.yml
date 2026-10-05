@@ -201,6 +201,19 @@ jobs:
           name: browser-screens
           path: browser-screens
 
+  process:
+    name: process
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # The app binary and rnx as real processes (signals, workers, the
+      # scheduler, systemd's socket, logs, prompts, rnx serve), and every
+      # example binary served and asked for its pages (tests/process, #270).
+      - run: sudo apt-get update && sudo apt-get install -y systemd
+      - run: tests/process/run.sh
+
   tutorial:
     name: tutorial (docs/tutorial.md, followed step by step)
     runs-on: ubuntu-latest
