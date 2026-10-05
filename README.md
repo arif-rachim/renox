@@ -45,7 +45,7 @@ SQLite; on Linux `build-essential` or your distribution's equivalent, on macOS
 `xcode-select --install`).
 
 ```bash
-cargo install renox-cli --version 1.0.0-rc.4   # installs `rnx`, Renox's command-line tool
+cargo install renox-cli --version 1.0.0-rc.5   # installs `rnx`, Renox's command-line tool
 rnx new blog && cd blog                        # or: --starter, --database postgres, --tailwind
 rnx serve                                      # http://127.0.0.1:3000
 ```
@@ -129,7 +129,7 @@ pages. Run `cargo test` after changes.
    instead of fetching or guessing:
 
    ```bash
-   git clone --depth 1 --branch v1.0.0-rc.4 https://github.com/arif-rachim/renox ~/src/renox
+   git clone --depth 1 --branch v1.0.0-rc.5 https://github.com/arif-rachim/renox ~/src/renox
    claude --add-dir ~/src/renox     # or, inside a session: /add-dir ~/src/renox
    ```
 
@@ -624,8 +624,9 @@ change on `main`.
 
 ## Status
 
-Renox **1.0.0-rc.4**, the release candidate for 1.0, is on crates.io (`renox`,
-`renox-core`, `renox-macros`, `renox-cli`). If nothing turns up, the same code becomes 1.0.0,
+Renox **1.0.0-rc.5**, the release candidate for 1.0, is on crates.io (`renox`,
+`renox-core`, `renox-macros`, `renox-cli`, and the plugins `renox-2fa`, `renox-editors`,
+`renox-oauth`, `renox-admin` and `renox-billing`). If nothing turns up, the same code becomes 1.0.0,
 and from there Renox follows semver ([docs/stability.md](docs/stability.md)). The [Laravel parity review](docs/audit/2026-10-laravel-parity.md)
 compares it with Laravel and Filament feature by feature, as of October 2026. Since the first
 review (after M17), milestones M18–M32 closed its gaps:

@@ -10,6 +10,63 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+## 1.0.0-rc.5 · 2026-10-05
+
+- **Roles per branch (#244):** a role can be given in one record (a store, a team, a school)
+  and for a period: `user.assign_role_in(&db, "manager", &Scope::of(&store))` with optional
+  `.from(date)` / `.until(date)`, `remove_role_in`, `sync_roles_in`, `assignments`,
+  `users_with_role_in`. Each request picks its scope with `permissions::set_scope(…)`, and
+  the existing checks (`require_role`, `require_permission`, `has_role`, `has_permission`,
+  `can()`) count the global roles plus the roles in that scope that are within their dates.
+  For policies and lists: `has_permission_in(permission, scope)` (the record's scope) and
+  `scopes_with::<Store>(permission)` (`All`, or the stores where the user has it;
+  `Scopes::apply` filters a query on one or more columns). Migration
+  `00010101000510_add_scope_to_role_user` (Permissions module); existing assignments stay
+  global with no dates, so apps with global roles only see no change. `permissions:prune`
+  deletes ended assignments. `route:list` marks role and permission guards that count the
+  active scope. Guide: docs/authorization.md "Roles per branch".
+- **New plugin: renox-oauth (#147):** sign in with Google and GitHub (another provider is one
+  `Provider` impl). Accounts link by an address both sides verified; new users can sign up
+  without a password and set one later; providers are unlinked from `/account` (never the
+  last way in); state and PKCE are checked; the second login step (renox-2fa) still applies.
+  renox-core gains `auth::sign_in`, `register_verified`, `registration_open`,
+  `confirm_identity` and `User::has_password`; the account page handles users without a
+  password. Guide: docs/oauth.md; examples/teams uses it.
+- **New plugin: renox-admin (#148):** an admin panel generated from the models (Filament's
+  resources): `Admin::new().authorize(…).resource(…)` with an `AdminResource` per model
+  (grid columns, form fields, filters, actions, policy). Lists with search, filters, bulk
+  actions and exports, create/edit forms, delete, a trash tab for soft deletes, a view page.
+  Closed until `authorize` or `gate` is set. Guide: docs/admin.md; new example examples/admin.
+- **New plugin: renox-billing (#155):** subscriptions with Stripe and Xendit (Laravel
+  Cashier): plans in code, trials (with or without a payment method), checkout, swap,
+  cancel, resume; the gateways' webhooks through `renox::webhook` (signatures checked, each
+  event applied once, older events ignored); `require_subscription` / `require_plan`
+  guards; a plans page and an account card. renox-core gains `Registry::provide`. Guide:
+  docs/billing.md; new example examples/billing.
+- **Fixed (#219), from the docs audit's list of suspected bugs:**
+  - `.without_csrf()` didn't exempt a `Routes::resource` update route from CSRF for PUT or
+    PATCH (it is listed as `PUT|PATCH`).
+  - On PostgreSQL, `?` inside dollar-quoted (`$$…$$`, `$tag$…$tag$`) and `E'…'` strings was
+    turned into a placeholder.
+  - A migration with `CONCURRENTLY` followed by a line break or tab ran inside a transaction
+    and failed on PostgreSQL.
+  - `migrations!` ignored a `.postgres.down.sql` / `.sqlite.down.sql` without its own
+    `.up.sql`; it is now a compile error (**breaking** for an app that has such a file:
+    give it its own `.up.sql`, or delete it).
+  - A job whose worker died during its last attempt went to `failed_jobs` without its
+    `failed` hook or an error report; both now run.
+  - `REQUEST_TIMEOUT` didn't bound the session and auth layers (database sessions waiting for
+    a connection); they're now cut off one second after the handler's limit.
+  - Registration skipped a second login step that every user must pass.
+  - Docs: `i8` and bare `serde_json::Value` on PostgreSQL, the `file` field's Rust type,
+    `.fragment()` and hx-boost, TestApp's defaults, the grid's search and selection limits,
+    the 1.x promise for new commands, RELEASING.md after the first release.
+- **Fixed (#226):** with live reload on, pages kept in the browser's back/forward cache held
+  their `/_renox/live` stream open, and after a few navigations requests hung. Live reload
+  and the notification bell's stream now close when a page is hidden and reopen when it
+  comes back.
+- **Fixed:** `rnx new --notifications` panicked when `rnx` was built from a checkout with
+  CRLF line endings (Git on Windows).
 - **Dashboards (#152):** `chart("scatter", …)` and `chart("bubble", …)` place points by two
   numbers (a bubble's area by a third), with axes fitted to the data, `x_title`/`y_title`
   (also on line, area and bar charts), `x_format`/`size_format`, a tooltip per point (the
