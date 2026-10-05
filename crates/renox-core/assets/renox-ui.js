@@ -219,18 +219,42 @@
   // by the bell and `event_stream()`. The app's own events
   // (`state.broadcast(…)`) arrive as `broadcast` and are dispatched on
   // `document` under their own name, with their data as `detail`.
+  // The stream closes on `pagehide` (a page kept in the back/forward cache
+  // would hold its connection, and browsers allow six per host) and opens
+  // again on `pageshow` with the same listeners. Listeners are added through
+  // the object `openStream` returns, which keeps them for that reopening.
   var stream = null;
+  var streamUrl = null;
+  var streamListeners = [];
+  var streamHandle = {
+    addEventListener: function (name, listener) {
+      streamListeners.push([name, listener]);
+      if (stream) stream.addEventListener(name, listener);
+    }
+  };
+  function connectStream() {
+    stream = new EventSource(streamUrl);
+    streamListeners.forEach(function (pair) { stream.addEventListener(pair[0], pair[1]); });
+  }
   function openStream(url) {
-    if (stream || !url || !window.EventSource) return stream;
-    stream = new EventSource(url);
-    stream.addEventListener("broadcast", function (event) {
+    if (streamUrl) return streamHandle;
+    if (!url || !window.EventSource) return null;
+    streamUrl = url;
+    streamHandle.addEventListener("broadcast", function (event) {
       var message;
       try { message = JSON.parse(event.data); } catch (e) { return; }
       if (!message || typeof message.event !== "string") return;
       document.dispatchEvent(new CustomEvent(message.event, { detail: message.data }));
     });
-    window.addEventListener("pagehide", function () { stream.close(); });
-    return stream;
+    connectStream();
+    window.addEventListener("pagehide", function () {
+      if (stream) stream.close();
+      stream = null;
+    });
+    window.addEventListener("pageshow", function (event) {
+      if (event.persisted && !stream) connectStream();
+    });
+    return streamHandle;
   }
   window.Renox.stream = function () { return stream; };
 

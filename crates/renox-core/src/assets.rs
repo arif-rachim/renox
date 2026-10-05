@@ -230,13 +230,28 @@ const RENOX: &str = r#"(function () {
 
   var live = document.querySelector('meta[name="renox-live"]');
   if (live && window.EventSource) {
+    // Closed on `pagehide`: a page kept in the back/forward cache would hold
+    // its stream open, and after a few navigations the browser's six
+    // connections per host are used up and requests hang. Opened again on
+    // `pageshow`; a new boot id then reloads a page restored after a restart.
     var boot = null;
-    var source = new EventSource("/_renox/live");
-    source.addEventListener("boot", function (event) {
-      if (boot !== null && boot !== event.data) location.reload();
-      boot = event.data;
+    var source = null;
+    var connect = function () {
+      source = new EventSource("/_renox/live");
+      source.addEventListener("boot", function (event) {
+        if (boot !== null && boot !== event.data) location.reload();
+        boot = event.data;
+      });
+      source.addEventListener("reload", function () { location.reload(); });
+    };
+    connect();
+    window.addEventListener("pagehide", function () {
+      if (source) source.close();
+      source = null;
     });
-    source.addEventListener("reload", function () { location.reload(); });
+    window.addEventListener("pageshow", function (event) {
+      if (event.persisted && !source) connect();
+    });
   }
 })();
 "#;
@@ -412,6 +427,35 @@ mod ui_tests {
             let rule = &css[start..];
             let rule = &rule[..rule.find('}').unwrap()];
             assert!(rule.contains("margin: auto;"), "{rule}");
+        }
+    }
+
+    /// Server-Sent Events streams close when the page is hidden and open again
+    /// when it comes back from the back/forward cache, or every cached page
+    /// keeps a connection and the browser's six per host run out (#226).
+    #[test]
+    fn event_streams_close_on_pagehide_and_reopen_on_pageshow() {
+        for (script, opened) in [
+            (super::RENOX, "new EventSource(\"/_renox/live\")"),
+            (super::UI_JS, "new EventSource(streamUrl)"),
+        ] {
+            let start = script.find(opened).expect(opened);
+            let (mut from, mut to) = (start.saturating_sub(1200), (start + 1200).min(script.len()));
+            while !script.is_char_boundary(from) {
+                from -= 1;
+            }
+            while !script.is_char_boundary(to) {
+                to += 1;
+            }
+            let around = &script[from..to];
+            for needle in [
+                "\"pagehide\"",
+                ".close()",
+                "\"pageshow\"",
+                "event.persisted",
+            ] {
+                assert!(around.contains(needle), "{needle} near {opened}");
+            }
         }
     }
 }
