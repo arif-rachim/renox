@@ -893,6 +893,12 @@ mod route_name_tests {
         assert!(!route_name_matches("shop.products.show", "products.*"));
         assert!(route_name_matches("anything", "*"));
         assert!(!route_name_matches("admin", "admin.*"));
+        // A middle part that isn't there (#252).
+        assert!(!route_name_matches("admin.users.index", "admin.*.posts.*"));
+        assert!(route_name_matches(
+            "admin.users.posts.edit",
+            "admin.*.posts.*"
+        ));
     }
 }
 

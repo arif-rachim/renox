@@ -325,4 +325,96 @@ mod tests {
         assert!(a.starts_with("products/") && a.ends_with(".png"), "{a}");
         assert_ne!(a, upload("a.png", b"x").key("products"));
     }
+
+    // #252: the accessors, JPEG and WebP headers the other tests don't use,
+    // and what's kept of a file in old input.
+
+    fn webp(chunk: &[u8; 4], body: &[u8]) -> Vec<u8> {
+        let mut b = b"RIFF\0\0\0\0WEBP".to_vec();
+        b.extend_from_slice(chunk);
+        b.extend_from_slice(&[0, 0, 0, 0]);
+        b.extend_from_slice(body);
+        b.resize(40, 0);
+        b
+    }
+
+    #[test]
+    fn webp_lossy_and_lossless_headers_and_unknown_chunks() {
+        // VP8 (lossy): a key frame start code, then 14-bit width and height.
+        let mut lossy = vec![0u8; 3];
+        lossy.extend_from_slice(&[0x9D, 0x01, 0x2A]);
+        lossy.extend_from_slice(&640u16.to_le_bytes());
+        lossy.extend_from_slice(&480u16.to_le_bytes());
+        let file = Upload::new("a.webp", "image/webp", webp(b"VP8 ", &lossy));
+        assert_eq!(file.sniffed_type(), Some("image/webp"));
+        assert_eq!(file.dimensions(), Some((640, 480)));
+        // VP8L (lossless): 0x2F, then (width - 1) and (height - 1) in 14 bits each.
+        let bits: u32 = (99) | (49 << 14);
+        let mut lossless = vec![0x2F];
+        lossless.extend_from_slice(&bits.to_le_bytes());
+        let file = Upload::new("b.webp", "image/webp", webp(b"VP8L", &lossless));
+        assert_eq!(file.dimensions(), Some((100, 50)));
+        // A chunk Renox doesn't read: no size, but still a WebP.
+        let file = Upload::new("c.webp", "image/webp", webp(b"ALPH", &[]));
+        assert!(file.is_image());
+        assert_eq!(file.dimensions(), None);
+    }
+
+    #[test]
+    fn jpeg_headers_skip_fill_bytes_and_standalone_markers() {
+        // SOI, a fill byte, an RST marker (no length), an APP0 segment, then
+        // SOF0 with height 20 and width 30.
+        let mut jpeg = vec![
+            0xFF, 0xD8, 0xFF, 0xFF, 0xD0, 0xFF, 0xE0, 0x00, 0x04, 0x00, 0x00,
+        ];
+        jpeg.extend_from_slice(&[0xFF, 0xC0, 0x00, 0x11, 0x08, 0x00, 0x14, 0x00, 0x1E]);
+        let file = Upload::new("photo.JPG", "image/jpeg", jpeg);
+        assert_eq!(file.sniffed_type(), Some("image/jpeg"));
+        assert_eq!(file.dimensions(), Some((30, 20)));
+        assert!(
+            file.key("photos").ends_with(".jpg"),
+            "{}",
+            file.key("photos")
+        );
+        // Cut off before any frame header: no size.
+        let cut = Upload::new("cut.jpg", "image/jpeg", vec![0xFF, 0xD8, 0xFF, 0xE0, 0x00]);
+        assert_eq!(cut.dimensions(), None);
+        // A PNG whose first chunk isn't IHDR: no size.
+        let odd = Upload::new(
+            "odd.png",
+            "image/png",
+            b"\x89PNG\r\n\x1a\n\0\0\0\x0dJUNK".to_vec(),
+        );
+        assert_eq!(odd.dimensions(), None);
+    }
+
+    #[test]
+    fn accessors_debug_and_old_input() {
+        let file = Upload::new("notes", "text/plain", b"hello".to_vec());
+        assert_eq!(file.content_type(), "text/plain");
+        assert_eq!(file.size(), 5);
+        assert_eq!(file.extension(), None);
+        // No extension and nothing sniffed: stored as .bin, with no folder.
+        assert!(file.key("").ends_with(".bin") && !file.key("").contains('/'));
+        // Debug shows the size, never the bytes.
+        let shown = format!("{file:?}");
+        assert!(
+            shown.contains("size: 5") && !shown.contains("hello"),
+            "{shown}"
+        );
+        // Old input keeps only the name.
+        assert_eq!(serde_json::to_value(&file).unwrap(), "notes");
+    }
+
+    #[tokio::test]
+    async fn store_keeps_the_file_private() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut config = crate::Config::default();
+        config.storage_path = dir.path().to_path_buf();
+        let storage = crate::storage::Storage::from_config(&config).unwrap();
+        let file = Upload::new("a.txt", "text/plain", b"hi".to_vec());
+        let key = file.store(&storage, "/notes/").await.unwrap();
+        assert!(key.starts_with("notes/") && key.ends_with(".txt"), "{key}");
+        assert_eq!(&storage.get(&key).await.unwrap().unwrap()[..], b"hi");
+    }
 }
