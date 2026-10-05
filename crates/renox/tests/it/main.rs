@@ -63,5 +63,6 @@ mod types;
 mod ui;
 mod uploads;
 mod validation;
+mod views;
 mod web_security;
 mod webhook;

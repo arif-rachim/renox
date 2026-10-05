@@ -830,8 +830,23 @@ pub(crate) async fn middleware(
                         Error::Internal(err) => err,
                         other => anyhow::anyhow!("{other:?}"),
                     };
-                    return Error::Internal(err.context(format!("sharing `{key}` with views")))
-                        .into_response();
+                    // Shown like any error: the error page, with the detail
+                    // while debugging.
+                    let mut failed =
+                        Error::Internal(err.context(format!("sharing `{key}` with views")))
+                            .into_response();
+                    return match failed.extensions_mut().remove::<ErrorPage>() {
+                        Some(page) => error_response(
+                            &state,
+                            page,
+                            failed,
+                            wants_json,
+                            &htmx,
+                            &request_line,
+                            None,
+                        ),
+                        None => failed,
+                    };
                 }
             }
         }

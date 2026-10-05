@@ -569,4 +569,144 @@ mod tests {
         assert_eq!(format_number(999.0, 0, "en"), "999");
         assert_eq!(format_number(-0.001, 2, "en"), "0.00");
     }
+
+    // #251: the filters' error messages and their less common inputs, in an
+    // environment with no `t` (as in some renders), so `since` falls back to
+    // the built-in English texts.
+
+    fn env(zone: crate::timezone::Zone) -> minijinja::Environment<'static> {
+        let mut env = minijinja::Environment::new();
+        env.add_filter("number", number);
+        env.add_filter("date", date(zone));
+        env.add_filter("since", since(zone));
+        env.add_filter("words", words);
+        env.add_filter("markdown", markdown);
+        env.add_function("class_names", class_names);
+        env.add_function("sparkline", sparkline);
+        env
+    }
+
+    fn render(env: &minijinja::Environment<'static>, source: &str) -> Result<String, String> {
+        env.render_str(
+            source,
+            minijinja::context! { nothing => (), list => vec![1, 2] },
+        )
+        .map_err(|err| format!("{err:#}"))
+    }
+
+    #[test]
+    fn number_reads_numeric_text_and_names_what_isnt() {
+        let env = env(crate::timezone::Zone::UTC);
+        assert_eq!(
+            render(&env, "{{ ' 1234.5 ' | number(1) }}").unwrap(),
+            "1,234.5"
+        );
+        let err = render(&env, "{{ 'cheap' | number }}").unwrap_err();
+        assert!(err.contains("number: `cheap` is not a number"), "{err}");
+        let err = render(&env, "{{ list | number }}").unwrap_err();
+        assert!(err.contains("is not a number"), "{err}");
+    }
+
+    #[test]
+    fn date_shows_moments_in_the_apps_zone() {
+        let jakarta: crate::timezone::Zone = "+07:00".parse().unwrap();
+        let env = env(jakarta);
+        // A moment moves to the zone; a local date-time or a date stays.
+        assert_eq!(
+            render(
+                &env,
+                "{{ '2026-10-01T23:30:00Z' | date('%Y-%m-%d %H:%M') }}"
+            )
+            .unwrap(),
+            "2026-10-02 06:30"
+        );
+        assert_eq!(
+            render(&env, "{{ '2026-10-01T23:30:00' | date('%H:%M') }}").unwrap(),
+            "23:30"
+        );
+        assert_eq!(
+            render(&env, "{{ '2026-10-01' | date('%d/%m') }}").unwrap(),
+            "01/10"
+        );
+        let err = render(&env, "{{ 'tomorrow' | date }}").unwrap_err();
+        assert!(err.contains("date: `tomorrow` is not a date"), "{err}");
+    }
+
+    #[test]
+    fn since_without_t_uses_the_english_texts() {
+        let env = env(crate::timezone::Zone::UTC);
+        let now = chrono::Utc::now();
+        let at = |delta: i64| (now + chrono::Duration::seconds(delta)).to_rfc3339();
+        let show = |delta: i64| {
+            env.render_str("{{ at | since }}", minijinja::context! { at => at(delta) })
+                .unwrap()
+        };
+        assert_eq!(show(-10), "just now");
+        assert_eq!(show(-3 * 3600), "3 hours ago");
+        assert_eq!(show(2 * 86_400 + 60), "in 2 days");
+        // A local date-time and a date are read in the zone too.
+        let yesterday = (now - chrono::Duration::days(1)).date_naive().to_string();
+        let shown = env
+            .render_str("{{ at | since }}", minijinja::context! { at => yesterday })
+            .unwrap();
+        assert!(shown.ends_with("ago"), "{shown}");
+        let err = render(&env, "{{ 'later' | since }}").unwrap_err();
+        assert!(err.contains("since: `later` is not a date"), "{err}");
+    }
+
+    #[test]
+    fn words_and_markdown_take_nothing_and_other_values() {
+        let env = env(crate::timezone::Zone::UTC);
+        assert_eq!(render(&env, "[{{ nothing | words(3) }}]").unwrap(), "[]");
+        assert_eq!(render(&env, "[{{ missing | words(3) }}]").unwrap(), "[]");
+        assert_eq!(
+            render(&env, "{{ 'one two three four' | words(2, end=' (more)') }}").unwrap(),
+            "one two (more)"
+        );
+        assert_eq!(render(&env, "{{ 12345 | words(1) }}").unwrap(), "12345");
+        assert_eq!(render(&env, "[{{ nothing | markdown }}]").unwrap(), "[]");
+        assert!(
+            render(&env, "{{ 42 | markdown }}")
+                .unwrap()
+                .contains("<p>42</p>")
+        );
+    }
+
+    #[test]
+    fn class_names_skip_values_that_are_neither_text_nor_maps() {
+        let env = env(crate::timezone::Zone::UTC);
+        assert_eq!(
+            render(
+                &env,
+                "{{ class_names('a b', 3, none, {'c': true, 'd': false}, 'a') }}"
+            )
+            .unwrap(),
+            "a b c"
+        );
+    }
+
+    #[test]
+    fn sparkline_reads_its_keywords() {
+        let env = env(crate::timezone::Zone::UTC);
+        let bars = render(
+            &env,
+            "{{ sparkline(list, kind='bars', width=2, height=2, label='Sales') }}",
+        )
+        .unwrap();
+        assert_eq!(bars.matches("<rect").count(), 2, "{bars}");
+        // Width and height are at least 8 pixels.
+        assert!(
+            bars.contains("width=\"8\"") && bars.contains("height=\"8\""),
+            "{bars}"
+        );
+        assert!(bars.contains("aria-label=\"Sales\""), "{bars}");
+        // Something that isn't a list draws an empty chart.
+        assert!(
+            render(&env, "{{ sparkline(5) }}")
+                .unwrap()
+                .ends_with("></svg>")
+        );
+        let err = render(&env, "{{ sparkline(list, colour='red') }}").unwrap_err();
+        assert!(err.contains("colour"), "{err}");
+    }
 }
