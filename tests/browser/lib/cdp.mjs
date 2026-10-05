@@ -69,6 +69,15 @@ export class Browser {
     const page = await this.page(options);
     try {
       return await fn(page);
+    } catch (error) {
+      // A picture of the page as it failed, for CI's artifacts.
+      const dir = process.env.BROWSER_SCREENS || join(process.cwd(), 'target', 'browser-screens');
+      const name = `${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
+      try {
+        await page.screenshot(join(dir, name));
+        error.message += `\n(screenshot: ${join(dir, name)})`;
+      } catch {}
+      throw error;
     } finally {
       await page.close();
     }
@@ -141,6 +150,13 @@ export class Page {
     });
     this.on('Log.entryAdded', ({ entry }) => {
       if (entry.level === 'error') this.problems.push(`${entry.source}: ${entry.text}`);
+    });
+    // Native dialogs (alert, confirm: htmx's hx-confirm) would block the
+    // page: they are accepted and recorded in `dialogs`.
+    this.dialogs = [];
+    this.on('Page.javascriptDialogOpening', ({ message, type }) => {
+      this.dialogs.push({ type, message });
+      this.send('Page.handleJavaScriptDialog', { accept: true });
     });
     await this.send('Page.enable');
     await this.send('Runtime.enable');

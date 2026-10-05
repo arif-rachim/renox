@@ -179,6 +179,28 @@ jobs:
       # over HTTP (tests/cli/smoke.py).
       - run: tests/cli/run.sh ${{ matrix.database }}
 
+  browser:
+    name: browser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # Headless Chrome (preinstalled on the runner) driven over the DevTools
+      # protocol by Node's own test runner: renox.js, the UI kit, the data
+      # grid, the editors and example flows (tests/browser, #262).
+      - run: tests/browser/run.sh
+        env:
+          BROWSER_SCREENS: ${{ github.workspace }}/browser-screens
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-screens
+          path: browser-screens
+
   tutorial:
     name: tutorial (docs/tutorial.md, followed step by step)
     runs-on: ubuntu-latest
