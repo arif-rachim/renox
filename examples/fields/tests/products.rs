@@ -332,3 +332,63 @@ async fn a_product_can_be_deleted() {
         .await
         .assert_status(404);
 }
+
+#[renox::test]
+async fn the_editors_save_rich_text_cleaned_and_code_as_typed() {
+    let app = TestApp::new(fields::app()).await;
+    let mut form = FULL.to_vec();
+    form.extend([
+        (
+            "details",
+            r#"<div>Roasted <strong>weekly</strong><img src=x onerror="alert(1)"></div>"#,
+        ),
+        ("settings", "{\"grind\": \"<fine>\"}"),
+    ]);
+    app.post("/products", &form).await.assert_status(303);
+    let product = Product::query().first(app.db()).await.unwrap().unwrap();
+    assert_eq!(
+        product.details.as_deref(),
+        Some("<div>Roasted <strong>weekly</strong></div>")
+    );
+    assert_eq!(product.settings.as_deref(), Some("{\"grind\": \"<fine>\"}"));
+
+    // The edit form gives each editor its value; the page loads the editors once.
+    let edit = app
+        .get(&format!("/products/{}/edit", product.id))
+        .await
+        .assert_ok()
+        .assert_see(r#"name="details" value="&lt;div&gt;Roasted &lt;strong&gt;weekly&lt;/strong&gt;&lt;/div&gt;""#)
+        .assert_see(r#"data-rx-code-editor data-language="json""#)
+        .assert_see(">{&quot;grind&quot;: &quot;&lt;fine&gt;&quot;}</textarea>")
+        .assert_see(r#"data-rx-markdown"#)
+        .text();
+    assert_eq!(edit.matches("data-renox-editors").count(), 1);
+
+    // The page shows the rich text and highlights the code, with buttons
+    // beside some entries.
+    app.get(&format!("/products/{}", product.id))
+        .await
+        .assert_see("<div>Roasted <strong>weekly</strong></div>")
+        .assert_see(r#"<code class="language-json" data-rx-highlight translate="no">{&quot;grind&quot;: &quot;&lt;fine&gt;&quot;}</code>"#)
+        .assert_see(&format!(
+            r#"href="/products/{}/edit" aria-label="Edit this product""#,
+            product.id
+        ));
+
+    // Settings that aren't JSON, and an emptied rich text editor.
+    let mut bad = FULL.to_vec();
+    bad.extend([("details", "<div><br></div>"), ("settings", "{grind")]);
+    app.htmx()
+        .post("/products", &bad)
+        .await
+        .assert_invalid("settings");
+    let mut empty = FULL.to_vec();
+    empty.extend([("details", "<div><br></div>"), ("settings", "")]);
+    let res = app.post("/products", &empty).await;
+    let id = res.header("location").unwrap().split('/').nth(2).unwrap();
+    let saved = Product::find(app.db(), id.parse().unwrap())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!((saved.details, saved.settings), (None, None));
+}

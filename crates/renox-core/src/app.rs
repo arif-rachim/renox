@@ -559,7 +559,10 @@ impl App {
             second_factor,
             duplicate_second_factor,
             mut account_sections,
+            assets: static_assets,
         } = self.registry;
+        check_assets(&static_assets)?;
+        let static_assets: Arc<[crate::registry::StaticAsset]> = static_assets.into();
         if let Some(name) = duplicate_job {
             return Err(anyhow!("job `{name}` is registered twice").into());
         }
@@ -826,7 +829,7 @@ impl App {
         }
 
         let public = embedded.map(|e| e.public);
-        let default = build_router(router, state.clone(), public, fallback);
+        let default = build_router(router, state.clone(), public, fallback, &static_assets);
         let router = if domains.is_empty() {
             default
         } else {
@@ -835,7 +838,7 @@ impl App {
                 .map(|(pattern, router, fallback)| {
                     (
                         pattern,
-                        build_router(router, state.clone(), public, fallback),
+                        build_router(router, state.clone(), public, fallback, &static_assets),
                     )
                 })
                 .collect();
@@ -1558,11 +1561,34 @@ fn check_clashes(
     Ok(())
 }
 
+/// `Registry::asset` paths: each starts with `/` and is used once.
+fn check_assets(assets: &[crate::registry::StaticAsset]) -> Result<()> {
+    let mut seen = std::collections::HashSet::new();
+    for asset in assets {
+        if !asset.path.starts_with('/') || asset.path.contains(['{', '}']) {
+            return Err(anyhow!(
+                "Registry::asset(\"{}\", …): the path must start with `/` and have no `{{…}}` parameters",
+                asset.path
+            )
+            .into());
+        }
+        if !seen.insert(asset.path) {
+            return Err(anyhow!(
+                "two modules serve a file at `{}` (Registry::asset)",
+                asset.path
+            )
+            .into());
+        }
+    }
+    Ok(())
+}
+
 fn build_router(
     router: Router<AppState>,
     state: AppState,
     embedded_public: Option<&'static [(&'static str, &'static [u8])]>,
     fallback: Option<axum::routing::MethodRouter<AppState>>,
+    static_assets: &[crate::registry::StaticAsset],
 ) -> Router {
     // No route and no public file: the app's fallback (`Routes::fallback`), else a 404.
     let fallback = fallback.map(|handler| handler.with_state(state.clone()));
@@ -1669,6 +1695,7 @@ fn build_router(
             crate::inspector::middleware,
         ))
         .merge(assets::router())
+        .merge(assets::module_router(static_assets))
         .merge(crate::health::router())
         .merge(robots(&state, embedded_public))
         .merge(favicon(&state, embedded_public))

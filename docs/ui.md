@@ -687,9 +687,21 @@ This card shows an order in two columns:
 | `format` | `"date"` and `"datetime"` (with `date_format`, using chrono's codes; in `APP_TIMEZONE`). `"since"`: "3 hours ago", with the date as its tooltip. `"money"`: in `APP_CURRENCY`, or `currency="USD"`. `"number"` (with `decimals`). `"markdown"`. `"bool"`: a check and "Yes", or a cross and "No". `"color"`: a colour sample and its code. `"image"`: a URL (with `image_size`, `circular`). `"key_value"`: pairs or a map, such as `KeyValues`, as a table. |
 | `badge`, `labels` | `badge=true`, a kind (`"success"`), or kinds by value (`{"paid": "success"}`). `labels` gives raw values friendly names (`{"paid": "Paid"}`), with or without a badge. |
 | `url`, `new_tab`, `copyable` | A link; a copy button (it copies the raw value). |
+| `prefix_actions`, `suffix_actions` | Buttons before or after the value, a list of mappings: `label` (also the tooltip of an icon-only button), `icon` (a kit icon such as `"edit"`, `"external"`, `"refresh"`, `"trash"`, `"download"`; without one the label is shown), and what it does: `url` (a link, with `new_tab`), `action` (a small form posted there, with the CSRF token; `method` `"PUT"`, `"PATCH"` or `"DELETE"` for the others), or neither, with `attrs` for htmx (`{"hx-post": …, "hx-confirm": "Sure?"}`). `variant` (`"plain"` by default) and `disabled_reason` as for buttons. |
 | `prefix`, `suffix`, `limit`, `words`, `placeholder` | Text before or after the value. At most `limit` letters, or `words` words, then "…". `placeholder` is what an empty value (none, `""`, an empty list) shows instead (by default `—`). |
 | A list as `value` | Each item is formatted the same way. By default they're joined with commas; `list="lines"` puts one per line, `list="bullets"` makes a bullet list. Badges, colour samples and images sit in a row. `limit_list=3` shows three and folds the rest behind "Show 2 more" (a `<details>` element, no script needed). |
 | `repeatable(label, items, columns=1, placeholder="—", span="full", hide_label=…)` with `{% call(item) %}` | A list of records inside the record (an order's lines). Each item is a small infolist with a border, made of the call block's entries. `placeholder` is shown when there are no items. |
+
+An entry with buttons beside its value, such as a link to edit it and a form that acts on it:
+
+```html
+{{ entry("Email", user.email, copyable=true, suffix_actions=[
+     {"label": "Write to them", "icon": "external", "url": "mailto:" ~ user.email},
+     {"label": "Send the verification again", "icon": "refresh", "action": route('users.verify', user.id)}]) }}
+```
+
+Code shown coloured, read-only and copyable (`code_entry`), and editors for rich text, Markdown
+and code, come from the `renox-editors` crate: see [editors.md](editors.md).
 
 For sections and tabs, use the kit's own `card`, `fieldset` and `tabs`, and put an infolist
 in each. examples/shop's order page and examples/fields' product page are built this way.

@@ -28,6 +28,16 @@ pub struct Registry {
     pub(crate) duplicate_second_factor: bool,
     /// Sections other modules add to the `/account` page.
     pub(crate) account_sections: Vec<crate::auth::account::AccountSection>,
+    /// Files modules serve as they are (`asset`): path, content type, body.
+    pub(crate) assets: Vec<StaticAsset>,
+}
+
+/// A file a module serves as it is (`Registry::asset`).
+#[derive(Clone, Copy)]
+pub(crate) struct StaticAsset {
+    pub(crate) path: &'static str,
+    pub(crate) content_type: &'static str,
+    pub(crate) body: &'static [u8],
 }
 
 impl Registry {
@@ -102,6 +112,45 @@ impl Registry {
         hook: impl Fn(&mut minijinja::Environment<'static>) + Send + Sync + 'static,
     ) -> &mut Self {
         self.templates.push(std::sync::Arc::new(hook));
+        self
+    }
+
+    /// Serves `body` at `path` the way Renox serves its own scripts and
+    /// styles: in front of sessions, CSRF and maintenance mode (no cookie is
+    /// set), with a year-long `immutable` cache. For a module's JavaScript,
+    /// CSS or fonts, compiled into its crate; put a version or a hash of the
+    /// content in `path`, so a new release gets a new address.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// struct Charts;
+    ///
+    /// impl Module for Charts {
+    ///     fn name(&self) -> &'static str { "charts" }
+    ///
+    ///     fn register(&self, app: &mut Registry) {
+    ///         app.asset(
+    ///             "/_charts/charts-1.2.0.js",
+    ///             "text/javascript; charset=utf-8",
+    ///             b"console.log('charts')",
+    ///         );
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// The path must start with `/`; two files at the same path stop the
+    /// app at boot.
+    pub fn asset(
+        &mut self,
+        path: &'static str,
+        content_type: &'static str,
+        body: &'static [u8],
+    ) -> &mut Self {
+        self.assets.push(StaticAsset {
+            path,
+            content_type,
+            body,
+        });
         self
     }
 

@@ -1,0 +1,35 @@
+# renox-editors
+
+Rich text, Markdown and code editor fields, and a code entry for detail pages, for
+[Renox](https://github.com/arif-rachim/renox) apps. They bring JavaScript the UI kit doesn't
+carry (Trix, CodeJar and Prism, compiled into this crate, no build step), and a page loads it
+only when it has one of them.
+
+```rust
+use renox::prelude::*;
+use renox_editors::Editors;
+
+App::new().module(Editors::new())
+```
+
+```html
+{% from "renox-editors/editors.html" import rich_editor, markdown_editor, code_editor, code_entry %}
+{{ rich_editor("body", "Body", value=post.body, required=true) }}
+{{ markdown_editor("notes", "Notes", value=post.notes) }}
+{{ code_editor("settings", "Settings", value=post.settings, language="json") }}
+```
+
+What it adds:
+
+- three form fields that each send a plain field of their name, so `Valid<T>`, old input,
+  errors, hints and live validation work as for the kit's own fields;
+- `RichText`, the rich editor's HTML cleaned on the server as it is read (an allowlist of
+  formatting tags; no scripts, event handlers, styles or `javascript:` links), and the
+  `rich_text` filter that cleans stored HTML again when it is shown;
+- the Markdown editor's preview, rendered on the server by the `markdown` filter;
+- `code_entry`, code shown highlighted in an infolist, read-only, with a copy button.
+
+The bundled libraries, their versions and licences are listed in
+[assets/vendor/NOTICE](assets/vendor/NOTICE). The guide is
+[docs/editors.md](https://github.com/arif-rachim/renox/blob/main/docs/editors.md);
+examples/fields uses it. Versioned with `renox`: use the same version for both.

@@ -6,4 +6,6 @@ publish = false
 
 [dependencies]
 renox = { workspace = true, features = ["uuid", "postgres"] }
+# The rich text, Markdown and code editors, and the code entry.
+renox-editors.workspace = true
 serde = { version = "1.0.229", features = ["derive"] }

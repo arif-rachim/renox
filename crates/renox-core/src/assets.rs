@@ -276,6 +276,25 @@ pub(crate) fn router() -> Router<AppState> {
         .route(alpine_csp, get(|| async { js(ALPINE_CSP) }))
 }
 
+/// The files modules serve (`Registry::asset`), cached like Renox's own.
+pub(crate) fn module_router(assets: &[crate::registry::StaticAsset]) -> Router<AppState> {
+    assets.iter().fold(Router::new(), |router, file| {
+        let file = *file;
+        router.route(
+            file.path,
+            get(move || async move {
+                (
+                    [
+                        (CONTENT_TYPE, file.content_type),
+                        (CACHE_CONTROL, "public, max-age=31536000, immutable"),
+                    ],
+                    file.body,
+                )
+            }),
+        )
+    })
+}
+
 fn asset(content_type: &'static str, body: &'static str) -> impl IntoResponse {
     (
         [

@@ -26,12 +26,20 @@ package already enables renox's `postgres` and `uuid` features.
 |---|---|
 | The model, the form struct with one comment per input, validation, routes, toasts after a save or delete | [src/app/products/mod.rs](src/app/products/mod.rs) |
 | The list as a kit `table` (price with the `money` filter, badges for size and availability), an `empty` state, Edit and a `confirm` sheet for Delete | [resources/views/products/index.html](resources/views/products/index.html) |
-| The form on the UI kit: text, textarea, number with a prefix or suffix, a switch, a radio group, a checkbox list, time, datetime-local, a date in the kit's calendar (`date_picker`), the key read-only with a copy button, in a `form_grid` and `fieldset`s | [resources/views/products/form.html](resources/views/products/form.html) |
-| The product read-only, as an infolist: money, numbers with a suffix, Yes/No, a badge with labels, color swatches, tag badges, the specifications as a table, Markdown, dates and `since` | [resources/views/products/show.html](resources/views/products/show.html) |
+| The form on the UI kit: text, a Markdown editor, number with a prefix or suffix, a switch, a radio group, a checkbox list, time, datetime-local, a date in the kit's calendar (`date_picker`), the key read-only with a copy button, a rich text editor and a JSON code editor (the `renox-editors` crate), in a `form_grid` and `fieldset`s | [resources/views/products/form.html](resources/views/products/form.html) |
+| The product read-only, as an infolist: money, numbers with a suffix, Yes/No, a badge with labels, color swatches, tag badges, the specifications as a table, Markdown, rich text (`rich_text`), JSON in a `code_entry`, dates and `since`; buttons beside the key and the stock (`suffix_actions`) | [resources/views/products/show.html](resources/views/products/show.html) |
 | The layout: the kit (`renox_ui()`), its `navbar`, `toasts()` | [resources/views/layouts/app.html](resources/views/layouts/app.html), [public/app.css](public/app.css) |
-| Column types on SQLite and on PostgreSQL | [.up.sql](migrations/20260101000000_create_products_table.up.sql), [.postgres.up.sql](migrations/20260101000000_create_products_table.postgres.up.sql); tags and specifications added later: [migrations](migrations) |
+| Column types on SQLite and on PostgreSQL | [.up.sql](migrations/20260101000000_create_products_table.up.sql), [.postgres.up.sql](migrations/20260101000000_create_products_table.postgres.up.sql); tags and specifications, then details and settings added later: [migrations](migrations) |
 
 ## Things worth copying
+
+- **Editors are plain fields.** The `renox-editors` module (`.module(Editors::new())` in
+  [src/lib.rs](src/lib.rs)) gives the form a Markdown editor (`description`, a `String`), a
+  rich text editor (`details`, read as `RichText`: the HTML is cleaned of scripts and event
+  handlers as the form is read, and an emptied editor counts as empty) and a code editor
+  (`settings`, a `String` checked with `.json()`). The product page shows `details` with the
+  `rich_text` filter, which cleans it again, and `settings` with `code_entry`. Guide:
+  [docs/editors.md](../../docs/editors.md).
 
 - **Tags and pairs are JSON columns.** The kit's `tags_input` sends one `tags` value per tag (a
   `Vec<String>`, stored as `Json<Vec<String>>`); its `key_value` sends `specs[0][key]`,

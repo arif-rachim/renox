@@ -12,6 +12,8 @@ pub fn app() -> App {
     App::new()
         .embed(renox::embedded!())
         .migrations(renox::migrations!())
+        // The rich text, Markdown and code editors (renox-editors).
+        .module(renox_editors::Editors::new())
         .module(app::products::Products)
         // `cargo run -- db:seed`: two products to open and edit.
         .seeder(|state| async move {

@@ -338,3 +338,74 @@ async fn misspelled_variables_fail_while_developing() {
     live.get("/typo").await.assert_ok().assert_see("<h1></h1>");
     let _ = Duration::ZERO;
 }
+
+/// A module serving its own script (`Registry::asset`, for plugin crates).
+struct Widgets;
+
+impl Module for Widgets {
+    fn name(&self) -> &'static str {
+        "widgets"
+    }
+
+    fn register(&self, app: &mut Registry) {
+        app.asset(
+            "/_widgets/widgets-1.0.0.js",
+            "text/javascript; charset=utf-8",
+            b"console.log('widgets')",
+        );
+    }
+}
+
+#[renox::test]
+async fn modules_serve_their_own_files_without_a_session() {
+    let app = TestApp::new(App::new().module(Widgets)).await;
+    let res = app.get("/_widgets/widgets-1.0.0.js").await;
+    res.assert_ok()
+        .assert_header("content-type", "text/javascript; charset=utf-8")
+        .assert_header("cache-control", "public, max-age=31536000, immutable")
+        .assert_see("console.log('widgets')");
+    // Served in front of the session: no cookie for a cached file.
+    assert_eq!(res.header("set-cookie"), None);
+
+    // Also in maintenance mode, as Renox's own scripts.
+    std::fs::create_dir_all(app.state().config.storage_path.join("framework")).unwrap();
+    std::fs::write(app.state().config.storage_path.join("framework/down"), "{}").unwrap();
+    app.get("/_widgets/widgets-1.0.0.js").await.assert_ok();
+}
+
+#[renox::test]
+async fn a_file_path_is_checked_at_boot() {
+    struct Twice;
+    impl Module for Twice {
+        fn name(&self) -> &'static str {
+            "twice"
+        }
+        fn register(&self, app: &mut Registry) {
+            app.asset("/a.js", "text/javascript", b"")
+                .asset("/a.js", "text/javascript", b"");
+        }
+    }
+    struct Relative;
+    impl Module for Relative {
+        fn name(&self) -> &'static str {
+            "relative"
+        }
+        fn register(&self, app: &mut Registry) {
+            app.asset("a.js", "text/javascript", b"");
+        }
+    }
+    let err = App::with_config(Config::default())
+        .module(Twice)
+        .boot()
+        .await
+        .err()
+        .unwrap();
+    assert!(format!("{err:?}").contains("two modules serve a file at `/a.js`"));
+    let err = App::with_config(Config::default())
+        .module(Relative)
+        .boot()
+        .await
+        .err()
+        .unwrap();
+    assert!(format!("{err:?}").contains("must start with `/`"));
+}

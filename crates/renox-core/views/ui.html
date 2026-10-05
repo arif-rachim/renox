@@ -1020,11 +1020,44 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     `badge`: true, a kind ("success"), or kinds by value
     (`{"paid": "success"}`); `labels` names values (`{"paid": "Paid"}`).
     `url` makes it a link, `copyable` adds a copy button, `limit` (letters)
-    and `words` shorten it, `placeholder` stands in for nothing (—). -#}
-{% macro entry(label, value=none, format=none, badge=none, labels=none, url=none, new_tab=false, copyable=false, tooltip=none, placeholder="—", hint=none, prefix=none, suffix=none, limit=none, words=none, list="comma", limit_list=none, decimals=none, currency=none, date_format=none, image_size=40, circular=false, span=none, inline=false, hide_label=false, id=none) -%}
-<div class="rx-entry{% if span %} rx-span-{{ span }}{% endif %}{% if inline %} rx-entry--inline{% endif %}{% if format in ['money', 'number'] %} rx-entry--numeric{% endif %}"{% if id %} id="{{ id }}"{% endif %}>
+    and `words` shorten it, `placeholder` stands in for nothing (—).
+
+    `prefix_actions` / `suffix_actions`: buttons before or after the value,
+    each a mapping: `label` (also the tooltip of an icon-only button),
+    `icon` (one of the kit's icons: "edit", "external", "refresh", "trash",
+    "download"…; without one the label is shown), and what it does: `url`
+    (a link; `new_tab`), `action` (a form posted there, with `method`:
+    "POST" by default, or "PUT", "PATCH", "DELETE"), or neither, with
+    `attrs` for htmx (`{"hx-post": …, "hx-confirm": "Sure?"}`). `variant`:
+    "plain" by default; `disabled_reason` keeps it focusable with the reason
+    as its tooltip.
+    {{ entry("Email", user.email, suffix_actions=[
+         {"label": "Send a message", "icon": "external", "url": "mailto:" ~ user.email},
+         {"label": "Verify", "action": route('users.verify', user=user.id)}]) }} -#}
+{%- macro _entry_actions(actions, side) -%}
+<span class="rx-entry__actions rx-entry__actions--{{ side }}">
+  {%- for action in actions %}
+  {%- set variant = action.variant or "plain" %}
+  {%- if action.action %}
+  <form class="rx-entry__action-form" method="post" action="{{ action.action }}">{{ csrf_field() }}
+    {%- if action.method and action.method | upper != "POST" %}{{ method_field(action.method | upper) }}{% endif %}
+    {%- if action.icon %}{{ icon_button(action.icon, action.label, variant=variant, type="submit", size="small", attrs=action.attrs or {}, disabled_reason=action.disabled_reason or none) }}
+    {%- else %}{{ button(action.label, variant=variant, size="small", attrs=action.attrs or {}, disabled_reason=action.disabled_reason or none) }}{% endif -%}
+  </form>
+  {%- elif action.url %}
+    {%- if action.icon %}{{ icon_button(action.icon, action.label, href=action.url, variant=variant, size="small", attrs=action.attrs or {}, new_tab=action.new_tab or false) }}
+    {%- else %}{{ link_button(action.url, action.label, variant=variant, size="small", attrs=action.attrs or {}, new_tab=action.new_tab or false) }}{% endif %}
+  {%- elif action.icon %}{{ icon_button(action.icon, action.label, variant=variant, size="small", attrs=action.attrs or {}, disabled_reason=action.disabled_reason or none) }}
+  {%- else %}{{ button(action.label, variant=variant, type="button", size="small", attrs=action.attrs or {}, disabled_reason=action.disabled_reason or none) }}
+  {%- endif %}
+  {%- endfor -%}
+</span>
+{%- endmacro -%}
+{% macro entry(label, value=none, format=none, badge=none, labels=none, url=none, new_tab=false, copyable=false, tooltip=none, placeholder="—", hint=none, prefix=none, suffix=none, limit=none, words=none, list="comma", limit_list=none, decimals=none, currency=none, date_format=none, image_size=40, circular=false, span=none, inline=false, hide_label=false, id=none, prefix_actions=none, suffix_actions=none) -%}
+<div class="rx-entry{% if span %} rx-span-{{ span }}{% endif %}{% if inline %} rx-entry--inline{% endif %}{% if format in ['money', 'number'] %} rx-entry--numeric{% endif %}{% if prefix_actions or suffix_actions %} rx-entry--actions{% endif %}"{% if id %} id="{{ id }}"{% endif %}>
   <dt class="rx-entry__label{% if hide_label %} rx-visually-hidden{% endif %}">{{ label }}</dt>
   <dd class="rx-entry__value"{% if tooltip %} title="{{ tooltip }}"{% endif %}>
+  {%- if prefix_actions %}{{ _entry_actions(prefix_actions, "prefix") }}{% endif %}
   {%- if caller is defined %}{{ caller() }}
   {%- elif _empty_value(value) %}<span class="rx-entry__empty">{{ placeholder }}</span>
   {%- elif format == "key_value" %}
@@ -1073,6 +1106,7 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     <button class="rx-affix__button rx-entry__copy" type="button" data-rx-copy data-rx-copy-text="{{ value | join(', ') if many else value }}" aria-label="{{ t('ui.copy') }} {{ label }}" data-label-done="{{ t('ui.copied') }}">{{ _icon("copy") }}{{ _icon("check") }}<span class="rx-visually-hidden" aria-live="polite"></span></button>
     {%- endif %}
   {%- endif -%}
+  {%- if suffix_actions %}{{ _entry_actions(suffix_actions, "suffix") }}{% endif -%}
   </dd>
   {%- if hint %}<dd class="rx-hint rx-entry__hint">{{ hint }}</dd>{% endif %}
 </div>

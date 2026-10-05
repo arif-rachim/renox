@@ -165,3 +165,67 @@ async fn the_currency_comes_from_the_config() {
         .await
         .assert_see("€1,250.00|Rp 1,250|€1,250.50|€3");
 }
+
+#[renox::test]
+async fn entries_carry_actions_beside_their_value() {
+    // Prefix and suffix actions (#150): a link, a form posted with its
+    // method, an htmx button and a labelled one.
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("actions.html"),
+        r##"{% from "renox/ui.html" import infolist, entry %}
+{% call infolist() %}
+{{ entry("Email", "ana@example.com", copyable=true,
+     prefix_actions=[{"label": "Open profile", "icon": "external", "url": "/users/1", "new_tab": true}],
+     suffix_actions=[
+       {"label": "Verify", "icon": "settings", "action": "/users/1/verify"},
+       {"label": "Remove", "icon": "trash", "action": "/users/1/email", "method": "delete", "variant": "danger"},
+       {"label": "Refresh", "icon": "refresh", "attrs": {"hx-post": "/users/1/refresh", "hx-target": "closest dl"}},
+       {"label": "Resend", "disabled_reason": "Sent a minute ago"}]) }}
+{{ entry("Plain", "x") }}
+{% call entry("Called", suffix_actions=[{"label": "Edit", "url": "/edit"}]) %}<em>called</em>{% endcall %}
+{% endcall %}"##,
+    )
+    .unwrap();
+    struct Actions;
+    impl Module for Actions {
+        fn name(&self) -> &'static str {
+            "actions"
+        }
+        fn routes(&self) -> Routes {
+            Routes::new().get("/actions", || async { view("actions.html", context! {}) })
+        }
+    }
+    let path = dir.path().to_path_buf();
+    let app = TestApp::with_config(App::new().module(Actions), move |c| c.views_path = path).await;
+    let html = app.get("/actions").await.assert_ok().text();
+    let has = |needle: &str| assert!(html.contains(needle), "missing {needle}\n{html}");
+    has(r#"<div class="rx-entry rx-entry--actions">"#);
+    has(r#"<span class="rx-entry__actions rx-entry__actions--prefix">"#);
+    has(
+        r#"href="/users/1" aria-label="Open profile" data-rx-tip="Open profile" target="_blank" rel="noopener""#,
+    );
+    has(
+        r#"<form class="rx-entry__action-form" method="post" action="/users/1/verify"><input type="hidden" name="_token""#,
+    );
+    has(r#"type="submit" aria-label="Verify""#);
+    has(r#"action="/users/1/email">"#);
+    has(r#"<input type="hidden" name="_method" value="DELETE">"#);
+    has("rx-icon-button--danger");
+    has(r#"hx-post="/users/1/refresh" hx-target="closest dl""#);
+    has(r#"aria-disabled="true" data-rx-tip="Sent a minute ago""#);
+    has(r#"<span class="rx-button__label">Resend</span>"#);
+    // The prefix comes before the value, the suffix after the copy button.
+    let (prefix, value, copy, suffix) = (
+        html.find("rx-entry__actions--prefix").unwrap(),
+        html.find("ana@example.com").unwrap(),
+        html.find("rx-entry__copy").unwrap(),
+        html.find("rx-entry__actions--suffix").unwrap(),
+    );
+    assert!(prefix < value && value < copy && copy < suffix, "{html}");
+    // Entries without actions are unchanged; a called entry gets them too.
+    has(r#"<div class="rx-entry">
+  <dt class="rx-entry__label">Plain</dt>"#);
+    has(r#"<em>called</em><span class="rx-entry__actions rx-entry__actions--suffix">"#);
+    has(r#"href="/edit""#);
+}
