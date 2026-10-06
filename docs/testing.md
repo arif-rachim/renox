@@ -302,6 +302,9 @@ confirm-password page.
 > `SystemTime::now()` or `chrono::Utc::now()`. Use travel rather than rewriting `created_at`
 > with SQL or sleeping; examples/shop, jobs, api and hello show it.
 
+[examples/bikeshop](../examples/bikeshop) has tests per area, a walk of its main pages counting queries on a large seed, and
+browser tests (`tests/browser/bikeshop-*.test.mjs`).
+
 ## Browser tests
 
 Most of an app is covered by `TestApp` requests. Some things only a real browser shows: a sheet

@@ -9,7 +9,7 @@ guest; a 5xx anywhere fails. tests/process/run.sh builds the binaries first.
 Examples with accounts are crawled a second time, logged in: with their
 seeded account, or one signed up for the run (hello, billing). With
 PROCESS_POSTGRES naming a PostgreSQL server (postgres://user:pw@host:port),
-postgres-app and fields run there instead, each in a database of its own
+postgres-app, fields and bikeshop run there instead, each in a database of its own
 (built with `--features renox/postgres`; tests/process/run.sh postgres).
 """
 
@@ -48,6 +48,7 @@ EXAMPLES = {
     "billing": "billing",
     "webhooks": "webhooks",
     "fields": "fields",
+    "bikeshop": "bikeshop",
 }
 
 # The account to log in with: seeded ones, or None to sign up.
@@ -62,10 +63,18 @@ ACCOUNTS = {
     "teams": ("alice@example.com", "password123"),
     "admin": ("admin@example.com", "password123"),
     "billing": None,
+    "bikeshop": ("owner@bikeshop.test", "password"),
+}
+
+# Variables an example needs beyond the common ones: the bike shop's staff
+# must set up two-factor login before the staff pages open, which a crawl
+# can't do.
+EXTRA_ENV = {
+    "bikeshop": {"BIKESHOP_STAFF_2FA": "optional"},
 }
 
 POSTGRES = os.environ.get("PROCESS_POSTGRES", "").rstrip("/")
-POSTGRES_EXAMPLES = {"postgres-app": "postgres", "fields": "fields"}
+POSTGRES_EXAMPLES = {"postgres-app": "postgres", "fields": "fields", "bikeshop": "bikeshop"}
 
 
 def free_port():
@@ -185,6 +194,7 @@ def smoke(binary, directory):
         "MAIL_MAILER": "log",
         "QUEUE_WORKERS": "1",
         "RUST_LOG": "warn",
+        **EXTRA_ENV.get(binary, {}),
     }
     proc = None
     database = None

@@ -29,7 +29,10 @@ Complete apps that use these tools:
 - [examples/crud](../examples/crud): a policy;
 - [examples/teams](../examples/teams): tenants;
 - [examples/backoffice](../examples/backoffice): roles made of permissions,
-  `require_permission` per section, and an activity log.
+  `require_permission` per section, and an activity log;
+- [examples/bikeshop](../examples/bikeshop): permissions only (never role names), roles per store with dates
+  (`assign_role_in`, `Scope`, `permissions::set_scope`, `scopes_with`) and records checked
+  against their owner, location or operating store.
 
 ### Words you'll meet
 

@@ -23,6 +23,7 @@
 
 pub mod app;
 pub mod explain;
+pub mod report;
 pub mod seed;
 
 use renox::prelude::*;
@@ -103,4 +104,7 @@ pub fn app() -> App {
         .layer(renox::axum::middleware::from_fn(
             app::staff::two_factor::middleware,
         ))
+        // Every 500, job failed for good and failed scheduled task: logged and
+        // kept in storage/logs/errors.log (src/report.rs).
+        .report(report::log)
 }

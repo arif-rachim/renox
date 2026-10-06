@@ -424,7 +424,8 @@ The frame of a page comes from the kit too. So an app writes no CSS for its navi
 its sidebar or its page headings.
 
 Every example is built this way. examples/backoffice has a sidebar. examples/shop has a
-navigation bar with links, a cart count and menus.
+navigation bar with links, a cart count and menus. [examples/bikeshop](../examples/bikeshop) has both (a public navbar, a
+staff sidebar) and shows how to add what the kit lacks as "blocks" of the app's own.
 
 A navigation bar on top looks like this:
 

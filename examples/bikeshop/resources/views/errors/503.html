@@ -1,0 +1,11 @@
+{% extends "layouts/app.html" %}
+{#- Maintenance mode (`bikeshop down`, back with `bikeshop up`): the shop's own
+    words instead of errors/default.html's "Sorry, that didn't work.". Renox sends
+    it with a 503 and `Retry-After`; /health keeps answering. -#}
+{% block seo %}<title>{{ status }} {{ reason }} · {{ app.name }}</title>{% endblock %}
+{% block content %}
+{% from "renox/ui.html" import empty %}
+<div class="rx-card">
+  {{ empty("We're giving the shop a quick tune-up", "We'll be back in a few minutes. Your cart, rentals and bookings are safe.") }}
+</div>
+{% endblock %}

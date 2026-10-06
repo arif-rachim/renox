@@ -1833,6 +1833,37 @@ Notes:
 - An action sheet's form doesn't show `form_errors`: with one sheet per row, a plain post's
   errors would show in every sheet.
 
+### The flagship example: examples/bikeshop (#231)
+
+A bike shop with three stores (buy, rent, service, stores working together) on Pagila's shape
+and volume, every page explaining itself ("About this page", `/about/pages`). One branch, one
+PR, one commit (or more) per story; needs #244 (roles per store with dates).
+
+- [x] #232 the app, its data model and a Pagila-sized seeder (`db:seed`, `demo:seed --size
+  large`), with the RBAC + ABAC foundations (#239, #245) built first so every story uses them
+- [x] #233 catalogue, product pages and full-text search
+- [x] #234 cart, checkout, payments (Midtrans + webhook, a demo gateway) and counter sales
+- [x] #235 bike rentals (two overlap checks, late fees, the ID check)
+- [x] #236 the workshop (my bikes, bookings within capacity, the board, extra work approval)
+- [x] #237 service plans on renox-billing (a named subscription per bike)
+- [x] #238 customer accounts (account sections, notifications, language, privacy)
+- [x] #239 stores, staff, roles per store, the audit log, the admin panel
+- [x] #240 stock (one ledger), consignment, suppliers and purchasing
+- [x] #241 the JSON API for kiosks and a customer app
+- [x] #242 dashboards, report grids, exports and the monthly report
+- [x] #245 multi-store operations: staff helping, placements, books between stores, settlements
+- [ ] #243 translations, docs, CI, deploy and the final browser check: the README, llms.txt,
+  the guides' links, `make:deploy`, `App::report`, error and maintenance pages, CI on
+  PostgreSQL, tests/browser and tests/process, the large-seed query walk
+  (`tests/queries.rs`) and a `CSP=strict` walk are in; the Spanish pass, the explanations'
+  review and the owner's sign-off on screenshots are open
+
+Notes:
+- What the kit lacked was built in the example as "blocks" (the owner's decision, below);
+  what Renox lacked or got wrong became issues #299–#319, worked around in the example.
+- The large seed is fast enough to run in every CI test job (~7 s on SQLite, ~27 s on
+  PostgreSQL for the query walk), so nothing is `#[ignore]`d.
+
 ## Decisions
 
 - **Browser tests on Node's own test runner and raw CDP** (#262, 2026-10): `tests/browser/`
@@ -1940,6 +1971,13 @@ Notes:
   and `db::now()` at check time, since the app's scope middleware runs after the auth one and
   `TestApp::travel` must reach the dates. Ended rows are ignored, and pruned by
   `permissions:prune`.
+
+- **The flagship example's missing UI components live in the example** (#231, the owner,
+  2026-10-06): galleries, a range slider, a quantity stepper, a keypad, a kanban board, a month
+  calendar, an availability timeline, a date-time range, a date picker with blocked days,
+  swatches, a timeline and a plan comparison are examples/bikeshop's "blocks"
+  (`resources/views/blocks/`, `public/blocks/`), written like a library on the kit's tokens so
+  they can move to a crate later; Renox's kit isn't changed for them.
 
 ## Not planned
 
