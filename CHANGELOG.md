@@ -10,6 +10,46 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+## 1.0.0-rc.6 · 2026-10-06
+
+The fixes found by testing every untested path (the coverage epic #246), and two UI kit
+behaviours.
+
+- **Back closes open sheets and menus:** a page shown again from the browser's
+  back/forward cache has its sheets and menus closed, as after any other way back (a sheet's
+  action form starts fresh, as after Escape).
+- **Escape closes a toast (#266):** the toast that has the focus, else the newest one, once
+  nothing else that Escape closes (a sheet, a menu, a popover, a tooltip) is open.
+- **Charts show fractions (#282):** line, area, bar, pie and doughnut charts gave plain
+  numbers 0 decimals in their tooltips and data table, so 4.5 read "5". They now get the
+  decimals the data needs (up to 2), as scatter charts did; `decimals=` still decides, and
+  money and percent keep their own.
+- **`rnx serve` stops its app (#288):** a signal sent to `rnx` alone (`kill`, an editor's
+  stop button, a closed terminal) left the app running on its port; `rnx` now passes
+  SIGINT/SIGTERM/SIGHUP on to the app and Tailwind's watcher.
+- **Fixed:**
+  - The data grid's column menu (show/hide, freeze, move, reset) threw and saved nothing
+    (#275); a date range picked on the grid's calendar wasn't applied (#285); two grids on a
+    page lost each other's page and sort (#286); `match=all` and the default rows per page
+    stayed in the grid's URL (#287); a poll answering during an inline edit wiped what was
+    typed (#289).
+  - Validation: `before`/`after` ignored a date limit given as text (#271); live
+    validation of a list field didn't show its items' errors (#274).
+  - Views: a failing `App::share` value showed a bare 500 instead of the error page (#272);
+    an app error page that doesn't parse showed the bare fallback instead of Renox's page
+    (#278).
+  - PostgreSQL: a user's extra `REAL`/`SMALLINT` (#273) and `TIME` (#281) columns read as
+    `null`.
+  - Mail: the plain-text part repeated the text before a `<` that opens no tag (#279).
+  - UI kit: a required searchable select left empty focused its hidden native select (#283);
+    on phones, the `rx-shell` sidebar grew to half the screen on short pages (#284).
+  - renox-editors: a code editor removed right after typing threw in the console (#290).
+  - examples/hello threw under `CSP=strict` when the guestbook was sent (#276).
+- **Tests:** browser tests for renox.js, the UI kit, the grid, the editors and every
+  example's main flow (`tests/browser`, CI job `browser`), the binary and `rnx` as real
+  processes on SQLite and PostgreSQL (`tests/process`, CI job `process`), and the coverage
+  job fails under 90 % of lines (#246, #247).
+
 ## 1.0.0-rc.5 · 2026-10-05
 
 - **Roles per branch (#244):** a role can be given in one record (a store, a team, a school)
