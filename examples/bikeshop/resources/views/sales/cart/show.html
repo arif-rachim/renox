@@ -7,7 +7,7 @@
 {% block seo %}{{ seo(title=t('sales.cart.title') ~ " · " ~ t('shop.name')) }}{% endblock %}
 
 {% block content %}
-{% call push('head') %}<link rel="stylesheet" href="{{ asset('sales/sales.css') }}">{% endcall %}
+{% include "sales/_assets.html" %}
 {{ page_header(t('sales.cart.title'), subtitle=t('sales.cart.lead'), back=route('catalog.index'), back_label=t('sales.cart.keep_shopping')) }}
 {% block lines %}
 <div id="cart" class="bs-cart">
@@ -44,14 +44,14 @@
     <form method="post" action="{{ route('cart.store') }}" hx-post="{{ route('cart.store') }}" hx-trigger="change" hx-target="#cart" hx-swap="outerHTML">
       {{ csrf_field() }}
       {%- set ns = namespace(options=[]) %}{% for s in cart.stores %}{% set ns.options = ns.options + [[s.id | string, s.name]] %}{% endfor %}
-      {{ select("store_id", t('sales.cart.store'), ns.options, selected=(cart.store.id | string if cart.store else none), hint=t('sales.cart.store_hint'), id="cart-store") }}
+      {{ select("store_id", t('sales.cart.store'), ns.options, selected=(cart.store.id | string if cart.store else none), hint=t('sales.cart.store_hint'), required=true, id="cart-store") }}
       <noscript>{{ button(t('sales.cart.change_store'), variant="secondary", size="small") }}</noscript>
     </form>
     <dl class="bs-totals">
       <div><dt>{{ t('sales.cart.items', count=cart.count) }}</dt><dd class="rx-num">{{ cart.subtotal | money }}</dd></div>
     </dl>
     <p class="rx-hint">{{ t('sales.cart.fees_later') }}</p>
-    {{ link_button("/checkout", t('sales.cart.checkout'), variant="primary", attrs={"data-rx-key": "c"}) }}
+    {{ link_button(route('checkout.show'), t('sales.cart.checkout'), variant="primary", attrs={"data-rx-key": "c"}) }}
   </aside>
   {%- else %}
   <div class="rx-card">{{ empty(t('sales.cart.empty_title'), t('sales.cart.empty_text'), route('catalog.index'), t('sales.cart.browse')) }}</div>

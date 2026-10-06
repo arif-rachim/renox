@@ -1,0 +1,4 @@
+{#- The sales pages' own styles and behaviour (public/sales/), pushed into
+    the layout's head and scripts stacks once. -#}
+{% call push('head') %}<link rel="stylesheet" href="{{ asset('sales/sales.css') }}">{% endcall %}
+{% call push('scripts') %}<script src="{{ asset('sales/sales.js') }}" nonce="{{ csp_nonce() }}"></script>{% endcall %}

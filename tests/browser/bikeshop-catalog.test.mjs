@@ -58,7 +58,7 @@ describe('bikeshop catalogue', () => {
 
           const href = await page.eval(() => document.querySelector('#results .rx-media-card__link').getAttribute('href'));
           await page.goto(`${app.url}${href}`);
-          await page.waitFor(() => document.querySelector('[data-bs-gallery][data-bs-ready]'));
+          await page.waitFor(() => !!document.querySelector('[data-bs-gallery][data-bs-ready]'));
           assert.ok(await page.eval(() => !!document.querySelector('#buybox .bs-buybox__price')));
           assert.ok(await fitsWidth(page), 'no sideways scrolling on a product');
           await shot(page, `catalog-product-${size}-${colours}`);
@@ -101,7 +101,7 @@ describe('bikeshop catalogue', () => {
   test('the price range slider narrows the results', () =>
     browser.with(async (page) => {
       await page.goto(`${app.url}/shop/bikes`);
-      await page.waitFor(() => document.querySelector('[data-bs-range][data-bs-ready]'));
+      await page.waitFor(() => !!document.querySelector('[data-bs-range][data-bs-ready]'));
       await page.focus('#filter-price-max');
       for (let i = 0; i < 20; i++) await page.press('PageDown');
       await page.waitFor(() => location.search.includes('price_max='));
@@ -161,7 +161,7 @@ describe('bikeshop catalogue', () => {
       // Add to cart, if any store has it: a toast and the navbar's count.
       if (await page.eval(() => !!document.querySelector('[data-bs-add-to-cart]'))) {
         await page.click('[data-bs-add-to-cart] button[type=submit]');
-        await page.waitFor(() => document.querySelector('.rx-toast--success'));
+        await page.waitFor(() => !!document.querySelector('.rx-toast--success'));
         // The navbar's count, swapped in out of band.
         await page.waitFor(() => document.querySelector('#nav-cart .rx-button__badge')?.textContent.trim() === '1');
         await shot(page, 'catalog-added');

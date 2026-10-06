@@ -1,0 +1,59 @@
+{% extends "layouts/app.html" %}
+{#- The customer's order page (src/app/sales/orders.rs `show`): where the
+    order stands, its lines, totals and payments. -#}
+{% from "renox/ui.html" import page_header, card, infolist, entry, link_button, badge, table, alert %}
+{% from "blocks/history.html" import history %}
+{% block seo %}{{ seo(title=t('sales.orders.title', number=page.number) ~ " · " ~ t('shop.name')) }}{% endblock %}
+
+{% block content %}
+{% include "sales/_assets.html" %}
+{%- set o = page %}
+{% call page_header(t('sales.orders.title', number=o.number), subtitle=t('sales.orders.placed', date=(o.placed_at | date("%Y-%m-%d %H:%M"))), badge=t('sales.status.' ~ o.status), badge_kind=("success" if o.status in ["paid", "ready", "completed"] else ("warning" if o.status == "pending" else none))) %}
+  {{ link_button(route('orders.invoice', o.id), t('sales.orders.invoice')) }}
+{% endcall %}
+
+<div class="bs-order" data-bs-reveal>
+  <div class="bs-order__main">
+    {%- if o.status == "pending" %}{{ alert(t('sales.orders.pending_note', minutes=30), kind="warning") }}{% endif %}
+    {%- if o.status == "cancelled" %}{{ alert(t('sales.orders.cancelled_note'), kind="error") }}{% endif %}
+    {% call card(t('sales.orders.lines')) %}
+      {% call table([t('sales.orders.product'), [t('sales.orders.quantity'), "num"], [t('sales.orders.price'), "num"], [t('sales.orders.line_total'), "num"]], caption=t('sales.orders.lines')) %}
+        {%- for line in o.lines %}
+        <tr>
+          <td>{% if line.slug %}<a class="rx-link" href="{{ route('catalog.show', line.slug) }}">{{ line.name }}</a>{% else %}{{ line.name }}{% endif %}<br><span class="rx-subtitle">{{ line.sku }}{% if line.variant %} · {{ line.variant }}{% endif %}</span></td>
+          <td class="rx-num">{{ line.quantity }}</td>
+          <td class="rx-num">{{ line.unit_price | money }}</td>
+          <td class="rx-num">{{ line.total | money }}</td>
+        </tr>
+        {%- endfor %}
+      {% endcall %}
+      {% include "sales/orders/_totals.html" %}
+    {% endcall %}
+    {%- if page.payments %}
+    {% call card(t('sales.orders.payments')) %}
+      <ul class="bs-plain-list" role="list">
+        {%- for p in page.payments %}
+        <li><span>{{ t('sales.payment_status.' ~ p.status) }} · {{ t('sales.method.' ~ p.method) }}{% if p.paid_at %} · {{ p.paid_at | date("%Y-%m-%d %H:%M") }}{% endif %}</span><span class="rx-num">{{ p.amount | money }}</span></li>
+        {%- endfor %}
+      </ul>
+    {% endcall %}
+    {%- endif %}
+  </div>
+  <aside class="bs-order__side">
+    {% call card(t('sales.orders.progress')) %}
+      {%- set ns = namespace(items=[]) %}
+      {%- for step in steps %}{% if step.done %}{% set ns.items = ns.items + [{"time": step.at, "title": t('sales.step.' ~ step.key), "kind": ("error" if step.key == "cancelled" else ("info" if step.key == "refunded" else "success"))}] %}{% endif %}{% endfor %}
+      {{ history(ns.items, label=t('sales.orders.progress')) }}
+    {% endcall %}
+    {% call card(t('sales.orders.details')) %}
+      {% call infolist() %}
+        {{ entry(t('sales.orders.store'), o.store.name if o.store else none) }}
+        {{ entry(t('sales.orders.fulfilment'), t('sales.checkout.delivery') if o.delivery else t('sales.checkout.pickup')) }}
+        {%- if o.address %}{{ entry(t('sales.orders.address'), o.address) }}{% endif %}
+        {%- if o.customer %}{{ entry(t('sales.orders.customer'), o.customer.name) }}{% endif %}
+        {%- if page.returnable %}{{ entry(t('sales.orders.returns'), t('sales.orders.returns_text', days=14)) }}{% endif %}
+      {% endcall %}
+    {% endcall %}
+  </aside>
+</div>
+{% endblock %}

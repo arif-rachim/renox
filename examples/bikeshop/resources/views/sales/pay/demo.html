@@ -1,0 +1,34 @@
+{% extends "layouts/app.html" %}
+{#- The demo gateway's hosted page (src/app/sales/gateway.rs): stands in for
+    Midtrans' page when MIDTRANS_SERVER_KEY isn't set. Paying here queues the
+    notification Midtrans would send, signed the same way, to this app's
+    webhook. -#}
+{% from "renox/ui.html" import page_header, card, button, alert, infolist, entry, radio %}
+{% block seo %}{{ seo(title=t('sales.demo.title')) }}{% endblock %}
+
+{% block content %}
+{% include "sales/_assets.html" %}
+<div class="bs-demo-gateway">
+  {{ alert(t('sales.demo.notice'), kind="warning", title=t('sales.demo.notice_title')) }}
+  {% call card(t('sales.demo.title'), subtitle=t('sales.demo.merchant', shop=t('shop.name'))) %}
+    {% call infolist(columns=2) %}
+      {{ entry(t('sales.demo.amount'), paying.payment.amount, format="money") }}
+      {{ entry(t('sales.demo.reference'), "BS-" ~ paying.payment.id) }}
+      {%- if paying.order %}{{ entry(t('sales.orders.number'), paying.order.number) }}{% endif %}
+      {{ entry(t('sales.demo.status'), t('sales.payment_status.' ~ paying.payment.status)) }}
+    {% endcall %}
+    {%- if paying.payment.status == "pending" %}
+    <form class="bs-demo-gateway__form" method="post" action="{{ action }}">
+      {{ csrf_field() }}
+      <input type="hidden" name="outcome" value="settlement">
+      {{ button(t('sales.demo.pay', amount=(paying.payment.amount | money)), variant="primary", block=true, key="p") }}
+    </form>
+    <form method="post" action="{{ action }}">
+      {{ csrf_field() }}
+      <input type="hidden" name="outcome" value="cancel">
+      {{ button(t('sales.demo.cancel'), variant="plain", block=true) }}
+    </form>
+    {%- endif %}
+  {% endcall %}
+</div>
+{% endblock %}

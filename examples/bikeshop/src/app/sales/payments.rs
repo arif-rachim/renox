@@ -13,10 +13,10 @@
 //! held, a work order is settled), so the payment code never needs to know
 //! about them.
 //!
-//! Status: the coordinator wrote this contract before the sales story
-//! (#234), which replaces the placeholder gateway in [`start`] with the
-//! real one (hosted page + signed webhook through `renox::webhook`). Keep
-//! the signatures; other areas already call them.
+//! The gateway itself (Midtrans' hosted page and signed webhook through
+//! `renox::webhook`, or the demo gateway without a key) is in
+//! `src/app/sales/gateway.rs`; the page the customer comes back to is
+//! `/pay/{payment}`. Keep these signatures: other areas call them.
 
 use renox::prelude::*;
 
@@ -125,8 +125,10 @@ pub async fn start(state: &AppState, charge: Charge) -> Result<Checkout> {
         },
     )
     .await?;
-    // Placeholder until #234 wires the real gateway: its hosted page.
-    let redirect_url = format!("/pay/{}", payment.id);
+    // The gateway's hosted page: Midtrans' with MIDTRANS_SERVER_KEY set,
+    // else the demo gateway's (src/app/sales/gateway.rs). Its webhook
+    // calls `mark_paid` / `mark_failed`.
+    let redirect_url = super::gateway::hosted_page(state, &payment).await?;
     Ok(Checkout {
         payment_id: payment.id,
         redirect_url,
