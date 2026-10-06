@@ -27,6 +27,7 @@
     {% if can('staff.help') %}{{ sidebar_link(route('multistore.help'), t('multistore.help.title'), active=route_is('multistore.help*')) }}{% endif %}
     {% if can('fleet.view') %}{{ sidebar_link(route('multistore.placements'), t('multistore.placements.title'), active=route_is('multistore.placements*')) }}{% endif %}
     {% if can('intercompany.view') %}{{ sidebar_link(route('multistore.books'), t('multistore.books.title'), active=route_is('multistore.books', 'multistore.settlements*', 'multistore.fees*')) }}{% endif %}
+    {% if can('reports.view') %}{{ sidebar_link(route('reports.dashboard'), t('reports.nav'), active=route_is('reports.*')) }}{% endif %}
     {#- --- end of staff navigation --- -#}
     {{ sidebar_section(t('nav.shop')) }}
     {{ sidebar_link(route('home'), t('nav.storefront')) }}

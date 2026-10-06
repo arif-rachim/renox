@@ -1,0 +1,132 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, link_tabs, link_button, menu, menu_link, period_filter, stats, stat, dashboard, widget, table, empty, progress, badge %}
+{% block seo %}{{ seo(title=t('reports.dashboard.title')) }}{% endblock %}
+
+{#- The reports dashboard (src/app/reports/dashboard.rs): the period, books or work, the store;
+    figures in the kit's `stats`, charts and lists in the kit's `dashboard` of `widget`s (a CSS
+    grid: one column on phones). Everything here comes from `n` (src/app/reports/numbers.rs). -#}
+{% block content %}
+{% include "reports/_assets.html" %}
+<div class="rx-stack" data-bs-reveal>
+  {% call page_header(t('reports.dashboard.title'), subtitle=(t('reports.dashboard.lead_store', store=store_name) if store_name else t('reports.dashboard.lead'))) %}
+    {{ link_button(route('reports.monthly'), t('reports.monthly.title'), icon="calendar") }}
+  {% endcall %}
+  {% include "reports/_tabs.html" %}
+
+  <div class="bs-report-controls">
+    {{ period_filter(period, options=periods, label=t('reports.period.label')) }}
+    {{ link_tabs([[query_with(by="work"), t('reports.by.work')], [query_with(by="books"), t('reports.by.books')]], current=query_with(by=by), label=t('reports.by.label')) }}
+    {%- if reach.stores | length > 1 %}
+    {% call menu(store_name or t('reports.all_stores'), id="report-store") %}
+      {{ menu_link(query_with(store=none), t('reports.all_stores')) }}
+      {%- for s in reach.stores %}
+      {{ menu_link(query_with(store=s.id), s.name) }}
+      {%- endfor %}
+    {% endcall %}
+    {%- endif %}
+  </div>
+  <p class="rx-subtitle">{{ t('reports.by.hint_' ~ by) }}</p>
+
+  {#- Income. -#}
+  {% call stats(4) %}
+    {{ stat(t('reports.stat.revenue'), n.revenue | money, delta=n.revenue_change, trend=n.revenue_trend) }}
+    {{ stat(t('reports.stat.orders'), n.orders | number, delta=n.orders_change, url=route('reports.orders')) }}
+    {{ stat(t('reports.stat.average_order'), n.average_order | money, hint=t('reports.stat.average_order_hint')) }}
+    {{ stat(t('reports.stat.rentals'), n.rentals | number, hint=t('reports.stat.rentals_hint'), url=route('reports.rentals')) }}
+  {% endcall %}
+  {#- The fleet, the workshop, plans. -#}
+  {% call stats(4) %}
+    {{ stat(t('reports.stat.fleet_use'), (n.fleet_use | number(1)) ~ " %", hint=t('reports.stat.fleet_use_hint', bikes=n.fleet)) }}
+    {{ stat(t('reports.stat.overdue'), n.overdue | number, hint=t('reports.stat.overdue_hint')) }}
+    {{ stat(t('reports.stat.work_done'), n.work_done | number, hint=(t('reports.stat.turnaround', hours=(n.turnaround_hours | number(1))) if n.turnaround_hours is not none else t('reports.stat.no_turnaround')), url=route('reports.work_orders')) }}
+    {{ stat(t('reports.stat.plans'), n.active_plans | number, hint=t('reports.stat.mrr', amount=(n.recurring_monthly | money))) }}
+  {% endcall %}
+  {#- Plans churn and the books between stores. -#}
+  {% call stats(4) %}
+    {{ stat(t('reports.stat.mrr_label'), n.recurring_monthly | money, hint=t('reports.stat.mrr_hint')) }}
+    {{ stat(t('reports.stat.churn'), ((n.churn | number(1)) ~ " %") if n.churn is not none else "—", hint=t('reports.stat.churn_hint')) }}
+    {{ stat(t('reports.stat.fees_earned'), n.fees_earned | money, hint=t('reports.stat.fees_earned_hint')) }}
+    {{ stat(t('reports.stat.fees_paid'), n.fees_paid | money, hint=t('reports.stat.fees_paid_hint')) }}
+  {% endcall %}
+
+  {% call dashboard(3) %}
+    {% call widget(t('reports.widget.revenue'), description=t('reports.widget.revenue_hint'), span=2) %}
+      {{ chart("bar", labels=n.labels, series=revenue, stacked=true, format="money", title=t('reports.widget.revenue'), id="chart-revenue") }}
+    {% endcall %}
+    {% call widget(t('reports.widget.mix'), description=t('reports.widget.mix_hint')) %}
+      {%- if n.revenue > 0 %}
+      {{ chart("doughnut", labels=stream_labels, values=stream_amounts, format="money", title=t('reports.widget.mix'), id="chart-mix") }}
+      {%- else %}{{ empty(t('reports.widget.nothing')) }}{% endif %}
+    {% endcall %}
+
+    {% call widget(t('reports.widget.hours'), description=t('reports.widget.hours_hint'), span=2) %}
+      {%- if n.rental_hours %}
+      {{ chart("bubble", points=n.rental_hours, x_title=t('reports.widget.hour'), y_title=t('reports.widget.weekday'), size_title=t('reports.widget.rentals'), title=t('reports.widget.hours'), id="chart-hours") }}
+      {%- else %}{{ empty(t('reports.widget.nothing')) }}{% endif %}
+    {% endcall %}
+    {% call widget(t('reports.widget.between'), description=t('reports.widget.between_hint')) %}
+      <div class="bs-widget-stack">
+        <dl class="bs-figures">
+          <div><dt>{{ t('reports.widget.position') }}</dt><dd>{{ n.position | money }}</dd></div>
+          <div><dt>{{ t('reports.widget.help_received') }}</dt><dd>{{ t('reports.hours', hours=(n.help_received_hours | number(1))) }}</dd></div>
+          <div><dt>{{ t('reports.widget.help_given') }}</dt><dd>{{ t('reports.hours', hours=(n.help_given_hours | number(1))) }}</dd></div>
+        </dl>
+        {%- if n.balances %}
+        {% call table([t('reports.widget.owes'), [t('reports.fields.amount'), "num"]], caption=t('reports.widget.balances')) %}
+          {%- for b in n.balances %}
+          <tr><td>{{ t('reports.widget.owes_line', debtor=b.debtor, creditor=b.creditor) }}</td><td class="rx-num">{{ b.amount | money }}</td></tr>
+          {%- endfor %}
+        {% endcall %}
+        {%- else %}{{ empty(t('reports.widget.square')) }}{% endif %}
+        {%- if can('intercompany.view') %}{{ link_button(route('reports.entries'), t('reports.tab.entries'), size="small") }}{% endif %}
+      </div>
+    {% endcall %}
+
+    {% call widget(t('reports.widget.products'), description=t('reports.widget.products_hint')) %}
+      {%- if n.top_products %}
+      {% call table([t('reports.fields.product'), [t('reports.fields.units'), "num"], [t('reports.fields.amount'), "num"]], caption=t('reports.widget.products')) %}
+        {%- for p in n.top_products %}<tr><td>{{ p.name }}</td><td class="rx-num">{{ p.quantity | number }}</td><td class="rx-num">{{ p.amount | money }}</td></tr>{% endfor %}
+      {% endcall %}
+      {%- else %}{{ empty(t('reports.widget.nothing')) }}{% endif %}
+    {% endcall %}
+    {% call widget(t('reports.widget.categories'), description=t('reports.widget.categories_hint')) %}
+      {%- if n.top_categories %}
+      {% call table([t('reports.fields.category'), [t('reports.fields.units'), "num"], [t('reports.fields.amount'), "num"]], caption=t('reports.widget.categories')) %}
+        {%- for c in n.top_categories %}<tr><td>{{ c.name }}</td><td class="rx-num">{{ c.quantity | number }}</td><td class="rx-num">{{ c.amount | money }}</td></tr>{% endfor %}
+      {% endcall %}
+      {%- else %}{{ empty(t('reports.widget.nothing')) }}{% endif %}
+    {% endcall %}
+    {% call widget(t('reports.widget.customers'), description=t('reports.widget.customers_hint')) %}
+      {%- if n.top_customers %}
+      {% call table([t('reports.fields.customer'), [t('reports.fields.visits'), "num"], [t('reports.fields.amount'), "num"]], caption=t('reports.widget.customers')) %}
+        {%- for c in n.top_customers %}<tr><td>{{ c.name }}</td><td class="rx-num">{{ c.quantity | number }}</td><td class="rx-num">{{ c.amount | money }}</td></tr>{% endfor %}
+      {% endcall %}
+      {%- else %}{{ empty(t('reports.widget.nothing')) }}{% endif %}
+    {% endcall %}
+
+    {%- if n.comparison %}
+    {% call widget(t('reports.widget.comparison'), description=t('reports.widget.comparison_hint_' ~ by), span="full") %}
+      <div class="bs-widget-stack">
+        {{ chart("bar", labels=comparison_labels, series=comparison, stacked=true, format="money", title=t('reports.widget.comparison'), id="chart-stores") }}
+        {% call table([t('reports.fields.store'), [t('reports.stream.sales'), "num"], [t('reports.stream.rentals'), "num"], [t('reports.stream.workshop'), "num"], [t('reports.stream.plans'), "num"], [t('reports.fields.total'), "num"], t('reports.widget.share')], caption=t('reports.widget.comparison')) %}
+          {%- for s in n.comparison %}
+          <tr>
+            <td><a class="rx-link" href="{{ query_with(store=s.id) }}">{{ s.name }}</a></td>
+            {%- for amount in s.streams %}<td class="rx-num">{{ amount | money }}</td>{% endfor %}
+            <td class="rx-num"><strong>{{ s.total | money }}</strong></td>
+            <td><span class="bs-share">{{ progress(s.share, label=t('reports.widget.share_of', store=s.name)) }}</span></td>
+          </tr>
+          {%- endfor %}
+          <tr>
+            <td><strong>{{ t('reports.fields.company') }}</strong></td>
+            {%- for stream in n.streams %}<td class="rx-num">{{ stream.amount | money }}</td>{% endfor %}
+            <td class="rx-num"><strong>{{ n.revenue | money }}</strong></td>
+            <td></td>
+          </tr>
+        {% endcall %}
+      </div>
+    {% endcall %}
+    {%- endif %}
+  {% endcall %}
+</div>
+{% endblock %}

@@ -73,15 +73,15 @@ impl Module for Reports {
 
     fn register(&self, app: &mut Registry) {
         // Income changed: every cached dashboard is stale.
-        app.listen(|_: RentalClosed, state: AppState| async move {
-            numbers::changed(&state).await
-        });
-        app.listen(|_: WorkOrderClosed, state: AppState| async move {
-            numbers::changed(&state).await
-        });
-        app.listen(|_: PaymentSucceeded, state: AppState| async move {
-            numbers::changed(&state).await
-        });
+        app.listen(
+            |_: RentalClosed, state: AppState| async move { numbers::changed(&state).await },
+        );
+        app.listen(
+            |_: WorkOrderClosed, state: AppState| async move { numbers::changed(&state).await },
+        );
+        app.listen(
+            |_: PaymentSucceeded, state: AppState| async move { numbers::changed(&state).await },
+        );
         app.job::<monthly::BuildStoreReport>();
         app.job::<monthly::SendMonthlyReport>();
         monthly::schedule(app.schedule());

@@ -9,9 +9,10 @@ pub fn entries() -> Vec<Explanation> {
 
         path: "/staff",
         title: "Staff dashboard",
-        purpose: "Where the staff side starts after logging in. For now it holds the \
-                  back office's layout; the dashboards with each store's numbers come \
-                  with the reports.",
+        purpose: "Where the staff side starts after logging in. People who see reports in \
+                  the active store get its last 7 days here (revenue, orders, rentals, work \
+                  done, from the reports area's cached numbers) and a way into the reports; \
+                  everyone else gets the shortcuts in the menu.",
         who: "Everyone on a store's staff: cashiers, mechanics, store managers and the \
               owner, each seeing what their roles in the chosen store allow.",
         audience: &[
@@ -44,6 +45,12 @@ pub fn entries() -> Vec<Explanation> {
                       counts the roles given in that store (#244).",
             },
             Feature {
+                api: "Cache::remember",
+                why: "The 7-day figures are the reports dashboard's own numbers for the \
+                      active store (`reports::dashboard::overview`), cached until income \
+                      changes, so the home page costs a few queries.",
+            },
+            Feature {
                 api: "UI kit: page_header + empty",
                 why: "The page's title row and the placeholder message, so even an empty \
                       page looks finished.",
@@ -69,6 +76,7 @@ pub fn entries() -> Vec<Explanation> {
             "examples/bikeshop/resources/views/layouts/staff.html",
             "examples/bikeshop/src/app/access/active_store.rs",
             "examples/bikeshop/resources/views/layouts/_store_switcher.html",
+            "examples/bikeshop/resources/views/reports/_overview.html",
         ],
     }]
 }

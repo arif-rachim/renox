@@ -100,6 +100,7 @@ pub async fn show(
         context! {
             period,
             periods => periods(&lang),
+            tabs => super::grids::tabs(),
             by => by.key(),
             reach,
             store_name,

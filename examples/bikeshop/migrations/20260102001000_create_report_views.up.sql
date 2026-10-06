@@ -118,7 +118,7 @@ CREATE VIEW report_work_orders AS
 SELECT w.id, w.store_id, s.name AS store, w.billed_store_id, w.source, w.status,
        COALESCE(c.name, '') AS customer,
        COALESCE(cb.name, rb.frame_number, '') AS bike,
-       COALESCE(u.name, '') AS mechanic,
+       COALESCE(u.name, '') AS mechanic_name,
        w.scheduled_for, w.started_at, w.completed_at,
        w.labour, w.parts, w.total
 FROM work_orders w

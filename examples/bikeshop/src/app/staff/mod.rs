@@ -32,6 +32,9 @@ impl Module for Staff {
     }
 }
 
-async fn dashboard() -> View {
-    view("staff/dashboard.html", context! {})
+/// `GET /staff` (`staff.dashboard`): for people who see reports in the
+/// active store, its last 7 days (`reports::dashboard::overview`, #242).
+async fn dashboard(State(state): State<AppState>, user: AuthUser) -> Result<View> {
+    let overview = crate::app::reports::dashboard::overview(&state, &user).await?;
+    Ok(view("staff/dashboard.html", context! { overview }))
 }

@@ -73,7 +73,7 @@
       "customer": "Cliente",
       "staff": "Personal",
       "cashier": "Cajero",
-      "mechanic": "Mecánico",
+      "mechanic_name": "Mecánico",
       "manager": "Encargado de tienda",
       "owner": "Dueño",
       "developer": "Desarrollador"
@@ -1196,7 +1196,7 @@
       "title": "Panel del taller",
       "lead": "Una orden abierta|:count órdenes abiertas",
       "filters": "Filtros",
-      "mechanic": "Mecánico",
+      "mechanic_name": "Mecánico",
       "everyone": "Todos",
       "unassigned": "Sin asignar",
       "filter": "Filtrar",
@@ -1225,7 +1225,7 @@
       "notes": "Notas y fotos",
       "photo_link": "foto",
       "summary": "Orden de taller",
-      "mechanic": "Mecánico",
+      "mechanic_name": "Mecánico",
       "take": "Me la quedo",
       "assigned": "Es tuya.",
       "noted": "Añadido.",
@@ -1880,6 +1880,266 @@
         "confirm": "Cada tienda confirma en la página del extracto cuando el dinero se haya movido. Los asientos van adjuntos.",
         "open": "Abrir el extracto"
       }
+    }
+  },
+  "reports": {
+    "nav": "Informes",
+    "tabs": "Informes",
+    "all_stores": "Todas mis tiendas",
+    "hours": ":hours h",
+    "tab": {
+      "dashboard": "Panel",
+      "orders": "Pedidos",
+      "rentals": "Alquileres",
+      "work_orders": "Órdenes de trabajo",
+      "payments": "Pagos",
+      "customers": "Clientes",
+      "entries": "Entre tiendas"
+    },
+    "period": {
+      "label": "Periodo",
+      "7d": "7 días",
+      "30d": "30 días",
+      "12w": "12 semanas",
+      "90d": "90 días",
+      "12m": "12 meses",
+      "ytd": "Este año"
+    },
+    "by": {
+      "label": "Contar ingresos",
+      "work": "Donde se hizo el trabajo",
+      "books": "En las cuentas de quién",
+      "hint_work": "Ingresos en la tienda que atendió al cliente, sea quien sea el dueño de la bicicleta o del género.",
+      "hint_books": "Ingresos en las cuentas de la tienda dueña de la bicicleta o del género, dondequiera que se alquilara o vendiera."
+    },
+    "stream": {
+      "sales": "Ventas",
+      "rentals": "Alquileres",
+      "workshop": "Taller",
+      "plans": "Planes"
+    },
+    "dashboard": {
+      "title": "Informes",
+      "lead": "Cómo van las tiendas: ingresos por línea, la flota, el taller, los planes y las cuentas entre tiendas.",
+      "lead_store": "Cómo va :store: ingresos por línea, la flota, el taller, los planes y las cuentas entre tiendas."
+    },
+    "stat": {
+      "revenue": "Ingresos",
+      "orders": "Pedidos",
+      "average_order": "Pedido medio",
+      "average_order_hint": "Ventas ÷ pedidos",
+      "rentals": "Alquileres",
+      "rentals_hint": "Devueltos en el periodo",
+      "fleet_use": "Uso de la flota",
+      "fleet_use_hint": "Horas-bicicleta alquiladas, de :bikes bicicletas",
+      "overdue": "Con retraso ahora",
+      "overdue_hint": "Bicicletas no devueltas a su hora",
+      "overdue_now": ":count con retraso ahora",
+      "work_done": "Órdenes terminadas",
+      "turnaround": ":hours h de la reserva al final, de media",
+      "no_turnaround": "Ninguna terminada",
+      "plans": "Planes activos",
+      "plans_active": ":count planes activos",
+      "mrr": ":amount al mes",
+      "mrr_label": "Planes al mes",
+      "mrr_hint": "Lo que aportan al mes los planes activos",
+      "churn": "Bajas de planes",
+      "churn_hint": "Planes cancelados en el periodo",
+      "fees_earned": "Comisiones cobradas",
+      "fees_earned_hint": "Por alquilar y vender bicicletas y género de otras tiendas",
+      "fees_paid": "Comisiones pagadas",
+      "fees_paid_hint": "A tiendas que alquilaron o vendieron lo nuestro"
+    },
+    "widget": {
+      "revenue": "Ingresos por línea",
+      "revenue_hint": "Por día, semana o mes, apilados por línea.",
+      "mix": "Reparto de ingresos",
+      "mix_hint": "La parte de cada línea en los ingresos del periodo.",
+      "hours": "Alquileres por día y hora",
+      "hours_hint": "Cuándo se recogen las bicicletas: cuanto mayor la burbuja, más alquileres.",
+      "hour": "Hora del día",
+      "weekday": "Día (1 = lunes)",
+      "rentals": "Alquileres",
+      "between": "Entre tiendas",
+      "between_hint": "Saldos abiertos y ayuda de personal en el periodo.",
+      "position": "Posición (nos deben − debemos)",
+      "help_received": "Ayuda recibida",
+      "help_given": "Ayuda prestada",
+      "balances": "Saldos abiertos",
+      "owes": "Quién debe a quién",
+      "owes_line": ":debtor debe a :creditor",
+      "square": "Las tiendas están en paz.",
+      "products": "Productos más vendidos",
+      "products_hint": "Ventas por ingresos.",
+      "categories": "Categorías principales",
+      "categories_hint": "Ventas y alquileres por ingresos.",
+      "customers": "Mejores clientes",
+      "customers_hint": "Todas las líneas, por ingresos.",
+      "comparison": "Comparación de tiendas",
+      "comparison_hint_work": "Ingresos en cada tienda, por línea (quién hizo el trabajo).",
+      "comparison_hint_books": "Ingresos en las cuentas de cada tienda, por línea (de quién son las bicicletas y el género).",
+      "share": "Parte",
+      "share_of": "Parte de :store",
+      "nothing": "Nada en este periodo."
+    },
+    "orders": {
+      "title": "Informe de pedidos",
+      "lead": "Todos los pedidos de tus tiendas: filtra, agrupa por tienda, estado o canal, y exporta."
+    },
+    "rentals": {
+      "title": "Informe de alquileres",
+      "lead": "Alquileres atendidos por tus tiendas o de tus bicicletas: agrupa por tienda, tienda propietaria, categoría o estado."
+    },
+    "work_orders": {
+      "title": "Informe de órdenes de trabajo",
+      "lead": "El trabajo de los talleres: agrupa por tienda, estado u origen, con mano de obra y piezas sumadas."
+    },
+    "payments": {
+      "title": "Informe de pagos",
+      "lead": "El dinero recibido en tus tiendas por pedidos, alquileres, órdenes de trabajo y planes."
+    },
+    "customers": {
+      "title": "Informe de clientes",
+      "lead": "Clientes que compraron en tus tiendas, con su valor total en toda la empresa."
+    },
+    "entries": {
+      "title": "Informe entre tiendas",
+      "lead": "Las cuentas entre tiendas: quién debe a quién, por qué y si está liquidado."
+    },
+    "empty": {
+      "orders": "Aún no hay pedidos",
+      "rentals": "Aún no hay alquileres",
+      "work_orders": "Aún no hay órdenes de trabajo",
+      "payments": "Aún no hay pagos",
+      "customers": "Aún no hay clientes",
+      "entries": "Aún no hay nada entre tiendas"
+    },
+    "fields": {
+      "number": "Pedido",
+      "placed_at": "Realizado",
+      "store": "Tienda",
+      "customer": "Cliente",
+      "channel": "Canal",
+      "status": "Estado",
+      "units": "Unidades",
+      "discount": "Descuento",
+      "total": "Total",
+      "paid_at": "Pagado",
+      "code": "Reserva",
+      "starts_at": "Inicio",
+      "owner_store": "Tienda propietaria",
+      "bike": "Bicicleta",
+      "model": "Modelo",
+      "category": "Categoría",
+      "rate": "Tarifa",
+      "price": "Precio",
+      "late_fee": "Recargo por retraso",
+      "damage_fee": "Cargo por daños",
+      "returned_at": "Devuelto",
+      "work_order": "Orden de trabajo",
+      "scheduled_for": "Reservado para",
+      "source": "Origen",
+      "mechanic_name": "Mecánico",
+      "labour": "Mano de obra",
+      "parts": "Piezas",
+      "completed_at": "Completado",
+      "payment": "Pago",
+      "kind": "Por",
+      "payable_id": "Documento",
+      "method": "Método",
+      "amount": "Importe",
+      "reference": "Referencia",
+      "email": "Correo",
+      "city": "Ciudad",
+      "visits": "Visitas",
+      "sales_value": "Compras",
+      "rentals_value": "Alquileres",
+      "workshop_value": "Servicios",
+      "plans_value": "Planes",
+      "lifetime_value": "Valor total",
+      "value": "Valor",
+      "first_at": "Primera visita",
+      "last_at": "Última visita",
+      "booked_at": "Registrado",
+      "debtor": "Debe",
+      "creditor": "Se le debe",
+      "fee_rate_bp": "Tasa (pb)",
+      "settlement": "Liquidación",
+      "product": "Producto",
+      "company": "Todas las tiendas"
+    },
+    "rate": {
+      "hourly": "Por horas",
+      "daily": "Por días"
+    },
+    "payable": {
+      "orders": "Pedido",
+      "rentals": "Alquiler",
+      "work_orders": "Orden de trabajo",
+      "plan_subscriptions": "Plan"
+    },
+    "payment_status": {
+      "pending": "Pendiente",
+      "paid": "Pagado",
+      "failed": "Fallido",
+      "refunded": "Reembolsado"
+    },
+    "settlement": {
+      "unsettled": "Sin liquidar",
+      "open": "En un extracto",
+      "settled": "Liquidado"
+    },
+    "overview": {
+      "title": ":store, últimos 7 días",
+      "open": "Abrir los informes"
+    },
+    "monthly": {
+      "title": "Informe mensual",
+      "lead": "Un libro de Excel por tienda y mes, enviado al propietario y a cada encargado. Se genera solo el día 1; aquí puedes generar cualquier mes.",
+      "run_title": "Generar un mes",
+      "run_lead": "Para :stores.",
+      "month": "Mes",
+      "month_hint": "Los libros de una ejecución anterior de este mes se reemplazan.",
+      "run": "Generar el informe",
+      "runs": "Ejecuciones",
+      "runs_hint": "Cada ejecución es un lote de la cola: un trabajo por tienda y luego el correo.",
+      "started": "El informe de :month está en marcha.",
+      "started_at": "Iniciado :at",
+      "progress": "Progreso de :month",
+      "done": "Enviado",
+      "running": "En curso",
+      "failed": "Falló",
+      "empty": "Aún no hay ejecuciones",
+      "empty_text": "La primera se genera el día 1 del mes que viene, o empieza una aquí.",
+      "invalid": "Elige un mes hasta el actual."
+    },
+    "mail": {
+      "subject": "Informe mensual: :month",
+      "title": "Informe mensual de :month",
+      "hello": "Hola :name:",
+      "body": "Adjuntamos el informe de :month de la tienda de bicicletas, un libro por tienda:",
+      "sheets": "Cada libro tiene un resumen, las cuentas de la tienda (sus bicicletas y género), su trabajo (los clientes que atendió) y su extracto entre tiendas.",
+      "open": "Abrir los informes"
+    },
+    "workbook": {
+      "summary": "Resumen",
+      "stream": "Línea",
+      "books": "Cuentas (propietaria)",
+      "work": "Trabajo (operadora)",
+      "total": "Total",
+      "owed_to": "Se le debe a la tienda",
+      "owed_by": "Debe la tienda",
+      "net": "Neto",
+      "intercompany": "Entre tiendas",
+      "date": "Fecha",
+      "kind": "Por",
+      "debtor": "Debe",
+      "creditor": "Se le debe",
+      "amount": "Importe",
+      "signed": "Para esta tienda",
+      "document": "Documento",
+      "operating": "Atendido en",
+      "owner_store": "Tienda propietaria"
     }
   }
 }

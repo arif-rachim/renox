@@ -21,11 +21,11 @@
 
 use std::collections::{BTreeMap, HashMap};
 
+use renox::Download;
 use renox::axum::body::Bytes;
 use renox::chrono::{Duration, NaiveDate};
 use renox::db::sql;
 use renox::prelude::*;
-use renox::Download;
 use renox::schedule::Schedule;
 use rust_xlsxwriter::{Format, Workbook, Worksheet, XlsxError};
 use serde::{Deserialize, Serialize};
@@ -44,16 +44,22 @@ pub const BATCH_PREFIX: &str = "monthly-report:";
 
 /// Registers the monthly task.
 pub fn schedule(s: &mut Schedule) {
-    s.monthly_on(1, "03:00", "reports:monthly", |state: AppState| async move {
-        let today = crate::app::rentals::booking::to_local(&state.config, renox::db::now()).date();
-        let previous = month_of(month_of(today) - Duration::days(1));
-        let stores: Vec<i64> = Store::all_by_name(&state.db)
-            .await?
-            .into_iter()
-            .map(|s| s.id)
-            .collect();
-        start(&state, previous, &stores).await.map(|_| ())
-    });
+    s.monthly_on(
+        1,
+        "03:00",
+        "reports:monthly",
+        |state: AppState| async move {
+            let today =
+                crate::app::rentals::booking::to_local(&state.config, renox::db::now()).date();
+            let previous = month_of(month_of(today) - Duration::days(1));
+            let stores: Vec<i64> = Store::all_by_name(&state.db)
+                .await?
+                .into_iter()
+                .map(|s| s.id)
+                .collect();
+            start(&state, previous, &stores).await.map(|_| ())
+        },
+    );
 }
 
 /// Where a store's workbook for `month` is kept (the private disk).
@@ -161,7 +167,9 @@ impl Job for SendMonthlyReport {
                 context! { name => &user.name, month => &month, stores => &names, url => &url },
             )?;
             for id in &theirs {
-                let Some(store) = stores.get(id) else { continue };
+                let Some(store) = stores.get(id) else {
+                    continue;
+                };
                 let Some(bytes) = state.storage.get(&file_key(self.month, *id)).await? else {
                     continue;
                 };
@@ -280,7 +288,11 @@ impl Report {
                 .sum()
         };
         for stream in STREAMS {
-            sheet.write_string(row, 0, self.lang.t(&format!("reports.stream.{stream}"), &[]))?;
+            sheet.write_string(
+                row,
+                0,
+                self.lang.t(&format!("reports.stream.{stream}"), &[]),
+            )?;
             sheet.write_number_with_format(row, 1, self.money(sum(&self.books, stream)), &money)?;
             sheet.write_number_with_format(row, 2, self.money(sum(&self.work, stream)), &money)?;
             row += 1;
@@ -322,7 +334,7 @@ impl Report {
         // Its work: income it earned serving customers, whoever owns the bikes.
         let sheet = book.add_worksheet();
         sheet.set_name(self.t("work"))?;
-        self.lines(sheet, &self.work, "owner", &bold, &money, &date)?;
+        self.lines(sheet, &self.work, "owner_store", &bold, &money, &date)?;
 
         // Its statement between stores.
         let sheet = book.add_worksheet();
@@ -342,7 +354,7 @@ impl Report {
         for (i, e) in self.entries.iter().enumerate() {
             let row = i as u32 + 1;
             let local = self.zone.local(e.booked_at.timestamp());
-            sheet.write_datetime_with_format(row, 0, &local, &date)?;
+            sheet.write_datetime_with_format(row, 0, local, &date)?;
             sheet.write_string(
                 row,
                 1,
@@ -393,14 +405,14 @@ impl Report {
         for (i, line) in lines.iter().enumerate() {
             let row = i as u32 + 1;
             let local = self.zone.local(line.booked_at.timestamp());
-            sheet.write_datetime_with_format(row, 0, &local, date)?;
+            sheet.write_datetime_with_format(row, 0, local, date)?;
             sheet.write_string(
                 row,
                 1,
                 self.lang.t(&format!("reports.stream.{}", line.stream), &[]),
             )?;
             sheet.write_string(row, 2, format!("{} #{}", line.source_type, line.source_id))?;
-            let store = if other == "owner" {
+            let store = if other == "owner_store" {
                 line.owner_store_id
             } else {
                 line.operating_store_id
@@ -523,10 +535,7 @@ pub fn parse_name(name: &str) -> Option<(NaiveDate, Vec<i64>)> {
     let rest = name.strip_prefix(BATCH_PREFIX)?;
     let (month, stores) = rest.split_once(':')?;
     let month = NaiveDate::parse_from_str(&format!("{month}-01"), "%Y-%m-%d").ok()?;
-    let stores = stores
-        .split('-')
-        .filter_map(|s| s.parse().ok())
-        .collect();
+    let stores = stores.split('-').filter_map(|s| s.parse().ok()).collect();
     Some((month, stores))
 }
 

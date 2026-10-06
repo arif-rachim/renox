@@ -171,7 +171,12 @@ pub fn change(now: i64, before: i64) -> Option<f64> {
 impl Numbers {
     /// The numbers for `reach`'s chosen stores, counted `by`, over `period`:
     /// from the cache when nothing changed since they were computed.
-    pub async fn for_page(state: &AppState, reach: &Reach, by: By, period: Period) -> Result<Numbers> {
+    pub async fn for_page(
+        state: &AppState,
+        reach: &Reach,
+        by: By,
+        period: Period,
+    ) -> Result<Numbers> {
         let generation: i64 = state.cache.get(GENERATION_KEY).await?.unwrap_or(0);
         let today = renox::db::now().date_naive();
         let key = format!(
@@ -214,8 +219,9 @@ impl Numbers {
         let count = "stream, CAST(SUM(amount) AS BIGINT), \
                      COUNT(DISTINCT source_type || ':' || CAST(source_id AS TEXT))";
         let current: Vec<(String, i64, i64)> = totals(start, end).select_as(db, count).await?;
-        let previous: Vec<(String, i64, i64)> =
-            totals(before_start, before_end).select_as(db, count).await?;
+        let previous: Vec<(String, i64, i64)> = totals(before_start, before_end)
+            .select_as(db, count)
+            .await?;
         let find = |rows: &[(String, i64, i64)], key: &str| {
             rows.iter()
                 .find(|r| r.0 == key)
@@ -308,9 +314,8 @@ impl Numbers {
         n.overdue = Rental::query()
             .where_in(rental_column, stores.clone())
             .where_any(|q| {
-                q.where_eq("status", "overdue").where_all(|q| {
-                    q.where_eq("status", "active").where_op("due_at", "<", now)
-                })
+                q.where_eq("status", "overdue")
+                    .where_all(|q| q.where_eq("status", "active").where_op("due_at", "<", now))
             })
             .count(db)
             .await? as i64;
@@ -517,7 +522,10 @@ impl Numbers {
             let per_store: Vec<(i64, String, i64)> = in_period()
                 .group_by(column)
                 .group_by("stream")
-                .select_as(db, &format!("{column}, stream, CAST(SUM(amount) AS BIGINT)"))
+                .select_as(
+                    db,
+                    &format!("{column}, stream, CAST(SUM(amount) AS BIGINT)"),
+                )
                 .await?;
             let all: i64 = per_store.iter().map(|r| r.2).sum();
             n.comparison = stores

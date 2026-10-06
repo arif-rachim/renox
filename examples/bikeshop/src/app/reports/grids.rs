@@ -278,7 +278,7 @@ pub fn work_orders_grid(lang: &Lang, stores: &[Store]) -> Grid {
         )
         .column(Column::text("customer", &f("customer")).searchable())
         .column(Column::text("bike", &f("bike")).searchable().limit(32))
-        .column(Column::text("mechanic", &f("mechanic")).searchable())
+        .column(Column::text("mechanic_name", &f("mechanic_name")).searchable())
         .column(Column::money("labour", &f("labour")).summary(Summary::Sum))
         .column(Column::money("parts", &f("parts")).summary(Summary::Sum))
         .column(
@@ -417,10 +417,18 @@ pub fn entries_grid(lang: &Lang, stores: &[Store]) -> Grid {
                 .mobile(),
         )
         .column(
-            Column::select("kind", &f("kind"), options(lang, "multistore.books.kind", &kinds))
-                .mobile(),
+            Column::select(
+                "kind",
+                &f("kind"),
+                options(lang, "multistore.books.kind", &kinds),
+            )
+            .mobile(),
         )
-        .column(Column::select("debtor", &f("debtor"), store_options(stores)))
+        .column(Column::select(
+            "debtor",
+            &f("debtor"),
+            store_options(stores),
+        ))
         .column(Column::select(
             "creditor",
             &f("creditor"),
@@ -437,7 +445,11 @@ pub fn entries_grid(lang: &Lang, stores: &[Store]) -> Grid {
             Column::select(
                 "settlement",
                 &f("settlement"),
-                options(lang, "reports.settlement", &["unsettled", "open", "settled"]),
+                options(
+                    lang,
+                    "reports.settlement",
+                    &["unsettled", "open", "settled"],
+                ),
             )
             .badges(&[
                 ("settled", "success"),
@@ -451,10 +463,7 @@ pub fn entries_grid(lang: &Lang, stores: &[Store]) -> Grid {
 
 /// What the grid template needs besides the grid.
 fn page(tab: &str, rows: impl Serialize) -> View {
-    view(
-        "reports/grid.html",
-        context! { rows, tab, tabs => tabs() },
-    )
+    view("reports/grid.html", context! { rows, tab, tabs => tabs() })
 }
 
 /// `GET /staff/reports/orders` (`reports.orders`).

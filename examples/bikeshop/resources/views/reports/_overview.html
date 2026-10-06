@@ -1,0 +1,13 @@
+{#- The staff home page's short dashboard (src/app/reports/dashboard.rs `overview`): the active
+    store's last 7 days, by the work it did, and a way into the reports. -#}
+{% from "renox/ui.html" import stats, stat, link_button %}
+<section class="rx-stack" aria-labelledby="overview-title">
+  <h2 class="rx-card__title" id="overview-title">{{ t('reports.overview.title', store=overview.store) }}</h2>
+  {% call stats(4) %}
+    {{ stat(t('reports.stat.revenue'), overview.numbers.revenue | money, delta=overview.numbers.revenue_change, trend=overview.numbers.revenue_trend, url=route('reports.dashboard', period="7d")) }}
+    {{ stat(t('reports.stat.orders'), overview.numbers.orders | number, delta=overview.numbers.orders_change) }}
+    {{ stat(t('reports.stat.rentals'), overview.numbers.rentals | number, hint=t('reports.stat.overdue_now', count=overview.numbers.overdue)) }}
+    {{ stat(t('reports.stat.work_done'), overview.numbers.work_done | number, hint=t('reports.stat.plans_active', count=overview.numbers.active_plans)) }}
+  {% endcall %}
+  <div>{{ link_button(route('reports.dashboard'), t('reports.overview.open'), variant="primary", icon="next") }}</div>
+</section>

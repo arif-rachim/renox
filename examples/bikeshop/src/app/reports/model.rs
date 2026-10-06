@@ -1,5 +1,5 @@
 //! What the reports read: database **views** over the other areas' tables
-//! (`migrations/20260101002500_create_report_views.*`), each with a
+//! (`migrations/20260102001000_create_report_views.*`), each with a
 //! read-only model.
 //!
 //! Nothing here is copied or kept in step by code: a view is a saved
@@ -187,7 +187,7 @@ pub struct WorkOrderRow {
     pub customer: String,
     /// The customer's bike, or the rental bike's frame number.
     pub bike: String,
-    pub mechanic: String,
+    pub mechanic_name: String,
     pub scheduled_for: DateTime,
     pub started_at: Option<DateTime>,
     pub completed_at: Option<DateTime>,
