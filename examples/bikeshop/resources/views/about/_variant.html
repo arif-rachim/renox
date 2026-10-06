@@ -1,0 +1,10 @@
+{#- The price and stock of the chosen variant: swapped in by the variant chips
+    on /about/blocks (GET /about/blocks/variant, src/app/about/blocks.rs). -#}
+<p class="bs-showcase__variant" id="variant" aria-live="polite">
+  <strong data-bs-variant-price>{{ price | money }}</strong>
+  {%- if stock > 0 %}
+  <span class="rx-badge rx-badge--success" data-bs-variant-stock>{{ t('blocks.page.in_stock', n=stock) }}</span>
+  {%- else %}
+  <span class="rx-badge rx-badge--warning" data-bs-variant-stock>{{ t('blocks.page.out_of_stock') }}</span>
+  {%- endif %}
+</p>

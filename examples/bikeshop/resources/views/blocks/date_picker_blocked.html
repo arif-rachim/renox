@@ -1,0 +1,27 @@
+{#- date_picker_blocked: the kit's `date_picker` with days that can't be
+    picked: the shop's closed days, a mechanic's full days, a bike's
+    booked days. One plain field, `name`, "YYYY-MM-DD" (a `NaiveDate`).
+
+    {% from "blocks/date_picker_blocked.html" import date_picker_blocked %}
+    {{ date_picker_blocked("visit_on", "Visit day", ["2026-10-12", "2026-10-13"],
+                           closed_weekdays=[0], min="2026-10-06", max="2026-11-30") }}
+
+    `disabled_dates`: the days that can't be picked ("YYYY-MM-DD").
+    `closed_weekdays`: weekdays that are never open (0 is Sunday … 6
+    Saturday). The rest is the kit's `date_picker`: `value`, `min`, `max`,
+    `hint`, `required`, `id`, `bag` (the `hint` defaults to a sentence
+    saying some days can't be picked).
+
+    The calendar greys those days out (Cally's `isDateDisallowed`) so they
+    can't be chosen with a click or the keyboard, and a day typed into the
+    field that is one of them is pointed out at once ("That day can't be
+    booked") and refused by the browser on submit. The server must still
+    refuse it, since anyone can send any date: `none_of` in `rules` with
+    the same list, or a check in `after` against the database. -#}
+{% from "renox/ui.html" import date_picker %}
+
+{% macro date_picker_blocked(name, label, disabled_dates=[], closed_weekdays=[], value=none, min=none, max=none, hint=none, required=false, id=none, bag=none) -%}
+<div class="bs-blocked" data-bs-blocked='{{ disabled_dates | tojson }}' data-bs-closed='{{ closed_weekdays | tojson }}' data-bs-message="{{ t('blocks.blocked.unavailable') }}">
+  {{ date_picker(name, label, value=value, min=min, max=max, hint=hint or t('blocks.blocked.hint'), required=required, id=id, bag=bag, attrs={"data-bs-blocked-input": true}) }}
+</div>
+{%- endmacro %}

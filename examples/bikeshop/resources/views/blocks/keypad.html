@@ -1,0 +1,39 @@
+{#- keypad: a point-of-sale number pad that types into a field of the form,
+    for a touch screen at the counter (an amount paid, a quantity, a PIN).
+
+    {% from "blocks/keypad.html" import keypad %}
+    {{ input("paid", "Amount paid", type="text", attrs={"inputmode": "numeric"}) }}
+    {{ keypad("rx-paid") }}
+
+    `target`: the id of the input it types into (the kit's `input("paid", …)`
+    has the id `rx-paid`). `label`: what screen readers call the pad.
+    `decimal=true` adds a decimal-point key (the page's separator: `.` or
+    `,`); `zeros=false` leaves out the "00" key. `enter_label`: the Enter
+    key's text ("Pay"). Enter submits the target's form
+    (`requestSubmit`, so `required` and htmx run as for a click).
+
+    The keys are buttons in a grid with one Tab stop: the arrow keys move
+    between them (Home/End to the first and last), Enter or Space presses
+    the focused one. While the focus is on the pad, typing a digit (or the
+    decimal point), Backspace and Delete (clear) work as on the keys, so a
+    keyboard at the counter works as well. Each press sends `input` on the target, so
+    live validation and htmx triggers see it; the target's `maxlength` is
+    respected. Without JavaScript the keys do nothing and the field is
+    typed into as usual. -#}
+{% macro keypad(target, label=none, decimal=false, zeros=true, enter_label=none) -%}
+{%- set keys = ["7", "8", "9", "4", "5", "6", "1", "2", "3"] %}
+<div class="bs-keypad{% if decimal and zeros %} bs-keypad--full{% endif %}" role="group" aria-label="{{ label or t('blocks.keypad.label') }}" aria-controls="{{ target }}" data-bs-keypad="{{ target }}" data-bs-locale="{{ app.locale }}">
+  {%- for key in keys %}
+  <button class="bs-keypad__key" type="button" data-bs-key="{{ key }}" tabindex="{{ 0 if loop.first else -1 }}">{{ key }}</button>
+  {%- endfor %}
+  {%- if zeros %}<button class="bs-keypad__key" type="button" data-bs-key="00" tabindex="-1">00</button>{% endif %}
+  <button class="bs-keypad__key" type="button" data-bs-key="0" tabindex="-1">0</button>
+  {%- if decimal %}<button class="bs-keypad__key" type="button" data-bs-key="decimal" tabindex="-1" aria-label="{{ t('blocks.keypad.decimal') }}"><span data-bs-decimal>.</span></button>{% endif %}
+  <button class="bs-keypad__key bs-keypad__key--tool" type="button" data-bs-key="backspace" tabindex="-1" aria-label="{{ t('blocks.keypad.backspace') }}">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M9 5h11a1 1 0 011 1v12a1 1 0 01-1 1H9l-6-7z" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/><path d="M12 9.5l5 5M17 9.5l-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+  </button>
+  {%- if not decimal and not zeros %}<span aria-hidden="true"></span>{% endif %}
+  <button class="bs-keypad__key bs-keypad__key--tool" type="button" data-bs-key="clear" tabindex="-1">{{ t('blocks.keypad.clear') }}</button>
+  <button class="bs-keypad__key bs-keypad__key--enter" type="button" data-bs-key="enter" tabindex="-1">{{ enter_label or t('blocks.keypad.enter') }}</button>
+</div>
+{%- endmacro %}
