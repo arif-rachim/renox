@@ -638,6 +638,13 @@ mod tests {
         let again = std::fs::read_to_string(dir.path().join(".env")).unwrap();
         assert_ne!(again, env);
         assert_eq!(again.matches("APP_KEY=").count(), 1, "{again}");
+
+        // A .env that can't be read (here a directory) is an error, not a
+        // fresh start that would drop its settings.
+        let odd = tempfile::tempdir().unwrap();
+        std::fs::create_dir(odd.path().join(".env")).unwrap();
+        let err = key_generate_in(odd.path(), false).unwrap_err();
+        assert!(err.to_string().contains("could not read .env"), "{err}");
     }
 
     #[test]
@@ -653,6 +660,9 @@ mod tests {
         assert!(app_root_in(dir.path().to_path_buf()).is_err(), "no src/");
         std::fs::create_dir(dir.path().join("src")).unwrap();
         assert_eq!(app_root_in(dir.path().to_path_buf()).unwrap(), dir.path());
+        // From a folder inside the app (src/), it's refused too: generators
+        // write paths relative to the app's root.
+        assert!(app_root_in(dir.path().join("src")).is_err());
     }
 
     #[test]

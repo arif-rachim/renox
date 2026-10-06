@@ -149,4 +149,23 @@ mod tests {
             "kept"
         );
     }
+
+    #[test]
+    fn the_package_name_comes_from_the_package_section_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let err = package_name(dir.path()).unwrap_err();
+        assert!(err.to_string().contains("no Cargo.toml here"), "{err}");
+        // A workspace manifest: a `name` outside [package] doesn't count.
+        fs::write(
+            dir.path().join("Cargo.toml"),
+            "[workspace]\nmembers = [\"app\"]\n\n[workspace.package]\nname = \"no\"\n",
+        )
+        .unwrap();
+        let err = make_deploy(dir.path()).unwrap_err();
+        assert!(
+            err.to_string().contains("Cargo.toml has no [package] name"),
+            "{err}"
+        );
+        assert!(!dir.path().join("Dockerfile").exists());
+    }
 }

@@ -134,6 +134,11 @@ step "every generator"
 "$RNX" make:component price_tag
 "$RNX" make:deploy
 
+step "make:component --ui forwards to the app's ui:publish"
+"$RNX" make:component --ui
+test -f resources/views/components/ui.html
+test -f public/css/renox-ui.css
+
 step "key:generate on a fresh clone (no .env)"
 mv .env "$WORK/env.bak"
 "$RNX" key:generate

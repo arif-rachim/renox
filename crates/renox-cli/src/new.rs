@@ -363,6 +363,12 @@ fn run_in(parent: &Path, name: &str, renox_path: Option<&Path>, options: Options
 /// `--tailwind`: the app's styles move into Tailwind's input, the layout
 /// links the built file, and the CSS is built once if the CLI can be had.
 fn use_tailwind(root: &Path) -> Result<()> {
+    use_tailwind_with(root, |root| crate::tailwind::build(root, false))
+}
+
+/// `use_tailwind` with the CSS built by `build` (tests pass one that needs
+/// no download).
+fn use_tailwind_with(root: &Path, build: impl FnOnce(&Path) -> Result<()>) -> Result<()> {
     let own = fs::read_to_string(root.join("public/app.css"))?;
     fs::remove_file(root.join("public/app.css"))?;
     let input = root.join(crate::tailwind::INPUT);
@@ -396,7 +402,7 @@ fn use_tailwind(root: &Path) -> Result<()> {
     );
     fs::write(&home, html)?;
 
-    if let Err(err) = crate::tailwind::build(root, false) {
+    if let Err(err) = build(root) {
         eprintln!("rnx: Tailwind isn't built yet ({err:#}); `rnx serve` will try again.");
     }
     Ok(())
@@ -504,6 +510,43 @@ mod tests {
     /// A written file with `\n` line ends (Windows checkouts give the stubs `\r\n`).
     fn read_lf(path: std::path::PathBuf) -> String {
         fs::read_to_string(path).unwrap().replace("\r\n", "\n")
+    }
+
+    /// `rnx new --tailwind`'s changes to a new app, with a build that needs no
+    /// download: one that works and one that fails (the app is still made,
+    /// `rnx serve` builds the CSS later).
+    #[test]
+    fn tailwind_moves_the_apps_css_and_links_the_built_file() {
+        let checkout = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        for works in [true, false] {
+            let dir = tempfile::tempdir().unwrap();
+            run_in(dir.path(), "inked", Some(&checkout), SQLITE).unwrap();
+            let root = dir.path().join("inked");
+            let own = read_lf(root.join("public/app.css"));
+            let built = std::cell::Cell::new(false);
+            use_tailwind_with(&root, |at| {
+                built.set(at == root.as_path());
+                if works {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!("no Tailwind here"))
+                }
+            })
+            .unwrap();
+            assert!(built.get());
+            assert!(!root.join("public/app.css").exists());
+            let input = read_lf(root.join(crate::tailwind::INPUT));
+            assert!(input.starts_with(crate::tailwind::INPUT_STUB), "{input}");
+            let rules = own
+                .split_once("*/")
+                .map_or(own.as_str(), |(_, r)| r.trim_start());
+            assert!(input.ends_with(rules), "the app's own rules kept:\n{input}");
+            let layout = read_lf(root.join("resources/views/layouts/app.html"));
+            assert!(layout.contains("{{ asset('css/app.css') }}"), "{layout}");
+            assert!(!layout.contains("{{ asset('app.css') }}"), "{layout}");
+            let home = read_lf(root.join("resources/views/home/index.html"));
+            assert!(home.contains("Tailwind is on"), "{home}");
+        }
     }
 
     #[test]

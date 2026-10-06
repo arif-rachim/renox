@@ -368,12 +368,17 @@ pub struct {pascal} {{
             key,
         )?;
     }
-    if key == crate::KeyType::Uuid {
-        println!(
-            "Uuid keys need renox's `uuid` feature: renox = {{ …, features = [\"uuid\"] }} in Cargo.toml"
-        );
+    if let Some(hint) = key_hint(key) {
+        println!("{hint}");
     }
     Ok(())
+}
+
+/// What a key type needs that a new app doesn't have.
+fn key_hint(key: crate::KeyType) -> Option<&'static str> {
+    (key == crate::KeyType::Uuid).then_some(
+        "Uuid keys need renox's `uuid` feature: renox = { …, features = [\"uuid\"] } in Cargo.toml",
+    )
 }
 
 /// `rnx make:job SendReceipt --module orders`.
@@ -1136,5 +1141,52 @@ mod tests {
         assert!(policy(dir.path(), "Ticket", "home").is_err());
         command(dir.path(), "tickets:close", "home").unwrap();
         assert!(command(dir.path(), "tickets:close", "home").is_err());
+        // Only uuid keys need a feature.
+        assert!(
+            key_hint(crate::KeyType::Uuid)
+                .unwrap()
+                .contains("features = [\"uuid\"]")
+        );
+        assert_eq!(key_hint(crate::KeyType::Integer), None);
+        assert_eq!(key_hint(crate::KeyType::String), None);
+        // A mail whose text part exists already is refused too.
+        fs::write(dir.path().join("resources/views/mail/receipt.txt"), "mine").unwrap();
+        let err = mail(dir.path(), "Receipt").unwrap_err();
+        assert!(format!("{err:#}").contains("receipt.txt"), "{err:#}");
+        assert_eq!(read(&dir, "resources/views/mail/receipt.txt"), "mine");
+    }
+
+    /// `rnx make:seeder` in an app built in lib.rs (what `rnx new` makes),
+    /// and `add_mod` when the line is there already.
+    #[test]
+    fn seeders_in_lib_apps_and_mod_lines_kept_once() {
+        let dir = app();
+        fs::write(
+            dir.path().join("src/lib.rs"),
+            "mod app;\n\npub fn app() -> renox::App {\n    renox::App::new()\n        .module(app::home::Home)\n}\n",
+        )
+        .unwrap();
+        seeder(dir.path(), "DemoData").unwrap();
+        let lib = read(&dir, "src/lib.rs");
+        assert!(lib.contains("mod seeders;"), "{lib}");
+        assert!(lib.contains(".seeder(seeders::demo_data::run)"), "{lib}");
+        assert!(!read(&dir, "src/main.rs").contains("seeders"));
+
+        // A job whose file was deleted but whose mod line stayed: made again
+        // without a second line.
+        job(dir.path(), "SendReceipt", "home").unwrap();
+        fs::remove_file(dir.path().join("src/app/home/send_receipt.rs")).unwrap();
+        job(dir.path(), "SendReceipt", "home").unwrap();
+        let module = read(&dir, "src/app/home/mod.rs");
+        assert_eq!(
+            module.matches("pub mod send_receipt;").count(),
+            1,
+            "{module}"
+        );
+        // `mod x;` (without pub) counts as there too.
+        let mod_rs = dir.path().join("src/app/home/mod.rs");
+        fs::write(&mod_rs, "mod private_part;\n").unwrap();
+        add_mod(&mod_rs, "private_part").unwrap();
+        assert_eq!(read(&dir, "src/app/home/mod.rs"), "mod private_part;\n");
     }
 }

@@ -980,5 +980,37 @@ mod tests {
         assert!(!tests.contains("__"), "{tests}");
         let module = read(&dir, "src/app/readings/mod.rs");
         assert!(module.contains("NaiveDate"), "{module}");
+        // Every generated file together: the fake values and the test's
+        // sample values for each kind, the float column, and the heading
+        // that falls back to the id when the first field isn't text.
+        let mut all = String::new();
+        for entry in walk(dir.path()) {
+            all.push_str(&fs::read_to_string(entry).unwrap_or_default());
+        }
+        for part in [
+            "(1..100).fake()",
+            "(1.0..100.0).fake()",
+            "NaiveDate::from_ymd_opt(2026, (1..13).fake(), (1..29).fake())",
+            "\"count\", \"5\"",
+            "\"ratio\", \"1.5\"",
+            "\"due\", \"2026-01-15\"",
+            "\"ratio\" REAL",
+            "Reading #{{ record.id }}",
+        ] {
+            assert!(all.contains(part), "{part} in:\n{all}");
+        }
+    }
+
+    fn walk(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+        let mut files = Vec::new();
+        for entry in fs::read_dir(dir).unwrap().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                files.extend(walk(&path));
+            } else {
+                files.push(path);
+            }
+        }
+        files
     }
 }

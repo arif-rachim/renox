@@ -130,6 +130,15 @@ fn wait_for_change(
     rx: &mpsc::Receiver<DebounceEventResult>,
     previous: Vec<(PathBuf, SystemTime, u64)>,
 ) -> Vec<(PathBuf, SystemTime, u64)> {
+    wait_for_change_with(rx, previous, fingerprint)
+}
+
+/// `wait_for_change` with the fingerprint taken by `fingerprint`.
+fn wait_for_change_with(
+    rx: &mpsc::Receiver<DebounceEventResult>,
+    previous: Vec<(PathBuf, SystemTime, u64)>,
+    mut fingerprint: impl FnMut() -> Vec<(PathBuf, SystemTime, u64)>,
+) -> Vec<(PathBuf, SystemTime, u64)> {
     for result in rx {
         if let Err(err) = result {
             eprintln!("rnx: watch error: {err}");
@@ -211,5 +220,50 @@ mod tests {
 
         fs::write(src.join("main.rs"), "fn main() { println!(); }").unwrap();
         assert_ne!(print(), first, "a new size is a change");
+
+        // The same size, a new modification time (an editor saving the same
+        // length): a change too.
+        let second = print();
+        let file = fs::File::options()
+            .write(true)
+            .open(src.join("app/mod.rs"))
+            .unwrap();
+        file.set_modified(SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(86_400))
+            .unwrap();
+        assert_ne!(print(), second, "a new modification time is a change");
+    }
+
+    /// Events only wake the loop: it returns when the fingerprint differs,
+    /// logs watch errors, and gives up when the watcher is gone.
+    #[test]
+    fn events_wake_the_loop_and_the_fingerprint_decides() {
+        let at = |secs| {
+            (
+                PathBuf::from("src/main.rs"),
+                SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(secs),
+                1,
+            )
+        };
+        let (tx, rx) = mpsc::channel::<DebounceEventResult>();
+        // An open (no change), a watch error, then a real change.
+        tx.send(Ok(Vec::new())).unwrap();
+        tx.send(Err(notify_debouncer_mini::notify::Error::generic(
+            "watch failed",
+        )))
+        .unwrap();
+        tx.send(Ok(Vec::new())).unwrap();
+        let mut looks = vec![vec![at(1)], vec![at(2)]].into_iter();
+        let changed = wait_for_change_with(&rx, vec![at(1)], || looks.next().unwrap());
+        assert_eq!(changed, vec![at(2)]);
+        assert!(
+            looks.next().is_none(),
+            "looked once per event, not for the error"
+        );
+        // The watcher gone: the previous fingerprint comes back.
+        drop(tx);
+        assert_eq!(
+            wait_for_change_with(&rx, vec![at(3)], Vec::new),
+            vec![at(3)]
+        );
     }
 }
