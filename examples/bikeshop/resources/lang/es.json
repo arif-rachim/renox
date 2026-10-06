@@ -429,7 +429,7 @@
     "sales.orders.show": {
       "title": "Pedido (personal)",
       "purpose": "Un pedido con todo lo que necesita el personal: líneas, pagos, movimientos de existencias, bicis registradas y el siguiente paso: listo o enviado, entregar, cancelar o aceptar una devolución.",
-      "who": "Cajeros (entregas), encargados (devoluciones y reembolsos).",
+      "who": "Cajeros y personal de tienda, que tienen `orders.sell` en la tienda del pedido: lo marcan como listo o enviado, lo entregan y cancelan uno sin pagar. Los encargados de tienda tienen además `orders.refund` para devoluciones y reembolsos; el dueño hace todo esto en cualquier tienda.",
       "under_hood": "Lee el pedido (`OrderView`), sus pagos, sus `stock_movements` y las `customer_bikes` que registró. Los cambios de estado son updates condicionales (`WHERE status = 'paid'`), así que dos clics lo cambian una sola vez; la entrega escribe los números de cuadro en las bicis del pedido y abre el plazo de devolución de 14 días.",
       "features": {
         "0": "`access::find::<Order>` responde 404 para el pedido de otra tienda; cada acción es `access::require(user, permission, StoreAttr::Operating, &order)`: `orders.sell` para avanzarlo o cancelarlo, `orders.refund` para una devolución, ambos en la tienda que atendió al cliente, algo que una simple comprobación de rol no podría distinguir.",
