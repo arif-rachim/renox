@@ -364,16 +364,21 @@ tests/browser/            browser tests (#262, CI `browser`): run.sh builds the 
                            Chrome over CDP. lib/cdp.mjs (pages, clicks, keys, waitFor, settle,
                            problems: console errors, exceptions, CSP violations), lib/app.mjs
                            (start an app binary on a free port, migrated/seeded), fixture/ (a
-                           workspace member: pages using the kit, a job, commands `jobs:push`
-                           and `ask:me`, a per-second task with FIXTURE_TICK); *.test.mjs for
-                           renox.js, the kit's forms and overlays, the grid (examples/grid),
-                           the editors (examples/fields), example flows, and assets.test.mjs
+                           workspace member: pages using the kit, Auth with notifications, jobs,
+                           commands `jobs:push`/`jobs:nap`/`ask:me`, a route on its own host, a
+                           per-second task with FIXTURE_TICK); *.test.mjs for renox.js, the
+                           kit's forms and overlays, the grid (grid, grid-more: examples/grid),
+                           the editors (examples/fields), example flows (examples,
+                           examples-flows), a11y (an accessibility smoke) and assets.test.mjs
                            (no top-level JS function declared twice)
 tests/process/            process e2e (#270): process.py (signals with a request in flight,
                            queue:work, two schedule:work, systemd's socket, LOG_FORMAT/LOG_FILE,
                            APP_KEY in production, db:shell, prompts from a pipe and a terminal
-                           via `script`, `rnx serve` with RNX_SERVE=1) on the fixture;
-                           examples.py serves every example binary and GETs its pages
+                           via `script`, the commands' output, `rnx serve`/forwarding/Tailwind
+                           with a stand-in TAILWIND_BIN, `rnx build` with RNX_BUILD=1) on the
+                           fixture; examples.py serves every example binary and GETs its pages
+                           as a guest and logged in; `run.sh postgres` with PROCESS_POSTGRES
+                           runs the database checks and postgres-app/fields on PostgreSQL
 tests/tutorial/           run.sh + follow.py: docs/tutorial.md followed as a reader does (steps
                            found by their lead-in sentence, never line numbers), then fmt,
                            clippy, the tutorial's tests, seed, the app answering (CI `tutorial`).
@@ -731,7 +736,10 @@ PostgreSQL suite 2.5x slower (reconnects).
   error, so check a new one fails with its own message.
 - JavaScript (renox.js, renox-ui.js, renox-grid.js, editors.js) is tested in a browser:
   `tests/browser/run.sh [file…]` (§2). Processes (`serve` and signals, workers, the scheduler,
-  `rnx serve`, every example served): `tests/process/run.sh [fixture|examples]`.
+  `rnx serve`, every example served): `tests/process/run.sh [fixture|examples|postgres]`.
+- A warning that matters is asserted: `crate::logs::capture()` in `crates/renox/tests/it/`
+  (`crate::test_logs::capture()` in renox-core's unit tests) collects what the test's thread
+  logs; check it with `logs.has(&[…])`.
 - Coverage: the CI `coverage` job (every crate, SQLite + PostgreSQL merged, HTML artifact);
   locally see CONTRIBUTING.md "Coverage". Stable `llvm-cov` doesn't count doctests.
 
@@ -802,7 +810,8 @@ PostgreSQL suite 2.5x slower (reconnects).
   made by `rnx new` (the CI docker job covers that).
 - Examples without a `.env` run with `APP_DEBUG` off, i.e. with the views embedded at build time:
   restart after editing templates.
-- Browser-check example UIs. Found that way in `examples/crud`: `hx-boost` on a whole section also
+- UI changes get a browser test in tests/browser (it replaced checking by hand; `run.sh <file>`
+  runs one file). Found by hand earlier in `examples/crud`: `hx-boost` on a whole section also
   boosts its edit links and delete forms (scope it to the page links), and boosted requests get
   full pages (by design, `Htmx::wants_fragment`), so pair them with `hx-select`.
 - Under `CSP=strict`, Alpine's CSP build rejects statements in attributes (examples/hello's
@@ -939,12 +948,11 @@ Parsed in `crates/renox-core/src/config.rs`; defaults in parentheses.
   `gh api -X PATCH repos/arif-rachim/renox/pulls/N -F body=@file`.
 - **`target/` grows to ~100 GB** over a few milestones and fills the disk (link errors, "No space
   left on device"); `cargo clean` before the full two-database run.
-- **Browser testing** works with headless Chrome + the DevTools protocol from a small Node script
-  (Node 24 has a global `WebSocket`): launch `google-chrome --headless=new --no-sandbox
-  --remote-debugging-port=9222 --user-data-dir=<temp dir>`, get the page's `webSocketDebuggerUrl`
-  from `http://127.0.0.1:9222/json`, then `Page.navigate`, `Runtime.evaluate` (fill inputs, click,
-  read DOM) and `Page.captureScreenshot`. This found bugs unit tests missed (§6.4). A sandboxed
-  `<iframe>` (mail preview) can't be read from the parent: check it via screenshot.
+- **Browser testing** is tests/browser (headless Chrome over the DevTools protocol, Node 24's
+  `node:test`, no npm packages; lib/cdp.mjs launches Chrome, drives pages and collects console
+  errors, exceptions and CSP violations). Write a test there rather than a one-off script; it
+  found bugs unit tests missed (§6.4). A sandboxed `<iframe>` (mail preview) can't be read from
+  the parent: check it via screenshot.
 
 - **Other agent sessions use this checkout too** (2026-10-04: a session working on another
   project ran `git checkout origin/main` here, and a commit landed on a detached HEAD; it
@@ -1351,7 +1359,16 @@ picks the build, not the terminal.
   given as text, a failing `App::share` showing a bare 500, REAL/SMALLINT extra columns on
   PostgreSQL, live validation of lists, the grid's column menu (two JS `save`s), examples/hello
   under `CSP=strict`. Small refactors for testability in renox-cli (`asset_for`,
-  `cache_dir_with`, `check_sum`, `app_root_in`, `key_generate_in`).
+  `cache_dir_with`, `check_sum`, `app_root_in`, `key_generate_in`). Merged (#277). #280 (another
+  session) tested what #277 left in #250–#253/#256 (fixes #278, #279). The rest of every
+  sub-issue in a third PR: PostgreSQL races/retries/connections/migrator, grid rules and
+  exports read back (zip), charts, the commands' output (tests/process), the CLI, the plugins,
+  browser tests for every remaining kit/grid/editor item and each example's main flow, process
+  tests on PostgreSQL; the coverage job fails under 90 % of lines. Fixes it found: #281
+  (PostgreSQL TIME extra columns), #282 (charts rounded fractions), #283 (a required combobox
+  focused its hidden select), #284 (`rx-shell` on phones), #285–#287 (grid date range, two
+  grids on a page, default parameters in the URL), #288 (`rnx serve` left the app running on a
+  signal). What stays untested is listed with its reason in that PR.
 - **Still open** (ROADMAP `- [ ]`): none of the plugins; `renox-2fa` (#146),
   `renox-oauth` (#147), `renox-admin` (#148) and `renox-billing` (#155) are done. A Laravel gap review after M25 (in the
   conversation that planned M26) ranked them: release and docs first, then 2FA and social

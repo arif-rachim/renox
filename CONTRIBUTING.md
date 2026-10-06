@@ -109,7 +109,8 @@ the top of `crates/renox/tests/it/s3.rs`, and `cargo test -p uploads --features 
 
 - **Coverage.** The `coverage` CI job measures every library crate, the CLI and the macros,
   on SQLite (with the `xlsx` feature) and on PostgreSQL, merged; its HTML report is an
-  artifact of the run. To measure locally (in its own target directory, one run at a time):
+  artifact of the run, and it fails when the total drops under 90 % of lines (doctests
+  aren't counted on stable Rust). To measure locally (in its own target directory, one run at a time):
   ```bash
   rustup component add llvm-tools-preview && cargo install --locked cargo-llvm-cov
   cargo llvm-cov --no-report -p renox -p renox-core -p renox-cli -p renox-macros \
@@ -130,8 +131,12 @@ the top of `crates/renox/tests/it/s3.rs`, and `cargo test -p uploads --features 
   stopping on signals with a request in flight, `queue:work`, `schedule:work` twice on one
   database, systemd's socket, `LOG_FORMAT`/`LOG_FILE`, `db:shell` and prompts from a pipe and
   a terminal, `rnx serve` restarting (and keeping the old app on a failed build), and every
-  example binary served and asked for its pages. Run it after changing `serve`, the commands,
-  logging or an example; `tests/process/run.sh fixture` or `examples` runs one half.
+  example binary served and asked for its pages, as a guest and logged in. Run it after
+  changing `serve`, the commands, logging or an example; `tests/process/run.sh fixture` or
+  `examples` runs one half. With `PROCESS_POSTGRES=postgres://postgres:postgres@localhost:55432`,
+  `tests/process/run.sh postgres` runs the database checks and postgres-app/fields on
+  PostgreSQL (each in a database it makes and drops); `RNX_BUILD=1` adds `rnx build` (a release
+  build, slow). CI's `process` job runs all of it.
 
 ## Style
 

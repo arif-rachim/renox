@@ -330,7 +330,7 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-llvm-cov
-      # Informational (#247): every library crate, the CLI and the macros
+      # #247: every library crate, the CLI and the macros
       # (measured while the test crates compile), on SQLite with Excel
       # exports, then again on PostgreSQL; the two runs are merged. Doctests
       # aren't counted on stable.
@@ -357,3 +357,7 @@ jobs:
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           cat coverage.txt >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Doctests are not counted (stable Rust has no doctest coverage); the examples, tests/browser and tests/process are measured by their own jobs, not here. The job fails under 90 % of lines in total.' >> "$GITHUB_STEP_SUMMARY"
+      # The floor (#247): the total line coverage of the crates above. The
+      # summary and the HTML report are written first, so a drop is visible.
+      - run: cargo llvm-cov report --fail-under-lines 90 > /dev/null
