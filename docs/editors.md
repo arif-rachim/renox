@@ -46,8 +46,8 @@ Add the crate next to `renox`, at the same version:
 
 ```toml
 [dependencies]
-renox = "1.0.0-rc.5"
-renox-editors = "1.0.0-rc.5"
+renox = "1.0.0-rc.6"
+renox-editors = "1.0.0-rc.6"
 ```
 
 Then add its module:
