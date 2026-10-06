@@ -11,11 +11,14 @@
 {#- The public layout: the kit's navbar, the page, a footer, stacked by a CSS
     grid (.bs-public in public/app.css). Pages fill `content`. -#}
 <body class="rx-page bs-public">
-  {% from "renox/ui.html" import navbar, nav_links, nav_link, menu, menu_link, menu_action, menu_separator, link_button, open_button %}
+  {% from "renox/ui.html" import navbar, nav_links, nav_link, menu, menu_link, menu_action, menu_separator, link_button, icon_button %}
   {#- This page's "About this page" entry (src/explain.rs), unless
       BIKESHOP_EXPLAIN=false hides the panels. -#}
   {%- set about = about_page(request.route, request.path) if explain_panels else none %}
-  {% call navbar(t('shop.name'), href=route('home'), mark=true, width="wide") %}
+  {#- `width="full"`: logged in, the bar holds the links, the search, the cart,
+      the language, the bell and the account menu; the wide container's
+      72rem put the account menu on a second line at 1280 px. -#}
+  {% call navbar(t('shop.name'), href=route('home'), mark=true, width="full") %}
     {% call nav_links() %}
       {#- --- Public navigation (one line per area; append yours) --- -#}
       {{ nav_link(route('home'), t('nav.home'), active=route_is('home')) }}
@@ -30,7 +33,9 @@
         (catalogue, #233) and the cart (#234). -#}
     {% include "layouts/_nav_search.html" ignore missing %}
     {% include "layouts/_nav_cart.html" ignore missing %}
-    {%- if about %}{{ open_button("about-page", t('about.button'), variant="plain", size="small") }}{% endif %}
+    {#- "About this page" as the kit's icon button (its label is the tooltip
+        and what screen readers say), so the bar keeps to one line. -#}
+    {%- if about %}{{ icon_button("info", t('about.button'), attrs={"data-rx-open": "about-page", "aria-haspopup": "dialog"}) }}{% endif %}
     {#- The language: a kit menu; each item posts to `locale.update`. -#}
     {% call menu(app.locale | upper, id="language-menu", variant="plain") %}
       {{ menu_action(route('locale.update', 'en'), "English") }}

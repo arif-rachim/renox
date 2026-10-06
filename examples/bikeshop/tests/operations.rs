@@ -78,6 +78,13 @@ async fn maintenance_mode_shows_the_shops_page_and_health_still_answers() {
         .assert_see("bs-public")
         .assert_see("quick tune-up");
     assert_eq!(res.header("retry-after"), Some("60"));
+    // In the visitor's language.
+    app.request()
+        .header("accept-language", "es")
+        .get("/")
+        .await
+        .assert_status(503)
+        .assert_see("puesta a punto");
     app.get("/health").await.assert_ok();
 
     assert!(renox::maintenance::up(&storage).unwrap());

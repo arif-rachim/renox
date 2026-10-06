@@ -5333,5 +5333,14 @@
     "manager": "encargado",
     "cashier": "cajero",
     "mechanic": "mecánico"
+  },
+  "errors": {
+    "maintenance": {
+      "title": "Le estamos dando a la tienda una pequeña puesta a punto",
+      "body": "Volvemos en unos minutos. Tu carrito, tus alquileres y tus reservas están a salvo."
+    },
+    "not_found": "Esa página no está aquí. Puede que el enlace sea antiguo o tenga un error.",
+    "failed": "Lo sentimos, eso no ha funcionado.",
+    "home": "Ir a la página de inicio"
   }
 }
