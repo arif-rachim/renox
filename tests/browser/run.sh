@@ -31,4 +31,6 @@ if [ "$#" -gt 0 ]; then
 else
   files=(tests/browser/*.test.mjs)
 fi
-node --test --test-concurrency=1 "${files[@]}"
+# A test that hangs fails after two minutes, with its name, instead of
+# holding the whole run (a CI job once hung for hours with no sign which).
+node --test --test-concurrency=1 --test-timeout=120000 "${files[@]}"
