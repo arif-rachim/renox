@@ -360,3 +360,56 @@ pub(crate) async fn get_json<T: serde::de::DeserializeOwned>(
         .error_for_status()?
         .json()
 }
+
+#[cfg(test)]
+mod debug_tests {
+    use super::*;
+
+    /// Secrets, codes and tokens never show in `Debug` (logs); credentials
+    /// given in code need both halves.
+    #[test]
+    fn debug_hides_secrets_codes_and_tokens() {
+        let given = Credentials::new("client-1", "very-secret");
+        assert_eq!(format!("{given:?}"), "Credentials(client-1, secret hidden)");
+        assert_eq!(
+            given.resolve(&Config::default()),
+            Some(("client-1".to_owned(), "very-secret".to_owned()))
+        );
+        assert_eq!(
+            Credentials::new("client-1", "").resolve(&Config::default()),
+            None
+        );
+        assert_eq!(
+            format!("{:?}", Credentials::from_config("GOOGLE")),
+            "Credentials::from_config(\"GOOGLE\")"
+        );
+
+        let request = TokenRequest {
+            code: "the-code".into(),
+            redirect_uri: "https://app.test/auth/google/callback".into(),
+            code_verifier: "the-verifier".into(),
+            client_id: "client-1".into(),
+            client_secret: "very-secret".into(),
+        };
+        let shown = format!("{request:?}");
+        assert!(
+            shown.contains("client-1") && shown.contains("/callback"),
+            "{shown}"
+        );
+        for hidden in ["the-code", "the-verifier", "very-secret"] {
+            assert!(!shown.contains(hidden), "{shown}");
+        }
+
+        let mut token = Token::new("access-123");
+        assert_eq!(token.access_token, "access-123");
+        assert!(token.refresh_token.is_none() && token.id_token.is_none());
+        token.refresh_token = Some("refresh-456".into());
+        token.expires_in = Some(3600);
+        let shown = format!("{token:?}");
+        assert!(shown.contains("3600"), "{shown}");
+        assert!(
+            !shown.contains("access-123") && !shown.contains("refresh-456"),
+            "{shown}"
+        );
+    }
+}
