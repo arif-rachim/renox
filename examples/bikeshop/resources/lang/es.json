@@ -540,7 +540,7 @@
     "workshop.walkin": {
       "title": "Pedido de taller sin cita",
       "purpose": "Un pedido de taller para alguien en el mostrador: un cliente conocido (buscado) o uno nuevo sin cuenta, la bici, las tareas y el día (hoy por defecto; un pedido para hoy se da por recibido al momento).",
-      "who": "Personal del mostrador y mecánicos (`workorders.view`).",
+      "who": "Quien trabaja en pedidos de taller en la tienda activa (`workorders.update`): mecánicos, encargados de tienda y el dueño. Los cajeros del mostrador ven el panel pero no abren pedidos de taller (el formulario y su POST responden 403).",
       "under_hood": "Al cargar: las tareas, la tienda activa y sus días completos. Al guardar: el cliente se encuentra o se crea (sin cuenta de usuario), la bici se encuentra por nombre o se registra a su nombre, y la misma transacción `capacity::book` que las reservas en línea escribe el pedido de taller; luego su página.",
       "features": {
         "0": "El cliente es un select con búsqueda que responde el servidor (`options_url`, `OptionQuery`), por nombre, correo o teléfono: la tienda tiene demasiados clientes para enviarlos todos con la página.",

@@ -905,6 +905,50 @@ async fn the_board_loads_in_a_fixed_number_of_queries() {
 }
 
 #[renox::test]
+async fn only_who_works_on_work_orders_takes_a_walk_in() {
+    let w = world().await;
+    let check = w.check.id.to_string();
+    let today = day(0).to_string();
+    let form = [
+        ("new_name", "Walk Inn"),
+        ("bike", "Old cruiser"),
+        ("tasks", check.as_str()),
+        ("day", today.as_str()),
+    ];
+    // The cashier sees the board (`workorders.view`) but works on no bike.
+    w.app.acting_as(&w.cashier);
+    let board = w.app.get("/staff/workshop").await.assert_ok().text();
+    assert!(
+        !board.contains("href=\"/staff/workshop/new\""),
+        "no button to a form they can't send"
+    );
+    w.app.get("/staff/workshop/new").await.assert_forbidden();
+    w.app
+        .post("/staff/workshop/new", &form)
+        .await
+        .assert_forbidden();
+    assert!(
+        WorkOrder::where_eq("source", WorkSource::WalkIn)
+            .first(w.app.db())
+            .await
+            .unwrap()
+            .is_none()
+    );
+    // The mechanic does (`workorders.update` in their store).
+    w.app.acting_as(&w.mechanic);
+    w.app
+        .post("/staff/workshop/new", &form)
+        .await
+        .assert_status(303);
+    let walk = WorkOrder::where_eq("source", WorkSource::WalkIn)
+        .first(w.app.db())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(walk.store_id, w.north.id);
+}
+
+#[renox::test]
 async fn every_workshop_page_answers() {
     let w = world().await;
     let order = booking(&w, 2, vec![w.check.clone()])

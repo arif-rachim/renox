@@ -80,10 +80,6 @@ impl Module for Workshop {
         let look = Routes::new()
             .get("/staff/workshop", board::index)
             .name("workshop.board")
-            .get("/staff/workshop/new", board::walk_in)
-            .name("workshop.walkin")
-            .post("/staff/workshop/new", board::walk_in_store)
-            .name("workshop.walkin.store")
             .get("/staff/workshop/customers", board::customer_options)
             .name("workshop.customers")
             .get("/staff/workshop/{order}", order::show)
@@ -96,7 +92,12 @@ impl Module for Workshop {
             .post("/staff/workshop/{order}/pay", order::pay)
             .name("workshop.order.pay")
             .require_permission(catalogue::WORKORDERS_VIEW);
+        // Taking a walk-in opens a work order: the same permission as working on one.
         let work = Routes::new()
+            .get("/staff/workshop/new", board::walk_in)
+            .name("workshop.walkin")
+            .post("/staff/workshop/new", board::walk_in_store)
+            .name("workshop.walkin.store")
             .post("/staff/workshop/move", board::move_card)
             .name("workshop.move")
             .post("/staff/workshop/{order}/tasks", order::tasks)
