@@ -83,16 +83,17 @@ describe('bikeshop staff side', () => {
       page.assertClean();
     }));
 
-  test('a store gets another opening day', () =>
+  test('a store\'s opening hours, one repeater row per day', () =>
     browser.with(async (page) => {
       await logIn(page, app, 'owner@bikeshop.test');
       await page.goto(`${app.url}/staff/stores`);
       await page.click('#stores a[href$="/edit"]');
       await page.waitFor(() => location.pathname.endsWith('/edit'));
-      const rows = await page.eval(() => document.querySelectorAll('.bs-hours').length);
-      assert.ok(rows >= 1);
+      const rows = await page.eval(() => document.querySelectorAll('[data-rx-rows] .bs-hours').length);
+      assert.equal(rows, 7, 'a row per day');
+      assert.ok(await page.eval(() => document.querySelector('[data-rx-row-add]').disabled), 'seven days: no more to add');
       await shot(page, 'staff-store-edit');
-      await page.click('form button[type=submit]');
+      await page.click('#store-form > .rx-row button[type=submit]');
       await page.waitFor(() => location.pathname === '/staff/stores', { message: 'saved' });
       page.assertClean();
     }));

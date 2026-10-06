@@ -10,7 +10,7 @@
 {% include "staff/_styles.html" %}
 <div class="rx-stack" data-bs-reveal>
   {{ page_header(store.name, subtitle=t('staff.stores.edit_lead'), back=route('staff.stores.index'), back_label=t('staff.stores.title')) }}
-  <form method="post" action="{{ route('staff.stores.update', store.id) }}" class="rx-stack" data-live-validate>
+  <form method="post" action="{{ route('staff.stores.update', store.id) }}" class="rx-stack" id="store-form" data-live-validate>
     {{ csrf_field() }}{{ method_field('PUT') }}
     {{ form_errors() }}
     {% call card(title=t('staff.stores.details')) %}

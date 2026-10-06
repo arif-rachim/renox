@@ -170,6 +170,12 @@ async fn the_matrix_changes_rights_live_and_is_audited() {
         .await
         .assert_forbidden();
 
+    // The audit page shows it.
+    app.acting_as(&owner);
+    app.get("/staff/audit")
+        .await
+        .assert_ok()
+        .assert_see("role.permission_granted");
     let granted = audited(&app, "role.permission_granted").await;
     assert_eq!(granted.len(), 1);
     assert_eq!(granted[0].0.as_deref(), Some(OWNER), "the role used");

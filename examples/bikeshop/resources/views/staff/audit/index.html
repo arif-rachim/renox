@@ -9,7 +9,7 @@
 <div class="rx-stack">
   {{ page_header(t('staff.audit.title'), subtitle=t('staff.audit.lead')) }}
   {% call(row, column) grid(entries) %}
-    {%- if column.key == "data" and row.data and row.data != "{}" %}<code>{{ row.data | truncate(120) }}</code>{% endif %}
+    {%- if column.key == "data" and row.data and row.data != "{}" %}<code>{{ row.data[:120] }}{% if row.data | length > 120 %}…{% endif %}</code>{% endif %}
   {% endcall %}
 </div>
 {% endblock %}
