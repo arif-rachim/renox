@@ -12,7 +12,7 @@
 //!
 //! How it fits together:
 //!
-//! - [`billing`]: what renox-billing sells (each plan by card and through
+//! - [`billing`](mod@billing): what renox-billing sells (each plan by card and through
 //!   Xendit) and its gateways; registered in `src/lib.rs`.
 //! - [`sync`]: renox-billing's events mirrored into the shop's plans (a
 //!   payment starts or renews a plan, a failed one puts it on hold, a

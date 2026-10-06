@@ -1,6 +1,6 @@
 //! Builds the demo shop: places, stores, people and their roles, the
 //! catalogue and the fleet here; 18 months of rentals, orders, stock and
-//! workshop history in [`super::history`]. Big tables are written with
+//! workshop history in `super::history` (private). Big tables are written with
 //! `Model::insert_many` (a few statements per thousand rows) inside
 //! transactions, so the large seed takes seconds, not minutes.
 
