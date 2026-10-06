@@ -51,26 +51,26 @@ pub const DELIVERY_ABROAD: i64 = 150_000;
 #[derive(Deserialize, Serialize, Validate, Debug, Clone, Default)]
 #[validate(hooks)]
 pub struct CheckoutForm {
-    #[validate(required, max = 100, label = "Name")]
+    #[validate(required, max = 100)]
     pub name: String,
-    #[validate(required, email, max = 150, label = "Email")]
+    #[validate(required, email, max = 150)]
     pub email: String,
-    #[validate(required, min = 6, max = 30, label = "Phone")]
+    #[validate(required, min = 6, max = 30)]
     pub phone: String,
-    #[validate(required, one_of(&["pickup", "delivery"]), label = "Pickup or delivery")]
+    #[validate(required, one_of(&["pickup", "delivery"]))]
     pub fulfilment: String,
     /// The store it is picked up from, or sent from (the cart's store).
     #[serde(default)]
-    #[validate(required, exists("stores", "id"), label = "Store")]
+    #[validate(required, exists("stores", "id"))]
     pub store_id: Option<i64>,
     #[serde(default)]
-    #[validate(required_if(self.fulfilment == "delivery"), exists("cities", "id"), label = "City")]
+    #[validate(required_if(self.fulfilment == "delivery"), exists("cities", "id"))]
     pub city_id: Option<i64>,
     #[serde(default)]
-    #[validate(required_if(self.fulfilment == "delivery"), max = 200, label = "Street and number")]
+    #[validate(required_if(self.fulfilment == "delivery"), max = 200)]
     pub line1: Option<String>,
     #[serde(default)]
-    #[validate(max = 20, label = "Postal code")]
+    #[validate(max = 20)]
     pub postal_code: Option<String>,
 }
 

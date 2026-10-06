@@ -1,0 +1,19 @@
+{#- The panel's home (renox-admin/dashboard.html), replaced by the bike shop
+    for its translations: how many records each resource the user may see
+    has, each a link to its list. -#}
+{% extends "renox-admin/layout.html" %}
+{% from "renox/ui.html" import page_header, stats, stat, empty %}
+{% from "renox-admin/_text.html" import tr %}
+
+{% block content %}
+{% call page_header(t('admin_panel.dashboard')) %}{% endcall %}
+{%- if cards %}
+{% call stats(4) %}
+  {%- for card in cards %}
+  {{ stat(tr(card.label), card.count | number, url=card.url) }}
+  {%- endfor %}
+{% endcall %}
+{%- else %}
+{{ empty(t('admin_panel.empty_title'), t('admin_panel.empty_text')) }}
+{%- endif %}
+{% endblock %}

@@ -2422,5 +2422,94 @@
       "rule_limit": ":count requests a minute per token; over that, 429 with Retry-After.",
       "rule_cors": "Browsers on :origin may call it (CORS)."
     }
+  },
+  "renox": {
+    "validation": {
+      "attributes": {
+        "name": "name",
+        "email": "email",
+        "phone": "phone",
+        "fulfilment": "pickup or delivery",
+        "store_id": "store",
+        "city_id": "city",
+        "line1": "street and number",
+        "postal_code": "postal code",
+        "variant_id": "product",
+        "quantity": "quantity",
+        "customer_id": "customer",
+        "method": "payment",
+        "tendered": "amount received",
+        "reason": "reason",
+        "brand_id": "brand",
+        "category_id": "category",
+        "country_id": "country",
+        "parent_id": "parent category",
+        "product_id": "product",
+        "id_number": "ID number",
+        "fee_percent": "fee"
+      }
+    }
+  },
+  "plugins": {
+    "two_factor": {
+      "title": "Two-factor authentication",
+      "challenge_lead": "Type the code your authenticator app shows for :app.",
+      "code": "Code",
+      "challenge_hint": "Lost your phone? Type one of your recovery codes instead.",
+      "log_in": "Log in",
+      "codes_title": "Your recovery codes",
+      "codes_lead": "If you lose your phone, each of these codes logs you in once. Keep them somewhere safe: this is the only time they're shown.",
+      "download": "Download",
+      "done": "Done",
+      "on_since": "On since :date. Logging in asks for a code from your authenticator app.",
+      "codes_left": "{0} No recovery codes left.|{1} One recovery code left.|[2,*] :count recovery codes left.",
+      "new_codes": "New recovery codes",
+      "turn_off": "Turn off",
+      "turn_off_question": "Turn off two-factor authentication?",
+      "turn_off_text": "Logging in will only ask for your password.",
+      "off": "Off. Add a second step to logging in: a code from an authenticator app on your phone.",
+      "turn_on": "Turn on",
+      "setup_title": "Turn on two-factor authentication",
+      "setup_lead": "Scan this code with an authenticator app (Google Authenticator, 1Password, Authy…), then type the code it shows.",
+      "no_scan": "Can't scan it? Type this key into the app instead:",
+      "app_code": "Code from the app",
+      "cancel": "Cancel"
+    },
+    "oauth": {
+      "confirm_with": "Or confirm it's you with",
+      "continue_with": "Or continue with",
+      "title": "Linked accounts",
+      "lead": "Log in with these instead of typing your password.",
+      "linked": "Linked",
+      "since": "since :date",
+      "unlink": "Unlink",
+      "unlink_question": "Unlink :provider?",
+      "unlink_text": "You won't be able to log in with :provider until you link it again.",
+      "only_login": "Your only login",
+      "link": "Link",
+      "no_password": "You don't have a password: you log in with a linked account.",
+      "set_password_before": "To have one too, ",
+      "set_password": "set a password",
+      "set_password_after": " (we email you a link)."
+    }
+  },
+  "admin_panel": {
+    "navigation": "Admin navigation",
+    "dashboard": "Dashboard",
+    "empty_title": "Nothing here yet",
+    "empty_text": "No resources are open to you.",
+    "new": "New :label",
+    "filters": ":label filters",
+    "delete": "Delete",
+    "delete_question": "Delete this :label?",
+    "to_trash": "It goes to the trash, where it can be restored.",
+    "for_good_text": "This can't be undone.",
+    "cancel": "Cancel",
+    "deleted": "Deleted",
+    "edit": "Edit",
+    "restore": "Restore",
+    "delete_for_good": "Delete for good",
+    "delete_for_good_question": "Delete this :label for good?",
+    "in_trash": "This :label is in the trash."
   }
 }

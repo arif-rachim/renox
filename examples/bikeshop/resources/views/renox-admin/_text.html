@@ -1,0 +1,11 @@
+{#- `tr(text)`: an English label the admin resources set in Rust
+    (src/app/staff/admin.rs: `label`, `plural_label`, `group`, the panel's
+    title), in the page's language. renox-admin's labels are plain `&str`s
+    with no language, so the shop translates them here by their English text
+    (`admin_panel.text.<text>` in resources/lang/<locale>.json); a text
+    without a translation is shown as it is. -#}
+{%- macro tr(text) -%}
+{%- set key = 'admin_panel.text.' ~ text -%}
+{%- set found = t(key) -%}
+{{ found if found != key else text }}
+{%- endmacro -%}

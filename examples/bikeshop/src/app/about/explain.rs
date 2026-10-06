@@ -21,7 +21,8 @@ pub fn entries() -> Vec<Explanation> {
                     api: "Query<T>",
                     why: "The two filters are a plain GET form; `Query<Filters>` reads \
                       `?feature=…&audience=…` into a struct, so the filtered list has its \
-                      own URL to share.",
+                      own URL to share and works without JavaScript. A feature or a role \
+                      the app doesn't know is ignored rather than refused.",
                 },
                 Feature {
                     api: "Lang",
@@ -31,29 +32,38 @@ pub fn entries() -> Vec<Explanation> {
                 },
                 Feature {
                     api: "Routes::get",
-                    why: "Every page is a named route; the list links to the ones without \
-                      parameters with `state.url(name, &[])`.",
+                    why: "Every page is a named route, and the explanations are keyed by \
+                      that name. The list links to the pages without parameters with \
+                      `state.url(name, &[])`; for one like `/products/{slug}` that call \
+                      fails, so the row is shown without a link instead of a broken one.",
                 },
                 Feature {
                     api: "UI kit: toolbar + select",
                     why: "The filters line up in the kit's `toolbar`, which wraps on phones \
-                      and needs no layout CSS.",
+                      and needs no layout CSS. The feature list is long (every `api` used \
+                      on any page), so it is a `select(…, searchable=true)`: type a few \
+                      letters to find one.",
                 },
                 Feature {
                     api: "UI kit: list + badge",
-                    why: "Each page is a row of the kit's `list`, its features and roles as \
-                      `badge`s.",
+                    why: "Each page is a row of the kit's `list`, its purpose through the \
+                      `markdown` filter, its roles and features as `badge`s. Each feature \
+                      badge links to this page filtered by it, so you can hop from a page \
+                      to every other page that uses the same API.",
                 },
                 Feature {
                     api: "App::templates",
                     why: "The \"About this page\" panel on every page comes from the \
-                      `about_page(…)` template function the app registers, so \
-                      handlers don't pass anything for it.",
+                      `about_page(request.route, request.path)` template function the app \
+                      registers, so no handler passes anything for it: the layouts ask \
+                      for it themselves. The panel is the kit's `sheet` (`slide_over`) \
+                      with an `infolist` inside.",
                 },
                 Feature {
                     api: "App::share",
                     why: "`explain_panels` (from `BIKESHOP_EXPLAIN`) is given to every view, \
-                      so the layouts can hide the panels for a clean demo.",
+                      so the layouts can hide the panels for a clean demo without any \
+                      handler knowing about it. This page stays either way.",
                 },
             ],
             under_hood: "No database: the explanations are Rust values in each area's \
@@ -64,7 +74,9 @@ pub fn entries() -> Vec<Explanation> {
                      doesn't exist.",
             docs: &[
                 "docs/routing.md#what-a-handler-can-take",
+                "docs/routing.md#route-urls-and-the-current-route",
                 "docs/ui.md#navigation-and-page-structure",
+                "docs/laravel.md#blade--minijinja",
                 "docs/laravel.md#cache-storage-sessions-cookies-and-translations",
                 "docs/testing.md#a-first-test",
             ],
@@ -74,6 +86,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/about/pages.html",
                 "examples/bikeshop/resources/views/about/_panel.html",
                 "examples/bikeshop/tests/about.rs",
+                "tests/browser/bikeshop-about.test.mjs",
             ],
         },
         Explanation {
@@ -105,25 +118,34 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "UI kit: sheet",
                     why: "The gallery's enlarged photo opens in the kit's `sheet`: focus \
-                      moves into it and back, Escape and the backdrop close it.",
+                      moves into it and back, Escape and the backdrop close it. The block \
+                      reuses the kit's dialog rather than writing a second one.",
                 },
                 Feature {
                     api: "Valid<T>",
-                    why: "Every form block sends plain fields (two numbers, one date-time per \
-                      end, a radio's value), so `Valid<BlocksForm>` reads them like any \
-                      form. Its `after` hook refuses the closed days and past dates again \
-                      on the server: the greyed-out calendar is only a help.",
+                    why: "Every form block sends plain fields (a number, the keypad's \
+                      digits, one date-time per end, a radio's value), so \
+                      `Valid<BlocksForm>` reads them like any form: `between(1, 5)`, \
+                      `gt(\"starts_at\", …)` for the end, and `one_of` without the \
+                      sold-out size. Its `after` hook refuses closed days and past dates \
+                      again on the server: the greyed-out calendar is only a help, and \
+                      anyone can send any date.",
                 },
                 Feature {
                     api: "Query<T>",
                     why: "The price filter is a GET form: the range's two handles become \
-                      `?price_min=…&price_max=…`, and the calendar's arrows `?month=…`.",
+                      `?price_min=…&price_max=…`, the calendar's arrows `?month=…` and a \
+                      free slot of the availability timeline `?slot=…`. Each state has \
+                      its own URL, and a month that can't be shown falls back to today's.",
                 },
                 Feature {
                     api: "htmx fragments",
                     why: "A variant chip asks `GET /about/blocks/variant` for the price and \
-                      stock (`hx-get` with `hx-include`), and a kanban move is an htmx \
-                      POST from a hidden form; Renox adds the CSRF header to both.",
+                      stock (`hx-get` with `hx-include`) and swaps in \
+                      `about/_variant.html`, not the whole page. The calendar's arrows are \
+                      boosted links with `hx-select=\"#calendar\"`, so only the calendar \
+                      changes. A kanban move is an htmx POST from a hidden form, which \
+                      gets Renox's CSRF header like any htmx request.",
                 },
                 Feature {
                     api: "motion.dev (vendored)",
@@ -138,10 +160,10 @@ pub fn entries() -> Vec<Explanation> {
                      attributes, on the page and in whatever htmx swaps in \
                      (`htmx:load`), with no inline handlers, so it runs under `CSP=strict`. \
                      Sending the form posts to `POST /about/blocks/form`: `Valid<T>` \
-                     checks it, and a success comes back with a flash message; a kanban \
-                     move posts the card, the column and the position to \
-                     `POST /about/blocks/kanban`, which answers `204` (or a `422` that \
-                     puts the card back).",
+                     checks it, and a success redirects back to the form with a flash \
+                     message (nothing is saved); a kanban move posts the card, the \
+                     column and the position to `POST /about/blocks/kanban`, which \
+                     answers `204` (or a `422` that puts the card back).",
             docs: &[
                 "docs/ui.md#changing-the-kit-itself",
                 "docs/ui.md#design-principles",
@@ -153,6 +175,7 @@ pub fn entries() -> Vec<Explanation> {
             sources: &[
                 "examples/bikeshop/src/app/about/blocks.rs",
                 "examples/bikeshop/resources/views/about/blocks.html",
+                "examples/bikeshop/resources/views/about/_variant.html",
                 "examples/bikeshop/resources/views/blocks/gallery.html",
                 "examples/bikeshop/resources/views/blocks/kanban.html",
                 "examples/bikeshop/public/blocks/blocks.js",
@@ -184,10 +207,11 @@ fn data_page() -> Explanation {
         features: &[
             Feature {
                 api: "#[derive(Model)]",
-                why: "One model per table (36 of them), in the area that owns it: \
+                why: "One model per table, in the area that owns it: \
                       `src/app/<area>/model.rs`. The derive writes the column list, the \
-                      reads and the writes; the table names are written out \
-                      (`#[model(table = \"rentals\")]`), plural as Renox recommends.",
+                      reads and the writes, so no SQL is repeated by hand; the table names \
+                      are written out (`#[model(table = \"rentals\")]`), plural as Renox \
+                      recommends.",
             },
             Feature {
                 api: "renox::db::relations",
@@ -195,17 +219,20 @@ fn data_page() -> Explanation {
                       (payments, stock movements and intercompany entries point at several \
                       tables) and `has_many_through` (a customer's work orders through \
                       their bikes): each loads a whole page's relations in a fixed number \
-                      of queries, which `tests/data.rs` checks with `capture_queries`.",
+                      of queries instead of one per row, which `tests/data.rs` checks with \
+                      `capture_queries`.",
             },
             Feature {
                 api: "DbEnum",
-                why: "Every status and kind is an enum stored as a word; the page lists \
-                      them from `ALL`, so it can't drift from the code.",
+                why: "Every status and kind is an enum stored as a word, readable in the \
+                      table and checked when it is read back; the page lists the values \
+                      from `ALL`, so it can't drift from the code.",
             },
             Feature {
                 api: "Encrypted<T>",
-                why: "The customer's ID number is sealed with `APP_KEY` in the table and \
-                      never serialized (`#[serde(skip_serializing)]`).",
+                why: "The customer's ID number is sealed with `APP_KEY` in the table, so \
+                      a copied database file doesn't give it away, and never serialized \
+                      (`#[serde(skip_serializing)]`), so it can't leak into a view or JSON.",
             },
             Feature {
                 api: "#[model(soft_deletes)]",
@@ -215,20 +242,23 @@ fn data_page() -> Explanation {
             Feature {
                 api: "renox::db::search",
                 why: "Products are searchable by name, brand, SKU and description \
-                      (`#[model(search = …)]`): an FTS5 table on SQLite, a generated \
-                      `tsvector` on PostgreSQL, from one migration Renox writes.",
+                      (`#[model(search = …)]`, the brand and SKUs copied into a \
+                      `keywords` column): an FTS5 table on SQLite, a generated `tsvector` \
+                      on PostgreSQL, from one migration Renox writes, instead of a slow \
+                      `LIKE` over every row.",
             },
             Feature {
                 api: "Factory",
-                why: "Every model has a factory with states named after the business \
-                      (`rentals().overdue()`, `rental_bikes().placed_at(store)`), used by \
-                      the seeders and by every test.",
+                why: "The main models have factories with states named after the \
+                      business (`rentals().overdue()`, `rental_bikes().placed_at(store)`), \
+                      used by the seeders and the tests, so a test says what it needs in \
+                      the shop's words instead of filling every column.",
             },
             Feature {
                 api: "AppCommand",
                 why: "`demo:seed --size large` is a typed clap command next to the \
-                      built-in `db:seed`; it refuses a seeded database with how to start \
-                      again.",
+                      built-in `db:seed`, so the option is parsed and listed in `--help`; \
+                      it refuses a seeded database and says how to start again.",
             },
             Feature {
                 api: "Permissions module",
@@ -238,8 +268,9 @@ fn data_page() -> Explanation {
             },
             Feature {
                 api: "renox::db::sql",
-                why: "The live row counts are one `UNION ALL` query over every table, \
-                      read into `(String, i64)` pairs with `fetch_as`.",
+                why: "The live row counts are one `UNION ALL` query over every table \
+                      listed in `data.rs`, read into `(String, i64)` pairs with \
+                      `fetch_as`: one round trip instead of one per table.",
             },
             Feature {
                 api: "UI kit: card + table",
@@ -288,6 +319,7 @@ fn data_page() -> Explanation {
             "examples/bikeshop/src/seed/history.rs",
             "examples/bikeshop/tests/data.rs",
             "examples/bikeshop/tests/seed.rs",
+            "tests/browser/bikeshop-data.test.mjs",
         ],
     }
 }

@@ -312,7 +312,7 @@ pub struct ReturnForm {
     #[serde(default)]
     #[validate(required, max = 50)]
     pub lines: Vec<ReturnLine>,
-    #[validate(required, max = 300, label = "Reason")]
+    #[validate(required, max = 300)]
     pub reason: String,
 }
 

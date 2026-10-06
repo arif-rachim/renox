@@ -7,19 +7,20 @@
 <!doctype html>
 <html lang="{{ app.locale }}">
 <head>
-  <title>{% block title %}{{ admin.title }}{% endblock %}</title>
+  <title>{% block title %}{{ tr(admin.title) }}{% endblock %}</title>
   {% include "layouts/_head.html" %}
   {{ stack('head') }}
 </head>
 <body class="rx-page rx-shell">
   {% from "renox/ui.html" import sidebar, sidebar_link, sidebar_section, navbar, menu, menu_link, menu_action, menu_separator, open_button %}
+  {% from "renox-admin/_text.html" import tr %}
   {%- set about = about_page(request.route, request.path) if explain_panels else none %}
-  {% call sidebar(admin.title, href=admin.home, label="Admin navigation") %}
-    {{ sidebar_link(admin.home, "Dashboard", active=admin.dashboard) }}
+  {% call sidebar(tr(admin.title), href=admin.home, label=t('admin_panel.navigation')) %}
+    {{ sidebar_link(admin.home, t('admin_panel.dashboard'), active=admin.dashboard) }}
     {%- for group in admin.nav %}
-    {%- if group.title %}{{ sidebar_section(group.title) }}{% endif %}
+    {%- if group.title %}{{ sidebar_section(tr(group.title)) }}{% endif %}
     {%- for item in group.items %}
-    {{ sidebar_link(item.url, item.label, active=item.active) }}
+    {{ sidebar_link(item.url, tr(item.label), active=item.active) }}
     {%- endfor %}
     {%- endfor %}
     {{ sidebar_section(t('nav.shop')) }}
@@ -27,7 +28,7 @@
     {{ sidebar_link(route('about.pages'), t('about.index_link')) }}
   {% endcall %}
   <div class="rx-shell__main">
-    {% call navbar(none, width="full", skip=false, label="Account") %}
+    {% call navbar(none, width="full", skip=false, label=t('nav.account')) %}
       {% include "layouts/_store_switcher.html" ignore missing %}
       <span class="rx-spacer"></span>
       {%- if about %}{{ open_button("about-page", t('about.button'), variant="plain", size="small") }}{% endif %}

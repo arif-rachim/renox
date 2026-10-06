@@ -1,0 +1,24 @@
+{#- A resource's list (renox-admin/index.html), replaced by the bike shop for
+    its translations: its named filters as tabs, then the grid with its
+    search, column filters, actions and exports. `custom` columns are drawn
+    by renox-admin/{slug}/cells.html. -#}
+{% extends "renox-admin/layout.html" %}
+{% from "renox/grid.html" import grid %}
+{% from "renox/ui.html" import page_header, link_button, link_tabs %}
+{% from "renox-admin/_text.html" import tr %}
+
+{% block title %}{{ tr(resource.plural_label) }} · {{ tr(admin.title) }}{% endblock %}
+
+{% block content %}
+{% call page_header(tr(resource.plural_label)) %}
+  {%- if allowed.create %}
+  {{ link_button(resource.create_url, t('admin_panel.new', label=(tr(resource.label) | lower)), variant="primary", icon="plus", key="n") }}
+  {%- endif %}
+{% endcall %}
+{%- if tabs %}
+{{ link_tabs(tabs, current=current_tab, label=t('admin_panel.filters', label=tr(resource.plural_label))) }}
+{%- endif %}
+{% call(row, column) grid(rows) %}
+  {%- include "renox-admin/" ~ resource.slug ~ "/cells.html" ignore missing %}
+{% endcall %}
+{% endblock %}

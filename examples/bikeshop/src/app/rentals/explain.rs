@@ -34,30 +34,37 @@ pub fn entries() -> Vec<Explanation> {
             features: &[
                 Feature {
                     api: "blocks: datetime_range",
-                    why: "The kit's `date_picker` picks a day but not an hour; the example's \
-                          `datetime_range` block puts two of them beside time selects and sends \
-                          plain `starts_at` / `ends_at` fields (`YYYY-MM-DDTHH:MM`), read as \
-                          `NaiveDateTime` in `APP_TIMEZONE` and turned into moments in Rust.",
+                    why: "Bikes are rented by the hour, and the kit's `date_picker` picks a \
+                          day but not an hour; the example's `datetime_range` block puts two \
+                          of them beside time selects (only the shop's hours, 08:00 to 20:00) \
+                          and sends two plain fields, `starts_at` / `ends_at` \
+                          (`YYYY-MM-DDTHH:MM`). The reservation form reads them as \
+                          `NaiveDateTime` (wall-clock time in `APP_TIMEZONE`) and Rust turns \
+                          them into moments, so no date parsing happens in the browser.",
                 },
                 Feature {
                     api: "blocks: availability",
-                    why: "The store's day as a table of bikes × hours (booked, free); each free \
-                          hour is a link, so the timeline works without JavaScript and reads \
-                          well to a screen reader (\"Trail 5, 11:00, Book\").",
+                    why: "The kit has no timeline, so the example's `availability` block draws \
+                          the store's day as a table of bikes × hours (booked, free; at most 12 \
+                          bikes). Each free hour is a plain link to this page with a two-hour \
+                          period from there, so it works without JavaScript, and being a real \
+                          table it reads well to a screen reader (\"Trail 5, 11:00, Book\").",
                 },
                 Feature {
                     api: "Htmx",
-                    why: "The search form re-asks the same page as it changes (`hx-get`, \
-                          `hx-select` of the results, `hx-push-url`), so only the bike list \
-                          moves and the address can be shared; without JavaScript it is a \
-                          plain GET form.",
+                    why: "The search form re-asks the same page on every change (`hx-get`, \
+                          `hx-select` of `#rent-results`, `hx-push-url`), so only the bike list \
+                          moves and the address can be shared. The handler needs nothing \
+                          special: it always renders the whole page and htmx keeps the part it \
+                          wants.",
                 },
                 Feature {
                     api: "Valid<T> + after hook",
                     why: "The reservation form's rules run first; its `after` hook then checks \
-                          the period and that the bike is still free (the **first** of two \
-                          overlap checks), so a clash shows next to the bike with the form \
-                          kept.",
+                          the period (in the future, at most 14 days) and that the bike still \
+                          stands at the store and is free (the **first** of two overlap \
+                          checks). It needs the database, which plain rules can't reach, and it \
+                          puts a clash next to the bike with the form kept.",
                 },
                 Feature {
                     api: "Db::begin_immediate + lock_for_update",
@@ -70,34 +77,38 @@ pub fn entries() -> Vec<Explanation> {
                 },
                 Feature {
                     api: "Pricing in Rust",
-                    why: "`pricing::quote` is a plain function (hours counted when started, \
-                          capped at the daily rate; whole days at the daily rate; the deposit), \
-                          unit-tested without a database and shared by the page, the booking \
-                          and the counter.",
+                    why: "`pricing::quote` is a plain function (whole days at the daily rate, \
+                          the hours after them counted when started and capped at one daily \
+                          rate, the deposit on top). Kept out of handlers and SQL, it is \
+                          unit-tested without a database and gives the same number on this \
+                          page, in the booking and at the counter.",
                 },
                 Feature {
                     api: "StoreAttr::Location",
                     why: "Availability is by **location**: the bikes listed are those standing \
-                          at the store now, whoever owns them (a bike North placed at South is \
-                          South's to rent out, #245). The owner store is copied onto the rental \
-                          for the books.",
+                          at the store now (`location_store_id`), whoever owns them, since only \
+                          a bike that is there can be handed over (a bike North placed at South \
+                          is South's to rent out, #245). The owner store is copied onto the \
+                          rental for the books.",
                 },
             ],
-            under_hood: "Loading: the stores, the bike categories, the variants at the store \
-                         (for sizes and names), the free bikes (two queries: the bikes at the \
-                         store, then the clashing rentals of all of them at once) and the day's \
-                         timeline (two more). Reserving (`POST /rent`): `Valid<ReserveForm>` \
-                         with its `after` hook, then `booking::book` in one transaction \
+            under_hood: "Loading: the stores, the bike categories, the variants standing at \
+                         the store with their models (for sizes and names), the free bikes (two \
+                         queries: the bikes at the store, then the clashing rentals of all of \
+                         them at once) and the day's timeline (the bikes, their rentals that \
+                         day, their names). Reserving (`POST /rent`): `Valid<ReserveForm>` with \
+                         its `after` hook; a customer who never sent an ID is sent to the ID \
+                         page first; then `booking::book` in one transaction \
                          (`begin_immediate`, the bike's row with `lock_for_update`, the clash \
-                         query again, the insert with a fresh `Ulid` code), then a redirect to \
-                         the reservation, where the deposit is paid. A customer who never sent \
-                         an ID is sent to the ID page first.",
+                         query again, the insert with a fresh `Ulid` code and the bike's owner \
+                         store), then a redirect to the reservation, where the deposit is \
+                         paid.",
             docs: &[
                 "docs/validation.md#hooks-prepare-authorize-after",
                 "docs/relations.md#more-of-the-query-builder",
-                "docs/ui.md#what-htmx-sent-the-htmx-extractor",
+                "docs/postgresql.md#things-that-behave-differently-on-purpose",
                 "docs/types.md#dates-and-times",
-                "docs/authorization.md#checking-one-record-has_permission_in",
+                "docs/types.md#time-zones",
             ],
             sources: &[
                 RESERVE,
@@ -125,46 +136,57 @@ pub fn entries() -> Vec<Explanation> {
             features: &[
                 Feature {
                     api: "Ulid",
-                    why: "The reservation code is a `Ulid`: unique without asking the \
-                          database, sortable by time, short enough to read out at the counter, \
-                          and it doesn't reveal how many rentals there are (an id would).",
+                    why: "The reservation code is a `Ulid` (`Ulid::new()` in the booking): \
+                          made without asking the database, sortable by time, impossible to \
+                          guess, and it doesn't reveal how many rentals there are (an id \
+                          would). It is also the address of this page and what the cashier \
+                          searches for at the counter.",
                 },
                 Feature {
                     api: "renox::webhook",
                     why: "\"Pay the deposit\" starts an online payment through the shared \
-                          payments contract (`payments::start`); the gateway's webhook marks it \
-                          paid and emits `PaymentSucceeded`, which this area's listener turns \
-                          into a held deposit and a confirmation mail with the code.",
+                          payments contract (`payments::start`) and sends the customer to the \
+                          gateway's page (Midtrans' with a key, else the demo gateway). This \
+                          page never marks anything paid: only the gateway's webhook does \
+                          (Midtrans' is signed and checked), so a customer can't fake a \
+                          payment by opening a URL.",
                 },
                 Feature {
                     api: "Schedule::every_minutes",
                     why: "The page states the two deadlines the `rentals:watch` task enforces \
-                          every 15 minutes: an unpaid reservation is called off after 30 \
-                          minutes, and one not picked up 30 minutes after its start is a \
-                          no-show (the bike is released, the deposit keeps the price at most, \
-                          the customer is told).",
+                          every 15 minutes: an unpaid reservation is called off 30 minutes \
+                          after it was made, and one not picked up 30 minutes after its start \
+                          is a no-show (the bike is released, the deposit keeps the price at \
+                          most, the customer is told). A task, not a check on each page view, \
+                          so the bike is freed even if nobody opens the page.",
                 },
                 Feature {
                     api: "Events and listeners",
                     why: "`PaymentSucceeded` / `PaymentFailed` are the sales area's events; \
-                          rentals only listens for `Payable::Rental`, so the payment code never \
-                          knows about rentals.",
+                          rentals listens (`Registry::listen` in its module) and acts only on \
+                          `Payable::Rental`: a paid deposit becomes held and the confirmation \
+                          goes out, a failed one calls the reservation off. The payment code \
+                          never knows about rentals.",
                 },
                 Feature {
                     api: "UI kit: infolist",
                     why: "The reservation's details as the kit's `infolist`: labels and values, \
-                          money and dates formatted, the code `copyable`.",
+                          money and dates formatted by `entry(…, format=…)`, the code \
+                          `copyable` so it can be pasted or shown at the counter.",
                 },
             ],
-            under_hood: "The rental is looked up by code **and** customer (a 404 otherwise), \
-                         loaded with its bike, model, customer and stores by \
-                         `RentalRow::load` (a fixed number of queries). Cancelling (`POST \
-                         /rentals/{code}/cancel`) is allowed until an hour before the start; a \
-                         held deposit is given back whole, and a mail and an in-app \
-                         notification say so.",
+            under_hood: "The rental is looked up by code **and** customer (someone else's \
+                         code is a 404), loaded with its bike, model, customer and stores by \
+                         `RentalRow::load` (five queries). \"Pay the deposit\" (`POST \
+                         /rentals/{code}/pay`) writes a pending payment and redirects to the \
+                         gateway; its webhook emits `PaymentSucceeded`, the deposit is marked \
+                         held and the customer gets a mail and an in-app notification with the \
+                         code. Cancelling (`POST /rentals/{code}/cancel`) is allowed until an \
+                         hour before the start; a held deposit is given back whole, and a mail \
+                         and an in-app notification say so.",
             docs: &[
                 "docs/types.md#keys",
-                "docs/routing.md#csrf",
+                "docs/operations.md#failed-webhook-calls",
                 "docs/scheduling.md#scheduled-tasks",
                 "docs/scheduling.md#events",
                 "docs/ui.md#infolists-read-only-details",
@@ -172,10 +194,13 @@ pub fn entries() -> Vec<Explanation> {
             sources: &[
                 RESERVE,
                 MODEL,
+                MOD,
                 TASKS,
+                NOTIFY,
                 "examples/bikeshop/src/app/sales/payments.rs",
                 "examples/bikeshop/resources/views/rentals/show.html",
                 TESTS,
+                BROWSER,
             ],
         },
         Explanation {
@@ -193,22 +218,28 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "relations::belongs_to",
                     why: "`RentalRow::load` brings each rental's bike, model, customer and \
-                          stores in one query per relation, however many rentals: no N+1 \
-                          (`tests/rentals.rs` counts them).",
+                          stores with `belongs_to`, one query per relation however many \
+                          rentals there are, instead of a query per row (N+1); \
+                          `tests/rentals.rs` checks the count stays the same with more \
+                          rentals.",
                 },
                 Feature {
                     api: "UI kit: list + badge",
                     why: "Each rental is a row of the kit's `list`, its status a `badge` whose \
-                          colour and text agree (never colour alone).",
+                          colour and word agree (never colour alone), so the page is readable \
+                          for colour-blind people and screen readers.",
                 },
                 Feature {
                     api: "money filter",
-                    why: "Money is stored as integers in the smallest unit and shown with \
-                          `money` in the visitor's locale (`Rp 150,000` / `Rp 150.000`).",
+                    why: "Money is stored as integers in the smallest unit (no rounding errors \
+                          from floats) and shown with `money` in the visitor's locale \
+                          (`Rp 150,000` / `Rp 150.000`).",
                 },
             ],
-            under_hood: "Two queries for the customer and their latest 50 rentals, then the \
-                         relations of all of them at once, then the latest ID document.",
+            under_hood: "One query for the customer record (made from the account on the \
+                         first visit), one for their latest 50 rentals, then their relations \
+                         all at once (`RentalRow::load`, five queries), then the latest ID \
+                         document for the ID check's status. Nothing is written.",
             docs: &[
                 "docs/relations.md#a-page-of-rows-with-their-relations-no-n1",
                 "docs/types.md#money",
@@ -234,35 +265,44 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "Upload",
                     why: "The photo is a form field (`Option<Upload>`) checked with `image()` \
-                          (by its **content**, sniffed, not its name) and `max`, then stored \
-                          with `Upload::store` under a random name **outside** `public/`: no \
-                          address reaches it.",
+                          (by its **content**, sniffed, not its name) and `max` (5 MB), then \
+                          stored with `Upload::store` under a random name in the storage \
+                          disk's `identity/`, **outside** `public/`: no address reaches it, \
+                          which an ID document needs.",
                 },
                 Feature {
-                    api: "Encrypted<String>",
-                    why: "The ID number is the customer's `id_number`, sealed with `APP_KEY` \
-                          when saved (`save_only` writes just that column), so a copy of the \
-                          database leaks nothing; staff see it masked.",
+                    api: "Encrypted<T>",
+                    why: "The ID number is the customer's `id_number`, an \
+                          `Encrypted<String>` sealed with `APP_KEY` when saved (`save_only` \
+                          writes just that column and `id_verified_at`), so a copy of the \
+                          database leaks nothing; staff see it masked (`•••••678`).",
                 },
                 Feature {
                     api: "Valid<T> + prepare hook",
                     why: "`prepare` tidies the number (trimmed, upper case) before the rules \
-                          check its length and characters.",
+                          check its length and characters, so \" ab-123 \" and \"AB-123\" are \
+                          the same number and the customer isn't refused for a space.",
                 },
                 Feature {
                     api: "notify",
                     why: "The chosen store's staff who may verify IDs get an in-app \
-                          notification; the customer gets a mail and a notification when it is \
-                          approved or refused.",
+                          notification (only in the app: it is work, not news); the customer \
+                          gets a mail and a notification when it is approved or refused, each \
+                          written in the recipient's language.",
                 },
             ],
-            under_hood: "On submit: the photo goes to private storage, the number is sealed \
-                         onto the customer, an earlier pending document is set aside, an \
-                         `identity_documents` row is written, and `notify::staff` finds the \
-                         users holding `rentals.verify_id` in that store (a query over the \
-                         permission tables, never a role name).",
+            under_hood: "Loading: the customer, their latest ID document and the stores. On \
+                         submit: the photo goes to private storage, the number is sealed onto \
+                         the customer (who is unverified until staff approve), an earlier \
+                         pending document is marked refused, an `identity_documents` row is \
+                         written, and `notify::staff` finds the users holding \
+                         `rentals.verify_id` in that store (a query over the permission \
+                         tables within their dates, never a role name). A customer with a \
+                         document waiting may already reserve; the pick-up needs it \
+                         approved.",
             docs: &[
                 "docs/validation.md#uploads",
+                "docs/types.md#the-table",
                 "docs/validation.md#hooks-prepare-authorize-after",
                 "docs/mail.md#database-notifications",
             ],
@@ -288,39 +328,56 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "Signed URLs",
                     why: "\"Open photo\" goes through a route that checks the permission in the \
-                          document's store (or a store serving one of the customer's rentals) \
-                          and then redirects to `storage.temporary_url`, a link signed with \
-                          `APP_KEY` that works for five minutes. Other customers and staff \
-                          without the permission never get a link.",
+                          document's store (or a store serving one of the customer's open \
+                          rentals) and then redirects to `storage.temporary_url`, a link signed \
+                          with `APP_KEY` that works for five minutes. The photo never gets a \
+                          lasting address: other customers and staff without the permission \
+                          never get a link, and a link passed on soon stops working.",
                 },
                 Feature {
                     api: "scopes_with",
                     why: "The list is `access::visible::<IdentityDocument>(rentals.verify_id)`: \
                           the documents of the stores where the person holds the permission \
-                          now (all of them for the owner's global role).",
+                          now (all of them for the owner's global role), one `WHERE` added to \
+                          the query rather than a filter in Rust after loading everything.",
                 },
                 Feature {
                     api: "has_permission_in",
-                    why: "Approving checks the permission in the document's store, not the \
-                          active store: ABAC on the record's own attribute.",
+                    why: "Opening, approving and refusing check the permission in the \
+                          document's store or a store serving one of the customer's open \
+                          rentals, not the active store: ABAC on the record's own \
+                          attributes. Anyone else gets a 404, so document ids can't be \
+                          probed.",
+                },
+                Feature {
+                    api: "UI kit: action_sheet",
+                    why: "\"Refuse\" opens a sheet with a required note the customer will \
+                          read, sent with htmx; a missing note stays in the sheet with its \
+                          error, so the list behind it is never reloaded for a mistake.",
                 },
                 Feature {
                     api: "Toast",
-                    why: "Approve and refuse answer with a toast and go back to the list.",
+                    why: "Approve and refuse answer with a toast and go back to the list \
+                          (`Back`), so the next document is right there.",
                 },
             ],
-            under_hood: "Three queries: the waiting documents, their customers, their stores. \
-                         Approving sets the document's status and the customer's \
-                         `id_verified_at` (valid in every store) and notifies the customer.",
+            under_hood: "Three queries: the waiting documents (oldest first, at most 100), \
+                         their customers, their stores. Approving sets the document's status \
+                         and reviewer and the customer's `id_verified_at` (valid in every \
+                         store), then sends the customer a mail and an in-app notification; \
+                         refusing stores the note and tells the customer, who may send \
+                         another document.",
             docs: &[
                 "docs/routing.md#signed-urls",
                 "docs/authorization.md#lists-scopes_with",
                 "docs/authorization.md#checking-one-record-has_permission_in",
+                "docs/ui.md#actions",
                 "docs/ui.md#toasts",
             ],
             sources: &[
                 IDENTITY,
                 POLICY,
+                NOTIFY,
                 "examples/bikeshop/resources/views/rentals/identities.html",
                 TESTS,
             ],
@@ -340,28 +397,36 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "renox::context",
                     why: "The active store is the access area's middleware's choice, kept in \
-                          `renox::context` for the request; every list is that store's.",
+                          `renox::context` for the request, so every handler and helper reads \
+                          it (`access::active_store::current()`) without passing it around; \
+                          every list here is that store's.",
                 },
                 Feature {
                     api: "StoreAttr::Operating",
-                    why: "Pick-ups belong to the **operating** store (where the bike stands). \
-                          Returns are allowed in any store where the person may take bikes \
-                          back, so the search also finds rentals out from another store.",
+                    why: "Pick-ups belong to the rental's **operating** store (the store that \
+                          serves the customer, where the bike stands). Returns are allowed in \
+                          any store where the person holds `rentals.return`, so the search \
+                          also finds bikes out from another store: a customer can bring a \
+                          bike back anywhere.",
                 },
                 Feature {
                     api: "relations::belongs_to",
                     why: "All three lists and the search results are loaded together by \
-                          `RentalRow::load`: one query per relation, not per row.",
+                          `RentalRow::load`: one query per relation, not per row, so a busy \
+                          day doesn't make the page slower (`tests/rentals.rs` counts them).",
                 },
                 Feature {
                     api: "UI kit: columns + list",
                     why: "Three columns on a desk, one under the other on a phone (the kit's \
-                          `columns`, a CSS grid), each a `list` of rentals.",
+                          `columns`, a CSS grid), each a `list` of rentals with its count: \
+                          the layout needs no CSS of the app's own.",
                 },
             ],
             under_hood: "One query for the store's rentals (out, overdue, or reserved to \
-                         start before tomorrow), one for the search, then `RentalRow::load` \
-                         once for all of them.",
+                         start before tomorrow); with a search, two more (the customers whose \
+                         name or email matches, then their rentals or the one with that code, \
+                         kept only when the person may see it); then `RentalRow::load` once \
+                         for all of them. Nothing is written.",
             docs: &[
                 "docs/authorization.md#roles-per-branch-a-role-in-one-store-for-a-while",
                 "docs/relations.md#a-page-of-rows-with-their-relations-no-n1",
@@ -390,24 +455,31 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "renox::select",
                     why: "The customer is a searchable select whose options come from the \
-                          server as the cashier types (`options_url`, `OptionQuery`): only \
-                          verified customers, never the whole table in the page.",
+                          server as the cashier types (`options_url`, `OptionQuery`, \
+                          `SelectOption` from `GET /staff/rentals/customers`): only verified \
+                          customers, at most 20 at a time, never the whole customer table in \
+                          the page.",
                 },
                 Feature {
                     api: "blocks: datetime_range",
-                    why: "The period, starting now, by the hour.",
+                    why: "The same period picker as `/rent`, filled in from now to two hours \
+                          later in half-hour steps, so the cashier only changes the end.",
                 },
                 Feature {
                     api: "Valid<T> + after hook",
                     why: "The hook checks the customer is verified, the period, and that the \
                           bike stands here and is free, with the errors next to the fields; \
-                          the booking transaction checks the overlap again.",
+                          the booking transaction checks the overlap again, since another \
+                          booking may land between the two.",
                 },
             ],
             under_hood: "The bikes standing at the store and free for the next two hours \
-                         (two queries) fill the bike select. On submit the same \
-                         `booking::book` transaction as online reservations runs, with the \
-                         active store as operating store and the cashier as `served_by`.",
+                         (two queries) and their names (two more) fill the bike select. On \
+                         submit the same `booking::book` transaction as online reservations \
+                         runs, with the active store as operating store and the cashier as \
+                         `served_by` (so the 30-minute online payment deadline doesn't apply), \
+                         then the desk opens for the pick-up, where the price and deposit are \
+                         paid.",
             docs: &[
                 "docs/ui.md#options-from-the-server",
                 "docs/validation.md#hooks-prepare-authorize-after",
@@ -416,6 +488,7 @@ pub fn entries() -> Vec<Explanation> {
                 COUNTER,
                 BOOKING,
                 "examples/bikeshop/resources/views/rentals/walk_in.html",
+                "examples/bikeshop/resources/views/blocks/datetime_range.html",
                 TESTS,
             ],
         },
@@ -436,19 +509,24 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "renox::context",
                     why: "The active store decides what the page offers: the pick-up only in \
-                          the rental's operating store, the return wherever the person may take \
-                          bikes back; the bike's **location** becomes the store that took it \
-                          back, its **owner** never changes.",
+                          the rental's operating store, the return wherever the person holds \
+                          `rentals.return`; the bike's **location** becomes the store that took \
+                          it back, its **owner** never changes. The same rental shows a \
+                          different form in each store without a parameter in the URL.",
                 },
                 Feature {
                     api: "UI kit: checkbox_list + toggle_buttons",
                     why: "The condition checklist is a `checkbox_list` (a `Vec<String>`, each \
-                          item checked with `one_of`), cash or card a `toggle_buttons`.",
+                          item checked with `one_of`), cash or card a `toggle_buttons`; the \
+                          damage fields appear only when the \"damaged\" switch is on \
+                          (`show_when`). Kit fields keep the old input and show the errors \
+                          after a failed submit with no code of the page's own.",
                 },
                 Feature {
                     api: "Upload",
                     why: "Damage photos are a `Vec<Upload>` (each `image()` by content, at most \
-                          six), stored privately and shown to staff through signed links.",
+                          six of 5 MB), stored privately and shown to staff through signed \
+                          links that expire, since they show a customer's rental.",
                 },
                 Feature {
                     api: "Events and listeners",
@@ -456,41 +534,51 @@ pub fn entries() -> Vec<Explanation> {
                           and opens a work order at this store, billed to the bike's owner store \
                           when it is another. Every return emits `RentalClosed`, where the \
                           intercompany books (#245) book the revenue to the owner store and the \
-                          operating store's fee.",
+                          operating store's fee. Rentals stays unaware of the workshop and the \
+                          books: each area adds its own listener.",
                 },
                 Feature {
                     api: "Transactions",
-                    why: "The rental, the bike (status, location, ridden hours) and the photos \
-                          are written in one transaction; the counter payments follow through \
-                          the shared payments contract.",
+                    why: "At the return the rental, the bike (status, location, ridden hours) \
+                          and the photos' rows are written in one transaction, so a failure \
+                          never leaves a closed rental with a bike still marked out (the \
+                          pick-up does the same for the rental and the bike). The counter \
+                          payments follow through the shared payments contract.",
                 },
                 Feature {
                     api: "Pricing in Rust",
                     why: "`pricing::late_fee` (per started hour after 15 minutes of grace) and \
                           `pricing::settle` (fees out of the deposit first, the rest given back, \
                           any excess paid now) are unit-tested functions; the page shows their \
-                          answer for now.",
+                          answer for now, and the return uses the same functions, so the \
+                          preview and the receipt agree.",
                 },
             ],
-            under_hood: "Pick-up: `access::require(rentals.checkout, Operating)`, the customer \
-                         must be verified, one transaction (rental active, checklist, bike \
-                         `rented`), then `payments::record_counter` for the price and, when \
-                         due, the deposit. Return: the photos to private storage, one \
+            under_hood: "Loading: the rental (a 404 unless the person may see it, or it is \
+                         out and may come back here), the customer and their pending ID \
+                         document, the bike's rate for the late fee so far, the photos, the \
+                         stores and `RentalRow::load`. Pick-up (`POST …/pickup`): \
+                         `access::require(rentals.checkout, Operating)`, the customer must be \
+                         verified, one transaction (rental active, checklist, bike `rented`), \
+                         then `payments::record_counter` for the price and, when due, the \
+                         deposit. Return (`POST …/return`): the photos to private storage, one \
                          transaction (late and damage fees, the deposit settled, the return \
-                         store, the ridden minutes; the bike's location, hours and status), \
-                         the excess paid at the counter, the events, and a mail with the \
-                         receipt to the customer.",
+                         store, the ridden minutes; the bike's location, hours and status, \
+                         `maintenance` when damaged), the excess paid at the counter, the \
+                         events, a mail and an in-app notification with the amounts to the \
+                         customer, then the receipt.",
             docs: &[
                 "docs/authorization.md#checking-one-record-has_permission_in",
                 "docs/scheduling.md#events",
                 "docs/validation.md#uploads",
-                "docs/relations.md#more-of-the-query-builder",
                 "docs/ui.md#form-fields",
+                "docs/ui.md#a-field-that-depends-on-another",
             ],
             sources: &[
                 COUNTER,
                 PRICING,
                 MOD,
+                "examples/bikeshop/src/app/sales/payments.rs",
                 "examples/bikeshop/src/app/workshop/fleet.rs",
                 "examples/bikeshop/resources/views/rentals/desk.html",
                 TESTS,
@@ -510,35 +598,44 @@ pub fn entries() -> Vec<Explanation> {
             flow: Flow::Rent,
             features: &[
                 Feature {
-                    api: "Morph",
-                    why: "The payments are `payments` rows pointing at the rental through a \
-                          polymorphic reference (`payable_type = 'rentals'`), the same table \
-                          sales and the workshop use.",
+                    api: "Query<T>",
+                    why: "The payments are rows of the shared `payments` table pointing at the \
+                          rental by `payable_type` + `payable_id` (the same table sales and \
+                          the workshop use), read with a plain query: `Payment::where_eq(…)` \
+                          on both columns and the paid status. One kind of parent is needed \
+                          here, so no `Morph` loader is.",
                 },
                 Feature {
                     api: "StoreAttr::Owner",
-                    why: "The books follow the **owner** store copied onto the rental: the \
-                          owner earns the revenue and fees, the operating store its fee \
-                          (`fee_rate_bp`, 20 % by default). #245 writes those entries on \
-                          `RentalClosed`; the receipt shows the same numbers.",
+                    why: "The books follow the **owner** store copied onto the rental at \
+                          booking (so moving the bike later never changes them): the owner \
+                          earns the revenue and fees, the operating store its fee \
+                          (`fee_rate_bp`, 20 % by default) when the two differ. #245 writes \
+                          those entries on `RentalClosed`; the receipt shows the same \
+                          numbers.",
                 },
                 Feature {
                     api: "money filter",
-                    why: "Integers in the smallest unit, formatted in the visitor's locale.",
+                    why: "Integers in the smallest unit, formatted in the visitor's locale by \
+                          `money` and `entry(…, format=\"money\")`, so no amount is formatted \
+                          by hand.",
                 },
             ],
-            under_hood: "The rental, its payments, the bike, the store it was placed at (the \
-                         latest placement that moved it, else the owner), and the stores' \
-                         names: a handful of queries.",
+            under_hood: "The rental, its paid payments, the bike, the store it was placed at \
+                         (the latest placement that moved it, else the owner), the three \
+                         stores, then `RentalRow::load`: about ten queries, nothing written. \
+                         When the bike came back elsewhere, the page says where to send it.",
             docs: &[
-                "docs/relations.md#polymorphic-relations",
+                "docs/relations.md#more-of-the-query-builder",
                 "docs/types.md#money",
             ],
             sources: &[
                 COUNTER,
+                "examples/bikeshop/src/app/multistore/books.rs",
                 "examples/bikeshop/src/app/multistore/model.rs",
                 "examples/bikeshop/resources/views/rentals/receipt.html",
                 TESTS,
+                BROWSER,
             ],
         },
         Explanation {
@@ -555,53 +652,68 @@ pub fn entries() -> Vec<Explanation> {
             features: &[
                 Feature {
                     api: "renox::grid",
-                    why: "Columns, filters, sorting, search and paging from one description in \
-                          Rust, kept in the address; the status `select` column filters by \
-                          status.",
+                    why: "Columns, filters, sorting, search (by frame number) and paging from \
+                          one description in Rust (`fleet_grid`), kept in the address so a view \
+                          can be shared; the status `select` column filters by status. A \
+                          hand-made table would need all of that written per page.",
                 },
                 Feature {
                     api: "Grid::poll",
                     why: "`poll(30)` reloads the board every 30 seconds while the tab is \
-                          visible and nobody is filtering, so a bike returned at the counter \
-                          or marked overdue by the scheduled task appears by itself.",
+                          visible and nobody is editing, selecting or filtering, so a bike \
+                          returned at the counter or marked overdue by the scheduled task \
+                          appears by itself, without a socket or a server push.",
                 },
                 Feature {
                     api: "Grid::cards_on_mobile",
-                    why: "On a phone each bike is a card with its frame number, model, status \
-                          and location.",
+                    why: "On a phone each bike is a card with the columns marked `mobile()`: \
+                          frame number, model, status and location, instead of a table that \
+                          scrolls sideways.",
                 },
                 Feature {
                     api: "Column::badges",
                     why: "Statuses are badges whose tone and word agree (overdue danger, \
-                          maintenance warning…).",
+                          maintenance warning…), so the board can be scanned at a glance and \
+                          still read without colour.",
                 },
                 Feature {
                     api: "Column::related",
-                    why: "Owner and location are the stores' names, read by subqueries that \
-                          sort and filter like the model's own columns.",
+                    why: "Owner and location are the stores' names, read by subqueries in the \
+                          page's one query, and they sort and filter like the model's own \
+                          columns: no join written by hand, no query per row.",
                 },
                 Feature {
                     api: "scopes_with",
                     why: "The grid starts from `access::visible::<RentalBike>(fleet.view)` \
                           (owner **or** location among the person's stores), then the tab \
-                          narrows it by owner and location.",
+                          narrows it to the active store by owner and location. The \
+                          permission limit is in the query, so paging and counts are right.",
+                },
+                Feature {
+                    api: "UI kit: link_tabs",
+                    why: "The tabs (all, mine here, placed here by others, mine elsewhere) are \
+                          links with their counts (`?view=`), so each is an address of its \
+                          own that can be bookmarked, unlike panels switched in the page.",
                 },
             ],
             under_hood: "One query for the page (with the related store names as \
                          subqueries), one for the total, two for the models' names, three \
-                         counts for the tabs.",
+                         counts for the tabs. Nothing is written; the board changes through \
+                         the counter, placements and the `rentals:watch` task.",
             docs: &[
                 "docs/grid.md#polling",
                 "docs/grid.md#cards-on-phones",
                 "docs/grid.md#columns-from-other-tables",
                 "docs/grid.md#options-every-column-takes",
                 "docs/authorization.md#lists-scopes_with",
+                "docs/ui.md#navigation-and-page-structure",
             ],
             sources: &[
                 FLEET,
                 POLICY,
                 "examples/bikeshop/resources/views/rentals/fleet.html",
                 TESTS,
+                BROWSER,
             ],
         },
         Explanation {
@@ -620,31 +732,40 @@ pub fn entries() -> Vec<Explanation> {
                     why: "ABAC: renting it out, taking it back and repairing it are checked in \
                           the **location** store; its rates, placing it elsewhere and retiring \
                           it in the **owner** store. The page lists each action with the store \
-                          it is checked in and whether the person may do it.",
+                          it is checked in and whether the person may do it, worked out by the \
+                          same `access::can` the handlers use, so the page can't disagree with \
+                          what the buttons elsewhere allow.",
                 },
                 Feature {
                     api: "relations::belongs_to",
-                    why: "Its rentals come with their customers and stores in a fixed number \
-                          of queries (`RentalRow::load`).",
+                    why: "Its latest 20 rentals come with their customers and stores in a \
+                          fixed number of queries (`RentalRow::load`), not one per rental.",
                 },
                 Feature {
                     api: "UI kit: infolist + tabs",
-                    why: "The bike's details as an `infolist`, its history in the kit's `tabs`.",
+                    why: "The bike's details as an `infolist`; its history (rentals, \
+                          placements, work orders) in the kit's `tabs`, which switch panels \
+                          in the page with the keyboard too, so three lists don't make one \
+                          long page.",
                 },
             ],
             under_hood: "`access::find::<RentalBike>` answers 404 to staff of a third store. \
-                         Then the stores, the latest 20 rentals with their relations, \
-                         placements and work orders.",
+                         Then the store it should go back to (its latest placement), the \
+                         stores, the latest 20 rentals with their relations, the latest 20 \
+                         placements and work orders, and the model's name. Nothing is \
+                         written.",
             docs: &[
                 "docs/authorization.md#checking-one-record-has_permission_in",
                 "docs/relations.md#a-page-of-rows-with-their-relations-no-n1",
                 "docs/ui.md#infolists-read-only-details",
+                "docs/ui.md#buttons-surfaces-and-other-parts",
             ],
             sources: &[
                 FLEET,
                 POLICY,
                 "examples/bikeshop/resources/views/rentals/fleet_show.html",
                 TESTS,
+                BROWSER,
             ],
         },
     ]

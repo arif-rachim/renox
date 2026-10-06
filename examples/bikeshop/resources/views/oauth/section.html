@@ -1,0 +1,33 @@
+{#- renox-oauth's card on the account page (`section.data`: providers (name,
+    label, link_url, linked, email, since), has_password, can_unlink,
+    set_password_url), replaced by the bike shop for its translations
+    (`plugins.oauth.*`). -#}
+{% from "renox/ui.html" import card, list, link_button, confirm, badge %}
+{% if section.data.providers %}
+{% call card(title=t('plugins.oauth.title'), subtitle=t('plugins.oauth.lead')) %}
+  {% call list(label=t('plugins.oauth.title')) %}
+    {%- for provider in section.data.providers %}
+    <li id="oauth-{{ provider.name }}">
+      <span class="rx-list__main">
+        <strong>{{ provider.label }}</strong>
+        {%- if provider.linked %}
+        <span class="rx-subtitle">{{ provider.email or t('plugins.oauth.linked') }}{% if provider.since %} · {{ t('plugins.oauth.since', date=(provider.since | date)) }}{% endif %}</span>
+        {%- endif %}
+      </span>
+      {%- if provider.linked %}
+        {%- if section.data.can_unlink %}
+        {{ confirm("oauth-unlink-" ~ provider.name, t('plugins.oauth.unlink'), route('oauth.unlink', provider.name), t('plugins.oauth.unlink_question', provider=provider.label), t('plugins.oauth.unlink_text', provider=provider.label), confirm_label=t('plugins.oauth.unlink')) }}
+        {%- else %}
+        {{ badge(t('plugins.oauth.only_login')) }}
+        {%- endif %}
+      {%- elif provider.link_url %}
+      {{ link_button(provider.link_url, t('plugins.oauth.link'), attrs={"hx-boost": "false"}) }}
+      {%- endif %}
+    </li>
+    {%- endfor %}
+  {% endcall %}
+  {%- if not section.data.has_password %}
+  <p class="rx-subtitle">{{ t('plugins.oauth.no_password') }}{% if section.data.set_password_url %} {{ t('plugins.oauth.set_password_before') }}<a class="rx-link" href="{{ section.data.set_password_url }}">{{ t('plugins.oauth.set_password') }}</a>{{ t('plugins.oauth.set_password_after') }}{% endif %}</p>
+  {%- endif %}
+{% endcall %}
+{% endif %}
