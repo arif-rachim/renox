@@ -463,6 +463,16 @@ async fn the_grid_search_box_uses_the_index() {
     let request = GridRequest::new(db, "/posts", &[("search", "tea 2")]);
     let page = mixed.page(Post::query(), &request).await.unwrap();
     assert_eq!(titles(page.items()), ["Brewing tea"]);
+
+    // Grouped: the best match first inside each group, before the grid's
+    // own sort (newest first would put "Brewing tea" first).
+    let grouped = grid().groups(&["author_id"]).group_by("author_id");
+    let request = GridRequest::new(db, "/posts", &[("search", "coffee")]);
+    let page = grouped.page(Post::query(), &request).await.unwrap();
+    assert_eq!(
+        titles(page.items()),
+        ["Roasting coffee at home", "Brewing tea"]
+    );
 }
 
 const RECIPES: Migration = Migration::new("20300101000010_recipes", "", Some("DROP TABLE recipes"))

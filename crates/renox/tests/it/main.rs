@@ -29,6 +29,7 @@ mod extension_points;
 mod external_login;
 mod forms;
 mod grid;
+mod grid_edges;
 mod i18n;
 mod infolist;
 mod infra;

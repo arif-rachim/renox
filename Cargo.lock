@@ -2420,6 +2420,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tower",
+ "zip",
 ]
 
 [[package]]

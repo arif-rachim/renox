@@ -1467,6 +1467,8 @@ The parts, one by one:
     `decimals`, `height` (240 px), `title` (for screen readers), `name` (one series' name),
     `x_format` (chrono's codes for date labels; otherwise `Oct 2`, `Oct 2026`),
     `x_title` and `y_title` (shown along the axes), `legend=false`, `table=false`, `id`.
+  - Plain numbers get as many decimals as the data needs (up to 2) in tooltips and the
+    data table, unless `decimals` says; `money` uses the currency's, `percent` one.
 - **Scatter and bubble charts** place points by two numbers (and a bubble's size by a third):
   ```html
   {{ chart("scatter", points=orders, x_title="Items", y_title="Total", format="money") }}
