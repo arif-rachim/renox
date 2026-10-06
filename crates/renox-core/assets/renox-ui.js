@@ -38,6 +38,27 @@
     setTimeout(function () { toast.remove(); }, reduceMotion ? 0 : 200);
   }
 
+  // Escape closes a toast: the one holding the focus, else the newest. It
+  // goes first to anything else Escape closes (a sheet, a menu or the
+  // bell's panel, a popover, a tooltip, the period filter, a grid cell being
+  // edited), so it runs early (capture) to look before they close.
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape" || event.defaultPrevented) return;
+    var toasts = document.querySelectorAll("[data-renox-toast]:not([data-leaving])");
+    if (!toasts.length) return;
+    var target = event.target.closest ? event.target : null;
+    var focused = target && target.closest("[data-renox-toast]");
+    if (focused) { dismiss(focused); return; }
+    var busy = '[aria-expanded="true"], .rx-tip, details[data-rx-period][open], dialog[open]';
+    try {
+      if (document.querySelector(busy + ", :popover-open")) return;
+    } catch (_) {
+      if (document.querySelector(busy)) return; // no :popover-open in this browser
+    }
+    if (target && target.closest(".rx-grid__editing")) return;
+    dismiss(toasts[toasts.length - 1]);
+  }, true);
+
   // Success and info leave after a while, longer for longer messages (or
   // after data-duration), and wait while hovered or focused; errors and
   // persistent toasts stay until dismissed.

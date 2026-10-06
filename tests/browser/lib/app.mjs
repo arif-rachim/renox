@@ -57,33 +57,44 @@ export async function start(binary, dir, { env = {}, seed = false } = {}) {
       throw new Error(`${binary} ${command} failed:\n${run.stdout}\n${run.stderr}`);
     }
   }
-  const proc = spawn(exe, ['serve'], { cwd, env: vars, stdio: ['ignore', 'pipe', 'pipe'] });
-  let log = '';
-  proc.stdout.on('data', (d) => (log += d));
-  proc.stderr.on('data', (d) => (log += d));
   const url = `http://127.0.0.1:${port}`;
-  const until = Date.now() + 20_000;
-  for (;;) {
-    if (proc.exitCode !== null) throw new Error(`${binary} exited:\n${log}`);
-    try {
-      if ((await fetch(`${url}/health`)).ok) break;
-    } catch {}
-    if (Date.now() > until) throw new Error(`${binary} didn't answer /health:\n${log}`);
-    await new Promise((r) => setTimeout(r, 100));
-  }
+  let log = '';
+  let proc;
+  const serve = async () => {
+    proc = spawn(exe, ['serve'], { cwd, env: vars, stdio: ['ignore', 'pipe', 'pipe'] });
+    proc.stdout.on('data', (d) => (log += d));
+    proc.stderr.on('data', (d) => (log += d));
+    const until = Date.now() + 20_000;
+    for (;;) {
+      if (proc.exitCode !== null) throw new Error(`${binary} exited:\n${log}`);
+      try {
+        if ((await fetch(`${url}/health`)).ok) break;
+      } catch {}
+      if (Date.now() > until) throw new Error(`${binary} didn't answer /health:\n${log}`);
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  };
+  const halt = () =>
+    new Promise((resolve) => {
+      if (proc.exitCode !== null) return resolve();
+      proc.on('exit', resolve);
+      proc.kill('SIGTERM');
+      setTimeout(() => {
+        proc.kill('SIGKILL');
+        resolve();
+      }, 5000);
+    });
+  await serve();
   return {
     url,
     log: () => log,
+    /** Stops the app and starts it again on the same port and database. */
+    async restart() {
+      await halt();
+      await serve();
+    },
     async stop() {
-      proc.kill('SIGTERM');
-      await new Promise((resolve) => {
-        if (proc.exitCode !== null) return resolve();
-        proc.on('exit', resolve);
-        setTimeout(() => {
-          proc.kill('SIGKILL');
-          resolve();
-        }, 5000);
-      });
+      await halt();
       rmSync(data, { recursive: true, force: true });
     },
   };

@@ -187,6 +187,35 @@ test('Renox.toast shows at the top, waits while focused, replaces by id and is d
     await page.waitFor(() => !document.querySelector('[data-toast-id="copy"]'), { message: 'dismissed by id' });
   }));
 
+// The owner's call (#266): Escape closes a toast, the focused one or else the
+// newest, unless something else Escape closes is open.
+test('Escape closes the focused toast, else the newest, after any open menu', () =>
+  onOverlays(async (page) => {
+    const ids = () => page.eval(() => [...document.querySelectorAll('[data-renox-toast]:not([data-leaving])')].map((t) => t.getAttribute('data-toast-id')));
+    await page.eval(() => {
+      Renox.toast({ kind: 'info', message: 'First', id: 'one', duration: 0 });
+      Renox.toast({ kind: 'info', message: 'Second', id: 'two', duration: 0 });
+    });
+    // Nothing focused in a toast: the newest goes.
+    await page.press('Escape');
+    await page.waitFor(() => !document.querySelector('[data-toast-id="two"]'), { message: 'the newest closed' });
+    assert.deepEqual(await ids(), ['one']);
+    // A menu open (by keyboard: the toast covers its button): Escape closes
+    // the menu, not the toast.
+    await page.focus('[aria-controls="more-menu"]');
+    await page.press('Enter');
+    await page.waitFor(() => !document.querySelector('#more-menu').hidden);
+    await page.press('Escape');
+    await page.waitFor(() => document.querySelector('#more-menu').hidden);
+    assert.deepEqual(await ids(), ['one'], 'the toast stays while the menu takes Escape');
+    // Focus in a toast: that one goes.
+    await page.eval(() => Renox.toast({ kind: 'info', message: 'Third', id: 'three', duration: 0 }));
+    await page.eval(() => document.querySelector('[data-toast-id="one"] [data-renox-dismiss]').focus());
+    await page.press('Escape');
+    await page.waitFor(() => !document.querySelector('[data-toast-id="one"]'), { message: 'the focused one closed' });
+    assert.deepEqual(await ids(), ['three']);
+  }));
+
 test('a toast action sends its request; a failure says so; other sites are left out', () =>
   onOverlays(
     async (page) => {
@@ -457,6 +486,48 @@ test('the bell counts a new notification live in every tab, toasts it, and marks
     });
   } finally {
     await other.close();
+  }
+});
+
+// The owner's call (#266): the bell's stream comes back by itself after the
+// server restarts, on the same page.
+test('the bell reconnects after the server restarts', async () => {
+  // Debug off: with it, live reload would reload the page on the new boot.
+  const own = await fixture({ env: { APP_DEBUG: 'false' } });
+  try {
+    await browser.with(async (page) => {
+      await page.goto(`${own.url}/form`);
+      await page.eval(async (email) => {
+        const token = document.querySelector('meta[name="csrf-token"]').content;
+        const body = new URLSearchParams({ _token: token, name: 'Bell', email, password: 'password123', password_confirmation: 'password123' });
+        await fetch('/register', { method: 'POST', body, redirect: 'manual' });
+      }, `restart${Date.now()}@example.com`);
+      const streams = [];
+      page.on('Network.requestWillBeSent', (p) => p.request.url.includes('/notifications/stream') && streams.push(Date.now()));
+      await page.goto(`${own.url}/inbox`);
+      await page.eval(() => { window.__same = true; });
+      await page.waitFor(() => true);
+      const until = Date.now() + 5000;
+      while (!streams.length && Date.now() < until) await sleep(50);
+      assert.ok(streams.length >= 1, 'the stream opened');
+
+      await own.restart();
+      // The page opens its stream again by itself (no reload).
+      const before = streams.length;
+      const again = Date.now() + 15_000;
+      while (streams.length <= before && Date.now() < again) await sleep(100);
+      assert.ok(streams.length > before, 'the stream came back after the restart');
+      assert.equal(await page.eval(() => window.__same), true, 'the same page, not reloaded');
+      // And it carries what happens on the new server.
+      await sleep(500);
+      await page.click('#notify');
+      await page.waitFor(() => document.querySelector('[data-rx-bell-count]').textContent === '1' && !document.querySelector('[data-rx-bell-count]').hidden, {
+        message: 'the badge counted it through the new stream',
+        timeout: 15_000,
+      });
+    });
+  } finally {
+    await own.stop();
   }
 });
 

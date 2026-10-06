@@ -332,7 +332,8 @@ can copy into an app: Node's own test runner and WebSocket speaking CDP to headl
   exceptions and CSP violations (scripts or styles the page's security policy blocked), and
   `assertClean()` fails the test when there are any.
 - `lib/app.mjs` starts an app binary on a free port with its own database and storage,
-  migrated and seeded, and stops it.
+  migrated and seeded, and stops it; `restart()` stops it and starts it again on the same
+  port and database (what a page sees when the server restarts).
 
 ```js
 test('a 422 keeps what was typed', () =>
