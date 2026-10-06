@@ -127,9 +127,19 @@ describe('with the keyboard alone', () => {
     try {
       await browser.with(async (page) => {
         await logIn(page, app.url, 'admin@example.com');
+        // A product in stock: the seeder's stock is random, and a sold-out
+        // product's page has no cart form.
         await page.goto(`${app.url}/products`);
-        const product = await page.eval(() => document.querySelector('a[href^="/products/"]').getAttribute('href'));
-        await page.goto(`${app.url}${product}`);
+        const products = await page.eval(() => [...new Set([...document.querySelectorAll('a[href^="/products/"]')].map((a) => a.getAttribute('href')))]);
+        let found = false;
+        for (const product of products) {
+          await page.goto(`${app.url}${product}`);
+          if (await page.eval(() => !!document.querySelector('form[action$="/cart"] button[type=submit]'))) {
+            found = true;
+            break;
+          }
+        }
+        assert.ok(found, `a product in stock among ${products.length}`);
         await tabTo(page, 'form[action$="/cart"] button[type=submit]');
         await submitAndLoad(page);
         await page.goto(`${app.url}/cart`);

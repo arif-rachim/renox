@@ -317,13 +317,21 @@ describe('the shop', () => {
 
   test('a guest browses and is asked to log in; a new customer orders and the bell rings', () =>
     browser.with(async (page) => {
+      // The seeder's stock is random: a sold-out product has no way to buy.
       await page.goto(`${app.url}/products`);
-      const product = await page.eval(() => document.querySelector('a[href^="/products/"]').getAttribute('href'));
-      await page.goto(`${app.url}${product}`);
-      assert.ok(await page.eval(() => !!document.querySelector('a[href$="/login"].rx-button, .rx-button[href$="/login"]')), 'log in to buy');
-      // A new customer.
+      const products = await page.eval(() => [...new Set([...document.querySelectorAll('a[href^="/products/"]')].map((a) => a.getAttribute('href')))]);
+      const findProduct = async (check) => {
+        for (const href of products) {
+          await page.goto(`${app.url}${href}`);
+          if (await page.eval(check)) return href;
+        }
+        throw new Error(`no product among ${products.length} passed ${check}`);
+      };
+      await findProduct(() => !!document.querySelector('a[href$="/login"].rx-button, .rx-button[href$="/login"]'));
+      // A new customer, ordering two of a product with at least two in stock.
       await register(page, app.url, `buyer${Date.now()}@example.com`);
-      await page.goto(`${app.url}${product}`);
+      // (One in stock says "Only one left"; none has no quantity field.)
+      await findProduct(() => !!document.querySelector('[name=quantity]') && !document.body.textContent.includes('Only one left'));
       await page.type('[name=quantity]', '2', { clear: true });
       await submitAndLoad(page, 'form[action$="/cart"] button[type=submit]');
       await page.goto(`${app.url}/cart`);
