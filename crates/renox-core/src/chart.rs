@@ -885,6 +885,18 @@ pub(crate) fn chart(
                     .iter()
                     .map(|l| display_label(l, x_format.as_deref()))
                     .collect();
+                // Plain numbers get as many decimals as the data needs, as
+                // on scatter charts; money and percent keep their own.
+                let decimals = match format.as_deref() {
+                    None | Some("number") => decimals.or_else(|| {
+                        auto_decimals(
+                            data.series
+                                .iter()
+                                .flat_map(|s| s.values.iter().flatten().copied()),
+                        )
+                    }),
+                    _ => decimals,
+                };
                 let formatter = formatter(format, decimals);
                 if kind == "pie" || kind == "doughnut" {
                     render_pie(&data, &options, &formatter)
@@ -2167,6 +2179,127 @@ mod tests {
         assert!(!ring.contains("rx-chart__legend"));
         let empty = render(r#"{{ chart("pie", labels=["a"], values=[0]) }}"#);
         assert!(!empty.contains("rx-chart__slice"), "{empty}");
+    }
+
+    /// Data given as a list of series, as one series object, as an object
+    /// holding labels and series, and values that aren't numbers.
+    #[test]
+    fn data_comes_in_every_shape() {
+        let list = render(
+            r#"{{ chart("line", [{"name": "North", "values": [1, 2]}, {"values": [3, 4]}], labels=["x", "y"], name="Sales") }}"#,
+        );
+        assert!(list.contains(">North<"), "{list}");
+        assert!(
+            list.contains(">Sales 2<"),
+            "a series without a name: {list}"
+        );
+        let one = render(r#"{{ chart("bar", {"name": "Visits", "values": [1, 2]}) }}"#);
+        assert!(one.contains(">Visits<"), "{one}");
+        let nested = render(
+            r#"{{ chart("line", {"labels": ["Mon", "Tue"], "series": [{"name": "Cups", "values": [5, 6]}]}) }}"#,
+        );
+        assert!(
+            nested.contains(">Mon<") && nested.contains(">Cups<"),
+            "{nested}"
+        );
+        // Labels that aren't text are written as text; a number in text is a
+        // number, other values are gaps.
+        let odd = render(r#"{{ chart("line", labels=[1, true], values=["3", "x", 2.5]) }}"#);
+        assert!(odd.contains(">True<"), "{odd}");
+        assert!(
+            odd.contains(">3.0</td>") && odd.contains(">—</td>"),
+            "{odd}"
+        );
+        // Three values but two labels: the third gets its number.
+        assert!(odd.contains(r#"<th scope="row">3</th>"#), "{odd}");
+    }
+
+    #[test]
+    fn axes_for_negative_and_flat_values() {
+        assert_eq!(scale(-9.0, -2.0), (-10.0, 0.0, 2.5));
+        let (lo, hi, step) = nice(3.0, 3.0);
+        assert!(lo < 3.0 && hi > 3.0 && step > 0.0, "{lo} {hi} {step}");
+        let (lo, hi, _) = nice(-4.0, -4.0);
+        assert!(lo < -4.0 && hi > -4.0, "{lo} {hi}");
+        let flat = render(r#"{{ chart("bar", [-4, -4]) }}"#);
+        assert!(flat.contains(">-4<") || flat.contains(">−4<"), "{flat}");
+    }
+
+    #[test]
+    fn lines_break_at_gaps_and_keep_their_last_label() {
+        let gap = render(r#"{{ chart("line", [1, none, 3, 4]) }}"#);
+        assert_eq!(gap.matches(r#"class="rx-chart__line "#).count(), 2, "{gap}");
+        // Twenty points: every third label, the last always, the one just
+        // before it giving way.
+        let many = render(r#"{{ chart("line", values=range(20)|list) }}"#);
+        let x = many.split(r#"<div class="rx-chart__x""#).nth(1).unwrap();
+        let x = x.split("</div>").next().unwrap();
+        assert!(x.contains(">20</span>") && !x.contains(">19</span>"), "{x}");
+        assert!(x.contains(">1</span>") && x.contains(">4</span>"), "{x}");
+        // One point sits in the middle.
+        let one = render(r#"{{ chart("line", [5]) }}"#);
+        assert!(one.contains(r#"style="left: 50%">1</span>"#), "{one}");
+    }
+
+    /// Line, bar and pie values with fractions keep them in the tooltip
+    /// data and the table (they were rounded to whole numbers); whole
+    /// numbers stay whole, and `decimals` still decides.
+    #[test]
+    fn fractions_keep_their_decimals() {
+        let bars = render(r#"{{ chart("bar", [1.5, 2.25, 3]) }}"#);
+        let table = bars.split("<tbody>").nth(1).unwrap();
+        assert!(
+            table.contains(">1.50<") && table.contains(">2.25<") && table.contains(">3.00<"),
+            "{table}"
+        );
+        let pie = render(r#"{{ chart("pie", labels=["a", "b"], values=[4.5, 5.5]) }}"#);
+        assert!(pie.contains(">4.5<"), "{pie}");
+        let whole = render(r#"{{ chart("line", [1, 2]) }}"#);
+        assert!(
+            whole.split("<tbody>").nth(1).unwrap().contains(">2<"),
+            "{whole}"
+        );
+        let chosen = render(r#"{{ chart("bar", [1.5], decimals=0) }}"#);
+        assert!(
+            chosen.split("<tbody>").nth(1).unwrap().contains(">2<"),
+            "{chosen}"
+        );
+    }
+
+    /// Scatter and bubble data in every shape `read_points` takes, and a
+    /// line chart's `name` for its one series.
+    #[test]
+    fn points_come_in_every_shape() {
+        let nested = render(
+            r#"{{ chart("scatter", {"series": [{"name": "North", "points": [[1, 2]]}, {"name": "South", "points": [[3, 4]]}]}) }}"#,
+        );
+        assert!(
+            nested.contains(">North<") && nested.contains(">South<"),
+            "{nested}"
+        );
+        let listed = render(r#"{{ chart("scatter", [{"name": "East", "points": [[1, 2]]}]) }}"#);
+        // One series: drawn, without a legend to name it.
+        assert!(listed.contains(r#"data-index="0""#), "{listed}");
+        let pairs = render(r#"{{ chart("scatter", [[1, 2], [3, 4]], name="Pairs") }}"#);
+        assert!(pairs.contains(r#"data-index="1""#), "two points: {pairs}");
+        let one =
+            render(r#"{{ chart("bubble", {"name": "Sizes", "points": [[1, 2, 3], [2, 3, 9]]}) }}"#);
+        assert!(one.contains(r#"data-index="1""#), "{one}");
+        let kwarg = render(
+            r#"{{ chart("scatter", series=[{"name": "West", "points": [[5, 5]]}, {"name": "Far", "points": [[6, 6]]}]) }}"#,
+        );
+        assert!(
+            kwarg.contains(">West<") && kwarg.contains(">Far<"),
+            "{kwarg}"
+        );
+        let named = render(r#"{{ chart("line", [1, 2], name="Only") }}"#);
+        assert!(named.contains(">Only<"), "{named}");
+    }
+
+    #[test]
+    fn scatter_marks_the_zero_line() {
+        let html = render(r#"{{ chart("scatter", points=[[-5, -10], [8, 20]]) }}"#);
+        assert!(html.contains("rx-chart__rule--base"), "{html}");
     }
 
     #[test]

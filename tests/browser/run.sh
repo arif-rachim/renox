@@ -12,7 +12,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 jobs="${CARGO_BUILD_JOBS:-2}"
-for package in browser-fixture grid fields htmx-recipes hello crud; do
+for package in browser-fixture grid fields htmx-recipes hello crud shop teams backoffice admin billing; do
   echo "building $package"
   cargo build --quiet -j "$jobs" -p "$package"
 done

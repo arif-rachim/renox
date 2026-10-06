@@ -998,9 +998,13 @@ async fn two_grids_on_a_page_keep_their_own_values() {
     assert_eq!(numbers(first), ["SO-002"]);
     assert_eq!(numbers(second), ["XX-003", "SO-002", "SO-001"]);
     // Each keeps the other's values and the page's own.
-    assert!(first.contains(r#"<input type="hidden" name="b.sort" value="-number">"#));
-    assert!(first.contains(r#"<input type="hidden" name="tab" value="2">"#));
-    assert!(second.contains(r#"<input type="hidden" name="a.search" value="SO-002">"#));
+    assert!(
+        first.contains(r#"<input type="hidden" name="b.sort" value="-number" data-grid-keep>"#)
+    );
+    assert!(first.contains(r#"<input type="hidden" name="tab" value="2" data-grid-keep>"#));
+    assert!(
+        second.contains(r#"<input type="hidden" name="a.search" value="SO-002" data-grid-keep>"#)
+    );
     assert!(first.contains(r#"name="a.page""#) && second.contains(r#"name="b.page""#));
 }
 

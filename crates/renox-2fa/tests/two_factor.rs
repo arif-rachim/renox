@@ -421,3 +421,141 @@ fn the_otpauth_address_names_the_app_and_the_account() {
         "{uri}"
     );
 }
+
+/// A credential that isn't confirmed (any more) asks for nothing at the
+/// challenge either.
+#[renox::test]
+async fn an_unconfirmed_credential_lets_a_waiting_login_finish() {
+    let (app, ana) = app().await;
+    turn_on(&app, &ana).await;
+    password(&app, &ana).await;
+    renox::db::sql("UPDATE two_factor SET confirmed_at = NULL")
+        .execute(app.db())
+        .await
+        .unwrap();
+    app.post("/two-factor/challenge", &[("code", "000000")])
+        .await
+        .assert_redirect("/");
+    app.assert_authenticated(Some(&ana));
+}
+
+/// Starting again before confirming makes a new secret; the pages for a
+/// later step send back to the account page when they don't apply.
+#[renox::test]
+async fn steps_out_of_order_go_back_to_the_account_page() {
+    let (app, ana) = app().await;
+    app.fake_events();
+    app.acting_as(&ana);
+    app.confirm_password();
+    // Nothing started: setup, confirm and new codes have nothing to work on.
+    app.get("/two-factor/setup")
+        .await
+        .assert_redirect("/account");
+    app.post("/two-factor/confirm", &[("code", "123456")])
+        .await
+        .assert_redirect("/account");
+    app.post("/two-factor/recovery-codes", &[])
+        .await
+        .assert_redirect("/account");
+    app.get("/two-factor/recovery-codes")
+        .await
+        .assert_redirect("/account");
+
+    // Over htmx, the answer is HX-Redirect.
+    app.htmx()
+        .post("/two-factor/enable", &[])
+        .await
+        .assert_hx_redirect("/two-factor/setup");
+    let first = secret(&app, &ana).await;
+    app.post("/two-factor/enable", &[])
+        .await
+        .assert_redirect("/two-factor/setup");
+    let second = secret(&app, &ana).await;
+    assert_ne!(first, second, "a new secret");
+    // Not on yet: no new recovery codes.
+    app.post("/two-factor/recovery-codes", &[])
+        .await
+        .assert_redirect("/account");
+    // Turning off an unconfirmed setup announces nothing.
+    app.delete("/two-factor").await.assert_redirect("/account");
+    assert!(
+        TwoFactorCredential::of(app.db(), ana.id)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    app.assert_not_emitted::<renox_2fa::TwoFactorDisabled>();
+
+    // Once on: enable, setup and confirm don't start again.
+    let (secret, _) = turn_on(&app, &ana).await;
+    app.post("/two-factor/enable", &[])
+        .await
+        .assert_redirect("/account");
+    app.get("/two-factor/setup")
+        .await
+        .assert_redirect("/account");
+    app.post(
+        "/two-factor/confirm",
+        &[("code", code(&secret, 0).as_str())],
+    )
+    .await
+    .assert_redirect("/account");
+}
+
+#[renox::test]
+async fn the_challenge_without_a_waiting_login_goes_to_the_login_page() {
+    let (app, _ana) = app().await;
+    app.get("/two-factor/challenge")
+        .await
+        .assert_redirect("/login");
+    app.post("/two-factor/challenge", &[("code", "123456")])
+        .await
+        .assert_redirect("/login");
+}
+
+/// "Remember me" ticked with the password lasts past the session's
+/// lifetime once the code is in.
+#[renox::test]
+async fn remember_me_carries_through_the_challenge() {
+    let (app, ana) = app().await;
+    let (secret, _) = turn_on(&app, &ana).await;
+    app.post("/logout", &[]).await;
+    app.post(
+        "/login",
+        &[
+            ("email", "ana@example.com"),
+            ("password", PASSWORD),
+            ("remember", "on"),
+        ],
+    )
+    .await
+    .assert_redirect("/two-factor/challenge");
+    app.post(
+        "/two-factor/challenge",
+        &[("code", code(&secret, 30).as_str())],
+    )
+    .await
+    .assert_redirect("/");
+    app.travel(Duration::from_secs(3 * 3600));
+    app.get("/account").await.assert_ok();
+    app.assert_authenticated(Some(&ana));
+}
+
+/// The setup page's QR code holds the otpauth address with the app's name
+/// as the issuer and the user's address as the account.
+#[renox::test]
+async fn the_qr_code_carries_the_app_and_the_account() {
+    let (app, ana) = app().await;
+    app.acting_as(&ana);
+    app.confirm_password();
+    app.post("/two-factor/enable", &[]).await;
+    let secret = secret(&app, &ana).await;
+    let page = app.get("/two-factor/setup").await.text();
+    let uri = totp::otpauth_uri(&app.state().config.name, "ana@example.com", &secret);
+    assert!(uri.contains(&format!(
+        "issuer={}",
+        app.state().config.name.replace(' ', "%20")
+    )));
+    let qr = renox_2fa::qr::svg(&uri, 200).unwrap();
+    assert!(page.contains(&qr), "the QR code of {uri}");
+}

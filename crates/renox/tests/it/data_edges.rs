@@ -353,7 +353,8 @@ async fn simple_pagination_draws_previous_and_next() {
 }
 
 /// A `DATABASE_URL` that is itself `postgres://` (as in production, not the
-/// test swap of an in-memory URL): the pool connects and answers. Runs only
+/// test swap of an in-memory URL), read from the environment with its pool
+/// size and statement timeout, on a database made for this test. Runs only
 /// with `TEST_DATABASE_URL`.
 #[cfg(feature = "postgres")]
 #[renox::test]
@@ -364,16 +365,469 @@ async fn a_postgres_database_url_connects_directly() {
     else {
         return; // no PostgreSQL to connect to
     };
-    let mut config = Config::default();
-    config.database_url = url;
-    config.database_pool_size = 2;
-    config.database_statement_timeout = Some(std::time::Duration::from_secs(5));
-    // Boot only: no migrations, so nothing is written to the shared database.
-    let kernel = App::with_config(config).boot().await.unwrap();
-    assert_eq!(kernel.db().dialect(), Dialect::Postgres);
-    let one: i64 = renox::db::sql("SELECT CAST(1 AS BIGINT)")
-        .scalar(kernel.db())
+    // Boot only on the shared database (no migrations): it makes the test's own.
+    let mut shared = Config::default();
+    shared.database_url = url.clone();
+    let server = App::with_config(shared).boot().await.unwrap();
+    let name = format!(
+        "renox_direct_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
+    renox::db::sql(format!("CREATE DATABASE {name}"))
+        .execute(server.db())
         .await
         .unwrap();
-    assert_eq!(one, 1);
+    let base = url.split('?').next().unwrap();
+    let own = format!("{}/{name}", base.rsplit_once('/').unwrap().0);
+    let config = Config::from_vars(|var| match var {
+        "DATABASE_URL" => Some(own.clone()),
+        "DATABASE_POOL_SIZE" => Some("2".into()),
+        "DATABASE_STATEMENT_TIMEOUT" => Some("7".into()),
+        _ => None,
+    })
+    .unwrap();
+    let kernel = App::with_config(config).boot().await.unwrap();
+    let db = kernel.db();
+    assert_eq!(db.dialect(), Dialect::Postgres);
+    assert_eq!(db.postgres().unwrap().options().get_max_connections(), 2);
+    let timeout: String = renox::db::sql("SHOW statement_timeout")
+        .scalar(db)
+        .await
+        .unwrap();
+    assert_eq!(timeout, "7s");
+    let database: String = renox::db::sql("SELECT current_database()::text")
+        .scalar(db)
+        .await
+        .unwrap();
+    assert_eq!(database, name);
+    db.close().await;
+    renox::db::sql(format!("DROP DATABASE {name} WITH (FORCE)"))
+        .execute(server.db())
+        .await
+        .unwrap();
+}
+
+/// Unknown columns name the table and the column, whichever method meets
+/// them first; a row lock is rendered only for PostgreSQL.
+#[renox::test]
+async fn unknown_columns_are_named_and_locks_render_per_dialect() {
+    let app = app().await;
+    let db = app.db();
+    let says = |err: Error, column: &str| {
+        let text = format!("{err:?}");
+        assert!(
+            text.contains(&format!("`labels` has no column `{column}`")),
+            "{text}"
+        );
+    };
+    says(
+        Label::query().sum::<i64, _>(db, "nope").await.unwrap_err(),
+        "nope",
+    );
+    says(Label::query().avg(db, "nope").await.unwrap_err(), "nope");
+    says(
+        Label::query().min::<i64, _>(db, "nope").await.unwrap_err(),
+        "nope",
+    );
+    says(
+        Label::query().max::<i64, _>(db, "nope").await.unwrap_err(),
+        "nope",
+    );
+    says(
+        Label::query().increment(db, "nope", 1).await.unwrap_err(),
+        "nope",
+    );
+    says(
+        Label::query()
+            .update(db, &[("nope", &"x")])
+            .await
+            .unwrap_err(),
+        "nope",
+    );
+    // The outer column of `where_in_query`, and the children's foreign key
+    // of `where_has` / `where_doesnt_have`.
+    says(
+        Label::query()
+            .where_in_query("nope", Note::query(), "label_id")
+            .get(db)
+            .await
+            .unwrap_err(),
+        "nope",
+    );
+    for query in [
+        Label::query().where_has(Note::query(), "nope"),
+        Label::query().where_doesnt_have(Note::query(), "nope"),
+    ] {
+        let text = format!("{:?}", query.get(db).await.unwrap_err());
+        assert!(text.contains("`notes` has no column `nope`"), "{text}");
+    }
+
+    let locked = Label::query().where_eq("code", "a").lock_for_update();
+    let (postgres, _) = locked.to_sql(Dialect::Postgres).unwrap();
+    assert!(postgres.ends_with(" FOR UPDATE"), "{postgres}");
+    let (sqlite, _) = locked.to_sql(Dialect::Sqlite).unwrap();
+    assert!(!sqlite.contains("FOR "), "{sqlite}");
+    let (shared, _) = Label::query()
+        .shared_lock()
+        .to_sql(Dialect::Postgres)
+        .unwrap();
+    assert!(shared.ends_with(" FOR SHARE"), "{shared}");
+    // The locked read runs inside a transaction on either database.
+    label(&app, "a", "A").await;
+    let mut tx = db.begin().await.unwrap();
+    let row = locked.first(&mut tx).await.unwrap().unwrap();
+    assert_eq!(row.name, "A");
+    tx.commit().await.unwrap();
+}
+
+/// A duplicate is a unique violation (SQLite's 2067, PostgreSQL's 23505);
+/// neither it nor other errors are worth retrying.
+#[renox::test]
+async fn unique_violations_are_recognised_and_not_retried() {
+    let app = app().await;
+    let db = app.db();
+    label(&app, "dup", "First").await;
+    let err = Label::create(
+        db,
+        Label {
+            code: "dup".into(),
+            name: "Second".into(),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap_err();
+    assert!(err.is_unique_violation(), "{err:?}");
+    assert!(!err.is_retryable(), "{err:?}");
+    assert!(!Error::NotFound.is_unique_violation());
+    assert!(!Error::NotFound.is_retryable());
+    let plain = Error::from(anyhow::anyhow!("not a database error"));
+    assert!(!plain.is_unique_violation());
+    assert!(!plain.is_retryable());
+}
+
+/// `first_or_create` losing a race: the row appears between its read and
+/// its insert, the insert hits the unique index, and the winner's row is
+/// returned. SQLite: another runtime inserts it from `make` (a file
+/// database, so that runtime opens its own connection).
+#[renox::test]
+async fn first_or_create_returns_the_row_that_won_the_race() {
+    let dir = tempfile::tempdir().unwrap();
+    let url = format!("sqlite://{}/race.db", dir.path().display());
+    let app = TestApp::with_config(App::new(), move |c| c.database_url = url).await;
+    let db = app.db().clone();
+    renox::db::sql("CREATE TABLE labels (id INTEGER PRIMARY KEY, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL)")
+        .execute(&db)
+        .await
+        .unwrap();
+    let other = db.clone();
+    let found = Label::query()
+        .where_eq("code", "race")
+        .first_or_create(&db, move || {
+            std::thread::spawn(move || {
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(async {
+                        Label::create(
+                            &other,
+                            Label {
+                                code: "race".into(),
+                                name: "Winner".into(),
+                                ..Default::default()
+                            },
+                        )
+                        .await
+                        .unwrap();
+                    })
+            })
+            .join()
+            .unwrap();
+            Label {
+                code: "race".into(),
+                name: "Loser".into(),
+                ..Default::default()
+            }
+        })
+        .await
+        .unwrap();
+    assert_eq!(found.name, "Winner");
+    assert_eq!(Label::query().count(&db).await.unwrap(), 1);
+}
+
+/// The same race on PostgreSQL: a sequence hides the winner's row from the
+/// first read only. Runs only with `TEST_DATABASE_URL`.
+#[renox::test]
+async fn first_or_create_returns_the_winner_on_postgres() {
+    let app = app().await;
+    let db = app.db();
+    if db.dialect() != Dialect::Postgres {
+        return;
+    }
+    label(&app, "race", "Winner").await;
+    renox::db::sql("CREATE SEQUENCE race_reads")
+        .execute(db)
+        .await
+        .unwrap();
+    let found = Label::query()
+        .where_eq("code", "race")
+        .where_raw("nextval('race_reads') > 1", Vec::<i64>::new())
+        .first_or_create(db, || Label {
+            code: "race".into(),
+            name: "Loser".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(found.name, "Winner");
+}
+
+/// `retrying` and `transaction_retrying` try again after a serialization
+/// failure (40001) and give up after the last attempt. PostgreSQL only: it
+/// raises the code from SQL (SQLite's busy errors are unit-tested in
+/// renox-core's db/conn.rs).
+#[renox::test]
+async fn retrying_tries_again_after_a_serialization_failure() {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    let app = app().await;
+    let db = app.db().clone();
+    if db.dialect() != Dialect::Postgres {
+        return;
+    }
+    const CONFLICT: &str = "DO $$ BEGIN RAISE EXCEPTION 'conflict' USING ERRCODE = '40001'; END $$";
+    let tries = Arc::new(AtomicU32::new(0));
+    let counter = tries.clone();
+    let conn = db.clone();
+    let value = db
+        .retrying(3, move || {
+            let conn = conn.clone();
+            let counter = counter.clone();
+            async move {
+                if counter.fetch_add(1, Ordering::SeqCst) == 0 {
+                    renox::db::sql(CONFLICT).execute(&conn).await?;
+                }
+                Ok(7)
+            }
+        })
+        .await
+        .unwrap();
+    assert_eq!((value, tries.load(Ordering::SeqCst)), (7, 2));
+
+    let tries = Arc::new(AtomicU32::new(0));
+    let counter = tries.clone();
+    let err = db
+        .transaction_retrying(2, move |tx| {
+            counter.fetch_add(1, Ordering::SeqCst);
+            Box::pin(async move {
+                renox::db::sql(CONFLICT).execute(tx).await?;
+                Ok(())
+            })
+        })
+        .await
+        .unwrap_err();
+    assert!(err.is_retryable(), "{err:?}");
+    assert_eq!(tries.load(Ordering::SeqCst), 2);
+}
+
+/// Saving a model with only an id, or with nothing changed, writes nothing.
+#[renox::test]
+async fn saving_nothing_new_writes_nothing() {
+    let app = app().await;
+    let db = app.db();
+    let mut bare = BareRow::create(db, BareRow::default()).await.unwrap();
+    bare.save(db).await.unwrap();
+    assert_eq!(BareRow::query().count(db).await.unwrap(), 1);
+    let mut kept = label(&app, "same", "Same").await;
+    let original = kept.clone();
+    assert!(!kept.save_changes(db, &original).await.unwrap());
+    kept.name = "Changed".into();
+    assert!(kept.save_changes(db, &original).await.unwrap());
+}
+
+#[derive(Model, serde::Serialize, Default, Clone, Debug)]
+#[model(table = "tags")]
+struct Tag {
+    id: i64,
+    name: String,
+}
+
+#[derive(serde::Serialize, Debug, FromRow)]
+struct Linked {
+    note: String,
+}
+
+const LABEL_TAGS: renox::db::relations::Pivot =
+    renox::db::relations::Pivot::new("label_tags", "label_id", "tag_id").with_timestamps();
+
+/// Loaders given no parents answer without a query, `Pivot` is built in a
+/// const and prints its columns, and `update_pivot` on a pair that isn't
+/// linked says so.
+#[renox::test]
+async fn relation_loaders_and_pivots_with_nothing_to_do() {
+    let app = app().await;
+    let db = app.db();
+    let id = match db.dialect() {
+        Dialect::Postgres => "BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY",
+        _ => "INTEGER PRIMARY KEY",
+    };
+    for statement in [
+        format!("CREATE TABLE tags (id {id}, name TEXT NOT NULL)"),
+        "CREATE TABLE label_tags (label_id BIGINT NOT NULL, tag_id BIGINT NOT NULL, \
+         note TEXT, created_at TEXT, updated_at TEXT)"
+            .to_owned(),
+    ] {
+        renox::db::sql(statement).execute(db).await.unwrap();
+    }
+    let none: Vec<Label> = Vec::new();
+    let through = renox::db::relations::has_many_through(
+        db,
+        &none,
+        Note::query(),
+        "label_id",
+        |n: &Note| n.label_id,
+        BareRow::query(),
+        "id",
+        |b: &BareRow| b.id,
+    )
+    .await
+    .unwrap();
+    assert!(through.is_empty());
+    let tags: std::collections::HashMap<i64, Vec<Tag>> =
+        LABEL_TAGS.load(db, Vec::new()).await.unwrap();
+    assert!(tags.is_empty());
+    let with: std::collections::HashMap<i64, Vec<(Tag, Linked)>> =
+        LABEL_TAGS.load_with_pivot(db, Vec::new()).await.unwrap();
+    assert!(with.is_empty());
+    let parents = renox::db::relations::Morph::new("kind", "owner_id")
+        .parents::<Label, Note>(db, &[], |n| ("labels".into(), n.label_id))
+        .await
+        .unwrap();
+    assert!(parents.is_empty());
+
+    #[allow(clippy::clone_on_copy)] // `Clone` itself is what's tested
+    let copy = LABEL_TAGS.clone();
+    let shown = format!("{copy:?}");
+    assert!(
+        shown.contains("label_tags") && shown.contains("timestamps: true"),
+        "{shown}"
+    );
+    assert!(
+        !LABEL_TAGS
+            .update_pivot(db, 1, 2, &[("note", &"x")])
+            .await
+            .unwrap()
+    );
+}
+
+/// A user's TIME column reads as text (it read as `null` on PostgreSQL),
+/// and a BLOB as `null`, as documented.
+#[renox::test]
+async fn user_time_and_blob_columns_come_back_as_json() {
+    let app = app().await;
+    let db = app.db();
+    let (time, blob) = match db.dialect() {
+        Dialect::Postgres => ("TIME DEFAULT '09:30:00'", "BYTEA DEFAULT '\\x0102'"),
+        _ => ("TEXT DEFAULT '09:30:00'", "BLOB DEFAULT x'0102'"),
+    };
+    for statement in [
+        format!("ALTER TABLE users ADD COLUMN opens {time}"),
+        format!("ALTER TABLE users ADD COLUMN avatar {blob}"),
+    ] {
+        renox::db::sql(statement).execute(db).await.unwrap();
+    }
+    let ann = User::register(db, "Ann", "ann@example.com", "password123")
+        .await
+        .unwrap();
+    assert_eq!(ann.get::<String>("opens").as_deref(), Some("09:30:00"));
+    assert_eq!(ann.get::<String>("avatar"), None);
+}
+
+/// The raw sqlx rows, `Debug` that shows only shapes, a `Json` column read
+/// from a column of another type, and a migration that is only a comment.
+#[renox::test]
+async fn rows_debug_output_and_json_type_checks() {
+    let app = app().await;
+    let db = app.db();
+    label(&app, "r", "Row").await;
+    let rows = renox::db::sql("SELECT id, code FROM labels")
+        .fetch_all(db)
+        .await
+        .unwrap();
+    let row = &rows[0];
+    match db.dialect() {
+        Dialect::Sqlite => assert!(row.sqlite().is_some()),
+        #[cfg(feature = "postgres")]
+        Dialect::Postgres => {
+            assert!(row.postgres().is_some());
+            assert!(row.sqlite().is_none());
+        }
+        #[allow(unreachable_patterns)]
+        _ => {}
+    }
+    #[cfg(feature = "postgres")]
+    if db.dialect() == Dialect::Sqlite {
+        assert!(row.postgres().is_none());
+    }
+    assert!(format!("{row:?}").contains("[\"id\", \"code\"]"), "{row:?}");
+    assert!(format!("{db:?}").contains("dialect"), "{db:?}");
+    let tx = db.begin().await.unwrap();
+    assert!(format!("{tx:?}").starts_with("Transaction"), "{tx:?}");
+    drop(tx);
+    // An id isn't JSON text.
+    assert!(
+        row.try_get::<renox::db::Json<serde_json::Value>>("id")
+            .is_err()
+    );
+    let code: renox::db::Json<String> = renox::db::sql("SELECT '\"x\"' AS code")
+        .fetch_one(db)
+        .await
+        .unwrap()
+        .try_get("code")
+        .unwrap();
+    assert_eq!(code.0, "x");
+}
+
+/// A statement that fails prints its error and the shell goes on; a value
+/// of a type the shell can't show is `?` (PostgreSQL's INTERVAL), a blob
+/// its size, NULL as `NULL`; input ending without `.quit` ends the shell.
+#[renox::test]
+async fn the_shell_reports_errors_and_shows_what_it_cant_print() {
+    let app = app().await;
+    let db = app.db();
+    let odd = match db.dialect() {
+        Dialect::Postgres => {
+            "SELECT INTERVAL '1 day' AS gap, CAST(NULL AS TEXT) AS empty, \
+             CAST('\\x0102' AS BYTEA) AS raw, CAST(2 AS SMALLINT) AS small, \
+             CAST(1.5 AS REAL) AS ratio, TRUE AS yes, DATE '2026-01-02' AS day;"
+        }
+        _ => "SELECT NULL AS empty, x'0102' AS raw, 1.5 AS ratio;",
+    };
+    let input =
+        format!("SELECT * FROM no_such_table;\nINSERT INTO bare_rows DEFAULT VALUES;\n{odd}\n");
+    let mut out = Vec::new();
+    renox::shell::run_with(db, input.as_bytes(), &mut out, false)
+        .await
+        .unwrap();
+    let out = String::from_utf8(out).unwrap();
+    assert!(out.contains("Error: "), "{out}");
+    assert!(out.contains("OK (1 row(s) affected)"), "{out}");
+    assert!(
+        out.contains("NULL") && out.contains("<2 bytes>") && out.contains("1.5"),
+        "{out}"
+    );
+    if db.dialect() == Dialect::Postgres {
+        let values = out.lines().find(|l| l.contains("<2 bytes>")).unwrap();
+        assert!(values.trim_start().starts_with('?'), "{out}");
+        assert!(
+            values.contains("true") && values.contains("2026-01-02"),
+            "{out}"
+        );
+    }
 }

@@ -898,7 +898,7 @@ impl Row {
     }
 
     /// A column's value as JSON, whatever its type; `null` when it can't be
-    /// read as a number, boolean, text, timestamp or JSON.
+    /// read as a number, boolean, text, date, time, timestamp or JSON.
     pub(crate) fn json(&self, column: &str) -> serde_json::Value {
         use serde_json::Value;
         if let Ok(v) = self.try_get::<Option<i64>>(column) {
@@ -933,6 +933,11 @@ impl Row {
         }
         if let Ok(v) = self.try_get::<Option<String>>(column) {
             return v.map_or(Value::Null, Value::from);
+        }
+        // After text, so SQLite text that looks like a time stays as written;
+        // PostgreSQL's TIME decodes only as this.
+        if let Ok(v) = self.try_get::<Option<chrono::NaiveTime>>(column) {
+            return v.map_or(Value::Null, |t| Value::from(t.to_string()));
         }
         if let Ok(v) = self.try_get::<Option<serde_json::Value>>(column) {
             return v.unwrap_or(Value::Null);
@@ -1067,6 +1072,96 @@ mod tests {
             numbered_placeholders("SELECT 'é?' WHERE ü = ?"),
             "SELECT 'é?' WHERE ü = $1"
         );
+    }
+
+    /// Unterminated quotes, comments and dollar quotes swallow the rest; a
+    /// `$` at the very end or before a digit is no quote (#254).
+    #[test]
+    fn placeholders_after_unfinished_quotes_stay() {
+        assert_eq!(numbered_placeholders("SELECT 'open ?"), "SELECT 'open ?");
+        assert_eq!(numbered_placeholders("SELECT 1 -- ?"), "SELECT 1 -- ?");
+        assert_eq!(numbered_placeholders("SELECT 1 /* ?"), "SELECT 1 /* ?");
+        assert_eq!(numbered_placeholders("SELECT $tag$ ?"), "SELECT $tag$ ?");
+        assert_eq!(numbered_placeholders("SELECT ? || $"), "SELECT $1 || $");
+        // A `$1` doesn't open a quote, so the `?` after it is still seen.
+        assert!(numbered_placeholders("SELECT $1, ?").ends_with(", $1"));
+        assert_eq!(numbered_placeholders("?"), "$1");
+    }
+
+    /// `retrying` and `transaction_retrying` try again after a busy error,
+    /// stop at the last attempt, and return other errors at once.
+    #[tokio::test]
+    async fn retrying_follows_the_error_kind() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicU32, Ordering};
+
+        use crate::db::DbError;
+        use crate::db::error::fake;
+
+        fn busy() -> crate::Error {
+            crate::Error::from(DbError::from(fake::coded(Some("5"))))
+        }
+        let db = super::super::connect(&crate::Config::default())
+            .await
+            .unwrap();
+
+        let tries = Arc::new(AtomicU32::new(0));
+        let counter = tries.clone();
+        let value = db
+            .retrying(3, move || {
+                let counter = counter.clone();
+                async move {
+                    match counter.fetch_add(1, Ordering::SeqCst) {
+                        0 | 1 => Err(busy()),
+                        _ => Ok("done"),
+                    }
+                }
+            })
+            .await
+            .unwrap();
+        assert_eq!((value, tries.load(Ordering::SeqCst)), ("done", 3));
+
+        let tries = Arc::new(AtomicU32::new(0));
+        let counter = tries.clone();
+        let err = db
+            .retrying(2, move || {
+                counter.fetch_add(1, Ordering::SeqCst);
+                async { Err::<(), _>(busy()) }
+            })
+            .await
+            .unwrap_err();
+        assert!(err.is_retryable());
+        assert_eq!(
+            tries.load(Ordering::SeqCst),
+            2,
+            "gives up at the last attempt"
+        );
+
+        let tries = Arc::new(AtomicU32::new(0));
+        let counter = tries.clone();
+        let err = db
+            .retrying(5, move || {
+                counter.fetch_add(1, Ordering::SeqCst);
+                async { Err::<(), _>(crate::Error::NotFound) }
+            })
+            .await
+            .unwrap_err();
+        assert!(matches!(err, crate::Error::NotFound));
+        assert_eq!(tries.load(Ordering::SeqCst), 1, "not retried");
+
+        let tries = Arc::new(AtomicU32::new(0));
+        let counter = tries.clone();
+        let value = db
+            .transaction_retrying(3, move |tx| {
+                let first = counter.fetch_add(1, Ordering::SeqCst) == 0;
+                Box::pin(async move {
+                    let one: i64 = super::sql("SELECT CAST(1 AS BIGINT)").scalar(tx).await?;
+                    if first { Err(busy()) } else { Ok(one) }
+                })
+            })
+            .await
+            .unwrap();
+        assert_eq!((value, tries.load(Ordering::SeqCst)), (1, 2));
     }
 
     // #254: an Encrypted value on a Db made outside App has no key to seal with.

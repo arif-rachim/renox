@@ -600,6 +600,30 @@ async fn sign_in_without_the_auth_module_goes_home() {
     }
     let app = TestApp::new(App::new().module(SignIn)).await;
     app.post("/sso", &[]).await.assert_ok().assert_see("/");
+
+    // With a route named `home`, there; with a page that asked for a login
+    // (what `require_auth` keeps in the session), that page.
+    struct Home;
+    impl Module for Home {
+        fn name(&self) -> &'static str {
+            "home"
+        }
+        fn routes(&self) -> Routes {
+            Routes::new()
+                .get("/dashboard", || async { "dashboard" })
+                .name("home")
+                .get("/asked", |session: Session| async move {
+                    session.put("_intended", "/reports")?;
+                    Ok::<_, Error>("asked")
+                })
+        }
+    }
+    let app = TestApp::new(App::new().module(SignIn).module(Home)).await;
+    app.post("/sso", &[]).await.assert_see("/dashboard");
+    app.get("/asked").await.assert_ok();
+    app.post("/sso", &[]).await.assert_see("/reports");
+    // The page was used: the next login goes home again.
+    app.post("/sso", &[]).await.assert_see("/dashboard");
 }
 
 /// A failure while saving the new user (not a duplicate email) is a 500,
@@ -819,6 +843,7 @@ async fn sending_a_verification_without_its_route_is_an_error() {
 
 #[renox::test]
 async fn a_failing_login_listener_doesnt_stop_the_login() {
+    let (logs, _logged) = crate::logs::capture();
     let app = TestApp::new(App::new().module(Auth::new()).module(More).listen(
         |_: renox::auth::events::LoggedIn, _state| async {
             Err::<(), _>(Error::Internal(renox::anyhow::anyhow!("audit is down")))
@@ -833,6 +858,7 @@ async fn a_failing_login_listener_doesnt_stop_the_login() {
     .await
     .assert_redirect("/");
     app.assert_authenticated(Some(&ann));
+    assert!(logs.has(&["auth listener failed"]), "{}", logs.text());
 }
 
 #[renox::test]

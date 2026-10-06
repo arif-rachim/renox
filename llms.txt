@@ -53,9 +53,11 @@
 - [tests/browser](tests/browser): Renox's own JavaScript tested in headless Chrome over the
   DevTools protocol with Node's test runner (no npm packages): `lib/cdp.mjs` and `lib/app.mjs`
   are a harness an app can copy (docs/testing.md "Browser tests"); tests for renox.js, the UI
-  kit's forms and overlays, the data grid, the editors and example flows (under `CSP=strict`
-  too). [tests/process](tests/process): the app binary and `rnx` as real processes (signals,
-  workers, the scheduler, systemd's socket, logs, prompts, `rnx serve`) and every example served.
+  kit's forms and overlays, the data grid, the editors, each example's main flow (under
+  `CSP=strict` too) and an accessibility smoke. [tests/process](tests/process): the app binary
+  and `rnx` as real processes (signals, workers, the scheduler, systemd's socket, logs, prompts,
+  the commands' output, `rnx serve`/`build`/forwarding) and every example served, as a guest
+  and logged in, on SQLite and (postgres-app, fields) PostgreSQL.
 
 ## Examples (complete apps, tested in CI)
 

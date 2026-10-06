@@ -757,3 +757,125 @@ async fn providers_from_config_and_their_debug_keep_secrets_out() {
         "{shown}"
     );
 }
+
+// ---------- #261: the rest of the linking rules, unlinking, GitHub, the section ----------
+
+#[renox::test]
+async fn a_verified_address_whose_user_has_another_account_there_is_refused() {
+    let app = app().await;
+    // Nia signs up with Google account g-1.
+    let http = google_says(&app, "g-1", "nia@example.com", true);
+    // Another Google account with the same verified address.
+    http.on(
+        GOOGLE_USER,
+        FakeResponse::json(
+            200,
+            json!({ "sub": "g-2", "email": "nia@example.com", "email_verified": true }),
+        ),
+    );
+    sign_in_with(&app, "google").await.assert_redirect("/");
+    app.logout();
+    sign_in_with(&app, "google").await.assert_redirect("/login");
+    app.assert_guest();
+    app.get("/login")
+        .await
+        .assert_see("This account is linked to another Google account.");
+    app.assert_database_count("oauth_accounts", 1).await;
+}
+
+#[renox::test]
+async fn unlinking_over_htmx_and_what_was_not_linked() {
+    let app = app().await;
+    let ana = User::register(app.db(), "Ana", "ana@example.com", PASSWORD)
+        .await
+        .unwrap();
+    app.acting_as(&ana);
+    google_says(&app, "g-ana", "ana@example.com", true);
+    sign_in_with(&app, "google")
+        .await
+        .assert_redirect("/account");
+    // Nothing linked at GitHub: back to the account page, nothing changes.
+    app.delete("/auth/github").await.assert_redirect("/account");
+    app.htmx()
+        .delete("/auth/google")
+        .await
+        .assert_hx_redirect("/account");
+    app.assert_database_count("oauth_accounts", 0).await;
+    // Recorded in the activity log.
+    let unlinked: i64 = renox::db::sql("SELECT COUNT(*) FROM audit_logs WHERE action = ?")
+        .bind("oauth.unlinked")
+        .scalar(app.db())
+        .await
+        .unwrap();
+    assert_eq!(unlinked, 1);
+
+    // Without the Audit module (no audit_logs table) the same works.
+    let app = TestApp::new(App::new().module(Auth::new().account()).module(oauth())).await;
+    let bo = User::register(app.db(), "Bo", "bo@example.com", PASSWORD)
+        .await
+        .unwrap();
+    app.acting_as(&bo);
+    google_says(&app, "g-bo", "bo@example.com", true);
+    sign_in_with(&app, "google")
+        .await
+        .assert_redirect("/account");
+    app.delete("/auth/google").await.assert_redirect("/account");
+    app.assert_database_count("oauth_accounts", 0).await;
+}
+
+#[renox::test]
+async fn a_public_github_address_that_isnt_verified_doesnt_sign_in() {
+    let app = app().await;
+    let http = app.fake_http();
+    http.on(
+        "POST https://github.com/login/oauth/access_token",
+        FakeResponse::json(200, json!({ "access_token": "gh-token" })),
+    );
+    http.on(
+        "https://api.github.com/user",
+        FakeResponse::json(
+            200,
+            json!({ "id": 9, "login": "pat", "email": "pat@example.com" }),
+        ),
+    );
+    // The address list can't be read (a private scope): the public address
+    // is all there is, unverified.
+    http.on(
+        "https://api.github.com/user/emails",
+        FakeResponse::json(404, json!({ "message": "Not Found" })),
+    );
+    sign_in_with(&app, "github").await.assert_redirect("/login");
+    app.assert_guest();
+    app.get("/login")
+        .await
+        .assert_see("GitHub didn&#x27;t share a verified email address");
+    app.assert_database_count("users", 0).await;
+}
+
+#[renox::test]
+async fn the_account_page_lists_providers_the_app_no_longer_offers() {
+    let app = app().await;
+    let ana = User::register(app.db(), "Ana", "ana@example.com", PASSWORD)
+        .await
+        .unwrap();
+    OAuthAccount::create(
+        app.db(),
+        OAuthAccount {
+            user_id: ana.id,
+            provider: "gitlab".into(),
+            provider_user_id: "gl-1".into(),
+            email: Some("ana@gitlab.example".into()),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    app.acting_as(&ana);
+    app.get("/account")
+        .await
+        .assert_see("gitlab")
+        .assert_see("ana@gitlab.example");
+    // It can still be unlinked.
+    app.delete("/auth/gitlab").await.assert_redirect("/account");
+    app.assert_database_count("oauth_accounts", 0).await;
+}

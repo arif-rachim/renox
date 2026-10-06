@@ -2420,6 +2420,9 @@ dependencies = [
  "tempfile",
  "tokio",
  "tower",
+ "tracing",
+ "tracing-subscriber",
+ "zip",
 ]
 
 [[package]]
@@ -2451,6 +2454,7 @@ dependencies = [
  "renox",
  "serde",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -2462,6 +2466,7 @@ dependencies = [
  "chrono",
  "clap",
  "heck",
+ "libc",
  "notify-debouncer-mini",
  "rand 0.10.3",
  "serde_json",

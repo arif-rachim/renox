@@ -358,14 +358,7 @@ impl Cache {
         {
             return;
         }
-        let pruned =
-            crate::db::sql("DELETE FROM cache WHERE expires_at IS NOT NULL AND expires_at <= ?")
-                .bind(now)
-                .execute(db)
-                .await;
-        if let Err(err) = pruned {
-            tracing::warn!(error = %err, "could not prune expired cache rows");
-        }
+        delete_expired(db, now).await;
     }
 
     /// Deletes `key` if it holds `value`; returns whether it did.
@@ -563,6 +556,19 @@ impl Drop for LockGuard {
     }
 }
 
+/// Deletes the rows expired at `now`; a failure is logged, not returned
+/// (pruning is housekeeping).
+async fn delete_expired(db: &Db, now: i64) {
+    let pruned =
+        crate::db::sql("DELETE FROM cache WHERE expires_at IS NOT NULL AND expires_at <= ?")
+            .bind(now)
+            .execute(db)
+            .await;
+    if let Err(err) = pruned {
+        tracing::warn!(error = %err, "could not prune expired cache rows");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -595,9 +601,16 @@ mod tests {
     /// fails stays held until its time runs out.
     #[tokio::test]
     async fn the_database_store_without_its_table() {
+        let (logs, _logged) = crate::test_logs::capture();
         let db = db().await;
         let cache = Cache::new(crate::CacheStore::Database, db.clone()).unwrap();
         assert!(cache.put("k", &1, None).await.is_err());
+        delete_expired(&db, 0).await;
+        assert!(
+            logs.has(&["could not prune expired cache rows"]),
+            "{}",
+            logs.text()
+        );
 
         crate::db::sql("CREATE TABLE cache (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL, expires_at BIGINT)")
             .execute(&db)
@@ -616,5 +629,6 @@ mod tests {
             .await
             .unwrap();
         assert!(lock.is_held().await.unwrap());
+        assert!(logs.has(&["could not release a lock"]), "{}", logs.text());
     }
 }

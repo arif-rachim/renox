@@ -657,6 +657,11 @@ async fn prune_claims(state: &AppState, now: i64) {
     {
         return;
     }
+    delete_expired_claims(state, now).await;
+}
+
+/// Deletes the claims expired at `now`; a failure is logged.
+async fn delete_expired_claims(state: &AppState, now: i64) {
     let pruned = crate::db::sql("DELETE FROM cache WHERE key LIKE ? AND expires_at < ?")
         .bind(format!("{CLAIM_PREFIX}%"))
         .bind(now)
@@ -1120,6 +1125,7 @@ mod tests {
     /// Claims that can't be written let the run go ahead.
     #[tokio::test]
     async fn the_run_loop_skips_runs_claimed_elsewhere() {
+        let (logs, _logged) = crate::test_logs::capture();
         let app = crate::testing::TestApp::new(crate::App::new()).await;
         let state = app.state().clone();
         let (stop, stopped) = watch::channel(false);
@@ -1135,6 +1141,17 @@ mod tests {
             .await
             .unwrap();
         assert!(claim(&state, "lonely", 60, 60).await);
+        delete_expired_claims(&state, unix_now()).await;
+        assert!(
+            logs.has(&["could not claim the run; running it anyway"]),
+            "{}",
+            logs.text()
+        );
+        assert!(
+            logs.has(&["could not clear old schedule claims"]),
+            "{}",
+            logs.text()
+        );
         crate::db::sql("ALTER TABLE cache_away RENAME TO cache")
             .execute(&state.db)
             .await
@@ -1150,7 +1167,15 @@ mod tests {
                 Ok(())
             }
         });
-        schedule.daily_at("00:00", "nightly", |_| async { Ok(()) });
+        let nightly = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counted_nightly = nightly.clone();
+        schedule.daily_at("00:00", "nightly", move |_| {
+            let counted = counted_nightly.clone();
+            async move {
+                counted.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            }
+        });
         // A second before the next minute, whose run another process has
         // claimed.
         let now = unix_now();
@@ -1165,5 +1190,13 @@ mod tests {
         stop.send(true).unwrap();
         looping.await.unwrap();
         assert_eq!(runs.load(Ordering::SeqCst), 0);
+        // The loop reached the minutely run and found it claimed; the nightly
+        // one wasn't due.
+        assert!(
+            logs.has(&["skipped: another process runs it", "minutely"]),
+            "{}",
+            logs.text()
+        );
+        assert_eq!(nightly.load(Ordering::SeqCst), 0);
     }
 }

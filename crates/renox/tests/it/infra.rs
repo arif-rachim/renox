@@ -297,7 +297,7 @@ async fn several_servers_share_limits_with_the_database_store() {
     use renox::testing::TestApp;
     for (store, shared) in [("database", true), ("memory", false)] {
         let dir = tempfile::tempdir().unwrap();
-        let url = format!("sqlite://{}/app.db", dir.path().display());
+        let (url, schema) = shared_database(dir.path()).await;
         let server = |url: String| {
             let store = match store {
                 "database" => renox::CacheStore::Database,
@@ -350,5 +350,43 @@ async fn several_servers_share_limits_with_the_database_store() {
         } else {
             assert_ne!(res.status.as_u16(), 422, "memory: b has its own counts");
         }
+        if let Some(drop) = schema {
+            renox::db::sql(drop).execute(a.db()).await.unwrap();
+        }
     }
+}
+
+/// A database two servers share: a file on SQLite; on PostgreSQL (with
+/// `TEST_DATABASE_URL`) a schema of its own, named in the URL so the test
+/// swap that gives every boot a fresh schema doesn't apply. Also the
+/// statement that drops that schema afterwards.
+async fn shared_database(dir: &std::path::Path) -> (String, Option<String>) {
+    let file = format!("sqlite://{}/app.db", dir.display());
+    let Some(base) = std::env::var("TEST_DATABASE_URL")
+        .ok()
+        .filter(|url| url.starts_with("postgres"))
+    else {
+        return (file, None);
+    };
+    let schema = format!(
+        "renox_shared_{}",
+        dir.file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_ascii_lowercase()
+            .replace(|c: char| !c.is_ascii_alphanumeric(), "_")
+    );
+    let mut config = Config::default();
+    config.database_url = base.clone();
+    let kernel = App::with_config(config).boot().await.unwrap();
+    renox::db::sql(format!("CREATE SCHEMA {schema}"))
+        .execute(kernel.db())
+        .await
+        .unwrap();
+    kernel.db().close().await;
+    let glue = if base.contains('?') { '&' } else { '?' };
+    (
+        format!("{base}{glue}options=-c%20search_path%3D{schema}"),
+        Some(format!("DROP SCHEMA {schema} CASCADE")),
+    )
 }

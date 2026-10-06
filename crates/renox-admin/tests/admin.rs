@@ -778,6 +778,22 @@ impl AdminResource for Specs {
         "specs"
     }
 
+    /// Next to Products, so the group has two links.
+    fn navigation_group(&self) -> Option<&str> {
+        Some("Shop")
+    }
+
+    /// The policy, except that a product named "Locked" can't be deleted.
+    fn allows(&self, user: &AuthUser, ability: &str, record: Option<&Product>) -> bool {
+        if ability == "delete" && record.is_some_and(|p| p.name == "Locked") {
+            return false;
+        }
+        match record {
+            Some(record) => user.can(ability, record),
+            None => user.can(ability, &Product::default()),
+        }
+    }
+
     fn columns(&self) -> Vec<Column> {
         vec![
             Column::text("name", "Name"),
@@ -941,4 +957,304 @@ async fn a_gate_can_guard_the_panel() {
     let owner = user(&app, "owner@example.com").await;
     app.acting_as(&owner);
     app.get("/admin").await.assert_ok();
+}
+
+/// The products with the defaults: entries from the columns, no filters.
+struct Plain;
+
+impl AdminResource for Plain {
+    type Model = Product;
+    type Form = ProductForm;
+
+    fn label(&self) -> &str {
+        "Plain"
+    }
+
+    fn plural_label(&self) -> &str {
+        "Plains"
+    }
+
+    fn slug(&self) -> &str {
+        "plain"
+    }
+
+    fn columns(&self) -> Vec<Column> {
+        vec![
+            Column::text("name", "Name"),
+            Column::number("price", "Price"),
+        ]
+    }
+
+    fn fields(&self) -> Vec<Field> {
+        vec![Field::text("name", "Name")]
+    }
+
+    fn fill(&self, product: &mut Product, form: ProductForm) {
+        product.name = form.name;
+    }
+}
+
+/// A `belongs_to` naming a table that isn't a plain name.
+struct Broken;
+
+impl AdminResource for Broken {
+    type Model = Category;
+    type Form = CategoryForm;
+
+    fn label(&self) -> &str {
+        "Broken"
+    }
+
+    fn plural_label(&self) -> &str {
+        "Brokens"
+    }
+
+    fn slug(&self) -> &str {
+        "broken"
+    }
+
+    fn columns(&self) -> Vec<Column> {
+        vec![Column::text("name", "Name")]
+    }
+
+    fn fields(&self) -> Vec<Field> {
+        vec![Field::belongs_to(
+            "parent_id",
+            "Parent",
+            "categories; --",
+            "name",
+        )]
+    }
+
+    fn fill(&self, category: &mut Category, form: CategoryForm) {
+        category.name = form.name;
+    }
+
+    fn allows(&self, _user: &AuthUser, _ability: &str, _record: Option<&Category>) -> bool {
+        true
+    }
+}
+
+#[renox::test]
+async fn every_field_kind_is_drawn_on_the_edit_page_too() {
+    let (app, coffee) = specs().await;
+    let html = app
+        .get(&format!("/admin/specs/{}/edit", coffee.id))
+        .await
+        .text();
+    for needle in [
+        r#"type="email""#,
+        r#"type="password""#,
+        r#"type="url""#,
+        r#"type="tel""#,
+        r#"type="number""#,
+        r#"type="datetime-local""#,
+        r#"type="checkbox""#,
+        "<textarea",
+        "rx-span-full",
+        "data-rx-combobox",
+    ] {
+        assert!(html.contains(needle), "the edit page lacks {needle}");
+    }
+    // Fields the record has no column for are drawn empty.
+    assert!(
+        html.contains(r#"name="website""#)
+            && !html.contains(r#"name="website" type="url" value="h"#)
+    );
+    // The create-only coupon sent with an edit is ignored; the edit saves.
+    app.htmx()
+        .put(
+            &format!("/admin/specs/{}", coffee.id),
+            &[
+                ("name", "Strong coffee"),
+                ("sku", "C-SECRET"),
+                ("price", "1"),
+                ("status", "live"),
+                ("coupon", "FREE"),
+            ],
+        )
+        .await
+        .assert_hx_redirect("/admin/specs");
+    let saved = Product::find(app.db(), coffee.id).await.unwrap().unwrap();
+    assert_eq!(saved.name, "Strong coffee");
+    // And the other way: the edit-only notes sent with a create are ignored
+    // (what is read is the form, not what the page drew); the record is made.
+    app.htmx()
+        .post(
+            "/admin/specs",
+            &[
+                ("name", "Green tea"),
+                ("sku", "T-1"),
+                ("price", "3"),
+                ("status", "draft"),
+                ("notes", "not on this page"),
+            ],
+        )
+        .await
+        .assert_hx_redirect("/admin/specs");
+    app.assert_database_has("products", &[("name", &"Green tea")])
+        .await;
+    // A form that doesn't pass: the answer is the form's (422 for htmx).
+    app.htmx()
+        .put(
+            &format!("/admin/specs/{}", coffee.id),
+            &[
+                ("name", ""),
+                ("sku", "C"),
+                ("price", "-1"),
+                ("status", "nope"),
+            ],
+        )
+        .await
+        .assert_status(422);
+}
+
+#[renox::test]
+async fn dates_keep_their_day_and_bad_relations_say_why() {
+    let app = app_with(admin().resource(Broken)).await;
+    let coffee = product(&app, "Coffee", "C-1", "live").await;
+    renox::db::sql("UPDATE products SET released_on = ? WHERE id = ?")
+        .bind(NaiveDate::from_ymd_opt(2026, 4, 1).unwrap())
+        .bind(coffee.id)
+        .execute(app.db())
+        .await
+        .unwrap();
+    let ana = user(&app, "ana@example.com").await;
+    app.acting_as(&ana);
+    app.get(&format!("/admin/products/{}/edit", coffee.id))
+        .await
+        .assert_see(r#"value="2026-04-01""#);
+    app.get("/admin/broken/create")
+        .await
+        .assert_status(500)
+        .assert_see("may only have letters, digits and");
+}
+
+#[renox::test]
+async fn entries_show_their_options_and_default_to_the_columns() {
+    let (app, coffee) = specs().await;
+    let html = app.get(&format!("/admin/specs/{}", coffee.id)).await.text();
+    assert!(html.contains("rx-entry__copied"), "copyable");
+    assert!(html.contains("rx-entry rx-span-full"), "span_full");
+    // The price column is a number: its entry too.
+    assert!(
+        html.contains("rx-entry--numeric") && html.contains("75,000"),
+        "{html}"
+    );
+    assert_eq!(Entry::text("name", "Name").key(), "name");
+    assert_eq!(Entry::new("sku", "SKU").key(), "sku");
+
+    let app = app_with(admin().resource(Plain)).await;
+    let tea = product(&app, "Tea", "T-1", "live").await;
+    let ana = user(&app, "ana@example.com").await;
+    app.acting_as(&ana);
+    app.get(&format!("/admin/plain/{}", tea.id))
+        .await
+        .assert_ok()
+        .assert_see("Tea")
+        .assert_see("75,000");
+    // A filter the resource doesn't have shows everything.
+    app.get("/admin/products?filter=nope")
+        .await
+        .assert_ok()
+        .assert_see("Tea");
+}
+
+#[renox::test]
+async fn actions_check_each_record_and_say_what_they_did() {
+    let (app, coffee) = specs().await;
+    let locked = product(&app, "Locked", "L-1", "live").await;
+    let tea = product(&app, "Tea", "T-1", "live").await;
+    // One of the selected records may not be deleted: nothing is.
+    app.htmx()
+        .post(
+            "/admin/specs/actions/delete",
+            &[("ids", &format!("{},{}", coffee.id, locked.id))],
+        )
+        .await
+        .assert_forbidden();
+    app.htmx()
+        .post(&format!("/admin/specs/{}/actions/delete", locked.id), &[])
+        .await
+        .assert_forbidden();
+    app.assert_database_count("products", 3).await;
+    // Two deleted: the toast counts them with the plural label.
+    let done = app
+        .htmx()
+        .post(
+            "/admin/products/actions/delete",
+            &[("ids", &format!("{},{}", coffee.id, tea.id))],
+        )
+        .await;
+    done.assert_status(204);
+    let trigger = done.header("hx-trigger").unwrap_or_default().to_owned();
+    assert!(trigger.contains("2 products deleted."), "{trigger}");
+    // Nothing matching the selection.
+    let none = app
+        .htmx()
+        .post("/admin/products/actions/publish", &[("ids", "987654")])
+        .await;
+    assert!(
+        none.header("hx-trigger")
+            .unwrap_or_default()
+            .contains("Nothing was selected."),
+        "{:?}",
+        none.header("hx-trigger")
+    );
+
+    // The viewer: an action needing `update`, and force-deleting from the
+    // trash (forceDeleteAny), are refused.
+    let viewer = user(&app, VIEWER).await;
+    app.acting_as(&viewer);
+    app.htmx()
+        .post(
+            "/admin/specs/actions/archive",
+            &[("ids", &locked.id.to_string())],
+        )
+        .await
+        .assert_forbidden();
+    app.htmx()
+        .post(
+            "/admin/products/actions/force-delete?filter=trashed",
+            &[("ids", &coffee.id.to_string())],
+        )
+        .await
+        .assert_forbidden();
+}
+
+#[renox::test]
+async fn the_gate_guards_every_page_and_groups_share_a_heading() {
+    let app = TestApp::new(
+        App::new()
+            .module(Auth::new())
+            .module(Admin::default().gate("back-office").resource(Products))
+            .migrations(renox::migrations!("tests/migrations"))
+            .gate("back-office", |user| user.email == "owner@example.com"),
+    )
+    .await;
+    let coffee = product(&app, "Coffee", "C-1", "live").await;
+    let ana = user(&app, "ana@example.com").await;
+    app.acting_as(&ana);
+    for page in [
+        "/admin/products".to_owned(),
+        "/admin/products/create".to_owned(),
+        format!("/admin/products/{}", coffee.id),
+        format!("/admin/products/{}/edit", coffee.id),
+    ] {
+        app.get(&page).await.assert_forbidden();
+    }
+    let shown = format!("{:?}", Admin::default().resource(Products).path("/staff"));
+    assert!(
+        shown.contains("/staff") && shown.contains("products"),
+        "{shown}"
+    );
+
+    let (app, _) = specs().await;
+    let html = app.get("/admin").await.text();
+    let shop = html.find(">Shop<").expect("the group's heading");
+    let rest = &html[shop..];
+    assert!(
+        rest.contains("/admin/products") && rest.contains("/admin/specs"),
+        "{html}"
+    );
 }

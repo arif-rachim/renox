@@ -9,7 +9,7 @@ use renox::testing::TestApp;
 const SCHEMA: Migration = Migration::new(
     "20300101000000_notes",
     "",
-    Some("DROP TABLE notes; DROP TABLE tags;"),
+    Some("DROP TABLE tags; DROP TABLE notes;"),
 )
 .sqlite(
     "CREATE TABLE notes (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL UNIQUE,
@@ -67,12 +67,81 @@ impl Module for Notes {
     }
 }
 
-/// A file database and storage directory, so commands see each other's work.
+/// A database every boot of the test shares, so commands see each other's
+/// work: a file on SQLite; on PostgreSQL (with `TEST_DATABASE_URL`) a
+/// schema of the test's own, named in the URL, so the test swap that gives
+/// each boot a fresh schema doesn't apply. And a storage directory.
 fn config(dir: &std::path::Path) -> Config {
     let mut config = Config::default();
-    config.database_url = format!("sqlite://{}", dir.join("app.db").display());
+    config.database_url = shared_database(dir);
     config.storage_path = dir.join("storage");
     config
+}
+
+fn shared_database(dir: &std::path::Path) -> String {
+    let file = format!("sqlite://{}", dir.join("app.db").display());
+    let Some(url) = std::env::var("TEST_DATABASE_URL")
+        .ok()
+        .filter(|url| url.starts_with("postgres"))
+    else {
+        return file;
+    };
+    // The schema is named after the temporary directory, so each test has
+    // its own; it's made by the first command (see `make_schema`).
+    let schema = format!(
+        "renox_cmd_{}",
+        dir.file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_ascii_lowercase()
+            .replace(|c: char| !c.is_ascii_alphanumeric(), "_")
+    );
+    let glue = if url.contains('?') { '&' } else { '?' };
+    format!("{url}{glue}options=-c%20search_path%3D{schema}")
+}
+
+/// Creates the PostgreSQL schema `shared_database` names (nothing on SQLite).
+async fn make_schema(dir: &std::path::Path) {
+    on_schema(dir, "CREATE SCHEMA IF NOT EXISTS").await;
+}
+
+/// Drops it again at the end of the test.
+async fn drop_schema(dir: &std::path::Path) {
+    on_schema(dir, "DROP SCHEMA IF EXISTS").await;
+}
+
+async fn on_schema(dir: &std::path::Path, statement: &str) {
+    let url = shared_database(dir);
+    let Some((base, schema)) = url.split_once("options=-c%20search_path%3D") else {
+        return;
+    };
+    let mut config = Config::default();
+    config.database_url = base.trim_end_matches(['?', '&']).to_owned();
+    let kernel = App::with_config(config).boot().await.unwrap();
+    let cascade = if statement.starts_with("DROP") {
+        " CASCADE"
+    } else {
+        ""
+    };
+    renox::db::sql(format!("{statement} {schema}{cascade}"))
+        .execute(kernel.db())
+        .await
+        .unwrap();
+    kernel.db().close().await;
+}
+
+async fn table_count(kernel: &renox::Kernel, table: &str) -> i64 {
+    let sql = match kernel.db().dialect() {
+        renox::db::Dialect::Postgres => {
+            "SELECT COUNT(*) FROM pg_tables WHERE schemaname = current_schema() AND tablename = ?"
+        }
+        _ => "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?",
+    };
+    renox::db::sql(sql)
+        .bind(table)
+        .scalar(kernel.db())
+        .await
+        .unwrap()
 }
 
 fn app(dir: &std::path::Path) -> App {
@@ -83,10 +152,8 @@ fn app(dir: &std::path::Path) -> App {
 
 #[renox::test]
 async fn the_binarys_commands_run_through_run_args() {
-    if std::env::var("TEST_DATABASE_URL").is_ok() {
-        return; // file databases only; the commands are the same on PostgreSQL
-    }
     let dir = tempfile::tempdir().unwrap();
+    make_schema(dir.path()).await;
     let run = |args: &'static [&'static str]| app(dir.path()).run_args(args.iter().copied());
     run(&["help"]).await.unwrap();
     run(&["migrate"]).await.unwrap();
@@ -117,15 +184,14 @@ async fn the_binarys_commands_run_through_run_args() {
     run(&["migrate:rollback"]).await.unwrap();
     run(&["migrate:fresh"]).await.unwrap();
     let kernel = app(dir.path()).boot().await.unwrap();
-    let tables: i64 = renox::db::sql(
-        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'notes'",
-    )
-    .scalar(kernel.db())
-    .await
-    .unwrap();
-    assert_eq!(tables, 1, "fresh ran every migration again");
+    assert_eq!(
+        table_count(&kernel, "notes").await,
+        1,
+        "fresh ran every migration again"
+    );
 
     assert!(run(&["no-such-command"]).await.is_err());
+    drop_schema(dir.path()).await;
 }
 
 #[renox::test]
@@ -284,10 +350,8 @@ async fn failed_jobs(dir: &std::path::Path) -> i64 {
 
 #[renox::test]
 async fn the_rest_of_the_binarys_commands() {
-    if std::env::var("TEST_DATABASE_URL").is_ok_and(|url| !url.is_empty()) {
-        return; // each boot gets a fresh schema there; the commands share a file here
-    }
     let dir = tempfile::tempdir().unwrap();
+    make_schema(dir.path()).await;
     let run = |args: &'static [&'static str]| full_app(dir.path()).run_args(args.iter().copied());
     run(&["help"]).await.unwrap();
     run(&["migrate"]).await.unwrap();
@@ -398,6 +462,7 @@ async fn the_rest_of_the_binarys_commands() {
     assert!(run(&["schedule:run"]).await.is_err());
     run(&["notes:echo", "one", "two"]).await.unwrap();
     assert_eq!(*ECHOED.lock().unwrap(), ["one", "two"]);
+    drop_schema(dir.path()).await;
 }
 
 #[renox::test]

@@ -39,10 +39,15 @@ pub fn format_touched() -> usize {
 /// lines and format (or fail on) the rest of the crate. Run from the file's
 /// folder, so it finds the app's `rustfmt.toml`.
 fn format_one(file: &Path) -> bool {
+    format_one_with("rustfmt", file)
+}
+
+/// `format_one` with another formatter program (tests use one that fails).
+fn format_one_with(program: &str, file: &Path) -> bool {
     let Ok(source) = std::fs::read_to_string(file) else {
         return false;
     };
-    let Ok(mut child) = Command::new("rustfmt")
+    let Ok(mut child) = Command::new(program)
         .args(["--edition", "2024", "--emit", "stdout"])
         .current_dir(file.parent().unwrap_or(Path::new(".")))
         .stdin(Stdio::piped())
@@ -97,5 +102,21 @@ mod tests {
         assert_eq!(std::fs::read_to_string(&untouched).unwrap(), messy);
         // Forgotten once formatted.
         assert_eq!(format_touched(), 0);
+    }
+
+    /// A file it can't read, a formatter that isn't installed or that fails,
+    /// and code rustfmt refuses: the file is left as it was.
+    #[test]
+    fn files_are_left_alone_when_formatting_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("broken.rs");
+        std::fs::write(&file, "fn main( {").unwrap();
+        assert!(!format_one(&dir.path().join("missing.rs")));
+        assert!(!format_one_with("renox-no-such-formatter", &file));
+        assert!(!format_one_with("false", &file));
+        if rustfmt_installed() {
+            assert!(!format_one(&file), "not Rust");
+        }
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "fn main( {");
     }
 }

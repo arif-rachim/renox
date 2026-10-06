@@ -171,6 +171,7 @@ async fn a_view_name_cant_leave_the_views_directory() {
 
 #[renox::test]
 async fn an_app_error_page_that_fails_falls_back_to_renoxs() {
+    let (logs, _logged) = crate::logs::capture();
     let (app, _dir) = app(|c| c.debug = false).await;
     // errors/404.html extends a missing layout; errors/403.html doesn't parse.
     app.get("/no-such-page")
@@ -181,6 +182,11 @@ async fn an_app_error_page_that_fails_falls_back_to_renoxs() {
         .await
         .assert_status(500)
         .assert_see("rx-error-page");
+    assert!(
+        logs.has(&["the error page failed; showing Renox's"]),
+        "{}",
+        logs.text()
+    );
 }
 
 #[renox::test]
@@ -224,10 +230,16 @@ async fn warning_toasts_keep_other_triggers_and_pages_drop_unsafe_links() {
 
 #[renox::test]
 async fn a_header_value_that_isnt_valid_is_dropped() {
+    let (logs, _logged) = crate::logs::capture();
     let (app, _dir) = app(|_| {}).await;
     let res = app.get("/bad-header").await;
     res.assert_ok().assert_see("ok");
     assert!(res.header("hx-redirect").is_none());
+    assert!(
+        logs.has(&["invalid header value dropped"]),
+        "{}",
+        logs.text()
+    );
 }
 
 #[renox::test]
@@ -340,4 +352,109 @@ async fn a_toast_joins_a_json_hx_trigger() {
     let triggers: serde_json::Value = serde_json::from_str(&trigger).unwrap();
     assert_eq!(triggers["refresh-list"]["page"], 2, "{trigger}");
     assert_eq!(triggers["renox:toast"]["toasts"][0]["message"], "Saved.");
+}
+
+#[derive(serde::Deserialize, Validate)]
+struct NoteForm {
+    #[validate(required, min = 3)]
+    title: String,
+}
+
+/// Pages whose app components read the page's request values.
+struct Components;
+
+impl Module for Components {
+    fn name(&self) -> &'static str {
+        "components"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new()
+            .get("/compose", || async { view("compose.html", context! {}) })
+            .post("/compose", |Valid(form): Valid<NoteForm>| async move {
+                let _ = form.title;
+                Redirect::to("/compose")
+            })
+            .get("/syntax", || async { view("syntax.html", context! {}) })
+            .get("/fragment", || async {
+                view("fragmented.html", context! {}).fragment("part")
+            })
+    }
+}
+
+async fn components_app() -> (TestApp, tempfile::TempDir) {
+    let root = tempfile::tempdir().unwrap();
+    let write = |name: &str, body: &str| std::fs::write(root.path().join(name), body).unwrap();
+    write(
+        "fields.html",
+        "{% macro field(name) %}<input name=\"{{ name }}\" value=\"{{ old(name) }}\">\
+         [{{ error(name) }}]{% if can('editor') %}<b>editor</b>{% endif %}{% endmacro %}",
+    );
+    write(
+        "compose.html",
+        "{% from 'fields.html' import field %}<form>{{ csrf_field() }}{{ field('title') }}</form>",
+    );
+    write("syntax.html", "{% if %}");
+    write(
+        "fragmented.html",
+        "page {% block part %}{{ no_such_function() }}{% endblock %}",
+    );
+    let path = root.path().to_path_buf();
+    let app = TestApp::with_config(
+        App::new()
+            .module(Auth::new())
+            .module(Components)
+            .gate("editor", |user| user.email.starts_with("ed")),
+        move |c| c.views_path = path,
+    )
+    .await;
+    (app, root)
+}
+
+/// An app component imported by a page reads the page's old input, its
+/// errors and the user's gates, after a plain form came back.
+#[renox::test]
+async fn components_read_old_input_errors_and_gates_during_a_page() {
+    let (app, _dir) = components_app().await;
+    let ed = User::register(app.db(), "Ed", "ed@example.com", "password123")
+        .await
+        .unwrap();
+    app.acting_as(&ed);
+    app.request()
+        .header("referer", "/compose")
+        .post("/compose", &[("title", "ab")])
+        .await
+        .assert_redirect("/compose");
+    let page = app.get("/compose").await;
+    page.assert_ok()
+        .assert_see(r#"value="ab""#)
+        .assert_see("at least 3")
+        .assert_see("<b>editor</b>");
+    // Another user fails the gate; a fresh page has no old input.
+    app.logout();
+    let bo = User::register(app.db(), "Bo", "bo@example.com", "password123")
+        .await
+        .unwrap();
+    app.acting_as(&bo);
+    app.get("/compose")
+        .await
+        .assert_see(r#"value="""#)
+        .assert_see("[]")
+        .assert_dont_see("<b>editor</b>");
+}
+
+/// A page whose template doesn't parse, and a fragment that fails, are 500s
+/// naming the template while debugging.
+#[renox::test]
+async fn pages_and_fragments_that_fail_are_500s() {
+    let (app, _dir) = components_app().await;
+    app.get("/syntax")
+        .await
+        .assert_status(500)
+        .assert_see("syntax.html");
+    app.htmx()
+        .get("/fragment")
+        .await
+        .assert_status(500)
+        .assert_see("fragmented.html");
 }

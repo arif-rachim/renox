@@ -135,6 +135,8 @@
       if ((el.type === "checkbox" || el.type === "radio") && !el.checked) return;
       if (el.value === "") drop = true;
       if (name === "page" && el.value === "1") drop = true;
+      if (name === "match" && el.value === "all") drop = true;
+      if (name === "per_page" && el.value === el.getAttribute("data-default")) drop = true;
       if (name.indexOf("m.") === 0) {
         var text = grid.querySelector('[name="' + CSS.escape(prefix + "q." + name.slice(2)) + '"]');
         if (!text || !text.value.trim() || el.value === "contains") drop = true;
@@ -142,6 +144,25 @@
       if (drop) { el.disabled = true; disabled.push(el); }
     });
     grid._rxDisabled = disabled;
+  }
+
+  // A grid with a prefix shares the page with others: their values in its
+  // links and form come from the address as it is now, not as it was when
+  // this grid was drawn (the others may have paged or filtered since).
+  function syncKept(grid) {
+    var prefix = config(grid).prefix || "";
+    if (!prefix) return;
+    grid.querySelectorAll("input[data-grid-keep]").forEach(function (el) { el.remove(); });
+    var at = grid.querySelector("[data-grid-state]");
+    new URLSearchParams(window.location.search).forEach(function (value, name) {
+      if (name.indexOf(prefix) === 0) return;
+      var input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      input.value = value;
+      input.setAttribute("data-grid-keep", "");
+      grid.insertBefore(input, at);
+    });
   }
 
   function untrim(grid) {
@@ -155,6 +176,7 @@
     if (!grid._rxKeepPage) setState(grid, "page", "1");
     if (grid._rxFocusSearch) { window._rxSearchFocus = grid.id; grid._rxFocusSearch = false; }
     grid._rxKeepPage = false;
+    syncKept(grid);
     trim(grid);
     // Without htmx the browser submits the form itself; give the fields back after.
     if (!window.htmx) setTimeout(function () { untrim(grid); }, 0);
@@ -222,11 +244,6 @@
       toggle(grid, el.getAttribute("data-grid-toggle"), el.checked);
     } else if (el.hasAttribute("data-grid-pin")) {
       pin(grid, el.getAttribute("data-grid-pin"), el.value);
-    } else if (el.matches("calendar-range[data-grid-range]")) {
-      var parts = (el.value || "").split("/");
-      var pop = el.closest("[data-grid-filter]");
-      pop.querySelector('[data-grid-date="from"]').value = parts[0] || "";
-      pop.querySelector('[data-grid-date="to"]').value = parts[1] || "";
     } else if (el.hasAttribute("data-grid-date")) {
       var box = el.closest("[data-grid-filter]");
       var from = box.querySelector('[data-grid-date="from"]').value;
@@ -235,6 +252,17 @@
       if (cal && from && to) { cal.value = from + "/" + to; cal.focusedDate = from; }
     }
   });
+
+  // A range picked on the calendar fills the From and To fields. Cally's
+  // `change` doesn't bubble, so it's heard on its way down (capture).
+  document.addEventListener("change", function (event) {
+    var el = event.target;
+    if (!el.matches || !el.matches("calendar-range[data-grid-range]")) return;
+    var parts = (el.value || "").split("/");
+    var pop = el.closest("[data-grid-filter]");
+    pop.querySelector('[data-grid-date="from"]').value = parts[0] || "";
+    pop.querySelector('[data-grid-date="to"]').value = parts[1] || "";
+  }, true);
 
   // ---------- The column menu ----------
 
@@ -1107,10 +1135,24 @@
   // ---------- Polling ----------
 
   function busy(grid) {
-    return grid.querySelector(".rx-grid__editing, [popover]:popover-open, dialog[open], [data-grid-select]:checked, [aria-busy=true]") ||
-      grid.contains(document.activeElement) && document.activeElement.matches("input, select, textarea") ||
-      grid.classList.contains("htmx-request");
+    return inUse(grid) || grid.classList.contains("htmx-request");
   }
+
+  // The user is doing something in the grid: editing, a menu, a selection.
+  function inUse(grid) {
+    return grid.querySelector(".rx-grid__editing, [popover]:popover-open, dialog[open], [data-grid-select]:checked, [aria-busy=true]") ||
+      grid.contains(document.activeElement) && document.activeElement.matches("input, select, textarea");
+  }
+
+  // A poll sent just before the user started editing (or opened a menu)
+  // answers after it: its table would replace what they're doing. Drop it;
+  // the next poll comes once they're done.
+  document.addEventListener("htmx:beforeSwap", function (event) {
+    var grid = event.detail && event.detail.elt;
+    if (!grid || !grid._rxPolled) return;
+    grid._rxPolled = false;
+    if (inUse(grid)) event.detail.shouldSwap = false;
+  });
 
   function startPolling(grid) {
     var seconds = config(grid).poll;
@@ -1119,6 +1161,7 @@
       if (!document.body.contains(grid)) { clearInterval(grid._rxPoll); return; }
       if (document.visibilityState !== "visible" || busy(grid)) return;
       grid._rxKeepPage = true;
+      grid._rxPolled = true;
       submit(grid, true);
     }, seconds * 1000);
   }

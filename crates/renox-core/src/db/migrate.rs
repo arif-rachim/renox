@@ -687,6 +687,109 @@ mod tests {
         ));
     }
 
+    async fn tables(db: &Db) -> Vec<String> {
+        let list = match db.dialect() {
+            Dialect::Sqlite => "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+            Dialect::Postgres => {
+                "SELECT tablename AS name FROM pg_tables \
+                 WHERE schemaname = current_schema() ORDER BY tablename"
+            }
+        };
+        sql(list)
+            .fetch_all(db)
+            .await
+            .unwrap()
+            .iter()
+            .map(|row| row.try_get::<String>("name").unwrap())
+            .collect()
+    }
+
+    /// Scripts that run outside the migration transaction, up and down,
+    /// with several statements: on PostgreSQL with `CONCURRENTLY`, so each
+    /// statement runs on its own; a migration that is only a comment.
+    #[tokio::test]
+    async fn scripts_outside_a_transaction_run_every_statement_both_ways() {
+        let db = super::super::connect(&crate::Config::default())
+            .await
+            .unwrap();
+        let outside = Migration::new(
+            "1_outside",
+            "-- renox:no-transaction\nCREATE TABLE a (id INT);\nCREATE TABLE b (id INT);",
+            Some("-- renox:no-transaction\nDROP TABLE b;\nDROP TABLE a;"),
+        )
+        .postgres(
+            "CREATE TABLE a (id INT);\nCREATE INDEX CONCURRENTLY a_id ON a (id);\nCREATE TABLE b (id INT);",
+            Some("DROP INDEX CONCURRENTLY a_id;\nDROP TABLE b;\nDROP TABLE a;"),
+        );
+        let comment = Migration::new("2_comment", "-- nothing to do yet\n", Some("-- nor here\n"));
+        let migrator = Migrator::new(vec![outside, comment]).unwrap();
+        assert_eq!(migrator.run(&db).await.unwrap(), ["1_outside", "2_comment"]);
+        let made = tables(&db).await;
+        assert!(
+            made.contains(&"a".to_owned()) && made.contains(&"b".to_owned()),
+            "{made:?}"
+        );
+        let undone = migrator.rollback(&db, 1).await.unwrap();
+        assert_eq!(undone, ["2_comment", "1_outside"]);
+        let left = tables(&db).await;
+        assert!(
+            !left.contains(&"a".to_owned()) && !left.contains(&"b".to_owned()),
+            "{left:?}"
+        );
+    }
+
+    /// A `renox_migrations` table from before checksums gets the column,
+    /// and its rows are kept.
+    #[tokio::test]
+    async fn an_old_migrations_table_gets_its_checksum_column() {
+        let db = super::super::connect(&crate::Config::default())
+            .await
+            .unwrap();
+        sql(format!(
+            "CREATE TABLE {TABLE} (name TEXT PRIMARY KEY NOT NULL, batch BIGINT NOT NULL, \
+             applied_at TEXT NOT NULL)"
+        ))
+        .execute(&db)
+        .await
+        .unwrap();
+        sql(format!(
+            "INSERT INTO {TABLE} (name, batch, applied_at) VALUES ('1_old', 1, 'then')"
+        ))
+        .execute(&db)
+        .await
+        .unwrap();
+        let old = Migration::new("1_old", "CREATE TABLE never (id INT);", None);
+        let new = Migration::new("2_new", "CREATE TABLE fresh (id INT);", None);
+        let migrator = Migrator::new(vec![old, new]).unwrap();
+        assert_eq!(migrator.run(&db).await.unwrap(), ["2_new"]);
+        let status = migrator.status(&db).await.unwrap();
+        assert_eq!(status.len(), 2);
+        assert!(!tables(&db).await.contains(&"never".to_owned()));
+    }
+
+    /// A migration recorded by someone else after the pending list was read
+    /// (another process, simulated by the migration before it) is skipped
+    /// inside its transaction instead of running twice.
+    #[tokio::test]
+    async fn a_migration_recorded_meanwhile_is_skipped() {
+        let db = super::super::connect(&crate::Config::default())
+            .await
+            .unwrap();
+        let first = Migration::new(
+            "1_first",
+            "INSERT INTO renox_migrations (name, batch, applied_at) VALUES ('2_second', 1, 'meanwhile');",
+            None,
+        );
+        let second = Migration::new("2_second", "CREATE TABLE twice (id INT);", None);
+        let done = Migrator::new(vec![first, second])
+            .unwrap()
+            .run(&db)
+            .await
+            .unwrap();
+        assert_eq!(done, ["1_first"]);
+        assert!(!tables(&db).await.contains(&"twice".to_owned()));
+    }
+
     /// Connections that read the schema before a migration aren't reused
     /// after it: with them, `SELECT *` on the altered table panicked inside
     /// sqlx-sqlite (a flaky macOS CI failure in M16b).

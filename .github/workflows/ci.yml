@@ -204,15 +204,34 @@ jobs:
   process:
     name: process
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       # The app binary and rnx as real processes (signals, workers, the
-      # scheduler, systemd's socket, logs, prompts, rnx serve), and every
-      # example binary served and asked for its pages (tests/process, #270).
+      # scheduler, systemd's socket, logs, prompts, rnx serve and build,
+      # Tailwind through a stand-in), and every example binary served and
+      # asked for its pages as a guest and logged in (tests/process, #270);
+      # then the engine checks and postgres-app/fields on PostgreSQL.
       - run: sudo apt-get update && sudo apt-get install -y systemd
       - run: tests/process/run.sh
+        env:
+          RNX_BUILD: 1
+      - run: tests/process/run.sh postgres
+        env:
+          PROCESS_POSTGRES: postgres://postgres:postgres@localhost:5432
 
   tutorial:
     name: tutorial (docs/tutorial.md, followed step by step)
@@ -311,7 +330,7 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-llvm-cov
-      # Informational (#247): every library crate, the CLI and the macros
+      # #247: every library crate, the CLI and the macros
       # (measured while the test crates compile), on SQLite with Excel
       # exports, then again on PostgreSQL; the two runs are merged. Doctests
       # aren't counted on stable.
@@ -338,3 +357,7 @@ jobs:
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           cat coverage.txt >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Doctests are not counted (stable Rust has no doctest coverage); the examples, tests/browser and tests/process are measured by their own jobs, not here. The job fails under 90 % of lines in total.' >> "$GITHUB_STEP_SUMMARY"
+      # The floor (#247): the total line coverage of the crates above. The
+      # summary and the HTML report are written first, so a drop is visible.
+      - run: cargo llvm-cov report --fail-under-lines 90 > /dev/null

@@ -394,3 +394,39 @@ impl Gateway for Xendit {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Interval;
+
+    #[test]
+    fn intervals_and_plan_statuses() {
+        let plan = |interval| Plan::new("p", "P").price(1, "IDR", interval);
+        assert_eq!(interval(&plan(Interval::Day)), "DAY");
+        assert_eq!(interval(&plan(Interval::Week)), "WEEK");
+        assert_eq!(interval(&plan(Interval::Month)), "MONTH");
+        assert_eq!(interval(&plan(Interval::Year)), "YEAR");
+        // A status Xendit may add later: not paid yet.
+        let remote = plan_remote(&json!({ "id": "repl_1", "status": "REQUIRES_ACTION" }));
+        assert_eq!(remote.status, Some(SubscriptionStatus::Incomplete));
+        assert_eq!(remote.owner, None);
+        assert_eq!(
+            plan_remote(&json!({ "id": "repl_1", "status": "INACTIVE" })).status,
+            Some(SubscriptionStatus::Canceled)
+        );
+    }
+
+    #[test]
+    fn keys_given_in_code_never_print() {
+        let xendit = Xendit::new("xnd_secret_value", "callback-value");
+        let shown = format!("{xendit:?}");
+        assert!(
+            !shown.contains("xnd_secret_value") && !shown.contains("callback-value"),
+            "{shown}"
+        );
+        assert!(xendit.configured(&renox::Config::default()));
+        assert!(!Xendit::new("", "").configured(&renox::Config::default()));
+        assert!(!Xendit::from_config().configured(&renox::Config::default()));
+    }
+}

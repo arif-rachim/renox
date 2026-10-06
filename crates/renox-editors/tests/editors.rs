@@ -367,3 +367,41 @@ fn between(html: &str, start: &str, end: &str) -> String {
     let to = html[from..].find(end).unwrap() + from;
     html[from..to].to_owned()
 }
+
+/// Rich text bound in a query is the cleaned HTML; read back as text it
+/// stays clean. An empty preview renders an empty page body.
+#[renox::test]
+async fn rich_text_is_stored_cleaned_and_an_empty_preview_is_fine() {
+    let app = app().await;
+    let db = app.db();
+    renox::db::sql("CREATE TABLE notes (body TEXT NOT NULL)")
+        .execute(db)
+        .await
+        .unwrap();
+    let body = RichText::new(r#"<p onclick="x()">Hi <script>alert(1)</script><b>there</b></p>"#);
+    renox::db::sql("INSERT INTO notes (body) VALUES (?)")
+        .bind(body.clone())
+        .execute(db)
+        .await
+        .unwrap();
+    let stored: String = renox::db::sql("SELECT body FROM notes")
+        .scalar(db)
+        .await
+        .unwrap();
+    assert_eq!(stored, body.as_str());
+    assert!(
+        !stored.contains("script") && !stored.contains("onclick"),
+        "{stored}"
+    );
+    assert!(stored.contains("<b>there</b>"), "{stored}");
+    // Read back into a form-like value, it's cleaned again on the way in.
+    let again: RichText = renox::serde_json::from_value(json!(stored)).unwrap();
+    assert_eq!(again.as_str(), stored);
+
+    app.get("/posts/new").await;
+    app.post("/_renox/editors/preview", &[("text", "")])
+        .await
+        .assert_ok()
+        .assert_dont_see("<p>");
+    app.post("/_renox/editors/preview", &[]).await.assert_ok();
+}

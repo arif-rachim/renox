@@ -180,7 +180,7 @@
 <form class="{{ class_names('rx-grid', {'rx-grid--cards': page.cards}) }}" id="{{ id }}"{% if page.advanced.on %} data-grid-rule-columns='{{ page.advanced.columns | tojson }}'{% endif %} data-rx-grid="{{ page.config }}" method="get" action="{{ page.path }}"
       hx-get="{{ page.path }}" hx-target="this" hx-select="#{{ id }}" hx-swap="outerHTML" hx-push-url="true">
   {#- The page's other query string values stay in the grid's links. -#}
-  {%- for name, value in page.keep %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+  {%- for name, value in page.keep %}<input type="hidden" name="{{ name }}" value="{{ value }}" data-grid-keep>{% endfor %}
   <input type="hidden" name="{{ page.p }}sort" value="{{ page.sort or '' }}" data-grid-state="sort">
   <input type="hidden" name="{{ page.p }}page" value="{{ page.page.page }}" data-grid-state="page">
   {%- if page.remember %}<input type="hidden" name="{{ page.p }}state" value="1">{% endif %}
@@ -471,7 +471,7 @@
   <div class="rx-grid__foot">
     <p class="rx-grid__range">{{ page.page.from | number }}–{{ page.page.to | number }} {{ t('ui.grid.of') }} {{ page.page.total | number }}</p>
     <label class="rx-grid__per">{{ t('ui.grid.rows') }}
-      <select class="rx-grid__control rx-grid__control--small" name="{{ page.p }}per_page" data-grid-per-page>
+      <select class="rx-grid__control rx-grid__control--small" name="{{ page.p }}per_page" data-grid-per-page data-default="{{ page.default_per_page }}">
         {%- for n in page.per_page_options %}<option value="{{ n }}"{% if n == page.page.per_page %} selected{% endif %}>{{ n }}</option>{% endfor %}
       </select>
     </label>
