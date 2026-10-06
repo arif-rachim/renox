@@ -386,3 +386,47 @@ impl fmt::Debug for Secret {
 pub(crate) fn from_unix(seconds: i64) -> Option<DateTime> {
     renox::chrono::DateTime::from_timestamp(seconds, 0)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A missing key says where to set it, or that it was given empty.
+    #[test]
+    fn missing_keys_say_where_to_set_them() {
+        let config = Config::default();
+        let err = Secret::Config("STRIPE_SECRET")
+            .require(&config, "Stripe's secret key")
+            .unwrap_err();
+        assert!(
+            format!("{err:?}")
+                .contains("Stripe's secret key is missing: set STRIPE_SECRET in .env"),
+            "{err:?}"
+        );
+        let err = Secret::Given(String::new())
+            .require(&config, "Xendit's secret key")
+            .unwrap_err();
+        assert!(format!("{err:?}").contains("it was given empty"), "{err:?}");
+        let mut config = Config::default();
+        config.vars.insert("STRIPE_SECRET".into(), "sk_1".into());
+        assert_eq!(
+            Secret::Config("STRIPE_SECRET")
+                .require(&config, "x")
+                .unwrap(),
+            "sk_1"
+        );
+        assert_eq!(format!("{:?}", Secret::Given("sk".into())), "(hidden)");
+    }
+
+    #[test]
+    fn payments_keep_their_id_and_an_upper_case_currency() {
+        let payment = Payment::new("in_1", 900, "usd", false)
+            .subscription("sub_1")
+            .customer("cus_1");
+        assert_eq!(payment.id, "in_1");
+        assert_eq!(payment.currency, "USD");
+        assert_eq!(payment.subscription_id.as_deref(), Some("sub_1"));
+        assert_eq!(payment.customer_id.as_deref(), Some("cus_1"));
+        assert!(!payment.succeeded);
+    }
+}

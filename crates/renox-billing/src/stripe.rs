@@ -406,4 +406,37 @@ mod tests {
         // Canceled at the period's end: access until then.
         assert_eq!(remote.ends_at, Some(end));
     }
+
+    #[test]
+    fn statuses_stripe_may_add_later_are_not_paid_yet() {
+        for (status, expected) in [
+            ("trialing", SubscriptionStatus::Trialing),
+            ("unpaid", SubscriptionStatus::PastDue),
+            ("paused", SubscriptionStatus::PastDue),
+            ("incomplete_expired", SubscriptionStatus::Canceled),
+            ("something_new", SubscriptionStatus::Incomplete),
+        ] {
+            let remote = remote(&json!({ "id": "sub_1", "status": status }));
+            assert_eq!(remote.status, Some(expected), "{status}");
+        }
+        // An expanded customer object, and an end from `cancel_at`.
+        let remote = remote(&json!({
+            "id": "sub_1", "status": "active",
+            "customer": { "id": "cus_9" }, "cancel_at": 1_800_000_000,
+        }));
+        assert_eq!(remote.customer_id.as_deref(), Some("cus_9"));
+        assert_eq!(remote.ends_at, Some(from_unix(1_800_000_000)));
+    }
+
+    #[test]
+    fn stripe_prorates_resumes_and_hides_its_keys() {
+        let stripe = Stripe::new("sk_live_hidden", "whsec_hidden");
+        assert!(stripe.prorates() && stripe.resumes());
+        let shown = format!("{stripe:?}");
+        assert!(
+            !shown.contains("sk_live_hidden") && !shown.contains("whsec_hidden"),
+            "{shown}"
+        );
+        assert!(format!("{:?}", Stripe::from_config()).contains("from STRIPE_SECRET"));
+    }
 }

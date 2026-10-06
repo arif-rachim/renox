@@ -196,6 +196,9 @@ mod tests {
         let idr = Plan::new("basic", "Basic").price(99_000, "IDR", Interval::Year);
         assert_eq!(idr.price_label("en"), "Rp 99,000 / year");
         assert_eq!(Plan::new("free", "Free").price_label("en"), "Free");
+        let daily = Plan::new("day", "Day pass").price(500, "USD", Interval::Day);
+        assert_eq!(daily.price_label("en"), "$5.00 / day");
+        assert_eq!(Interval::Week.as_str(), "week");
     }
 
     #[test]
