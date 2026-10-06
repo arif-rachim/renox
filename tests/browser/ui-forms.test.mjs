@@ -183,21 +183,22 @@ test('after Back, a regular form that was sent is ready again', () => browser.wi
   });
   await page.goto(`${app.url}/widgets`);
   await page.eval(() => { window.__first = true; });
-  // The form's request is held in the browser and never answered, so
-  // leaving always comes first (a slow runner let the 600 ms answer arrive
-  // before the navigation, and Back then showed the form's result).
-  await page.send('Fetch.enable', { patterns: [{ urlPattern: '*/slow-plain*' }] });
-  // Sent (busy), then left for another page before the answer: Chrome keeps
-  // a page in its back/forward cache only after a navigation it started
-  // itself, not after the form's own (BrowsingInstanceNotSwapped).
+  // The form is sent as far as renox-ui.js is concerned (it marks the form
+  // sending and its button busy), but the browser never submits it: a
+  // listener on window runs after renox-ui.js's on document and cancels the
+  // submission. So nothing races the navigation below (a real request did on
+  // slow CI runners, and holding it with CDP's Fetch stalled the navigation).
+  // Then the page is left: Chrome keeps a page in its back/forward cache only
+  // after a navigation it started itself, not after the form's own.
+  await page.eval(() => window.addEventListener('submit', (event) => event.preventDefault()));
   const busy = await page.eval(() => {
     const button = document.querySelector('#plain-busy-button');
     button.click();
     return button.getAttribute('aria-busy');
   });
   assert.equal(busy, 'true');
+  assert.equal(await page.eval(() => document.querySelector('#plain-busy').hasAttribute('data-rx-sending')), true);
   await page.goto(`${app.url}/stock`);
-  await page.send('Fetch.disable');
   await page.eval(() => history.back());
   await page.waitFor(() => window.__first === true, { message: 'the first page shown again' });
   const state = await page.eval(() => ({
