@@ -2237,6 +2237,7 @@ impl<M: Serialize> GridPage<M> {
             "columns": columns,
             "header": header_rows(&ordered),
             "rows": rows,
+            "default_per_page": self.grid.per_page,
             "page": {
                 "page": self.rows.page,
                 "per_page": self.rows.per_page,
