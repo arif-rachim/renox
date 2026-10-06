@@ -154,3 +154,63 @@ is missing there is shown in English.
 
 `BIKESHOP_EXPLAIN=false` hides the panels (the index stays). The rest is Renox's, documented in
 [.env.example](.env.example).
+
+## Service plans (#237)
+
+A customer subscribes one of their bikes to a plan on `/plans`, pays monthly through
+renox-billing (Stripe, or Xendit in rupiah; without keys a demo gateway of the example's own
+stands in, never in production), and the visits are booked a week ahead as workshop work orders
+on their weekday, within the workshop's capacity (`plans:visits`, daily at 06:00). They skip or
+move visits, change plan from the next period, pause, cancel at the period's end and resume on
+`/plans/mine/{plan}`; a failed payment holds the visits until it is paid. Each bike is its own
+renox-billing subscription of the user (`Billing::of(&state, &user).named("bike-12")`). The
+code is in [src/app/plans/](src/app/plans/), the tests in [tests/plans.rs](tests/plans.rs).
+
+Keys go in `.env`: `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_<PLAN>` (e.g.
+`STRIPE_PRICE_MONTHLY_TUNE_UP`), `XENDIT_SECRET_KEY`, `XENDIT_CALLBACK_TOKEN`; the webhooks
+come to `/billing/webhooks/stripe` and `/billing/webhooks/xendit`.
+
+## The JSON API (#241)
+
+For the self-service kiosks next to the bike racks and the shop's mobile app. Every endpoint,
+its ability, request and answer is on [`/about/api`](src/app/api/endpoints.rs); the code is in
+[src/app/api/](src/app/api/), the tests in [tests/api.rs](tests/api.rs).
+
+- **Tokens.** A manager makes a kiosk's token on `/staff/api-tokens` (abilities
+  `rentals:read`, `rentals:checkout`, `rentals:return`; the kiosk sees only its store); a
+  customer makes theirs on `/account/api-tokens` (`read`, `rent`, `order`). A token is shown
+  once. Send it as `Authorization: Bearer …`: none is a 401, one without the endpoint's ability
+  a 403, another store's reservation a 404.
+- **Same rules as the website**: the API calls the same functions (`booking::book`,
+  `reserve::cancel_rental`, `counter::hand_over`, `counter::take_back`) and reads the same
+  forms, so a refusal is Renox's `422 {"message", "errors"}`.
+- **Limits**: 120 requests a minute per token (429 after), CORS for
+  `https://app.bikeshop.example`. Lists are paginated with `links`; rentals are found by their
+  `Ulid` code.
+
+```bash
+URL=http://127.0.0.1:3000
+TOKEN='12|…'            # from /staff/api-tokens (kiosk) or /account/api-tokens (customer)
+
+# Kiosk
+curl -H "Authorization: Bearer $TOKEN" $URL/api/v1/kiosk/bikes
+curl -H "Authorization: Bearer $TOKEN" $URL/api/v1/kiosk/rentals/$CODE
+curl -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+     -d '{"checklist":["frame","brakes"],"method":"card"}' $URL/api/v1/kiosk/rentals/$CODE/checkout
+curl -X POST -H "Authorization: Bearer $TOKEN" -F method=card \
+     -F damaged=true -F 'damage_note=Bent rim' -F photos=@rim.jpg $URL/api/v1/kiosk/rentals/$CODE/return
+
+# Customer app
+curl -H "Authorization: Bearer $TOKEN" $URL/api/v1/me
+curl -H "Authorization: Bearer $TOKEN" "$URL/api/v1/products?q=helmet&page=2"
+curl -H "Authorization: Bearer $TOKEN" $URL/api/v1/products/trek-fx-3
+curl -H "Authorization: Bearer $TOKEN" $URL/api/v1/me/bikes
+curl -H "Authorization: Bearer $TOKEN" $URL/api/v1/me/work-orders
+curl -H "Authorization: Bearer $TOKEN" $URL/api/v1/me/plan
+curl -H "Authorization: Bearer $TOKEN" $URL/api/v1/me/rentals
+curl -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+     -d '{"store":1,"bike":12,"starts_at":"2026-10-09T10:00:00","ends_at":"2026-10-09T14:00:00"}' \
+     $URL/api/v1/me/rentals
+curl -X DELETE -H "Authorization: Bearer $TOKEN" $URL/api/v1/me/rentals/$CODE
+curl -H "Authorization: Bearer $TOKEN" $URL/api/v1/me/orders
+```

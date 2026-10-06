@@ -1,0 +1,45 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, card, empty, link_button, infolist, entry %}
+{% from "plans/_parts.html" import assets, status %}
+{% block seo %}{{ seo(title=t('plans.mine.title')) }}{% endblock %}
+
+{#- The customer's plans (#237): each bike's plan with its state, next
+    visit, visits done and last invoice, on a CSS grid of cards. -#}
+{% block content %}
+{{ assets() }}
+<div class="rx-stack">
+  {{ page_header(t('plans.mine.title'), subtitle=t('plans.mine.lead')) }}
+  {%- if current %}
+  <div class="bs-my-plans" id="my-plans" data-bs-reveal>
+    {%- for line in current %}
+    <article class="rx-card bs-my-plan" data-bs-plan="{{ line.subscription.id }}">
+      <header class="bs-my-plan__header">
+        <h2 class="rx-card__title"><a class="rx-link" href="{{ route('plans.show', line.subscription.id) }}">{{ line.bike }}</a></h2>
+        {{ status(line.status) }}
+      </header>
+      <p class="rx-subtitle">{{ line.plan.name if line.plan else "" }} · {{ line.store }}</p>
+      {% call infolist(columns=2) %}
+        {{ entry(t('plans.fields.next_visit'), line.subscription.next_visit_on if line.status in ['active', 'ending'] else none, format="date") }}
+        {{ entry(t('plans.fields.visits_done'), line.done, format="number") }}
+        {%- if line.last_invoice %}
+        {% call entry(t('plans.fields.last_invoice')) %}{{ line.last_invoice.amount | money }} · {{ t('plans.invoice.paid' if line.last_invoice.paid else 'plans.invoice.failed') }}{% endcall %}
+        {%- else %}{{ entry(t('plans.fields.last_invoice'), none, placeholder=t('plans.mine.counter')) }}{% endif %}
+      {% endcall %}
+      {{ link_button(route('plans.show', line.subscription.id), t('plans.mine.open'), size="small") }}
+    </article>
+    {%- endfor %}
+  </div>
+  {%- else %}
+  <div class="rx-card">{{ empty(t('plans.mine.none'), t('plans.mine.none_text'), route('plans.index'), t('plans.index.title')) }}</div>
+  {%- endif %}
+  {%- if past %}
+  {% call card(title=t('plans.mine.past')) %}
+    <ul class="rx-list">
+      {%- for line in past %}
+      <li><a class="rx-link" href="{{ route('plans.show', line.subscription.id) }}">{{ line.bike }} · {{ line.plan.name if line.plan else "" }}</a> {{ status(line.status) }}</li>
+      {%- endfor %}
+    </ul>
+  {% endcall %}
+  {%- endif %}
+</div>
+{% endblock %}

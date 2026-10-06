@@ -628,6 +628,9 @@ async fn services(tx: &mut Transaction, world: &mut World) -> Result {
                 price: *price,
                 description: (*description).into(),
                 active: true,
+                parts_discount_bp: crate::app::plans::billing::default_parts_discount_bp(
+                    frequency.parse::<Frequency>().unwrap_or_default(),
+                ),
                 ..Default::default()
             },
         )

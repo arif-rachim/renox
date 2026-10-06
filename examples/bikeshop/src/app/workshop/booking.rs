@@ -425,31 +425,11 @@ pub async fn reschedule(
         ));
     }
     let day = form.day.unwrap_or_default();
-    let store = Store::find_or_404(db, order.store_id).await?;
-    // The order's own minutes don't count against its new day.
-    let mut tx = db.begin_immediate().await?;
-    Store::where_eq("id", store.id)
-        .lock_for_update()
-        .first(&mut tx)
-        .await?;
-    let mut problem =
-        capacity::check_day(&mut tx, &state.config, &store, day, order.minutes).await?;
-    let current_day = to_local(&state.config, order.scheduled_for).date();
-    if problem == Some(capacity::DayProblem::Full) && day == current_day {
-        problem = None;
-    }
-    if let Some(problem) = problem {
-        tx.rollback().await?;
+    if let Some(problem) = capacity::move_booking(db, &state.config, &mut order, day).await? {
         let mut errors = Errors::new();
         errors.add("day", lang.t(problem.key(), &[]));
         return Err(errors.into());
     }
-    order.scheduled_for = capacity::drop_off(&state.config, day);
-    order.reminded_at = None;
-    order
-        .save_only(&mut tx, &["scheduled_for", "reminded_at"])
-        .await?;
-    tx.commit().await?;
     Ok((
         Toast::success(lang.t("workshop.service.rescheduled", &[("day", &day)])),
         Redirect::route("workshop.service.show", &[&order.id])?,

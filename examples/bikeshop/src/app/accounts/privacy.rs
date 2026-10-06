@@ -241,19 +241,6 @@ pub async fn erase(state: &AppState, id: i64) -> Result {
     .bind(id)
     .execute(&mut tx)
     .await?;
-    // A plan still running stops: nobody will bring the bike any more.
-    renox::db::sql(
-        "UPDATE plan_subscriptions SET status = ?, cancelled_at = ?, next_visit_on = NULL, \
-         updated_at = ? WHERE status <> ? \
-         AND customer_bike_id IN (SELECT id FROM customer_bikes WHERE customer_id = ?)",
-    )
-    .bind(crate::app::plans::model::SubscriptionStatus::Cancelled)
-    .bind(now)
-    .bind(now)
-    .bind(crate::app::plans::model::SubscriptionStatus::Cancelled)
-    .bind(id)
-    .execute(&mut tx)
-    .await?;
     // The home address goes, unless an order was delivered there (the
     // order keeps it: the books need where goods went).
     if let Some(address_id) = customer.address_id {
@@ -280,6 +267,25 @@ pub async fn erase(state: &AppState, id: i64) -> Result {
         }
     }
     tx.commit().await?;
+    // A plan still running stops (nobody will bring the bike any more), with
+    // its upcoming visits and their work orders, through the plans area so
+    // the workshop's slots are freed too.
+    let running: Vec<crate::app::plans::model::PlanSubscription> =
+        crate::app::plans::model::PlanSubscription::query()
+            .where_op(
+                "status",
+                "<>",
+                crate::app::plans::model::SubscriptionStatus::Cancelled,
+            )
+            .where_raw(
+                "customer_bike_id IN (SELECT id FROM customer_bikes WHERE customer_id = ?)",
+                [id],
+            )
+            .get(&state.db)
+            .await?;
+    for mut sub in running {
+        crate::app::plans::visits::end(&state.db, &mut sub).await?;
+    }
     // Files can't roll back with the transaction: removed once it committed.
     state.storage.delete_all(&files_of(id)).await?;
     state.emit(CustomerErased { customer_id: id }).await?;

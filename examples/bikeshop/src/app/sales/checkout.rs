@@ -38,7 +38,6 @@ use super::orders;
 use super::payments::{self, Charge, Payable};
 use crate::app::accounts::model::{Address, City, Country, Customer};
 use crate::app::catalog::model::{Product, ProductVariant};
-use crate::app::plans::model::SubscriptionStatus;
 use crate::app::staff::model::{Store, fee};
 
 /// Delivery in a city with one of our stores.
@@ -47,9 +46,6 @@ pub const DELIVERY_LOCAL: i64 = 25_000;
 pub const DELIVERY_COUNTRY: i64 = 60_000;
 /// Delivery abroad.
 pub const DELIVERY_ABROAD: i64 = 150_000;
-/// The parts discount of customers with an active service plan (#237), in
-/// basis points: 1000 = 10 %.
-pub const PLAN_PARTS_DISCOUNT_BP: i64 = 1_000;
 
 /// The checkout form: four steps of one form.
 #[derive(Deserialize, Serialize, Validate, Debug, Clone, Default)]
@@ -119,6 +115,10 @@ pub struct Totals {
     pub total: i64,
     /// Whether the plan discount applied.
     pub plan_discount: bool,
+    /// The plan's parts discount, in basis points (1000 = 10 %).
+    pub discount_bp: i64,
+    /// The same as people write it: `10`, `7.5`.
+    pub discount_percent: String,
 }
 
 /// What delivery to a city costs: in a city with a store, elsewhere in a
@@ -142,39 +142,26 @@ pub async fn delivery_fee(db: &Db, city_id: i64) -> Result<i64> {
     })
 }
 
-/// Whether the customer has a service plan running (the parts discount).
-pub async fn on_a_plan(db: &Db, customer_id: Option<i64>) -> Result<bool> {
-    let Some(customer) = customer_id else {
-        return Ok(false);
-    };
-    renox::db::sql(
-        "SELECT COUNT(*) FROM plan_subscriptions s JOIN customer_bikes b ON b.id = s.customer_bike_id \
-         WHERE b.customer_id = ? AND s.status = ?",
-    )
-    .bind(customer)
-    .bind(SubscriptionStatus::Active)
-    .scalar::<i64>(db)
-    .await
-    .map(|n| n > 0)
-    .map_err(Into::into)
+/// The parts discount of the customer's service plan, in basis points
+/// (1000 = 10 %; 0 without a plan): the subscriber's plan decides (#237).
+pub async fn on_a_plan(db: &Db, customer_id: Option<i64>) -> Result<i64> {
+    crate::app::plans::parts_discount_bp(db, customer_id).await
 }
 
 /// The totals for a cart: its lines, the plan discount on parts, and the
 /// delivery fee.
-pub fn totals(cart: &CartView, plan: bool, delivery_fee: i64) -> Totals {
+pub fn totals(cart: &CartView, discount_bp: i64, delivery_fee: i64) -> Totals {
     let subtotal = cart.subtotal;
     let parts: i64 = cart.lines.iter().filter(|l| l.part).map(|l| l.total).sum();
-    let discount = if plan {
-        fee(parts, PLAN_PARTS_DISCOUNT_BP)
-    } else {
-        0
-    };
+    let discount = fee(parts, discount_bp.max(0));
     Totals {
         subtotal,
         discount,
         delivery_fee,
         total: subtotal - discount + delivery_fee,
-        plan_discount: plan && discount > 0,
+        plan_discount: discount > 0,
+        discount_bp,
+        discount_percent: crate::app::rentals::counter::percent(discount_bp),
     }
 }
 
@@ -293,7 +280,7 @@ pub async fn show(
     Ok(view(
         "sales/checkout/show.html",
         context! { cart => data, totals, prefill, stores, cities, delivery, fees, plan,
-        discount_percent => PLAN_PARTS_DISCOUNT_BP / 100 },
+        discount_percent => crate::app::rentals::counter::percent(plan) },
     )
     .fragment("summary")
     .into_response())

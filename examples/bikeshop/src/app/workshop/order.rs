@@ -425,6 +425,8 @@ pub async fn take_part(
 ) -> Result<bool> {
     let db = &state.db;
     let variant = ProductVariant::find_or_404(db, variant_id).await?;
+    // A plan's visit gets the plan's parts discount (#237).
+    let unit_price = crate::app::plans::part_price(db, order, variant.price).await?;
     let mut tx = db.begin_immediate().await?;
     let available = StockLevel::where_eq("variant_id", variant.id)
         .where_eq("owner_store_id", order.store_id)
@@ -468,8 +470,8 @@ pub async fn take_part(
                     work_order_id: order.id,
                     variant_id: variant.id,
                     quantity,
-                    unit_price: variant.price,
-                    total: variant.price * quantity,
+                    unit_price,
+                    total: unit_price * quantity,
                     status,
                     ..Default::default()
                 },

@@ -288,3 +288,38 @@ async fn book_in(
     }
     Ok(Ok(order))
 }
+
+/// Moves a booked work order to `day`, in one transaction that takes the
+/// store's row first (like [`book`]); its own minutes don't count against
+/// its current day. `Some(problem)` when the day can't take it (nothing
+/// changes). Rescheduling a booking (customers) and moving a plan's visit
+/// (#237) both go through it.
+pub async fn move_booking(
+    db: &Db,
+    config: &Config,
+    order: &mut WorkOrder,
+    day: NaiveDate,
+) -> Result<Option<DayProblem>> {
+    let mut tx = db.begin_immediate().await?;
+    let store = Store::where_eq("id", order.store_id)
+        .lock_for_update()
+        .first(&mut tx)
+        .await?
+        .ok_or(Error::NotFound)?;
+    let mut problem = check_day(&mut tx, config, &store, day, order.minutes).await?;
+    let current_day = to_local(config, order.scheduled_for).date();
+    if problem == Some(DayProblem::Full) && day == current_day {
+        problem = None;
+    }
+    if problem.is_some() {
+        tx.rollback().await?;
+        return Ok(problem);
+    }
+    order.scheduled_for = drop_off(config, day);
+    order.reminded_at = None;
+    order
+        .save_only(&mut tx, &["scheduled_for", "reminded_at"])
+        .await?;
+    tx.commit().await?;
+    Ok(None)
+}

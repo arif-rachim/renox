@@ -2141,5 +2141,288 @@
       "send": "Enviar la invitación",
       "sent": "La invitación va de camino a :email."
     }
+  },
+  "plans": {
+    "nav": "Planes de servicio",
+    "index": {
+      "title": "Planes de servicio",
+      "lead": "Tu bici cuidada con un calendario: elige un plan, una tienda y un día de la semana, y reservamos las visitas por ti.",
+      "choose": "Elegir este plan",
+      "how_title": "Cómo funciona un plan",
+      "how_1": "Elige una de tus bicis, un plan, la tienda cuyo taller la cuida y el día de la semana que te venga bien.",
+      "how_2": "Paga cada mes con tarjeta (o con Xendit, en rupias). Cada visita se reserva una semana antes en tu día, o el siguiente con hueco.",
+      "how_3": "Salta o mueve una visita, cambia de plan desde el mes siguiente, pausa, o cancela al final del mes pagado."
+    },
+    "every": {
+      "weekly": "Una visita cada semana",
+      "fortnightly": "Una visita cada dos semanas",
+      "monthly": "Una visita cada mes",
+      "quarterly": "Una visita cada tres meses"
+    },
+    "frequency": {
+      "weekly": "Semanal",
+      "fortnightly": "Cada dos semanas",
+      "monthly": "Mensual",
+      "quarterly": "Cada tres meses"
+    },
+    "perks": {
+      "discount": ":percent % de descuento en recambios"
+    },
+    "compare": {
+      "how_often": "Frecuencia",
+      "per_visit": "Precio por visita",
+      "discount": "Descuento en recambios",
+      "flexible": "Saltar o mover una visita"
+    },
+    "fields": {
+      "bike": "Bici",
+      "plan": "Plan",
+      "store": "Tienda",
+      "weekday": "Día preferido",
+      "pay_with": "Pagar con",
+      "monthly": "Precio al mes",
+      "first_visit": "Primera visita",
+      "next_visit": "Próxima visita",
+      "visits_done": "Visitas hechas",
+      "last_invoice": "Último pago",
+      "status": "Estado",
+      "discount": "Descuento en recambios",
+      "gateway": "Pagado con",
+      "renews": "Se renueva el",
+      "ends": "Termina el",
+      "amount": "Importe",
+      "day": "Día"
+    },
+    "weekday": {
+      "mon": "Lunes",
+      "tue": "Martes",
+      "wed": "Miércoles",
+      "thu": "Jueves",
+      "fri": "Viernes",
+      "sat": "Sábado",
+      "sun": "Domingo"
+    },
+    "pay_with": {
+      "stripe": "Tarjeta (Stripe)",
+      "demo": "Tarjeta de prueba (sin dinero real)",
+      "xendit": "Tarjeta o monedero en rupias (Xendit)",
+      "counter": "En el mostrador de la tienda"
+    },
+    "subscribe": {
+      "title": "Suscribir una bici",
+      "lead": "Elige la bici, el plan y cuándo te viene bien; pagas en la página siguiente.",
+      "no_bike": "Añade primero tu bici",
+      "no_bike_text": "Un plan cuida una de tus bicis: añádela a tus bicis y vuelve.",
+      "all_taken": "Todas tus bicis tienen plan",
+      "all_taken_text": "Una bici puede tener un plan a la vez. Cambia el plan desde su página.",
+      "no_gateway": "Ahora no se pueden pagar planes en línea. Pregunta en una tienda.",
+      "store_hint": "Su taller hace las visitas.",
+      "when": "Cuándo",
+      "weekday_hint": "No se ofrecen los días que la tienda cierra.",
+      "summary": "Resumen",
+      "pick_day": "Elige un día",
+      "billing_hint": "Se cobra cada mes desde hoy. Las visitas empiezan la semana después de confirmarse el pago.",
+      "submit": "Continuar al pago"
+    },
+    "status": {
+      "active": "En marcha",
+      "paused": "En pausa",
+      "held": "Retenido",
+      "ending": "Terminando",
+      "pending": "Esperando el pago",
+      "cancelled": "Terminado"
+    },
+    "visit_status": {
+      "scheduled": "Reservada",
+      "done": "Hecha",
+      "skipped": "Saltada",
+      "missed": "Perdida",
+      "held": "Retenida",
+      "cancelled": "Cancelada"
+    },
+    "mine": {
+      "title": "Mis planes",
+      "lead": "Los planes de tus bicis, sus próximas visitas y lo que has pagado.",
+      "none": "Aún no tienes plan",
+      "none_text": "Un plan reserva las visitas de tu bici por ti.",
+      "open": "Visitas y cambios",
+      "past": "Planes terminados",
+      "counter": "Pagado en la tienda"
+    },
+    "show": {
+      "title": "Plan de :bike",
+      "upcoming": "Próximas visitas",
+      "past": "Visitas pasadas",
+      "details": "El plan",
+      "due": "prevista el :day",
+      "move": "Mover",
+      "move_title": "Mover esta visita",
+      "move_text": "Elige otro día con hueco en el taller.",
+      "skip": "Saltar",
+      "skip_title": "¿Saltar esta visita?",
+      "skip_text": "El taller libera el hueco. La siguiente visita llega como estaba previsto.",
+      "keep": "Mantenerla",
+      "no_upcoming": "Aún no hay visitas reservadas",
+      "no_upcoming_text": "Las visitas se reservan con una semana de antelación, cada mañana.",
+      "work_order": "Orden de trabajo n.º :number",
+      "swap": "Cambiar de plan",
+      "swap_title": "Cambiar de plan",
+      "swap_text": "El nuevo plan y su precio empiezan el mes siguiente; las visitas de este mes no cambian.",
+      "pause": "Pausar visitas",
+      "unpause": "Reanudar visitas",
+      "resume": "Mantener el plan",
+      "cancel": "Cancelar el plan",
+      "cancel_title": "¿Cancelar el plan?",
+      "cancel_text": "Las visitas siguen hasta el final del mes pagado; no se cobra nada más.",
+      "cancel_now_text": "El plan termina ahora y se cancelan sus visitas reservadas.",
+      "keep_plan": "Mantener el plan",
+      "invoices": "Pagos",
+      "no_invoices": "Aún no hay pagos.",
+      "pending": "Se está confirmando el pago. Tus primeras visitas se reservan en cuanto se confirme.",
+      "held": "El último pago falló. Tus visitas están retenidas hasta que se pague; el proveedor de pagos lo vuelve a intentar.",
+      "ending": "El plan se canceló: las visitas siguen hasta el :day.",
+      "paused_note": "No se reservan visitas mientras el plan está en pausa.",
+      "next_plan": "El plan cambia a :plan el :day.",
+      "swapped": "El plan cambia con el mes siguiente.",
+      "paused": "Visitas en pausa.",
+      "unpaused": "Las visitas vuelven.",
+      "cancelled": "El plan termina con el mes pagado.",
+      "ended": "El plan ha terminado.",
+      "resumed": "El plan sigue.",
+      "skipped": "Visita saltada.",
+      "moved": "Visita movida al :day."
+    },
+    "invoice": {
+      "date": "Fecha",
+      "paid": "Pagado",
+      "failed": "Fallido"
+    },
+    "errors": {
+      "bike": "Elige una de tus bicis.",
+      "one_plan": "Esta bici ya tiene plan: una bici puede tener un plan a la vez.",
+      "not_sold": "Este plan ya no se vende.",
+      "closed": "La tienda cierra ese día.",
+      "pay_with": "Esa forma de pago no está disponible.",
+      "gateway": "El proveedor de pagos no respondió. Inténtalo de nuevo.",
+      "not_running": "El plan no está en marcha.",
+      "not_scheduled": "Esta visita ya no está reservada.",
+      "too_late": "Esta visita ya no puede cambiar: ha llegado su día.",
+      "on_hold": "Tus visitas están retenidas hasta que se cobre el último pago."
+    },
+    "mail": {
+      "started": {
+        "title": "Tu plan :plan ha empezado",
+        "body": "¡Gracias! :bike tiene el plan :plan. Reservaremos sus visitas y te lo recordaremos el día antes."
+      },
+      "renewed": {
+        "title": "Tu plan :plan se ha renovado",
+        "body": "Hemos recibido :amount por el plan :plan de :bike. ¡Gracias!"
+      },
+      "failed": {
+        "title": "Tu pago de :plan no se pudo cobrar",
+        "body": "No pudimos cobrar :amount por el plan de :bike. Las visitas están retenidas hasta que se pague; el proveedor de pagos lo intentará de nuevo en unos días, así que revisa tu forma de pago."
+      },
+      "visit": {
+        "title": "Visita reservada el :day",
+        "body": "La próxima visita de tu plan está reservada el :day (orden n.º :number). Sáltala o muévela desde la página de tu plan."
+      },
+      "missed": {
+        "title": "Te esperábamos el :day",
+        "body": "Tu bici no vino a su visita del plan el :day. La siguiente visita llega como estaba previsto."
+      }
+    },
+    "mails": {
+      "title": "Los correos de los planes",
+      "lead": "Cada correo que envía un plan de servicio, para un suscriptor inventado.",
+      "sent_by": "Se envía con",
+      "started": "Plan iniciado",
+      "renewed": "Plan renovado",
+      "failed": "Pago fallido",
+      "visit": "Visita reservada",
+      "missed": "Visita perdida"
+    },
+    "demo": {
+      "title": "Pago de prueba",
+      "merchant": "Pago a :shop",
+      "notice_title": "Sin dinero real",
+      "notice": "Esta página sustituye a la de Stripe o Xendit mientras no estén sus claves. No se cobra nada.",
+      "pay": "Pagar :amount",
+      "decline": "Rechazar (el pago falla)",
+      "renewing": "La renovación está en camino: recarga en un momento.",
+      "renew_title": "Prueba: el pago del mes siguiente",
+      "renew_text": "Una pasarela real cobra cada mes sola; pruébalo aquí.",
+      "renew_paid": "Renovar, pagado",
+      "renew_failed": "Renovar, el pago falla"
+    },
+    "billing_page": {
+      "lead": "Nuestros planes cuidan una bici cada uno: elige uno y luego la bici."
+    },
+    "account": {
+      "title": "Planes de servicio",
+      "lead": "Los planes, visitas y pagos de tus bicis."
+    }
+  },
+  "api": {
+    "abilities": {
+      "rentals_read": "Ver las bicis libres de la tienda y sus reservas",
+      "rentals_checkout": "Entregar bicis reservadas",
+      "rentals_return": "Recibir bicis, con daños y fotos",
+      "read": "Leer el catálogo, mis bicis, órdenes de trabajo y planes",
+      "rent": "Ver, reservar y cancelar mis alquileres",
+      "order": "Ver mis pedidos"
+    },
+    "tokens": {
+      "title": "Tokens de la API",
+      "lead": "Los tokens dejan que la app de la tienda (o tus propios scripts) usen tu cuenta por la API JSON, cada uno solo para lo que marques.",
+      "yours": "Tus tokens",
+      "new": "Un token nuevo",
+      "name": "Nombre",
+      "name_hint": "Dónde lo usarás, p. ej. \"Mi móvil\".",
+      "abilities": "Qué puede hacer",
+      "make": "Crear el token",
+      "token": "El token",
+      "last_used": "Último uso",
+      "expires": "Caduca",
+      "never": "Nunca",
+      "revoke": "Revocar",
+      "revoke_title": "¿Revocar este token?",
+      "revoke_text": "Lo que lo use deja de funcionar al momento.",
+      "none": "Aún no hay tokens",
+      "none_text": "Crea uno para la app abajo.",
+      "once_title": "Cópialo ahora",
+      "once": "Este token solo se muestra una vez: solo se guarda una huella. Envíalo como Authorization: Bearer.",
+      "made": "Token creado: cópialo ahora, solo se muestra una vez.",
+      "revoked": "Token revocado."
+    },
+    "kiosks": {
+      "nav": "Tokens de quioscos",
+      "title": "Tokens de quioscos",
+      "lead": "Los quioscos de autoservicio de :store: cada uno usa su propio token, solo para los alquileres de esta tienda.",
+      "list": "Quioscos de :store",
+      "new": "Un quiosco nuevo",
+      "name_hint": "Dónde está, p. ej. \"Junto a la puerta\".",
+      "state": "Estado",
+      "active": "Funcionando",
+      "revoked": "Revocado",
+      "none": "Aún no hay quioscos",
+      "none_text": "Crea un token para un quiosco abajo.",
+      "revoke_title": "¿Revocar el token de este quiosco?",
+      "revoke_text": "El quiosco deja de funcionar al momento. Hazlo si se pierde o se cambia."
+    },
+    "about": {
+      "title": "La API JSON",
+      "lead": "Cada endpoint para los quioscos y la app de la tienda: qué necesita, qué enviar, qué responde.",
+      "link": "Todos los endpoints, con ejemplos curl",
+      "how": "Cómo funciona",
+      "ability": "Permiso",
+      "request": "Petición",
+      "answer": "Respuesta",
+      "kiosk": "Quioscos",
+      "customer": "La app del cliente",
+      "rule_token": "Envía un token como Authorization: Bearer; sin él la respuesta es 401, sin el permiso del endpoint 403.",
+      "rule_errors": "Una petición rechazada es 422 {\"message\", \"errors\"}, con las mismas reglas que la web; las listas llegan por páginas con enlaces.",
+      "rule_limit": ":count peticiones por minuto y token; por encima, 429 con Retry-After.",
+      "rule_cors": "Los navegadores en :origin pueden llamarla (CORS)."
+    }
   }
 }

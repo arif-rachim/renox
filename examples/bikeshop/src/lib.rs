@@ -58,6 +58,11 @@ pub fn app() -> App {
         // `db:seed`: a small shop in seconds (`demo:seed --size large` for Pagila's volume).
         .seeder(seed::run)
         .typed_command::<seed::DemoSeed>()
+        // Service plans billed as subscriptions (#237): renox-billing's
+        // plans, gateways (Stripe, Xendit, the demo) and webhooks.
+        .module(app::plans::billing())
+        // The JSON API's limit per token (#241): `.throttle_by("bikeshop-api")`.
+        .rate_limiter(app::api::LIMITER, app::api::limit)
         // --- Areas (alphabetical; add new ones in order) ---
         .module(app::about::About)
         .module(app::access::Access)

@@ -1,0 +1,32 @@
+{% extends "layouts/app.html" %}
+{#- The demo billing gateway's "hosted page" (src/app/plans/demo.rs): stands
+    in for Stripe's or Xendit's page when their keys aren't set. Paying here
+    queues the webhook a gateway would send, signed, to this app's own
+    /billing/webhooks/demo. -#}
+{% from "renox/ui.html" import card, button, alert, infolist, entry %}
+{% from "plans/_parts.html" import assets %}
+{% block seo %}{{ seo(title=t('plans.demo.title')) }}{% endblock %}
+
+{% block content %}
+{{ assets() }}
+<div class="bs-demo-billing" data-bs-reveal>
+  {{ alert(t('plans.demo.notice'), kind="warning", title=t('plans.demo.notice_title')) }}
+  {% call card(t('plans.demo.title'), subtitle=t('plans.demo.merchant', shop=t('shop.name'))) %}
+    {% call infolist(columns=2) %}
+      {{ entry(t('plans.fields.plan'), paying.plan) }}
+      {{ entry(t('plans.fields.bike'), paying.bike) }}
+      {% call entry(t('plans.fields.monthly')) %}<strong>{{ paying.amount | money }}</strong> / {{ t('blocks.plans.month') }}{% endcall %}
+    {% endcall %}
+    <form method="post" action="{{ action }}">
+      {{ csrf_field() }}
+      <input type="hidden" name="outcome" value="pay">
+      {{ button(t('plans.demo.pay', amount=(paying.amount | money)), variant="primary", block=true, key="p") }}
+    </form>
+    <form method="post" action="{{ action }}">
+      {{ csrf_field() }}
+      <input type="hidden" name="outcome" value="decline">
+      {{ button(t('plans.demo.decline'), variant="plain", block=true) }}
+    </form>
+  {% endcall %}
+</div>
+{% endblock %}

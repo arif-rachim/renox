@@ -1,0 +1,54 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, card, select, radio, toggle_buttons, button, form_errors, empty, infolist, entry, alert %}
+{% from "plans/_parts.html" import assets %}
+{% block seo %}{{ seo(title=t('plans.subscribe.title'), description=t('plans.subscribe.lead')) }}{% endblock %}
+
+{#- Subscribe a bike to a plan (#237). The form posts to
+    `plans.subscribe.store`, which starts renox-billing's checkout; while it
+    changes, htmx asks this page again and swaps the weekdays (they depend on
+    the store's opening days) and the summary. -#}
+{% block content %}
+{{ assets() }}
+<div class="rx-stack">
+  {{ page_header(t('plans.subscribe.title'), subtitle=t('plans.subscribe.lead'), back=route('plans.index'), back_label=t('plans.index.title')) }}
+  {%- if not has_bikes %}
+  <div class="rx-card">{{ empty(t('plans.subscribe.no_bike'), t('plans.subscribe.no_bike_text'), route('workshop.bikes'), t('workshop.bikes.add')) }}</div>
+  {%- elif not bikes %}
+  <div class="rx-card">{{ empty(t('plans.subscribe.all_taken'), t('plans.subscribe.all_taken_text'), route('plans.mine'), t('plans.mine.title')) }}</div>
+  {%- elif not ways %}
+  {{ alert(t('plans.subscribe.no_gateway'), kind="warning") }}
+  {%- else %}
+  <form method="post" action="{{ route('plans.subscribe.store') }}" id="subscribe-form" novalidate data-bs-subscribe
+        hx-get="{{ route('plans.subscribe') }}" hx-trigger="change" hx-select="#subscribe-live" hx-target="#subscribe-live" hx-swap="outerHTML">
+    {{ csrf_field() }}
+    <div class="bs-subscribe">
+      {% call card() %}
+        {{ form_errors() }}
+        {{ select("bike", t('plans.fields.bike'), bikes, selected=bike, required=true) }}
+        {{ radio("plan", t('plans.fields.plan'), plans, selected=(plan.slug if plan else none), required=true) }}
+        {{ select("store", t('plans.fields.store'), stores, selected=store_id, required=true, hint=t('plans.subscribe.store_hint')) }}
+        {{ radio("pay_with", t('plans.fields.pay_with'), ways, selected=pay_with, required=true) }}
+      {% endcall %}
+      <div id="subscribe-live" class="bs-subscribe__summary rx-stack" aria-live="polite">
+        {% call card(title=t('plans.subscribe.when')) %}
+          {{ toggle_buttons("weekday", t('plans.fields.weekday'), weekdays, selected=weekday, required=true, hint=t('plans.subscribe.weekday_hint')) }}
+        {% endcall %}
+        {% call card(title=t('plans.subscribe.summary')) %}
+          <div data-bs-plan-summary>
+          {%- if plan %}
+          {% call infolist() %}
+            {{ entry(t('plans.fields.plan'), plan.name) }}
+            {% call entry(t('plans.fields.monthly')) %}<strong class="bs-subscribe__price">{{ monthly | money }}</strong> / {{ t('blocks.plans.month') }}{% endcall %}
+            {{ entry(t('plans.fields.first_visit'), first, format="date", placeholder=t('plans.subscribe.pick_day')) }}
+          {% endcall %}
+          <p class="rx-hint">{{ t('plans.subscribe.billing_hint') }}</p>
+          {%- endif %}
+          </div>
+          {{ button(t('plans.subscribe.submit'), icon="check", block=true, key="s") }}
+        {% endcall %}
+      </div>
+    </div>
+  </form>
+  {%- endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,9 @@
+{#- renox-billing's card on the account page, replaced by the shop: plans
+    are per bike (src/app/plans), so the card points to them. -#}
+{% from "renox/ui.html" import card, link_button %}
+{% call card(title=t('plans.account.title'), subtitle=t('plans.account.lead')) %}
+  <div class="rx-card__footer">
+    {{ link_button(route('plans.mine'), t('plans.mine.title')) }}
+    {{ link_button(route('plans.index'), t('plans.index.title'), variant="plain") }}
+  </div>
+{% endcall %}

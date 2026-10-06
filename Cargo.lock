@@ -314,9 +314,11 @@ dependencies = [
  "renox",
  "renox-2fa",
  "renox-admin",
+ "renox-billing",
  "renox-editors",
  "renox-oauth",
  "serde",
+ "tracing",
 ]
 
 [[package]]

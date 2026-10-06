@@ -71,7 +71,7 @@
       {% call card(t('sales.counter.pay_title')) %}
         <dl class="bs-totals">
           <div><dt>{{ t('sales.cart.items', count=sale.count) }}</dt><dd class="rx-num">{{ totals.subtotal | money }}</dd></div>
-          {%- if totals.discount > 0 %}<div><dt>{{ t('sales.checkout.plan_discount', percent=10) }}</dt><dd class="rx-num">− {{ totals.discount | money }}</dd></div>{% endif %}
+          {%- if totals.discount > 0 %}<div><dt>{{ t('sales.checkout.plan_discount', percent=totals.discount_percent) }}</dt><dd class="rx-num">− {{ totals.discount | money }}</dd></div>{% endif %}
           <div class="bs-totals__total"><dt>{{ t('sales.orders.total') }}</dt><dd class="rx-num" data-bs-counter-total="{{ totals.total }}">{{ totals.total | money }}</dd></div>
         </dl>
         <form class="bs-counter__pay" method="post" action="{{ route('sales.counter.pay') }}" hx-boost="false" data-bs-change-label="{{ t('sales.counter.change') }}" data-bs-short-label="{{ t('sales.counter.short') }}">

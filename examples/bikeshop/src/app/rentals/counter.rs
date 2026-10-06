@@ -324,24 +324,47 @@ pub async fn pickup(
             lang.t("rentals.desk.not_here", &[]),
         ));
     }
-    let customer = Customer::find_or_404(db, rental.customer_id).await?;
-    if !customer.id_verified() {
-        let mut errors = Errors::new();
-        errors.add("method", lang.t("rentals.errors.unverified", &[]));
-        return Err(errors.into());
-    }
     let staff = staff_id(db, &user).await?.ok_or_else(|| {
         abort(
             StatusCode::FORBIDDEN,
             lang.t("rentals.errors.no_staff", &[]),
         )
     })?;
+    hand_over(&state, &mut rental, &form, Some(staff)).await?;
+    Ok((
+        Toast::success(lang.t("rentals.desk.picked_up", &[])),
+        Redirect::route("rentals.desk", &[&rental.id])?,
+    )
+        .into_response())
+}
+
+/// The bike leaves with the customer: the rule both the counter
+/// ([`pickup`]) and a store's kiosk (the JSON API, #241) follow, after
+/// each checked that `rental` is reserved at its own store. The customer
+/// must be verified (a 422 on `method` otherwise); what isn't paid yet (the
+/// price, the deposit when it wasn't paid online) is recorded as counter
+/// payments after the rental is saved. `staff`: who handed it over (`None`
+/// for a kiosk).
+pub async fn hand_over(
+    state: &AppState,
+    rental: &mut Rental,
+    form: &PickupForm,
+    staff: Option<i64>,
+) -> Result {
+    let db = &state.db;
+    let lang = state.current_lang();
+    let customer = Customer::find_or_404(db, rental.customer_id).await?;
+    if !customer.id_verified() {
+        let mut errors = Errors::new();
+        errors.add("method", lang.t("rentals.errors.unverified", &[]));
+        return Err(errors.into());
+    }
     let now = renox::db::now();
     let deposit_due = rental.deposit_status == DepositStatus::Unpaid;
     let mut tx = db.begin().await?;
     rental.status = RentalStatus::Active;
     rental.picked_up_at = Some(now);
-    rental.served_by = Some(staff);
+    rental.served_by = staff.or(rental.served_by);
     rental.pickup_checklist = Some(DbJson(form.checklist.clone()));
     if deposit_due {
         rental.deposit_status = DepositStatus::Held;
@@ -359,7 +382,7 @@ pub async fn pickup(
     };
     if rental.price > 0 {
         payments::record_counter(
-            &state,
+            state,
             charge(rental.price),
             counter_method(&form.method),
             staff,
@@ -368,18 +391,14 @@ pub async fn pickup(
     }
     if deposit_due && rental.deposit > 0 {
         payments::record_counter(
-            &state,
+            state,
             charge(rental.deposit),
             counter_method(&form.method),
             staff,
         )
         .await?;
     }
-    Ok((
-        Toast::success(lang.t("rentals.desk.picked_up", &[])),
-        Redirect::route("rentals.desk", &[&rental.id])?,
-    )
-        .into_response())
+    Ok(())
 }
 
 /// The return form (multipart: damage photos).
@@ -452,6 +471,31 @@ pub async fn give_back(
             lang.t("rentals.errors.no_staff", &[]),
         )
     })?;
+    take_back(&state, &mut rental, &form, store, Some(staff)).await?;
+    Ok((
+        Toast::success(lang.t("rentals.desk.returned", &[])),
+        Redirect::route("rentals.receipt", &[&rental.id])?,
+    )
+        .into_response())
+}
+
+/// The bike is back at `store`: the rule both the counter ([`give_back`])
+/// and a store's kiosk (the JSON API, #241) follow, after each checked
+/// that `rental` is out and may come back here. Late fee, damage (photos,
+/// a note, a fee), the deposit settled against the fees, the hours ridden
+/// added to the bike, its location moved to `store`; a damaged bike goes to
+/// the workshop ([`FleetRepairNeeded`]), [`RentalClosed`] tells the books,
+/// the customer gets the receipt. `staff`: who took it back (`None` for a
+/// kiosk). Answers the settlement.
+pub async fn take_back(
+    state: &AppState,
+    rental: &mut Rental,
+    form: &ReturnForm,
+    store: i64,
+    staff: Option<i64>,
+) -> Result<Settlement> {
+    let db = &state.db;
+    let lang = state.current_lang();
     let mut bike = RentalBike::find_or_404(db, rental.rental_bike_id).await?;
     // The photos go to private storage before the transaction.
     let mut stored = Vec::new();
@@ -466,13 +510,13 @@ pub async fn give_back(
     } else {
         0
     };
-    let settlement = settle(held(&rental), rental.fees());
+    let settlement = settle(held(rental), rental.fees());
     let minutes = pricing::ridden_minutes(rental.picked_up_at.unwrap_or(rental.starts_at), now);
 
     let mut tx = db.begin().await?;
     rental.status = RentalStatus::Returned;
     rental.returned_at = Some(now);
-    rental.returned_by = Some(staff);
+    rental.returned_by = staff;
     rental.return_store_id = (store != rental.operating_store_id).then_some(store);
     rental.return_checklist = Some(DbJson(form.checklist.clone()));
     rental.damage_note = form.damage_note.clone().filter(|n| !n.trim().is_empty());
@@ -511,7 +555,7 @@ pub async fn give_back(
 
     if settlement.due > 0 {
         payments::record_counter(
-            &state,
+            state,
             Charge {
                 payable: Payable::Rental(rental.id),
                 customer_id: Some(rental.customer_id),
@@ -542,7 +586,7 @@ pub async fn give_back(
         .await?;
     if let Some(customer) = Customer::find(db, rental.customer_id).await? {
         notify::customer(
-            &state,
+            state,
             &customer,
             &Notice::new(
                 "rental-returned",
@@ -550,31 +594,24 @@ pub async fn give_back(
                 "rentals.mail.returned.body",
             )
             .param("code", &rental.reservation_code)
-            .row("rentals.fields.price", money(&state, rental.price))
-            .row("rentals.fields.late_fee", money(&state, rental.late_fee))
-            .row(
-                "rentals.fields.damage_fee",
-                money(&state, rental.damage_fee),
-            )
+            .row("rentals.fields.price", money(state, rental.price))
+            .row("rentals.fields.late_fee", money(state, rental.late_fee))
+            .row("rentals.fields.damage_fee", money(state, rental.damage_fee))
             .row(
                 "rentals.fields.refund",
-                money(&state, rental.deposit_refunded),
+                money(state, rental.deposit_refunded),
             )
-            .row("rentals.fields.paid_now", money(&state, settlement.due))
+            .row("rentals.fields.paid_now", money(state, settlement.due))
             .tone(Tone::Success)
             .url(super::link(
-                &state,
+                state,
                 "rentals.show",
                 Some(&rental.reservation_code),
             )?),
         )
         .await?;
     }
-    Ok((
-        Toast::success(lang.t("rentals.desk.returned", &[])),
-        Redirect::route("rentals.receipt", &[&rental.id])?,
-    )
-        .into_response())
+    Ok(settlement)
 }
 
 /// How a rental is booked between stores, for the receipt (#245 writes the

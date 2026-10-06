@@ -1,0 +1,43 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, card, badge, link_button, infolist, entry %}
+{% from "api/_parts.html" import assets %}
+{% block seo %}{{ seo(title=t('api.about.title'), description=t('api.about.lead')) }}{% endblock %}
+
+{#- Every endpoint of the JSON API (#241), from src/app/api/endpoints.rs. -#}
+{% macro endpoint(e) -%}
+<article class="rx-card bs-endpoint" id="{{ e.route | replace('.', '-') }}">
+  <header class="bs-endpoint__head">
+    {{ badge(e.method, kind=("info" if e.method == "GET" else "warning")) }}
+    <code class="bs-endpoint__path">{{ e.path }}</code>
+    <span class="rx-subtitle">{{ t('api.about.ability') }} <code>{{ e.ability }}</code></span>
+  </header>
+  <p>{{ e.purpose | markdown }}</p>
+  {% call infolist(columns=2) %}
+    {% call entry(t('api.about.request')) %}{{ (e.request | markdown) if e.request else "—" }}{% endcall %}
+    {% call entry(t('api.about.answer')) %}{{ e.answer | markdown }}{% endcall %}
+  {% endcall %}
+  <pre class="bs-code"><code>{{ e.curl | replace("$URL", base) }}</code></pre>
+</article>
+{%- endmacro %}
+
+{% block content %}
+{{ assets() }}
+<div class="rx-stack">
+  {{ page_header(t('api.about.title'), subtitle=t('api.about.lead')) }}
+  {% call card(title=t('api.about.how')) %}
+    <ul class="bs-api-rules">
+      <li>{{ t('api.about.rule_token') }}</li>
+      <li>{{ t('api.about.rule_errors') }}</li>
+      <li>{{ t('api.about.rule_limit', count=per_minute) }}</li>
+      <li>{{ t('api.about.rule_cors', origin=origin) }}</li>
+    </ul>
+    <div class="bs-api-links">
+      {%- if auth.check %}{{ link_button(route('api.tokens'), t('api.tokens.title'), size="small") }}{% endif %}
+    </div>
+  {% endcall %}
+  <h2 class="bs-api-group">{{ t('api.about.kiosk') }}</h2>
+  <div class="bs-endpoints" data-bs-reveal>{% for e in kiosk %}{{ endpoint(e) }}{% endfor %}</div>
+  <h2 class="bs-api-group">{{ t('api.about.customer') }}</h2>
+  <div class="bs-endpoints" data-bs-reveal>{% for e in customer %}{{ endpoint(e) }}{% endfor %}</div>
+</div>
+{% endblock %}
