@@ -223,5 +223,348 @@
   "data_page": {
     "title": "El modelo de datos",
     "lead": "Cada tabla de la tienda de bicicletas, cómo se relacionan y las decisiones detrás de ellas."
+  },
+  "rentals": {
+    "nav": {
+      "rent": "Alquilar",
+      "counter": "Mostrador de alquiler",
+      "fleet": "Flota",
+      "identities": "Documentos",
+      "mine": "Mis alquileres"
+    },
+    "search": {
+      "title": "Alquilar una bici",
+      "lead": "Elige una tienda y cuándo vas a montar: verás las bicis que están allí y libres todo ese tiempo, con su precio.",
+      "filters": "Qué buscas",
+      "results": "Bicis que puedes alquilar",
+      "show": "Ver bicis",
+      "any_type": "Cualquier tipo",
+      "any_size": "Cualquier talla",
+      "pick": "Hay una bici libre|Hay :count bicis libres",
+      "placed_by": "traída aquí por :store",
+      "rule": "Las horas se cuentan al empezar y nunca cuestan más que un día; una bici devuelta más de :grace minutos tarde cuesta una hora por cada hora empezada.",
+      "reserve": "Reservar esta bici",
+      "login": "Inicia sesión para reservar",
+      "none_title": "No hay bicis libres entonces",
+      "none_text": "Prueba otra hora, otro tipo o talla, u otra tienda.",
+      "day": "El día de la tienda",
+      "taken": "Ocupada"
+    },
+    "fields": {
+      "store": "Tienda",
+      "period": "Cuándo",
+      "type": "Tipo",
+      "size": "Talla",
+      "bike": "Bici",
+      "frame": "Número de cuadro",
+      "code": "Código de reserva",
+      "status": "Estado",
+      "starts": "Recogida",
+      "ends": "Devolver antes de",
+      "price": "Precio",
+      "deposit": "Fianza",
+      "late_fee": "Recargo por retraso",
+      "damage_fee": "Cargo por daños",
+      "refund": "Fianza devuelta",
+      "kept": "Retenido de la fianza",
+      "paid_now": "Pagado en el mostrador",
+      "customer": "Cliente",
+      "owner": "Tienda propietaria",
+      "location": "Está en",
+      "operating": "Atendido por",
+      "ridden": "Horas de uso",
+      "daily_rate": "Tarifa diaria",
+      "hourly_rate": "Tarifa por hora",
+      "service": "Revisión",
+      "condition": "Estado"
+    },
+    "errors": {
+      "order": "El final debe ser después del inicio.",
+      "past": "El inicio no puede estar en el pasado.",
+      "too_long": "Un alquiler dura como mucho 14 días.",
+      "pick_bike": "Elige una bici.",
+      "pick_customer": "Elige un cliente.",
+      "taken": "Alguien acaba de reservar esta bici para ese momento. Elige otra.",
+      "gone": "Esta bici no se puede alquilar ahora en esta tienda. Elige otra.",
+      "unverified": "El documento del cliente aún no está comprobado.",
+      "no_staff": "Solo el personal puede cobrar en el mostrador.",
+      "damage_fee": "Pon un cargo a los daños, o una foto."
+    },
+    "status": {
+      "rental": {
+        "reserved": "Reservada",
+        "active": "Fuera",
+        "overdue": "Con retraso",
+        "returned": "Devuelta",
+        "cancelled": "Cancelada",
+        "no_show": "No se presentó"
+      },
+      "bike": {
+        "available": "Disponible",
+        "reserved": "Reservada",
+        "rented": "Fuera",
+        "overdue": "Con retraso",
+        "maintenance": "En taller",
+        "in_transit": "En tránsito",
+        "retired": "Retirada"
+      }
+    },
+    "deposit": {
+      "unpaid": "Sin pagar",
+      "held": "En la tienda",
+      "settled": "Liquidada en la devolución",
+      "refunded": "Devuelta",
+      "forfeited": "Retenida en parte (no se presentó)",
+      "paid_online": "Pagada en línea"
+    },
+    "condition": {
+      "new": "Nueva",
+      "good": "Buena",
+      "fair": "Regular",
+      "needs_repair": "Necesita reparación"
+    },
+    "methods": {
+      "cash": "Efectivo",
+      "card": "Tarjeta",
+      "gateway": "En línea"
+    },
+    "checklist": {
+      "frame": "Cuadro",
+      "brakes": "Frenos",
+      "tyres": "Neumáticos",
+      "gears": "Cambios",
+      "lights": "Luces",
+      "lock": "Candado",
+      "bell": "Timbre"
+    },
+    "photos": {
+      "pickup": "Foto de recogida",
+      "return": "Foto de devolución",
+      "damage": "Foto de daños"
+    },
+    "show": {
+      "title": "Reserva :code",
+      "heading": "Tu reserva",
+      "unpaid": "Paga la fianza para guardar la bici",
+      "pay_by": "La reserva se anula si la fianza no está pagada a las :time.",
+      "confirmed": "Tu bici está reservada",
+      "held_until": "Enseña el código en el mostrador. La bici se guarda hasta :time.",
+      "code": "Tu código",
+      "code_hint": "Enséñalo (o dilo) en el mostrador: es todo lo que necesitan.",
+      "details": "Detalles",
+      "pay": "Pagar la fianza (:amount)",
+      "cancel": "Cancelar la reserva",
+      "cancel_title": "¿Cancelar esta reserva?",
+      "cancel_text": "Una fianza pagada se devuelve entera.",
+      "no_cancel": "Ya no se puede cancelar en línea: falta menos de una hora.",
+      "too_late": "Falta menos de una hora: ya no se puede cancelar.",
+      "cancelled": "La reserva está cancelada."
+    },
+    "mine": {
+      "title": "Mis alquileres",
+      "lead": "Tus reservas, las bicis que tienes fuera y los alquileres anteriores.",
+      "current": "Ahora y próximamente",
+      "past": "Antes",
+      "none": "Ningún alquiler próximo",
+      "none_text": "Busca una bici para tu próxima salida.",
+      "verified": "Tu documento está comprobado: puedes alquilar en todas las tiendas.",
+      "pending": "Tu documento está pendiente. Puedes reservar; el personal lo comprueba antes de salir.",
+      "unverified": "Antes de tu primer alquiler, envía tu documento una vez."
+    },
+    "identity": {
+      "title": "Comprobación del documento",
+      "lead": "Una vez, antes de tu primer alquiler: una foto de tu documento y su número. El personal lo comprueba y luego alquilas en todas las tiendas.",
+      "needed": "Antes de tu primer alquiler, envía tu documento una vez.",
+      "send": "Envía tu documento",
+      "number": "Número del documento",
+      "number_hint": "Tal como aparece impreso. Se guarda cifrado; el personal solo ve sus últimos caracteres.",
+      "photo": "Foto del documento",
+      "photo_hint": "Una foto o escaneo claro, de 5 MB como mucho. Solo el personal que comprueba documentos puede abrirla.",
+      "store": "Tienda que lo comprueba",
+      "store_hint": "Donde recogerás tu primera bici.",
+      "submit": "Enviar para comprobar",
+      "sent": "Enviado: la tienda lo comprueba pronto.",
+      "waiting": "La tienda lo comprueba antes de tu primera salida. Recibirás un correo.",
+      "done": "Comprobado",
+      "verified": "Tu documento se comprobó el :date.",
+      "refused": "No se pudo comprobar tu documento"
+    },
+    "identities": {
+      "title": "Documentos por comprobar",
+      "lead": "Documentos que los clientes enviaron a tu tienda. Abre la foto, compárala con el número, aprueba o rechaza.",
+      "none": "Nada que comprobar",
+      "none_text": "Los documentos nuevos aparecen aquí y en tus notificaciones.",
+      "open_photo": "Abrir foto",
+      "approve": "Aprobar",
+      "approved": "El cliente está verificado.",
+      "refuse": "Rechazar",
+      "refuse_title": "Rechazar este documento",
+      "note": "Por qué (el cliente lo lee)",
+      "refused": "Se le explica al cliente por qué."
+    },
+    "counter": {
+      "title": "Mostrador de alquiler",
+      "lead": "Las recogidas de hoy, las bicis fuera y las que van con retraso en tu tienda.",
+      "search": "Código o cliente",
+      "search_hint": "Código de reserva o nombre del cliente",
+      "found": "Un alquiler encontrado|:count alquileres encontrados",
+      "nothing": "No se encontró nada",
+      "nothing_text": "Revisa el código, o busca por el nombre o el correo del cliente.",
+      "pickups": "Recogidas de hoy",
+      "out": "Fuera",
+      "overdue": "Con retraso",
+      "empty_pickups": "No quedan recogidas hoy",
+      "empty_out": "Ninguna bici fuera",
+      "empty_overdue": "Nada con retraso"
+    },
+    "desk": {
+      "title": "Alquiler :code",
+      "rental": "Alquiler",
+      "customer": "Cliente",
+      "id_check": "Documento",
+      "verified": "Verificado",
+      "not_verified": "Sin verificar",
+      "photos": "Fotos",
+      "pickup": "Entregar la bici",
+      "pickup_lead": "Marca lo que está bien, cobra lo pendiente y entrégala.",
+      "checklist": "Estado",
+      "due_now": "A pagar ahora",
+      "method": "Pago",
+      "hand_over": "Entregar",
+      "picked_up": "La bici ha salido. ¡Buen viaje!",
+      "return": "Recibir la bici",
+      "return_lead": "Marca lo que está bien y anota cualquier daño. La fianza cubre primero los cargos.",
+      "late": ":minutes minutos después de la hora: recargo :fee.",
+      "damaged": "Con daños",
+      "damage": "Daños encontrados en la devolución",
+      "damage_note": "Qué está dañado",
+      "damage_photos": "Fotos de los daños",
+      "photos_hint": "Hasta seis fotos de 5 MB.",
+      "deposit_held": "Fianza en la tienda",
+      "to_pay": "A pagar ahora",
+      "settle_hint": "Los recargos y daños salen de la fianza; el resto se devuelve.",
+      "take_back": "Recibir",
+      "returned": "La bici ha vuelto.",
+      "closed": "Este alquiler está cerrado.",
+      "nothing": "No hay nada que hacer en el mostrador con este alquiler.",
+      "other_store": "Esta bici se recoge en :store. Cambia de tienda para entregarla.",
+      "not_here": "Este alquiler no se puede entregar aquí.",
+      "not_out": "Esta bici no está fuera."
+    },
+    "receipt": {
+      "title": "Recibo del alquiler",
+      "customer": "Para el cliente",
+      "total": "Total",
+      "kept": "Retenido de la fianza",
+      "books": "Entre las tiendas",
+      "books_lead": "La tienda propietaria de la bici gana el alquiler y sus cargos; la tienda que atendió gana su comisión.",
+      "owner_share": "Para la tienda propietaria",
+      "fee": "Comisión de la tienda que atendió (:rate %)",
+      "same_store": "La misma tienda es propietaria y atendió.",
+      "payments": "Pagos",
+      "when": "Cuándo",
+      "amount": "Importe",
+      "no_payments": "Ningún pago registrado.",
+      "send_back": "Devolverla a :store",
+      "send_back_text": "Esta bici estaba en :store: devuélvela allí cuando puedas."
+    },
+    "walkin": {
+      "title": "Alquiler sin reserva",
+      "lead": "Para alguien en el mostrador sin reserva.",
+      "customer_hint": "Escribe un nombre o correo",
+      "verified_only": "Solo clientes con el documento comprobado.",
+      "submit": "Seguir a la entrega",
+      "no_bikes": "No hay bicis libres ahora",
+      "no_bikes_text": "Todas las bicis de aquí están fuera, reservadas o en el taller."
+    },
+    "fleet": {
+      "title": "Panel de la flota",
+      "lead": "Las bicis de alquiler de tu tienda: dónde están, de quién son y qué hacen.",
+      "views": "Qué bicis",
+      "view": {
+        "all": "Todas",
+        "mine_here": "Nuestras, aquí",
+        "others_here": "Traídas por otras tiendas",
+        "mine_elsewhere": "Nuestras, en otra tienda"
+      },
+      "empty": "No hay bicis aquí",
+      "service_due": "Revisión pendiente",
+      "service_due_text": "Esta bici ha llegado a su intervalo de revisión.",
+      "hours_left": ":hours h para la revisión",
+      "service_note": "Revisión periódica (:hours h de uso)",
+      "bike": "La bici",
+      "owner_hint": "Sus cuentas, tarifas, retirarla o venderla",
+      "location_hint": "Alquilarla y repararla",
+      "history": "Historial",
+      "rentals": "Alquileres",
+      "placements": "Traslados",
+      "work_orders": "Órdenes de taller",
+      "no_rentals": "Aún no se ha alquilado",
+      "no_placements": "Nunca ha estado en otra tienda",
+      "no_work": "Ninguna orden de taller aún",
+      "billed_to": "a cargo de :store"
+    },
+    "abilities": {
+      "title": "Quién puede hacer qué",
+      "lead": "Cada acción se comprueba en la tienda que importa para ella.",
+      "rent_out": "Alquilarla",
+      "take_back": "Recibirla",
+      "repair": "Repararla",
+      "rates": "Cambiar sus tarifas",
+      "place": "Llevarla a otra tienda",
+      "retire": "Retirarla o venderla",
+      "checked_in": "Se comprueba en :store (:attribute)",
+      "owner_store": "propietaria",
+      "location_store": "ubicación",
+      "yes": "Puedes",
+      "no": "Tú no"
+    },
+    "mail": {
+      "open": "Abrir",
+      "reserved": {
+        "title": "Tu bici está reservada: :code",
+        "body": "Enseña el código :code en :store al recogerla."
+      },
+      "unpaid": {
+        "title": "Reserva :code anulada",
+        "body": "La fianza no se pagó a tiempo, así que la bici vuelve a estar libre. Puedes reservar otra."
+      },
+      "cancelled": {
+        "title": "Reserva :code cancelada",
+        "body": "Tu reserva está cancelada. Una fianza pagada se devuelve entera."
+      },
+      "no_show": {
+        "title": "No recogiste tu bici (:code)",
+        "body": "La bici se guardó media hora después del inicio y luego se liberó. La fianza retiene como mucho el precio del alquiler; el resto se devuelve."
+      },
+      "reminder": {
+        "title": "Te queda una hora con la bici (:code)",
+        "body": "Devuélvela antes de las :time, en cualquiera de nuestras tiendas."
+      },
+      "overdue": {
+        "title": "Tu bici va con retraso (:code)",
+        "body": "Ha pasado la hora de devolución. Se añade un recargo por cada hora empezada; devuélvela en cualquier tienda."
+      },
+      "overdue_staff": {
+        "title": "Con retraso: :code",
+        "body": ":name aún no ha devuelto la bici."
+      },
+      "returned": {
+        "title": "Gracias por montar con nosotros (:code)",
+        "body": "Tu bici ha vuelto. Aquí tienes tu recibo."
+      },
+      "identity_sent": {
+        "title": "Documento por comprobar: :name",
+        "body": ":name envió su documento para su primer alquiler."
+      },
+      "identity_ok": {
+        "title": "Tu documento está comprobado",
+        "body": "Ya puedes alquilar bicis en todas las tiendas."
+      },
+      "identity_refused": {
+        "title": "No se pudo comprobar tu documento",
+        "body": ":note Puedes enviar otra foto."
+      }
+    }
   }
 }

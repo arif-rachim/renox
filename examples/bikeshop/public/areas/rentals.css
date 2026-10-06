@@ -1,0 +1,28 @@
+/* The rental pages' layout (#235): CSS grids spaced with the kit's
+   tokens (--rx-space-*), type from the kit's scale (--rx-type-*); no sizes of our own.
+   Loaded by those pages only, through the layout's `head` stack. */
+
+/* /rent: the filters beside the results on a wide screen, above them on a phone. */
+.bs-rent { display: grid; gap: var(--rx-space-6); align-items: start; }
+@media (min-width: 64rem) { .bs-rent { grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr); } }
+.bs-rent__header { grid-column: 1 / -1; }
+.bs-rent__filters { display: grid; gap: var(--rx-space-4); }
+.bs-rent__results { display: grid; gap: var(--rx-space-4); min-width: 0; }
+.bs-rent__total { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: var(--rx-space-2); font: var(--rx-type-body); }
+.bs-rent__total strong { font: var(--rx-type-heading); }
+
+/* A rental in a list: what it is, then its status and link. */
+.bs-rental { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--rx-space-1) var(--rx-space-3); width: 100%; }
+.bs-rental__title { font: var(--rx-type-label); }
+.bs-rental__meta { grid-column: 1; font: var(--rx-type-note); color: var(--rx-secondary-label); }
+.bs-rental__side { grid-column: 2; grid-row: 1 / span 2; display: grid; justify-items: end; gap: var(--rx-space-1); }
+
+/* The counter's desk: the rental's facts beside the form. */
+.bs-desk { display: grid; gap: var(--rx-space-6); align-items: start; }
+@media (min-width: 64rem) { .bs-desk { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); } }
+.bs-desk__side, .bs-desk__main { display: grid; gap: var(--rx-space-4); min-width: 0; }
+.bs-figures { display: grid; grid-template-columns: 1fr auto; gap: var(--rx-space-2) var(--rx-space-4); margin: 0; font: var(--rx-type-body); }
+.bs-figures dt { color: var(--rx-secondary-label); }
+.bs-figures dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.bs-figures .bs-figures__total { font: var(--rx-type-label); color: var(--rx-label); }
+.bs-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr)); gap: var(--rx-space-2); margin: 0; padding: 0; list-style: none; }

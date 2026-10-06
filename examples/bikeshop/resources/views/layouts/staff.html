@@ -15,6 +15,9 @@
     {#- --- Staff navigation (one line per area; append yours, behind the
         permission it needs: {% if can('…') %}…{% endif %}) --- -#}
     {{ sidebar_link(route('staff.dashboard'), t('nav.dashboard'), active=route_is('staff.dashboard')) }}
+    {% if can('rentals.view') %}{{ sidebar_link(route('rentals.counter'), t('rentals.nav.counter'), active=route_is('rentals.counter', 'rentals.desk', 'rentals.receipt', 'rentals.walkin')) }}{% endif %}
+    {% if can('fleet.view') %}{{ sidebar_link(route('rentals.fleet'), t('rentals.nav.fleet'), active=route_is('rentals.fleet', 'rentals.fleet.show')) }}{% endif %}
+    {% if can('rentals.verify_id') %}{{ sidebar_link(route('rentals.identities'), t('rentals.nav.identities'), active=route_is('rentals.identities')) }}{% endif %}
     {#- --- end of staff navigation --- -#}
     {{ sidebar_section(t('nav.shop')) }}
     {{ sidebar_link(route('home'), t('nav.storefront')) }}

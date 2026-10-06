@@ -1,0 +1,51 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, infolist, entry, alert, link_button, table, columns %}
+{% from "rentals/_parts.html" import styles, status %}
+{% block seo %}{{ seo(title=t('rentals.receipt.title')) }}{% endblock %}
+
+{#- A rental's receipt (#235): money in and out, payments, how it is booked between stores, where the bike goes next. -#}
+{% block content %}
+{{ styles() }}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('rentals.receipt.title'), subtitle=row.reservation_code, back=route('rentals.desk', row.id), back_label=t('rentals.desk.rental')) }}
+  {%- if send_back %}
+  {{ alert(t('rentals.receipt.send_back_text', store=send_back), kind="info", title=t('rentals.receipt.send_back', store=send_back)) }}
+  {%- endif %}
+  {% call columns(2) %}
+    {% call card(title=t('rentals.receipt.customer')) %}
+      <dl class="bs-figures">
+        <dt>{{ t('rentals.fields.price') }}</dt><dd>{{ row.price | money }}</dd>
+        <dt>{{ t('rentals.fields.late_fee') }}</dt><dd>{{ row.late_fee | money }}</dd>
+        <dt>{{ t('rentals.fields.damage_fee') }}</dt><dd>{{ row.damage_fee | money }}</dd>
+        <dt class="bs-figures__total">{{ t('rentals.receipt.total') }}</dt><dd class="bs-figures__total">{{ (row.price + row.late_fee + row.damage_fee) | money }}</dd>
+        <dt>{{ t('rentals.fields.deposit') }}</dt><dd>{{ row.deposit | money }}</dd>
+        <dt>{{ t('rentals.receipt.kept') }}</dt><dd>{{ settlement.kept | money }}</dd>
+        <dt>{{ t('rentals.fields.refund') }}</dt><dd>{{ row.deposit_refunded | money }}</dd>
+      </dl>
+      {%- if row.damage_note %}<p class="rx-hint">{{ t('rentals.desk.damage_note') }}: {{ row.damage_note }}</p>{% endif %}
+    {% endcall %}
+    {% call card(title=t('rentals.receipt.books'), subtitle=t('rentals.receipt.books_lead')) %}
+      {% call infolist() %}
+        {{ entry(t('rentals.fields.owner'), books.owner) }}
+        {{ entry(t('rentals.fields.operating'), books.operating) }}
+        {%- if books.split %}
+        {{ entry(t('rentals.receipt.owner_share'), books.owner_share, format="money") }}
+        {{ entry(t('rentals.receipt.fee', rate=books.fee_rate), books.fee, format="money") }}
+        {%- else %}
+        {{ entry(t('rentals.receipt.owner_share'), row.price + row.late_fee + row.damage_fee, format="money", hint=t('rentals.receipt.same_store')) }}
+        {%- endif %}
+      {% endcall %}
+    {% endcall %}
+  {% endcall %}
+  {% call card(title=t('rentals.receipt.payments')) %}
+    {%- if payments %}
+    {% call table([t('rentals.receipt.when'), t('rentals.desk.method'), [t('rentals.receipt.amount'), "num"]], caption=t('rentals.receipt.payments')) %}
+      {%- for p in payments %}
+      <tr><td>{{ p.paid_at | date('%d %b %H:%M') }}</td><td>{{ t('rentals.methods.' ~ p.method) }}</td><td class="rx-num">{{ p.amount | money }}</td></tr>
+      {%- endfor %}
+    {% endcall %}
+    {%- else %}<p class="rx-subtitle">{{ t('rentals.receipt.no_payments') }}</p>{% endif %}
+  {% endcall %}
+  <p>{{ link_button(route('rentals.counter'), t('rentals.counter.title')) }}</p>
+</div>
+{% endblock %}

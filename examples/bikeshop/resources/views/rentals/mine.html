@@ -1,0 +1,51 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, list, empty, alert, link_button, card %}
+{% from "rentals/_parts.html" import styles, rental_item %}
+{% block seo %}{{ seo(title=t('rentals.mine.title')) }}{% endblock %}
+
+{#- The customer's rentals (#235): current ones first, then the past with their fees. -#}
+{% block content %}
+{{ styles() }}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('rentals.mine.title'), subtitle=t('rentals.mine.lead')) }}
+  {%- if verified %}
+  {{ alert(t('rentals.mine.verified'), kind="success") }}
+  {%- elif identity and identity.status == "pending" %}
+  {{ alert(t('rentals.mine.pending'), kind="info") }}
+  {%- else %}
+  {{ alert(t('rentals.mine.unverified'), kind="warning") }}
+  <p>{{ link_button(route('rentals.identity'), t('rentals.identity.title'), variant="primary") }}</p>
+  {%- endif %}
+  <section class="rx-stack" aria-labelledby="current-title">
+    <h2 class="rx-card__title" id="current-title">{{ t('rentals.mine.current') }}</h2>
+    {%- if current %}
+    {% call list(id="current-rentals", label=t('rentals.mine.current')) %}
+      {%- for row in current %}{{ rental_item(row, route('rentals.show', row.reservation_code), show_customer=false) }}{% endfor %}
+    {% endcall %}
+    {%- else %}
+    <div class="rx-card">{{ empty(t('rentals.mine.none'), t('rentals.mine.none_text'), route('rentals.create'), t('rentals.search.title')) }}</div>
+    {%- endif %}
+  </section>
+  {%- if past %}
+  <section class="rx-stack" aria-labelledby="past-title">
+    <h2 class="rx-card__title" id="past-title">{{ t('rentals.mine.past') }}</h2>
+    {% call list(id="past-rentals", label=t('rentals.mine.past')) %}
+      {%- for row in past %}
+      <li>
+        <div class="bs-rental">
+          <a class="rx-link bs-rental__title" href="{{ route('rentals.show', row.reservation_code) }}">{{ row.model or t('rentals.fields.bike') }}</a>
+          <p class="bs-rental__meta">
+            {{ row.starts_at | date('%d %b %Y') }} · {{ t('rentals.fields.price') }} {{ row.price | money }}
+            {%- if row.late_fee %} · {{ t('rentals.fields.late_fee') }} {{ row.late_fee | money }}{% endif %}
+            {%- if row.damage_fee %} · {{ t('rentals.fields.damage_fee') }} {{ row.damage_fee | money }}{% endif %}
+            {%- if row.deposit_refunded %} · {{ t('rentals.fields.refund') }} {{ row.deposit_refunded | money }}{% endif %}
+          </p>
+          <div class="bs-rental__side">{% from "rentals/_parts.html" import status %}{{ status(row) }}</div>
+        </div>
+      </li>
+      {%- endfor %}
+    {% endcall %}
+  </section>
+  {%- endif %}
+</div>
+{% endblock %}

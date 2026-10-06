@@ -1,0 +1,47 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, toolbar, input, button, link_button, list, empty, columns %}
+{% from "rentals/_parts.html" import styles, rental_item %}
+{% block seo %}{{ seo(title=t('rentals.counter.title')) }}{% endblock %}
+
+{#- The rental counter (#235): the active store's day, and a search by code or customer. -#}
+{% block content %}
+{{ styles() }}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('rentals.counter.title'), subtitle=t('rentals.counter.lead')) }}
+  {% call toolbar() %}
+    <form method="get" action="{{ route('rentals.counter') }}" class="bs-board__search" role="search">
+      {{ input("q", t('rentals.counter.search'), value=q, placeholder=t('rentals.counter.search_hint'), hide_label=true) }}
+    </form>
+    <span class="rx-spacer"></span>
+    {%- if can('rentals.checkout') %}{{ link_button(route('rentals.walkin'), t('rentals.walkin.title'), variant="primary", icon="plus") }}{% endif %}
+    {%- if can('rentals.verify_id') %}{{ link_button(route('rentals.identities'), t('rentals.identities.title')) }}{% endif %}
+    {%- if can('fleet.view') %}{{ link_button(route('rentals.fleet'), t('rentals.fleet.title')) }}{% endif %}
+  {% endcall %}
+  {%- if searched %}
+  <section class="rx-stack" aria-labelledby="found-title">
+    <h2 class="rx-card__title" id="found-title">{{ t('rentals.counter.found', count=found | length) }}</h2>
+    {%- if found %}
+    {% call list(id="found-rentals", label=t('rentals.counter.found', count=found | length)) %}
+      {%- for row in found %}{{ rental_item(row, route('rentals.desk', row.id)) }}{% endfor %}
+    {% endcall %}
+    {%- else %}
+    <div class="rx-card">{{ empty(t('rentals.counter.nothing'), t('rentals.counter.nothing_text')) }}</div>
+    {%- endif %}
+  </section>
+  {%- endif %}
+  {% call columns(3) %}
+    {%- for key, rows in [["pickups", pickups], ["out", out], ["overdue", overdue]] %}
+    <section class="rx-stack" aria-labelledby="{{ key }}-title">
+      <h2 class="rx-card__title" id="{{ key }}-title">{{ t('rentals.counter.' ~ key) }} <span class="rx-badge">{{ rows | length }}</span></h2>
+      {%- if rows %}
+      {% call list(id=key ~ "-rentals", label=t('rentals.counter.' ~ key)) %}
+        {%- for row in rows %}{{ rental_item(row, route('rentals.desk', row.id)) }}{% endfor %}
+      {% endcall %}
+      {%- else %}
+      <div class="rx-card">{{ empty(t('rentals.counter.empty_' ~ key)) }}</div>
+      {%- endif %}
+    </section>
+    {%- endfor %}
+  {% endcall %}
+</div>
+{% endblock %}

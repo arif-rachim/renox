@@ -1,0 +1,25 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, link_tabs %}
+{% from "renox/grid.html" import grid %}
+{% block seo %}{{ seo(title=t('rentals.fleet.title')) }}{% endblock %}
+
+{#- The fleet board (#235): renox::grid with poll(30) and cards on phones; the
+    tabs narrow it by owner and location (#245). -#}
+{% block content %}
+<div class="rx-stack">
+  {{ page_header(t('rentals.fleet.title'), subtitle=t('rentals.fleet.lead')) }}
+  {%- set tabs = namespace(items=[]) %}
+  {%- for key in views %}
+    {%- set label = t('rentals.fleet.view.' ~ key) ~ ((" (" ~ counts[key] ~ ")") if key != "all" else "") %}
+    {%- set tabs.items = tabs.items + [[route('rentals.fleet', view=key), label]] %}
+  {%- endfor %}
+  {{ link_tabs(tabs.items, current=route('rentals.fleet', view=tab), label=t('rentals.fleet.views')) }}
+  {% call(row, column) grid(fleet) %}
+    {%- if column.key == "model" %}{{ row.model }}{% if row.size %} <span class="rx-subtitle">{{ row.size }}</span>{% endif %}
+    {%- elif column.key == "service" %}
+      {%- if row.service_due %}<span class="rx-badge rx-badge--warning">{{ t('rentals.fleet.service_due') }}</span>
+      {%- else %}{{ t('rentals.fleet.hours_left', hours=row.hours_to_service) }}{% endif %}
+    {%- endif %}
+  {% endcall %}
+</div>
+{% endblock %}

@@ -18,8 +18,8 @@
 //! Migration: `migrations/20260101000600_create_fleet_and_rentals_tables.*`.
 
 use renox::chrono::NaiveDate;
-use renox::db::Ulid;
 use renox::db::relations::belongs_to;
+use renox::db::{Json, Ulid};
 use renox::prelude::*;
 use serde::Serialize;
 
@@ -50,6 +50,8 @@ pub enum BikeStatus {
     Reserved,
     /// Out with a customer.
     Rented,
+    /// Out with a customer and past its due time (set by the overdue job).
+    Overdue,
     /// In the workshop.
     Maintenance,
     /// On its way to another store (a placement or a recall).
@@ -79,6 +81,9 @@ pub struct RentalBike {
     /// What it is worth in the owner's books.
     pub asset_value: i64,
     pub ridden_hours: i64,
+    /// `ridden_hours` when the workshop last serviced it: the next service
+    /// is due [`crate::app::rentals::pricing::SERVICE_EVERY_HOURS`] later.
+    pub serviced_at_hours: i64,
     pub purchased_on: Option<NaiveDate>,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
@@ -178,6 +183,24 @@ pub enum RentalStatus {
     Returned,
     /// Called off before pick-up.
     Cancelled,
+    /// Not picked up within half an hour of its start (the no-show task).
+    NoShow,
+}
+
+/// What happened to a rental's deposit.
+#[derive(DbEnum, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DepositStatus {
+    /// Not paid yet (a walk-in pays it at the counter).
+    #[default]
+    Unpaid,
+    /// Paid online or at the counter, held by the operating store.
+    Held,
+    /// Settled at the return: fees taken from it, the rest given back.
+    Settled,
+    /// Given back whole (a cancellation in time).
+    Refunded,
+    /// Partly kept for a no-show.
+    Forfeited,
 }
 
 /// A bike rented by a customer for some hours or days.
@@ -211,6 +234,23 @@ pub struct Rental {
     pub damage_fee: i64,
     /// Who handed it over (a `staff` row).
     pub served_by: Option<i64>,
+    pub deposit_status: DepositStatus,
+    /// What was given back of the deposit (at the return, a cancellation or
+    /// a no-show).
+    pub deposit_refunded: i64,
+    /// The condition checklist at pick-up: the items found in order.
+    pub pickup_checklist: Option<Json<Vec<String>>>,
+    /// The same checklist at the return.
+    pub return_checklist: Option<Json<Vec<String>>>,
+    /// What was damaged, noted at the return.
+    pub damage_note: Option<String>,
+    /// Who took it back (a `staff` row).
+    pub returned_by: Option<i64>,
+    /// When the "an hour left" reminder went out.
+    pub reminded_at: Option<DateTime>,
+    pub cancelled_at: Option<DateTime>,
+    /// From pick-up to return, added to the bike's `ridden_hours`.
+    pub ridden_minutes: i64,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
 }
@@ -226,6 +266,110 @@ impl Rental {
     pub fn total(&self) -> i64 {
         self.price + self.late_fee + self.damage_fee
     }
+
+    /// Late and damage fees together (what the deposit settles against).
+    pub fn fees(&self) -> i64 {
+        self.late_fee + self.damage_fee
+    }
+
+    /// Booked, not picked up yet.
+    pub fn is_reserved(&self) -> bool {
+        self.status == RentalStatus::Reserved
+    }
+
+    /// With the customer now (on time or not).
+    pub fn is_out(&self) -> bool {
+        matches!(self.status, RentalStatus::Active | RentalStatus::Overdue)
+    }
+
+    /// The customer may still cancel it: reserved, and more than
+    /// [`crate::app::rentals::pricing::CANCEL_UNTIL_MINUTES`] before its start.
+    pub fn cancellable(&self) -> bool {
+        self.is_reserved()
+            && renox::db::now()
+                < self.starts_at
+                    - renox::chrono::Duration::minutes(
+                        crate::app::rentals::pricing::CANCEL_UNTIL_MINUTES,
+                    )
+    }
+}
+
+/// Where a customer's ID document stands.
+#[derive(DbEnum, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum IdentityStatus {
+    /// Sent, waiting for staff.
+    #[default]
+    Pending,
+    /// Checked by staff: the customer's `id_verified_at` is set.
+    Approved,
+    /// Refused (a blurred photo, a number that doesn't match), with a note.
+    Refused,
+}
+
+/// A customer's ID document, sent once before their first rental (#235).
+///
+/// The photo is a **private** upload (`Upload::store`, never under
+/// `public/`): staff open it through a signed link that works for a few
+/// minutes, and only staff who may check IDs (`rentals.verify_id`) in the
+/// store the customer chose (`store_id`) or in a store serving one of their
+/// rentals. The ID number itself is the customer's `id_number`, an
+/// `Encrypted<String>`. Approving sets `customers.id_verified_at`, valid in
+/// every store.
+#[derive(Model, Serialize, Default, Debug, Clone)]
+#[model(table = "identity_documents")]
+pub struct IdentityDocument {
+    pub id: i64,
+    pub customer_id: i64,
+    /// The private storage key of the photo (never shown: staff get a
+    /// temporary signed link).
+    #[serde(skip_serializing)]
+    pub photo_path: String,
+    /// The store that checks it (where the customer will pick up first).
+    pub store_id: i64,
+    pub status: IdentityStatus,
+    pub submitted_at: DateTime,
+    /// The user who approved or refused it.
+    pub reviewed_by: Option<i64>,
+    pub reviewed_at: Option<DateTime>,
+    /// Why it was refused.
+    pub note: Option<String>,
+    pub created_at: Option<DateTime>,
+    pub updated_at: Option<DateTime>,
+}
+
+impl StoreRecord for IdentityDocument {
+    const VIEW: &'static str = catalogue::RENTALS_VERIFY_ID;
+    const STORE_COLUMNS: &'static [&'static str] = &["store_id"];
+
+    fn store_id(&self, _attr: StoreAttr) -> Option<i64> {
+        Some(self.store_id)
+    }
+}
+
+/// Why a rental photo was taken.
+#[derive(DbEnum, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PhotoKind {
+    /// The bike at pick-up.
+    #[default]
+    Pickup,
+    /// The bike at the return.
+    Return,
+    /// Damage found at the return.
+    Damage,
+}
+
+/// A photo of a rental bike at the counter (a private upload).
+#[derive(Model, Serialize, Default, Debug, Clone)]
+#[model(table = "rental_photos")]
+pub struct RentalPhoto {
+    pub id: i64,
+    pub rental_id: i64,
+    pub kind: PhotoKind,
+    /// The private storage key.
+    #[serde(skip_serializing)]
+    pub path: String,
+    pub created_at: Option<DateTime>,
+    pub updated_at: Option<DateTime>,
 }
 
 impl StoreRecord for Rental {

@@ -71,6 +71,8 @@ pub enum WorkStatus {
     InProgress,
     /// Waiting for a part to arrive.
     WaitingParts,
+    /// Extra work proposed, waiting for the customer's answer.
+    WaitingApproval,
     /// Done, waiting for the customer.
     Ready,
     /// Picked up (and paid).

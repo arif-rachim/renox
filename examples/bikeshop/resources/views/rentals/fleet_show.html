@@ -1,0 +1,66 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, infolist, entry, alert, tabs, tab_panel, list, empty, badge, columns %}
+{% from "rentals/_parts.html" import styles, rental_item %}
+{% block seo %}{{ seo(title=bike.frame_number) }}{% endblock %}
+
+{#- A rental bike (#235, #245): owner and location, what each store may do, its history. -#}
+{% block content %}
+{{ styles() }}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(model ~ (" (" ~ size ~ ")" if size else ""), subtitle=bike.frame_number, back=route('rentals.fleet'), back_label=t('rentals.fleet.title'), badge=t('rentals.status.bike.' ~ bike.status)) }}
+  {%- if send_back %}{{ alert(t('rentals.receipt.send_back_text', store=send_back), kind="info", title=t('rentals.receipt.send_back', store=send_back)) }}{% endif %}
+  {%- if service_due %}{{ alert(t('rentals.fleet.service_due_text'), kind="warning") }}{% endif %}
+  {% call columns(2) %}
+    {% call card(title=t('rentals.fleet.bike')) %}
+      {% call infolist() %}
+        {{ entry(t('rentals.fields.owner'), owner, hint=t('rentals.fleet.owner_hint')) }}
+        {{ entry(t('rentals.fields.location'), location, hint=t('rentals.fleet.location_hint')) }}
+        {{ entry(t('rentals.fields.condition'), t('rentals.condition.' ~ bike.condition)) }}
+        {{ entry(t('rentals.fields.hourly_rate'), bike.hourly_rate, format="money") }}
+        {{ entry(t('rentals.fields.daily_rate'), bike.daily_rate, format="money") }}
+        {{ entry(t('rentals.fields.deposit'), bike.deposit, format="money") }}
+        {{ entry(t('rentals.fields.ridden'), bike.ridden_hours, format="number", hint=t('rentals.fleet.hours_left', hours=hours_to_service)) }}
+      {% endcall %}
+    {% endcall %}
+    {% call card(title=t('rentals.abilities.title'), subtitle=t('rentals.abilities.lead')) %}
+      {% call list(id="abilities", label=t('rentals.abilities.title')) %}
+        {%- for a in abilities %}
+        <li>
+          <div class="rx-list__main">
+            <strong>{{ t(a.action) }}</strong>
+            <p class="rx-subtitle">{{ t('rentals.abilities.checked_in', store=a.store, attribute=t('rentals.abilities.' ~ a.attribute)) }} · <code>{{ a.permission }}</code></p>
+          </div>
+          {{ badge(t('rentals.abilities.yes') if a.allowed else t('rentals.abilities.no'), kind="success" if a.allowed else none) }}
+        </li>
+        {%- endfor %}
+      {% endcall %}
+    {% endcall %}
+  {% endcall %}
+  {{ tabs("history", [["rentals", t('rentals.fleet.rentals')], ["placements", t('rentals.fleet.placements')], ["work", t('rentals.fleet.work_orders')]], label=t('rentals.fleet.history')) }}
+  {% call tab_panel("history", "rentals", selected=true) %}
+    {%- if rentals %}
+    {% call list(id="bike-rentals", label=t('rentals.fleet.rentals')) %}
+      {%- for row in rentals %}{{ rental_item(row, route('rentals.desk', row.id)) }}{% endfor %}
+    {% endcall %}
+    {%- else %}<div class="rx-card">{{ empty(t('rentals.fleet.no_rentals')) }}</div>{% endif %}
+  {% endcall %}
+  {% call tab_panel("history", "placements") %}
+    {%- if placements %}
+    {% call list(id="bike-placements", label=t('rentals.fleet.placements')) %}
+      {%- for p in placements %}
+      <li><div class="rx-list__main"><strong>{{ p.from }} → {{ p.to }}</strong><p class="rx-subtitle">{{ p.placement.requested_at | date('%d %b %Y') }}</p></div>{{ badge(p.placement.status) }}</li>
+      {%- endfor %}
+    {% endcall %}
+    {%- else %}<div class="rx-card">{{ empty(t('rentals.fleet.no_placements')) }}</div>{% endif %}
+  {% endcall %}
+  {% call tab_panel("history", "work") %}
+    {%- if work_orders %}
+    {% call list(id="bike-work", label=t('rentals.fleet.work_orders')) %}
+      {%- for w in work_orders %}
+      <li><div class="rx-list__main"><strong>#{{ w.order.id }} · {{ w.store }}</strong><p class="rx-subtitle">{{ w.order.scheduled_for | date('%d %b %Y') }}{% if w.billed %} · {{ t('rentals.fleet.billed_to', store=w.billed) }}{% endif %}{% if w.order.customer_note %} · {{ w.order.customer_note }}{% endif %}</p></div>{{ badge(w.order.status) }}</li>
+      {%- endfor %}
+    {% endcall %}
+    {%- else %}<div class="rx-card">{{ empty(t('rentals.fleet.no_work')) }}</div>{% endif %}
+  {% endcall %}
+</div>
+{% endblock %}
