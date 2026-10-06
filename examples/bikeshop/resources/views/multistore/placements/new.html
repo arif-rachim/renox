@@ -1,0 +1,31 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, select, input, button, form_errors, toggle_buttons, empty %}
+{% from "stock/_parts.html" import styles %}
+{% block seo %}{{ seo(title=t('multistore.placements.new')) }}{% endblock %}
+
+{#- Place one of our bikes at another store, or ask another store for one of its bikes (#245). -#}
+{% block content %}
+{{ styles() }}
+<div class="rx-stack">
+  {{ page_header(t('multistore.placements.new'), subtitle=t('multistore.placements.new_lead'), back=route('multistore.placements'), back_label=t('multistore.placements.title')) }}
+  {%- set stores = namespace(items=[]) %}{% for s in others %}{% set stores.items = stores.items + [[s.id, s.name]] %}{% endfor %}
+  <form method="get" action="{{ route('multistore.placements.create') }}" class="bs-filters" id="placement-pick">
+    {{ toggle_buttons("direction", t('multistore.placements.direction'), [["place", t('multistore.placements.place')], ["ask", t('multistore.placements.ask')]], selected=direction) }}
+    {{ select("store", t('multistore.placements.other_store'), stores.items, selected=other) }}
+    {{ button(t('multistore.placements.show_bikes'), variant="secondary") }}
+  </form>
+  <form method="post" action="{{ route('multistore.placements.store') }}" id="placement-form" novalidate>
+    {{ csrf_field() }}
+    <input type="hidden" name="direction" value="{{ direction }}">
+    <input type="hidden" name="store" value="{{ other }}">
+    {% call card(title=t('multistore.placements.bikes_' ~ direction)) %}
+      {{ form_errors() }}
+      {%- if options %}
+      {{ select("bike", t('multistore.placements.bike'), options, required=true, searchable=true) }}
+      {{ input("note", t('multistore.placements.note')) }}
+      {{ button(t('multistore.placements.submit_' ~ direction), icon="check") }}
+      {%- else %}{{ empty(t('multistore.placements.no_bikes')) }}{% endif %}
+    {% endcall %}
+  </form>
+</div>
+{% endblock %}

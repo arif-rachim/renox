@@ -1,0 +1,33 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, link_button, empty, stats, stat, list %}
+{% from "renox/grid.html" import grid %}
+{% from "stock/_parts.html" import styles %}
+{% block seo %}{{ seo(title=t('multistore.books.title')) }}{% endblock %}
+
+{#- The books between stores (#245): open balances per store pair, and every entry this person
+    may see (renox::grid with a sum under the amounts, exports). -#}
+{% block content %}
+{{ styles() }}
+<div class="rx-stack">
+  {% call page_header(t('multistore.books.title'), subtitle=t('multistore.books.lead')) %}
+    {{ link_button(route('multistore.fees'), t('multistore.fees.title')) }}
+    {{ link_button(route('multistore.settlements'), t('multistore.settlements.title'), variant="primary") }}
+  {% endcall %}
+  {% call stats(2) %}
+    {{ stat(t('multistore.books.position', store=store_name), mine | money, hint=t('multistore.books.position_hint')) }}
+    {{ stat(t('multistore.books.pairs'), balances | length) }}
+  {% endcall %}
+  {% call card(title=t('multistore.books.balances'), subtitle=t('multistore.books.balances_lead')) %}
+    {%- if balances %}
+    {% call list(id="balances", label=t('multistore.books.balances')) %}
+      {%- for b in balances %}
+      <li><div class="rx-list__main"><strong>{{ t('multistore.books.owes', debtor=b.debtor, creditor=b.creditor) }}</strong></div><span class="rx-num">{{ b.amount | money }}</span></li>
+      {%- endfor %}
+    {% endcall %}
+    {%- else %}{{ empty(t('multistore.books.square')) }}{% endif %}
+  {% endcall %}
+  {% call(row, column) grid(entries) %}
+    {%- if column.key == "source" %}{% if row.source_url %}<a class="rx-link" href="{{ row.source_url }}">{{ row.source_label }}</a>{% else %}{{ row.source_label }}{% endif %}{% endif %}
+  {% endcall %}
+</div>
+{% endblock %}

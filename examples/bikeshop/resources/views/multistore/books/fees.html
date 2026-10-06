@@ -1,0 +1,43 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, list, badge, action_sheet, input, empty %}
+{% from "blocks/history.html" import history %}
+{% from "stock/_parts.html" import styles %}
+{% block seo %}{{ seo(title=t('multistore.fees.title')) }}{% endblock %}
+
+{#- The stores' fee rates (#245): what a store earns for work done for another; only the owner
+    changes them (`settings.fees`), every change audited; entries keep the rate they were
+    booked with. -#}
+{% block content %}
+{{ styles() }}
+<div class="rx-stack">
+  {{ page_header(t('multistore.fees.title'), subtitle=t('multistore.fees.lead'), back=route('multistore.books'), back_label=t('multistore.books.title')) }}
+  <div class="bs-split" data-bs-reveal>
+    <div>
+      {% call card(title=t('multistore.fees.rates')) %}
+        {% call list(id="fee-rates", label=t('multistore.fees.rates')) %}
+          {%- for r in rates %}{% set s = r.store %}
+          <li>
+            <div class="rx-list__main"><strong>{{ s.name }}</strong><p class="rx-subtitle">{{ t('multistore.fees.earns', rate=r.percent) }}</p></div>
+            {%- if can_change %}
+            {% call action_sheet("fee-" ~ s.id, t('multistore.fees.change'), route('multistore.fees.update', s.id), t('multistore.fees.change_title', store=s.name), description=t('multistore.fees.change_lead'), size="small", icon="edit") %}
+              {{ input("percent", t('multistore.fees.percent'), type="number", value=r.value, required=true, suffix="%", attrs={"min": 0, "max": 50, "step": 0.01}) }}
+            {% endcall %}
+            {%- endif %}
+          </li>
+          {%- endfor %}
+        {% endcall %}
+        {%- if not can_change %}<p class="rx-subtitle">{{ t('multistore.fees.owner_only') }}</p>{% endif %}
+      {% endcall %}
+    </div>
+    <div>
+      {% call card(title=t('multistore.fees.history')) %}
+        {%- if changes %}
+        {%- set h = namespace(items=[]) %}
+        {%- for e in changes %}{% set h.items = h.items + [{"time": e.at, "title": t('multistore.fees.changed', store=e.store, from=e.from, to=e.to), "by": e.by, "kind": "info"}] %}{% endfor %}
+        {{ history(h.items, label=t('multistore.fees.history'), date_format="%d %b %Y %H:%M") }}
+        {%- else %}{{ empty(t('multistore.fees.no_history')) }}{% endif %}
+      {% endcall %}
+    </div>
+  </div>
+</div>
+{% endblock %}

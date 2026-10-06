@@ -1,0 +1,11 @@
+{#- A monthly statement between two stores (src/app/multistore/settlements.rs `SendStatement`),
+    the entries attached as a CSV file. -#}
+{% extends "renox/mail/layout.html" %}
+{% from "renox/mail/components.html" import table, button %}
+{% block content %}
+<p><strong>{{ t('multistore.mail.statement.title', month=month) }}</strong></p>
+<p>{{ t('multistore.mail.statement.body', debtor=debtor, creditor=creditor, amount=(amount | money)) }}</p>
+{{ table([[t('multistore.mail.statement.pays'), debtor], [t('multistore.mail.statement.paid'), creditor], [t('multistore.settlements.amount'), amount | money], [t('multistore.statement.entries'), entries]]) }}
+<p>{{ t('multistore.mail.statement.confirm') }}</p>
+{{ button(url, t('multistore.mail.statement.open')) }}
+{% endblock %}

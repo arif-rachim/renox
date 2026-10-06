@@ -1,10 +1,448 @@
 //! "About this page" entries for the multistore area's pages (see `crate::explain`).
 
-use crate::explain::{Explanation, NotAPage};
+use crate::explain::{Audience, Explanation, Feature, Flow, NotAPage};
+
+const MOD: &str = "examples/bikeshop/src/app/multistore/mod.rs";
+const MODEL: &str = "examples/bikeshop/src/app/multistore/model.rs";
+const HELP: &str = "examples/bikeshop/src/app/multistore/help.rs";
+const PLACEMENTS: &str = "examples/bikeshop/src/app/multistore/placements.rs";
+const BOOKS: &str = "examples/bikeshop/src/app/multistore/books.rs";
+const INTERCOMPANY: &str = "examples/bikeshop/src/app/multistore/intercompany.rs";
+const SETTLEMENTS: &str = "examples/bikeshop/src/app/multistore/settlements.rs";
+const AUDIT: &str = "examples/bikeshop/src/app/multistore/audit.rs";
+const ACTIVE_STORE: &str = "examples/bikeshop/src/app/access/active_store.rs";
+const POLICY: &str = "examples/bikeshop/src/app/access/policy.rs";
+const TESTS: &str = "examples/bikeshop/tests/multistore.rs";
+const BROWSER: &str = "tests/browser/bikeshop-multistore.test.mjs";
+
+const AUDITED: Feature = Feature {
+    api: "Audit",
+    why: "Renox's `Audit` module keeps `audit_logs`; `multistore::audit::record` adds the store \
+          the person was working in and the roles they held **there** (from `assignments`, never \
+          a role-name check), so \"who did this, as what, where\" has an answer even for someone \
+          with roles in two stores.",
+};
+
+const SCOPES: Feature = Feature {
+    api: "scopes_with",
+    why: "Lists start from `access::visible::<M>(permission)`: Renox's `scopes_with` turns the \
+          person's roles into the stores they may see that in, and `Scopes::apply` filters on \
+          the record's two store columns (\"mine **or** at my store\"). The owner's global role \
+          sees everything, without any check on a role's name.",
+};
+
+const POSTING: Feature = Feature {
+    api: "Events and listeners",
+    why: "The books follow the business without the other areas knowing them: the module \
+          listens to `rentals::RentalClosed` and `workshop::status::WorkOrderClosed` \
+          (`Registry::listen`) and books the entries in `multistore::books`, the one place that \
+          writes them (sales call it for consigned goods, the stock take for losses).",
+};
 
 /// The explanation of every page in this area.
 pub fn entries() -> Vec<Explanation> {
-    vec![]
+    vec![
+        Explanation {
+            route: "multistore.help",
+            path: "/staff/help",
+            title: "Help between stores",
+            purpose: "A store short of people borrows someone from another store for some days. \
+                      The page lists help asked of the active store (to approve or refuse), help \
+                      it asked for, who is helping now, and lets either store end a help early \
+                      and the helped store log the hours. An approved request gives the helper a \
+                      role **in the helped store, between two dates**: their access there starts \
+                      and ends by itself. The store switcher in the top bar is how the helper \
+                      works there: it offers every store where they hold a role today.",
+            who: "Store managers (`staff.help`) and the owner.",
+            audience: &[Audience::Manager, Audience::Owner],
+            flow: Flow::BackOffice,
+            features: &[
+                Feature {
+                    api: "assign_role_in().from().until()",
+                    why: "Approving calls `helper.assign_role_in(db, role, &Scope::of(store))\
+                          .from(start).until(end)` (Renox #244). Nothing has to run at the end: \
+                          the role stops counting, so `scopes_with` no longer lists the store in \
+                          the helper's switcher and its pages answer 403. Ending early moves the \
+                          end to now (or removes the role, if it hadn't started).",
+                },
+                Feature {
+                    api: "renox::context",
+                    why: "The store switcher (`access::active_store`) keeps the chosen store in \
+                          the session and calls `permissions::set_scope` on every staff request, \
+                          so the helper's rights come from the roles **in that store only**: a \
+                          manager of North working in South as staff has staff rights there.",
+                },
+                Feature {
+                    api: "has_permission_in",
+                    why: "Approving and refusing need `staff.help` in the **lending** store, \
+                          withdrawing in the **asking** store, ending in either: \
+                          `access::can_in(user, STAFF_HELP, store)` per action.",
+                },
+                Feature {
+                    api: "notify",
+                    why: "The other store's managers hear of each step in the app; the helper \
+                          gets a mail and a notification with the dates.",
+                },
+                AUDITED,
+            ],
+            under_hood: "Loading: up to 100 requests of the store, then the helpers' staff rows \
+                         and users, the stores and the hours, five queries whatever the number. \
+                         Each action moves the status with `UPDATE … WHERE status = ?` (pressing \
+                         twice acts once), then gives, shortens or removes the dated role, writes \
+                         an audit row and notifies.",
+            docs: &[
+                "docs/authorization.md#roles-per-branch-a-role-in-one-store-for-a-while",
+                "docs/authorization.md#managing-assignments",
+                "docs/mail.md#database-notifications",
+                "docs/authorization.md#sensitive-actions-and-the-audit-trail",
+            ],
+            sources: &[
+                HELP,
+                ACTIVE_STORE,
+                AUDIT,
+                "examples/bikeshop/resources/views/multistore/help/index.html",
+                "examples/bikeshop/resources/views/layouts/_store_switcher.html",
+                TESTS,
+                BROWSER,
+            ],
+        },
+        Explanation {
+            route: "multistore.help.create",
+            path: "/staff/help/new",
+            title: "Ask another store for help",
+            purpose: "Ask another store to lend someone: the person (from that store's staff), \
+                      the role they'll have here (a role from the catalogue, never typed), the \
+                      first and last day, and why.",
+            who: "Store managers (`staff.help` in the store asking).",
+            audience: &[Audience::Manager, Audience::Owner],
+            flow: Flow::BackOffice,
+            features: &[
+                Feature {
+                    api: "Valid<T> + after hook",
+                    why: "`HelpForm`'s rules check the fields (the role `one_of` the \
+                          catalogue's store roles); its `after` hook checks the days are in \
+                          order and not past, and that the person works at the lending store.",
+                },
+                Feature {
+                    api: "UI kit: date_picker",
+                    why: "The kit's date picker (Cally in a popover) for the two days; they are \
+                          turned into moments at midnight in `APP_TIMEZONE` (the last day ends \
+                          at the next midnight).",
+                },
+            ],
+            under_hood: "Loading: the stores, the lending store's active staff and their users. \
+                         Sending: `Valid<HelpForm>`, one insert, an audit row, a notice to the \
+                         lending store's managers.",
+            docs: &[
+                "docs/validation.md#hooks-prepare-authorize-after",
+                "docs/ui.md#form-fields",
+                "docs/types.md#dates-and-times",
+            ],
+            sources: &[
+                HELP,
+                "examples/bikeshop/resources/views/multistore/help/new.html",
+                TESTS,
+            ],
+        },
+        Explanation {
+            route: "multistore.help.hours",
+            path: "/staff/help/hours",
+            title: "Hours helped",
+            purpose: "Hours helped per person and store, for reports. Help between stores is \
+                      never charged (the owner's decision 2): these hours are counted, not \
+                      booked.",
+            who: "Store managers and the owner (`staff.help`).",
+            audience: &[Audience::Manager, Audience::Owner],
+            flow: Flow::BackOffice,
+            features: &[
+                SCOPES,
+                Feature {
+                    api: "Query<T>",
+                    why: "One grouped query (`group_by` + `select_as`: `COUNT(DISTINCT \
+                          worked_on)`, `SUM(minutes)`) per person and store, within the stores \
+                          the person may see.",
+                },
+                Feature {
+                    api: "UI kit: stats + table",
+                    why: "Totals as the kit's stats, the lines as its table.",
+                },
+            ],
+            under_hood: "Four queries: the grouped hours, the staff rows, their users, the stores.",
+            docs: &[
+                "docs/authorization.md#lists-scopes_with",
+                "docs/relations.md#more-of-the-query-builder",
+            ],
+            sources: &[
+                HELP,
+                "examples/bikeshop/resources/views/multistore/help/hours.html",
+                TESTS,
+            ],
+        },
+        Explanation {
+            route: "multistore.placements",
+            path: "/staff/placements",
+            title: "Bike placements",
+            purpose: "Rental bikes placed at another store: requested by the store that wants \
+                      them, approved and moved by the owner store, called back by it. The bike \
+                      stays the owner's (its books, rates, retiring it) while its location \
+                      changes (renting it out is the location's business). Bikes brought back at \
+                      a store other than their home get a \"send back to …\" task.",
+            who: "Staff of both stores (`fleet.view`); managers act (`fleet.place`).",
+            audience: &[Audience::Staff, Audience::Manager, Audience::Owner],
+            flow: Flow::Rent,
+            features: &[
+                Feature {
+                    api: "has_permission_in",
+                    why: "Owner, location and operating store are different attributes: \
+                          approving, moving and recalling check `fleet.place` in the **owner** \
+                          store (`access::require(…, StoreAttr::Owner, …)`), sending a bike \
+                          back checks it in its **location** (or owner) store, renting it out \
+                          (the rentals area) in its location.",
+                },
+                Feature {
+                    api: "Db::begin_immediate + lock_for_update",
+                    why: "A recall and a booking of the same bike can't both win: the recall \
+                          locks the bike's row and looks for open rentals in one transaction, \
+                          as the booking does, so one waits for the other and the second is \
+                          refused. A bike out with a customer is never called away from under \
+                          them.",
+                },
+                SCOPES,
+                AUDITED,
+            ],
+            under_hood: "Loading: the store's placements, their bikes, the bikes owned here or \
+                         standing here and their homes (the latest `moved` placement of all of \
+                         them in one query), the variants' names and the stores. Each action: a \
+                         status guard or a locked bike row, then the bike's location, an audit \
+                         row and a notice to the other store.",
+            docs: &[
+                "docs/authorization.md#checking-one-record-has_permission_in",
+                "docs/relations.md#more-of-the-query-builder",
+                "docs/authorization.md#sensitive-actions-and-the-audit-trail",
+            ],
+            sources: &[
+                PLACEMENTS,
+                POLICY,
+                "examples/bikeshop/src/app/rentals/model.rs",
+                "examples/bikeshop/resources/views/multistore/placements/index.html",
+                TESTS,
+                BROWSER,
+            ],
+        },
+        Explanation {
+            route: "multistore.placements.create",
+            path: "/staff/placements/new",
+            title: "New bike placement",
+            purpose: "Place one of our bikes standing at home at another store (approved at \
+                      once: it's ours), or ask another store for one of its bikes (it decides).",
+            who: "Managers (`fleet.place` in the active store).",
+            audience: &[Audience::Manager, Audience::Owner],
+            flow: Flow::Rent,
+            features: &[
+                Feature {
+                    api: "#[derive(Validate)]",
+                    why: "`PlacementForm`'s rules are attributes on its fields; the handler then \
+                          checks the bike stands free at its owner store.",
+                },
+                Feature {
+                    api: "UI kit: toggle_buttons + select",
+                    why: "Direction and other store are a small GET form, so the bike list is \
+                          the right owner's; the bike is the kit's searchable select.",
+                },
+            ],
+            under_hood: "Loading: the stores, up to 200 free bikes of the owner and their names. \
+                         Saving: `Valid<PlacementForm>`, the bike checked, one insert, an audit \
+                         row, a notice to the other store.",
+            docs: &[
+                "docs/validation.md#derivevalidate",
+                "docs/ui.md#form-fields",
+            ],
+            sources: &[
+                PLACEMENTS,
+                "examples/bikeshop/resources/views/multistore/placements/new.html",
+                TESTS,
+            ],
+        },
+        Explanation {
+            route: "multistore.books",
+            path: "/staff/books",
+            title: "Books between stores",
+            purpose: "Who owes whom for work done for each other. A rental of North's bike \
+                      served by South: South owes North the price, North owes South its fee; \
+                      late and damage fees go to the owner; consigned goods sold at another \
+                      store: the seller owes the owner, minus its fee; a fleet repair by \
+                      another store's workshop: the owner pays it. The open balance per pair of \
+                      stores, the active store's position, and every entry in a grid.",
+            who: "Store managers (`intercompany.view`) and the owner.",
+            audience: &[Audience::Manager, Audience::Owner],
+            flow: Flow::BackOffice,
+            features: &[
+                POSTING,
+                Feature {
+                    api: "renox::grid",
+                    why: "The entries in one `Grid`: filter by kind (a select column), sort, \
+                          group by kind, `Column::summary(Summary::Sum)` under the amounts, the \
+                          two stores as `Column::related` subqueries, exports for the \
+                          accountant.",
+                },
+                SCOPES,
+                Feature {
+                    api: "Rate copied on the entry",
+                    why: "Each fee entry keeps the fee rate in force when it was booked \
+                          (`fee_rate_bp`), read in the booking's transaction: changing a \
+                          store's rate never rewrites history.",
+                },
+            ],
+            under_hood: "One grouped query for the open balances (`debtor`, `creditor`, \
+                         `SUM(amount)` where not settled), netted per pair in Rust \
+                         (`intercompany::balances`; the positions of all stores add up to \
+                         zero), then the grid's count, page, summaries and store names.",
+            docs: &[
+                "docs/scheduling.md#events",
+                "docs/grid.md#summaries-and-groups",
+                "docs/grid.md#exports",
+                "docs/authorization.md#lists-scopes_with",
+            ],
+            sources: &[
+                INTERCOMPANY,
+                BOOKS,
+                MODEL,
+                MOD,
+                "examples/bikeshop/resources/views/multistore/books/index.html",
+                TESTS,
+                BROWSER,
+            ],
+        },
+        Explanation {
+            route: "multistore.settlements",
+            path: "/staff/books/settlements",
+            title: "Monthly settlements",
+            purpose: "On the 1st of each month, last month's entries are netted per pair of \
+                      stores into one settlement, mailed to both stores' managers and the owner, \
+                      and confirmed by both stores once the money has moved.",
+            who: "Store managers (`intercompany.view`) and the owner.",
+            audience: &[Audience::Manager, Audience::Owner],
+            flow: Flow::BackOffice,
+            features: &[
+                Feature {
+                    api: "Schedule::monthly_on",
+                    why: "`monthly_on(1, \"02:00\", \"books:settle\", …)`: `schedule:list` shows \
+                          it, `schedule:run books:settle` runs it now, several servers run it \
+                          once. `settlements::settle_month` is a plain function the tests call \
+                          after `TestApp::travel`.",
+                },
+                Feature {
+                    api: "Queue",
+                    why: "The statements go out as a **batch** (`state.queue.batch(…)`, one \
+                          `SendStatement` job per store pair, `allow_failures`): one slow mail \
+                          server doesn't hold the others, and the batch's progress is visible \
+                          on the queue dashboard.",
+                },
+                SCOPES,
+            ],
+            under_hood: "Three queries a page: the count, the page (`access::visible`) and the \
+                         store names. The monthly task: one transaction that sums the unsettled \
+                         entries of the month per pair, creates or reuses the pair's settlement, \
+                         points the entries at it and stores the net; then the batch.",
+            docs: &[
+                "docs/scheduling.md#scheduled-tasks",
+                "docs/queue.md#chains-and-batches",
+            ],
+            sources: &[
+                SETTLEMENTS,
+                MODEL,
+                "examples/bikeshop/resources/views/multistore/books/settlements.html",
+                TESTS,
+            ],
+        },
+        Explanation {
+            route: "multistore.settlements.show",
+            path: "/staff/books/settlements/{settlement}",
+            title: "A two-party statement",
+            purpose: "One month between two stores: what each owes the other by kind, the net \
+                      (who pays whom), every entry with its document, and each store's \
+                      confirmation. The paying store confirms it paid, the other that it was \
+                      paid; with both, the settlement is settled.",
+            who: "Managers of the two stores and the owner.",
+            audience: &[Audience::Manager, Audience::Owner],
+            flow: Flow::BackOffice,
+            features: &[
+                Feature {
+                    api: "has_permission_in",
+                    why: "Each side's button needs `intercompany.settle` **in that side's \
+                          store** (`access::require` on the settlement's debtor or creditor \
+                          store). The owner, whose global role holds it everywhere, can confirm \
+                          for either; nobody can confirm for a store they don't hold it in.",
+                },
+                Feature {
+                    api: "Mail",
+                    why: "The statement mail (`mail_view`, the kit's mail layout and table) \
+                          carries the entries as a CSV attachment (`Mail::attach`), so each \
+                          store's accountant has the detail.",
+                },
+                AUDITED,
+            ],
+            under_hood: "Loading: the settlement (`access::find`, 404 for other stores), its \
+                         entries, grouped by side and kind in Rust, the store names. Confirming: \
+                         `UPDATE … WHERE status = 'open' AND <side>_confirmed_at IS NULL`, then \
+                         settled when both sides are, and an audit row.",
+            docs: &[
+                "docs/authorization.md#checking-one-record-has_permission_in",
+                "docs/mail.md#sending-a-mail",
+            ],
+            sources: &[
+                SETTLEMENTS,
+                "examples/bikeshop/resources/views/multistore/books/statement.html",
+                "examples/bikeshop/resources/views/mail/multistore/statement.html",
+                TESTS,
+                BROWSER,
+            ],
+        },
+        Explanation {
+            route: "multistore.fees",
+            path: "/staff/books/fees",
+            title: "Fee rates",
+            purpose: "The fee each store earns for work done for another store (20 % by \
+                      default): renting out another store's bike, selling its consigned goods. \
+                      Only the owner changes a rate; every change is audited and listed here, \
+                      and entries already booked keep the rate they were booked with.",
+            who: "Managers see them; the owner (`settings.fees`) changes them.",
+            audience: &[Audience::Manager, Audience::Owner],
+            flow: Flow::BackOffice,
+            features: &[
+                Feature {
+                    api: "Routes::require_permission",
+                    why: "The change checks `settings.fees`, which only the owner's global role \
+                          grants: a permission, never a role's name. The page hides the button \
+                          for everyone else (`user.has_permission`).",
+                },
+                Feature {
+                    api: "UI kit: action_sheet",
+                    why: "Each rate is changed in a sheet sent with htmx: an error stays in the \
+                          sheet, success reloads with a toast.",
+                },
+                AUDITED,
+                Feature {
+                    api: "Bike shop blocks",
+                    why: "The changes are the `history` block over the audit log's \
+                          `store.fee_rate_changed` rows (old and new rate, who, when).",
+                },
+            ],
+            under_hood: "Loading: the stores, the latest audit rows and their users. Changing: \
+                         `Valid<FeeForm>` (a percentage, stored in basis points), one update, an \
+                         audit row with the old and the new rate.",
+            docs: &[
+                "docs/routing.md#guards",
+                "docs/authorization.md#sensitive-actions-and-the-audit-trail",
+                "docs/types.md#money",
+            ],
+            sources: &[
+                INTERCOMPANY,
+                "examples/bikeshop/resources/views/multistore/books/fees.html",
+                TESTS,
+            ],
+        },
+    ]
 }
 
 /// GET routes of this area that aren't pages (JSON, files, streams).
