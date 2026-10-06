@@ -755,3 +755,190 @@ async fn routes_are_named_and_behind_a_login() {
     assert_eq!(url("admin.products.show", &[&7]), "/admin/products/7");
     assert_eq!(url("admin.categories.index", &[]), "/admin/categories");
 }
+
+// ---------- #260: every field kind and modifier, entries, actions, the gate ----------
+
+/// The products again, drawn with every kind of field (the pages are only
+/// shown here, not saved).
+struct Specs;
+
+impl AdminResource for Specs {
+    type Model = Product;
+    type Form = ProductForm;
+
+    fn label(&self) -> &str {
+        "Spec"
+    }
+
+    fn plural_label(&self) -> &str {
+        "Specs"
+    }
+
+    fn slug(&self) -> &str {
+        "specs"
+    }
+
+    fn columns(&self) -> Vec<Column> {
+        vec![
+            Column::text("name", "Name"),
+            Column::number("price", "Price"),
+        ]
+    }
+
+    fn fields(&self) -> Vec<Field> {
+        vec![
+            Field::email("name", "Contact email")
+                .hint("We never share it.")
+                .placeholder("ana@example.com")
+                .autocomplete("email"),
+            Field::password("sku", "Secret"),
+            Field::url("website", "Site").prefix("https://"),
+            Field::tel("phone", "Phone").suffix("ext"),
+            Field::textarea("notes", "Notes")
+                .rows(4)
+                .span_full()
+                .only_on_edit(),
+            Field::number("price", "Price").step("0.5").min(1).max(120),
+            Field::datetime("created_at", "Created"),
+            Field::checkbox("active", "Active"),
+            Field::select("status", "Status", [("draft", "Draft"), ("live", "Live")]).searchable(),
+            Field::text("coupon", "Coupon").only_on_create(),
+        ]
+    }
+
+    fn entries(&self) -> Vec<Entry> {
+        let mut entries = vec![
+            Entry::text("name", "Name").copyable(),
+            Entry::new("sku", "SKU").span_full(),
+        ];
+        entries.extend(self.columns().iter().filter_map(Entry::from_column));
+        entries
+    }
+
+    fn fill(&self, product: &mut Product, form: ProductForm) {
+        product.name = form.name;
+    }
+
+    fn actions(&self) -> Vec<AdminAction<Product>> {
+        vec![
+            AdminAction::new("archive", "Archive", |_: Vec<Product>, _cx| async {
+                Ok(Toast::success("Archived."))
+            })
+            .danger()
+            .ability("update"),
+            AdminAction::new("print", "Print label", |_: Vec<Product>, _cx| async {
+                Ok(Toast::success("Printed."))
+            })
+            .row_only(),
+        ]
+    }
+}
+
+async fn specs() -> (TestApp, Product) {
+    let app = app_with(admin().resource(Specs)).await;
+    let coffee = product(&app, "Coffee", "C-SECRET", "live").await;
+    renox::db::sql("UPDATE products SET created_at = ? WHERE id = ?")
+        .bind(
+            renox::chrono::DateTime::parse_from_rfc3339("2026-10-05T09:30:45Z")
+                .unwrap()
+                .with_timezone(&renox::chrono::Utc),
+        )
+        .bind(coffee.id)
+        .execute(app.db())
+        .await
+        .unwrap();
+    let ana = user(&app, "ana@example.com").await;
+    app.acting_as(&ana);
+    (app, coffee)
+}
+
+#[renox::test]
+async fn every_field_kind_and_modifier_is_drawn() {
+    let (app, coffee) = specs().await;
+    let create = app.get("/admin/specs/create").await;
+    create.assert_ok();
+    let html = create.text();
+    for needle in [
+        r#"type="email""#,
+        "We never share it.",
+        r#"placeholder="ana@example.com""#,
+        r#"autocomplete="email""#,
+        r#"type="password""#,
+        r#"type="url""#,
+        "https://",
+        r#"type="tel""#,
+        "ext",
+        r#"type="number""#,
+        r#"step="0.5""#,
+        r#"min="1""#,
+        r#"max="120""#,
+        r#"type="datetime-local""#,
+        r#"type="checkbox""#,
+        r#"name="coupon""#,
+    ] {
+        assert!(html.contains(needle), "the create page lacks {needle}");
+    }
+    assert!(
+        !html.contains(r#"name="notes""#),
+        "notes are for editing only"
+    );
+
+    let edit = app.get(&format!("/admin/specs/{}/edit", coffee.id)).await;
+    edit.assert_ok();
+    let html = edit.text();
+    assert!(html.contains(r#"name="notes""#) && html.contains(r#"rows="4""#));
+    assert!(
+        !html.contains(r#"name="coupon""#),
+        "the coupon is for creating only"
+    );
+    // A password is never filled in, whatever the record holds.
+    assert!(
+        !html.contains("C-SECRET"),
+        "the stored value leaked into the form"
+    );
+    // A moment fits datetime-local: minutes, no zone.
+    assert!(
+        html.contains(r#"value="2026-10-05T09:30""#),
+        "the date-time value"
+    );
+}
+
+#[renox::test]
+async fn entries_and_actions_follow_their_options() {
+    let (app, coffee) = specs().await;
+    let show = app.get(&format!("/admin/specs/{}", coffee.id)).await;
+    show.assert_ok().assert_see("Coffee").assert_see("C-SECRET");
+    let list = app.get("/admin/specs").await.text();
+    // A danger action is a red bulk button; a row-only one is only in each
+    // row's menu, never offered for a selection.
+    assert!(list.contains(
+        r#"class="rx-button rx-button--small rx-button--danger" data-grid-bulk-action data-url="/admin/specs/actions/archive""#
+    ));
+    assert!(list.contains(&format!(
+        r#"data-url="/admin/specs/{}/actions/print""#,
+        coffee.id
+    )));
+    assert!(!list.contains(r#"data-url="/admin/specs/actions/print""#));
+    // An action the resource doesn't have is a 404.
+    app.post(&format!("/admin/specs/{}/actions/nope", coffee.id), &[])
+        .await
+        .assert_not_found();
+}
+
+#[renox::test]
+async fn a_gate_can_guard_the_panel() {
+    let app = TestApp::new(
+        App::new()
+            .module(Auth::new())
+            .module(Admin::new().gate("back-office").resource(Products))
+            .migrations(renox::migrations!("tests/migrations"))
+            .gate("back-office", |user| user.email == "owner@example.com"),
+    )
+    .await;
+    let ana = user(&app, "ana@example.com").await;
+    app.acting_as(&ana);
+    app.get("/admin").await.assert_forbidden();
+    let owner = user(&app, "owner@example.com").await;
+    app.acting_as(&owner);
+    app.get("/admin").await.assert_ok();
+}

@@ -107,8 +107,31 @@ the top of `crates/renox/tests/it/s3.rs`, and `cargo test -p uploads --features 
 `cargo semver-checks -p renox-core -p renox --baseline-rev origin/main --release-type minor`
 (public API changes; `cargo install --locked cargo-semver-checks`). Releases: [RELEASING.md](RELEASING.md).
 
+- **Coverage.** The `coverage` CI job measures every library crate, the CLI and the macros,
+  on SQLite (with the `xlsx` feature) and on PostgreSQL, merged; its HTML report is an
+  artifact of the run. To measure locally (in its own target directory, one run at a time):
+  ```bash
+  rustup component add llvm-tools-preview && cargo install --locked cargo-llvm-cov
+  cargo llvm-cov --no-report -p renox -p renox-core -p renox-cli -p renox-macros \
+      -p renox-2fa -p renox-oauth -p renox-admin -p renox-billing -p renox-editors --features renox/xlsx
+  TEST_DATABASE_URL=postgres://postgres:postgres@localhost:55432/renox_test cargo llvm-cov --no-report \
+      -p renox -p renox-core -p renox-cli -p renox-2fa -p renox-oauth -p renox-admin \
+      -p renox-billing -p renox-editors --features renox/postgres
+  cargo llvm-cov report --html
+  ```
+  New code comes with tests that run it; check the report for the files you touched.
+
 - **UI changes.** Check pages in a real browser (desktop, a phone width, dark mode): several
-  bugs only showed there (see CLAUDE.md §6.4).
+  bugs only showed there (see CLAUDE.md §6.4). A change to renox.js, the UI kit, the data grid
+  or the editors gets a test in `tests/browser/` (headless Chrome over the DevTools protocol,
+  Node 24, no npm packages): `tests/browser/run.sh`, or one file with
+  `tests/browser/run.sh grid`. CI's `browser` job runs them all.
+- **Processes.** `tests/process/run.sh` runs the app binary and `rnx` as real processes:
+  stopping on signals with a request in flight, `queue:work`, `schedule:work` twice on one
+  database, systemd's socket, `LOG_FORMAT`/`LOG_FILE`, `db:shell` and prompts from a pipe and
+  a terminal, `rnx serve` restarting (and keeping the old app on a failed build), and every
+  example binary served and asked for its pages. Run it after changing `serve`, the commands,
+  logging or an example; `tests/process/run.sh fixture` or `examples` runs one half.
 
 ## Style
 

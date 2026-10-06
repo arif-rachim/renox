@@ -1,0 +1,24 @@
+{% extends "layout.html" %}
+{% from "renox/ui.html" import button, input, action_sheet, menu, menu_link, tabs, tab_panel %}
+{% block content %}
+<button id="toast-me" class="rx-button rx-button--secondary" hx-post="/toast" hx-swap="none">Toast</button>
+
+{% call action_sheet("trip-sheet", "Plan a trip", "/sheet", "Plan a trip") %}
+  {{ input("from", "From", required=true) }}
+  {{ input("to", "To", required=true) }}
+{% endcall %}
+
+{% call menu("More", id="more-menu") %}
+  {{ menu_link("/stock", "Stock") }}
+  {{ menu_link("/", "Home") }}
+{% endcall %}
+
+{{ tabs("t", [["one", "One"], ["two", "Two"], ["three", "Three"]], selected="one") }}
+{% call tab_panel("t", "one", selected=true) %}<p>First panel</p>{% endcall %}
+{% call tab_panel("t", "two") %}<p>Second panel</p>{% endcall %}
+{% call tab_panel("t", "three") %}<p>Third panel</p>{% endcall %}
+
+<button id="tipped" type="button" class="rx-button rx-button--plain" data-rx-tip="More about this">Info</button>
+<button id="shortcut" type="button" class="rx-button rx-button--plain" data-rx-key="k" onclick="this.dataset.pressed = (Number(this.dataset.pressed || 0) + 1)">Shortcut</button>
+<input id="typing" aria-label="Typing">
+{% endblock %}

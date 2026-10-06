@@ -513,8 +513,10 @@
   }
 
   // Sends the row's edited cells; the grid reloads its page when saved, and
-  // a 422 shows the errors next to the fields (renox.js).
-  function save(grid, row, cells) {
+  // a 422 shows the errors next to the fields (renox.js). (Not `save`: that
+  // one stores the column preferences, and a second function declaration of
+  // the same name would replace it.)
+  function saveCells(grid, row, cells) {
     var url = row.getAttribute("data-edit");
     if (!url || !window.htmx) return;
     var values = {};
@@ -569,7 +571,7 @@
       : col.kind === "tags" ? JSON.stringify(now) === before
       : String(rawValue(cell) == null ? "" : rawValue(cell)).slice(0, col.kind === "date_time" ? 16 : undefined) === now;
     if (same) { stopEdit(cell); return; }
-    save(grid, cell.closest("tr"), [cell]);
+    saveCells(grid, cell.closest("tr"), [cell]);
   }
 
   document.addEventListener("dblclick", function (event) {
@@ -598,7 +600,7 @@
       } else if (event.key === "Enter" && event.target.type !== "checkbox") {
         // Enter saves instead of submitting the grid's filters.
         event.preventDefault();
-        if (rowMode) save(grid, row, Array.prototype.slice.call(row.querySelectorAll("td[data-editable]")));
+        if (rowMode) saveCells(grid, row, Array.prototype.slice.call(row.querySelectorAll("td[data-editable]")));
         else commitCell(grid, cell);
       }
       return;
@@ -690,7 +692,7 @@
       var row = t.closest("tr");
       if (t.hasAttribute("data-grid-expand")) toggleDetails(grid, row);
       else if (t.hasAttribute("data-grid-edit-row")) editRow(grid, row, true);
-      else if (t.hasAttribute("data-grid-save-row")) save(grid, row, Array.prototype.slice.call(row.querySelectorAll("td[data-editable]")));
+      else if (t.hasAttribute("data-grid-save-row")) saveCells(grid, row, Array.prototype.slice.call(row.querySelectorAll("td[data-editable]")));
       else editRow(grid, row, false);
       return;
     }

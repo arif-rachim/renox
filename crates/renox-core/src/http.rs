@@ -688,4 +688,80 @@ mod tests {
         fake.assert_sent(|r| r.method == "POST");
         fake.assert_not_sent(|r| r.method == "DELETE");
     }
+
+    // #252: the rest of the client's builder and response, on the fake.
+
+    #[tokio::test]
+    async fn put_patch_raw_bodies_and_response_helpers() {
+        let http = Http::default();
+        let fake = http.fake();
+        fake.on(
+            "PUT https://api.test/items/1",
+            FakeResponse::text(200, "not json").header("x-request-id", "r1"),
+        );
+        fake.on("PATCH https://api.test/items/1", FakeResponse::status(204));
+        let res = http
+            .put("https://api.test/items/1")
+            .body("text/csv", "a,b\n1,2")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(res.header("X-Request-Id"), Some("r1"));
+        assert_eq!(res.bytes(), b"not json");
+        let err = res.json::<serde_json::Value>().unwrap_err();
+        assert!(
+            format!("{err:?}")
+                .contains("the response of https://api.test/items/1 is not the expected JSON"),
+            "{err:?}"
+        );
+        http.patch("https://api.test/items/1").send().await.unwrap();
+        let sent = fake.sent();
+        assert_eq!(sent[0].method, "PUT");
+        assert_eq!(sent[0].body, "a,b\n1,2");
+        assert!(
+            sent[0]
+                .headers
+                .iter()
+                .any(|(k, v)| k == "content-type" && v == "text/csv")
+        );
+        assert_eq!(sent[1].method, "PATCH");
+        // Debug says what it is, nothing more.
+        assert_eq!(format!("{http:?}"), "Http");
+    }
+
+    #[tokio::test]
+    async fn bodies_that_cant_be_encoded_fail_at_send() {
+        let http = Http::default();
+        let fake = http.fake();
+        let mut odd = std::collections::HashMap::new();
+        odd.insert((1, 2), 3);
+        assert!(
+            http.post("https://api.test/a")
+                .json(&odd)
+                .send()
+                .await
+                .is_err()
+        );
+        let nested = [("a", vec![1, 2])];
+        assert!(
+            http.post("https://api.test/b")
+                .form(&nested)
+                .send()
+                .await
+                .is_err()
+        );
+        assert!(fake.sent().is_empty(), "nothing was sent");
+    }
+
+    #[tokio::test]
+    #[should_panic(
+        expected = "no matching HTTP request was sent; sent: [\n    \"GET https://api.test/x\",\n]"
+    )]
+    async fn assert_sent_lists_what_was_sent() {
+        let http = Http::default();
+        let fake = http.fake();
+        fake.on("https://api.test/*", FakeResponse::status(200));
+        http.get("https://api.test/x").send().await.unwrap();
+        fake.assert_sent(|r| r.method == "POST");
+    }
 }

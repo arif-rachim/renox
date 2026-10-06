@@ -7,10 +7,12 @@
 
 {#- htmx sends the form and swaps in the new list; errors show next to the
     fields (422). The kit's button shows a spinner while it's sent; Alpine
-    clears the form after a success. -#}
+    clears the form after a success, with its logic in `Alpine.data` below so
+    the page also works under CSP=strict (whose Alpine build refuses
+    statements in attributes). -#}
 <form method="post" action="{{ route('guestbook.store') }}" enctype="multipart/form-data"
       hx-post="{{ route('guestbook.store') }}" hx-target="#entries" hx-swap="outerHTML"
-      x-data @htmx:after-request="if ($event.detail.successful) $el.reset()" novalidate>
+      x-data="guestbookForm" @htmx:after-request="clearOnSuccess" novalidate>
   {{ csrf_field() }}
   {% call card() %}
     {{ input("name", t('guestbook.name'), value=(auth.user.name if auth.check else none), required=true, autocomplete="name") }}
@@ -19,6 +21,20 @@
     <div class="rx-card__footer">{{ button(t('guestbook.send')) }}</div>
   {% endcall %}
 </form>
+
+{% call push('scripts', once='guestbook-form') %}
+<script nonce="{{ csp_nonce() }}">
+  document.addEventListener("alpine:init", function () {
+    Alpine.data("guestbookForm", function () {
+      return {
+        clearOnSuccess: function (event) {
+          if (event.detail.successful) this.$el.reset();
+        }
+      };
+    });
+  });
+</script>
+{% endcall %}
 
 {% block entries %}
 <section id="entries" class="rx-stack" hx-boost="true" hx-target="#entries" hx-select="#entries" hx-swap="outerHTML">

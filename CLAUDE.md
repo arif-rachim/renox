@@ -359,6 +359,21 @@ tests/cli/run.sh           `rnx new` + every `make:*`, then build and test the a
                            (every GET page, a `--resource` module's forms, the starter's sign-up,
                            verification and roles over HTTP, #142), and the `rnx new` option matrix (plain, --tailwind, --starter, names
                            on both sides of "renox", #143)
+tests/browser/            browser tests (#262, CI `browser`): run.sh builds the binaries one at a
+                           time, then `node --test` (Node 24, no npm packages) drives headless
+                           Chrome over CDP. lib/cdp.mjs (pages, clicks, keys, waitFor, settle,
+                           problems: console errors, exceptions, CSP violations), lib/app.mjs
+                           (start an app binary on a free port, migrated/seeded), fixture/ (a
+                           workspace member: pages using the kit, a job, commands `jobs:push`
+                           and `ask:me`, a per-second task with FIXTURE_TICK); *.test.mjs for
+                           renox.js, the kit's forms and overlays, the grid (examples/grid),
+                           the editors (examples/fields), example flows, and assets.test.mjs
+                           (no top-level JS function declared twice)
+tests/process/            process e2e (#270): process.py (signals with a request in flight,
+                           queue:work, two schedule:work, systemd's socket, LOG_FORMAT/LOG_FILE,
+                           APP_KEY in production, db:shell, prompts from a pipe and a terminal
+                           via `script`, `rnx serve` with RNX_SERVE=1) on the fixture;
+                           examples.py serves every example binary and GETs its pages
 tests/tutorial/           run.sh + follow.py: docs/tutorial.md followed as a reader does (steps
                            found by their lead-in sentence, never line numbers), then fmt,
                            clippy, the tutorial's tests, seed, the app answering (CI `tutorial`).
@@ -709,6 +724,16 @@ PostgreSQL suite 2.5x slower (reconnects).
   nothing). The SeaweedFS commands are at the top of `it/s3.rs`. With the same variables,
   `cargo test -p uploads --features s3` runs examples/uploads on that bucket (CI's `s3` job runs both).
 - Don't run tests with `--release` (slow compile, no debug assertions).
+- Run tests scoped while working (`cargo test -p renox --test it -- module::name`, `-p
+  renox-core --lib path`, a plugin's `--test file name`), not the whole workspace: a full run
+  rebuilds and fills the disk, and CI runs everything. `cargo test --doc -p renox
+  MacroCompileErrors` runs the macros' `compile_fail` blocks; a `compile_fail` passes for any
+  error, so check a new one fails with its own message.
+- JavaScript (renox.js, renox-ui.js, renox-grid.js, editors.js) is tested in a browser:
+  `tests/browser/run.sh [file…]` (§2). Processes (`serve` and signals, workers, the scheduler,
+  `rnx serve`, every example served): `tests/process/run.sh [fixture|examples]`.
+- Coverage: the CI `coverage` job (every crate, SQLite + PostgreSQL merged, HTML artifact);
+  locally see CONTRIBUTING.md "Coverage". Stable `llvm-cov` doesn't count doctests.
 
 ### 4.8 Forms and validation internals
 - Forms are deserialized with `serde_html_form` (repeated names → `Vec`), or, when a name has
@@ -780,10 +805,13 @@ PostgreSQL suite 2.5x slower (reconnects).
 - Browser-check example UIs. Found that way in `examples/crud`: `hx-boost` on a whole section also
   boosts its edit links and delete forms (scope it to the page links), and boosted requests get
   full pages (by design, `Htmx::wants_fragment`), so pair them with `hx-select`.
-- Under `CSP=strict`, Alpine's CSP build rejects statements in attributes (e.g. examples/hello's
-  `@htmx:after-request="sending = false; if (…) $el.reset()"` → "CSP Parser Error: Unexpected
-  token: if"). That's why relaxed is the default; strict apps move logic into `Alpine.data`.
-  Browser-check CSP work by collecting `Log.entryAdded` / `Runtime.exceptionThrown` over CDP.
+- Under `CSP=strict`, Alpine's CSP build rejects statements in attributes (examples/hello's
+  `@htmx:after-request="if ($event.detail.successful) $el.reset()"` threw "CSP Parser Error:
+  Unexpected token: $el" when the form was sent, found by tests/browser). That's why relaxed is
+  the default; strict apps move logic into `Alpine.data` in a nonce'd script, as hello now does
+  (`x-data="guestbookForm" @htmx:after-request="clearOnSuccess"`). The handlers only run on
+  their events, so a page that loads cleanly can still break: tests/browser/examples.test.mjs
+  sends hello's and crud's forms under `CSP=strict`.
 - `docs/assets/demo.gif` was made by driving examples/hello (`APP_LOCALE=en`, a fresh database)
   in headless Chrome over CDP (a 760 × 752 viewport with `Emulation.setScrollbarsHidden`,
   `Page.captureScreenshot` per typed character, `Input.insertText`), then composing the frames
@@ -953,6 +981,19 @@ opening #5 with the same commit to `main`. Lesson: don't stack; if you must, ret
 - A scripted edit meant to add `.image()` to the guestbook's photo rule silently didn't apply, so a
   text file named `.png` was accepted. All framework tests passed; only the headless-Chrome upload
   check showed it. Keep browser checks for UI features.
+- renox-grid.js declared two functions named `save` (column preferences, inline-edit cells); the
+  second replaced the first, so every column-menu action threw and saved nothing. Found by
+  tests/browser/grid.test.mjs (#267); tests/browser/assets.test.mjs now refuses a top-level
+  function declared twice in any shipped JS.
+- Live validation of a list field (`tags`) answered with no errors while its items failed
+  (`each(…)` reports on `tags.0`): the answer looked up the exact key only. Found by
+  tests/browser/renoxjs.test.mjs; it includes the items' errors now.
+- Writing browser tests (tests/browser): headless Chrome has no hovering mouse (`(hover:
+  hover)` is false, so tooltips never show) unless started with `--blink-settings=…HoverType…`;
+  each open tab keeps its live-reload stream and Chrome allows six connections per host (close
+  every page, `browser.with` does); the browser's own checks (`required`, `type=email`) stop a
+  form before the server sees it (give test forms `novalidate`); `hx-confirm`'s native dialog
+  blocks the page until `Page.handleJavaScriptDialog` answers it.
 
 ### 6.5 Scripted edits go wrong silently
 This happened in M6b, M6c, M7 and M9a:
@@ -1302,6 +1343,15 @@ picks the build, not the terminal.
   time and filters by the active scope and `db::now()` at each check; `AuthUser::role_names`
   is worked out the first time it's asked. The global `assign_role`/`remove_role`/`sync_roles`
   and `users_with_role` only touch global rows.
+- **#246, test coverage** (epic with sub-issues #247–#270, one PR): the coverage job measures
+  every crate on SQLite and PostgreSQL; tests for every item the issues list (macros' compile
+  errors, `renox::testing`'s messages, validation, views, request helpers, auth, the data
+  layer, grid and charts, background work, commands, the CLI, the plugins); browser tests in
+  tests/browser (CI `browser`) and process tests in tests/process. Fixes it found: date limits
+  given as text, a failing `App::share` showing a bare 500, REAL/SMALLINT extra columns on
+  PostgreSQL, live validation of lists, the grid's column menu (two JS `save`s), examples/hello
+  under `CSP=strict`. Small refactors for testability in renox-cli (`asset_for`,
+  `cache_dir_with`, `check_sum`, `app_root_in`, `key_generate_in`).
 - **Still open** (ROADMAP `- [ ]`): none of the plugins; `renox-2fa` (#146),
   `renox-oauth` (#147), `renox-admin` (#148) and `renox-billing` (#155) are done. A Laravel gap review after M25 (in the
   conversation that planned M26) ranked them: release and docs first, then 2FA and social

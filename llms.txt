@@ -50,6 +50,13 @@
   a seeder and tests. `rnx new <name> --notifications`: the plain app with the bell
   (`Auth::new().notifications()` and `notification_bell` in its layout).
 
+- [tests/browser](tests/browser): Renox's own JavaScript tested in headless Chrome over the
+  DevTools protocol with Node's test runner (no npm packages): `lib/cdp.mjs` and `lib/app.mjs`
+  are a harness an app can copy (docs/testing.md "Browser tests"); tests for renox.js, the UI
+  kit's forms and overlays, the data grid, the editors and example flows (under `CSP=strict`
+  too). [tests/process](tests/process): the app binary and `rnx` as real processes (signals,
+  workers, the scheduler, systemd's socket, logs, prompts, `rnx serve`) and every example served.
+
 ## Examples (complete apps, tested in CI)
 
 Every example has a README.md that walks through it.

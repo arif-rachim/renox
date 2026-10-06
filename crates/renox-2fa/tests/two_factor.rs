@@ -366,3 +366,58 @@ async fn it_works_without_the_audit_module() {
             .unwrap()
     );
 }
+
+// ---------- #261: the challenge's other paths ----------
+
+/// 2FA turned off (in another session) between the password and the code:
+/// the login goes through without one.
+#[renox::test]
+async fn a_challenge_after_two_factor_was_turned_off_lets_the_login_finish() {
+    let (app, ana) = app().await;
+    turn_on(&app, &ana).await;
+    password(&app, &ana).await;
+    renox::db::sql("DELETE FROM two_factor")
+        .execute(app.db())
+        .await
+        .unwrap();
+    app.post("/two-factor/challenge", &[("code", "000000")])
+        .await
+        .assert_redirect("/");
+    app.assert_authenticated(Some(&ana));
+}
+
+/// Using a recovery code that leaves two or fewer warns about it on the next
+/// page (the account page shows the flashed status).
+#[renox::test]
+async fn running_low_on_recovery_codes_is_flashed() {
+    let (app, ana) = app().await;
+    let (_, codes) = turn_on(&app, &ana).await;
+    for (used, code) in codes[..6].iter().enumerate() {
+        password(&app, &ana).await;
+        app.post("/two-factor/challenge", &[("code", code.as_str())])
+            .await
+            .assert_redirect("/");
+        let page = app.get("/account").await;
+        if used < 5 {
+            page.assert_dont_see("You have ");
+        } else {
+            page.assert_see("You have 2 recovery codes left");
+        }
+    }
+}
+
+/// The address authenticator apps read names the app and the account.
+#[test]
+fn the_otpauth_address_names_the_app_and_the_account() {
+    let uri = totp::otpauth_uri("Acme Shop", "ana@example.com", "JBSWY3DPEHPK3PXP");
+    assert!(
+        uri.starts_with("otpauth://totp/Acme%20Shop:ana@example.com?"),
+        "{uri}"
+    );
+    assert!(uri.contains("secret=JBSWY3DPEHPK3PXP"), "{uri}");
+    assert!(uri.contains("issuer=Acme%20Shop"), "{uri}");
+    assert!(
+        uri.contains("digits=6") && uri.contains("period=30"),
+        "{uri}"
+    );
+}

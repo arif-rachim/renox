@@ -37,5 +37,7 @@
     {% block content %}{% endblock %}
   </main>
   {{ toasts() }}
+  {#- Scripts pushed by pages, e.g. the guestbook form's Alpine component. -#}
+  {{ stack('scripts') }}
 </body>
 </html>

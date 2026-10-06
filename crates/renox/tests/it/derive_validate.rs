@@ -235,3 +235,59 @@ async fn without_detect_locale_the_header_is_ignored() {
             .is_none_or(|v| !v.contains("Accept-Language"))
     );
 }
+
+/// A raw identifier field is checked (and named in errors) as its plain name.
+#[derive(serde::Deserialize, Validate)]
+struct Kind {
+    #[validate(required)]
+    r#type: String,
+}
+
+#[renox::test]
+async fn raw_identifiers_are_validated_under_their_plain_name() {
+    let app = TestApp::new(App::new()).await;
+    let errors = Validator::rules_of(&Kind {
+        r#type: String::new(),
+    })
+    .finish(app.db())
+    .await
+    .unwrap();
+    assert!(errors.has("type"), "{errors:?}");
+    assert!(!errors.has("r#type"));
+}
+
+/// Live validation of a list field shows its items' errors (`each(…)` rules
+/// report on `tags.0`, `tags.1`), found by a browser test (#264).
+#[renox::test]
+async fn live_validation_of_a_list_shows_its_items_errors() {
+    let app = app().await;
+    let res = app
+        .request()
+        .header("x-renox-validate", "tags")
+        .post("/signup", &signup(&[("tags", "toolong")]))
+        .await;
+    res.assert_ok();
+    let body: serde_json::Value = res.json();
+    assert_eq!(body["field"], "tags");
+    let first = body["errors"][0].as_str().unwrap_or_default();
+    assert!(first.contains('5'), "{body}");
+    // The list's own rule (max = 3 items) is reported too.
+    let many = [("tags", "a"), ("tags", "b"), ("tags", "c"), ("tags", "d")];
+    let mut form = signup(&[]);
+    form.extend(many);
+    let body: serde_json::Value = app
+        .request()
+        .header("x-renox-validate", "tags")
+        .post("/signup", &form)
+        .await
+        .json();
+    assert!(!body["errors"].as_array().unwrap().is_empty(), "{body}");
+    // Another field isn't confused with the list (`tags_extra` ≠ `tags.N`).
+    let body: serde_json::Value = app
+        .request()
+        .header("x-renox-validate", "name")
+        .post("/signup", &signup(&[("tags", "toolong")]))
+        .await
+        .json();
+    assert_eq!(body["errors"], serde_json::json!([]));
+}

@@ -496,4 +496,99 @@ mod tests {
         assert_eq!(lookup(&json, "items").unwrap().as_array().unwrap().len(), 2);
         assert!(lookup(&json, "items.5.name").is_none());
     }
+
+    // #250: the parts of the reader no form had reached yet.
+
+    #[test]
+    fn a_name_that_is_both_a_value_and_a_map_keeps_the_deeper_one() {
+        #[derive(Deserialize, Debug)]
+        struct Form {
+            a: std::collections::BTreeMap<String, String>,
+        }
+        // `a[b]` first, then a plain `a`: the plain value is dropped.
+        let node = Node::build(&pairs(&[("a[b]", "2"), ("a", "1")]));
+        let form: Form = deserialize(node).unwrap();
+        assert_eq!(form.a.get("b").map(String::as_str), Some("2"));
+        // A plain `a`, then `a[b]`: the map replaces the value.
+        let node = Node::build(&pairs(&[("a", "1"), ("a[b]", "2")]));
+        let form: Form = deserialize(node).unwrap();
+        assert_eq!(form.a.len(), 1);
+    }
+
+    #[test]
+    fn booleans_read_every_way_a_form_says_no() {
+        #[derive(Deserialize)]
+        struct Flags {
+            items: Vec<Flag>,
+        }
+        #[derive(Deserialize)]
+        struct Flag {
+            on: bool,
+        }
+        let mut list = Vec::new();
+        let values = ["false", "off", "0", "no", "", "TRUE", "yes", "checked"];
+        for (i, value) in values.iter().enumerate() {
+            list.push((format!("items[{i}][on]"), (*value).to_owned()));
+        }
+        let flags: Flags = deserialize(Node::build(&list)).unwrap();
+        let read: Vec<bool> = flags.items.iter().map(|f| f.on).collect();
+        assert_eq!(read, [false, false, false, false, false, true, true, true]);
+
+        let bad = Node::build(&pairs(&[("items[0][on]", "maybe")]));
+        let err = deserialize::<Flags>(bad).err().unwrap();
+        assert_eq!(err.path().to_string(), "items[0].on");
+    }
+
+    #[test]
+    fn tuples_newtypes_and_empty_lists() {
+        #[derive(Deserialize, Debug, PartialEq)]
+        struct Cents(i64);
+        #[derive(Deserialize, Debug)]
+        struct Form {
+            point: (i64, i64),
+            price: Cents,
+            #[serde(default)]
+            tags: Vec<String>,
+            sizes: Vec<String>,
+        }
+        let node = Node::build(&pairs(&[
+            ("point[0]", "3"),
+            ("point[1]", "4"),
+            ("price", "1250"),
+            ("sizes", ""),
+        ]));
+        let form: Form = deserialize(node).unwrap();
+        assert_eq!(form.point, (3, 4));
+        assert_eq!(form.price, Cents(1250));
+        assert!(form.tags.is_empty());
+        // An empty value where a list is expected is an empty list.
+        assert!(form.sizes.is_empty());
+    }
+
+    #[test]
+    fn an_enum_sent_as_a_map_is_refused_at_its_path() {
+        #[derive(Deserialize, Debug)]
+        #[allow(dead_code)]
+        enum Shape {
+            Circle { r: i64 },
+        }
+        #[derive(Deserialize, Debug)]
+        #[allow(dead_code)]
+        struct Form {
+            shape: Shape,
+        }
+        // Forms send an enum as its variant's name; anything deeper is an
+        // error on that field, not a panic.
+        let node = Node::build(&pairs(&[("shape[Circle][r]", "2")]));
+        let err = deserialize::<Form>(node).unwrap_err();
+        assert_eq!(err.path().to_string(), "shape");
+    }
+
+    #[test]
+    fn lookups_stop_at_values_that_have_no_children() {
+        let json = Node::build(&pairs(&[("a[0][b]", "x")])).into_json();
+        assert_eq!(lookup(&json, "a.0.b"), Some(&Value::String("x".into())));
+        assert_eq!(lookup(&json, "a.0.b.c"), None);
+        assert_eq!(lookup(&json, "a.x"), None);
+    }
 }

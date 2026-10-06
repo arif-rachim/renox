@@ -938,4 +938,47 @@ mod tests {
         assert!(read(&dir, "src/app/product/model.rs").contains(r#"table = "items""#));
         assert!(resource(dir.path(), "bad name!", None, None).is_err());
     }
+
+    // #248: the field kinds no other test generates.
+
+    #[test]
+    fn whole_numbers_decimals_and_dates_in_every_part() {
+        let fields = parse_fields("count:int ratio:float due:date").unwrap();
+        let columns = |db| fields.iter().map(|f| f.column(db)).collect::<Vec<_>>();
+        let sqlite = columns(Database::Sqlite).join(", ");
+        assert!(sqlite.contains("\"count\" INTEGER"), "{sqlite}");
+        assert!(
+            sqlite.contains("\"due\" TEXT NOT NULL DEFAULT '1970-01-01'"),
+            "{sqlite}"
+        );
+        let postgres = columns(Database::Postgres).join(", ");
+        assert!(
+            postgres.contains("\"count\" BIGINT NOT NULL DEFAULT 0"),
+            "{postgres}"
+        );
+        assert!(postgres.contains("\"due\" DATE"), "{postgres}");
+
+        let dir = app();
+        resource(
+            dir.path(),
+            "readings",
+            None,
+            Some("count:int ratio:float due:date"),
+        )
+        .unwrap();
+        let model = read(&dir, "src/app/readings/model.rs");
+        assert!(model.contains("pub count: i64,"), "{model}");
+        assert!(model.contains("pub ratio: f64,"), "{model}");
+        assert!(model.contains("pub due: NaiveDate,"), "{model}");
+        assert!(model.contains("use renox::chrono::NaiveDate;"), "{model}");
+        let form = read(&dir, "resources/views/readings/form.html");
+        assert!(
+            form.contains(r#"type="number""#) && form.contains(r#"type="date""#),
+            "{form}"
+        );
+        let tests = read(&dir, "tests/readings.rs");
+        assert!(!tests.contains("__"), "{tests}");
+        let module = read(&dir, "src/app/readings/mod.rs");
+        assert!(module.contains("NaiveDate"), "{module}");
+    }
 }

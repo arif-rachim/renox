@@ -224,4 +224,45 @@ mod tests {
             vec![Some(1), Some(2), Some(3), Some(4), None, Some(9)]
         );
     }
+
+    // #254: map keeps the page information.
+    #[test]
+    fn map_keeps_the_page_information() {
+        let page = Paginated {
+            items: vec![1, 2],
+            page: 2,
+            per_page: 2,
+            total: 5,
+            last_page: 3,
+            from: 3,
+            to: 4,
+            has_prev: true,
+            has_next: true,
+            pages: window(2, 3),
+        }
+        .map(|n| n * 10);
+        assert_eq!(page.items, [10, 20]);
+        assert_eq!((page.page, page.total, page.last_page), (2, 5, 3));
+        assert!(page.has_prev && page.has_next);
+
+        let simple = SimplePage {
+            items: vec!["a"],
+            page: 1,
+            per_page: 10,
+            has_prev: false,
+            has_next: true,
+        }
+        .map(str::to_uppercase);
+        assert_eq!(simple.items, ["A"]);
+        assert!(!simple.has_prev && simple.has_next);
+
+        let cursor = CursorPage {
+            items: vec![1],
+            per_page: 1,
+            next_cursor: Some("abc".into()),
+        }
+        .map(|n| n + 1);
+        assert_eq!(cursor.items, [2]);
+        assert_eq!(cursor.next_cursor.as_deref(), Some("abc"));
+    }
 }

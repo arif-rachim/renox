@@ -407,7 +407,11 @@ impl Database {
 }
 
 fn app_root() -> Result<PathBuf> {
-    let root = std::env::current_dir()?;
+    app_root_in(std::env::current_dir()?)
+}
+
+/// `root` if it holds an app (a `Cargo.toml` and `src/`).
+fn app_root_in(root: PathBuf) -> Result<PathBuf> {
     if !root.join("Cargo.toml").is_file() || !root.join("src").is_dir() {
         anyhow::bail!("run this from your app's directory (the one with Cargo.toml and src/)");
     }
@@ -421,6 +425,11 @@ pub(crate) fn generate_key() -> String {
 }
 
 fn key_generate(show: bool) -> Result<()> {
+    key_generate_in(std::path::Path::new("."), show)
+}
+
+/// `rnx key:generate` in the app at `dir`.
+fn key_generate_in(dir: &std::path::Path, show: bool) -> Result<()> {
     let key = generate_key();
     if show {
         println!("{key}");
@@ -428,17 +437,17 @@ fn key_generate(show: bool) -> Result<()> {
     }
 
     // No .env yet (a fresh clone): start one from .env.example, or empty.
-    let env = match std::fs::read_to_string(".env") {
+    let env = match std::fs::read_to_string(dir.join(".env")) {
         Ok(env) => env,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-            if !std::path::Path::new("Cargo.toml").is_file() {
+            if !dir.join("Cargo.toml").is_file() {
                 anyhow::bail!("no .env or Cargo.toml here; run from your app or pass --show");
             }
-            std::fs::read_to_string(".env.example").unwrap_or_default()
+            std::fs::read_to_string(dir.join(".env.example")).unwrap_or_default()
         }
         Err(err) => return Err(err).context("could not read .env"),
     };
-    std::fs::write(".env", with_key(&env, &key)).context("could not write .env")?;
+    std::fs::write(dir.join(".env"), with_key(&env, &key)).context("could not write .env")?;
     println!("APP_KEY written to .env. Existing sessions are now invalid.");
     Ok(())
 }
@@ -602,5 +611,53 @@ mod tests {
             with_key("export APP_KEY=old\nAPP_KEY=other", "k"),
             "export APP_KEY=k\n# APP_KEY=other\n"
         );
+    }
+
+    // #248: key:generate and the app's directory, without changing the
+    // working directory (tests run in parallel).
+
+    #[test]
+    fn key_generate_starts_from_the_example_or_refuses_outside_an_app() {
+        let dir = tempfile::tempdir().unwrap();
+        let err = key_generate_in(dir.path(), false).unwrap_err();
+        assert!(
+            err.to_string().contains("no .env or Cargo.toml here"),
+            "{err}"
+        );
+        key_generate_in(dir.path(), true).unwrap(); // --show writes nothing
+        assert!(!dir.path().join(".env").exists());
+
+        std::fs::write(dir.path().join("Cargo.toml"), "[package]\nname = \"a\"\n").unwrap();
+        std::fs::write(dir.path().join(".env.example"), "APP_NAME=Shop\nAPP_KEY=\n").unwrap();
+        key_generate_in(dir.path(), false).unwrap();
+        let env = std::fs::read_to_string(dir.path().join(".env")).unwrap();
+        assert!(env.contains("APP_NAME=Shop"), "{env}");
+        assert!(env.contains("APP_KEY=base64:"), "{env}");
+        // Again: a new key replaces the old one.
+        key_generate_in(dir.path(), false).unwrap();
+        let again = std::fs::read_to_string(dir.path().join(".env")).unwrap();
+        assert_ne!(again, env);
+        assert_eq!(again.matches("APP_KEY=").count(), 1, "{again}");
+    }
+
+    #[test]
+    fn the_app_root_needs_a_manifest_and_src() {
+        let dir = tempfile::tempdir().unwrap();
+        let err = app_root_in(dir.path().to_path_buf()).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("run this from your app's directory"),
+            "{err}"
+        );
+        std::fs::write(dir.path().join("Cargo.toml"), "").unwrap();
+        assert!(app_root_in(dir.path().to_path_buf()).is_err(), "no src/");
+        std::fs::create_dir(dir.path().join("src")).unwrap();
+        assert_eq!(app_root_in(dir.path().to_path_buf()).unwrap(), dir.path());
+    }
+
+    #[test]
+    fn make_component_needs_a_name_or_ui() {
+        let err = run(parse(&["make:component"])).unwrap_err();
+        assert!(err.to_string().contains("give a name, or --ui"), "{err}");
     }
 }

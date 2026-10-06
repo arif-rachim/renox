@@ -232,4 +232,36 @@ mod tests {
         let empty: KeyValues = serde_json::from_str(r#""""#).unwrap();
         assert!(empty.is_empty());
     }
+
+    #[test]
+    fn text_that_isnt_empty_and_null_are_handled() {
+        // Some text where rows were expected is refused, naming what's wanted.
+        let err = serde_json::from_str::<KeyValues>(r#""colour=red""#).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("expected rows of key and value, or an object"),
+            "{err}"
+        );
+        // An empty text box and `null` are no pairs.
+        assert!(
+            serde_json::from_str::<KeyValues>(r#""  ""#)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            serde_json::from_str::<KeyValues>("null")
+                .unwrap()
+                .is_empty()
+        );
+        let pairs: KeyValues =
+            serde_json::from_str(r#"[["a", "1"], {"key": " b ", "value": "2"}, {"key": ""}]"#)
+                .unwrap();
+        assert_eq!(
+            pairs.into_vec(),
+            [
+                ("a".to_owned(), "1".to_owned()),
+                ("b".to_owned(), "2".to_owned())
+            ]
+        );
+    }
 }

@@ -25,7 +25,7 @@ Other things to try: `/hello/<name>`, `/language/en` and `/language/es` to switc
 | Feature | Where |
 |---|---|
 | Everything in Rust: the model and factory, the form and its rules (`#[derive(Validate)]`), `detect_locale`, the `EntryPosted` event, the `ThankGuest` job, the `entries:prune` command (a clap `AppCommand` that confirms with `renox::prompt`), the every-minute task, the handlers, `app()` | [src/lib.rs](src/lib.rs) |
-| The page: the form posted with htmx and Alpine, the `entries` block swapped on post and on page links | [resources/views/guestbook/index.html](resources/views/guestbook/index.html) |
+| The page: the form posted with htmx and Alpine (its reset in `Alpine.data`, so it also works under `CSP=strict`), the `entries` block swapped on post and on page links | [resources/views/guestbook/index.html](resources/views/guestbook/index.html) |
 | Texts in English and Spanish; the Spanish file also translates validation messages, field names, the login and account pages and the UI kit's labels | [resources/lang](resources/lang) |
 | The entries table, then a second migration adding `photo` | [migrations](migrations) |
 | The layout: the logged-in user's name links to `/account` (`route('account.show')`) | [resources/views/layouts/app.html](resources/views/layouts/app.html) |

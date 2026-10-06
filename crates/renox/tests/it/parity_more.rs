@@ -443,3 +443,69 @@ async fn has_many_through_reaches_grandchildren_in_two_queries() {
     assert_eq!(ids(2), [102]);
     assert!(ids(3).is_empty(), "no customers, no sales");
 }
+
+/// #250: a breach check that can't connect at all (not just an error
+/// status) also lets the password through.
+#[renox::test]
+async fn uncompromised_allows_the_password_when_the_service_cant_be_reached() {
+    let app = TestApp::new(App::new().module(Forms)).await;
+    app.fake_http().on(
+        "https://api.pwnedpasswords.com/*",
+        FakeResponse::connection_error(),
+    );
+    app.htmx()
+        .post("/sign-up", &[("password", "password")])
+        .await
+        .assert_ok();
+}
+
+/// #256: when every mailer in the failover list fails too, the last error
+/// comes back. Also SMTP over TLS with credentials, and MAIL_PORT that isn't
+/// a number (`{PREFIX}_PORT`).
+#[renox::test]
+async fn failover_that_runs_out_returns_the_last_error() {
+    let down = |config: &mut MailConfig, port: u16| {
+        config.mailer = renox::mail::MailDriver::Smtp;
+        config.host = "127.0.0.1".into();
+        config.port = Some(port);
+        config.encryption = renox::mail::MailEncryption::None;
+        config.timeout = std::time::Duration::from_secs(2);
+    };
+    let app = TestApp::with_config(
+        App::new().mailer("backup", move |_| {
+            let mut backup = MailConfig::default();
+            down(&mut backup, 10);
+            backup.encryption = renox::mail::MailEncryption::Tls;
+            backup.username = Some("app".into());
+            backup.password = Some("secret".into());
+            Ok(backup)
+        }),
+        move |c| {
+            down(&mut c.mail, 9);
+            c.mail.failover = vec!["backup".into()];
+        },
+    )
+    .await;
+    let err = app
+        .state()
+        .mailer
+        .send(Mail::new("ann@example.com", "Receipt", "Thanks."))
+        .await
+        .unwrap_err();
+    let shown = format!("{err:?}");
+    assert!(!shown.contains("secret"), "{shown}");
+
+    let err = MailConfig::from_env(
+        &{
+            let mut c = Config::default();
+            c.vars.insert("REPORTS_PORT".into(), "twenty-five".into());
+            c
+        },
+        "REPORTS",
+    )
+    .unwrap_err();
+    assert!(
+        format!("{err:?}").contains("REPORTS_PORT must be a number, got `twenty-five`"),
+        "{err:?}"
+    );
+}

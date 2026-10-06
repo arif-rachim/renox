@@ -71,8 +71,16 @@ pub fn enabled(root: &Path) -> bool {
 
 /// The release asset for this machine.
 fn asset() -> Result<&'static str> {
-    let musl = cfg!(target_env = "musl");
-    Ok(match (env::consts::OS, env::consts::ARCH) {
+    asset_for(
+        env::consts::OS,
+        env::consts::ARCH,
+        cfg!(target_env = "musl"),
+    )
+}
+
+/// The release asset for an OS, architecture and C library.
+fn asset_for(os: &str, arch: &str, musl: bool) -> Result<&'static str> {
+    Ok(match (os, arch) {
         ("linux", "x86_64") if musl => "tailwindcss-linux-x64-musl",
         ("linux", "x86_64") => "tailwindcss-linux-x64",
         ("linux", "aarch64") if musl => "tailwindcss-linux-arm64-musl",
@@ -88,17 +96,23 @@ fn asset() -> Result<&'static str> {
 
 /// Where downloaded tools live: `RNX_CACHE_DIR`, else the platform's cache.
 fn cache_dir() -> Result<PathBuf> {
-    if let Some(dir) = env::var_os("RNX_CACHE_DIR") {
+    cache_dir_with(|name| env::var_os(name))
+}
+
+/// [`cache_dir`] with the environment read through `var` (for tests, which
+/// mustn't set variables: they run in parallel).
+fn cache_dir_with(var: impl Fn(&str) -> Option<std::ffi::OsString>) -> Result<PathBuf> {
+    if let Some(dir) = var("RNX_CACHE_DIR") {
         return Ok(PathBuf::from(dir));
     }
     let base = if cfg!(windows) {
-        env::var_os("LOCALAPPDATA").map(PathBuf::from)
+        var("LOCALAPPDATA").map(PathBuf::from)
     } else if cfg!(target_os = "macos") {
-        env::var_os("HOME").map(|home| PathBuf::from(home).join("Library/Caches"))
+        var("HOME").map(|home| PathBuf::from(home).join("Library/Caches"))
     } else {
-        env::var_os("XDG_CACHE_HOME")
+        var("XDG_CACHE_HOME")
             .map(PathBuf::from)
-            .or_else(|| env::var_os("HOME").map(|home| PathBuf::from(home).join(".cache")))
+            .or_else(|| var("HOME").map(|home| PathBuf::from(home).join(".cache")))
     };
     Ok(base
         .context("no cache directory (set RNX_CACHE_DIR)")?
@@ -119,13 +133,27 @@ pub fn binary() -> Result<PathBuf> {
     Ok(path)
 }
 
-/// Downloads `asset` with the system's `curl` and checks its SHA-256.
-fn download(asset: &str, to: &Path) -> Result<()> {
-    let expected = SUMS
-        .iter()
+/// The pinned SHA-256 of `asset`.
+fn expected_sum(asset: &str) -> Result<&'static str> {
+    SUMS.iter()
         .find(|(name, _)| *name == asset)
         .map(|(_, sum)| *sum)
-        .context("no checksum for this platform")?;
+        .context("no checksum for this platform")
+}
+
+/// Whether `bytes` are the pinned `asset`; an error naming both sums if not.
+fn check_sum(asset: &str, bytes: &[u8]) -> Result<()> {
+    let expected = expected_sum(asset)?;
+    let actual = hex(&Sha256::digest(bytes));
+    if actual != expected {
+        bail!("{asset} has SHA-256 {actual}, expected {expected}; not using it");
+    }
+    Ok(())
+}
+
+/// Downloads `asset` with the system's `curl` and checks its SHA-256.
+fn download(asset: &str, to: &Path) -> Result<()> {
+    expected_sum(asset)?;
     let url =
         format!("https://github.com/tailwindlabs/tailwindcss/releases/download/v{VERSION}/{asset}");
     let dir = to.parent().context("the cache path has a parent")?;
@@ -151,10 +179,9 @@ fn download(asset: &str, to: &Path) -> Result<()> {
         bail!("could not download {url}");
     }
     let bytes = fs::read(&partial)?;
-    let actual = hex(&Sha256::digest(&bytes));
-    if actual != expected {
+    if let Err(err) = check_sum(asset, &bytes) {
         let _ = fs::remove_file(&partial);
-        bail!("{asset} has SHA-256 {actual}, expected {expected}; not using it");
+        return Err(err);
     }
     #[cfg(unix)]
     {
@@ -242,5 +269,71 @@ mod tests {
         fs::create_dir_all(input.parent().unwrap()).unwrap();
         fs::write(&input, INPUT_STUB).unwrap();
         assert!(enabled(dir.path()));
+    }
+
+    // #248: the platform mapping, the cache directory and the checksum,
+    // without the network.
+
+    #[test]
+    fn each_platform_maps_to_its_asset() {
+        let cases = [
+            ("linux", "x86_64", false, "tailwindcss-linux-x64"),
+            ("linux", "x86_64", true, "tailwindcss-linux-x64-musl"),
+            ("linux", "aarch64", false, "tailwindcss-linux-arm64"),
+            ("linux", "aarch64", true, "tailwindcss-linux-arm64-musl"),
+            ("macos", "x86_64", false, "tailwindcss-macos-x64"),
+            ("macos", "aarch64", false, "tailwindcss-macos-arm64"),
+            ("windows", "x86_64", false, "tailwindcss-windows-x64.exe"),
+        ];
+        for (os, arch, musl, asset) in cases {
+            assert_eq!(asset_for(os, arch, musl).unwrap(), asset, "{os}/{arch}");
+            assert!(expected_sum(asset).is_ok(), "{asset} has a pinned sum");
+        }
+        let err = asset_for("freebsd", "x86_64", false).unwrap_err();
+        assert!(err.to_string().contains("set TAILWIND_BIN"), "{err}");
+        assert!(
+            asset().is_ok() || cfg!(not(any(target_os = "linux", target_os = "macos", windows)))
+        );
+    }
+
+    #[test]
+    fn the_cache_directory_comes_from_the_environment() {
+        let env = |pairs: &'static [(&'static str, &'static str)]| {
+            move |name: &str| {
+                pairs
+                    .iter()
+                    .find(|(k, _)| *k == name)
+                    .map(|(_, v)| std::ffi::OsString::from(*v))
+            }
+        };
+        assert_eq!(
+            cache_dir_with(env(&[("RNX_CACHE_DIR", "/tmp/rnx"), ("HOME", "/home/a")])).unwrap(),
+            PathBuf::from("/tmp/rnx")
+        );
+        assert!(cache_dir_with(env(&[])).is_err(), "nowhere to put it");
+        if cfg!(target_os = "linux") {
+            assert_eq!(
+                cache_dir_with(env(&[("XDG_CACHE_HOME", "/c"), ("HOME", "/home/a")])).unwrap(),
+                PathBuf::from("/c/renox")
+            );
+            assert_eq!(
+                cache_dir_with(env(&[("HOME", "/home/a")])).unwrap(),
+                PathBuf::from("/home/a/.cache/renox")
+            );
+        }
+    }
+
+    #[test]
+    fn a_download_with_another_checksum_is_refused() {
+        let err = check_sum("tailwindcss-linux-x64", b"not tailwind").unwrap_err();
+        let shown = err.to_string();
+        assert!(
+            shown.contains("has SHA-256") && shown.contains("not using it"),
+            "{shown}"
+        );
+        assert!(
+            check_sum("tailwindcss-amiga", b"").is_err(),
+            "no sum for it"
+        );
     }
 }

@@ -72,6 +72,8 @@ impl Module for Orders {
             .get("/orders", index)
             .get("/totals", totals)
             .get("/exports", exports)
+            .get("/exports-detail", exports_detail)
+            .get("/plain", plain)
             // A grid in a group: its links keep the group's prefix.
             .group("/back", "back.", Routes::new().get("/exports", exports))
     }
@@ -93,6 +95,22 @@ async fn exports(request: GridRequest) -> Result<Response> {
     }
     let page = grid.page(GridOrder::query(), &request).await?;
     Ok(view("orders.html", context! { orders => page }).into_response())
+}
+
+/// #255: a grid whose exports show a moment in APP_TIMEZONE, numbers with
+/// decimals and yes/no.
+async fn exports_detail(request: GridRequest) -> Result<Response> {
+    let grid = Grid::new("detail")
+        .column(Column::text("number", "Order"))
+        .column(Column::datetime("placed_at", "Placed"))
+        .column(Column::number("total", "Total").decimals(2))
+        .column(Column::bool("paid", "Paid"))
+        .sort_by("number")
+        .exports();
+    match grid.export(GridOrder::query(), &request).await? {
+        Some(file) => Ok(file),
+        None => Ok("no export".into_response()),
+    }
 }
 
 /// `Grid::filter` for figures over every filtered row.
@@ -1599,4 +1617,154 @@ async fn remembered_grids_come_back_as_they_were_left() {
     // Clearing (the grid sends `state` with nothing else) is remembered too.
     assert_eq!(names("?state=1").await.len(), 4);
     assert_eq!(names("").await.len(), 4);
+}
+
+/// #255: the advanced filter's negative operators keep rows whose value is
+/// NULL (Stray has no owner and no birthday), on SQLite and PostgreSQL.
+#[renox::test]
+async fn negative_rules_keep_rows_without_a_value() {
+    let (app, _views) = pets_app().await;
+    let names = |q: &'static str| {
+        let app = &app;
+        async move { cells(&app.get(&format!("/pets?state=1&{q}")).await.text(), "name") }
+    };
+    assert_eq!(
+        names("r.0.c=owner&r.0.o=not_empty").await,
+        ["Kiki", "Momo", "Rex"]
+    );
+    assert_eq!(
+        names("r.0.c=owner&r.0.o=not_equals&r.0.v=ANNA").await,
+        ["Rex", "Stray"],
+        "case doesn't matter, and no owner is 'not Anna'"
+    );
+    assert_eq!(names("r.0.c=born&r.0.o=empty").await, ["Stray"]);
+    assert_eq!(
+        names("r.0.c=weight&r.0.o=ne&r.0.v=6").await,
+        ["Kiki", "Rex", "Stray"]
+    );
+    assert_eq!(
+        names("r.0.c=weight&r.0.o=lte&r.0.v=4").await,
+        ["Kiki", "Stray"]
+    );
+    // `is_not` is for option columns: on text it's dropped like any rule
+    // that doesn't fit.
+    assert_eq!(names("r.0.c=name&r.0.o=is_not&r.0.v=Rex").await.len(), 4);
+    assert_eq!(names("r.0.c=name&r.0.o=starts&r.0.v=m").await, ["Momo"]);
+    assert_eq!(names("r.0.c=name&r.0.o=ends&r.0.v=X").await, ["Rex"]);
+}
+
+#[renox::test]
+async fn exports_show_moments_in_the_apps_zone_decimals_and_yes_no() {
+    let (_, views) = app().await;
+    let path = views.path().to_path_buf();
+    let app = TestApp::with_config(App::new().migrations(&[SCHEMA]).module(Orders), move |c| {
+        c.views_path = path;
+        c.timezone = "+07:00".parse().unwrap();
+    })
+    .await;
+    let at = renox::chrono::DateTime::parse_from_rfc3339("2026-04-01T20:00:00Z")
+        .unwrap()
+        .with_timezone(&renox::chrono::Utc);
+    for (number, placed_at, total, paid) in [("A-1", Some(at), 7, true), ("A-2", None, 1250, false)]
+    {
+        GridOrder::create(
+            app.db(),
+            GridOrder {
+                number: number.into(),
+                status: "new".into(),
+                total,
+                ordered_on: NaiveDate::from_ymd_opt(2026, 4, 1).unwrap(),
+                placed_at,
+                paid,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    }
+    let csv = app.get("/exports-detail?export=csv").await.text();
+    let lines: Vec<&str> = csv.trim_start_matches('\u{feff}').lines().collect();
+    assert_eq!(lines[0], "Order,Placed,Total,Paid");
+    assert_eq!(lines[1], "A-1,2026-04-02 03:00,7.00,Yes", "{csv}");
+    assert_eq!(lines[2], "A-2,,1250.00,No", "{csv}");
+    // Excel takes the same cells: numbers with decimals, a moment, an
+    // empty cell (the file is a zip; its XML isn't read here).
+    let xlsx = app.get("/exports-detail?export=xlsx").await;
+    if cfg!(feature = "xlsx") {
+        xlsx.assert_ok();
+        assert!(xlsx.body.starts_with(b"PK"));
+    }
+}
+
+/// #255: builder options that change what the page offers, and their
+/// accessors.
+fn plain_grid() -> Grid {
+    Grid::new("plain")
+        .column(
+            Column::text("number", "Order")
+                .sortable(false)
+                .filterable(false),
+        )
+        .column(Column::text("status", "Status").width("12rem"))
+        .column(Column::text("total", "Total").numeric().decimals(1))
+        .group_by("status")
+        .per_page(7)
+}
+
+async fn plain(request: GridRequest) -> Result<renox::axum::Json<serde_json::Value>> {
+    let page = plain_grid().page(GridOrder::query(), &request).await?;
+    Ok(renox::axum::Json(serde_json::to_value(page)?))
+}
+
+#[renox::test]
+async fn column_options_turn_sorting_and_filtering_off() {
+    let grid = plain_grid();
+    assert_eq!(grid.id(), "plain");
+    let keys: Vec<&str> = grid.columns().iter().map(Column::key).collect();
+    assert_eq!(keys, ["number", "status", "total"]);
+    let (app, _views) = app().await;
+    let page = app.get("/plain").await;
+    page.assert_ok();
+    let options = page.json_path("per_page_options");
+    assert!(options.as_array().unwrap().contains(&json!(7)), "{options}");
+    let column = |key: &str| {
+        page.json_path("columns")
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["key"] == key)
+            .cloned()
+            .unwrap()
+    };
+    assert_eq!(column("number")["sortable"], false);
+    assert_eq!(column("number")["filterable"], false);
+    assert_eq!(column("status")["width"], "12rem");
+    // Grouped by status: rows come sorted by it.
+    let statuses: Vec<String> = page
+        .json_path("rows")
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["status"].as_str().unwrap_or_default().to_owned())
+        .collect();
+    let mut sorted = statuses.clone();
+    sorted.sort();
+    assert!(!statuses.is_empty());
+    assert_eq!(statuses, sorted);
+}
+
+#[renox::test]
+async fn row_orders_refuse_more_than_a_thousand_rows() {
+    let (app, _views) = app().await;
+    let ids: Vec<String> = (0..1001).map(|i| i.to_string()).collect();
+    let order: renox::grid::RowOrder =
+        serde_json::from_value(json!({ "ids": ids.join(","), "offset": 0 })).unwrap();
+    let err = order
+        .save::<GridOrder>(app.db(), "total")
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(err, Error::BadRequest(ref m) if m == "too many rows"),
+        "{err:?}"
+    );
 }

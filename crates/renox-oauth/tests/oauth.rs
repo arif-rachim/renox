@@ -695,3 +695,65 @@ async fn the_table_keeps_one_link_per_provider_account_and_per_user() {
     ana.delete(app.db()).await.unwrap();
     app.assert_database_count("oauth_accounts", 1).await;
 }
+
+// ---------- #261: the callback's other refusals, and secrets kept out of Debug ----------
+
+#[renox::test]
+async fn a_callback_without_a_code_or_with_a_profile_without_an_id_logs_nobody_in() {
+    let app = app().await;
+    let url = start(&app, "google", "").await;
+    let state = param(&query(&url), "state").unwrap();
+    app.get(&format!("/auth/google/callback?code=&state={state}"))
+        .await
+        .assert_redirect("/login");
+    app.get("/login")
+        .await
+        .assert_see("Google didn&#x27;t send a sign-in code. Try again.");
+
+    // The provider answers, but its profile has no id.
+    google_says(&app, "", "nia@example.com", true);
+    sign_in_with(&app, "google").await.assert_redirect("/login");
+    app.assert_guest();
+    app.assert_database_count("users", 0).await;
+}
+
+#[renox::test]
+async fn a_token_answer_that_isnt_json_asks_to_try_again() {
+    let app = app().await;
+    app.fake_http().on(
+        GOOGLE_TOKEN,
+        FakeResponse::text(502, "<html>Bad gateway</html>"),
+    );
+    sign_in_with(&app, "google").await.assert_redirect("/login");
+    app.get("/login").await.assert_see("Try again.");
+    app.assert_guest();
+}
+
+#[renox::test]
+async fn providers_from_config_and_their_debug_keep_secrets_out() {
+    // From config: credentials from GITHUB_CLIENT_ID/_SECRET; without them
+    // the provider isn't offered.
+    let app = TestApp::with_config(
+        App::new().module(Auth::new()).module(OAuth::new().github()),
+        |c| {
+            c.vars.insert("GITHUB_CLIENT_ID".into(), "gh-id".into());
+            c.vars
+                .insert("GITHUB_CLIENT_SECRET".into(), "gh-very-secret".into());
+        },
+    )
+    .await;
+    let url = start(&app, "github", "").await;
+    assert!(
+        url.starts_with("https://github.com/login/oauth/authorize"),
+        "{url}"
+    );
+    assert_eq!(param(&query(&url), "client_id").as_deref(), Some("gh-id"));
+    let unset = TestApp::new(App::new().module(Auth::new()).module(OAuth::new().github())).await;
+    unset.get("/auth/github/redirect").await.assert_not_found();
+
+    let shown = format!("{:?}", oauth());
+    assert!(
+        !shown.contains("google-secret") && !shown.contains("github-secret"),
+        "{shown}"
+    );
+}

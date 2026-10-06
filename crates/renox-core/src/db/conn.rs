@@ -907,8 +907,15 @@ impl Row {
         if let Ok(v) = self.try_get::<Option<i32>>(column) {
             return v.map_or(Value::Null, Value::from);
         }
+        // PostgreSQL's SMALLINT and REAL decode only as these.
+        if let Ok(v) = self.try_get::<Option<i16>>(column) {
+            return v.map_or(Value::Null, Value::from);
+        }
         if let Ok(v) = self.try_get::<Option<f64>>(column) {
             return v.map_or(Value::Null, Value::from);
+        }
+        if let Ok(v) = self.try_get::<Option<f32>>(column) {
+            return v.map_or(Value::Null, |n| Value::from(f64::from(n)));
         }
         if let Ok(v) = self.try_get::<Option<bool>>(column) {
             return v.map_or(Value::Null, Value::from);
@@ -1020,7 +1027,8 @@ pub mod bounds {
 
 #[cfg(test)]
 mod tests {
-    use super::numbered_placeholders;
+    use super::{numbered_placeholders, seal};
+    use crate::db::DbValue;
 
     #[test]
     fn numbers_placeholders_outside_quotes_and_comments() {
@@ -1059,5 +1067,27 @@ mod tests {
             numbered_placeholders("SELECT 'é?' WHERE ü = ?"),
             "SELECT 'é?' WHERE ü = $1"
         );
+    }
+
+    // #254: an Encrypted value on a Db made outside App has no key to seal with.
+    #[test]
+    fn sealing_needs_the_apps_key() {
+        let err = seal(
+            None,
+            vec![DbValue::Encrypted(super::super::encrypted::Unsealed(
+                "x".into(),
+            ))],
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("an Encrypted value needs the app's Db"),
+            "{err}"
+        );
+        // Plain values pass through untouched.
+        assert!(matches!(
+            seal(None, vec![DbValue::Integer(1)]).unwrap()[..],
+            [DbValue::Integer(1)]
+        ));
     }
 }

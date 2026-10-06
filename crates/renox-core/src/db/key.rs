@@ -263,4 +263,13 @@ mod tests {
         assert!(Ulid::default().is_unsaved());
         assert!(!first.is_unsaved());
     }
+
+    // #254: an empty key is the unsaved one; Display is the text form.
+    #[test]
+    fn empty_text_is_the_unsaved_ulid() {
+        let empty: Ulid = "".parse().unwrap();
+        assert_eq!(empty, Ulid::default());
+        let id: Ulid = "01arz3ndektsv4rrffq69g5fav".parse().unwrap();
+        assert_eq!(id.to_string(), "01ARZ3NDEKTSV4RRFFQ69G5FAV");
+    }
 }

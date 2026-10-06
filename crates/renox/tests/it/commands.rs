@@ -222,3 +222,344 @@ async fn paths_that_dont_parse_are_404s_and_missing_parameters_500s() {
     app.get("/notes/seven").await.assert_not_found();
     app.get("/broken").await.assert_status(500);
 }
+
+// ---------- #249: the commands and branches the test above doesn't run ----------
+
+/// Fails every time, once: fills `failed_jobs` for the queue commands.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct Broken;
+
+impl Job for Broken {
+    const NAME: &'static str = "broken";
+    const MAX_ATTEMPTS: u32 = 1;
+    async fn handle(self, _ctx: JobContext) -> Result {
+        Err(Error::BadRequest("always fails".into()))
+    }
+}
+
+static ECHOED: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+fn full_app(dir: &std::path::Path) -> App {
+    let mut config = config(dir);
+    config.views_path = dir.join("views");
+    config.public_path = dir.join("public");
+    App::with_config(config)
+        .migrations(&[SCHEMA])
+        .module(Notes)
+        .job::<Broken>()
+        .seeder(|state| async move {
+            renox::db::sql("INSERT INTO notes (title) VALUES ('seeded')")
+                .execute(&state.db)
+                .await?;
+            Ok(())
+        })
+        .command(
+            "notes:echo",
+            "Echoes its words",
+            |args, _state| async move {
+                ECHOED
+                    .lock()
+                    .unwrap()
+                    .extend(args.positional().iter().map(|w| (*w).to_owned()));
+                Ok(())
+            },
+        )
+}
+
+async fn notes(dir: &std::path::Path) -> i64 {
+    let kernel = full_app(dir).boot().await.unwrap();
+    renox::db::sql("SELECT COUNT(*) FROM notes")
+        .scalar(kernel.db())
+        .await
+        .unwrap()
+}
+
+async fn failed_jobs(dir: &std::path::Path) -> i64 {
+    let kernel = full_app(dir).boot().await.unwrap();
+    renox::db::sql("SELECT COUNT(*) FROM failed_jobs")
+        .scalar(kernel.db())
+        .await
+        .unwrap()
+}
+
+#[renox::test]
+async fn the_rest_of_the_binarys_commands() {
+    if std::env::var("TEST_DATABASE_URL").is_ok_and(|url| !url.is_empty()) {
+        return; // each boot gets a fresh schema there; the commands share a file here
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let run = |args: &'static [&'static str]| full_app(dir.path()).run_args(args.iter().copied());
+    run(&["help"]).await.unwrap();
+    run(&["migrate"]).await.unwrap();
+    run(&["migrate"]).await.unwrap(); // nothing to do
+
+    // Seeding, alone and after a fresh start.
+    run(&["db:seed"]).await.unwrap();
+    assert_eq!(notes(dir.path()).await, 1);
+    run(&["migrate:fresh", "--seed"]).await.unwrap();
+    assert_eq!(notes(dir.path()).await, 1);
+
+    // Rolling back by steps, and a step that isn't a number.
+    assert!(run(&["migrate:rollback", "--step", "x"]).await.is_err());
+    run(&["migrate:rollback", "--step", "2"]).await.unwrap();
+    run(&["migrate:status"]).await.unwrap(); // pending ones listed
+    run(&["migrate"]).await.unwrap();
+
+    // The queue: a job that fails, worked once on the named queues.
+    full_app(dir.path())
+        .boot()
+        .await
+        .unwrap()
+        .state()
+        .dispatch(Broken)
+        .await
+        .unwrap();
+    run(&["queue:work", "--once", "--queue", "default,mail"])
+        .await
+        .unwrap();
+    assert_eq!(failed_jobs(dir.path()).await, 1);
+    run(&["queue:failed"]).await.unwrap(); // with a row to print
+    assert!(run(&["queue:retry", "abc"]).await.is_err());
+    run(&["queue:retry", "all"]).await.unwrap();
+    assert_eq!(failed_jobs(dir.path()).await, 0);
+    run(&["queue:work", "--once"]).await.unwrap();
+    let id = {
+        let kernel = full_app(dir.path()).boot().await.unwrap();
+        renox::db::sql("SELECT id FROM failed_jobs")
+            .scalar::<i64>(kernel.db())
+            .await
+            .unwrap()
+    };
+    full_app(dir.path())
+        .run_args(["queue:retry".to_owned(), id.to_string()])
+        .await
+        .unwrap();
+    run(&["queue:work", "--once"]).await.unwrap();
+    assert!(run(&["queue:forget"]).await.is_err(), "needs an id");
+    assert!(
+        run(&["queue:forget", "987654"]).await.is_err(),
+        "no such job"
+    );
+    let id = {
+        let kernel = full_app(dir.path()).boot().await.unwrap();
+        renox::db::sql("SELECT id FROM failed_jobs")
+            .scalar::<i64>(kernel.db())
+            .await
+            .unwrap()
+    };
+    full_app(dir.path())
+        .run_args(["queue:forget".to_owned(), id.to_string()])
+        .await
+        .unwrap();
+    assert_eq!(failed_jobs(dir.path()).await, 0);
+
+    // Webhook calls that failed, listed and retried.
+    {
+        let kernel = full_app(dir.path()).boot().await.unwrap();
+        renox::db::sql(
+            "INSERT INTO webhook_calls (provider, event_id, payload, status, error, received_at) \
+             VALUES ('pay', 'evt_1', ?, 'failed', 'the shop is closed', ?)",
+        )
+        .bind(b"{}".to_vec())
+        .bind(renox::db::now().timestamp())
+        .execute(kernel.db())
+        .await
+        .unwrap();
+    }
+    run(&["webhook:failed"]).await.unwrap();
+    assert!(run(&["webhook:retry"]).await.is_err(), "needs an id");
+    assert!(run(&["webhook:retry", "abc"]).await.is_err());
+    assert!(
+        run(&["webhook:retry", "987654"]).await.is_err(),
+        "no such call"
+    );
+    run(&["webhook:retry", "1"]).await.unwrap();
+
+    // The UI kit copied into the app, once; again only with --force.
+    run(&["ui:publish"]).await.unwrap();
+    assert!(dir.path().join("views/components/ui.html").exists());
+    assert!(dir.path().join("public/css/renox-ui.css").exists());
+    assert!(
+        run(&["ui:publish"]).await.is_err(),
+        "exists without --force"
+    );
+    run(&["ui:publish", "--force"]).await.unwrap();
+
+    // Maintenance with a bypass secret and a retry time; up when not down.
+    run(&["down", "--secret", "let-me-in", "--retry", "60"])
+        .await
+        .unwrap();
+    let down = std::fs::read_to_string(dir.path().join("storage/framework/down")).unwrap();
+    assert!(down.contains("let-me-in") && down.contains("60"), "{down}");
+    run(&["up"]).await.unwrap();
+    run(&["up"]).await.unwrap(); // was not down
+
+    // The scheduler's usage error, and an app command with its words.
+    assert!(run(&["schedule:run"]).await.is_err());
+    run(&["notes:echo", "one", "two"]).await.unwrap();
+    assert_eq!(*ECHOED.lock().unwrap(), ["one", "two"]);
+}
+
+#[renox::test]
+async fn schedule_list_and_route_list_with_little_to_show() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut config = Config::default();
+    config.database_url = format!("sqlite://{}", dir.path().join("app.db").display());
+    // No scheduled tasks; a route on its own domain shows the DOMAIN column.
+    let app = || App::with_config(config.clone()).module(Hosted);
+    app().run_args(["schedule:list"]).await.unwrap();
+    app().run_args(["route:list"]).await.unwrap();
+}
+
+struct Hosted;
+
+impl Module for Hosted {
+    fn name(&self) -> &'static str {
+        "hosted"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new().domain(
+            "{team}.example.com",
+            Routes::new().get("/", || async { "team" }),
+        )
+    }
+}
+
+// ---------- #249: what App::boot refuses, and what it wires up ----------
+
+struct Fallback(&'static str);
+
+impl Module for Fallback {
+    fn name(&self) -> &'static str {
+        self.0
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new().fallback(|| async { "not here" })
+    }
+}
+
+struct DomainFallback(&'static str);
+
+impl Module for DomainFallback {
+    fn name(&self) -> &'static str {
+        self.0
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new().domain(
+            "admin.example.com",
+            Routes::new()
+                .get(&format!("/{}", self.0), || async { "admin" })
+                .fallback(|| async { "admin 404" }),
+        )
+    }
+}
+
+struct Nested;
+
+impl Module for Nested {
+    fn name(&self) -> &'static str {
+        "nested"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new().domain(
+            "{team}.example.com",
+            Routes::new().domain(
+                "deeper.example.com",
+                Routes::new().get("/", || async { "x" }),
+            ),
+        )
+    }
+}
+
+/// Two modules whose routes axum can't merge (one path, a wildcard each).
+struct Wild(&'static str);
+
+impl Module for Wild {
+    fn name(&self) -> &'static str {
+        self.0
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::from(renox::axum::Router::new().route(
+            "/files/{*rest}",
+            renox::axum::routing::get(|| async { "files" }),
+        ))
+    }
+}
+
+async fn boot_error(app: App) -> String {
+    match app.boot().await {
+        Ok(_) => panic!("booted"),
+        Err(err) => format!("{err:?}"),
+    }
+}
+
+#[renox::test]
+async fn boot_refuses_routes_that_cant_be_put_together() {
+    let err = boot_error(App::new().module(Fallback("one")).module(Fallback("two"))).await;
+    assert!(
+        err.contains("two modules set a fallback route (`two` is the second)"),
+        "{err}"
+    );
+    let err = boot_error(
+        App::new()
+            .module(DomainFallback("a"))
+            .module(DomainFallback("b")),
+    )
+    .await;
+    assert!(
+        err.contains("two fallbacks for the domain `admin.example.com` (module `b`)"),
+        "{err}"
+    );
+    let err = boot_error(App::new().module(Nested)).await;
+    assert!(
+        err.contains("inside another domain (module `nested`)"),
+        "{err}"
+    );
+    let err = boot_error(App::new().module(Wild("left")).module(Wild("right"))).await;
+    assert!(
+        err.contains("the routes of the `right` module clash"),
+        "{err}"
+    );
+    let err = boot_error(
+        App::new()
+            .mailer("news", |_| Ok(renox::mail::MailConfig::default()))
+            .mailer("news", |_| Ok(renox::mail::MailConfig::default())),
+    )
+    .await;
+    assert!(
+        err.contains("two mailers are named `news` (App::mailer)"),
+        "{err}"
+    );
+}
+
+/// `App::layer` wraps the routes of each domain too.
+#[renox::test]
+async fn app_layers_wrap_domain_routes() {
+    use renox::axum::http::{HeaderName, HeaderValue};
+    let app = TestApp::new(App::new().module(DomainFallback("a")).layer(
+        renox::axum::middleware::map_response(|mut res: Response| async move {
+            res.headers_mut().insert(
+                HeaderName::from_static("x-layer"),
+                HeaderValue::from_static("on"),
+            );
+            res
+        }),
+    ))
+    .await;
+    app.request()
+        .header("host", "admin.example.com")
+        .get("/a")
+        .await
+        .assert_see("admin")
+        .assert_header("x-layer", "on");
+    app.request()
+        .header("host", "admin.example.com")
+        .get("/missing")
+        .await
+        .assert_see("admin 404");
+}

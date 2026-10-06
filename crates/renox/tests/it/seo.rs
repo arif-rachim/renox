@@ -39,6 +39,12 @@ impl Module for Shop {
                     view("page.html", ()).fragment("body"),
                 ))
             })
+            .get(
+                "/ga",
+                |analytics::GaClientId(id): analytics::GaClientId| async move {
+                    id.unwrap_or_else(|| "none".into())
+                },
+            )
             .post("/track", |State(state): State<AppState>| async move {
                 state
                     .dispatch(ServerEvent::new(None, "purchase").param("value", 18000))
@@ -258,4 +264,82 @@ async fn server_events_are_queued_and_skipped_without_ga4() {
     app.post("/track", &[]).await.assert_ok();
     assert_eq!(app.queued_jobs().await, ["renox:analytics"]);
     assert_eq!(app.run_jobs().await, 1);
+}
+
+/// #252: the `_ga` cookie read on the server.
+#[renox::test]
+async fn the_ga_client_id_comes_from_the_cookie() {
+    let (app, _dir) = app(|_| {}).await;
+    app.request()
+        .header("cookie", "theme=dark; _ga=GA1.1.1234567890.1700000000")
+        .get("/ga")
+        .await
+        .assert_see("1234567890.1700000000");
+    app.request()
+        .header("cookie", "_ga=junk")
+        .get("/ga")
+        .await
+        .assert_see("none");
+    app.get("/ga").await.assert_see("none");
+}
+
+/// #252: with GA4 set, events are only logged outside production, and sent
+/// to the Measurement Protocol in production; an error answer fails the job.
+#[renox::test]
+async fn server_events_go_to_ga4_in_production_only() {
+    use renox::http::FakeResponse;
+    let ga4 = |c: &mut Config| {
+        c.analytics.ga4_measurement_id = Some("G-TEST".into());
+        c.analytics.ga4_api_secret = Some("s3cret".into());
+    };
+    let (local, _dir) = app(ga4).await;
+    let http = local.fake_http();
+    local.post("/track", &[]).await.assert_ok();
+    assert_eq!(local.run_jobs().await, 1);
+    assert!(http.sent().is_empty(), "nothing leaves a local app");
+
+    let (live, _dir) = app(move |c| {
+        ga4(c);
+        c.env = Environment::Production;
+        c.debug = false;
+    })
+    .await;
+    let http = live.fake_http();
+    http.on(
+        "POST https://www.google-analytics.com/mp/collect*",
+        FakeResponse::status(204),
+    );
+    live.post("/track", &[]).await.assert_ok();
+    live.run_jobs().await;
+    let sent = http.sent();
+    assert_eq!(sent.len(), 1, "{sent:?}");
+    assert!(
+        sent[0].url.contains("measurement_id=G-TEST"),
+        "{}",
+        sent[0].url
+    );
+    let body: serde_json::Value = serde_json::from_str(&sent[0].body).unwrap();
+    assert_eq!(body["events"][0]["name"], "purchase");
+
+    let (failing, _dir) = app(move |c| {
+        ga4(c);
+        c.env = Environment::Production;
+        c.debug = false;
+    })
+    .await;
+    failing.fake_http().on(
+        "POST https://www.google-analytics.com/mp/collect*",
+        FakeResponse::status(500),
+    );
+    failing.post("/track", &[]).await.assert_ok();
+    failing.run_jobs().await;
+    let failed: i64 = renox::db::sql("SELECT COUNT(*) FROM failed_jobs")
+        .scalar(failing.db())
+        .await
+        .unwrap();
+    let waiting: i64 = renox::db::sql("SELECT COUNT(*) FROM jobs")
+        .scalar(failing.db())
+        .await
+        .unwrap();
+    assert_eq!(failed + waiting, 1, "the job failed and is kept to retry");
 }
