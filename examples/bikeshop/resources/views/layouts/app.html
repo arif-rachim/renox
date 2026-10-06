@@ -36,6 +36,8 @@
       {{ menu_action(route('locale.update', 'es'), "Español") }}
     {% endcall %}
     {% if auth.check %}
+      {#- The bell: unread notifications, new ones live (Auth::notifications, #238). -#}
+      {% from "renox/ui.html" import notification_bell %}{{ notification_bell(unread_notifications) }}
       {% call menu(auth.user.name, id="account-menu", variant="plain") %}
         {{ menu_link(route('account.show'), t('nav.account')) }}
         {#- Everyone sees it until the access foundations put it behind a permission. -#}

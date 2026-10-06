@@ -1,0 +1,21 @@
+{#- Account section (order 20): whether staff have checked the customer's ID
+    document, which renting a bike needs. Only the last three characters of
+    the number are shown (`Customer::masked_id_number`; the number itself is
+    an `Encrypted<String>` and never reaches a template). The document is
+    handed in at a store's counter (rentals, #235). -#}
+{%- if section.data.customer %}
+{% from "renox/ui.html" import card, infolist, entry, badge %}
+{% call card(title=t('accounts.id.title'), subtitle=t('accounts.id.lead')) %}
+  {% call infolist(columns=2) %}
+    {%- if section.data.verified_at %}
+    {{ entry(t('accounts.id.status'), t('accounts.id.verified'), badge="success") }}
+    {{ entry(t('accounts.id.checked_on'), section.data.verified_at, format="date") }}
+    {%- elif section.data.on_file %}
+    {{ entry(t('accounts.id.status'), t('accounts.id.waiting'), badge="warning") }}
+    {%- else %}
+    {{ entry(t('accounts.id.status'), t('accounts.id.missing'), badge=true) }}
+    {%- endif %}
+    {{ entry(t('accounts.id.number'), section.data.masked) }}
+  {% endcall %}
+{% endcall %}
+{%- endif %}

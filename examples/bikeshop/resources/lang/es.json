@@ -40,6 +40,162 @@
       "lead": "La trastienda de las tres tiendas.",
       "empty_title": "Aún no hay nada aquí",
       "empty_text": "Las ventas, los alquileres, el taller y el stock de cada tienda aparecerán aquí a medida que crezca el ejemplo."
+    },
+    "two_factor": {
+      "required": "Las cuentas del personal necesitan el acceso en dos pasos. Actívalo abajo para abrir la trastienda."
+    },
+    "cancel": "Cancelar",
+    "nav": {
+      "back_office": "Trastienda",
+      "team": "Equipo",
+      "stores": "Tiendas",
+      "roles": "Roles",
+      "audit": "Registro de auditoría",
+      "admin": "Panel de administración"
+    },
+    "stores": {
+      "title": "Tiendas",
+      "lead": "Los datos de cada tienda, su horario, el tiempo de taller y la comisión.",
+      "phone": "Teléfono",
+      "email": "Correo",
+      "workshop": "Tiempo de taller al día",
+      "minutes": ":minutes minutos",
+      "minutes_unit": "min",
+      "fee": "Comisión para otras tiendas",
+      "hours": "Horario",
+      "days": {
+        "mon": "Lunes",
+        "tue": "Martes",
+        "wed": "Miércoles",
+        "thu": "Jueves",
+        "fri": "Viernes",
+        "sat": "Sábado",
+        "sun": "Domingo"
+      },
+      "edit": "Editar",
+      "none": "No hay tiendas que gestionar aquí.",
+      "edit_lead": "Los cambios se ven al momento en las páginas de la tienda.",
+      "details": "Datos",
+      "name": "Nombre",
+      "workshop_hint": "Minutos de mecánico que el taller puede reservar cada día.",
+      "fee_hint": "Lo que gana esta tienda por el trabajo hecho para otra (alquilar su bicicleta, vender sus productos). Queda auditado.",
+      "hours_lead": "Una fila por cada día que abre; deja fuera el día que cierra.",
+      "day": "Día",
+      "add_day": "Añadir un día",
+      "opens": "Abre",
+      "closes": "Cierra",
+      "saved": ":store se guardó."
+    },
+    "team": {
+      "title": "Equipo de :store",
+      "lead": "Quién trabaja aquí: su tienda principal, o un rol dado en esta tienda.",
+      "name": "Nombre",
+      "roles": "Roles",
+      "home": "Tienda principal",
+      "status": "Estado",
+      "active": "Activo",
+      "inactive": "Desactivado",
+      "open": "Abrir",
+      "no_role": "Sin rol",
+      "empty": "Aún no trabaja nadie aquí.",
+      "roles_lead": "Roles en cada tienda, con sus fechas. Los dados en esta tienda se pueden quitar aquí.",
+      "everywhere": "Todas las tiendas",
+      "from": "desde :date",
+      "until": "hasta :date",
+      "not_in_force": "No vigente ahora",
+      "remove": "Quitar",
+      "remove_title": "¿Quitar el rol :role?",
+      "remove_text": "Pierde lo que permitía en :store desde su próxima página.",
+      "give": "Dar un rol en :store",
+      "give_lead": "Opcionalmente desde y hasta una fecha: la ayuda de una semana termina sola.",
+      "role": "Rol",
+      "choose_role": "Elige un rol",
+      "starts_on": "Desde",
+      "starts_hint": "Vacío: desde ahora.",
+      "ends_on": "Hasta (incluido)",
+      "ends_hint": "Vacío: para siempre.",
+      "give_button": "Dar el rol",
+      "details": "Datos",
+      "hired": "Contratado",
+      "access": "Acceso",
+      "deactivate_lead": "Deja la empresa: se quitan todos sus roles y se cierra su sesión en todas partes a la vez.",
+      "reactivate_lead": "Desactivado. Dale de nuevo un rol para que pueda trabajar.",
+      "deactivate": "Desactivar",
+      "deactivate_title": "¿Desactivar a :name?",
+      "deactivate_text": "Se quitan todos sus roles y terminan ahora todas sus sesiones.",
+      "reactivate": "Reactivar",
+      "role_given": "Se dio el rol.",
+      "role_removed": "Se quitó el rol.",
+      "deactivated": "Desactivado y con la sesión cerrada en todas partes.",
+      "reactivated": "De vuelta en el equipo: dale un rol."
+    },
+    "invitations": {
+      "title": "Invitar al equipo",
+      "lead": "Recibirá un correo con un enlace para unirse al equipo de :store.",
+      "email": "Correo electrónico",
+      "role_hint": "Solo roles cuyos permisos tienes todos aquí.",
+      "send": "Enviar la invitación",
+      "sent": "La invitación va de camino a :email.",
+      "joined": "Bienvenido al equipo de :store. Inicia sesión: primero configurarás el acceso en dos pasos.",
+      "mail": {
+        "subject": "Únete al equipo de :store",
+        "text": ":inviter te invita a trabajar en :store como :role.",
+        "button": "Unirme al equipo",
+        "expires": "El enlace funciona :days días.",
+        "two_factor": "Las cuentas del personal usan el acceso en dos pasos: ten a mano una aplicación de autenticación en el móvil."
+      }
+    },
+    "join": {
+      "title": "Únete a :store",
+      "lead": "Te invitan como :role en :store.",
+      "used": "Esta invitación ya se aceptó. Inicia sesión para empezar.",
+      "log_in_first": "Ya tienes una cuenta con :email. Inicia sesión y vuelve a abrir el enlace.",
+      "name": "Tu nombre",
+      "password": "Elige una contraseña",
+      "password_confirmation": "Escríbela otra vez",
+      "button": "Unirme al equipo",
+      "two_factor": "Tras iniciar sesión configurarás el acceso en dos pasos, obligatorio para el personal."
+    },
+    "roles": {
+      "title": "Roles y permisos",
+      "lead": "Lo que puede hacer cada rol. Los cambios cuentan desde la próxima página de cada persona.",
+      "note": "El código comprueba permisos, nunca nombres de rol: un interruptor aquí cambia lo que permite un rol sin desplegar nada. Dónde cuenta cada rol se decide por persona y por tienda, en las páginas del equipo.",
+      "permission": "Permiso",
+      "global": "Todas las tiendas",
+      "count": ":count permisos",
+      "cell": ":role puede :permission",
+      "granted": ":role ahora tiene :permission.",
+      "revoked": ":role ya no tiene :permission."
+    },
+    "audit": {
+      "title": "Registro de auditoría",
+      "lead": "Los cambios delicados en todas las tiendas: quién, en qué tienda, con qué rol y cuándo."
+    },
+    "catalog": {
+      "move_title": "Mover a una categoría",
+      "move_lead": ":count productos elegidos en el panel.",
+      "products": "Productos",
+      "category": "Categoría",
+      "choose_category": "Elige una categoría",
+      "move_button": "Moverlos",
+      "moved": ":count productos movidos.",
+      "fits_title": "Qué encaja: :product",
+      "gear": "El equipamiento no encaja en bicicletas: aquí no hay nada que indicar.",
+      "fits_bikes": "Bicicletas en las que encaja esta pieza",
+      "fits_parts": "Piezas que encajan en esta bicicleta",
+      "remove": "Quitar",
+      "remove_title": "¿Quitar :product?",
+      "remove_text": "Los clientes dejarán de verlo entre lo que encaja.",
+      "none_yet": "Nada todavía.",
+      "add_fit": "Añadir",
+      "bike": "Modelo de bicicleta",
+      "part": "Pieza",
+      "choose": "Elige…",
+      "note": "Nota",
+      "note_hint": "Opcional, p. ej. \"necesita buje de 12 velocidades\".",
+      "fit_added": "Añadido.",
+      "fit_removed": "Quitado.",
+      "fits_link": "Qué encaja"
     }
   },
   "about": {
@@ -1880,6 +2036,110 @@
         "confirm": "Cada tienda confirma en la página del extracto cuando el dinero se haya movido. Los asientos van adjuntos.",
         "open": "Abrir el extracto"
       }
+    }
+  },
+  "accounts": {
+    "save": "Guardar",
+    "page": {
+      "lead": "Hola, :name. Tus pedidos, alquileres, bicicletas y ajustes, en un solo lugar.",
+      "notifications": "Notificaciones"
+    },
+    "contact": {
+      "title": "Datos de contacto",
+      "lead": "Dónde te localizamos y tu dirección.",
+      "phone": "Teléfono",
+      "line1": "Calle y número",
+      "line2": "Piso, puerta",
+      "district": "Barrio",
+      "postal_code": "Código postal",
+      "city": "Ciudad",
+      "country": "País",
+      "choose_country": "Elige un país",
+      "saved": "Tus datos de contacto se guardaron."
+    },
+    "id": {
+      "title": "Comprobación del documento",
+      "lead": "Para alquilar una bicicleta hay que comprobar un documento de identidad en el mostrador de una tienda.",
+      "status": "Estado",
+      "verified": "Comprobado",
+      "checked_on": "Comprobado el",
+      "waiting": "Pendiente de comprobar",
+      "missing": "Sin documento",
+      "number": "Número del documento"
+    },
+    "notifications": {
+      "title": "Notificaciones",
+      "lead": "Elige cómo te avisamos de cada cosa: por correo, aquí en la aplicación, ambos o nada.",
+      "saved": "Tus preferencias de notificación se guardaron.",
+      "choice": {
+        "both": "Ambos",
+        "mail": "Correo",
+        "in_app": "En la aplicación",
+        "none": "Nada"
+      },
+      "kind": {
+        "order": "Pedidos",
+        "rental": "Alquileres",
+        "workshop": "Taller",
+        "plan": "Plan de mantenimiento",
+        "marketing": "Novedades y ofertas"
+      },
+      "hint": {
+        "order": "Confirmado, listo para recoger, reembolsado.",
+        "rental": "Reservado, vence pronto, con retraso.",
+        "workshop": "Reservado, listo, esperando piezas.",
+        "plan": "Tu próxima visita, un pago fallido.",
+        "marketing": "Bicicletas nuevas y ofertas, de vez en cuando."
+      }
+    },
+    "language": {
+      "title": "Idioma",
+      "lead": "El idioma de estas páginas y de los correos que te enviamos.",
+      "label": "Idioma",
+      "saved": "Tu idioma se guardó."
+    },
+    "privacy": {
+      "title": "Tus datos",
+      "lead": "Descarga todo lo que guardamos sobre ti en un archivo. Te enviamos un enlace que funciona :days días.",
+      "export": "Descargar mis datos",
+      "export_queued": "Estamos reuniendo tus datos. Recibirás un correo con un enlace en unos minutos.",
+      "delete_intro": "Se eliminan tu acceso y tus datos personales. Los pedidos y pagos quedan en la contabilidad sin tu nombre; un plan de mantenimiento activo se cancela.",
+      "delete_confirm": "No se puede deshacer. Tu nombre, datos de contacto, dirección y documento de identidad se eliminan para siempre.",
+      "mail": {
+        "subject": "Tus datos de la tienda de bicicletas",
+        "hello": "Hola, :name:",
+        "text": "Aquí tienes todo lo que guardamos sobre ti, en un archivo JSON.",
+        "button": "Descargar mis datos",
+        "expires": "El enlace funciona :days días."
+      }
+    },
+    "claim": {
+      "title": "Reclama tu ficha",
+      "lead": "Vincula lo que hiciste en nuestras tiendas a tu cuenta, :name.",
+      "what": "Esta ficha tiene:",
+      "orders": "Pedidos",
+      "rentals": "Alquileres",
+      "bikes": "Bicicletas",
+      "button": "Soy yo: vincularla a mi cuenta",
+      "done": "Tus pedidos, alquileres y bicicletas anteriores ya están en tu cuenta.",
+      "taken": "Esta ficha ya está vinculada a una cuenta.",
+      "other_email": "Esta invitación se envió a :email, pero has iniciado sesión como :current. Inicia sesión con :email para reclamarla.",
+      "mail": {
+        "subject": "Tu cuenta de la tienda de bicicletas te espera",
+        "hello": "Hola, :name:",
+        "text": "Has comprado con nosotros en el mostrador. Crea una cuenta (o inicia sesión) y vincula a ella tus compras, alquileres y bicicletas.",
+        "button": "Reclamar mi ficha",
+        "expires": "El enlace funciona :days días."
+      }
+    },
+    "invite": {
+      "title": "Invitar a una cuenta",
+      "lead": "Envía a este cliente un enlace para reclamar su ficha en línea.",
+      "since": "Cliente desde",
+      "email": "Su correo electrónico",
+      "email_hint": "Se guarda en la ficha; el enlace funciona siete días.",
+      "send": "Enviar la invitación",
+      "sent": "La invitación va de camino a :email."
     }
   }
 }

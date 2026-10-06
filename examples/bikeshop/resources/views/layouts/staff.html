@@ -27,6 +27,11 @@
     {% if can('staff.help') %}{{ sidebar_link(route('multistore.help'), t('multistore.help.title'), active=route_is('multistore.help*')) }}{% endif %}
     {% if can('fleet.view') %}{{ sidebar_link(route('multistore.placements'), t('multistore.placements.title'), active=route_is('multistore.placements*')) }}{% endif %}
     {% if can('intercompany.view') %}{{ sidebar_link(route('multistore.books'), t('multistore.books.title'), active=route_is('multistore.books', 'multistore.settlements*', 'multistore.fees*')) }}{% endif %}
+    {%- if can('staff.manage') %}{{ sidebar_link(route('staff.team.index'), t('staff.nav.team'), active=route_is('staff.team.*') or route_is('staff.invitations.*')) }}{% endif %}
+    {%- if can('stores.manage') %}{{ sidebar_link(route('staff.stores.index'), t('staff.nav.stores'), active=route_is('staff.stores.*')) }}{% endif %}
+    {%- if can('roles.manage') %}{{ sidebar_link(route('staff.roles.index'), t('staff.nav.roles'), active=route_is('staff.roles.*')) }}{% endif %}
+    {%- if can('audit.view') %}{{ sidebar_link(route('staff.audit.index'), t('staff.nav.audit'), active=route_is('staff.audit.*')) }}{% endif %}
+    {%- if can('catalog.manage') or can('plans.manage') or can('purchasing.manage') or can('stores.manage') %}{{ sidebar_link(route('admin.dashboard'), t('staff.nav.admin')) }}{% endif %}
     {#- --- end of staff navigation --- -#}
     {{ sidebar_section(t('nav.shop')) }}
     {{ sidebar_link(route('home'), t('nav.storefront')) }}
@@ -44,6 +49,8 @@
         {{ menu_action(route('locale.update', 'es'), "Español") }}
       {% endcall %}
       {%- if auth.check %}
+      {#- The bell: unread notifications, new ones live (Auth::notifications, #238). -#}
+      {% from "renox/ui.html" import notification_bell %}{{ notification_bell(unread_notifications) }}
       {% call menu(auth.user.name, id="account-menu", variant="plain") %}
         {{ menu_link(route('account.show'), t('nav.account')) }}
         {{ menu_separator() }}

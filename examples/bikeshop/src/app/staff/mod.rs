@@ -1,15 +1,32 @@
-//! The staff side: the back office's home and, later, staff, roles and the
-//! stores' settings (#239).
+//! The staff side (#239): the back office's home, the stores, the team and
+//! its invitations, the role × permission matrix, the audit log, two-factor
+//! login for staff, and the admin panel for the catalogue.
 //!
-//! For now only the dashboard placeholder, so the staff layout
-//! (`resources/views/layouts/staff.html`: the kit's `sidebar` in an
-//! `rx-shell`) has a page. Like every staff route it goes through
-//! `access::staff_routes`: a login, then `staff.access` in the active store
-//! (`src/app/access`).
+//! Every page goes through `access::staff_routes` (a login, then
+//! `staff.access` in the active store, `src/app/access`) and asks for its
+//! own permission on top: `stores.manage`, `staff.manage`, `roles.manage`,
+//! `audit.view`, `catalog.manage`. The admin panel (`renox-admin`) is
+//! [`admin::panel`], registered in `src/lib.rs`.
+//!
+//! - [`stores`]: the stores' details, opening hours (a repeater) and fee rate;
+//! - [`team`]: who works in the store, invitations, roles per store with
+//!   dates, deactivation;
+//! - [`roles`]: the role × permission matrix, edited live;
+//! - [`audit`]: the audit log page and `audit::record`, which every area
+//!   uses for its sensitive actions;
+//! - [`two_factor`]: two-factor login required for staff;
+//! - [`admin`] and [`catalog_tools`]: the panel and its two extra pages.
 
+pub mod admin;
+pub mod audit;
+pub mod catalog_tools;
 pub mod explain;
 pub mod factories;
 pub mod model;
+pub mod roles;
+pub mod stores;
+pub mod team;
+pub mod two_factor;
 
 use renox::prelude::*;
 
@@ -29,6 +46,18 @@ impl Module for Staff {
                 .get("/staff", dashboard)
                 .name("staff.dashboard"),
         )
+        .merge(stores::routes())
+        .merge(team::routes())
+        .merge(roles::routes())
+        .merge(audit::routes())
+        .merge(catalog_tools::routes())
+    }
+
+    fn register(&self, app: &mut Registry) {
+        // Two-factor login is required for staff (two_factor.rs).
+        app.listen(two_factor::on_logged_in)
+            .listen(two_factor::on_enabled)
+            .listen(two_factor::on_disabled);
     }
 }
 

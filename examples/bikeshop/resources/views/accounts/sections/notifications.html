@@ -1,0 +1,32 @@
+{#- Account section (order 110): how each kind of notification reaches the
+    customer, sent to `accounts.preferences`. One row per kind (a CSS grid:
+    its name, then the kit's `toggle_buttons` with the four choices), so the
+    "matrix" is the kit's own segmented control, once per kind.
+    `section.data`: rows (kind, choice), choices. Every notification in the
+    app reads these through `accounts::preferences::channels_for`. -#}
+{% from "renox/ui.html" import card, toggle_buttons, button %}
+<form method="post" action="{{ route('accounts.preferences') }}" id="account-notifications">
+  {{ csrf_field() }}{{ method_field('PUT') }}
+  {% call card(title=t('accounts.notifications.title'), subtitle=t('accounts.notifications.lead')) %}
+    {#- The four choices, in `Choice::ALL`'s order (a list literal: a
+        `{% set %}` inside a loop wouldn't outlive the loop). -#}
+    {%- set options = [
+      ["both", t('accounts.notifications.choice.both')],
+      ["mail", t('accounts.notifications.choice.mail')],
+      ["in_app", t('accounts.notifications.choice.in_app')],
+      ["none", t('accounts.notifications.choice.none')],
+    ] %}
+    <div class="bs-prefs" role="group" aria-label="{{ t('accounts.notifications.title') }}">
+      {%- for row in section.data.rows %}
+      <div class="bs-prefs__row" data-bs-pref="{{ row.kind }}">
+        <div class="bs-prefs__kind">
+          <strong id="pref-{{ row.kind }}-label">{{ t('accounts.notifications.kind.' ~ row.kind) }}</strong>
+          <span>{{ t('accounts.notifications.hint.' ~ row.kind) }}</span>
+        </div>
+        {{ toggle_buttons(row.kind, t('accounts.notifications.kind.' ~ row.kind), options, selected=row.choice, required=true, id="pref-" ~ row.kind) }}
+      </div>
+      {%- endfor %}
+    </div>
+    <div class="rx-card__footer">{{ button(t('accounts.save')) }}</div>
+  {% endcall %}
+</form>
