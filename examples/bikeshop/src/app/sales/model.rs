@@ -116,6 +116,13 @@ pub struct OrderItem {
 /// `work_orders`, `payable_id` the row.
 pub const PAYABLE: Morph = Morph::new("payable_type", "payable_id");
 
+/// `payable_type` of a payment for an order.
+pub const PAYABLE_ORDER: &str = "orders";
+/// `payable_type` of a payment for a rental.
+pub const PAYABLE_RENTAL: &str = "rentals";
+/// `payable_type` of a payment for a work order.
+pub const PAYABLE_WORK_ORDER: &str = "work_orders";
+
 /// How a customer paid.
 #[derive(DbEnum, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PaymentMethod {

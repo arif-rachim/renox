@@ -7,6 +7,7 @@
 pub mod explain;
 pub mod factories;
 pub mod model;
+pub mod payments;
 
 /// The sales area, registered in `src/lib.rs`.
 pub struct Sales;
