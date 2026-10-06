@@ -46,6 +46,8 @@ pub fn app() -> App {
         .module(renox::auth::Auth::new().account()) // login, register, /account
         // Roles given per store, with dates (#244); the catalogue is src/app/access.
         .module(renox::auth::permissions::Permissions)
+        // Who did what, in which store, with which role (src/app/multistore/audit.rs).
+        .module(renox::audit::Audit)
         // `db:seed`: a small shop in seconds (`demo:seed --size large` for Pagila's volume).
         .seeder(seed::run)
         .typed_command::<seed::DemoSeed>()

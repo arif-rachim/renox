@@ -481,6 +481,7 @@ async fn consignments(
                             shipment_id: shipment.id,
                             variant_id: item.variant_id,
                             quantity,
+                            received_quantity: quantity,
                             returned_quantity: if recalled { quantity } else { 0 },
                             created_at: Some(sent),
                             ..Default::default()

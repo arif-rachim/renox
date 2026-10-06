@@ -11,10 +11,15 @@
 //! | late or damage fee on A's bike, served by B | `late_fee` / `damage_fee`: B owes A the fee |
 //! | sale at B of A's consigned goods | `sale_revenue`: B owes A the line; `selling_fee`: A owes B the fee |
 //! | B's workshop repairs A's rental bike | `repair`: A owes B the work order's total |
+//! | A's consigned goods missing at B's stock take | `consignment_loss`: B owes A their cost |
 //!
 //! The deposit stays with the store that served the customer; staff
 //! helping another store are never charged. Entries are summed per store
-//! pair into a monthly [`Settlement`], which the owner marks settled.
+//! pair into a monthly [`Settlement`], which both stores mark settled
+//! (the owner, through a global role, may do it for either).
+//!
+//! [`super::books`] writes the entries (the one place that does);
+//! `settlements.rs` nets them into the monthly statements.
 //!
 //! Migration: `migrations/20260101001000_create_intercompany_tables.*`.
 
@@ -43,6 +48,9 @@ pub enum EntryKind {
     DamageFee,
     /// A repair of the debtor's rental bike by the creditor's workshop.
     Repair,
+    /// The creditor's consigned goods lost or damaged while the debtor
+    /// held them (a stock take found fewer), at cost.
+    ConsignmentLoss,
 }
 
 /// What an entry was booked for: `source_type` is `rentals`, `orders` or
@@ -89,7 +97,7 @@ pub enum SettlementStatus {
     /// Summed, not paid yet.
     #[default]
     Open,
-    /// Paid between the stores (marked by the owner).
+    /// Paid between the stores: confirmed by both of them.
     Settled,
 }
 
@@ -105,9 +113,30 @@ pub struct Settlement {
     pub amount: i64,
     pub status: SettlementStatus,
     pub settled_at: Option<DateTime>,
+    /// The user whose confirmation completed it.
     pub settled_by: Option<i64>,
+    /// When the paying store confirmed it paid (`intercompany.settle` there).
+    pub debtor_confirmed_at: Option<DateTime>,
+    pub debtor_confirmed_by: Option<i64>,
+    /// When the store being paid confirmed it was paid.
+    pub creditor_confirmed_at: Option<DateTime>,
+    pub creditor_confirmed_by: Option<i64>,
+    /// When the statement went out to both stores.
+    pub mailed_at: Option<DateTime>,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
+}
+
+impl Settlement {
+    /// Whether the paying store has confirmed (a settled row counts as confirmed by both).
+    pub fn debtor_confirmed(&self) -> bool {
+        self.status == SettlementStatus::Settled || self.debtor_confirmed_at.is_some()
+    }
+
+    /// Whether the store being paid has confirmed.
+    pub fn creditor_confirmed(&self) -> bool {
+        self.status == SettlementStatus::Settled || self.creditor_confirmed_at.is_some()
+    }
 }
 
 impl StoreRecord for Settlement {

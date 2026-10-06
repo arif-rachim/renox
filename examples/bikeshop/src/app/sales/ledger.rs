@@ -36,8 +36,7 @@ use renox::db::{Transaction, sql};
 use renox::prelude::*;
 
 use super::model::{Order, OrderItem};
-use crate::app::multistore::model::{EntryKind, IntercompanyEntry};
-use crate::app::staff::model::fee;
+use crate::app::multistore::books;
 use crate::app::stock::model::{MovementReason, StockLevel, StockMovement};
 
 /// Not enough of a variant at the store: what the customer asked for and
@@ -291,8 +290,9 @@ pub async fn take_back(
 }
 
 /// The books for consigned goods sold (or returned, `reverse`) at the
-/// order's store: the seller owes the owner the line (`sale_revenue`), the
-/// owner owes the seller its fee at the seller's rate (`selling_fee`).
+/// order's store: written by the books between stores
+/// (`multistore::books::consigned_sale`, the one place that writes
+/// intercompany entries), in this sale's transaction.
 async fn book_consigned(
     tx: &mut Transaction,
     order: &Order,
@@ -300,50 +300,14 @@ async fn book_consigned(
     amount: i64,
     reverse: bool,
 ) -> Result {
-    let seller = order.operating_store_id;
-    let owner = item.owner_store_id;
-    let rate: i64 = sql("SELECT fee_rate_bp FROM stores WHERE id = ?")
-        .bind(seller)
-        .scalar(&mut *tx)
-        .await?;
-    let now = renox::db::now();
-    let (revenue_from, revenue_to) = if reverse {
-        (owner, seller)
-    } else {
-        (seller, owner)
-    };
-    for (debtor, creditor, amount, kind, fee_rate_bp) in [
-        (
-            revenue_from,
-            revenue_to,
-            amount,
-            EntryKind::SaleRevenue,
-            None,
-        ),
-        (
-            revenue_to,
-            revenue_from,
-            fee(amount, rate),
-            EntryKind::SellingFee,
-            Some(rate),
-        ),
-    ] {
-        if amount <= 0 {
-            continue;
-        }
-        IntercompanyEntry {
-            debtor_store_id: debtor,
-            creditor_store_id: creditor,
-            amount,
-            kind,
-            fee_rate_bp,
-            source_type: Order::TABLE.into(),
-            source_id: order.id,
-            booked_at: now,
-            ..Default::default()
-        }
-        .insert(&mut *tx)
-        .await?;
-    }
+    books::consigned_sale(
+        tx,
+        order.id,
+        order.operating_store_id,
+        item.owner_store_id,
+        amount,
+        reverse,
+    )
+    .await?;
     Ok(())
 }

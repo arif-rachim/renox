@@ -1,0 +1,23 @@
+{#- Small pieces the multi-store pages share (they use the stock pages' stylesheet). -#}
+{% from "renox/ui.html" import badge %}
+
+{#- A help request's status as a badge. -#}
+{% macro help_status(row) -%}
+{%- if row.active %}{{ badge(t('multistore.help.status.active'), kind="success") }}
+{%- else %}
+{%- set tones = {"requested": "info", "approved": "success", "refused": none, "withdrawn": none, "ended_early": "warning"} %}
+{{ badge(t('multistore.help.status.' ~ row.status), kind=tones[row.status]) }}
+{%- endif %}
+{%- endmacro %}
+
+{#- A placement's status as a badge. -#}
+{% macro placement_status(key) -%}
+{%- set tones = {"requested": "info", "approved": "info", "moved": "success", "recalled": none, "refused": none} %}
+{{ badge(t('multistore.placements.status.' ~ key), kind=tones[key]) }}
+{%- endmacro %}
+
+{#- A post button in a small form (an action that needs no input). -#}
+{% macro post(action, label, variant="secondary", icon=none, id=none) -%}
+{% from "renox/ui.html" import button %}
+<form method="post" action="{{ action }}"{% if id %} id="{{ id }}"{% endif %}>{{ csrf_field() }}{{ button(label, variant=variant, size="small", icon=icon) }}</form>
+{%- endmacro %}

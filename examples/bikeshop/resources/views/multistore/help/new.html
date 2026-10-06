@@ -1,0 +1,35 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, select, input, textarea, date_picker, button, form_errors, form_grid, empty %}
+{% from "stock/_parts.html" import styles %}
+{% block seo %}{{ seo(title=t('multistore.help.new')) }}{% endblock %}
+
+{#- Ask another store for someone (#245): the person, the role they'll have here, the days. -#}
+{% block content %}
+{{ styles() }}
+<div class="rx-stack">
+  {{ page_header(t('multistore.help.new'), subtitle=t('multistore.help.new_lead'), back=route('multistore.help'), back_label=t('multistore.help.title')) }}
+  {%- set stores = namespace(items=[]) %}{% for s in others %}{% set stores.items = stores.items + [[s.id, s.name]] %}{% endfor %}
+  <form method="get" action="{{ route('multistore.help.create') }}" class="bs-filters" id="help-store">
+    {{ select("store", t('multistore.help.lending_store'), stores.items, selected=lending) }}
+    {{ button(t('multistore.help.show_people'), variant="secondary") }}
+  </form>
+  <form method="post" action="{{ route('multistore.help.store') }}" id="help-form" novalidate>
+    {{ csrf_field() }}
+    <input type="hidden" name="store" value="{{ lending }}">
+    {% call card() %}
+      {{ form_errors() }}
+      {%- if people %}
+      {% call form_grid(2) %}
+        {{ select("staff", t('multistore.help.person'), people, required=true, searchable=true) }}
+        {%- set r = namespace(items=[]) %}{% for name, label in roles %}{% set r.items = r.items + [[name, label]] %}{% endfor %}
+        {{ select("role", t('multistore.help.role'), r.items, required=true, hint=t('multistore.help.role_hint')) }}
+        {{ date_picker("starts_on", t('multistore.help.starts_on'), min=today, required=true) }}
+        {{ date_picker("ends_on", t('multistore.help.ends_on'), min=today, required=true, hint=t('multistore.help.ends_hint')) }}
+      {% endcall %}
+      {{ textarea("reason", t('multistore.help.reason'), rows=2, required=true) }}
+      {{ button(t('multistore.help.send'), icon="check") }}
+      {%- else %}{{ empty(t('multistore.help.no_people')) }}{% endif %}
+    {% endcall %}
+  </form>
+</div>
+{% endblock %}

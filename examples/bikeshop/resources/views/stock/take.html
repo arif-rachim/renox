@@ -1,0 +1,60 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, select, input, textarea, button, empty, form_errors, form_grid, alert %}
+{% from "stock/_parts.html" import styles %}
+{% block seo %}{{ seo(title=t('stock.take.title')) }}{% endblock %}
+
+{#- The stock take (#240): one category at the active store, the store's own goods and the
+    goods it holds for other stores apart (#245). Nested form names (lines[3][counted]) read
+    as a list by Valid<T>; a blank count leaves the line as it is. -#}
+{% macro rows(items, start) -%}
+<ul class="bs-rows bs-rows--3" role="list">
+  <li class="bs-row bs-row--head" aria-hidden="true"><span>{{ t('stock.fields.product') }}</span><span class="bs-row__figure">{{ t('stock.fields.on_hand') }}</span><span class="bs-row__figure bs-row__figure--extra">{{ t('stock.fields.reserved') }}</span><span>{{ t('stock.take.counted') }}</span></li>
+  {%- for r in items %}
+  {%- set i = start + loop.index0 %}
+  <li class="bs-row">
+    <span class="bs-row__name">{{ r.product }}{% if r.size %} ({{ r.size }}){% endif %}<small>{{ r.sku }}{% if r.owner_store_id != r.location_store_id %} · {{ t('stock.take.owned_by', store=r.owner) }}{% endif %}</small></span>
+    <span class="bs-row__figure">{{ r.on_hand }}</span>
+    <span class="bs-row__figure bs-row__figure--extra">{{ r.reserved }}</span>
+    <span>
+      <input type="hidden" name="lines[{{ i }}][level]" value="{{ r.id }}">
+      {{ input("lines[" ~ i ~ "][counted]", t('stock.take.counted_of', name=r.product ~ " " ~ r.sku), type="number", hide_label=true, attrs={"min": 0, "inputmode": "numeric", "placeholder": r.on_hand}) }}
+    </span>
+  </li>
+  {%- endfor %}
+</ul>
+{%- endmacro %}
+
+{% block content %}
+{{ styles() }}
+<div class="rx-stack">
+  {{ page_header(t('stock.take.title'), subtitle=t('stock.take.lead'), back=route('stock.index'), back_label=t('stock.index.title')) }}
+  <form method="get" action="{{ route('stock.take') }}" class="bs-filters" id="take-category">
+    {%- set opts = namespace(items=[]) %}{% for c in categories %}{% set opts.items = opts.items + [[c, c]] %}{% endfor %}
+    {{ select("category", t('stock.fields.category'), opts.items, selected=category, required=true) }}
+    {{ button(t('stock.take.open'), variant="secondary") }}
+  </form>
+  {%- if not own and not held %}
+  <div class="rx-card">{{ empty(t('stock.take.nothing')) }}</div>
+  {%- else %}
+  <form method="post" action="{{ route('stock.take.store') }}" id="take-form" novalidate data-bs-reveal>
+    {{ csrf_field() }}
+    <input type="hidden" name="category" value="{{ category }}">
+    {{ form_errors() }}
+    {% call card(title=t('stock.take.own', count=own | length)) %}
+      {%- if own %}{{ rows(own, 0) }}{% else %}{{ empty(t('stock.take.no_own')) }}{% endif %}
+    {% endcall %}
+    {% call card(title=t('stock.take.held', count=held | length), subtitle=t('stock.take.held_lead')) %}
+      {%- if held %}{{ rows(held, own | length) }}{% else %}{{ empty(t('stock.take.no_held')) }}{% endif %}
+    {% endcall %}
+    {% call card(title=t('stock.take.why')) %}
+      {% call form_grid(2) %}
+        {%- set r = namespace(items=[]) %}{% for key in reasons %}{% set r.items = r.items + [[key, t('stock.take.reason.' ~ key)]] %}{% endfor %}
+        {{ select("reason", t('stock.fields.reason'), r.items, selected="count", required=true) }}
+        {{ input("note", t('stock.take.note')) }}
+      {% endcall %}
+      {{ button(t('stock.take.save'), icon="check") }}
+    {% endcall %}
+  </form>
+  {%- endif %}
+</div>
+{% endblock %}

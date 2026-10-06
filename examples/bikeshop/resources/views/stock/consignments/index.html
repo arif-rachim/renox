@@ -1,0 +1,40 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, link_tabs, link_button, table, empty %}
+{% from "stock/_parts.html" import styles, shipment_status %}
+{% block seo %}{{ seo(title=t('stock.consignments.title')) }}{% endblock %}
+
+{#- Consignment shipments of the active store, both ways (#240, #245). -#}
+{% block content %}
+{{ styles() }}
+<div class="rx-stack" data-bs-reveal>
+  {% call page_header(t('stock.consignments.title'), subtitle=t('stock.consignments.lead')) %}
+    {%- if can('consignment.manage') %}
+    {{ link_button(route('stock.consignments.create', direction="ask"), t('stock.consignments.ask'), icon="download") }}
+    {{ link_button(route('stock.consignments.create', direction="send"), t('stock.consignments.send'), variant="primary", icon="box") }}
+    {%- endif %}
+  {% endcall %}
+  {%- set tabs = namespace(items=[]) %}
+  {%- for key in views %}{% set tabs.items = tabs.items + [[route('stock.consignments', view=key), t('stock.consignments.view.' ~ key)]] %}{% endfor %}
+  {{ link_tabs(tabs.items, current=route('stock.consignments', view=tab), label=t('stock.consignments.views')) }}
+  {%- if shipments.items %}
+  <div class="rx-card">
+  {% call table([t('stock.consignments.number'), t('stock.fields.owner_store'), t('stock.fields.location_store'), t('stock.fields.status'), [t('stock.consignments.units'), "num"], [t('stock.consignments.in_transit'), "num"], t('stock.consignments.updated')], caption=t('stock.consignments.title')) %}
+    {%- for s in shipments.items %}
+    <tr>
+      <td><a class="rx-link" href="{{ route('stock.consignments.show', s.id) }}">CS-{{ s.id }}</a></td>
+      <td>{{ s.owner }}{% if s.ours %} <span class="rx-subtitle">({{ t('stock.consignments.ours') }})</span>{% endif %}</td>
+      <td>{{ s.location }}</td>
+      <td>{{ shipment_status(s.status) }}</td>
+      <td class="rx-num">{{ s.units }}</td>
+      <td class="rx-num">{{ s.in_transit or "—" }}</td>
+      <td>{{ s.updated_at | since }}</td>
+    </tr>
+    {%- endfor %}
+  {% endcall %}
+  </div>
+  {% from "renox/pagination.html" import pagination %}{{ pagination(shipments) }}
+  {%- else %}
+  <div class="rx-card">{{ empty(t('stock.consignments.empty')) }}</div>
+  {%- endif %}
+</div>
+{% endblock %}

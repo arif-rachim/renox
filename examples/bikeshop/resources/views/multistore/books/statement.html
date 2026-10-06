@@ -1,0 +1,50 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, table, badge, button, alert, infolist, entry %}
+{% from "stock/_parts.html" import styles %}
+{% block seo %}{{ seo(title=t('multistore.statement.title', month=(statement.period_start | date("%B %Y")))) }}{% endblock %}
+
+{#- A two-party statement (#245): each store's side by kind, the net, each store's
+    confirmation, the entries. -#}
+{% macro side(name, data, confirmed, can, which) -%}
+{% call card(title=t('multistore.statement.owes', store=name)) %}
+  {%- if data.lines %}
+  {% call table([t('multistore.books.fields.kind'), [t('multistore.statement.entries'), "num"], [t('multistore.books.fields.amount'), "num"]], caption=t('multistore.statement.owes', store=name)) %}
+    {%- for kind, count, amount in data.lines %}
+    <tr><td>{{ t('multistore.books.kind.' ~ kind) }}</td><td class="rx-num">{{ count }}</td><td class="rx-num">{{ amount | money }}</td></tr>
+    {%- endfor %}
+    <tr><th scope="row" colspan="2">{{ t('multistore.statement.total') }}</th><td class="rx-num"><strong>{{ data.total | money }}</strong></td></tr>
+  {% endcall %}
+  {%- else %}<p class="rx-subtitle">{{ t('multistore.statement.nothing') }}</p>{% endif %}
+  <p>{% if confirmed %}{{ badge(t('multistore.statement.confirmed_' ~ which, store=name), kind="success") }}{% else %}{{ badge(t('multistore.statement.waiting_' ~ which, store=name), kind="warning") }}{% endif %}</p>
+  {%- if can %}
+  <form method="post" action="{{ route('multistore.settlements.confirm', statement.id) }}" id="confirm-{{ which }}">{{ csrf_field() }}<input type="hidden" name="side" value="{{ which }}">{{ button(t('multistore.statement.confirm_' ~ which, store=name), icon="check") }}</form>
+  {%- endif %}
+{% endcall %}
+{%- endmacro %}
+
+{% block content %}
+{{ styles() }}
+<div class="rx-stack">
+  {{ page_header(t('multistore.statement.title', month=(statement.period_start | date("%B %Y"))), subtitle=statement.debtor ~ " ⇄ " ~ statement.creditor, back=route('multistore.settlements'), back_label=t('multistore.settlements.title'), badge=t('multistore.settlements.status_' ~ statement.status), badge_kind=("success" if statement.status == "settled" else "warning")) }}
+  {{ alert(t('multistore.statement.net', debtor=statement.debtor, creditor=statement.creditor, amount=(statement.amount | money)), kind=("success" if statement.status == "settled" else "info")) }}
+  <div class="bs-split" data-bs-reveal>
+    <div>{{ side(statement.debtor, debtor_side, statement.debtor_confirmed, can_debtor, "debtor") }}</div>
+    <div>{{ side(statement.creditor, creditor_side, statement.creditor_confirmed, can_creditor, "creditor") }}</div>
+  </div>
+  {% call card(title=t('multistore.statement.entries')) %}
+    {% call table([t('multistore.books.fields.booked_at'), t('multistore.books.fields.kind'), t('multistore.books.fields.debtor'), [t('multistore.books.fields.amount'), "num"], [t('multistore.fees.percent'), "num"], t('multistore.books.fields.source')], caption=t('multistore.statement.entries')) %}
+      {%- for row in entries %}
+      {%- set e = row.entry %}
+      <tr>
+        <td>{{ e.booked_at | date("%Y-%m-%d") }}</td>
+        <td>{{ t('multistore.books.kind.' ~ e.kind) }}</td>
+        <td>{{ statement.debtor if e.debtor_store_id == statement.debtor_store_id else statement.creditor }}</td>
+        <td class="rx-num">{{ e.amount | money }}</td>
+        <td class="rx-num">{% if e.fee_rate_bp is not none %}{{ (e.fee_rate_bp / 100) | round(2) }} %{% else %}—{% endif %}</td>
+        <td>{% if row.url %}<a class="rx-link" href="{{ row.url }}">{{ e.source_type }} #{{ e.source_id }}</a>{% else %}{{ e.source_type }} #{{ e.source_id }}{% endif %}</td>
+      </tr>
+      {%- endfor %}
+    {% endcall %}
+  {% endcall %}
+</div>
+{% endblock %}
