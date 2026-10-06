@@ -1,0 +1,21 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, link_button %}
+{% from "renox/grid.html" import grid %}
+{% block seo %}{{ seo(title=t('reports.' ~ tab ~ '.title')) }}{% endblock %}
+
+{#- One report grid (src/app/reports/grids.rs): `rows` is the grid's page (renox::grid), `tab`
+    which report it is. The grid draws its toolbar (search, columns, groups, the advanced
+    filter, exports), the heading filters, the sums and the cards on phones itself; only the
+    books' "source" column is drawn here. -#}
+{% block content %}
+{% include "reports/_assets.html" %}
+<div class="rx-stack">
+  {% call page_header(t('reports.' ~ tab ~ '.title'), subtitle=t('reports.' ~ tab ~ '.lead')) %}
+    {{ link_button(route('reports.monthly'), t('reports.monthly.title'), icon="calendar") }}
+  {% endcall %}
+  {% include "reports/_tabs.html" %}
+  {% call(row, column) grid(rows) %}
+    {%- if column.key == "source" %}{% if row.source_url %}<a class="rx-link" href="{{ row.source_url }}">{{ row.source_label }}</a>{% else %}{{ row.source_label }}{% endif %}{% endif %}
+  {% endcall %}
+</div>
+{% endblock %}

@@ -1,0 +1,29 @@
+{#- The monthly report's runs (src/app/reports/monthly.rs `runs`): each batch's progress from
+    `job_batches` (the kit's `progress`), and its workbooks once it finished. Rendered in
+    the page and alone by `reports.monthly.runs`, which the widget polls. -#}
+{% from "renox/ui.html" import list, progress, badge, link_button, empty %}
+{%- if runs %}
+{% call list(id="report-runs", label=t('reports.monthly.runs')) %}
+  {%- for run in runs %}
+  <li>
+    <div class="rx-list__main bs-run">
+      <strong>{{ run.month_name }}</strong>
+      <span class="rx-subtitle">{{ t('reports.monthly.started_at', at=(run.started_at | date('%Y-%m-%d %H:%M'))) }}</span>
+      {{ progress(run.done, max=run.total, label=t('reports.monthly.progress', month=run.month_name)) }}
+      {%- if run.finished and run.failed == 0 and not run.cancelled %}
+      <div class="bs-run__files">
+        {%- for store in run.stores %}
+        {{ link_button(route('reports.monthly.file', run.month, store.id), store.name, size="small", icon="download") }}
+        {%- endfor %}
+      </div>
+      {%- endif %}
+    </div>
+    {%- if run.cancelled or run.failed > 0 %}{{ badge(t('reports.monthly.failed'), kind="danger") }}
+    {%- elif run.finished %}{{ badge(t('reports.monthly.done'), kind="success") }}
+    {%- else %}{{ badge(t('reports.monthly.running'), kind="info") }}{% endif %}
+  </li>
+  {%- endfor %}
+{% endcall %}
+{%- else %}
+{{ empty(t('reports.monthly.empty'), t('reports.monthly.empty_text')) }}
+{%- endif %}

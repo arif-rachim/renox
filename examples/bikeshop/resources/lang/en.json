@@ -1354,7 +1354,8 @@
       "everyone": "Everyone",
       "unassigned": "Unassigned",
       "filter": "Filter",
-      "clear": "Clear"
+      "clear": "Clear",
+      "mechanic_name": "Mechanic"
     },
     "walkin": {
       "title": "Walk-in work order",
@@ -1394,7 +1395,8 @@
         "ready": "Ready for pick-up",
         "completed": "Collected",
         "cancelled": "Cancel"
-      }
+      },
+      "mechanic_name": "Mechanic"
     },
     "parts": {
       "part": "Part",
@@ -2421,6 +2423,268 @@
       "rule_errors": "A refused request is 422 {\"message\", \"errors\"}, with the same rules as the website; lists come in pages with links.",
       "rule_limit": ":count requests a minute per token; over that, 429 with Retry-After.",
       "rule_cors": "Browsers on :origin may call it (CORS)."
+    }
+  },
+  "reports": {
+    "nav": "Reports",
+    "tabs": "Reports",
+    "all_stores": "All my stores",
+    "hours": ":hours h",
+    "tab": {
+      "dashboard": "Dashboard",
+      "orders": "Orders",
+      "rentals": "Rentals",
+      "work_orders": "Work orders",
+      "payments": "Payments",
+      "customers": "Customers",
+      "entries": "Between stores"
+    },
+    "period": {
+      "label": "Period",
+      "7d": "7 days",
+      "30d": "30 days",
+      "12w": "12 weeks",
+      "90d": "90 days",
+      "12m": "12 months",
+      "ytd": "This year"
+    },
+    "by": {
+      "label": "Count income",
+      "work": "Where the work was done",
+      "books": "In whose books",
+      "hint_work": "Income at the store that served the customer, whoever owns the bike or the goods.",
+      "hint_books": "Income in the books of the store that owns the bike or the goods, wherever it was rented out or sold."
+    },
+    "stream": {
+      "sales": "Sales",
+      "rentals": "Rentals",
+      "workshop": "Workshop",
+      "plans": "Plans"
+    },
+    "dashboard": {
+      "title": "Reports",
+      "lead": "How the stores are doing: income by stream, the fleet, the workshop, plans and the books between stores.",
+      "lead_store": "How :store is doing: income by stream, the fleet, the workshop, plans and the books between stores."
+    },
+    "stat": {
+      "revenue": "Revenue",
+      "orders": "Orders",
+      "average_order": "Average order",
+      "average_order_hint": "Sales ÷ orders",
+      "rentals": "Rentals",
+      "rentals_hint": "Returned in the period",
+      "fleet_use": "Fleet use",
+      "fleet_use_hint": "Bike-hours rented, of :bikes bikes",
+      "overdue": "Overdue now",
+      "overdue_hint": "Bikes not back by their due time",
+      "overdue_now": ":n overdue now",
+      "work_done": "Work orders done",
+      "turnaround": ":hours h from booking to done, on average",
+      "no_turnaround": "None completed",
+      "plans": "Active plans",
+      "plans_active": ":n active plans",
+      "mrr": ":amount a month",
+      "mrr_label": "Plans per month",
+      "mrr_hint": "What the active plans bring in a month",
+      "churn": "Plan churn",
+      "churn_hint": "Plans cancelled in the period",
+      "fees_earned": "Fees earned",
+      "fees_earned_hint": "For renting and selling other stores' bikes and goods",
+      "fees_paid": "Fees paid",
+      "fees_paid_hint": "To stores that rented or sold ours"
+    },
+    "widget": {
+      "revenue": "Revenue by stream",
+      "revenue_hint": "Per day, week or month, stacked by stream.",
+      "mix": "Income mix",
+      "mix_hint": "Each stream's share of the period's income.",
+      "hours": "Rentals by weekday and hour",
+      "hours_hint": "When bikes are picked up: the bigger the bubble, the more rentals.",
+      "hour": "Hour of the day",
+      "weekday": "Weekday (1 = Monday)",
+      "rentals": "Rentals",
+      "between": "Between stores",
+      "between_hint": "Open balances, and staff help in the period.",
+      "position": "Position (owed to us − owed by us)",
+      "help_received": "Help received",
+      "help_given": "Help given",
+      "balances": "Open balances",
+      "owes": "Who owes whom",
+      "owes_line": ":debtor owes :creditor",
+      "square": "All square between the stores.",
+      "products": "Top products",
+      "products_hint": "Sales by revenue.",
+      "categories": "Top categories",
+      "categories_hint": "Sales and rentals by revenue.",
+      "customers": "Best customers",
+      "customers_hint": "All streams, by revenue.",
+      "comparison": "Store comparison",
+      "comparison_hint_work": "Income at each store, by stream (who did the work).",
+      "comparison_hint_books": "Income in each store's books, by stream (whose bikes and goods).",
+      "share": "Share",
+      "share_of": "Share of :store",
+      "nothing": "Nothing in this period.",
+      "units_line": ":n units",
+      "visits_line": ":n visits"
+    },
+    "orders": {
+      "title": "Orders report",
+      "lead": "Every order of your stores: filter, group by store, status or channel, and export."
+    },
+    "rentals": {
+      "title": "Rentals report",
+      "lead": "Rentals served by your stores or of your bikes: group by store, owner store, category or status."
+    },
+    "work_orders": {
+      "title": "Work orders report",
+      "lead": "The workshops' work: group by store, status or source, with labour and parts summed."
+    },
+    "payments": {
+      "title": "Payments report",
+      "lead": "Money received at your stores, for orders, rentals, work orders and plans."
+    },
+    "customers": {
+      "title": "Customers report",
+      "lead": "Customers who did business with your stores, with their lifetime value across the company."
+    },
+    "entries": {
+      "title": "Between stores report",
+      "lead": "The books between stores: who owes whom, why, and whether it is settled."
+    },
+    "empty": {
+      "orders": "No orders yet",
+      "rentals": "No rentals yet",
+      "work_orders": "No work orders yet",
+      "payments": "No payments yet",
+      "customers": "No customers yet",
+      "entries": "Nothing booked between stores yet"
+    },
+    "fields": {
+      "number": "Order",
+      "placed_at": "Placed",
+      "store": "Store",
+      "customer": "Customer",
+      "channel": "Channel",
+      "status": "Status",
+      "units": "Units",
+      "discount": "Discount",
+      "total": "Total",
+      "paid_at": "Paid",
+      "code": "Reservation",
+      "starts_at": "Starts",
+      "owner_store": "Owner store",
+      "bike": "Bike",
+      "model": "Model",
+      "category": "Category",
+      "rate": "Rate",
+      "price": "Price",
+      "late_fee": "Late fee",
+      "damage_fee": "Damage fee",
+      "returned_at": "Returned",
+      "work_order": "Work order",
+      "scheduled_for": "Booked for",
+      "source": "Source",
+      "mechanic_name": "Mechanic",
+      "labour": "Labour",
+      "parts": "Parts",
+      "completed_at": "Completed",
+      "payment": "Payment",
+      "kind": "For",
+      "payable_id": "Document",
+      "method": "Method",
+      "amount": "Amount",
+      "reference": "Reference",
+      "email": "Email",
+      "city": "City",
+      "visits": "Visits",
+      "sales_value": "Purchases",
+      "rentals_value": "Rentals",
+      "workshop_value": "Services",
+      "plans_value": "Plans",
+      "lifetime_value": "Lifetime value",
+      "value": "Value",
+      "first_at": "First visit",
+      "last_at": "Last visit",
+      "booked_at": "Booked",
+      "debtor": "Owes",
+      "creditor": "Is owed",
+      "fee_rate_bp": "Rate (bp)",
+      "settlement": "Settlement",
+      "product": "Product",
+      "company": "All stores"
+    },
+    "rate": {
+      "hourly": "Hourly",
+      "daily": "Daily"
+    },
+    "payable": {
+      "orders": "Order",
+      "rentals": "Rental",
+      "work_orders": "Work order",
+      "plan_subscriptions": "Plan"
+    },
+    "payment_status": {
+      "pending": "Pending",
+      "paid": "Paid",
+      "failed": "Failed",
+      "refunded": "Refunded"
+    },
+    "settlement": {
+      "unsettled": "Not settled yet",
+      "open": "On a statement",
+      "settled": "Settled"
+    },
+    "overview": {
+      "title": ":store, last 7 days",
+      "open": "Open the reports"
+    },
+    "monthly": {
+      "title": "Monthly report",
+      "lead": "One Excel workbook per store and month, mailed to the owner and each manager. It runs by itself on the 1st; run any month here.",
+      "run_title": "Run a month",
+      "run_lead": "For :stores.",
+      "month": "Month",
+      "month_hint": "The workbooks of an earlier run of this month are replaced.",
+      "run": "Run the report",
+      "runs": "Runs",
+      "runs_hint": "Each run is a queue batch: one job per store, then the mail.",
+      "started": "The report for :month is on its way.",
+      "started_at": "Started :at",
+      "progress": "Progress of :month",
+      "done": "Mailed",
+      "running": "Running",
+      "failed": "Failed",
+      "empty": "No runs yet",
+      "empty_text": "The first one runs on the 1st of next month, or start one here.",
+      "invalid": "Pick a month up to this one."
+    },
+    "mail": {
+      "subject": "Monthly report: :month",
+      "title": "Monthly report for :month",
+      "hello": "Hello :name,",
+      "body": "The bike shop's report for :month is attached, one workbook per store:",
+      "sheets": "Each workbook has a summary, the store's books (its own bikes and goods), its work (the customers it served) and its statement between stores.",
+      "open": "Open the reports"
+    },
+    "workbook": {
+      "summary": "Summary",
+      "stream": "Stream",
+      "books": "Books (owner)",
+      "work": "Work (operator)",
+      "total": "Total",
+      "owed_to": "Owed to the store",
+      "owed_by": "Owed by the store",
+      "net": "Net",
+      "intercompany": "Between stores",
+      "date": "Date",
+      "kind": "For",
+      "debtor": "Owes",
+      "creditor": "Is owed",
+      "amount": "Amount",
+      "signed": "For this store",
+      "document": "Document",
+      "operating": "Served at",
+      "owner_store": "Owner store"
     }
   }
 }

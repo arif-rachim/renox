@@ -5,8 +5,12 @@
 {% block content %}
 <div class="rx-stack" data-bs-reveal>
   {{ page_header(t('staff.dashboard.title'), subtitle=t('staff.dashboard.lead')) }}
+  {%- if overview %}
+  {% include "reports/_overview.html" %}
+  {%- else %}
   <div class="rx-card">
     {{ empty(t('staff.dashboard.empty_title'), t('staff.dashboard.empty_text'), route('about.pages'), t('about.index_link')) }}
   </div>
+  {%- endif %}
 </div>
 {% endblock %}

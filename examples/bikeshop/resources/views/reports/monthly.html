@@ -1,0 +1,28 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, input, button, widget, dashboard %}
+{% block seo %}{{ seo(title=t('reports.monthly.title')) }}{% endblock %}
+
+{#- The monthly report (src/app/reports/monthly.rs): start a run for a month, follow the runs.
+    The runs' list is a kit `widget` that reloads itself from `reports.monthly.runs` every
+    three seconds while a run is going. -#}
+{% block content %}
+{% include "reports/_assets.html" %}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('reports.monthly.title'), subtitle=t('reports.monthly.lead')) }}
+  {% include "reports/_tabs.html" %}
+  <div class="bs-monthly">
+    {% call card(title=t('reports.monthly.run_title'), subtitle=t('reports.monthly.run_lead', stores=(reach.stores | map(attribute='name') | join(', ')))) %}
+      <form method="post" action="{{ route('reports.monthly.run') }}" class="rx-stack">
+        {{ csrf_field() }}
+        {{ input("month", t('reports.monthly.month'), type="month", value=old('month', month), required=true, attrs={"max": max}, hint=t('reports.monthly.month_hint')) }}
+        {{ button(t('reports.monthly.run')) }}
+      </form>
+    {% endcall %}
+    {% call dashboard(1) %}
+      {% call widget(t('reports.monthly.runs'), description=t('reports.monthly.runs_hint'), url=(route('reports.monthly.runs') if running else none), poll=(3 if running else none), id="monthly-runs") %}
+        {% include "reports/_runs.html" %}
+      {% endcall %}
+    {% endcall %}
+  </div>
+</div>
+{% endblock %}

@@ -33,6 +33,7 @@
     {%- if can('audit.view') %}{{ sidebar_link(route('staff.audit.index'), t('staff.nav.audit'), active=route_is('staff.audit.*')) }}{% endif %}
     {%- if can('catalog.manage') or can('plans.manage') or can('purchasing.manage') or can('stores.manage') %}{{ sidebar_link(route('admin.dashboard'), t('staff.nav.admin')) }}{% endif %}
     {% if can('fleet.manage') %}{{ sidebar_link(route('api.kiosks'), t('api.kiosks.nav'), active=route_is('api.kiosks')) }}{% endif %}
+    {% if can('reports.view') %}{{ sidebar_link(route('reports.dashboard'), t('reports.nav'), active=route_is('reports.*')) }}{% endif %}
     {#- --- end of staff navigation --- -#}
     {{ sidebar_section(t('nav.shop')) }}
     {{ sidebar_link(route('home'), t('nav.storefront')) }}

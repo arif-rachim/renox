@@ -15,3 +15,7 @@ renox-oauth.workspace = true
 serde = { version = "1.0.229", features = ["derive"] }
 # Logs a gateway that didn't answer, and a plan visit that found no room (#237).
 tracing = "0.1.44"
+# The monthly report's workbooks (src/app/reports/monthly.rs): several sheets in one file,
+# which renox::grid's one-sheet exports don't make. The same version and features Renox's
+# `xlsx` feature already builds, so no new crate is compiled.
+rust_xlsxwriter = { version = "0.99.1", default-features = false, features = ["chrono"] }
