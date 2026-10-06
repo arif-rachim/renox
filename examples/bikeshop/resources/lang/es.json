@@ -92,6 +92,81 @@
       "title": "Inicio",
       "purpose": "La puerta de entrada de la tienda: lo que ofrecen las tres tiendas (comprar, alquilar, taller) y por dónde empezar.",
       "who": "Cualquiera que abra el sitio: visitantes y clientes."
+    },
+    "catalog.index": {
+      "title": "Todos los productos",
+      "purpose": "Todo el catálogo en una lista: bicicletas, equipo y recambios, filtrados por marca, precio, talla, tamaño de rueda, material del cuadro, eléctrica y existencias en una tienda, y ordenados por popularidad, precio o novedad. Es donde empieza la compra cuando el visitante aún no sabe la categoría.",
+      "who": "Compradores en el móvil o el portátil, con sesión iniciada o no."
+    },
+    "catalog.category": {
+      "title": "Categoría",
+      "purpose": "Una categoría del catálogo (bicicletas de carretera, cascos, cadenas…) con las que cuelgan de ella: «Bicicletas» muestra todos los tipos. Los mismos filtros y órdenes que la tienda entera; las categorías de recambios ofrecen además «compatible con mi bici» a los clientes que registraron sus bicis.",
+      "who": "Compradores que saben lo que quieren; clientes que buscan un recambio para su propia bici."
+    },
+    "catalog.search": {
+      "title": "Resultados de búsqueda",
+      "purpose": "Búsqueda de texto completo en los nombres, marcas, referencias y descripciones de los productos, primero los mejores resultados, con los mismos filtros que el catálogo. La caja de búsqueda de la barra lleva aquí; sus sugerencias al escribir salen del mismo índice.",
+      "who": "Quien escribe en la caja de búsqueda: compradores, y el personal que busca una referencia."
+    },
+    "catalog.show": {
+      "title": "Producto",
+      "purpose": "Todo lo necesario para decidir: fotos, descripción, especificaciones, el precio y las existencias de cada talla y color en cada tienda, en qué bicis encaja el recambio (o qué recambios encajan en la bici), un enlace para alquilar el modelo si está en la flota de alquiler, y el formulario para añadir al carrito.",
+      "who": "Compradores que deciden comprar o alquilar; clientes que comprueban un recambio para su bici; personal que atiende una llamada."
+    },
+    "sitemap": {
+      "title": "sitemap.xml y robots.txt",
+      "purpose": "No es una página para leer: la lista de direcciones de la tienda para los buscadores (la portada, el catálogo, cada categoría y cada producto a la venta, con su última modificación). El /robots.txt de Renox apunta a ella.",
+      "who": "Los buscadores; el dueño de la tienda, que quiere que se encuentre el catálogo."
+    },
+    "cart.show": {
+      "title": "Carrito",
+      "purpose": "Lo que el comprador va a comprar, comprobado con las existencias de una tienda: donde recoge (o desde donde se envía). Se cambian cantidades o se quitan líneas sin recargar; luego, a pagar.",
+      "who": "Compradores, con sesión o sin ella. El carrito de un invitado pasa a su cuenta al iniciar sesión."
+    },
+    "checkout.show": {
+      "title": "Pagar",
+      "purpose": "Donde un carrito se convierte en pedido: quién es el cliente, recogida en tienda o envío (con un coste según la ciudad), un último vistazo y la página de pago. Al hacer el pedido se apartan las existencias, así que siguen ahí cuando llega el pago.",
+      "who": "Compradores, con cuenta o como invitados (se les ofrece una después)."
+    },
+    "pay.show": {
+      "title": "Estado del pago",
+      "purpose": "Donde llega el cliente después de pagar: espera la confirmación del proveedor de pagos (el webhook) y luego dice si está pagado (con el pedido y, para un invitado, la oferta de crear una cuenta) o no.",
+      "who": "Clientes que acaban de pagar en línea un pedido, un alquiler o un trabajo de taller."
+    },
+    "pay.demo": {
+      "title": "Página de pago de demostración",
+      "purpose": "Sustituye a la página de pago de Midtrans cuando MIDTRANS_SERVER_KEY no está configurada, para seguir toda la compra en un portátil. «Pagar» envía a la aplicación exactamente lo que enviaría Midtrans: una notificación firmada al webhook.",
+      "who": "Desarrolladores y quien prueba la demo; nunca clientes reales."
+    },
+    "orders.show": {
+      "title": "Pedido",
+      "purpose": "Lo que ve el cliente de un pedido: en qué punto está, sus líneas y totales, los pagos, la tienda y el plazo de devolución.",
+      "who": "El cliente que lo hizo (su cuenta, el navegador que pidió o el enlace firmado de sus correos); el personal de su tienda."
+    },
+    "orders.invoice": {
+      "title": "Factura y recibo",
+      "purpose": "El pedido como factura para imprimir, o el recibo del mostrador justo después de una venta (con el cambio a devolver).",
+      "who": "Clientes que quieren una copia; cajeros que imprimen un recibo."
+    },
+    "sales.orders.index": {
+      "title": "Pedidos (personal)",
+      "purpose": "Los pedidos de la tienda donde la persona trabaja hoy, por estado: por preparar, sin pagar, listos, completados, cancelados, reembolsados.",
+      "who": "Cajeros, personal y encargados de una tienda; el dueño, en la tienda que elija."
+    },
+    "sales.orders.show": {
+      "title": "Pedido (personal)",
+      "purpose": "Un pedido con todo lo que necesita el personal: líneas, pagos, movimientos de existencias, bicis registradas y el siguiente paso: listo o enviado, entregar, cancelar o aceptar una devolución.",
+      "who": "Cajeros (entregas), encargados (devoluciones y reembolsos)."
+    },
+    "sales.counter": {
+      "title": "Mostrador",
+      "purpose": "Vender en el mostrador: buscar un producto por referencia, código de barras o nombre, marcarlo, asignar un cliente o vender sin cliente, cobrar en efectivo (con el cambio calculado) o con tarjeta e imprimir el recibo. Las mismas reglas de existencias y pagos que la tienda en línea.",
+      "who": "Cajeros en el mostrador de una tienda."
+    },
+    "sales.mails": {
+      "title": "Correos de pedidos",
+      "purpose": "Cada correo que recibe un cliente sobre un pedido (confirmación, listo para recoger, enviado, reembolso, cancelado), para un pedido inventado.",
+      "who": "Desarrolladores y el dueño de la tienda."
     }
   },
   "blocks": {
@@ -223,5 +298,409 @@
   "data_page": {
     "title": "El modelo de datos",
     "lead": "Cada tabla de la tienda de bicicletas, cómo se relacionan y las decisiones detrás de ellas."
+  },
+  "catalog": {
+    "all": {
+      "title": "Todos los productos",
+      "description": "Bicicletas, equipo y recambios de nuestras tres tiendas, con precios y existencias por tienda."
+    },
+    "category": {
+      "description": "Compra :name en nuestras tres tiendas: compara precios, tallas y qué hay en cada una."
+    },
+    "categories": "Categorías",
+    "search": {
+      "title": "Buscar",
+      "results": "Resultados para «:q»",
+      "label": "Buscar en la tienda",
+      "placeholder": "Busca bicicletas, equipo, recambios…",
+      "lead": "Primero los mejores resultados; afínalos con los filtros."
+    },
+    "found": "{0} Ningún producto|{1} Un producto|[2,*] :count productos",
+    "price_from": "desde :price",
+    "sort": {
+      "label": "Ordenar por",
+      "relevance": "Más relevantes",
+      "popular": "Más vendidos",
+      "newest": "Novedades",
+      "price_asc": "Precio: de menor a mayor",
+      "price_desc": "Precio: de mayor a menor"
+    },
+    "filters": {
+      "title": "Filtros",
+      "brand": "Marca",
+      "price": "Precio",
+      "size": "Talla",
+      "wheels": "Tamaño de rueda",
+      "frame": "Material del cuadro",
+      "ebike": "Solo eléctricas",
+      "store": "Disponible en",
+      "any": "Cualquiera",
+      "any_store": "Cualquier tienda",
+      "apply": "Aplicar",
+      "clear": "Quitar filtros",
+      "on": "Filtros activos",
+      "remove": "Quitar el filtro :filter"
+    },
+    "chip": {
+      "brand": "Marca: :value",
+      "size": "Talla: :value",
+      "price": "Rango de precio",
+      "wheels": "Ruedas: :value",
+      "frame": "Cuadro: :value",
+      "ebike": "Eléctricas",
+      "store": "Disponible en :value",
+      "fits": "Compatible con mi bici"
+    },
+    "fits": {
+      "label": "Compatible con mi bici",
+      "any": "Cualquiera de mis bicis",
+      "off": "Mostrar todos los recambios",
+      "hint": "Solo recambios que sabemos que encajan en las bicis de tu cuenta."
+    },
+    "empty": {
+      "title": "No hay resultados",
+      "text": "Prueba con menos filtros o con otra categoría.",
+      "search": "Nada coincide con «:q». Prueba otras palabras o menos filtros."
+    },
+    "suggest": {
+      "label": "Sugerencias",
+      "none": "Ningún producto coincide con «:q».",
+      "all": "Todos los resultados para «:q»"
+    },
+    "home": {
+      "featured": "Bicicletas populares",
+      "all_bikes": "Todas las bicicletas",
+      "categories": "Compra por categoría",
+      "shop": "Ver la tienda",
+      "rent": "Alquila una bici",
+      "service": "Reserva una revisión"
+    },
+    "product": {
+      "photos": "Fotos de :name",
+      "size": "Talla",
+      "colour": "Color",
+      "show_variant": "Mostrar",
+      "sold_out": "agotado",
+      "sku": "Ref. :sku",
+      "stock_title": "Existencias en nuestras tiendas",
+      "stock_at": "{0} Agotado en :store|{1} Una en :store|[2,*] :count en :store",
+      "quantity": "Cantidad",
+      "add_to_cart": "Añadir al carrito",
+      "sold_out_everywhere": "Agotado en todas las tiendas por ahora.",
+      "rent": "Alquilar este modelo",
+      "description": "Descripción",
+      "specs": "Especificaciones",
+      "brand": "Marca",
+      "prices": "Precios",
+      "variants": "Variantes",
+      "fits_bikes": "Encaja en estas bicicletas",
+      "fitting_parts": "Recambios y accesorios compatibles",
+      "recently_viewed": "Vistos recientemente"
+    }
+  },
+  "sales": {
+    "cart": {
+      "title": "Carrito",
+      "lead": "Comprobado con las existencias de la tienda donde recoges.",
+      "keep_shopping": "Seguir comprando",
+      "lines": "Productos en tu carrito",
+      "summary": "Resumen",
+      "changed": "Algunas cantidades cambiaron: la tienda tiene menos de lo que pedía tu carrito.",
+      "line_lowered": "{0} No queda ninguna en esta tienda.|{1} Solo queda una en esta tienda.|[2,*] Solo quedan :count en esta tienda.",
+      "quantity_of": "Cantidad de :name",
+      "update": "Actualizar",
+      "remove": "Quitar :name",
+      "store": "Tienda",
+      "store_hint": "Recógelo allí, o te lo enviamos desde allí.",
+      "change_store": "Cambiar de tienda",
+      "items": "{0} Ningún artículo|{1} Un artículo|[2,*] :count artículos",
+      "fees_later": "El envío y los descuentos se suman al pagar.",
+      "checkout": "Pagar",
+      "empty_title": "Tu carrito está vacío",
+      "empty_text": "Busca una bicicleta, equipo o un recambio y añádelo aquí.",
+      "browse": "Ver la tienda",
+      "link_label": "{0} Carrito, vacío|{1} Carrito, un artículo|[2,*] Carrito, :count artículos",
+      "added": ":name está en tu carrito.",
+      "view": "Ver el carrito",
+      "none_left": "No quedan más :name en :store.",
+      "only_left": "Solo quedaban :count más de :name en :store: eso es lo que se añadió.",
+      "lowered": "La tienda tiene menos: se bajó la cantidad.",
+      "updated": "Carrito actualizado.",
+      "removed": "Quitado del carrito.",
+      "store_set": "Tu carrito se comprueba ahora con :store.",
+      "store_lowered": ":store tiene menos de algunos productos: se bajaron las cantidades."
+    },
+    "checkout": {
+      "title": "Pagar",
+      "lead": "Tres pasos cortos y luego pagas en la página de pago. Te guardamos las existencias :minutes minutos mientras pagas.",
+      "step": {
+        "contact": "Contacto",
+        "delivery": "Recogida o envío",
+        "review": "Revisión"
+      },
+      "name": "Nombre completo",
+      "email": "Correo",
+      "email_hint": "Aquí llegan la confirmación y los avisos.",
+      "phone": "Teléfono",
+      "fulfilment": "¿Cómo lo recibes?",
+      "pickup": "Recoger en tienda",
+      "delivery": "Envío",
+      "store": "Tienda",
+      "store_hint": "Donde lo recoges, o desde donde se envía.",
+      "city": "Ciudad",
+      "city_pick": "Elige una ciudad",
+      "line1": "Calle y número",
+      "postal_code": "Código postal",
+      "fees": "Envío: :local en una ciudad con tienda, :country en el resto del país, :abroad al extranjero.",
+      "next": "Ahora, la página de pago. Tu pedido se guarda :minutes minutos; sin pagar, se cancela y las existencias vuelven a la estantería.",
+      "place": "Hacer el pedido y pagar",
+      "summary": "Tu pedido",
+      "plan_discount": "Plan de mantenimiento: :percent% en recambios",
+      "plan_note": "Tu plan de mantenimiento te da un :percent% en recambios.",
+      "delivery_fee": "Envío",
+      "free_pickup": "Gratis (recogida)",
+      "total": "Total",
+      "from_store": "Comprobado con las existencias de :store.",
+      "empty": "Tu carrito está vacío: añade algo antes.",
+      "cart_changed": "Tu carrito cambió (una tienda tiene menos): revísalo antes de pagar.",
+      "sold_out": "Alguien fue más rápido: solo quedaban :count de «:name». Tu carrito se ha actualizado."
+    },
+    "pay": {
+      "title": "Pago",
+      "for_order": "Pedido :number",
+      "for_orders": "Un pedido",
+      "for_rentals": "Un alquiler",
+      "for_work_orders": "Un trabajo de taller",
+      "paid": "Gracias, está pagado",
+      "paid_text": "Hemos recibido :amount. La confirmación va camino de tu correo.",
+      "see_order": "Ver tu pedido",
+      "waiting": "Esperando el pago…",
+      "waiting_text": "El proveedor de pagos nos avisa en un momento; esta página se actualiza sola. Tu pedido se guarda :minutes minutos.",
+      "failed": "El pago no se completó",
+      "failed_text": "No se ha cobrado nada y el pedido está cancelado. Los productos vuelven a la estantería: puedes pedir de nuevo.",
+      "offer_title": "Sigue tus pedidos",
+      "offer_account": "Crea una cuenta con el mismo correo y este pedido (y los siguientes) estarán en tu cuenta, con tus bicis y su mantenimiento.",
+      "create_account": "Crear una cuenta"
+    },
+    "demo": {
+      "title": "Página de pago de demostración",
+      "notice_title": "Esto no es un pago real",
+      "notice": "La pasarela de demostración sustituye a Midtrans cuando MIDTRANS_SERVER_KEY no está configurada. Pagar aquí envía a la aplicación la misma notificación firmada que enviaría Midtrans; no se mueve dinero.",
+      "merchant": "Pago a :shop",
+      "amount": "Importe",
+      "reference": "Referencia",
+      "status": "Estado",
+      "pay": "Pagar :amount",
+      "cancel": "Cancelar el pago"
+    },
+    "orders": {
+      "title": "Pedido :number",
+      "placed": "Hecho el :date",
+      "invoice": "Factura",
+      "lines": "Productos",
+      "product": "Producto",
+      "quantity": "Cantidad",
+      "price": "Precio",
+      "line_total": "Importe",
+      "subtotal": "Subtotal",
+      "discount": "Descuento",
+      "total": "Total",
+      "payments": "Pagos",
+      "progress": "Progreso",
+      "details": "Detalles",
+      "store": "Tienda",
+      "fulfilment": "Recogida o envío",
+      "address": "Dirección de envío",
+      "customer": "Cliente",
+      "returns": "Devoluciones",
+      "returns_text": "En :days días desde la entrega, en la tienda.",
+      "pending_note": "Esperando el pago. Sin pagar tras :minutes minutos, el pedido se cancela.",
+      "cancelled_note": "Este pedido se canceló: no se cobró nada.",
+      "number": "Número de pedido",
+      "placed_at": "Hecho",
+      "paid_at": "Pagado",
+      "completed_at": "Entregado",
+      "channel": "Canal",
+      "status": "Estado"
+    },
+    "status": {
+      "pending": "Esperando el pago",
+      "paid": "Pagado",
+      "ready": "Listo",
+      "completed": "Completado",
+      "cancelled": "Cancelado",
+      "refunded": "Reembolsado"
+    },
+    "step": {
+      "placed": "Hecho",
+      "paid": "Pagado",
+      "ready": "Listo para recoger",
+      "shipped": "Enviado",
+      "completed": "Entregado",
+      "cancelled": "Cancelado",
+      "refunded": "Devuelto y reembolsado"
+    },
+    "channel": {
+      "online": "En línea",
+      "counter": "Mostrador"
+    },
+    "method": {
+      "cash": "Efectivo",
+      "card": "Tarjeta",
+      "gateway": "Pago en línea"
+    },
+    "payment_status": {
+      "pending": "Pendiente",
+      "paid": "Pagado",
+      "failed": "Fallido",
+      "refunded": "Reembolsado"
+    },
+    "movement": {
+      "purchase": "Recibido",
+      "sale": "Vendido",
+      "return": "Devuelto",
+      "service": "Usado en taller",
+      "consign_out": "Enviado en consigna",
+      "consign_in": "Llegado en consigna",
+      "recall": "Retirado",
+      "adjustment": "Ajustado",
+      "reserved": "Reservado",
+      "released": "Liberado"
+    },
+    "invoice": {
+      "title": "Factura :number",
+      "receipt": "Recibo :number",
+      "print": "Imprimir",
+      "back": "Volver al pedido",
+      "billed_to": "Facturado a",
+      "footer": "Gracias por rodar con nosotros. Devoluciones en :days días con este recibo."
+    },
+    "staff": {
+      "title": "Pedidos",
+      "lead": "Los pedidos de la tienda donde trabajas: en línea y en mostrador.",
+      "tabs": "Pedidos por estado",
+      "tab": {
+        "open": "Por preparar",
+        "pending": "Sin pagar",
+        "ready": "Listos",
+        "completed": "Completados",
+        "cancelled": "Cancelados",
+        "refunded": "Reembolsados"
+      },
+      "walk_in": "Sin cliente",
+      "empty": "No hay pedidos aquí.",
+      "mark_ready": "Listo para recoger",
+      "mark_shipped": "Enviado",
+      "ready_done": "El pedido :number está listo; se ha avisado al cliente.",
+      "shipped_done": "El pedido :number va de camino; se ha avisado al cliente.",
+      "hand_over": "Entregar",
+      "hand_over_title": "Entregar el pedido :number",
+      "hand_over_text": "El cliente tiene la mercancía. Escribe el número de cuadro de cada bici: queda en la bici de la cuenta del cliente.",
+      "frame_of": "Número de cuadro de :name",
+      "no_bikes": "No hay bicis en este pedido.",
+      "completed": "El pedido :number está entregado.",
+      "cancel": "Cancelar el pedido",
+      "cancel_title": "¿Cancelar el pedido :number?",
+      "cancel_text": "No está pagado. Las existencias reservadas vuelven a la estantería.",
+      "cancelled": "El pedido :number está cancelado.",
+      "return": "Devolución y reembolso",
+      "return_title": "Devolución del pedido :number",
+      "return_text": "Cuántas unidades de cada línea vuelven (en :days días). Las existencias vuelven a la estantería y se registra el reembolso.",
+      "reason": "Por qué se devuelve",
+      "refunded": "La devolución del pedido :number está registrada y reembolsada.",
+      "owner": "Tienda propietaria",
+      "consigned": "En consigna",
+      "ledger": "Movimientos de existencias",
+      "ledger_lead": "Cada movimiento que causó este pedido.",
+      "when": "Cuándo",
+      "reason_col": "Movimiento",
+      "note": "Nota",
+      "bikes": "Bicis registradas",
+      "no_frame": "sin número de cuadro aún",
+      "no_payments": "Aún no hay pagos.",
+      "return_until": "Devoluciones hasta",
+      "not_paid": "Solo un pedido pagado puede avanzar.",
+      "not_pending": "Solo se puede cancelar un pedido sin pagar.",
+      "not_returnable": "Las devoluciones se aceptan en :days días desde la entrega.",
+      "nothing_returned": "Indica cuántas unidades de una línea vuelven."
+    },
+    "counter": {
+      "title": "Mostrador",
+      "lead": "Vendiendo en :store.",
+      "find": "Buscar un producto",
+      "product": "Producto",
+      "product_hint": "Referencia, código de barras o nombre",
+      "add": "Añadir",
+      "sale": "Esta venta",
+      "empty": "Nada marcado aún",
+      "empty_text": "Escanea o escribe una referencia, o busca por nombre.",
+      "customer": "Cliente",
+      "walk_in": "Sin cliente",
+      "attach": "Asignar",
+      "customer_hint": "Sus bicis quedan registradas a su nombre y se aplica el descuento de su plan.",
+      "pay_title": "Pago",
+      "method": "Pagado con",
+      "tendered": "Importe recibido",
+      "tendered_hint": "En efectivo: lo que entrega el cliente.",
+      "keypad": "Teclado numérico del importe recibido",
+      "pay": "Cobrar",
+      "pay_amount": "Cobrar :amount",
+      "clear": "Empezar de nuevo",
+      "here": "{0} ninguna aquí|{1} una aquí|[2,*] :count aquí",
+      "added": "Añadido (:count).",
+      "none_left": "No queda ninguna en esta tienda.",
+      "changed": "La tienda tiene menos de algo de esta venta: revísala.",
+      "not_enough": "Es menos que el total.",
+      "sold": "La venta :number está hecha.",
+      "new_sale": "Nueva venta",
+      "change": "Cambio",
+      "short": "Falta",
+      "change_due": "Cambio a devolver: :amount"
+    },
+    "mail": {
+      "hello": "Hola, :name",
+      "view_order": "Ver tu pedido",
+      "confirmation": {
+        "subject": "El pedido :number está pagado",
+        "thanks": "Gracias: hemos recibido el pago del pedido :number.",
+        "pickup": "Te escribiremos cuando esté listo para recoger en :store.",
+        "delivery": "Te escribiremos cuando salga hacia :address.",
+        "returns": "¿Cambiaste de idea? Devuélvelo en :days días desde que lo recibas."
+      },
+      "ready": {
+        "subject": "El pedido :number está listo para recoger",
+        "text": "Te espera en :store (:phone). Trae este correo o tu número de pedido."
+      },
+      "shipped": {
+        "subject": "El pedido :number va de camino",
+        "text": "Salió hoy de la tienda, hacia :address."
+      },
+      "refund": {
+        "subject": "Tu reembolso del pedido :number",
+        "text": "Hemos reembolsado :amount por los productos devueltos del pedido :number.",
+        "when": "Llega a tu cuenta por el mismo medio de pago, normalmente en pocos días."
+      },
+      "expired": {
+        "subject": "El pedido :number se canceló",
+        "text": "No recibimos el pago en :minutes minutos, así que el pedido se canceló y no se cobró nada.",
+        "again": "Pedir de nuevo"
+      }
+    },
+    "mails": {
+      "title": "Los correos de la tienda",
+      "lead": "Lo que reciben los clientes sobre sus pedidos, para un pedido inventado, en tu idioma.",
+      "confirmation": "Confirmación (pagado)",
+      "ready": "Listo para recoger",
+      "shipped": "Enviado",
+      "refund": "Reembolso",
+      "expired": "Cancelado (sin pagar a tiempo)"
+    },
+    "notice": {
+      "confirmation": "¡Gracias! El pedido :number está pagado.",
+      "ready": "El pedido :number está listo para recoger.",
+      "shipped": "El pedido :number va de camino.",
+      "refund": "La devolución del pedido :number está reembolsada.",
+      "expired": "El pedido :number no se pagó a tiempo y se canceló."
+    }
   }
 }

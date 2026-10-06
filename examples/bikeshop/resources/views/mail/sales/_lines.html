@@ -1,0 +1,7 @@
+{#- The order's lines and totals as the kit's mail table (every sales mail). -#}
+{% from "renox/mail/components.html" import table %}
+{%- set ns = namespace(rows=[]) %}
+{%- for line in order.lines %}{% set ns.rows = ns.rows + [[line.quantity ~ " × " ~ line.name ~ ((" · " ~ line.variant) if line.variant else ""), line.total | money]] %}{% endfor %}
+{%- if order.discount > 0 %}{% set ns.rows = ns.rows + [[t('sales.orders.discount'), "− " ~ (order.discount | money)]] %}{% endif %}
+{%- if order.delivery %}{% set ns.rows = ns.rows + [[t('sales.checkout.delivery_fee'), order.delivery_fee | money]] %}{% endif %}
+{{ table(ns.rows, head=[t('sales.orders.product'), t('sales.orders.line_total')], total=[t('sales.orders.total'), order.total | money]) }}

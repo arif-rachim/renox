@@ -1,0 +1,48 @@
+{% extends "layouts/app.html" %}
+{#- Back from the gateway (src/app/sales/gateway.rs `show`): waits for the
+    webhook, then shows the result. While the payment is pending, htmx asks
+    for the `status` block again every two seconds. -#}
+{% from "renox/ui.html" import page_header, card, link_button, alert, infolist, entry, empty %}
+{% block seo %}{{ seo(title=t('sales.pay.title') ~ " · " ~ t('shop.name')) }}{% endblock %}
+
+{% block content %}
+{% include "sales/_assets.html" %}
+{{ page_header(t('sales.pay.title'), subtitle=(t('sales.pay.for_order', number=paying.order.number) if paying.order else t('sales.pay.for_' ~ paying.kind))) }}
+{% block status %}
+{%- set p = paying.payment %}
+<section id="pay-status" class="rx-card bs-pay" aria-live="polite"
+  {%- if p.status == "pending" and not expired %} hx-get="{{ request.path }}" hx-trigger="every 2s" hx-target="this" hx-swap="outerHTML"{% endif %}>
+  {%- if p.status == "paid" %}
+  <div class="bs-pay__icon bs-pay__icon--paid" aria-hidden="true">
+    <svg viewBox="0 0 48 48" width="48" height="48"><circle cx="24" cy="24" r="22" fill="currentColor"/><path d="M14 25l7 7 13-15" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+  <h2 class="rx-title">{{ t('sales.pay.paid') }}</h2>
+  <p>{{ t('sales.pay.paid_text', amount=(p.amount | money)) }}</p>
+  {%- if paying.order %}
+  {% call infolist(columns=2) %}
+    {{ entry(t('sales.orders.number'), paying.order.number, copyable=true) }}
+    {{ entry(t('sales.orders.total'), paying.order.total, format="money") }}
+  {% endcall %}
+  <p class="bs-pay__actions">{{ link_button(route('orders.show', paying.order.id), t('sales.pay.see_order'), variant="primary") }}</p>
+  {%- if guest %}
+  {{ alert(t('sales.pay.offer_account'), kind="info", title=t('sales.pay.offer_title')) }}
+  <p class="bs-pay__actions">{{ link_button(route('register'), t('sales.pay.create_account')) }}</p>
+  {%- endif %}
+  {%- endif %}
+  {%- elif p.status == "pending" and not expired %}
+  <div class="bs-pay__icon bs-pay__icon--waiting" aria-hidden="true" data-bs-waiting>
+    <svg viewBox="0 0 48 48" width="48" height="48"><circle cx="24" cy="24" r="20" stroke="currentColor" stroke-opacity="0.25" stroke-width="5" fill="none"/><path d="M24 4a20 20 0 0 1 20 20" stroke="currentColor" stroke-width="5" fill="none" stroke-linecap="round"/></svg>
+  </div>
+  <h2 class="rx-title">{{ t('sales.pay.waiting') }}</h2>
+  <p>{{ t('sales.pay.waiting_text', minutes=minutes) }}</p>
+  {%- else %}
+  <div class="bs-pay__icon bs-pay__icon--failed" aria-hidden="true">
+    <svg viewBox="0 0 48 48" width="48" height="48"><circle cx="24" cy="24" r="22" fill="currentColor"/><path d="M16 16l16 16M32 16L16 32" stroke="#fff" stroke-width="4" stroke-linecap="round"/></svg>
+  </div>
+  <h2 class="rx-title">{{ t('sales.pay.failed') }}</h2>
+  <p>{{ t('sales.pay.failed_text') }}</p>
+  <p class="bs-pay__actions">{{ link_button(route('catalog.index'), t('sales.cart.browse'), variant="primary") }}</p>
+  {%- endif %}
+</section>
+{% endblock %}
+{% endblock %}

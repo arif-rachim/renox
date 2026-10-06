@@ -79,6 +79,7 @@ impl OrderStates for FactoryBuilder<Order> {
             o.status = OrderStatus::Completed;
             o.paid_at
                 .get_or_insert(renox::db::now() - Duration::days(1));
+            o.completed_at.get_or_insert(renox::db::now());
         })
     }
 

@@ -20,6 +20,8 @@ impl Module for Home {
         Routes::new()
             .get("/", index)
             .name("home")
+            // A 304 without the body when the page didn't change (#233).
+            .etag()
             .post("/locale/{locale}", locale)
             .name("locale.update")
     }

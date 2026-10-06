@@ -1,0 +1,10 @@
+{#- Sent when a pickup order is ready to collect. -#}
+{% extends "renox/mail/layout.html" %}
+{% from "renox/mail/components.html" import table, panel, button %}
+{% block title %}{{ t('sales.mail.ready.subject', number=order.number) }}{% endblock %}
+{% block content %}
+<p>{{ t('sales.mail.hello', name=name) }}</p>
+{% call panel() %}{{ t('sales.mail.ready.text', store=order.store.name, phone=order.store.phone) }}{% endcall %}
+{% include "mail/sales/_lines.html" %}
+{{ button(url, t('sales.mail.view_order')) }}
+{% endblock %}

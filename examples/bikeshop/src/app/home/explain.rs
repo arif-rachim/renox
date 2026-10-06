@@ -35,6 +35,31 @@ pub fn entries() -> Vec<Explanation> {
                       shop's own.",
             },
             Feature {
+                api: "App::share",
+                why: "The featured bikes (the best sellers) and the category tree come from \
+                      the catalog area, which shares them with the view as `storefront` \
+                      (`Registry::share`, computed only when the path is `/`, so other pages \
+                      run no query for it). The home module stays ignorant of the catalogue.",
+            },
+            Feature {
+                api: "UI kit: card_grid + media_card",
+                why: "The featured bikes are the same `media_card`s as the catalogue's, in a \
+                      `card_grid`; the categories are kit cards on a CSS grid.",
+            },
+            Feature {
+                api: "Routes::etag",
+                why: "`.etag()` hashes the page and answers `304 Not Modified` to a \
+                      browser that already has it. The cart's count is fetched after the \
+                      page loads, so it doesn't make the page differ per visitor; the \
+                      layout's per-request CSP nonce still does, for now (a Renox gap, \
+                      reported).",
+            },
+            Feature {
+                api: "seo()",
+                why: "The shop's name and lead as the title and description, with Open \
+                      Graph tags for shared links.",
+            },
+            Feature {
                 api: "App::detect_locale",
                 why: "A visitor whose browser asks for Spanish gets the Spanish texts \
                       straight away; the language menu then remembers a choice with \
@@ -53,7 +78,9 @@ pub fn entries() -> Vec<Explanation> {
                       `prefers-reduced-motion`.",
             },
         ],
-        under_hood: "No database query: the handler returns `view(\"home/index.html\")`. \
+        under_hood: "The handler returns `view(\"home/index.html\")`; the catalog area's \
+                     `storefront` share adds two queries for the featured bikes (by units \
+                     sold) and four for their cards, plus one for the category tree. \
                      The view middleware renders it inside `layouts/app.html`, adding the \
                      shared `explain_panels` value and this explanation (the \
                      `about_page(…)` template function). The language menu \
@@ -61,6 +88,7 @@ pub fn entries() -> Vec<Explanation> {
                      goes `Back`.",
         docs: &[
             "docs/routing.md#apps-modules-and-routes",
+            "docs/routing.md#etags",
             "docs/ui.md#navigation-and-page-structure",
             "docs/ui.md#the-current-route-conditional-classes-loops",
             "docs/laravel.md#one-file-to-deploy",
@@ -68,6 +96,8 @@ pub fn entries() -> Vec<Explanation> {
         sources: &[
             "examples/bikeshop/src/app/home/mod.rs",
             "examples/bikeshop/resources/views/home/index.html",
+            "examples/bikeshop/resources/views/catalog/_home.html",
+            "examples/bikeshop/src/app/catalog/mod.rs",
             "examples/bikeshop/resources/views/layouts/app.html",
             "examples/bikeshop/public/app.js",
             "examples/bikeshop/tests/about.rs",

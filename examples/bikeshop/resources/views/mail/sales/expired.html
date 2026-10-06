@@ -1,0 +1,10 @@
+{#- Sent when an order wasn't paid within 30 minutes (or the payment failed). -#}
+{% extends "renox/mail/layout.html" %}
+{% from "renox/mail/components.html" import table, panel, button %}
+{% block title %}{{ t('sales.mail.expired.subject', number=order.number) }}{% endblock %}
+{% block content %}
+<p>{{ t('sales.mail.hello', name=name) }}</p>
+{% call panel() %}{{ t('sales.mail.expired.text', minutes=30) }}{% endcall %}
+{% include "mail/sales/_lines.html" %}
+{{ button(app.url ~ "/shop", t('sales.mail.expired.again')) }}
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends "layouts/app.html" %}
+{#- A product (src/app/catalog/product.rs). Macros are imported at the top,
+    so the `buybox` block sees them when htmx asks for it alone (a change of
+    size or colour). -#}
+{% from "renox/ui.html" import page_header, card, card_grid, media_card, infolist, entry, button, link_button, badge, alert %}
+{% from "blocks/gallery.html" import gallery as photo_gallery %}
+{% from "blocks/swatches.html" import swatches %}
+{% from "blocks/quantity.html" import quantity %}
+{% block seo %}{{ seo(title=product.name ~ " · " ~ t('shop.name'), description=summary, image=og_image, type="product") }}{% endblock %}
+
+{% block content %}
+{% call push('head') %}<link rel="stylesheet" href="{{ asset('catalog/catalog.css') }}">{% endcall %}
+{{ page_header(product.name,
+               subtitle=((brand.name ~ " · ") if brand else "") ~ (category.name if category else ""),
+               back=(route('catalog.category', category.slug) if category else route('catalog.index')),
+               back_label=(category.name if category else t('catalog.all.title'))) }}
+
+<div class="bs-product">
+  <div class="bs-product__media">
+    {%- if gallery %}
+    {{ photo_gallery(gallery, id="product-photos", label=t('catalog.product.photos', name=product.name)) }}
+    {%- endif %}
+  </div>
+
+  <div class="bs-product__buy">
+    {#- The variant picker: a GET form on this page's address. htmx sends it
+        on every change and swaps the buy box; without JavaScript, "Show"
+        reloads the page with the choice. -#}
+    {%- if sizes or colours %}
+    <form id="variant-form" class="bs-product__variants" method="get" action="{{ route('catalog.show', product.slug) }}"
+          hx-get="{{ route('catalog.show', product.slug) }}" hx-target="#buybox" hx-swap="outerHTML" hx-trigger="change" hx-push-url="true" hx-sync="this:replace">
+      {%- if sizes %}
+      {%- set ns = namespace(options=[]) %}
+      {%- for o in sizes %}{% set ns.options = ns.options + [{"value": o.value, "label": o.label, "note": (t('catalog.product.sold_out') if o.note else none)}] %}{% endfor %}
+      {{ swatches("size", t('catalog.product.size'), ns.options, selected=(chosen.size if chosen else none), required=true) }}
+      {%- endif %}
+      {%- if colours %}
+      {%- set ns = namespace(options=[]) %}
+      {%- for o in colours %}{% set ns.options = ns.options + [{"value": o.value, "label": o.label, "color": o.color}] %}{% endfor %}
+      {{ swatches("colour", t('catalog.product.colour'), ns.options, selected=(chosen.colour if chosen else none), kind="colour", required=true) }}
+      {%- endif %}
+      <noscript>{{ button(t('catalog.product.show_variant'), variant="secondary", size="small") }}</noscript>
+    </form>
+    {%- endif %}
+
+    {% block buybox %}
+    <section id="buybox" class="rx-card bs-buybox" aria-labelledby="buybox-price" aria-live="polite">
+      {%- if chosen %}
+      <p class="bs-buybox__price" id="buybox-price">{{ chosen.price | money }}</p>
+      <p class="rx-subtitle">{{ t('catalog.product.sku', sku=chosen.sku) }}{% if chosen.size %} · {{ chosen.size }}{% endif %}{% if chosen.colour %} · {{ chosen.colour }}{% endif %}</p>
+      <h2 class="bs-buybox__heading">{{ t('catalog.product.stock_title') }}</h2>
+      <ul class="bs-stock" role="list">
+        {%- for s in chosen.stock %}
+        <li class="bs-stock__row{% if s.available == 0 %} bs-stock__row--out{% endif %}">
+          <span class="bs-stock__dot" aria-hidden="true"></span>
+          <span>{{ t('catalog.product.stock_at', count=s.available, store=s.store) }}</span>
+        </li>
+        {%- endfor %}
+      </ul>
+      {%- if chosen.available > 0 %}
+      {#- Add to cart: a plain POST form (the cart, #234). With htmx the
+          answer is a toast and the navbar's cart, swapped out of band. -#}
+      <form class="bs-buybox__add" method="post" action="{{ route('cart.add') }}"
+            hx-post="{{ route('cart.add') }}" hx-swap="none" data-bs-add-to-cart>
+        {{ csrf_field() }}
+        <input type="hidden" name="variant_id" value="{{ chosen.id }}">
+        {{ quantity("quantity", 1, min=1, max=([chosen.available, 10] | min), label=t('catalog.product.quantity'), id="add-quantity") }}
+        {{ button(t('catalog.product.add_to_cart'), variant="primary", key="a") }}
+      </form>
+      {%- else %}
+      {{ alert(t('catalog.product.sold_out_everywhere'), kind="warning") }}
+      {%- endif %}
+      {%- endif %}
+      {%- if rent_url %}
+      <p class="bs-buybox__rent">{{ link_button(rent_url, t('catalog.product.rent'), variant="secondary") }}</p>
+      {%- endif %}
+    </section>
+    {% endblock %}
+  </div>
+</div>
+
+<div class="bs-product__details" data-bs-reveal>
+  {% call card(t('catalog.product.description')) %}
+    <div class="rx-prose">{{ product.description | markdown }}</div>
+  {% endcall %}
+  {%- if specs %}
+  {% call card(t('catalog.product.specs')) %}
+    {% call infolist(columns=2) %}
+      {%- if brand %}{{ entry(t('catalog.product.brand'), brand.name, url=brand.website, new_tab=true) }}{% endif %}
+      {%- for spec in specs %}{{ entry(spec[0], spec[1]) }}{% endfor %}
+      {%- if price_low is not none and price_low != price_high %}{{ entry(t('catalog.product.prices'), (price_low | money) ~ " – " ~ (price_high | money)) }}{% endif %}
+      {{ entry(t('catalog.product.variants'), variants | length) }}
+    {% endcall %}
+  {% endcall %}
+  {%- endif %}
+</div>
+
+{%- if related %}
+<section class="bs-product__related" aria-labelledby="related-title">
+  <h2 class="rx-title" id="related-title">{{ t('catalog.product.fits_bikes') if kind == 'part' else t('catalog.product.fitting_parts') }}</h2>
+  <div data-bs-reveal>
+  {% call card_grid() %}
+    {%- for r in related %}
+    {{ media_card(route('catalog.show', r.slug), r.name, image=r.photo, image_alt=r.photo_alt,
+                  subtitle=(r.price_from | money if r.price_from is not none else none), note=r.note) }}
+    {%- endfor %}
+  {% endcall %}
+  </div>
+</section>
+{%- endif %}
+
+{%- if recently %}
+<section class="bs-product__related" aria-labelledby="recent-title">
+  <h2 class="rx-title" id="recent-title">{{ t('catalog.product.recently_viewed') }}</h2>
+  {% call card_grid() %}
+    {%- for c in recently %}
+    {{ media_card(route('catalog.show', c.slug), c.name, image=c.photo, image_alt=c.photo_alt,
+                  subtitle=(c.price_from | money if c.price_from is not none else none)) }}
+    {%- endfor %}
+  {% endcall %}
+</section>
+{%- endif %}
+{% endblock %}
