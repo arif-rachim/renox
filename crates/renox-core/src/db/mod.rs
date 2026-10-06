@@ -106,8 +106,16 @@ pub(crate) async fn connect(config: &Config) -> anyhow::Result<Db> {
 /// `TEST_DATABASE_URL` from the environment, else from `.env` in the current
 /// directory (without loading the rest of `.env` into the environment).
 fn test_database_url() -> Option<String> {
-    std::env::var("TEST_DATABASE_URL").ok().or_else(|| {
-        dotenvy::from_path_iter(".env")
+    test_database_url_in(
+        std::env::var("TEST_DATABASE_URL").ok(),
+        std::path::Path::new(".env"),
+    )
+}
+
+/// `env` when set, else `TEST_DATABASE_URL` in the file `dotenv`.
+fn test_database_url_in(env: Option<String>, dotenv: &std::path::Path) -> Option<String> {
+    env.or_else(|| {
+        dotenvy::from_path_iter(dotenv)
             .ok()?
             .flatten()
             .find(|(key, _)| key == "TEST_DATABASE_URL")
@@ -409,7 +417,89 @@ mod tests {
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::time::Duration;
 
-    use super::{is_pool_timeout, retry_while};
+    use super::{
+        is_busy, is_busy_or_pool_timeout, is_pool_timeout, redact, retry_while,
+        test_database_url_in,
+    };
+    use crate::db::error::fake;
+
+    #[test]
+    fn urls_lose_only_their_password() {
+        assert_eq!(
+            redact("postgres://app:secret@db:5432/app"),
+            "postgres://app:***@db:5432/app"
+        );
+        // A user without a password still gets the mask; no `@` or no
+        // scheme leaves the URL as it is.
+        assert_eq!(redact("postgres://app@db/app"), "postgres://app:***@db/app");
+        assert_eq!(redact("postgres://db/app"), "postgres://db/app");
+        assert_eq!(redact("sqlite:app.db"), "sqlite:app.db");
+    }
+
+    #[test]
+    fn busy_errors_and_pool_timeouts() {
+        for code in ["5", "6", "517", "261"] {
+            assert!(is_busy(&fake::coded(Some(code))), "{code}");
+        }
+        assert!(!is_busy(&fake::coded(Some("19"))));
+        assert!(!is_busy(&fake::coded(Some("40001")))); // not a number
+        assert!(!is_busy(&fake::coded(None)));
+        assert!(!is_busy(&sqlx::Error::PoolTimedOut));
+        assert!(is_busy_or_pool_timeout(&sqlx::Error::PoolTimedOut));
+        assert!(is_busy_or_pool_timeout(&fake::coded(Some("5"))));
+        assert!(!is_busy_or_pool_timeout(&sqlx::Error::PoolClosed));
+    }
+
+    /// The environment wins; else `.env` is read for that one key; a
+    /// missing file or key gives nothing.
+    #[test]
+    fn the_test_database_url_comes_from_the_environment_or_dotenv() {
+        let dir = tempfile::tempdir().unwrap();
+        let dotenv = dir.path().join(".env");
+        assert_eq!(test_database_url_in(None, &dotenv), None);
+        std::fs::write(
+            &dotenv,
+            "APP_NAME=x\nTEST_DATABASE_URL=postgres://t@localhost/t\n",
+        )
+        .unwrap();
+        assert_eq!(
+            test_database_url_in(None, &dotenv).as_deref(),
+            Some("postgres://t@localhost/t")
+        );
+        assert_eq!(
+            test_database_url_in(Some("postgres://env/e".into()), &dotenv).as_deref(),
+            Some("postgres://env/e")
+        );
+        std::fs::write(&dotenv, "APP_NAME=x\n").unwrap();
+        assert_eq!(test_database_url_in(None, &dotenv), None);
+    }
+
+    /// A file database in directories that don't exist yet: they're made.
+    /// An in-memory one waits at most 2 s for its one connection.
+    #[tokio::test]
+    async fn sqlite_makes_directories_and_caps_the_in_memory_wait() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = crate::Config {
+            database_url: format!("sqlite://{}/a/b/app.db", dir.path().display()),
+            ..crate::Config::default()
+        };
+        let pool = super::connect_sqlite(&config, Default::default())
+            .await
+            .unwrap();
+        assert!(dir.path().join("a/b/app.db").exists());
+        pool.close().await;
+
+        let config = crate::Config {
+            database_url: "sqlite::memory:".into(),
+            database_acquire_timeout: Duration::from_secs(30),
+            ..crate::Config::default()
+        };
+        let pool = super::connect_sqlite(&config, Default::default())
+            .await
+            .unwrap();
+        assert_eq!(pool.options().get_acquire_timeout(), Duration::from_secs(2));
+        assert_eq!(pool.options().get_max_connections(), 1);
+    }
 
     /// Pools opening one brand-new file database at once all open it (#163).
     #[tokio::test(flavor = "multi_thread", worker_threads = 8)]

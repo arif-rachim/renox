@@ -1037,9 +1037,8 @@ async fn a_panicking_or_slow_handler_answers_500_and_the_app_keeps_serving() {
 /// timeout (#219).
 #[renox::test]
 async fn request_timeout_also_bounds_the_session_layer() {
-    if std::env::var("TEST_DATABASE_URL").is_ok() {
-        return; // needs the one-connection SQLite pool below
-    }
+    // A file database: `TEST_DATABASE_URL` swaps only in-memory ones, so this
+    // runs on SQLite in the PostgreSQL suite too.
     let dir = tempfile::tempdir().unwrap();
     let url = format!("sqlite://{}", dir.path().join("app.db").display());
     let app = TestApp::with_config(App::new().module(Faulty), |c| {
