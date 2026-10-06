@@ -183,6 +183,10 @@ test('after Back, a regular form that was sent is ready again', () => browser.wi
   });
   await page.goto(`${app.url}/widgets`);
   await page.eval(() => { window.__first = true; });
+  // The form's request is held in the browser and never answered, so
+  // leaving always comes first (a slow runner let the 600 ms answer arrive
+  // before the navigation, and Back then showed the form's result).
+  await page.send('Fetch.enable', { patterns: [{ urlPattern: '*/slow-plain*' }] });
   // Sent (busy), then left for another page before the answer: Chrome keeps
   // a page in its back/forward cache only after a navigation it started
   // itself, not after the form's own (BrowsingInstanceNotSwapped).
@@ -193,6 +197,7 @@ test('after Back, a regular form that was sent is ready again', () => browser.wi
   });
   assert.equal(busy, 'true');
   await page.goto(`${app.url}/stock`);
+  await page.send('Fetch.disable');
   await page.eval(() => history.back());
   await page.waitFor(() => window.__first === true, { message: 'the first page shown again' });
   const state = await page.eval(() => ({
