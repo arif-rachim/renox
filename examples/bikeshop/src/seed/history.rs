@@ -163,23 +163,37 @@ async fn rentals(tx: &mut Transaction, world: &mut World, books: &mut Books) -> 
         return Ok(());
     }
     let bikes_total = world.bikes.len() as i64;
-    // Days between two pick-ups of the same bike, to reach the target count.
+    // Hours between a bike's return and its next pick-up, to reach the
+    // target count: the history's hours per rental, less a rental's
+    // average length (about 40 hours).
     let cycle_hours =
-        (world.volume.history_days * 24 * bikes_total / world.volume.rentals.max(1) as i64).max(30);
+        (world.volume.history_days * 24 * bikes_total / world.volume.rentals.max(1) as i64 - 40)
+            .max(12);
     let stores: HashMap<i64, i64> = world.stores.iter().map(|s| (s.id, s.fee_rate_bp)).collect();
 
     let mut rows = Vec::new();
     let mut statuses: Vec<(i64, BikeStatus)> = Vec::new();
     let bikes = world.bikes.clone();
+    // Whatever the volume and the time of day, each store has a bike
+    // overdue and one due back later today.
+    let mut seen_per_store: HashMap<i64, usize> = HashMap::new();
+    let end_of_today = midnight_of(today() + Duration::days(1));
     for bike in &bikes {
         if Some(bike.id) == world.demo_bike {
             continue;
         }
         let placed = world.placements.get(&bike.id).copied();
-        let overdue_bike = world.rng.chance(3);
-        let maintenance_bike = !overdue_bike && world.rng.chance(5);
+        let nth = {
+            let seen = seen_per_store.entry(bike.location_store_id).or_default();
+            *seen += 1;
+            *seen
+        };
+        let overdue_bike = nth == 1 || world.rng.chance(3);
+        let due_today_bike = nth == 2;
+        let maintenance_bike = !overdue_bike && !due_today_bike && world.rng.chance(5);
         let mut t = start(world) + Duration::hours(world.rng.range(0, cycle_hours));
         let mut status = BikeStatus::Available;
+        let mut previous_end = start(world) - Duration::days(1);
         loop {
             let hourly = world.rng.chance(30);
             let (rate, length) = if hourly {
@@ -222,13 +236,21 @@ async fn rentals(tx: &mut Transaction, world: &mut World, books: &mut Books) -> 
                 created_at: Some(starts - Duration::hours(world.rng.range(1, 72))),
                 ..Default::default()
             };
-            let last = starts + length + Duration::hours(cycle_hours) > now;
-            if last && overdue_bike && starts < now {
-                // Out and not back: a day or two past its due time.
-                rental.starts_at = now - Duration::days(world.rng.range(2, 4));
-                rental.due_at = now - Duration::hours(world.rng.range(4, 30));
+            if (overdue_bike || due_today_bike) && due >= now - Duration::days(1) {
+                // The rental out now: picked up after the previous came back.
+                rental.starts_at = (now - Duration::days(3)).max(previous_end + Duration::hours(1));
                 rental.picked_up_at = Some(rental.starts_at);
-                rental.status = RentalStatus::Overdue;
+                if overdue_bike {
+                    // Not back: hours or a day past its due time.
+                    rental.due_at = (now - Duration::hours(world.rng.range(4, 20)))
+                        .max(rental.starts_at + Duration::hours(1))
+                        .min(now - Duration::minutes(30));
+                    rental.status = RentalStatus::Overdue;
+                } else {
+                    // Due back before the day ends.
+                    rental.due_at = now + (end_of_today - now) / 2;
+                    rental.status = RentalStatus::Active;
+                }
                 status = BikeStatus::Rented;
                 rows.push(rental);
                 break;
@@ -271,6 +293,7 @@ async fn rentals(tx: &mut Transaction, world: &mut World, books: &mut Books) -> 
                     status = BikeStatus::Reserved;
                 }
             }
+            previous_end = rental.returned_at.unwrap_or(rental.due_at);
             rows.push(rental);
             t = starts
                 + length
@@ -1074,6 +1097,36 @@ async fn workshop(tx: &mut Transaction, world: &mut World, books: &mut Books) ->
         orders.push(order);
         tasks.push(rows);
         used_parts.push(part);
+    }
+    // Whatever the volume, each workshop has bikes on the bench right now.
+    let on_bench = [
+        WorkStatus::InProgress,
+        WorkStatus::WaitingParts,
+        WorkStatus::CheckedIn,
+    ];
+    let stores: Vec<i64> = world.stores.iter().map(|s| s.id).collect();
+    let mut wanted: Vec<(i64, WorkStatus)> = stores
+        .iter()
+        .flat_map(|store| on_bench.iter().map(move |status| (*store, *status)))
+        .collect();
+    for (order, rows) in orders.iter_mut().zip(&mut tasks) {
+        if wanted.is_empty() {
+            break;
+        }
+        if order.source == WorkSource::Fleet || order.plan_subscription_id.is_some() {
+            continue;
+        }
+        let (store, status) = wanted.remove(0);
+        order.store_id = store;
+        order.mechanic_id = world.mechanic(store);
+        order.status = status;
+        order.scheduled_for = now - Duration::hours(world.rng.range(1, 5));
+        order.started_at =
+            (status != WorkStatus::CheckedIn).then(|| order.scheduled_for + Duration::minutes(15));
+        order.completed_at = None;
+        for task in rows.iter_mut() {
+            task.done = false;
+        }
     }
     WorkOrder::insert_many(&mut *tx, orders.clone()).await?;
     let ids: Vec<i64> = sql("SELECT id FROM work_orders ORDER BY id")

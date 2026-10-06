@@ -63,10 +63,12 @@ impl Volume {
         }
     }
 
-    /// `demo:seed --size large`: Pagila's volume over 18 months.
+    /// `demo:seed --size large`: Pagila's volume over 18 months (about
+    /// 1,000 variants, 600 customers, 16,000 rentals, 5,000 orders, 3,000
+    /// work orders).
     pub fn large() -> Self {
         Volume {
-            products: 300,
+            products: 370,
             customers: 600,
             rentals: 16_000,
             orders: 5_000,
@@ -1055,16 +1057,19 @@ async fn fleet(tx: &mut Transaction, world: &mut World) -> Result {
     RentalBike::insert_many(&mut *tx, bikes).await?;
     world.bikes = RentalBike::query().order_by("id").get(&mut *tx).await?;
 
-    // About one in ten is placed at another store, between five and sixty
-    // days ago; the owner store keeps it in its books.
+    // About one in ten is placed at another store, some time in the last
+    // eight months; the owner store keeps it in its books.
     let mut placements = Vec::new();
     for i in 0..world.bikes.len() {
-        if !world.rng.chance(10) {
+        // (The fourth bike of each store always is, so even the small seed has some.)
+        let fourth = i % world.volume.bikes_per_store.max(1) == 3;
+        if !(fourth || world.rng.chance(10)) {
             continue;
         }
         let bike = world.bikes[i].clone();
         let to = world.other_store(bike.owner_store_id);
-        let moved = renox::db::now() - Duration::days(world.rng.range(5, 60));
+        let moved = renox::db::now()
+            - Duration::days(world.rng.range(5, world.volume.history_days.min(240)));
         let approver = world
             .staff_of(bike.owner_store_id, MANAGER)
             .first()
@@ -1191,6 +1196,11 @@ async fn demo_customer(db: &Db, world: &mut World) -> Result {
             .make_one();
         current.served_by = world.counter_person(north);
         current.insert(db).await?;
+        sql("UPDATE rental_bikes SET status = ? WHERE id = ?")
+            .bind(crate::app::rentals::model::BikeStatus::Rented)
+            .bind(fleet_bike.id)
+            .execute(db)
+            .await?;
         payments()
             .for_rental(&current)
             .paid()

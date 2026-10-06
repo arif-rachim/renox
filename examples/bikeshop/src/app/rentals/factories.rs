@@ -152,7 +152,7 @@ pub trait RentalStates {
     fn for_customer(self, customer_id: i64) -> Self;
     /// Picked up two hours ago, due tomorrow.
     fn active(self) -> Self;
-    /// Picked up, due back later today.
+    /// Picked up yesterday, due back later today.
     fn due_today(self) -> Self;
     /// Out and a day past its due time.
     fn overdue(self) -> Self;
@@ -192,9 +192,14 @@ impl RentalStates for FactoryBuilder<Rental> {
         self.state(|r| {
             let now = renox::db::now();
             r.status = RentalStatus::Active;
+            let end_of_today = (now.date_naive() + Duration::days(1))
+                .and_hms_opt(0, 0, 0)
+                .expect("midnight")
+                .and_utc();
             r.starts_at = now - Duration::hours(20);
             r.picked_up_at = Some(r.starts_at);
-            r.due_at = now + Duration::hours(3);
+            // Halfway between now and midnight: later today, whatever the time.
+            r.due_at = now + (end_of_today - now) / 2;
         })
     }
 
