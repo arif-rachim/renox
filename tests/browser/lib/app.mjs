@@ -52,9 +52,11 @@ export async function start(binary, dir, { env = {}, seed = false } = {}) {
     ...env,
   };
   for (const command of ['migrate', ...(seed ? ['db:seed'] : [])]) {
-    const run = spawnSync(exe, [command], { cwd, env: vars, encoding: 'utf8' });
+    // Bounded: a command that hangs fails the test instead of the whole run.
+    const run = spawnSync(exe, [command], { cwd, env: vars, encoding: 'utf8', timeout: 120_000, killSignal: 'SIGKILL' });
     if (run.status !== 0) {
-      throw new Error(`${binary} ${command} failed:\n${run.stdout}\n${run.stderr}`);
+      const why = run.error ? ` (${run.error.message})` : '';
+      throw new Error(`${binary} ${command} failed${why}:\n${run.stdout}\n${run.stderr}`);
     }
   }
   const url = `http://127.0.0.1:${port}`;
@@ -64,13 +66,17 @@ export async function start(binary, dir, { env = {}, seed = false } = {}) {
     proc = spawn(exe, ['serve'], { cwd, env: vars, stdio: ['ignore', 'pipe', 'pipe'] });
     proc.stdout.on('data', (d) => (log += d));
     proc.stderr.on('data', (d) => (log += d));
-    const until = Date.now() + 20_000;
+    const until = Date.now() + 60_000; // a CI runner can be slow right after the build
     for (;;) {
       if (proc.exitCode !== null) throw new Error(`${binary} exited:\n${log}`);
       try {
-        if ((await fetch(`${url}/health`)).ok) break;
+        if ((await fetch(`${url}/health`, { signal: AbortSignal.timeout(2000) })).ok) break;
       } catch {}
-      if (Date.now() > until) throw new Error(`${binary} didn't answer /health:\n${log}`);
+      if (Date.now() > until) {
+        // Stopped, so it doesn't outlive the test that couldn't use it.
+        proc.kill('SIGKILL');
+        throw new Error(`${binary} didn't answer /health within 60 s:\n${log}`);
+      }
       await new Promise((r) => setTimeout(r, 100));
     }
   };
