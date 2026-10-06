@@ -380,7 +380,7 @@ pub async fn reserve(
 
 /// The customer's own rental by its code, or a 404 (someone else's code
 /// is as good as a wrong one).
-async fn own_rental(db: &Db, user: &User, code: &str) -> Result<(Customer, Rental)> {
+pub async fn own_rental(db: &Db, user: &User, code: &str) -> Result<(Customer, Rental)> {
     let customer = customer_of(db, user).await?;
     let rental = Rental::where_eq("reservation_code", code)
         .where_eq("customer_id", customer.id)
@@ -456,9 +456,25 @@ pub async fn cancel(
 ) -> Result<Redirect> {
     let (customer, mut rental) = own_rental(&state.db, &user, &code).await?;
     let lang = state.current_lang();
-    if !rental.cancellable() {
+    if !cancel_rental(&state, &customer, &mut rental).await? {
         session.flash("status", lang.t("rentals.show.too_late", &[]))?;
         return Redirect::route("rentals.show", &[&rental.reservation_code]);
+    }
+    session.flash("status", lang.t("rentals.show.cancelled", &[]))?;
+    Redirect::route("rentals.show", &[&rental.reservation_code])
+}
+
+/// Cancels the customer's reservation when it still may be (until an hour
+/// before the start; a paid deposit is given back whole) and tells them:
+/// the rule the page above and the JSON API (#241) share. `false` when
+/// it's too late.
+pub async fn cancel_rental(
+    state: &AppState,
+    customer: &Customer,
+    rental: &mut Rental,
+) -> Result<bool> {
+    if !rental.cancellable() {
+        return Ok(false);
     }
     rental.status = RentalStatus::Cancelled;
     rental.cancelled_at = Some(renox::db::now());
@@ -468,8 +484,8 @@ pub async fn cancel(
     }
     rental.save(&state.db).await?;
     notify::customer(
-        &state,
-        &customer,
+        state,
+        customer,
         &Notice::new(
             "rental-cancelled",
             "rentals.mail.cancelled.title",
@@ -478,17 +494,16 @@ pub async fn cancel(
         .param("code", &rental.reservation_code)
         .row(
             "rentals.fields.refund",
-            money(&state, rental.deposit_refunded),
+            money(state, rental.deposit_refunded),
         )
         .url(super::link(
-            &state,
+            state,
             "rentals.show",
             Some(&rental.reservation_code),
         )?),
     )
     .await?;
-    session.flash("status", lang.t("rentals.show.cancelled", &[]))?;
-    Redirect::route("rentals.show", &[&rental.reservation_code])
+    Ok(true)
 }
 
 /// `GET /rentals` (`rentals.mine`): the customer's rentals, current first,
