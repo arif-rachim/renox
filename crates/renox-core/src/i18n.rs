@@ -826,4 +826,30 @@ mod tests {
         assert_eq!(out["a.n"], "3");
         assert_eq!(out["c"], "y");
     }
+
+    /// Parts that aren't ranges, or whose ranges don't read, are skipped;
+    /// with no match the last part is used as it is.
+    #[test]
+    fn ranges_that_dont_read_are_skipped() {
+        let text = "{0 unclosed|[1 no end|plain|[a,b] letters|[1,2] few|the rest";
+        assert_eq!(choose_range(text, 1), "few");
+        assert_eq!(choose_range(text, 9), "the rest");
+    }
+
+    /// A lang file broken while the app runs (a half-saved edit): the
+    /// previous translations stay until the file reads again.
+    #[test]
+    fn a_lang_file_broken_while_reloading_keeps_the_previous_texts() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("es.json");
+        std::fs::write(&file, r#"{"hi": "Hola"}"#).unwrap();
+        let translator = Translator::load(dir.path(), true).unwrap();
+        assert_eq!(translator.get("es", "en", "hi"), "Hola");
+        std::fs::write(&file, r#"{"hi": "Hola de nue"#).unwrap();
+        std::thread::sleep(RELOAD_CHECK + Duration::from_millis(100));
+        assert_eq!(translator.get("es", "en", "hi"), "Hola");
+        std::fs::write(&file, r#"{"hi": "Hola de nuevo"}"#).unwrap();
+        std::thread::sleep(RELOAD_CHECK + Duration::from_millis(100));
+        assert_eq!(translator.get("es", "en", "hi"), "Hola de nuevo");
+    }
 }

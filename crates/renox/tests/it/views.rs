@@ -48,6 +48,18 @@ impl Module for Pages {
                 (HxRedirect("/a\nb".into()), "ok")
             })
             .get("/back", |back: Back| async move { back })
+            .get("/forbidden", || async {
+                Err::<String, _>(Error::Forbidden)
+            })
+            .get("/routes", || async { view("routes.html", context! {}) })
+            .get("/no-route", || async { view("no_route.html", context! {}) })
+            .get("/json-trigger", || async {
+                (
+                    Toast::info("Saved."),
+                    HxTrigger(r#"{"refresh-list": {"page": 2}}"#.into()),
+                    "ok",
+                )
+            })
             .get(
                 "/mail/{name}",
                 |State(state): State<AppState>, Path(name): Path<String>| async move {
@@ -67,6 +79,9 @@ fn views() -> tempfile::TempDir {
     // Next to the views, not in them: no view name may reach it.
     std::fs::write(root.path().join("secret.html"), "TOP SECRET").unwrap();
     write("plain.html", "plain page");
+    // `route()` with a query value left out, and a route that doesn't exist.
+    write("routes.html", "{{ route('login', page=none, q='a b') }}");
+    write("no_route.html", "{{ route('no.such.route') }}");
     write("toasted.html", "{{ toasts() }}");
     write("storage.html", "{{ storage_url('public/avatars/a.png') }}");
     write("broken.html", "{{ no_such_function() }}");
@@ -267,4 +282,62 @@ async fn a_failing_shared_value_breaks_pages_but_not_error_pages() {
         .await
         .assert_status(404)
         .assert_see("app 404 [no cart]");
+}
+
+#[renox::test]
+async fn route_in_a_template_skips_empty_query_values_and_names_a_missing_route() {
+    let (app, _dir) = app(|_| {}).await;
+    app.get("/routes")
+        .await
+        .assert_ok()
+        .assert_see("/login?q=a+b");
+    app.get("/no-route")
+        .await
+        .assert_status(500)
+        .assert_see("no.such.route");
+}
+
+/// An app error page that doesn't even parse: Renox's own page, with the
+/// status kept (the failure is logged).
+#[renox::test]
+async fn an_error_page_that_doesnt_parse_falls_back_to_renoxs() {
+    let (app, _dir) = app(|c| c.debug = false).await;
+    app.get("/forbidden")
+        .await
+        .assert_status(403)
+        .assert_see("rx-error-page");
+}
+
+/// A share that fails with an error other than an internal one, on an app
+/// with its own 500 page: the page is drawn without the request's values.
+#[renox::test]
+async fn a_share_failing_with_any_error_shows_the_apps_500_page() {
+    let root = views();
+    std::fs::write(
+        root.path().join("views/errors/500.html"),
+        "app 500: {{ status }}",
+    )
+    .unwrap();
+    let path = root.path().join("views");
+    let app = TestApp::with_config(
+        App::new()
+            .module(Pages)
+            .share("cart", |_| async { Err::<i64, _>(Error::Forbidden) }),
+        move |c| c.views_path = path,
+    )
+    .await;
+    app.get("/created")
+        .await
+        .assert_status(500)
+        .assert_see("app 500: 500");
+}
+
+#[renox::test]
+async fn a_toast_joins_a_json_hx_trigger() {
+    let (app, _dir) = app(|_| {}).await;
+    let res = app.htmx().get("/json-trigger").await;
+    let trigger = res.header("hx-trigger").unwrap().to_owned();
+    let triggers: serde_json::Value = serde_json::from_str(&trigger).unwrap();
+    assert_eq!(triggers["refresh-list"]["page"], 2, "{trigger}");
+    assert_eq!(triggers["renox:toast"]["toasts"][0]["message"], "Saved.");
 }

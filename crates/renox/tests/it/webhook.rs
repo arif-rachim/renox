@@ -273,3 +273,125 @@ async fn calls_without_an_id_and_calls_for_a_provider_thats_gone() {
         "{err:?}"
     );
 }
+
+/// A provider that posts a form, read with `WebhookRequest::form`.
+struct FormPay;
+
+impl Webhook for FormPay {
+    const PROVIDER: &'static str = "form-pay";
+
+    fn verify(_: &WebhookRequest, _: &AppState) -> Result {
+        Ok(())
+    }
+
+    fn event_id(request: &WebhookRequest) -> Result<String> {
+        Ok(request.form::<Event>()?.id)
+    }
+
+    async fn handle(_call: WebhookCall, _ctx: JobContext) -> Result {
+        Ok(())
+    }
+}
+
+struct FormShop;
+
+impl Module for FormShop {
+    fn name(&self) -> &'static str {
+        "form-shop"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new().webhook::<FormPay>("/webhooks/form-pay")
+    }
+
+    fn register(&self, app: &mut Registry) {
+        app.webhook::<FormPay>();
+    }
+}
+
+/// #256: form bodies, a store that can't be written (the provider sends
+/// again), and the job meeting a call that is gone or already processed.
+#[renox::test]
+async fn form_calls_failed_stores_and_calls_done_meanwhile() {
+    let app = TestApp::new(App::new().module(Shop).module(FormShop)).await;
+    let post_form = |body: &'static str| {
+        let app = &app;
+        async move {
+            app.request()
+                .without_csrf()
+                .post_body(
+                    "/webhooks/form-pay",
+                    "application/x-www-form-urlencoded",
+                    body,
+                )
+                .await
+        }
+    };
+    post_form("id=evt_f1&order=F-1")
+        .await
+        .assert_ok()
+        .assert_see("ok");
+    // Not a form with an `id`: refused.
+    post_form("order=F-2").await.assert_status(400);
+
+    // Gone before its job ran, and processed before its job ran: both jobs
+    // end quietly.
+    let gone = body("evt_gone", "G-1");
+    send(&app, &gone, &webhook::hmac_sha256_hex(SECRET, &gone))
+        .await
+        .assert_ok();
+    let done = body("evt_done", "D-1");
+    send(&app, &done, &webhook::hmac_sha256_hex(SECRET, &done))
+        .await
+        .assert_ok();
+    renox::db::sql("DELETE FROM webhook_calls WHERE event_id LIKE ?")
+        .bind("%evt_gone")
+        .execute(app.db())
+        .await
+        .unwrap();
+    renox::db::sql("UPDATE webhook_calls SET status = 'processed' WHERE event_id LIKE ?")
+        .bind("%evt_done")
+        .execute(app.db())
+        .await
+        .unwrap();
+    app.run_jobs().await;
+    assert!(!paid(&app, "G-1").await && !paid(&app, "D-1").await);
+    app.assert_database_count("failed_jobs", 0).await;
+
+    // The table can't be written: a 500, so the provider sends it again.
+    renox::db::sql("ALTER TABLE webhook_calls RENAME TO webhook_calls_away")
+        .execute(app.db())
+        .await
+        .unwrap();
+    let later = body("evt_later", "L-1");
+    send(&app, &later, &webhook::hmac_sha256_hex(SECRET, &later))
+        .await
+        .assert_status(500);
+}
+
+#[renox::test]
+async fn a_webhook_registered_twice_stops_the_boot() {
+    struct Twice;
+
+    impl Module for Twice {
+        fn name(&self) -> &'static str {
+            "twice"
+        }
+
+        fn register(&self, app: &mut Registry) {
+            app.webhook::<Pay>();
+            app.webhook::<Pay>();
+        }
+    }
+
+    let err = App::with_config(Config::default())
+        .module(Twice)
+        .boot()
+        .await
+        .err()
+        .unwrap();
+    assert!(
+        format!("{err:?}").contains("`pay` is registered twice"),
+        "{err:?}"
+    );
+}

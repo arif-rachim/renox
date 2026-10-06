@@ -684,4 +684,15 @@ mod tests {
             "production needs a key"
         );
     }
+
+    /// Settings print and serialize as the word `.env` takes.
+    #[test]
+    fn settings_print_and_serialize_as_their_word() {
+        assert_eq!(SessionDriver::Database.to_string(), "database");
+        assert_eq!(
+            serde_json::to_string(&CacheStore::Database).unwrap(),
+            r#""database""#
+        );
+        assert_eq!(format!("{}", LogFormat::Json), "json");
+    }
 }

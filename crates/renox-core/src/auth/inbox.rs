@@ -342,3 +342,73 @@ impl Watch {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use axum::body::Body;
+    use http_body_util::BodyExt;
+    use tower::ServiceExt;
+
+    use crate::auth::{Auth, User};
+    use crate::testing::TestApp;
+
+    /// A stream open for `user`, its first frame (the unread count) read.
+    async fn open(app: &TestApp, user: &User) -> Body {
+        let token = user.create_token(app.db(), "page", None).await.unwrap();
+        let req = axum::http::Request::builder()
+            .uri("/notifications/stream")
+            .header("authorization", format!("Bearer {}", token.plain))
+            .body(Body::empty())
+            .unwrap();
+        let res = app.kernel().router().oneshot(req).await.unwrap();
+        assert_eq!(res.status(), 200);
+        let mut body = res.into_body();
+        let first = body.frame().await.unwrap().unwrap().into_data().unwrap();
+        assert!(String::from_utf8_lossy(&first).contains("event: count"));
+        body
+    }
+
+    async fn rest(body: Body) -> String {
+        let bytes = tokio::time::timeout(std::time::Duration::from_secs(5), body.collect())
+            .await
+            .expect("the stream ends")
+            .unwrap()
+            .to_bytes();
+        String::from_utf8_lossy(&bytes).into_owned()
+    }
+
+    async fn app() -> (TestApp, User) {
+        let app = TestApp::new(crate::App::new().module(Auth::new().notifications())).await;
+        let user = User::register(app.db(), "Ann", "ann@example.com", "password123")
+            .await
+            .unwrap();
+        (app, user)
+    }
+
+    /// At shutdown the hub stops every stream, also one that fell behind
+    /// (it looks at the table, then ends).
+    #[tokio::test]
+    async fn streams_end_when_the_hub_stops() {
+        let (app, user) = app().await;
+        let body = open(&app, &user).await;
+        let hub = app.state().notification_hub.clone();
+        for _ in 0..300 {
+            hub.touch(user.id + 1);
+        }
+        hub.stop();
+        rest(body).await;
+    }
+
+    /// A look at the table that fails ends the stream; the page reconnects.
+    #[tokio::test]
+    async fn a_stream_ends_when_its_look_fails() {
+        let (app, user) = app().await;
+        let body = open(&app, &user).await;
+        crate::db::sql("ALTER TABLE notifications RENAME TO notifications_gone")
+            .execute(app.db())
+            .await
+            .unwrap();
+        app.state().notification_hub.touch(user.id);
+        rest(body).await;
+    }
+}

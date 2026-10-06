@@ -693,6 +693,8 @@ pub(crate) fn html_to_text(html: &str) -> String {
     while let Some(open) = rest.find('<') {
         out.push_str(&rest[..open]);
         let Some(close) = rest[open..].find('>') else {
+            // A `<` that opens no tag: the rest is text (once).
+            rest = &rest[open..];
             break;
         };
         let tag = &rest[open + 1..open + close];
@@ -864,5 +866,70 @@ mod tests {
             html_to_text(html),
             "Hello & welcome\n\nClick here (https://x.id/a?b=1&c=2).\n\nTotal Rp 10.000\n"
         );
+        // Without a <body>: a style block is skipped, and a title that is
+        // never closed is dropped as a tag.
+        assert_eq!(html_to_text("<style>p{}</style>Hi<p>there"), "Hi\nthere\n");
+        assert_eq!(html_to_text("<title>No end"), "No end\n");
+        // A `<` that opens no tag is text, kept once (it was written twice).
+        assert_eq!(html_to_text("Price < 5"), "Price < 5\n");
+        assert_eq!(html_to_text("<p>a</p>b <c"), "a\nb <c\n");
+    }
+
+    /// The log driver writes the mail to the log; with `APP_DEBUG` on it
+    /// keeps the last 50 for `/_renox/mail`, and none with it off.
+    #[tokio::test]
+    async fn the_log_driver_keeps_the_last_fifty_while_debugging() {
+        let mut config = Config {
+            debug: true,
+            ..Config::default()
+        };
+        let mail = MailConfig::default();
+        let mailer = Mailer::open(&mail, &config).unwrap();
+        for i in 0..OUTBOX + 1 {
+            mailer
+                .send(Mail::new("ann@example.com", format!("Mail {i}"), "Hi"))
+                .await
+                .unwrap();
+        }
+        let sent = mailer.sent();
+        assert_eq!(sent.len(), OUTBOX);
+        assert_eq!(sent[0].subject, "Mail 1", "the oldest is gone");
+
+        config.debug = false;
+        let quiet = Mailer::open(&mail, &config).unwrap();
+        quiet
+            .send(Mail::new("ann@example.com", "Hi", "Hi"))
+            .await
+            .unwrap();
+        assert!(quiet.sent().is_empty());
+    }
+
+    /// Mails SMTP can't send are permanent errors (no retry), found before
+    /// connecting: no recipient, an attachment with a bad content type.
+    #[test]
+    fn mails_smtp_cant_send_are_permanent_errors() {
+        let from: Mailbox = "shop@example.com".parse().unwrap();
+        let mut nobody = Mail::new("ann@example.com", "Hi", "Hi");
+        nobody.to.clear();
+        let err = message(&from, &nobody).unwrap_err();
+        assert!(err.is_permanent());
+        assert!(format!("{err:?}").contains("the mail has no recipient"));
+
+        let odd = Mail::new("ann@example.com", "Hi", "Hi").attach("a.bin", "not a type", vec![1]);
+        let err = message(&from, &odd).unwrap_err();
+        assert!(err.is_permanent());
+        assert!(
+            format!("{err:?}").contains("is not a content type"),
+            "{err:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_outbox_page_says_when_nothing_was_sent() {
+        let app = crate::testing::TestApp::new(crate::App::new()).await;
+        app.get("/_renox/mail")
+            .await
+            .assert_ok()
+            .assert_see("No mail sent yet.");
     }
 }

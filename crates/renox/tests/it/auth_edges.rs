@@ -431,3 +431,491 @@ async fn notify_later_is_recorded_by_the_fake() {
     app.assert_notified(&ann, "bare");
     assert!(app.queued_jobs().await.is_empty());
 }
+
+// The rest of #253: the auth paths left after the first pass, many of them
+// what happens when a table, a template or a listener fails.
+
+#[derive(Model, serde::Serialize, Default, Clone)]
+#[model(table = "stores")]
+struct Store {
+    id: i64,
+}
+
+/// A record whose policy lets its owner edit it.
+struct Doc {
+    owner_id: i64,
+}
+
+impl Policy for Doc {
+    fn allows(&self, user: &User, ability: &str) -> bool {
+        ability == "edit" && user.id == self.owner_id
+    }
+}
+
+struct More;
+
+impl Module for More {
+    fn name(&self) -> &'static str {
+        "more"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new()
+            .get("/", || async { "home" })
+            .name("home")
+            .get("/policy", |user: AuthUser| async move {
+                let mine = Doc { owner_id: user.id };
+                let theirs = Doc { owner_id: 0 };
+                let can = Can::new(mine, Some(&user), &["edit", "delete"]);
+                let me = user.user();
+                format!(
+                    "{:?}|{}|{}|{}|{}",
+                    can.abilities,
+                    me.can("edit", &theirs),
+                    me.authorize("edit", &Doc { owner_id: me.id }).is_ok(),
+                    me.authorize("edit", &theirs).is_err(),
+                    User::has_permission(me, "orders.view"),
+                )
+            })
+            .get(
+                "/scopes",
+                |State(db): State<Db>, user: AuthUser| async move {
+                    let store = Scope::of_id::<Store>(7);
+                    permissions::set_scope(store.clone());
+                    let scoped = user.has_role("manager");
+                    permissions::clear_scope();
+                    let unscoped = user.has_role("manager");
+                    let me = user.user();
+                    let stores = match me.scopes_with::<Store>("orders.refund") {
+                        permissions::Scopes::All => "all".to_owned(),
+                        permissions::Scopes::Only(ids) => format!("{ids:?}"),
+                    };
+                    let active = me
+                        .assignments(&db)
+                        .await?
+                        .iter()
+                        .map(|a| format!("{}:{}", a.role, a.is_active()))
+                        .collect::<Vec<_>>()
+                        .join(",");
+                    Ok::<_, Error>(format!(
+                        "{scoped}|{unscoped}|{}|{stores}|{active}",
+                        me.has_role_in("manager", &store)
+                    ))
+                },
+            )
+            .merge(
+                Routes::new()
+                    .get("/flaky", || async { "never" })
+                    .require_gate("flaky"),
+            )
+            .merge(
+                Routes::new()
+                    .post("/save", || async { "saved" })
+                    .require_auth(),
+            )
+    }
+}
+
+fn more() -> App {
+    App::new()
+        .module(Auth::default())
+        .module(Permissions)
+        .module(More)
+        .gate_async("flaky", |_user, _state| async {
+            Err::<bool, _>(Error::Internal(renox::anyhow::anyhow!("gate service down")))
+        })
+}
+
+#[renox::test]
+async fn policies_see_the_auth_user_and_users_answer_for_themselves() {
+    let app = TestApp::new(more()).await;
+    let db = app.db();
+    permissions::define_role(db, "clerk", &["orders.view"])
+        .await
+        .unwrap();
+    let ann = ann(&app).await;
+    ann.assign_role(db, "clerk").await.unwrap();
+    app.acting_as(&ann);
+    app.get("/policy")
+        .await
+        .assert_ok()
+        .assert_see(r#"{"delete": false, "edit": true}|false|true|true|true"#);
+}
+
+#[renox::test]
+async fn scopes_can_be_set_and_cleared_and_users_answer_for_a_scope() {
+    let app = TestApp::new(more()).await;
+    let db = app.db();
+    permissions::define_role(db, "manager", &["orders.refund"])
+        .await
+        .unwrap();
+    let ann = ann(&app).await;
+    ann.assign_role_in(db, "manager", &Scope::of_id::<Store>(7))
+        .await
+        .unwrap();
+    app.acting_as(&ann);
+    app.get("/scopes")
+        .await
+        .assert_ok()
+        .assert_see("true|false|true|[7]|manager:true");
+}
+
+#[renox::test]
+async fn an_async_gate_that_fails_is_a_500_not_a_pass() {
+    let app = TestApp::new(more()).await;
+    app.acting_as(&ann(&app).await);
+    app.get("/flaky").await.assert_status(500);
+}
+
+/// A guest who posts to a guarded route goes to log in, without the post
+/// being remembered as where to go back to; a guest's logout just goes home.
+#[renox::test]
+async fn guests_posting_are_sent_to_log_in_and_their_logout_goes_home() {
+    let app = TestApp::new(more()).await;
+    app.post("/save", &[]).await.assert_redirect("/login");
+    app.assert_session_missing("_intended");
+    app.post("/logout", &[]).await.assert_redirect("/");
+}
+
+/// `auth::sign_in` in an app without the `Auth` module: the page that asked
+/// for a login, else home, else `/`.
+#[renox::test]
+async fn sign_in_without_the_auth_module_goes_home() {
+    struct SignIn;
+    impl Module for SignIn {
+        fn name(&self) -> &'static str {
+            "sign-in"
+        }
+        fn routes(&self) -> Routes {
+            Routes::new().post(
+                "/sso",
+                |State(state): State<AppState>, session: Session| async move {
+                    let mut user = User::default();
+                    user.id = 42;
+                    user.name = "Sso".into();
+                    renox::auth::sign_in(&state, &session, &user, false, None).await
+                },
+            )
+        }
+    }
+    let app = TestApp::new(App::new().module(SignIn)).await;
+    app.post("/sso", &[]).await.assert_ok().assert_see("/");
+}
+
+/// A failure while saving the new user (not a duplicate email) is a 500,
+/// and nobody is logged in.
+#[renox::test]
+async fn a_sign_up_the_database_refuses_is_a_500() {
+    let app = TestApp::new(App::new().module(Auth::new()).module(More)).await;
+    let refuse = match app.db().dialect() {
+        renox::db::Dialect::Sqlite => {
+            "CREATE TRIGGER no_sign_ups BEFORE INSERT ON users BEGIN SELECT RAISE(ABORT, 'closed'); END"
+        }
+        _ => "ALTER TABLE users ADD CONSTRAINT no_sign_ups CHECK (email <> 'eve@example.com')",
+    };
+    renox::db::sql(refuse).execute(app.db()).await.unwrap();
+    app.post(
+        "/register",
+        &[
+            ("name", "Eve"),
+            ("email", "eve@example.com"),
+            ("password", "a long password 12"),
+            ("password_confirmation", "a long password 12"),
+        ],
+    )
+    .await
+    .assert_status(500);
+    app.assert_guest();
+}
+
+/// One value for a field read with `Registration::all` is a list of one.
+#[renox::test]
+async fn a_registration_field_sent_once_is_a_list_of_one() {
+    let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let kept = seen.clone();
+    let app = TestApp::new(App::new().module(Auth::new().on_registered(
+        move |_user, reg, _state| {
+            let kept = kept.clone();
+            async move {
+                kept.lock().unwrap().push(reg.all("topics"));
+                Ok(())
+            }
+        },
+    )))
+    .await;
+    app.post(
+        "/register",
+        &[
+            ("name", "Cara"),
+            ("email", "cara@example.com"),
+            ("password", "a long password 12"),
+            ("password_confirmation", "a long password 12"),
+            ("topics", "news"),
+        ],
+    )
+    .await
+    .assert_redirect("/");
+    assert_eq!(*seen.lock().unwrap(), [vec!["news".to_owned()]]);
+}
+
+/// A user without a password (made by a social login) confirms who they
+/// are before changing their password or ending other sessions; a user
+/// with one must type it.
+#[renox::test]
+async fn account_actions_ask_for_confirmation_or_the_password() {
+    let app = TestApp::new(App::new().module(Auth::new().account()).module(More)).await;
+    let ann = ann(&app).await;
+    let mut social = User::register(app.db(), "Sol", "sol@example.com", "password123")
+        .await
+        .unwrap();
+    renox::db::sql("UPDATE users SET password = '' WHERE id = ?")
+        .bind(social.id)
+        .execute(app.db())
+        .await
+        .unwrap();
+    social.password = String::new();
+    app.acting_as(&social);
+    app.put(
+        "/account/password",
+        &[
+            ("password", "a long password 12"),
+            ("password_confirmation", "a long password 12"),
+        ],
+    )
+    .await
+    .assert_redirect("/confirm-password");
+    app.post("/account/logout-others", &[])
+        .await
+        .assert_redirect("/confirm-password");
+
+    app.acting_as(&ann);
+    app.htmx()
+        .post("/account/logout-others", &[("password", "")])
+        .await
+        .assert_invalid("password");
+}
+
+/// Without `verify_email`, a new address is saved as it is: no new
+/// verification, and the old verification date stays.
+#[renox::test]
+async fn a_new_email_needs_no_verification_unless_asked() {
+    let app = TestApp::new(App::new().module(Auth::new().account()).module(More)).await;
+    let mut ann = ann(&app).await;
+    ann.email_verified_at = Some(renox::db::now());
+    ann.save(app.db()).await.unwrap();
+    app.acting_as(&ann);
+    app.put(
+        "/account/profile",
+        &[("name", "Ann"), ("email", "ann.b@example.com")],
+    )
+    .await
+    .assert_redirect("/account");
+    let me = User::find_by_email(app.db(), "ann.b@example.com")
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(me.email_verified_at.is_some());
+    assert!(app.sent_mail().is_empty());
+}
+
+/// An app's copy of the auth mails that doesn't render: the request fails
+/// (500) instead of claiming a mail went out.
+fn broken_mail_views() -> tempfile::TempDir {
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("renox/mail/auth");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("reset-password.html"),
+        "{{ link | no_such_filter }}",
+    )
+    .unwrap();
+    std::fs::write(dir.join("verify-email.txt"), "{% if %}").unwrap();
+    root
+}
+
+#[renox::test]
+async fn auth_mails_that_dont_render_fail_the_request() {
+    let views = broken_mail_views();
+    let path = views.path().to_owned();
+    let app = TestApp::with_config(
+        App::new().module(Auth::new().verify_email()).module(More),
+        move |c| c.views_path = path,
+    )
+    .await;
+    let ann = ann(&app).await;
+    app.post("/forgot-password", &[("email", "ann@example.com")])
+        .await
+        .assert_status(500);
+    app.acting_as(&ann);
+    app.post("/email/verification-notification", &[])
+        .await
+        .assert_status(500);
+    assert!(app.sent_mail().is_empty());
+}
+
+#[renox::test]
+async fn a_reset_form_that_isnt_valid_goes_back_with_errors() {
+    let app = TestApp::new(App::new().module(Auth::new()).module(More)).await;
+    app.htmx()
+        .post(
+            "/reset-password",
+            &[("token", ""), ("email", "not an email")],
+        )
+        .await
+        .assert_invalid("email");
+}
+
+/// The verification link works once and then just goes home; asking for
+/// another link when verified goes home too.
+#[renox::test]
+async fn verifying_twice_and_resending_when_verified_go_home() {
+    let app = TestApp::new(App::new().module(Auth::new().verify_email()).module(More)).await;
+    app.post(
+        "/register",
+        &[
+            ("name", "Ann"),
+            ("email", "ann@example.com"),
+            ("password", "a long password 12"),
+            ("password_confirmation", "a long password 12"),
+        ],
+    )
+    .await
+    .assert_redirect("/");
+    let mail = app.sent_mail().pop().expect("a verification mail");
+    let html = mail.html.unwrap_or_default();
+    let start = html.find("/verify-email/").expect("a link");
+    let end = start + html[start..].find('"').unwrap();
+    let link = html[start..end].replace("&amp;", "&");
+    app.get(&link).await.assert_redirect("/");
+    let verified_at = User::find_by_email(app.db(), "ann@example.com")
+        .await
+        .unwrap()
+        .unwrap()
+        .email_verified_at;
+    assert!(verified_at.is_some());
+    app.get(&link).await.assert_redirect("/");
+    app.post("/email/verification-notification", &[])
+        .await
+        .assert_redirect("/");
+    assert_eq!(app.sent_mail().len(), 1, "no second mail");
+}
+
+/// `send_verification` in an app without the `Auth` module's routes says
+/// the route is missing, instead of mailing a broken link.
+#[renox::test]
+async fn sending_a_verification_without_its_route_is_an_error() {
+    let app = TestApp::new(App::new()).await;
+    let mut user = User::default();
+    user.id = 1;
+    user.email = "ann@example.com".into();
+    let err = renox::auth::send_verification(app.state(), &user)
+        .await
+        .unwrap_err();
+    assert!(
+        format!("{err:?}").contains("verification.verify"),
+        "{err:?}"
+    );
+}
+
+#[renox::test]
+async fn a_failing_login_listener_doesnt_stop_the_login() {
+    let app = TestApp::new(App::new().module(Auth::new()).module(More).listen(
+        |_: renox::auth::events::LoggedIn, _state| async {
+            Err::<(), _>(Error::Internal(renox::anyhow::anyhow!("audit is down")))
+        },
+    ))
+    .await;
+    let ann = ann(&app).await;
+    app.post(
+        "/login",
+        &[("email", "ann@example.com"), ("password", "password123")],
+    )
+    .await
+    .assert_redirect("/");
+    app.assert_authenticated(Some(&ann));
+}
+
+#[renox::test]
+async fn users_end_their_sessions_and_wrong_passwords_find_nobody() {
+    let app = TestApp::new(App::new().module(Auth::new()).module(Pages)).await;
+    let ann = ann(&app).await;
+    assert!(
+        User::attempt(app.db(), "ann@example.com", "wrong")
+            .await
+            .unwrap()
+            .is_none()
+    );
+    app.acting_as(&ann);
+    app.get("/who").await.assert_see("Ann");
+    ann.revoke_sessions(app.db()).await.unwrap();
+    app.get("/who").await.assert_see("guest");
+}
+
+/// A bearer token that isn't `id|secret` with a numeric id: a guest.
+#[renox::test]
+async fn a_malformed_token_is_a_guest() {
+    let app = app().await;
+    ann(&app).await;
+    app.request()
+        .header("authorization", "Bearer abc|def")
+        .get("/who")
+        .await
+        .assert_ok()
+        .assert_see("guest");
+}
+
+/// With `CACHE_STORE=database`, a successful login clears the login lock's
+/// counters for the address and the account; a cache table that can't be
+/// read or written leaves logins working.
+#[renox::test]
+async fn the_shared_login_lock_clears_on_success_and_survives_a_broken_cache() {
+    let app = TestApp::with_config(App::new().module(Auth::new()).module(More), |c| {
+        c.cache_store = renox::CacheStore::Database;
+    })
+    .await;
+    let ann = ann(&app).await;
+    let counters = |pattern: &'static str| {
+        let app = &app;
+        async move {
+            renox::db::sql("SELECT COUNT(*) FROM cache WHERE key LIKE ?")
+                .bind(pattern)
+                .scalar::<i64>(app.db())
+                .await
+                .unwrap()
+        }
+    };
+    let wrong = [("email", "ann@example.com"), ("password", "nope")];
+    let right = [("email", "ann@example.com"), ("password", "password123")];
+    app.post("/login", &wrong).await.assert_redirect("/");
+    assert_eq!(counters("%login:account:%").await, 1);
+    app.post("/login", &right).await.assert_redirect("/");
+    assert_eq!(counters("%login:account:%").await, 0);
+    assert_eq!(counters("%login:pair:%").await, 0);
+    assert_eq!(
+        counters("%login:ip:%").await,
+        1,
+        "the address keeps its count"
+    );
+    app.assert_authenticated(Some(&ann));
+
+    app.logout();
+    renox::db::sql("ALTER TABLE cache RENAME TO cache_gone")
+        .execute(app.db())
+        .await
+        .unwrap();
+    app.post("/login", &wrong).await.assert_redirect("/");
+    app.assert_guest();
+    app.post("/login", &right).await.assert_redirect("/");
+    app.assert_authenticated(Some(&ann));
+}
+
+#[renox::test]
+async fn audit_entries_keep_the_address() {
+    let app = TestApp::new(App::new().module(Auth::new()).module(renox::audit::Audit)).await;
+    let ip: std::net::IpAddr = "203.0.113.7".parse().unwrap();
+    renox::audit::record(app.db(), renox::audit::Entry::new("export").ip(Some(ip)))
+        .await
+        .unwrap();
+    let latest = renox::audit::latest(app.db(), 1).await.unwrap();
+    assert_eq!(latest[0].ip.as_deref(), Some("203.0.113.7"));
+}

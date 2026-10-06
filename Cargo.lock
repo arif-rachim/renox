@@ -2487,6 +2487,7 @@ dependencies = [
  "form_urlencoded",
  "futures-util",
  "hmac 0.13.0",
+ "http-body",
  "http-body-util",
  "lettre",
  "listenfd",

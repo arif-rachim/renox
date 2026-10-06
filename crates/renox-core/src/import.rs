@@ -573,4 +573,109 @@ mod tests {
         assert_eq!(quote_cell("name"), "name");
         assert_eq!(quote_cell("a,b"), "\"a,b\"");
     }
+
+    #[derive(serde::Deserialize)]
+    struct Row {
+        name: String,
+        qty: i64,
+        #[allow(dead_code)]
+        due: Option<chrono::NaiveDate>,
+    }
+
+    impl Validate for Row {
+        fn rules(&self, v: &mut Validator) {
+            v.field("name", &self.name).required();
+            v.field("qty", &self.qty).min(1);
+        }
+    }
+
+    async fn app() -> crate::testing::TestApp {
+        crate::testing::TestApp::new(crate::App::new()).await
+    }
+
+    /// Rows that don't read: a date that no placeholder makes readable
+    /// fails the row; a number that doesn't read is reported once, not
+    /// again by its `min` rule.
+    #[tokio::test]
+    async fn rows_that_dont_read_are_reported_once() {
+        let app = app().await;
+        let csv = "name,qty,due\nTea,2,someday\nCoffee,lots,2026-01-01\nCake,3,\n";
+        let user = User::default();
+        let report = Import::csv(csv)
+            .user(&user)
+            .run(app.state(), |_tx, _row: Row| Box::pin(async { Ok(()) }))
+            .await
+            .unwrap();
+        assert_eq!(report.imported, 1);
+        let rows: Vec<_> = report.failed.iter().map(|f| f.row).collect();
+        assert_eq!(rows, [2, 3]);
+        assert!(report.failed[0].errors.has("due"));
+        let qty: Vec<_> = report.failed[1]
+            .errors
+            .iter()
+            .filter(|(field, _)| *field == "qty")
+            .flat_map(|(_, messages)| messages.iter())
+            .collect();
+        assert_eq!(qty, ["The qty must be a number."]);
+        let debug = format!("{report:?}");
+        assert!(
+            debug.starts_with("ImportReport { imported: 1, failed: [")
+                && debug.contains("all_or_nothing: false"),
+            "{debug}"
+        );
+    }
+
+    /// Why `write` refused a row: its validation messages, its text, a
+    /// repeat, "not saved" for an internal error; any other error (a 403)
+    /// stops the import.
+    #[tokio::test]
+    async fn writes_that_fail_are_reported_by_kind() {
+        let app = app().await;
+        let csv = "name,qty\ninvalid,1\nbad,1\nboom,1\nfine,1\n";
+        let report = Import::csv(csv)
+            .run(app.state(), |_tx, row: Row| {
+                Box::pin(async move {
+                    match row.name.as_str() {
+                        "invalid" => {
+                            let mut errors = Errors::new();
+                            errors.add("name", "The name is taken.");
+                            Err(ValidationError::new(errors).into())
+                        }
+                        "bad" => Err(Error::BadRequest("Unknown supplier.".into())),
+                        "boom" => Err(Error::Internal(anyhow::anyhow!("disk full"))),
+                        _ => Ok(()),
+                    }
+                })
+            })
+            .await
+            .unwrap();
+        assert_eq!(report.imported, 1);
+        let first = |i: usize, field: &str| report.failed[i].errors.first(field).map(str::to_owned);
+        assert_eq!(first(0, "name").as_deref(), Some("The name is taken."));
+        assert_eq!(first(1, "row").as_deref(), Some("Unknown supplier."));
+        assert!(first(2, "row").is_some_and(|m| !m.contains("disk full")));
+
+        let stopped = Import::csv(csv)
+            .run(app.state(), |_tx, _row: Row| {
+                Box::pin(async { Err(Error::Forbidden) })
+            })
+            .await;
+        assert!(matches!(stopped, Err(Error::Forbidden)));
+    }
+
+    /// A file that can't be read is an error on the form's field, named
+    /// with `field`.
+    #[tokio::test]
+    async fn an_unreadable_file_is_an_error_on_its_field() {
+        let app = app().await;
+        let err = Import::csv([0xFF, 0xFE, 0x00])
+            .field("upload")
+            .run(app.state(), |_tx, _row: Row| Box::pin(async { Ok(()) }))
+            .await
+            .unwrap_err();
+        let Error::Validation(invalid) = err else {
+            panic!("a validation error");
+        };
+        assert!(invalid.errors.has("upload"));
+    }
 }

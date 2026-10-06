@@ -145,3 +145,41 @@ pub(crate) fn cache_control(uri: &Uri) -> &'static str {
         "public, max-age=3600"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn public_files_get_their_content_type() {
+        for (path, expected) in [
+            ("logo.PNG", "image/png"),
+            ("a.jpg", "image/jpeg"),
+            ("a.jpeg", "image/jpeg"),
+            ("a.gif", "image/gif"),
+            ("a.webp", "image/webp"),
+            ("favicon.ico", "image/x-icon"),
+            ("f.woff", "font/woff"),
+            ("f.woff2", "font/woff2"),
+            ("terms.pdf", "application/pdf"),
+            ("sitemap.xml", "application/xml"),
+            ("archive.zip", "application/octet-stream"),
+            ("README", "application/octet-stream"),
+        ] {
+            assert_eq!(content_type(path), expected, "{path}");
+        }
+    }
+
+    /// Versions of files on disk: read once and kept until the file
+    /// changes; a path out of the public folder has none.
+    #[test]
+    fn disk_versions_are_cached_and_stay_in_the_public_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("app.css"), "a{}").unwrap();
+        let versions = AssetVersions::new(dir.path(), None);
+        let first = versions.version("/app.css").expect("a version");
+        assert_eq!(versions.version("app.css"), Some(first));
+        assert_eq!(versions.version("../secret.txt"), None);
+        assert_eq!(versions.version("missing.css"), None);
+    }
+}

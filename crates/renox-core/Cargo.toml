@@ -89,3 +89,7 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 # Doc examples are written the way apps use Renox: through the `renox` crate.
 # Path only, so `cargo publish` drops it (`renox` is published after this crate).
 renox = { path = "../renox" }
+# A page body that fails while it is read (security.rs's ETag test).
+http-body = "1.0.1"
+# Paused time, for the queue's retry delays.
+tokio = { version = "1.53.1", features = ["test-util"] }

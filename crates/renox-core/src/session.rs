@@ -665,3 +665,28 @@ pub(crate) fn cookie_pair(state: &AppState, session: &Session) -> String {
         .to_string();
     cookie.split(';').next().unwrap_or_default().to_owned()
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn old_input_keeps_objects_only_and_drops_passwords_and_the_largest_values() {
+        // Old input is always an object: a JSON list or text keeps nothing.
+        assert_eq!(old_input(json!(["a", "b"])), json!({}));
+        assert_eq!(old_input(json!("text")), json!({}));
+        let big = "x".repeat(OLD_INPUT_LIMIT);
+        let kept = old_input(json!({
+            "_token": "t",
+            "name": "Ann",
+            "users": [{ "email": "a@b.c", "Password": "secret" }],
+            "essay": big,
+        }));
+        assert_eq!(
+            kept,
+            json!({ "name": "Ann", "users": [{ "email": "a@b.c" }] })
+        );
+    }
+}

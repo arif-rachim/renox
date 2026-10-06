@@ -2024,4 +2024,145 @@ mod tests {
         assert_eq!(number(3.0), "3");
         assert_eq!(number(2.5), "2.5");
     }
+    /// A value that inspects as whatever a test needs (a file, a bool).
+    struct As(Inspected);
+
+    impl FieldValue for As {
+        fn inspect(&self) -> Inspected {
+            self.0.clone()
+        }
+        fn db_value(&self) -> DbValue {
+            DbValue::Null
+        }
+    }
+
+    /// A rule that fails every value it sees.
+    struct Never;
+
+    impl Rule for Never {
+        fn check(&self, _: &Inspected) -> std::result::Result<(), String> {
+            Err("never".into())
+        }
+    }
+
+    fn file(kilobytes: f64, dimensions: Option<(u32, u32)>) -> As {
+        As(Inspected::File {
+            kilobytes,
+            extension: "png".into(),
+            image: true,
+            dimensions,
+        })
+    }
+
+    // #250: the branches rules take for values they don't measure, and the
+    // passing side of rules only failures had reached.
+    #[test]
+    fn rules_pass_or_step_aside_for_values_they_dont_judge() {
+        let mut v = Validator::default();
+        let photo = file(120.0, Some((800, 600)));
+        v.field("photo", &photo)
+            .mimes(&["PNG", "jpeg"])
+            .dimensions(&Dimensions::new().min_width(400).max_height(600));
+        v.field("code", &"AB1234")
+            .matches(r"^[A-Z]{2}\d{4}$")
+            .not_matches(r"^\d+$");
+        v.field("secret", &"long enough password")
+            .password(&Password::min(8));
+        // Rules that can't read the value leave it alone.
+        let missing: Option<String> = None;
+        v.field("note", &missing)
+            .decimal(2, 2)
+            .apply(&Never)
+            .gt("other", &"5");
+        v.field("price", &"12").gt("budget", &missing);
+        // A limit that isn't a date leaves the date rules out.
+        v.field("day", &"2026-01-01")
+            .before_or_equal(5)
+            .after(true)
+            .after_or_equal(2.5);
+        assert!(v.errors.is_empty(), "{:?}", v.errors);
+    }
+
+    #[test]
+    fn rules_fail_values_of_the_wrong_kind() {
+        let mut v = Validator::default();
+        // A number isn't a date; a bool has no digits, no decimals, no number.
+        v.field("day", &7).before("2026-01-01");
+        v.field("agree", &true).digits(3);
+        v.field("flag", &true).decimal(2, 2);
+        v.field("on", &true).numeric();
+        // Two files compare by size; two booleans can't be compared.
+        v.field("photo", &file(10.0, None))
+            .gt("thumb", &file(20.0, None));
+        v.field("yes", &true).lt("no", &false);
+        assert_eq!(v.errors.first("day"), Some("The day is not a valid date."));
+        assert_eq!(v.errors.first("agree"), Some("The agree must be 3 digits."));
+        assert_eq!(
+            v.errors.first("flag"),
+            Some("The flag must have 2 decimal places.")
+        );
+        assert_eq!(v.errors.first("on"), Some("The on must be a number."));
+        assert_eq!(
+            v.errors.first("photo"),
+            Some("The photo must be larger than thumb.")
+        );
+        assert!(v.errors.has("yes"), "{:?}", v.errors);
+        // An image too wide fails `dimensions`.
+        let mut v = Validator::new();
+        v.field("photo", &file(1.0, Some((2000, 10))))
+            .dimensions(&Dimensions::new().max_width(100));
+        assert!(v.errors.has("photo"));
+    }
+
+    #[test]
+    fn nested_rows_carry_their_async_checks_under_the_row_name() {
+        struct Row {
+            password: String,
+        }
+        impl Validate for Row {
+            fn rules(&self, v: &mut Validator) {
+                v.field("password", &self.password).current_password();
+            }
+        }
+        let mut v = Validator::new();
+        v.nested(
+            "rows",
+            &[
+                Row {
+                    password: "a".into(),
+                },
+                Row {
+                    password: "b".into(),
+                },
+            ],
+        );
+        let fields: Vec<_> = v.checks.iter().map(|c| c.field.as_str()).collect();
+        assert_eq!(fields, ["rows.0.password", "rows.1.password"]);
+    }
+
+    #[tokio::test]
+    async fn checks_on_a_field_that_already_failed_are_skipped() {
+        let db = crate::db::connect(&crate::Config::default()).await.unwrap();
+        let mut v = Validator::new();
+        // The field failed a rule before its database and async checks were
+        // added: neither runs (no `users` table is asked), one error stays.
+        v.field("email", &"not an email").email();
+        v.field("email", &"not an email")
+            .unique("no_such_table", "email")
+            .current_password();
+        // `.message` after an async check is that check's message.
+        v.field("password", &"guess")
+            .current_password()
+            .message("That isn't your password.");
+        let errors = v.finish(&db).await.unwrap();
+        assert_eq!(
+            errors.first("email"),
+            Some("The email must be a valid email address.")
+        );
+        assert_eq!(
+            errors.iter().find(|(f, _)| *f == "email").unwrap().1.len(),
+            1
+        );
+        assert_eq!(errors.first("password"), Some("That isn't your password."));
+    }
 }

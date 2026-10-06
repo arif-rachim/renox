@@ -319,4 +319,60 @@ mod tests {
             Verdict::Allowed { remaining: 1 }
         ));
     }
+
+    /// Past `SWEEP_AT` keys, counters whose window ended are dropped, so
+    /// many one-off visitors don't grow the map for good.
+    #[test]
+    fn old_counters_are_swept_once_there_are_many() {
+        let limiter = Limiter::new("t".into(), 5, Duration::from_secs(60));
+        let named = NamedLimiter::new(std::sync::Arc::new(|_: &LimitRequest| Limit::per_hour(5)));
+        let limit = Limit::per_hour(5);
+        for i in 0..SWEEP_AT {
+            limiter.hit(&format!("ip:{i}"));
+            named.hit(&format!("ip:{i}"), &limit);
+        }
+        // A day later (and a minute for the plain limiter), the next hit
+        // finds only itself.
+        crate::clock::with_offset_sync(25 * 60 * 60, || {
+            limiter.hit("late");
+            named.hit("late", &limit);
+        });
+        assert_eq!(limiter.hits.lock().unwrap().len(), 1);
+        assert_eq!(named.hits.lock().unwrap().len(), 1);
+        // The clock can go back too: a counter is never older than now.
+        crate::clock::with_offset_sync(-10, || {
+            assert!(matches!(
+                limiter.hit("late"),
+                Verdict::Allowed { remaining: 3 }
+            ));
+        });
+    }
+
+    #[tokio::test]
+    async fn a_named_limit_outside_the_app_lets_requests_through_and_an_unknown_one_is_a_500() {
+        use tower::ServiceExt;
+        let router = |name: &'static str| {
+            axum::Router::new()
+                .route("/", axum::routing::get(|| async { "ok" }))
+                .layer(axum::middleware::from_fn(move |req, next| {
+                    check_named(name, req, next)
+                }))
+        };
+        let request = || {
+            Request::builder()
+                .uri("/")
+                .body(axum::body::Body::empty())
+                .unwrap()
+        };
+        // No app state (a router used on its own): not limited.
+        let res = router("api").oneshot(request()).await.unwrap();
+        assert_eq!(res.status(), axum::http::StatusCode::OK);
+        // `App::boot` refuses a `throttle_by` name with no limiter; a
+        // router merged in another way still gets a clear 500.
+        let app = crate::testing::TestApp::new(crate::App::new()).await;
+        let mut req = request();
+        req.extensions_mut().insert(app.state().clone());
+        let res = router("nowhere").oneshot(req).await.unwrap();
+        assert_eq!(res.status(), axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+    }
 }

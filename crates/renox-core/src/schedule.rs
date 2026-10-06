@@ -1075,4 +1075,95 @@ mod tests {
         assert_eq!(at(1) % 900, 0, "aligned to the quarter hour");
         assert_eq!(at(2) % 3600, 0, "on the hour");
     }
+
+    /// Filters no run ever passes: the task never runs (a date that can't
+    /// come, `0 0 31 2 *`, is refused when the schedule is made).
+    #[test]
+    fn tasks_that_never_run_have_no_next_run() {
+        let mut schedule = Schedule::default();
+        schedule
+            .hourly("never-on-the-hour", |_| async { Ok(()) })
+            .between("10:30", "10:40");
+        schedule.check().unwrap();
+        let upcoming = schedule.upcoming(Zone::UTC);
+        assert!(upcoming.iter().all(|run| run.at.is_none()), "{upcoming:?}");
+    }
+
+    /// Autumn's repeated hour: a run already made in its first pass isn't
+    /// made again in the second.
+    #[test]
+    fn the_repeated_hour_runs_once() {
+        let task = build(|s| {
+            s.cron("30 1 * * *", "a", |_| async { Ok(()) });
+        });
+        let ny = zone("America/New_York");
+        // 2026-11-01 06:15 UTC is the second 01:15 in New York (EST).
+        let second_pass = 1_793_513_700;
+        assert_eq!(local(second_pass, ny), "Sun 2026-11-01 01:15");
+        let at = task.next_run(second_pass, ny);
+        assert_eq!(local(at, ny), "Mon 2026-11-02 01:30");
+    }
+
+    /// A task that couldn't be added ignores the settings chained after
+    /// it; a chain reads the schedule it builds.
+    #[test]
+    fn settings_after_a_task_that_failed_are_ignored() {
+        let mut schedule = Schedule::default();
+        let task = schedule.cron("not cron", "bad", |_| async { Ok(()) });
+        assert!(task.upcoming(Zone::UTC).is_empty());
+        task.weekdays();
+        assert!(schedule.check().is_err());
+    }
+
+    /// The run loop: nothing to do ends it; a due cron-style task already
+    /// claimed by another process is skipped; a task not due yet waits.
+    /// Claims that can't be written let the run go ahead.
+    #[tokio::test]
+    async fn the_run_loop_skips_runs_claimed_elsewhere() {
+        let app = crate::testing::TestApp::new(crate::App::new()).await;
+        let state = app.state().clone();
+        let (stop, stopped) = watch::channel(false);
+        // Nothing scheduled: returns at once.
+        Schedule::default()
+            .run(state.clone(), Zone::UTC, stopped.clone())
+            .await;
+
+        // The cache table gone: a claim can't be pruned or written, and the
+        // run goes ahead as in a single process.
+        crate::db::sql("ALTER TABLE cache RENAME TO cache_away")
+            .execute(&state.db)
+            .await
+            .unwrap();
+        assert!(claim(&state, "lonely", 60, 60).await);
+        crate::db::sql("ALTER TABLE cache_away RENAME TO cache")
+            .execute(&state.db)
+            .await
+            .unwrap();
+
+        let runs = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let mut schedule = Schedule::default();
+        let counted = runs.clone();
+        schedule.cron("* * * * *", "minutely", move |_| {
+            let counted = counted.clone();
+            async move {
+                counted.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            }
+        });
+        schedule.daily_at("00:00", "nightly", |_| async { Ok(()) });
+        // A second before the next minute, whose run another process has
+        // claimed.
+        let now = unix_now();
+        let slot = (now / 60 + 1) * 60;
+        let offset = slot - 1 - now;
+        assert!(claim(&state, "minutely", slot, 3600).await);
+        let looping = tokio::spawn(crate::clock::with_offset(
+            offset,
+            schedule.run(state.clone(), Zone::UTC, stopped),
+        ));
+        tokio::time::sleep(Duration::from_millis(2500)).await;
+        stop.send(true).unwrap();
+        looping.await.unwrap();
+        assert_eq!(runs.load(Ordering::SeqCst), 0);
+    }
 }

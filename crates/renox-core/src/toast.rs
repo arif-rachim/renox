@@ -468,6 +468,16 @@ mod tests {
         assert!(html.contains(r#"target="_blank" rel="noopener""#));
         assert!(!html.contains("javascript") && !html.contains(">Bad<"));
         assert!(html.contains(r#"data-rx-toast-event="order-undo""#));
+        // An action read back from the session with a method but no URL,
+        // or with nothing to do, is never shown.
+        let mut nowhere = ToastAction::link("Send", "/x");
+        nowhere.url = None;
+        nowhere.method = Some("POST".into());
+        assert!(!nowhere.is_safe());
+        let mut nothing = ToastAction::event("Nothing", "x");
+        nothing.event = None;
+        assert!(!nothing.is_safe());
+        assert_eq!(action_html(&nothing), "");
         assert!(
             html.contains(r#"data-duration="8000""#) && html.contains(r#"data-toast-id="order-7""#)
         );

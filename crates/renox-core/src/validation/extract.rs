@@ -881,4 +881,103 @@ mod tests {
         );
         assert_eq!(errors.first("extra"), Some("The extra is invalid."));
     }
+
+    #[test]
+    fn a_nested_form_can_be_a_list_at_its_root() {
+        // Every name starts with a number: the form is a list, and there is
+        // no object to keep as old input.
+        let pairs =
+            form_urlencoded::parse(b"0%5Bname%5D=Tea&0%5Bqty%5D=1&1%5Bname%5D=Coffee&1%5Bqty%5D=2")
+                .into_owned()
+                .collect();
+        let (parsed, input) = parse_pairs::<Vec<Line>>(pairs, &HashMap::new(), &plain());
+        match parsed {
+            Parsed::Ok(lines, errors) => {
+                assert!(errors.is_empty(), "{errors:?}");
+                assert_eq!(lines.len(), 2);
+                assert_eq!(lines[1].name, "Coffee");
+            }
+            Parsed::Invalid(errors) => panic!("{errors:?}"),
+        }
+        assert!(input.is_empty());
+    }
+
+    #[derive(Deserialize, Debug)]
+    #[allow(dead_code)]
+    struct Visit {
+        title: String,
+        slots: Vec<Slot>,
+    }
+
+    #[derive(Deserialize, Debug)]
+    #[allow(dead_code)]
+    struct Slot {
+        starts_at: chrono::NaiveDateTime,
+    }
+
+    #[test]
+    fn nested_forms_rewrite_what_browsers_send_and_try_every_placeholder() {
+        // `datetime-local` leaves out the seconds: put back, deep down too.
+        let pairs =
+            form_urlencoded::parse(b"title=T&slots%5B0%5D%5Bstarts_at%5D=2026-10-01T10%3A30")
+                .into_owned()
+                .collect();
+        let (parsed, _) = parse_pairs::<Visit>(pairs, &HashMap::new(), &plain());
+        assert!(errors_of_parsed_is_empty(parsed));
+        // A month 13 still fails once rewritten; it isn't rewritten twice,
+        // and no placeholder ("0", "false") reads as a date either, so the
+        // form is invalid with one error for the field.
+        let errors =
+            nested_errors::<Visit>("title=T&slots%5B0%5D%5Bstarts_at%5D=2026-13-01T10%3A30");
+        let messages: Vec<_> = errors.iter().collect();
+        assert_eq!(messages.len(), 1, "{errors:?}");
+        assert_eq!(messages[0].0, "slots.0.starts_at");
+        assert_eq!(messages[0].1.len(), 1, "{errors:?}");
+    }
+
+    #[test]
+    fn a_plain_form_rewrites_a_value_once() {
+        let errors = parse_browser("agree=on&news=off&starts_at=2026-13-01T10%3A30").unwrap_err();
+        assert!(errors.has("starts_at"), "{errors:?}");
+        assert!(!errors.has("agree") && !errors.has("news"), "{errors:?}");
+    }
+
+    #[test]
+    fn a_json_enum_of_an_unknown_variant_gets_a_valid_one_as_placeholder() {
+        #[derive(Deserialize, Debug)]
+        #[serde(rename_all = "lowercase")]
+        #[allow(dead_code)]
+        enum Size {
+            Small,
+            Large,
+        }
+        #[derive(Deserialize, Debug)]
+        #[allow(dead_code)]
+        struct Cup {
+            size: Size,
+            name: String,
+        }
+        let (parsed, _) = parse_json::<Cup>(br#"{"size": "huge", "name": 5}"#, &plain()).unwrap();
+        let errors = errors(parsed);
+        // Both fields are reported: the placeholder variant let the rest
+        // of the body be read.
+        assert!(errors.has("size"), "{errors:?}");
+        assert!(errors.has("name"), "{errors:?}");
+    }
+
+    #[tokio::test]
+    async fn a_multipart_part_without_a_name_is_skipped() {
+        let body = "--XX\r\nContent-Disposition: form-data\r\n\r\nlost\r\n\
+                    --XX\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\nCoffee\r\n\
+                    --XX--\r\n";
+        let req = Request::builder()
+            .method(Method::POST)
+            .header(CONTENT_TYPE, "multipart/form-data; boundary=XX")
+            .body(axum::body::Body::from(body))
+            .unwrap();
+        let multipart = Multipart::from_request(req, &()).await.unwrap();
+        let (pairs, uploads) = read_multipart(multipart).await.unwrap();
+        assert_eq!(pairs, [("name".to_owned(), "Coffee".to_owned())]);
+        assert!(uploads.is_empty());
+    }
 }

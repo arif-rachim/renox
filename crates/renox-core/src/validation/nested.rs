@@ -591,4 +591,53 @@ mod tests {
         assert_eq!(lookup(&json, "a.0.b.c"), None);
         assert_eq!(lookup(&json, "a.x"), None);
     }
+
+    #[test]
+    fn numbers_and_booleans_sent_as_maps_are_refused_at_their_path() {
+        #[derive(Deserialize, Debug)]
+        #[allow(dead_code)]
+        struct Form {
+            qty: i64,
+            gift: bool,
+        }
+        let node = Node::build(&pairs(&[("qty[a]", "1"), ("gift", "on")]));
+        let err = deserialize::<Form>(node).unwrap_err();
+        assert_eq!(err.path().to_string(), "qty");
+        assert!(err.inner().to_string().contains("invalid type"), "{err}");
+        let node = Node::build(&pairs(&[("qty", "1"), ("gift[a]", "on")]));
+        let err = deserialize::<Form>(node).unwrap_err();
+        assert_eq!(err.path().to_string(), "gift");
+    }
+
+    #[test]
+    fn tuple_structs_units_and_unknown_fields_read_like_serde_forms() {
+        #[derive(Deserialize, Debug, PartialEq)]
+        struct Point(i64, i64);
+        #[derive(Deserialize, Debug, PartialEq)]
+        struct Marker;
+        #[derive(Deserialize, Debug, PartialEq)]
+        struct Form {
+            at: Point,
+            marker: Marker,
+            nothing: (),
+        }
+        // `extra` isn't a field: skipped (`deserialize_ignored_any`), as
+        // serde skips unknown fields unless told otherwise.
+        let node = Node::build(&pairs(&[
+            ("at[]", "3"),
+            ("at[]", "4"),
+            ("marker", ""),
+            ("nothing", ""),
+            ("extra[deep]", "x"),
+        ]));
+        let form: Form = deserialize(node).unwrap();
+        assert_eq!(
+            form,
+            Form {
+                at: Point(3, 4),
+                marker: Marker,
+                nothing: ()
+            }
+        );
+    }
 }
