@@ -13,7 +13,7 @@
 //!
 //! The area has no page of its own: the roles page and staff management
 //! are the staff area's (#239). Its one route is the store switcher's
-//! `POST /staff/store`. It shares the switcher's data with every view.
+//! `POST /staff/store/{store}`. It shares the switcher's data with every view.
 //! Renox's `Permissions` module (the tables `roles`, `permissions`,
 //! `permission_role`, `role_user` with scopes and dates, and the
 //! `permissions:prune` command) is turned on in `src/lib.rs`.
@@ -41,7 +41,7 @@ impl Module for Access {
     fn routes(&self) -> Routes {
         staff_routes(
             Routes::new()
-                .post("/staff/store", active_store::switch)
+                .post("/staff/store/{store}", active_store::switch)
                 .name("access.store.switch"),
         )
     }

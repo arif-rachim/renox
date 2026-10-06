@@ -46,6 +46,7 @@
 use renox::auth::permissions::{self, Scope};
 use renox::db::{Db, Model, Query};
 use renox::prelude::*;
+use std::future::Future;
 
 use crate::app::staff::model::Store;
 
@@ -142,10 +143,21 @@ pub fn visible<M: StoreRecord>(permission: &str) -> Query<M> {
 
 /// The record `id` of `M`, or a 404 when it doesn't exist or `user` may
 /// not see it ([`StoreRecord::VIEW`] in none of its stores).
-pub async fn find<M: StoreRecord<Key = i64>>(db: &Db, user: &User, id: i64) -> Result<M> {
-    let record = M::find_or_404(db, id).await?;
-    if !can_see(user, &record) {
-        return Err(Error::NotFound);
+///
+/// A plain `fn` returning a `Send` future (not an `async fn`), so handlers
+/// that await it stay `Send` (Renox's CLAUDE.md §4.2: rustc can't prove it
+/// for a generic async fn over an executor).
+pub fn find<'a, M: StoreRecord<Key = i64> + Send + 'a>(
+    db: &'a Db,
+    user: &'a User,
+    id: i64,
+) -> impl Future<Output = Result<M>> + Send + 'a {
+    let found = M::find_or_404(db, id);
+    async move {
+        let record = found.await?;
+        if !can_see(user, &record) {
+            return Err(Error::NotFound);
+        }
+        Ok(record)
     }
-    Ok(record)
 }

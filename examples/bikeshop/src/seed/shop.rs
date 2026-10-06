@@ -810,15 +810,21 @@ async fn staff(db: &Db, world: &mut World) -> Result {
     ];
     let mut n = 0;
     for store in &stores {
-        for (role, prefix) in [
-            (MANAGER, "manager"),
-            (CASHIER, "cashier"),
-            (MECHANIC, "mechanic"),
-            (MECHANIC, "mechanic2"),
-            (STAFF, "staff"),
+        // Logins are named after the role: manager.north@…, mechanic2.north@….
+        for (role, second) in [
+            (MANAGER, false),
+            (CASHIER, false),
+            (MECHANIC, false),
+            (MECHANIC, true),
+            (STAFF, false),
         ] {
             let (first, last) = names[n % names.len()];
             n += 1;
+            let prefix = if second {
+                format!("{role}2")
+            } else {
+                role.to_owned()
+            };
             people.push((
                 format!("{first} {last}"),
                 format!("{prefix}.{}@bikeshop.test", store.slug),

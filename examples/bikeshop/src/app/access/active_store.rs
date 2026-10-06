@@ -172,25 +172,18 @@ pub async fn switcher(db: &Db) -> Result<Option<Switcher>> {
     }))
 }
 
-/// `POST /staff/store` (`access.store.switch`), form field `store_id`:
-/// works in that store from now on, if the user may work there (else a
-/// 403). Goes back to the page it came from.
+/// `POST /staff/store/{store}` (`access.store.switch`): works in that
+/// store from now on, if the user may work there today (else a 403). Goes
+/// back to the page it came from.
 pub async fn switch(
     session: Session,
     user: AuthUser,
     back: Back,
-    Form(form): Form<SwitchForm>,
+    Path(store): Path<i64>,
 ) -> Result<Back> {
-    if !workable(&user).contains(&form.store_id) {
+    if !workable(&user).contains(&store) {
         return Err(Error::Forbidden);
     }
-    session.put(SESSION_KEY, form.store_id)?;
+    session.put(SESSION_KEY, store)?;
     Ok(back)
-}
-
-/// The switcher's form.
-#[derive(serde::Deserialize, Debug)]
-pub struct SwitchForm {
-    /// The store to work in.
-    pub store_id: i64,
 }

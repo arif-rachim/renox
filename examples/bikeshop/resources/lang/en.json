@@ -68,5 +68,11 @@
       "none_title": "No page matches",
       "none_text": "No page uses that feature for that role yet."
     }
+  },
+  "access": {
+    "switcher": {
+      "working_in": "Working in :store",
+      "switch_to": "Switch store"
+    }
   }
 }

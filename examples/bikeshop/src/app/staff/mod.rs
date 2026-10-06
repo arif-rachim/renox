@@ -3,9 +3,9 @@
 //!
 //! For now only the dashboard placeholder, so the staff layout
 //! (`resources/views/layouts/staff.html`: the kit's `sidebar` in an
-//! `rx-shell`) has a page. The permission check (`staff.access` or similar)
-//! comes with the access foundations (`src/app/access`); until then the
-//! route only needs a login.
+//! `rx-shell`) has a page. Like every staff route it goes through
+//! `access::staff_routes`: a login, then `staff.access` in the active store
+//! (`src/app/access`).
 
 pub mod explain;
 pub mod factories;
@@ -22,10 +22,13 @@ impl Module for Staff {
     }
 
     fn routes(&self) -> Routes {
-        Routes::new()
-            .get("/staff", dashboard)
-            .name("staff.dashboard")
-            .require_auth()
+        // Logged in, and working in a store where a role grants
+        // `staff.access` today (the active store, src/app/access).
+        crate::app::access::staff_routes(
+            Routes::new()
+                .get("/staff", dashboard)
+                .name("staff.dashboard"),
+        )
     }
 }
 

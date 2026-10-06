@@ -93,5 +93,11 @@
       "purpose": "La puerta de entrada de la tienda: lo que ofrecen las tres tiendas (comprar, alquilar, taller) y por dónde empezar.",
       "who": "Cualquiera que abra el sitio: visitantes y clientes."
     }
+  },
+  "access": {
+    "switcher": {
+      "working_in": "Trabajando en :store",
+      "switch_to": "Cambiar de tienda"
+    }
   }
 }
