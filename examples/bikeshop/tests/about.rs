@@ -392,10 +392,18 @@ async fn the_panel_speaks_spanish_and_falls_back_to_english() {
         .await
         .assert_ok()
         .assert_see("Sobre esta página")
-        // Translated in es.json…
+        // Translated in es.json, the API names and paths left as they are.
         .assert_see("La puerta de entrada de la tienda")
-        // …and not yet: the English text stands in.
-        .assert_see("route named <code>home</code>");
+        .assert_see("Una ruta <code>GET /</code> llamada <code>home</code>")
+        .assert_dont_see("route named <code>home</code>");
+
+    // A text a language lacks falls back to English, field by field.
+    let home = explain::for_route("home").expect("the home page is explained");
+    let page =
+        home.localize(&|key: &str| (key == "about_page.home.title").then(|| "Inicio".to_owned()));
+    assert_eq!(page.title, "Inicio");
+    assert_eq!(page.purpose, home.purpose);
+    assert_eq!(page.features[0].why, home.features[0].why);
 }
 
 #[renox::test]

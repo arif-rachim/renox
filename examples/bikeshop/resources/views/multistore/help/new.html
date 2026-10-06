@@ -1,5 +1,6 @@
 {% extends "layouts/staff.html" %}
 {% from "renox/ui.html" import page_header, card, select, input, textarea, date_picker, button, form_errors, form_grid, empty %}
+{% from "layouts/_text.html" import tx %}
 {% from "stock/_parts.html" import styles %}
 {% block seo %}{{ seo(title=t('multistore.help.new')) }}{% endblock %}
 
@@ -21,7 +22,7 @@
       {%- if people %}
       {% call form_grid(2) %}
         {{ select("staff", t('multistore.help.person'), people, required=true, searchable=true) }}
-        {%- set r = namespace(items=[]) %}{% for name, label in roles %}{% set r.items = r.items + [[name, label]] %}{% endfor %}
+        {%- set r = namespace(items=[]) %}{% for name, label in roles %}{% set r.items = r.items + [[name, tx(label) | string]] %}{% endfor %}
         {{ select("role", t('multistore.help.role'), r.items, required=true, hint=t('multistore.help.role_hint')) }}
         {{ date_picker("starts_on", t('multistore.help.starts_on'), min=today, required=true) }}
         {{ date_picker("ends_on", t('multistore.help.ends_on'), min=today, required=true, hint=t('multistore.help.ends_hint')) }}

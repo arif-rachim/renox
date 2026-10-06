@@ -1,7 +1,10 @@
 // The bike shop's skeleton (#232, part 1) in a browser: the public and staff
 // layouts at desktop and phone width, the "About this page" panel, the index
 // of every page, Motion (vendored) under the default CSP and CSP=strict, and
-// prefers-reduced-motion. Screenshots go to BIKESHOP_SCREENS when it's set.
+// prefers-reduced-motion, and the shop in Spanish (the language menu, the
+// panel, the staff side, money) at desktop and phone width. Staff log in with
+// a password only (BIKESHOP_STAFF_2FA=optional). Screenshots go to
+// BIKESHOP_SCREENS when it's set.
 
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,6 +13,8 @@ import { Browser } from './lib/cdp.mjs';
 import { start } from './lib/app.mjs';
 
 const PHONE = { width: 390, height: 844 };
+const ENGLISH = ['Renox features used, and why', 'Under the hood', 'In the guide', 'Source files'];
+const SPANISH = ['Funciones de Renox que usa, y por qué', 'Por dentro', 'En la guía', 'Archivos fuente'];
 let browser;
 
 before(async () => {
@@ -38,12 +43,12 @@ const revealed = (page) =>
   );
 
 /** Opens the panel with its button and checks what it shows. */
-async function openPanel(page, title) {
+async function openPanel(page, title, parts = ENGLISH) {
   await page.click('[data-rx-open="about-page"]');
   await page.waitFor(() => document.querySelector('#about-page')?.open, { message: 'the panel open' });
   const text = await page.text('#about-page');
   assert.ok(text.includes(title), `the panel is about "${title}"`);
-  for (const part of ['Renox features used, and why', 'Under the hood', 'In the guide', 'Source files']) {
+  for (const part of parts) {
     assert.ok(text.includes(part), `the panel shows "${part}"`);
   }
   // Its entries slide in with Motion and end fully shown.
@@ -59,7 +64,12 @@ for (const csp of ['relaxed', 'strict']) {
     let app;
     before(async () => {
       // Seeded: the staff side needs a role in a store (the demo users).
-      app = await start('bikeshop', 'examples/bikeshop', { env: { CSP: csp }, seed: true });
+      // Staff log in with a password only here: two-factor login, which the
+      // shop asks staff for, is tested in bikeshop-staff.test.mjs.
+      app = await start('bikeshop', 'examples/bikeshop', {
+        env: { CSP: csp, BIKESHOP_STAFF_2FA: 'optional' },
+        seed: true,
+      });
     });
     after(() => app?.stop());
 
@@ -156,4 +166,75 @@ describe('bikeshop with prefers-reduced-motion', () => {
       await quiet.stop();
     }
   });
+});
+
+describe('bikeshop in Spanish', () => {
+  let app;
+  before(async () => {
+    app = await start('bikeshop', 'examples/bikeshop', { env: { BIKESHOP_STAFF_2FA: 'optional' }, seed: true });
+  });
+  after(() => app?.stop());
+
+  /** Chooses Español in the navbar's language menu. */
+  async function spanish(page) {
+    await page.click('[aria-controls="language-menu"]');
+    await page.waitFor(() => !document.querySelector('#language-menu').hidden, { message: 'the menu open' });
+    await page.click('#language-menu form:nth-of-type(2) button');
+    await page.waitFor(() => document.documentElement.lang === 'es', { message: 'the page in Spanish' });
+  }
+
+  for (const [size, options] of [
+    ['desktop', undefined],
+    ['phone', PHONE],
+  ]) {
+    test(`the language menu, the panel and the shop (${size})`, () =>
+      browser.with(async (page) => {
+        await page.send('Network.clearBrowserCookies');
+        await page.goto(`${app.url}/`);
+        await spanish(page);
+        await revealed(page);
+        assert.ok(await fitsWidth(page), 'no sideways scrolling');
+        await shot(page, `home-es-${size}`);
+        await openPanel(page, 'Inicio', SPANISH);
+        await shot(page, `home-panel-es-${size}`);
+        await page.press('Escape');
+        // The catalogue: Spanish texts, money with Spanish separators.
+        await page.goto(`${app.url}/shop`);
+        const shop = await page.text('main');
+        assert.match(shop, /Rp \d{1,3}(\.\d{3})+/, 'Rp 1.250.000, not Rp 1,250,000');
+        assert.ok(await fitsWidth(page));
+        await shot(page, `shop-es-${size}`);
+        // The index of every page, in Spanish.
+        await page.goto(`${app.url}/about/pages`);
+        assert.ok((await page.text('main')).includes('Todas las páginas y sus funciones'));
+        assert.ok(await fitsWidth(page));
+        page.assertClean();
+      }, options));
+
+    test(`the staff side and the admin panel (${size})`, () =>
+      browser.with(async (page) => {
+        // A fresh visitor (the tabs share cookies): the choice is kept in the
+        // session, so Renox's login page follows it.
+        await page.send('Network.clearBrowserCookies');
+        await page.goto(`${app.url}/`);
+        await spanish(page);
+        await page.goto(`${app.url}/login`);
+        assert.ok((await page.text('body')).includes('Iniciar sesión'), "Renox's login page in Spanish");
+        await page.type('#rx-email', 'owner@bikeshop.test');
+        await page.type('#rx-password', 'password');
+        await page.click('form button[type=submit]');
+        await page.waitFor(() => location.pathname !== '/login');
+        await page.goto(`${app.url}/staff/roles`);
+        const roles = await page.text('main');
+        assert.ok(roles.includes('Encargado de tienda') && roles.includes('Leer el registro de actividad.'), 'the roles in Spanish');
+        assert.ok(await fitsWidth(page));
+        await shot(page, `staff-roles-es-${size}`);
+        await page.goto(`${app.url}/staff`);
+        await revealed(page);
+        await openPanel(page, 'Panel del personal', SPANISH);
+        await page.press('Escape');
+        await shot(page, `staff-es-${size}`);
+        page.assertClean();
+      }, options));
+  }
 });

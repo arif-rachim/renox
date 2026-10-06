@@ -16,7 +16,7 @@ const TESTS: &str = "examples/bikeshop/tests/multistore.rs";
 const BROWSER: &str = "tests/browser/bikeshop-multistore.test.mjs";
 
 const AUDITED: Feature = Feature {
-    api: "Audit",
+    api: "Audit module",
     why: "Renox's `Audit` module keeps `audit_logs`; `multistore::audit::record` adds the store \
           the person was working in and the roles they held **there** (from `assignments`, never \
           a role-name check), so \"who did this, as what, where\" has an answer even for someone \
@@ -27,8 +27,9 @@ const SCOPES: Feature = Feature {
     api: "scopes_with",
     why: "Lists start from `access::visible::<M>(permission)`: Renox's `scopes_with` turns the \
           person's roles into the stores they may see that in, and `Scopes::apply` filters on \
-          the record's two store columns (\"mine **or** at my store\"). The owner's global role \
-          sees everything, without any check on a role's name.",
+          the record's store columns (a row counts when **either** store is one of them). One \
+          filter in SQL instead of a check per row, so paging and totals stay right; the \
+          owner's global role sees everything, without any check on a role's name.",
 };
 
 const POSTING: Feature = Feature {
@@ -47,23 +48,26 @@ pub fn entries() -> Vec<Explanation> {
             path: "/staff/help",
             title: "Help between stores",
             purpose: "A store short of people borrows someone from another store for some days. \
-                      The page lists help asked of the active store (to approve or refuse), help \
-                      it asked for, who is helping now, and lets either store end a help early \
-                      and the helped store log the hours. An approved request gives the helper a \
-                      role **in the helped store, between two dates**: their access there starts \
-                      and ends by itself. The store switcher in the top bar is how the helper \
-                      works there: it offers every store where they hold a role today.",
+                      The page has two lists, help asked of the active store (to approve or \
+                      refuse) and help it asked for, each with its status and hours so far; \
+                      either store can end a help early and the helped store logs the hours. An \
+                      approved request gives the helper a role **in the helped store, between \
+                      two dates**: their access there starts and ends by itself. The store \
+                      switcher in the top bar is how the helper works there: it offers every \
+                      store where they hold a role today.",
             who: "Store managers (`staff.help`) and the owner.",
             audience: &[Audience::Manager, Audience::Owner],
             flow: Flow::BackOffice,
             features: &[
                 Feature {
-                    api: "assign_role_in().from().until()",
-                    why: "Approving calls `helper.assign_role_in(db, role, &Scope::of(store))\
-                          .from(start).until(end)` (Renox #244). Nothing has to run at the end: \
-                          the role stops counting, so `scopes_with` no longer lists the store in \
-                          the helper's switcher and its pages answer 403. Ending early moves the \
-                          end to now (or removes the role, if it hadn't started).",
+                    api: "assign_role_in(…).from(…).until(…)",
+                    why: "Approving calls `helper.assign_role_in(db, role, &scope)\
+                          .from(start).until(end)`, the scope being the helped store's \
+                          (`Scope::of_id::<Store>(id)`, Renox #244). Nothing has to run at the \
+                          end: the role stops counting, so `scopes_with` no longer lists the \
+                          store in the helper's switcher and its pages answer 403, with no cron \
+                          job to forget. Ending early moves the end to now (or removes the role \
+                          with `remove_role_in`, if it hadn't started).",
                 },
                 Feature {
                     api: "renox::context",
@@ -80,20 +84,39 @@ pub fn entries() -> Vec<Explanation> {
                 },
                 Feature {
                     api: "notify",
-                    why: "The other store's managers hear of each step in the app; the helper \
-                          gets a mail and a notification with the dates.",
+                    why: "The other store's people with `staff.help` hear of a request, an \
+                          approval, a refusal or an early end in the app (the bell, no mail: \
+                          they are at work in the app anyway); the helper gets a mail and a \
+                          notification with the store and the dates, since they may not be \
+                          looking.",
+                },
+                Feature {
+                    api: "UI kit: action_sheet + date_picker",
+                    why: "Logging a day's hours is a small form in a sheet on the row (day, \
+                          hours, note), so the manager stays on the list; a day outside the \
+                          help's dates is refused.",
                 },
                 AUDITED,
+                Feature {
+                    api: "Redirect::route",
+                    why: "Every form on the page (ask, approve, refuse, end early, log hours) \
+                          answers with `Redirect::route(\"multistore.help\", &[])`: the \
+                          redirect names the route rather than a path written by hand, so \
+                          moving the page to another address cannot leave a form sending people \
+                          to a 404.",
+                },
             ],
             under_hood: "Loading: up to 100 requests of the store, then the helpers' staff rows \
                          and users, the stores and the hours, five queries whatever the number. \
-                         Each action moves the status with `UPDATE … WHERE status = ?` (pressing \
-                         twice acts once), then gives, shortens or removes the dated role, writes \
-                         an audit row and notifies.",
+                         Approving, refusing and withdrawing move the status with `UPDATE … \
+                         WHERE status = ?` (pressing twice acts once, the second gets a 409); \
+                         approving and ending give or shorten the dated role; each action writes \
+                         an audit row, and all but withdrawing and logging hours notify.",
             docs: &[
                 "docs/authorization.md#roles-per-branch-a-role-in-one-store-for-a-while",
                 "docs/authorization.md#managing-assignments",
                 "docs/mail.md#database-notifications",
+                "docs/ui.md#actions",
                 "docs/authorization.md#sensitive-actions-and-the-audit-trail",
             ],
             sources: &[
@@ -120,19 +143,24 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "Valid<T> + after hook",
                     why: "`HelpForm`'s rules check the fields (the role `one_of` the \
-                          catalogue's store roles); its `after` hook checks the days are in \
-                          order and not past, and that the person works at the lending store.",
+                          catalogue's store roles, so no role can be typed in); its `after` \
+                          hook checks what needs two fields or the database: the days are in \
+                          order and not past, the person works at the lending store, and that \
+                          store isn't the one asking. Errors come back next to the fields like \
+                          any other rule's.",
                 },
                 Feature {
                     api: "UI kit: date_picker",
-                    why: "The kit's date picker (Cally in a popover) for the two days; they are \
-                          turned into moments at midnight in `APP_TIMEZONE` (the last day ends \
-                          at the next midnight).",
+                    why: "The kit's date picker (Cally in a popover, `min` today) for the two \
+                          days, the same on every browser. The handler turns them into moments \
+                          at midnight in `APP_TIMEZONE` (the last day ends at the next \
+                          midnight), so the role starts and ends on the shop's own calendar.",
                 },
             ],
-            under_hood: "Loading: the stores, the lending store's active staff and their users. \
-                         Sending: `Valid<HelpForm>`, one insert, an audit row, a notice to the \
-                         lending store's managers.",
+            under_hood: "Loading: the stores, the lending store's active staff and their users \
+                         (the lending store is picked by a small GET form above). Sending: \
+                         `Valid<HelpForm>` (its `after` hook reads the staff row), one insert, \
+                         an audit row, an in-app notice to the lending store's managers.",
             docs: &[
                 "docs/validation.md#hooks-prepare-authorize-after",
                 "docs/ui.md#form-fields",
@@ -155,16 +183,23 @@ pub fn entries() -> Vec<Explanation> {
             audience: &[Audience::Manager, Audience::Owner],
             flow: Flow::BackOffice,
             features: &[
-                SCOPES,
+                Feature {
+                    api: "scopes_with",
+                    why: "`permissions::scopes_with::<Store>(\"staff.help\")` gives the stores \
+                          the person holds `staff.help` in, and `Scopes::apply` keeps the hours \
+                          worked in those stores: a manager sees the help their store received, \
+                          the owner's global role sees every store, with no role name checked.",
+                },
                 Feature {
                     api: "Query<T>",
                     why: "One grouped query (`group_by` + `select_as`: `COUNT(DISTINCT \
-                          worked_on)`, `SUM(minutes)`) per person and store, within the stores \
-                          the person may see.",
+                          worked_on)`, `SUM(minutes)`) per person and store: the database adds \
+                          up, rather than every hour row being loaded into Rust.",
                 },
                 Feature {
                     api: "UI kit: stats + table",
-                    why: "Totals as the kit's stats, the lines as its table.",
+                    why: "The total hours and the number of lines as the kit's stats, the lines \
+                          as its table: a report page made of kit parts, nothing hand-built.",
                 },
             ],
             under_hood: "Four queries: the grouped hours, the staff rows, their users, the stores.",
@@ -212,9 +247,11 @@ pub fn entries() -> Vec<Explanation> {
             ],
             under_hood: "Loading: the store's placements, their bikes, the bikes owned here or \
                          standing here and their homes (the latest `moved` placement of all of \
-                         them in one query), the variants' names and the stores. Each action: a \
-                         status guard or a locked bike row, then the bike's location, an audit \
-                         row and a notice to the other store.",
+                         them in one query), the variants' names and the stores. Deciding: a \
+                         status guard (`UPDATE … WHERE status = 'requested'`). Moving, recalling \
+                         and sending back: a transaction with the bike's row locked, then its \
+                         location. Each writes an audit row; all but sending back notify the \
+                         other store in the app.",
             docs: &[
                 "docs/authorization.md#checking-one-record-has_permission_in",
                 "docs/relations.md#more-of-the-query-builder",
@@ -241,13 +278,16 @@ pub fn entries() -> Vec<Explanation> {
             features: &[
                 Feature {
                     api: "#[derive(Validate)]",
-                    why: "`PlacementForm`'s rules are attributes on its fields; the handler then \
-                          checks the bike stands free at its owner store.",
+                    why: "`PlacementForm`'s rules are attributes on its fields (the direction \
+                          `one_of` place or ask), short enough not to need an `impl Validate`; \
+                          the handler then checks what needs the database: the bike stands free \
+                          at its owner store, which isn't the other store.",
                 },
                 Feature {
                     api: "UI kit: toggle_buttons + select",
                     why: "Direction and other store are a small GET form, so the bike list is \
-                          the right owner's; the bike is the kit's searchable select.",
+                          the right owner's without any JavaScript; the bike is the kit's \
+                          searchable select, quick to use with up to 200 bikes.",
                 },
             ],
             under_hood: "Loading: the stores, up to 200 free bikes of the owner and their names. \
@@ -259,6 +299,7 @@ pub fn entries() -> Vec<Explanation> {
             ],
             sources: &[
                 PLACEMENTS,
+                ACTIVE_STORE,
                 "examples/bikeshop/resources/views/multistore/placements/new.html",
                 TESTS,
             ],
@@ -282,8 +323,9 @@ pub fn entries() -> Vec<Explanation> {
                     api: "renox::grid",
                     why: "The entries in one `Grid`: filter by kind (a select column), sort, \
                           group by kind, `Column::summary(Summary::Sum)` under the amounts, the \
-                          two stores as `Column::related` subqueries, exports for the \
-                          accountant.",
+                          two stores as `Column::related` subqueries, CSV/Excel exports for the \
+                          accountant, cards on phones. A ledger is exactly what the grid is for, \
+                          so the page writes no table, filter or export code of its own.",
                 },
                 SCOPES,
                 Feature {
@@ -328,15 +370,18 @@ pub fn entries() -> Vec<Explanation> {
                     api: "Schedule::monthly_on",
                     why: "`monthly_on(1, \"02:00\", \"books:settle\", …)`: `schedule:list` shows \
                           it, `schedule:run books:settle` runs it now, several servers run it \
-                          once. `settlements::settle_month` is a plain function the tests call \
-                          after `TestApp::travel`.",
+                          once (each run is claimed first). The work is a plain function, \
+                          `settlements::settle_month`, safe to run twice; the tests call it \
+                          directly, and also travel to the 1st (`TestApp::travel`) and run the \
+                          task with `Kernel::run_scheduled`.",
                 },
                 Feature {
                     api: "Queue",
                     why: "The statements go out as a **batch** (`state.queue.batch(…)`, one \
-                          `SendStatement` job per store pair, `allow_failures`): one slow mail \
-                          server doesn't hold the others, and the batch's progress is visible \
-                          on the queue dashboard.",
+                          `SendStatement` job per store pair, `allow_failures`): the monthly \
+                          task ends as soon as the books are settled, one slow or failing mail \
+                          doesn't hold the others, and the batch's progress is counted in \
+                          `job_batches`.",
                 },
                 SCOPES,
             ],
@@ -346,6 +391,7 @@ pub fn entries() -> Vec<Explanation> {
                          points the entries at it and stores the net; then the batch.",
             docs: &[
                 "docs/scheduling.md#scheduled-tasks",
+                "docs/scheduling.md#testing-a-task",
                 "docs/queue.md#chains-and-batches",
             ],
             sources: &[
@@ -376,9 +422,10 @@ pub fn entries() -> Vec<Explanation> {
                 },
                 Feature {
                     api: "Mail",
-                    why: "The statement mail (`mail_view`, the kit's mail layout and table) \
-                          carries the entries as a CSV attachment (`Mail::attach`), so each \
-                          store's accountant has the detail.",
+                    why: "The `SendStatement` job mails this statement (`mail_view` on Renox's \
+                          mail layout and its `table` component) to the people who see either \
+                          store's books, with the entries as a CSV attachment (`Mail::attach`): \
+                          each store's accountant has the detail without logging in.",
                 },
                 AUDITED,
             ],
@@ -389,9 +436,12 @@ pub fn entries() -> Vec<Explanation> {
             docs: &[
                 "docs/authorization.md#checking-one-record-has_permission_in",
                 "docs/mail.md#sending-a-mail",
+                "docs/mail.md#mail-views",
             ],
             sources: &[
                 SETTLEMENTS,
+                POLICY,
+                MODEL,
                 "examples/bikeshop/resources/views/multistore/books/statement.html",
                 "examples/bikeshop/resources/views/mail/multistore/statement.html",
                 TESTS,
@@ -412,33 +462,42 @@ pub fn entries() -> Vec<Explanation> {
             features: &[
                 Feature {
                     api: "Routes::require_permission",
-                    why: "The change checks `settings.fees`, which only the owner's global role \
-                          grants: a permission, never a role's name. The page hides the button \
-                          for everyone else (`user.has_permission`).",
+                    why: "The books' routes need `intercompany.view` (one \
+                          `require_permission` on the group), so managers can read the rates. \
+                          Changing one also checks `user.has_permission(\"settings.fees\")` in \
+                          the handler, which only the owner's global role grants: a permission, \
+                          never a role's name. The page hides the button for everyone else.",
                 },
                 Feature {
                     api: "UI kit: action_sheet",
-                    why: "Each rate is changed in a sheet sent with htmx: an error stays in the \
-                          sheet, success reloads with a toast.",
+                    why: "Each rate is changed in a sheet sent with htmx, next to the rate it \
+                          changes: an error stays in the sheet, success reloads with a toast. \
+                          No separate edit page for one number.",
                 },
                 AUDITED,
                 Feature {
                     api: "Bike shop blocks",
                     why: "The changes are the `history` block over the audit log's \
-                          `store.fee_rate_changed` rows (old and new rate, who, when).",
+                          `store.fee_rate_changed` rows (old and new rate, who, when): the audit \
+                          trail already holds them, so no extra table is kept.",
                 },
             ],
-            under_hood: "Loading: the stores, the latest audit rows and their users. Changing: \
-                         `Valid<FeeForm>` (a percentage, stored in basis points), one update, an \
-                         audit row with the old and the new rate.",
+            under_hood: "Loading: the stores, the latest 200 audit rows (the last 20 rate \
+                         changes kept) and their users. Changing: `Found<Store>`, \
+                         `Valid<FeeForm>` (a percentage from 0 to 50, stored in basis points), \
+                         one update, an audit row with the old and the new rate.",
             docs: &[
                 "docs/routing.md#guards",
+                "docs/authorization.md#roles-and-permissions",
+                "docs/ui.md#actions",
                 "docs/authorization.md#sensitive-actions-and-the-audit-trail",
                 "docs/types.md#money",
             ],
             sources: &[
                 INTERCOMPANY,
+                MOD,
                 "examples/bikeshop/resources/views/multistore/books/fees.html",
+                "examples/bikeshop/resources/views/blocks/history.html",
                 TESTS,
             ],
         },

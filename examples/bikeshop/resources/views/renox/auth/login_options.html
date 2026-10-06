@@ -1,0 +1,13 @@
+{#- renox-oauth's provider buttons on Renox's login, register and
+    confirm-password pages (`page`: "login", "register" or "confirm";
+    `oauth_providers`: name, label, url), replaced by the bike shop for its
+    translations (`plugins.oauth.*`). -#}
+{%- set providers = oauth_providers | default([]) %}
+{%- if providers %}
+<div class="rx-stack rx-oauth">
+  <p class="rx-auth__alt">{{ t('plugins.oauth.confirm_with') if page == "confirm" else t('plugins.oauth.continue_with') }}</p>
+  {%- for provider in providers %}
+  <a class="rx-button rx-button--secondary rx-button--block" href="{{ provider.url }}" hx-boost="false" data-oauth-provider="{{ provider.name }}"><span class="rx-button__label">{{ provider.label }}</span></a>
+  {%- endfor %}
+</div>
+{%- endif %}

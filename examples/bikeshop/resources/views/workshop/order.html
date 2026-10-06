@@ -1,5 +1,5 @@
 {% extends "layouts/staff.html" %}
-{% from "renox/ui.html" import page_header, card, infolist, entry, alert, button, checkbox_list, textarea, select, input, file, toggle_buttons, form_errors, action_sheet, empty, list, form_grid %}
+{% from "renox/ui.html" import page_header, card, infolist, entry, alert, button, checkbox_list, textarea, select, input, file, toggle_buttons, form_errors, action_sheet, empty, list, form_grid, link_button %}
 {% from "blocks/history.html" import history %}
 {% from "workshop/_parts.html" import styles, status as status_badge %}
 {% block seo %}{{ seo(title=t('workshop.order.title', number=order.id)) }}{% endblock %}
@@ -86,6 +86,9 @@
           {{ entry(t('workshop.fields.total'), order.total, format="money") }}
           {{ entry(t('workshop.fields.paid'), order.paid_at, format="datetime", placeholder=t('workshop.service.not_paid')) }}
         {% endcall %}
+        {%- if customer and customer.user_id is none and can('customers.manage') %}
+        <p>{{ link_button(route('accounts.invite', customer.id), t('accounts.invite.title'), variant="plain", size="small") }}</p>
+        {%- endif %}
         {%- if can_update and not mine and order.status not in ["completed", "cancelled"] %}
         <form method="post" action="{{ route('workshop.order.assign', order.id) }}">{{ csrf_field() }}{{ button(t('workshop.order.take'), variant="secondary", block=true) }}</form>
         {%- endif %}

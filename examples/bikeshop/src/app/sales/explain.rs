@@ -19,40 +19,45 @@ pub fn entries() -> Vec<Explanation> {
             features: &[
                 Feature {
                     api: "Sessions",
-                    why: "A guest's cart is a small value in the session (`session.put(\"cart\", …)`): \
-                      no table rows for people who never buy. A logged-in customer's cart is a \
-                      row in `carts`, so it is there on their phone and their laptop; the first \
-                      request after logging in merges the session's cart into it \
-                      (`Cart::load`).",
+                    why: "A guest's cart is a small value in the session \
+                      (`session.put(\"cart\", …)`): no table rows for people who never buy. \
+                      A logged-in customer's cart is a row in `carts`, so it is there on \
+                      their phone and their laptop; the first request after logging in \
+                      merges the session's cart into it (`Cart::load`).",
                 },
                 Feature {
                     api: "View::also",
                     why: "A change answers the cart's `lines` block plus the navbar's `mini` \
                       block (`.fragment(\"lines\").also(\"mini\")`); the second one has \
                       `hx-swap-oob`, so htmx puts it into the navbar's cart link while the \
-                      first replaces the cart: one answer, two places updated.",
+                      first replaces the cart: one answer, two places updated, and no second \
+                      request just to refresh the count.",
                 },
                 Feature {
                     api: "Toast",
-                    why: "Every change says what happened in a toast (\"Only 2 left at North: \
-                      your cart has 2\"), through the `HX-Trigger` header for htmx or the \
-                      session after a plain form's redirect.",
+                    why: "Every change says what happened in a toast (\"The store has fewer: \
+                      the quantity was lowered.\"), so a quantity that silently went down \
+                      never surprises the shopper. Renox sends it in the `HX-Trigger` header \
+                      for htmx, or keeps it in the session across a plain form's redirect.",
                 },
                 Feature {
                     api: "renox::db::relations",
-                    why: "The lines' variants, products, categories, photos and the store's \
-                      stock are read in six queries however long the cart is \
-                      (`find_many`, `has_many`).",
+                    why: "The stores, the lines' variants, their products, categories and \
+                      photos, and the store's stock are read in six queries however long the \
+                      cart is (`find_many`, `has_many`), instead of a few queries per line.",
                 },
                 Feature {
                     api: "Bike shop blocks",
-                    why: "The quantity of each line is the `quantity` block (− / number / +); \
-                      each step sends `change`, which htmx turns into a `PATCH` after 300 ms.",
+                    why: "The quantity of each line is the `quantity` block (− / number / +), \
+                      big enough to tap on a phone; each step sends `change`, which htmx turns \
+                      into a `PATCH` after 300 ms (`hx-trigger=\"change delay:300ms\"`), so \
+                      three quick taps are one request.",
                 },
                 Feature {
                     api: "Method spoofing",
                     why: "Without JavaScript the quantity and remove forms are `POST`s carrying \
-                      `_method=PATCH` / `DELETE`, routed like the htmx requests.",
+                      `_method=PATCH` / `DELETE` (`method_field`), routed to the same handlers \
+                      as the htmx requests: one set of routes for both.",
                 },
             ],
             under_hood: "Each request loads the cart (session or `carts`), then the variants and \
@@ -66,6 +71,7 @@ pub fn entries() -> Vec<Explanation> {
                 "docs/routing.md#sessions",
                 "docs/ui.md#fragments-and-out-of-band-swaps",
                 "docs/ui.md#toasts",
+                "docs/relations.md#a-page-of-rows-with-their-relations-no-n1",
                 "docs/routing.md#method-spoofing",
             ],
             sources: &[
@@ -73,6 +79,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/sales/cart/show.html",
                 "examples/bikeshop/resources/views/sales/cart/_mini.html",
                 "examples/bikeshop/resources/views/layouts/_nav_cart.html",
+                "examples/bikeshop/resources/views/blocks/quantity.html",
                 "examples/bikeshop/migrations/20260102000700_create_carts_table.up.sql",
                 "examples/bikeshop/tests/sales.rs",
             ],
@@ -92,31 +99,36 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "UI kit: wizard",
                     why: "Contact → pickup or delivery → review is the kit's `wizard`: one \
-                          form in steps, \"Next\" checks the step first, the first step with \
-                          an error opens after a failed submit, and without JavaScript all \
-                          steps show at once. `toggle_buttons` and `show_when` hide the \
-                          address for a pickup (hidden fields are disabled, so not sent).",
+                          form in steps, so a phone shows a few fields at a time but the \
+                          server gets (and checks) everything in one submit. \"Next\" checks \
+                          the step first, the first step with an error opens after a failed \
+                          submit, and without JavaScript all steps show at once. \
+                          `toggle_buttons` and `show_when` hide the address for a pickup \
+                          (hidden fields are disabled, so not sent), and `required_if` asks \
+                          for it only for a delivery.",
                 },
                 Feature {
                     api: "#[derive(Validate)]",
-                    why: "`CheckoutForm`'s rules are attributes (`required`, `email`, \
-                          `one_of`, `exists(\"stores\", \"id\")`, \
+                    why: "`CheckoutForm`'s rules are attributes next to its fields \
+                          (`required`, `email`, `one_of`, `exists(\"stores\", \"id\")`, \
                           `required_if(self.fulfilment == \"delivery\")`); \
-                          `#[validate(hooks)]` adds `prepare` (trim, lowercase the email) and \
-                          `after` (a readable phone number).",
+                          `#[validate(hooks)]` adds `prepare` (tidy the name, trim and \
+                          lowercase the email) and `after` (the phone is digits, spaces, \
+                          dashes and a leading `+`). One place for the rules, used by the \
+                          submit and the live checks alike.",
                 },
                 Feature {
                     api: "Live validation",
                     why: "`data-live-validate` on the form: leaving a field asks the server \
                           with `X-Renox-Validate`, and `Valid<T>` answers that field's errors \
                           from the same rules without running the handler. Nothing is \
-                          written twice.",
+                          written twice, and no JavaScript copy of the rules can drift.",
                 },
                 Feature {
                     api: "Valid<T>",
                     why: "A failed plain submit goes back with the errors and the old input \
-                          (the kit's fields read `old()`), htmx gets a 422 with the errors \
-                          placed next to the fields.",
+                          (the kit's fields read `old()`), so nothing typed is lost; htmx \
+                          gets a 422 with the errors placed next to the fields.",
                 },
                 Feature {
                     api: "Transactions",
@@ -125,27 +137,32 @@ pub fn entries() -> Vec<Explanation> {
                           (`WHERE on_hand - reserved >= ?`): when two customers buy the last \
                           helmet at once, the database runs the updates one after the other \
                           and the second changes no row, so it rolls back and that customer is \
-                          told, while the first pays. `tests/sales.rs` races two checkouts.",
+                          told, while the first pays. Checking first and writing later would \
+                          sell the helmet twice. `tests/sales.rs` races two checkouts.",
                 },
                 Feature {
                     api: "htmx fragments",
                     why: "Choosing delivery or a city asks for the `summary` block again \
                           (`hx-get` on the same page, `hx-include` of the two fields), with \
-                          the city's delivery fee.",
+                          the city's delivery fee: the same handler and template as the \
+                          page, so the total can't be worked out two ways.",
                 },
             ],
-            under_hood: "The page reads the cart (lowering lines a store can't fill), the \
-                         customer, their address and whether they have an active service plan \
-                         (10 % off spare parts). Placing the order: `Valid<CheckoutForm>`, the \
-                         customer row (found or made for a guest), a delivery address, then one \
+            under_hood: "The page reads the cart (lowering lines a store can't fill; an empty \
+                         cart goes back to `/cart`), the customer, their address and the parts \
+                         discount of their service plan, if they subscribe to one. Placing the \
+                         order: `Valid<CheckoutForm>`, the customer row (found by email or made \
+                         for a guest), a delivery address, the stock levels read, then one \
                          transaction (order `pending`, `stock_movements` reason `reserved` per \
                          line, `stock_levels.reserved` up, `order_items` with the owner store \
                          of each unit), then `payments::start` (a pending `payments` row and \
-                         the gateway's page), the cart emptied, and a redirect to the gateway. \
-                         An order left unpaid is cancelled after 30 minutes by the scheduled \
-                         task `sales:expire-orders`.",
+                         the gateway's page), the cart emptied, the order and payment ids \
+                         kept in the session, and a redirect to the gateway. An order left \
+                         unpaid is cancelled after 30 minutes by the scheduled task \
+                         `sales:expire-orders`.",
             docs: &[
                 "docs/ui.md#form-fields",
+                "docs/ui.md#a-field-that-depends-on-another",
                 "docs/validation.md#derivevalidate",
                 "docs/validation.md#hooks-with-the-derive",
                 "docs/validation.md#live-validation",
@@ -155,6 +172,7 @@ pub fn entries() -> Vec<Explanation> {
             sources: &[
                 "examples/bikeshop/src/app/sales/checkout.rs",
                 "examples/bikeshop/src/app/sales/ledger.rs",
+                "examples/bikeshop/src/app/sales/payments.rs",
                 "examples/bikeshop/resources/views/sales/checkout/show.html",
                 "examples/bikeshop/tests/sales.rs",
             ],
@@ -173,47 +191,58 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "renox::webhook",
                     why: "The payment is marked paid by Midtrans' webhook, never by this \
-                          page: `POST /webhooks/midtrans` checks the SHA-512 signature (a \
-                          401 otherwise), stores each event once (`transaction:status`, so a \
-                          notification sent twice is handled once), and runs the handler in \
-                          a queue worker with retries; `webhook:failed` lists what failed and \
-                          `webhook:retry` runs it again.",
+                          page, since anyone can open a URL that says \"paid\": \
+                          `POST /webhooks/midtrans` checks the SHA-512 signature (a 401 \
+                          otherwise), stores each event once (keyed by the transaction id and \
+                          status, so a notification sent twice is handled once), and runs the \
+                          handler in a queue worker with retries. An amount that doesn't \
+                          match the payment is a permanent failure; `webhook:failed` lists \
+                          what failed and `webhook:retry` runs it again.",
                 },
                 Feature {
-                    api: "Queue",
-                    why: "The webhook's handler runs as a job; its `PaymentSucceeded` event \
-                          makes the order paid in a transaction (the reservation becomes a \
-                          sale), registers the bikes and queues the confirmation mail.",
+                    api: "Events and listeners",
+                    why: "The handler only marks the payment paid and emits \
+                          `PaymentSucceeded`; the sales area's listener makes the order paid \
+                          in a transaction (the reservation becomes a sale), registers the \
+                          bikes and queues the confirmation mail. Rentals and the workshop \
+                          listen to the same event, so the payment code knows none of them.",
                 },
                 Feature {
                     api: "htmx polling",
                     why: "While the payment is pending the status block asks again every two \
                           seconds (`hx-trigger=\"every 2s\"`, the `status` fragment) and stops \
-                          once it is paid or failed.",
+                          once it is paid, failed or expired: simpler than a live stream for a \
+                          wait of a few seconds.",
                 },
                 Feature {
-                    api: "Scheduler",
+                    api: "Schedule::every_minute",
                     why: "`sales:expire-orders` runs every minute: an order still unpaid after \
                           30 minutes is cancelled, its pending payment failed, its reservation \
-                          released, and the customer mailed.",
+                          released, and the customer mailed. Without it, an abandoned payment \
+                          would hold the stock forever.",
                 },
                 Feature {
                     api: "analytics::event",
                     why: "When the page first sees the order paid it records a GA4 \
-                          `purchase` event (number, value, currency) in the session; Renox \
-                          delivers it with this page (production only).",
+                          `purchase` event (number, value, currency) in the session, once per \
+                          order; Renox delivers it with this answer (the page, or the poll's \
+                          `HX-Trigger`). Google's tags load only in production with \
+                          `GA4_MEASUREMENT_ID` set.",
                 },
             ],
             under_hood: "Who may see it: the browser that started the payment (its id is in \
                          the session), someone coming back from the gateway with the page's \
                          token (an HMAC of the id with `APP_KEY`, which survives the query \
-                         parameters Midtrans adds), or the paying customer's account. Reads the \
-                         `payments` row and the order it pays.",
+                         parameters Midtrans adds), or the paying customer's account; anyone \
+                         else gets a 404. Reads the `payments` row and the order it pays; \
+                         while it is pending, htmx asks for the `status` block every two \
+                         seconds.",
             docs: &[
                 "docs/operations.md#failed-webhook-calls",
                 "docs/queue.md#failures-and-retries",
                 "docs/scheduling.md#scheduled-tasks",
                 "docs/scheduling.md#events",
+                "docs/operations.md#all-settings",
             ],
             sources: &[
                 "examples/bikeshop/src/app/sales/gateway.rs",
@@ -229,10 +258,10 @@ pub fn entries() -> Vec<Explanation> {
             title: "Demo payment page",
             purpose: "Stands in for Midtrans' hosted payment page when `MIDTRANS_SERVER_KEY` \
                       isn't set, so the whole buying flow can be followed on a laptop. \"Pay\" \
-                      sends the app exactly what Midtrans would: a signed notification to the \
-                      webhook.",
+                      (or \"Cancel\") sends the app exactly what Midtrans would: a signed \
+                      notification to the webhook.",
             who: "Developers and anyone trying the demo; never real customers (with Midtrans \
-                  configured it answers 404).",
+                  configured no link to it is given, and paying on it answers 404).",
             audience: &[Audience::Visitor, Audience::Developer],
             flow: Flow::Buy,
             features: &[
@@ -240,24 +269,28 @@ pub fn entries() -> Vec<Explanation> {
                     api: "Signed URLs",
                     why: "The page and its form only work through the signed link \
                           `payments::start` gave (`state.signed_url`, an hour): someone \
-                          guessing another payment's id gets a 403.",
+                          guessing another payment's id gets a 403, with no table of tokens \
+                          to keep.",
                 },
                 Feature {
                     api: "Queue",
                     why: "Paying queues `DemoNotify`, which POSTs Midtrans' notification \
                           (signed with a key derived from `APP_KEY`) to this app's \
-                          `/webhooks/midtrans` through `state.http`, a moment later, as the \
-                          real provider does. The webhook can't tell the difference.",
+                          `/webhooks/midtrans`, a moment later, as the real provider does. \
+                          The webhook can't tell the difference, so the demo runs the real \
+                          code path; a failed send is retried (five attempts).",
                 },
                 Feature {
                     api: "renox::http",
-                    why: "The real gateway's page comes from Midtrans' Snap API through \
-                          `state.http` (`hosted_page`); tests answer it with `FakeHttp`.",
+                    why: "`DemoNotify` sends through `state.http`, the same client that asks \
+                          Midtrans' Snap API for the real page (`hosted_page`); tests answer \
+                          Midtrans with `FakeHttp`, so no test needs the network.",
                 },
             ],
             under_hood: "Reads the payment and its order. The form posts to the same signed \
-                         address; the handler queues the notification and sends the customer to \
-                         `/pay/{payment}?token=…`, which waits for the webhook.",
+                         address; the handler queues the notification (only while the payment \
+                         is pending) and sends the customer to `/pay/{payment}?token=…`, \
+                         which waits for the webhook.",
             docs: &[
                 "docs/routing.md#signed-urls",
                 "docs/queue.md#a-job",
@@ -265,7 +298,9 @@ pub fn entries() -> Vec<Explanation> {
             ],
             sources: &[
                 "examples/bikeshop/src/app/sales/gateway.rs",
+                "examples/bikeshop/src/app/sales/payments.rs",
                 "examples/bikeshop/resources/views/sales/pay/demo.html",
+                "examples/bikeshop/tests/sales.rs",
             ],
         },
         Explanation {
@@ -289,29 +324,31 @@ pub fn entries() -> Vec<Explanation> {
                     api: "Signed URLs",
                     why: "Every mail links to `/orders/{id}/view?expires=…&signature=…` \
                           (30 days): a guest without an account opens their order, and the \
-                          browser remembers it.",
+                          browser remembers it, without a password or a stored token.",
                 },
                 Feature {
                     api: "access policy helpers",
                     why: "Staff see it when they may see orders in its store \
                           (`access::can_see`, the operating store); anyone else who isn't \
-                          its customer gets a 404, so order ids can't be probed.",
+                          its customer gets a 404, not a 403, so order ids can't be probed.",
                 },
                 Feature {
                     api: "UI kit: infolist + entry",
                     why: "The order's details are an `infolist`; the lines a kit `table`; \
                           the progress the `history` block (a timeline with icons, not \
-                          colour alone).",
+                          colour alone), so the page needs no CSS of its own for them.",
                 },
                 Feature {
                     api: "money filter",
-                    why: "Every amount is an integer in the smallest unit, written with \
-                          `{{ amount | money }}` in the visitor's language.",
+                    why: "Every amount is an integer in the smallest unit (no float rounding), \
+                          written with `{{ amount | money }}` in `APP_CURRENCY` and the \
+                          visitor's language.",
                 },
             ],
-            under_hood: "Seven queries: the order, its lines, their variants and products \
+            under_hood: "Reads the order, its lines, their variants and products \
                          (discontinued ones too, `with_trashed`), the store, the customer, \
-                         the delivery address; then its payments.",
+                         the delivery address, then its payments: a handful of queries \
+                         however many lines.",
             docs: &[
                 "docs/routing.md#signed-urls",
                 "docs/ui.md#infolists-read-only-details",
@@ -321,6 +358,8 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/sales/orders.rs",
                 "examples/bikeshop/src/app/sales/notify.rs",
                 "examples/bikeshop/resources/views/sales/orders/show.html",
+                "examples/bikeshop/resources/views/blocks/history.html",
+                "examples/bikeshop/tests/sales.rs",
             ],
         },
         Explanation {
@@ -337,12 +376,14 @@ pub fn entries() -> Vec<Explanation> {
                     api: "Print styles",
                     why: "`@media print` in `public/sales/sales.css` hides the navigation, \
                           the buttons and the toasts, so the browser's print gives a clean \
-                          page; \"Print\" (or the R key, `data-rx-key`) calls `window.print()`.",
+                          page without a PDF library; \"Print\" (or the R key, `data-rx-key`) \
+                          calls `window.print()`. On a counter receipt, N starts a new sale.",
                 },
                 Feature {
-                    api: "Sessions",
+                    api: "Session flash",
                     why: "The change to give after a cash sale is flashed by the counter \
-                          (`session.flash`) and shown once, here.",
+                          (`session.flash(\"change\", …)`) and shown once, here: a reload \
+                          doesn't show it again, and nothing is stored for it.",
                 },
             ],
             under_hood: "The same order data and access rules as the order page.",
@@ -351,14 +392,17 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/sales/orders.rs",
                 "examples/bikeshop/resources/views/sales/orders/invoice.html",
                 "examples/bikeshop/public/sales/sales.css",
+                "examples/bikeshop/public/sales/sales.js",
+                "examples/bikeshop/tests/sales.rs",
             ],
         },
         Explanation {
             route: "sales.orders.index",
             path: "/staff/orders",
             title: "Orders (staff)",
-            purpose: "The orders of the store the person works in today, by status: to prepare \
-                      (paid), unpaid, ready, completed, cancelled, refunded.",
+            purpose: "The orders of the store the person works in today, by status: open \
+                      (paid or ready, still to hand over), unpaid, ready, completed, \
+                      cancelled, refunded.",
             who: "Cashiers, store staff and managers of a store; the owner, in the store \
                   they switched to.",
             audience: &[
@@ -371,21 +415,24 @@ pub fn entries() -> Vec<Explanation> {
             features: &[
                 Feature {
                     api: "Routes::require_permission",
-                    why: "`access::staff_routes` with `require_permission(\"orders.view\")`: \
-                          a login, then the permission in the active store (roles given per \
-                          store, #244).",
+                    why: "`access::staff_routes` around `require_permission(\"orders.view\")`: \
+                          a login, `staff.access` in some store, then the permission in the \
+                          active store (roles given per store, #244). The guard sits on the \
+                          routes, so no handler can forget it.",
                 },
                 Feature {
                     api: "renox::context",
                     why: "The active store (picked by the store switcher, checked against \
                           today's roles) is in `renox::context`; `active_store::current()` \
-                          scopes the list to it, and `access::visible::<Order>` keeps only \
-                          orders the user may see at all.",
+                          scopes the list to it, and `access::visible::<Order>` \
+                          (`scopes_with`) keeps only orders the user may see at all, without \
+                          passing the store through every function.",
                 },
                 Feature {
                     api: "UI kit: link_tabs + table",
                     why: "The status filter is the kit's `link_tabs` (links, so each tab has \
-                          an address); the orders a `table` with `badge`s; pagination below.",
+                          an address to bookmark or share); the orders a `table` with \
+                          `badge`s; pagination below.",
                 },
             ],
             under_hood: "Three queries for a page of 25: the count, the page, the customers \
@@ -399,6 +446,8 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/sales/staff.rs",
                 "examples/bikeshop/resources/views/sales/staff/index.html",
                 "examples/bikeshop/src/app/access/policy.rs",
+                "examples/bikeshop/src/app/access/active_store.rs",
+                "examples/bikeshop/tests/sales.rs",
             ],
         },
         Explanation {
@@ -408,8 +457,9 @@ pub fn entries() -> Vec<Explanation> {
             purpose: "One order with everything staff need: lines (with the owner store of \
                       consigned goods), payments, the stock movements it caused, the bikes it \
                       registered, and the next step: ready or sent out, hand over (with frame \
-                      numbers), cancel, or take a return and refund it.",
-            who: "Cashiers (hand over), managers (returns and refunds).",
+                      numbers), cancel an unpaid one, or take a return and refund it.",
+            who: "Cashiers and floor staff (ready, hand over), managers (returns and \
+                  refunds); the owner in any store.",
             audience: &[Audience::Cashier, Audience::Manager, Audience::Owner],
             flow: Flow::BackOffice,
             features: &[
@@ -417,32 +467,36 @@ pub fn entries() -> Vec<Explanation> {
                     api: "access policy helpers",
                     why: "`access::find::<Order>` answers 404 for another store's order; each \
                           action is `access::require(user, permission, StoreAttr::Operating, \
-                          &order)`: `orders.sell` to move it on, `orders.refund` for a return, \
-                          both in the store that served the customer.",
+                          &order)`: `orders.sell` to move it on or cancel it, `orders.refund` \
+                          for a return, both in the store that served the customer, which a \
+                          plain role check couldn't tell.",
                 },
                 Feature {
                     api: "UI kit: action_sheet",
                     why: "\"Hand over\" and \"Return and refund\" are `action_sheet`s: a form \
-                          in a sheet, sent with htmx; a 422 stays in the sheet, success reloads \
-                          the page with a toast (`HxRefresh`).",
+                          in a sheet, sent with htmx, so the order stays in view; a 422 stays \
+                          in the sheet, success reloads the page with a toast (`HxRefresh`). \
+                          Cancelling asks first in a `confirm`.",
                 },
                 Feature {
                     api: "Stock ledger",
                     why: "A return writes a `return` movement per line (the goods are back at \
                           the store, still their owner's), reverses the books between stores \
                           for consigned goods, and records a refund in `payments`, in one \
-                          transaction.",
+                          transaction, so stock and money can't disagree.",
                 },
                 Feature {
-                    api: "Notifications",
-                    why: "Ready, sent out and refunded each queue a mail in the customer's \
-                          language and add a `DatabaseMessage` to their account's \
-                          notifications.",
+                    api: "notify",
+                    why: "Ready, sent out and refunded each queue a mail in the language the \
+                          customer ordered in and, for a customer with an account, add a \
+                          `DatabaseMessage` to their notifications.",
                 },
             ],
             under_hood: "Reads the order (`OrderView`), its payments, its `stock_movements` \
                          and the `customer_bikes` it registered. Status changes are conditional \
-                         updates (`WHERE status = 'paid'`), so two clicks change it once.",
+                         updates (`WHERE status = 'paid'`), so two clicks change it once; the \
+                         handover writes the frame numbers on the order's bikes and starts the \
+                         14-day return window.",
             docs: &[
                 "docs/authorization.md#checking-one-record-has_permission_in",
                 "docs/ui.md#actions",
@@ -451,6 +505,7 @@ pub fn entries() -> Vec<Explanation> {
             sources: &[
                 "examples/bikeshop/src/app/sales/staff.rs",
                 "examples/bikeshop/src/app/sales/ledger.rs",
+                "examples/bikeshop/src/app/sales/notify.rs",
                 "examples/bikeshop/resources/views/sales/staff/show.html",
                 "examples/bikeshop/tests/sales.rs",
             ],
@@ -470,10 +525,16 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "renox::select",
                     why: "The product and customer pickers are the kit's searchable `select` \
-                          with `options_url`: they ask `/staff/counter/variants?q=` (an exact \
-                          SKU first, then the full-text matches, with this store's stock) and \
+                          with `options_url`: they ask `/staff/counter/variants?q=` (each \
+                          option with its price and this store's stock) and \
                           `/staff/counter/customers?q=` for `SelectOption`s as the cashier \
-                          types.",
+                          types, instead of sending every product and customer with the page.",
+                },
+                Feature {
+                    api: "renox::db::search",
+                    why: "The product search puts an exact SKU first (what a barcode scanner \
+                          types), then `Product::search`'s full-text matches on the name, so \
+                          one box serves the scanner and the cashier's typing.",
                 },
                 Feature {
                     api: "Keyboard shortcuts (data-rx-key)",
@@ -485,12 +546,13 @@ pub fn entries() -> Vec<Explanation> {
                     api: "renox::context",
                     why: "The sale belongs to the active store (`active_store::current()`); \
                           the stock checked, the order's operating store and the payment's \
-                          store are all that one.",
+                          store are all that one, with no store id in the forms to tamper \
+                          with.",
                 },
                 Feature {
                     api: "Bike shop blocks",
-                    why: "The `keypad` block types the amount received on a touch screen; \
-                          `quantity` changes a line.",
+                    why: "The `keypad` block types the amount received on a touch screen \
+                          (and works from a keyboard too); `quantity` changes a line.",
                 },
                 Feature {
                     api: "Transactions",
@@ -501,18 +563,23 @@ pub fn entries() -> Vec<Explanation> {
                           reservation into a sale.",
                 },
             ],
-            under_hood: "The sale being rung up is in the session (`counter:{store}`). Paying: \
-                         the order (`counter`, served by this staff member), the reservation \
-                         and the lines in one transaction, then `record_counter`, the order \
-                         completed at once, bikes registered to a known customer, and the \
-                         receipt.",
+            under_hood: "The sale being rung up is in the session (`counter:{store}`), like a \
+                         cart; the forms are boosted by htmx, so nothing reloads, and work as \
+                         plain forms without JavaScript. Paying: cash less than the total is \
+                         refused, then the order (`counter`, served by this staff member), \
+                         the reservation and the lines in one transaction, then \
+                         `record_counter` (the listener makes it paid, registers the bikes of \
+                         a known customer and queues their confirmation mail), the order \
+                         completed at once, the change flashed, and the receipt.",
             docs: &[
                 "docs/ui.md#options-from-the-server",
+                "docs/search.md#3-searching",
                 "docs/ui.md#what-every-button-can-carry",
                 "docs/authorization.md#roles-per-branch-a-role-in-one-store-for-a-while",
             ],
             sources: &[
                 "examples/bikeshop/src/app/sales/counter.rs",
+                "examples/bikeshop/src/app/sales/payments.rs",
                 "examples/bikeshop/resources/views/sales/counter/show.html",
                 "examples/bikeshop/resources/views/blocks/keypad.html",
                 "examples/bikeshop/tests/sales.rs",
@@ -533,7 +600,9 @@ pub fn entries() -> Vec<Explanation> {
                     why: "Each mail is `state.mail_view_in(locale, to, subject, \
                           \"mail/sales/…\", ctx)` on Renox's mail layout with its components \
                           (`table`, `panel`, `button`), styled inline for mail clients; the \
-                          plain-text part is made from the HTML.",
+                          plain-text part is made from the HTML, so there is one template per \
+                          mail. This page renders them through the same call as the real \
+                          mails, so what you see is what is sent.",
                 },
                 Feature {
                     api: "queue_mail",
@@ -543,7 +612,8 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "Localized mail",
                     why: "Orders keep the language the customer ordered in (`orders.locale`), \
-                          and mails sent later from the queue or by staff are written in it.",
+                          and mails sent later from the queue or by staff are written in it; \
+                          here they show in your language.",
                 },
             ],
             under_hood: "No database query: a made-up order is rendered through each mail \
@@ -556,7 +626,9 @@ pub fn entries() -> Vec<Explanation> {
             sources: &[
                 "examples/bikeshop/src/app/sales/mails.rs",
                 "examples/bikeshop/src/app/sales/notify.rs",
+                "examples/bikeshop/resources/views/sales/mails.html",
                 "examples/bikeshop/resources/views/mail/sales/confirmation.html",
+                "examples/bikeshop/tests/sales.rs",
             ],
         },
     ]
@@ -567,7 +639,8 @@ pub fn not_pages() -> Vec<NotAPage> {
     vec![
         NotAPage {
             route: "cart.mini",
-            reason: "an htmx fragment: the navbar's cart link with its count (explained on the cart page)",
+            reason: "an htmx fragment: the navbar's cart link with its count (explained on \
+                     the cart page)",
         },
         NotAPage {
             route: "orders.signed",

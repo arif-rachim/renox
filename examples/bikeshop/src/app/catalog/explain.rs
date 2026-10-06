@@ -10,6 +10,7 @@ const SOURCES_LISTING: &[&str] = &[
     "examples/bikeshop/public/catalog/catalog.css",
     "examples/bikeshop/public/catalog/catalog.js",
     "examples/bikeshop/tests/catalog.rs",
+    "tests/browser/bikeshop-catalog.test.mjs",
 ];
 
 const FILTERS_FROM_QUERY: Feature = Feature {
@@ -17,16 +18,18 @@ const FILTERS_FROM_QUERY: Feature = Feature {
     why: "Every filter is a query-string value (`?brand=trek&size=M&price_max=9000000`), \
           so a filtered page can be shared, bookmarked and reloaded. `Filters::apply` turns \
           them into conditions on `Product::query()`: `where_in_query` for brands and \
-          sizes, `where_raw` with bound values for the `EXISTS` sub-queries (a variant in \
-          the price range, stock at a store, a part that fits), and each database's JSON \
+          sizes, `where_raw` with bound values for the `EXISTS` sub-queries (one per end \
+          of the price range, stock at a store, a part that fits), and each database's JSON \
           operator for the specifications. Nothing the visitor typed is written into the SQL.",
 };
 
 const PAGINATION: Feature = Feature {
     api: "Paginated",
-    why: "`paginate(&db, page, 24)` runs the count and the page in two queries and gives \
-          the template what the kit's `pagination` macro needs; `page_url(n)` keeps the \
-          filters in every page link.",
+    why: "`.paginate(db, filters.page, PER_PAGE)` (24 a page) runs the count and the page \
+          in two queries and gives the template what Renox's `pagination` macro \
+          (`renox/pagination.html`) needs; its `page_url(n)` keeps the filters in every page \
+          link, so page 3 of a filtered list is still filtered. The links are boosted by \
+          htmx and swap only the results (`hx-select`).",
 };
 
 const FRAGMENTS: Feature = Feature {
@@ -51,7 +54,7 @@ const ETAG: Feature = Feature {
           when the browser or a crawler already has that version. The sitemap gets 304s \
           every time. HTML pages carry the layout's per-request CSP nonce in their script \
           tags, so today their hash changes on every request and they are always sent \
-          whole (a Renox gap, reported); the cart's count is fetched separately \
+          whole (a Renox gap); the cart's count is fetched separately \
           (`cart.mini`) so it won't make pages differ once that is solved.",
 };
 
@@ -137,7 +140,8 @@ pub fn entries() -> Vec<Explanation> {
                       categories under it: \"Bikes\" lists every kind of bike. Same filters and \
                       sort orders as the whole shop; part categories also offer \"fits my \
                       bike\" to customers who registered their bikes.",
-            who: "Shoppers who know what they want; customers looking for a part for their own bike.",
+            who: "Shoppers who know what they want; customers looking for a part for their \
+                  own bike.",
             audience: &[Audience::Visitor, Audience::Customer, Audience::Developer],
             flow: Flow::Buy,
             features: &[
@@ -149,10 +153,12 @@ pub fn entries() -> Vec<Explanation> {
                 },
                 Feature {
                     api: "Pivot",
-                    why: "\"Fits my bike\" keeps the parts linked through the `part_fits` \
-                          pivot (`PART_FITS`, part → bike models) to the bike models the \
-                          customer registered (`customer_bikes`): one `EXISTS` on the pivot, \
-                          for any of their bikes or one of them.",
+                    why: "Parts and the bike models they fit are a many-to-many, the \
+                          `Pivot` `PART_FITS` (table `part_fits`). \"Fits my bike\" filters \
+                          on that table with the bike models the customer registered \
+                          (`customer_bikes`): one `EXISTS` (`where_raw`, the ids bound), for \
+                          any of their bikes or one of them. A filter needs a condition \
+                          inside the products' query, which the pivot's loaders don't give.",
                 },
                 FILTERS_FROM_QUERY,
                 PAGINATION,
@@ -169,7 +175,6 @@ pub fn entries() -> Vec<Explanation> {
                          bike_id IN (…))`. The back link goes to the parent category.",
             docs: &[
                 "docs/routing.md#route-model-binding-foundm",
-                "docs/relations.md#pivot-columns",
                 "docs/relations.md#filtering-by-a-related-table-without-a-join",
                 "docs/ui.md#fragments-and-out-of-band-swaps",
             ],
@@ -206,18 +211,20 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "htmx fragments",
                     why: "The navbar box asks `GET /search/suggest?q=` as you type \
-                          (`hx-trigger=\"input changed delay:200ms\"`) and shows the six best \
-                          matches under it; the arrow keys and Escape move through them \
-                          (`public/catalog/catalog.js`). Enter submits the plain form to \
-                          this page, so it works without JavaScript.",
+                          (`hx-trigger=\"input changed delay:200ms\"`, from two letters on) \
+                          and shows the six best matches under it, a small template of its \
+                          own (`catalog/_suggest.html`); the arrow keys and Escape move \
+                          through them (`public/catalog/catalog.js`). Enter submits the \
+                          plain form to this page, so it works without JavaScript.",
                 },
                 FILTERS_FROM_QUERY,
                 PAGINATION,
                 NO_N_PLUS_ONE,
                 ETAG,
             ],
-            under_hood: "`Product::query().where_search(q)` then the filters, then the order: \
-                         \"Best match\" (`order_by_relevance`, the default with words), or \
+            under_hood: "`Product::query().where_search(q)` keeps the matches, then the \
+                         filters, then the order: \"Best match\" (`Query::search`, i.e. \
+                         `order_by_relevance`, the default when words are given), or \
                          popularity, price or newest among the matches. A word matches the \
                          start of longer words (`dom` finds Domane); search syntax is never \
                          interpreted, the words are bound as one value. With no words the page \
@@ -235,7 +242,9 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/migrations/20260101000410_search_products.postgres.up.sql",
                 "examples/bikeshop/resources/views/layouts/_nav_search.html",
                 "examples/bikeshop/resources/views/catalog/_suggest.html",
+                "examples/bikeshop/public/catalog/catalog.js",
                 "examples/bikeshop/tests/catalog.rs",
+                "tests/browser/bikeshop-catalog.test.mjs",
             ],
         },
         Explanation {
@@ -265,8 +274,9 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "UI kit: infolist + entry",
                     why: "The specifications (frame, wheels, gears, motor…) are an \
-                          `infolist` of `entry`s in two columns; the brand entry links to the \
-                          brand's site.",
+                          `infolist` of `entry`s in two columns, labels and values marked up \
+                          by the kit rather than a hand-made table; the brand entry links to \
+                          the brand's site.",
                 },
                 Feature {
                     api: "Bike shop blocks",
@@ -297,7 +307,9 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "money filter",
                     why: "Prices are integers in the smallest unit of `APP_CURRENCY`; \
-                          `{{ price | money }}` writes them the visitor's way (`Rp 12.500.000`).",
+                          `{{ price | money }}` writes them the visitor's way \
+                          (`Rp 12,500,000` in English, `Rp 12.500.000` in Spanish), so no \
+                          template formats a number by hand.",
                 },
                 Feature {
                     api: "seo()",
@@ -322,15 +334,18 @@ pub fn entries() -> Vec<Explanation> {
                 "docs/relations.md#pivot-columns",
                 "docs/routing.md#sessions",
                 "docs/ui.md#formatting-values",
+                "docs/ui.md#fragments-and-out-of-band-swaps",
                 "docs/types.md#money",
             ],
             sources: &[
                 "examples/bikeshop/src/app/catalog/product.rs",
+                "examples/bikeshop/src/app/catalog/model.rs",
                 "examples/bikeshop/resources/views/catalog/show.html",
                 "examples/bikeshop/resources/views/blocks/gallery.html",
                 "examples/bikeshop/resources/views/blocks/swatches.html",
                 "examples/bikeshop/resources/views/blocks/quantity.html",
                 "examples/bikeshop/tests/catalog.rs",
+                "tests/browser/bikeshop-catalog.test.mjs",
             ],
         },
         Explanation {

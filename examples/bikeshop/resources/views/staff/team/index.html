@@ -3,6 +3,7 @@
     name, email, home_store, roles). -#}
 {% extends "layouts/staff.html" %}
 {% from "renox/ui.html" import page_header, table, badge, link_button, empty %}
+{% from "layouts/_text.html" import tx %}
 {% block seo %}{{ seo(title=t('staff.team.title', store=store.name)) }}{% endblock %}
 
 {% block content %}
@@ -15,7 +16,7 @@
     {%- for m in members %}
     <tr id="member-{{ m.staff.id }}">
       <td><a class="rx-link" href="{{ route('staff.team.show', m.staff.id) }}">{{ m.name }}</a><br><span class="rx-subtitle">{{ m.email }}</span></td>
-      <td>{% for role in m.roles %}{{ badge(role) }} {% else %}<span class="rx-subtitle">{{ t('staff.team.no_role') }}</span>{% endfor %}</td>
+      <td>{% for role in m.roles %}{{ badge(tx(role)) }} {% else %}<span class="rx-subtitle">{{ t('staff.team.no_role') }}</span>{% endfor %}</td>
       <td>{{ m.home_store }}</td>
       <td>{% if m.staff.active %}{{ badge(t('staff.team.active'), "success") }}{% else %}{{ badge(t('staff.team.inactive'), "warning") }}{% endif %}</td>
       <td>{{ link_button(route('staff.team.show', m.staff.id), t('staff.team.open'), size="small") }}</td>

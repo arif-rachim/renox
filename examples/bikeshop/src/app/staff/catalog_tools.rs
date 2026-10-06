@@ -66,9 +66,13 @@ pub async fn start_move(products: Vec<Product>, cx: ActionContext) -> Result<Toa
         .put(&key(&token), &selection, Some(MOVE_FOR))
         .await?;
     let url = cx.state.url("staff.catalog.move", &[&token])?;
-    Ok(Toast::info(format!("{} selected.", products.len()))
-        .link("Choose the category", url)
-        .persistent())
+    let lang = cx.state.current_lang();
+    let count = products.len().to_string();
+    Ok(
+        Toast::info(lang.t("staff.catalog.selected", &[("count", &count)]))
+            .link(lang.t("staff.catalog.move_link", &[]), url)
+            .persistent(),
+    )
 }
 
 async fn selection(state: &AppState, user: &User, token: &str) -> Result<Selection> {

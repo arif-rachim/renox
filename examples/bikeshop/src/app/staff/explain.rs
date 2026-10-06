@@ -2,6 +2,9 @@
 
 use crate::explain::{Audience, Explanation, Feature, Flow, NotAPage};
 
+/// The staff side's browser test (two-factor, the matrix, hours, team, panel).
+const BROWSER: &str = "tests/browser/bikeshop-staff.test.mjs";
+
 /// The explanation of every page in this area.
 pub fn entries() -> Vec<Explanation> {
     let mut entries = vec![Explanation {
@@ -26,23 +29,27 @@ pub fn entries() -> Vec<Explanation> {
         features: &[
             Feature {
                 api: "UI kit: sidebar + rx-shell",
-                why: "The back office's frame: navigation down the side, the account menu \
-                      and the store switcher on top, and a bar on phones, all from the \
-                      kit (`sidebar`, `sidebar_link`, `rx-shell`).",
+                why: "The back office's frame: navigation down the side (a scrolling bar \
+                      on phones), and on top the store switcher, the bell and the account \
+                      menu, all from the kit (`sidebar`, `sidebar_link`, `navbar`, \
+                      `rx-shell`). Each link shows only with the permission it needs \
+                      (`can('…')`), so nobody sees a door that answers 403.",
             },
             Feature {
                 api: "Routes::require_permission",
                 why: "The staff side needs `staff.access`, a permission every staff role \
                       grants, in the store the person works in today: a customer with a \
                       login gets a 403, a guest goes to the login page first \
-                      (`access::staff_routes` adds both guards).",
+                      (`access::staff_routes` adds both guards). One permission, not a \
+                      list of role names, so a new role needs no code change.",
             },
             Feature {
                 api: "permissions::set_scope",
                 why: "The active store: a middleware picks the store this request works in \
                       (the session's choice, checked against the person's roles today) and \
                       makes it the request's scope, so every permission check on the page \
-                      counts the roles given in that store (#244).",
+                      counts the roles given in that store (#244), with no store id passed \
+                      around by hand.",
             },
             Feature {
                 api: "Cache::remember",
@@ -52,15 +59,16 @@ pub fn entries() -> Vec<Explanation> {
             },
             Feature {
                 api: "UI kit: page_header + empty",
-                why: "The page's title row and the placeholder message, so even an empty \
-                      page looks finished.",
+                why: "The page's title row and the placeholder message with its link, so \
+                      even a page with nothing on it yet looks finished.",
             },
         ],
         under_hood: "The auth middleware has already loaded the user and every role \
                      they hold (with its store and dates). `require_auth` sends guests to \
                      `/login`; the active-store middleware reads the chosen store from \
-                     the session, keeps it if a role grants `staff.access` there today \
-                     (else the home store), and calls `permissions::set_scope`; then \
+                     the session and keeps it if a role grants `staff.access` there today \
+                     (else the home store, else the first such store, remembered in the \
+                     session), and calls `permissions::set_scope`; then \
                      `require_permission(\"staff.access\")` checks it. The layout's store \
                      switcher lists the stores where the person may work now (one query \
                      for their names). The handler renders `staff/dashboard.html` in \
@@ -77,6 +85,7 @@ pub fn entries() -> Vec<Explanation> {
             "examples/bikeshop/src/app/access/active_store.rs",
             "examples/bikeshop/resources/views/layouts/_store_switcher.html",
             "examples/bikeshop/resources/views/reports/_overview.html",
+            "examples/bikeshop/tests/access.rs",
         ],
     }];
     entries.extend(two_factor());
@@ -90,17 +99,20 @@ const TWO_FACTOR: Feature = Feature {
     api: "renox-2fa (Registry::second_factor)",
     why: "One module adds the whole second step: the `two_factor` table, these pages, \
           the card on the account page and the check after the password \
-          (`Registry::second_factor`), so a stolen password alone opens nothing.",
+          (`Registry::second_factor`), so a stolen password alone opens nothing, and \
+          the shop wrote none of it.",
 };
 
 /// Who must use it.
 const STAFF_MUST: Feature = Feature {
     api: "Events (LoggedIn) + App::layer",
     why: "Two-factor login is optional for customers and required for staff: a \
-          `LoggedIn` listener notes a member of staff who logged in without it, and a \
-          layer on `/staff` and `/admin` sends them to set it up before anything else \
-          opens (`src/app/staff/two_factor.rs`). The check asks for a permission \
-          (`staff.access`), never a role's name.",
+          `LoggedIn` listener notes (in the cache) a member of staff who logged in \
+          without it, and a layer on `/staff` and `/admin` sends them to their account \
+          page, with a toast saying why, until they turn it on \
+          (`src/app/staff/two_factor.rs`). The check asks for a permission \
+          (`staff.access`), never a role's name; `BIKESHOP_STAFF_2FA=optional` turns \
+          the rule off for a demo.",
 };
 
 fn two_factor() -> Vec<Explanation> {
@@ -123,8 +135,9 @@ fn two_factor() -> Vec<Explanation> {
                 TWO_FACTOR,
                 Feature {
                     api: "Login throttle",
-                    why: "Wrong codes count towards the same throttle as wrong passwords, \
-                          so codes can't be guessed either.",
+                    why: "Wrong codes count towards the same lock as wrong passwords \
+                          (`pending.failed`), so six digits can't be guessed by trying \
+                          them all.",
                 },
                 Feature {
                     api: "View overrides (renox/auth/layout.html)",
@@ -132,14 +145,16 @@ fn two_factor() -> Vec<Explanation> {
                           replaced: they get the brand and this panel with no copy of them.",
                 },
             ],
-            under_hood: "The pending login waits in the session for ten minutes. The code \
-                         is checked against the secret (decrypted with `APP_KEY`) for the \
-                         current 30-second step and its neighbours; a step already used is \
-                         refused. The right code finishes the login (`complete_login`) and \
-                         emits `LoggedIn`; a recovery code is used up.",
+            under_hood: "The pending login waits in the session for ten minutes (after that, \
+                         back to `/login`). The code is checked against the secret \
+                         (decrypted with `APP_KEY`) for the current 30-second step and its \
+                         two neighbours; a step already used is refused. The right code \
+                         finishes the login (`complete_login`), which emits `LoggedIn`; a \
+                         recovery code is used up and `RecoveryCodeUsed` emitted.",
             docs,
             sources: &[
                 "crates/renox-2fa/src/handlers.rs",
+                "crates/renox-2fa/src/totp.rs",
                 "crates/renox-2fa/views/challenge.html",
                 "examples/bikeshop/src/app/staff/two_factor.rs",
             ],
@@ -149,8 +164,8 @@ fn two_factor() -> Vec<Explanation> {
             path: "/two-factor/setup",
             title: "Set up two-factor login",
             purpose: "Scan the QR code with an authenticator app and type the first code \
-                      to turn two-factor login on. Staff are sent here before the back \
-                      office opens.",
+                      to turn two-factor login on. Staff without it are sent to their \
+                      account page, which starts here, before the back office opens.",
             who: "Staff (required) and customers (optional), from their account page.",
             audience: &[Audience::Staff, Audience::Owner, Audience::Customer],
             flow: Flow::Account,
@@ -159,25 +174,32 @@ fn two_factor() -> Vec<Explanation> {
                 STAFF_MUST,
                 Feature {
                     api: "Routes::require_password_confirmed",
-                    why: "Turning it on asks for the password again unless it was typed in \
-                          the last three hours, so someone at an unlocked computer can't.",
+                    why: "Setting it up asks for the password again unless it was typed in \
+                          the last three hours, so someone at an unlocked computer can't \
+                          tie the account to their own phone.",
                 },
                 Feature {
-                    api: "db::Encrypted",
-                    why: "The shared secret is sealed with `APP_KEY` in the table and shown \
-                          only on this page, once.",
+                    api: "Encrypted<T>",
+                    why: "The shared secret is sealed with `APP_KEY` in the table \
+                          (`Encrypted<String>`), so a copy of the database can't make \
+                          codes; it is shown only on this page, and never again once \
+                          two-factor login is on.",
                 },
             ],
             under_hood: "`two-factor.enable` made a new secret (not active yet); this page \
-                         draws it as an SVG QR code and as text. The first right code turns \
-                         it on, emits `TwoFactorEnabled` (written to the audit log) and \
-                         lifts the staff side's block for this person.",
+                         draws it as an SVG QR code and as text in groups of four. The \
+                         first right code turns it on, makes eight recovery codes, emits \
+                         `TwoFactorEnabled` (written to the audit log, and the shop's \
+                         listener lifts the staff side's block for this person) and goes \
+                         to the recovery codes.",
             docs,
             sources: &[
                 "crates/renox-2fa/src/handlers.rs",
                 "crates/renox-2fa/src/qr.rs",
                 "crates/renox-2fa/views/setup.html",
                 "examples/bikeshop/src/app/staff/two_factor.rs",
+                "examples/bikeshop/tests/staff.rs",
+                BROWSER,
             ],
         },
         Explanation {
@@ -198,13 +220,15 @@ fn two_factor() -> Vec<Explanation> {
                           can show them only once and a database leak gives nothing away.",
                 },
             ],
-            under_hood: "The codes come from the session, put there when they were made, \
-                         and are removed from it once shown.",
+            under_hood: "The codes come from the session, flashed when they were made, so \
+                         they are there for this one page only; without them the page goes \
+                         back to the account page. Making new ones replaces the old ones.",
             docs: &[
                 "docs/two-factor.md#recovery-codes",
                 "docs/two-factor.md#how-it-keeps-accounts-safe",
             ],
             sources: &[
+                "crates/renox-2fa/src/handlers.rs",
                 "crates/renox-2fa/src/recovery.rs",
                 "crates/renox-2fa/views/recovery-codes.html",
             ],
@@ -228,7 +252,8 @@ const STAFF_GUARD: Feature = Feature {
     why: "`access::staff_routes` adds a login, the active store and `staff.access`; the \
           page's own permission comes on top and is checked **in the active store** \
           (`permissions::set_scope`), so a manager of North has it in North only. The \
-          guard names a permission, never a role.",
+          guard names a permission, never a role, so the owner can move a right from \
+          one role to another on the roles page without a deploy.",
 };
 
 /// The shared audit helper.
@@ -245,8 +270,8 @@ const SWITCHER: Feature = Feature {
     api: "renox::context + permissions::set_scope",
     why: "The store switcher in the top bar picks the store this request works in; \
           rights change with it because roles are given per store (#244). A record of \
-          a store the person has no rights in answers **404, not 403**: for them it \
-          doesn't exist, so ids can't be probed.",
+          another store answers **404, not 403**: for them it doesn't exist, so ids \
+          can't be probed.",
 };
 
 /// The stores, team, roles, audit and catalogue pages.
@@ -256,10 +281,10 @@ fn back_office() -> Vec<Explanation> {
             route: "staff.stores.index",
             path: "/staff/stores",
             title: "Stores",
-            purpose: "The three stores at a glance: address, phone, opening hours, how many \
-                      mechanic minutes the workshop has per day, and the fee rate a store \
-                      earns for work done for another (renting out its bike, selling its \
-                      goods on consignment).",
+            purpose: "The stores at a glance: address, phone, mail, the days they open, how \
+                      many mechanic minutes the workshop has per day, and the fee rate a \
+                      store earns for work done for another (renting out its bike, selling \
+                      its goods on consignment).",
             who: "The owner (`stores.manage`, which only the owner's role grants by default).",
             audience: OWNER,
             flow: Flow::BackOffice,
@@ -268,18 +293,20 @@ fn back_office() -> Vec<Explanation> {
                 Feature {
                     api: "UI kit: card + infolist",
                     why: "A card per store on a CSS grid that fills the row, each with the \
-                          kit's infolist: the days formatted from their keys (`labels`), \
-                          the rate with a suffix.",
+                          kit's infolist: the days spelled out from their keys (`labels`), \
+                          the rate with a suffix. Read-only details need no table or form.",
                 },
                 Feature {
-                    api: "access::can_in",
+                    api: "has_permission_in",
                     why: "Only the stores where the person holds `stores.manage` are listed: \
-                          a check in each store's own scope, with no query (the roles were \
-                          loaded with the user).",
+                          `access::can_in` asks `has_permission_in` in each store's own \
+                          scope, with no query (the roles were loaded with the user), so a \
+                          manager given the right in one store sees that one only.",
                 },
             ],
-            under_hood: "Two queries: the stores, then their addresses with city and \
-                         country (`FullAddress::load`, three small queries for any number).",
+            under_hood: "Four queries: the stores, then their addresses, cities and countries \
+                         (`FullAddress::load`, three small queries for any number of \
+                         stores).",
             docs: &[
                 "docs/authorization.md#checking-one-record-has_permission_in",
                 "docs/ui.md#infolists-read-only-details",
@@ -288,6 +315,7 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/staff/stores.rs",
                 "examples/bikeshop/resources/views/staff/stores/index.html",
                 "examples/bikeshop/src/app/staff/model.rs",
+                "examples/bikeshop/src/app/access/policy.rs",
             ],
         },
         Explanation {
@@ -308,12 +336,19 @@ fn back_office() -> Vec<Explanation> {
                           `hours[0][day]`, Renox reads them as a `Vec`, and `v.nested` \
                           checks each row (a known day, times as HH:MM). Stored as JSON \
                           (`Json<Vec<OpeningHours>>`), a list so the order is kept on both \
-                          databases.",
+                          databases; no table of hours for seven rows at most.",
                 },
                 Feature {
                     api: "Valid<T> + impl Validate",
-                    why: "Rules written by hand here, because the rows need `v.nested` and \
-                          the fee rate `between(0, 100)`.",
+                    why: "Rules written by hand here, because the rows need `v.nested` (a \
+                          call on the validator, not on one field) and the fee rate \
+                          `between(0, 100)`. A failed save comes back with the errors and \
+                          what was typed.",
+                },
+                Feature {
+                    api: "Live validation",
+                    why: "The form has `data-live-validate`: each field is checked by the \
+                          same rules as you leave it, so a wrong time shows before saving.",
                 },
                 Feature {
                     api: "audit::record",
@@ -326,16 +361,19 @@ fn back_office() -> Vec<Explanation> {
                          the address row and the store are updated; the fee rate only when \
                          `settings.fees` is held in that store (a value sent without it is \
                          ignored), converted from a percentage to basis points (integers, \
-                         never floats, for money).",
+                         never floats, for money); then the audit entries, a toast and \
+                         back to the stores.",
             docs: &[
                 "docs/ui.md#rows-of-fields",
                 "docs/validation.md#rules-with-impl-validate",
+                "docs/ui.md#live-validation",
                 "docs/authorization.md#sensitive-actions-and-the-audit-trail",
             ],
             sources: &[
                 "examples/bikeshop/src/app/staff/stores.rs",
                 "examples/bikeshop/resources/views/staff/stores/edit.html",
                 "examples/bikeshop/tests/staff.rs",
+                BROWSER,
             ],
         },
         Explanation {
@@ -353,13 +391,15 @@ fn back_office() -> Vec<Explanation> {
                 SWITCHER,
                 Feature {
                     api: "UI kit: table + badge",
-                    why: "One row per person with their roles here as badges; on a phone the \
-                          kit's table scrolls inside its card.",
+                    why: "One row per person with their roles here as badges and whether \
+                          they're active; on a phone the kit's table scrolls sideways \
+                          inside its frame instead of squeezing the columns.",
                 },
             ],
-            under_hood: "A fixed number of queries: the users with a role in this store, the \
-                         staff rows, their logins, their roles in force here or globally (one \
-                         query with `IN`), and the stores' names.",
+            under_hood: "A fixed number of queries however big the team: the users with a \
+                         role in this store, the staff rows, their logins, their roles in \
+                         force here or globally (one query with `IN`), and the stores' \
+                         names.",
             docs: &[
                 "docs/authorization.md#managing-assignments",
                 "docs/authorization.md#roles-per-branch-a-role-in-one-store-for-a-while",
@@ -367,6 +407,7 @@ fn back_office() -> Vec<Explanation> {
             sources: &[
                 "examples/bikeshop/src/app/staff/team.rs",
                 "examples/bikeshop/resources/views/staff/team/index.html",
+                BROWSER,
             ],
         },
         Explanation {
@@ -385,29 +426,32 @@ fn back_office() -> Vec<Explanation> {
                     api: "assign_role_in(…).from(…).until(…)",
                     why: "Roles are given in a store, with dates (#244): help for a week ends \
                           by itself, no one has to remember to take it back. Only roles \
-                          whose every permission the giver holds here are offered, so a \
-                          manager can't make an owner.",
+                          whose every permission the giver holds here are offered (and \
+                          checked again on submit), so a manager can't make an owner.",
                 },
                 Feature {
                     api: "User::revoke_sessions",
                     why: "Deactivating removes every role and ends every session of the \
                           person at once (`users.sessions_revoked_at`, checked on each \
                           request), so a login shared with or stolen by someone else stops \
-                          working everywhere.",
+                          working everywhere. Only the home store's manager may do it, and \
+                          never to the owner or to themselves.",
                 },
                 Feature {
                     api: "UI kit: confirm + date_picker",
                     why: "Taking a role away and deactivating ask first, in the kit's \
-                          confirmation sheet; the dates are the kit's date picker.",
+                          confirmation sheet; the dates are the kit's date picker, so no \
+                          one types a date format by hand.",
                 },
                 AUDITED,
                 SWITCHER,
             ],
             under_hood: "The person must belong to the active store (else a 404). Giving a \
-                         role upserts a `role_user` row with the store's scope and the dates; \
-                         removing deletes it; deactivating deletes all their rows, sets \
-                         `staff.active = false` and bumps `sessions_revoked_at`, all audited \
-                         with what was removed.",
+                         role upserts a `role_user` row with the store's scope and the dates \
+                         (the end date counts in full); removing deletes it; deactivating \
+                         deletes all their rows, sets `staff.active = false` and bumps \
+                         `sessions_revoked_at`, all audited with what was removed. \
+                         Reactivating keeps them logged out until given a role again.",
             docs: &[
                 "docs/authorization.md#managing-assignments",
                 "docs/authorization.md#roles-per-branch-a-role-in-one-store-for-a-while",
@@ -417,6 +461,7 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/staff/team.rs",
                 "examples/bikeshop/resources/views/staff/team/show.html",
                 "examples/bikeshop/tests/staff.rs",
+                BROWSER,
             ],
         },
         Explanation {
@@ -432,24 +477,27 @@ fn back_office() -> Vec<Explanation> {
                 Feature {
                     api: "Signed URLs",
                     why: "The link is signed with `APP_KEY` over the store, the role and the \
-                          address, and expires in seven days: no invitations table, and \
-                          nobody can change the role in the link.",
+                          address, and expires in seven days: no invitations table to keep, \
+                          and nobody can change the role in the link.",
                 },
                 Feature {
                     api: "queue_mail",
-                    why: "The mail is queued and sent by a worker with retries.",
+                    why: "The mail is queued and sent by a worker with retries, so the page \
+                          answers at once even when the mail server is slow or down.",
                 },
                 AUDITED,
             ],
-            under_hood: "The role must be one the inviter may give here. The link is \
-                         `state.signed_url(\"staff.invitations.accept\", [store, role, email])`; \
-                         `mail/staff/invitation.html` is rendered and queued, and \
-                         `staff.invited` recorded.",
+            under_hood: "The role must be one the inviter may give here (else a 403). The \
+                         link is `state.signed_url(\"staff.invitations.accept\", [store, \
+                         role, email], 7 days)`; `mail/staff/invitation.html` is rendered \
+                         and queued, `staff.invited` recorded, and the team page shows a \
+                         toast.",
             docs: &["docs/routing.md#signed-urls", "docs/mail.md#sending-a-mail"],
             sources: &[
                 "examples/bikeshop/src/app/staff/team.rs",
                 "examples/bikeshop/resources/views/staff/team/invite.html",
                 "examples/bikeshop/resources/views/mail/staff/invitation.html",
+                "examples/bikeshop/tests/staff.rs",
             ],
         },
         Explanation {
@@ -457,30 +505,32 @@ fn back_office() -> Vec<Explanation> {
             path: "/staff/join/{store}/{role}/{email}",
             title: "Join the team",
             purpose: "The page an invitation opens: choose a name and a password (or log in \
-                      with an existing account) and join the store's team with the role \
-                      given.",
+                      first with an existing account) and join the store's team with the \
+                      role given.",
             who: "Someone who received a staff invitation.",
             audience: &[Audience::Visitor, Audience::Staff],
             flow: Flow::BackOffice,
             features: &[
                 Feature {
-                    api: "Signed URLs (ValidSignature)",
-                    why: "A changed or expired link answers 403 before anything is read.",
+                    api: "Signed URLs",
+                    why: "A changed or expired link answers 403 before anything is read, on \
+                          the page and on its form, which posts back to the same signed \
+                          address.",
                 },
                 Feature {
                     api: "View overrides (renox/auth/layout.html)",
-                    why: "The page uses the shop's sign-in layout, like Renox's own pages.",
+                    why: "The page uses the shop's sign-in layout, like Renox's own pages, \
+                          so joining looks like signing in.",
                 },
-                Feature {
-                    api: "renox-2fa",
-                    why: "After joining, the new member of staff logs in, and two-factor \
-                          login is set up before the back office opens.",
-                },
+                STAFF_MUST,
             ],
             under_hood: "On submit: the user is made (address marked verified, since the link \
-                         reached it) or the logged-in one used; the `staff` row with this home \
-                         store; the role in the store (`assign_role_in`); `staff.joined` \
-                         recorded. Used once: a second time finds the role already given.",
+                         reached it), or an existing account is used when logged in as \
+                         itself (else a 403); the `staff` row with this home store (or the \
+                         old one reactivated); the role in the store (`assign_role_in`); \
+                         `staff.joined` recorded. Then the session is cleared and the login \
+                         page asks for two-factor setup. Used once: a second time finds the \
+                         role already given.",
             docs: &[
                 "docs/routing.md#signed-urls",
                 "docs/two-factor.md#what-your-users-see",
@@ -488,6 +538,7 @@ fn back_office() -> Vec<Explanation> {
             sources: &[
                 "examples/bikeshop/src/app/staff/team.rs",
                 "examples/bikeshop/resources/views/staff/team/join.html",
+                "examples/bikeshop/src/app/staff/two_factor.rs",
                 "examples/bikeshop/tests/staff.rs",
             ],
         },
@@ -502,17 +553,19 @@ fn back_office() -> Vec<Explanation> {
             flow: Flow::BackOffice,
             features: &[
                 Feature {
-                    api: "Permissions module (RBAC)",
+                    api: "Permissions module",
                     why: "A role is a named set of permissions; **code only ever checks \
                           permissions** (`require_permission`, `can()`, `allows`), never a \
-                          role's name (`tests/access.rs` fails on one). So one switch here \
-                          changes what every cashier may do, from their next page.",
+                          role's name (`tests/access.rs` checks the catalogue). So one \
+                          switch here changes what every cashier may do, from their next \
+                          page.",
                 },
                 Feature {
                     api: "permissions::grant / revoke",
                     why: "Each switch posts on its own with htmx (`hx-post`, `hx-trigger: \
-                          change`) and answers with a toast; Renox loads roles with the user \
-                          on each request, so there is no cache to clear.",
+                          change`, `hx-swap: none`) and answers with a toast, so the page \
+                          never reloads; Renox loads roles with the user on each request, \
+                          so there is no cache to clear.",
                 },
                 Feature {
                     api: "UI kit: checkbox(switch=true)",
@@ -522,20 +575,22 @@ fn back_office() -> Vec<Explanation> {
                 },
                 AUDITED,
             ],
-            under_hood: "Loading: two queries (`permissions::roles`). A switch: the role and \
-                         the permission must exist (else a 404); a global role can't lose \
-                         `roles.manage` or `staff.access` (else a 403), so the owner can't \
-                         lock themselves out; then one insert or delete in \
-                         `permission_role` and an audit entry.",
+            under_hood: "Loading: one query (`permissions::roles`). A switch: the permission \
+                         must be in the shop's catalogue and the role must exist (else a \
+                         404); a global role can't lose `roles.manage` or `staff.access` \
+                         (those switches are disabled, and a 403 answers anyway), so the \
+                         owner can't lock themselves out; then one insert or delete in \
+                         `permission_role`, in a transaction, and an audit entry.",
             docs: &[
                 "docs/authorization.md#roles-and-permissions",
-                "docs/ui.md#htmx-response-headers",
+                "docs/ui.md#toasts",
             ],
             sources: &[
                 "examples/bikeshop/src/app/staff/roles.rs",
                 "examples/bikeshop/resources/views/staff/roles/index.html",
                 "examples/bikeshop/src/app/access/catalogue.rs",
                 "examples/bikeshop/tests/staff.rs",
+                BROWSER,
             ],
         },
         Explanation {
@@ -550,19 +605,21 @@ fn back_office() -> Vec<Explanation> {
             audience: OWNER,
             flow: Flow::BackOffice,
             features: &[
+                STAFF_GUARD,
                 Feature {
                     api: "Audit module",
                     why: "Renox's `Audit` module owns `audit_logs` and records the auth \
-                          events itself (logins, lockouts, deleted accounts, two-factor and \
-                          social login changes); the shop adds a store and a role column and \
-                          records its own actions with `staff::audit::record`.",
+                          events itself (logins, failed logins, lockouts, password changes, \
+                          deleted accounts); the plugins add two-factor and social login \
+                          changes. The shop adds a store and a role column and records its \
+                          own actions with `staff::audit::record`: one trail, not two.",
                 },
                 Feature {
                     api: "renox::grid",
                     why: "The log is a data grid: newest first, each heading a filter by its \
-                          kind (dates, the person and the store from their tables through \
-                          `Column::related`), a search on the action, 50 rows a page, CSV \
-                          and Excel exports.",
+                          kind (dates; the person and the store shown from their tables \
+                          through `Column::related`), a search on the action, 50 rows a \
+                          page. No handwritten filter form or SQL.",
                 },
                 Feature {
                     api: "audit:prune",
@@ -570,17 +627,20 @@ fn back_office() -> Vec<Explanation> {
                           365` (Renox's command) deletes older entries.",
                 },
             ],
-            under_hood: "One query for the page and one for the count; the related columns \
-                         are subqueries, so there's no N+1.",
+            under_hood: "One query for the page, one for the count and one for each column \
+                         from another table (the people's and the stores' names, for the \
+                         whole page at once), so there's no N+1.",
             docs: &[
                 "docs/authorization.md#sensitive-actions-and-the-audit-trail",
                 "docs/grid.md#filters-search-and-chips",
+                "docs/grid.md#columns-from-other-tables",
                 "docs/operations.md#tables-that-keep-growing",
             ],
             sources: &[
                 "examples/bikeshop/src/app/staff/audit.rs",
                 "examples/bikeshop/resources/views/staff/audit/index.html",
                 "examples/bikeshop/migrations/20260102000200_add_store_and_role_to_audit_logs.up.sql",
+                BROWSER,
             ],
         },
         Explanation {
@@ -589,28 +649,34 @@ fn back_office() -> Vec<Explanation> {
             title: "Move products to a category",
             purpose: "The admin panel's \"Move to a category…\" bulk action leads here to \
                       pick the category for the selected products.",
-            who: "Whoever manages the catalogue (`catalog.manage`).",
+            who: "Whoever manages the catalogue (`catalog.manage`, the owner's by default).",
             audience: OWNER,
             flow: Flow::BackOffice,
             features: &[
+                STAFF_GUARD,
                 Feature {
                     api: "Cache",
                     why: "The selection waits in the cache for half an hour under a random \
-                          token, for the same person only.",
+                          token, for the same person only (anyone else, or a late visit, \
+                          gets a 404): no table for something this short-lived.",
                 },
                 Feature {
                     api: "Toast actions",
-                    why: "The panel's action answers with a toast that links here \
-                          (`Toast::link`), since `renox-admin` actions take no input yet.",
+                    why: "The panel's action answers with a toast that stays and links here \
+                          (`Toast::link`, `persistent`), since `renox-admin` actions take no \
+                          input yet.",
                 },
                 AUDITED,
             ],
-            under_hood: "Loading reads the selection and the categories; moving is one \
-                         `UPDATE … WHERE id IN (…)`, recorded as `catalog.category_moved`.",
+            under_hood: "Loading reads the selection from the cache, the products and the \
+                         categories; moving checks the category exists, runs one \
+                         `UPDATE … WHERE id IN (…)`, forgets the selection, records \
+                         `catalog.category_moved` and goes back to the products list.",
             docs: &["docs/admin.md#actions", "docs/scheduling.md#cache"],
             sources: &[
                 "examples/bikeshop/src/app/staff/catalog_tools.rs",
                 "examples/bikeshop/resources/views/staff/catalog/move.html",
+                "examples/bikeshop/src/app/staff/admin.rs",
             ],
         },
         Explanation {
@@ -620,26 +686,29 @@ fn back_office() -> Vec<Explanation> {
             purpose: "Which bike models a spare part fits (or, from a bike, which parts fit \
                       it), with a note: what the catalogue uses to find parts for a \
                       customer's bike and the workshop uses for repairs.",
-            who: "Whoever manages the catalogue (`catalog.manage`).",
+            who: "Whoever manages the catalogue (`catalog.manage`, the owner's by default).",
             audience: OWNER,
             flow: Flow::BackOffice,
             features: &[
                 Feature {
-                    api: "Pivot (part_fits)",
-                    why: "A many-to-many between products with a `note` on the link \
-                          (Pagila's `film_actor`): `load_with_pivot` reads the links with \
-                          their notes, `attach_with` and `detach` change them, and \
-                          `inverse()` gives the same table seen from the bike.",
+                    api: "Pivot",
+                    why: "`part_fits` is a many-to-many between products with a `note` on \
+                          the link (Pagila's `film_actor`): `load_with_pivot` reads the links \
+                          with their notes, `attach_with` and `detach` change them, and \
+                          `inverse()` gives the same table seen from the bike, so one table \
+                          serves both pages. A panel form can't edit it, hence this page.",
                 },
                 Feature {
                     api: "UI kit: list + select(searchable)",
-                    why: "The linked products as a list with a remove button each, and a \
-                          searchable select to add one.",
+                    why: "The linked products as a list with a remove button each (asking \
+                          first), and a searchable select to add one among hundreds.",
                 },
                 AUDITED,
             ],
-            under_hood: "Three queries: the product, the links with the products they point \
-                         at, and the products that could be added.",
+            under_hood: "The product and its category (gear fits nothing), the links with \
+                         the products they point at, and the products of the other kind \
+                         that could be added. Adding or removing writes one `part_fits` row \
+                         and an audit entry (`catalog.fit_added` / `catalog.fit_removed`).",
             docs: &[
                 "docs/relations.md#pivot-columns",
                 "docs/relations.md#changing-a-many-to-many",
@@ -648,6 +717,7 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/staff/catalog_tools.rs",
                 "examples/bikeshop/resources/views/staff/catalog/fits.html",
                 "examples/bikeshop/src/app/catalog/model.rs",
+                "examples/bikeshop/tests/staff.rs",
             ],
         },
     ]
@@ -717,16 +787,37 @@ const RESOURCES: &[(&str, &str, &str, &str, &str)] = &[
         "Stores",
         "store",
         "stores.manage",
-        "the three stores' names and contacts (edit only: hours and fees are on the stores page)",
+        "the stores' names and contacts (edit only: hours and fees are on the stores page)",
     ),
+];
+
+/// What a resource's list shows from another table (`Column::related`).
+fn related_of(slug: &str) -> Option<&'static str> {
+    match slug {
+        "categories" => Some("the parent category's name"),
+        "products" => Some("the category's and the brand's names"),
+        "product_variants" | "product-photos" => Some("the product's name"),
+        _ => None,
+    }
+}
+
+/// The resources whose `rules()` need the record (a unique slug or SKU).
+const RECORD_RULES: &[&str] = &[
+    "categories",
+    "brands",
+    "products",
+    "product_variants",
+    "service-tasks",
+    "service-plans",
 ];
 
 /// The panel's shared features.
 const ADMIN: Feature = Feature {
     api: "renox-admin (AdminResource)",
     why: "The model is declared once (its grid columns, form fields, rules, filters and \
-          actions) and the panel makes the list, the forms, the view page, exports and \
-          the trash, on the kit and the data grid. No page of it is written by hand.",
+          actions) and the panel makes the list, the forms, the view page, the exports \
+          and, for soft-deleted products, the trash, on the kit and the data grid. No \
+          page of it is written by hand, which is why nine resources cost one file.",
 };
 
 const ADMIN_POLICY: Feature = Feature {
@@ -734,15 +825,26 @@ const ADMIN_POLICY: Feature = Feature {
     why: "Every page and button asks the model's `Policy`, which answers with a \
           **permission** in the active store (`user.has_permission`), never a role: \
           `catalog.manage`, `plans.manage`, `purchasing.manage` or `stores.manage`; \
-          prices need `prices.change` as well. A layer runs the active-store middleware on \
-          `/admin` too, so a manager's rights count in the store they work in.",
+          price changes need `prices.change` as well. A layer runs the active-store \
+          middleware on `/admin` too, so a manager's rights count in the store they work \
+          in.",
 };
 
 const ADMIN_LAYOUT: Feature = Feature {
     api: "View overrides (renox-admin/layout.html)",
     why: "The shop replaces the panel's frame with its own (brand, store switcher, this \
           panel) and its field macro (`renox-admin/fields.html`, for the Markdown \
-          editor), by files of the same name.",
+          editor), by files of the same name, without forking the plugin.",
+};
+
+/// The stores resource answers more than its policy.
+const STORES_ALLOWS: Feature = Feature {
+    api: "AdminResource::allows",
+    why: "The stores resource refuses `create` and every kind of delete whatever the \
+          permission: a store is opened with its address and hours on the stores page, \
+          and deleting one would orphan its stock and books. So the list has no New or \
+          Delete buttons, and a store is edited only where the person holds \
+          `stores.manage` (`access::can_in`).",
 };
 
 const ADMIN_DOCS: &[&str] = &[
@@ -784,8 +886,10 @@ fn admin_pages() -> Vec<Explanation> {
                     Feature {
                         api: "Admin::authorize",
                         why: "The panel opens for `staff.access` plus any of its permissions \
-                              (`staff::admin::PANEL_PERMISSIONS`); a resource you may not \
-                              see is left out of the sidebar and the counts.",
+                              (`staff::admin::PANEL_PERMISSIONS`) in the active store; a \
+                              resource whose policy refuses `viewAny` is left out of the \
+                              sidebar and the counts, so a manager sees plans and suppliers \
+                              but not the catalogue.",
                     },
                     ADMIN_LAYOUT,
                 ],
@@ -794,21 +898,37 @@ fn admin_pages() -> Vec<Explanation> {
                 sources: ADMIN_SOURCES,
             }];
             for (slug, plural, one, permission, holds) in RESOURCES {
+                let stores = *slug == "stores";
+                let index_purpose = if stores {
+                    format!(
+                        "The list of {holds}: search, a filter on every heading, sorting \
+                         and exports."
+                    )
+                } else {
+                    format!(
+                        "The list of {holds}: search, a filter on every heading, sorting, \
+                         bulk actions and exports."
+                    )
+                };
+                let create_purpose = if stores {
+                    "Stores aren't made in the panel: a store needs its address and opening \
+                     hours, so this page answers 403."
+                        .to_owned()
+                } else {
+                    format!("A form for a new {one}.")
+                };
                 let pages_of = [
                     (
                         "index",
                         format!("/admin/{slug}"),
                         plural.to_string(),
-                        format!(
-                            "The list of {holds}: search, a filter on every heading, sorting, \
-                              bulk actions and exports."
-                        ),
+                        index_purpose,
                     ),
                     (
                         "create",
                         format!("/admin/{slug}/create"),
                         format!("New {one}"),
-                        format!("A form for a new {one}."),
+                        create_purpose,
                     ),
                     (
                         "show",
@@ -825,40 +945,94 @@ fn admin_pages() -> Vec<Explanation> {
                 ];
                 for (page, path, title, purpose) in pages_of {
                     let mut features = vec![ADMIN, ADMIN_POLICY];
+                    if stores {
+                        features.push(STORES_ALLOWS);
+                    }
                     if page == "index" {
+                        let related = related_of(slug).map_or(String::new(), |shown| {
+                            format!(
+                                " `Column::related` shows {shown} from its table with one \
+                                 query for the whole page, no N+1."
+                            )
+                        });
                         features.push(Feature {
                             api: "renox::grid",
-                            why: "The list is the data grid: each column filters by its kind, \
-                                  `Column::related` shows a name from another table (one \
-                                  subquery, no N+1), and the user's column choices are kept.",
+                            why: leak(format!(
+                                "The list is the data grid: a search box, a filter on each \
+                                 heading by its kind, sorting, CSV and Excel exports, and \
+                                 the person's column choices kept.{related}"
+                            )),
                         });
                         if *slug == "products" {
                             features.push(Feature {
                                 api: "AdminAction",
                                 why: "Bulk actions: prices ±5 % or ±10 % on every variant \
-                                      (`prices.change`, audited), move to a category (a page \
-                                      to pick it), discontinue (to the trash). The \"Products\" \
-                                      tabs are `Filter`s by kind; the trash restores.",
+                                      (`prices.change` too, one transaction, audited), move \
+                                      to a category (a page to pick it), discontinue (to the \
+                                      trash, also on each row). The tabs by kind are \
+                                      `Filter`s; the Trash tab restores.",
+                            });
+                            features.push(Feature {
+                                api: "Column::custom",
+                                why: "The \"What fits\" column is drawn by the shop's \
+                                      `renox-admin/products/cells.html`: a link to the page \
+                                      where a part's bikes (or a bike's parts) are edited, \
+                                      which a panel form can't do.",
                             });
                         }
-                    } else if page != "show" {
+                    } else if page != "show" && !(stores && page == "create") {
+                        let rules = if RECORD_RULES.contains(slug) {
+                            ", plus `rules()` for what needs the record (a unique slug or \
+                             SKU that may be its own)"
+                        } else {
+                            ""
+                        };
                         features.push(Feature {
                             api: "Valid<T> + #[derive(Validate)]",
-                            why: "The form is a typed struct with its rules, plus `rules()` for \
-                                  what needs the record (a unique slug that may be its own); \
-                                  errors show under the fields without a reload (htmx), and \
-                                  each field is checked as you leave it.",
+                            why: leak(format!(
+                                "The form is a typed struct with its rules{rules}; the panel \
+                                 sends it with htmx, so errors show under the fields without \
+                                 a reload, and each field is checked as you leave it."
+                            )),
                         });
-                        if *slug == "products" || *slug == "service-plans" {
+                        if *slug == "products" {
                             features.push(Feature {
                                 api: "renox-editors (markdown_editor)",
-                                why: "The description is Markdown with a toolbar and a preview; \
-                                      the shop shows it with the `markdown` filter, which \
-                                      prints any HTML as text.",
+                                why: "The description is Markdown with a toolbar and a \
+                                      preview; the product page shows it with the `markdown` \
+                                      filter, which prints any HTML as text, so nothing \
+                                      typed can run in a customer's browser.",
+                            });
+                        } else if *slug == "service-plans" {
+                            features.push(Feature {
+                                api: "renox-editors (markdown_editor)",
+                                why: "The description gets the same Markdown editor as the \
+                                      products' (the shop's field macro draws it for every \
+                                      `description` textarea); the plans page prints it as \
+                                      plain text.",
                             });
                         }
                     }
                     features.push(ADMIN_LAYOUT);
+                    let under_hood = match page {
+                        "index" => "One query for the page, one for the count and one per \
+                                    column from another table, with the filters, search and \
+                                    sort from the address; the policy is asked once per \
+                                    button for the whole list, not per row."
+                            .to_owned(),
+                        "show" => "The record is read (a 404 if missing), the policy asked \
+                                   `view`, and the entries formatted by kind."
+                            .to_owned(),
+                        "create" if stores => "The resource is asked for `create` and says \
+                                               no: a 403 before any form is drawn."
+                            .to_owned(),
+                        _ => format!(
+                            "The form's selects from other tables get their choices (one \
+                             query each). On save: the policy is asked, the form validated, \
+                             `fill` copies it into the {one} and the model is saved (its \
+                             hooks run); back to the list with a toast."
+                        ),
+                    };
                     pages.push(Explanation {
                         route: leak(format!("admin.{slug}.{page}")),
                         path: leak(path),
@@ -870,20 +1044,7 @@ fn admin_pages() -> Vec<Explanation> {
                         audience: MANAGERS,
                         flow: Flow::BackOffice,
                         features: Box::leak(features.into_boxed_slice()),
-                        under_hood: leak(match page {
-                            "index" => "One query for the page and one for the count, with the \
-                                        filters, search and sort from the address; the policy is \
-                                        asked once for the list's buttons."
-                                .to_owned(),
-                            "show" => "The record is read (a 404 if missing), the policy asked \
-                                       `view`, and the entries formatted by kind."
-                                .to_owned(),
-                            _ => format!(
-                                "On save: the policy is asked, the form validated, \
-                                          `fill` copies it into the {one} and the model is \
-                                          saved (its hooks run); back to the list with a toast."
-                            ),
-                        }),
+                        under_hood: leak(under_hood),
                         docs: ADMIN_DOCS,
                         sources: ADMIN_SOURCES,
                     });

@@ -13,6 +13,8 @@ const ORDER: &str = "examples/bikeshop/src/app/workshop/order.rs";
 const APPROVAL: &str = "examples/bikeshop/src/app/workshop/approval.rs";
 const TASKS: &str = "examples/bikeshop/src/app/workshop/tasks.rs";
 const NOTIFY: &str = "examples/bikeshop/src/app/rentals/notify.rs";
+const HISTORY: &str = "examples/bikeshop/resources/views/blocks/history.html";
+const BLOCKED: &str = "examples/bikeshop/resources/views/blocks/date_picker_blocked.html";
 const TESTS: &str = "examples/bikeshop/tests/workshop.rs";
 const BROWSER: &str = "tests/browser/bikeshop-workshop.test.mjs";
 
@@ -33,31 +35,38 @@ pub fn entries() -> Vec<Explanation> {
             features: &[
                 Feature {
                     api: "relations::has_many",
-                    why: "Each bike's work orders come in one query for all the bikes \
-                          (`has_many` keyed by `customer_bike_id`), newest first, so the \
-                          \"last service\" line costs nothing per bike.",
+                    why: "The work orders of all the bikes come in one query (`has_many` keyed \
+                          by `customer_bike_id`), newest first, so the \"last service\" line \
+                          and the count cost nothing per bike: a customer with ten bikes \
+                          doesn't mean ten more queries.",
                 },
                 Feature {
                     api: "Upload",
-                    why: "The photo is an optional `Upload` field checked with `image()` (by \
-                          content) and stored privately; only its owner opens it, through a \
-                          signed temporary link.",
+                    why: "The photo is an optional `Upload` field, checked as an image by its \
+                          content (not its name) and stored on the **private** disk \
+                          (`store`, not `store_public`): a frame photo with its number is \
+                          the owner's business. The bike's page opens it through a \
+                          short-lived signed link (`temporary_url`) after checking the owner.",
                 },
                 Feature {
-                    api: "derive(Validate)",
+                    api: "#[derive(Validate)]",
                     why: "The form's rules are attributes on the struct (`required`, `max`, \
-                          `image`), so the handler only runs with clean input.",
+                          `image`), next to the fields they check, so the handler only runs \
+                          with clean input and the rules can't drift away from the form.",
                 },
                 Feature {
                     api: "UI kit: select (searchable) + form_grid",
-                    why: "The catalogue's bike models in a searchable select, the fields side \
-                          by side from tablet width.",
+                    why: "The catalogue's bike models in a searchable select (typing beats \
+                          scrolling a few hundred names), with \"another model\" for free \
+                          text; the fields sit two by two on wider screens and in one \
+                          column on a phone.",
                 },
             ],
-            under_hood: "Three queries: the customer, their bikes, the work orders of all of \
-                         them; then the catalogue's bike models for the form. Adding a bike \
-                         stores the photo, writes the `customer_bikes` row and opens its \
-                         history page.",
+            under_hood: "Loading: the customer, their bikes, the work orders of all of them \
+                         (one query), then the catalogue's bike categories and models for the \
+                         select. Adding a bike: `Valid<BikeForm>`, the photo stored privately, \
+                         the `customer_bikes` row written, and a redirect with a toast to the \
+                         bike's history page.",
             docs: &[
                 "docs/relations.md#the-loaders",
                 "docs/validation.md#derivevalidate",
@@ -83,29 +92,36 @@ pub fn entries() -> Vec<Explanation> {
             features: &[
                 Feature {
                     api: "UI kit: infolist",
-                    why: "The bike's details as labels and values, money and dates formatted, \
-                          the frame number copyable.",
+                    why: "The bike's details as labels and values: the purchase date and the \
+                          money spent formatted by the kit (`format=\"date\"`, `\"money\"`), \
+                          the frame number copyable for an insurance or police form.",
                 },
                 Feature {
                     api: "blocks: history",
                     why: "The kit has no timeline; the example's `history` block draws the work \
-                          orders as an ordered list with a dated marker each, its body in \
-                          Markdown (the tasks and parts as a list).",
+                          orders as an ordered list with a dated marker each (colour **and** \
+                          icon by status, never colour alone), its body in Markdown (the \
+                          tasks and parts as a list, the notes as quotes).",
                 },
                 Feature {
                     api: "relations::has_many",
-                    why: "Tasks, parts and notes of every work order come in one query each, \
-                          the task names and part names in one more: seven queries however \
-                          long the history.",
+                    why: "The tasks, parts and notes of every work order come in one query each, \
+                          and their names and stores in a few more (`belongs_to`), so the page \
+                          costs the same number of queries for one service or fifty.",
                 },
                 Feature {
-                    api: "Policy (own rows only)",
-                    why: "The bike is looked up by its id **and** the customer, so another \
-                          customer's id simply isn't found.",
+                    api: "Query<T>",
+                    why: "`own_bike` looks the bike up by its id **and** the signed-in \
+                          customer (two `where_eq`), so another customer's id simply isn't \
+                          found (404): there is no separate check to forget, and ids can't be \
+                          probed.",
                 },
             ],
-            under_hood: "The bike, its work orders, their tasks, the tasks' names, parts, \
-                         notes, stores and the parts' names, each one query.",
+            under_hood: "The customer and the bike, its work orders, then one query each for \
+                         their tasks, the tasks' names, parts, notes and stores, two for the \
+                         parts' variants and products, and one for the bike's catalogue model. \
+                         The photo link (`workshop.bikes.photo`) checks the owner again and \
+                         redirects to a 10-minute signed URL.",
             docs: &[
                 "docs/ui.md#infolists-read-only-details",
                 "docs/relations.md#a-page-of-rows-with-their-relations-no-n1",
@@ -113,7 +129,7 @@ pub fn entries() -> Vec<Explanation> {
             sources: &[
                 BIKES,
                 "examples/bikeshop/resources/views/workshop/bike.html",
-                "examples/bikeshop/resources/views/blocks/history.html",
+                HISTORY,
                 TESTS,
             ],
         },
@@ -133,53 +149,63 @@ pub fn entries() -> Vec<Explanation> {
                     api: "blocks: date_picker_blocked",
                     why: "The kit's `date_picker` with the full days and the store's closed \
                           weekdays greyed out (Cally's `isDateDisallowed`), so people pick a day \
-                          with room; the server checks again.",
+                          with room instead of learning it from an error; the server checks \
+                          again, since anyone can send any date.",
                 },
                 Feature {
                     api: "UI kit: checkbox_list + radio",
                     why: "The tasks as a `checkbox_list` (a `Vec<i64>`, each with its time and \
-                          price as a hint), the packages as a `radio`.",
+                          price as a hint), the packages as a `radio` with a line on what each \
+                          includes: both readable at a glance, and plain form fields that work \
+                          without JavaScript.",
                 },
                 Feature {
                     api: "Htmx",
-                    why: "The form `hx-get`s this page on every change and swaps only the day \
-                          picker and the estimate (`hx-select`), since full days depend on the \
-                          store and on the minutes chosen.",
+                    why: "The form `hx-get`s this same page on every change and swaps only the \
+                          day picker and the estimate (`hx-select=\"#booking-live\"`), since \
+                          the full days depend on the store and on the minutes chosen. One \
+                          handler serves both the page and the update, with no JSON API.",
                 },
                 Feature {
                     api: "Valid<T> + after hook",
-                    why: "The hook checks the bike is the customer's, that something was \
-                          chosen and that the day has room: the first capacity check.",
+                    why: "The `after` hook checks the bike is the customer's, that something \
+                          was chosen and that the day has room (`capacity::check_day`): the \
+                          first capacity check, which puts the error next to the field.",
                 },
                 Feature {
                     api: "Db::begin_immediate + lock_for_update",
                     why: "The second capacity check, in the transaction that writes the work \
-                          order: the store's row is taken first, so two bookings of the last \
-                          slot run one after the other and the second is refused.",
+                          order (`capacity::book`): the store's row is taken first, so two \
+                          bookings of the last slot run one after the other and the second is \
+                          refused instead of overbooking the day.",
                 },
                 Feature {
                     api: "notify",
-                    why: "The confirmation goes out as a mail and an in-app notification, in \
-                          the customer's language.",
+                    why: "The confirmation goes out as a mail and an in-app notification (one \
+                          `Notice`), written in the customer's language (their `locale`), \
+                          whoever's request sent it.",
                 },
             ],
             under_hood: "Loading: the customer's bikes, the stores, the tasks, and the period's \
                          work orders of the chosen store (one query, summed per day in Rust) \
                          for the full days. Booking: `Valid<BookForm>` with its `after` hook, \
                          then `capacity::book` (store row locked, the day's minutes summed \
-                         again, the work order and its tasks written), the confirmation, the \
-                         work order's page. `workshop:reminders` mails the day before.",
+                         again, the work order and its tasks written), the confirmation, and \
+                         a redirect to the work order's page. The scheduled \
+                         `workshop:reminders` reminds the customer the evening before.",
             docs: &[
                 "docs/validation.md#hooks-prepare-authorize-after",
                 "docs/ui.md#form-fields",
-                "docs/ui.md#what-htmx-sent-the-htmx-extractor",
+                "docs/ui.md#fragments-and-out-of-band-swaps",
+                "docs/relations.md#more-of-the-query-builder",
                 "docs/mail.md#notifications",
             ],
             sources: &[
                 BOOKING,
                 CAPACITY,
+                NOTIFY,
                 "examples/bikeshop/resources/views/workshop/book.html",
-                "examples/bikeshop/resources/views/blocks/date_picker_blocked.html",
+                BLOCKED,
                 TESTS,
             ],
         },
@@ -187,8 +213,8 @@ pub fn entries() -> Vec<Explanation> {
             route: "workshop.service.show",
             path: "/service/{order}",
             title: "My service",
-            purpose: "A work order for its customer: a progress line (booked, checked in, in \
-                      progress, ready, collected), the tasks ticked as the mechanic does \
+            purpose: "A work order for its customer: a progress line (scheduled, checked in, \
+                      in progress, ready, collected), the tasks ticked as the mechanic does \
                       them, the parts, the notes, extra work and its answer, the total; \
                       reschedule or cancel until 24 hours before, pay online when it's ready.",
             who: "The customer whose bike it is.",
@@ -198,37 +224,52 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "notify",
                     why: "Every status change sends a mail and an in-app notification (a \
-                          `DatabaseMessage` the bell shows, live through the notification \
-                          stream when the layout has it).",
+                          `DatabaseMessage`), which the bell in the layout shows live through \
+                          its notification stream: the customer needn't keep reloading this \
+                          page to know the bike is ready.",
                 },
                 Feature {
                     api: "renox::webhook",
                     why: "\"Pay\" starts an online payment through the shared payments \
-                          contract; the gateway's webhook emits `PaymentSucceeded`, which marks \
-                          the work order paid.",
+                          contract; the gateway's signed webhook marks the payment paid and \
+                          the app emits `PaymentSucceeded`, which the workshop listens to and \
+                          marks the work order paid. The page never trusts the browser's \
+                          return for that.",
                 },
                 Feature {
-                    api: "UI kit: action_sheet + date_picker",
-                    why: "Rescheduling is a small form in a sheet (sent with htmx; a full day \
-                          answers 422 inside the sheet).",
+                    api: "UI kit: action_sheet + confirm + date_picker",
+                    why: "Rescheduling is a small form in a sheet, sent with htmx: a full day \
+                          answers 422 and the error stays in the sheet. Cancelling asks first \
+                          with `confirm`. Both show only while the booking can still change.",
+                },
+                Feature {
+                    api: "workshop::capacity (move_booking)",
+                    why: "A new day goes through the same locked transaction as a booking \
+                          (the store's row first, the day's room checked again), so a \
+                          reschedule can't overbook a day either.",
                 },
                 Feature {
                     api: "Schedule::daily_at",
-                    why: "`workshop:reminders` (18:00) mails tomorrow's bookings once; a \
-                          rescheduled booking is reminded again.",
+                    why: "`workshop:reminders` (18:00, `APP_TIMEZONE`) reminds tomorrow's \
+                          bookings once (`reminded_at`); a rescheduled booking is reminded \
+                          again for its new day.",
                 },
             ],
             under_hood: "The work order is found through the customer's bikes (a 404 for \
-                         anyone else and for fleet repairs); its tasks, parts, notes and extra \
-                         work, a query each.",
+                         anyone else and for fleet repairs); then its tasks and their names, \
+                         parts and their names, notes, extra work, the bike and the store. \
+                         Cancelling sets the status (the customer is told); rescheduling runs \
+                         `capacity::move_booking`; \"Pay\" redirects to the gateway's page.",
             docs: &[
                 "docs/mail.md#database-notifications",
                 "docs/ui.md#actions",
                 "docs/scheduling.md#scheduled-tasks",
+                "docs/scheduling.md#events",
             ],
             sources: &[
                 BOOKING,
                 STATUS,
+                CAPACITY,
                 TASKS,
                 "examples/bikeshop/resources/views/workshop/service.html",
                 TESTS,
@@ -248,22 +289,29 @@ pub fn entries() -> Vec<Explanation> {
                     api: "Signed URLs",
                     why: "`state.signed_url` makes the link (HMAC-SHA256 with `APP_KEY`, valid \
                           72 hours); `ValidSignature` refuses one changed by hand or expired with \
-                          a 403. The buttons post to the same signed address.",
+                          a 403. The buttons post to the same signed address. The bike waits \
+                          on the stand, so answering from the phone in one tap, without a \
+                          password, gets the work going sooner.",
                 },
                 Feature {
                     api: "Single use",
                     why: "The answer is recorded once (`status`, `decided_at`); afterwards the \
-                          page shows the decision and a second answer is refused (409).",
+                          page shows the decision and a second answer, or one after the \
+                          deadline, is refused (409), so a forwarded mail can't change it.",
                 },
                 Feature {
                     api: "StockMovement::record",
-                    why: "Approved parts are taken from the store's stock in a transaction \
-                          with a ledger movement (reason `service`), or waited for.",
+                    why: "Approved parts are taken from the store's stock, each in a \
+                          transaction with a ledger movement (reason `service`), or recorded \
+                          as waited for when the shelf is short.",
                 },
             ],
-            under_hood: "Approving adds the tasks to the work order, takes the parts, adds up \
-                         the totals and puts the work back in progress; refusing only moves \
-                         it on. The store's mechanics get an in-app notification either way.",
+            under_hood: "Showing: the extra work, its work order, store and bike. Approving \
+                         adds the tasks to the work order, takes the parts and adds up the \
+                         totals; either answer puts a work order that was waiting for approval \
+                         back in progress (the customer is told). The store's staff who may \
+                         work on it get an in-app notification either way. The page is \
+                         `noindex`.",
             docs: &["docs/routing.md#signed-urls", "docs/routing.md#csrf"],
             sources: &[
                 APPROVAL,
@@ -290,32 +338,36 @@ pub fn entries() -> Vec<Explanation> {
                     why: "The kit has no board; the example's `kanban` block moves cards by \
                           mouse, touch or keyboard and sends each move as an htmx POST. The \
                           server checks the step is allowed and the person may work on that \
-                          work order in its store, or the card goes back.",
+                          work order in its store, or the card goes back: the browser never \
+                          decides what a move means.",
                 },
                 Feature {
                     api: "renox::context",
-                    why: "The board is the active store's; its mechanics (for the filter) are \
-                          the people holding `workorders.update` there now.",
+                    why: "The board is the active store's (`active_store`, read from the \
+                          request's context); its mechanics (for the filter) are the people \
+                          holding `workorders.update` there now.",
                 },
                 Feature {
                     api: "relations::belongs_to",
                     why: "The cards' bikes, customers, fleet bikes, models and mechanics come \
-                          in a fixed number of queries.",
+                          in a fixed number of queries, however many cards the board has.",
                 },
                 Feature {
-                    api: "Htmx polling",
-                    why: "The board reloads itself every minute (`hx-trigger=\"every 60s\"`), \
-                          so other mechanics' moves and new bookings show up.",
+                    api: "htmx polling",
+                    why: "The board reloads itself every minute (`hx-trigger=\"every 60s\"`, \
+                          `hx-select` of the board), so other mechanics' moves and new \
+                          bookings show up without a reload or a socket.",
                 },
             ],
             under_hood: "One query for the open work orders (filters applied), then the \
                          cards' relations, then the mechanics. A move: `Valid<Move>`, \
-                         `access::require(workorders.update, Operating)`, the step checked \
+                         `access::find` (404 for another store's), `access::require` \
+                         (`workorders.update` in its operating store), the step checked \
                          against `status::allowed`, the status saved and the customer told.",
             docs: &[
                 "docs/authorization.md#checking-one-record-has_permission_in",
                 "docs/relations.md#a-page-of-rows-with-their-relations-no-n1",
-                "docs/ui.md#htmx-response-headers",
+                "docs/ui.md#fragments-and-out-of-band-swaps",
             ],
             sources: &[
                 BOARD,
@@ -332,7 +384,7 @@ pub fn entries() -> Vec<Explanation> {
             title: "Walk-in work order",
             purpose: "A work order for someone at the counter: a known customer (searched) or \
                       a new one without an account, the bike, the tasks and the day (today by \
-                      default, checked in at once).",
+                      default; a work order for today is checked in at once).",
             who: "Staff at the counter and mechanics (`workorders.view`).",
             audience: &[Audience::Staff, Audience::Mechanic, Audience::Cashier],
             flow: Flow::Service,
@@ -340,29 +392,35 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "renox::select",
                     why: "The customer is a searchable select answered by the server \
-                          (`options_url`, `OptionQuery`), by name, email or phone.",
+                          (`options_url`, `OptionQuery`), by name, email or phone: the shop \
+                          has too many customers to send them all with the page.",
                 },
                 Feature {
                     api: "blocks: date_picker_blocked",
-                    why: "The store's full days and closed weekdays can't be picked.",
+                    why: "The store's closed weekdays and the days too full for a half-hour \
+                          job can't be picked; the exact check, for the tasks chosen, runs on \
+                          the server.",
                 },
                 Feature {
                     api: "Valid<T> + after hook",
-                    why: "`required_if` asks for a new customer's name when none was picked; \
-                          the hook checks the day's capacity.",
+                    why: "`required_if` asks for a new customer's name only when none was \
+                          picked; the hook checks the day's capacity for the tasks chosen.",
                 },
             ],
-            under_hood: "The customer is found or created (no user account), the bike \
-                         registered to them, and the same `capacity::book` transaction as \
-                         online bookings writes the work order.",
+            under_hood: "Loading: the tasks, the active store and its full days. Saving: the \
+                         customer is found or created (no user account), the bike found by \
+                         name or registered to them, and the same `capacity::book` \
+                         transaction as online bookings writes the work order; then its page.",
             docs: &[
                 "docs/ui.md#options-from-the-server",
                 "docs/validation.md#every-rule",
+                "docs/validation.md#hooks-prepare-authorize-after",
             ],
             sources: &[
                 BOARD,
                 CAPACITY,
                 "examples/bikeshop/resources/views/workshop/walk_in.html",
+                BLOCKED,
                 TESTS,
             ],
         },
@@ -382,40 +440,47 @@ pub fn entries() -> Vec<Explanation> {
                     api: "renox::select",
                     why: "The part select asks the server as the mechanic types: the parts \
                           that **fit** this bike (`part_fits`, a `Pivot`, through \
-                          `FITTING_PARTS.ids`), each with the store's stock.",
+                          `FITTING_PARTS.ids`), each with the store's stock, so nobody fits \
+                          the wrong chain or promises a part that isn't on the shelf.",
                 },
                 Feature {
                     api: "StockMovement::record",
                     why: "A part used is a stock ledger movement (reason `service`, a `Morph` \
-                          reference to the work order) and its level in one transaction; out of \
-                          stock, the line waits and the order goes to \"waiting for parts\" \
+                          reference to the work order) and its line in one transaction; out \
+                          of stock, the line waits and the order goes to \"waiting for parts\" \
                           (purchasing, #240, sees what is waited for).",
                 },
                 Feature {
                     api: "Signed URLs",
                     why: "Proposing extra work mails the customer a signed link to approve or \
-                          refuse it without logging in.",
+                          refuse it without logging in; the order waits for the answer.",
                 },
                 Feature {
                     api: "has_permission_in",
                     why: "Every action checks `workorders.update` (or `orders.sell` for the \
-                          payment) in the work order's own store; another store's staff get a \
-                          404.",
+                          payment) in the work order's own store (`access::require`); another \
+                          store's staff get a 404, and someone who may only look sees no \
+                          buttons.",
                 },
                 Feature {
                     api: "Events and listeners",
-                    why: "Collecting emits `WorkOrderClosed` (#245 bills fleet repairs to the \
-                          owner store); a collected fleet repair puts the bike back in the \
-                          fleet, serviced.",
+                    why: "Collecting emits `WorkOrderClosed`: the intercompany books (#245) \
+                          bill a fleet repair to its owner store and plans (#237) mark the \
+                          visit done, without the workshop knowing about either. The counter \
+                          payment emits `PaymentSucceeded`, which marks the order paid.",
                 },
                 Feature {
                     api: "Upload",
-                    why: "Before/after photos are private uploads shown through signed links.",
+                    why: "Before/after photos are private uploads, opened through a short-lived \
+                          signed link after the store is checked, since they show customers' \
+                          bikes.",
                 },
             ],
             under_hood: "The order, its tasks and their names, parts and their names, notes, \
-                         extra work, the bike, the customer and the stores. Each action is one \
-                         short handler that redirects back with a toast.",
+                         extra work, the bike, the customer, the stores and the mechanic. Each \
+                         action is one short handler that redirects back with a toast. \
+                         Collecting needs the order paid (409 otherwise), except a fleet \
+                         repair, which also puts the bike back in the fleet, serviced.",
             docs: &[
                 "docs/ui.md#options-from-the-server",
                 "docs/relations.md#changing-a-many-to-many",
@@ -431,6 +496,7 @@ pub fn entries() -> Vec<Explanation> {
                 MOD,
                 "examples/bikeshop/src/app/stock/model.rs",
                 "examples/bikeshop/resources/views/workshop/order.html",
+                HISTORY,
                 TESTS,
                 BROWSER,
             ],

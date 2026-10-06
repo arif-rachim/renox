@@ -1,0 +1,33 @@
+{#- A resource's create and edit page (renox-admin/form.html), replaced by the
+    bike shop for its translations. Sent with htmx: errors show under their
+    fields (422), a success goes back to the list with a toast. Without
+    JavaScript it is a plain form. -#}
+{% extends "renox-admin/layout.html" %}
+{% from "renox/ui.html" import page_header, card, form_grid, form_errors, button, link_button, confirm %}
+{% from "renox-admin/fields.html" import field %}
+{% from "layouts/_text.html" import tx as tr %}
+
+{% block title %}{{ title }} · {{ tr(admin.title) }}{% endblock %}
+
+{% block content %}
+{% call page_header(title, back=resource.index_url, back_label=tr(resource.plural_label)) %}
+  {%- if delete %}
+  {{ confirm("rx-admin-delete", t('admin_panel.delete'), delete.url, t('admin_panel.delete_question', label=(tr(delete.label) | lower)), (t('admin_panel.to_trash') if delete.soft else t('admin_panel.for_good_text')), icon="trash") }}
+  {%- endif %}
+{% endcall %}
+<form method="post" action="{{ action }}" hx-post="{{ action }}" hx-swap="none" data-live-validate novalidate>
+  {{ csrf_field() }}{% if method != "POST" %}{{ method_field(method) }}{% endif %}
+  {{ form_errors() }}
+  {% call card() %}
+    {% call form_grid(2) %}
+      {%- for f in fields %}
+      {{ field(f, currency=admin.currency) }}
+      {%- endfor %}
+    {% endcall %}
+    <div class="rx-row">
+      {{ button(submit_label, key="mod+s") }}
+      {{ link_button(resource.index_url, t('admin_panel.cancel'), variant="plain") }}
+    </div>
+  {% endcall %}
+</form>
+{% endblock %}

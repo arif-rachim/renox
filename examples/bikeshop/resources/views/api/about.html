@@ -3,7 +3,14 @@
 {% from "api/_parts.html" import assets %}
 {% block seo %}{{ seo(title=t('api.about.title'), description=t('api.about.lead')) }}{% endblock %}
 
-{#- Every endpoint of the JSON API (#241), from src/app/api/endpoints.rs. -#}
+{#- Every endpoint of the JSON API (#241), from src/app/api/endpoints.rs; its
+    texts in another language under `api.endpoints.<route>`. -#}
+{#- A text of the endpoint (Markdown) in the page's language, else as written. -#}
+{% macro _md(key, english) -%}
+{%- set found = t(key) -%}
+{{ (found if found != key else english) | markdown }}
+{%- endmacro %}
+
 {% macro endpoint(e) -%}
 <article class="rx-card bs-endpoint" id="{{ e.route | replace('.', '-') }}">
   <header class="bs-endpoint__head">
@@ -11,10 +18,11 @@
     <code class="bs-endpoint__path">{{ e.path }}</code>
     <span class="rx-subtitle">{{ t('api.about.ability') }} <code>{{ e.ability }}</code></span>
   </header>
-  <p>{{ e.purpose | markdown }}</p>
+  {%- set key = 'api.endpoints.' ~ e.route ~ '.' %}
+  <p>{{ _md(key ~ 'purpose', e.purpose) }}</p>
   {% call infolist(columns=2) %}
-    {% call entry(t('api.about.request')) %}{{ (e.request | markdown) if e.request else "—" }}{% endcall %}
-    {% call entry(t('api.about.answer')) %}{{ e.answer | markdown }}{% endcall %}
+    {% call entry(t('api.about.request')) %}{{ _md(key ~ 'request', e.request) if e.request else "—" }}{% endcall %}
+    {% call entry(t('api.about.answer')) %}{{ _md(key ~ 'answer', e.answer) }}{% endcall %}
   {% endcall %}
   <pre class="bs-code"><code>{{ e.curl | replace("$URL", base) }}</code></pre>
 </article>

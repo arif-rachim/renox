@@ -200,9 +200,9 @@ pub async fn customers(
 /// A line rung up.
 #[derive(Deserialize, Validate, Debug)]
 pub struct LineForm {
-    #[validate(required, exists("product_variants", "id"), label = "Product")]
+    #[validate(required, exists("product_variants", "id"))]
     pub variant_id: Option<i64>,
-    #[validate(between(1, 20), label = "Quantity")]
+    #[validate(between(1, 20))]
     pub quantity: i64,
 }
 
@@ -272,7 +272,7 @@ pub async fn remove(session: Session, Path(variant): Path<i64>) -> Result<Redire
 #[derive(Deserialize, Validate, Debug)]
 pub struct CustomerForm {
     #[serde(default)]
-    #[validate(exists("customers", "id"), label = "Customer")]
+    #[validate(exists("customers", "id"))]
     pub customer_id: Option<i64>,
 }
 
@@ -295,11 +295,11 @@ pub async fn clear(session: Session) -> Result<Redirect> {
 /// How the customer pays.
 #[derive(Deserialize, Validate, Debug)]
 pub struct PayForm {
-    #[validate(required, one_of(&["cash", "card"]), label = "Payment")]
+    #[validate(required, one_of(&["cash", "card"]))]
     pub method: String,
     /// What the customer handed over, for cash (the change is worked out).
     #[serde(default)]
-    #[validate(min = 0, label = "Amount received")]
+    #[validate(min = 0)]
     pub tendered: Option<i64>,
 }
 

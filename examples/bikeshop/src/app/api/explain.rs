@@ -31,34 +31,42 @@ pub fn entries() -> Vec<Explanation> {
                     api: "Authorization: Bearer (API tokens)",
                     why: "Programs don't log in with a password: they send a token made on a \
                           tokens page. Renox's auth middleware finds the user from it (only a \
-                          SHA-256 hash is stored), and Bearer requests skip CSRF, since a \
-                          browser never sends one on its own.",
+                          SHA-256 hash is stored, so a leaked database gives no usable \
+                          tokens), and Bearer requests skip CSRF, since a browser never sends \
+                          that header on its own. No valid token on an `/api/v1` route \
+                          (`require_auth`) is a JSON 401, not a redirect to a login page.",
                 },
                 Feature {
                     api: "Routes::require_ability",
-                    why: "Each endpoint needs one ability (`rentals:checkout`, `rent`…): a \
-                          token without it gets 403, no token 401, so a kiosk's token can't \
-                          read customers' orders and a lost one can only do what it was \
-                          given.",
+                    why: "Each endpoint needs one ability (`rentals:checkout`, `rent`…), \
+                          declared once on its group of routes: a token without it gets 403, \
+                          so a kiosk's token can't read customers' orders and a lost one can \
+                          only do what it was given. Kiosk calls then also check the token is \
+                          a kiosk's and the rental is at its store.",
                 },
                 Feature {
                     api: "Valid<T> (JSON)",
                     why: "The API reads the website's own forms (`ReserveForm`, the counter's \
-                          `PickupForm` and `ReturnForm`) from JSON, or multipart for photos, \
-                          and a refusal is Renox's `422 {\"message\", \"errors\"}`, the same \
-                          rules as the pages.",
+                          `PickupForm` and `ReturnForm`) from JSON, or multipart for damage \
+                          photos, and a refusal is Renox's `422 {\"message\", \"errors\"}`: \
+                          the same rules as the pages, written once, so the API can't accept \
+                          what the website refuses.",
                 },
                 Feature {
                     api: "Routes::throttle_by",
                     why: "The `bikeshop-api` limiter (`App::rate_limiter` in `src/lib.rs`) \
-                          counts per token (its id, before the `|`): 120 a minute, then 429 \
-                          with `Retry-After`.",
+                          counts per token (its id, before the `|`), not per IP address: \
+                          several kiosks behind one store router don't share a limit. 120 a \
+                          minute, then 429 with `Retry-After`; a call without a token gets 30 \
+                          a minute per IP.",
                 },
                 Feature {
                     api: "Routes::cors",
-                    why: "The app's web build on its own origin may call the API from a \
-                          browser: Renox answers the preflight and adds the \
-                          `Access-Control-Allow-*` headers for that origin only.",
+                    why: "The app's web build on its own origin \
+                          (`https://app.bikeshop.example`) may call the API from a browser: \
+                          Renox answers the preflight and adds the `Access-Control-Allow-*` \
+                          headers for that origin only, so no other site's scripts can use \
+                          it.",
                 },
                 Feature {
                     api: "Ulid",
@@ -67,12 +75,15 @@ pub fn entries() -> Vec<Explanation> {
                 },
                 Feature {
                     api: "Query::paginate",
-                    why: "Lists come a page at a time, with `meta` (total, last page) and \
-                          `links` (first, last, prev, next) made from the paginator.",
+                    why: "Lists come a page at a time (`?page=`), with `meta` (page, per \
+                          page, total, last page) and `links` (first, last, prev, next) made \
+                          from the paginator: a phone never downloads a customer's whole \
+                          history, and the app needs no paging logic of its own.",
                 },
             ],
             under_hood: "No query: the page renders the endpoint list in \
-                         `src/app/api/endpoints.rs`. The API itself shares the website's \
+                         `src/app/api/endpoints.rs` (`ENDPOINTS`), which a test compares with the \
+                         app's `/api/v1` routes. The API itself shares the website's \
                          functions: `booking::book` and `reserve::cancel_rental` for \
                          customers, `counter::hand_over` and `counter::take_back` for \
                          kiosks.",
@@ -104,27 +115,45 @@ pub fn entries() -> Vec<Explanation> {
             features: &[
                 Feature {
                     api: "User::create_token_with",
-                    why: "A token limited to the abilities ticked and expiring in a year; \
-                          `tokens()` lists them and `revoke_token` ends one at once.",
+                    why: "A token limited to the abilities ticked (`read`, `rent`, `order`) \
+                          and expiring in a year, so a script that only reads can't book; \
+                          `tokens()` lists them with their last use and `revoke_token` ends \
+                          one at once (the app's next call gets 401).",
                 },
                 Feature {
                     api: "Session flash",
                     why: "Only the token's hash is stored, so the secret is shown once: \
-                          flashed into the next page, gone after it.",
+                          `session.flash` carries it to the page after the redirect, and a \
+                          reload no longer shows it. Nothing secret stays in the database or \
+                          the URL.",
                 },
                 Feature {
                     api: "UI kit: checkbox_list + input (copyable) + table",
                     why: "The abilities as a checkbox list, the new token in a read-only \
-                          field with the kit's copy button, the tokens in a table.",
+                          field with the kit's copy button (with a `curl` line to try it), the \
+                          tokens in a table with a confirm before revoking.",
+                },
+                Feature {
+                    api: "Redirect::route",
+                    why: "Creating and revoking a token go back with \
+                          `Redirect::route(\"api.tokens\", &[])`, by the route's name: the same \
+                          name the templates link with, so the address is written once, in the \
+                          module's routes.",
                 },
             ],
-            under_hood: "One query for the tokens. Making one inserts a \
-                         `personal_access_tokens` row (its SHA-256 hash, the abilities as \
-                         JSON, the expiry); revoking deletes it.",
-            docs: &["docs/authorization.md#api-tokens-and-abilities"],
+            under_hood: "One query for the tokens. Making one: `Valid<TokenForm>` (each \
+                         ability `one_of` the three), then a `personal_access_tokens` row (its \
+                         SHA-256 hash, the abilities as JSON, the expiry). Revoking deletes the \
+                         row, only among the user's own tokens (404 otherwise).",
+            docs: &[
+                "docs/authorization.md#api-tokens-and-abilities",
+                "docs/routing.md#sessions",
+            ],
             sources: &[
                 TOKENS,
+                MOD,
                 "examples/bikeshop/resources/views/api/tokens.html",
+                "examples/bikeshop/resources/views/api/_parts.html",
                 TESTS,
             ],
         },
@@ -143,32 +172,40 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "access::staff_routes + require_permission",
                     why: "The page works in the active store and needs `fleet.manage` there; \
-                          a kiosk is made for that store and revoked only by someone who \
-                          manages that store's fleet (404 elsewhere).",
+                          a kiosk is made for that store, and revoking one checks \
+                          `access::can_in` on the kiosk's own store (404 elsewhere), so a \
+                          manager of one store can't switch off another store's kiosks.",
                 },
                 Feature {
                     api: "User::create_token_with",
                     why: "Each kiosk acts as its own user (a random password nobody is \
-                          told) with one token limited to `rentals:read`, \
-                          `rentals:checkout` and `rentals:return` as ticked; the API then \
-                          only shows that store's reservations.",
+                          told), not as the manager who made it, with one token limited to \
+                          `rentals:read`, `rentals:checkout` and `rentals:return` as ticked and \
+                          no expiry (the manager revokes it); the API then only shows that \
+                          store's reservations.",
                 },
                 Feature {
                     api: "Session flash",
-                    why: "The token is shown once, right after it is made.",
+                    why: "The token is shown once, right after it is made (only its hash is \
+                          stored), to be typed or pasted into the kiosk.",
                 },
             ],
-            under_hood: "Two queries: the store's kiosks and their tokens' last use. Making a \
-                         kiosk registers its user, makes the token and writes the `kiosks` \
-                         row; revoking deletes the user's tokens and marks the row revoked.",
+            under_hood: "Three queries: the store, its kiosks and their tokens' last use. \
+                         Making a kiosk: `Valid<KioskForm>`, then its user is registered, the \
+                         token made and the `kiosks` row written. Revoking deletes the kiosk \
+                         user's tokens (`revoke_tokens`) and marks the row revoked, kept for \
+                         the history.",
             docs: &[
                 "docs/authorization.md#api-tokens-and-abilities",
-                "docs/authorization.md#roles-per-branch-a-role-in-one-store-for-a-while",
+                "docs/authorization.md#checking-one-record-has_permission_in",
             ],
             sources: &[
                 TOKENS,
                 KIOSK,
+                MOD,
+                "examples/bikeshop/src/app/access/active_store.rs",
                 "examples/bikeshop/resources/views/api/kiosks.html",
+                "examples/bikeshop/resources/views/api/_parts.html",
                 "examples/bikeshop/migrations/20260103001100_create_kiosks_table.up.sql",
                 TESTS,
             ],

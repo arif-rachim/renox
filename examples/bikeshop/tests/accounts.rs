@@ -595,3 +595,49 @@ async fn logins_are_throttled_and_locked() {
     .await;
     app.assert_guest();
 }
+
+/// Staff reach a walk-in customer's invitation from the pages that show the
+/// customer: the rental desk and the work order (#243).
+#[renox::test]
+async fn staff_pages_link_a_walk_in_customer_to_the_invitation() {
+    let app = TestApp::with_config(bikeshop::app(), |c| {
+        c.vars
+            .insert("BIKESHOP_STAFF_2FA".into(), "optional".into());
+    })
+    .await;
+    bikeshop::seed::run(app.state().clone()).await.unwrap();
+    let owner = User::find_by_email(app.db(), "owner@bikeshop.test")
+        .await
+        .unwrap()
+        .unwrap();
+    app.acting_as(&owner);
+
+    // A work order on a walk-in's bike, and one on a registered customer's.
+    let pick = |claimed: bool| {
+        format!(
+            "SELECT w.id, w.store_id, c.id FROM work_orders w \
+             JOIN customer_bikes b ON b.id = w.customer_bike_id \
+             JOIN customers c ON c.id = b.customer_id \
+             WHERE c.user_id IS {} NULL AND c.deleted_at IS NULL ORDER BY w.id LIMIT 1",
+            if claimed { "NOT" } else { "" }
+        )
+    };
+    for claimed in [false, true] {
+        let (order, store, customer): (i64, i64, i64) = renox::db::sql(pick(claimed))
+            .fetch_as::<(i64, i64, i64)>(app.db())
+            .await
+            .unwrap()
+            .pop()
+            .expect("the seed has both kinds");
+        app.post(&format!("/staff/store/{store}"), &[]).await;
+        let page = app.get(&format!("/staff/workshop/{order}")).await;
+        page.assert_ok();
+        let link = format!("/staff/customers/{customer}/invite");
+        if claimed {
+            page.assert_dont_see(&link);
+        } else {
+            page.assert_see(&link);
+            app.get(&link).await.assert_ok();
+        }
+    }
+}
