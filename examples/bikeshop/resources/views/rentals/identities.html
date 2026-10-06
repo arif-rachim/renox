@@ -1,0 +1,29 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, list, empty, link_button, button, action_sheet, textarea %}
+{% block seo %}{{ seo(title=t('rentals.identities.title')) }}{% endblock %}
+
+{#- ID checks waiting (#235): each photo opens through a signed link that works for five minutes. -#}
+{% block content %}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('rentals.identities.title'), subtitle=t('rentals.identities.lead')) }}
+  {%- if waiting %}
+  {% call list(id="identities", label=t('rentals.identities.title')) %}
+    {%- for w in waiting %}
+    <li>
+      <div class="rx-list__main">
+        <strong>{{ w.customer.name if w.customer else "?" }}</strong>
+        <p class="rx-subtitle">{{ w.masked or "" }} · {{ w.store or "" }} · {{ w.document.submitted_at | since }}</p>
+      </div>
+      {{ link_button(route('rentals.identities.photo', w.document.id), t('rentals.identities.open_photo'), size="small", new_tab=true) }}
+      <form method="post" action="{{ route('rentals.identities.approve', w.document.id) }}">{{ csrf_field() }}{{ button(t('rentals.identities.approve'), size="small", icon="check") }}</form>
+      {% call action_sheet("refuse-" ~ w.document.id, t('rentals.identities.refuse'), route('rentals.identities.refuse', w.document.id), t('rentals.identities.refuse_title'), size="small", danger=true) %}
+        {{ textarea("note", t('rentals.identities.note'), rows=3, required=true, id="refuse-note-" ~ w.document.id) }}
+      {% endcall %}
+    </li>
+    {%- endfor %}
+  {% endcall %}
+  {%- else %}
+  <div class="rx-card">{{ empty(t('rentals.identities.none'), t('rentals.identities.none_text')) }}</div>
+  {%- endif %}
+</div>
+{% endblock %}

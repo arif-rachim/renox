@@ -20,6 +20,8 @@
       {#- --- Public navigation (one line per area; append yours) --- -#}
       {{ nav_link(route('home'), t('nav.home'), active=route_is('home')) }}
       {{ nav_link(route('catalog.index'), t('nav.shop'), active=route_is('catalog.*')) }}
+      {{ nav_link(route('rentals.create'), t('rentals.nav.rent'), active=route_is('rentals.create', 'rentals.show', 'rentals.mine', 'rentals.identity')) }}
+      {{ nav_link(route('workshop.book'), t('workshop.nav.book'), active=route_is('workshop.book', 'workshop.bikes', 'workshop.bikes.show', 'workshop.service.show')) }}
       {#- --- end of public navigation --- -#}
     {% endcall %}
     <span class="rx-spacer"></span>

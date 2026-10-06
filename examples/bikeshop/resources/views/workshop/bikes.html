@@ -1,0 +1,45 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, card, input, select, file, button, form_errors, empty, link_button, form_grid %}
+{% from "workshop/_parts.html" import styles, status %}
+{% block seo %}{{ seo(title=t('workshop.bikes.title')) }}{% endblock %}
+
+{#- The customer's bikes (#236): each with its last service, and the form to add one. -#}
+{% block content %}
+{{ styles() }}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('workshop.bikes.title'), subtitle=t('workshop.bikes.lead')) }}
+  {%- if rows %}
+  <div class="bs-bikes" id="my-bikes">
+    {%- for row in rows %}
+    <article class="rx-card rx-stack">
+      <h2 class="rx-card__title"><a class="rx-link" href="{{ route('workshop.bikes.show', row.bike.id) }}">{{ row.bike.name }}</a></h2>
+      <p class="rx-subtitle">{{ row.bike.frame_number or t('workshop.bikes.no_frame') }}{% if row.bike.size %} · {{ row.bike.size }}{% endif %}</p>
+      {%- if row.last %}
+      <p>{{ t('workshop.bikes.last', date=(row.last.at | date('%d %b %Y'))) }} {{ status(row.last.status) }}</p>
+      {%- else %}<p class="rx-subtitle">{{ t('workshop.bikes.never') }}</p>{% endif %}
+      {{ link_button(route('workshop.book', bike=row.bike.id), t('workshop.book.title'), size="small") }}
+    </article>
+    {%- endfor %}
+  </div>
+  {%- else %}
+  <div class="rx-card">{{ empty(t('workshop.bikes.none'), t('workshop.bikes.none_text')) }}</div>
+  {%- endif %}
+  <form method="post" action="{{ route('workshop.bikes.store') }}" enctype="multipart/form-data" id="add-bike" novalidate>
+    {{ csrf_field() }}
+    {% call card(title=t('workshop.bikes.add')) %}
+      {{ form_errors() }}
+      {%- set opts = namespace(list=[["", t('workshop.bikes.other_model')]]) %}
+      {%- for m in models %}{% set opts.list = opts.list + [[m[0], m[1]]] %}{% endfor %}
+      {% call form_grid(2) %}
+        {{ select("product", t('workshop.bikes.model'), opts.list, searchable=true, hint=t('workshop.bikes.model_hint')) }}
+        {{ input("name", t('workshop.bikes.name'), required=true, placeholder=t('workshop.bikes.name_hint')) }}
+        {{ input("brand", t('workshop.bikes.brand')) }}
+        {{ input("frame_number", t('workshop.bikes.frame')) }}
+        {{ input("size", t('workshop.bikes.size')) }}
+        {{ file("photo", t('workshop.bikes.photo'), accept="image/*", preview=true) }}
+      {% endcall %}
+      {{ button(t('workshop.bikes.save'), icon="plus") }}
+    {% endcall %}
+  </form>
+</div>
+{% endblock %}

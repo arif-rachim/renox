@@ -1,0 +1,31 @@
+{#- Small pieces the rental pages share. -#}
+{% from "renox/ui.html" import badge %}
+
+{#- The page's stylesheet (public/areas/rentals.css), once, through the layout's head stack. -#}
+{% macro styles() -%}
+{% call push('head', once='rentals-css') %}<link rel="stylesheet" href="{{ asset('areas/rentals.css') }}">{% endcall %}
+{%- endmacro %}
+
+{#- A rental's status as a badge: the tone and the word agree. -#}
+{% macro status(rental, overdue=false) -%}
+{%- set tones = {"reserved": "info", "active": "success", "overdue": "error", "returned": none, "cancelled": none, "no_show": "warning"} %}
+{%- set key = "overdue" if overdue and rental.status == "active" else rental.status %}
+{{ badge(t('rentals.status.rental.' ~ key), kind=tones[key]) }}
+{%- endmacro %}
+
+{#- One rental in a list (`row` is a RentalRow): the bike, the code, the
+    customer and the period, its status, and a link (`href`). -#}
+{% macro rental_item(row, href, show_customer=true) -%}
+<li>
+  <div class="bs-rental">
+    <a class="rx-link bs-rental__title" href="{{ href }}">{{ row.model or t('rentals.fields.bike') }}</a>
+    <p class="bs-rental__meta">
+      <span>{{ row.reservation_code }}</span>
+      {%- if show_customer and row.customer %} · {{ row.customer.name }}{% endif %}
+      · {{ row.starts_at | date('%d %b %H:%M') }} → {{ row.due_at | date('%d %b %H:%M') }}
+      {%- if row.operating_store %} · {{ row.operating_store.name }}{% endif %}
+    </p>
+    <div class="bs-rental__side">{{ status(row, row.overdue) }}</div>
+  </div>
+</li>
+{%- endmacro %}

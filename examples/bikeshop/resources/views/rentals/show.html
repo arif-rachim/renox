@@ -1,0 +1,58 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, card, infolist, entry, alert, button, confirm, link_button %}
+{% from "rentals/_parts.html" import styles, status %}
+{% block seo %}{{ seo(title=t('rentals.show.title', code=row.reservation_code)) }}{% endblock %}
+
+{#- A reservation (#235): its code, the bike and the store, the money, and
+    what can still be done (pay the deposit, cancel). -#}
+{% block content %}
+{{ styles() }}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('rentals.show.heading'), subtitle=row.model, back=route('rentals.mine'), back_label=t('rentals.mine.title')) }}
+  {%- if needs_payment %}
+  {{ alert(t('rentals.show.pay_by', time=(pay_by | date('%H:%M'))), kind="warning", title=t('rentals.show.unpaid')) }}
+  {%- elif row.status == "reserved" %}
+  {{ alert(t('rentals.show.held_until', time=(held_until | date('%d %b %H:%M'))), kind="success", title=t('rentals.show.confirmed')) }}
+  {%- endif %}
+  <div class="bs-desk">
+    <div class="bs-desk__side">
+      {% call card(title=t('rentals.show.code')) %}
+        <p class="rx-subtitle">{{ t('rentals.show.code_hint') }}</p>
+        {% call infolist() %}
+          {{ entry(t('rentals.fields.code'), row.reservation_code, copyable=true) }}
+        {% endcall %}
+      {% endcall %}
+      {%- if needs_payment or row.status == "reserved" %}
+      <div class="rx-card rx-stack">
+        {%- if needs_payment %}
+        <form method="post" action="{{ route('rentals.pay', row.reservation_code) }}">
+          {{ csrf_field() }}
+          {{ button(t('rentals.show.pay', amount=(row.deposit | money)), icon="check", block=true) }}
+        </form>
+        {%- endif %}
+        {%- if cancellable %}
+        {{ confirm("cancel-rental", t('rentals.show.cancel'), route('rentals.cancel', row.reservation_code), t('rentals.show.cancel_title'), t('rentals.show.cancel_text'), confirm_label=t('rentals.show.cancel'), method="POST") }}
+        {%- else %}
+        <p class="rx-hint">{{ t('rentals.show.no_cancel') }}</p>
+        {%- endif %}
+      </div>
+      {%- endif %}
+    </div>
+    {% call card(title=t('rentals.show.details')) %}
+      {% call infolist(columns=2) %}
+        {% call entry(t('rentals.fields.status')) %}{{ status(row, row.overdue) }}{% endcall %}
+        {{ entry(t('rentals.fields.store'), row.operating_store.name if row.operating_store else none) }}
+        {{ entry(t('rentals.fields.bike'), row.model) }}
+        {{ entry(t('rentals.fields.frame'), row.bike.frame_number if row.bike else none) }}
+        {{ entry(t('rentals.fields.starts'), row.starts_at, format="datetime") }}
+        {{ entry(t('rentals.fields.ends'), row.due_at, format="datetime") }}
+        {{ entry(t('rentals.fields.price'), row.price, format="money") }}
+        {{ entry(t('rentals.fields.deposit'), row.deposit, format="money", hint=t('rentals.deposit.' ~ row.deposit_status)) }}
+        {%- if row.late_fee %}{{ entry(t('rentals.fields.late_fee'), row.late_fee, format="money") }}{% endif %}
+        {%- if row.damage_fee %}{{ entry(t('rentals.fields.damage_fee'), row.damage_fee, format="money") }}{% endif %}
+        {%- if row.deposit_refunded %}{{ entry(t('rentals.fields.refund'), row.deposit_refunded, format="money") }}{% endif %}
+      {% endcall %}
+    {% endcall %}
+  </div>
+</div>
+{% endblock %}

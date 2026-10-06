@@ -1,0 +1,32 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, card, input, select, file, button, alert, form_errors, infolist, entry %}
+{% block seo %}{{ seo(title=t('rentals.identity.title')) }}{% endblock %}
+
+{#- The ID check (#235): a private photo, the number sealed with APP_KEY, a store that checks it. -#}
+{% block content %}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('rentals.identity.title'), subtitle=t('rentals.identity.lead'), back=route('rentals.mine'), back_label=t('rentals.mine.title')) }}
+  {%- if verified %}
+  {{ alert(t('rentals.identity.verified', date=(verified_at | date('%d %b %Y'))), kind="success", title=t('rentals.identity.done')) }}
+  {%- elif document and document.status == "pending" %}
+  {{ alert(t('rentals.identity.waiting'), kind="info", title=t('rentals.identity.sent')) }}
+  {%- elif document and document.status == "refused" and document.note %}
+  {{ alert(document.note, kind="warning", title=t('rentals.identity.refused')) }}
+  {%- endif %}
+  {%- if masked %}
+  {% call card() %}{% call infolist() %}{{ entry(t('rentals.identity.number'), masked) }}{% endcall %}{% endcall %}
+  {%- endif %}
+  {%- if not verified %}
+  <form method="post" action="{{ route('rentals.identity.store') }}" enctype="multipart/form-data" novalidate>
+    {{ csrf_field() }}
+    {% call card(title=t('rentals.identity.send')) %}
+      {{ form_errors() }}
+      {{ input("id_number", t('rentals.identity.number'), required=true, autocomplete="off", hint=t('rentals.identity.number_hint')) }}
+      {{ file("photo", t('rentals.identity.photo'), accept="image/*", required=true, preview=true, hint=t('rentals.identity.photo_hint')) }}
+      {{ select("store", t('rentals.identity.store'), stores, required=true, hint=t('rentals.identity.store_hint')) }}
+      {{ button(t('rentals.identity.submit'), icon="check") }}
+    {% endcall %}
+  </form>
+  {%- endif %}
+</div>
+{% endblock %}
