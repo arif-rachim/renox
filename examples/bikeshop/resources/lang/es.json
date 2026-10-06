@@ -93,5 +93,125 @@
       "purpose": "La puerta de entrada de la tienda: lo que ofrecen las tres tiendas (comprar, alquilar, taller) y por dónde empezar.",
       "who": "Cualquiera que abra el sitio: visitantes y clientes."
     }
+  },
+  "blocks": {
+    "gallery": {
+      "label": "Fotos",
+      "carousel": "carrusel",
+      "slide": "diapositiva",
+      "position": "Foto :n de :total",
+      "keys": "Foto: las flechas muestran la siguiente",
+      "previous": "Foto anterior",
+      "next": "Foto siguiente",
+      "enlarge": "Ampliar",
+      "thumbnails": "Elige una foto",
+      "show": "Foto :n: :alt",
+      "close": "Cerrar"
+    },
+    "range": {
+      "label": "Rango",
+      "minimum": ":label mínimo",
+      "maximum": ":label máximo"
+    },
+    "quantity": {
+      "label": "Cantidad",
+      "decrease": "Uno menos (:label)",
+      "increase": "Uno más (:label)"
+    },
+    "keypad": {
+      "label": "Teclado numérico",
+      "decimal": "Coma decimal",
+      "backspace": "Borrar el último dígito",
+      "clear": "Borrar",
+      "enter": "Aceptar"
+    },
+    "kanban": {
+      "label": "Tablero",
+      "help": "Para mover una tarjeta: Espacio o Intro la levanta, las flechas la mueven, Espacio o Intro la suelta, Escape cancela.",
+      "picked": "Has levantado :card, en :column, posición :position de :total.",
+      "moved": ":card: :column, posición :position de :total.",
+      "dropped": ":card soltada en :column, posición :position de :total.",
+      "cancelled": "Movimiento cancelado. :card vuelve a :column, posición :position de :total.",
+      "failed": "No se pudo guardar el movimiento de :card. Vuelve a :column."
+    },
+    "calendar": {
+      "months": "Meses",
+      "previous": "Mes anterior",
+      "next": "Mes siguiente",
+      "today": "Hoy",
+      "none": "Nada reservado este mes.",
+      "month_1": "Enero",
+      "month_2": "Febrero",
+      "month_3": "Marzo",
+      "month_4": "Abril",
+      "month_5": "Mayo",
+      "month_6": "Junio",
+      "month_7": "Julio",
+      "month_8": "Agosto",
+      "month_9": "Septiembre",
+      "month_10": "Octubre",
+      "month_11": "Noviembre",
+      "month_12": "Diciembre",
+      "day_0": "dom",
+      "day_1": "lun",
+      "day_2": "mar",
+      "day_3": "mié",
+      "day_4": "jue",
+      "day_5": "vie",
+      "day_6": "sáb",
+      "day_long_0": "domingo",
+      "day_long_1": "lunes",
+      "day_long_2": "martes",
+      "day_long_3": "miércoles",
+      "day_long_4": "jueves",
+      "day_long_5": "viernes",
+      "day_long_6": "sábado"
+    },
+    "availability": {
+      "label": "Disponibilidad",
+      "resource": "Recurso",
+      "free": "Libre",
+      "booked": "Reservado",
+      "closed": "Cerrado",
+      "book": "Reservar :resource a las :slot",
+      "legend": "Qué significa cada franja"
+    },
+    "datetime": {
+      "start_date": "Desde (día)",
+      "start_time": "Desde (hora)",
+      "end_date": "Hasta (día)",
+      "end_time": "Hasta (hora)",
+      "hour": "1 hora",
+      "hours": ":n horas",
+      "day": "1 día",
+      "days": ":n días",
+      "minutes": ":n min",
+      "order": "El final debe ser posterior al inicio."
+    },
+    "blocked": {
+      "unavailable": "Ese día no se puede reservar: elige otro.",
+      "hint": "Los días que no podemos atender aparecen en gris en el calendario."
+    },
+    "swatches": {
+      "sold_out": "agotado"
+    },
+    "history": {
+      "label": "Historial",
+      "kind_info": "nota",
+      "kind_success": "hecho",
+      "kind_warning": "requiere atención",
+      "kind_error": "problema"
+    },
+    "plans": {
+      "label": "Planes",
+      "popular": "El más elegido",
+      "month": "mes",
+      "year": "año",
+      "choose": "Elegir este plan",
+      "compare": "Compara los planes",
+      "feature": "Característica",
+      "included": "Incluido",
+      "not_included": "No incluido"
+    }
   }
 }

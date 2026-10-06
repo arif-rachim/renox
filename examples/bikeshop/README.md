@@ -36,6 +36,38 @@ The skeleton the stories build on (#232, part 1):
 | English and Spanish | [resources/lang/](resources/lang/) |
 | The walker test (every GET route has an explanation whose guide anchors and source files exist), the panel, the index, the language menu | [tests/about.rs](tests/about.rs) |
 
+## Blocks
+
+The UI pieces Renox's kit doesn't have are built here, as **blocks**, written like a small
+library so they can move to a crate later: one macro file each in
+[resources/views/blocks/](resources/views/blocks/) (documented at the top, keyword arguments
+like the kit's), `bs-` classes on the kit's `--rx-*` tokens in
+[public/blocks/blocks.css](public/blocks/blocks.css), and the behaviour in
+[public/blocks/blocks.js](public/blocks/blocks.js) (set up from `data-bs-*` attributes, on the
+page and after htmx swaps; no inline handlers, so `CSP=strict` works; Motion on `transform`,
+nothing moves under `prefers-reduced-motion`). Both layouts load them. Form blocks send plain
+fields, so `Valid<T>` reads them; the server still checks every value.
+[`/about/blocks`](src/app/about/blocks.rs) shows each one working, with its signature.
+
+| Macro | What it is |
+|---|---|
+| `gallery(photos, id, label, enlarge)` | Product photos: arrows, thumbnails, swipe, arrow keys, enlarged in the kit's `sheet` |
+| `range_slider(name_min, name_max, min, max, step, value_min, value_max, label, format)` | Two handles on one track (two native range inputs), sent as two fields |
+| `quantity(name, value, min, max, step, label)` | − / number / + stepper |
+| `keypad(target, label, decimal, zeros, enter_label)` | A counter's number pad typing into the input `target`; arrow keys between keys, digits typed on it |
+| `kanban(id, columns, url, label, values)` + `kanban_card(card)` | Columns of cards; drag (mouse, or the handle on touch) or Space/arrows/Space; each move an htmx POST of `card`, `column`, `position`, announced in a live region, put back if refused |
+| `month_calendar(month, events, url, param, today, first_day, label, heading)` | A month grid with events per day, previous/next months, today marked; a list on phones |
+| `availability(columns, rows, label, corner)` | Resources × hours/days, booked and free slots; a free slot is a link or a small form |
+| `datetime_range(name_start, name_end, label, …, min, max, step, opens, closes)` | Two kit date pickers + time selects, sent as two `YYYY-MM-DDTHH:MM` fields, with the duration shown |
+| `date_picker_blocked(name, label, disabled_dates, closed_weekdays, …)` | The kit's `date_picker` with days that can't be picked (Cally's `isDateDisallowed`) |
+| `swatches(name, label, options, selected, kind, attrs)` | Size or colour chips as radios; `attrs` takes htmx to update price and stock |
+| `history(items, label, date_format)` | A vertical timeline: time, title, body (Markdown), status icon |
+| `compare_plans(plans, features, highlight, …)` | Pricing cards and a comparison table, one plan highlighted |
+
+Tests: [tests/blocks.rs](tests/blocks.rs) (the page, the calendar's grid, the server-side
+checks) and `tests/browser/bikeshop-blocks.test.mjs` (every block's keyboard and pointer paths
+at 1280 and 390 px, light and dark, both CSPs, reduced motion).
+
 ## Adding a page
 
 1. Add the route to the area's `routes()` in `src/app/<area>/mod.rs`, with a `.name(…)`.

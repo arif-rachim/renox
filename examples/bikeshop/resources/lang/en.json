@@ -68,5 +68,156 @@
       "none_title": "No page matches",
       "none_text": "No page uses that feature for that role yet."
     }
+  },
+  "blocks": {
+    "gallery": {
+      "label": "Photos",
+      "carousel": "carousel",
+      "slide": "slide",
+      "position": "Photo :n of :total",
+      "keys": "Photo: the arrow keys show the next one",
+      "previous": "Previous photo",
+      "next": "Next photo",
+      "enlarge": "Enlarge",
+      "thumbnails": "Choose a photo",
+      "show": "Photo :n: :alt",
+      "close": "Close"
+    },
+    "range": {
+      "label": "Range",
+      "minimum": "Lowest :label",
+      "maximum": "Highest :label"
+    },
+    "quantity": {
+      "label": "Quantity",
+      "decrease": "One less (:label)",
+      "increase": "One more (:label)"
+    },
+    "keypad": {
+      "label": "Number pad",
+      "decimal": "Decimal point",
+      "backspace": "Delete the last digit",
+      "clear": "Clear",
+      "enter": "Enter"
+    },
+    "kanban": {
+      "label": "Board",
+      "help": "To move a card: Space or Enter picks it up, the arrow keys move it, Space or Enter drops it, Escape cancels.",
+      "picked": "Picked up :card, in :column, position :position of :total.",
+      "moved": ":card: :column, position :position of :total.",
+      "dropped": ":card dropped in :column, position :position of :total.",
+      "cancelled": "Move cancelled. :card is back in :column, position :position of :total.",
+      "failed": "The move of :card couldn't be saved. It is back in :column."
+    },
+    "calendar": {
+      "months": "Months",
+      "previous": "Previous month",
+      "next": "Next month",
+      "today": "Today",
+      "none": "Nothing booked this month.",
+      "month_1": "January",
+      "month_2": "February",
+      "month_3": "March",
+      "month_4": "April",
+      "month_5": "May",
+      "month_6": "June",
+      "month_7": "July",
+      "month_8": "August",
+      "month_9": "September",
+      "month_10": "October",
+      "month_11": "November",
+      "month_12": "December",
+      "day_0": "Sun",
+      "day_1": "Mon",
+      "day_2": "Tue",
+      "day_3": "Wed",
+      "day_4": "Thu",
+      "day_5": "Fri",
+      "day_6": "Sat",
+      "day_long_0": "Sunday",
+      "day_long_1": "Monday",
+      "day_long_2": "Tuesday",
+      "day_long_3": "Wednesday",
+      "day_long_4": "Thursday",
+      "day_long_5": "Friday",
+      "day_long_6": "Saturday"
+    },
+    "availability": {
+      "label": "Availability",
+      "resource": "Resource",
+      "free": "Free",
+      "booked": "Booked",
+      "closed": "Closed",
+      "book": "Book :resource at :slot",
+      "legend": "What the slots mean"
+    },
+    "datetime": {
+      "start_date": "From (day)",
+      "start_time": "From (time)",
+      "end_date": "Until (day)",
+      "end_time": "Until (time)",
+      "hour": "1 hour",
+      "hours": ":n hours",
+      "day": "1 day",
+      "days": ":n days",
+      "minutes": ":n min",
+      "order": "The end must come after the start."
+    },
+    "blocked": {
+      "unavailable": "That day can't be booked: pick another one.",
+      "hint": "Days we can't take are greyed out on the calendar."
+    },
+    "swatches": {
+      "sold_out": "sold out"
+    },
+    "history": {
+      "label": "History",
+      "kind_info": "note",
+      "kind_success": "done",
+      "kind_warning": "needs attention",
+      "kind_error": "problem"
+    },
+    "plans": {
+      "label": "Plans",
+      "popular": "Most popular",
+      "month": "month",
+      "year": "year",
+      "choose": "Choose this plan",
+      "compare": "Compare the plans",
+      "feature": "Feature",
+      "included": "Included",
+      "not_included": "Not included"
+    },
+    "page": {
+      "title": "Bike shop blocks",
+      "lead": "The UI pieces Renox's kit doesn't have, built inside this example as macros on the kit's tokens. Each one works here, with its signature.",
+      "contents": "On this page",
+      "signature": "Macro",
+      "gallery": "A product's photos: arrows, thumbnails, swipes and the arrow keys, and an enlarged view in the kit's sheet.",
+      "form_title": "Form fields",
+      "form_lead": "These blocks are plain form fields, so Valid<T> reads them. Send the form: the server checks every value again.",
+      "range": "Two handles on one track, sent as two fields.",
+      "quantity": "A number with − and + buttons.",
+      "keypad": "A counter's number pad, typing into the amount.",
+      "datetime": "A start and an end with hours, sent as two date-times.",
+      "blocked": "The kit's date picker with closed days.",
+      "swatches": "Variants as chips; a change asks the server for the price and stock.",
+      "send": "Send the form",
+      "received": "The server accepted: :summary",
+      "paid": "Amount paid",
+      "filter_title": "A price filter",
+      "filter_lead": "A GET form: the two handles become ?price_min=…&price_max=… in the address.",
+      "filter": "Filter",
+      "filtering": "Showing bikes from :low to :high.",
+      "kanban": "The workshop's jobs: drag a card, or pick it up with Space and move it with the arrow keys. Each move is sent with htmx.",
+      "calendar": "Service visits in a month; the arrows go to the months around it.",
+      "availability": "Bikes against the hours of a day; a free slot is a link that books it.",
+      "history": "What happened to a bike in the workshop.",
+      "plans": "The service plans, side by side and compared.",
+      "variant": "Price and stock",
+      "in_stock": ":n in stock",
+      "out_of_stock": "Out of stock",
+      "booked": "Booking :slot (a demo: nothing is saved)."
+    }
   }
 }

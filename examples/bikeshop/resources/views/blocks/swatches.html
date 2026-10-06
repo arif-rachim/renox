@@ -1,0 +1,56 @@
+{#- swatches: a variant picker (a frame size, a colour) as chips. A group of
+    radio buttons, so one plain field, `name`, is sent.
+
+    {% from "blocks/swatches.html" import swatches %}
+    {{ swatches("size", "Frame size", [
+         {"value": "S", "label": "S", "note": "150–165 cm"},
+         {"value": "M", "label": "M"},
+         {"value": "L", "label": "L", "disabled": true}
+       ], selected="M") }}
+    {{ swatches("colour", "Colour", [
+         {"value": "teal", "label": "Teal", "color": "#0b6e66"},
+         {"value": "sand", "label": "Sand", "color": "#d8c7a3"}
+       ], selected="teal", kind="colour",
+       attrs={"hx-get": route('catalog.variant', 12), "hx-trigger": "change", "hx-target": "#price", "hx-include": "closest form"}) }}
+
+    `options`: a list of {value, label, note?, color?, disabled?}: `note`
+    is shown under the label (a fit, a price difference), `disabled` a
+    variant out of stock (still shown, crossed out and "sold out" for
+    screen readers), `color` the chip's colour with `kind="colour"` (a
+    round chip with the label beside it, so the colour is never the only
+    way to tell). `selected`: the value chosen at first (old input wins).
+    `attrs`: attributes for the group, e.g. htmx ones: a change of variant
+    asks the server for the price and the stock (`hx-include` sends the
+    other fields too). `required`, `hint`, `id`, `bag` as for the kit's fields.
+
+    Native radios: Tab reaches the group, the arrow keys choose, the focus
+    ring is the kit's; a chosen chip is filled and ticked (a shape, not
+    only a colour). Works without JavaScript. -#}
+{% macro swatches(name, label, options, selected=none, kind="size", attrs={}, required=false, hint=none, id=none, bag=none) -%}
+{%- set id = id or ("bs-" ~ name) %}
+{%- set current = old(name, selected if selected is not none else "") | string %}
+{%- set message = error(name, bag=bag) %}
+<fieldset class="rx-field bs-swatches bs-swatches--{{ kind }}" id="{{ id }}" aria-describedby="{% if hint %}{{ id }}-hint {% endif %}{{ id }}-error"
+  {%- for key, value in attrs | items %} {{ key }}="{{ value }}"{% endfor %}>
+  <legend class="rx-label">{{ label }}{% if not required %} <span class="rx-required">({{ t('ui.optional') }})</span>{% endif %}</legend>
+  <div class="bs-swatches__options">
+    {%- for option in options %}
+    <label class="bs-swatch{% if option.disabled %} bs-swatch--disabled{% endif %}">
+      <input class="bs-swatch__input" type="radio" name="{{ name }}" value="{{ option.value }}"
+        {%- if (option.value | string) == current %} checked{% endif %}
+        {%- if option.disabled %} disabled{% endif %}
+        {%- if required %} required{% endif %}
+        {%- if message %} aria-invalid="true"{% endif %}>
+      <span class="bs-swatch__chip">
+        {%- if kind == "colour" %}<svg class="bs-swatch__colour" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="{{ option.color or 'currentColor' }}" stroke="currentColor" stroke-opacity="0.25"/></svg>{% endif %}
+        <span class="bs-swatch__label">{{ option.label }}</span>
+        {%- if option.note %}<span class="bs-swatch__note">{{ option.note }}</span>{% endif %}
+        {%- if option.disabled %}<span class="rx-visually-hidden">({{ t('blocks.swatches.sold_out') }})</span>{% endif %}
+      </span>
+    </label>
+    {%- endfor %}
+  </div>
+  {%- if hint %}<p class="rx-hint" id="{{ id }}-hint">{{ hint }}</p>{% endif %}
+  <p class="rx-error" id="{{ id }}-error" data-error-for="{{ name }}" aria-live="polite">{{ message }}</p>
+</fieldset>
+{%- endmacro %}
