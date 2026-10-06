@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/*", "examples/*", "site", "tests/browser/fixture", "tests/chaos"]
 
 [workspace.package]
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.6"
 edition = "2024"
 # The oldest Rust that builds Renox (sqlx 0.9 needs 1.94); checked in CI.
 rust-version = "1.94"
@@ -16,15 +16,15 @@ categories = ["web-programming::http-server"]
 [workspace.dependencies]
 # Released together, in lockstep: the macros write code against renox-core's
 # items of the same release, so each crate pins the others exactly (`=`).
-renox = { path = "crates/renox", version = "=1.0.0-rc.5" }
-renox-core = { path = "crates/renox-core", version = "=1.0.0-rc.5", default-features = false }
-renox-macros = { path = "crates/renox-macros", version = "=1.0.0-rc.5" }
+renox = { path = "crates/renox", version = "=1.0.0-rc.6" }
+renox-core = { path = "crates/renox-core", version = "=1.0.0-rc.6", default-features = false }
+renox-macros = { path = "crates/renox-macros", version = "=1.0.0-rc.6" }
 # The plugin crates, released with renox at the same version.
-renox-2fa = { path = "crates/renox-2fa", version = "=1.0.0-rc.5" }
-renox-editors = { path = "crates/renox-editors", version = "=1.0.0-rc.5" }
-renox-admin = { path = "crates/renox-admin", version = "=1.0.0-rc.5" }
-renox-oauth = { path = "crates/renox-oauth", version = "=1.0.0-rc.5" }
-renox-billing = { path = "crates/renox-billing", version = "=1.0.0-rc.5" }
+renox-2fa = { path = "crates/renox-2fa", version = "=1.0.0-rc.6" }
+renox-editors = { path = "crates/renox-editors", version = "=1.0.0-rc.6" }
+renox-admin = { path = "crates/renox-admin", version = "=1.0.0-rc.6" }
+renox-oauth = { path = "crates/renox-oauth", version = "=1.0.0-rc.6" }
+renox-billing = { path = "crates/renox-billing", version = "=1.0.0-rc.6" }
 
 # Password hashing (Argon2) is deliberately slow, and far slower unoptimised:
 # every login, registration and auth test paid for it. Optimise just these

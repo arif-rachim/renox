@@ -1659,9 +1659,12 @@ Started by the owner on 2026-10-03, after M34. In steps, one PR each:
 - [x] `1.0.0-rc.3` with those fixes: published 2026-10-04 (#132, tag `v1.0.0-rc.3`)
 - [x] `1.0.0-rc.4`: the fixes found using rc.3 (#133, #144, #163, #178) and the extension
       points for plugins (#167, #168); tag `v1.0.0-rc.4`
-- [ ] `1.0.0-rc.5`: #219's checks, #226, the plugins renox-oauth (#147), renox-admin (#148)
-      and renox-billing (#155), roles per branch (#244), CI on rustc 1.99; the version is
-      set on main, published once the owner runs `cargo publish` (RELEASING.md)
+- [x] `1.0.0-rc.5`: #219's checks, #226, the plugins renox-oauth (#147), renox-admin (#148)
+      and renox-billing (#155), roles per branch (#244), CI on rustc 1.99; tag `v1.0.0-rc.5`
+- [ ] `1.0.0-rc.6`: the fixes the coverage epic found (#246: #271–#290, #278, #279, #292,
+      #294), Back closing sheets and menus, Escape closing toasts (#266), the browser and
+      process suites and the coverage floor in CI; the version is set on main, published once
+      the owner runs `cargo publish` (RELEASING.md)
 - [ ] 1.0.0
 - [ ] Real crates published to crates.io (`renox`, `renox-core`, `renox-macros`, `renox-cli`;
       only 0.0.1 placeholders exist before the release candidate; the owner runs `cargo login` and RELEASING.md), then
