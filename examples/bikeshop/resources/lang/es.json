@@ -1520,5 +1520,68 @@
       "title": "Planes de servicio",
       "lead": "Los planes, visitas y pagos de tus bicis."
     }
+  },
+  "api": {
+    "abilities": {
+      "rentals_read": "Ver las bicis libres de la tienda y sus reservas",
+      "rentals_checkout": "Entregar bicis reservadas",
+      "rentals_return": "Recibir bicis, con daños y fotos",
+      "read": "Leer el catálogo, mis bicis, órdenes de trabajo y planes",
+      "rent": "Ver, reservar y cancelar mis alquileres",
+      "order": "Ver mis pedidos"
+    },
+    "tokens": {
+      "title": "Tokens de la API",
+      "lead": "Los tokens dejan que la app de la tienda (o tus propios scripts) usen tu cuenta por la API JSON, cada uno solo para lo que marques.",
+      "yours": "Tus tokens",
+      "new": "Un token nuevo",
+      "name": "Nombre",
+      "name_hint": "Dónde lo usarás, p. ej. \"Mi móvil\".",
+      "abilities": "Qué puede hacer",
+      "make": "Crear el token",
+      "token": "El token",
+      "last_used": "Último uso",
+      "expires": "Caduca",
+      "never": "Nunca",
+      "revoke": "Revocar",
+      "revoke_title": "¿Revocar este token?",
+      "revoke_text": "Lo que lo use deja de funcionar al momento.",
+      "none": "Aún no hay tokens",
+      "none_text": "Crea uno para la app abajo.",
+      "once_title": "Cópialo ahora",
+      "once": "Este token solo se muestra una vez: solo se guarda una huella. Envíalo como Authorization: Bearer.",
+      "made": "Token creado: cópialo ahora, solo se muestra una vez.",
+      "revoked": "Token revocado."
+    },
+    "kiosks": {
+      "nav": "Tokens de quioscos",
+      "title": "Tokens de quioscos",
+      "lead": "Los quioscos de autoservicio de :store: cada uno usa su propio token, solo para los alquileres de esta tienda.",
+      "list": "Quioscos de :store",
+      "new": "Un quiosco nuevo",
+      "name_hint": "Dónde está, p. ej. \"Junto a la puerta\".",
+      "state": "Estado",
+      "active": "Funcionando",
+      "revoked": "Revocado",
+      "none": "Aún no hay quioscos",
+      "none_text": "Crea un token para un quiosco abajo.",
+      "revoke_title": "¿Revocar el token de este quiosco?",
+      "revoke_text": "El quiosco deja de funcionar al momento. Hazlo si se pierde o se cambia."
+    },
+    "about": {
+      "title": "La API JSON",
+      "lead": "Cada endpoint para los quioscos y la app de la tienda: qué necesita, qué enviar, qué responde.",
+      "link": "Todos los endpoints, con ejemplos curl",
+      "how": "Cómo funciona",
+      "ability": "Permiso",
+      "request": "Petición",
+      "answer": "Respuesta",
+      "kiosk": "Quioscos",
+      "customer": "La app del cliente",
+      "rule_token": "Envía un token como Authorization: Bearer; sin él la respuesta es 401, sin el permiso del endpoint 403.",
+      "rule_errors": "Una petición rechazada es 422 {\"message\", \"errors\"}, con las mismas reglas que la web; las listas llegan por páginas con enlaces.",
+      "rule_limit": ":count peticiones por minuto y token; por encima, 429 con Retry-After.",
+      "rule_cors": "Los navegadores en :origin pueden llamarla (CORS)."
+    }
   }
 }

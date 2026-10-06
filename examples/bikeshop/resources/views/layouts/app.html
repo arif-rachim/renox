@@ -39,6 +39,8 @@
     {% if auth.check %}
       {% call menu(auth.user.name, id="account-menu", variant="plain") %}
         {{ menu_link(route('account.show'), t('nav.account')) }}
+        {{ menu_link(route('plans.mine'), t('plans.mine.title')) }}
+        {{ menu_link(route('api.tokens'), t('api.tokens.title')) }}
         {#- Everyone sees it until the access foundations put it behind a permission. -#}
         {{ menu_link(route('staff.dashboard'), t('nav.staff')) }}
         {{ menu_separator() }}

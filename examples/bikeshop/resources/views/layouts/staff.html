@@ -21,6 +21,7 @@
     {% if can('fleet.view') %}{{ sidebar_link(route('rentals.fleet'), t('rentals.nav.fleet'), active=route_is('rentals.fleet', 'rentals.fleet.show')) }}{% endif %}
     {% if can('rentals.verify_id') %}{{ sidebar_link(route('rentals.identities'), t('rentals.nav.identities'), active=route_is('rentals.identities')) }}{% endif %}
     {% if can('workorders.view') %}{{ sidebar_link(route('workshop.board'), t('workshop.nav.board'), active=route_is('workshop.board', 'workshop.order', 'workshop.walkin')) }}{% endif %}
+    {% if can('fleet.manage') %}{{ sidebar_link(route('api.kiosks'), t('api.kiosks.nav'), active=route_is('api.kiosks')) }}{% endif %}
     {#- --- end of staff navigation --- -#}
     {{ sidebar_section(t('nav.shop')) }}
     {{ sidebar_link(route('home'), t('nav.storefront')) }}

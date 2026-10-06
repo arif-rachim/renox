@@ -1518,5 +1518,68 @@
       "title": "Service plans",
       "lead": "Your bikes' plans, visits and payments."
     }
+  },
+  "api": {
+    "abilities": {
+      "rentals_read": "See the store's free bikes and its reservations",
+      "rentals_checkout": "Hand reserved bikes over",
+      "rentals_return": "Take bikes back, with damage and photos",
+      "read": "Read the catalogue, my bikes, work orders and plans",
+      "rent": "See, reserve and cancel my rentals",
+      "order": "See my orders"
+    },
+    "tokens": {
+      "title": "API tokens",
+      "lead": "Tokens let the shop's app (or your own scripts) use your account through the JSON API, each only for what you tick.",
+      "yours": "Your tokens",
+      "new": "A new token",
+      "name": "Name",
+      "name_hint": "Where you'll use it, e.g. \"My phone\".",
+      "abilities": "What it may do",
+      "make": "Make the token",
+      "token": "The token",
+      "last_used": "Last used",
+      "expires": "Expires",
+      "never": "Never",
+      "revoke": "Revoke",
+      "revoke_title": "Revoke this token?",
+      "revoke_text": "Whatever uses it stops working at once.",
+      "none": "No token yet",
+      "none_text": "Make one for the app below.",
+      "once_title": "Copy it now",
+      "once": "This token is shown only once: only a fingerprint of it is kept. Send it as Authorization: Bearer.",
+      "made": "Token made: copy it now, it is shown only once.",
+      "revoked": "Token revoked."
+    },
+    "kiosks": {
+      "nav": "Kiosk tokens",
+      "title": "Kiosk tokens",
+      "lead": "The self-service kiosks of :store: each acts through its own token, only for the rentals of this store.",
+      "list": "Kiosks of :store",
+      "new": "A new kiosk",
+      "name_hint": "Where it stands, e.g. \"Racks by the door\".",
+      "state": "State",
+      "active": "Working",
+      "revoked": "Revoked",
+      "none": "No kiosk yet",
+      "none_text": "Make a token for a kiosk below.",
+      "revoke_title": "Revoke this kiosk's token?",
+      "revoke_text": "The kiosk stops working at once. Do it when a kiosk is lost or replaced."
+    },
+    "about": {
+      "title": "The JSON API",
+      "lead": "Every endpoint for the store kiosks and the shop's app: what it needs, what to send, what comes back.",
+      "link": "Every endpoint, with curl examples",
+      "how": "How it works",
+      "ability": "Ability",
+      "request": "Request",
+      "answer": "Answer",
+      "kiosk": "Kiosks",
+      "customer": "The customer's app",
+      "rule_token": "Send a token as Authorization: Bearer; without one the answer is 401, without the endpoint's ability 403.",
+      "rule_errors": "A refused request is 422 {\"message\", \"errors\"}, with the same rules as the website; lists come in pages with links.",
+      "rule_limit": ":count requests a minute per token; over that, 429 with Retry-After.",
+      "rule_cors": "Browsers on :origin may call it (CORS)."
+    }
   }
 }
