@@ -449,6 +449,7 @@ async fn health_reports_a_database_that_doesnt_answer_in_time() {
 /// A reporter that panics is logged; the others still get the report.
 #[renox::test]
 async fn a_reporter_that_panics_doesnt_stop_the_others() {
+    let (logs, _logged) = crate::logs::capture();
     let views = views();
     let seen: Arc<Mutex<Vec<ErrorReport>>> = Arc::default();
     let reports = seen.clone();
@@ -465,4 +466,5 @@ async fn a_reporter_that_panics_doesnt_stop_the_others() {
     .await;
     app.get("/boom").await.assert_status(500);
     assert_eq!(wait_for(&seen, 1).await.len(), 1);
+    assert!(logs.has(&["an error reporter panicked"]), "{}", logs.text());
 }

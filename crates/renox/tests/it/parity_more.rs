@@ -448,6 +448,7 @@ async fn has_many_through_reaches_grandchildren_in_two_queries() {
 /// status) also lets the password through.
 #[renox::test]
 async fn uncompromised_allows_the_password_when_the_service_cant_be_reached() {
+    let (logs, _logged) = crate::logs::capture();
     let app = TestApp::new(App::new().module(Forms)).await;
     app.fake_http().on(
         "https://api.pwnedpasswords.com/*",
@@ -457,6 +458,11 @@ async fn uncompromised_allows_the_password_when_the_service_cant_be_reached() {
         .post("/sign-up", &[("password", "password")])
         .await
         .assert_ok();
+    assert!(
+        logs.has(&["the password breach check failed; allowing the password"]),
+        "{}",
+        logs.text()
+    );
 }
 
 /// #256: when every mailer in the failover list fails too, the last error
@@ -464,6 +470,7 @@ async fn uncompromised_allows_the_password_when_the_service_cant_be_reached() {
 /// a number (`{PREFIX}_PORT`).
 #[renox::test]
 async fn failover_that_runs_out_returns_the_last_error() {
+    let (logs, _logged) = crate::logs::capture();
     let down = |config: &mut MailConfig, port: u16| {
         config.mailer = renox::mail::MailDriver::Smtp;
         config.host = "127.0.0.1".into();
@@ -475,6 +482,9 @@ async fn failover_that_runs_out_returns_the_last_error() {
         App::new().mailer("backup", move |_| {
             let mut backup = MailConfig::default();
             down(&mut backup, 10);
+            // A host that can't be resolved: another error than the first
+            // mailer's refused connection.
+            backup.host = "no such host".into();
             backup.encryption = renox::mail::MailEncryption::Tls;
             backup.username = Some("app".into());
             backup.password = Some("secret".into());
@@ -494,6 +504,16 @@ async fn failover_that_runs_out_returns_the_last_error() {
         .unwrap_err();
     let shown = format!("{err:?}");
     assert!(!shown.contains("secret"), "{shown}");
+    assert!(
+        !shown.to_lowercase().contains("refused"),
+        "the backup's error: {shown}"
+    );
+    let logged = logs.text();
+    assert!(
+        logged.contains("sending mail failed; trying the next mailer")
+            && logged.contains("mailer=backup"),
+        "{logged}"
+    );
 
     let err = MailConfig::from_env(
         &{

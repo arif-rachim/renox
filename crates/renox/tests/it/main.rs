@@ -35,6 +35,7 @@ mod infolist;
 mod infra;
 mod jobs;
 mod leftovers;
+mod logs;
 mod mail;
 mod method;
 mod model_keys;

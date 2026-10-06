@@ -358,6 +358,28 @@ async fn form_calls_failed_stores_and_calls_done_meanwhile() {
     assert!(!paid(&app, "G-1").await && !paid(&app, "D-1").await);
     app.assert_database_count("failed_jobs", 0).await;
 
+    // A call that failed before (its first try) is handled again by its job
+    // and ends processed.
+    let again = body("evt_again", "A-1");
+    send(&app, &again, &webhook::hmac_sha256_hex(SECRET, &again))
+        .await
+        .assert_ok();
+    renox::db::sql(
+        "UPDATE webhook_calls SET status = 'failed', error = 'earlier' WHERE event_id LIKE ?",
+    )
+    .bind("%evt_again")
+    .execute(app.db())
+    .await
+    .unwrap();
+    app.run_jobs().await;
+    assert!(paid(&app, "A-1").await);
+    let status: String = renox::db::sql("SELECT status FROM webhook_calls WHERE event_id LIKE ?")
+        .bind("%evt_again")
+        .scalar(app.db())
+        .await
+        .unwrap();
+    assert_eq!(status, "processed");
+
     // The table can't be written: a 500, so the provider sends it again.
     renox::db::sql("ALTER TABLE webhook_calls RENAME TO webhook_calls_away")
         .execute(app.db())

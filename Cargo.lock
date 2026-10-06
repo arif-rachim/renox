@@ -2420,6 +2420,8 @@ dependencies = [
  "tempfile",
  "tokio",
  "tower",
+ "tracing",
+ "tracing-subscriber",
  "zip",
 ]
 

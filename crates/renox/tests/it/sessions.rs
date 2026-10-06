@@ -162,9 +162,15 @@ async fn test_helpers_work_with_database_sessions() {
 /// browsers may drop it).
 #[renox::test]
 async fn a_cookie_session_over_4_kb_is_still_sent() {
+    let (logs, _logged) = crate::logs::capture();
     let app = TestApp::new(app()).await;
     app.get("/big").await.assert_ok();
     assert!(app.session_cookie().unwrap().len() > 4000);
+    assert!(
+        logs.has(&["WARN", "larger than browsers reliably store"]),
+        "{}",
+        logs.text()
+    );
 }
 
 /// With the test mirror (`APP_ENV=testing`), a new id at login drops the
@@ -267,4 +273,44 @@ async fn test_helpers_keep_a_remembered_session() {
     app.confirm_password();
     app.assert_authenticated(Some(&user));
     app.get("/whoami").await.assert_see("Fay");
+    // Three hours on, past SESSION_LIFETIME (two hours): still logged in,
+    // the cookie keeps REMEMBER_LIFETIME's minutes.
+    app.travel(std::time::Duration::from_secs(3 * 3600));
+    app.get("/whoami").await.assert_see("Fay");
+}
+
+/// Without "remember me" the same three hours end the session.
+#[renox::test]
+async fn a_session_not_remembered_ends_after_its_lifetime() {
+    let app = TestApp::new(app()).await;
+    User::register(app.db(), "Gus", "gus@example.com", "password123")
+        .await
+        .unwrap();
+    app.post(
+        "/login",
+        &[("email", "gus@example.com"), ("password", "password123")],
+    )
+    .await
+    .assert_redirect("/");
+    app.get("/whoami").await.assert_see("Gus");
+    app.travel(std::time::Duration::from_secs(3 * 3600));
+    app.get("/whoami").await.assert_dont_see("Gus");
+}
+
+/// A session cookie that doesn't decrypt (tampered, or from another
+/// APP_KEY) is ignored: the visitor is a guest with a fresh session.
+#[renox::test]
+async fn a_session_cookie_that_doesnt_decrypt_is_ignored() {
+    let app = TestApp::new(app()).await;
+    let res = app
+        .request()
+        .header("cookie", "renox_session=bm90IGVuY3J5cHRlZA")
+        .get("/whoami")
+        .await;
+    res.assert_ok().assert_dont_see("Fay");
+    assert!(
+        res.header("set-cookie")
+            .is_some_and(|c| c.starts_with("renox_session=")),
+        "a fresh session is sent"
+    );
 }

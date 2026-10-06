@@ -345,6 +345,7 @@ impl Job for Vanishing {
 
 #[renox::test]
 async fn a_panicking_failed_hook_still_records_the_failure() {
+    let (logs, _logged) = crate::logs::capture();
     let app = TestApp::new(App::new().job::<Doomed>().job::<Vanishing>()).await;
     app.state().dispatch(Doomed).await.unwrap();
     app.run_jobs().await;
@@ -356,6 +357,11 @@ async fn a_panicking_failed_hook_still_records_the_failure() {
     app.run_jobs().await;
     assert!(app.queued_jobs().await.is_empty());
     assert_eq!(count(&app, "SELECT COUNT(*) FROM failed_jobs").await, 1);
+    assert!(
+        logs.has(&["the job's failed hook panicked"]),
+        "{}",
+        logs.text()
+    );
 }
 
 /// The dashboard's numbers: jobs done in the last hour, and a queue whose

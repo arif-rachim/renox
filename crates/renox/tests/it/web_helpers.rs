@@ -277,6 +277,7 @@ async fn named_limits_are_shared_through_the_database_store() {
 
 #[renox::test]
 async fn a_failing_shared_counter_lets_the_request_through() {
+    let (logs, _logged) = crate::logs::capture();
     let app = TestApp::with_config(web(), |c| c.cache_store = CacheStore::Database).await;
     renox::db::sql("DROP TABLE cache")
         .execute(app.db())
@@ -284,6 +285,11 @@ async fn a_failing_shared_counter_lets_the_request_through() {
         .unwrap();
     app.get("/hourly").await.assert_ok();
     app.get("/hourly").await.assert_ok();
+    assert!(
+        logs.has(&["could not count a rate-limited request"]),
+        "{}",
+        logs.text()
+    );
 }
 
 #[renox::test]
@@ -316,6 +322,7 @@ async fn push_turns_a_single_value_into_a_list() {
 /// error is logged), and the next request is a fresh session.
 #[renox::test]
 async fn a_session_that_cant_be_saved_doesnt_break_the_page() {
+    let (logs, _logged) = crate::logs::capture();
     let app = TestApp::with_config(web(), |c| {
         c.session_driver = renox::SessionDriver::Database;
         // Outside `testing`, sessions go to the table, not the test mirror.
@@ -328,13 +335,18 @@ async fn a_session_that_cant_be_saved_doesnt_break_the_page() {
         .await
         .unwrap();
     app.get("/push").await.assert_ok();
+    assert!(logs.has(&["could not save the session"]), "{}", logs.text());
 }
 
 #[renox::test]
 async fn path_reads_through_to_its_value_and_a_route_without_parameters_is_a_500() {
     let app = TestApp::new(web()).await;
     app.get("/length/coffee").await.assert_see("6");
-    app.get("/no-params").await.assert_status(500);
+    // While debugging, the page names what the route lacks.
+    app.get("/no-params")
+        .await
+        .assert_status(500)
+        .assert_see("parameters");
 }
 
 /// A form sent to a URL no route matches still needs its CSRF token (419),
