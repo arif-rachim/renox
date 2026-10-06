@@ -1,0 +1,60 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, card, infolist, entry, alert, button, confirm, link_button, date_picker, action_sheet %}
+{% from "workshop/_parts.html" import styles, status as status_badge %}
+{% block seo %}{{ seo(title=t('workshop.service.title', number=order.id)) }}{% endblock %}
+
+{#- A work order for its customer (#236): where it stands, what is done, what it costs. -#}
+{% block content %}
+{{ styles() }}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('workshop.service.title', number=order.id), subtitle=(bike.name if bike else none), back=route('workshop.bikes'), back_label=t('workshop.bikes.title')) }}
+  {%- if status != "cancelled" %}
+  <ol class="bs-steps" aria-label="{{ t('workshop.service.progress') }}">
+    {%- for step in steps %}<li{% if step[1] %} data-done{% endif %}>{{ t('workshop.status.' ~ step[0]) }}</li>{% endfor %}
+  </ol>
+  {%- endif %}
+  {%- if order.customer_note %}{{ alert(order.customer_note, kind="info", title=t('workshop.order.customer_note')) }}{% endif %}
+  {%- if pending_extra %}{{ alert(t('workshop.service.extra_waiting'), kind="warning") }}{% endif %}
+  {%- if status == "ready" %}{{ alert(t('workshop.service.ready', store=(store.name if store else "")), kind="success") }}{% endif %}
+  <div class="bs-order">
+    <div class="bs-order__main">
+      {% call card(title=t('workshop.service.work')) %}
+        <dl class="bs-lines">
+          {%- for line in lines %}<dt>{% if line.done %}✓ {% endif %}{{ line.name }} <small>{{ line.detail }}</small></dt><dd>{{ line.amount | money }}</dd>{% endfor %}
+          <dt><strong>{{ t('workshop.fields.total') }}</strong></dt><dd><strong>{{ order.total | money }}</strong></dd>
+        </dl>
+      {% endcall %}
+      {%- if notes %}
+      {% call card(title=t('workshop.service.notes')) %}
+        {%- for n in notes %}<p>{{ n.body }} <span class="rx-subtitle">· {{ n.created_at | since }}</span></p>{% endfor %}
+      {% endcall %}
+      {%- endif %}
+      {%- if extras %}
+      {% call card(title=t('workshop.service.extras')) %}
+        {%- for e in extras %}<p>{{ e.description }} · {{ e.total | money }} · {{ t('workshop.extra_status.' ~ e.status) }}</p>{% endfor %}
+      {% endcall %}
+      {%- endif %}
+    </div>
+    <div class="bs-order__side">
+      {% call card(title=t('workshop.service.details')) %}
+        {% call infolist() %}
+          {% call entry(t('workshop.fields.status')) %}{{ status_badge(status) }}{% endcall %}
+          {{ entry(t('workshop.fields.store'), store.name if store else none) }}
+          {{ entry(t('workshop.fields.day'), order.scheduled_for, format="date") }}
+          {{ entry(t('workshop.fields.minutes'), order.minutes, format="number") }}
+          {{ entry(t('workshop.fields.paid'), order.paid_at, format="datetime", placeholder=t('workshop.service.not_paid')) }}
+        {% endcall %}
+        {%- if payable %}
+        <form method="post" action="{{ route('workshop.service.pay', order.id) }}">{{ csrf_field() }}{{ button(t('workshop.service.pay', amount=(order.total | money)), icon="check", block=true) }}</form>
+        {%- endif %}
+        {%- if changeable %}
+        {% call action_sheet("reschedule", t('workshop.service.reschedule'), route('workshop.service.reschedule', order.id), t('workshop.service.reschedule')) %}
+          {{ date_picker("day", t('workshop.fields.day'), value=day, min=today, required=true, id="reschedule-day") }}
+        {% endcall %}
+        {{ confirm("cancel-service", t('workshop.service.cancel'), route('workshop.service.cancel', order.id), t('workshop.service.cancel_title'), t('workshop.service.cancel_text'), method="POST") }}
+        {%- elif status == "booked" %}<p class="rx-hint">{{ t('workshop.service.no_change') }}</p>{% endif %}
+      {% endcall %}
+    </div>
+  </div>
+</div>
+{% endblock %}

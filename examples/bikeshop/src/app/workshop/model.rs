@@ -27,6 +27,13 @@ pub struct CustomerBike {
     /// The order it was bought with, when bought here.
     pub order_id: Option<i64>,
     pub bought_on: Option<NaiveDate>,
+    /// The brand when it isn't a catalogue model ("Gazelle").
+    pub brand: Option<String>,
+    /// The frame size ("M", "54 cm").
+    pub size: Option<String>,
+    /// A photo, as a private storage key (shown through a signed link).
+    #[serde(skip_serializing)]
+    pub photo_path: Option<String>,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
 }
@@ -107,8 +114,31 @@ pub struct WorkOrder {
     pub customer_note: Option<String>,
     pub started_at: Option<DateTime>,
     pub completed_at: Option<DateTime>,
+    /// Mechanic time booked, for the store's daily capacity.
+    pub minutes: i64,
+    /// The package chosen when booking (`tune-up`, `overhaul`), if any.
+    pub package: Option<String>,
+    /// When the "tomorrow" reminder went out.
+    pub reminded_at: Option<DateTime>,
+    pub cancelled_at: Option<DateTime>,
+    /// When the customer paid (online or at the counter).
+    pub paid_at: Option<DateTime>,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
+}
+
+impl WorkOrder {
+    /// Still to be worked on or collected.
+    pub fn is_open(&self) -> bool {
+        !matches!(self.status, WorkStatus::Completed | WorkStatus::Cancelled)
+    }
+
+    /// The customer may still reschedule or cancel it: booked, and more
+    /// than 24 hours before the day.
+    pub fn changeable(&self) -> bool {
+        self.status == WorkStatus::Booked
+            && renox::db::now() < self.scheduled_for - renox::chrono::Duration::hours(24)
+    }
 }
 
 impl StoreRecord for WorkOrder {
@@ -156,4 +186,103 @@ pub fn work_orders_of<'a>(
         "customer_bike_id",
         |order: &WorkOrder| order.customer_bike_id,
     )
+}
+
+/// Whether a part was taken from stock or is waited for.
+#[derive(DbEnum, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PartStatus {
+    /// Taken from the store's stock (a ledger movement, reason `service`).
+    #[default]
+    Used,
+    /// Out of stock: the work order waits for it (purchasing, #240).
+    Waiting,
+}
+
+/// A part used on a work order.
+#[derive(Model, Serialize, Default, Debug, Clone)]
+#[model(table = "work_order_parts")]
+pub struct WorkOrderPart {
+    pub id: i64,
+    pub work_order_id: i64,
+    /// The part (a catalogue variant).
+    pub variant_id: i64,
+    pub quantity: i64,
+    /// Money in the smallest unit of `APP_CURRENCY`.
+    pub unit_price: i64,
+    pub total: i64,
+    pub status: PartStatus,
+    pub created_at: Option<DateTime>,
+    pub updated_at: Option<DateTime>,
+}
+
+/// What a note on a work order is.
+#[derive(DbEnum, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum NoteKind {
+    /// Text only.
+    #[default]
+    Note,
+    /// A photo before the work.
+    Before,
+    /// A photo after the work.
+    After,
+}
+
+/// A mechanic's note or photo on a work order.
+#[derive(Model, Serialize, Default, Debug, Clone)]
+#[model(table = "work_order_notes")]
+pub struct WorkOrderNote {
+    pub id: i64,
+    pub work_order_id: i64,
+    /// Who wrote it (a `staff` row).
+    pub staff_id: Option<i64>,
+    pub kind: NoteKind,
+    pub body: Option<String>,
+    /// A private storage key, shown through a signed link.
+    #[serde(skip_serializing)]
+    pub photo_path: Option<String>,
+    pub created_at: Option<DateTime>,
+    pub updated_at: Option<DateTime>,
+}
+
+/// One task or part proposed as extra work.
+#[derive(Serialize, serde::Deserialize, Default, Debug, Clone, PartialEq)]
+pub struct ExtraItem {
+    /// `task` or `part`.
+    pub kind: String,
+    /// The service task's or the variant's id.
+    pub id: i64,
+    pub name: String,
+    pub quantity: i64,
+    /// The line's price.
+    pub price: i64,
+}
+
+/// Where a proposal of extra work stands.
+#[derive(DbEnum, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ExtraStatus {
+    /// Sent to the customer, not answered yet.
+    #[default]
+    Pending,
+    Approved,
+    Refused,
+}
+
+/// Extra work the mechanic proposes; the customer answers through a signed
+/// link in a mail (no login), once, before it expires.
+#[derive(Model, Serialize, Default, Debug, Clone)]
+#[model(table = "extra_work_requests")]
+pub struct ExtraWork {
+    pub id: i64,
+    pub work_order_id: i64,
+    /// Why it's needed, in the mechanic's words.
+    pub description: String,
+    pub items: renox::db::Json<Vec<ExtraItem>>,
+    pub total: i64,
+    pub status: ExtraStatus,
+    pub expires_at: DateTime,
+    pub decided_at: Option<DateTime>,
+    /// Who proposed it (a `staff` row).
+    pub created_by: Option<i64>,
+    pub created_at: Option<DateTime>,
+    pub updated_at: Option<DateTime>,
 }

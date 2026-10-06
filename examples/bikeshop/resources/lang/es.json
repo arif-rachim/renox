@@ -566,5 +566,260 @@
         "body": ":note Puedes enviar otra foto."
       }
     }
+  },
+  "workshop": {
+    "nav": {
+      "bikes": "Mis bicis",
+      "book": "Reservar una revisión",
+      "board": "Taller"
+    },
+    "status": {
+      "booked": "Programada",
+      "checked_in": "Recibida",
+      "in_progress": "En curso",
+      "waiting_parts": "Esperando piezas",
+      "waiting_approval": "Esperando aprobación",
+      "ready": "Lista",
+      "completed": "Recogida",
+      "cancelled": "Cancelada"
+    },
+    "source": {
+      "walk_in": "En tienda",
+      "booking": "Reserva",
+      "plan": "Visita del plan",
+      "fleet": "Flota"
+    },
+    "extra_status": {
+      "pending": "Esperando respuesta",
+      "approved": "Aprobado",
+      "refused": "Rechazado"
+    },
+    "packages": {
+      "tune-up": {
+        "name": "Puesta a punto",
+        "text": "Revisión de seguridad, frenos, cambios, cadena"
+      },
+      "overhaul": {
+        "name": "Revisión completa",
+        "text": "Revisión completa, ruedas centradas, frenos purgados, cadena nueva"
+      }
+    },
+    "fields": {
+      "bike": "Bici",
+      "store": "Tienda",
+      "day": "Día",
+      "status": "Estado",
+      "customer": "Cliente",
+      "minutes": "Tiempo de mecánico (minutos)",
+      "estimate": "Presupuesto",
+      "total": "Total",
+      "labour": "Mano de obra",
+      "parts": "Piezas",
+      "paid": "Pagado",
+      "extra_total": "Precio del trabajo extra"
+    },
+    "errors": {
+      "past": "Ese día ya pasó.",
+      "too_far": "Se reserva con 60 días de antelación como mucho.",
+      "closed": "La tienda cierra ese día.",
+      "full": "El taller está completo ese día. Elige otro.",
+      "bike": "Elige una de tus bicis.",
+      "no_tasks": "Elige un paquete o al menos una tarea.",
+      "step": "Una orden no puede pasar ahí desde donde está.",
+      "unpaid": "Hay que pagarla antes de recogerla.",
+      "not_payable": "No hay nada que pagar en esta orden ahora.",
+      "empty_note": "Escribe una nota o añade una foto.",
+      "no_extra": "Elige una tarea o una pieza para proponer.",
+      "no_customer": "El trabajo extra se propone a un cliente; una reparación de la flota no tiene."
+    },
+    "bikes": {
+      "title": "Mis bicis",
+      "lead": "Tus bicis, sus revisiones y la próxima por reservar.",
+      "none": "Aún no hay bicis",
+      "none_text": "Añade tu bici abajo; las compradas en nuestra tienda aparecen solas.",
+      "add": "Añadir una bici",
+      "added": "Bici añadida.",
+      "model": "Modelo",
+      "model_hint": "De nuestro catálogo, u otro modelo.",
+      "other_model": "Otro modelo",
+      "name": "Nombre",
+      "name_hint": "p. ej. Trek Domane azul",
+      "brand": "Marca",
+      "frame": "Número de cuadro",
+      "size": "Talla",
+      "photo": "Foto",
+      "save": "Añadir la bici",
+      "no_frame": "Sin número de cuadro",
+      "last": "Última revisión :date",
+      "never": "Aún sin revisiones aquí.",
+      "details": "La bici",
+      "bought": "Comprada",
+      "spent": "Gastado en revisiones",
+      "open_photo": "Abrir la foto",
+      "open": "Abierto ahora",
+      "nothing_open": "Nada abierto.",
+      "history": "Historial de revisiones",
+      "event": "Orden #:number en :store: :status"
+    },
+    "book": {
+      "title": "Reservar una revisión",
+      "lead": "Elige tu bici, una tienda, qué hacer y un día con hueco. El presupuesto se actualiza al elegir.",
+      "no_bike": "Añade primero tu bici",
+      "no_bike_text": "Una revisión se reserva para una de tus bicis.",
+      "package": "Paquete",
+      "no_package": "Sin paquete",
+      "tasks": "Tareas",
+      "tasks_hint": "Además del paquete, o solas.",
+      "note": "¿Algo que debamos saber?",
+      "note_hint": "Un ruido, un traqueteo, una fecha límite…",
+      "when": "Cuándo",
+      "day_hint": "No se pueden elegir días completos o cerrados (el taller tiene :minutes minutos al día).",
+      "estimate": "Presupuesto",
+      "estimate_hint": "Las piezas se añaden cuando el mecánico las usa; el trabajo extra siempre se pregunta antes.",
+      "total": "Total (:minutes min)",
+      "pick": "Elige un paquete o tareas para ver el presupuesto.",
+      "submit": "Reservar",
+      "booked": "¡Reservado! Te enviamos una confirmación."
+    },
+    "service": {
+      "title": "Revisión #:number",
+      "progress": "Progreso",
+      "work": "El trabajo",
+      "notes": "Notas del taller",
+      "extras": "Trabajo extra",
+      "details": "Detalles",
+      "not_paid": "Sin pagar",
+      "pay": "Pagar :amount",
+      "reschedule": "Otro día",
+      "cancel": "Cancelar la reserva",
+      "cancel_title": "¿Cancelar esta reserva?",
+      "cancel_text": "El día queda libre para otra persona.",
+      "no_change": "Faltan menos de 24 horas: llama a la tienda para cambiarla.",
+      "too_late": "Faltan menos de 24 horas: ya no se puede cambiar en línea.",
+      "cancelled": "La reserva está cancelada.",
+      "rescheduled": "Movida al :day.",
+      "extra_waiting": "El mecánico propuso trabajo extra: responde desde el correo que te enviamos.",
+      "ready": "Tu bici está lista en :store."
+    },
+    "approve": {
+      "title": "Trabajo extra en tu bici",
+      "lead": "Orden #:number en :store",
+      "yes": "Aprobar",
+      "no": "Rechazar",
+      "until": "Responde antes del :time.",
+      "already": "Esta propuesta ya tiene respuesta, o ha caducado.",
+      "done_approved": "Aprobaste este trabajo. ¡Gracias!",
+      "done_refused": "Rechazaste este trabajo; seguimos con el resto.",
+      "thanks_yes": "Aprobado: el mecánico sigue.",
+      "thanks_no": "Rechazado: el mecánico sigue con el resto."
+    },
+    "board": {
+      "title": "Panel del taller",
+      "lead": "Una orden abierta|:count órdenes abiertas",
+      "filters": "Filtros",
+      "mechanic": "Mecánico",
+      "everyone": "Todos",
+      "unassigned": "Sin asignar",
+      "filter": "Filtrar",
+      "clear": "Quitar filtros"
+    },
+    "walkin": {
+      "title": "Orden en tienda",
+      "lead": "Para alguien en el mostrador: un cliente, la bici, qué hacer.",
+      "who": "Cliente",
+      "search": "Busca un cliente",
+      "or_new": "O un cliente nuevo abajo.",
+      "new_name": "Nombre del cliente nuevo",
+      "new_phone": "Teléfono",
+      "submit": "Crear la orden"
+    },
+    "order": {
+      "title": "Orden #:number",
+      "customer_note": "Del cliente",
+      "billed": "Reparación de la flota, a cargo de :store.",
+      "checklist": "Lista de tareas",
+      "tasks_done": "Hecho",
+      "no_tasks": "Aún sin tareas.",
+      "save_checklist": "Guardar la lista",
+      "saved": "Lista guardada.",
+      "parts": "Piezas",
+      "notes": "Notas y fotos",
+      "photo_link": "foto",
+      "summary": "Orden de taller",
+      "mechanic": "Mecánico",
+      "take": "Me la quedo",
+      "assigned": "Es tuya.",
+      "noted": "Añadido.",
+      "proposed": "Enviado al cliente para su aprobación.",
+      "paid": "Pagado.",
+      "moved": "Ahora: :status.",
+      "pay": "Cobrar :amount",
+      "to": {
+        "checked_in": "Recibir",
+        "in_progress": "Empezar el trabajo",
+        "waiting_parts": "Esperando piezas",
+        "ready": "Lista para recoger",
+        "completed": "Recogida",
+        "cancelled": "Cancelar"
+      }
+    },
+    "parts": {
+      "part": "Pieza",
+      "search": "Escribe el nombre de una pieza",
+      "fitting": "Piezas que sirven para esta bici.",
+      "any": "Cualquier recambio (la bici no es de nuestro catálogo).",
+      "quantity": "Cantidad",
+      "add": "Usar la pieza",
+      "taken": "Sacada del almacén.",
+      "short": "Sin existencias: la orden espera la pieza.",
+      "waiting": "Esperando",
+      "used": "Usada",
+      "take": "Ya llegó",
+      "in_stock": ":count en almacén"
+    },
+    "notes": {
+      "kind": "Tipo",
+      "note": "Nota",
+      "before": "Antes",
+      "after": "Después",
+      "body": "Nota",
+      "photo": "Foto",
+      "add": "Añadir"
+    },
+    "extra": {
+      "propose": "Proponer trabajo extra",
+      "lead": "El cliente lo aprueba o rechaza desde un correo, antes de hacerlo.",
+      "description": "Qué y por qué",
+      "tasks": "Tareas"
+    },
+    "mail": {
+      "booked": {
+        "title": "Revisión reservada: #:number",
+        "body": "Te esperamos con tu bici en :store el :day."
+      },
+      "reminder": {
+        "title": "Tu revisión es mañana (#:number)",
+        "body": "Trae tu bici a partir de las :time."
+      },
+      "status": {
+        "title": "Tu revisión #:number: :status",
+        "body": "Tu orden de taller está ahora: :status.",
+        "ready": "Tu bici está lista para recoger.",
+        "parts": "Esperamos una pieza; te avisamos cuando llegue."
+      },
+      "extra": {
+        "title": "Trabajo extra en tu bici (#:number)",
+        "body": ":description Apruébalo o recházalo antes de que lo hagamos."
+      },
+      "extra_approved": {
+        "title": "Trabajo extra aprobado (#:number)"
+      },
+      "extra_refused": {
+        "title": "Trabajo extra rechazado (#:number)"
+      },
+      "extra_answered": {
+        "body": "El cliente respondió a la propuesta de :total."
+      }
+    }
   }
 }

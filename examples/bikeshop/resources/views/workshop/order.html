@@ -1,0 +1,123 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, infolist, entry, alert, button, checkbox_list, textarea, select, input, file, toggle_buttons, form_errors, action_sheet, empty, list, form_grid %}
+{% from "blocks/history.html" import history %}
+{% from "workshop/_parts.html" import styles, status as status_badge %}
+{% block seo %}{{ seo(title=t('workshop.order.title', number=order.id)) }}{% endblock %}
+
+{#- A work order at the bench (#236): checklist, parts, notes and photos, extra work, status, payment. -#}
+{% block content %}
+{{ styles() }}
+<div class="rx-stack">
+  {{ page_header(t('workshop.order.title', number=order.id), subtitle=bike_name, back=route('workshop.board'), back_label=t('workshop.board.title'), badge=t('workshop.source.' ~ source)) }}
+  {%- if billed %}{{ alert(t('workshop.order.billed', store=billed), kind="info") }}{% endif %}
+  {%- if order.customer_note %}{{ alert(order.customer_note, kind="info", title=t('workshop.order.customer_note')) }}{% endif %}
+  <div class="bs-order" data-bs-reveal>
+    <div class="bs-order__main">
+      <form method="post" action="{{ route('workshop.order.tasks', order.id) }}" id="checklist-form">
+        {{ csrf_field() }}
+        {% call card(title=t('workshop.order.checklist')) %}
+          {%- set c = namespace(options=[], done=[]) %}
+          {%- for task in tasks %}
+            {%- set c.options = c.options + [[task.id, task.name, task.minutes ~ " min · " ~ (task.price | money)]] %}
+            {%- if task.done %}{% set c.done = c.done + [task.id] %}{% endif %}
+          {%- endfor %}
+          {%- if tasks %}{{ checkbox_list("done", t('workshop.order.tasks_done'), c.options, selected=c.done) }}
+          {%- else %}{{ empty(t('workshop.order.no_tasks')) }}{% endif %}
+          {%- if can_update and tasks %}{{ button(t('workshop.order.save_checklist'), variant="secondary", icon="check") }}{% endif %}
+        {% endcall %}
+      </form>
+
+      {% call card(title=t('workshop.order.parts')) %}
+        {%- if parts %}
+        {% call list(id="order-parts", label=t('workshop.order.parts')) %}
+          {%- for p in parts %}
+          <li>
+            <span class="rx-list__main">{{ p.quantity }} × {{ p.name }} · {{ p.total | money }}</span>
+            {%- if p.waiting %}<span class="rx-badge rx-badge--warning">{{ t('workshop.parts.waiting') }}</span>
+            {%- if can_update %}<form method="post" action="{{ route('workshop.order.parts.take', order.id, p.id) }}">{{ csrf_field() }}{{ button(t('workshop.parts.take'), size="small", variant="secondary") }}</form>{% endif %}
+            {%- else %}<span class="rx-badge rx-badge--success">{{ t('workshop.parts.used') }}</span>{% endif %}
+          </li>
+          {%- endfor %}
+        {% endcall %}
+        {%- endif %}
+        {%- if can_update and order.status not in ["completed", "cancelled"] %}
+        <form method="post" action="{{ route('workshop.order.parts', order.id) }}" id="part-form" novalidate>
+          {{ csrf_field() }}
+          {% call form_grid(2) %}
+            {{ select("variant", t('workshop.parts.part'), [], placeholder=t('workshop.parts.search'), options_url=route('workshop.parts', order.id), searchable=true, required=true, hint=(t('workshop.parts.fitting') if fits else t('workshop.parts.any'))) }}
+            {{ input("quantity", t('workshop.parts.quantity'), type="number", value=1, attrs={"min": 1, "max": 20}) }}
+          {% endcall %}
+          {{ button(t('workshop.parts.add'), variant="secondary", icon="plus") }}
+        </form>
+        {%- endif %}
+      {% endcall %}
+
+      {% call card(title=t('workshop.order.notes')) %}
+        {%- if notes %}
+        {%- set h = namespace(items=[]) %}
+        {%- for n in notes %}
+          {%- set body = (n.body or "") ~ ((" [" ~ t('workshop.order.photo_link') ~ "](" ~ route('workshop.order.photo', order.id, n.id) ~ ")") if n.photo else "") %}
+          {%- set h.items = h.items + [{"time": n.time, "title": t('workshop.notes.' ~ n.kind), "body": body, "kind": ("info" if n.kind == "note" else "success")}] %}
+        {%- endfor %}
+        {{ history(h.items, label=t('workshop.order.notes'), date_format="%d %b %H:%M") }}
+        {%- endif %}
+        {%- if can_update %}
+        <form method="post" action="{{ route('workshop.order.notes', order.id) }}" enctype="multipart/form-data" id="note-form" novalidate>
+          {{ csrf_field() }}
+          {{ toggle_buttons("kind", t('workshop.notes.kind'), [["note", t('workshop.notes.note')], ["before", t('workshop.notes.before')], ["after", t('workshop.notes.after')]], selected="note") }}
+          {{ textarea("body", t('workshop.notes.body'), rows=2) }}
+          {{ file("photo", t('workshop.notes.photo'), accept="image/*", preview=true) }}
+          {{ button(t('workshop.notes.add'), variant="secondary", icon="plus") }}
+        </form>
+        {%- endif %}
+      {% endcall %}
+    </div>
+
+    <div class="bs-order__side">
+      {% call card(title=t('workshop.order.summary')) %}
+        {% call infolist() %}
+          {% call entry(t('workshop.fields.status')) %}{{ status_badge(status) }}{% endcall %}
+          {{ entry(t('workshop.fields.customer'), customer.name if customer else none) }}
+          {{ entry(t('workshop.fields.store'), store.name if store else none) }}
+          {{ entry(t('workshop.fields.day'), order.scheduled_for, format="datetime") }}
+          {{ entry(t('workshop.order.mechanic'), mechanic, placeholder=t('workshop.board.unassigned')) }}
+          {{ entry(t('workshop.fields.labour'), order.labour, format="money") }}
+          {{ entry(t('workshop.fields.parts'), order.parts, format="money") }}
+          {{ entry(t('workshop.fields.total'), order.total, format="money") }}
+          {{ entry(t('workshop.fields.paid'), order.paid_at, format="datetime", placeholder=t('workshop.service.not_paid')) }}
+        {% endcall %}
+        {%- if can_update and not mine and order.status not in ["completed", "cancelled"] %}
+        <form method="post" action="{{ route('workshop.order.assign', order.id) }}">{{ csrf_field() }}{{ button(t('workshop.order.take'), variant="secondary", block=true) }}</form>
+        {%- endif %}
+        {%- if can_update and next %}
+        <div class="rx-stack" id="status-buttons">
+          {%- for to in next %}
+          <form method="post" action="{{ route('workshop.order.status', order.id) }}">{{ csrf_field() }}<input type="hidden" name="status" value="{{ to }}">{{ button(t('workshop.order.to.' ~ to), variant=("primary" if loop.first else "secondary"), block=true) }}</form>
+          {%- endfor %}
+        </div>
+        {%- endif %}
+        {%- if payable and can_take_payment %}
+        <form method="post" action="{{ route('workshop.order.pay', order.id) }}" id="pay-form">
+          {{ csrf_field() }}
+          {{ toggle_buttons("method", t('rentals.desk.method'), [["card", t('rentals.methods.card')], ["cash", t('rentals.methods.cash')]], selected="card") }}
+          {{ button(t('workshop.order.pay', amount=(order.total | money)), icon="check", block=true) }}
+        </form>
+        {%- endif %}
+      {% endcall %}
+      {%- if can_update and customer and order.status in ["checked_in", "in_progress", "waiting_parts"] %}
+      {% call action_sheet("extra-work", t('workshop.extra.propose'), route('workshop.order.extra', order.id), t('workshop.extra.propose'), description=t('workshop.extra.lead'), slide_over=true, icon="plus") %}
+        {{ textarea("description", t('workshop.extra.description'), rows=3, required=true, id="extra-description") }}
+        {{ checkbox_list("tasks", t('workshop.extra.tasks'), all_tasks, columns=1, id="extra-tasks") }}
+        {{ select("part", t('workshop.parts.part'), [], placeholder=t('workshop.parts.search'), options_url=route('workshop.parts', order.id), searchable=true, id="extra-part") }}
+        {{ input("quantity", t('workshop.parts.quantity'), type="number", value=1, attrs={"min": 1, "max": 20}, id="extra-quantity") }}
+      {% endcall %}
+      {%- endif %}
+      {%- if extras %}
+      {% call card(title=t('workshop.service.extras')) %}
+        {%- for e in extras %}<p>{{ e.description }} · {{ e.total | money }} · <span class="rx-badge">{{ t('workshop.extra_status.' ~ e.status) }}</span></p>{% endfor %}
+      {% endcall %}
+      {%- endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

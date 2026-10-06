@@ -1,0 +1,13 @@
+{#- Small pieces the workshop pages share. -#}
+{% from "renox/ui.html" import badge %}
+
+{#- The page's stylesheet (public/areas/workshop.css), once. -#}
+{% macro styles() -%}
+{% call push('head', once='workshop-css') %}<link rel="stylesheet" href="{{ asset('areas/workshop.css') }}">{% endcall %}
+{%- endmacro %}
+
+{#- A work order's status as a badge (tone and word agree). -#}
+{% macro status(key) -%}
+{%- set tones = {"booked": "info", "checked_in": "info", "in_progress": none, "waiting_parts": "warning", "waiting_approval": "warning", "ready": "success", "completed": "success", "cancelled": none} %}
+{{ badge(t('workshop.status.' ~ key), kind=tones[key]) }}
+{%- endmacro %}
