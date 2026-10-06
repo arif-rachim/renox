@@ -161,7 +161,6 @@ pub fn entries() -> Vec<Explanation> {
                 "tests/browser/bikeshop-blocks.test.mjs",
             ],
         },
-    ]
         data_page(),
     ]
 }
