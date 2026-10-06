@@ -5,6 +5,7 @@ upgrades and downgrades, and cancellations that keep access until the end of the
 for. Renox's `renox-billing` crate does it with Stripe (cards, worldwide) and Xendit (cards and
 e-wallets in Indonesia and the Philippines): plans declared in code, a plans page, a card on the
 account page, the providers' webhooks, and a guard for pages only subscribers see.
+[examples/bikeshop](../examples/bikeshop) bills service plans with it: a named subscription per bike.
 
 In this guide:
 

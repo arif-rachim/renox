@@ -3,6 +3,7 @@
 Two-factor authentication (2FA) adds a second step to logging in. After the password, people
 type a six-digit code from an app on their phone. Someone who steals or guesses a password
 still can't log in without the phone. Renox's `renox-2fa` crate adds it with one module.
+[examples/bikeshop](../examples/bikeshop) makes it optional for customers and required for staff.
 
 In this guide:
 

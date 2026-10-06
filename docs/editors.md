@@ -13,6 +13,7 @@ them, and a way to show code on a detail page:
 They're a separate crate, not part of the UI kit, because they bring JavaScript libraries
 (about 270 KB) that most pages don't need. A page loads them only when it uses one of these
 fields, and each library only when the page has a field that needs it.
+[examples/bikeshop](../examples/bikeshop)'s admin panel writes product descriptions with `markdown_editor`.
 
 In this guide:
 

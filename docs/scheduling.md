@@ -43,6 +43,8 @@ Want working code to look at?
 - [examples/jobs](../examples/jobs) has scheduled reports with a lock and a failure alert, an
   event, and `App::report`.
 - [examples/hello](../examples/hello) has a typed `entries:prune` command and a scheduled task.
+- [examples/bikeshop](../examples/bikeshop) has nine scheduled tasks (every minute to monthly), events that keep cached
+  dashboards fresh, `App::report` and a typed `demo:seed` command.
 
 ## Scheduled tasks
 

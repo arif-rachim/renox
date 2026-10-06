@@ -54,14 +54,56 @@
   DevTools protocol with Node's test runner (no npm packages): `lib/cdp.mjs` and `lib/app.mjs`
   are a harness an app can copy (docs/testing.md "Browser tests"); tests for renox.js, the UI
   kit's forms and overlays, the data grid, the editors, each example's main flow (under
-  `CSP=strict` too) and an accessibility smoke. [tests/process](tests/process): the app binary
+  `CSP=strict` too), the bike shop's areas and blocks (`bikeshop-*.test.mjs`; `run.sh
+  'bikeshop-*'`) and an accessibility smoke. [tests/process](tests/process): the app binary
   and `rnx` as real processes (signals, workers, the scheduler, systemd's socket, logs, prompts,
   the commands' output, `rnx serve`/`build`/forwarding) and every example served, as a guest
-  and logged in, on SQLite and (postgres-app, fields) PostgreSQL.
+  and logged in, on SQLite and (postgres-app, fields, bikeshop) PostgreSQL.
 
 ## Examples (complete apps, tested in CI)
 
 Every example has a README.md that walks through it.
+
+- [examples/bikeshop](examples/bikeshop) ([README](examples/bikeshop/README.md)): **the
+  flagship example**, the one to read for how a whole business fits together on Renox, at
+  Pagila's data volume (`demo:seed --size large`: ~15,000 rentals, 5,000 orders, 3,000 work
+  orders). A bike shop with three stores where customers buy, rent by the hour or the day,
+  and have bikes serviced once or on a plan; the stores lend staff, place bikes and goods at
+  each other and settle monthly. **Every page explains itself** ("About this page": purpose,
+  the Renox features used and why, under the hood, guide and source links; `/about/pages`
+  lists every page by feature and role; src/explain.rs + each area's explain.rs, and a test
+  that fails when a GET route has none). Shows: RBAC + ABAC (permissions, never role names;
+  roles per store with dates via `assign_role_in`/`Scope`/`permissions::set_scope`/
+  `scopes_with`; owner / location / operating store attributes checked by
+  src/app/access/policy.rs); `renox::grid` everywhere (fleet board with `poll`, report grids
+  with groups, sums and exports); relations without N+1 (`Pivot` for what fits, `Morph` for
+  the stock ledger and payments, `has_many_through`; tests/queries.rs walks the main pages on
+  the large seed); full-text search (`#[model(search)]`); two overlap checks for bookings
+  (form hook + `Db::begin_immediate` + `lock_for_update`); the queue (batches for the monthly
+  report and the settlements' statements, queued mails), nine scheduled tasks (`every_minutes`, `daily_at`,
+  `monthly_on`), events and listeners keeping cached dashboards fresh; renox-billing service
+  plans (named subscriptions per bike, Stripe/Xendit/a demo gateway), renox-admin (the
+  catalogue by permission), renox-oauth, renox-2fa (required for staff), renox-editors;
+  webhooks (Midtrans); signed single-use links; `Encrypted<String>` ID numbers; a JSON API
+  for kiosks and a mobile app (token abilities, `throttle_by`, CORS, `Ulid` codes); the
+  kit's dashboard, charts, wizard, action sheets, repeater, infolists; "blocks" for what the
+  kit lacks (gallery, range slider, quantity, keypad, kanban, month calendar, availability,
+  date-time range, swatches, history, plan comparison: resources/views/blocks/,
+  public/blocks/), Motion (motion.dev, vendored) on `transform`; English and Spanish;
+  `CSP=strict`; `App::report`; `make:deploy` files; tests in Rust (SQLite and PostgreSQL),
+  in headless Chrome (tests/browser/bikeshop-*.test.mjs) and as a process.
+  - The app and its modules: [src/lib.rs](examples/bikeshop/src/lib.rs); areas in
+    [src/app/](examples/bikeshop/src/app) (one folder each: `mod.rs` routes, `model.rs`,
+    `factories.rs`, `explain.rs`); access:
+    [catalogue.rs](examples/bikeshop/src/app/access/catalogue.rs),
+    [policy.rs](examples/bikeshop/src/app/access/policy.rs),
+    [active_store.rs](examples/bikeshop/src/app/access/active_store.rs); rentals:
+    [booking.rs](examples/bikeshop/src/app/rentals/booking.rs); stock ledger:
+    [stock/ledger.rs](examples/bikeshop/src/app/stock/ledger.rs); books between stores:
+    [multistore/books.rs](examples/bikeshop/src/app/multistore/books.rs); reports:
+    [reports/dashboard.rs](examples/bikeshop/src/app/reports/dashboard.rs),
+    [reports/monthly.rs](examples/bikeshop/src/app/reports/monthly.rs); seeds:
+    [src/seed/](examples/bikeshop/src/seed); tests: [tests/](examples/bikeshop/tests)
 
 - [examples/shop](examples/shop): a whole online shop, the example to read for how everything
   fits: catalog with htmx search, sort and pagination, a cached home page, SEO and a sitemap; a
@@ -399,20 +441,23 @@ Every example has a README.md that walks through it.
 - `crates/renox-2fa`: the optional two-factor plugin crate (same version as `renox`): the
   module (`lib.rs`: the second login step, the account card, events to the audit log), its
   pages (`handlers.rs`, `views/`), TOTP (`totp.rs`), recovery codes (`recovery.rs`), the QR
-  code (`qr.rs`). Guide: [docs/two-factor.md](docs/two-factor.md); used in examples/teams.
+  code (`qr.rs`). Guide: [docs/two-factor.md](docs/two-factor.md); used in examples/teams and
+  examples/bikeshop (required for staff).
 - `crates/renox-editors`: the optional editors plugin crate (same version as `renox`): the
   `Editors` module (`lib.rs`: its views, the `rich_text` filter, the Markdown preview route,
   its files served with `Registry::asset`), `RichText` and `sanitize` (`rich_text.rs`, ammonia),
   `assets.rs` (URLs and the tags), `views/editors.html` (`rich_editor`, `markdown_editor`,
   `code_editor`, `code_entry`), `assets/editors.js|css` and the vendored Trix, Prism and CodeJar
-  (`assets/vendor/NOTICE`). Guide: [docs/editors.md](docs/editors.md); used in examples/fields.
+  (`assets/vendor/NOTICE`). Guide: [docs/editors.md](docs/editors.md); used in examples/fields and
+  examples/bikeshop (the admin panel's forms).
 - `crates/renox-oauth`: the optional social login plugin crate (same version as `renox`): the
   `OAuth` module (`lib.rs`: the buttons' `oauth_providers`, the account card, events to the
   audit log), the routes (`handlers.rs`: redirect with `state` + PKCE, callback, unlink;
   linking by verified email), the `Provider` trait with `Profile`, `Token`, `Credentials`
   (`provider.rs`), `google.rs`, `github.rs`, `OAuthAccount` (`model.rs`, `oauth_accounts`).
   Logs in through `renox::auth::sign_in` / `register_verified` / `confirm_identity`
-  (renox-core `auth/external.rs`). Guide: [docs/oauth.md](docs/oauth.md); used in examples/teams.
+  (renox-core `auth/external.rs`). Guide: [docs/oauth.md](docs/oauth.md); used in examples/teams and
+  examples/bikeshop.
 - `crates/renox-admin`: the optional admin panel plugin crate (same version as `renox`),
   Filament's resources: the `Admin` module (`lib.rs`: path, title, `authorize`/`gate`, the
   views registered unless the app has a file of the name), the `AdminResource` trait with
@@ -421,7 +466,7 @@ Every example has a README.md that walks through it.
   bulk/row actions, create/store, show, edit/update, destroy, the trash; every page asks the
   model's `Policy`), `views/` (`renox-admin/layout.html`, `dashboard.html`, `index.html`,
   `form.html`, `fields.html`, `show.html`). Guide: [docs/admin.md](docs/admin.md); used in
-  examples/admin.
+  examples/admin and examples/bikeshop (resources authorized by permission).
 - `crates/renox-billing`: the optional subscriptions plugin crate (same version as `renox`),
   Laravel's Cashier: the `Billing` module (`lib.rs`: plans, gateways, the provided settings,
   the account section, the listeners: a deleted account's subscriptions end, audit entries),
@@ -432,4 +477,5 @@ Every example has a README.md that walks through it.
   `Remote` becomes a row and events (`sync.rs`), the webhook (`webhook.rs`: one route,
   `/billing/webhooks/{gateway}`, through `renox::webhook`), the pages (`handlers.rs`,
   `views/plans.html`, `views/section.html`), the guards (`guard.rs`). Guide:
-  [docs/billing.md](docs/billing.md); used in examples/billing.
+  [docs/billing.md](docs/billing.md); used in examples/billing and examples/bikeshop (a
+  named subscription per bike).

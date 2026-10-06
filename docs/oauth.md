@@ -3,7 +3,7 @@
 Social login lets people sign in with an account they already have, such as Google or GitHub,
 instead of making up another password. Renox's `renox-oauth` crate adds "Continue with Google"
 and "Continue with GitHub" to the login and register pages, linked to your app's `users`
-table, with one module.
+table, with one module. [examples/bikeshop](../examples/bikeshop) offers it to its customers.
 
 In this guide:
 
