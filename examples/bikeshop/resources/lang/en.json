@@ -1932,12 +1932,12 @@
       "fleet_use_hint": "Bike-hours rented, of :bikes bikes",
       "overdue": "Overdue now",
       "overdue_hint": "Bikes not back by their due time",
-      "overdue_now": ":count overdue now",
+      "overdue_now": ":n overdue now",
       "work_done": "Work orders done",
       "turnaround": ":hours h from booking to done, on average",
       "no_turnaround": "None completed",
       "plans": "Active plans",
-      "plans_active": ":count active plans",
+      "plans_active": ":n active plans",
       "mrr": ":amount a month",
       "mrr_label": "Plans per month",
       "mrr_hint": "What the active plans bring in a month",
@@ -1978,7 +1978,9 @@
       "comparison_hint_books": "Income in each store's books, by stream (whose bikes and goods).",
       "share": "Share",
       "share_of": "Share of :store",
-      "nothing": "Nothing in this period."
+      "nothing": "Nothing in this period.",
+      "units_line": ":n units",
+      "visits_line": ":n visits"
     },
     "orders": {
       "title": "Orders report",

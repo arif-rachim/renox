@@ -1934,12 +1934,12 @@
       "fleet_use_hint": "Horas-bicicleta alquiladas, de :bikes bicicletas",
       "overdue": "Con retraso ahora",
       "overdue_hint": "Bicicletas no devueltas a su hora",
-      "overdue_now": ":count con retraso ahora",
+      "overdue_now": ":n con retraso ahora",
       "work_done": "Órdenes terminadas",
       "turnaround": ":hours h de la reserva al final, de media",
       "no_turnaround": "Ninguna terminada",
       "plans": "Planes activos",
-      "plans_active": ":count planes activos",
+      "plans_active": ":n planes activos",
       "mrr": ":amount al mes",
       "mrr_label": "Planes al mes",
       "mrr_hint": "Lo que aportan al mes los planes activos",
@@ -1980,7 +1980,9 @@
       "comparison_hint_books": "Ingresos en las cuentas de cada tienda, por línea (de quién son las bicicletas y el género).",
       "share": "Parte",
       "share_of": "Parte de :store",
-      "nothing": "Nada en este periodo."
+      "nothing": "Nada en este periodo.",
+      "units_line": ":n unidades",
+      "visits_line": ":n visitas"
     },
     "orders": {
       "title": "Informe de pedidos",

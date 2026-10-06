@@ -1,5 +1,5 @@
 {% extends "layouts/staff.html" %}
-{% from "renox/ui.html" import page_header, link_tabs, link_button, menu, menu_link, period_filter, stats, stat, dashboard, widget, table, empty, progress, badge %}
+{% from "renox/ui.html" import page_header, link_tabs, link_button, menu, menu_link, period_filter, stats, stat, dashboard, widget, table, list, empty %}
 {% block seo %}{{ seo(title=t('reports.dashboard.title')) }}{% endblock %}
 
 {#- The reports dashboard (src/app/reports/dashboard.rs): the period, books or work, the store;
@@ -84,23 +84,29 @@
 
     {% call widget(t('reports.widget.products'), description=t('reports.widget.products_hint')) %}
       {%- if n.top_products %}
-      {% call table([t('reports.fields.product'), [t('reports.fields.units'), "num"], [t('reports.fields.amount'), "num"]], caption=t('reports.widget.products')) %}
-        {%- for p in n.top_products %}<tr><td>{{ p.name }}</td><td class="rx-num">{{ p.quantity | number }}</td><td class="rx-num">{{ p.amount | money }}</td></tr>{% endfor %}
-      {% endcall %}
+      <div class="bs-top">{% call list(label=t('reports.widget.products')) %}
+        {%- for item in n.top_products %}
+        <li><div class="rx-list__main"><strong>{{ item.name }}</strong><span class="rx-subtitle">{{ t('reports.widget.units_line', n=(item.quantity | number)) }}</span></div><span class="rx-num">{{ item.amount | money }}</span></li>
+        {%- endfor %}
+      {% endcall %}</div>
       {%- else %}{{ empty(t('reports.widget.nothing')) }}{% endif %}
     {% endcall %}
     {% call widget(t('reports.widget.categories'), description=t('reports.widget.categories_hint')) %}
       {%- if n.top_categories %}
-      {% call table([t('reports.fields.category'), [t('reports.fields.units'), "num"], [t('reports.fields.amount'), "num"]], caption=t('reports.widget.categories')) %}
-        {%- for c in n.top_categories %}<tr><td>{{ c.name }}</td><td class="rx-num">{{ c.quantity | number }}</td><td class="rx-num">{{ c.amount | money }}</td></tr>{% endfor %}
-      {% endcall %}
+      <div class="bs-top">{% call list(label=t('reports.widget.categories')) %}
+        {%- for item in n.top_categories %}
+        <li><div class="rx-list__main"><strong>{{ item.name }}</strong><span class="rx-subtitle">{{ t('reports.widget.units_line', n=(item.quantity | number)) }}</span></div><span class="rx-num">{{ item.amount | money }}</span></li>
+        {%- endfor %}
+      {% endcall %}</div>
       {%- else %}{{ empty(t('reports.widget.nothing')) }}{% endif %}
     {% endcall %}
     {% call widget(t('reports.widget.customers'), description=t('reports.widget.customers_hint')) %}
       {%- if n.top_customers %}
-      {% call table([t('reports.fields.customer'), [t('reports.fields.visits'), "num"], [t('reports.fields.amount'), "num"]], caption=t('reports.widget.customers')) %}
-        {%- for c in n.top_customers %}<tr><td>{{ c.name }}</td><td class="rx-num">{{ c.quantity | number }}</td><td class="rx-num">{{ c.amount | money }}</td></tr>{% endfor %}
-      {% endcall %}
+      <div class="bs-top">{% call list(label=t('reports.widget.customers')) %}
+        {%- for item in n.top_customers %}
+        <li><div class="rx-list__main"><strong>{{ item.name }}</strong><span class="rx-subtitle">{{ t('reports.widget.visits_line', n=(item.quantity | number)) }}</span></div><span class="rx-num">{{ item.amount | money }}</span></li>
+        {%- endfor %}
+      {% endcall %}</div>
       {%- else %}{{ empty(t('reports.widget.nothing')) }}{% endif %}
     {% endcall %}
 
@@ -108,13 +114,13 @@
     {% call widget(t('reports.widget.comparison'), description=t('reports.widget.comparison_hint_' ~ by), span="full") %}
       <div class="bs-widget-stack">
         {{ chart("bar", labels=comparison_labels, series=comparison, stacked=true, format="money", title=t('reports.widget.comparison'), id="chart-stores") }}
-        {% call table([t('reports.fields.store'), [t('reports.stream.sales'), "num"], [t('reports.stream.rentals'), "num"], [t('reports.stream.workshop'), "num"], [t('reports.stream.plans'), "num"], [t('reports.fields.total'), "num"], t('reports.widget.share')], caption=t('reports.widget.comparison')) %}
+        {% call table([t('reports.fields.store'), [t('reports.stream.sales'), "num"], [t('reports.stream.rentals'), "num"], [t('reports.stream.workshop'), "num"], [t('reports.stream.plans'), "num"], [t('reports.fields.total'), "num"], [t('reports.widget.share'), "num"]], caption=t('reports.widget.comparison')) %}
           {%- for s in n.comparison %}
           <tr>
             <td><a class="rx-link" href="{{ query_with(store=s.id) }}">{{ s.name }}</a></td>
             {%- for amount in s.streams %}<td class="rx-num">{{ amount | money }}</td>{% endfor %}
             <td class="rx-num"><strong>{{ s.total | money }}</strong></td>
-            <td><span class="bs-share">{{ progress(s.share, label=t('reports.widget.share_of', store=s.name)) }}</span></td>
+            <td class="rx-num">{{ s.share | number(1) }} %</td>
           </tr>
           {%- endfor %}
           <tr>
