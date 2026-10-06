@@ -7,12 +7,13 @@
 
 use crate::explain::{Audience, Explanation, Feature, Flow, NotAPage};
 
-/// Every sign-in page is drawn in the shop's version of Renox's auth layout.
+/// The sign-in pages and the account page are Renox's `Auth` module.
 const AUTH_MODULE: Feature = Feature {
     api: "Auth module",
     why: "Login, registration, password reset, email verification and the account \
-          page are Renox's, added by one line (`.module(Auth::new().account())`), \
-          so the shop writes none of that security-sensitive code itself.",
+          page are Renox's, switched on by one builder in `src/lib.rs` \
+          (`Auth::new().account().verify_email()…`), so the shop writes none of that \
+          security-sensitive code itself.",
 };
 
 /// The shop's own look for Renox's pages.
@@ -23,10 +24,12 @@ const AUTH_LAYOUT: Feature = Feature {
           and this panel, without copying the pages themselves.",
 };
 
+/// The CSRF token in every form of these pages.
 const CSRF: Feature = Feature {
     api: "CSRF protection",
     why: "The form carries the session's token (`csrf_field()`), checked by the CSRF \
-          middleware before the handler runs, so another site can't post it for you.",
+          middleware before the handler runs, so another site can't post it for you \
+          (a hidden form elsewhere logging you into the attacker's account, say).",
 };
 
 /// The social login buttons under the sign-in forms.
@@ -39,11 +42,6 @@ const OAUTH_BUTTONS: Feature = Feature {
           the provider verified.",
 };
 
-const AUTH_DOCS: &[&str] = &[
-    "docs/authorization.md#the-auth-modules-routes",
-    "docs/ui.md#renoxs-own-pages",
-];
-
 /// The explanation of every page in this area.
 pub fn entries() -> Vec<Explanation> {
     vec![
@@ -51,9 +49,10 @@ pub fn entries() -> Vec<Explanation> {
             route: "login",
             path: "/login",
             title: "Log in",
-            purpose: "Where customers and staff sign in. Customers go on to their \
-                      orders, rentals and bikes; staff to the back office of the stores \
-                      they work in.",
+            purpose: "Where customers and staff sign in. After the password (and the \
+                      two-factor code, for those who have it) everyone goes back to the \
+                      page they were trying to open, else to the home page; staff reach \
+                      the back office of the stores they work in from there.",
             who: "Everyone with an account: customers, cashiers, mechanics, store \
                   managers and the owner.",
             audience: &[
@@ -67,41 +66,53 @@ pub fn entries() -> Vec<Explanation> {
                 AUTH_MODULE,
                 Feature {
                     api: "Valid<T>",
-                    why: "The email and password are checked before anything else; a \
-                          failed attempt comes back with the errors next to the fields \
-                          (a 422 for htmx, a redirect with old input otherwise).",
+                    why: "The email and password are checked before the database is asked; \
+                          a blank field or a wrong password comes back with the error next \
+                          to the field and the email kept (a 422 for the htmx form, a \
+                          redirect with old input without JavaScript), so nobody retypes \
+                          anything.",
                 },
                 Feature {
                     api: "Login throttle",
-                    why: "Too many failed attempts for one email, one address or the \
-                          pair lock that login for a while, so passwords can't be \
-                          guessed by brute force.",
+                    why: "Too many failed attempts for one email, from one IP address, or \
+                          for the pair, lock that login for a while (the error says how \
+                          many seconds), so passwords can't be guessed by brute force. \
+                          It's built in, so the shop didn't have to add a rate limit of \
+                          its own.",
                 },
                 Feature {
                     api: "Sessions",
-                    why: "Logging in gives the session a new id and stores the user's id \
-                          with a fingerprint of the password hash: changing the password \
-                          ends the other sessions.",
+                    why: "Logging in stores the user's id with a fingerprint of the password \
+                          hash and a new id for this device, and gives the form a new CSRF \
+                          token: changing the password later ends the other sessions, and \
+                          \"Remember me\" makes this one last longer \
+                          (`REMEMBER_LIFETIME`). No `remember_token` column is needed.",
                 },
                 OAUTH_BUTTONS,
                 Feature {
                     api: "renox-2fa (Registry::second_factor)",
-                    why: "Someone with two-factor login on (every member of staff, any \
-                          customer who chose it) isn't logged in after the password: \
-                          the login waits at `/two-factor/challenge` for the code from \
-                          their phone.",
+                    why: "Someone with two-factor login on (staff must turn it on, \
+                          customers may) isn't logged in after the password: the login \
+                          waits in the session at `/two-factor/challenge` for the code \
+                          from their phone. The plugin plugs into Renox's own login with \
+                          one hook, so the shop's login page didn't change.",
                 },
                 CSRF,
                 AUTH_LAYOUT,
             ],
-            under_hood: "On submit: the form is validated, the throttle counts the \
-                         attempt, the user is looked up by the normalized email and the \
-                         password checked with Argon2 (on a blocking thread, with a dummy \
-                         hash for unknown emails so timing reveals nothing). On success \
-                         the session id rotates, a `LoggedIn` event is emitted and the \
-                         visitor goes back to the page they wanted (`Redirect::intended`). \
-                         A member of staff without two-factor login is then sent to set it \
-                         up before the staff side opens (`src/app/staff/two_factor.rs`).",
+            under_hood: "On submit: the form is validated, the throttle checks the email \
+                         and IP address aren't locked, the user is looked up by the \
+                         normalized email and the password checked with Argon2 (on a \
+                         blocking thread, with a dummy hash for unknown emails so timing \
+                         reveals nothing). A failure counts towards the lock and emits \
+                         `LoginFailed` (or `LockedOut`), which the `Audit` module writes \
+                         to the activity log. With two-factor login on, the login waits \
+                         for the code. Otherwise the throttle is cleared, the user's id \
+                         goes into the session, a `LoggedIn` event is emitted and the \
+                         visitor goes back to the page they wanted (`Redirect::intended`), \
+                         else home. The shop's `LoggedIn` listener notes a member of staff \
+                         without two-factor login, who is sent to set it up before the \
+                         staff side opens (`src/app/staff/two_factor.rs`).",
             docs: &[
                 "docs/authorization.md#the-auth-modules-routes",
                 "docs/routing.md#sessions",
@@ -116,6 +127,8 @@ pub fn entries() -> Vec<Explanation> {
                 "crates/renox-oauth/views/login_options.html",
                 "crates/renox-core/views/auth/login.html",
                 "examples/bikeshop/resources/views/renox/auth/layout.html",
+                "examples/bikeshop/src/app/staff/two_factor.rs",
+                "examples/bikeshop/tests/accounts.rs",
             ],
         },
         Explanation {
@@ -132,14 +145,18 @@ pub fn entries() -> Vec<Explanation> {
                 AUTH_MODULE,
                 Feature {
                     api: "Password rules",
-                    why: "The password must be long enough and confirmed; the rules are \
-                          Renox's `Password` policy, shared with the reset and account \
-                          pages.",
+                    why: "The password must be long enough and typed twice the same; the \
+                          rules are Renox's `Password` policy, shared with the reset and \
+                          account pages, so one setting changes all three and none can be \
+                          weaker than the others.",
                 },
                 Feature {
                     api: "Valid<T>",
                     why: "Name, email and password are checked, and the email must be \
-                          unique (a `unique` rule that asks the database).",
+                          unique (a `unique` rule that asks the database, on the address \
+                          lowercased, so `Ana@…` and `ana@…` can't be two accounts). Two \
+                          sign-ups with one address at the same moment are stopped by the \
+                          database's unique index and get the same message.",
                 },
                 Feature {
                     api: "Auth::on_registered",
@@ -151,8 +168,10 @@ pub fn entries() -> Vec<Explanation> {
                 },
                 Feature {
                     api: "Auth::verify_email",
-                    why: "A mail with a signed link asks the new customer to confirm the \
-                          address, so mails about orders and rentals reach the right person.",
+                    why: "A mail with a signed link (valid for an hour) asks the new \
+                          customer to confirm the address, so mails about orders and \
+                          rentals reach the right person. One builder call: the shop \
+                          writes neither the mail nor the link check.",
                 },
                 OAUTH_BUTTONS,
                 CSRF,
@@ -161,20 +180,26 @@ pub fn entries() -> Vec<Explanation> {
             under_hood: "On submit: validation (with the email lowercased before the \
                          unique check), the password hashed with Argon2, the user \
                          inserted and read back, then `accounts::registration::on_registered` \
-                         inserts the `customers` row and sets `users.locale`; a `Registered` \
-                         event is emitted, the verification mail sent, and the new customer \
-                         logged in with a fresh session id. A walk-in who already has a \
+                         inserts the `customers` row and sets `users.locale` (if it fails, \
+                         the user row is deleted again); the verification mail is sent, a \
+                         `Registered` event emitted (the activity log records it) and the \
+                         new customer logged in. A walk-in who already has a \
                          record at the counter isn't linked by email here (the address \
                          isn't verified yet): they claim it from an invitation.",
             docs: &[
                 "docs/authorization.md#the-auth-modules-routes",
                 "docs/validation.md#passwords",
+                "docs/authorization.md#logging-in-another-way",
+                "docs/oauth.md#which-account-a-sign-in-logs-into",
             ],
             sources: &[
                 "crates/renox-core/src/auth/module.rs",
                 "crates/renox-core/src/auth/user.rs",
+                "crates/renox-core/src/auth/verification.rs",
                 "crates/renox-core/views/auth/register.html",
+                "examples/bikeshop/src/lib.rs",
                 "examples/bikeshop/src/app/accounts/registration.rs",
+                "examples/bikeshop/resources/views/renox/auth/layout.html",
                 "examples/bikeshop/tests/accounts.rs",
             ],
         },
@@ -192,15 +217,18 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "Mail",
                     why: "The reset link goes out as a mail rendered from Renox's \
-                          template, in the visitor's language; with `MAIL_MAILER=log` \
-                          it shows in `/_renox/mail` while developing.",
+                          template, in the visitor's language, so the shop wrote no mail \
+                          for it; while developing, `/_renox/mail` shows what was sent.",
                 },
+                CSRF,
                 AUTH_LAYOUT,
             ],
-            under_hood: "On submit: a random token is stored hashed in \
-                         `password_reset_tokens`, and the mail with the link is sent. \
-                         The answer is the same whether the email exists or not, so the \
-                         page can't be used to find out who has an account.",
+            under_hood: "On submit: the address is validated and lowercased; if it has an \
+                         account, a random token is stored hashed (SHA-256) in \
+                         `password_reset_tokens` and the mail with the link is sent, at \
+                         most once a minute per address. The answer is the same whether \
+                         the email exists or not, so the page can't be used to find out \
+                         who has an account.",
             docs: &[
                 "docs/authorization.md#the-auth-modules-routes",
                 "docs/mail.md#sending-a-mail",
@@ -208,6 +236,7 @@ pub fn entries() -> Vec<Explanation> {
             sources: &[
                 "crates/renox-core/src/auth/passwords.rs",
                 "crates/renox-core/views/auth/forgot-password.html",
+                "examples/bikeshop/resources/views/renox/auth/layout.html",
             ],
         },
         Explanation {
@@ -225,42 +254,74 @@ pub fn entries() -> Vec<Explanation> {
                     why: "The same `Password` policy as registration, so a reset can't \
                           set a weaker password.",
                 },
+                CSRF,
                 AUTH_LAYOUT,
             ],
-            under_hood: "The token in the address is checked against its hash and its \
-                         age when the form is sent; the new password is hashed and \
-                         saved, the token deleted, and every session of that user ends \
-                         (their password fingerprint changed).",
-            docs: AUTH_DOCS,
+            under_hood: "When the form is sent, the token from the link is compared with \
+                         the stored hash (in constant time) and must be under an hour old; \
+                         a wrong or old one answers with an error, not a hint. The new \
+                         password is hashed with Argon2 and saved, the user's API tokens \
+                         revoked, the reset token deleted, a `PasswordReset` event emitted \
+                         (the activity log records it), and every session of that user \
+                         ends (their password fingerprint changed). The visitor goes to \
+                         the login page to sign in with it.",
+            docs: &[
+                "docs/authorization.md#the-auth-modules-routes",
+                "docs/validation.md#passwords",
+                "docs/ui.md#renoxs-own-pages",
+            ],
             sources: &[
                 "crates/renox-core/src/auth/passwords.rs",
                 "crates/renox-core/views/auth/reset-password.html",
+                "examples/bikeshop/resources/views/renox/auth/layout.html",
             ],
         },
         Explanation {
             route: "password.confirm",
             path: "/confirm-password",
             title: "Confirm your password",
-            purpose: "Asks for the password again before a sensitive action, such as \
-                      deleting the account.",
+            purpose: "Asks for the password again before a sensitive change, such as \
+                      turning two-factor login on or off. Someone who signed up with \
+                      Google or GitHub and has no password confirms here with that \
+                      provider instead, before changing their account.",
             who: "Logged-in customers and staff.",
             audience: &[Audience::Customer, Audience::Staff],
             flow: Flow::Account,
             features: &[
                 AUTH_MODULE,
                 Feature {
-                    api: "require_password_confirmed",
-                    why: "Routes behind it send the user here first unless they confirmed \
-                          recently, then back to where they were going.",
+                    api: "Routes::require_password_confirmed",
+                    why: "`renox-2fa`'s pages that change the second step sit behind it: \
+                          they send the user here first unless the password was typed in \
+                          the last three hours, then back to where they were going. \
+                          Someone at a computer left logged in can't turn it off.",
                 },
+                Feature {
+                    api: "renox-oauth",
+                    why: "Under the form, only the providers this login is linked to are \
+                          offered (another one wouldn't prove who they are), so an \
+                          account without a password can still confirm.",
+                },
+                CSRF,
                 AUTH_LAYOUT,
             ],
             under_hood: "On submit the password is checked with Argon2 and the time of \
-                         the confirmation is stored in the session.",
-            docs: AUTH_DOCS,
+                         the confirmation is stored in the session (logging in counts \
+                         too); the visitor goes back to the page that asked. With a \
+                         provider, the round trip to Google or GitHub must come back with \
+                         the linked account.",
+            docs: &[
+                "docs/authorization.md#sensitive-actions-and-the-audit-trail",
+                "docs/authorization.md#the-auth-modules-routes",
+                "docs/oauth.md#users-without-a-password",
+                "docs/two-factor.md#its-pages-and-routes",
+            ],
             sources: &[
                 "crates/renox-core/src/auth/account.rs",
                 "crates/renox-core/views/auth/confirm-password.html",
+                "crates/renox-2fa/src/handlers.rs",
+                "crates/renox-oauth/src/lib.rs",
+                "examples/bikeshop/resources/views/renox/auth/layout.html",
             ],
         },
         Explanation {
@@ -276,13 +337,19 @@ pub fn entries() -> Vec<Explanation> {
                 AUTH_MODULE,
                 Feature {
                     api: "Signed URLs",
-                    why: "The link in the mail is signed with the app's key, so it can't \
-                          be forged or changed to verify someone else.",
+                    why: "The link in the mail is signed with the app's key and works for \
+                          an hour, so it can't be forged or changed to verify someone \
+                          else, and no table of verification codes is needed.",
                 },
+                CSRF,
                 AUTH_LAYOUT,
             ],
-            under_hood: "Sending again posts to `verification.send`, which mails a new \
-                         signed link to `verification.verify`.",
+            under_hood: "Loading: someone already verified is sent to the home page. \
+                         Sending again posts to `verification.send`, which mails a new \
+                         signed link to `verification.verify`. Opening that link (logged \
+                         in as the same user, with the same address) sets \
+                         `users.email_verified_at`, emits `EmailVerified` (the activity \
+                         log records it) and goes home with a message.",
             docs: &[
                 "docs/authorization.md#the-auth-modules-routes",
                 "docs/routing.md#signed-urls",
@@ -290,19 +357,20 @@ pub fn entries() -> Vec<Explanation> {
             sources: &[
                 "crates/renox-core/src/auth/verification.rs",
                 "crates/renox-core/views/auth/verify-email.html",
+                "examples/bikeshop/resources/views/renox/auth/layout.html",
             ],
         },
         Explanation {
             route: "account.show",
             path: "/account",
             title: "My account",
-            purpose: "Everything a customer has with the shop, in one place: their \
-                      name and login, contact details and address, whether their ID was \
-                      checked (needed to rent), their bikes, orders, rentals, service \
-                      visits, plan and payments, how they want to be told about each, \
-                      their language, and their data (download it, or delete the \
-                      account). Staff see the parts that concern a login: password, \
-                      devices, two-factor authentication.",
+            purpose: "A customer's settings with the shop, in one place: their name \
+                      and login, contact details and address, whether their ID was \
+                      checked (needed to rent), their service plan, two-factor login, \
+                      linked Google or GitHub accounts, how they want to be told about \
+                      each kind of news, their language, and their data (download it, \
+                      or delete the account). Staff without a customer record don't see \
+                      the contact and ID cards; the rest concerns any login.",
             who: "Every logged-in customer, and staff for their own login.",
             audience: &[Audience::Customer, Audience::Staff],
             flow: Flow::Account,
@@ -310,13 +378,14 @@ pub fn entries() -> Vec<Explanation> {
                 AUTH_MODULE,
                 Feature {
                     api: "Registry::account_section",
-                    why: "Each area adds its own card to Renox's account page from its \
-                          module's `register`: a template and a closure that loads what \
+                    why: "Each module adds its own card to Renox's account page from its \
+                          `register`: a template, an order and a closure that loads what \
                           it shows for the logged-in user. The accounts area adds contact, \
-                          ID check, notifications, language and privacy; sales, rentals, \
-                          the workshop and plans add their lists; `renox-2fa` and \
-                          `renox-oauth` add theirs. No area edits another's code, and \
-                          `accounts::section_order` keeps the page in a sensible order.",
+                          ID check, notifications, language and privacy \
+                          (`accounts::section_order`); `renox-billing` adds the plan, \
+                          `renox-2fa` and `renox-oauth` add theirs. No module edits \
+                          another's code or the page's template, so a plugin's card \
+                          appears just by adding the plugin.",
                 },
                 Feature {
                     api: "View overrides (renox/auth/account.html)",
@@ -331,7 +400,15 @@ pub fn entries() -> Vec<Explanation> {
                     why: "The contact, notification and language forms are typed structs \
                           with their rules on the fields (`required`, `max`, `one_of`, \
                           `exists(\"countries\", \"id\")`); a mistake comes back next to \
-                          the field with what was typed kept.",
+                          the field with what was typed kept, and the handler only ever \
+                          sees valid data.",
+                },
+                Feature {
+                    api: "Live validation",
+                    why: "`data-live-validate` on the contact form: leaving a field asks \
+                          the server with `X-Renox-Validate`, and `Valid<T>` answers that \
+                          field's errors from the same rules without running the handler. \
+                          Nothing is written twice.",
                 },
                 Feature {
                     api: "UI kit: toggle_buttons",
@@ -342,16 +419,18 @@ pub fn entries() -> Vec<Explanation> {
                 },
                 Feature {
                     api: "Method spoofing",
-                    why: "The forms send `PUT` and `DELETE` through a hidden `_method` \
-                          field, so each action is its own route with its own name.",
+                    why: "HTML forms can only send GET and POST; the forms send `PUT` and \
+                          `DELETE` through a hidden `_method` field (`method_field()`), so \
+                          each action is its own route with its own name.",
                 },
                 Feature {
-                    api: "AccountDeleted event",
-                    why: "Deleting the account is Renox's route (it asks for the password \
-                          first). The shop listens to the `AccountDeleted` event it \
-                          announces and makes the customer anonymous: personal data goes, \
-                          orders and payments stay for the books, plans are cancelled, the \
-                          ID document's files are deleted.",
+                    api: "Events and listeners",
+                    why: "Deleting the account is Renox's route (the password is typed \
+                          again in the form). The shop listens to the `AccountDeleted` \
+                          event it announces and makes the customer anonymous: personal \
+                          data goes, orders and payments stay for the books, plans are \
+                          cancelled, the ID document's files are deleted. Listening keeps \
+                          Renox's route untouched instead of copying it.",
                 },
                 Feature {
                     api: "Job (queue)",
@@ -363,32 +442,44 @@ pub fn entries() -> Vec<Explanation> {
             ],
             under_hood: "Loading runs each section's closure in order (a query or two each: \
                          the customer, their address with city and country, the countries \
-                         for the select). Contact: the city is found by name in the country \
-                         or added, the address saved, the customer updated. Notifications: \
-                         the choices are stored as JSON in `users.notification_preferences`, \
-                         which every notification reads (`accounts::channels_for`). \
-                         Language: saved in `users.locale` and in the session; Renox's \
-                         notifications write mails in `users.locale` by themselves. Changing \
-                         the password ends the other sessions; \"log out other devices\" bumps \
-                         `users.sessions_revoked_at`. Deleting: Renox deletes the login, then \
-                         `accounts::privacy::on_account_deleted` anonymises the customer in a \
-                         transaction and deletes `customers/{id}/` from the disk.",
+                         for the select). Each form answers with a toast and back to this \
+                         page. Contact: the city is found by name in the country or added, \
+                         the address saved, the customer updated. Notifications: the \
+                         choices are stored as JSON in `users.notification_preferences`, \
+                         and `accounts::preferences::channels_for(to, Kind)` turns them \
+                         into Renox's channels for a notification to use. Language: saved \
+                         in `users.locale` and in the session; Renox's notifications write \
+                         mails in `users.locale` by themselves. Changing the password ends \
+                         the other sessions; \"log out other devices\" bumps \
+                         `users.sessions_revoked_at`. \"Download my data\" queues \
+                         `ExportMyData`. Deleting: Renox deletes the login, then \
+                         `accounts::privacy::on_account_deleted` anonymises the customer in \
+                         a transaction, deletes `customers/{id}/` from the disk and writes \
+                         `customer.erased` to the activity log.",
             docs: &[
                 "docs/authorization.md#a-section-on-the-account-page",
                 "docs/authorization.md#the-auth-modules-routes",
                 "docs/ui.md#renoxs-own-pages",
                 "docs/validation.md#derivevalidate",
                 "docs/queue.md#a-job",
+                "docs/scheduling.md#events",
                 "docs/mail.md#localized-notifications",
+                "docs/ui.md#form-fields",
+                "docs/ui.md#live-validation",
                 "docs/routing.md#method-spoofing",
             ],
             sources: &[
                 "examples/bikeshop/src/app/accounts/mod.rs",
                 "examples/bikeshop/src/app/accounts/preferences.rs",
+                "examples/bikeshop/src/app/accounts/locale.rs",
                 "examples/bikeshop/src/app/accounts/privacy.rs",
                 "examples/bikeshop/resources/views/renox/auth/account.html",
                 "examples/bikeshop/resources/views/accounts/sections/contact.html",
+                "examples/bikeshop/resources/views/accounts/sections/id_check.html",
                 "examples/bikeshop/resources/views/accounts/sections/notifications.html",
+                "examples/bikeshop/resources/views/accounts/sections/language.html",
+                "examples/bikeshop/resources/views/accounts/sections/privacy.html",
+                "examples/bikeshop/resources/views/mail/accounts/export_ready.html",
                 "examples/bikeshop/tests/accounts.rs",
                 "crates/renox-core/src/auth/account.rs",
             ],
@@ -432,16 +523,21 @@ pub fn entries() -> Vec<Explanation> {
                 },
                 Feature {
                     api: "Notification::channels",
-                    why: "Whether a notification lands here at all is the customer's \
-                          choice on their account page: every notification in the app \
-                          asks `accounts::channels_for(to, Kind)`, which turns \"mail\", \
-                          \"in the app\", \"both\" or \"none\" into Renox's channels.",
+                    why: "Each notification says where it goes. The shop's notices pick \
+                          `Channel::Database` for anyone with a login (so they land here) \
+                          and add `Channel::Mail` when the moment deserves a mail. The \
+                          account page's choices are turned into channels by \
+                          `accounts::preferences::channels_for(to, Kind)` (\"mail\", \"in \
+                          the app\", \"both\" or \"none\"), for a notification's \
+                          `channels` to return.",
                 },
             ],
-            under_hood: "The page reads the user's rows of `notifications`, newest first. \
-                         Opening one marks it read and follows its link; the bell's stream \
-                         ends after five minutes and the browser opens a new one, so a \
-                         logged-out session doesn't keep one open.",
+            under_hood: "The page reads a page of the user's rows of `notifications`, \
+                         newest first (older ones behind a link), and the unread count. \
+                         Opening one marks it read and follows its link; each can be \
+                         marked read or unread or deleted, or all at once. The bell's \
+                         stream ends after five minutes and the browser opens a new one, \
+                         so a logged-out session doesn't keep one open.",
             docs: &[
                 "docs/mail.md#database-notifications",
                 "docs/mail.md#the-bell",
@@ -451,7 +547,11 @@ pub fn entries() -> Vec<Explanation> {
                 "crates/renox-core/src/auth/inbox.rs",
                 "crates/renox-core/views/notifications.html",
                 "examples/bikeshop/src/app/accounts/preferences.rs",
+                "examples/bikeshop/src/app/rentals/notify.rs",
+                "examples/bikeshop/src/app/sales/notify.rs",
                 "examples/bikeshop/resources/views/layouts/app.html",
+                "examples/bikeshop/resources/views/layouts/staff.html",
+                "examples/bikeshop/tests/accounts.rs",
             ],
         },
         Explanation {
@@ -482,8 +582,10 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "Transactions",
                     why: "Claiming moves anything the new account already had onto the \
-                          walk-in record and links it, in one transaction; the update only \
-                          touches a record with no login yet, so it works once.",
+                          walk-in record and links it, in one transaction, so a failure \
+                          halfway never leaves orders split between two records; the \
+                          update only touches a record with no login yet, so it works \
+                          once, even for two clicks at the same moment.",
                 },
                 Feature {
                     api: "audit::record",
@@ -491,13 +593,15 @@ pub fn entries() -> Vec<Explanation> {
                           since it gives a login access to someone's history.",
                 },
             ],
-            under_hood: "Loading checks the signature, then whether the record is still \
-                         unclaimed and the logged-in address is the invited one, and counts \
-                         the record's orders, rentals and bikes (three `COUNT` queries). The \
-                         button posts to the same signed address: in a transaction the \
-                         walk-in row gets the user's id and address, the rows of the account's \
-                         own customer record (`orders`, `payments`, `rentals`, \
-                         `customer_bikes`) move to it, and that empty record is deleted.",
+            under_hood: "Loading checks the signature, finds the record, works out \
+                         whether it is still unclaimed and the logged-in address is the \
+                         invited one (else the page says why), and counts the record's \
+                         orders, rentals and bikes (three `COUNT` queries). The button \
+                         posts to the same signed address: in a transaction the walk-in \
+                         row gets the user's id and address, the rows of the account's own \
+                         customer record (`orders`, `payments`, `rentals`, \
+                         `customer_bikes`) move to it, and that record is deleted. Then the \
+                         audit entry, a toast, and the account page.",
             docs: &[
                 "docs/routing.md#signed-urls",
                 "docs/routing.md#guards",
@@ -529,13 +633,15 @@ pub fn entries() -> Vec<Explanation> {
                 },
                 Feature {
                     api: "Valid<T> + #[derive(Validate)]",
-                    why: "The address is `required` and an `email`; a mistake comes back \
-                          next to the field.",
+                    why: "The address is `required`, an `email` and at most 255 \
+                          characters, declared on the form's struct; a mistake comes back \
+                          next to the field and nothing is sent.",
                 },
                 Feature {
                     api: "Signed URLs",
                     why: "The mail's link is signed and expires in seven days \
-                          (`state.signed_url`), so it needs no table of invitations.",
+                          (`state.signed_url`), so it needs no table of invitations to \
+                          store, look up or clean.",
                 },
                 Feature {
                     api: "queue_mail",
@@ -544,17 +650,20 @@ pub fn entries() -> Vec<Explanation> {
                 },
             ],
             under_hood: "The record must exist, have no login and not be deleted (else a \
-                         404). Sending saves the address on the record, builds the signed \
-                         link, renders `mail/accounts/claim_invitation.html` in the staff \
-                         member's language and queues it, then comes back with a toast.",
+                         404). Sending validates the address, saves it (lowercased) on the \
+                         record, builds the signed link, renders \
+                         `mail/accounts/claim_invitation.html` in the staff member's \
+                         language and queues it, then comes back to this page with a toast.",
             docs: &[
                 "docs/routing.md#signed-urls",
                 "docs/mail.md#sending-a-mail",
+                "docs/validation.md#derivevalidate",
                 "docs/authorization.md#roles-per-branch-a-role-in-one-store-for-a-while",
             ],
             sources: &[
                 "examples/bikeshop/src/app/accounts/claim.rs",
                 "examples/bikeshop/resources/views/accounts/invite.html",
+                "examples/bikeshop/resources/views/mail/accounts/claim_invitation.html",
                 "examples/bikeshop/tests/accounts.rs",
             ],
         },

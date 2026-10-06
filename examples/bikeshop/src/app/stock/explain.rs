@@ -12,6 +12,8 @@ const PURCHASING: &str = "examples/bikeshop/src/app/stock/purchasing.rs";
 const IMPORT: &str = "examples/bikeshop/src/app/stock/import.rs";
 const REORDER: &str = "examples/bikeshop/src/app/stock/reorder.rs";
 const FLEET: &str = "examples/bikeshop/src/app/stock/fleet.rs";
+const NOTIFY: &str = "examples/bikeshop/src/app/stock/notify.rs";
+const PARTS: &str = "examples/bikeshop/resources/views/stock/_parts.html";
 const BOOKS: &str = "examples/bikeshop/src/app/multistore/books.rs";
 const AUDIT: &str = "examples/bikeshop/src/app/multistore/audit.rs";
 const POLICY: &str = "examples/bikeshop/src/app/access/policy.rs";
@@ -22,10 +24,12 @@ const BROWSER: &str = "tests/browser/bikeshop-stock.test.mjs";
 const ABAC: Feature = Feature {
     api: "access policy helpers",
     why: "Goods have an **owner** store (whose books) and a **location** store (where they \
-          are). `access::find` gives a 404 to anyone who holds the permission in neither, and \
+          are). `access::find` gives a 404 to anyone who may see the record in neither (so ids \
+          of another store's goods can't be probed), and \
           `access::require(user, permission, StoreAttr::…, &record)` checks each action in the \
           store that matters (`has_permission_in` from #244): selling and counting where the \
-          goods are, writing off and recalling where they are owned.",
+          goods are, writing off and recalling where they are owned. A role check alone \
+          couldn't say which of the two stores the person works for.",
 };
 
 const SCOPES: Feature = Feature {
@@ -66,38 +70,44 @@ pub fn entries() -> Vec<Explanation> {
                       cost. Tabs keep the store's own goods apart from goods it holds for other \
                       stores (consigned here), its own goods at other stores, and what is under \
                       its reorder level. Each row opens its ledger.",
-            who: "Everyone on a store's staff (`stock.view`); managers use the tabs and the export.",
+            who: "Everyone on a store's staff (`stock.view`): the counter checks what is \
+                  available, managers watch the low tab and take the export.",
             audience: &[Audience::Staff, Audience::Manager, Audience::Owner],
             flow: Flow::BackOffice,
             features: &[
                 Feature {
                     api: "renox::grid",
                     why: "One `Grid` gives search, filters per column, sorting, column choices, \
-                          paging and cards on phones. `Column::summary(Summary::Sum)` puts the \
-                          totals of on hand, available and value under the columns (over every \
-                          filtered row, not the page), `.groups(&[\"category\"])` adds \
-                          \"Group by category\" with subtotals, and `.exports()` gives CSV, \
-                          Excel (`xlsx` feature) and a print page from the same handler.",
+                          paging and cards on phones, so a stock list of thousands of rows \
+                          needed no hand-written table, filter form or pager. \
+                          `Column::summary(Summary::Sum)` puts the totals of on hand, reserved, \
+                          available and value under the columns (over every filtered row, not \
+                          the page), `.groups(&[\"category\"])` adds \"Group by category\" with \
+                          subtotals, and `.exports()` gives CSV, Excel (`xlsx` feature) and a \
+                          print page from the same handler and the same filters.",
                 },
                 Feature {
                     api: "Database view as a model",
-                    why: "The grid sums and groups only a model's own columns, so the rows come \
-                          from a database view, `stock_overview` (the level joined with its \
-                          variant, product and category), read through `#[derive(Model)] \
-                          StockRow`. The owner and location store names are \
-                          `Column::related` subqueries, fetched once per page.",
+                    why: "The grid filters, sums and groups a model's own columns, so the rows \
+                          come from a database view, `stock_overview` (the level joined with \
+                          its variant, product and category, with `available` and \
+                          `value_at_cost` worked out), read through `#[derive(Model)] \
+                          StockRow`: no copy of the numbers to keep in step. The owner and \
+                          location store names are `Column::related` columns, read in the \
+                          page's own query.",
                 },
                 SCOPES,
                 Feature {
                     api: "UI kit: link_tabs",
                     why: "The four views are links (`?view=own|held|away|low`), so each is a \
-                          shareable address and the grid's own query string stays as it is; \
-                          the counts on the tabs are four small `count` queries.",
+                          shareable address and the grid's own filters stay apart from it; \
+                          the counts on the tabs are four small `count` queries, the same \
+                          whatever the store holds.",
                 },
             ],
             under_hood: "One request: the tab's query (`access::visible` then the active store's \
-                         owner/location condition), the grid's count, page and summaries, the \
-                         related store names, and four counts for the tabs. With \
+                         owner/location condition), the grid's count, page (with the store \
+                         names) and summaries, and four counts for the tabs. With \
                          `?export=csv|xlsx|print` the same handler answers with the file \
                          instead (`Grid::export`), over every filtered row.",
             docs: &[
@@ -135,25 +145,30 @@ pub fn entries() -> Vec<Explanation> {
                           `reference_id`, a polymorphic relation (`REFERENCE: Morph`). \
                           `Morph::parents::<Order, _>` loads the orders of a page of movements \
                           in one query, then the work orders, shipments, purchase orders and \
-                          bikes: five queries whatever the page holds.",
+                          bikes: five queries whatever the page holds, where a lookup per row \
+                          would cost 25. One pair of columns serves every kind of document, \
+                          so a new kind needs no migration.",
                 },
                 ABAC,
                 Feature {
                     api: "UI kit: action_sheet",
-                    why: "The write-off is a form in a sheet sent with htmx: a validation error \
-                          stays in the sheet, success reloads the page with a toast. It is only \
-                          drawn for people who may write off in the **owner** store.",
+                    why: "The write-off is a form in a sheet sent with htmx, so it needs no \
+                          page of its own: a validation error stays in the sheet, success \
+                          brings the ledger back with a toast. It is only drawn for people who \
+                          may write off in the **owner** store (the handler checks it again).",
                 },
                 AUDITED,
             ],
             under_hood: "Loading: the level (`access::find`, 404 unless seen), its variant and \
                          product, the store names, a page of movements, the sum of the newer \
-                         ones (to show the running level), the staff and their users, and the \
-                         source documents. Writing off: `ledger::take` with an `adjustment` in \
-                         one transaction (refused if the units aren't there), then an audit row.",
+                         ones (to show the running level), the staff and their users \
+                         (`belongs_to`), and the source documents. Writing off: \
+                         `Valid<WriteOffForm>`, then `ledger::take` with an `adjustment` in one \
+                         transaction (a 409 if the units aren't there), then an audit row.",
             docs: &[
                 "docs/relations.md#polymorphic-relations",
                 "docs/relations.md#more-of-the-query-builder",
+                "docs/ui.md#actions",
                 "docs/authorization.md#checking-one-record-has_permission_in",
                 "docs/authorization.md#sensitive-actions-and-the-audit-trail",
             ],
@@ -184,38 +199,45 @@ pub fn entries() -> Vec<Explanation> {
                     why: "The sheet is one form with nested names (`lines[3][level]`, \
                           `lines[3][counted]`), which `Valid<TakeForm>` reads as a list of \
                           `TakeLine`; `v.nested(\"lines\", …)` checks each row and keys its \
-                          errors `lines.3.counted`, where the kit shows them. A blank count \
-                          leaves the line alone.",
+                          errors `lines.3.counted`, where the kit shows them. One form for the \
+                          whole shelf means one save and one transaction, not a request per \
+                          row. A blank count leaves the line alone.",
                 },
                 Feature {
                     api: "Routes::require_permission",
                     why: "The routes need `stock.adjust` **in the active store**: the store \
                           switcher sets the scope (`permissions::set_scope`), so a cashier who \
-                          is a manager elsewhere can't count here. Each line is checked again: \
-                          it must stand at this store.",
+                          is a manager elsewhere can't count here. The handler asks again \
+                          (`access::can_in`), and each line must stand at this store, or the \
+                          whole count is a 404: a changed level id can't reach another \
+                          store's shelf.",
                 },
                 Feature {
                     api: "Transactions",
                     why: "The whole count is one transaction: every adjustment movement (and \
                           its level) and every `consignment_loss` entry of the books between \
                           stores (`multistore::books`, the one place that writes them) commit \
-                          together or not at all.",
+                          together or not at all: a count can't fix the levels and forget \
+                          what the store owes for missing consigned goods.",
                 },
                 Feature {
                     api: "notify",
                     why: "The owner stores of goods found short get a mail and an in-app \
                           notification (`Notification` with the database and mail channels) \
-                          sent to whoever holds `consignment.manage` there.",
+                          sent to whoever holds `consignment.manage` there: they lost goods \
+                          they never saw go, so they hear it from the app, not by chance.",
                 },
                 AUDITED,
             ],
-            under_hood: "Loading: the stock rows at the store (one query for the categories, one \
-                         for the category's rows) and the store names. Saving: `Valid<TakeForm>`, \
-                         then one transaction with an `adjustment` per differing line \
+            under_hood: "Loading: the stock rows at the store (one query, for the category \
+                         picker), the chosen category's rows and the store names. Saving: \
+                         `Valid<TakeForm>`, the levels and costs of the counted lines, then one \
+                         transaction with an `adjustment` per differing line \
                          (`StockMovement::record`) and a `consignment_loss` entry for consigned \
                          shortfalls, then the audit row and the owner stores' notifications.",
             docs: &[
-                "docs/validation.md#browser-values",
+                "docs/types.md#nested-names-rows-inside-a-form",
+                "docs/relations.md#more-of-the-query-builder",
                 "docs/authorization.md#roles-per-branch-a-role-in-one-store-for-a-while",
                 "docs/mail.md#notifications",
                 "docs/authorization.md#sensitive-actions-and-the-audit-trail",
@@ -223,6 +245,7 @@ pub fn entries() -> Vec<Explanation> {
             sources: &[
                 TAKE,
                 BOOKS,
+                NOTIFY,
                 AUDIT,
                 "examples/bikeshop/resources/views/stock/take.html",
                 TESTS,
@@ -246,17 +269,20 @@ pub fn entries() -> Vec<Explanation> {
                     api: "Query<T>",
                     why: "\"Ours or at our store\": `where_any(|q| q.where_eq(\"owner_store_id\", \
                           store).where_eq(\"location_store_id\", store))` inside what \
-                          `access::visible` allows; the tabs narrow by status with `where_in`.",
+                          `access::visible` allows, so the OR can never widen what the person \
+                          may see; the tabs narrow by status with `where_in`.",
                 },
                 Feature {
                     api: "UI kit: link_tabs + table",
                     why: "Open / in transit / all as links, the list as the kit's table with \
-                          status badges whose colour and word agree.",
+                          status badges (`shipment_status` in `stock/_parts.html`) whose \
+                          colour and word agree, so the colour is never the only clue.",
                 },
             ],
             under_hood: "Three queries a page: the count, the page of shipments, and every line \
-                         of those shipments at once (for units and what is in transit), plus the \
-                         three store names.",
+                         of those shipments at once (for units and what is in transit), plus \
+                         one for the store names. The test checks the count stays the same \
+                         with more shipments.",
             docs: &[
                 "docs/authorization.md#lists-scopes_with",
                 "docs/relations.md#more-of-the-query-builder",
@@ -266,6 +292,7 @@ pub fn entries() -> Vec<Explanation> {
                 CONSIGNMENT,
                 MODEL,
                 "examples/bikeshop/resources/views/stock/consignments/index.html",
+                PARTS,
                 TESTS,
             ],
         },
@@ -283,28 +310,41 @@ pub fn entries() -> Vec<Explanation> {
             features: &[
                 Feature {
                     api: "Valid<T> + after hook",
-                    why: "`NewShipment`'s rules check the fields and each nested line; its \
-                          `after` hook then reads the owner's stock and puts \"only 3 \
-                          available\" next to each line that asks for more, with the form kept.",
+                    why: "`NewShipment`'s rules check the fields and each nested line \
+                          (`lines[0][quantity]`); its `after` hook then checks the other store \
+                          exists and isn't this one, that something is asked for, and reads \
+                          the owner's stock to put \"only 3 available\" next to each line that \
+                          asks for more, with the form kept. The database check runs only \
+                          once the plain rules pass, and its errors land where the rules' do.",
                 },
                 Feature {
                     api: "UI kit: toggle_buttons + select",
-                    why: "Direction and other store are a small GET form above the sheet, so \
-                          changing them re-asks the page with the right owner's goods.",
+                    why: "Direction, other store and a search are a small GET form above the \
+                          sheet, so changing them re-asks the page with the right owner's \
+                          goods, without a line of JavaScript.",
                 },
-                ABAC,
+                Feature {
+                    api: "Routes::require_permission",
+                    why: "The page and its form need `consignment.manage` **in the active \
+                          store** (the handler asks again with `access::can_in`); approving a \
+                          request is then the owner store's own decision, on the shipment's \
+                          page.",
+                },
             ],
-            under_hood: "Loading: the stores and up to 100 of the owner's stock rows (searchable). \
-                         Sending: `Valid<NewShipment>` (rules, then the `after` hook's stock \
-                         check), then the shipment and its lines in one transaction, an audit \
-                         row, and an in-app notice to the other store's managers.",
+            under_hood: "Loading: the stores and up to 100 of the owner's stock rows with \
+                         something available (searchable). Sending: `Valid<NewShipment>` \
+                         (rules, then the `after` hook's checks), then the shipment and its \
+                         lines in one transaction, an audit row, and an in-app notice to the \
+                         other store's `consignment.manage` holders.",
             docs: &[
                 "docs/validation.md#hooks-prepare-authorize-after",
+                "docs/types.md#nested-names-rows-inside-a-form",
                 "docs/ui.md#form-fields",
-                "docs/authorization.md#checking-one-record-has_permission_in",
+                "docs/authorization.md#roles-per-branch-a-role-in-one-store-for-a-while",
             ],
             sources: &[
                 CONSIGNMENT,
+                MOD,
                 "examples/bikeshop/resources/views/stock/consignments/new.html",
                 TESTS,
                 BROWSER,
@@ -329,22 +369,27 @@ pub fn entries() -> Vec<Explanation> {
                           `UPDATE … WHERE status = ?` (two people pressing \"ship\" ship once), \
                           then writes the ledger: `consign_out` at the owner with a guarded \
                           `ledger::take` (a line whose stock ran out ships short), `consign_in` \
-                          at the location on receipt, `recall` both ways.",
+                          at the location on receipt, `recall` both ways. A step that fails \
+                          half-way leaves neither a new status nor a stray movement; one that \
+                          lost the race answers 409.",
                 },
                 LEDGER_PATTERN,
                 Feature {
                     api: "Bike shop blocks",
-                    why: "The steps are an ordered list styled as a stepper (CSS grid, the kit's \
-                          tokens; the done steps slide in through Motion, not under reduced \
-                          motion), and the dated events are the `history` block.",
+                    why: "The kit has no stepper or timeline: the steps are an ordered list \
+                          styled as a stepper (the `steps` macro in `stock/_parts.html`, the \
+                          current step marked `aria-current`; the done steps slide in through \
+                          Motion, not under reduced motion), and the dated events are the \
+                          `history` block.",
                 },
                 AUDITED,
             ],
             under_hood: "Loading: the shipment (`access::find`), its lines and their names, the \
                          store names. Each action: the status guard, the ledger movements and \
                          line updates in one transaction, an audit row, and an in-app notice \
-                         to the other store. Goods never received are the owner's loss (still \
-                         theirs), and the owner store is told.",
+                         to the other store. A receipt marked \"nothing more will come\" \
+                         closes the shipment: goods never received are the owner's loss \
+                         (still theirs), and the owner store is told by mail and in the app.",
             docs: &[
                 "docs/authorization.md#checking-one-record-has_permission_in",
                 "docs/relations.md#more-of-the-query-builder",
@@ -355,7 +400,9 @@ pub fn entries() -> Vec<Explanation> {
                 LEDGER,
                 MODEL,
                 "examples/bikeshop/resources/views/stock/consignments/show.html",
-                "examples/bikeshop/resources/views/stock/_parts.html",
+                PARTS,
+                "examples/bikeshop/resources/views/blocks/history.html",
+                "examples/bikeshop/public/areas/stock.js",
                 TESTS,
                 BROWSER,
             ],
@@ -374,16 +421,17 @@ pub fn entries() -> Vec<Explanation> {
                     api: "Query<T>",
                     why: "The counts beside each supplier are two `GROUP BY` queries \
                           (`group_by` + `select_as`) over the page's suppliers, not one query \
-                          per row.",
+                          per row, so the page costs the same with 5 suppliers or 500.",
                 },
                 Feature {
                     api: "Routes::require_permission",
-                    why: "Suppliers are the company's, not a store's: the routes only need \
-                          `purchasing.manage` in the active store.",
+                    why: "Suppliers are the company's, not a store's, so there is no record to \
+                          check store by store: the routes only need `purchasing.manage` in \
+                          the active store.",
                 },
             ],
             under_hood: "Four queries: the page of suppliers (with its count), their price-list \
-                         sizes and their open orders at this store.",
+                         sizes and their open orders (draft, ordered, partial) at this store.",
             docs: &[
                 "docs/relations.md#more-of-the-query-builder",
                 "docs/routing.md#guards",
@@ -406,14 +454,17 @@ pub fn entries() -> Vec<Explanation> {
             features: &[Feature {
                 api: "#[derive(Validate)]",
                 why: "`SupplierForm`'s rules are attributes on its fields (`required`, `email`, \
-                      `min`/`max`); a failed plain form goes back with the errors and the input \
-                      kept.",
+                      `min`/`max`), next to the fields they check, with no `impl Validate` to \
+                      keep in step; a failed plain form goes back with the errors and the \
+                      input kept.",
             }],
-            under_hood: "`Valid<SupplierForm>`, then one insert and a redirect to the supplier.",
+            under_hood: "`Valid<SupplierForm>`, then one insert and a redirect to the supplier's \
+                         page with a toast.",
             docs: &["docs/validation.md#derivevalidate"],
             sources: &[
                 PURCHASING,
                 "examples/bikeshop/resources/views/stock/suppliers/form.html",
+                TESTS,
             ],
         },
         Explanation {
@@ -429,14 +480,17 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "Found<M>",
                     why: "Route model binding: `Found<Supplier>` loads the supplier the \
-                          route's parameter names, or answers 404.",
+                          route's `{supplier}` parameter names, or answers 404, so the \
+                          handler starts with the record instead of a lookup and a check.",
                 },
                 Feature {
                     api: "#[derive(Validate)]",
-                    why: "The same `SupplierForm` as the new-supplier page.",
+                    why: "The same `SupplierForm` and template as the new-supplier page: one \
+                          set of rules for both.",
                 },
             ],
-            under_hood: "Loading: one query. Saving: `Valid<SupplierForm>`, then `save`.",
+            under_hood: "Loading: one query. Saving: the supplier again (`Found`), \
+                         `Valid<SupplierForm>`, then `save` and a redirect with a toast.",
             docs: &[
                 "docs/routing.md#route-model-binding-foundm",
                 "docs/validation.md#derivevalidate",
@@ -444,6 +498,7 @@ pub fn entries() -> Vec<Explanation> {
             sources: &[
                 PURCHASING,
                 "examples/bikeshop/resources/views/stock/suppliers/form.html",
+                TESTS,
             ],
         },
         Explanation {
@@ -464,13 +519,16 @@ pub fn entries() -> Vec<Explanation> {
                           (`PriceRow`'s `#[derive(Validate)]`), writes the good ones each in its \
                           own savepoint of one transaction, and answers with an `ImportReport`: \
                           a toast when every row went in, else a table of row numbers and \
-                          messages. A row naming an unknown product undoes only itself.",
+                          messages. A row naming an unknown product undoes only itself, so one \
+                          bad line never throws away a whole price list, and the same rules \
+                          and messages as a form apply without a CSV parser of the shop's own.",
                 },
                 Feature {
                     api: "Queue",
                     why: "Files over 200 rows don't make anyone wait: the file goes to private \
                           storage and the `ImportPriceList` job runs the same import in the \
-                          background, then mails the report (`queue_mail`).",
+                          background, in the sender's language, then mails the report \
+                          (`queue_mail`) and deletes the file.",
                 },
                 Feature {
                     api: "renox::import::template",
@@ -478,15 +536,16 @@ pub fn entries() -> Vec<Explanation> {
                           columns, so suppliers fill the right ones.",
                 },
             ],
-            under_hood: "Loading: the supplier, a page of their price list with the variants' \
-                         names (three queries) and the last ten orders. Importing: \
-                         `Valid<ImportForm>` (a `.csv`), then the import (each row: find the SKU, \
-                         update cost/price/barcode or create the variant, upsert \
-                         `supplier_items`), or for a large file a stored file and a queued job.",
+            under_hood: "Loading: the supplier (`Found<Supplier>`), a page of their price list \
+                         (count and page) with the variants' names (two queries) and the last \
+                         ten orders at this store. Importing: `Valid<ImportForm>` (a `.csv` \
+                         file), then the import (each row: find the SKU, update \
+                         cost/price/barcode or create the variant, upsert `supplier_items`), or \
+                         for a large file a stored file and a queued job.",
             docs: &[
                 "docs/ui.md#import",
                 "docs/queue.md#a-job",
-                "docs/mail.md#mail-views",
+                "docs/mail.md#localized-mail",
             ],
             sources: &[
                 PURCHASING,
@@ -516,29 +575,35 @@ pub fn entries() -> Vec<Explanation> {
                     why: "`daily_at(\"06:30\", \"stock:reorder\", …)` in the module's `register`: \
                           `schedule:list` shows it, `schedule:run stock:reorder` runs it now, and \
                           several servers sharing the database run it once (Renox claims each \
-                          run). The steps are plain functions, so tests call them after \
-                          `TestApp::travel`.",
+                          run), so no cron line on the server and no double orders. The steps \
+                          are plain functions, so tests call them after `TestApp::travel`.",
                 },
                 Feature {
                     api: "notify",
                     why: "The alert is a `Notification` on the mail and database channels, sent \
                           to whoever holds `purchasing.manage` at the store (a permission, \
-                          never a role's name), each in their own language.",
+                          never a role's name), each in their own language: a role renamed or \
+                          added later still gets it.",
                 },
                 SCOPES,
             ],
             under_hood: "Three queries a page: the count, the page and the suppliers \
                          (`belongs_to`). The reorder check: per store, the stock rows under their \
                          level, other stores' spare, the cheapest supplier per variant; old \
-                         untouched suggestions are replaced by today's.",
+                         untouched suggestions are replaced by today's drafts, then the store's \
+                         buyers are told.",
             docs: &[
                 "docs/scheduling.md#scheduled-tasks",
+                "docs/scheduling.md#several-servers",
                 "docs/mail.md#notifications",
                 "docs/relations.md#the-loaders",
+                "docs/authorization.md#lists-scopes_with",
             ],
             sources: &[
                 PURCHASING,
                 REORDER,
+                NOTIFY,
+                MOD,
                 "examples/bikeshop/resources/views/stock/purchase_orders/index.html",
                 "examples/bikeshop/resources/views/mail/stock/notice.html",
                 TESTS,
@@ -559,29 +624,36 @@ pub fn entries() -> Vec<Explanation> {
             features: &[
                 Feature {
                     api: "Valid<T> + after hook",
-                    why: "Nested names (`lines[4][quantity]`) read as `Vec<OrderLine>`, each \
-                          checked by `v.nested`; the supplier must exist (`exists` rule), and the \
-                          `after` hook refuses an order without a single quantity.",
+                    why: "Nested names (`lines[4][quantity]`, `lines[4][unit_cost]`) read as \
+                          `Vec<OrderLine>`, each checked by `v.nested`; the supplier must exist \
+                          (`exists` rule), and the `after` hook refuses an order without a \
+                          single quantity, a rule about the whole form that no single field \
+                          could carry.",
                 },
                 Feature {
                     api: "Query<T>",
                     why: "The needs are two plain queries (the store's work orders waiting for \
                           parts, then their waiting parts) and the stock rows under their level, \
-                          joined in Rust by variant: no query per line.",
+                          joined in Rust by variant: no query per line, and the buyer starts \
+                          from what is missing instead of a blank list.",
                 },
             ],
-            under_hood: "Loading: suppliers, the store's needs (three queries), the supplier's \
-                         price list and the variants' names. Saving: the draft and its lines in \
-                         one transaction, and an audit row.",
+            under_hood: "Loading: suppliers, the store's needs (three queries and the variants' \
+                         names), the supplier's price list and its variants' names. Saving: \
+                         `Valid<OrderForm>`, the draft and its lines in one transaction, and an \
+                         audit row.",
             docs: &[
                 "docs/validation.md#hooks-prepare-authorize-after",
-                "docs/relations.md#the-loaders",
+                "docs/types.md#nested-names-rows-inside-a-form",
+                "docs/validation.md#database-rules-unique-and-exists",
+                "docs/relations.md#more-of-the-query-builder",
             ],
             sources: &[
                 PURCHASING,
                 "examples/bikeshop/src/app/workshop/model.rs",
                 "examples/bikeshop/resources/views/stock/purchase_orders/new.html",
                 TESTS,
+                BROWSER,
             ],
         },
         Explanation {
@@ -602,34 +674,42 @@ pub fn entries() -> Vec<Explanation> {
                     why: "Receiving updates each variant's cost to the average over the whole \
                           company's stock: `(on hand × cost + received × unit cost) / (on hand + \
                           received)`, rounded half up, in integers (`purchasing::average_cost`, \
-                          unit-tested).",
+                          unit-tested), so the value of the stock and the margins stay right \
+                          when a supplier's price changes, without float rounding.",
                 },
                 LEDGER_PATTERN,
                 Feature {
                     api: "Signed URLs",
                     why: "The supplier has no account, so the mail carries \
                           `state.signed_url(\"stock.purchasing.print\", …, 30 days)`: an \
-                          HMAC-signed link that opens this one order and nothing else.",
+                          HMAC-signed link that opens this one order and nothing else, with no \
+                          login to create or token table to keep.",
                 },
                 Feature {
                     api: "Mail",
-                    why: "The order goes out through `state.mail_view` (the kit's mail layout and \
-                          table) and `queue_mail`, so a slow mail server never holds the page.",
+                    why: "When the supplier has an address, the order goes out through \
+                          `state.mail_view` (Renox's mail layout and its `table` component) \
+                          and `queue_mail`, so a slow mail server never holds the page.",
                 },
                 ABAC,
             ],
             under_hood: "Loading: the order (`access::find`), the supplier, the lines and names, \
-                         the store's needs. Sending: the status guard, the dates (expected after \
-                         the supplier's lead time), a queued mail, an audit row. Receiving: one \
-                         transaction with a `purchase` movement, the new average cost and the \
-                         line's received quantity per line, then partial or received.",
+                         the store's needs, the store names and the signed print link. Sending: \
+                         the status guard, the dates (expected after the supplier's lead time), \
+                         a queued mail, an audit row. Receiving: one transaction with a \
+                         `purchase` movement, the new average cost and the line's received \
+                         quantity per line, then partial or received, and an audit row. \
+                         Cancelling: refused once anything has arrived.",
             docs: &[
                 "docs/routing.md#signed-urls",
                 "docs/mail.md#sending-a-mail",
                 "docs/types.md#money",
+                "docs/authorization.md#checking-one-record-has_permission_in",
             ],
             sources: &[
                 PURCHASING,
+                MODEL,
+                POLICY,
                 "examples/bikeshop/resources/views/stock/purchase_orders/show.html",
                 "examples/bikeshop/resources/views/mail/stock/purchase_order.html",
                 TESTS,
@@ -651,25 +731,28 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "Signed URLs",
                     why: "The handler takes `ValidSignature`: a link that wasn't signed with the \
-                          app's key, was changed or has expired is a 403. No login is needed, \
-                          and no other order can be reached from it.",
+                          app's key, was changed or has expired is a 403. The route sits \
+                          outside the staff guards, so no login is needed, and no other order \
+                          can be reached from it (changing the id breaks the signature).",
                 },
                 Feature {
                     api: "UI kit: infolist + entry",
-                    why: "The kit's infolist and table on a page of its own (no layout), with a \
-                          print button handled in `public/areas/stock.js` (no inline script, so \
-                          `CSP=strict` works).",
+                    why: "The kit's infolist and table on a page of its own (no shop layout, \
+                          so it prints clean), with a print button handled in \
+                          `public/areas/stock.js` (no inline script, so `CSP=strict` works).",
                 },
             ],
-            under_hood: "Four queries: the order, the supplier, the store and the lines with \
-                         their names.",
+            under_hood: "Six queries: the order, the supplier, the store, the lines, and their \
+                         variants' and products' names. Nothing is written.",
             docs: &[
                 "docs/routing.md#signed-urls",
                 "docs/ui.md#infolists-read-only-details",
             ],
             sources: &[
                 PURCHASING,
+                MOD,
                 "examples/bikeshop/resources/views/stock/purchase_orders/print.html",
+                "examples/bikeshop/public/areas/stock.js",
                 TESTS,
             ],
         },
@@ -690,29 +773,34 @@ pub fn entries() -> Vec<Explanation> {
                     api: "has_permission_in",
                     why: "Both directions are the **owner** store's decision: \
                           `access::require(…, FLEET_MANAGE, StoreAttr::Owner, …)`. A bike placed \
-                          at another store can be rented out there, but not retired by it.",
+                          at another store can be rented out there, but not retired by it, and \
+                          goods held on consignment can't be put in the holder's fleet.",
                 },
                 Feature {
-                    api: "Valid<T>",
+                    api: "Valid<T> + #[derive(Validate)]",
                     why: "The new bike's frame number must be unique \
                           (`#[validate(unique(\"rental_bikes\", \"frame_number\"))]`) and its \
-                          rates present; the bike and its `to_fleet` movement are written in \
-                          one transaction.",
+                          rates and deposit present: a second bike with the same frame number \
+                          is refused next to the field, before anything is written.",
                 },
                 AUDITED,
             ],
-            under_hood: "Loading: the store's own bikes on its shelf (the stock view) and its \
-                         fleet bikes standing here with their names. Adding: a guarded `to_fleet` \
-                         movement and the `rental_bikes` row in one transaction. Retiring: refused \
-                         while the bike is out or booked; else a used variant, a `from_fleet` \
-                         movement and the bike retired, in one transaction.",
+            under_hood: "Loading: the store's own new bikes on its shelf with something \
+                         available (the stock view) and its fleet bikes standing here with their \
+                         names. Adding: `Valid<ToFleetForm>`, a guarded `to_fleet` movement and \
+                         the `rental_bikes` row (at the variant's cost as its book value) in one \
+                         transaction, then an audit row. Retiring: refused while the bike is \
+                         out or booked; else a used variant, a `from_fleet` movement and the \
+                         bike retired, in one transaction, then an audit row.",
             docs: &[
                 "docs/authorization.md#checking-one-record-has_permission_in",
-                "docs/validation.md#every-rule",
+                "docs/validation.md#database-rules-unique-and-exists",
             ],
             sources: &[
                 FLEET,
                 LEDGER,
+                POLICY,
+                AUDIT,
                 "examples/bikeshop/resources/views/stock/fleet.html",
                 TESTS,
                 MOD,

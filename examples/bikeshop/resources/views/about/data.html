@@ -1,8 +1,10 @@
 {% extends "layouts/app.html" %}
 {#- /about/data: the data model explained (src/app/about/data.rs). Only the
     kit: page_header, infolist + entry, card, columns, table, badge. The
-    texts are Markdown in resources/lang/<locale>.json under `data_page`. -#}
+    texts are Markdown in resources/lang/<locale>.json under `data_page`; the
+    tables' and roles' descriptions, written in Rust, through `tx`. -#}
 {% from "renox/ui.html" import page_header, infolist, entry, card, columns, table, badge, link_button %}
+{% from "layouts/_text.html" import tx %}
 {% block seo %}{{ seo(title=t('data_page.title'), description=t('data_page.lead')) }}{% endblock %}
 
 {% block content %}
@@ -17,13 +19,13 @@
 
   {% call card(t('data_page.tables.title'), subtitle=t('data_page.tables.lead')) %}
     {%- for area in areas %}
-    <div class="rx-prose"><h3>{{ area.title }} · <a class="rx-link" href="{{ repository }}{{ area.file }}" target="_blank" rel="noopener"><code>{{ area.file | replace("examples/bikeshop/", "") }}</code></a></h3></div>
-    {% call table([t('data_page.tables.table'), t('data_page.tables.model'), t('data_page.tables.holds'), [t('data_page.tables.rows'), "num"]], caption=area.title) %}
+    <div class="rx-prose"><h3>{{ tx(area.title) }} · <a class="rx-link" href="{{ repository }}{{ area.file }}" target="_blank" rel="noopener"><code>{{ area.file | replace("examples/bikeshop/", "") }}</code></a></h3></div>
+    {% call table([t('data_page.tables.table'), t('data_page.tables.model'), t('data_page.tables.holds'), [t('data_page.tables.rows'), "num"]], caption=tx(area.title)) %}
       {%- for table in area.tables %}
       <tr>
         <td><code>{{ table.name }}</code></td>
         <td><code>{{ table.model }}</code></td>
-        <td>{{ table.holds }}</td>
+        <td>{{ tx(table.holds) }}</td>
         <td class="rx-num">{{ counts[table.name] | default(0) | number }}</td>
       </tr>
       {%- endfor %}
@@ -34,7 +36,7 @@
   {% call card(t('data_page.relations.title'), subtitle=t('data_page.relations.lead')) %}
     {% call table([t('data_page.relations.from'), t('data_page.relations.kind'), t('data_page.relations.to'), t('data_page.relations.how')], caption=t('data_page.relations.title')) %}
       {%- for rel in relations %}
-      <tr><td><code>{{ rel.from }}</code></td><td>{{ rel.kind }}</td><td><code>{{ rel.to }}</code></td><td>{{ rel.how | markdown }}</td></tr>
+      <tr><td><code>{{ rel.from }}</code></td><td>{{ tx(rel.kind) }}</td><td><code>{{ rel.to }}</code></td><td>{%- set k = 'text.' ~ rel.how %}{% set found = t(k) %}{{ (found if found != k else rel.how) | markdown }}</td></tr>
       {%- endfor %}
     {% endcall %}
   {% endcall %}
@@ -42,7 +44,7 @@
   {% call card(t('data_page.pagila.title'), subtitle=t('data_page.pagila.lead')) %}
     {% call table([t('data_page.pagila.pagila'), t('data_page.pagila.here')], caption=t('data_page.pagila.title')) %}
       {%- for row in pagila %}
-      <tr><td><code>{{ row[0] }}</code></td><td>{{ row[1] }}</td></tr>
+      <tr><td><code>{{ row[0] }}</code></td><td>{{ tx(row[1]) }}</td></tr>
       {%- endfor %}
     {% endcall %}
   {% endcall %}
@@ -89,7 +91,7 @@
     {% call table([t('data_page.access.role'), t('data_page.access.where'), t('data_page.access.grants')], caption=t('data_page.access.title')) %}
       {%- for role in roles %}
       <tr>
-        <td><strong>{{ role.label }}</strong> <code>{{ role.name }}</code><br><span class="rx-subtitle">{{ role.description }}</span></td>
+        <td><strong>{{ tx(role.label) }}</strong> <code>{{ role.name }}</code><br><span class="rx-subtitle">{{ tx(role.description) }}</span></td>
         <td>{% if role.global %}{{ badge(t('data_page.access.everywhere'), kind="info") }}{% else %}{{ badge(t('data_page.access.in_a_store')) }}{% endif %}</td>
         <td><span class="bs-badges">{% for p in role.permissions %}{{ badge(p) }}{% endfor %}</span></td>
       </tr>
@@ -97,7 +99,7 @@
     {% endcall %}
     {% call infolist(columns=2) %}
       {%- for p in permissions %}
-      {{ entry(p.name, p.description) }}
+      {{ entry(p.name, tx(p.description)) }}
       {%- endfor %}
     {% endcall %}
   {% endcall %}

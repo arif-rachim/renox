@@ -13,7 +13,7 @@
 </head>
 <body class="rx-page rx-shell">
   {% from "renox/ui.html" import sidebar, sidebar_link, sidebar_section, navbar, menu, menu_link, menu_action, menu_separator, open_button %}
-  {% from "renox-admin/_text.html" import tr %}
+  {% from "layouts/_text.html" import tx as tr %}
   {%- set about = about_page(request.route, request.path) if explain_panels else none %}
   {% call sidebar(tr(admin.title), href=admin.home, label=t('admin_panel.navigation')) %}
     {{ sidebar_link(admin.home, t('admin_panel.dashboard'), active=admin.dashboard) }}

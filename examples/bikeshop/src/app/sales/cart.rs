@@ -337,7 +337,10 @@ impl ValidateHooks for AddForm {
             None => false,
         };
         if !sold {
-            errors.add("variant_id", "This product isn't sold any more.");
+            errors.add(
+                "variant_id",
+                form.state.current_lang().t("sales.cart.not_sold", &[]),
+            );
         }
         Ok(())
     }

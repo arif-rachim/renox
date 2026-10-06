@@ -89,7 +89,7 @@ impl ValidateHooks for CheckoutForm {
     }
 
     /// A phone number is digits, with spaces, dashes and a leading `+`.
-    async fn after(&self, _form: &FormContext<'_>, errors: &mut Errors) -> Result {
+    async fn after(&self, form: &FormContext<'_>, errors: &mut Errors) -> Result {
         let digits = self.phone.chars().filter(char::is_ascii_digit).count();
         let tidy = self
             .phone
@@ -99,7 +99,9 @@ impl ValidateHooks for CheckoutForm {
         if !tidy || digits < 6 {
             errors.add(
                 "phone",
-                "Write the phone number with digits, like +62 812 3456 7890.",
+                form.state
+                    .current_lang()
+                    .t("sales.checkout.phone_digits", &[]),
             );
         }
         Ok(())

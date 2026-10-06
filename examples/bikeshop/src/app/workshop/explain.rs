@@ -504,7 +504,6 @@ pub fn entries() -> Vec<Explanation> {
     ]
 }
 
-
 /// GET routes of this area that aren't pages (JSON, files, streams).
 pub fn not_pages() -> Vec<NotAPage> {
     vec![

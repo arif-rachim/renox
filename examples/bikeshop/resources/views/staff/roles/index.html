@@ -6,6 +6,7 @@
     form's button sends the switch the same way. -#}
 {% extends "layouts/staff.html" %}
 {% from "renox/ui.html" import page_header, card, checkbox, badge, alert %}
+{% from "layouts/_text.html" import tx %}
 {% block seo %}{{ seo(title=t('staff.roles.title')) }}{% endblock %}
 
 {% block content %}
@@ -19,19 +20,19 @@
       <div role="row">
         <div role="columnheader">{{ t('staff.roles.permission') }}</div>
         {%- for c in columns %}
-        <div role="columnheader" data-bs-role="{{ c.name }}">{{ c.label }}{% if c.global %}{{ badge(t('staff.roles.global')) }}{% endif %}<span class="rx-subtitle">{{ t('staff.roles.count', count=c.count) }}</span></div>
+        <div role="columnheader" data-bs-role="{{ c.name }}">{{ tx(c.label) }}{% if c.global %}{{ badge(t('staff.roles.global')) }}{% endif %}<span class="rx-subtitle">{{ t('staff.roles.count', count=c.count) }}</span></div>
         {%- endfor %}
       </div>
       {%- set ns = namespace(group="") %}
       {%- for row in rows %}
       {%- if row.group != ns.group %}{% set ns.group = row.group %}
-      <div role="row"><div role="rowheader" class="bs-matrix__group" aria-level="2">{{ row.group }}</div></div>
+      <div role="row"><div role="rowheader" class="bs-matrix__group" aria-level="2">{{ tx(row.group) }}</div></div>
       {%- endif %}
       <div role="row" data-bs-permission="{{ row.name }}">
-        <div role="rowheader"><code>{{ row.name }}</code><span>{{ row.description }}</span></div>
+        <div role="rowheader"><code>{{ row.name }}</code><span>{{ tx(row.description) }}</span></div>
         {%- for cell in row.cells %}
         <div role="cell">
-          {{ checkbox("granted", t('staff.roles.cell', role=cell.role, permission=row.name), checked=cell.granted, switch=true, hide_label=true,
+          {{ checkbox("granted", t('staff.roles.cell', role=tx(cell.role), permission=row.name), checked=cell.granted, switch=true, hide_label=true,
                       disabled=cell.locked, id="perm-" ~ cell.role ~ "-" ~ row.name | replace(".", "-"),
                       attrs={"hx-post": route('staff.roles.toggle', cell.role, row.name), "hx-trigger": "change", "hx-swap": "none", "data-bs-cell": cell.role ~ ":" ~ row.name}) }}
         </div>

@@ -2,6 +2,7 @@
 {% from "renox/ui.html" import page_header, card, list, empty, link_button, action_sheet, date_picker, input, row_actions, confirm %}
 {% from "stock/_parts.html" import styles %}
 {% from "multistore/_parts.html" import help_status, post %}
+{% from "layouts/_text.html" import tx %}
 {% block seo %}{{ seo(title=t('multistore.help.title')) }}{% endblock %}
 
 {#- Staff helping other stores (#245): help asked by this store and of it. An approved request
@@ -12,7 +13,7 @@
   {%- for r in items %}
   <li>
     <div class="rx-list__main">
-      <strong>{{ r.helper }}</strong> · {{ r.role_label }} {{ help_status(r) }}
+      <strong>{{ r.helper }}</strong> · {{ tx(r.role_label) }} {{ help_status(r) }}
       <p class="rx-subtitle">{{ t('multistore.help.from_to', from=r.from, to=r.to) }} · {{ r.starts_at | date("%d %b") }} – {{ (r.ends_at) | date("%d %b %Y") }}{% if r.minutes %} · {{ t('multistore.help.hours_done', hours=(r.minutes / 60) | round(1)) }}{% endif %}</p>
       <p class="rx-subtitle">{{ r.reason }}</p>
     </div>

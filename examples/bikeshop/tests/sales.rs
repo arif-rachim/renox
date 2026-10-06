@@ -1070,5 +1070,5 @@ async fn the_cart_speaks_spanish_and_explains_itself() {
         .await
         .assert_ok()
         .assert_see("Tu carrito está vacío")
-        .assert_see("Lo que el comprador va a comprar");
+        .assert_see("Lo que el cliente está a punto de comprar");
 }

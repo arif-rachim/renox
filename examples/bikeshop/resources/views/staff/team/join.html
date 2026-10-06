@@ -4,9 +4,10 @@
     `action` (this signed address, which the form posts back to). -#}
 {% extends "renox/auth/layout.html" %}
 {% from "renox/ui.html" import card, input, button, alert, link_button %}
+{% from "layouts/_text.html" import tx %}
 {% block title %}{{ t('staff.join.title', store=store.name) }}{% endblock %}
 {% block content %}
-{% call card(title=t('staff.join.title', store=store.name), subtitle=t('staff.join.lead', role=role, store=store.name)) %}
+{% call card(title=t('staff.join.title', store=store.name), subtitle=t('staff.join.lead', role=tx(role), store=store.name)) %}
 {%- if used %}
 {{ alert(t('staff.join.used'), kind="info") }}
 {{ link_button(route('login'), t('nav.login'), variant="primary") }}

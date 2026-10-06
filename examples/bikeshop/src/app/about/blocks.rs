@@ -395,17 +395,18 @@ impl Validate for BlocksForm {
     // days, but anyone can send any date, so the server refuses them too.
     async fn after(&self, form: &FormContext<'_>, errors: &mut Errors) -> Result {
         let today = today(&form.state.config);
+        let lang = form.state.current_lang();
         if let Some(day) = self.visit_on {
             if day < today {
-                errors.add("visit_on", "Pick today or a day after it.");
+                errors.add("visit_on", lang.t("blocks.page.errors.past_day", &[]));
             } else if is_closed(today, day) {
-                errors.add("visit_on", "The shop is closed that day: pick another one.");
+                errors.add("visit_on", lang.t("blocks.page.errors.closed_day", &[]));
             }
         }
         if let Some(start) = self.starts_at
             && start.date() < today
         {
-            errors.add("starts_at", "A rental can't start in the past.");
+            errors.add("starts_at", lang.t("blocks.page.errors.past_start", &[]));
         }
         Ok(())
     }

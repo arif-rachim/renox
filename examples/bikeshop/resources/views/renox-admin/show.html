@@ -3,7 +3,7 @@
     Delete (or Restore for a deleted record). -#}
 {% extends "renox-admin/layout.html" %}
 {% from "renox/ui.html" import page_header, card, infolist, entry, link_button, confirm, button, alert %}
-{% from "renox-admin/_text.html" import tr %}
+{% from "layouts/_text.html" import tx as tr %}
 
 {% block title %}{{ title }} · {{ tr(admin.title) }}{% endblock %}
 
@@ -27,7 +27,7 @@
     {%- for e in entries %}
     {%- set value = record[e.key] if record[e.key] is defined else none %}
     {%- if e.format == "money" and value is number %}{% set value = value / admin.money_divisor %}{% endif %}
-    {{ entry(e.label, value, format=e.format, badge=(true if e.badge else none), labels=(e.labels if e.labels else none), copyable=e.copyable, span=e.span) }}
+    {{ entry(tr(e.label), value, format=e.format, badge=(true if e.badge else none), labels=(e.labels if e.labels else none), copyable=e.copyable, span=e.span) }}
     {%- endfor %}
   {% endcall %}
 {% endcall %}

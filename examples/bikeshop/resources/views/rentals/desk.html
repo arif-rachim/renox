@@ -35,6 +35,9 @@
             {%- else %}<span class="rx-badge rx-badge--warning">{{ t('rentals.desk.not_verified') }}</span>{% endif %}
           {% endcall %}
         {% endcall %}
+{%- if customer and customer.user_id is none and can('customers.manage') %}
+        <p>{{ link_button(route('accounts.invite', customer.id), t('accounts.invite.title'), variant="plain", size="small") }}</p>
+        {%- endif %}
         {%- if not verified and document and can('rentals.verify_id') %}
         <div class="rx-stack">
           {{ link_button(route('rentals.identities.photo', document.id), t('rentals.identities.open_photo'), new_tab=true) }}

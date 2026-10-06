@@ -195,7 +195,9 @@
       "note_hint": "Optional, e.g. \"needs a 12-speed hub\".",
       "fit_added": "Added.",
       "fit_removed": "Removed.",
-      "fits_link": "What fits"
+      "fits_link": "What fits",
+      "selected": ":count selected.",
+      "move_link": "Choose the category"
     }
   },
   "about": {
@@ -373,7 +375,12 @@
       "variant": "Price and stock",
       "in_stock": ":n in stock",
       "out_of_stock": "Out of stock",
-      "booked": "Booking :slot (a demo: nothing is saved)."
+      "booked": "Booking :slot (a demo: nothing is saved).",
+      "errors": {
+        "past_day": "Pick today or a day after it.",
+        "closed_day": "The shop is closed that day: pick another one.",
+        "past_start": "A rental can't start in the past."
+      }
     }
   },
   "access": {
@@ -582,7 +589,8 @@
       "updated": "Cart updated.",
       "removed": "Removed from your cart.",
       "store_set": "Your cart is checked against :store now.",
-      "store_lowered": ":store has fewer of some products: the quantities were lowered."
+      "store_lowered": ":store has fewer of some products: the quantities were lowered.",
+      "not_sold": "This product isn't sold any more."
     },
     "checkout": {
       "title": "Checkout",
@@ -617,7 +625,8 @@
       "from_store": "Checked against the stock of :store.",
       "empty": "Your cart is empty: add something first.",
       "cart_changed": "Your cart changed (a store has fewer now): check it before paying.",
-      "sold_out": "Someone was quicker: only :count of “:name” were left. Your cart has been updated."
+      "sold_out": "Someone was quicker: only :count of “:name” were left. Your cart has been updated.",
+      "phone_digits": "Write the phone number with digits, like +62 812 3456 7890."
     },
     "pay": {
       "title": "Payment",
@@ -2510,6 +2519,7 @@
     "restore": "Restore",
     "delete_for_good": "Delete for good",
     "delete_for_good_question": "Delete this :label for good?",
-    "in_trash": "This :label is in the trash."
+    "in_trash": "This :label is in the trash.",
+    "select": "Select…"
   }
 }
