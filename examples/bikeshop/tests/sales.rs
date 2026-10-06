@@ -1000,6 +1000,22 @@ async fn a_guest_who_registers_finds_their_orders() {
         .await
         .unwrap()
         .unwrap();
+    // Not before the address is verified: anyone could register with it.
+    let guest = Customer::find(app.db(), order.customer_id.unwrap())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(guest.user_id, None);
+    let verify = app
+        .state()
+        .signed_url(
+            "verification.verify",
+            &[&user.id, &renox::webhook::sha256_hex(&user.email)],
+            std::time::Duration::from_secs(3600),
+        )
+        .unwrap();
+    app.acting_as(&user);
+    app.get(&verify).await;
     let customer = Customer::find(app.db(), order.customer_id.unwrap())
         .await
         .unwrap()

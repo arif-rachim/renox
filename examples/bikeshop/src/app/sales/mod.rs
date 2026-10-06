@@ -31,7 +31,7 @@ pub mod orders;
 pub mod payments;
 pub mod staff;
 
-use renox::auth::events::Registered;
+use renox::auth::events::EmailVerified;
 use renox::prelude::*;
 
 use crate::app::access::{self, catalogue};
@@ -89,12 +89,21 @@ impl renox::Module for Sales {
             .listen(orders::on_payment)
             .listen(orders::on_payment_failed)
             // A guest who registers with the address they ordered with finds
-            // those orders in their account.
-            .listen(|event: Registered, state: AppState| async move {
-                Customer::where_eq("email", event.email)
+            // those orders in their account, once the address is proven theirs
+            // (the verification link): linking at registration would hand
+            // anyone's orders to whoever signs up with their address. The
+            // accounts area's claim merges the records (#238).
+            .listen(|event: EmailVerified, state: AppState| async move {
+                let Some(user) = User::find(&state.db, event.user_id).await? else {
+                    return Ok(());
+                };
+                let guests = Customer::where_eq("email", user.email.clone())
                     .where_null("user_id")
-                    .update(&state.db, &[("user_id", &event.user_id)])
+                    .get(&state.db)
                     .await?;
+                for guest in guests {
+                    crate::app::accounts::claim::link(&state.db, &user, guest.id).await?;
+                }
                 Ok(())
             });
         app.schedule()
