@@ -290,8 +290,13 @@ fn the_anchor_rules_match_the_docs_site() {
     assert!(!found.contains("use-x"));
 }
 
+/// Someone on a store's staff (the staff side needs `staff.access` in a store).
 async fn staff_member(app: &TestApp) -> User {
-    User::register(app.db(), "Sam Staff", "sam@example.com", "secret123")
+    use bikeshop::seed::fixtures;
+    fixtures::roles(app.db()).await.unwrap();
+    let store = fixtures::store(app.db(), "North").await.unwrap();
+    let staff = bikeshop::app::access::catalogue::STAFF;
+    fixtures::person(app.db(), "sam@example.com", &[(staff, Some(store.id))])
         .await
         .unwrap()
 }

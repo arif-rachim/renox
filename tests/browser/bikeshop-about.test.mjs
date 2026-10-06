@@ -58,7 +58,8 @@ for (const csp of ['relaxed', 'strict']) {
   describe(`bikeshop under CSP=${csp}`, () => {
     let app;
     before(async () => {
-      app = await start('bikeshop', 'examples/bikeshop', { env: { CSP: csp } });
+      // Seeded: the staff side needs a role in a store (the demo users).
+      app = await start('bikeshop', 'examples/bikeshop', { env: { CSP: csp }, seed: true });
     });
     after(() => app?.stop());
 
@@ -98,15 +99,13 @@ for (const csp of ['relaxed', 'strict']) {
         page.assertClean();
       }));
 
-    test('the staff layout, after registering (desktop and phone)', () =>
+    test('the staff layout, after logging in as staff (desktop and phone)', () =>
       browser.with(async (page) => {
-        await page.goto(`${app.url}/register`);
-        await page.type('#rx-name', 'Sam Staff');
-        await page.type('#rx-email', `sam-${csp}@example.com`);
-        await page.type('#rx-password', 'secret123');
-        await page.type('#rx-password_confirmation', 'secret123');
+        await page.goto(`${app.url}/login`);
+        await page.type('#rx-email', 'staff.north@bikeshop.test');
+        await page.type('#rx-password', 'password');
         await page.click('form button[type=submit]');
-        await page.waitFor(() => location.pathname === '/');
+        await page.waitFor(() => location.pathname !== '/login');
         await page.goto(`${app.url}/staff`);
         assert.ok(await page.eval(() => document.body.classList.contains('rx-shell')));
         assert.ok(await fitsWidth(page));

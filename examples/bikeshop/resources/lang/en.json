@@ -219,5 +219,82 @@
       "out_of_stock": "Out of stock",
       "booked": "Booking :slot (a demo: nothing is saved)."
     }
+  },
+  "access": {
+    "switcher": {
+      "working_in": "Working in :store",
+      "switch_to": "Switch store"
+    }
+  },
+  "data_page": {
+    "title": "The data model",
+    "lead": "Every table of the bike shop, how they relate, and the choices behind them: Pagila's shape grown into a business with three stores that sell, rent and service bikes.",
+    "glance": {
+      "tables": "Tables",
+      "rows": "Rows now",
+      "volume": "Pagila's volume"
+    },
+    "tables": {
+      "title": "Tables, by area",
+      "lead": "Each area of src/app owns the models of its tables. The counts are live: run the large seed and they grow to Pagila's size.",
+      "table": "Table",
+      "model": "Model",
+      "holds": "One row is",
+      "rows": "Rows"
+    },
+    "relations": {
+      "title": "Relations",
+      "lead": "No lazy relations in Renox: each one is loaded for a whole page in a fixed number of queries, so lists never run a query per row.",
+      "from": "From",
+      "kind": "Kind",
+      "to": "To",
+      "how": "Loaded with"
+    },
+    "pagila": {
+      "title": "From Pagila to the bike shop",
+      "lead": "Sakila/Pagila is the sample database whose shape touches the most of a framework. A DVD shop is dated; a bike shop keeps the shape.",
+      "pagila": "Pagila",
+      "here": "Here"
+    },
+    "stores": {
+      "title": "Owner, location and operating store",
+      "text": "Three stores work together, so a record can belong to more than one store, and each action is checked against the one that matters:\n\n- the **owner store** has the bike or the goods in its books: prices, retiring or selling a bike and recalling consigned goods are its decisions;\n- the **location store** is where the bike or goods are now: renting them out, the counter and stock takes happen there;\n- the **operating store** served the customer: it holds the deposit and earns a fee (its `fee_rate_bp`, 20 % unless the owner changes it) when the bike or goods are another store's, and the books between stores record who owes whom.\n\n`access::require(user, permission, StoreAttr::Owner, &bike)` checks a permission in the store an attribute names; `access::visible::<RentalBike>(permission)` lists what is owned by, or located at, the stores where the person holds it.",
+      "record": "Record",
+      "owner": "Owner store",
+      "location": "Location store",
+      "operating": "Operating store"
+    },
+    "money": {
+      "title": "Money as integers",
+      "text": "Every amount is an `i64` in the smallest unit of `APP_CURRENCY` (`INTEGER` on SQLite, `BIGINT` on PostgreSQL), never a float: `0.1 + 0.2` isn't `0.3` in floating point, and a sum of prices must be exact. Templates show it with the `money` filter; fees are worked out in basis points with integer rounding (`staff::model::fee`).",
+      "stored": "Stored",
+      "shown": "Shown"
+    },
+    "encrypted": {
+      "title": "Secrets: Encrypted",
+      "text": "A customer's ID number (needed to rent a bike) is an `Encrypted<String>`: sealed with `APP_KEY` when it's written, so the `customers.id_number` column holds unreadable text and a stolen database leaks nothing. The app reads the plain value; the field is `#[serde(skip_serializing)]`, so it never reaches a template or an API answer by accident, and staff see `masked_id_number()`."
+    },
+    "enums": {
+      "title": "Statuses: DbEnum",
+      "text": "Every status and kind is a Rust enum with `#[derive(DbEnum)]`: stored as a word (`overdue`, `waiting_parts`), read back as the enum, so a typo is a compile error and a form sending an unknown value gets a validation error."
+    },
+    "soft_deletes": {
+      "title": "Soft deletes",
+      "text": "Customers who leave and discontinued products are **soft deleted** (`#[model(soft_deletes)]`, a `deleted_at` column): queries skip them, `restore` brings them back, and the rentals, orders and payments that point at them keep working. Everything else is history that is never deleted: a rental is returned or cancelled, an order refunded."
+    },
+    "seed": {
+      "title": "Factories and the seeders",
+      "text": "Every model has a `Factory` in its area's `factories.rs`, with states and sequences named after the business: `rentals().of_bike(&bike).overdue()`, `rental_bikes().owned_by(north).placed_at(south)`, `orders().at(store).paid()`, `work_orders().waiting_parts()`. Tests make exactly the rows they need with them (`seed::fixtures` adds stores and people with roles).\n\n`cargo run -- db:seed` builds a small shop in a second; `cargo run -- demo:seed --size large` builds Pagila's volume (about 1,000 variants, 600 customers, 16,000 rentals, 5,000 orders, 3,000 work orders) in a few seconds. The dates count back from today, so the shop is always alive: rentals out and overdue, one due back later today, work on the bench, low stock, bikes and goods at other stores, someone helping another store this week, last month's balances still open. A seed never runs twice: `db:seed` skips a seeded database and `demo:seed` refuses it."
+    },
+    "access": {
+      "title": "Who may do what: RBAC + ABAC",
+      "lead": "Roles say what, stores say where.",
+      "text": "The code checks **permissions** (`access::catalogue`), never a role's name: a role is a named set of permissions that the owner can change without a deploy. Roles are given **in a store** (`assign_role_in(…, &Scope::of(&store))`), optionally between two dates (staff helping another store), and only the owner's role is global. On the staff side a middleware picks the store the request works in and calls `permissions::set_scope`, so `require_permission`, `allows` and `can()` count the roles in that store; another store's record answers 404.",
+      "role": "Role",
+      "where": "Given",
+      "grants": "Permissions",
+      "everywhere": "Everywhere",
+      "in_a_store": "In a store"
+    }
   }
 }

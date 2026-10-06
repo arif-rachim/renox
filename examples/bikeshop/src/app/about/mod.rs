@@ -1,12 +1,13 @@
 //! Pages about the example itself: `/about/pages`, the index of every page
 //! with the Renox features it uses (filtered by feature or by who uses the
-//! page), and `/about/blocks`, the bike shop's own UI blocks working
-//! (`blocks.rs`). `/about/data` (the data model) comes next.
+//! page); `/about/data`, the data model explained ([`data`]); and
+//! `/about/blocks`, the bike shop's own UI blocks working (`blocks.rs`).
 //!
 //! The "About this page" mechanism is in `src/explain.rs`; the panel every
 //! page shows is `resources/views/about/_panel.html`.
 
 pub mod blocks;
+pub mod data;
 pub mod explain;
 
 use crate::explain::{self as about_this_page, Audience};
@@ -25,6 +26,8 @@ impl Module for About {
         Routes::new()
             .get("/about/pages", pages)
             .name("about.pages")
+            .get("/about/data", data::show)
+            .name("about.data")
             .merge(blocks::routes())
     }
 }

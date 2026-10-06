@@ -213,5 +213,15 @@
       "included": "Incluido",
       "not_included": "No incluido"
     }
+  },
+  "access": {
+    "switcher": {
+      "working_in": "Trabajando en :store",
+      "switch_to": "Cambiar de tienda"
+    }
+  },
+  "data_page": {
+    "title": "El modelo de datos",
+    "lead": "Cada tabla de la tienda de bicicletas, cómo se relacionan y las decisiones detrás de ellas."
   }
 }
