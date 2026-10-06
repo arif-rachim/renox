@@ -5,6 +5,8 @@
 //! "About this page" entry of every GET route it adds in `explain.rs`.
 
 pub mod explain;
+pub mod factories;
+pub mod model;
 
 /// The catalog area, registered in `src/lib.rs`.
 pub struct Catalog;

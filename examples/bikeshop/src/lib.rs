@@ -23,6 +23,7 @@
 
 pub mod app;
 pub mod explain;
+pub mod seed;
 
 use renox::prelude::*;
 
@@ -43,6 +44,11 @@ pub fn app() -> App {
             |ctx: renox::view::ViewContext| async move { Ok(explain::enabled(&ctx.state.config)) },
         )
         .module(renox::auth::Auth::new().account()) // login, register, /account
+        // Roles given per store, with dates (#244); the catalogue is src/app/access.
+        .module(renox::auth::permissions::Permissions)
+        // `db:seed`: a small shop in seconds (`demo:seed --size large` for Pagila's volume).
+        .seeder(seed::run)
+        .typed_command::<seed::DemoSeed>()
         // --- Areas (alphabetical; add new ones in order) ---
         .module(app::about::About)
         .module(app::access::Access)

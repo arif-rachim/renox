@@ -1,0 +1,137 @@
+//! The workshop: customers' bikes, service tasks and work orders.
+//!
+//! A [`WorkOrder`] is done by one store's workshop (`store_id`) on a
+//! customer's bike or on a bike of the rental fleet. A fleet repair of a
+//! bike owned by another store is billed to that owner store
+//! (`billed_store_id`), which the intercompany books record (#245).
+//!
+//! Migration: `migrations/20260101000800_create_workshop_tables.*`.
+
+use renox::chrono::NaiveDate;
+use renox::prelude::*;
+use serde::Serialize;
+
+use crate::app::access::{StoreAttr, StoreRecord, catalogue};
+
+/// A customer's own bike, registered to them (bought here or brought in).
+#[derive(Model, Serialize, Default, Debug, Clone)]
+#[model(table = "customer_bikes")]
+pub struct CustomerBike {
+    pub id: i64,
+    pub customer_id: i64,
+    /// The bike model, when it's one of the catalogue's.
+    pub product_id: Option<i64>,
+    /// What the customer calls it: "Trek Domane AL 2, blue".
+    pub name: String,
+    pub frame_number: Option<String>,
+    /// The order it was bought with, when bought here.
+    pub order_id: Option<i64>,
+    pub bought_on: Option<NaiveDate>,
+    pub created_at: Option<DateTime>,
+    pub updated_at: Option<DateTime>,
+}
+
+/// Something a mechanic does, with its usual time and price.
+#[derive(Model, Serialize, Default, Debug, Clone)]
+#[model(table = "service_tasks")]
+pub struct ServiceTask {
+    pub id: i64,
+    pub name: String,
+    pub slug: String,
+    pub minutes: i64,
+    /// Labour price in the smallest unit of `APP_CURRENCY`.
+    pub price: i64,
+    pub created_at: Option<DateTime>,
+    pub updated_at: Option<DateTime>,
+}
+
+/// Why a work order exists.
+#[derive(DbEnum, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum WorkSource {
+    /// A customer walked in with their bike.
+    #[default]
+    WalkIn,
+    /// Booked online.
+    Booking,
+    /// A visit of a service plan.
+    Plan,
+    /// A repair of a rental bike.
+    Fleet,
+}
+
+/// Where a work order stands.
+#[derive(DbEnum, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum WorkStatus {
+    /// Booked for `scheduled_for`.
+    #[default]
+    Booked,
+    /// The bike is at the workshop.
+    CheckedIn,
+    /// A mechanic is on it.
+    InProgress,
+    /// Waiting for a part to arrive.
+    WaitingParts,
+    /// Done, waiting for the customer.
+    Ready,
+    /// Picked up (and paid).
+    Completed,
+    Cancelled,
+}
+
+/// A job for a store's workshop.
+#[derive(Model, Serialize, Default, Debug, Clone)]
+#[model(table = "work_orders")]
+pub struct WorkOrder {
+    pub id: i64,
+    /// A customer's bike…
+    pub customer_bike_id: Option<i64>,
+    /// …or a bike of the rental fleet.
+    pub rental_bike_id: Option<i64>,
+    /// The store whose workshop does it.
+    pub store_id: i64,
+    /// The mechanic (a `staff` row).
+    pub mechanic_id: Option<i64>,
+    pub source: WorkSource,
+    pub plan_subscription_id: Option<i64>,
+    /// For a fleet repair of another store's bike: the owner store, which
+    /// pays for it.
+    pub billed_store_id: Option<i64>,
+    pub scheduled_for: DateTime,
+    pub status: WorkStatus,
+    /// Money in the smallest unit of `APP_CURRENCY`.
+    pub labour: i64,
+    pub parts: i64,
+    pub total: i64,
+    pub customer_note: Option<String>,
+    pub started_at: Option<DateTime>,
+    pub completed_at: Option<DateTime>,
+    pub created_at: Option<DateTime>,
+    pub updated_at: Option<DateTime>,
+}
+
+impl StoreRecord for WorkOrder {
+    const VIEW: &'static str = catalogue::WORKORDERS_VIEW;
+    const STORE_COLUMNS: &'static [&'static str] = &["store_id", "billed_store_id"];
+
+    fn store_id(&self, attr: StoreAttr) -> Option<i64> {
+        match attr {
+            StoreAttr::Operating | StoreAttr::Location => Some(self.store_id),
+            StoreAttr::Owner => Some(self.billed_store_id.unwrap_or(self.store_id)),
+        }
+    }
+}
+
+/// A task of a work order: done or not, with a note.
+#[derive(Model, Serialize, Default, Debug, Clone)]
+#[model(table = "work_order_tasks")]
+pub struct WorkOrderTask {
+    pub id: i64,
+    pub work_order_id: i64,
+    pub service_task_id: i64,
+    pub minutes: i64,
+    pub price: i64,
+    pub done: bool,
+    pub note: Option<String>,
+    pub created_at: Option<DateTime>,
+    pub updated_at: Option<DateTime>,
+}

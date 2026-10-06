@@ -8,6 +8,8 @@
 //! route only needs a login.
 
 pub mod explain;
+pub mod factories;
+pub mod model;
 
 use renox::prelude::*;
 
