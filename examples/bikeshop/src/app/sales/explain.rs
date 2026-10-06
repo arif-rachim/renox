@@ -208,7 +208,7 @@ pub fn entries() -> Vec<Explanation> {
                           listen to the same event, so the payment code knows none of them.",
                 },
                 Feature {
-                    api: "Htmx polling",
+                    api: "htmx polling",
                     why: "While the payment is pending the status block asks again every two \
                           seconds (`hx-trigger=\"every 2s\"`, the `status` fragment) and stops \
                           once it is paid, failed or expired: simpler than a live stream for a \

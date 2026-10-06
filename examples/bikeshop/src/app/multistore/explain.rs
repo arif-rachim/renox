@@ -16,7 +16,7 @@ const TESTS: &str = "examples/bikeshop/tests/multistore.rs";
 const BROWSER: &str = "tests/browser/bikeshop-multistore.test.mjs";
 
 const AUDITED: Feature = Feature {
-    api: "Audit",
+    api: "Audit module",
     why: "Renox's `Audit` module keeps `audit_logs`; `multistore::audit::record` adds the store \
           the person was working in and the roles they held **there** (from `assignments`, never \
           a role-name check), so \"who did this, as what, where\" has an answer even for someone \
@@ -97,6 +97,14 @@ pub fn entries() -> Vec<Explanation> {
                           help's dates is refused.",
                 },
                 AUDITED,
+                Feature {
+                    api: "Redirect::route",
+                    why: "Every form on the page (ask, approve, refuse, end early, log hours) \
+                          answers with `Redirect::route(\"multistore.help\", &[])`: the \
+                          redirect names the route rather than a path written by hand, so \
+                          moving the page to another address cannot leave a form sending people \
+                          to a 404.",
+                },
             ],
             under_hood: "Loading: up to 100 requests of the store, then the helpers' staff rows \
                          and users, the stores and the hours, five queries whatever the number. \

@@ -10,7 +10,7 @@
 :root[data-theme="dark"] { --rx-accent: #0f766e; --rx-accent-hover: #12837a; --rx-accent-pressed: #0b625b; --rx-accent-text: #5fd4c6; }
 
 /* The public layout: the bar, the page, the footer, top to bottom. */
-.bs-public { display: grid; grid-template-rows: auto 1fr auto; min-height: 100vh; min-height: 100dvh; }
+.bs-public { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr auto; min-height: 100vh; min-height: 100dvh; }
 .bs-footer { display: grid; grid-auto-flow: column; justify-content: space-between; align-items: center; gap: var(--rx-space-3); padding-block: var(--rx-space-6); border-top: 0.5px solid var(--rx-separator); }
 @media (max-width: 40rem) { .bs-footer { grid-auto-flow: row; justify-content: start; } }
 

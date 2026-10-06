@@ -151,6 +151,14 @@ pub fn entries() -> Vec<Explanation> {
                           summary sits beside the form on a wide screen and under it on a \
                           phone (the page's own CSS grid).",
                 },
+                Feature {
+                    api: "HxRedirect",
+                    why: "The form is sent with htmx, and paying happens on the gateway's own \
+                          page: a plain `303` would only be followed inside htmx's request and \
+                          swapped into this page, so the handler answers an htmx request with \
+                          `HxRedirect(url)` and the browser leaves for Stripe or Xendit; \
+                          without JavaScript it is a normal `Redirect::to`.",
+                },
             ],
             under_hood: "On load: the customer's bikes and which already have a plan, the \
                          plans, the stores. On send: the plan is written as **pending** (an \

@@ -566,7 +566,7 @@ pub fn entries() -> Vec<Explanation> {
             flow: Flow::Account,
             features: &[
                 Feature {
-                    api: "Signed URLs (ValidSignature)",
+                    api: "Signed URLs",
                     why: "The link is `state.signed_url(\"accounts.claim\", …)`: the \
                           customer's id, the address it went to and an expiry (seven days) \
                           signed with `APP_KEY`. Changing any of them, or opening it late, \

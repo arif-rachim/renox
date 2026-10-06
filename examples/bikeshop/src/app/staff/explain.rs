@@ -504,7 +504,7 @@ fn back_office() -> Vec<Explanation> {
             flow: Flow::BackOffice,
             features: &[
                 Feature {
-                    api: "Signed URLs (ValidSignature)",
+                    api: "Signed URLs",
                     why: "A changed or expired link answers 403 before anything is read, on \
                           the page and on its form, which posts back to the same signed \
                           address.",
@@ -545,7 +545,7 @@ fn back_office() -> Vec<Explanation> {
             flow: Flow::BackOffice,
             features: &[
                 Feature {
-                    api: "Permissions module (RBAC)",
+                    api: "Permissions module",
                     why: "A role is a named set of permissions; **code only ever checks \
                           permissions** (`require_permission`, `can()`, `allows`), never a \
                           role's name (`tests/access.rs` checks the catalogue). So one \
@@ -599,7 +599,7 @@ fn back_office() -> Vec<Explanation> {
             features: &[
                 STAFF_GUARD,
                 Feature {
-                    api: "Audit",
+                    api: "Audit module",
                     why: "Renox's `Audit` module owns `audit_logs` and records the auth \
                           events itself (logins, failed logins, lockouts, password changes, \
                           deleted accounts); the plugins add two-factor and social login \

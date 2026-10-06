@@ -285,6 +285,13 @@ fn data_page() -> Explanation {
                       kit `infolist`s; `entry(…, format=\"money\")` shows how an \
                       integer amount is displayed.",
             },
+            Feature {
+                api: "Model::insert_many",
+                why: "The seeders write each table with `insert_many` inside one transaction: a \
+                      few multi-row `INSERT`s instead of one statement per row, which is what \
+                      lets `demo:seed --size large` build 16,000 rentals and 5,000 orders in \
+                      seconds.",
+            },
         ],
         under_hood: "Two queries: one `SELECT 'table', COUNT(*) FROM table UNION ALL …` \
                      for the row counts, and `permissions::roles` for the roles and their \

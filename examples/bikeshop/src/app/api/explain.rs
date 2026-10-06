@@ -133,6 +133,13 @@ pub fn entries() -> Vec<Explanation> {
                           field with the kit's copy button (with a `curl` line to try it), the \
                           tokens in a table with a confirm before revoking.",
                 },
+                Feature {
+                    api: "Redirect::route",
+                    why: "Creating and revoking a token go back with \
+                          `Redirect::route(\"api.tokens\", &[])`, by the route's name: the same \
+                          name the templates link with, so the address is written once, in the \
+                          module's routes.",
+                },
             ],
             under_hood: "One query for the tokens. Making one: `Valid<TokenForm>` (each \
                          ability `one_of` the three), then a `personal_access_tokens` row (its \

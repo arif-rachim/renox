@@ -189,6 +189,7 @@ describe('bikeshop in Spanish', () => {
   ]) {
     test(`the language menu, the panel and the shop (${size})`, () =>
       browser.with(async (page) => {
+        await page.send('Network.clearBrowserCookies');
         await page.goto(`${app.url}/`);
         await spanish(page);
         await revealed(page);
@@ -212,7 +213,9 @@ describe('bikeshop in Spanish', () => {
 
     test(`the staff side and the admin panel (${size})`, () =>
       browser.with(async (page) => {
-        // The choice is kept in the session, so Renox's login page follows it.
+        // A fresh visitor (the tabs share cookies): the choice is kept in the
+        // session, so Renox's login page follows it.
+        await page.send('Network.clearBrowserCookies');
         await page.goto(`${app.url}/`);
         await spanish(page);
         await page.goto(`${app.url}/login`);

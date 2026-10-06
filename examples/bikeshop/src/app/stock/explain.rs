@@ -52,7 +52,7 @@ const LEDGER_PATTERN: Feature = Feature {
 };
 
 const AUDITED: Feature = Feature {
-    api: "Audit",
+    api: "Audit module",
     why: "Renox's `Audit` module keeps `audit_logs`; `multistore::audit::record` adds the store \
           the person was working in and the roles they held **there** (from `assignments`, \
           never a role-name check), so \"who did this, as what, where\" has an answer.",
@@ -103,6 +103,14 @@ pub fn entries() -> Vec<Explanation> {
                           shareable address and the grid's own filters stay apart from it; \
                           the counts on the tabs are four small `count` queries, the same \
                           whatever the store holds.",
+                },
+                Feature {
+                    api: "push + stack, csp_nonce()",
+                    why: "The stock pages add their script with `{% call push('scripts', \
+                          once='stock-js') %}` from `stock/_parts.html`: the layout prints it \
+                          where its `stack('scripts')` is, once however many parts ask for it, \
+                          and only on the pages that use it. The tag carries `nonce=\"{{ \
+                          csp_nonce() }}\"`, so it runs under `CSP=strict` too.",
                 },
             ],
             under_hood: "One request: the tab's query (`access::visible` then the active store's \

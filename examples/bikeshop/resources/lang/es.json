@@ -607,7 +607,8 @@
         "8": "Los roles y lo que permiten se leen de la base de datos (`permissions::roles`), así que la página muestra lo que configuró el dueño, con las etiquetas y el catálogo de permisos de `access::catalogue`.",
         "9": "Los recuentos de filas en vivo son una sola consulta `UNION ALL` sobre cada tabla listada en `data.rs`, leída en pares `(String, i64)` con `fetch_as`: un solo viaje a la base de datos en lugar de uno por tabla.",
         "10": "Cada parte de la página es una `card` del kit; las tablas, las relaciones y las correspondencias son `table` del kit (con desplazamiento lateral en el móvil), y las notas sobre dinero, cifrado, enums y borrado suave están en una cuadrícula `columns(2)` del kit. Sin CSS de diseño propio de la app.",
-        "11": "Los números de arriba, los valores de los enums y los permisos son `infolist` del kit; `entry(…, format=\"money\")` muestra cómo se presenta una cantidad entera."
+        "11": "Los números de arriba, los valores de los enums y los permisos son `infolist` del kit; `entry(…, format=\"money\")` muestra cómo se presenta una cantidad entera.",
+        "12": "Las semillas escriben cada tabla con `insert_many` dentro de una transacción: unos pocos `INSERT` de muchas filas en vez de una sentencia por fila, que es lo que permite a `demo:seed --size large` crear 16.000 alquileres y 5.000 pedidos en segundos."
       }
     },
     "multistore.help": {
@@ -621,7 +622,8 @@
         "2": "Aprobar y rechazar necesitan `staff.help` en la tienda **que presta**, retirar en la tienda **que pide**, terminar en cualquiera de las dos: `access::can_in(user, STAFF_HELP, store)` en cada acción.",
         "3": "Las personas de la otra tienda con `staff.help` se enteran en la app de una solicitud, una aprobación, un rechazo o un final anticipado (la campana, sin correo: ya están trabajando en la app); quien ayuda recibe un correo y una notificación con la tienda y las fechas, porque puede que no esté mirando.",
         "4": "Registrar las horas de un día es un pequeño formulario en un panel sobre la fila (día, horas, nota), así el encargado no sale de la lista; un día fuera de las fechas de la ayuda se rechaza.",
-        "5": "El módulo `Audit` de Renox guarda `audit_logs`; `multistore::audit::record` añade la tienda en la que trabajaba la persona y los roles que tenía **allí** (de `assignments`, nunca comprobando el nombre de un rol), así que \"quién hizo esto, como qué y dónde\" tiene respuesta incluso para alguien con roles en dos tiendas."
+        "5": "El módulo `Audit` de Renox guarda `audit_logs`; `multistore::audit::record` añade la tienda en la que trabajaba la persona y los roles que tenía **allí** (de `assignments`, nunca comprobando el nombre de un rol), así que \"quién hizo esto, como qué y dónde\" tiene respuesta incluso para alguien con roles en dos tiendas.",
+        "6": "Cada formulario de la página (pedir, aprobar, rechazar, terminar antes, anotar horas) responde con `Redirect::route(\"multistore.help\", &[])`: la redirección nombra la ruta en vez de una dirección escrita a mano, así que mover la página a otra dirección no puede dejar un formulario que lleve a un 404."
       }
     },
     "multistore.help.create": {
@@ -736,7 +738,8 @@
       "features": {
         "0": "Un token limitado a las capacidades marcadas (`read`, `rent`, `order`) y que caduca en un año, así un script que solo lee no puede reservar; `tokens()` los lista con su último uso y `revoke_token` termina uno al instante (la siguiente llamada de la app recibe 401).",
         "1": "Solo se guarda el hash del token, así que el secreto se muestra una vez: `session.flash` lo lleva a la página que sigue a la redirección, y al recargar ya no aparece. Nada secreto queda en la base de datos ni en la URL.",
-        "2": "Las capacidades como una lista de casillas, el token nuevo en un campo de solo lectura con el botón de copiar del kit (con una línea `curl` para probarlo), los tokens en una tabla con una confirmación antes de revocar."
+        "2": "Las capacidades como una lista de casillas, el token nuevo en un campo de solo lectura con el botón de copiar del kit (con una línea `curl` para probarlo), los tokens en una tabla con una confirmación antes de revocar.",
+        "3": "Crear y revocar un token vuelven con `Redirect::route(\"api.tokens\", &[])`, por el nombre de la ruta: el mismo nombre con el que enlazan las plantillas, así que la dirección se escribe una sola vez, en las rutas del módulo."
       }
     },
     "api.kiosks": {
@@ -1032,7 +1035,8 @@
         "0": "Un solo `Grid` da búsqueda, filtros por columna, orden, elección de columnas, paginación y tarjetas en el móvil, así una lista de miles de filas no necesitó una tabla, un formulario de filtros ni un paginador hechos a mano. `Column::summary(Summary::Sum)` pone los totales de a mano, reservado, disponible y valor bajo las columnas (sobre todas las filas filtradas, no solo la página), `.groups(&[\"category\"])` añade \"Agrupar por categoría\" con subtotales, y `.exports()` da CSV, Excel (feature `xlsx`) y una página para imprimir desde el mismo handler y con los mismos filtros.",
         "1": "La tabla filtra, suma y agrupa las columnas propias de un modelo, por eso las filas vienen de una vista de la base de datos, `stock_overview` (la existencia unida a su variante, producto y categoría, con `available` y `value_at_cost` ya calculados), leída con `#[derive(Model)] StockRow`: ninguna copia de los números que mantener al día. Los nombres de la tienda dueña y la de ubicación son columnas `Column::related`, leídas en la misma consulta de la página.",
         "2": "Las listas parten de `access::visible::<M>(permission)`: `scopes_with` de Renox convierte los roles de la persona en las tiendas donde puede verlo, y `Scopes::apply` arma la consulta \"tienda dueña en (…) **o** tienda de ubicación en (…)\", así la mercancía de North que está en South aparece para ambas tiendas y para nadie más. Un rol global (el dueño) lo ve todo, sin comprobar nunca el nombre de un rol.",
-        "3": "Las cuatro vistas son enlaces (`?view=own|held|away|low`), así cada una es una dirección que se puede compartir y los filtros propios de la tabla quedan aparte; los recuentos de las pestañas son cuatro pequeñas consultas `count`, las mismas tenga lo que tenga la tienda."
+        "3": "Las cuatro vistas son enlaces (`?view=own|held|away|low`), así cada una es una dirección que se puede compartir y los filtros propios de la tabla quedan aparte; los recuentos de las pestañas son cuatro pequeñas consultas `count`, las mismas tenga lo que tenga la tienda.",
+        "4": "Las páginas de existencias añaden su script con `{% call push('scripts', once='stock-js') %}` desde `stock/_parts.html`: el diseño lo imprime donde está su `stack('scripts')`, una sola vez por muchas partes que lo pidan, y solo en las páginas que lo usan. La etiqueta lleva `nonce=\"{{ csp_nonce() }}\"`, así que también funciona con `CSP=strict`."
       }
     },
     "stock.ledger": {
@@ -1822,7 +1826,8 @@
         "2": "renox-billing entrega su configuración (planes, pasarelas) a toda la app con `Registry::provide`, así que `Billing::of(&state, …)` la encuentra solo con el estado: en el handler de esta página y en código sin petición (el job de la cola del webhook, los listeners de eventos). El formulario ofrece solo las formas de pago cuya pasarela dice estar `configured`.",
         "3": "Las reglas comprueban que el plan y la tienda existen, que el día es de 1 a 7 y que la forma de pago es `card` o `xendit`; el hook `after` comprueba lo que necesita la base de datos: que la bici es del cliente, que no tiene un plan en marcha (un plan por bici), que la tienda abre ese día de la semana y que esa forma de pago está configurada. Los errores aparecen junto a los campos con lo escrito conservado, antes de llamar a ninguna pasarela.",
         "4": "Los días de la semana dependen de los días que abre la tienda y el resumen depende del plan, así que el formulario hace `hx-get` a esta página en cada cambio y reemplaza solo esa parte (`hx-select`); sin JavaScript el formulario se envía igual, y el servidor lo vuelve a comprobar todo.",
-        "5": "Solo campos del kit: la bici y la tienda como selects, el plan y la forma de pago como radios, el día como botones de alternancia (solo los días que abre la tienda) y el resumen como infolist. El resumen queda al lado del formulario en una pantalla ancha y debajo en el móvil (la cuadrícula CSS propia de la página)."
+        "5": "Solo campos del kit: la bici y la tienda como selects, el plan y la forma de pago como radios, el día como botones de alternancia (solo los días que abre la tienda) y el resumen como infolist. El resumen queda al lado del formulario en una pantalla ancha y debajo en el móvil (la cuadrícula CSS propia de la página).",
+        "6": "El formulario se envía con htmx, y el pago ocurre en la página propia de la pasarela: un `303` normal solo se seguiría dentro de la petición de htmx y se pegaría en esta página, así que el handler responde a una petición htmx con `HxRedirect(url)` y el navegador se va a Stripe o a Xendit; sin JavaScript es un `Redirect::to` normal."
       }
     },
     "plans.mine": {
