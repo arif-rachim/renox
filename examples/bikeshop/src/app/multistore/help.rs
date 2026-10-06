@@ -22,6 +22,7 @@
 
 use std::collections::HashMap;
 
+use renox::auth::permissions::Scopes;
 use renox::chrono::{Duration, NaiveDate};
 use renox::prelude::*;
 use renox::validation::FormContext;
@@ -662,12 +663,28 @@ pub struct HoursLine {
 }
 
 /// `GET /staff/help/hours` (`multistore.help.hours`): hours helped per
-/// person and store, for the stores the person may see (help given to or
-/// by them), in one grouped query.
+/// person and store, for the stores the person may see: help given **to**
+/// them (the helped store is theirs) and **by** them (the helper's home
+/// store is theirs, wherever they helped), in one grouped query.
 pub async fn hours(State(db): State<Db>, user: AuthUser) -> Result<View> {
     let scopes = renox::auth::permissions::scopes_with::<Store>(catalogue::STAFF_HELP);
-    let lines: Vec<HoursLine> = scopes
-        .apply(StaffHelpHour::query(), &["store_id"])
+    let query = match &scopes {
+        Scopes::All => StaffHelpHour::query(),
+        Scopes::Only(ids) if ids.is_empty() => {
+            StaffHelpHour::query().where_raw("1 = 0", std::iter::empty::<i64>())
+        }
+        Scopes::Only(ids) => {
+            let marks = vec!["?"; ids.len()].join(", ");
+            StaffHelpHour::query().where_raw(
+                &format!(
+                    "(store_id IN ({marks}) OR staff_id IN \
+                     (SELECT id FROM staff WHERE home_store_id IN ({marks})))"
+                ),
+                ids.iter().chain(ids.iter()).copied(),
+            )
+        }
+    };
+    let lines: Vec<HoursLine> = query
         .group_by("staff_id")
         .group_by("store_id")
         .select_as(

@@ -2785,5 +2785,14 @@
     "delete_for_good_question": "Delete this :label for good?",
     "in_trash": "This :label is in the trash.",
     "select": "Select…"
+  },
+  "errors": {
+    "maintenance": {
+      "title": "We're giving the shop a quick tune-up",
+      "body": "We'll be back in a few minutes. Your cart, rentals and bookings are safe."
+    },
+    "not_found": "That page isn't here. The link may be old or mistyped.",
+    "failed": "Sorry, that didn't work.",
+    "home": "Go to the home page"
   }
 }

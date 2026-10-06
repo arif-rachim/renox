@@ -24,6 +24,7 @@ use super::notify::{self, Notice, Tone};
 use super::{booking, customer_of};
 use crate::app::access::{self, catalogue};
 use crate::app::accounts::model::Customer;
+use crate::app::accounts::preferences::Kind;
 use crate::app::staff::model::Store;
 
 /// How long a staff member's link to an ID photo works.
@@ -323,5 +324,5 @@ pub async fn decide(
         .tone(Tone::Warning)
         .url(super::link(state, "rentals.identity", None::<i64>)?)
     };
-    notify::customer(state, &customer, &notice).await
+    notify::customer(state, &customer, Kind::Rental, &notice).await
 }

@@ -252,7 +252,8 @@ impl Filters {
     /// Adds the filters' conditions and the order to `query`. `dialect`
     /// picks the JSON operator for the specifications; `fits_bikes` are
     /// the bike models (product ids) the `fits` filter stands for (empty:
-    /// nothing fits).
+    /// nothing fits). `query` already holds the scope and the search
+    /// (`where_search(q)`); this adds the filters and ranks by it.
     pub fn apply(
         &self,
         mut query: Query<Product>,
@@ -266,18 +267,16 @@ impl Filters {
                 "id",
             );
         }
-        if let Some(low) = self.price_min {
+        // Both ends in one EXISTS: one variant must be in the range (a bike
+        // at 1,000,000 and 10,000,000 is not "between 4 and 5 million").
+        if self.price_min.is_some() || self.price_max.is_some() {
             query = query.where_raw(
                 "EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = products.id \
-                 AND pv.price >= ?)",
-                [low],
-            );
-        }
-        if let Some(high) = self.price_max {
-            query = query.where_raw(
-                "EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = products.id \
-                 AND pv.price <= ?)",
-                [high],
+                 AND pv.price >= ? AND pv.price <= ?)",
+                [
+                    self.price_min.unwrap_or(0),
+                    self.price_max.unwrap_or(i64::MAX),
+                ],
             );
         }
         if !self.sizes.is_empty() {
@@ -331,20 +330,22 @@ impl Filters {
     }
 
     /// The order, after the filters. Ties are broken by id so pages never
-    /// overlap.
+    /// overlap. The search itself (`where_search(q)`) is already on the
+    /// query the caller passes, where the facets read it too: here it only
+    /// ranks.
     fn order(&self, query: Query<Product>) -> Query<Product> {
         let query = match self.sort {
-            Sort::Relevance => query.search(&self.q),
-            Sort::Popular => query.where_search(&self.q).order_by_raw(
+            Sort::Relevance => query.order_by_relevance(&self.q),
+            Sort::Popular => query.order_by_raw(
                 "(SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi \
                  JOIN product_variants pv ON pv.id = oi.variant_id \
                  WHERE pv.product_id = products.id) DESC",
             ),
-            Sort::Newest => query.where_search(&self.q).order_by_desc("created_at"),
-            Sort::PriceAsc => query.where_search(&self.q).order_by_raw(
+            Sort::Newest => query.order_by_desc("created_at"),
+            Sort::PriceAsc => query.order_by_raw(
                 "(SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = products.id) ASC",
             ),
-            Sort::PriceDesc => query.where_search(&self.q).order_by_raw(
+            Sort::PriceDesc => query.order_by_raw(
                 "(SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = products.id) DESC",
             ),
         };

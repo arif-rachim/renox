@@ -5,8 +5,8 @@
 {% block seo %}<title>{{ status }} {{ reason }} · {{ app.name }}</title>{% endblock %}
 {% block content %}
 {% from "renox/ui.html" import empty %}
-{% set fallback = "That page isn't here. The link may be old or mistyped." if status == 404 else "Sorry, that didn't work." %}
+{% set fallback = t('errors.not_found') if status == 404 else t('errors.failed') %}
 <div class="rx-card">
-  {{ empty(reason, detail or fallback, "/", "Go to the home page") }}
+  {{ empty(reason, detail or fallback, "/", t('errors.home')) }}
 </div>
 {% endblock %}

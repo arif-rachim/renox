@@ -10,9 +10,13 @@
 //!   themselves (`Recipient::locale`), so mails go out in the customer's
 //!   language with no code here.
 //!
-//! **Every notification in the app asks [`channels_for`]** in its
+//! **Every notification to a customer asks [`channels_for`]** in its
 //! `Notification::channels`, so the customer's choice is respected
-//! everywhere. It reads the preferences from the `User` the notification is
+//! everywhere: the rentals', workshop's and plans' notices
+//! (`rentals::notify::customer`, given the [`Kind`]) and the orders' mail and
+//! notification (`sales::notify::tell`). Notices to staff are work, not
+//! preferences, and keep their own channels. No customer notification is
+//! marketing yet; [`Kind::Marketing`] is there for the first one. It reads the preferences from the `User` the notification is
 //! for (Renox loads `users` with `SELECT *`, so the column is in
 //! `user.extra`): no query.
 //!

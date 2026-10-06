@@ -16,30 +16,31 @@ use std::collections::{BTreeMap, BTreeSet, HashSet, VecDeque};
 
 /// Texts that are the same in English and Spanish, on purpose.
 const SAME_IN_BOTH: &[&str] = &[
-    "shop.name",                  // the brand: "Bike Shop"
-    "staff.nav.roles",            // "Roles"
-    "staff.team.roles",           // "Roles"
-    "staff.stores.minutes_unit",  // "min"
-    "blocks.datetime.minutes",    // ":n min"
-    "blocks.page.signature",      // "Macro"
-    "data_page.pagila.pagila",    // "Pagila", a name
-    "sales.checkout.total",       // "Total"
-    "sales.orders.subtotal",      // "Subtotal"
-    "sales.orders.total",         // "Total"
-    "rentals.receipt.total",      // "Total"
-    "workshop.fields.total",      // "Total"
-    "workshop.book.total",        // "Total (:minutes min)"
-    "stock.fields.sku",           // "SKU"
-    "stock.consignments.from_to", // ":owner → :location"
-    "stock.purchasing.total",     // "Total"
-    "multistore.help.from_to",    // ":from → :to"
-    "multistore.statement.total", // "Total"
-    "multistore.fees.changed",    // ":store: :from % → :to %"
-    "plans.fields.plan",          // "Plan"
+    "shop.name",                          // the brand: "Bike Shop"
+    "staff.nav.roles",                    // "Roles"
+    "staff.team.roles",                   // "Roles"
+    "staff.stores.minutes_unit",          // "min"
+    "blocks.datetime.minutes",            // ":n min"
+    "blocks.page.signature",              // "Macro"
+    "data_page.pagila.pagila",            // "Pagila", a name
+    "sales.checkout.total",               // "Total"
+    "sales.orders.subtotal",              // "Subtotal"
+    "sales.orders.total",                 // "Total"
+    "rentals.receipt.total",              // "Total"
+    "workshop.fields.total",              // "Total"
+    "workshop.book.total",                // "Total (:minutes min)"
+    "stock.fields.sku",                   // "SKU"
+    "stock.consignments.from_to",         // ":owner → :location"
+    "stock.purchasing.total",             // "Total"
+    "multistore.help.from_to",            // ":from → :to"
+    "multistore.statement.total",         // "Total"
+    "multistore.fees.changed",            // ":store: :from % → :to %"
+    "plans.fields.plan",                  // "Plan"
+    "reports.fields.total",               // "Total"
+    "reports.workbook.total",             // "Total"
+    "reports.hours",                      // ":hours h"
+    "reports.payable.plan_subscriptions", // "Plan"
 ];
-
-/// The areas whose pages aren't translated yet (another story builds them).
-const NOT_YET: &[&str] = &["reports."];
 
 /// English a Spanish page may still show, and why.
 const STILL_ENGLISH: &[&str] = &[
@@ -113,9 +114,6 @@ fn every_english_text_has_its_spanish() {
     let es = lang("es");
     let mut problems = Vec::new();
     for (key, english) in &en {
-        if NOT_YET.iter().any(|p| key.starts_with(p)) {
-            continue;
-        }
         let Some(spanish) = es.get(key) else {
             problems.push(format!("`{key}` has no Spanish (en: {english:?})"));
             continue;
@@ -153,9 +151,6 @@ fn every_explanation_has_its_spanish() {
     let es = lang("es");
     let mut problems = Vec::new();
     for e in explain::all() {
-        if NOT_YET.iter().any(|p| e.route.starts_with(p)) {
-            continue;
-        }
         let mut fields: Vec<(String, &str)> = vec![
             ("title".into(), e.title),
             ("purpose".into(), e.purpose),
@@ -260,7 +255,6 @@ fn english_texts() -> Vec<String> {
             && !english.contains('`')
             && !english.contains('*')
             && es.get(&key) != Some(&english)
-            && !NOT_YET.iter().any(|p| key.starts_with(p))
             && !names.contains(english.as_str())
             && !STILL_ENGLISH.iter().any(|s| english.contains(s))
         {

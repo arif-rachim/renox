@@ -10,6 +10,7 @@ use renox::schedule::Schedule;
 use super::capacity::day_bounds;
 use super::model::{WorkOrder, WorkSource, WorkStatus};
 use super::status::customer_of;
+use crate::app::accounts::preferences::Kind;
 use crate::app::rentals::booking::to_local;
 use crate::app::rentals::notify::{self, Notice};
 
@@ -41,6 +42,7 @@ pub async fn reminders(state: &AppState) -> Result<u64> {
             notify::customer(
                 state,
                 &customer,
+                Kind::Workshop,
                 &Notice::new(
                     "workshop-reminder",
                     "workshop.mail.reminder.title",

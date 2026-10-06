@@ -1070,5 +1070,28 @@ async fn the_cart_speaks_spanish_and_explains_itself() {
         .await
         .assert_ok()
         .assert_see("Tu carrito está vacío")
-        .assert_see("Lo que el cliente está a punto de comprar");
+        .assert_see("Lo que el comprador va a comprar");
+}
+
+#[renox::test]
+async fn the_staff_order_page_names_everyone_who_hands_orders_over() {
+    use bikeshop::app::access::catalogue::{ORDERS_SELL, STAFF};
+    use bikeshop::explain::{self, Audience};
+
+    // Floor staff hold `orders.sell`, so they hand orders over too.
+    let staff = bikeshop::app::access::catalogue::roles()
+        .into_iter()
+        .find(|r| r.name == STAFF)
+        .expect("the staff role");
+    assert!(staff.permissions.contains(&ORDERS_SELL));
+    let page = explain::for_route("sales.orders.show").unwrap();
+    assert!(page.audience.contains(&Audience::Staff));
+    assert!(page.who.contains("floor staff") && page.who.contains("`orders.sell`"));
+    let es: renox::serde_json::Value =
+        renox::serde_json::from_str(&std::fs::read_to_string("resources/lang/es.json").unwrap())
+            .unwrap();
+    let who = es["about_page"]["sales.orders.show"]["who"]
+        .as_str()
+        .unwrap();
+    assert!(who.contains("personal de tienda") && who.contains("`orders.sell`"));
 }

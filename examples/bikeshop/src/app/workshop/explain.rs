@@ -385,8 +385,10 @@ pub fn entries() -> Vec<Explanation> {
             purpose: "A work order for someone at the counter: a known customer (searched) or \
                       a new one without an account, the bike, the tasks and the day (today by \
                       default; a work order for today is checked in at once).",
-            who: "Staff at the counter and mechanics (`workorders.view`).",
-            audience: &[Audience::Staff, Audience::Mechanic, Audience::Cashier],
+            who: "Whoever works on work orders in the active store (`workorders.update`): \
+                  mechanics, store managers and the owner. The counter's cashiers see the \
+                  board but don't open work orders (the form and its POST answer 403).",
+            audience: &[Audience::Mechanic, Audience::Manager, Audience::Owner],
             flow: Flow::Service,
             features: &[
                 Feature {

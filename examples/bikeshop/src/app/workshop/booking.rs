@@ -16,6 +16,7 @@ use super::model::{
 };
 use super::status::{self, key};
 use crate::app::accounts::model::Customer;
+use crate::app::accounts::preferences::Kind;
 use crate::app::rentals::booking::to_local;
 use crate::app::rentals::notify::{self, Notice, Tone};
 use crate::app::rentals::{customer_of, link, reserve::money};
@@ -224,6 +225,7 @@ async fn confirm(state: &AppState, customer: &Customer, order: &WorkOrder) -> Re
     notify::customer(
         state,
         customer,
+        Kind::Workshop,
         &Notice::new(
             "workshop-booked",
             "workshop.mail.booked.title",

@@ -13,6 +13,7 @@ use super::notify::{self, Notice, Tone};
 use super::pricing::{self, Quote, period_problem};
 use super::{customer_of, identity};
 use crate::app::accounts::model::Customer;
+use crate::app::accounts::preferences::Kind;
 use crate::app::catalog::model::{Category, CategoryKind, Product, ProductVariant};
 use crate::app::sales::model::{Payment, PaymentMethod};
 use crate::app::sales::payments::{self, Charge, Payable};
@@ -486,6 +487,7 @@ pub async fn cancel_rental(
     notify::customer(
         state,
         customer,
+        Kind::Rental,
         &Notice::new(
             "rental-cancelled",
             "rentals.mail.cancelled.title",
@@ -579,6 +581,7 @@ pub async fn deposit_paid(state: &AppState, payment_id: i64, rental_id: i64) -> 
         notify::customer(
             state,
             &customer,
+            Kind::Rental,
             &Notice::new(
                 "rental-reserved",
                 "rentals.mail.reserved.title",
@@ -627,6 +630,7 @@ pub async fn deposit_failed(state: &AppState, rental_id: i64) -> Result {
         notify::customer(
             state,
             &customer,
+            Kind::Rental,
             &Notice::new(
                 "rental-payment-failed",
                 "rentals.mail.unpaid.title",

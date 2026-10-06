@@ -440,6 +440,21 @@ async fn either_store_ends_help_early_and_hours_are_counted_not_charged() {
         .await
         .assert_ok()
         .assert_see("7.5");
+    // North, who lent the cashier, sees their person's hours at South too;
+    // West, in neither store, doesn't.
+    w.app.acting_as(&w.manager_north);
+    w.app
+        .get("/staff/help/hours")
+        .await
+        .assert_ok()
+        .assert_see("7.5");
+    w.app.acting_as(&w.manager_west);
+    w.app
+        .get("/staff/help/hours")
+        .await
+        .assert_ok()
+        .assert_dont_see("7.5");
+    w.app.acting_as(&w.manager_south);
     // South ends it early: the helper can't work there any more.
     w.app
         .post(&format!("/staff/help/{}/end", request.id), &[])

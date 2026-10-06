@@ -22,7 +22,7 @@
 //!   the same way** (orders, rentals, bikes, work orders, plan, payments),
 //!   with an `order` from [`section_order`] so the page reads top to bottom;
 //! - [`preferences`]: `channels_for(to, Kind)`, which **every notification
-//!   in the app** calls in `Notification::channels`;
+//!   to a customer** calls in `Notification::channels`;
 //! - [`locale`]: the language kept on the account as well as the session;
 //! - [`privacy`]: the export job and erasing a customer who leaves.
 //!

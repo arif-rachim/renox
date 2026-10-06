@@ -400,6 +400,49 @@ async fn htmx_gets_only_the_results() {
 }
 
 #[renox::test]
+async fn both_ends_of_the_price_range_apply_to_the_same_variant() {
+    let app = TestApp::new(bikeshop::app()).await;
+    shop(&app).await;
+    // The Domane comes at 10,000,000 and 12,000,000: neither is between
+    // 11,000,000 and 11,500,000, though one is above the low end and the
+    // other below the high end.
+    assert!(
+        names(
+            &app.get("/shop/bikes?price_min=11000000&price_max=11500000")
+                .await
+                .assert_ok()
+                .text()
+        )
+        .is_empty()
+    );
+    assert_eq!(
+        names(
+            &app.get("/shop/bikes?price_min=11000000&price_max=12500000")
+                .await
+                .text()
+        ),
+        ["Trek Domane"]
+    );
+}
+
+#[renox::test]
+async fn a_search_filters_once() {
+    let app = TestApp::new(bikeshop::app()).await;
+    shop(&app).await;
+    for sort in ["relevance", "newest", "price_asc"] {
+        let (res, queries) =
+            renox::db::capture_queries(app.get(&format!("/search?q=chain&sort={sort}"))).await;
+        res.assert_ok();
+        let count = queries
+            .iter()
+            .find(|q| q.contains("COUNT(") && q.contains("FROM \"products\""))
+            .unwrap_or_else(|| panic!("the listing's count query in {queries:#?}"));
+        let conditions = count.matches(" MATCH ").count() + count.matches(" @@ ").count();
+        assert_eq!(conditions, 1, "{sort}: {count}");
+    }
+}
+
+#[renox::test]
 async fn search_ranks_name_matches_first_and_keeps_the_filters() {
     let app = TestApp::new(bikeshop::app()).await;
     let s = shop(&app).await;

@@ -18,8 +18,8 @@ const FILTERS_FROM_QUERY: Feature = Feature {
     why: "Every filter is a query-string value (`?brand=trek&size=M&price_max=9000000`), \
           so a filtered page can be shared, bookmarked and reloaded. `Filters::apply` turns \
           them into conditions on `Product::query()`: `where_in_query` for brands and \
-          sizes, `where_raw` with bound values for the `EXISTS` sub-queries (one per end \
-          of the price range, stock at a store, a part that fits), and each database's JSON \
+          sizes, `where_raw` with bound values for the `EXISTS` sub-queries (a variant \
+          priced within the range, stock at a store, a part that fits), and each database's JSON \
           operator for the specifications. Nothing the visitor typed is written into the SQL.",
 };
 

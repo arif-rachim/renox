@@ -19,7 +19,7 @@
     {{ button(t('workshop.board.filter'), variant="secondary") }}
     {%- if by or day %}{{ link_button(route('workshop.board'), t('workshop.board.clear'), variant="plain") }}{% endif %}
     <span class="rx-spacer"></span>
-    {{ link_button(route('workshop.walkin'), t('workshop.walkin.title'), variant="primary", icon="plus") }}
+    {% if can('workorders.update') %}{{ link_button(route('workshop.walkin'), t('workshop.walkin.title'), variant="primary", icon="plus") }}{% endif %}
   </form>
   <div id="workshop-board" class="bs-board__body" hx-get="{{ request.path }}{% if request.query %}?{{ request.query }}{% endif %}" hx-trigger="every 60s" hx-select="#workshop-board" hx-swap="outerHTML">
     {{ kanban("workshop-kanban", columns, url=route('workshop.move'), label=t('workshop.board.title')) }}

@@ -28,6 +28,7 @@ use super::model::{
     PlanInvoice, PlanSubscription, ServicePlan, SubscriptionStatus, bike_of_billing_name,
 };
 use super::visits;
+use crate::app::accounts::preferences::Kind;
 use crate::app::rentals::booking::to_local;
 use crate::app::rentals::notify::{self, Notice, Tone};
 use crate::app::workshop::model::CustomerBike;
@@ -240,6 +241,7 @@ async fn tell(
     notify::customer(
         state,
         &customer,
+        Kind::Plan,
         &Notice::new(kind, title, body)
             .param("plan", plan.map(|p| p.name).unwrap_or_default())
             .param("bike", &bike.name)

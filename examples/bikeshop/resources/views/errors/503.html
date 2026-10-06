@@ -6,6 +6,6 @@
 {% block content %}
 {% from "renox/ui.html" import empty %}
 <div class="rx-card">
-  {{ empty("We're giving the shop a quick tune-up", "We'll be back in a few minutes. Your cart, rentals and bookings are safe.") }}
+  {{ empty(t('errors.maintenance.title'), t('errors.maintenance.body')) }}
 </div>
 {% endblock %}

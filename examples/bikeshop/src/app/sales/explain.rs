@@ -458,9 +458,16 @@ pub fn entries() -> Vec<Explanation> {
                       consigned goods), payments, the stock movements it caused, the bikes it \
                       registered, and the next step: ready or sent out, hand over (with frame \
                       numbers), cancel an unpaid one, or take a return and refund it.",
-            who: "Cashiers and floor staff (ready, hand over), managers (returns and \
-                  refunds); the owner in any store.",
-            audience: &[Audience::Cashier, Audience::Manager, Audience::Owner],
+            who: "Cashiers and floor staff, who hold `orders.sell` in the order's store: \
+                  they mark it ready or sent out, hand it over and cancel an unpaid one. \
+                  Store managers also hold `orders.refund` for returns and refunds; the \
+                  owner does all of it in any store.",
+            audience: &[
+                Audience::Cashier,
+                Audience::Staff,
+                Audience::Manager,
+                Audience::Owner,
+            ],
             flow: Flow::BackOffice,
             features: &[
                 Feature {
