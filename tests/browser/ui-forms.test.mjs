@@ -1,9 +1,14 @@
-// #265: the form half of renox-ui.js in a real browser: busy buttons,
-// revealable passwords, show_when, tags, the searchable select, the date
-// picker, the repeater and the wizard.
+// #265: the form half of renox-ui.js in a real browser: busy buttons (and
+// after Back), live validation, revealable and copyable fields, file
+// fields, show_when, tags, the searchable select (local, required, and with
+// options from the server), the date picker, the repeater, the wizard, and
+// a button disabled with a reason.
 
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Browser, sleep } from './lib/cdp.mjs';
 import { fixture } from './lib/app.mjs';
 
@@ -170,4 +175,235 @@ test('the wizard checks a step before the next and lands on the step with an err
   await page.type('#rx-to', 'Jakarta');
   await page.click('#w [data-rx-wizard-submit]');
   await page.waitFor(() => document.querySelector('#trip-result').textContent.includes('Bandung to Jakarta'));
+}));
+
+test('after Back, a regular form that was sent is ready again', () => browser.with(async (page) => {
+  await page.send('Page.addScriptToEvaluateOnNewDocument', {
+    source: "addEventListener('pageshow', (e) => { window.__persisted = e.persisted; });",
+  });
+  await page.goto(`${app.url}/widgets`);
+  await page.eval(() => { window.__first = true; });
+  // Sent (busy), then left for another page before the answer: Chrome keeps
+  // a page in its back/forward cache only after a navigation it started
+  // itself, not after the form's own (BrowsingInstanceNotSwapped).
+  const busy = await page.eval(() => {
+    const button = document.querySelector('#plain-busy-button');
+    button.click();
+    return button.getAttribute('aria-busy');
+  });
+  assert.equal(busy, 'true');
+  await page.goto(`${app.url}/stock`);
+  await page.eval(() => history.back());
+  await page.waitFor(() => window.__first === true, { message: 'the first page shown again' });
+  const state = await page.eval(() => ({
+    persisted: window.__persisted,
+    busy: document.querySelector('#plain-busy-button').getAttribute('aria-busy'),
+    sending: document.querySelector('#plain-busy').hasAttribute('data-rx-sending'),
+  }));
+  assert.equal(state.persisted, true, 'from the back/forward cache');
+  assert.equal(state.busy, null);
+  assert.equal(state.sending, false);
+}));
+
+test('live validation: nothing for an untouched field, other errors stay, a fix clears', () => browser.with(async (page) => {
+  await page.goto(`${app.url}/form`);
+  const checked = [];
+  page.on('Network.requestWillBeSent', (p) => {
+    const header = Object.entries(p.request.headers).find(([k]) => k.toLowerCase() === 'x-renox-validate');
+    if (header) checked.push(header[1]);
+  });
+  // Through the email field without typing: not checked.
+  await page.focus('#rx-email');
+  await page.focus('#rx-name');
+  await sleep(300);
+  assert.deepEqual(checked, []);
+  await page.type('#rx-name', 'A name far too long');
+  await page.focus('#rx-email');
+  await page.waitFor(() => document.querySelector('#rx-name').getAttribute('aria-invalid') === 'true', { message: 'name checked' });
+  await page.type('#rx-email', 'nope');
+  await page.focus('#rx-name');
+  await page.waitFor(() => document.querySelector('#rx-email').getAttribute('aria-invalid') === 'true', { message: 'email checked' });
+  // The name's error is still there.
+  assert.equal(await page.eval(() => document.querySelector('#rx-name').getAttribute('aria-invalid')), 'true');
+  assert.deepEqual([...new Set(checked)].sort(), ['email', 'name']);
+  // Typing a fix clears the error (after a short pause), without leaving.
+  await page.type('#rx-name', 'Ana', { clear: true });
+  await page.waitFor(() => !document.querySelector('#rx-name').hasAttribute('aria-invalid'), { message: 'the fix accepted' });
+  assert.equal(await page.eval(() => document.querySelector('#rx-email').getAttribute('aria-invalid')), 'true');
+}));
+
+test('a copyable field copies its value and says so', () => onWidgets(async (page) => {
+  // The clipboard itself is the browser's: record what is written to it.
+  await page.eval(() => {
+    window.__copied = null;
+    navigator.clipboard.writeText = (text) => { window.__copied = text; return Promise.resolve(); };
+  });
+  await page.click('[data-rx-copy="rx-code"]');
+  await page.waitFor(() => window.__copied === 'RX-42');
+  await page.waitFor(() => document.querySelector('[data-rx-copy="rx-code"]').hasAttribute('data-rx-done'));
+  assert.match(await page.text('[data-rx-copy="rx-code"] [aria-live]'), /copied/i);
+}));
+
+test('a file field lists the chosen files with their sizes, and clears', () => onWidgets(async (page) => {
+  const dir = mkdtempSync(join(tmpdir(), 'renox-files-'));
+  try {
+    writeFileSync(join(dir, 'menu.txt'), 'hello');
+    writeFileSync(join(dir, 'big.bin'), Buffer.alloc(3 * 1024));
+    const { root } = await page.send('DOM.getDocument');
+    const { nodeId } = await page.send('DOM.querySelector', { nodeId: root.nodeId, selector: '#rx-photos' });
+    await page.send('DOM.setFileInputFiles', { nodeId, files: [join(dir, 'menu.txt'), join(dir, 'big.bin')] });
+    const listed = await page.waitFor(() => {
+      const items = [...document.querySelectorAll('[data-rx-file-list] .rx-file__item')];
+      return items.length === 2 ? items.map((i) => [i.querySelector('.rx-file__name').textContent, i.querySelector('.rx-file__size').textContent]) : null;
+    });
+    assert.deepEqual(listed, [['menu.txt', '5 B'], ['big.bin', '3 KB']]);
+    assert.equal(await page.eval(() => document.querySelector('#rx-photos').multiple), true);
+    await page.eval(() => {
+      const input = document.querySelector('#rx-photos');
+      input.value = '';
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    assert.equal(await page.eval(() => document.querySelectorAll('[data-rx-file-list] li').length), 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}));
+
+test('the date picker names the month it shows and tells the field it changed', () => onWidgets(async (page) => {
+  await page.eval(() => {
+    window.__changes = 0;
+    document.querySelector('#rx-on').addEventListener('change', () => window.__changes++);
+  });
+  await page.click('[popovertarget="rx-on-calendar"]');
+  await page.waitFor(() => document.querySelector('#rx-on-calendar').matches(':popover-open'));
+  const heading = () => page.eval(() => document.querySelector('#rx-on-calendar .rx-calendar__heading').textContent);
+  assert.equal(await heading(), 'October 2026');
+  await page.waitFor(() => !!document.querySelector('calendar-date'));
+  await sleep(200);
+  await page.eval(() => document.querySelector('calendar-date').focus());
+  await page.press('PageDown');
+  await page.waitFor(() => document.querySelector('#rx-on-calendar .rx-calendar__heading').textContent === 'November 2026', {
+    message: 'the next month named',
+  });
+  await page.press('Enter');
+  await page.waitFor(() => document.querySelector('#rx-on').value === '2026-11-02', { message: 'the day picked' });
+  assert.equal(await page.eval(() => window.__changes), 1, 'one change event on the field');
+  assert.equal(await page.eval(() => document.querySelector('#rx-on-calendar').matches(':popover-open')), false);
+}));
+
+test('a hidden show_when group is left out of what the form sends', () => onWidgets(async (page) => {
+  await page.click('#ship-send');
+  await page.waitFor(() => document.querySelector('#ship-result').textContent !== '');
+  assert.equal(await page.text('#ship-result'), 'via=pickup');
+  await page.click('label[for="rx-via-2"]');
+  await page.waitFor(() => !document.querySelector('[data-rx-show-when="via"]').disabled);
+  await page.type('#ship-street', 'Main St');
+  await page.click('#ship-send');
+  await page.waitFor(() => document.querySelector('#ship-result').textContent.includes('street'));
+  assert.equal(await page.text('#ship-result'), 'via=courier&street=Main St');
+}));
+
+test('a repeater keeps its minimum and removes one row from the middle', () => onWidgets(async (page) => {
+  const rows = () =>
+    page.eval(() => [...document.querySelectorAll('#rx-lines [data-rx-row]')].map((row) => {
+      const name = row.querySelector('input');
+      return [name.name, name.value];
+    }));
+  // One row, the minimum: it can't be removed.
+  assert.equal(await page.eval(() => document.querySelector('#rx-lines [data-rx-row-remove]').disabled), true);
+  await page.click('#rx-lines [data-rx-row-add]');
+  await page.type('[name="lines[1][name]"]', 'Tea');
+  await page.click('#rx-lines [data-rx-row-add]');
+  await page.type('[name="lines[2][name]"]', 'Cocoa');
+  await page.click('#rx-lines [data-rx-row]:nth-of-type(2) [data-rx-row-remove]');
+  assert.deepEqual(await rows(), [['lines[0][name]', 'Coffee'], ['lines[1][name]', 'Cocoa']]);
+}));
+
+test('a searchable select gets its options from the server, adds one and renames it', () => onWidgets(async (page) => {
+  await page.waitFor(() => document.querySelector('#rx-category-search'));
+  await page.type('#rx-category-search', 'co');
+  const found = await page.waitFor(() => {
+    const options = [...document.querySelectorAll('#rx-category-listbox .rx-combobox__option')].filter((o) => !o.hidden);
+    const labels = options.map((o) => o.textContent.trim());
+    return labels.includes('Cocoa') && !labels.includes('Tea') ? labels : null;
+  }, { message: 'the server’s matches' });
+  // Opening asked for everything; typing asks the server for the matches.
+  assert.deepEqual(found, ['Coffee', 'Cocoa', 'Add “co”']);
+  await page.eval(() => [...document.querySelectorAll('#rx-category-listbox .rx-combobox__option')].find((o) => o.textContent.trim() === 'Cocoa').click());
+  await page.waitFor(() => document.querySelector('#rx-category').value === '3', { message: 'Cocoa chosen' });
+
+  // Something new: "Add …" posts it and chooses it.
+  await page.type('#rx-category-search', 'Juice', { clear: true });
+  await page.waitFor(() => document.querySelector('.rx-combobox__option--create'), { message: 'the add option' });
+  await page.eval(() => document.querySelector('.rx-combobox__option--create').click());
+  const added = await page.waitFor(() => {
+    const select = document.querySelector('#rx-category');
+    const chosen = select.options[select.selectedIndex];
+    return chosen && chosen.textContent === 'Juice' ? chosen.value : null;
+  }, { message: 'Juice added and chosen' });
+  assert.ok(Number(added) > 3, added);
+
+  // Renamed with the pencil: Enter saves (a PUT), the option follows.
+  await page.click('#remote .rx-combobox__edit');
+  await page.type('#rx-category-search', 'Juice & Smoothies', { clear: true });
+  await page.press('Enter');
+  await page.waitFor(() => {
+    const select = document.querySelector('#rx-category');
+    return select.options[select.selectedIndex]?.textContent === 'Juice & Smoothies';
+  }, { message: 'renamed' });
+  const listed = await page.eval(async () => (await (await fetch('/categories?q=smooth')).json()).map((o) => o.label));
+  assert.deepEqual(listed, ['Juice & Smoothies']);
+}));
+
+test('a required searchable select stops the form until something is picked', () => onWidgets(async (page) => {
+  const sent = [];
+  page.on('Network.requestWillBeSent', (p) => p.request.url.endsWith('/picked') && sent.push(p.request.url));
+  await page.click('#pick-send');
+  await sleep(300);
+  assert.equal(sent.length, 0, 'not sent');
+  assert.equal(await page.focused(), 'rx-flavour-search', 'the search box is focused');
+  await page.type('#rx-flavour-search', 'mi');
+  await page.press('Enter');
+  await page.waitFor(() => document.querySelector('#rx-flavour').value === 'mint');
+  await page.click('#pick-send');
+  await page.waitFor(() => document.querySelector('#pick-result').textContent === 'picked');
+}, ));
+
+test('a wizard in a sheet goes back to the step whose field the server refused', () => browser.with(async (page) => {
+  await page.goto(`${app.url}/overlays`);
+  await page.click('[data-rx-open="wizard-sheet"]');
+  await page.waitFor(() => document.querySelector('#wizard-sheet').open);
+  const step = () => page.eval(() => document.querySelector('#ws').getAttribute('data-rx-step-index'));
+  // The first step has nothing the browser requires: Next goes on.
+  await page.click('#ws [data-rx-wizard-next]');
+  await page.waitFor(() => document.querySelector('#ws').getAttribute('data-rx-step-index') === '1');
+  await page.type('#ws-to', 'Jakarta');
+  await page.click('#ws [data-rx-wizard-submit]');
+  // The server requires `from`: back on the first step, focused there.
+  await page.waitFor(() => document.querySelector('#ws').getAttribute('data-rx-step-index') === '0', {
+    message: 'back on the first step',
+  });
+  assert.equal(await step(), '0');
+  assert.equal(await page.eval(() => document.querySelector('#ws-from').getAttribute('aria-invalid')), 'true');
+  assert.equal(await page.focused(), 'ws-from');
+  assert.ok(await page.eval(() => document.querySelector('#wizard-sheet').open), 'still in the sheet');
+  page.assertClean({ allow: [/422/] });
+}));
+
+test('a button disabled with a reason is reached by keyboard, says why and does nothing', () => browser.with(async (page) => {
+  await page.goto(`${app.url}/overlays`);
+  await page.focus('#toast-refresh');
+  await page.press('Tab');
+  assert.equal(await page.focused(), 'publish');
+  const tip = await page.waitFor(() => {
+    const el = document.querySelector('[role=tooltip]');
+    return el && !el.hidden ? el.textContent : null;
+  }, { message: 'the reason shown' });
+  assert.match(tip, /Add a title first/);
+  await page.click('#publish');
+  // Its shortcut (j) is ignored too.
+  await page.eval(() => document.activeElement.blur());
+  await page.press('j');
+  assert.equal(await page.eval(() => document.querySelector('#publish').dataset.pressed), undefined);
+  assert.equal(await page.eval(() => document.querySelector('#publish').getAttribute('aria-disabled')), 'true');
 }));

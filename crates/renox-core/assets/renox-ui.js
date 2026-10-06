@@ -1700,7 +1700,10 @@
     });
     box.addEventListener("click", function (e) { if (e.target === box) input.focus(); });
     // The browser checks the hidden select for `required`: point at the box.
+    // After the `invalid` event the browser focuses the select itself (1px,
+    // see-through): send that focus on to the box too.
     select.addEventListener("invalid", function () { input.focus(); });
+    select.addEventListener("focus", function () { input.focus(); });
     select.addEventListener("rx:refresh", renderChips);
 
     // Values sent back without a label (after a failed submit): ask for them.

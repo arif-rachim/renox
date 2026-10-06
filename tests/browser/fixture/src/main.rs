@@ -52,6 +52,93 @@ struct Trip {
     to: String,
 }
 
+/// Fields with no error slot: renox.js inserts its own error paragraphs,
+/// and finds a list item's input among several of one name.
+#[derive(Deserialize, Serialize, Validate)]
+struct Notes {
+    #[validate(required, max = 3)]
+    note: String,
+    #[serde(default)]
+    #[validate(each(max = 3))]
+    tags: Vec<String>,
+}
+
+/// A notification for the bell (database only).
+struct Hello;
+
+impl renox::auth::Notification for Hello {
+    fn kind(&self) -> &'static str {
+        "hello"
+    }
+
+    fn channels(&self, _to: &renox::auth::Recipient) -> Vec<renox::auth::Channel> {
+        vec![renox::auth::Channel::Database]
+    }
+
+    fn to_database(
+        &self,
+        _to: &renox::auth::Recipient,
+        _state: &AppState,
+    ) -> Result<renox::serde_json::Value> {
+        Ok(renox::auth::DatabaseMessage::info("Hello there").into())
+    }
+}
+
+/// The searchable select's server-side options (`options_url`), kept in
+/// memory: searched, added and renamed.
+static CATEGORIES: std::sync::Mutex<Vec<(i64, String)>> = std::sync::Mutex::new(Vec::new());
+
+fn categories() -> std::sync::MutexGuard<'static, Vec<(i64, String)>> {
+    let mut list = CATEGORIES.lock().unwrap();
+    if list.is_empty() {
+        list.extend([
+            (1, "Coffee".to_owned()),
+            (2, "Tea".to_owned()),
+            (3, "Cocoa".to_owned()),
+        ]);
+    }
+    list
+}
+
+#[derive(Deserialize)]
+struct CategoryForm {
+    #[serde(default)]
+    value: Option<i64>,
+    label: String,
+}
+
+async fn category_options(
+    query: renox::select::OptionQuery,
+) -> Json<Vec<renox::select::SelectOption>> {
+    let needle = query.q.to_lowercase();
+    Json(
+        categories()
+            .iter()
+            .filter(|(_, label)| label.to_lowercase().contains(&needle))
+            .map(|(id, label)| renox::select::SelectOption::new(id, label.clone()))
+            .collect(),
+    )
+}
+
+async fn add_category(
+    renox::axum::Form(form): renox::axum::Form<CategoryForm>,
+) -> Json<renox::select::SelectOption> {
+    let mut list = categories();
+    let id = list.iter().map(|(id, _)| *id).max().unwrap_or(0) + 1;
+    list.push((id, form.label.clone()));
+    Json(renox::select::SelectOption::new(id, form.label))
+}
+
+async fn rename_category(
+    renox::axum::Form(form): renox::axum::Form<CategoryForm>,
+) -> Json<renox::select::SelectOption> {
+    let id = form.value.unwrap_or_default();
+    if let Some(entry) = categories().iter_mut().find(|(i, _)| *i == id) {
+        entry.1 = form.label.clone();
+    }
+    Json(renox::select::SelectOption::new(id, form.label))
+}
+
 struct Pages;
 
 impl Module for Pages {
@@ -106,6 +193,62 @@ impl Module for Pages {
                 (Toast::success(format!("{} saved.", form.from)), "ok")
             })
             .get("/stock", || async { "stock page" })
+            // renox.js: errors without slots; analytics events.
+            .get("/errors", || async { view("errors.html", context! {}) })
+            .post("/notes", |Valid(notes): Valid<Notes>| async move {
+                format!("{} saved", notes.note)
+            })
+            .post("/track", |session: Session| async move {
+                renox::analytics::event(&session, "signup", json!({ "plan": "pro" }))?;
+                Ok::<_, Error>("tracked")
+            })
+            .get("/tracked", |session: Session| async move {
+                renox::analytics::event(&session, "page_seen", json!({ "page": "tracked" }))?;
+                Ok::<_, Error>(view("home.html", context! {}))
+            })
+            .get("/track-then-go", |session: Session| async move {
+                renox::analytics::event(&session, "went", json!({}))?;
+                Ok::<_, Error>(Redirect::to("/"))
+            })
+            // renox-ui.js: what a form sent, toasts that wait for the next
+            // page, a toast action's answers.
+            .post(
+                "/echo",
+                |renox::axum::Form(fields): renox::axum::Form<Vec<(String, String)>>| async move {
+                    fields
+                        .into_iter()
+                        .filter(|(k, _)| k != "_token")
+                        .map(|(k, v)| format!("{k}={v}"))
+                        .collect::<Vec<_>>()
+                        .join("&")
+                },
+            )
+            .post("/toast-redirect", || async {
+                (Toast::success("Moved along."), HxRedirect("/".into()))
+            })
+            .post("/toast-refresh", || async {
+                (Toast::info("Fresh again."), HxRefresh)
+            })
+            .post("/undo", || async { Toast::success("Undone.") })
+            .post("/fails", || async {
+                Err::<String, _>(Error::BadRequest("no".into()))
+            })
+            .get("/categories", category_options)
+            .post("/categories", add_category)
+            .put("/categories", rename_category)
+            .post("/picked", || async { "picked" })
+            .get("/charts", || async { view("charts.html", context! {}) })
+            .get("/nav", || async { view("nav.html", context! {}) })
+            .get("/shell", || async { view("shell.html", context! {}) })
+            // The bell: a page with it, and a notification for the user.
+            .get("/inbox", || async { view("inbox.html", context! {}) })
+            .post(
+                "/notify-me",
+                |State(state): State<AppState>, user: AuthUser| async move {
+                    state.notify(&*user, &Hello).await?;
+                    Ok::<_, Error>("sent")
+                },
+            )
             // A request still running when the server is told to stop.
             .get("/pause", || async {
                 renox::tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
@@ -143,6 +286,8 @@ impl Job for Touch {
 
 fn main() -> Result {
     let mut app = App::new()
+        // Accounts (a login rotates the CSRF token) and the bell.
+        .module(Auth::new().notifications())
         .module(Pages)
         .job::<Touch>()
         // `jobs:push 3`: queues three Touch jobs.

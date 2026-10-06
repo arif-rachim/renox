@@ -313,6 +313,8 @@ export class Page {
       ArrowRight: { code: 'ArrowRight', keyCode: 39 },
       Home: { code: 'Home', keyCode: 36 },
       End: { code: 'End', keyCode: 35 },
+      PageDown: { code: 'PageDown', keyCode: 34 },
+      PageUp: { code: 'PageUp', keyCode: 33 },
       ' ': { code: 'Space', keyCode: 32, text: ' ' },
       ',': { code: 'Comma', keyCode: 188, text: ',' },
     }[key] || { code: `Key${key.toUpperCase()}`, keyCode: key.toUpperCase().charCodeAt(0), text: key };

@@ -1,5 +1,8 @@
-// #266: the other half of renox-ui.js: toasts, action sheets, menus, tabs,
-// tooltips and keyboard shortcuts, as a keyboard or mouse user meets them.
+// #266: the other half of renox-ui.js: toasts (from htmx, from the page's
+// script, with request actions, waiting for the next page), sheets, menus,
+// tabs, tooltips, keyboard shortcuts, charts, the period filter, the
+// navigation on phones and the notification bell, as a keyboard, mouse or
+// touch user meets them.
 
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -157,3 +160,291 @@ test('a keyboard shortcut presses its button, but not while typing', () =>
     assert.equal(await pressed(), 1, 'typing a k in a field');
     assert.equal(await page.eval(() => document.querySelector('#typing').value), 'k');
   }));
+
+test('Renox.toast shows at the top, waits while focused, replaces by id and is dismissed by id', () =>
+  onOverlays(async (page) => {
+    const placed = await page.eval(() => {
+      const el = Renox.toast({ kind: 'success', message: 'Copied', duration: 600, id: 'copy', actions: [{ label: 'Open', url: '/stock' }] });
+      const region = el.closest('[data-renox-toasts]');
+      const r = el.getBoundingClientRect();
+      return { position: region.className, top: r.top, centre: Math.round(r.left + r.width / 2), half: Math.round(innerWidth / 2) };
+    });
+    assert.match(placed.position, /rx-toasts--top\b/);
+    assert.ok(placed.top < 120 && Math.abs(placed.centre - placed.half) < 4, JSON.stringify(placed));
+    // Focus inside it holds it past its 600 ms (a background tab has no
+    // focus events without focus emulation).
+    await page.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+    await page.eval(() => document.querySelector('[data-toast-id="copy"] a').focus());
+    await sleep(1200);
+    assert.ok(await page.eval(() => !!document.querySelector('[data-toast-id="copy"]')), 'kept while focused');
+    // The same id replaces it; Renox.dismissToast removes it.
+    await page.eval(() => Renox.toast({ kind: 'info', message: 'Copied again', id: 'copy', duration: 0 }));
+    assert.deepEqual(
+      await page.eval(() => [...document.querySelectorAll('[data-toast-id="copy"]')].map((t) => t.textContent.includes('Copied again'))),
+      [true],
+    );
+    await page.eval(() => Renox.dismissToast('copy'));
+    await page.waitFor(() => !document.querySelector('[data-toast-id="copy"]'), { message: 'dismissed by id' });
+  }));
+
+test('a toast action sends its request; a failure says so; other sites are left out', () =>
+  onOverlays(
+    async (page) => {
+      await page.eval(() => Renox.toast({
+        kind: 'info', message: 'Archived', duration: 0,
+        actions: [
+          { label: 'Undo', url: '/undo', method: 'POST' },
+          { label: 'Elsewhere', url: '//evil.example/x', method: 'POST' },
+          { label: 'Odd', url: '/undo', method: 'GET' },
+        ],
+      }));
+      const labels = await page.eval(() => [...document.querySelectorAll('.rx-toast__action')].map((a) => a.textContent));
+      assert.deepEqual(labels, ['Undo'], 'only a request to this site, with a method that changes something');
+      await page.click('[data-rx-request="/undo"]');
+      await page.waitFor(() => [...document.querySelectorAll('.rx-toast')].some((t) => t.textContent.includes('Undone.')), {
+        message: 'the answer’s toast',
+      });
+      await page.eval(() => Renox.toast({ kind: 'info', message: 'Try it', duration: 0, actions: [{ label: 'Retry', url: '/fails', method: 'POST' }] }));
+      await page.click('[data-rx-request="/fails"]');
+      await page.waitFor(() => document.querySelector('.rx-toast--error')?.textContent.includes("That didn't work. Try again."), {
+        message: 'the failure toast',
+      });
+    },
+    [/400/],
+  ));
+
+test('a toast sent with HxRedirect or HxRefresh shows on the next page', () =>
+  onOverlays(async (page) => {
+    let loaded = page.once('Page.loadEventFired');
+    await page.click('#toast-redirect');
+    await loaded;
+    await page.waitFor(() => location.pathname === '/' && document.querySelector('.rx-toast')?.textContent.includes('Moved along.'), {
+      message: 'the toast after the redirect',
+    });
+    await page.goto(`${app.url}/overlays`);
+    loaded = page.once('Page.loadEventFired');
+    await page.click('#toast-refresh');
+    await loaded;
+    await page.waitFor(() => document.querySelector('.rx-toast')?.textContent.includes('Fresh again.'), {
+      message: 'the toast after the refresh',
+    });
+  }));
+
+test('a side sheet keeps focus inside, closes on its backdrop and gives focus back', () =>
+  onOverlays(async (page) => {
+    await page.click('[data-rx-open="side-sheet"]');
+    await page.waitFor(() => document.querySelector('#side-sheet').open);
+    // Once it has slid in.
+    await page.waitFor(() => Math.abs(document.querySelector('#side-sheet').getBoundingClientRect().right - innerWidth) <= 2, {
+      message: 'the sheet at the right edge',
+    });
+    const box = await page.eval(() => {
+      const d = document.querySelector('#side-sheet');
+      const r = d.getBoundingClientRect();
+      return { classes: d.className, right: Math.round(r.right), height: Math.round(r.height), width: innerWidth, tall: innerHeight };
+    });
+    assert.match(box.classes, /rx-sheet--side/);
+    assert.match(box.classes, /rx-sheet--lg/);
+    assert.ok(Math.abs(box.right - box.width) <= 2 && box.height >= box.tall - 2, JSON.stringify(box));
+    // Tab never leaves the sheet for the page behind it.
+    for (let i = 0; i < 6; i++) {
+      await page.press('Tab');
+      const where = await page.eval(() => {
+        const el = document.activeElement;
+        return !el || el === document.body || document.querySelector('#side-sheet').contains(el);
+      });
+      assert.ok(where, `tab ${i + 1} stayed in the sheet`);
+    }
+    // A click on the backdrop (left of the side sheet) closes it.
+    await page.clickAt(20, 450);
+    await page.waitFor(() => !document.querySelector('#side-sheet').open, { message: 'closed by the backdrop' });
+    assert.ok(await page.eval(() => document.activeElement.matches('[data-rx-open="side-sheet"]')));
+  }));
+
+test('a menu jumps with Home and End and says when it is closed', () =>
+  onOverlays(async (page) => {
+    const button = '[aria-controls="more-menu"]';
+    await page.click(button);
+    await page.waitFor(() => !document.querySelector('#more-menu').hidden);
+    await page.press('End');
+    assert.equal(await page.eval(() => document.activeElement.textContent.trim()), 'Home');
+    await page.press('Home');
+    assert.equal(await page.eval(() => document.activeElement.textContent.trim()), 'Stock');
+    await page.press('Escape');
+    await page.waitFor(() => document.querySelector('#more-menu').hidden);
+    assert.equal(await page.eval((b) => document.querySelector(b).getAttribute('aria-expanded'), button), 'false');
+    // ArrowUp on the button opens it at the last item.
+    await page.focus(button);
+    await page.press('ArrowUp');
+    assert.equal(await page.eval(() => document.activeElement.textContent.trim()), 'Home');
+  }));
+
+test('tooltips share one element', () =>
+  onOverlays(async (page) => {
+    await page.hover('#tipped');
+    await page.waitFor(() => document.querySelector('[role=tooltip]')?.textContent.includes('More about this'));
+    await page.hover('#cell-tip');
+    await page.waitFor(() => document.querySelector('[role=tooltip]')?.textContent.includes('long explanation'));
+    assert.equal(await page.eval(() => document.querySelectorAll('[role=tooltip]').length), 1);
+  }));
+
+test('on a phone, a tooltip in a table neither widens the page nor leaves the screen', () =>
+  browser.with(async (page) => {
+    await page.goto(`${app.url}/overlays`);
+    // The keyboard reaches it (a phone has no hover).
+    await page.eval(() => {
+      const all = [...document.querySelectorAll('a[href], button, input, [tabindex]')].filter((el) => el.tabIndex >= 0 && el.getClientRects().length && !el.closest('dialog'));
+      all[all.indexOf(document.querySelector('#cell-tip')) - 1].focus();
+    });
+    await page.press('Tab');
+    assert.equal(await page.focused(), 'cell-tip');
+    const shown = await page.waitFor(() => {
+      const tip = document.querySelector('[role=tooltip]');
+      if (!tip) return null;
+      const r = tip.getBoundingClientRect();
+      return { left: r.left, right: r.right, page: document.documentElement.scrollWidth, width: innerWidth };
+    }, { message: 'the tooltip' });
+    assert.ok(shown.left >= 0 && shown.right <= shown.width, JSON.stringify(shown));
+    assert.ok(shown.page <= shown.width, `the page is ${shown.page}px wide on a ${shown.width}px screen`);
+  }, { width: 390, height: 844 }));
+
+test('charts: a crosshair follows the pointer, scatter picks the nearest point, keys move it', () =>
+  browser.with(async (page) => {
+    await page.goto(`${app.url}/charts`);
+    const plot = (id) => page.eval((i) => {
+      const r = document.querySelector(`#${i} .rx-chart__plot`).getBoundingClientRect();
+      return { left: r.left, top: r.top, width: r.width, height: r.height };
+    }, id);
+    const tip = (id) => page.eval((i) => {
+      const t = document.querySelector(`#${i} .rx-chart__tip`);
+      return t.hidden ? null : t.textContent;
+    }, id);
+    const move = (x, y) => page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+
+    let box = await plot('line');
+    await move(box.left + box.width * (2 / 3), box.top + box.height / 2);
+    await page.waitFor(() => !document.querySelector('#line .rx-chart__tip').hidden);
+    assert.match(await tip('line'), /^Wed3/);
+    assert.equal(await page.eval(() => document.querySelector('#line .rx-chart__cross').hidden), false);
+
+    box = await plot('bar');
+    await move(box.left + box.width * 0.25, box.top + box.height / 2);
+    await page.waitFor(() => !document.querySelector('#bar .rx-chart__tip').hidden);
+    assert.match(await tip('bar'), /^Coffee4/);
+
+    const point = await page.eval(() => {
+      const r = document.querySelector('#scatter .rx-chart__point[data-index="1"]').getBoundingClientRect();
+      return { x: r.left + r.width / 2 + 3, y: r.top + r.height / 2 + 3 };
+    });
+    await move(point.x, point.y);
+    await page.waitFor(() => !document.querySelector('#scatter .rx-chart__tip').hidden);
+    assert.match(await tip('scatter'), /Large/);
+
+    // The keyboard: focus shows the last label, the arrows and Home move,
+    // Escape hides.
+    await move(1, 1);
+    await page.focus('#line .rx-chart__plot');
+    await page.waitFor(() => !document.querySelector('#line .rx-chart__tip').hidden);
+    assert.match(await tip('line'), /^Thu8/);
+    await page.press('ArrowLeft');
+    assert.match(await tip('line'), /^Wed3/);
+    await page.press('Home');
+    assert.match(await tip('line'), /^Mon1/);
+    await page.press('Escape');
+    assert.equal(await tip('line'), null);
+  }));
+
+test('the period filter’s custom range sends both dates', () =>
+  browser.with(async (page) => {
+    await page.goto(`${app.url}/charts`);
+    await page.click('.rx-period__toggle');
+    await page.waitFor(() => document.querySelector('[data-rx-period]').open);
+    await page.type('#rx-period-from', '2026-09-01');
+    await page.type('#rx-period-to', '2026-09-30');
+    const loaded = page.once('Page.loadEventFired');
+    await page.click('.rx-period__form button[type=submit]');
+    await loaded;
+    const query = new URLSearchParams(await page.eval(() => location.search));
+    assert.equal(query.get('period'), 'custom');
+    assert.equal(query.get('from'), '2026-09-01');
+    assert.equal(query.get('to'), '2026-09-30');
+  }));
+
+test('on a phone, the navbar’s links and the sidebar become a row that scrolls', () =>
+  browser.with(async (page) => {
+    await page.goto(`${app.url}/nav`);
+    const nav = await page.eval(() => {
+      const links = document.querySelector('.rx-navbar__links');
+      return { scrolls: links.scrollWidth > links.clientWidth, overflow: getComputedStyle(links).overflowX, page: document.documentElement.scrollWidth, width: innerWidth };
+    });
+    assert.ok(nav.scrolls && /auto|scroll/.test(nav.overflow), JSON.stringify(nav));
+    assert.ok(nav.page <= nav.width, JSON.stringify(nav));
+    await page.goto(`${app.url}/shell`);
+    const bar = await page.eval(() => {
+      const r = document.querySelector('.rx-sidebar').getBoundingClientRect();
+      return { top: r.top, width: r.width, height: r.height, page: document.documentElement.scrollWidth, screen: innerWidth };
+    });
+    assert.ok(bar.top <= 1 && bar.width >= bar.screen - 1 && bar.height < 200, JSON.stringify(bar));
+    const links = await page.eval(() => {
+      const row = document.querySelector('.rx-sidebar__links');
+      return { scrolls: row.scrollWidth > row.clientWidth, overflow: getComputedStyle(row).overflowX };
+    });
+    assert.ok(links.scrolls && /auto|scroll/.test(links.overflow), JSON.stringify(links));
+    assert.ok(bar.page <= bar.screen, JSON.stringify(bar));
+  }, { width: 390, height: 844 }));
+
+test('on a desktop, the sidebar is a column down the side', () =>
+  browser.with(async (page) => {
+    await page.goto(`${app.url}/shell`);
+    const side = await page.eval(() => {
+      const r = document.querySelector('.rx-sidebar').getBoundingClientRect();
+      return { left: r.left, width: r.width, height: r.height, tall: innerHeight };
+    });
+    assert.ok(side.left <= 1 && side.width < 400 && side.height >= side.tall - 2, JSON.stringify(side));
+  }));
+
+test('the bell counts a new notification live in every tab, toasts it, and marks all read', async () => {
+  // A user for this browser (the bell is for logged-in users).
+  await browser.with(async (page) => {
+    await page.goto(`${app.url}/form`);
+    await page.eval(async (email) => {
+      const token = document.querySelector('meta[name="csrf-token"]').content;
+      const body = new URLSearchParams({ _token: token, name: 'Bell', email, password: 'password123', password_confirmation: 'password123' });
+      await fetch('/register', { method: 'POST', body, redirect: 'manual' });
+    }, `bell${Date.now()}@example.com`);
+  });
+  const other = await browser.page();
+  try {
+    await other.goto(`${app.url}/inbox`);
+    await browser.with(async (page) => {
+      await page.goto(`${app.url}/inbox`);
+      const badge = (p) => p.eval(() => {
+        const b = document.querySelector('[data-rx-bell-count]');
+        return b.hidden ? '' : b.textContent;
+      });
+      assert.equal(await badge(page), '');
+      // Both tabs have their stream open before anything is sent.
+      await sleep(500);
+      await page.click('#notify');
+      await page.waitFor(() => document.querySelector('[data-rx-bell-count]').textContent === '1' && !document.querySelector('[data-rx-bell-count]').hidden, {
+        message: 'the badge counted it',
+      });
+      await page.waitFor(() => document.querySelector('[data-toast-id^="rx-notification-"]')?.textContent.includes('Hello there'), {
+        message: 'the toast',
+      });
+      await other.waitFor(() => document.querySelector('[data-rx-bell-count]').textContent === '1', { message: 'the other tab' });
+      // The panel lists it; "Mark all as read" empties the badge.
+      await page.click('.rx-bell__button');
+      await page.waitFor(() => document.querySelector('[data-rx-notifications]'), { message: 'the panel' });
+      assert.match(await page.eval(() => document.querySelector('[data-rx-notifications]').textContent), /Hello there/);
+      await page.eval(() => {
+        const form = [...document.querySelectorAll('[data-rx-notification-form]')].find((f) => f.action.endsWith('/read-all'));
+        form.querySelector('button').click();
+      });
+      await page.waitFor(() => document.querySelector('[data-rx-bell-count]').hidden, { message: 'none unread' });
+      await other.waitFor(() => document.querySelector('[data-rx-bell-count]').hidden, { message: 'the other tab, read' });
+    });
+  } finally {
+    await other.close();
+  }
+});
