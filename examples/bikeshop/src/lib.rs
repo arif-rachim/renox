@@ -43,7 +43,16 @@ pub fn app() -> App {
             "explain_panels",
             |ctx: renox::view::ViewContext| async move { Ok(explain::enabled(&ctx.state.config)) },
         )
-        .module(renox::auth::Auth::new().account()) // login, register, /account
+        // Login, register, password reset, email verification, /account with
+        // the areas' sections, and the notification bell's list and stream;
+        // signing up makes a customer (src/app/accounts).
+        .module(
+            renox::auth::Auth::new()
+                .account()
+                .verify_email()
+                .notifications()
+                .on_registered(app::accounts::registration::on_registered),
+        )
         // Roles given per store, with dates (#244); the catalogue is src/app/access.
         .module(renox::auth::permissions::Permissions)
         // `db:seed`: a small shop in seconds (`demo:seed --size large` for Pagila's volume).
@@ -64,5 +73,21 @@ pub fn app() -> App {
         .module(app::staff::Staff)
         .module(app::stock::Stock)
         .module(app::workshop::Workshop)
-    // --- end of areas ---
+        // --- end of areas ---
+        // --- Plugins and app-wide layers (append) ---
+        // "Continue with Google / GitHub" when their keys are set (#238).
+        .module(renox_oauth::OAuth::new().google().github())
+        // Two-factor login: optional for customers, required for staff (#238, #239).
+        .module(renox_2fa::TwoFactor::new())
+        // The audit log: logins, deleted accounts, claimed records, and the staff
+        // side's sensitive changes (src/app/staff/audit.rs).
+        .module(renox::audit::Audit)
+        // The language follows the account to every device (src/app/accounts/locale.rs).
+        .layer(renox::axum::middleware::from_fn(
+            app::accounts::locale::middleware,
+        ))
+        // Staff without two-factor login are sent to set it up (src/app/staff/two_factor.rs).
+        .layer(renox::axum::middleware::from_fn(
+            app::staff::two_factor::middleware,
+        ))
 }

@@ -1,0 +1,10 @@
+{#- Account section (order 130): download my data. The button queues a job
+    (`accounts.export` → `ExportMyData`) that mails a link to a JSON file;
+    deleting the account is the card at the end of the page. -#}
+{% from "renox/ui.html" import card, button %}
+<form method="post" action="{{ route('accounts.export') }}" id="account-export">
+  {{ csrf_field() }}
+  {% call card(title=t('accounts.privacy.title'), subtitle=t('accounts.privacy.lead', days=section.data.days)) %}
+    <div class="rx-card__footer">{{ button(t('accounts.privacy.export'), variant="secondary", icon="download") }}</div>
+  {% endcall %}
+</form>

@@ -40,6 +40,9 @@
       "lead": "La trastienda de las tres tiendas.",
       "empty_title": "Aún no hay nada aquí",
       "empty_text": "Las ventas, los alquileres, el taller y el stock de cada tienda aparecerán aquí a medida que crezca el ejemplo."
+    },
+    "two_factor": {
+      "required": "Las cuentas del personal necesitan el acceso en dos pasos. Actívalo abajo para abrir la trastienda."
     }
   },
   "about": {
@@ -223,5 +226,109 @@
   "data_page": {
     "title": "El modelo de datos",
     "lead": "Cada tabla de la tienda de bicicletas, cómo se relacionan y las decisiones detrás de ellas."
+  },
+  "accounts": {
+    "save": "Guardar",
+    "page": {
+      "lead": "Hola, :name. Tus pedidos, alquileres, bicicletas y ajustes, en un solo lugar.",
+      "notifications": "Notificaciones"
+    },
+    "contact": {
+      "title": "Datos de contacto",
+      "lead": "Dónde te localizamos y tu dirección.",
+      "phone": "Teléfono",
+      "line1": "Calle y número",
+      "line2": "Piso, puerta",
+      "district": "Barrio",
+      "postal_code": "Código postal",
+      "city": "Ciudad",
+      "country": "País",
+      "choose_country": "Elige un país",
+      "saved": "Tus datos de contacto se guardaron."
+    },
+    "id": {
+      "title": "Comprobación del documento",
+      "lead": "Para alquilar una bicicleta hay que comprobar un documento de identidad en el mostrador de una tienda.",
+      "status": "Estado",
+      "verified": "Comprobado",
+      "checked_on": "Comprobado el",
+      "waiting": "Pendiente de comprobar",
+      "missing": "Sin documento",
+      "number": "Número del documento"
+    },
+    "notifications": {
+      "title": "Notificaciones",
+      "lead": "Elige cómo te avisamos de cada cosa: por correo, aquí en la aplicación, ambos o nada.",
+      "saved": "Tus preferencias de notificación se guardaron.",
+      "choice": {
+        "both": "Ambos",
+        "mail": "Correo",
+        "in_app": "En la aplicación",
+        "none": "Nada"
+      },
+      "kind": {
+        "order": "Pedidos",
+        "rental": "Alquileres",
+        "workshop": "Taller",
+        "plan": "Plan de mantenimiento",
+        "marketing": "Novedades y ofertas"
+      },
+      "hint": {
+        "order": "Confirmado, listo para recoger, reembolsado.",
+        "rental": "Reservado, vence pronto, con retraso.",
+        "workshop": "Reservado, listo, esperando piezas.",
+        "plan": "Tu próxima visita, un pago fallido.",
+        "marketing": "Bicicletas nuevas y ofertas, de vez en cuando."
+      }
+    },
+    "language": {
+      "title": "Idioma",
+      "lead": "El idioma de estas páginas y de los correos que te enviamos.",
+      "label": "Idioma",
+      "saved": "Tu idioma se guardó."
+    },
+    "privacy": {
+      "title": "Tus datos",
+      "lead": "Descarga todo lo que guardamos sobre ti en un archivo. Te enviamos un enlace que funciona :days días.",
+      "export": "Descargar mis datos",
+      "export_queued": "Estamos reuniendo tus datos. Recibirás un correo con un enlace en unos minutos.",
+      "delete_intro": "Se eliminan tu acceso y tus datos personales. Los pedidos y pagos quedan en la contabilidad sin tu nombre; un plan de mantenimiento activo se cancela.",
+      "delete_confirm": "No se puede deshacer. Tu nombre, datos de contacto, dirección y documento de identidad se eliminan para siempre.",
+      "mail": {
+        "subject": "Tus datos de la tienda de bicicletas",
+        "hello": "Hola, :name:",
+        "text": "Aquí tienes todo lo que guardamos sobre ti, en un archivo JSON.",
+        "button": "Descargar mis datos",
+        "expires": "El enlace funciona :days días."
+      }
+    },
+    "claim": {
+      "title": "Reclama tu ficha",
+      "lead": "Vincula lo que hiciste en nuestras tiendas a tu cuenta, :name.",
+      "what": "Esta ficha tiene:",
+      "orders": "Pedidos",
+      "rentals": "Alquileres",
+      "bikes": "Bicicletas",
+      "button": "Soy yo: vincularla a mi cuenta",
+      "done": "Tus pedidos, alquileres y bicicletas anteriores ya están en tu cuenta.",
+      "taken": "Esta ficha ya está vinculada a una cuenta.",
+      "other_email": "Esta invitación se envió a :email, pero has iniciado sesión como :current. Inicia sesión con :email para reclamarla.",
+      "mail": {
+        "subject": "Tu cuenta de la tienda de bicicletas te espera",
+        "hello": "Hola, :name:",
+        "text": "Has comprado con nosotros en el mostrador. Crea una cuenta (o inicia sesión) y vincula a ella tus compras, alquileres y bicicletas.",
+        "button": "Reclamar mi ficha",
+        "expires": "El enlace funciona :days días."
+      }
+    },
+    "invite": {
+      "title": "Invitar a una cuenta",
+      "lead": "Envía a este cliente un enlace para reclamar su ficha en línea.",
+      "since": "Cliente desde",
+      "email": "Su correo electrónico",
+      "email_hint": "Se guarda en la ficha; el enlace funciona siete días.",
+      "send": "Enviar la invitación",
+      "sent": "La invitación va de camino a :email."
+    }
   }
 }

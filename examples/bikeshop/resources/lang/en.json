@@ -40,6 +40,9 @@
       "lead": "The back office of the three stores.",
       "empty_title": "Nothing here yet",
       "empty_text": "Each store's sales, rentals, workshop and stock appear here as the example grows."
+    },
+    "two_factor": {
+      "required": "Staff accounts need two-factor login. Turn it on below to open the back office."
     }
   },
   "about": {
@@ -295,6 +298,110 @@
       "grants": "Permissions",
       "everywhere": "Everywhere",
       "in_a_store": "In a store"
+    }
+  },
+  "accounts": {
+    "save": "Save",
+    "page": {
+      "lead": "Hello, :name. Your orders, rentals, bikes and settings, in one place.",
+      "notifications": "Notifications"
+    },
+    "contact": {
+      "title": "Contact details",
+      "lead": "Where we reach you, and your home address.",
+      "phone": "Phone",
+      "line1": "Street and number",
+      "line2": "Apartment, floor",
+      "district": "District",
+      "postal_code": "Postal code",
+      "city": "City",
+      "country": "Country",
+      "choose_country": "Choose a country",
+      "saved": "Your contact details were saved."
+    },
+    "id": {
+      "title": "ID check",
+      "lead": "Renting a bike needs an ID document checked at a store's counter.",
+      "status": "Status",
+      "verified": "Checked",
+      "checked_on": "Checked on",
+      "waiting": "Waiting for a check",
+      "missing": "Not on file",
+      "number": "Document number"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "lead": "Choose how we tell you about each thing: by mail, here in the app, both, or not at all.",
+      "saved": "Your notification choices were saved.",
+      "choice": {
+        "both": "Both",
+        "mail": "Mail",
+        "in_app": "In the app",
+        "none": "None"
+      },
+      "kind": {
+        "order": "Orders",
+        "rental": "Rentals",
+        "workshop": "Workshop",
+        "plan": "Service plan",
+        "marketing": "News and offers"
+      },
+      "hint": {
+        "order": "Confirmed, ready to collect, refunded.",
+        "rental": "Reserved, due back soon, late.",
+        "workshop": "Booked, ready, waiting for parts.",
+        "plan": "Your next visit, a payment that failed.",
+        "marketing": "New bikes and offers, now and then."
+      }
+    },
+    "language": {
+      "title": "Language",
+      "lead": "The language of these pages and of the mails we send you.",
+      "label": "Language",
+      "saved": "Your language was saved."
+    },
+    "privacy": {
+      "title": "Your data",
+      "lead": "Download everything we keep about you as one file. We mail you a link that works for :days days.",
+      "export": "Download my data",
+      "export_queued": "We're gathering your data. You'll get a mail with a link in a few minutes.",
+      "delete_intro": "Your login and personal details are removed. Orders and payments stay in the books with your name taken out; a running service plan is cancelled.",
+      "delete_confirm": "This can't be undone. Your name, contact details, address and ID document are removed for good.",
+      "mail": {
+        "subject": "Your data from the bike shop",
+        "hello": "Hello :name,",
+        "text": "Here is everything we keep about you, as one JSON file.",
+        "button": "Download my data",
+        "expires": "The link works for :days days."
+      }
+    },
+    "claim": {
+      "title": "Claim your record",
+      "lead": "Link what you did at our stores to your account, :name.",
+      "what": "This record has:",
+      "orders": "Orders",
+      "rentals": "Rentals",
+      "bikes": "Bikes",
+      "button": "This is me: link it to my account",
+      "done": "Your past orders, rentals and bikes are now in your account.",
+      "taken": "This record is already linked to an account.",
+      "other_email": "This invitation was sent to :email, but you're logged in as :current. Log in with :email to claim it.",
+      "mail": {
+        "subject": "Your bike shop account is waiting",
+        "hello": "Hello :name,",
+        "text": "You've shopped with us at the counter. Create an account (or log in) and link your past purchases, rentals and bikes to it.",
+        "button": "Claim my record",
+        "expires": "The link works for :days days."
+      }
+    },
+    "invite": {
+      "title": "Invite to an account",
+      "lead": "Mail this customer a link to claim their record online.",
+      "since": "Customer since",
+      "email": "Their email address",
+      "email_hint": "Saved on the record; the link works for seven days.",
+      "send": "Send the invitation",
+      "sent": "The invitation is on its way to :email."
     }
   }
 }

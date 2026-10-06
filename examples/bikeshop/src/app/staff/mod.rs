@@ -10,6 +10,7 @@
 pub mod explain;
 pub mod factories;
 pub mod model;
+pub mod two_factor;
 
 use renox::prelude::*;
 
@@ -29,6 +30,13 @@ impl Module for Staff {
                 .get("/staff", dashboard)
                 .name("staff.dashboard"),
         )
+    }
+
+    fn register(&self, app: &mut Registry) {
+        // Two-factor login is required for staff (two_factor.rs).
+        app.listen(two_factor::on_logged_in)
+            .listen(two_factor::on_enabled)
+            .listen(two_factor::on_disabled);
     }
 }
 
