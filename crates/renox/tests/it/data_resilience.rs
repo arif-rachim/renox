@@ -1004,7 +1004,23 @@ impl Module for Faulty {
                 "too late"
             })
             .get("/ok", || async { "ok" })
+            .get("/lingering", || async {
+                tokio::time::sleep(Duration::from_millis(1500)).await;
+                "done"
+            })
     }
+}
+
+/// `REQUEST_TIMEOUT=0`: no limit around the handler or the layers before
+/// it, and a panic is still a 500.
+#[renox::test]
+async fn without_a_request_timeout_slow_handlers_finish() {
+    let app = TestApp::with_config(App::new().module(Faulty), |c| {
+        c.request_timeout = None;
+    })
+    .await;
+    app.get("/lingering").await.assert_ok().assert_see("done");
+    app.get("/panic").await.assert_status(500);
 }
 
 #[renox::test]

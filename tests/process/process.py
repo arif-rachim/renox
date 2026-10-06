@@ -385,7 +385,106 @@ def rnx_serve():
         shutil.rmtree(work, ignore_errors=True)
 
 
+def commands():
+    """The binary's built-in commands and what they print (#249)."""
+    import sqlite3
+
+    app = App()
+    try:
+        out = app.run("migrate:status").stdout
+        assert "  pending          00010101000100_create_jobs_table" in out, out
+        out = app.run("migrate").stdout
+        assert "Migrated: 00010101000100_create_jobs_table" in out, out
+        assert app.run("migrate").stdout.strip() == "Nothing to do."
+
+        # An applied migration whose file is gone, and one edited after it ran.
+        db = sqlite3.connect(os.path.join(app.dir, "app.db"))
+        db.execute(
+            "INSERT INTO renox_migrations (name, batch, applied_at, checksum) "
+            "VALUES ('29990101000000_gone', 1, 'then', NULL)"
+        )
+        db.execute(
+            "UPDATE renox_migrations SET checksum = 'edited' "
+            "WHERE name = '00010101000200_create_cache_table'"
+        )
+        # A failed job and a failed webhook call to list.
+        db.execute(
+            "INSERT INTO failed_jobs (queue, job, payload, max_attempts, error, failed_at) "
+            "VALUES ('default', 'fixture-touch', '{\"n\":1}', 3, 'it broke', 0)"
+        )
+        db.execute(
+            "INSERT INTO webhook_calls (provider, event_id, payload, status, error, received_at) "
+            "VALUES ('pay', 'evt_1', ?, 'failed', 'the shop is closed\nat line 2', 0)",
+            (b"{}",),
+        )
+        db.commit()
+        db.close()
+        out = app.run("migrate:status").stdout
+        assert "29990101000000_gone  (applied, but its file is gone)" in out, out
+        assert "00010101000200_create_cache_table  (edited after it ran; the edit won't run)" in out, out
+        assert "  #1 fixture-touch (default): it broke" in app.run("queue:failed").stdout
+        out = app.run("webhook:failed").stdout
+        assert "  #1 pay evt_1: the shop is closed\n" in out, out
+        assert "Webhook call #1 queued again." in app.run("webhook:retry", "1").stdout
+        assert "No failed webhook calls." in app.run("webhook:failed").stdout
+        for args, says in [
+            (("webhook:retry", "99"), "there is no webhook call #99"),
+            (("webhook:retry", "abc"), "usage: webhook:retry <id>"),
+            (("migrate:rollback", "--step", "x"), "--step needs a number"),
+            (("schedule:run",), "usage: schedule:run <task>"),
+        ]:
+            failed = app.run(*args, check=False)
+            assert failed.returncode != 0 and says in failed.stdout + failed.stderr, (args, failed.stderr)
+        # `--queue` without a value works every queue.
+        app.run("queue:work", "--once", "--queue")
+
+        # The scheduler's list, without and with a task.
+        assert "No scheduled tasks." in app.run("schedule:list").stdout
+        out = app.run("schedule:list", env={"FIXTURE_TICK": "1"}).stdout
+        assert "tick" in out and "UTC" in out, out
+
+        # Maintenance: the bypass and Retry-After, and `up` twice.
+        out = app.run("down", "--secret", "let-me-in", "--retry", "60").stdout
+        assert "The app is down. Visit /let-me-in to bypass it." in out, out
+        proc = app.start("serve")
+        try:
+            app.wait_health(proc)
+            try:
+                urllib.request.urlopen(f"{app.url}/", timeout=10)
+                raise AssertionError("not down")
+            except urllib.error.HTTPError as down:
+                assert down.code == 503 and down.headers.get("Retry-After") == "60", down.headers
+        finally:
+            stop(proc)
+        assert "The app is up." in app.run("up").stdout
+        assert "The app was not down." in app.run("up").stdout
+
+        # The kit copied into the app (into a temporary place), then kept
+        # without --force and replaced with it.
+        place = {"VIEWS_PATH": os.path.join(app.dir, "views"), "PUBLIC_PATH": os.path.join(app.dir, "public")}
+        assert "Wrote " in app.run("ui:publish", env=place).stdout
+        kept = app.run("ui:publish", check=False, env=place)
+        assert kept.returncode != 0 and "add --force to replace it" in kept.stderr + kept.stdout
+        assert "Wrote " in app.run("ui:publish", "--force", env=place).stdout
+
+        # The route list with the DOMAIN column; help with the app's commands.
+        out = app.run("route:list").stdout
+        assert out.splitlines()[0].startswith("DOMAIN") and "{team}.fixture.test" in out, out
+        out = app.run("help").stdout
+        assert "App commands:" in out and "jobs:push" in out and "Queues Touch jobs" in out, out
+
+        # Rolling back by steps: everything ran in one batch; the migration
+        # whose file is gone is forgotten.
+        out = app.run("migrate:rollback", "--step", "2").stdout
+        assert "Rolled back: 00010101000100_create_jobs_table" in out, out
+        assert "Rolled back: 29990101000000_gone" in out, out
+        assert "Nothing to do." in app.run("migrate:rollback").stdout
+    finally:
+        app.close()
+
+
 CHECKS = {
+    "commands": commands,
     "signals": signals,
     "socket": socket_activation,
     "queue": queue,

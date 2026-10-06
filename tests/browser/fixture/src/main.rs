@@ -63,6 +63,12 @@ impl Module for Pages {
         Routes::new()
             .get("/", || async { view("home.html", context! {}) })
             .name("home")
+            // A route on its own host, so `route:list` shows the DOMAIN
+            // column (tests/process).
+            .domain(
+                "{team}.fixture.test",
+                Routes::new().get("/team", || async { "team" }),
+            )
             .get("/form", || async { view("form.html", context! {}) })
             .post("/signup", |Valid(form): Valid<Signup>| async move {
                 Toast::success(format!("Welcome, {}.", form.name))

@@ -417,3 +417,28 @@ async fn a_webhook_registered_twice_stops_the_boot() {
         "{err:?}"
     );
 }
+
+/// The routes only: the app itself registers the webhook.
+struct PayRoutes;
+
+impl Module for PayRoutes {
+    fn name(&self) -> &'static str {
+        "pay-routes"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new().webhook::<Pay>("/webhooks/pay")
+    }
+}
+
+/// `App::webhook` registers a webhook without a module's `register`.
+#[renox::test]
+async fn the_app_can_register_a_webhook_itself() {
+    let app = TestApp::new(App::new().webhook::<Pay>().module(PayRoutes)).await;
+    let call = body("evt_app", "P-1");
+    send(&app, &call, &webhook::hmac_sha256_hex(SECRET, &call))
+        .await
+        .assert_ok();
+    app.run_jobs().await;
+    assert!(paid(&app, "P-1").await);
+}
