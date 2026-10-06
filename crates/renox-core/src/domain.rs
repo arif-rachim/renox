@@ -201,5 +201,21 @@ mod tests {
         ] {
             assert!(DomainPattern::parse(bad).is_err(), "{bad}");
         }
+        // An empty label never fills a parameter.
+        let tenant = DomainPattern::parse("{account}.example.com").unwrap();
+        assert!(tenant.matches(".example.com").is_none());
+    }
+
+    #[test]
+    fn hosts_drop_their_port_ipv6_included() {
+        let host_of = |value: &str| {
+            let req = Request::builder()
+                .header(axum::http::header::HOST, value)
+                .body(axum::body::Body::empty())
+                .unwrap();
+            host(&req)
+        };
+        assert_eq!(host_of("[::1]:3000").as_deref(), Some("[::1]"));
+        assert_eq!(host_of("shop.test:8080").as_deref(), Some("shop.test"));
     }
 }

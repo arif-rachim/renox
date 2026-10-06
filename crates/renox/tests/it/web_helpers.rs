@@ -49,6 +49,10 @@ impl Module for Web {
                 word.0
             })
             .get("/two/{a}/{b}", |word: Path<String>| async move { word.0 })
+            .get("/length/{word}", |word: Path<String>| async move {
+                word.len().to_string()
+            })
+            .get("/no-params", |word: Path<String>| async move { word.0 })
             .get("/member/{id}", |mut user: Found<User>| async move {
                 user.name.push_str(" (seen)");
                 user.name.clone()
@@ -324,4 +328,33 @@ async fn a_session_that_cant_be_saved_doesnt_break_the_page() {
         .await
         .unwrap();
     app.get("/push").await.assert_ok();
+}
+
+#[renox::test]
+async fn path_reads_through_to_its_value_and_a_route_without_parameters_is_a_500() {
+    let app = TestApp::new(web()).await;
+    app.get("/length/coffee").await.assert_see("6");
+    app.get("/no-params").await.assert_status(500);
+}
+
+/// A form sent to a URL no route matches still needs its CSRF token (419),
+/// and its token is looked for in the body, which has a size limit.
+#[renox::test]
+async fn csrf_applies_to_unmatched_urls_and_limits_the_form_it_reads() {
+    let app = TestApp::new(web()).await;
+    app.request()
+        .without_csrf()
+        .post("/nowhere", &[("a", "b")])
+        .await
+        .assert_status(419);
+    // The method override in a header leaves the body to the CSRF check,
+    // which stops reading at 2 MB.
+    let big = "x".repeat(3 * 1024 * 1024);
+    app.request()
+        .without_csrf()
+        .header("x-http-method-override", "PUT")
+        .post("/any-method", &[("note", big.as_str())])
+        .await
+        .assert_status(400)
+        .assert_see("The form is too large.");
 }

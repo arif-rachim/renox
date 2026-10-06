@@ -428,7 +428,11 @@ impl Views {
             let template = match env.get_template(&name) {
                 Ok(template) => template,
                 Err(err) if err.kind() == ErrorKind::TemplateNotFound => continue,
-                Err(err) => return Err(err.into()),
+                // One that doesn't parse fails like one that doesn't render.
+                Err(err) => {
+                    tracing::error!(error = ?err, template = %name, "the error page failed; showing Renox's");
+                    break;
+                }
             };
             let rendered = match &globals {
                 Some(globals) => {
@@ -1237,5 +1241,59 @@ fn globals(
                 .or(default)
                 .unwrap_or_else(|| Value::from(""))
         }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn env() -> Environment<'static> {
+        let mut env = Environment::new();
+        for name in REQUEST_GLOBALS {
+            env.add_global(*name, Value::from_object(RequestGlobal(name)));
+        }
+        env
+    }
+
+    /// A template rendered while a page renders (a component a Rust
+    /// template function renders, say) reads the page's request values
+    /// through the `RequestGlobal`s; outside a page they are empty.
+    #[test]
+    fn request_globals_read_the_page_being_rendered() {
+        let env = env();
+        let page = "{% if auth %}[{{ auth.name }}]{% endif %}\
+                    {% for key in flash %}{{ key }}={{ flash[key] }};{% endfor %}\
+                    {{ t('hi') }}|{{ request }}|{% for e in errors %}{{ e }}{% endfor %}.";
+
+        let outside = env
+            .render_str(
+                "{% if auth %}in{% endif %}[{{ request }}]{% for k in flash %}{{ k }}{% endfor %}",
+                (),
+            )
+            .unwrap();
+        assert_eq!(outside, "[]");
+        let err = env.render_str("{{ t('hi') }}", ()).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("`t` is only available while rendering a page"),
+            "{err}"
+        );
+
+        let globals = minijinja::context! {
+            auth => minijinja::context! { name => "Ann" },
+            flash => minijinja::context! { status => "Saved" },
+            t => Value::from_function(|key: String| format!("({key})")),
+            request => "GET /",
+            // A list: not a map, so it lists no keys.
+            errors => vec!["a"],
+        };
+        let current = CurrentGlobals::set(globals);
+        assert_eq!(
+            env.render_str(page, ()).unwrap(),
+            "[Ann]status=Saved;(hi)|GET /|."
+        );
+        drop(current);
+        assert_eq!(env.render_str("{{ request }}", ()).unwrap(), "");
     }
 }

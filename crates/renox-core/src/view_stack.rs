@@ -185,4 +185,33 @@ mod tests {
             .unwrap();
         assert_eq!(html, "[]");
     }
+
+    #[test]
+    fn a_marker_cut_short_is_kept_as_text() {
+        let scope = Scope::begin();
+        let nonce = CURRENT.with(|c| c.borrow().as_ref().unwrap().nonce.clone());
+        let html = format!("<p>a</p>{}scripts (no end)", marker_prefix(&nonce));
+        assert_eq!(scope.finish(html.clone()), html);
+    }
+
+    #[test]
+    fn a_scope_whose_stacks_are_gone_returns_the_page_as_it_is() {
+        // Only a scope inside another's render could take them; the page
+        // then comes back untouched rather than losing its markers.
+        let scope = Scope::begin();
+        CURRENT.with(|c| c.borrow_mut().take());
+        assert_eq!(scope.finish("page".into()), "page");
+    }
+
+    #[test]
+    fn push_outside_a_call_block_says_how_to_use_it() {
+        let mut env = Environment::new();
+        register(&mut env);
+        let err = env.render_str("{{ push('scripts') }}", ()).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("use it as {% call push('name') %}…{% endcall %}"),
+            "{err}"
+        );
+    }
 }

@@ -419,4 +419,26 @@ mod tests {
         assert!(key.starts_with("notes/") && key.ends_with(".txt"), "{key}");
         assert_eq!(&storage.get(&key).await.unwrap().unwrap()[..], b"hi");
     }
+
+    /// Stored names take the extension the content shows, whatever the
+    /// file was called.
+    #[test]
+    fn sniffed_files_are_stored_under_their_real_extension() {
+        let mut webp = b"RIFF\0\0\0\0WEBPVP8 ".to_vec();
+        webp.extend_from_slice(&[0; 20]);
+        for (name, bytes, ext) in [
+            ("a.png", b"GIF89a\x01\x00\x01\x00".to_vec(), "gif"),
+            ("b.png", webp, "webp"),
+            ("c.txt", b"%PDF-1.7\n".to_vec(), "pdf"),
+        ] {
+            let file = Upload::new(name, "application/octet-stream", bytes);
+            let key = file.key("files");
+            assert!(key.ends_with(&format!(".{ext}")), "{name}: {key}");
+        }
+        // A JPEG with stray bytes before a marker: they are skipped.
+        let mut jpeg = vec![0xFF, 0xD8, 0x00, 0x13, 0xFF, 0xE0, 0x00, 0x02];
+        jpeg.extend_from_slice(&[0xFF, 0xC0, 0x00, 0x11, 0x08, 0x00, 0x0A, 0x00, 0x0B]);
+        let file = Upload::new("photo.jpg", "image/jpeg", jpeg);
+        assert_eq!(file.dimensions(), Some((11, 10)));
+    }
 }

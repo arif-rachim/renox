@@ -189,4 +189,29 @@ mod tests {
         );
         assert!(disposition("ünï.pdf", false).ends_with("filename*=UTF-8''%C3%BCn%C3%AF.pdf"));
     }
+
+    /// A missing file is a 404; a path that can't be opened for another
+    /// reason (here a file used as a folder) is an error naming the path.
+    #[tokio::test]
+    async fn files_that_cant_be_opened() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(matches!(
+            Download::file(dir.path().join("gone.pdf"), "gone.pdf").await,
+            Err(Error::NotFound)
+        ));
+        // (Windows reports this one as "not found".)
+        #[cfg(unix)]
+        {
+            let file = dir.path().join("report.pdf");
+            std::fs::write(&file, b"%PDF-").unwrap();
+            let Err(err) = Download::file(file.join("inside.pdf"), "x.pdf").await else {
+                panic!("opened a file inside a file");
+            };
+            assert!(
+                format!("{err:?}").contains("could not open")
+                    && format!("{err:?}").contains("report.pdf"),
+                "{err:?}"
+            );
+        }
+    }
 }

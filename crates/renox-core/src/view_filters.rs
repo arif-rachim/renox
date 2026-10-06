@@ -511,6 +511,9 @@ mod tests {
         assert!(bars.contains("aria-label=\"Sales &lt;q1>\""));
         assert!(spark_svg(&[], false, 96.0, 28.0, None).ends_with("></svg>"));
         assert!(spark_svg(&[5.0], false, 96.0, 28.0, None).contains("<circle"));
+        // Fractions keep their decimals in the label.
+        let label = spark_svg(&[1.5, 2.0, 2.25], false, 96.0, 28.0, None);
+        assert!(label.contains("aria-label=\"1.5 → 2.25\""), "{label}");
     }
 
     #[test]

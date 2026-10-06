@@ -165,3 +165,27 @@ async fn check(req: Request, next: Next) -> Response {
     next.run(Request::from_parts(parts, Body::from(bytes)))
         .await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::StatusCode;
+    use tower::ServiceExt;
+
+    /// The CSRF check placed outside the session layer (a layer added in
+    /// the wrong place) says so, instead of letting the request through.
+    #[tokio::test]
+    async fn without_the_session_layer_a_post_is_a_500() {
+        let app = axum::Router::new()
+            .route("/", axum::routing::post(|| async { "posted" }))
+            .layer(axum::middleware::from_fn(super::middleware));
+        let req = Request::builder()
+            .method("POST")
+            .uri("/")
+            .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(Body::from("_token=x"))
+            .unwrap();
+        let res = app.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+}

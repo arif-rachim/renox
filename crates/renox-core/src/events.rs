@@ -81,3 +81,29 @@ impl AppState {
         first_error.map_or(Ok(()), Err)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Clone)]
+    struct Placed;
+    impl Event for Placed {}
+
+    #[derive(Clone)]
+    struct Cancelled;
+    impl Event for Cancelled {}
+
+    /// Listeners are kept per event type, so one never gets another type;
+    /// if it did, it would do nothing rather than fail.
+    #[tokio::test]
+    async fn a_listener_ignores_an_event_of_another_type() {
+        let app = crate::testing::TestApp::new(crate::App::new()).await;
+        let (kind, run) = listener(|_: Placed, _state| async {
+            Err(Error::Internal(anyhow::anyhow!("only for Placed")))
+        });
+        assert_eq!(kind, TypeId::of::<Placed>());
+        assert!(run(Box::new(Cancelled), app.state().clone()).await.is_ok());
+        assert!(run(Box::new(Placed), app.state().clone()).await.is_err());
+    }
+}

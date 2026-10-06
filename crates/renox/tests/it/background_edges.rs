@@ -242,3 +242,155 @@ impl Module for Probe {
         )
     }
 }
+
+// The rest of #256: queue paths left after the first pass.
+
+/// A job that can't be written down (its `Serialize` fails).
+#[derive(Deserialize)]
+struct Unsaveable;
+
+impl Serialize for Unsaveable {
+    fn serialize<S: serde::Serializer>(&self, _: S) -> std::result::Result<S::Ok, S::Error> {
+        Err(serde::ser::Error::custom("this job can't be saved"))
+    }
+}
+
+impl Job for Unsaveable {
+    const NAME: &'static str = "edges-unsaveable";
+    async fn handle(self, _ctx: JobContext) -> Result {
+        Ok(())
+    }
+}
+
+#[renox::test]
+async fn chains_and_batches_with_a_job_that_cant_be_saved_queue_nothing() {
+    let app = app().await;
+    let queue = &app.state().queue;
+    let err = queue
+        .chain()
+        .then(Part(1))
+        .then(Unsaveable)
+        .then(Part(2))
+        .dispatch()
+        .await
+        .unwrap_err();
+    assert!(format!("{err:?}").contains("can't be saved"), "{err:?}");
+    let err = queue
+        .batch("broken")
+        .push(Part(1))
+        .push(Unsaveable)
+        .dispatch()
+        .await
+        .unwrap_err();
+    assert!(format!("{err:?}").contains("can't be saved"), "{err:?}");
+    assert!(app.queued_jobs().await.is_empty());
+    assert_eq!(count(&app, "SELECT COUNT(*) FROM job_batches").await, 0);
+}
+
+/// An empty batch is finished at once (100 %); a batch pruned while its
+/// job waits doesn't stop the job.
+#[renox::test]
+async fn empty_and_pruned_batches() {
+    let app = app().await;
+    let queue = &app.state().queue;
+    let empty = queue.batch("nothing").dispatch().await.unwrap();
+    let status = queue.batch_status(empty).await.unwrap().unwrap();
+    assert!(status.finished);
+    assert_eq!((status.total, status.progress()), (0, 100));
+
+    queue
+        .batch("pruned")
+        .push(Part(1))
+        .dispatch()
+        .await
+        .unwrap();
+    renox::db::sql("DELETE FROM job_batches")
+        .execute(app.db())
+        .await
+        .unwrap();
+    assert_eq!(app.run_jobs().await, 1);
+    assert_eq!(count(&app, "SELECT COUNT(*) FROM failed_jobs").await, 0);
+    assert!(app.queued_jobs().await.is_empty());
+}
+
+/// Fails for good; its `failed` hook panics.
+#[derive(Serialize, Deserialize)]
+struct Doomed;
+
+impl Job for Doomed {
+    const NAME: &'static str = "edges-doomed";
+    async fn handle(self, _ctx: JobContext) -> Result {
+        Err(Error::permanent(renox::anyhow::anyhow!("out of stock")))
+    }
+    async fn failed(self, _ctx: JobContext, _error: String) {
+        panic!("the hook broke too");
+    }
+}
+
+/// Deletes its own row while it runs, as `queue:forget` from another
+/// process would.
+#[derive(Serialize, Deserialize)]
+struct Vanishing;
+
+impl Job for Vanishing {
+    const NAME: &'static str = "edges-vanishing";
+    async fn handle(self, ctx: JobContext) -> Result {
+        renox::db::sql("DELETE FROM jobs WHERE id = ?")
+            .bind(ctx.id)
+            .execute(&ctx.state.db)
+            .await?;
+        Ok(())
+    }
+}
+
+#[renox::test]
+async fn a_panicking_failed_hook_still_records_the_failure() {
+    let app = TestApp::new(App::new().job::<Doomed>().job::<Vanishing>()).await;
+    app.state().dispatch(Doomed).await.unwrap();
+    app.run_jobs().await;
+    assert_eq!(count(&app, "SELECT COUNT(*) FROM failed_jobs").await, 1);
+    assert!(app.queued_jobs().await.is_empty());
+
+    // A job whose row is gone when it finishes: nothing is recorded twice.
+    app.state().dispatch(Vanishing).await.unwrap();
+    app.run_jobs().await;
+    assert!(app.queued_jobs().await.is_empty());
+    assert_eq!(count(&app, "SELECT COUNT(*) FROM failed_jobs").await, 1);
+}
+
+/// The dashboard's numbers: jobs done in the last hour, and a queue whose
+/// only job waits for later has no "oldest waiting".
+#[renox::test]
+async fn queue_stats_count_finished_jobs_and_ignore_delayed_ones() {
+    let app = app().await;
+    let queue = &app.state().queue;
+    queue.dispatch(Part(1)).await.unwrap();
+    assert_eq!(app.run_jobs().await, 1);
+    queue
+        .dispatch_after(Part(2), Duration::from_secs(3600))
+        .await
+        .unwrap();
+    let stats = queue.stats().await.unwrap();
+    assert_eq!(stats.done_last_hour, 1);
+    assert_eq!(stats.oldest_wait, None);
+    assert_eq!(stats.queues[0].delayed, 1);
+}
+
+/// A worker loop that can't read the queue logs it and keeps going until
+/// it is stopped.
+#[renox::test]
+async fn a_worker_loop_survives_a_queue_it_cant_read() {
+    let app = app().await;
+    renox::db::sql("ALTER TABLE jobs RENAME TO jobs_away")
+        .execute(app.db())
+        .await
+        .unwrap();
+    let (stop, stopped) = tokio::sync::watch::channel(false);
+    let worker = tokio::spawn(app.kernel().worker(Vec::new()).run(1, stopped));
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    stop.send(true).unwrap();
+    tokio::time::timeout(Duration::from_secs(5), worker)
+        .await
+        .expect("the worker stops")
+        .unwrap();
+}

@@ -244,3 +244,23 @@ async fn retry_all(State(state): State<AppState>) -> Result<Redirect> {
     state.queue.retry_all().await?;
     Ok(Redirect::to("/_renox/queue"))
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn ages_read_in_the_largest_whole_unit() {
+        let ago = super::ago;
+        assert_eq!(
+            [
+                ago(-5),
+                ago(59),
+                ago(60),
+                ago(3599),
+                ago(3600),
+                ago(86_399),
+                ago(86_400 * 3)
+            ],
+            ["0s", "59s", "1m", "59m", "1h", "23h", "3d"]
+        );
+    }
+}

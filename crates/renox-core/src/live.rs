@@ -109,3 +109,66 @@ async fn events(
     let events = stream::once(async move { hello }).chain(updates).map(Ok);
     Ok(Sse::new(events).keep_alive(KeepAlive::default()))
 }
+
+#[cfg(test)]
+mod tests {
+    use axum::body::Body;
+    use http_body_util::BodyExt;
+    use tower::ServiceExt;
+
+    use super::*;
+
+    /// A changed file sends `reload`; stopping ends every open stream, even
+    /// one that fell behind.
+    #[tokio::test]
+    async fn the_stream_sends_reloads_and_ends_when_stopped() {
+        let app = crate::testing::TestApp::with_config(crate::App::new(), |c| {
+            c.env = crate::Environment::Local;
+            c.debug = true;
+        })
+        .await;
+        let live = app
+            .state()
+            .live
+            .clone()
+            .expect("live reload while developing");
+        let req = axum::http::Request::builder()
+            .uri("/_renox/live")
+            .body(Body::empty())
+            .unwrap();
+        let res = app.kernel().router().oneshot(req).await.unwrap();
+        let mut body = res.into_body();
+        let first = body.frame().await.unwrap().unwrap().into_data().unwrap();
+        assert!(String::from_utf8_lossy(&first).contains("event: boot"));
+        // More than the channel holds: the stream skips what it missed.
+        for _ in 0..40 {
+            let _ = live.tx.send(Message::Reload);
+        }
+        live.stop();
+        let rest = tokio::time::timeout(Duration::from_secs(5), body.collect())
+            .await
+            .expect("the stream ends")
+            .unwrap()
+            .to_bytes();
+        let rest = String::from_utf8_lossy(&rest);
+        assert!(rest.contains("event: reload"), "{rest}");
+    }
+
+    #[tokio::test]
+    async fn a_changed_file_is_a_reload() {
+        let dir = tempfile::tempdir().unwrap();
+        let live = Live::start(vec![dir.path().to_path_buf()]);
+        let mut rx = live.tx.subscribe();
+        // The watcher's first look, before the change.
+        tokio::time::sleep(POLL / 5).await;
+        std::fs::write(dir.path().join("page.html"), "new").unwrap();
+        let message = tokio::time::timeout(Duration::from_secs(5), rx.recv())
+            .await
+            .expect("a message")
+            .unwrap();
+        assert!(matches!(message, Message::Reload));
+        // Dropped: the watcher stops at its next look.
+        drop(live);
+        tokio::time::sleep(POLL * 2).await;
+    }
+}

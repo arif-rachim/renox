@@ -703,4 +703,77 @@ mod tests {
             assert!(check_key(bad).is_err(), "{bad}");
         }
     }
+
+    fn local(root: &Path, name: Option<&str>) -> Storage {
+        let settings = StorageConfig::default();
+        Storage::open(&settings, root.to_path_buf(), name).unwrap()
+    }
+
+    /// A named disk can't use S3 without the feature, and the error names
+    /// the disk; only the default disk serves public files.
+    #[test]
+    fn named_disks_are_named_in_errors_and_serve_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        #[cfg(not(feature = "s3"))]
+        {
+            let settings = StorageConfig {
+                disk: DiskDriver::S3,
+                ..StorageConfig::default()
+            };
+            let err = Storage::open(&settings, dir.path().to_path_buf(), Some("backups"))
+                .err()
+                .unwrap();
+            assert!(
+                err.to_string().contains("the `backups` disk's driver=s3"),
+                "{err}"
+            );
+        }
+        assert!(local(dir.path(), Some("backups")).public_root().is_none());
+        assert!(local(dir.path(), None).public_root().is_some());
+    }
+
+    /// Local disk errors other than "not there" are errors naming the
+    /// path or keys, not `None`/404.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn local_disk_errors_name_what_failed() {
+        let dir = tempfile::tempdir().unwrap();
+        let disk = local(dir.path(), None);
+        disk.put("docs/a.txt", Bytes::from_static(b"a"))
+            .await
+            .unwrap();
+        disk.put("full/b.txt", Bytes::from_static(b"b"))
+            .await
+            .unwrap();
+        // A folder read as a file.
+        let err = disk.get("docs").await.unwrap_err();
+        assert!(format!("{err:?}").contains("could not read"), "{err:?}");
+        // A file used as a folder.
+        assert!(disk.size("docs/a.txt/inner").await.is_err());
+        let err = disk.copy("docs", "copy.txt").await.unwrap_err();
+        assert!(
+            format!("{err:?}").contains("could not copy `docs`"),
+            "{err:?}"
+        );
+        // A file moved onto a folder that has files.
+        let err = disk.rename("docs/a.txt", "full").await.unwrap_err();
+        assert!(
+            format!("{err:?}").contains("could not move `docs/a.txt`"),
+            "{err:?}"
+        );
+        // A symbolic link is listed as neither file nor folder; a link that
+        // points at itself can't be listed.
+        std::os::unix::fs::symlink(dir.path().join("docs/loop"), dir.path().join("docs/loop"))
+            .unwrap();
+        let keys: Vec<_> = disk
+            .list("docs")
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|f| f.key)
+            .collect();
+        assert_eq!(keys, ["docs/a.txt"]);
+        let err = disk.list("docs/loop").await.unwrap_err();
+        assert!(format!("{err:?}").contains("could not list"), "{err:?}");
+    }
 }

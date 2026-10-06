@@ -395,3 +395,74 @@ async fn error_pages_get_shared_values_too() {
     let res = app.get("/nowhere").await;
     res.assert_not_found().assert_see("<p>Cart (3)</p>Lost");
 }
+
+/// #256: the inspector keeps the last 50 requests; its pages are 404s
+/// where it doesn't run, and an app's copy of its page that fails is a 500.
+#[renox::test]
+async fn the_inspector_keeps_fifty_requests_and_answers_404_where_it_is_off() {
+    let views = views();
+    let app = local_app(&views).await;
+    for _ in 0..51 {
+        app.get("/fine").await.assert_ok();
+    }
+    app.get("/_renox/debug/1").await.assert_not_found();
+    app.get("/_renox/debug/2").await.assert_ok();
+    app.get("/_renox/debug/51").await.assert_ok();
+
+    let views = self::views();
+    let app = test_app(&views).await;
+    app.get("/_renox/debug/1").await.assert_not_found();
+}
+
+#[renox::test]
+async fn an_inspector_page_that_fails_is_a_500() {
+    let views = views();
+    std::fs::create_dir_all(views.path().join("renox")).unwrap();
+    std::fs::write(
+        views.path().join("renox/debug.html"),
+        "{{ no_such_function() }}",
+    )
+    .unwrap();
+    let app = local_app(&views).await;
+    app.get("/fine").await.assert_ok();
+    app.get("/_renox/debug").await.assert_status(500);
+}
+
+/// `/health` waits two seconds for the database, then says it timed out.
+#[renox::test]
+async fn health_reports_a_database_that_doesnt_answer_in_time() {
+    let dir = tempfile::tempdir().unwrap();
+    let url = format!("sqlite://{}", dir.path().join("app.db").display());
+    let app = TestApp::with_config(App::new(), move |c| {
+        c.database_url = url;
+        c.database_pool_size = 1;
+    })
+    .await;
+    // The only connection is busy.
+    let tx = app.db().begin().await.unwrap();
+    let res = app.get("/health").await;
+    res.assert_status(503).assert_see("timed out");
+    drop(tx);
+    app.get("/health").await.assert_ok();
+}
+
+/// A reporter that panics is logged; the others still get the report.
+#[renox::test]
+async fn a_reporter_that_panics_doesnt_stop_the_others() {
+    let views = views();
+    let seen: Arc<Mutex<Vec<ErrorReport>>> = Arc::default();
+    let reports = seen.clone();
+    let path = views.path().to_path_buf();
+    let app = TestApp::with_config(
+        app()
+            .report(|_report, _state| async { panic!("the reporter broke") })
+            .report(move |report, _state| {
+                let reports = reports.clone();
+                async move { reports.lock().unwrap().push(report) }
+            }),
+        move |c| c.views_path = path,
+    )
+    .await;
+    app.get("/boom").await.assert_status(500);
+    assert_eq!(wait_for(&seen, 1).await.len(), 1);
+}

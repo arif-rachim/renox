@@ -313,3 +313,42 @@ pub(crate) async fn middleware(
     }
     res
 }
+
+#[cfg(test)]
+mod tests {
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
+
+    use axum::body::{Body, Bytes, HttpBody};
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
+
+    use super::*;
+
+    /// A page body that claims a size, then fails while being read.
+    struct Broken;
+
+    impl HttpBody for Broken {
+        type Data = Bytes;
+        type Error = std::io::Error;
+
+        fn poll_frame(
+            self: Pin<&mut Self>,
+            _: &mut Context<'_>,
+        ) -> Poll<Option<Result<http_body::Frame<Bytes>, std::io::Error>>> {
+            Poll::Ready(Some(Err(std::io::Error::other("disk went away"))))
+        }
+
+        fn size_hint(&self) -> http_body::SizeHint {
+            http_body::SizeHint::with_exact(10)
+        }
+    }
+
+    #[tokio::test]
+    async fn an_etag_page_that_cant_be_read_is_a_500() {
+        let mut res = (StatusCode::OK, Body::new(Broken)).into_response();
+        res.extensions_mut().insert(WantsEtag);
+        let res = etag(res, &Method::GET, None).await;
+        assert_eq!(res.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+}

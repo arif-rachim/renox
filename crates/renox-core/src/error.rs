@@ -298,3 +298,40 @@ fn escape(s: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validation_errors_answer_422_and_other_errors_500() {
+        let mut errors = crate::validation::Errors::new();
+        errors.add("name", "The name field is required.");
+        let err = Error::Validation(crate::validation::ValidationError::new(errors));
+        assert_eq!(err.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let plain = Error::from(anyhow::anyhow!("no database involved"));
+        assert!(!plain.is_unique_violation());
+        assert_eq!(plain.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    /// A unique violation from sqlx itself (an app querying its pool
+    /// directly, then `?`) is a 409 like one from `renox::db`.
+    #[tokio::test]
+    async fn a_raw_sqlx_unique_violation_is_a_conflict() {
+        let db = crate::db::connect(&crate::Config::default()).await.unwrap();
+        let Some(pool) = db.sqlite() else {
+            return; // the PostgreSQL run: the same check, another driver
+        };
+        sqlx::raw_sql("CREATE TABLE tags (name TEXT UNIQUE); INSERT INTO tags VALUES ('a')")
+            .execute(pool)
+            .await
+            .unwrap();
+        let raw = sqlx::raw_sql("INSERT INTO tags VALUES ('a')")
+            .execute(pool)
+            .await
+            .unwrap_err();
+        let err = Error::from(anyhow::Error::new(raw));
+        assert!(err.is_unique_violation());
+        assert_eq!(err.status(), StatusCode::CONFLICT);
+    }
+}

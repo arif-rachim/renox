@@ -900,6 +900,22 @@ mod route_name_tests {
             "admin.*.posts.*"
         ));
     }
+
+    /// Outside the app's middleware (no `AppState` on the request), no
+    /// route is current.
+    #[tokio::test]
+    async fn current_route_without_the_app_is_none() {
+        use axum::extract::FromRequestParts;
+        let (mut parts, ()) = axum::http::Request::builder()
+            .uri("/x")
+            .body(())
+            .unwrap()
+            .into_parts();
+        let current = super::CurrentRoute::from_request_parts(&mut parts, &())
+            .await
+            .unwrap();
+        assert_eq!(current.name(), None);
+    }
 }
 
 /// A redirect with this status and `Location`.

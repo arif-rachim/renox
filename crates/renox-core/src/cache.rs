@@ -562,3 +562,59 @@ impl Drop for LockGuard {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    async fn db() -> Db {
+        crate::db::connect(&crate::Config::default()).await.unwrap()
+    }
+
+    /// Past `SWEEP_AT` keys, the memory store drops what expired.
+    #[tokio::test]
+    async fn the_memory_store_sweeps_expired_values_once_it_is_large() {
+        let cache = Cache::new(crate::CacheStore::Memory, db().await).unwrap();
+        for i in 0..SWEEP_AT {
+            cache
+                .put(&format!("k{i}"), &i, Some(Duration::from_secs(1)))
+                .await
+                .unwrap();
+        }
+        crate::clock::with_offset(10, cache.put("late", &1, None))
+            .await
+            .unwrap();
+        let Store::Memory(map) = &cache.store else {
+            unreachable!()
+        };
+        assert_eq!(map.lock().unwrap().len(), 1);
+    }
+
+    /// The database store when its table is missing or goes away: writing
+    /// is an error (after a failed prune, logged), and a lock whose release
+    /// fails stays held until its time runs out.
+    #[tokio::test]
+    async fn the_database_store_without_its_table() {
+        let db = db().await;
+        let cache = Cache::new(crate::CacheStore::Database, db.clone()).unwrap();
+        assert!(cache.put("k", &1, None).await.is_err());
+
+        crate::db::sql("CREATE TABLE cache (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL, expires_at BIGINT)")
+            .execute(&db)
+            .await
+            .unwrap();
+        let lock = cache.lock("report", Duration::from_secs(60));
+        let guard = lock.try_acquire().await.unwrap().expect("free");
+        crate::db::sql("ALTER TABLE cache RENAME TO cache_away")
+            .execute(&db)
+            .await
+            .unwrap();
+        drop(guard);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        crate::db::sql("ALTER TABLE cache_away RENAME TO cache")
+            .execute(&db)
+            .await
+            .unwrap();
+        assert!(lock.is_held().await.unwrap());
+    }
+}

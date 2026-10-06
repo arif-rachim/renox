@@ -240,6 +240,22 @@ mod tests {
         assert!(TrustedProxies::parse("").unwrap().is_empty());
         assert!(TrustedProxies::parse("10.0.0.0/33").is_err());
         assert!(TrustedProxies::parse("proxy.local").is_err());
+        let err = TrustedProxies::parse("*, 10.0.0.1").unwrap_err();
+        assert!(
+            format!("{err:?}").contains("`*` already trusts every address"),
+            "{err:?}"
+        );
+    }
+
+    /// Outside the app's middleware (no resolved address yet), the
+    /// connection's address is the client's.
+    #[tokio::test]
+    async fn without_the_middleware_the_peer_is_the_client() {
+        let req = request("203.0.113.9", &[("x-forwarded-for", "1.1.1.1")]);
+        assert_eq!(ClientIp::of(&req), ip("203.0.113.9"));
+        let (mut parts, _) = req.into_parts();
+        let found = ClientIp::from_request_parts(&mut parts, &()).await.unwrap();
+        assert_eq!(found.0, ip("203.0.113.9"));
     }
 
     #[test]

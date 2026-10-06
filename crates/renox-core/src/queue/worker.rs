@@ -539,3 +539,60 @@ impl Worker {
         while loops.join_next().await.is_some() {}
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn an_aborted_attempt_says_it_was_cancelled() {
+        let task = tokio::spawn(std::future::pending::<()>());
+        task.abort();
+        let err = task.await.unwrap_err();
+        assert!(panic_message(err).starts_with("the job was cancelled"));
+    }
+
+    /// Bookkeeping retries while the database is briefly away: a write
+    /// that works on its second try succeeds; one that never works gives
+    /// up after the last delay with its error.
+    #[tokio::test(start_paused = true)]
+    async fn bookkeeping_writes_are_retried_then_given_up() {
+        let tries = Arc::new(AtomicUsize::new(0));
+        let counted = tries.clone();
+        retry_write(|| {
+            let n = counted.fetch_add(1, Ordering::SeqCst);
+            async move {
+                if n == 0 {
+                    Err(crate::Error::Internal(anyhow::anyhow!(
+                        "database is locked"
+                    )))
+                } else {
+                    Ok(())
+                }
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(tries.load(Ordering::SeqCst), 2);
+
+        let tries = Arc::new(AtomicUsize::new(0));
+        let counted = tries.clone();
+        let started = tokio::time::Instant::now();
+        let err = retry_write(|| {
+            counted.fetch_add(1, Ordering::SeqCst);
+            async { Err(crate::Error::Internal(anyhow::anyhow!("database is gone"))) }
+        })
+        .await
+        .unwrap_err();
+        assert!(format!("{err:?}").contains("database is gone"));
+        assert_eq!(
+            tries.load(Ordering::SeqCst),
+            6,
+            "the first try and five retries"
+        );
+        assert_eq!(started.elapsed(), Duration::from_millis(10_000));
+    }
+}

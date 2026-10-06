@@ -157,3 +157,18 @@ pub(crate) async fn middleware(
     }
     res
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `up` that can't remove the marker (here a folder in its place) says
+    /// so, instead of reporting the app as up.
+    #[test]
+    fn up_reports_a_marker_it_cant_remove() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(!up(dir.path()).unwrap(), "nothing to bring up");
+        std::fs::create_dir_all(file(dir.path())).unwrap();
+        assert!(up(dir.path()).is_err());
+    }
+}

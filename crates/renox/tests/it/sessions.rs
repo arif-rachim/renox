@@ -157,3 +157,114 @@ async fn test_helpers_work_with_database_sessions() {
     app.post("/logout", &[]).await.assert_redirect("/");
     app.assert_guest();
 }
+
+/// #252: the cookie driver still sends a session over 4 KB (and logs that
+/// browsers may drop it).
+#[renox::test]
+async fn a_cookie_session_over_4_kb_is_still_sent() {
+    let app = TestApp::new(app()).await;
+    app.get("/big").await.assert_ok();
+    assert!(app.session_cookie().unwrap().len() > 4000);
+}
+
+/// With the test mirror (`APP_ENV=testing`), a new id at login drops the
+/// old session from the mirror.
+#[renox::test]
+async fn logging_in_drops_the_old_session_from_the_test_mirror() {
+    let app =
+        TestApp::with_config(app(), |c| c.session_driver = renox::SessionDriver::Database).await;
+    let user = User::register(app.db(), "Dee", "dee@example.com", "password123")
+        .await
+        .unwrap();
+    app.get("/put/coffee").await.assert_ok();
+    let before = app.session_cookie();
+    app.get(&format!("/login/{}", user.id))
+        .await
+        .assert_see("in");
+    app.get("/get").await.assert_see("coffee");
+    app.use_session_cookie(before);
+    app.get("/get").await.assert_see("none");
+}
+
+/// A session row that can't be deleted at login (the table is gone): the
+/// failure is logged and the page still answers.
+#[renox::test]
+async fn a_session_that_cant_be_deleted_doesnt_break_the_login() {
+    let app = TestApp::with_config(app(), |c| {
+        c.session_driver = renox::SessionDriver::Database;
+        c.env = renox::Environment::Local;
+    })
+    .await;
+    let user = User::register(app.db(), "Eli", "eli@example.com", "password123")
+        .await
+        .unwrap();
+    app.get("/put/coffee").await.assert_ok();
+    renox::db::sql("ALTER TABLE sessions RENAME TO sessions_gone")
+        .execute(app.db())
+        .await
+        .unwrap();
+    app.get(&format!("/login/{}", user.id))
+        .await
+        .assert_ok()
+        .assert_see("in");
+}
+
+/// Requests prune expired sessions now and then (1 in 50), in the
+/// background.
+#[renox::test]
+async fn requests_prune_expired_sessions_now_and_then() {
+    let app = TestApp::with_config(app(), |c| {
+        c.session_driver = renox::SessionDriver::Database;
+        c.env = renox::Environment::Local;
+    })
+    .await;
+    renox::db::sql(
+        "INSERT INTO sessions (id, user_id, payload, expires_at, last_activity) VALUES ('old', NULL, '{}', 1, 1)",
+    )
+    .execute(app.db())
+    .await
+    .unwrap();
+    let expired = || async {
+        renox::db::sql("SELECT COUNT(*) FROM sessions WHERE id = 'old'")
+            .scalar::<i64>(app.db())
+            .await
+            .unwrap()
+    };
+    // The chance that 1,000 requests never prune is about 2 in a billion.
+    for _ in 0..1000 {
+        app.get("/get").await.assert_ok();
+        if expired().await == 0 {
+            break;
+        }
+    }
+    for _ in 0..100 {
+        if expired().await == 0 {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    assert_eq!(expired().await, 0, "the expired session is pruned");
+}
+
+/// "Remember me" sessions keep their lifetime when a test helper rewrites
+/// the cookie.
+#[renox::test]
+async fn test_helpers_keep_a_remembered_session() {
+    let app = TestApp::new(app()).await;
+    let user = User::register(app.db(), "Fay", "fay@example.com", "password123")
+        .await
+        .unwrap();
+    app.post(
+        "/login",
+        &[
+            ("email", "fay@example.com"),
+            ("password", "password123"),
+            ("remember", "on"),
+        ],
+    )
+    .await
+    .assert_redirect("/");
+    app.confirm_password();
+    app.assert_authenticated(Some(&user));
+    app.get("/whoami").await.assert_see("Fay");
+}
