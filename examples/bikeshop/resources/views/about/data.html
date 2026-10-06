@@ -1,0 +1,107 @@
+{% extends "layouts/app.html" %}
+{#- /about/data: the data model explained (src/app/about/data.rs). Only the
+    kit: page_header, infolist + entry, card, columns, table, badge. The
+    texts are Markdown in resources/lang/<locale>.json under `data_page`. -#}
+{% from "renox/ui.html" import page_header, infolist, entry, card, columns, table, badge, link_button %}
+{% block seo %}{{ seo(title=t('data_page.title'), description=t('data_page.lead')) }}{% endblock %}
+
+{% block content %}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('data_page.title'), subtitle=t('data_page.lead')) }}
+
+  {% call infolist(columns=3) %}
+    {{ entry(t('data_page.glance.tables'), counts | length) }}
+    {{ entry(t('data_page.glance.rows'), total, format="number") }}
+    {% call entry(t('data_page.glance.volume')) %}<code>cargo run -- demo:seed --size large</code>{% endcall %}
+  {% endcall %}
+
+  {% call card(t('data_page.tables.title'), subtitle=t('data_page.tables.lead')) %}
+    {%- for area in areas %}
+    <div class="rx-prose"><h3>{{ area.title }} · <a class="rx-link" href="{{ repository }}{{ area.file }}" target="_blank" rel="noopener"><code>{{ area.file | replace("examples/bikeshop/", "") }}</code></a></h3></div>
+    {% call table([t('data_page.tables.table'), t('data_page.tables.model'), t('data_page.tables.holds'), [t('data_page.tables.rows'), "num"]], caption=area.title) %}
+      {%- for table in area.tables %}
+      <tr>
+        <td><code>{{ table.name }}</code></td>
+        <td><code>{{ table.model }}</code></td>
+        <td>{{ table.holds }}</td>
+        <td class="rx-num">{{ counts[table.name] | default(0) | number }}</td>
+      </tr>
+      {%- endfor %}
+    {% endcall %}
+    {%- endfor %}
+  {% endcall %}
+
+  {% call card(t('data_page.relations.title'), subtitle=t('data_page.relations.lead')) %}
+    {% call table([t('data_page.relations.from'), t('data_page.relations.kind'), t('data_page.relations.to'), t('data_page.relations.how')], caption=t('data_page.relations.title')) %}
+      {%- for rel in relations %}
+      <tr><td><code>{{ rel.from }}</code></td><td>{{ rel.kind }}</td><td><code>{{ rel.to }}</code></td><td>{{ rel.how | markdown }}</td></tr>
+      {%- endfor %}
+    {% endcall %}
+  {% endcall %}
+
+  {% call card(t('data_page.pagila.title'), subtitle=t('data_page.pagila.lead')) %}
+    {% call table([t('data_page.pagila.pagila'), t('data_page.pagila.here')], caption=t('data_page.pagila.title')) %}
+      {%- for row in pagila %}
+      <tr><td><code>{{ row[0] }}</code></td><td>{{ row[1] }}</td></tr>
+      {%- endfor %}
+    {% endcall %}
+  {% endcall %}
+
+  {% call card(t('data_page.stores.title')) %}
+    <div class="rx-prose">{{ t('data_page.stores.text') | markdown }}</div>
+    {% call table([t('data_page.stores.record'), t('data_page.stores.owner'), t('data_page.stores.location'), t('data_page.stores.operating')], caption=t('data_page.stores.title')) %}
+      {%- for a in attributes %}
+      <tr><td><code>{{ a.record }}</code></td><td><code>{{ a.owner }}</code></td><td><code>{{ a.location }}</code></td><td><code>{{ a.operating }}</code></td></tr>
+      {%- endfor %}
+    {% endcall %}
+  {% endcall %}
+
+  {% call columns(2) %}
+    {% call card(t('data_page.money.title')) %}
+      <div class="rx-prose">{{ t('data_page.money.text') | markdown }}</div>
+      {% call infolist(inline=true) %}
+        {{ entry(t('data_page.money.stored'), "1250000") }}
+        {{ entry(t('data_page.money.shown'), 1250000, format="money") }}
+      {% endcall %}
+    {% endcall %}
+    {% call card(t('data_page.encrypted.title')) %}
+      <div class="rx-prose">{{ t('data_page.encrypted.text') | markdown }}</div>
+    {% endcall %}
+    {% call card(t('data_page.enums.title')) %}
+      <div class="rx-prose">{{ t('data_page.enums.text') | markdown }}</div>
+      {% call infolist() %}
+        {%- for e in enums %}
+        {% call entry(e.name) %}<span class="rx-subtitle"><code>{{ e.column }}</code></span> <span class="bs-badges">{% for v in e.values %}{{ badge(v) }}{% endfor %}</span>{% endcall %}
+        {%- endfor %}
+      {% endcall %}
+    {% endcall %}
+    {% call card(t('data_page.soft_deletes.title')) %}
+      <div class="rx-prose">{{ t('data_page.soft_deletes.text') | markdown }}</div>
+    {% endcall %}
+  {% endcall %}
+
+  {% call card(t('data_page.seed.title')) %}
+    <div class="rx-prose">{{ t('data_page.seed.text') | markdown }}</div>
+  {% endcall %}
+
+  {% call card(t('data_page.access.title'), subtitle=t('data_page.access.lead')) %}
+    <div class="rx-prose">{{ t('data_page.access.text') | markdown }}</div>
+    {% call table([t('data_page.access.role'), t('data_page.access.where'), t('data_page.access.grants')], caption=t('data_page.access.title')) %}
+      {%- for role in roles %}
+      <tr>
+        <td><strong>{{ role.label }}</strong> <code>{{ role.name }}</code><br><span class="rx-subtitle">{{ role.description }}</span></td>
+        <td>{% if role.global %}{{ badge(t('data_page.access.everywhere'), kind="info") }}{% else %}{{ badge(t('data_page.access.in_a_store')) }}{% endif %}</td>
+        <td><span class="bs-badges">{% for p in role.permissions %}{{ badge(p) }}{% endfor %}</span></td>
+      </tr>
+      {%- endfor %}
+    {% endcall %}
+    {% call infolist(columns=2) %}
+      {%- for p in permissions %}
+      {{ entry(p.name, p.description) }}
+      {%- endfor %}
+    {% endcall %}
+  {% endcall %}
+
+  <p>{{ link_button(route('about.pages'), t('about.index_link'), variant="secondary") }}</p>
+</div>
+{% endblock %}

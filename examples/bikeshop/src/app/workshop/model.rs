@@ -135,3 +135,23 @@ pub struct WorkOrderTask {
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
 }
+
+/// The work orders of a page of customers, through their bikes (customer →
+/// customer bikes → work orders), newest first, in two queries: Renox's
+/// `has_many_through`. Keyed by customer id.
+pub fn work_orders_of<'a>(
+    db: &'a Db,
+    customers: &[crate::app::accounts::model::Customer],
+) -> impl std::future::Future<Output = Result<std::collections::HashMap<i64, Vec<WorkOrder>>>> + Send + 'a
+{
+    renox::db::relations::has_many_through(
+        db,
+        customers,
+        CustomerBike::query(),
+        "customer_id",
+        |bike: &CustomerBike| bike.customer_id,
+        WorkOrder::query().order_by_desc("scheduled_for"),
+        "customer_bike_id",
+        |order: &WorkOrder| order.customer_bike_id,
+    )
+}

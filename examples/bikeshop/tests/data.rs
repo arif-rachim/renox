@@ -264,3 +264,59 @@ async fn search_finds_products_by_name_brand_and_sku() {
     let by_sku = Product::search(&sku).get(db).await.unwrap();
     assert!(by_sku.iter().any(|p| p.id == product.id), "{sku}");
 }
+
+#[renox::test]
+async fn customers_work_orders_load_through_their_bikes_in_two_queries() {
+    let app = TestApp::new(bikeshop::app()).await;
+    let db = app.db().clone();
+    seed::run(app.state().clone()).await.unwrap();
+    let customers = Customer::query()
+        .order_by("id")
+        .limit(30)
+        .get(&db)
+        .await
+        .unwrap();
+    let (found, queries) = renox::db::capture_queries(
+        bikeshop::app::workshop::model::work_orders_of(&db, &customers),
+    )
+    .await;
+    let found = found.unwrap();
+    assert_eq!(queries.len(), 2, "{queries:#?}");
+    assert!(found.values().any(|orders| !orders.is_empty()));
+    let total: usize = found.values().map(Vec::len).sum();
+    let expected: i64 = sql(
+        "SELECT COUNT(*) FROM work_orders w JOIN customer_bikes b ON b.id = w.customer_bike_id \
+         WHERE b.customer_id IN (SELECT id FROM customers WHERE deleted_at IS NULL ORDER BY id LIMIT 30)",
+    )
+    .scalar(&db)
+    .await
+    .unwrap();
+    assert_eq!(total as i64, expected);
+}
+
+#[renox::test]
+async fn the_data_page_explains_the_model_with_live_counts() {
+    let app = TestApp::new(bikeshop::app()).await;
+    seed::run(app.state().clone()).await.unwrap();
+    let rentals: i64 = sql("SELECT COUNT(*) FROM rentals")
+        .scalar(app.db())
+        .await
+        .unwrap();
+    let page = app.get("/about/data").await;
+    page.assert_ok()
+        .assert_view("about/data.html")
+        .assert_see("The data model")
+        .assert_see("<code>part_fits</code>")
+        .assert_see("<code>intercompany_entries</code>")
+        .assert_see("Owner, location and operating store")
+        .assert_see("waiting_parts")
+        .assert_see("rentals.checkout")
+        .assert_see(&renox::format_number(rentals as f64, 0, "en"))
+        // The panel explains the page too.
+        .assert_see("id=\"about-page\"");
+    for area in bikeshop::app::about::data::AREAS {
+        for table in area.tables {
+            page.assert_see(&format!("<code>{}</code>", table.name));
+        }
+    }
+}
