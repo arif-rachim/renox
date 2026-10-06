@@ -838,10 +838,15 @@
     var button = event.submitter || form.querySelector('button[type="submit"], button:not([type])');
     if (button && button.classList.contains("rx-button")) button.setAttribute("aria-busy", "true");
   });
-  // Back/forward cache: a page shown again is ready again.
-  window.addEventListener("pageshow", function () {
+  // Back/forward cache: a page shown again is ready again, with its sheets
+  // and menus closed as after any other way back (closing a sheet resets its
+  // action form, as Escape does).
+  window.addEventListener("pageshow", function (event) {
     document.querySelectorAll("[data-rx-sending]").forEach(function (form) { form.removeAttribute("data-rx-sending"); });
     document.querySelectorAll('.rx-button[aria-busy="true"]').forEach(function (b) { b.removeAttribute("aria-busy"); });
+    if (!event.persisted) return;
+    document.querySelectorAll("dialog.rx-sheet[open]").forEach(function (dialog) { dialog.close(); });
+    closeMenus(null);
   });
   document.addEventListener("htmx:beforeRequest", function (event) {
     var elt = event.detail && event.detail.elt;

@@ -817,6 +817,8 @@ def commands():
         assert "No scheduled tasks." in app.run("schedule:list").stdout
         out = app.run("schedule:list", env={"FIXTURE_TICK": "1"}).stdout
         assert "tick" in out and "UTC" in out, out
+        out = app.run("schedule:list", env={"FIXTURE_NEVER": "1"}).stdout
+        assert any(line.strip().startswith("never") and "never-on-the-hour" in line for line in out.splitlines()), out
 
         # Maintenance: the bypass and Retry-After, and `up` twice.
         out = app.run("down", "--secret", "let-me-in", "--retry", "60").stdout

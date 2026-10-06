@@ -791,6 +791,10 @@ async fn a_trial_without_a_payment_method_carries_over_to_the_checkout() {
     .assert_ok();
     app.run_jobs().await;
     app.assert_database_count("subscriptions", 1).await;
+    // The row now has the gateway's id: announced as an update.
+    app.assert_emitted::<SubscriptionUpdated>(|e| {
+        e.subscription.gateway_id.is_some() && e.previous_status == SubscriptionStatus::Trialing
+    });
     let subscription = app.at_travelled_time(latest(&app, &ana)).await;
     assert_eq!(subscription.gateway, "stripe");
     assert_eq!(subscription.status, SubscriptionStatus::Trialing);
@@ -2027,10 +2031,51 @@ async fn billing_changes_go_to_the_audit_log_with_amounts() {
     assert!(failed[0].contains("99000"), "{failed:?}");
 }
 
+/// What a test logs, through a subscriber of this thread only.
+fn capture_logs() -> (
+    std::sync::Arc<std::sync::Mutex<Vec<u8>>>,
+    tracing::subscriber::DefaultGuard,
+) {
+    #[derive(Clone)]
+    struct Sink(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+    impl std::io::Write for Sink {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Sink {
+        type Writer = Sink;
+        fn make_writer(&'a self) -> Sink {
+            self.clone()
+        }
+    }
+    let lines = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let subscriber = tracing_subscriber::fmt()
+        .with_writer(Sink(lines.clone()))
+        .with_ansi(false)
+        .finish();
+    (lines, tracing::subscriber::set_default(subscriber))
+}
+
 #[renox::test]
 async fn a_deleted_account_loses_its_rows_even_when_the_gateway_refuses() {
+    let (logs, _logged) = capture_logs();
     let app = app().await;
     let (ana, _) = subscribed(&app).await;
+    // An old subscription without a gateway id (a trial that never paid):
+    // nothing to cancel at the gateway, its row goes too.
+    renox::db::sql(
+        "INSERT INTO subscriptions (billable_type, billable_id, name, plan, gateway, status) \
+         VALUES ('user', ?, 'old', 'pro', '', 'trialing')",
+    )
+    .bind(ana.id)
+    .execute(app.db())
+    .await
+    .unwrap();
     app.fake_http().on(
         &format!("DELETE {STRIPE}/subscriptions/sub_1"),
         FakeResponse::json(500, json!({ "error": { "message": "try later" } })),
@@ -2042,6 +2087,16 @@ async fn a_deleted_account_loses_its_rows_even_when_the_gateway_refuses() {
     let _ = ana;
     app.assert_database_count("subscriptions", 0).await;
     app.assert_database_count("billing_customers", 0).await;
+    let logged = String::from_utf8(logs.lock().unwrap().clone()).unwrap();
+    assert!(
+        logged.contains("billing: couldn't cancel a deleted account's subscription"),
+        "{logged}"
+    );
+    assert_eq!(
+        logged.matches("couldn't cancel").count(),
+        1,
+        "only the one with a gateway id was cancelled there"
+    );
 }
 
 #[renox::test]

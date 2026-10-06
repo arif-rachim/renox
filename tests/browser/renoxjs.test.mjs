@@ -197,6 +197,17 @@ test('live reload: the stream opens, a template change reloads, and Back reopens
       await page.send('Page.addScriptToEvaluateOnNewDocument', {
         source: "addEventListener('pageshow', (e) => { window.__persisted = e.persisted; });",
       });
+      // Each close of the live stream is counted in sessionStorage, which
+      // outlives the page.
+      await page.send('Page.addScriptToEvaluateOnNewDocument', {
+        source: `const close = EventSource.prototype.close;
+          EventSource.prototype.close = function () {
+            if (String(this.url).includes('/_renox/live')) {
+              sessionStorage.setItem('liveClosed', String(Number(sessionStorage.getItem('liveClosed') || 0) + 1));
+            }
+            return close.call(this);
+          };`,
+      });
       await page.goto(`${live.url}/`);
       const until = Date.now() + 5000;
       while (!streams.length && Date.now() < until) await sleep(50);
@@ -210,7 +221,10 @@ test('live reload: the stream opens, a template change reloads, and Back reopens
       // Away and Back: the page left closes its stream (pagehide); restored
       // from the back/forward cache, it opens a new one (pageshow).
       const before = streams.length;
+      const closedBefore = await page.eval(() => Number(sessionStorage.getItem('liveClosed') || 0));
       await page.goto(`${live.url}/plain`);
+      const closed = await page.eval(() => Number(sessionStorage.getItem('liveClosed') || 0));
+      assert.equal(closed, closedBefore + 1, 'the page left closed its stream on pagehide');
       await page.eval(() => history.back());
       await page.waitFor(() => location.pathname === '/' && window.__persisted !== undefined, { message: 'back on /' });
       const persisted = await page.eval(() => window.__persisted);

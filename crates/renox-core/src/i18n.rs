@@ -748,6 +748,18 @@ impl<S: Send + Sync> FromRequestParts<S> for Lang {
 mod tests {
     use super::*;
 
+    /// Renox's own texts: English, English for a language without its own,
+    /// and the key itself for a text there isn't.
+    #[test]
+    fn builtin_texts_fall_back_to_english_then_the_key() {
+        assert_eq!(super::builtin_text("en", "ui.cancel"), "Cancel");
+        assert_eq!(super::builtin_text("xx", "ui.cancel"), "Cancel");
+        assert_eq!(
+            super::builtin_text("en", "ui.no-such-text"),
+            "ui.no-such-text"
+        );
+    }
+
     #[test]
     fn accept_language_picks_the_first_available() {
         let ours = |l: &str| matches!(l, "en" | "es" | "pt-br");

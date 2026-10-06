@@ -259,6 +259,18 @@ test('the code editor: its label, errors shown on it, a form reset, and the even
 test('editors brought in by htmx start; the module runs once', () =>
   onForm(async (page, loaded) => {
     await page.waitFor(() => !!document.querySelector('[data-rx-code-editor] [contenteditable]'));
+    // Listeners on the page itself (window and document), as DevTools counts
+    // them: an editor's own go on its elements and leave with them.
+    const pageListeners = async () => {
+      let count = 0;
+      for (const expression of ['window', 'document']) {
+        const { result } = await page.send('Runtime.evaluate', { expression });
+        const { listeners } = await page.send('DOMDebugger.getEventListeners', { objectId: result.objectId });
+        count += listeners.length;
+      }
+      return count;
+    };
+    const listenersBefore = await pageListeners();
     const modules = () => loaded.filter((p) => /\/editors-[0-9a-f]+\.js$/.test(p) || p.includes('/editors.js')).length;
     const before = modules();
     // The same form again, swapped into the page (with its <script> tag).
@@ -270,6 +282,9 @@ test('editors brought in by htmx start; the module runs once', () =>
     });
     await page.waitFor(() => document.querySelectorAll('.rx-editor__code').length === 2, { message: 'the new code editor started' });
     await page.waitFor(() => [...document.querySelectorAll('trix-editor')].every((t) => t.editor), { message: 'both Trix editors ready' });
+    // A second form's editors add nothing page-wide: their listeners are on
+    // their own elements (Trix shares one page listener among its editors).
+    assert.equal(await pageListeners(), listenersBefore, 'a second form added no page-wide listeners');
     assert.equal(modules(), before, 'editors.js not loaded again');
     // The original form removed; the new one's editors work, and a toolbar
     // button acts once (a second copy of the module would act twice).
@@ -282,4 +297,9 @@ test('editors brought in by htmx start; the module runs once', () =>
     await page.click('#swapped [data-rx-code-editor] [contenteditable]');
     await page.type('#swapped [data-rx-code-editor] [contenteditable]', '[1]');
     await page.waitFor(() => document.querySelector('#swapped textarea[name="settings"]').value === '[1]');
+    // One form left (the first was removed above): as many as at the start.
+    assert.equal(await pageListeners(), listenersBefore, 'the removed form took its listeners along');
+    // None left: nothing stays behind (Trix even takes its shared one away).
+    await page.eval(() => document.querySelector('#swapped').remove());
+    assert.ok((await pageListeners()) <= listenersBefore, 'removed editors left no page-wide listeners');
   }));

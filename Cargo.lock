@@ -2454,6 +2454,7 @@ dependencies = [
  "renox",
  "serde",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

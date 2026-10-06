@@ -711,7 +711,8 @@ async fn relation_loaders_and_pivots_with_nothing_to_do() {
         .unwrap();
     assert!(parents.is_empty());
 
-    let copy = LABEL_TAGS;
+    #[allow(clippy::clone_on_copy)] // `Clone` itself is what's tested
+    let copy = LABEL_TAGS.clone();
     let shown = format!("{copy:?}");
     assert!(
         shown.contains("label_tags") && shown.contains("timestamps: true"),

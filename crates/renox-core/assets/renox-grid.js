@@ -1135,10 +1135,24 @@
   // ---------- Polling ----------
 
   function busy(grid) {
-    return grid.querySelector(".rx-grid__editing, [popover]:popover-open, dialog[open], [data-grid-select]:checked, [aria-busy=true]") ||
-      grid.contains(document.activeElement) && document.activeElement.matches("input, select, textarea") ||
-      grid.classList.contains("htmx-request");
+    return inUse(grid) || grid.classList.contains("htmx-request");
   }
+
+  // The user is doing something in the grid: editing, a menu, a selection.
+  function inUse(grid) {
+    return grid.querySelector(".rx-grid__editing, [popover]:popover-open, dialog[open], [data-grid-select]:checked, [aria-busy=true]") ||
+      grid.contains(document.activeElement) && document.activeElement.matches("input, select, textarea");
+  }
+
+  // A poll sent just before the user started editing (or opened a menu)
+  // answers after it: its table would replace what they're doing. Drop it;
+  // the next poll comes once they're done.
+  document.addEventListener("htmx:beforeSwap", function (event) {
+    var grid = event.detail && event.detail.elt;
+    if (!grid || !grid._rxPolled) return;
+    grid._rxPolled = false;
+    if (inUse(grid)) event.detail.shouldSwap = false;
+  });
 
   function startPolling(grid) {
     var seconds = config(grid).poll;
@@ -1147,6 +1161,7 @@
       if (!document.body.contains(grid)) { clearInterval(grid._rxPoll); return; }
       if (document.visibilityState !== "visible" || busy(grid)) return;
       grid._rxKeepPage = true;
+      grid._rxPolled = true;
       submit(grid, true);
     }, seconds * 1000);
   }

@@ -1077,6 +1077,23 @@ async fn every_field_kind_is_drawn_on_the_edit_page_too() {
         .assert_hx_redirect("/admin/specs");
     let saved = Product::find(app.db(), coffee.id).await.unwrap().unwrap();
     assert_eq!(saved.name, "Strong coffee");
+    // And the other way: the edit-only notes sent with a create are ignored
+    // (what is read is the form, not what the page drew); the record is made.
+    app.htmx()
+        .post(
+            "/admin/specs",
+            &[
+                ("name", "Green tea"),
+                ("sku", "T-1"),
+                ("price", "3"),
+                ("status", "draft"),
+                ("notes", "not on this page"),
+            ],
+        )
+        .await
+        .assert_hx_redirect("/admin/specs");
+    app.assert_database_has("products", &[("name", &"Green tea")])
+        .await;
     // A form that doesn't pass: the answer is the form's (422 for htmx).
     app.htmx()
         .put(

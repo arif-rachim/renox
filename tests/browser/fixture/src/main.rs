@@ -334,6 +334,14 @@ fn main() -> Result {
             );
             Ok(())
         });
+    // A task that can never run (hourly, but only between 10:30 and 10:40),
+    // only when asked: `schedule:list` shows "never" (tests/process).
+    if std::env::var("FIXTURE_NEVER").is_ok() {
+        app = app.schedule(|s| {
+            s.hourly("never-on-the-hour", |_state| async { Ok(()) })
+                .between("10:30", "10:40");
+        });
+    }
     // A task every second, only when asked (tests/process).
     if std::env::var("FIXTURE_TICK").is_ok() {
         app = app.schedule(|s| {

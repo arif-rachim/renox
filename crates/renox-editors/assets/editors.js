@@ -289,6 +289,8 @@ function startCodeEditor(box, CodeJar, Prism) {
   editor.addEventListener("input", () => {
     sync(jar.toString());
     requestAnimationFrame(() => {
+      // Removed meanwhile (an htmx swap right after typing): nothing to repaint.
+      if (!editor.isConnected) return;
       const caret = jar.save();
       highlight(Prism, editor);
       jar.restore(caret);

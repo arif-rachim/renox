@@ -142,6 +142,21 @@ describe('as a guest', () => {
       }));
       assert.equal(pinned.pin, 'right');
       assert.match(pinned.offset, /px$/);
+      // And one to the left edge.
+      await page.waitFor(() => document.querySelector('#grid-orders-columns').matches(':popover-open'));
+      await redraw(page, () =>
+        page.eval(() => {
+          const pick = document.querySelector('[data-grid-pin="customer"]');
+          pick.value = 'left';
+          pick.dispatchEvent(new Event('change', { bubbles: true }));
+        }),
+      );
+      const left = await page.eval(() => ({
+        pin: document.querySelector('thead th[data-col="customer"]').dataset.pin,
+        offset: document.querySelector('tbody tr[data-id] td[data-col="customer"]').style.left,
+      }));
+      assert.equal(left.pin, 'left');
+      assert.match(left.offset, /px$/);
       // The menu opens again after the reload; reset brings the defaults back.
       await page.waitFor(() => document.querySelector('#grid-orders-columns').matches(':popover-open'));
       await redraw(page, () => page.click('[data-grid-reset]'));
@@ -177,7 +192,15 @@ describe('as a guest', () => {
       const width = () => page.eval(() => document.querySelector('thead th[data-col="region"]').style.width);
       await page.focus('thead th[data-col="region"] [data-grid-resize]');
       await page.press('ArrowRight', { shift: true });
-      assert.match(await width(), /px$/);
+      const widened = await width();
+      assert.match(widened, /px$/);
+      // Both are kept: after a reload the column is where it was dropped,
+      // and as wide as it was made.
+      await sleep(800); // the width is saved a moment after the last change
+      await page.goto(`${app.url}/?state=1`);
+      const reloaded = await order();
+      assert.equal(reloaded.indexOf('city'), reloaded.indexOf('customer') - 1, JSON.stringify(reloaded));
+      assert.equal(await width(), widened, 'the width came back');
       await page.eval(() =>
         document
           .querySelector('thead th[data-col="region"] [data-grid-resize]')
@@ -425,6 +448,40 @@ describe('logged in', () => {
   const cell = (key) => `tbody tr[data-id]:first-of-type td[data-col="${key}"]`;
   const editCell = (page, key) =>
     page.eval((s) => document.querySelector(s).dispatchEvent(new MouseEvent('dblclick', { bubbles: true })), cell(key));
+
+  test('polling waits while a cell is being edited', () =>
+    browser.with(async (page) => {
+      // Thirty seconds becomes a third of one, as in the guest's test.
+      await page.send('Page.addScriptToEvaluateOnNewDocument', {
+        source: `(() => { const set = window.setInterval; window.setInterval = (fn, ms, ...a) => set(fn, ms >= 30000 ? ms / 100 : ms, ...a); })();`,
+      });
+      const polls = [];
+      const urls = [];
+      page.on('Network.requestWillBeSent', (p) => {
+        if (p.request.headers['HX-Request'] && p.request.method === 'GET') {
+          polls.push(Date.now());
+          urls.push(p.request.url);
+        }
+      });
+      await page.goto(`${app.url}/?state=1`);
+      await page.settle();
+      await editCell(page, 'customer');
+      await page.waitFor((s) => !!document.querySelector(`${s} [data-grid-input]`), { message: 'a cell being edited' }, cell('customer'));
+      await page.type(`${cell('customer')} [data-grid-input]`, 'Half typed', { clear: true });
+      await sleep(200);
+      const editing = polls.length;
+      await sleep(1200);
+      // A poll sent just before the edit began must not redraw the table
+      // under it: what was typed is still there.
+      const kept = await page.eval((s) => document.querySelector(`${s} [data-grid-input]`)?.value ?? null, cell('customer'));
+      assert.equal(kept, 'Half typed', 'the edit survives the polling');
+      assert.equal(polls.length, editing, `no refresh while a cell is edited: ${JSON.stringify(urls.slice(editing))}`);
+      // Once the edit ends, polling goes on.
+      await page.press('Escape');
+      await sleep(1200);
+      assert.ok(polls.length > editing, 'refreshes again after the edit');
+      page.assertClean();
+    }));
 
   test('a cell edits in place: Enter saves, Escape cancels, a 422 shows in the cell', () =>
     onGrid(async (page) => {

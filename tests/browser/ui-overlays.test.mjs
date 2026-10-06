@@ -340,6 +340,17 @@ test('charts: a crosshair follows the pointer, scatter picks the nearest point, 
     await page.waitFor(() => !document.querySelector('#scatter .rx-chart__tip').hidden);
     assert.match(await tip('scatter'), /Large/);
 
+    // A bubble chart picks the nearest bubble the same way, near the small one.
+    await page.eval(() => document.querySelector('#bubble').scrollIntoView({ block: 'center' }));
+    await page.settle();
+    const bubble = await page.eval(() => {
+      const r = document.querySelector('#bubble .rx-chart__point[data-index="0"]').getBoundingClientRect();
+      return { x: r.left + r.width / 2 + 4, y: r.top + r.height / 2 - 4 };
+    });
+    await move(bubble.x, bubble.y);
+    await page.waitFor(() => !document.querySelector('#bubble .rx-chart__tip').hidden);
+    assert.match(await tip('bubble'), /Few/);
+
     // The keyboard: focus shows the last label, the arrows and Home move,
     // Escape hides.
     await move(1, 1);
@@ -448,3 +459,45 @@ test('the bell counts a new notification live in every tab, toasts it, and marks
     await other.close();
   }
 });
+
+// The owner's call (#266): a page shown again by Back from the back/forward
+// cache has its sheets and menus closed, as after any other way back.
+test('after Back, an open sheet and an open menu are closed', () => browser.with(async (page) => {
+  await page.send('Page.addScriptToEvaluateOnNewDocument', {
+    source: "addEventListener('pageshow', (e) => { window.__persisted = e.persisted; });",
+  });
+  const leaveAndComeBack = async () => {
+    // A navigation Chrome starts itself, so the page goes to the cache.
+    await page.goto(`${app.url}/stock`);
+    await page.eval(() => history.back());
+    await page.waitFor(() => window.__kept === true, { message: 'the overlays page shown again' });
+    assert.equal(await page.eval(() => window.__persisted), true, 'from the back/forward cache');
+  };
+
+  await page.goto(`${app.url}/overlays`);
+  await page.eval(() => { window.__kept = true; });
+  await page.click('[data-rx-open="trip-sheet"]');
+  await page.waitFor(() => document.querySelector('#trip-sheet').open);
+  await page.type('#rx-from', 'Lisbon');
+  await leaveAndComeBack();
+  // `close` (which resets the form) is its own task: wait for it.
+  await page.waitFor(() => !document.querySelector('#trip-sheet').open && document.querySelector('#rx-from').value === '', {
+    message: 'the sheet closed and its form reset',
+  }).catch(() => {});
+  const sheet = await page.eval(() => ({
+    open: document.querySelector('#trip-sheet').open,
+    from: document.querySelector('#rx-from').value,
+  }));
+  assert.equal(sheet.open, false, 'the sheet is closed');
+  assert.equal(sheet.from, '', 'and its form starts fresh, as after Escape');
+
+  await page.click('[aria-controls="more-menu"]');
+  await page.waitFor(() => !document.querySelector('#more-menu').hidden);
+  await leaveAndComeBack();
+  const menu = await page.eval(() => ({
+    hidden: document.querySelector('#more-menu').hidden,
+    expanded: document.querySelector('[aria-controls="more-menu"]').getAttribute('aria-expanded'),
+  }));
+  assert.deepEqual(menu, { hidden: true, expanded: 'false' });
+  page.assertClean();
+}));

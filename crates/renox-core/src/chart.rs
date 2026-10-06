@@ -2266,6 +2266,36 @@ mod tests {
         );
     }
 
+    /// Scatter and bubble data in every shape `read_points` takes, and a
+    /// line chart's `name` for its one series.
+    #[test]
+    fn points_come_in_every_shape() {
+        let nested = render(
+            r#"{{ chart("scatter", {"series": [{"name": "North", "points": [[1, 2]]}, {"name": "South", "points": [[3, 4]]}]}) }}"#,
+        );
+        assert!(
+            nested.contains(">North<") && nested.contains(">South<"),
+            "{nested}"
+        );
+        let listed = render(r#"{{ chart("scatter", [{"name": "East", "points": [[1, 2]]}]) }}"#);
+        // One series: drawn, without a legend to name it.
+        assert!(listed.contains(r#"data-index="0""#), "{listed}");
+        let pairs = render(r#"{{ chart("scatter", [[1, 2], [3, 4]], name="Pairs") }}"#);
+        assert!(pairs.contains(r#"data-index="1""#), "two points: {pairs}");
+        let one =
+            render(r#"{{ chart("bubble", {"name": "Sizes", "points": [[1, 2, 3], [2, 3, 9]]}) }}"#);
+        assert!(one.contains(r#"data-index="1""#), "{one}");
+        let kwarg = render(
+            r#"{{ chart("scatter", series=[{"name": "West", "points": [[5, 5]]}, {"name": "Far", "points": [[6, 6]]}]) }}"#,
+        );
+        assert!(
+            kwarg.contains(">West<") && kwarg.contains(">Far<"),
+            "{kwarg}"
+        );
+        let named = render(r#"{{ chart("line", [1, 2], name="Only") }}"#);
+        assert!(named.contains(">Only<"), "{named}");
+    }
+
     #[test]
     fn scatter_marks_the_zero_line() {
         let html = render(r#"{{ chart("scatter", points=[[-5, -10], [8, 20]]) }}"#);
