@@ -141,7 +141,7 @@ pub async fn record_counter(
     state: &AppState,
     charge: Charge,
     method: PaymentMethod,
-    received_by: i64,
+    received_by: impl Into<Option<i64>>,
 ) -> Result<Payment> {
     let payment = Payment::create(
         &state.db,
@@ -154,7 +154,9 @@ pub async fn record_counter(
             method,
             status: PaymentStatus::Paid,
             paid_at: Some(renox::db::now()),
-            received_by: Some(received_by),
+            // The staff row that took it; none for the owner, who has a
+            // global role but may not be on any store's staff.
+            received_by: received_by.into(),
             ..Default::default()
         },
     )

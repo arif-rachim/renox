@@ -1048,6 +1048,9 @@ async fn fleet(tx: &mut Transaction, world: &mut World) -> Result {
             bike.deposit = daily * 5;
             bike.asset_value = item.price * 7 / 10;
             bike.ridden_hours = world.rng.range(20, 1_500);
+            // Serviced recently for most bikes (up to 180 of the 200 hours
+            // between services), so only a few are due when the demo opens.
+            bike.serviced_at_hours = (bike.ridden_hours - world.rng.range(0, 180)).max(0);
             bike.purchased_on = Some(
                 today() - Duration::days(world.rng.range(60, world.volume.history_days + 300)),
             );
