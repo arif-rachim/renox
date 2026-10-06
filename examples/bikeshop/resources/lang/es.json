@@ -1,0 +1,97 @@
+{
+  "shop": {
+    "name": "Bike Shop",
+    "footer": "Un ejemplo de Renox: tres tiendas de bicicletas que venden, alquilan y reparan bicicletas."
+  },
+  "nav": {
+    "home": "Inicio",
+    "account": "Cuenta",
+    "staff": "Área del personal",
+    "login": "Iniciar sesión",
+    "register": "Registrarse",
+    "logout": "Cerrar sesión",
+    "dashboard": "Panel",
+    "shop": "Tienda",
+    "storefront": "Tienda en línea"
+  },
+  "home": {
+    "title": "Bicicletas para comprar, alquilar y seguir rodando",
+    "lead": "Tres tiendas, una sola casa: compra una bicicleta o equipo, alquila una por horas o por días, y llévala al taller cuando lo necesite.",
+    "buy": {
+      "title": "Comprar",
+      "text": "Bicicletas de carretera, de montaña, urbanas y eléctricas, cascos, luces, candados y los repuestos que le van a tu bicicleta."
+    },
+    "rent": {
+      "title": "Alquilar",
+      "text": "Recoge una bicicleta en cualquiera de nuestras tiendas por horas o por días, y devuélvela en la que te quede más cerca."
+    },
+    "service": {
+      "title": "Taller",
+      "text": "Una revisión puntual, o un plan de mantenimiento cuyas visitas se reservan solas, cada semana o cada mes."
+    },
+    "stores": {
+      "title": "Tres tiendas que trabajan juntas",
+      "text": "El personal ayuda en otras tiendas, las bicicletas van adonde hacen falta y las tiendas liquidan cuentas cada mes."
+    }
+  },
+  "staff": {
+    "dashboard": {
+      "title": "Panel",
+      "lead": "La trastienda de las tres tiendas.",
+      "empty_title": "Aún no hay nada aquí",
+      "empty_text": "Las ventas, los alquileres, el taller y el stock de cada tienda aparecerán aquí a medida que crezca el ejemplo."
+    }
+  },
+  "about": {
+    "button": "Sobre esta página",
+    "index_link": "Todas las páginas y sus funciones",
+    "panel": {
+      "who": "Quién la usa",
+      "roles": "Roles y flujo",
+      "features": "Funciones de Renox que usa, y por qué",
+      "under_hood": "Por dentro",
+      "docs": "En la guía",
+      "sources": "Archivos fuente",
+      "close": "Cerrar"
+    },
+    "pages": {
+      "title": "Todas las páginas y sus funciones",
+      "lead": "Cada página de la tienda, para qué sirve y las funciones de Renox que la hacen funcionar. Empieza por una función o por un rol.",
+      "filters": "Filtrar las páginas",
+      "feature": "Función de Renox",
+      "any_feature": "Cualquier función",
+      "audience": "La usa",
+      "anyone": "Cualquiera",
+      "filter": "Filtrar",
+      "clear": "Ver todas",
+      "count": ":shown de :total páginas",
+      "none_title": "Ninguna página coincide",
+      "none_text": "Ninguna página usa esa función para ese rol todavía."
+    },
+    "audience": {
+      "visitor": "Visitante",
+      "customer": "Cliente",
+      "staff": "Personal",
+      "cashier": "Cajero",
+      "mechanic": "Mecánico",
+      "manager": "Encargado de tienda",
+      "owner": "Dueño",
+      "developer": "Desarrollador"
+    },
+    "flow": {
+      "buy": "Comprar",
+      "rent": "Alquilar",
+      "service": "Taller",
+      "account": "Cuenta",
+      "back_office": "Trastienda",
+      "learn": "Aprender Renox"
+    }
+  },
+  "about_page": {
+    "home": {
+      "title": "Inicio",
+      "purpose": "La puerta de entrada de la tienda: lo que ofrecen las tres tiendas (comprar, alquilar, taller) y por dónde empezar.",
+      "who": "Cualquiera que abra el sitio: visitantes y clientes."
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, toolbar, select, button, link_button, list, badge, empty %}
+{% block seo %}{{ seo(title=t('about.pages.title'), description=t('about.pages.lead')) }}{% endblock %}
+
+{% block content %}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('about.pages.title'), subtitle=t('about.pages.lead')) }}
+  {#- A plain GET form: a filtered list has its own URL to share. -#}
+  <form method="get" action="{{ route('about.pages') }}" aria-label="{{ t('about.pages.filters') }}">
+    {% call toolbar() %}
+      {{ select("feature", t('about.pages.feature'), features, selected=feature, placeholder=t('about.pages.any_feature'), searchable=true) }}
+      {{ select("audience", t('about.pages.audience'), audiences, selected=audience, placeholder=t('about.pages.anyone')) }}
+      {{ button(t('about.pages.filter'), variant="secondary") }}
+      {%- if feature or audience %}{{ link_button(route('about.pages'), t('about.pages.clear'), variant="plain") }}{% endif %}
+    {% endcall %}
+  </form>
+  <p class="rx-subtitle" aria-live="polite">{{ t('about.pages.count', shown=pages | length, total=total) }}</p>
+  {%- if pages %}
+  {% call list(id="about-pages", label=t('about.pages.title')) %}
+    {%- for page in pages %}
+    <li>
+      <div class="rx-list__main bs-page-row">
+        <strong>{% if page.url %}<a class="rx-link" href="{{ page.url }}">{{ page.title }}</a>{% else %}{{ page.title }}{% endif %}</strong>
+        <span class="rx-subtitle"><code>{{ page.route }}</code> · {{ page.flow.label }}</span>
+        <span>{{ page.purpose | markdown }}</span>
+        <span class="bs-badges" aria-label="{{ t('about.panel.roles') }}">{% for role in page.audience %}{{ badge(role.label) }}{% endfor %}</span>
+        <span class="bs-badges" aria-label="{{ t('about.panel.features') }}">
+          {%- for f in page.features %}<a class="rx-link" href="{{ route('about.pages') }}?feature={{ f.api | urlencode }}">{{ badge(f.api, kind="info") }}</a>{% endfor -%}
+        </span>
+      </div>
+    </li>
+    {%- endfor %}
+  {% endcall %}
+  {%- else %}
+  <div class="rx-card">{{ empty(t('about.pages.none_title'), t('about.pages.none_text'), route('about.pages'), t('about.pages.clear')) }}</div>
+  {%- endif %}
+</div>
+{% endblock %}

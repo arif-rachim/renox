@@ -1,0 +1,19 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, columns, card, link_button %}
+{% block seo %}{{ seo(title=t('shop.name'), description=t('home.lead')) }}{% endblock %}
+
+{% block content %}
+<div class="rx-stack" data-bs-reveal>
+  {% call page_header(t('home.title'), subtitle=t('home.lead')) %}
+    {{ link_button(route('about.pages'), t('about.index_link')) }}
+  {% endcall %}
+  {#- Buy, rent, service: the three ways to use the shop, side by side on a
+      CSS grid (the kit's `columns`), one under the other on phones. -#}
+  {% call columns(3) %}
+    {% call card(t('home.buy.title')) %}<p>{{ t('home.buy.text') }}</p>{% endcall %}
+    {% call card(t('home.rent.title')) %}<p>{{ t('home.rent.text') }}</p>{% endcall %}
+    {% call card(t('home.service.title')) %}<p>{{ t('home.service.text') }}</p>{% endcall %}
+  {% endcall %}
+  {% call card(t('home.stores.title'), subtitle=t('home.stores.text')) %}{% endcall %}
+</div>
+{% endblock %}

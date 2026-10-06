@@ -1,0 +1,72 @@
+{
+  "shop": {
+    "name": "Bike Shop",
+    "footer": "A Renox example: three bike stores that sell, rent and service bikes."
+  },
+  "nav": {
+    "home": "Home",
+    "account": "Account",
+    "staff": "Staff area",
+    "login": "Log in",
+    "register": "Register",
+    "logout": "Log out",
+    "dashboard": "Dashboard",
+    "shop": "Shop",
+    "storefront": "Storefront"
+  },
+  "home": {
+    "title": "Bikes to buy, rent and keep riding",
+    "lead": "Three stores, one shop: buy a bike or gear, rent one by the hour or the day, and have it serviced when it needs it.",
+    "buy": {
+      "title": "Buy",
+      "text": "Road, mountain, city and electric bikes, helmets, lights, locks and the spare parts that fit your bike."
+    },
+    "rent": {
+      "title": "Rent",
+      "text": "Pick a bike up at any of our stores by the hour or the day, and bring it back to whichever is closest."
+    },
+    "service": {
+      "title": "Service",
+      "text": "A one-off tune-up, or a service plan whose visits are booked for you, weekly or monthly."
+    },
+    "stores": {
+      "title": "Three stores, working together",
+      "text": "Staff help each other's stores, bikes move to where riders need them, and the stores settle up every month."
+    }
+  },
+  "staff": {
+    "dashboard": {
+      "title": "Dashboard",
+      "lead": "The back office of the three stores.",
+      "empty_title": "Nothing here yet",
+      "empty_text": "Each store's sales, rentals, workshop and stock appear here as the example grows."
+    }
+  },
+  "about": {
+    "button": "About this page",
+    "index_link": "Every page and its features",
+    "panel": {
+      "who": "Who uses it",
+      "roles": "Roles and flow",
+      "features": "Renox features used, and why",
+      "under_hood": "Under the hood",
+      "docs": "In the guide",
+      "sources": "Source files",
+      "close": "Close"
+    },
+    "pages": {
+      "title": "Every page and its features",
+      "lead": "Each page of the bike shop, what it is for, and the Renox features that make it work. Start from a feature or from a role.",
+      "filters": "Filter the pages",
+      "feature": "Renox feature",
+      "any_feature": "Any feature",
+      "audience": "Used by",
+      "anyone": "Anyone",
+      "filter": "Filter",
+      "clear": "Show all",
+      "count": ":shown of :total pages",
+      "none_title": "No page matches",
+      "none_text": "No page uses that feature for that role yet."
+    }
+  }
+}
