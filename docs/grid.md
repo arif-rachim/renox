@@ -13,7 +13,8 @@ Here is what it does for you:
 - The server does the paging, sorting and filtering, and keeps them in the page's address
   (the URL). So a filtered page has a link of its own that you can bookmark or send.
 
-`examples/grid` in the repository is a sales dashboard built on it.
+`examples/grid` in the repository is a sales dashboard built on it. [examples/bikeshop](../examples/bikeshop), the flagship example,
+uses grids for a whole back office (a polled fleet board, report grids grouped, summed and exported).
 
 ### In this guide
 

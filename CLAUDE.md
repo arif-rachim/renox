@@ -339,6 +339,24 @@ examples/                  workspace members, each with a README.md and its own 
   billing/                 subscriptions made with renox-billing: three plans (Stripe, and
                            Xendit in IDR), trials without a card, require_subscription /
                            require_plan pages, a mail on PaymentFailed
+  bikeshop/                THE FLAGSHIP (epic #231): three bike stores that sell, rent and
+                           service, working together; every page explains itself. src/lib.rs
+                           (modules, plugins, layers, `App::report` → src/report.rs);
+                           src/explain.rs (the "About this page" registry and panel) + one
+                           folder per area in src/app/<area>/ (mod.rs routes, model.rs,
+                           factories.rs, explain.rs: an entry per GET route, tests/about.rs
+                           fails without one): about, access (permission catalogue, active
+                           store, ABAC policy: owner/location/operating store), accounts, api,
+                           catalog, home, multistore, plans, rentals, reports, sales, staff,
+                           stock, workshop; src/seed/ (`db:seed`, `demo:seed --size large`,
+                           test fixtures); resources/views/blocks/ + public/blocks/ (the
+                           "blocks": UI the kit lacks, kept in the example by the owner's
+                           decision); public/vendor/motion (motion.dev, vendored); errors/
+                           (default + 503); migrations for SQLite and PostgreSQL;
+                           Dockerfile + deploy/ (make:deploy); tests/<area>.rs,
+                           tests/queries.rs (main pages on the large seed, no N+1),
+                           tests/operations.rs; browser tests tests/browser/bikeshop-*.test.mjs.
+                           Code checks permissions, never role names (tests/access.rs)
 site/                      the documentation site (package `renox-site`, publish = false): a Renox
                            app that compiles the repo's Markdown in (src/content.rs lists the
                            pages, src/render.rs: pulldown-cmark, anchors, TOC, hidden doctest
@@ -369,8 +387,10 @@ tests/browser/            browser tests (#262, CI `browser`): run.sh builds the 
                            per-second task with FIXTURE_TICK); *.test.mjs for renox.js, the
                            kit's forms and overlays, the grid (grid, grid-more: examples/grid),
                            the editors (examples/fields), example flows (examples,
-                           examples-flows), a11y (an accessibility smoke) and assets.test.mjs
-                           (no top-level JS function declared twice)
+                           examples-flows), a11y (an accessibility smoke), assets.test.mjs
+                           (no top-level JS function declared twice) and bikeshop-*.test.mjs
+                           (each area of examples/bikeshop; bikeshop-walk: the main pages
+                           under CSP=strict). `run.sh 'bikeshop-*'` takes quoted patterns
 tests/process/            process e2e (#270): process.py (signals with a request in flight,
                            queue:work, two schedule:work, systemd's socket, LOG_FORMAT/LOG_FILE,
                            APP_KEY in production, db:shell, prompts from a pipe and a terminal
@@ -378,7 +398,9 @@ tests/process/            process e2e (#270): process.py (signals with a request
                            with a stand-in TAILWIND_BIN, `rnx build` with RNX_BUILD=1) on the
                            fixture; examples.py serves every example binary and GETs its pages
                            as a guest and logged in; `run.sh postgres` with PROCESS_POSTGRES
-                           runs the database checks and postgres-app/fields on PostgreSQL
+                           runs the database checks and postgres-app/fields/bikeshop on
+                           PostgreSQL (EXTRA_ENV: per-example variables, e.g. bikeshop's
+                           BIKESHOP_STAFF_2FA=optional)
 tests/tutorial/           run.sh + follow.py: docs/tutorial.md followed as a reader does (steps
                            found by their lead-in sentence, never line numbers), then fmt,
                            clippy, the tutorial's tests, seed, the app answering (CI `tutorial`).
@@ -721,9 +743,9 @@ PostgreSQL suite 2.5x slower (reconnects).
   docker run -d --rm --name renox-pg --shm-size=512m -e POSTGRES_PASSWORD=postgres \
       -e POSTGRES_DB=renox_test -p 55432:5432 postgres:17-alpine
   TEST_DATABASE_URL=postgres://postgres:postgres@localhost:55432/renox_test \
-      cargo test -p renox -p renox-core -p renox-cli -p postgres-app -p fields --features renox/postgres
+      cargo test -p renox -p renox-core -p renox-cli -p postgres-app -p fields -p bikeshop --features renox/postgres
   ```
-  Not the other examples (SQLite migrations).
+  Not the other examples (SQLite migrations); examples/bikeshop has both.
 - **S3:** `cargo test -p renox --features s3 --test it s3` with `TEST_S3_ENDPOINT`,
   `TEST_S3_BUCKET`, `TEST_S3_ACCESS_KEY_ID`, `TEST_S3_SECRET_ACCESS_KEY` (without them the tests do
   nothing). The SeaweedFS commands are at the top of `it/s3.rs`. With the same variables,
@@ -1371,6 +1393,15 @@ picks the build, not the terminal.
   focused its hidden select), #284 (`rx-shell` on phones), #285–#287 (grid date range, two
   grids on a page, default parameters in the URL), #288 (`rnx serve` left the app running on a
   signal). What stays untested is listed with its reason in that PR.
+- **#231, examples/bikeshop, the flagship example** (stories #232–#243, #245; one branch
+  `feat/issue-231-bikeshop`, one PR, a commit per story): a bike shop with three stores on
+  Pagila's shape and volume, every page explained ("About this page", `/about/pages`), RBAC +
+  ABAC on #244's roles per store, the plugins, a JSON API, dashboards and reports; the UI kit
+  plus the example's own "blocks" (the owner's decision on #231), Motion vendored. #243 wired
+  it into CI (`-p bikeshop` in the PostgreSQL job, tests/browser/run.sh, tests/process) and
+  added `tests/queries.rs` (the main pages on the large seed: same query count as the small
+  one). What Renox lacked became issues #299–#319 (listed in its README), worked around in the
+  example. Open in #243: the Spanish pass, the explanations' review, the owner's sign-off.
 - **Still open** (ROADMAP `- [ ]`): none of the plugins; `renox-2fa` (#146),
   `renox-oauth` (#147), `renox-admin` (#148) and `renox-billing` (#155) are done. A Laravel gap review after M25 (in the
   conversation that planned M26) ranked them: release and docs first, then 2FA and social

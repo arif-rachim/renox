@@ -3,7 +3,8 @@
 Find records by the words in them, the way people type into a search box: "roast coffee"
 finds the post titled "Roasting coffee at home", best matches first. Renox gives you one API
 on both databases: SQLite's FTS5 and PostgreSQL's `tsvector`. It is Renox's answer to
-Laravel Scout's database engine, without a separate search server.
+Laravel Scout's database engine, without a separate search server. [examples/bikeshop](../examples/bikeshop)'s
+catalogue search is a complete example on both databases.
 
 Three steps:
 
