@@ -1,0 +1,10 @@
+{#- A staff invitation (src/app/staff/team.rs): `store`, `role` (its label),
+    `inviter`, `link` (signed), `days`. -#}
+{% extends "renox/mail/layout.html" %}
+{% from "renox/mail/components.html" import button %}
+{% block content %}
+<p>{{ t('staff.invitations.mail.text', inviter=inviter, role=role, store=store.name) }}</p>
+{{ button(link, t('staff.invitations.mail.button')) }}
+<p>{{ t('staff.invitations.mail.expires', days=days) }}</p>
+<p>{{ t('staff.invitations.mail.two_factor') }}</p>
+{% endblock %}

@@ -15,6 +15,11 @@
     {#- --- Staff navigation (one line per area; append yours, behind the
         permission it needs: {% if can('…') %}…{% endif %}) --- -#}
     {{ sidebar_link(route('staff.dashboard'), t('nav.dashboard'), active=route_is('staff.dashboard')) }}
+    {%- if can('staff.manage') %}{{ sidebar_link(route('staff.team.index'), t('staff.nav.team'), active=route_is('staff.team.*') or route_is('staff.invitations.*')) }}{% endif %}
+    {%- if can('stores.manage') %}{{ sidebar_link(route('staff.stores.index'), t('staff.nav.stores'), active=route_is('staff.stores.*')) }}{% endif %}
+    {%- if can('roles.manage') %}{{ sidebar_link(route('staff.roles.index'), t('staff.nav.roles'), active=route_is('staff.roles.*')) }}{% endif %}
+    {%- if can('audit.view') %}{{ sidebar_link(route('staff.audit.index'), t('staff.nav.audit'), active=route_is('staff.audit.*')) }}{% endif %}
+    {%- if can('catalog.manage') or can('plans.manage') or can('purchasing.manage') or can('stores.manage') %}{{ sidebar_link(route('admin.dashboard'), t('staff.nav.admin')) }}{% endif %}
     {#- --- end of staff navigation --- -#}
     {{ sidebar_section(t('nav.shop')) }}
     {{ sidebar_link(route('home'), t('nav.storefront')) }}

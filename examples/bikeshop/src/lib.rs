@@ -86,6 +86,13 @@ pub fn app() -> App {
         .layer(renox::axum::middleware::from_fn(
             app::accounts::locale::middleware,
         ))
+        // The admin panel for the catalogue, workshop, suppliers and stores
+        // (renox-admin, authorized by permission: src/app/staff/admin.rs), and
+        // the editors its forms use (renox-editors).
+        .module(app::staff::admin::panel())
+        .module(renox_editors::Editors::new())
+        // The active store for the panel's pages too (src/app/staff/admin.rs).
+        .layer(renox::axum::middleware::from_fn(app::staff::admin::layer))
         // Staff without two-factor login are sent to set it up (src/app/staff/two_factor.rs).
         .layer(renox::axum::middleware::from_fn(
             app::staff::two_factor::middleware,

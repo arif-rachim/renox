@@ -1,0 +1,15 @@
+{#- `staff.audit.index`: the audit log on the data grid (src/app/staff/audit.rs).
+    Every heading filters; `data` is drawn here as the entry's JSON. -#}
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header %}
+{% from "renox/grid.html" import grid %}
+{% block seo %}{{ seo(title=t('staff.audit.title')) }}{% endblock %}
+
+{% block content %}
+<div class="rx-stack">
+  {{ page_header(t('staff.audit.title'), subtitle=t('staff.audit.lead')) }}
+  {% call(row, column) grid(entries) %}
+    {%- if column.key == "data" and row.data and row.data != "{}" %}<code>{{ row.data | truncate(120) }}</code>{% endif %}
+  {% endcall %}
+</div>
+{% endblock %}

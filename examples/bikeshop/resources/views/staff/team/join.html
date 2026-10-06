@@ -1,0 +1,30 @@
+{#- `staff.invitations.accept` (signed): the page an invitation opens
+    (src/app/staff/team.rs), in the shop's sign-in layout. `store`, `role`
+    (its label), `email`, `has_account`, `used`, `signed_in_as_invited`,
+    `action` (this signed address, which the form posts back to). -#}
+{% extends "renox/auth/layout.html" %}
+{% from "renox/ui.html" import card, input, button, alert, link_button %}
+{% block title %}{{ t('staff.join.title', store=store.name) }}{% endblock %}
+{% block content %}
+{% call card(title=t('staff.join.title', store=store.name), subtitle=t('staff.join.lead', role=role, store=store.name)) %}
+{%- if used %}
+{{ alert(t('staff.join.used'), kind="info") }}
+{{ link_button(route('login'), t('nav.login'), variant="primary") }}
+{%- elif has_account and not signed_in_as_invited %}
+{{ alert(t('staff.join.log_in_first', email=email), kind="info") }}
+{{ link_button(route('login'), t('nav.login'), variant="primary") }}
+{%- else %}
+<form method="post" action="{{ action }}" class="rx-stack" data-live-validate>
+  {{ csrf_field() }}
+  {%- if not has_account %}
+  {{ input("email_shown", t('staff.invitations.email'), value=email, readonly=true, id="join-email") }}
+  {{ input("name", t('staff.join.name'), required=true, autocomplete="name") }}
+  {{ input("password", t('staff.join.password'), type="password", revealable=true, required=true, autocomplete="new-password") }}
+  {{ input("password_confirmation", t('staff.join.password_confirmation'), type="password", revealable=true, required=true, autocomplete="new-password") }}
+  {%- endif %}
+  {{ button(t('staff.join.button'), block=true) }}
+  <p class="rx-subtitle">{{ t('staff.join.two_factor') }}</p>
+</form>
+{%- endif %}
+{% endcall %}
+{% endblock %}
