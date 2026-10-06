@@ -135,7 +135,13 @@ step "every generator"
 "$RNX" make:deploy
 
 step "make:component --ui forwards to the app's ui:publish"
-"$RNX" make:component --ui
+# A new app has the kit's files already: without --force they're kept (an
+# error), with it they're written again.
+if "$RNX" make:component --ui; then
+  echo "make:component --ui replaced the kit's files without --force" >&2
+  exit 1
+fi
+"$RNX" make:component --ui --force
 test -f resources/views/components/ui.html
 test -f public/css/renox-ui.css
 
