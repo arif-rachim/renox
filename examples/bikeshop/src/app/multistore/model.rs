@@ -11,10 +11,14 @@
 //! | late or damage fee on A's bike, served by B | `late_fee` / `damage_fee`: B owes A the fee |
 //! | sale at B of A's consigned goods | `sale_revenue`: B owes A the line; `selling_fee`: A owes B the fee |
 //! | B's workshop repairs A's rental bike | `repair`: A owes B the work order's total |
+//! | A's consigned goods missing at B's stock take | `consignment_loss`: B owes A their cost |
 //!
 //! The deposit stays with the store that served the customer; staff
 //! helping another store are never charged. Entries are summed per store
 //! pair into a monthly [`Settlement`], which the owner marks settled.
+//!
+//! [`super::books`] writes the entries (the one place that does);
+//! `settlements.rs` nets them into the monthly statements.
 //!
 //! Migration: `migrations/20260101001000_create_intercompany_tables.*`.
 
@@ -43,6 +47,9 @@ pub enum EntryKind {
     DamageFee,
     /// A repair of the debtor's rental bike by the creditor's workshop.
     Repair,
+    /// The creditor's consigned goods lost or damaged while the debtor
+    /// held them (a stock take found fewer), at cost.
+    ConsignmentLoss,
 }
 
 /// What an entry was booked for: `source_type` is `rentals`, `orders` or

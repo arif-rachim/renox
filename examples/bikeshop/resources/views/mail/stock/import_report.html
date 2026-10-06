@@ -1,0 +1,15 @@
+{#- The report of a price list imported in the background (src/app/stock/import.rs
+    `ImportPriceList`): the summary and the rows left out with their messages. -#}
+{% extends "renox/mail/layout.html" %}
+{% from "renox/mail/components.html" import table, button %}
+{% block content %}
+<p><strong>{{ summary }}</strong></p>
+{%- if failed %}
+<p>{{ t('stock.mail.import.failed') }}</p>
+{%- set ns = namespace(rows=[]) %}
+{%- for f in failed %}{% set ns.rows = ns.rows + [[t('stock.mail.import.row', row=f.row), f.messages]] %}{% endfor %}
+{{ table(ns.rows) }}
+{%- if more %}<p>{{ t('stock.mail.import.more', count=more) }}</p>{% endif %}
+{%- endif %}
+{%- if url %}{{ button(url, t('stock.mail.import.open')) }}{% endif %}
+{% endblock %}

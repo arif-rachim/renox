@@ -44,6 +44,10 @@ pub enum MovementReason {
     Reserved,
     /// Put back from `reserved`.
     Released,
+    /// A new bike taken from sale stock into the rental fleet (`−`).
+    ToFleet,
+    /// A rental bike retired into sale stock, to be sold as used (`+`).
+    FromFleet,
 }
 
 /// What caused a movement: `reference_type` is the table (`orders`,
@@ -173,7 +177,8 @@ pub struct Supplier {
     pub updated_at: Option<DateTime>,
 }
 
-/// Where a purchase order stands.
+/// Where a purchase order stands: draft → ordered (mailed to the
+/// supplier) → partial → received, or cancelled.
 #[derive(DbEnum, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PurchaseStatus {
     #[default]
@@ -199,6 +204,10 @@ pub struct PurchaseOrder {
     pub received_at: Option<DateTime>,
     pub total: i64,
     pub created_by: Option<i64>,
+    /// A note for the supplier, printed on the order.
+    pub note: Option<String>,
+    /// Drafted by the daily reorder check rather than by a person.
+    pub suggested: bool,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
 }
@@ -226,20 +235,47 @@ pub struct PurchaseOrderLine {
     pub updated_at: Option<DateTime>,
 }
 
-/// Where a consignment shipment stands.
+/// Where a consignment shipment stands (see `src/app/stock/consignment.rs`
+/// for who moves it on).
+///
+/// ```text
+/// requested ─→ approved ─→ sent ─→ partly received ─→ received ─→ recall requested ─→ recall sent ─→ recalled
+///     └─→ refused            └──────────────────────────↗
+/// ```
 #[derive(DbEnum, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ShipmentStatus {
-    /// Being put together by the owner store.
+    /// Being put together by the owner store (older rows; new shipments
+    /// start as requested or approved).
     #[default]
     Draft,
+    /// Asked for by the location store, waiting for the owner store.
+    Requested,
+    /// Approved by the owner store (or made by it), not shipped yet.
+    Approved,
+    /// The owner store said no.
+    Refused,
     /// On its way to the location store.
     Sent,
+    /// Some of it arrived; the rest is still on its way.
+    PartlyReceived,
     /// Arrived: the goods are at the location store, still the owner's.
     Received,
     /// The owner asked for what's left back.
     RecallRequested,
+    /// The location store sent what was left back; on its way home.
+    RecallSent,
     /// What was left is back at the owner store.
     Recalled,
+}
+
+impl ShipmentStatus {
+    /// Goods are between two stores (either way).
+    pub fn in_transit(self) -> bool {
+        matches!(
+            self,
+            ShipmentStatus::Sent | ShipmentStatus::PartlyReceived | ShipmentStatus::RecallSent
+        )
+    }
 }
 
 /// Goods sent by their owner store to another store, to be sold there on
@@ -256,6 +292,11 @@ pub struct ConsignmentShipment {
     pub recalled_at: Option<DateTime>,
     pub created_by: Option<i64>,
     pub note: Option<String>,
+    /// The user who asked for it (the location store's, or the owner's own).
+    pub requested_by: Option<i64>,
+    /// The user of the owner store who approved it.
+    pub approved_by: Option<i64>,
+    pub approved_at: Option<DateTime>,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
 }
@@ -279,9 +320,74 @@ pub struct ConsignmentShipmentLine {
     pub id: i64,
     pub shipment_id: i64,
     pub variant_id: i64,
+    /// Sent (or asked for, before it ships).
     pub quantity: i64,
     pub sold_quantity: i64,
+    /// Sent back to the owner store by a recall.
     pub returned_quantity: i64,
+    /// Arrived at the location store so far (a partial receipt is less).
+    pub received_quantity: i64,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
+}
+
+/// What one supplier sells and at what cost: their price list, kept by
+/// the price list import (`src/app/stock/import.rs`). The purchase order
+/// form and the reorder check pick a supplier's items from it.
+#[derive(Model, Serialize, Default, Debug, Clone)]
+#[model(table = "supplier_items")]
+pub struct SupplierItem {
+    pub id: i64,
+    pub supplier_id: i64,
+    pub variant_id: i64,
+    /// The supplier's price to us, in the smallest unit of `APP_CURRENCY`.
+    pub cost: i64,
+    pub created_at: Option<DateTime>,
+    pub updated_at: Option<DateTime>,
+}
+
+/// One stock level as the stock grid shows it: a row of the database view
+/// `stock_overview` (`migrations/20260101002400_add_stock_details.*`),
+/// which joins the level with its variant, product and category. A view
+/// rather than a join in Rust, so the grid can filter, sort, **group** and
+/// **sum** these columns like any of a model's own (`renox::grid` groups
+/// and sums only a model's columns). Read only: levels change through
+/// [`StockMovement::record`].
+#[derive(Model, Serialize, Default, Debug, Clone)]
+#[model(table = "stock_overview")]
+pub struct StockRow {
+    /// The stock level's id.
+    pub id: i64,
+    pub variant_id: i64,
+    pub owner_store_id: i64,
+    pub location_store_id: i64,
+    pub on_hand: i64,
+    pub reserved: i64,
+    pub available: i64,
+    pub sku: String,
+    pub size: Option<String>,
+    pub colour: Option<String>,
+    /// The variant's average cost.
+    pub cost: i64,
+    pub reorder_level: i64,
+    /// `on_hand × cost`.
+    pub value_at_cost: i64,
+    pub product_id: i64,
+    pub product: String,
+    pub category: String,
+    /// Bikes, gear or parts.
+    pub category_kind: crate::app::catalog::model::CategoryKind,
+    pub updated_at: Option<DateTime>,
+}
+
+impl StoreRecord for StockRow {
+    const VIEW: &'static str = catalogue::STOCK_VIEW;
+    const STORE_COLUMNS: &'static [&'static str] = &["owner_store_id", "location_store_id"];
+
+    fn store_id(&self, attr: StoreAttr) -> Option<i64> {
+        match attr {
+            StoreAttr::Owner => Some(self.owner_store_id),
+            StoreAttr::Location | StoreAttr::Operating => Some(self.location_store_id),
+        }
+    }
 }

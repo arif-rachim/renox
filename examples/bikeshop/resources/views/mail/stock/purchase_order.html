@@ -1,0 +1,13 @@
+{#- A purchase order mailed to the supplier (src/app/stock/purchasing.rs `send`): the lines and a
+    signed link to the printable page. -#}
+{% extends "renox/mail/layout.html" %}
+{% from "renox/mail/components.html" import table, button %}
+{% block content %}
+<p><strong>{{ t('stock.mail.purchase_order.hello', supplier=supplier.name) }}</strong></p>
+<p>{{ t('stock.mail.purchase_order.body', number=order.id, store=store.name) }}</p>
+{%- set ns = namespace(rows=[]) %}
+{%- for l in lines %}{% set ns.rows = ns.rows + [[l.quantity ~ " × " ~ l.name ~ " (" ~ l.sku ~ ")", l.total | money]] %}{% endfor %}
+{%- set ns.rows = ns.rows + [[t('stock.purchasing.total'), order.total | money]] %}
+{{ table(ns.rows) }}
+{{ button(url, t('stock.mail.purchase_order.open')) }}
+{% endblock %}

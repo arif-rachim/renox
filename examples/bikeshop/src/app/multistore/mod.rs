@@ -4,6 +4,8 @@
 //! in `resources/views/multistore/`, its tests in `tests/multistore.rs`, and the
 //! "About this page" entry of every GET route it adds in `explain.rs`.
 
+pub mod audit;
+pub mod books;
 pub mod explain;
 pub mod factories;
 pub mod model;
