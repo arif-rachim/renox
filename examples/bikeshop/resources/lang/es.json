@@ -643,7 +643,7 @@
       "who": "Encargados de tienda y el dueño (`staff.help`).",
       "under_hood": "Cuatro consultas: las horas agrupadas, las fichas de personal, sus usuarios y las tiendas.",
       "features": {
-        "0": "`permissions::scopes_with::<Store>(\"staff.help\")` da las tiendas en las que la persona tiene `staff.help`, y `Scopes::apply` se queda con las horas trabajadas en esas tiendas: un encargado ve la ayuda que recibió su tienda, el rol global del dueño ve todas las tiendas, sin comprobar ningún nombre de rol.",
+        "0": "`permissions::scopes_with::<Store>(\"staff.help\")` da las tiendas en las que la persona tiene `staff.help`, y la consulta se queda con las horas trabajadas en esas tiendas **o** por personas cuya tienda de origen es una de ellas: un encargado ve la ayuda que recibió su tienda y la que su propia gente dio en otras; el rol global del dueño (`Scopes::All`) ve todas las tiendas, sin comprobar ningún nombre de rol.",
         "1": "Una sola consulta agrupada (`group_by` + `select_as`: `COUNT(DISTINCT worked_on)`, `SUM(minutes)`) por persona y tienda: suma la base de datos, en vez de cargar cada fila de horas en Rust.",
         "2": "El total de horas y el número de líneas como estadísticas del kit, las líneas como su tabla: una página de informe hecha con piezas del kit, nada hecho a mano."
       }

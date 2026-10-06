@@ -186,9 +186,11 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "scopes_with",
                     why: "`permissions::scopes_with::<Store>(\"staff.help\")` gives the stores \
-                          the person holds `staff.help` in, and `Scopes::apply` keeps the hours \
-                          worked in those stores: a manager sees the help their store received, \
-                          the owner's global role sees every store, with no role name checked.",
+                          the person holds `staff.help` in, and the query keeps the hours \
+                          worked in those stores **or** by people whose home store is one of \
+                          them: a manager sees the help their store received and the help \
+                          their own people gave elsewhere; the owner's global role \
+                          (`Scopes::All`) sees every store, with no role name checked.",
                 },
                 Feature {
                     api: "Query<T>",
