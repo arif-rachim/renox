@@ -740,7 +740,8 @@ components follow by themselves. They're worth keeping in an app's own pages too
   - A button shows it's working (a spinner, `aria-busy`) and can't be pressed twice.
   - A toast confirms what happened and names the thing ("“Espresso” moved to the trash").
   - Success and info toasts go away by themselves, but wait while the mouse is over them or
-    they have focus. Error toasts stay until dismissed.
+    they have focus. Error toasts stay until dismissed. Escape closes the toast that has the
+    focus, else the newest one, once nothing else that Escape closes is open.
 - **Forgiveness** (mistakes are easy to avoid and undo).
   - Destructive actions ask first, with Cancel focused.
   - Live validation checks a field when you leave it, then again as you correct it. It never
