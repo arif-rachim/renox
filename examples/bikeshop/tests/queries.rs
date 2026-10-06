@@ -152,5 +152,9 @@ async fn main_pages_cost_the_same_queries_on_the_large_seed() {
             problems.push(format!("{page}: {many} queries (more than {CEILING})"));
         }
     }
-    assert!(problems.is_empty(), "N+1 suspects:\n{}", problems.join("\n"));
+    assert!(
+        problems.is_empty(),
+        "N+1 suspects:\n{}",
+        problems.join("\n")
+    );
 }
