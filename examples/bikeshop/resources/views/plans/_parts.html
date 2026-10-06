@@ -1,0 +1,22 @@
+{#- Small pieces the plans pages share (#237). -#}
+{% from "renox/ui.html" import badge %}
+
+{#- The pages' own styles and behaviour (public/plans/), once, through the
+    layout's head and scripts stacks. -#}
+{% macro assets() -%}
+{% call push('head', once='plans-css') %}<link rel="stylesheet" href="{{ asset('plans/plans.css') }}">{% endcall %}
+{% call push('scripts', once='plans-js') %}<script src="{{ asset('plans/plans.js') }}" nonce="{{ csp_nonce() }}"></script>{% endcall %}
+{%- endmacro %}
+
+{#- A plan's state as a badge (`active`, `paused`, `held`, `ending`,
+    `pending`, `cancelled`): the tone and the word agree. -#}
+{% macro status(key) -%}
+{%- set tones = {"active": "success", "paused": none, "held": "error", "ending": "warning", "pending": "info", "cancelled": none} %}
+{{ badge(t('plans.status.' ~ key), kind=tones[key]) }}
+{%- endmacro %}
+
+{#- A visit's state as a badge. -#}
+{% macro visit_status(key) -%}
+{%- set tones = {"scheduled": "info", "done": "success", "skipped": none, "missed": "warning", "held": "error", "cancelled": none} %}
+{{ badge(t('plans.visit_status.' ~ key), kind=tones[key]) }}
+{%- endmacro %}

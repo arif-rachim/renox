@@ -1,0 +1,29 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, link_button %}
+{% from "blocks/compare_plans.html" import compare_plans %}
+{% from "plans/_parts.html" import assets %}
+{% block seo %}{{ seo(title=t('plans.index.title'), description=t('plans.index.lead')) }}{% endblock %}
+
+{#- The service plans compared (#237): the shop's `compare_plans` block
+    (cards on a CSS grid, then a table, task by task). Prices are a month. -#}
+{% block content %}
+{{ assets() }}
+<div class="rx-stack">
+  {{ page_header(t('plans.index.title'), subtitle=t('plans.index.lead')) }}
+  <div class="bs-plans-page" data-bs-reveal>
+    {{ compare_plans(cards, rows, highlight=highlight, label=t('plans.index.title')) }}
+    <section class="rx-card bs-plans-page__how" aria-labelledby="plans-how">
+      <h2 class="rx-card__title" id="plans-how">{{ t('plans.index.how_title') }}</h2>
+      <ol class="bs-plans-steps">
+        <li>{{ t('plans.index.how_1') }}</li>
+        <li>{{ t('plans.index.how_2') }}</li>
+        <li>{{ t('plans.index.how_3') }}</li>
+      </ol>
+      <div class="bs-plans-page__actions">
+        {%- if auth.check %}{{ link_button(route('plans.mine'), t('plans.mine.title'), variant="secondary") }}{% endif %}
+        {{ link_button(route('plans.mails'), t('plans.mails.title'), variant="plain") }}
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

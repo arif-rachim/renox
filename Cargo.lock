@@ -312,7 +312,9 @@ name = "bikeshop"
 version = "0.0.0"
 dependencies = [
  "renox",
+ "renox-billing",
  "serde",
+ "tracing",
 ]
 
 [[package]]

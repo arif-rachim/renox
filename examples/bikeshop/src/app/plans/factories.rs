@@ -17,6 +17,7 @@ impl Factory for ServicePlan {
             price: 250_000,
             description: "Regular care for your bike.".into(),
             active: true,
+            parts_discount_bp: 1_000,
             ..Default::default()
         }
     }
@@ -48,6 +49,10 @@ pub trait SubscriptionStates {
     fn due_soon(self) -> Self;
     /// Cancelled last week.
     fn cancelled(self) -> Self;
+    /// Paid online by `user_id` through `gateway` (`stripe`, `demo`…).
+    fn online(self, user_id: i64, gateway: &str) -> Self;
+    /// Paused by the customer.
+    fn paused(self) -> Self;
 }
 
 impl SubscriptionStates for FactoryBuilder<PlanSubscription> {
@@ -68,6 +73,21 @@ impl SubscriptionStates for FactoryBuilder<PlanSubscription> {
             s.status = SubscriptionStatus::Cancelled;
             s.next_visit_on = None;
             s.cancelled_at = Some(renox::db::now() - Duration::days(7));
+        })
+    }
+
+    fn online(self, user_id: i64, gateway: &str) -> Self {
+        let gateway = gateway.to_owned();
+        self.state(move |s| {
+            s.user_id = Some(user_id);
+            s.gateway = gateway.clone();
+        })
+    }
+
+    fn paused(self) -> Self {
+        self.state(|s| {
+            s.status = SubscriptionStatus::Paused;
+            s.paused_at = Some(renox::db::now());
         })
     }
 }

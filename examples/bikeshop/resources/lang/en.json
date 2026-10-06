@@ -1298,5 +1298,225 @@
         "body": "The customer answered the proposal of :total."
       }
     }
+  },
+  "plans": {
+    "nav": "Service plans",
+    "index": {
+      "title": "Service plans",
+      "lead": "Your bike looked after on a schedule: pick a plan, a store and a weekday, and we book the visits for you.",
+      "choose": "Choose this plan",
+      "how_title": "How a plan works",
+      "how_1": "Choose one of your bikes, a plan, the store whose workshop looks after it and the weekday that suits you.",
+      "how_2": "Pay monthly by card (or through Xendit, in rupiah). Each visit is booked a week ahead on your weekday, or the next day with room.",
+      "how_3": "Skip or move a visit, change plan from the next month, pause, or cancel at the end of the month you paid for."
+    },
+    "every": {
+      "weekly": "A visit every week",
+      "fortnightly": "A visit every two weeks",
+      "monthly": "A visit every month",
+      "quarterly": "A visit every three months"
+    },
+    "frequency": {
+      "weekly": "Weekly",
+      "fortnightly": "Every two weeks",
+      "monthly": "Monthly",
+      "quarterly": "Every three months"
+    },
+    "perks": {
+      "discount": ":percent % off spare parts"
+    },
+    "compare": {
+      "how_often": "How often",
+      "per_visit": "Price a visit",
+      "discount": "Discount on parts",
+      "flexible": "Skip or move a visit"
+    },
+    "fields": {
+      "bike": "Bike",
+      "plan": "Plan",
+      "store": "Home store",
+      "weekday": "Preferred weekday",
+      "pay_with": "Pay with",
+      "monthly": "Price a month",
+      "first_visit": "First visit",
+      "next_visit": "Next visit",
+      "visits_done": "Visits done",
+      "last_invoice": "Last payment",
+      "status": "Status",
+      "discount": "Discount on parts",
+      "gateway": "Paid through",
+      "renews": "Renews on",
+      "ends": "Ends on",
+      "amount": "Amount",
+      "day": "Day"
+    },
+    "weekday": {
+      "mon": "Monday",
+      "tue": "Tuesday",
+      "wed": "Wednesday",
+      "thu": "Thursday",
+      "fri": "Friday",
+      "sat": "Saturday",
+      "sun": "Sunday"
+    },
+    "pay_with": {
+      "stripe": "Card (Stripe)",
+      "demo": "Demo card (no real money)",
+      "xendit": "Card or e-wallet in rupiah (Xendit)",
+      "counter": "At the store's counter"
+    },
+    "subscribe": {
+      "title": "Subscribe a bike",
+      "lead": "Choose the bike, the plan and when it suits you; you pay on the next page.",
+      "no_bike": "Add your bike first",
+      "no_bike_text": "A plan looks after one of your bikes: add it to your bikes, then come back.",
+      "all_taken": "Every bike has a plan",
+      "all_taken_text": "A bike can have one plan at a time. Change a bike's plan from its page.",
+      "no_gateway": "Plans can't be paid online right now. Ask at a store.",
+      "store_hint": "Its workshop does the visits.",
+      "when": "When",
+      "weekday_hint": "Days the store is closed aren't offered.",
+      "summary": "Summary",
+      "pick_day": "Pick a weekday",
+      "billing_hint": "Charged monthly from today. Visits start the week after the payment is confirmed.",
+      "submit": "Continue to payment"
+    },
+    "status": {
+      "active": "Running",
+      "paused": "Paused",
+      "held": "On hold",
+      "ending": "Ending",
+      "pending": "Waiting for payment",
+      "cancelled": "Ended"
+    },
+    "visit_status": {
+      "scheduled": "Booked",
+      "done": "Done",
+      "skipped": "Skipped",
+      "missed": "Missed",
+      "held": "On hold",
+      "cancelled": "Cancelled"
+    },
+    "mine": {
+      "title": "My plans",
+      "lead": "Your bikes' service plans, their next visits and what you paid.",
+      "none": "No plan yet",
+      "none_text": "A plan books your bike's visits for you.",
+      "open": "Visits and changes",
+      "past": "Plans that ended",
+      "counter": "Paid at the store"
+    },
+    "show": {
+      "title": "Plan for :bike",
+      "upcoming": "Upcoming visits",
+      "past": "Past visits",
+      "details": "The plan",
+      "due": "due :day",
+      "move": "Move",
+      "move_title": "Move this visit",
+      "move_text": "Pick another day with room at the workshop.",
+      "skip": "Skip",
+      "skip_title": "Skip this visit?",
+      "skip_text": "The workshop frees the slot. Your next visit comes as planned.",
+      "keep": "Keep it",
+      "no_upcoming": "No visit booked yet",
+      "no_upcoming_text": "Visits are booked a week ahead, every morning.",
+      "work_order": "Work order #:number",
+      "swap": "Change plan",
+      "swap_title": "Change plan",
+      "swap_text": "The new plan and its price start with the next month; this month's visits stay as they are.",
+      "pause": "Pause visits",
+      "unpause": "Resume visits",
+      "resume": "Keep the plan",
+      "cancel": "Cancel plan",
+      "cancel_title": "Cancel the plan?",
+      "cancel_text": "Visits go on until the end of the month you paid for; nothing more is charged.",
+      "cancel_now_text": "The plan ends now and its booked visits are cancelled.",
+      "keep_plan": "Keep the plan",
+      "invoices": "Payments",
+      "no_invoices": "No payment yet.",
+      "pending": "The payment is being confirmed. Your first visits are booked as soon as it is.",
+      "held": "The last payment failed. Your visits are on hold until it is paid; the payment provider tries again.",
+      "ending": "The plan was cancelled: visits go on until :day.",
+      "paused_note": "No visits are booked while the plan is paused.",
+      "next_plan": "The plan changes to :plan on :day.",
+      "swapped": "The plan changes with the next month.",
+      "paused": "Visits paused.",
+      "unpaused": "Visits are back on.",
+      "cancelled": "The plan ends with the month you paid for.",
+      "ended": "The plan has ended.",
+      "resumed": "The plan goes on.",
+      "skipped": "Visit skipped.",
+      "moved": "Visit moved to :day."
+    },
+    "invoice": {
+      "date": "Date",
+      "paid": "Paid",
+      "failed": "Failed"
+    },
+    "errors": {
+      "bike": "Choose one of your bikes.",
+      "one_plan": "This bike has a plan already: a bike can have one plan at a time.",
+      "not_sold": "This plan isn't sold any more.",
+      "closed": "The store is closed on that day.",
+      "pay_with": "That way of paying isn't available.",
+      "gateway": "The payment provider didn't answer. Please try again.",
+      "not_running": "The plan isn't running.",
+      "not_scheduled": "This visit isn't booked any more.",
+      "too_late": "This visit can't change any more: its day has come.",
+      "on_hold": "Your visits are on hold until the last payment goes through."
+    },
+    "mail": {
+      "started": {
+        "title": "Your :plan plan has started",
+        "body": "Thank you! :bike is on the :plan plan. We'll book its visits and remind you the day before each."
+      },
+      "renewed": {
+        "title": "Your :plan plan is renewed",
+        "body": "We received :amount for :bike's :plan plan. Thank you!"
+      },
+      "failed": {
+        "title": "Your payment for :plan didn't go through",
+        "body": "We couldn't take :amount for :bike's plan. The visits are on hold until it is paid; the payment provider tries again in a few days, so please check your payment method."
+      },
+      "visit": {
+        "title": "Visit booked on :day",
+        "body": "Your plan's next visit is booked for :day (work order #:number). Skip it or move it from your plan's page."
+      },
+      "missed": {
+        "title": "We missed you on :day",
+        "body": "Your bike didn't come in for its plan visit on :day. The next visit comes as planned."
+      }
+    },
+    "mails": {
+      "title": "The plans' mails",
+      "lead": "Every mail a service plan sends, for a made-up subscriber.",
+      "sent_by": "Sent on",
+      "started": "Plan started",
+      "renewed": "Plan renewed",
+      "failed": "Payment failed",
+      "visit": "Visit booked",
+      "missed": "Visit missed"
+    },
+    "demo": {
+      "title": "Demo payment",
+      "merchant": "Paying :shop",
+      "notice_title": "No real money",
+      "notice": "This page stands in for Stripe's or Xendit's while their keys aren't set. Nothing is charged.",
+      "pay": "Pay :amount",
+      "decline": "Decline (the payment fails)",
+      "renewing": "The renewal is on its way: refresh in a moment.",
+      "renew_title": "Demo: next month's payment",
+      "renew_text": "A real gateway charges each month on its own; try it here.",
+      "renew_paid": "Renew, paid",
+      "renew_failed": "Renew, payment fails"
+    },
+    "billing_page": {
+      "lead": "Our plans look after one bike each: choose one, then the bike."
+    },
+    "account": {
+      "title": "Service plans",
+      "lead": "Your bikes' plans, visits and payments."
+    }
   }
 }

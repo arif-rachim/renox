@@ -6,4 +6,8 @@ publish = false
 
 [dependencies]
 renox.workspace = true
+# Service plans billed as subscriptions (#237): Stripe, and Xendit for IDR.
+renox-billing.workspace = true
 serde = { version = "1.0.229", features = ["derive"] }
+# Logs a gateway that didn't answer, and a plan visit that found no room (#237).
+tracing = "0.1.44"
