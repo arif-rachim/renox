@@ -38,6 +38,7 @@ use super::reserve::money;
 use super::{FleetRepairNeeded, RentalClosed, active_store, identity, staff_id};
 use crate::app::access::{self, StoreAttr, catalogue};
 use crate::app::accounts::model::Customer;
+use crate::app::accounts::preferences::Kind;
 use crate::app::sales::model::{PAYABLE_RENTAL, Payment, PaymentMethod, PaymentStatus};
 use crate::app::sales::payments::{self, Charge, Payable};
 use crate::app::staff::model::Store;
@@ -588,6 +589,7 @@ pub async fn take_back(
         notify::customer(
             state,
             &customer,
+            Kind::Rental,
             &Notice::new(
                 "rental-returned",
                 "rentals.mail.returned.title",

@@ -393,6 +393,136 @@ async fn preferences_decide_the_channels() {
         .assert_invalid("order");
 }
 
+/// Saves `user`'s choices through the account page.
+async fn choose(app: &TestApp, user: &User, choices: [(&str, &str); 5]) {
+    app.acting_as(user);
+    app.put("/account/notifications", &choices)
+        .await
+        .assert_redirect("/account");
+}
+
+/// The kinds of `user`'s in-app notifications, oldest first.
+async fn in_app(app: &TestApp, user: &User) -> Vec<String> {
+    renox::db::sql("SELECT kind FROM notifications WHERE user_id = ? ORDER BY id")
+        .bind(user.id)
+        .scalars(app.db())
+        .await
+        .unwrap()
+}
+
+/// How many mails went to `email` (after running the queued ones).
+async fn mails_to(app: &TestApp, email: &str) -> usize {
+    app.run_jobs().await;
+    app.sent_mail()
+        .iter()
+        .filter(|m| m.to.iter().any(|t| t.contains(email)))
+        .count()
+}
+
+#[renox::test]
+async fn every_area_asks_the_customers_preferences() {
+    use bikeshop::app::rentals::factories::{RentalStates, rentals};
+    use bikeshop::app::sales::notify::{Moment, tell};
+    use bikeshop::app::workshop::factories::{WorkOrderStates, work_orders};
+
+    let app = boot().await;
+    let db = app.db();
+    let state = app.state();
+    let north = fixtures::store(db, "North").await.unwrap();
+    let email = "nia@example.com";
+    let user = sign_up(&app, "Nia", email).await;
+    let customer = Customer::of_user(db, user.id).await.unwrap().unwrap();
+    choose(
+        &app,
+        &user,
+        [
+            ("order", "in_app"),
+            ("rental", "mail"),
+            ("workshop", "none"),
+            ("plan", "both"),
+            ("marketing", "none"),
+        ],
+    )
+    .await;
+    let mails = mails_to(&app, email).await;
+
+    // Rentals by mail only: the reminder is mailed, the bell stays quiet.
+    let bike = fixtures::bike(db, north.id, north.id).await.unwrap();
+    let mut rental = rentals()
+        .of_bike(&bike)
+        .for_customer(customer.id)
+        .active()
+        .create_one(db)
+        .await
+        .unwrap();
+    rental.due_at = renox::db::now() + renox::chrono::Duration::minutes(30);
+    rental.save(db).await.unwrap();
+    bikeshop::app::rentals::tasks::reminders(state)
+        .await
+        .unwrap();
+    assert_eq!(mails_to(&app, email).await, mails + 1, "rentals: mail");
+    assert!(in_app(&app, &user).await.is_empty(), "rentals: no bell");
+
+    // The workshop not at all.
+    let bike = customer_bikes_of(customer.id).create_one(db).await.unwrap();
+    let order = work_orders()
+        .at(north.id)
+        .on_bike(bike.id)
+        .waiting_parts()
+        .create_one(db)
+        .await
+        .unwrap();
+    bikeshop::app::workshop::status::tell_customer(state, &order)
+        .await
+        .unwrap();
+    assert_eq!(mails_to(&app, email).await, mails + 1, "workshop: no mail");
+    assert!(in_app(&app, &user).await.is_empty(), "workshop: no bell");
+
+    // Orders in the app only: the bell rings, no confirmation mail.
+    let order = orders()
+        .at(north.id)
+        .for_customer(customer.id)
+        .paid()
+        .create_one(db)
+        .await
+        .unwrap();
+    tell(state, &order, Moment::Paid, None).await.unwrap();
+    assert_eq!(mails_to(&app, email).await, mails + 1, "orders: no mail");
+    assert_eq!(in_app(&app, &user).await, vec!["order-paid".to_owned()]);
+
+    // Rentals switched off: the next reminder goes nowhere.
+    choose(
+        &app,
+        &user,
+        [
+            ("order", "in_app"),
+            ("rental", "none"),
+            ("workshop", "none"),
+            ("plan", "both"),
+            ("marketing", "none"),
+        ],
+    )
+    .await;
+    let bike = fixtures::bike(db, north.id, north.id).await.unwrap();
+    let mut rental = rentals()
+        .of_bike(&bike)
+        .for_customer(customer.id)
+        .active()
+        .create_one(db)
+        .await
+        .unwrap();
+    rental.due_at = renox::db::now() + renox::chrono::Duration::minutes(30);
+    rental.save(db).await.unwrap();
+    assert_eq!(
+        bikeshop::app::rentals::tasks::reminders(state)
+            .await
+            .unwrap(),
+        1
+    );
+    assert_eq!(mails_to(&app, email).await, mails + 1, "rentals: none");
+    assert_eq!(in_app(&app, &user).await, vec!["order-paid".to_owned()]);
+}
+
 #[renox::test]
 async fn the_language_is_kept_on_the_account() {
     let app = boot().await;

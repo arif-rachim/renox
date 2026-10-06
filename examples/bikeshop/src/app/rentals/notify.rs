@@ -9,6 +9,13 @@
 //! it. Mail goes through `mail/rentals/notice.html` (+ `.txt`), built on the
 //! kit's mail layout; the in-app row is a `DatabaseMessage`, what the kit's
 //! notification bell and its live stream show.
+//!
+//! A notice to a **customer** ([`customer`]) goes out on the channels they
+//! chose for its kind on their account (`accounts::preferences`: rentals,
+//! the workshop, plans), so "mail only" or "none" is respected. A notice to
+//! **staff** ([`staff`], or `state.notify` on a member of staff) is work, not
+//! a preference: it keeps its own channels (the bell, and mail when
+//! [`Notice::mail`] is set).
 
 use renox::auth::{Channel, DatabaseMessage, Notification, Recipient};
 use renox::db::sql;
@@ -18,6 +25,7 @@ use serde::Serialize;
 
 use crate::app::access::policy::store_scope;
 use crate::app::accounts::model::Customer;
+use crate::app::accounts::preferences::{Kind, channels_for};
 
 /// How a notice looks in the bell: its colour and icon.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,6 +58,9 @@ pub struct Notice {
     pub mail: bool,
     /// The mail view: `mail/rentals/notice` or the workshop's.
     pub view: &'static str,
+    /// For a customer: which of their notification preferences decides the
+    /// channels (set by [`customer`]). `None` for staff.
+    pub topic: Option<Kind>,
 }
 
 impl Notice {
@@ -66,6 +77,7 @@ impl Notice {
             tone: Tone::Info,
             mail: true,
             view: "mail/rentals/notice",
+            topic: None,
         }
     }
 
@@ -127,6 +139,17 @@ impl Notification for Notice {
     }
 
     fn channels(&self, to: &Recipient) -> Vec<Channel> {
+        if let Some(kind) = self.topic {
+            // A customer: what they chose for this kind, where it can reach them.
+            return channels_for(to, kind)
+                .into_iter()
+                .filter(|c| match c {
+                    Channel::Mail => self.mail && to.email().is_some(),
+                    Channel::Database => to.user().is_some(),
+                    _ => true,
+                })
+                .collect();
+        }
         let mut channels = Vec::new();
         if to.user().is_some() {
             channels.push(Channel::Database);
@@ -177,10 +200,20 @@ impl Notification for Notice {
     }
 }
 
-/// Sends `notice` to a customer: to their account (mail + the bell) when
-/// they have one, else by mail to their address, else nowhere (a walk-in
-/// who left no address).
-pub async fn customer(state: &AppState, customer: &Customer, notice: &Notice) -> Result {
+/// Sends `notice` about `kind` to a customer: to their account when they
+/// have one (by mail, in the app, both or neither, as they chose for
+/// `kind`), else by mail to their address, else nowhere (a walk-in who left
+/// no address).
+pub async fn customer(
+    state: &AppState,
+    customer: &Customer,
+    kind: Kind,
+    notice: &Notice,
+) -> Result {
+    let notice = &Notice {
+        topic: Some(kind),
+        ..notice.clone()
+    };
     if let Some(user_id) = customer.user_id
         && let Some(user) = User::find(&state.db, user_id).await?
     {

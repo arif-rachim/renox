@@ -13,6 +13,10 @@
 //! (`orders.locale`, `mail_view_in`), even when the queue or a member of
 //! staff sends them later. The link in each mail is a signed URL to the
 //! order (`orders.signed`), so a guest can open it without an account.
+//!
+//! Both follow the customer's choice for orders on their account
+//! (`accounts::preferences`, `Kind::Order`): "mail only" sends no
+//! notification, "in the app" no mail, "none" neither.
 
 use std::time::Duration;
 
@@ -22,6 +26,7 @@ use serde::Serialize;
 
 use super::model::{Fulfilment, Order, OrderItem};
 use crate::app::accounts::model::{Customer, FullAddress};
+use crate::app::accounts::preferences::{Kind, channels_for};
 use crate::app::catalog::model::{Product, ProductVariant};
 use crate::app::staff::model::Store;
 
@@ -147,12 +152,12 @@ impl Moment {
 }
 
 /// Queues the mail for `moment` (when the customer gave an address) and
-/// notifies their account (when they have one). `refund`: the amount paid
-/// back, for the refund mail.
+/// notifies their account (when they have one), as they chose for orders.
+/// `refund`: the amount paid back, for the refund mail.
 pub async fn tell(state: &AppState, order: &Order, moment: Moment, refund: Option<i64>) -> Result {
-    let Some(customer_id) = order.customer_id else {
+    if order.customer_id.is_none() {
         return Ok(()); // a walk-in at the counter
-    };
+    }
     let view = OrderView::load(&state.db, order.clone()).await?;
     let Some(customer) = view.customer.clone() else {
         return Ok(());
@@ -168,7 +173,20 @@ pub async fn tell(state: &AppState, order: &Order, moment: Moment, refund: Optio
         &format!("sales.mail.{}.subject", moment.key()),
         &[("number", &number)],
     );
-    if let Some(email) = customer.email.as_deref().filter(|e| !e.is_empty()) {
+    let user = match customer.user_id {
+        Some(id) => User::find(&state.db, id).await?,
+        None => None,
+    };
+    let email = customer.email.as_deref().filter(|e| !e.is_empty());
+    let to = match (&user, email) {
+        (Some(user), _) => Recipient::for_user(user),
+        (None, Some(email)) => Recipient::to("mail", email),
+        (None, None) => return Ok(()),
+    };
+    let channels = channels_for(&to, Kind::Order);
+    if let Some(email) = email
+        && channels.contains(&Channel::Mail)
+    {
         let mail = state.mail_view_in(
             &locale,
             email,
@@ -178,16 +196,14 @@ pub async fn tell(state: &AppState, order: &Order, moment: Moment, refund: Optio
         )?;
         state.queue_mail(mail).await?;
     }
-    if let Some(user_id) = customer.user_id
-        && let Some(user) = User::find(&state.db, user_id).await?
-    {
+    if let Some(user) = &user {
         let body = lang.t(
             &format!("sales.notice.{}", moment.key()),
             &[("number", &number)],
         );
         state
             .notify(
-                &user,
+                user,
                 &OrderNotice {
                     moment,
                     order_id: order.id,
@@ -197,7 +213,6 @@ pub async fn tell(state: &AppState, order: &Order, moment: Moment, refund: Optio
             )
             .await?;
     }
-    let _ = customer_id;
     Ok(())
 }
 
@@ -221,8 +236,14 @@ impl Notification for OrderNotice {
         }
     }
 
-    fn channels(&self, _to: &Recipient) -> Vec<Channel> {
-        vec![Channel::Database]
+    // The bell, when the customer wants orders in the app. The mail is
+    // queued by `tell` itself (in the language the order was placed in),
+    // after the same question.
+    fn channels(&self, to: &Recipient) -> Vec<Channel> {
+        channels_for(to, Kind::Order)
+            .into_iter()
+            .filter(|c| *c == Channel::Database)
+            .collect()
     }
 
     fn to_database(&self, _: &Recipient, _state: &AppState) -> Result<renox::serde_json::Value> {

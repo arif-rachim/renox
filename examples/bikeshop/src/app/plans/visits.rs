@@ -33,6 +33,7 @@ use super::model::{
     Frequency, PLAN_TASKS, PlanSubscription, PlanVisit, ServicePlan, SubscriptionStatus,
     VisitStatus, visit_day,
 };
+use crate::app::accounts::preferences::Kind;
 use crate::app::rentals::booking::to_local;
 use crate::app::rentals::notify::{self, Notice, Tone};
 use crate::app::workshop::capacity::{self, DayProblem, NewBooking, day_bounds};
@@ -239,6 +240,7 @@ async fn tell(
     notify::customer(
         state,
         &customer,
+        Kind::Plan,
         &Notice::new(kind, title, body)
             .param("day", &day)
             .param("number", order.id)

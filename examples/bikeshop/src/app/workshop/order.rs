@@ -21,6 +21,7 @@ use super::model::{
 use super::status::{self, allowed, from_key, key};
 use crate::app::access::{self, StoreAttr, catalogue};
 use crate::app::accounts::model::Customer;
+use crate::app::accounts::preferences::Kind;
 use crate::app::catalog::model::{Category, CategoryKind, FITTING_PARTS, Product, ProductVariant};
 use crate::app::rentals::counter::{COUNTER_METHODS, counter_method};
 use crate::app::rentals::model::RentalBike;
@@ -640,6 +641,7 @@ pub async fn propose(
         notify::customer(
             &state,
             &customer,
+            Kind::Workshop,
             &Notice::new(
                 "workshop-extra",
                 "workshop.mail.extra.title",

@@ -13,6 +13,7 @@ use renox::prelude::*;
 
 use super::model::{CustomerBike, WorkOrder, WorkOrderPart, WorkOrderTask, WorkSource, WorkStatus};
 use crate::app::accounts::model::Customer;
+use crate::app::accounts::preferences::Kind;
 use crate::app::rentals::model::{BikeCondition, BikeStatus, RentalBike};
 use crate::app::rentals::notify::{self, Notice, Tone};
 
@@ -175,5 +176,5 @@ pub async fn tell_customer(state: &AppState, order: &WorkOrder) -> Result {
     })
     .view("mail/workshop/notice")
     .url(url);
-    notify::customer(state, &customer, &notice).await
+    notify::customer(state, &customer, Kind::Workshop, &notice).await
 }

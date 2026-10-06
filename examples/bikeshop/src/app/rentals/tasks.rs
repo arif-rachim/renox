@@ -30,6 +30,7 @@ use super::pricing::{self, late_fee, no_show_fee};
 use super::reserve::money;
 use crate::app::access::catalogue;
 use crate::app::accounts::model::Customer;
+use crate::app::accounts::preferences::Kind;
 
 /// Registers the tasks.
 pub fn schedule(s: &mut Schedule) {
@@ -68,6 +69,7 @@ pub async fn lapse_unpaid(state: &AppState) -> Result<u64> {
             notify::customer(
                 state,
                 &customer,
+                Kind::Rental,
                 &Notice::new(
                     "rental-unpaid",
                     "rentals.mail.unpaid.title",
@@ -109,6 +111,7 @@ pub async fn no_shows(state: &AppState) -> Result<u64> {
             notify::customer(
                 state,
                 &customer,
+                Kind::Rental,
                 &Notice::new(
                     "rental-no-show",
                     "rentals.mail.no_show.title",
@@ -154,6 +157,7 @@ pub async fn reminders(state: &AppState) -> Result<u64> {
             notify::customer(
                 state,
                 &customer,
+                Kind::Rental,
                 &Notice::new(
                     "rental-reminder",
                     "rentals.mail.reminder.title",
@@ -217,6 +221,7 @@ pub async fn overdue(state: &AppState) -> Result<u64> {
             notify::customer(
                 state,
                 customer,
+                Kind::Rental,
                 &Notice::new(
                     "rental-overdue",
                     "rentals.mail.overdue.title",
