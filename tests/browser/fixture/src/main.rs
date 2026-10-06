@@ -284,12 +284,32 @@ impl Job for Touch {
     }
 }
 
+/// A job that takes a while, so tests/process can stop the app while it runs.
+#[derive(Serialize, Deserialize)]
+struct Nap;
+
+impl Job for Nap {
+    const NAME: &'static str = "fixture-nap";
+    async fn handle(self, _ctx: JobContext) -> Result {
+        note("nap started");
+        renox::tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+        note("nap done");
+        Ok(())
+    }
+}
+
 fn main() -> Result {
     let mut app = App::new()
         // Accounts (a login rotates the CSRF token) and the bell.
         .module(Auth::new().notifications())
         .module(Pages)
         .job::<Touch>()
+        .job::<Nap>()
+        // `jobs:nap`: queues one Nap job.
+        .command("jobs:nap", "Queues a slow job", |_args, state| async move {
+            state.dispatch(Nap).await?;
+            Ok(())
+        })
         // `jobs:push 3`: queues three Touch jobs.
         .command("jobs:push", "Queues Touch jobs", |args, state| async move {
             let count: u32 = args

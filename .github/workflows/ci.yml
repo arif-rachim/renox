@@ -204,15 +204,34 @@ jobs:
   process:
     name: process
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       # The app binary and rnx as real processes (signals, workers, the
-      # scheduler, systemd's socket, logs, prompts, rnx serve), and every
-      # example binary served and asked for its pages (tests/process, #270).
+      # scheduler, systemd's socket, logs, prompts, rnx serve and build,
+      # Tailwind through a stand-in), and every example binary served and
+      # asked for its pages as a guest and logged in (tests/process, #270);
+      # then the engine checks and postgres-app/fields on PostgreSQL.
       - run: sudo apt-get update && sudo apt-get install -y systemd
       - run: tests/process/run.sh
+        env:
+          RNX_BUILD: 1
+      - run: tests/process/run.sh postgres
+        env:
+          PROCESS_POSTGRES: postgres://postgres:postgres@localhost:5432
 
   tutorial:
     name: tutorial (docs/tutorial.md, followed step by step)
