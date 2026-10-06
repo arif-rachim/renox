@@ -79,6 +79,14 @@ pub struct Order {
     pub paid_at: Option<DateTime>,
     /// Who sold it at the counter (a `staff` row).
     pub served_by: Option<i64>,
+    /// The customer's language when they ordered (`en`, `es`), for the
+    /// mails sent later from the queue.
+    pub locale: Option<String>,
+    /// When the goods were handed over or delivered (the 14-day return
+    /// window starts then).
+    pub completed_at: Option<DateTime>,
+    /// When they came back (a return).
+    pub returned_at: Option<DateTime>,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
 }
@@ -171,4 +179,19 @@ impl StoreRecord for Payment {
     fn store_id(&self, _attr: StoreAttr) -> Option<i64> {
         Some(self.store_id)
     }
+}
+
+/// A logged-in customer's saved cart (a guest's lives in the session):
+/// see `src/app/sales/cart.rs`.
+#[derive(Model, Serialize, Default, Debug, Clone)]
+#[model(table = "carts")]
+pub struct SavedCart {
+    pub id: i64,
+    pub user_id: i64,
+    /// The store the cart is checked against and picked up from.
+    pub store_id: Option<i64>,
+    /// The lines, as JSON.
+    pub lines: renox::db::Json<Vec<super::cart::CartLine>>,
+    pub created_at: Option<DateTime>,
+    pub updated_at: Option<DateTime>,
 }

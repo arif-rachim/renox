@@ -296,5 +296,137 @@
       "everywhere": "Everywhere",
       "in_a_store": "In a store"
     }
+  },
+  "catalog": {
+    "all": {
+      "title": "All products",
+      "description": "Bikes, gear and spare parts from our three stores, with prices and stock per store."
+    },
+    "category": {
+      "description": "Shop :name at our three stores: compare prices, sizes and what is in stock where."
+    },
+    "categories": "Categories",
+    "search": {
+      "title": "Search",
+      "results": "Results for “:q”",
+      "label": "Search the shop",
+      "placeholder": "Search bikes, gear, parts…",
+      "lead": "Best matches first; narrow them down with the filters."
+    },
+    "found": "{0} No products|{1} One product|[2,*] :count products",
+    "price_from": "from :price",
+    "sort": {
+      "label": "Sort by",
+      "relevance": "Best match",
+      "popular": "Most popular",
+      "newest": "Newest",
+      "price_asc": "Price: low to high",
+      "price_desc": "Price: high to low"
+    },
+    "filters": {
+      "title": "Filters",
+      "brand": "Brand",
+      "price": "Price",
+      "size": "Size",
+      "wheels": "Wheel size",
+      "frame": "Frame material",
+      "ebike": "E-bikes only",
+      "store": "In stock at",
+      "any": "Any",
+      "any_store": "Any store",
+      "apply": "Apply",
+      "clear": "Clear filters",
+      "on": "Filters that are on",
+      "remove": "Remove the filter :filter"
+    },
+    "chip": {
+      "brand": "Brand: :value",
+      "size": "Size: :value",
+      "price": "Price range",
+      "wheels": "Wheels: :value",
+      "frame": "Frame: :value",
+      "ebike": "E-bikes",
+      "store": "In stock at :value",
+      "fits": "Fits my bike"
+    },
+    "fits": {
+      "label": "Fits my bike",
+      "any": "Any of my bikes",
+      "off": "Show every part",
+      "hint": "Only parts known to fit the bikes in your account."
+    },
+    "empty": {
+      "title": "Nothing matches",
+      "text": "Try fewer filters, or another category.",
+      "search": "Nothing matches “:q”. Try other words, or fewer filters."
+    },
+    "suggest": {
+      "label": "Suggestions",
+      "none": "No product matches “:q”.",
+      "all": "All results for “:q”"
+    },
+    "home": {
+      "featured": "Popular bikes",
+      "all_bikes": "All bikes",
+      "categories": "Shop by category",
+      "shop": "Browse the shop",
+      "rent": "Rent a bike",
+      "service": "Book a service"
+    },
+    "product": {
+      "photos": "Photos of :name",
+      "size": "Size",
+      "colour": "Colour",
+      "show_variant": "Show",
+      "sold_out": "sold out",
+      "sku": "SKU :sku",
+      "stock_title": "Stock in our stores",
+      "stock_at": "{0} Out of stock at :store|{1} One at :store|[2,*] :count at :store",
+      "quantity": "Quantity",
+      "add_to_cart": "Add to cart",
+      "sold_out_everywhere": "Sold out in every store for now.",
+      "rent": "Rent this model",
+      "description": "Description",
+      "specs": "Specifications",
+      "brand": "Brand",
+      "prices": "Prices",
+      "variants": "Variants",
+      "fits_bikes": "Fits these bikes",
+      "fitting_parts": "Parts and accessories that fit",
+      "recently_viewed": "Recently viewed"
+    }
+  },
+  "sales": {
+    "cart": {
+      "title": "Cart",
+      "lead": "Checked against the stock of the store you pick up from.",
+      "keep_shopping": "Keep shopping",
+      "lines": "Products in your cart",
+      "summary": "Summary",
+      "changed": "Some quantities changed: the store has fewer than your cart asked for.",
+      "line_lowered": "{0} None left at this store.|{1} Only one left at this store.|[2,*] Only :count left at this store.",
+      "quantity_of": "Quantity of :name",
+      "update": "Update",
+      "remove": "Remove :name",
+      "store": "Store",
+      "store_hint": "Pick up there, or delivered from there.",
+      "change_store": "Change store",
+      "items": "{0} No items|{1} One item|[2,*] :count items",
+      "fees_later": "Delivery fee and discounts are added at the checkout.",
+      "checkout": "Check out",
+      "empty_title": "Your cart is empty",
+      "empty_text": "Find a bike, gear or a part, and add it here.",
+      "browse": "Browse the shop",
+      "link_label": "{0} Cart, empty|{1} Cart, one item|[2,*] Cart, :count items",
+      "added": ":name is in your cart.",
+      "view": "View cart",
+      "none_left": "There are no more :name at :store.",
+      "only_left": "Only :count more :name at :store: that's what was added.",
+      "lowered": "The store has fewer: the quantity was lowered.",
+      "updated": "Cart updated.",
+      "removed": "Removed from your cart.",
+      "store_set": "Your cart is checked against :store now.",
+      "store_lowered": ":store has fewer of some products: the quantities were lowered."
+    }
   }
 }

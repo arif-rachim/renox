@@ -19,6 +19,7 @@
     {% call nav_links() %}
       {#- --- Public navigation (one line per area; append yours) --- -#}
       {{ nav_link(route('home'), t('nav.home'), active=route_is('home')) }}
+      {{ nav_link(route('catalog.index'), t('nav.shop'), active=route_is('catalog.*')) }}
       {#- --- end of public navigation --- -#}
     {% endcall %}
     <span class="rx-spacer"></span>

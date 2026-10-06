@@ -1,13 +1,15 @@
-//! Cart, checkout, payments and counter sales.
+//! Cart, checkout, payments and counter sales (#234).
 //!
-//! An empty area for now: #234. Its routes go in `routes()`, its views
-//! in `resources/views/sales/`, its tests in `tests/sales.rs`, and the
-//! "About this page" entry of every GET route it adds in `explain.rs`.
+//! Made with `rnx make:module sales`, then the files by hand; the models
+//! came with #232.
 
+pub mod cart;
 pub mod explain;
 pub mod factories;
 pub mod model;
 pub mod payments;
+
+use renox::prelude::*;
 
 /// The sales area, registered in `src/lib.rs`.
 pub struct Sales;
@@ -15,5 +17,21 @@ pub struct Sales;
 impl renox::Module for Sales {
     fn name(&self) -> &'static str {
         "sales"
+    }
+
+    fn routes(&self) -> Routes {
+        Routes::new()
+            .get("/cart", cart::show)
+            .name("cart.show")
+            .get("/cart/mini", cart::mini)
+            .name("cart.mini")
+            .post("/cart", cart::add)
+            .name("cart.add")
+            .patch("/cart/{variant}", cart::update)
+            .name("cart.update")
+            .delete("/cart/{variant}", cart::remove)
+            .name("cart.remove")
+            .post("/cart/store", cart::store)
+            .name("cart.store")
     }
 }
