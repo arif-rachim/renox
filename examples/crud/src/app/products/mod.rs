@@ -14,7 +14,7 @@ use renox::validation::ValidateHooks;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-use model::{COUNT_KEY, Product};
+use model::{COUNT_KEY, Product, cents};
 
 pub struct Products;
 
@@ -64,8 +64,9 @@ impl Module for Products {
 struct ProductForm {
     #[validate(required, max = 100)]
     name: String,
-    #[validate(min = 0)]
-    price: i64,
+    /// In dollars as typed (`12.99`); stored in cents.
+    #[validate(min = 0, decimal(0, 2))]
+    price: f64,
 }
 
 impl ValidateHooks for ProductForm {
@@ -114,7 +115,7 @@ async fn store(
     let product = Product {
         user_id: user.id,
         name: form.name,
-        price: form.price,
+        price: cents(form.price),
         ..Default::default()
     };
     Product::create(&db, product).await?;
@@ -129,7 +130,9 @@ async fn store(
 // (Laravel's route model binding); trashed products count as missing.
 async fn edit(user: AuthUser, Found(product): Found<Product>) -> Result<View> {
     user.authorize("update", &product)?;
-    Ok(view("products/form.html", context! { product }))
+    // The price in dollars, as the form takes it.
+    let price = format!("{:.2}", product.price as f64 / 100.0);
+    Ok(view("products/form.html", context! { product, price }))
 }
 
 async fn update(
@@ -141,7 +144,7 @@ async fn update(
     user.authorize("update", &original)?;
     let mut product = original.clone();
     product.name = form.name;
-    product.price = form.price;
+    product.price = cents(form.price);
     // Writes only the columns that differ from `original` (plus
     // `updated_at`), including the slug the `saving` hook derives, so a
     // concurrent change to another column isn't overwritten. `false` means

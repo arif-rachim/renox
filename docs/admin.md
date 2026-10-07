@@ -225,7 +225,7 @@ label. The kind decides which of the kit's fields draws it:
 | `password` | a password box with a "show" button, empty on the edit page | `Option<String>` (change it only when one was typed) |
 | `textarea` | several lines (`.rows(n)`) | `String` |
 | `number` | a number box (`.step("0.01")`, `.min(0)`, `.max(99)`) | a number |
-| `money` | a number box with `APP_CURRENCY`'s code before it | the amount as the model stores it |
+| `money` | a number box with `APP_CURRENCY`'s code before it, in whole units (`12.99`) | the smallest unit (`1299` cents) |
 | `date` | the kit's date picker | `NaiveDate` |
 | `datetime` | a date-and-time box | `NaiveDateTime` |
 | `select(name, label, options)` | a select of `(value, label)` pairs (`.searchable()`) | the value |
@@ -233,10 +233,11 @@ label. The kind decides which of the kit's fields draws it:
 | `belongs_to(name, label, table, title)` | a searchable select of `table`'s rows, by `title` | the row's id |
 
 > [!NOTE]
-> `money` takes the amount as the model stores it: the smallest unit, as the grid's `money`
-> columns read it. For a currency without decimals (IDR, JPY) that's the amount people write.
-> For cents, take a decimal in the form (`Field::number(…).step("0.01")`) and convert it in
-> `fill`.
+> The model keeps money in the smallest unit, as the grid's `money` columns read it: cents
+> with the default `USD`. The form shows and takes whole units: a price of `1299` shows as
+> `12.99`, and `12.99` typed in reaches the form's rules and `fill` as `1299` (rounded to the
+> cent). For a currency without decimals (IDR, JPY) the amount is as typed. The view page's
+> `money` entries show `$12.99` too.
 
 Options every field takes:
 

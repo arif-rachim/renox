@@ -75,13 +75,14 @@ const COLOURS: [(&str, &str, &str); 3] = [
     ("graphite", "Graphite", "#3f3f46"),
 ];
 
-/// The price (whole rupiah, the `money` filter) and stock of a variant.
+/// The price (cents, the `money` filter's smallest unit) and stock of a
+/// variant.
 pub fn variant_of(size: &str, colour: &str) -> (i64, i64) {
     let price = match size {
-        "S" => 4_500_000,
-        "M" => 4_750_000,
-        "L" => 5_000_000,
-        _ => 5_250_000,
+        "S" => 149_900,
+        "M" => 159_900,
+        "L" => 169_900,
+        _ => 179_900,
     };
     let stock = match (size, colour) {
         (SOLD_OUT, _) => 0,
@@ -174,10 +175,10 @@ pub struct PageQuery {
     slot: Option<String>,
 }
 
-/// The price filter's scale (whole rupiah).
+/// The price filter's scale (cents).
 pub const PRICE_MIN: i64 = 0;
 /// The top of the price filter's scale.
-pub const PRICE_MAX: i64 = 20_000_000;
+pub const PRICE_MAX: i64 = 1_000_000;
 
 /// `YYYY-MM` when `text` is a month the calendar can show.
 fn month_param(text: &str) -> Option<String> {
@@ -253,7 +254,7 @@ async fn page(State(state): State<AppState>, Query(query): Query<PageQuery>) -> 
     };
     let timeline = vec![
         context! { time => at(9, 12), title => "Checked in at the Harbour store", body => "Brakes squeal; the chain is dry. The customer wants it **by Friday**.", kind => "info", by => "Marta" },
-        context! { time => at(9, 40), title => "Quote accepted", body => "Brake pads and a new chain: `Rp 385.000`.", kind => "success", by => "Ana R." },
+        context! { time => at(9, 40), title => "Quote accepted", body => "Brake pads and a new chain: `$84.00`.", kind => "success", by => "Ana R." },
         context! { time => at(11, 5), title => "Waiting for parts", body => "The chain comes from the Hill store this afternoon.", kind => "warning", by => "Marta" },
         context! { time => at(15, 30), title => "Serviced", kind => "success", by => "Joko" },
         context! { time => at(16, 2), title => "Ready for pickup", body => "A text message went to the customer.", kind => "info" },
@@ -282,13 +283,13 @@ async fn page(State(state): State<AppState>, Query(query): Query<PageQuery>) -> 
     ];
 
     let plans = vec![
-        context! { key => "basic", name => "Basic", price => 150_000, interval => "month",
+        context! { key => "basic", name => "Basic", price => 2_900, interval => "month",
         description => "For a bike ridden at weekends.", perks => vec!["A check-up every month", "10% off parts"],
         url => "#plans" },
-        context! { key => "rider", name => "Rider", price => 300_000, interval => "month",
+        context! { key => "rider", name => "Rider", price => 4_900, interval => "month",
         description => "For the daily commute.", perks => vec!["Two visits a month", "Pickup and delivery", "15% off parts"],
         url => "#plans" },
-        context! { key => "pro", name => "Pro", price => 550_000, interval => "month",
+        context! { key => "pro", name => "Pro", price => 7_900, interval => "month",
         description => "For a fleet, or a racer.", perks => vec!["Unlimited visits", "A loan bike while yours is in", "20% off parts"],
         url => "#plans" },
     ];

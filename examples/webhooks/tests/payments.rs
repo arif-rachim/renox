@@ -17,7 +17,7 @@ async fn app() -> TestApp {
             .insert("STRIPE_WEBHOOK_SECRET".into(), "whsec_test".into());
     })
     .await;
-    Order::create(app.db(), Order::new("INV-1", 150_000))
+    Order::create(app.db(), Order::new("INV-1", 4_999))
         .await
         .unwrap();
     app
@@ -32,6 +32,7 @@ async fn status(app: &TestApp) -> (String, Option<String>) {
     (order.status, order.paid_via)
 }
 
+// Midtrans charges rupiah only, so its `gross_amount` is IDR.
 fn midtrans(transaction_status: &str, server_key: &str) -> String {
     let signature = webhook::sha512_hex(format!("INV-1200150000.00{server_key}"));
     format!(
@@ -121,8 +122,8 @@ async fn the_order_page_shows_payment_status() {
         .assert_ok()
         .assert_see(r#"<table class="rx-table">"#)
         .assert_see("<strong>INV-1</strong>")
-        // The amount through the `money` filter (APP_CURRENCY, IDR by default).
-        .assert_see("Rp 150,000")
+        // The amount (cents) through the `money` filter, in APP_CURRENCY.
+        .assert_see("$49.99")
         .assert_see(r#"<span class="rx-badge rx-badge--warning">Pending</span>"#);
 
     // Paid via Xendit: the badge and the provider follow.

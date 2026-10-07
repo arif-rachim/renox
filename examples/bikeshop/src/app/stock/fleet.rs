@@ -82,12 +82,14 @@ pub struct ToFleetForm {
     pub level: Option<i64>,
     #[validate(required, max = 40, unique("rental_bikes", "frame_number"))]
     pub frame_number: String,
+    /// Amounts in whole units as typed (`15.00`), stored in the smallest
+    /// unit ([`crate::money::from_form`]).
     #[validate(required, min = 0)]
-    pub hourly_rate: Option<i64>,
+    pub hourly_rate: Option<f64>,
     #[validate(required, min = 0)]
-    pub daily_rate: Option<i64>,
+    pub daily_rate: Option<f64>,
     #[validate(required, min = 0)]
-    pub deposit: Option<i64>,
+    pub deposit: Option<f64>,
 }
 
 /// `POST /staff/stock/fleet` (`stock.fleet.store`).
@@ -137,9 +139,9 @@ pub async fn to_fleet(
             frame_number: form.frame_number.trim().to_owned(),
             condition: BikeCondition::New,
             status: BikeStatus::Available,
-            hourly_rate: form.hourly_rate.unwrap_or(0),
-            daily_rate: form.daily_rate.unwrap_or(0),
-            deposit: form.deposit.unwrap_or(0),
+            hourly_rate: crate::money::from_form(form.hourly_rate),
+            daily_rate: crate::money::from_form(form.daily_rate),
+            deposit: crate::money::from_form(form.deposit),
             asset_value: variant.cost,
             purchased_on: Some(crate::seed::today()),
             ..Default::default()

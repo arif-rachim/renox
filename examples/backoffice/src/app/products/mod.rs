@@ -19,7 +19,7 @@ pub struct Product {
     pub id: i64,
     pub sku: String,
     pub name: String,
-    /// In rupiah.
+    /// In cents (`APP_CURRENCY`, USD): `1299` is $12.99.
     pub price: i64,
     /// Kept by the ledger (`stock::change`); never set directly.
     pub stock: i64,
@@ -60,7 +60,7 @@ pub fn grid(user: &AuthUser) -> Grid {
                 .searchable()
                 .editable(),
         )
-        .column(Column::money("price", "Price (Rp)").mobile().editable())
+        .column(Column::money("price", "Price ($)").mobile().editable())
         // Drawn in products/index.html: the number with a badge.
         .column(Column::custom("level", "Stock").mobile())
         .column(
@@ -122,13 +122,24 @@ pub struct ProductForm {
     pub sku: String,
     #[validate(required, max = 100)]
     pub name: String,
-    #[validate(required, min = 0)]
-    pub price: i64,
+    /// In dollars as typed (`12.99`); stored in cents.
+    #[validate(required, min = 0, decimal(0, 2))]
+    pub price: f64,
     #[validate(min = 0)]
     pub min_stock: Option<i64>,
     /// What is on the shelf today: the ledger's first row.
     #[validate(min = 0, max = 100000)]
     pub opening_stock: Option<i64>,
+}
+
+/// A price typed in dollars (`12.99`) in cents, as products keep it.
+pub fn cents(dollars: f64) -> i64 {
+    (dollars * 100.0).round() as i64
+}
+
+/// Cents as a form shows them: `1299` is `12.99`.
+pub fn dollars(cents: i64) -> String {
+    format!("{:.2}", cents as f64 / 100.0)
 }
 
 /// "Duplicate": the new-product form, filled from a copy of this product
@@ -141,7 +152,7 @@ pub(super) async fn replicate(State(db): State<Db>, Path(id): Path<i64>) -> Resu
     copy.name = format!("{} (copy)", original.name);
     Ok(view(
         "products/replicate.html",
-        context! { original, product => copy },
+        context! { original, price => dollars(copy.price), product => copy },
     ))
 }
 
@@ -170,7 +181,7 @@ pub(super) async fn store(
         Product {
             sku: form.sku.to_uppercase(),
             name: form.name,
-            price: form.price,
+            price: cents(form.price),
             min_stock: form.min_stock.unwrap_or(0),
             active: true,
             ..Default::default()
@@ -205,6 +216,7 @@ pub(super) async fn store(
 pub struct ProductEdit {
     #[validate(max = 100)]
     pub name: Option<String>,
+    /// In cents: the grid's inline edit sends the stored value.
     #[validate(min = 0)]
     pub price: Option<i64>,
     #[validate(min = 0)]

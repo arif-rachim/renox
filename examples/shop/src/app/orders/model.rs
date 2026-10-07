@@ -23,7 +23,7 @@ pub struct Order {
     pub id: i64,
     pub user_id: i64,
     pub status: OrderStatus,
-    /// In rupiah.
+    /// In cents, like the products' prices.
     pub total: i64,
     pub address: String,
     /// Picked up at the store instead of sent.

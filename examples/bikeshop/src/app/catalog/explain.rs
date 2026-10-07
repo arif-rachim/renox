@@ -15,7 +15,7 @@ const SOURCES_LISTING: &[&str] = &[
 
 const FILTERS_FROM_QUERY: Feature = Feature {
     api: "Query<T>",
-    why: "Every filter is a query-string value (`?brand=trek&size=M&price_max=9000000`), \
+    why: "Every filter is a query-string value (`?brand=trek&size=M&price_max=900000`), \
           so a filtered page can be shared, bookmarked and reloaded. `Filters::apply` turns \
           them into conditions on `Product::query()`: `where_in_query` for brands and \
           sizes, `where_raw` with bound values for the `EXISTS` sub-queries (a variant \
@@ -306,9 +306,9 @@ pub fn entries() -> Vec<Explanation> {
                 },
                 Feature {
                     api: "money filter",
-                    why: "Prices are integers in the smallest unit of `APP_CURRENCY`; \
+                    why: "Prices are integers in the smallest unit of `APP_CURRENCY` (cents); \
                           `{{ price | money }}` writes them the visitor's way \
-                          (`Rp 12,500,000` in English, `Rp 12.500.000` in Spanish), so no \
+                          (`$1,249.99` in English, `$1.249,99` in Spanish), so no \
                           template formats a number by hand.",
                 },
                 Feature {

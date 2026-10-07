@@ -20,8 +20,8 @@
       {{ form_errors() }}
       {{ input("name", "Name", value=product.name if product else none, required=true,
                hint="Shown on the shop's product list.", autocomplete="off") }}
-      {{ input("price", "Price (Rp)", value=product.price if product else none, required=true,
-               hint="In rupiah, without dots.", attrs={"inputmode": "numeric"}) }}
+      {{ input("price", "Price", value=price if product else none, required=true, prefix="$",
+               hint="In US dollars, like 12.99.", attrs={"inputmode": "decimal"}) }}
       <div class="rx-card__footer">
         {{ link_button(route('products.index'), "Cancel", variant="plain") }}
         {{ button("Save changes" if product else "Create product") }}

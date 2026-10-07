@@ -168,7 +168,7 @@ fn views() -> tempfile::TempDir {
 <form method="post" action="/profile">{{ csrf_field() }}{{ form_errors() }}
 {% call form_grid(2) %}
 {{ input("name", "Name", id="profile-name", required=true) }}
-{{ input("price", "Price", type="number", prefix="Rp", suffix=".00", span=2) }}
+{{ input("price", "Price", type="number", prefix="$", suffix=".00", span=2) }}
 {{ input("code", "Code", value="X1", readonly=true, datalist=["X1", ["X2", "Second"]]) }}
 {{ textarea("bio", "Bio", id="profile-bio", disabled=true, span="full") }}
 {{ select("size", "Size", ["s", "m"], id="profile-size", span=2) }}
@@ -415,7 +415,7 @@ async fn form_fields_choices_affixes_and_layout() {
         .assert_see(r#"id="profile-bio""#)
         .assert_see(r#"id="profile-size""#)
         // Prefix and suffix are joined to the input and described by it.
-        .assert_see(r#"<span class="rx-affix__text" id="rx-price-prefix">Rp</span>"#)
+        .assert_see(r#"<span class="rx-affix__text" id="rx-price-prefix">$</span>"#)
         .assert_see(r#"aria-describedby="rx-price-prefix rx-price-suffix rx-price-error""#)
         // Read-only, disabled, suggestions.
         .assert_see(r#"value="X1" list="rx-code-list" readonly"#)

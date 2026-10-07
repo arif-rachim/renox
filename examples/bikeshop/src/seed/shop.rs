@@ -426,7 +426,7 @@ async fn catalogue(tx: &mut Transaction, world: &mut World) -> Result {
         }
         made += 1;
         let slug = slugify(&name);
-        let base_price = rng.price(spec.price.0, spec.price.1);
+        let base_price = rng.retail(spec.price.0, spec.price.1);
 
         // The variants first: their SKUs go into the product's keywords.
         let sizes: Vec<&str> = match spec.kind {
@@ -1037,17 +1037,17 @@ async fn fleet(tx: &mut Transaction, world: &mut World) -> Result {
         for _ in 0..world.volume.bikes_per_store {
             let item = world.rng.pick(&rentable).clone();
             let daily = match item.category {
-                "e-bikes" => world.rng.price(350_000, 500_000),
-                "road-bikes" => world.rng.price(250_000, 400_000),
-                "mountain-bikes" => world.rng.price(200_000, 350_000),
-                _ => world.rng.price(120_000, 200_000),
+                "e-bikes" => world.rng.price(7_500, 9_000),
+                "road-bikes" => world.rng.price(6_000, 7_500),
+                "mountain-bikes" => world.rng.price(5_000, 6_500),
+                _ => world.rng.price(4_000, 5_000),
             };
             let mut bike = rental_bikes()
                 .model(item.variant_id)
                 .owned_by(*store)
                 .make_one();
             bike.daily_rate = daily;
-            bike.hourly_rate = daily / 5 / 1_000 * 1_000;
+            bike.hourly_rate = daily / 5 / 100 * 100;
             bike.deposit = daily * 5;
             bike.asset_value = item.price * 7 / 10;
             bike.ridden_hours = world.rng.range(20, 1_500);
@@ -1216,7 +1216,7 @@ async fn demo_customer(db: &Db, world: &mut World) -> Result {
     work_orders()
         .at(north)
         .on_bike(bikes[0].id)
-        .completed(250_000)
+        .completed(9_000)
         .create_one(db)
         .await?;
     work_orders()

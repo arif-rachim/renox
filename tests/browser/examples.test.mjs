@@ -123,7 +123,7 @@ describe('crud under CSP=strict', () => {
       await page.waitFor(() => document.querySelector('[name=price]').getAttribute('aria-invalid') === 'true', {
         message: 'live validation',
       });
-      await page.type('[name=price]', '25000', { clear: true });
+      await page.type('[name=price]', '4.50', { clear: true });
       await page.waitFor(() => !document.querySelector('[name=price]').hasAttribute('aria-invalid'), {
         message: 'the error gone',
       });

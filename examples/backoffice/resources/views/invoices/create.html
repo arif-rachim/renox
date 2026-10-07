@@ -15,7 +15,7 @@
         {{ select(prefix ~ "[product_id]", "Product", products, selected=row.product_id, required=true, searchable=true, placeholder="Choose a product", span=2) }}
         {{ input(prefix ~ "[quantity]", "Quantity", type="number", value=row.quantity or 1, required=true, attrs={'min': 1}) }}
       {% endcall %}
-      {{ input(prefix ~ "[unit_price]", "Price", type="number", value=row.unit_price, prefix="Rp", hint="Empty: the product's price.", attrs={'min': 0}) }}
+      {{ input(prefix ~ "[unit_price]", "Price", type="number", value=row.unit_price, prefix="$", hint="Empty: the product's price.", attrs={'min': 0, 'step': '0.01'}) }}
     {% endcall %}
     {{ textarea("notes", "Notes", rows=2, hint="Printed on the invoice.") }}
     <div class="rx-row">

@@ -136,7 +136,7 @@ Paths are relative to this folder.
 |---|---|
 | The app: modules, plugins, layers, the reporter | [src/lib.rs](src/lib.rs) |
 | "About this page": `Explanation`, the registry, the panel, `BIKESHOP_EXPLAIN` | [src/explain.rs](src/explain.rs), each area's `explain.rs`, [resources/views/about/_panel.html](resources/views/about/_panel.html) |
-| Models and factories per area, migrations for SQLite and PostgreSQL, money as integers | `src/app/<area>/model.rs`, `src/app/<area>/factories.rs`, [migrations/](migrations/) |
+| Models and factories per area, migrations for SQLite and PostgreSQL, money as integers (US dollars in cents, `APP_CURRENCY=USD`; typed amounts converted in [src/money.rs](src/money.rs)) | `src/app/<area>/model.rs`, `src/app/<area>/factories.rs`, [migrations/](migrations/) |
 | Seeds (`db:seed`, the typed `demo:seed` command) and test fixtures | [src/seed/](src/seed/) |
 | Scheduled tasks (below), jobs, events and listeners | each area's `tasks.rs` / `mod.rs` |
 | Error reports (`App::report`) to `storage/logs/errors.log` | [src/report.rs](src/report.rs) |
@@ -313,8 +313,8 @@ Renox's settings are in [.env.example](.env.example), with a comment for each. T
 | `BIKESHOP_EXPLAIN=false` | Hides the "About this page" panels for a clean demo (`/about/pages` stays) |
 | `BIKESHOP_STAFF_2FA=optional` | Staff may use the staff side without two-factor login (demos, browser tests) |
 | `BIKESHOP_DEMO_LOGINS=false` | Hides the demo accounts on the login page (shown only while the seeded users exist) |
-| `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_<PLAN>`, `XENDIT_SECRET_KEY`, `XENDIT_CALLBACK_TOKEN` | Service plans through Stripe or Xendit; without them a demo gateway of the shop's own stands in (never in production). Webhooks come to `/billing/webhooks/stripe` and `/billing/webhooks/xendit` |
-| `MIDTRANS_SERVER_KEY` | Online orders paid through Midtrans; without it a demo payment page stands in |
+| `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_<PLAN>`, `XENDIT_SECRET_KEY`, `XENDIT_CALLBACK_TOKEN` | Service plans through Stripe or Xendit; without them a demo gateway of the shop's own stands in (never in production). Webhooks come to `/billing/webhooks/stripe` and `/billing/webhooks/xendit`. Card plans are charged in USD; Xendit only charges rupiah, so its plans carry their own IDR price (`RUPIAH_PER_DOLLAR` in src/app/plans/billing.rs) |
+| `MIDTRANS_SERVER_KEY` | Online orders paid through Midtrans; without it a demo payment page stands in. Midtrans only charges rupiah, so a real key needs `APP_CURRENCY=IDR`; the demo works in dollars |
 | `GOOGLE_CLIENT_ID`/`_SECRET`, `GITHUB_CLIENT_ID`/`_SECRET` | "Continue with Google / GitHub" (hidden when unset) |
 
 ## Operations

@@ -102,10 +102,10 @@ async fn products_are_created_with_json_and_validated() {
                 .await
         }
     };
-    let created = post(json!({ "name": "Coffee", "price": 18000 })).await;
+    let created = post(json!({ "name": "Coffee", "price": 450 })).await;
     created
         .assert_status(201)
-        .assert_json(json!({ "name": "Coffee", "price": 18000 }));
+        .assert_json(json!({ "name": "Coffee", "price": 450 }));
 
     let invalid = post(json!({ "name": "Coffee", "price": -1 })).await;
     invalid.assert_status(422);
@@ -192,10 +192,7 @@ async fn read_only_tokens_cannot_write() {
                 .without_csrf()
                 .json()
                 .header("authorization", &token)
-                .post_json(
-                    "/api/products",
-                    &json!({ "name": "Coffee", "price": 18000 }),
-                )
+                .post_json("/api/products", &json!({ "name": "Coffee", "price": 450 }))
                 .await
         }
     };

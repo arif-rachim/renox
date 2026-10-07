@@ -376,8 +376,8 @@ async fn excel_exports_keep_numbers_dates_and_text_apart() {
         sheet.contains("<v>46113</v>") && sheet.contains("<v>46114.125</v>"),
         "{sheet}"
     );
-    // Money in the smallest unit becomes the amount (IDR has no cents).
-    assert!(sheet.contains("<v>150000</v>"), "{sheet}");
+    // Money in the smallest unit becomes the amount (cents → dollars).
+    assert!(sheet.contains("<v>1500</v>"), "{sheet}");
     // Gamma (row 4) has no maker: no cell B4.
     assert!(
         sheet.contains(r#"r="A4""#) && !sheet.contains(r#"r="B4""#),

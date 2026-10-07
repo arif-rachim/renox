@@ -347,7 +347,7 @@ async fn the_list_exports_csv() {
     );
     let text = file.text();
     assert!(text.contains("Name,SKU,Price,Status,Active"), "{text}");
-    assert!(text.contains("Iced coffee,C-1,75000,Live,Yes"), "{text}");
+    assert!(text.contains("Iced coffee,C-1,750.00,Live,Yes"), "{text}");
 }
 
 #[renox::test]
@@ -408,7 +408,7 @@ async fn the_create_page_draws_the_fields() {
     has(r#"data-live-validate"#);
     has(r#"name="name" type="text""#);
     // Money: a number with the currency's code before it.
-    has(r#"<span class="rx-affix__text" id="rx-price-prefix">IDR</span>"#);
+    has(r#"<span class="rx-affix__text" id="rx-price-prefix">USD</span>"#);
     has(r#"name="price" type="number""#);
     // The select and the belongs-to choices.
     has(r#"<option value="live">Live</option>"#);
@@ -443,7 +443,7 @@ async fn creating_checks_the_form_then_saves() {
             &[
                 ("name", "Iced coffee"),
                 ("sku", "c-1"),
-                ("price", "25000"),
+                ("price", "250"),
                 ("status", "live"),
                 ("active", "on"),
                 ("released_on", "2026-10-01"),
@@ -492,6 +492,74 @@ async fn creating_checks_the_form_then_saves() {
     app.assert_database_count("products", 1).await;
 }
 
+/// Money fields show and take whole units of `APP_CURRENCY` (`12.99`) and
+/// keep the smallest unit (`1299`); a currency without decimals is as typed.
+#[renox::test]
+async fn money_fields_take_whole_units() {
+    let app = app().await;
+    let ana = user(&app, "ana@example.com").await;
+    app.acting_as(&ana);
+    let fields = |sku: &'static str, price: &'static str| {
+        [
+            ("name", "Tea"),
+            ("sku", sku),
+            ("price", price),
+            ("status", "live"),
+        ]
+    };
+    app.htmx()
+        .post("/admin/products", &fields("t-1", "12.99"))
+        .await
+        .assert_hx_redirect("/admin/products");
+    let tea = Product::query().first(app.db()).await.unwrap().unwrap();
+    assert_eq!(tea.price, 1299);
+    let edit = format!("/admin/products/{}/edit", tea.id);
+    app.get(&edit).await.assert_see(r#"value="12.99""#);
+    // JSON too, and rounding to the cent; text that isn't an amount fails.
+    app.post_json(
+        "/admin/products",
+        &json!({ "name": "Green tea", "sku": "t-3", "price": 0.305, "status": "live", "active": true }),
+    )
+    .await;
+    let tea = Product::find(app.db(), tea.id + 1).await.unwrap().unwrap();
+    assert_eq!(tea.price, 31);
+    let edit = format!("/admin/products/{}/edit", tea.id);
+    app.get(&edit).await.assert_see(r#"value="0.31""#);
+    app.htmx()
+        .post("/admin/products", &fields("t-2", "lots"))
+        .await
+        .assert_status(422);
+    let shown = app.get(&format!("/admin/products/{}", tea.id)).await;
+    shown.assert_see("$0.31");
+
+    // IDR has no cents: the amount is as typed.
+    let app = TestApp::with_config(
+        App::new()
+            .module(Auth::new())
+            .module(admin())
+            .migrations(renox::migrations!("tests/migrations")),
+        |c| c.currency = "IDR".into(),
+    )
+    .await;
+    let ana = user(&app, "ana@example.com").await;
+    app.acting_as(&ana);
+    app.htmx()
+        .post("/admin/products", &fields("t-1", "75000"))
+        .await
+        .assert_hx_redirect("/admin/products");
+    let tea = Product::query().first(app.db()).await.unwrap().unwrap();
+    assert_eq!(tea.price, 75_000);
+    let html = app
+        .get(&format!("/admin/products/{}/edit", tea.id))
+        .await
+        .text();
+    assert!(html.contains(r#"value="75000""#), "{html}");
+    assert!(!html.contains(r#"step="0.01""#), "{html}");
+    app.get(&format!("/admin/products/{}", tea.id))
+        .await
+        .assert_see("Rp 75,000");
+}
+
 #[renox::test]
 async fn editing_shows_the_record_and_saves_it() {
     let app = app().await;
@@ -502,7 +570,9 @@ async fn editing_shows_the_record_and_saves_it() {
     let html = app.get(&format!("{url}/edit")).await.assert_ok().text();
     let has = |needle: &str| assert!(html.contains(needle), "missing {needle}\n{html}");
     has(r#"value="Coffee""#);
-    has(r#"value="75000""#);
+    // Money in whole units: 75000 cents.
+    has(r#"value="750.00""#);
+    has(r#"step="0.01""#);
     has(r#"<option value="live" selected>Live</option>"#);
     // The SKU can't change here, and the page can delete.
     has(r#"name="sku" type="text" value="C-1" required aria-required="true" readonly"#);
@@ -515,7 +585,7 @@ async fn editing_shows_the_record_and_saves_it() {
             &[
                 ("name", "Hot coffee"),
                 ("sku", "C-1"),
-                ("price", "30000"),
+                ("price", "300.00"),
                 ("status", "draft"),
             ],
         )
@@ -543,7 +613,7 @@ async fn the_view_page_lists_the_entries() {
         .assert_view("renox-admin/show.html")
         .assert_see("Product #")
         .assert_see("Coffee")
-        .assert_see("Rp 75,000")
+        .assert_see("$750.00")
         .assert_see(r#"<span class="rx-badge">Live</span>"#)
         .assert_see(&format!("/admin/products/{}/edit", coffee.id))
         .assert_see("Released");

@@ -410,7 +410,8 @@ pub struct ReturnForm {
     /// Damage found.
     #[serde(default)]
     pub damaged: bool,
-    pub damage_fee: Option<i64>,
+    /// In whole units as typed (`45.00`); stored in the smallest unit.
+    pub damage_fee: Option<f64>,
     pub damage_note: Option<String>,
     #[serde(default)]
     pub photos: Vec<Upload>,
@@ -433,7 +434,7 @@ impl Validate for ReturnForm {
     }
 
     async fn after(&self, form: &FormContext<'_>, errors: &mut Errors) -> Result {
-        if self.damaged && self.damage_fee.unwrap_or(0) <= 0 && self.photos.is_empty() {
+        if self.damaged && self.damage_fee.unwrap_or(0.0) <= 0.0 && self.photos.is_empty() {
             errors.add(
                 "damage_fee",
                 form.state
@@ -504,13 +505,10 @@ pub async fn take_back(
         stored.push(photo.store(&state.storage, "rentals").await?);
     }
     let now = renox::db::now();
-    let damaged = form.damaged || form.damage_fee.unwrap_or(0) > 0;
+    let damage_fee = crate::money::from_form(form.damage_fee).max(0);
+    let damaged = form.damaged || damage_fee > 0;
     rental.late_fee = late_fee(bike.hourly_rate, rental.due_at, now);
-    rental.damage_fee = if damaged {
-        form.damage_fee.unwrap_or(0).max(0)
-    } else {
-        0
-    };
+    rental.damage_fee = if damaged { damage_fee } else { 0 };
     let settlement = settle(held(rental), rental.fees());
     let minutes = pricing::ridden_minutes(rental.picked_up_at.unwrap_or(rental.starts_at), now);
 

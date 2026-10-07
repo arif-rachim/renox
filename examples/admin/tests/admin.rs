@@ -98,7 +98,7 @@ async fn an_editor_adds_and_changes_products_but_deletes_nothing() {
             &[
                 ("name", "Cold brew 1 L"),
                 ("sku", "cof-arb"),
-                ("price", "55000"),
+                ("price", "11.99"),
                 ("stock", "10"),
                 ("status", "live"),
             ],
@@ -114,7 +114,7 @@ async fn an_editor_adds_and_changes_products_but_deletes_nothing() {
                 ("name", "Cold brew 1 L"),
                 ("sku", "cof-cold"),
                 ("category_id", &coffee.id.to_string()),
-                ("price", "55000"),
+                ("price", "11.99"),
                 ("stock", "10"),
                 ("status", "live"),
                 ("featured", "on"),
@@ -135,19 +135,19 @@ async fn an_editor_adds_and_changes_products_but_deletes_nothing() {
             &[
                 ("name", "Cold brew 1 L"),
                 ("sku", "COF-COLD"),
-                ("price", "60000"),
+                ("price", "12.99"),
                 ("stock", "8"),
                 ("status", "live"),
             ],
         )
         .await
         .assert_hx_redirect("/admin/products");
-    assert_eq!(product(&app, "COF-COLD").await.price, 60_000);
+    assert_eq!(product(&app, "COF-COLD").await.price, 1_299);
 
     app.get(&url)
         .await
         .assert_ok()
-        .assert_see("Rp 60,000")
+        .assert_see("$12.99")
         .assert_dont_see("Delete this product?");
     app.htmx().delete(&url).await.assert_forbidden();
     // Customers: editors only look.

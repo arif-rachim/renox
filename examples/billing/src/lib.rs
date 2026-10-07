@@ -2,7 +2,8 @@
 //! small writing app that charges for plans:
 //!
 //! - three plans declared in code: Basic and Pro through Stripe (Pro with a
-//!   14-day trial), and Pro (IDR) through Xendit for Indonesian customers;
+//!   14-day trial) in US dollars, and Pro (IDR) through Xendit for
+//!   Indonesian customers (Xendit charges rupiah only);
 //! - the module's plans page (`/billing`), its card on `/account` (change
 //!   plan, cancel, resume), and free trials without a payment method;
 //! - pages for subscribers only: `/reports` for any plan
@@ -53,6 +54,8 @@ pub fn billing() -> Billing {
                 .feature("Everything in Basic")
                 .feature("Exports to PDF and EPUB"),
         )
+        // Xendit charges rupiah only, so its plan stays in IDR; the
+        // others are in US dollars (cents) through Stripe.
         .plan(
             Plan::new("pro-idr", "Pro (IDR)")
                 .price(149_000, "IDR", Interval::Month)

@@ -268,7 +268,8 @@ impl Filters {
             );
         }
         // Both ends in one EXISTS: one variant must be in the range (a bike
-        // at 1,000,000 and 10,000,000 is not "between 4 and 5 million").
+        // with variants at $1,000 and $10,000 is not "between $4,000 and
+        // $5,000").
         if self.price_min.is_some() || self.price_max.is_some() {
             query = query.where_raw(
                 "EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = products.id \
@@ -396,13 +397,13 @@ mod tests {
             ("brand", "trek"),
             ("brand", "giant"),
             ("price_min", "abc"),
-            ("price_max", "5000000"),
+            ("price_max", "500000"),
             ("sort", "nope"),
             ("page", "0"),
         ]));
         assert_eq!(f.brands, ["trek", "giant"]);
         assert_eq!(f.price_min, None);
-        assert_eq!(f.price_max, Some(5_000_000));
+        assert_eq!(f.price_max, Some(500_000));
         assert_eq!(f.sort, Sort::Popular);
         assert_eq!(f.page, 1);
     }

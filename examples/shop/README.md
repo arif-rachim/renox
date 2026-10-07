@@ -140,6 +140,7 @@ section.
 `rnx new`, `docker build .` works as is (CI checks that on every change). This example is part
 of the Renox workspace, so build it from a copy made with `rnx new` rather than from this folder.
 
-Money is in rupiah as `i64`, shown with the `money` filter (`APP_CURRENCY`, `IDR` by default:
-`Rp 75.000` in Spanish, `Rp 75,000` in English), and the payment is a bank transfer the admin confirms by hand. To
+Money is in US dollars, stored in cents as `i64` (`450` is $4.50) and shown with the `money`
+filter (`APP_CURRENCY=USD`: `$4,50` in Spanish, `$4.50` in English); the admin types prices in
+dollars. The payment is a bank transfer the admin confirms by hand. To
 take card or e-wallet payments, see [examples/webhooks](../webhooks).

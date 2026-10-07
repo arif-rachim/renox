@@ -16,23 +16,24 @@ use crate::Settings;
 
 const CITIES: [&str; 6] = ["Bandung", "Jakarta", "Bogor", "Cimahi", "Garut", "Sumedang"];
 
+/// SKU, name, price in cents.
 const PRODUCTS: [(&str, &str, i64); 16] = [
-    ("COF-ARB", "Arabica coffee 250 g", 65_000),
-    ("COF-ROB", "Robusta coffee 250 g", 45_000),
-    ("TEA-JAS", "Jasmine tea 100 g", 18_000),
-    ("SUGAR-PALM", "Palm sugar 500 g", 32_000),
-    ("MILK-UHT", "UHT milk 1 L", 21_000),
-    ("CUP-12", "Paper cups 12 oz (50)", 38_000),
-    ("CUP-16", "Paper cups 16 oz (50)", 44_000),
-    ("LID-90", "Cup lids 90 mm (50)", 19_000),
-    ("SPOON-WD", "Wooden spoons (100)", 25_000),
-    ("SYRUP-VAN", "Vanilla syrup 750 ml", 89_000),
-    ("SYRUP-CRM", "Caramel syrup 750 ml", 89_000),
-    ("COCOA-PWD", "Cocoa powder 500 g", 74_000),
-    ("FILTER-V60", "V60 filter papers (100)", 55_000),
-    ("BAG-PPR", "Paper bags (25)", 27_000),
-    ("ICE-5KG", "Ice cubes 5 kg", 15_000),
-    ("WATER-19L", "Mineral water 19 L", 22_000),
+    ("COF-ARB", "Arabica coffee 250 g", 1_299),
+    ("COF-ROB", "Robusta coffee 250 g", 899),
+    ("TEA-JAS", "Jasmine tea 100 g", 499),
+    ("SUGAR-PALM", "Palm sugar 500 g", 599),
+    ("MILK-UHT", "UHT milk 1 L", 299),
+    ("CUP-12", "Paper cups 12 oz (50)", 799),
+    ("CUP-16", "Paper cups 16 oz (50)", 899),
+    ("LID-90", "Cup lids 90 mm (50)", 399),
+    ("SPOON-WD", "Wooden spoons (100)", 499),
+    ("SYRUP-VAN", "Vanilla syrup 750 ml", 1_499),
+    ("SYRUP-CRM", "Caramel syrup 750 ml", 1_499),
+    ("COCOA-PWD", "Cocoa powder 500 g", 1_199),
+    ("FILTER-V60", "V60 filter papers (100)", 699),
+    ("BAG-PPR", "Paper bags (25)", 399),
+    ("ICE-5KG", "Ice cubes 5 kg", 349),
+    ("WATER-19L", "Mineral water 19 L", 599),
 ];
 
 pub async fn run(state: AppState) -> Result {

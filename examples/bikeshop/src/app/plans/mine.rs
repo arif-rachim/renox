@@ -284,12 +284,28 @@ pub async fn show(
         .and_then(|r| r.day.clone())
         .unwrap_or_else(|| today.to_string())[..7]
         .to_owned();
+    // A Xendit plan is charged in rupiah (billing.rs): its own price.
+    let (monthly, monthly_currency) = if sub.gateway == "xendit" {
+        (
+            super::billing::xendit_price(plan.monthly_price()),
+            super::billing::XENDIT_CURRENCY.to_owned(),
+        )
+    } else {
+        (plan.monthly_price(), state.config.currency.clone())
+    };
+    let rate = crate::money::format(
+        super::billing::RUPIAH_PER_DOLLAR,
+        super::billing::XENDIT_CURRENCY,
+        &state.current_lang().locale,
+    );
     Ok(view(
         "plans/show.html",
         context! {
             status => shown_status(&sub),
             demo => sub.gateway == "demo",
-            monthly => plan.monthly_price(),
+            monthly,
+            monthly_currency,
+            rate,
             discount => super::subscribe::percent(plan.parts_discount_bp),
             sub,
             bike,

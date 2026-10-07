@@ -5,6 +5,12 @@
 //! by its signature, stored once per event and handled by the queue, which
 //! marks the invoice paid and tells the cashiers (the bell).
 //!
+//! Invoices are in US dollars (cents), but Midtrans and Xendit charge
+//! rupiah only: both read the amount sent as IDR. The pages and webhooks
+//! work as they are in the sandbox; a live Midtrans or Xendit account
+//! charges IDR, so a business taking payments there invoices in rupiah
+//! (`APP_CURRENCY=IDR`, whole rupiah).
+//!
 //! Keys come from `.env`: `MIDTRANS_SERVER_KEY`, `XENDIT_SECRET_KEY` and
 //! `XENDIT_CALLBACK_TOKEN`. `MIDTRANS_URL` and `XENDIT_URL` point at the
 //! sandbox by default.
@@ -87,6 +93,7 @@ async fn midtrans_page(state: &AppState, invoice: &Invoice, customer: &Customer)
         .post(format!("{base}/snap/v1/transactions"))
         .basic_auth(&key, "")
         .json(&json!({
+            // Read by Midtrans as rupiah (IDR is all it charges).
             "transaction_details": { "order_id": invoice.number, "gross_amount": invoice.total },
             "customer_details": { "first_name": customer.name, "email": customer.email },
         }))
@@ -118,6 +125,7 @@ async fn xendit_page(state: &AppState, invoice: &Invoice, customer: &Customer) -
         .header("idempotency-key", invoice.number.clone())
         .json(&json!({
             "external_id": invoice.number,
+            // Read by Xendit as rupiah (its default currency).
             "amount": invoice.total,
             "payer_email": customer.email,
             "description": format!("Invoice {}", invoice.number),
@@ -168,11 +176,12 @@ pub async fn mark_paid(state: &AppState, number: &str, via: &str, by: &str) -> R
     Ok(true)
 }
 
-/// An amount the way the `money` filter writes it (`APP_CURRENCY`).
+/// An amount in cents the way the `money` filter writes it
+/// (`APP_CURRENCY`). `format_money` takes whole units, hence the division.
 pub fn money(amount: i64) -> String {
     match renox::context::app() {
         Some(state) => renox::format_money(
-            amount as f64,
+            amount as f64 / 10f64.powi(renox::currency_decimals(&state.config.currency) as i32),
             &state.config.currency,
             None,
             &state.current_lang().locale,

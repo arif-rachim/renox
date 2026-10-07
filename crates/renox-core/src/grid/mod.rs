@@ -81,7 +81,7 @@ pub enum Kind {
     Text,
     /// A number, right-aligned; filtered with a minimum and a maximum.
     Number,
-    /// An amount in the smallest unit (rupiah, cents), with thousands
+    /// An amount in the smallest unit (cents, fils), with thousands
     /// separators; filtered like a number.
     Money,
     /// A date (`NaiveDate`); filtered with a date range.
@@ -340,8 +340,9 @@ impl Column {
     }
 
     /// An amount in the smallest unit (cents, fils), shown in whole units
-    /// of `APP_CURRENCY` with its usual decimals (`400000` fils is `4,000.00`
-    /// in AED, `400,000` in IDR). Summaries and exports show whole units too,
+    /// of `APP_CURRENCY` with its usual decimals (`129900` cents is
+    /// `1,299.00` in USD, `400,000` in IDR), as the `money` template filter
+    /// takes it. Summaries and exports show whole units too,
     /// and range filters take them. An inline edit still sends the stored
     /// value (the smallest unit).
     pub fn money(key: &str, label: &str) -> Self {

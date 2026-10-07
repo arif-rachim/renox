@@ -5,9 +5,10 @@ use renox::clap;
 use renox::command::AppCommand;
 use renox::prelude::*;
 
-use super::model::Product;
+use super::model::{Product, cents};
 
-/// Import products from a CSV file of `name,price` lines.
+/// Import products from a CSV file of `name,price` lines (prices in
+/// dollars, like `4.50`).
 ///
 /// Everything goes in one transaction; each line runs in a savepoint, so a
 /// bad line (a price that isn't a number, a name the `saving` hook refuses,
@@ -93,9 +94,10 @@ fn parse(line: &str) -> Result<(String, i64)> {
         .ok_or_else(|| Error::BadRequest("expected `name,price`".into()))?;
     let price = price
         .trim()
-        .parse::<i64>()
+        .parse::<f64>()
         .ok()
-        .filter(|price| *price >= 0)
+        .filter(|price| price.is_finite() && *price >= 0.0)
+        .map(cents)
         .ok_or_else(|| Error::BadRequest(format!("`{}` isn't a price", price.trim())))?;
     Ok((name.trim().to_owned(), price))
 }

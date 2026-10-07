@@ -1303,7 +1303,7 @@ public static function table(Table $table): Table
     return $table->columns([
         TextColumn::make('number')->searchable(),
         TextColumn::make('status')->badge(),
-        TextColumn::make('total')->money('IDR')->summarize(Sum::make()),
+        TextColumn::make('total')->money('USD', divideBy: 100)->summarize(Sum::make()),
     ])->defaultSort('total', 'desc');
 }
 ```

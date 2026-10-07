@@ -21,7 +21,8 @@ pub struct Product {
     pub name: String,
     /// Made from `name` by the `saving` hook, e.g. "Coffee Latte" → "coffee-latte".
     pub slug: String,
-    /// In the smallest currency unit (e.g. rupiah), to avoid float rounding.
+    /// In cents (the smallest unit of `APP_CURRENCY`, USD), to avoid float
+    /// rounding: `1299` is $12.99.
     pub price: i64,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
@@ -80,7 +81,7 @@ impl Factory for Product {
     fn definition() -> Self {
         Product {
             name: Word().fake(),
-            price: (1_000..100_000).fake(),
+            price: (199..4_999).fake(),
             ..Default::default()
         }
     }
@@ -94,4 +95,9 @@ impl Product {
             ..Product::factory().make_one()
         }
     }
+}
+
+/// A price typed in dollars (`12.99`, from the form or a CSV line) in cents.
+pub fn cents(dollars: f64) -> i64 {
+    (dollars * 100.0).round() as i64
 }

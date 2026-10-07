@@ -131,7 +131,7 @@ const PAGE: &str = r##"{% from "renox/ui.html" import stats, stat, dashboard, wi
 <div id="pie">{{ chart("doughnut", labels=["a", "b", "c", "d", "e", "f", "g"], values=[10, 20, 30, 10, 10, 10, 10], title="Mix") }}</div>
 <div id="month">{{ chart("bar", labels=["2026-08", "2026-09"], values=[1, 2], x_format="%m/%Y") }}</div>
 <div id="scatter">{{ chart("scatter", [{"name": "Coffee", "points": [[10, 52], [20.5, 87], {"x": 30, "y": 60, "label": "Latte"}]}, {"name": "Tea", "points": [[15, 70], ["x", 1]]}], x_title="Price", y_title="Sold") }}</div>
-<div id="bubble">{{ chart("bubble", points=[{"x": 1000, "y": 5, "size": 400, "label": "Mug"}, {"x": 25000, "y": 12, "size": 100, "label": "Beans"}, [5000, 9]], x_format="money", size_title="Revenue", size_format="money", title="Products") }}</div>
+<div id="bubble">{{ chart("bubble", points=[{"x": 450, "y": 5, "size": 400, "label": "Mug"}, {"x": 25000, "y": 12, "size": 100, "label": "Beans"}, [5000, 9]], x_format="money", size_title="Revenue", size_format="money", title="Products") }}</div>
 <div id="end"></div>"##;
 
 async fn app(timezone: &str, locale: &str) -> (TestApp, tempfile::TempDir) {
@@ -251,7 +251,7 @@ async fn charts_stats_and_widgets_render() {
     // Figures.
     has(r#"<div class="rx-stats rx-cols-3">"#);
     has(r#"<a class="rx-stat rx-stat--link" href="/orders">"#);
-    has(r#"<p class="rx-stat__value">Rp 75,000</p>"#);
+    has(r#"<p class="rx-stat__value">$750.00</p>"#);
     has(r#"rx-stat__delta--good"#);
     has(
         r#"<span class="rx-stat__change">+12.5%</span> <span class="rx-stat__vs">vs previous period</span>"#,
@@ -282,7 +282,7 @@ async fn charts_stats_and_widgets_render() {
         "{line}"
     );
     assert!(
-        line.contains(">30K</span>") && line.contains(">0</span>"),
+        line.contains(">300</span>") && line.contains(">0</span>"),
         "{line}"
     );
     assert!(
@@ -293,12 +293,9 @@ async fn charts_stats_and_widgets_render() {
         line.contains(r#"class="rx-chart__dot rx-series-1" style="left: 100%"#),
         "{line}"
     );
+    assert!(line.contains("<td class=\"rx-num\">$300.00</td>"), "{line}");
     assert!(
-        line.contains("<td class=\"rx-num\">Rp 30,000</td>"),
-        "{line}"
-    );
-    assert!(
-        line.contains("&quot;values&quot;:[&quot;Rp 12,500&quot;"),
+        line.contains("&quot;values&quot;:[&quot;$125.00&quot;"),
         "{line}"
     );
     assert!(
@@ -363,8 +360,8 @@ async fn dashboards_speak_the_apps_language() {
         ">7 días</a>",
         r#"aria-current="page">30 días</a>"#,
         "frente al periodo anterior",
-        "Rp 75.000",
-        ">30K</span>",
+        "$750,00",
+        ">300</span>",
         ">Oct 1</span>",
         "Ver los datos",
         "Otros",
@@ -585,7 +582,12 @@ async fn scatter_and_bubble_charts_render() {
     has(bubble, r#"<th scope="col" class="rx-num">Revenue</th>"#);
     has(
         bubble,
-        r#"<tr><th scope="row">Beans</th><td class="rx-num">Rp 25,000</td><td class="rx-num">12</td><td class="rx-num">Rp 100</td></tr>"#,
+        r#"<tr><th scope="row">Beans</th><td class="rx-num">$250.00</td><td class="rx-num">12</td><td class="rx-num">$1.00</td></tr>"#,
+    );
+    // Money is in cents and keeps its decimals, though the data has none.
+    has(
+        bubble,
+        r#"<tr><th scope="row">Mug</th><td class="rx-num">$4.50</td><td class="rx-num">5</td><td class="rx-num">$4.00</td></tr>"#,
     );
     assert!(!bubble.contains("rx-chart__legend"), "one series: {bubble}");
 

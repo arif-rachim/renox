@@ -233,7 +233,7 @@ pub fn entries() -> Vec<Explanation> {
                     api: "money filter",
                     why: "Money is stored as integers in the smallest unit (no rounding errors \
                           from floats) and shown with `money` in the visitor's locale \
-                          (`Rp 150,000` / `Rp 150.000`).",
+                          (`$150.00` / `$150,00`).",
                 },
             ],
             under_hood: "One query for the customer record (made from the account on the \

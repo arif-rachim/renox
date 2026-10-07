@@ -34,11 +34,14 @@ There is no sign-up page: staff are added by an admin. Log in as
 - **Get paid.** "Paid in cash" marks it paid. With a gateway chosen in
   Settings and its key in `.env`, "Payment link" asks Midtrans or Xendit for
   a payment page; when the customer pays, the gateway's webhook marks the
-  invoice paid and the cashiers' bell rings.
+  invoice paid and the cashiers' bell rings. Prices and invoices are in US
+  dollars (stored in cents); Midtrans and Xendit charge rupiah only, so a
+  live account there charges IDR (invoice in rupiah, `APP_CURRENCY=IDR`,
+  to use them for real).
 - **Stock.** A product's page shows its ledger. "Adjust stock" receives
   deliveries, writes off damage, or sets the count from the shelf; stock
   never goes below zero. Products → More → "Import from CSV…" reads a CSV
-  file (`sku,name,price,stock`; "Download the CSV template" gives an empty
+  file (`sku,name,price,stock`, prices in dollars like `12.99`; "Download the CSV template" gives an empty
   one) with `renox::import`: each row is checked with `ProductRow`'s rules,
   like a form, and the good rows land in one transaction, a savepoint each.
   Refused rows stay listed in the sheet with their row numbers and why.

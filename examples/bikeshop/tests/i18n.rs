@@ -506,13 +506,27 @@ async fn spanish_formats_money_and_counts() {
     let page = app.get("/shop").await;
     page.assert_ok();
     let html = page.text();
-    // Money with the Spanish separators (Rp 1.250.000), never English ones.
-    assert!(html.contains("Rp "), "prices are shown");
+    // Money with the Spanish separators ($1.249,99), never English ones
+    // ($1,249.99): every price ends in a decimal comma.
     let text = visible(&html);
-    assert!(
-        !text.contains("Rp 1,") && !text.contains("Rp 2,"),
-        "no English thousands separators in Spanish"
-    );
+    let prices: Vec<&str> = text
+        .split('$')
+        .skip(1)
+        .filter_map(|rest| {
+            let figures = rest
+                .split(|c: char| !(c.is_ascii_digit() || c == '.' || c == ','))
+                .next()?
+                .trim_end_matches(['.', ',']);
+            (!figures.is_empty()).then_some(figures)
+        })
+        .collect();
+    assert!(!prices.is_empty(), "prices are shown");
+    for price in &prices {
+        assert!(
+            price.len() > 3 && price.as_bytes()[price.len() - 3] == b',',
+            "${price}: no English separators in Spanish"
+        );
+    }
     // The plural range of the result count, in Spanish.
     assert!(text.contains(" productos"), "the count is Spanish");
 }

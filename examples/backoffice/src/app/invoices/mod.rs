@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::Settings;
 use crate::app::customers::Customer;
-use crate::app::products::{Product, stock};
+use crate::app::products::{Product, cents, stock};
 pub use model::{Invoice, InvoiceLine, STATUS_TONES, STATUSES};
 
 /// Today in `APP_TIMEZONE`: an invoice issued at 1 a.m. in Jakarta is
@@ -50,12 +50,12 @@ pub fn grid(can_export: bool) -> Grid {
         .column(Column::date("issued_on", "Issued"))
         .column(Column::date("due_on", "Due"))
         .column(
-            Column::money("total", "Total (Rp)")
+            Column::money("total", "Total ($)")
                 .mobile()
                 .summary(renox::grid::Summary::Sum),
         )
         .column(
-            Column::money("tax", "Tax (Rp)")
+            Column::money("tax", "Tax ($)")
                 .hidden()
                 .summary(renox::grid::Summary::Sum),
         )
@@ -158,8 +158,8 @@ pub struct InvoiceForm {
 pub struct LineForm {
     pub product_id: i64,
     pub quantity: i64,
-    /// Empty: the product's price.
-    pub unit_price: Option<i64>,
+    /// In dollars as typed (`12.99`). Empty: the product's price.
+    pub unit_price: Option<f64>,
 }
 
 /// One line's rules; `v.nested` keys its errors `lines.0.quantity`, where
@@ -175,7 +175,8 @@ impl Validate for LineForm {
             .between(1, 10_000);
         v.field("unit_price", &self.unit_price)
             .label("Price")
-            .min(0);
+            .min(0)
+            .decimal(0, 2);
     }
 }
 
@@ -208,7 +209,7 @@ pub(super) async fn store(
     let mut lines = Vec::with_capacity(form.lines.len());
     for line in &form.lines {
         let product = Product::find_or_404(&mut tx, line.product_id).await?;
-        let unit_price = line.unit_price.unwrap_or(product.price);
+        let unit_price = line.unit_price.map(cents).unwrap_or(product.price);
         lines.push(InvoiceLine {
             product_id: product.id,
             description: product.name,

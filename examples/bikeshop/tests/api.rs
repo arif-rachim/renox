@@ -140,9 +140,9 @@ async fn reserved(w: &World, store: &Store) -> Rental {
         .await
         .unwrap();
     // Every bike at the same rates, so two rentals can be compared.
-    bike.hourly_rate = 26_000;
-    bike.daily_rate = 150_000;
-    bike.deposit = 650_000;
+    bike.hourly_rate = 1_300;
+    bike.daily_rate = 6_000;
+    bike.deposit = 26_000;
     bike.save(w.app.db()).await.unwrap();
     let now = renox::db::now();
     booking::book(
