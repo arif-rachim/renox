@@ -100,7 +100,9 @@ const DETAILS = {
   ],
   owner: [
     ['/staff/fleet', /^\/staff\/fleet\/\d+$/],
-    ['/staff/orders', /^\/staff\/orders\/\d+$/],
+    // The orders list opens on the open (paid / ready) tab, which the seed
+    // doesn't promise for the owner's store; every store has completed ones.
+    ['/staff/orders?status=completed', /^\/staff\/orders\/\d+$/],
     ['/staff/stock', /^\/staff\/stock\/\d+$/],
     ['/staff/purchase-orders', /^\/staff\/purchase-orders\/\d+$/],
     ['/staff/suppliers', /^\/staff\/suppliers\/\d+$/],
