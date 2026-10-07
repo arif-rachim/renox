@@ -44,6 +44,9 @@ pub fn app() -> App {
             "explain_panels",
             |ctx: renox::view::ViewContext| async move { Ok(explain::enabled(&ctx.state.config)) },
         )
+        // The demo accounts and their password on the login page of a seeded
+        // demo, hidden with BIKESHOP_DEMO_LOGINS=false (src/app/accounts/demo_logins.rs).
+        .share("demo_logins", app::accounts::demo_logins::for_view)
         // Login, register, password reset, email verification, /account with
         // the areas' sections, and the notification bell's list and stream;
         // signing up makes a customer (src/app/accounts).

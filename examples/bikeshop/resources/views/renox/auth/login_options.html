@@ -1,7 +1,10 @@
 {#- renox-oauth's provider buttons on Renox's login, register and
     confirm-password pages (`page`: "login", "register" or "confirm";
     `oauth_providers`: name, label, url), replaced by the bike shop for its
-    translations (`plugins.oauth.*`). -#}
+    translations (`plugins.oauth.*`); on the login page of a seeded demo it
+    also lists the demo accounts (`demo_logins`, src/app/accounts/demo_logins.rs):
+    a tap fills the form (public/app.js), and without JavaScript the email
+    and the password are there to type. -#}
 {%- set providers = oauth_providers | default([]) %}
 {%- if providers %}
 <div class="rx-stack rx-oauth">
@@ -10,4 +13,22 @@
   <a class="rx-button rx-button--secondary rx-button--block" href="{{ provider.url }}" hx-boost="false" data-oauth-provider="{{ provider.name }}"><span class="rx-button__label">{{ provider.label }}</span></a>
   {%- endfor %}
 </div>
+{%- endif %}
+{%- set demo = demo_logins | default(none) %}
+{%- if page == "login" and demo %}
+<section class="bs-demo-logins" aria-labelledby="demo-logins-title">
+  <h2 class="bs-demo-logins__title" id="demo-logins-title">{{ t('accounts.demo.title') }}</h2>
+  <p class="bs-demo-logins__lead">{{ t('accounts.demo.lead') }} <code>{{ demo.password }}</code></p>
+  <ul class="bs-demo-logins__list" role="list">
+    {%- for account in demo.accounts %}
+    <li>
+      <button class="bs-demo-logins__account" type="button" data-bs-demo-email="{{ account.email }}" data-bs-demo-password="{{ demo.password }}">
+        <span class="bs-demo-logins__role">{{ t('accounts.demo.who.' ~ account.who) }}</span>
+        <span class="bs-demo-logins__email">{{ account.email }}</span>
+      </button>
+    </li>
+    {%- endfor %}
+  </ul>
+  {%- if demo.staff_2fa %}<p class="bs-demo-logins__note">{{ t('accounts.demo.two_factor') }}</p>{% endif %}
+</section>
 {%- endif %}

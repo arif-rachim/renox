@@ -19,9 +19,64 @@
 @media (min-width: 40.0625rem) { .bs-public .rx-navbar .bs-search { flex: 4 1 0; width: auto; min-width: 7rem; max-width: 20rem; } }
 /* Phones: the cart is its icon and count (the word stays for screen readers, as
    the kit's .rx-visually-hidden does), so the account menu fits the same row. */
-@media (max-width: 36rem) { .bs-public .bs-cart-link .rx-button__label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } }
+@media (max-width: 40rem) { .bs-public .bs-cart-link .rx-button__label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } }
+
+/* Phones: the top bar keeps one row (the brand, a search button, the cart,
+   "About this page", the bell); the links, the language and the account move to a tab bar at
+   the bottom and the menu panel it opens (layouts/_nav_menu.html). The
+   search box opens under the top row when its button is pressed (app.js). */
+.bs-desktop-only { display: contents; }
+.bs-phone-only, .bs-tabbar { display: none; }
+@media (max-width: 40rem) {
+  .bs-desktop-only, .bs-public .rx-navbar .rx-navbar__links { display: none; }
+  .bs-phone-only { display: inline-flex; }
+  .bs-public .rx-navbar .bs-search { display: none; order: 11; flex-basis: 100%; padding-bottom: var(--rx-space-2); }
+  .bs-public .rx-navbar.bs-searching .bs-search { display: grid; }
+  .bs-public { padding-bottom: calc(3.5rem + env(safe-area-inset-bottom)); }
+  .bs-tabbar {
+    position: fixed; inset: auto 0 0 0; z-index: 30; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+    padding: var(--rx-space-1) var(--rx-space-1) calc(var(--rx-space-1) + env(safe-area-inset-bottom));
+    background: var(--rx-surface-raised);
+    border-top: 0.5px solid var(--rx-separator);
+  }
+}
+.bs-tabbar__tab {
+  display: grid; justify-items: center; align-content: center; gap: 2px; min-height: var(--rx-target); padding: var(--rx-space-1) 0;
+  border: 0; border-radius: var(--rx-radius-s); background: none; color: var(--rx-secondary-label); font: var(--rx-type-caption);
+  text-decoration: none; cursor: pointer;
+}
+.bs-tabbar__tab > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bs-tabbar__tab[aria-current="page"] { color: var(--rx-accent-text); font-weight: 600; }
+.bs-tabbar__tab:focus-visible { outline: 2px solid var(--rx-focus); outline-offset: -2px; }
+.bs-menu { display: grid; gap: var(--rx-space-2); }
+.bs-menu__links { display: grid; gap: 2px; }
+.bs-menu__section { margin: var(--rx-space-2) 0 0; font: var(--rx-type-note); color: var(--rx-secondary-label); }
+.bs-menu__row { display: flex; flex-wrap: wrap; gap: var(--rx-space-2); }
+@media print { .bs-tabbar { display: none; } }
+
+/* The demo accounts on the login page (renox/auth/login_options.html). */
+.bs-demo-logins { display: grid; gap: var(--rx-space-2); padding: var(--rx-space-4); border: var(--rx-surface-border); border-radius: var(--rx-radius-l); background: color-mix(in srgb, var(--rx-accent) 6%, var(--rx-surface)); }
+.bs-demo-logins__title { margin: 0; font: var(--rx-type-heading); }
+.bs-demo-logins__lead, .bs-demo-logins__note { margin: 0; font: var(--rx-type-note); color: var(--rx-secondary-label); }
+.bs-demo-logins__list { display: grid; gap: var(--rx-space-1); margin: 0; padding: 0; list-style: none; }
+.bs-demo-logins__account {
+  display: grid; width: 100%; min-height: var(--rx-target); padding: var(--rx-space-2) var(--rx-space-3); text-align: left;
+  border: var(--rx-surface-border); border-radius: var(--rx-radius-s); background: var(--rx-surface); color: var(--rx-label); cursor: pointer;
+}
+.bs-demo-logins__account:hover { background: var(--rx-fill); }
+.bs-demo-logins__account:focus-visible { outline: 2px solid var(--rx-focus); outline-offset: 1px; }
+.bs-demo-logins__role { font: var(--rx-type-label); }
+.bs-demo-logins__email { font: var(--rx-type-note); color: var(--rx-secondary-label); overflow-wrap: anywhere; }
+
+/* Grid items may shrink below their content's width, so a wide table or code
+   line scrolls inside its own frame instead of widening the page on phones. */
+.rx-stack > *, .rx-card > *, .rx-list__main { min-width: 0; }
 
 /* Lists inside the "About this page" panel and on /about/pages. */
 .bs-links { display: grid; gap: var(--rx-space-1); margin: 0; padding: 0; list-style: none; }
 .bs-badges { display: flex; flex-wrap: wrap; gap: var(--rx-space-1); }
+/* A long badge (a feature's name) wraps instead of widening the page on phones. */
+.bs-badges > *, .bs-badges .rx-badge { max-width: 100%; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+/* Long code names in explanations break where they must. */
+.rx-prose code, .rx-entry code, .rx-table code { overflow-wrap: anywhere; }
 .bs-page-row { display: grid; gap: var(--rx-space-2); padding-block: var(--rx-space-2); }

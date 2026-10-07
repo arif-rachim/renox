@@ -56,7 +56,9 @@ database does nothing, `demo:seed` refuses and tells you to `migrate:fresh` firs
 
 ### Demo users
 
-The seed prints them at the end. The password is `password` for all.
+The seed prints them at the end. The password is `password` for all. The login page
+lists the main ones too (a tap fills the form) while they exist; `BIKESHOP_DEMO_LOGINS=false`
+hides that list ([src/app/accounts/demo_logins.rs](src/app/accounts/demo_logins.rs)).
 
 | Login | Who |
 |---|---|
@@ -290,6 +292,7 @@ Renox's settings are in [.env.example](.env.example), with a comment for each. T
 |---|---|
 | `BIKESHOP_EXPLAIN=false` | Hides the "About this page" panels for a clean demo (`/about/pages` stays) |
 | `BIKESHOP_STAFF_2FA=optional` | Staff may use the staff side without two-factor login (demos, browser tests) |
+| `BIKESHOP_DEMO_LOGINS=false` | Hides the demo accounts on the login page (shown only while the seeded users exist) |
 | `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_<PLAN>`, `XENDIT_SECRET_KEY`, `XENDIT_CALLBACK_TOKEN` | Service plans through Stripe or Xendit; without them a demo gateway of the shop's own stands in (never in production). Webhooks come to `/billing/webhooks/stripe` and `/billing/webhooks/xendit` |
 | `MIDTRANS_SERVER_KEY` | Online orders paid through Midtrans; without it a demo payment page stands in |
 | `GOOGLE_CLIENT_ID`/`_SECRET`, `GITHUB_CLIENT_ID`/`_SECRET` | "Continue with Google / GitHub" (hidden when unset) |

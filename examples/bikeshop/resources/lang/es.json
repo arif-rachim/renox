@@ -12,7 +12,16 @@
     "logout": "Cerrar sesión",
     "dashboard": "Panel",
     "shop": "Tienda",
-    "storefront": "Tienda en línea"
+    "storefront": "Tienda en línea",
+    "menu": "Menú",
+    "language": "Idioma",
+    "tabs": {
+      "label": "Secciones principales",
+      "home": "Inicio",
+      "shop": "Tienda",
+      "rent": "Alquilar",
+      "workshop": "Taller"
+    }
   },
   "home": {
     "title": "Bicicletas para comprar, alquilar y seguir rodando",
@@ -3945,6 +3954,19 @@
       "email_hint": "Se guarda en la ficha; el enlace funciona siete días.",
       "send": "Enviar la invitación",
       "sent": "La invitación va de camino a :email."
+    },
+    "demo": {
+      "title": "Prueba la demo",
+      "lead": "Entra como una de estas personas (toca una para rellenar el formulario). La contraseña de todas es",
+      "two_factor": "Al personal se le pide activar el inicio de sesión en dos pasos antes de entrar en sus páginas.",
+      "who": {
+        "shopper": "Cliente: pedidos, alquileres, bicis, un plan",
+        "shop_owner": "Dueña: todas las tiendas, informes, administración",
+        "store_manager": "Gerente de la tienda North",
+        "till": "Cajera en North: la caja",
+        "workshop": "Mecánica en North: el taller",
+        "two_stores": "Cajero en dos tiendas"
+      }
     }
   },
   "plans": {

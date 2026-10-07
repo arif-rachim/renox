@@ -41,6 +41,43 @@
     }
   });
 
+  // Phones: the search button opens the search box under the top bar (and
+  // closes it again); the box gets the focus, Escape in it closes it.
+  document.addEventListener("click", function (event) {
+    var toggle = event.target.closest && event.target.closest("[data-bs-search-toggle]");
+    if (!toggle) return;
+    var bar = toggle.closest(".rx-navbar");
+    var open = !bar.classList.contains("bs-searching");
+    bar.classList.toggle("bs-searching", open);
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    var input = bar.querySelector(".bs-search__input");
+    if (open && input) input.focus();
+  });
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape" || !event.target.closest) return;
+    var bar = event.target.closest(".rx-navbar.bs-searching");
+    var toggle = bar && bar.querySelector("[data-bs-search-toggle]");
+    if (!toggle || event.target.closest(".bs-suggest")) return;
+    if (bar.querySelector(".bs-suggest:not(:empty)")) return;
+    bar.classList.remove("bs-searching");
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.focus();
+  });
+
+  // The login page's demo accounts: a tap fills the form's email and
+  // password and moves to its button.
+  document.addEventListener("click", function (event) {
+    var account = event.target.closest && event.target.closest("[data-bs-demo-email]");
+    if (!account) return;
+    var form = document.querySelector("form input[name=email]");
+    form = form && form.form;
+    if (!form) return;
+    form.elements.email.value = account.getAttribute("data-bs-demo-email");
+    form.elements.password.value = account.getAttribute("data-bs-demo-password");
+    var submit = form.querySelector("[type=submit]");
+    if (submit) submit.focus();
+  });
+
   window.Bikeshop = { reveal: reveal };
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () { reveal(document); });
