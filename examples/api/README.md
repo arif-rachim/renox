@@ -21,8 +21,10 @@ curl -X POST localhost:3000/api/tokens -H 'content-type: application/json' \
 curl localhost:3000/api/products -H 'authorization: Bearer <token>'
 # → {"items":[…],"per_page":20,"next_cursor":null}   (next page: ?cursor=<next_cursor>)
 curl -X POST localhost:3000/api/products -H 'authorization: Bearer <token>' \
-  -H 'content-type: application/json' -d '{"name":"Milk","price":12000}'
+  -H 'content-type: application/json' -d '{"name":"Milk","price":349}'
 ```
+
+Prices are whole numbers of cents in US dollars (`349` is $3.49), so no float rounds them.
 
 Add `"read_only":true` to the login body for a token that can only read: writing with it gets
 `403`.

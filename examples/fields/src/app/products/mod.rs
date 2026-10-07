@@ -33,7 +33,7 @@ pub struct Product {
     pub description: Option<String>,
     pub stock: i64,
     pub weight_kg: f64,
-    /// Money in the smallest unit (rupiah), never a float.
+    /// Money in the smallest unit (cents: `1699` is $16.99), never a float.
     pub price: i64,
     pub available: bool,
     pub size: Size,
@@ -61,7 +61,7 @@ struct ProductForm {
     description: Option<String>, // the Markdown editor (a <textarea>), empty → None
     stock: i64,                  // <input type="number">
     weight_kg: f64,              // <input type="number" step="0.01">
-    price: i64,                  // <input type="number" step="1">
+    price: f64,                  // <input type="number" step="0.01">: dollars, stored as cents
     available: bool,             // <input type="checkbox">: "on", or nothing → false
     size: Size,                  // the kit's radio group: one value of the enum
     #[serde(default)]
@@ -89,7 +89,7 @@ impl Validate for ProductForm {
         v.field("name", &self.name).required().max(100);
         v.field("stock", &self.stock).min(0);
         v.field("weight_kg", &self.weight_kg).min(0);
-        v.field("price", &self.price).min(0);
+        v.field("price", &self.price).min(0).decimal(0, 2);
         // Rules for each item of a list: errors are keyed `colors.0`,
         // `colors.1`…, and `error('colors')` in the form shows the first.
         v.each("colors", &self.colors, |color| color.one_of(COLORS));
@@ -111,7 +111,7 @@ impl ProductForm {
         product.description = self.description;
         product.stock = self.stock;
         product.weight_kg = self.weight_kg;
-        product.price = self.price;
+        product.price = (self.price * 100.0).round() as i64;
         product.available = self.available;
         product.size = self.size;
         product.colors = Json(self.colors);
@@ -158,7 +158,13 @@ impl Module for Products {
 fn form_view(product: Option<&Product>) -> View {
     view(
         "products/form.html",
-        context! { product, sizes => Size::ALL, colors => COLORS },
+        context! {
+            product,
+            // The price in dollars, as the form takes it.
+            price => product.map(|p| format!("{:.2}", p.price as f64 / 100.0)),
+            sizes => Size::ALL,
+            colors => COLORS,
+        },
     )
 }
 

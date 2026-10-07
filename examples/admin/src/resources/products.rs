@@ -24,7 +24,7 @@ pub struct Product {
     pub category_id: Option<i64>,
     pub name: String,
     pub sku: String,
-    /// In rupiah (IDR has no smaller unit).
+    /// In cents (the smallest unit of `APP_CURRENCY`, USD).
     pub price: i64,
     pub stock: i64,
     pub status: String,

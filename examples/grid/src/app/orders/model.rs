@@ -21,7 +21,7 @@ pub struct Order {
     pub status: String,
     pub tags: Json<Vec<String>>,
     pub items: i64,
-    /// In rupiah.
+    /// In cents (`APP_CURRENCY`'s smallest unit).
     pub total: i64,
     /// Percent.
     pub discount: f64,
@@ -96,7 +96,8 @@ impl Factory for Order {
             status: status.to_owned(),
             tags: Json(tags),
             items,
-            total: items * (25..900).fake::<i64>() * 1_000,
+            // In cents: $4.99 to $149.99 an item.
+            total: items * ((5..150).fake::<i64>() * 100 - 1),
             discount: f64::from((0..250).fake::<u32>()) / 10.0,
             ordered_on: start + Duration::days((0..270).fake::<i64>()),
             paid: status != "new" && status != "cancelled",

@@ -51,7 +51,7 @@ pub fn grid(can_edit: bool) -> Grid {
             "customer_id",
         ))
         .column(
-            Column::sum_of("billed", "Billed (Rp)", "invoices", "customer_id", "total")
+            Column::sum_of("billed", "Billed ($)", "invoices", "customer_id", "total")
                 .summary(renox::grid::Summary::Sum),
         )
         .column(Column::date("created_at", "Since").hidden())

@@ -112,7 +112,7 @@ describe('with the keyboard alone', () => {
         await tabTo(page, '[name=name]');
         await page.type('[name=name]', 'Keyboard blend');
         await tabTo(page, '[name=price]');
-        await page.type('[name=price]', '30000', { clear: true });
+        await page.type('[name=price]', '6.50', { clear: true });
         await submitAndLoad(page); // Enter in a field sends the form
         assert.match(await page.eval(() => document.body.textContent), /Keyboard blend/);
         page.assertClean();

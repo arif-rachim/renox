@@ -211,7 +211,7 @@ mod gateway {
         })
     }
 
-    /// Charges `order.total`. `order-{id}` is the idempotency key, so a
+    /// Charges `order.total` (in cents, as Stripe takes it). `order-{id}` is the idempotency key, so a
     /// retry after a lost response can't charge twice.
     pub async fn charge(state: &AppState, order: &Order, card_token: &str) -> Result {
         let secret = state
@@ -223,7 +223,7 @@ mod gateway {
             .post(format!("{}/charges", base_url(state)))
             .basic_auth(&secret, "") // as Stripe does
             .header("idempotency-key", format!("order-{}", order.id))
-            .json(&json!({ "amount": order.total, "currency": "idr", "source": card_token }))
+            .json(&json!({ "amount": order.total, "currency": "usd", "source": card_token }))
             .timeout(Duration::from_secs(15))
             .send()
             .await?; // no answer at all: a plain error, retried (MAX_ATTEMPTS)

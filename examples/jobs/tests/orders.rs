@@ -24,7 +24,7 @@ async fn place(app: &TestApp) {
         &[
             ("customer_email", "buyer@example.com"),
             ("item", "Coffee"),
-            ("total", "18000"),
+            ("total", "4.50"),
         ],
     )
     .await
@@ -50,7 +50,7 @@ async fn an_order_notifies_admins() {
         &[
             ("customer_email", "buyer@example.com"),
             ("item", "Coffee"),
-            ("total", "18000"),
+            ("total", "4.50"),
         ],
     )
     .await
@@ -65,10 +65,10 @@ async fn an_order_notifies_admins() {
         .unwrap();
     let unread = admin.unread_notifications(app.db()).await.unwrap();
     assert_eq!(unread[0].kind, "new-order");
-    assert_eq!(unread[0].data["total"], 18000);
+    assert_eq!(unread[0].data["total"], 450);
     let message = unread[0].message().unwrap(); // a DatabaseMessage
     assert_eq!(message.title, "New order #1");
-    assert_eq!(message.body.as_deref(), Some("Total: Rp 18,000"));
+    assert_eq!(message.body.as_deref(), Some("Total: $4.50"));
     assert_eq!(order(&app, 1).await.status, OrderStatus::Unpaid);
     app.get("/")
         .await
@@ -152,11 +152,7 @@ async fn paying_runs_the_chain_in_order() {
         .into_iter()
         .find(|m| m.is_for("buyer@example.com"))
         .unwrap();
-    assert!(
-        receipt.text.contains("Coffee: Rp 18,000"),
-        "{}",
-        receipt.text
-    );
+    assert!(receipt.text.contains("Coffee: $4.50"), "{}", receipt.text);
 
     // Pressing "Pay" again doesn't charge twice.
     app.post("/orders/1/pay", &[("card_token", "tok_visa")])
@@ -337,10 +333,10 @@ async fn a_stuck_reminder_stops_blocking_after_an_hour() {
 async fn statements_go_out_as_a_batch_with_progress() {
     let app = app().await;
     for (email, total) in [
-        ("a@example.com", 10_000),
-        ("a@example.com", 5_000),
-        ("b@example.com", 7_000),
-        ("c@example.com", 1_000),
+        ("a@example.com", 1_000),
+        ("a@example.com", 500),
+        ("b@example.com", 700),
+        ("c@example.com", 100),
     ] {
         let order = Order {
             customer_email: email.into(),
@@ -381,7 +377,7 @@ async fn statements_go_out_as_a_batch_with_progress() {
     assert!(
         statement
             .text
-            .contains("2 order(s) in the last 30 days, Rp 15,000"),
+            .contains("2 order(s) in the last 30 days, $15.00"),
         "{}",
         statement.text
     );
@@ -399,7 +395,7 @@ async fn receipts_jump_ahead_of_reports() {
     let order = Order {
         customer_email: "buyer@example.com".into(),
         item: "Coffee".into(),
-        total: 18_000,
+        total: 450,
         ..Default::default()
     };
     let order = Order::create(app.db(), order).await.unwrap();
@@ -437,7 +433,7 @@ async fn invalid_orders_are_not_placed() {
 #[renox::test]
 async fn the_daily_report_sums_todays_orders() {
     let app = app().await;
-    for total in [18_000, 9_000] {
+    for total in [450, 900] {
         let order = Order {
             customer_email: "b@example.com".into(),
             item: "Coffee".into(),
@@ -452,7 +448,7 @@ async fn the_daily_report_sums_todays_orders() {
     let today = Order {
         customer_email: "b@example.com".into(),
         item: "Tea".into(),
-        total: 5_000,
+        total: 500,
         ..Default::default()
     };
     // `at_travelled_time` for code called directly: `created_at` and the
@@ -470,7 +466,7 @@ async fn the_daily_report_sums_todays_orders() {
         .find(|m| m.subject == "Today's sales")
         .unwrap();
     assert!(
-        report.text.contains("1 order(s) today, Rp 5,000"),
+        report.text.contains("1 order(s) today, $5.00"),
         "{}",
         report.text
     );
@@ -479,7 +475,7 @@ async fn the_daily_report_sums_todays_orders() {
 #[renox::test]
 async fn the_weekly_report_covers_seven_days() {
     let app = app().await;
-    for (total, days_ago) in [(18_000, 0), (5_000, 3), (1_000, 10)] {
+    for (total, days_ago) in [(450, 0), (500, 3), (100, 10)] {
         let order = Order {
             customer_email: "b@example.com".into(),
             item: "Coffee".into(),
@@ -498,9 +494,7 @@ async fn the_weekly_report_covers_seven_days() {
         .find(|m| m.subject == "This week's sales")
         .unwrap();
     assert!(
-        report
-            .text
-            .contains("2 order(s) in the last 7 days, Rp 23,000"),
+        report.text.contains("2 order(s) in the last 7 days, $9.50"),
         "{}",
         report.text
     );
@@ -553,7 +547,9 @@ async fn the_charge_request_carries_the_amount_and_an_idempotency_key() {
     http.assert_sent_count(2);
     let charge = &http.sent()[1];
     assert_eq!(charge.method, "POST");
-    assert_eq!(charge.json()["amount"], 18000);
+    // Stripe-style: the amount in cents, in US dollars.
+    assert_eq!(charge.json()["amount"], 450);
+    assert_eq!(charge.json()["currency"], "usd");
     assert_eq!(charge.json()["source"], "tok_visa");
     assert_eq!(charge.header("idempotency-key"), Some("order-1"));
     assert!(
@@ -567,7 +563,7 @@ async fn the_charge_request_carries_the_amount_and_an_idempotency_key() {
 #[renox::test]
 async fn the_sandbox_gateway_answers_like_a_provider() {
     let app = app().await;
-    let charge = |token: &'static str| json!({ "amount": 5000, "source": token });
+    let charge = |token: &'static str| json!({ "amount": 500, "source": token });
     app.post_json("/sandbox/gateway/charges", &charge("tok_visa"))
         .await
         .assert_status(201);
@@ -713,7 +709,7 @@ async fn mails_carry_copies_replies_and_attachments() {
     assert_eq!(csv.content_type, "text/csv");
     let text = String::from_utf8(csv.data.clone()).unwrap();
     assert!(text.starts_with("order,date,item,total\n1,"), "{text}");
-    assert!(text.contains(",\"Coffee\",18000"), "{text}");
+    assert!(text.contains(",\"Coffee\",4.50"), "{text}");
 }
 
 /// What the `reports` mailer sent (`App::mailer("reports", …)`).

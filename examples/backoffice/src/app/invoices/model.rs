@@ -15,7 +15,7 @@ pub struct Invoice {
     pub status: String,
     pub issued_on: NaiveDate,
     pub due_on: NaiveDate,
-    /// In rupiah.
+    /// In cents (`APP_CURRENCY`, USD).
     pub subtotal: i64,
     pub tax: i64,
     pub total: i64,
@@ -67,7 +67,7 @@ impl Invoice {
         self.status == "issued" && self.due_on < today
     }
 
-    /// The tax on `subtotal` at `percent`, rounded to the rupiah.
+    /// The tax on `subtotal` (cents) at `percent`, rounded to the cent.
     pub fn tax_on(subtotal: i64, percent: i64) -> i64 {
         (subtotal * percent + 50) / 100
     }

@@ -41,7 +41,7 @@ pub fn app() -> App {
                 .state(move |p: &mut Product| p.user_id = owner_id)
                 .sequence(|i, p| {
                     p.name = format!("Premium {}", i + 1);
-                    p.price = 500_000 + 100_000 * i as i64;
+                    p.price = 4_999 + 1_000 * i as i64; // $49.99, $59.99, …
                 })
                 .create(&db)
                 .await?;

@@ -23,7 +23,7 @@
       {{ markdown_editor("description", "Description", value=value('description'), rows=5, span="full", hint="Markdown: **bold**, _italic_, lists, links.") }}
       {{ input("stock", "Stock", type="number", value=value('stock'), required=true, attrs={"min": 0}) }}
       {{ input("weight_kg", "Weight", type="number", value=value('weight_kg'), required=true, suffix="kg", attrs={"step": "0.01", "min": 0}) }}
-      {{ input("price", "Price", type="number", value=value('price'), required=true, prefix="Rp", attrs={"min": 0}) }}
+      {{ input("price", "Price", type="number", value=(price or ''), required=true, prefix="$", attrs={"step": "0.01", "min": 0}) }}
       {{ checkbox("available", "Available", checked=product.available if product else false, switch=true) }}
     {% endcall %}
 

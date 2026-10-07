@@ -41,7 +41,7 @@
       <form id="add" novalidate>
         {% call card(title="New product") %}
           {{ input("name", "Name", required=true, id="product-name") }}
-          {{ input("price", "Price", type="number", required=true, prefix="Rp", attrs={"min": 0}, id="product-price") }}
+          {{ input("price", "Price", type="number", required=true, prefix="$", attrs={"min": 0, "step": "0.01"}, id="product-price") }}
           <p class="rx-error" data-error aria-live="polite"></p>
           <div class="rx-card__footer">{{ button("Add") }}</div>
         {% endcall %}

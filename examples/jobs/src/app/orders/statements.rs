@@ -68,11 +68,12 @@ impl Job for SendStatement {
                 .created_at
                 .map(|at| at.format("%Y-%m-%d").to_string())
                 .unwrap_or_default();
+            // The total in dollars (`4.50`), as a spreadsheet reads it.
             csv.push_str(&format!(
-                "{},{date},\"{}\",{}\n",
+                "{},{date},\"{}\",{:.2}\n",
                 order.id,
                 order.item.replace('"', "\"\""),
-                order.total
+                order.total as f64 / 100.0
             ));
         }
         let month = renox::db::now().format("%Y-%m");
