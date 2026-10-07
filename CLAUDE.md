@@ -385,6 +385,11 @@ www/                       renox.rs: the landing page and blog (package `renox-w
                            .github/workflows/release-www.yml builds it for the owner's server.
                            Links into the docs must name a page in site/src/content.rs PAGES
                            (tests/www.rs checks)
+benchmarks/                Renox vs bare Axum vs Laravel (FPM and Octane) in Docker, pinned to
+                           2 cores and 1 GB, driven by oha (#333): its own cargo workspace
+                           (renox-app, axum-app; not a member of the root one), laravel/
+                           (Dockerfile + overlay), run.sh, summarize.py, results/*.json,
+                           RESULTS.md (the latest run; www/content/benchmarks.json copies it)
 tests/chaos/               app + run.sh (postgres|sqlite) that the `chaos` CI job injects faults
                            into (docker pause/stop/restart, python3 holding SQLite's lock)
 tests/cli/run.sh           `rnx new` + every `make:*`, then build and test the app (CI `cli`/`docker`);
