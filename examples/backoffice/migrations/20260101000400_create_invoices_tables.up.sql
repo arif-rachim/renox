@@ -7,7 +7,7 @@ CREATE TABLE invoices (
     status TEXT NOT NULL DEFAULT 'draft',
     issued_on TEXT NOT NULL,
     due_on TEXT NOT NULL,
-    -- In cents (APP_CURRENCY, USD): the lines, the tax on them, both.
+    -- In rupiah: the lines, the tax on them, both.
     subtotal INTEGER NOT NULL DEFAULT 0,
     tax INTEGER NOT NULL DEFAULT 0,
     total INTEGER NOT NULL DEFAULT 0,

@@ -4,7 +4,7 @@ CREATE TABLE products (
     name TEXT NOT NULL,
     slug TEXT NOT NULL UNIQUE,
     description TEXT NOT NULL DEFAULT '',
-    -- In cents (APP_CURRENCY, USD).
+    -- In rupiah.
     price INTEGER NOT NULL,
     -- The database refuses to sell what isn't there, even if a check is missed.
     stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
