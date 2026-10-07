@@ -556,7 +556,7 @@ async fn the_admin_panel_edits_the_catalogue_by_permission() {
         .expect("the product was saved");
     assert_eq!(product.description, "A **fast** road bike.");
     let variant = variants_of(product.id)
-        .state(|v| v.price = 1_000_000)
+        .state(|v| v.price = 100_000)
         .create_one(db)
         .await
         .unwrap();
@@ -567,7 +567,7 @@ async fn the_admin_panel_edits_the_catalogue_by_permission() {
         .await
         .assert_status(204);
     let variant = ProductVariant::find(db, variant.id).await.unwrap().unwrap();
-    assert_eq!(variant.price, 1_100_000);
+    assert_eq!(variant.price, 110_000);
     assert_eq!(audited(&app, "catalog.prices_changed").await.len(), 1);
 
     // A manager (plans.manage and prices.change in North, no catalog.manage)

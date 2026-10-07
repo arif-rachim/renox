@@ -48,12 +48,14 @@ pub struct PriceRow {
     pub size: Option<String>,
     #[validate(max = 30)]
     pub colour: Option<String>,
-    /// The supplier's price to us (the smallest unit of `APP_CURRENCY`).
+    /// The supplier's price to us, in whole units as a price list writes
+    /// it (`12.50`); stored in the smallest unit of `APP_CURRENCY` (cents).
     #[validate(required, min = 0)]
-    pub cost: Option<i64>,
-    /// Our selling price; needed for a new SKU, kept as it is when blank.
+    pub cost: Option<f64>,
+    /// Our selling price (whole units); needed for a new SKU, kept as it
+    /// is when blank.
     #[validate(min = 0)]
-    pub price: Option<i64>,
+    pub price: Option<f64>,
     #[validate(max = 40)]
     pub barcode: Option<String>,
 }
@@ -65,7 +67,9 @@ pub async fn write_row(tx: &mut Transaction, supplier_id: i64, row: PriceRow) ->
     let now = renox::db::now();
     let sku = row.sku.trim().to_owned();
     let barcode = row.barcode.filter(|b| !b.trim().is_empty());
-    let cost = row.cost.unwrap_or(0);
+    let currency = crate::money::currency();
+    let cost = crate::money::from_whole(row.cost.unwrap_or(0.0), &currency);
+    let price = row.price.map(|p| crate::money::from_whole(p, &currency));
     let existing: Option<i64> = sql("SELECT id FROM product_variants WHERE sku = ?")
         .bind(&sku)
         .scalar_optional(&mut *tx)
@@ -77,7 +81,7 @@ pub async fn write_row(tx: &mut Transaction, supplier_id: i64, row: PriceRow) ->
                  barcode = COALESCE(?, barcode), updated_at = ? WHERE id = ?",
             )
             .bind(cost)
-            .bind(row.price)
+            .bind(price)
             .bind(barcode)
             .bind(now)
             .bind(id)
@@ -96,7 +100,7 @@ pub async fn write_row(tx: &mut Transaction, supplier_id: i64, row: PriceRow) ->
                     slug.trim()
                 )));
             };
-            let Some(price) = row.price else {
+            let Some(price) = price else {
                 return Err(Error::BadRequest(format!(
                     "The new SKU {sku} needs a price."
                 )));

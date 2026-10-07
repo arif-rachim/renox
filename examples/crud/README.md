@@ -15,7 +15,7 @@ cargo run                        # http://127.0.0.1:3000
 
 Log in at `/login` (or register at `/register`), then add products at `/products/new`. To add
 many at once: `cargo run -- products:import products.csv --owner demo@example.com` (lines of
-`name,price`; bad lines are skipped and listed).
+`name,price`, prices in dollars like `4.50`; bad lines are skipped and listed).
 
 ## What's where
 

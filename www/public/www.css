@@ -172,13 +172,13 @@ section.s { padding: 120px 0; border-bottom: 1px solid var(--line); position: re
 .js .pair { display: none; border-top: 0; min-height: 380px; } .js .pair.on { display: grid; } .js .pair__name { display: none; }
 
 /* benchmarks */
-.bench { margin-top: 56px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-.chart { border: 1px solid var(--line); border-radius: 18px; background: var(--bg-2); padding: 24px 26px; min-width: 0; }
+.bench { margin-top: 56px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.chart { border: 1px solid var(--line); border-radius: 18px; background: var(--bg-2); padding: 22px 20px; min-width: 0; }
 .chart figcaption { display: flex; justify-content: space-between; gap: 10px; font-size: 15px; }
 .chart figcaption span { font: 500 12px/1.3 var(--mono); color: var(--fg-3); text-align: right; }
 .bars { width: 100%; margin-top: 18px; border-collapse: collapse; }
-.bars th { width: 34%; text-align: left; font-weight: 400; color: var(--fg-2); font-size: 14px; padding: 7px 10px 7px 0; }
-.bars td.v { width: 92px; text-align: right; font: 600 13px/1 var(--mono); color: var(--fg); padding-left: 10px; white-space: nowrap; }
+.bars th { width: 36%; text-align: left; font-weight: 400; color: var(--fg-2); font-size: 14px; padding: 7px 10px 7px 0; }
+.bars td.v { width: 76px; text-align: right; font: 600 13px/1 var(--mono); color: var(--fg); padding-left: 10px; white-space: nowrap; }
 .track { padding: 7px 0; }
 .track .fill { display: block; height: 12px; border-radius: 99px; width: var(--w); background: #3a4240; }
 .bars tr.me th { color: var(--fg); font-weight: 600; }
@@ -296,5 +296,5 @@ section.s { padding: 120px 0; border-bottom: 1px solid var(--line); position: re
   .toc { position: static; }
   section.s { padding: 80px 0; }
 }
-@media (max-width: 600px) { .features { grid-template-columns: 1fr; } .ex { grid-template-columns: 1fr; } .js .crates { min-height: 360px; } }
+@media (max-width: 600px) { .chart { padding: 20px 18px; } .features { grid-template-columns: 1fr; } .ex { grid-template-columns: 1fr; } .js .crates { min-height: 360px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } html { scroll-behavior: auto; } }

@@ -28,8 +28,9 @@ pub struct ProductRow {
     pub sku: String,
     #[validate(required, max = 100)]
     pub name: String,
-    #[validate(required, min = 0)]
-    pub price: i64,
+    /// In dollars (`12.99`); stored in cents.
+    #[validate(required, min = 0, decimal(0, 2))]
+    pub price: f64,
     #[validate(min = 0, max = 100000)]
     pub stock: Option<i64>,
 }
@@ -72,7 +73,7 @@ pub async fn import(state: &AppState, import: Import, user: &str) -> Result<Impo
                 let product = match existing {
                     Some(mut product) => {
                         product.name = row.name;
-                        product.price = row.price;
+                        product.price = super::cents(row.price);
                         product.save_only(&mut *tx, &["name", "price"]).await?;
                         product
                     }
@@ -82,7 +83,7 @@ pub async fn import(state: &AppState, import: Import, user: &str) -> Result<Impo
                             Product {
                                 sku: row.sku,
                                 name: row.name,
-                                price: row.price,
+                                price: super::cents(row.price),
                                 active: true,
                                 ..Default::default()
                             },

@@ -168,7 +168,7 @@ async fn rates_come_from_the_api() {
 
     // From here on, web requests get fake answers instead of reaching the internet.
     let http = app.fake_http(); // `*` matches anything; "POST https://…" for one method
-    http.on("https://api.example.com/*", FakeResponse::json(200, json!({ "idr": 16000.0 })));
+    http.on("https://api.example.com/*", FakeResponse::json(200, json!({ "eur": 0.92 })));
     let res = app.state().http.get("https://api.example.com/rates").send().await.unwrap();
     assert_eq!(res.status(), 200);
     // Check which requests were sent, and how many.

@@ -25,7 +25,8 @@ pub enum FieldKind {
     Textarea,
     /// A number (`type="number"`).
     Number,
-    /// An amount, as the model stores it, with the currency's code before it.
+    /// An amount kept in the currency's smallest unit, shown and typed in
+    /// whole units, with the currency's code before it.
     Money,
     /// A date with a calendar (`NaiveDate`, sent as `YYYY-MM-DD`).
     Date,
@@ -152,11 +153,13 @@ impl Field {
         Self::new(name, label, FieldKind::Number)
     }
 
-    /// An amount as the model stores it (the smallest unit, like the data
-    /// grid's `money` columns), with `APP_CURRENCY`'s code before it. For a
-    /// currency without decimals (IDR, JPY) that is the amount people
-    /// write; for cents, take a decimal in the form and convert it in
-    /// [`fill`](crate::AdminResource::fill).
+    /// An amount the model keeps in the smallest unit (cents, like the
+    /// data grid's `money` columns), with `APP_CURRENCY`'s code before it.
+    /// The form shows and takes whole units: with `USD`, `1299` shows as
+    /// `12.99` (a `0.01` step), and `12.99` is read back as `1299` before
+    /// the form's rules and [`fill`](crate::AdminResource::fill) see it
+    /// (rounded to the cent). A currency without decimals (IDR, JPY) is
+    /// as typed. Rules on the form (`min`, `max`) are in the smallest unit.
     pub fn money(name: &str, label: &str) -> Self {
         let mut field = Self::new(name, label, FieldKind::Money);
         field.min = Some("0".into());
@@ -230,7 +233,7 @@ impl Field {
         self
     }
 
-    /// Text joined to the start of the field ("https://", "Rp").
+    /// Text joined to the start of the field ("https://", "$").
     pub fn prefix(mut self, prefix: &str) -> Self {
         self.prefix = Some(prefix.to_owned());
         self

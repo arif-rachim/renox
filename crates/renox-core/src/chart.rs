@@ -51,7 +51,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use crate::db::{DateTime, Dialect, Model, Query};
 use crate::timezone::Zone;
 use crate::toast::escape;
-use crate::view_filters::{format_money, format_number};
+use crate::view_filters::{format_money, format_number, money_divisor};
 use crate::{AppState, Result};
 
 /// How long a dashboard looks back: `7d`, `30d`, `90d` (any number of days
@@ -727,10 +727,23 @@ struct Formatter {
     decimals: Option<u32>,
     currency: String,
     locale: String,
+    /// What money is divided by: data is in the currency's smallest unit,
+    /// as for the `money` filter (100 for `USD`, `divide_by` to change it).
+    divisor: f64,
 }
 
 impl Formatter {
+    /// `value` in the unit it is shown in (money in whole units).
+    fn shown(&self, value: f64) -> f64 {
+        if self.format == "money" {
+            value / self.divisor
+        } else {
+            value
+        }
+    }
+
     fn full(&self, value: f64) -> String {
+        let value = self.shown(value);
         match self.format.as_str() {
             "money" => format_money(value, &self.currency, self.decimals, &self.locale),
             "percent" => format!(
@@ -744,6 +757,7 @@ impl Formatter {
     /// Axis ticks: `12.5K` (`12,5K` where the locale writes a decimal
     /// comma), plain under 10,000.
     fn tick(&self, value: f64) -> String {
+        let value = self.shown(value);
         let units: [(f64, &str); 4] = [(1e12, "T"), (1e9, "B"), (1e6, "M"), (1e3, "K")];
         let suffix = if self.format == "percent" { "%" } else { "" };
         if value.abs() >= 10_000.0 {
@@ -825,6 +839,7 @@ pub(crate) fn chart(
         let format: Option<String> = kwargs.get("format")?;
         let decimals: Option<u32> = kwargs.get("decimals")?;
         let currency_kw: Option<String> = kwargs.get("currency")?;
+        let divide_by: Option<f64> = kwargs.get("divide_by")?;
         let stacked: Option<bool> = kwargs.get("stacked")?;
         let legend: Option<bool> = kwargs.get("legend")?;
         let table: Option<bool> = kwargs.get("table")?;
@@ -837,11 +852,22 @@ pub(crate) fn chart(
         let currency = currency_kw
             .map(|c| c.trim().to_ascii_uppercase())
             .unwrap_or_else(|| currency.clone());
-        let formatter = |format: Option<String>, decimals: Option<u32>| Formatter {
-            format: format.unwrap_or_else(|| "number".into()),
-            decimals,
-            currency: currency.clone(),
-            locale: locale.clone(),
+        let divisor = money_divisor(&currency, divide_by);
+        // Money keeps its currency's decimals unless `decimals` says
+        // otherwise; other formats take what the data needs.
+        let formatter = |format: Option<String>, given: Option<u32>, auto: Option<u32>| {
+            let format = format.unwrap_or_else(|| "number".into());
+            Formatter {
+                decimals: if format == "money" {
+                    given
+                } else {
+                    given.or(auto)
+                },
+                format,
+                currency: currency.clone(),
+                locale: locale.clone(),
+                divisor,
+            }
         };
         let mut options = Options {
             kind: kind.clone(),
@@ -867,12 +893,13 @@ pub(crate) fn chart(
                 kwargs.assert_all_used()?;
                 let all = || clouds.iter().flat_map(|c| c.points.iter());
                 let formats = Formats {
-                    x: formatter(x_format, auto_decimals(all().map(|p| p.x))),
-                    y: formatter(
-                        format,
-                        decimals.or_else(|| auto_decimals(all().map(|p| p.y))),
+                    x: formatter(x_format, None, auto_decimals(all().map(|p| p.x))),
+                    y: formatter(format, decimals, auto_decimals(all().map(|p| p.y))),
+                    size: formatter(
+                        size_format,
+                        None,
+                        auto_decimals(all().filter_map(|p| p.size)),
                     ),
-                    size: formatter(size_format, auto_decimals(all().filter_map(|p| p.size))),
                     size_title: size_title.unwrap_or_else(|| text(state, "ui.chart.size", &locale)),
                 };
                 render_points(&clouds, &options, &formats)
@@ -887,17 +914,15 @@ pub(crate) fn chart(
                     .collect();
                 // Plain numbers get as many decimals as the data needs, as
                 // on scatter charts; money and percent keep their own.
-                let decimals = match format.as_deref() {
-                    None | Some("number") => decimals.or_else(|| {
-                        auto_decimals(
-                            data.series
-                                .iter()
-                                .flat_map(|s| s.values.iter().flatten().copied()),
-                        )
-                    }),
-                    _ => decimals,
+                let auto = match format.as_deref() {
+                    None | Some("number") => auto_decimals(
+                        data.series
+                            .iter()
+                            .flat_map(|s| s.values.iter().flatten().copied()),
+                    ),
+                    _ => None,
                 };
-                let formatter = formatter(format, decimals);
+                let formatter = formatter(format, decimals, auto);
                 if kind == "pie" || kind == "doughnut" {
                     render_pie(&data, &options, &formatter)
                 } else {
@@ -2079,8 +2104,9 @@ mod tests {
         let f = |locale: &str| Formatter {
             format: "number".into(),
             decimals: None,
-            currency: "IDR".into(),
+            currency: "USD".into(),
             locale: locale.into(),
+            divisor: 1.0,
         };
         assert_eq!(f("en").tick(12_500.0), "12.5K");
         assert_eq!(f("es").tick(2_500_000.0), "2,5M");

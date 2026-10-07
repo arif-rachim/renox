@@ -24,7 +24,7 @@
 //! use renox::analytics::{GaClientId, ServerEvent};
 //!
 //! async fn paid(State(state): State<AppState>, GaClientId(client): GaClientId) -> Result<Redirect> {
-//!     state.dispatch(ServerEvent::new(client, "purchase").param("value", 18_000).param("currency", "IDR")).await?;
+//!     state.dispatch(ServerEvent::new(client, "purchase").param("value", 49.99).param("currency", "USD")).await?;
 //!     Ok(Redirect::to("/thanks"))
 //! }
 //! ```
@@ -248,15 +248,15 @@ mod tests {
     #[cfg(feature = "server-events")]
     fn builds_measurement_protocol_payloads() {
         let event = ServerEvent::new(Some("1.2".into()), "purchase")
-            .param("value", 18_000)
-            .param("currency", "IDR")
+            .param("value", 49.99)
+            .param("currency", "USD")
             .user_id(42);
         assert_eq!(
             event.payload(),
             json!({
                 "client_id": "1.2",
                 "user_id": "42",
-                "events": [{ "name": "purchase", "params": { "value": 18000, "currency": "IDR" } }],
+                "events": [{ "name": "purchase", "params": { "value": 49.99, "currency": "USD" } }],
             })
         );
         assert!(

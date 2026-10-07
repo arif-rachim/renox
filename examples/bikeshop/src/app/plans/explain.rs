@@ -34,9 +34,11 @@ pub fn entries() -> Vec<Explanation> {
                 Feature {
                     api: "renox_billing::Plan + Interval",
                     why: "Each service plan is a renox-billing `Plan` declared in code \
-                          (`Plan::new(\"monthly-tune-up\", …).price(amount, \"IDR\", \
+                          (`Plan::new(\"monthly-tune-up\", …).price(amount, \"USD\", \
                           Interval::Month)`), twice: paid by card (Stripe, or the demo \
-                          gateway without Stripe's keys) and through Xendit. Plans live in \
+                          gateway without Stripe's keys) and through Xendit, which only \
+                          charges rupiah, so its copy carries its own `IDR` price (the \
+                          dollar price at the shop's fixed `RUPIAH_PER_DOLLAR`). Plans live in \
                           code because a gateway's price can't change under a subscriber. \
                           The `service_plans` rows this page reads (what the admin panel \
                           edits) are seeded from the same list \
@@ -44,10 +46,11 @@ pub fn entries() -> Vec<Explanation> {
                 },
                 Feature {
                     api: "money filter",
-                    why: "Prices are integers in rupiah (`price` per visit, \
+                    why: "Prices are integers in cents (`price` per visit, \
                           `ServicePlan::monthly_price()` a month). The cards use the `money` \
                           filter and the table's per-visit row `renox::format_money`, the \
-                          function behind it, so both are written the visitor's way with \
+                          function behind it (through `money::format`, which turns cents \
+                          into dollars first), so both are written the visitor's way with \
                           `APP_CURRENCY` and nothing is formatted by hand.",
                 },
                 Feature {
@@ -92,7 +95,7 @@ pub fn entries() -> Vec<Explanation> {
             title: "Subscribe a bike to a plan",
             purpose: "The customer chooses one of their bikes, a plan, the home store whose \
                       workshop does the visits, the weekday they prefer and how to pay (a \
-                      card, or Xendit for rupiah by card or e-wallet). The summary shows the \
+                      card, or Xendit, in rupiah, by card or e-wallet). The summary shows the \
                       monthly price and the first visit's day. Sending it takes them to the \
                       gateway's payment page; the plan starts when the gateway confirms.",
             who: "Logged-in customers with a bike registered (`/bikes`).",

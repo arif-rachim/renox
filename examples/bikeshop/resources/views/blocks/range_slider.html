@@ -3,8 +3,8 @@
     numbers.
 
     {% from "blocks/range_slider.html" import range_slider %}
-    {{ range_slider("price_min", "price_max", 0, 20000000, step=250000,
-                    value_min=1000000, value_max=8000000, label="Price", format="money") }}
+    {{ range_slider("price_min", "price_max", 0, 1000000, step=25000,
+                    value_min=100000, value_max=500000, label="Price", format="money") }}
 
     `min`, `max`, `step`: the scale. `value_min`, `value_max`: where the
     handles start (the ends of the scale when left out; old input after a

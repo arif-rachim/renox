@@ -125,7 +125,7 @@ test('a product saved through every editor, cleaned by the server, its settings 
     await page.type('#rx-name', 'Editor roast');
     await page.type('#rx-stock', '3', { clear: true });
     await page.type('#rx-weight_kg', '0.25', { clear: true });
-    await page.type('#rx-price', '45000', { clear: true });
+    await page.type('#rx-price', '12.50', { clear: true });
     await page.type('#rx-description', 'Dark and **smooth**');
     await page.click('trix-editor');
     await page.type('trix-editor', 'Roasted on Monday');

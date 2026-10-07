@@ -15,7 +15,9 @@ use serde::{Deserialize, Serialize};
 pub struct Order {
     pub id: i64,
     pub code: String,
-    /// In rupiah.
+    /// In cents (`APP_CURRENCY`, USD). Stripe charges it as it is; Midtrans
+    /// and Xendit charge rupiah (IDR) only, so a live account there takes
+    /// the amount in IDR.
     pub amount: i64,
     /// `pending` or `paid`.
     pub status: String,

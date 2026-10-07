@@ -1166,10 +1166,11 @@ async fn summaries_cover_every_filtered_row_and_each_group() {
     })
     .await;
     for (number, status, total, paid) in [
-        ("A", "new", 100, false),
-        ("B", "paid", 300, true),
-        ("C", "paid", 500, true),
-        ("D", "new", 1_000, false),
+        // In cents: $100, $300, $500 and $1,000.
+        ("A", "new", 10_000, false),
+        ("B", "paid", 30_000, true),
+        ("C", "paid", 50_000, true),
+        ("D", "new", 100_000, false),
     ] {
         GridOrder::create(
             app.db(),
@@ -1193,8 +1194,8 @@ async fn summaries_cover_every_filtered_row_and_each_group() {
         &html[html.len().saturating_sub(3000)..]
     );
     let foot = html.split("<tfoot>").nth(1).unwrap();
-    assert!(foot.contains("1,900"), "{foot}");
-    assert!(foot.contains("475"), "the average");
+    assert!(foot.contains("1,900.00"), "{foot}");
+    assert!(foot.contains("475.00"), "the average");
     assert!(foot.contains("Count</span>4"), "{foot}");
     assert!(
         !html.contains("rx-grid__group-row"),

@@ -22,7 +22,7 @@ const SEARCH: Feature = Feature {
 };
 const ADVANCED: Feature = Feature {
     api: "Grid::advanced_filter",
-    why: "Questions the heading filters can't ask (\"over 1,000,000 **or** cancelled\"): rules \
+    why: "Questions the heading filters can't ask (\"over $1,000 **or** cancelled\"): rules \
           per column, matching all or any. Only the grid's own columns count, so nobody can \
           filter on a column the page doesn't show.",
 };

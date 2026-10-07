@@ -23,7 +23,6 @@
   {% call infolist(columns=2) %}
     {%- for e in entries %}
     {%- set value = record[e.key] if record[e.key] is defined else none %}
-    {%- if e.format == "money" and value is number %}{% set value = value / admin.money_divisor %}{% endif %}
     {{ entry(e.label, value, format=e.format, badge=(true if e.badge else none), labels=(e.labels if e.labels else none), copyable=e.copyable, span=e.span) }}
     {%- endfor %}
   {% endcall %}

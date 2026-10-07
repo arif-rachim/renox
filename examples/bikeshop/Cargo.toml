@@ -8,7 +8,8 @@ publish = false
 renox = { workspace = true, features = ["xlsx"] }
 renox-2fa.workspace = true
 renox-admin.workspace = true
-# Service plans billed as subscriptions (#237): Stripe, and Xendit for IDR.
+# Service plans billed as subscriptions (#237): Stripe in USD, and Xendit
+# (which only charges rupiah) at its own IDR price.
 renox-billing.workspace = true
 renox-editors.workspace = true
 renox-oauth.workspace = true

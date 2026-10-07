@@ -41,9 +41,9 @@ struct World {
     rider: User,
     customer: Customer,
     bike: CustomerBike,
-    /// 40 minutes, 100,000.
+    /// 40 minutes, $60.00.
     tune: ServiceTask,
-    /// 20 minutes, 50,000.
+    /// 20 minutes, $30.00.
     check: ServiceTask,
 }
 
@@ -99,10 +99,10 @@ async fn world() -> World {
             ..Default::default()
         }
     };
-    let tune = ServiceTask::create(db, task("Tune", 40, 100_000))
+    let tune = ServiceTask::create(db, task("Tune", 40, 6_000))
         .await
         .unwrap();
-    let check = ServiceTask::create(db, task("Check", 20, 50_000))
+    let check = ServiceTask::create(db, task("Check", 20, 3_000))
         .await
         .unwrap();
     World {
@@ -178,7 +178,7 @@ async fn part(w: &World, fits: Option<i64>, stock: i64) -> ProductVariant {
         .await
         .unwrap();
     let mut variant = variants_of(product.id).create_one(db).await.unwrap();
-    variant.price = 30_000;
+    variant.price = 2_500;
     variant.save(db).await.unwrap();
     if let Some(bike_product) = fits {
         PART_FITS
@@ -351,7 +351,7 @@ async fn customers_register_bikes_book_and_follow_the_work() {
     res.assert_redirect(&format!("/service/{}", order.id));
     assert_eq!(
         (order.minutes, order.total, order.status),
-        (60, 150_000, WorkStatus::Booked)
+        (60, 9_000, WorkStatus::Booked)
     );
     assert_eq!(
         WorkOrderTask::where_eq("work_order_id", order.id)
@@ -372,7 +372,7 @@ async fn customers_register_bikes_book_and_follow_the_work() {
         .await
         .assert_ok()
         .assert_see("Squeaky brakes")
-        .assert_see("150,000");
+        .assert_see("$90.00");
     w.app
         .get(&format!("/bikes/{}", w.bike.id))
         .await
@@ -507,7 +507,7 @@ async fn parts_move_stock_and_a_missing_one_makes_the_order_wait() {
         .unwrap();
     let order = WorkOrder::find(db, order.id).await.unwrap().unwrap();
     assert_eq!(order.status, WorkStatus::WaitingParts);
-    assert_eq!(order.parts, 30_000 * 4);
+    assert_eq!(order.parts, 2_500 * 4);
     assert_eq!(
         StockLevel::where_eq("variant_id", chain.id)
             .first(db)
@@ -583,7 +583,7 @@ async fn extra_work_is_approved_once_through_a_signed_link() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(extra.total, 100_000);
+    assert_eq!(extra.total, 6_000);
     assert_eq!(
         WorkOrder::find(db, order.id).await.unwrap().unwrap().status,
         WorkStatus::WaitingApproval
@@ -611,7 +611,7 @@ async fn extra_work_is_approved_once_through_a_signed_link() {
         .await
         .assert_ok()
         .assert_see("The chain is worn.")
-        .assert_see("100,000");
+        .assert_see("$60.00");
     w.app
         .get(&path.replace(&format!("/{}?", extra.id), &format!("/{}?", extra.id + 1)))
         .await
@@ -623,10 +623,7 @@ async fn extra_work_is_approved_once_through_a_signed_link() {
     let extra = ExtraWork::find(db, extra.id).await.unwrap().unwrap();
     assert_eq!(extra.status, ExtraStatus::Approved);
     let order = WorkOrder::find(db, order.id).await.unwrap().unwrap();
-    assert_eq!(
-        (order.status, order.total),
-        (WorkStatus::InProgress, 150_000)
-    );
+    assert_eq!((order.status, order.total), (WorkStatus::InProgress, 9_000));
     // Once only.
     w.app
         .post(&path, &[("decision", "refuse")])

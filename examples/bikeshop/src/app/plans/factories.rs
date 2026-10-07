@@ -14,7 +14,7 @@ impl Factory for ServicePlan {
             name: format!("Plan {n}"),
             slug: format!("plan-{n}"),
             frequency: Frequency::Monthly,
-            price: 250_000,
+            price: 6_000,
             description: "Regular care for your bike.".into(),
             active: true,
             parts_discount_bp: 1_000,

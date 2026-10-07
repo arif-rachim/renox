@@ -14,6 +14,7 @@ pub struct Product {
     /// also what the list's cursors are made of.
     pub id: Ulid,
     pub name: String,
+    /// In cents: `450` is $4.50.
     pub price: i64,
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,

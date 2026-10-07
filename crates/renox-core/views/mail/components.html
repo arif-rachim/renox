@@ -2,7 +2,7 @@
     {% from "renox/mail/components.html" import button, panel, table, divider %}
     {{ button(url, "Pay now") }}
     {% call panel() %}Your order ships tomorrow.{% endcall %}
-    {{ table([["Coffee", "Rp 18.000"], ["Tea", "Rp 12.000"]], head=["Item", "Price"], total=["Total", "Rp 30.000"]) }}
+    {{ table([["Coffee", "$4.50"], ["Tea", "$3.00"]], head=["Item", "Price"], total=["Total", "$7.50"]) }}
     {{ divider() }} -#}
 {% macro button(url, label) -%}
 <p style="margin:24px 0;text-align:center;">

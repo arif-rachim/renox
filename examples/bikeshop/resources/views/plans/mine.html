@@ -22,7 +22,7 @@
         {{ entry(t('plans.fields.next_visit'), line.subscription.next_visit_on if line.status in ['active', 'ending'] else none, format="date") }}
         {{ entry(t('plans.fields.visits_done'), line.done, format="number") }}
         {%- if line.last_invoice %}
-        {% call entry(t('plans.fields.last_invoice')) %}{{ line.last_invoice.amount | money }} · {{ t('plans.invoice.paid' if line.last_invoice.paid else 'plans.invoice.failed') }}{% endcall %}
+        {% call entry(t('plans.fields.last_invoice')) %}{{ line.last_invoice.amount | money(currency=line.last_invoice.currency) }} · {{ t('plans.invoice.paid' if line.last_invoice.paid else 'plans.invoice.failed') }}{% endcall %}
         {%- else %}{{ entry(t('plans.fields.last_invoice'), none, placeholder=t('plans.mine.counter')) }}{% endif %}
       {% endcall %}
       {{ link_button(route('plans.show', line.subscription.id), t('plans.mine.open'), size="small") }}

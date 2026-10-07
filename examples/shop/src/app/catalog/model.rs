@@ -21,7 +21,7 @@ pub struct Product {
     pub name: String,
     pub slug: String,
     pub description: String,
-    /// In rupiah.
+    /// In cents (`APP_CURRENCY`, USD): `450` is $4.50.
     pub price: i64,
     pub stock: i64,
     /// Storage key of the photo, e.g. `public/products/abc.jpg`.
@@ -40,7 +40,8 @@ impl Factory for Product {
             slug: slug(&name),
             name,
             description: Sentence(8..16).fake(),
-            price: (10..500).fake::<i64>() * 1_000,
+            // $1.99 to $39.99.
+            price: (2..40).fake::<i64>() * 100 - 1,
             stock: (0..40).fake(),
             active: true,
             ..Default::default()

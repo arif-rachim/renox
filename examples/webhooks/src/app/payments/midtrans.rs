@@ -1,5 +1,7 @@
 //! Midtrans HTTP notifications: the JSON body carries `signature_key`, the
 //! SHA-512 of order id + status code + gross amount + your server key.
+//! Midtrans charges rupiah only: `gross_amount` is in IDR (`"150000.00"`),
+//! whatever the app's `APP_CURRENCY`; it is only part of the signature here.
 
 use renox::prelude::*;
 use renox::webhook;

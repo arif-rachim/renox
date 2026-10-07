@@ -260,7 +260,7 @@ fn site() -> tempfile::TempDir {
 {% from "renox/mail/components.html" import button, panel, table, divider %}
 {% block content %}<p>{{ t('shipped.body', order=order) }} ({{ app.locale }})</p>
 {% call panel() %}{{ t('shipped.panel') }}{% endcall %}
-{{ table([["Coffee", "18.000"]], head=["Item", "Rp"], total=["Total", "18.000"]) }}{{ divider() }}
+{{ table([["Coffee", "4.50"]], head=["Item", "USD"], total=["Total", "4.50"]) }}{{ divider() }}
 {{ button("https://shop.test/o/" ~ order, t('shipped.track')) }}{% endblock %}"#,
     )
     .unwrap();
@@ -328,7 +328,7 @@ async fn notifications_speak_the_recipients_language() {
     assert_eq!(mail[0].subject, "Pedido 7 enviado");
     let html = mail[0].html.clone().unwrap();
     assert!(html.contains("El pedido 7 va en camino (es)"), "{html}");
-    assert!(html.contains("Llega mañana") && html.contains(">Seguir<") && html.contains("18.000"));
+    assert!(html.contains("Llega mañana") && html.contains(">Seguir<") && html.contains("4.50"));
     assert!(
         mail[0].text.contains("El pedido 7 va en camino"),
         "{}",

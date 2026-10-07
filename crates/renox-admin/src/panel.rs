@@ -75,7 +75,6 @@ impl Panel {
             nav,
             account_url: state.url("account.show", &[]).ok(),
             logout_url: state.url("logout", &[]).ok(),
-            money_divisor: 10u64.pow(renox::currency_decimals(&currency).min(6)),
             currency,
         }
     }
@@ -93,8 +92,6 @@ struct Frame {
     logout_url: Option<String>,
     /// `APP_CURRENCY`, before money fields.
     currency: String,
-    /// What a money amount is divided by for whole units.
-    money_divisor: u64,
 }
 
 #[derive(Serialize)]
@@ -400,7 +397,8 @@ impl<R: AdminResource> Ctx<R> {
 
     /// The form's fields for the create page (`record` is `None`) or the
     /// edit page, each with its value and a `belongs_to`'s choices.
-    async fn fields(&self, db: &Db, record: Option<&Value>) -> Result<Vec<FieldView>> {
+    async fn fields(&self, state: &AppState, record: Option<&Value>) -> Result<Vec<FieldView>> {
+        let (db, decimals) = (&state.db, money_decimals(state));
         let creating = record.is_none();
         let mut views = Vec::new();
         for mut field in self.resource.fields() {
@@ -411,9 +409,19 @@ impl<R: AdminResource> Ctx<R> {
                 let options = relation_options(db, table, title).await?;
                 field.set_options(options);
             }
-            views.push(FieldView::new(field, record, creating));
+            views.push(FieldView::new(field, record, creating, decimals));
         }
         Ok(views)
+    }
+
+    /// The names of the form's money fields.
+    fn money_fields(&self) -> Vec<String> {
+        self.resource
+            .fields()
+            .iter()
+            .filter(|field| field.kind() == FieldKind::Money)
+            .map(|field| field.name().to_owned())
+            .collect()
     }
 
     /// The resource's record-aware rules for `form`, with what refills the
@@ -451,7 +459,9 @@ struct FieldView {
 }
 
 impl FieldView {
-    fn new(field: Field, record: Option<&Value>, creating: bool) -> Self {
+    /// `decimals`: `APP_CURRENCY`'s, for money fields, which show whole
+    /// units (`12.99`) of an amount kept in the smallest unit (`1299`).
+    fn new(field: Field, record: Option<&Value>, creating: bool, decimals: u32) -> Self {
         let json = renox::serde_json::to_value(&field).unwrap_or(Value::Null);
         let read = |key: &str| json.get(key).cloned().unwrap_or(Value::Null);
         let mut value = match record {
@@ -472,9 +482,21 @@ impl FieldView {
                     value = Value::String(text.chars().take(10).collect());
                 }
             }
+            FieldKind::Money if decimals > 0 => {
+                if let Some(amount) = value.as_i64() {
+                    value = Value::String(whole_units(amount, decimals));
+                }
+            }
             _ => {}
         }
         let mut attrs = BTreeMap::new();
+        if field.kind() == FieldKind::Money && decimals > 0 {
+            // `0.01` for cents, so the browser takes `12.99`.
+            attrs.insert(
+                "step".to_owned(),
+                format!("{:.*}", decimals as usize, 0.1f64.powi(decimals as i32)),
+            );
+        }
         for key in ["step", "min", "max"] {
             if let Some(text) = read(key).as_str() {
                 attrs.insert(key.to_owned(), text.to_owned());
@@ -539,15 +561,165 @@ fn done(htmx: &Htmx, toast: Toast, to: &str) -> Response {
 }
 
 /// Reads and checks the form, after the user was let in: `Valid<T>`'s
-/// answer (errors, or a live-validation reply) when it isn't valid.
-async fn read_form<F>(state: &AppState, req: Request) -> std::result::Result<F, Box<Response>>
+/// answer (errors, or a live-validation reply) when it isn't valid. The
+/// `money` fields' whole units (`12.99`) become the smallest unit
+/// (`1299`) first, as the model keeps them.
+async fn read_form<F>(
+    state: &AppState,
+    req: Request,
+    money: &[String],
+) -> std::result::Result<F, Box<Response>>
 where
     F: serde::de::DeserializeOwned + Validate + Send,
 {
+    let req = money_to_smallest_unit(state, req, money).await?;
     Valid::<F>::from_request(req, state)
         .await
         .map(|Valid(form)| form)
         .map_err(Box::new)
+}
+
+/// `APP_CURRENCY`'s usual decimals (2 for `USD`, 0 for `IDR`).
+fn money_decimals(state: &AppState) -> u32 {
+    renox::currency_decimals(&state.config.currency).min(6)
+}
+
+/// `1299` with 2 decimals → `12.99`.
+fn whole_units(amount: i64, decimals: u32) -> String {
+    let scale = 10i64.pow(decimals);
+    let sign = if amount < 0 { "-" } else { "" };
+    let (whole, part) = (
+        amount.unsigned_abs() / scale as u64,
+        amount.unsigned_abs() % scale as u64,
+    );
+    format!("{sign}{whole}.{part:0width$}", width = decimals as usize)
+}
+
+/// `12.99` with 2 decimals → `1299` (rounded to the smallest unit). Text
+/// that isn't an amount is left for the form's rules to report.
+/// Worked out on the digits, so `0.305` is `31`, not a float's `30`.
+fn smallest_unit(text: &str, decimals: u32) -> Option<String> {
+    let text = text.trim();
+    let (negative, text) = match text.strip_prefix('-') {
+        Some(rest) => (true, rest),
+        None => (false, text.strip_prefix('+').unwrap_or(text)),
+    };
+    let (whole, fraction) = text.split_once('.').unwrap_or((text, ""));
+    let digits = |s: &str| s.bytes().all(|b| b.is_ascii_digit());
+    if (whole.is_empty() && fraction.is_empty()) || !digits(whole) || !digits(fraction) {
+        return None;
+    }
+    let places = decimals as usize;
+    let kept: String = fraction
+        .chars()
+        .chain(std::iter::repeat('0'))
+        .take(places)
+        .collect();
+    let mut amount: i64 = format!("{whole}{kept}")
+        .trim_start_matches('0')
+        .parse()
+        .unwrap_or(0);
+    if whole.trim_start_matches('0').len() + places > 17 {
+        return None;
+    }
+    if fraction.as_bytes().get(places).is_some_and(|b| *b >= b'5') {
+        amount += 1;
+    }
+    Some(format!(
+        "{}{amount}",
+        if negative && amount != 0 { "-" } else { "" }
+    ))
+}
+
+/// The request with its money fields in the smallest unit: a form
+/// (`application/x-www-form-urlencoded`) or a JSON object. Other bodies,
+/// and currencies without decimals, pass as they are.
+async fn money_to_smallest_unit(
+    state: &AppState,
+    req: Request,
+    money: &[String],
+) -> std::result::Result<Request, Box<Response>> {
+    use renox::axum::body::{Body, Bytes};
+    use renox::axum::http::header::{CONTENT_LENGTH, CONTENT_TYPE};
+
+    let decimals = money_decimals(state);
+    if decimals == 0 || money.is_empty() {
+        return Ok(req);
+    }
+    let kind = req
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let form = kind.starts_with("application/x-www-form-urlencoded");
+    let json = kind.starts_with("application/json");
+    if !form && !json {
+        return Ok(req);
+    }
+    let (mut parts, body) = req.into_parts();
+    let bytes = Bytes::from_request(Request::from_parts(parts.clone(), body), state)
+        .await
+        .map_err(|rejection| Box::new(rejection.into_response()))?;
+    let changed = if form {
+        let text = String::from_utf8_lossy(&bytes);
+        let pairs: Vec<String> = text
+            .split('&')
+            .map(|pair| {
+                let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+                if money.iter().any(|name| *name == url_decode(key))
+                    && let Some(amount) = smallest_unit(&url_decode(value), decimals)
+                {
+                    format!("{key}={amount}")
+                } else {
+                    pair.to_owned()
+                }
+            })
+            .collect();
+        Bytes::from(pairs.join("&"))
+    } else {
+        match renox::serde_json::from_slice::<Value>(&bytes) {
+            Ok(Value::Object(mut object)) => {
+                for name in money {
+                    let amount = match object.get(name) {
+                        Some(Value::String(text)) => smallest_unit(text, decimals),
+                        Some(Value::Number(n)) => smallest_unit(&n.to_string(), decimals),
+                        _ => None,
+                    };
+                    if let Some(amount) = amount.and_then(|a| a.parse::<i64>().ok()) {
+                        object.insert(name.clone(), Value::from(amount));
+                    }
+                }
+                Bytes::from(renox::serde_json::to_vec(&object).unwrap_or_default())
+            }
+            _ => bytes,
+        }
+    };
+    parts.headers.remove(CONTENT_LENGTH);
+    Ok(Request::from_parts(parts, Body::from(changed)))
+}
+
+/// `a%20b+c` → `a b c` (a form's key or value).
+fn url_decode(text: &str) -> String {
+    let hex = |b: u8| (b as char).to_digit(16);
+    let bytes = text.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let escaped = (bytes[i] == b'%' && i + 2 < bytes.len())
+            .then(|| Some(hex(bytes[i + 1])? * 16 + hex(bytes[i + 2])?))
+            .flatten();
+        match (bytes[i], escaped) {
+            (_, Some(byte)) => {
+                out.push(byte as u8);
+                i += 2;
+            }
+            (b'+', None) => out.push(b' '),
+            (byte, None) => out.push(byte),
+        }
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 async fn dashboard(
@@ -633,7 +805,7 @@ async fn create<R: AdminResource>(
     user: AuthUser,
 ) -> Result<View> {
     cx.authorize(&user, "create", None)?;
-    let fields = cx.fields(&state.db, None).await?;
+    let fields = cx.fields(&state, None).await?;
     let info = cx.info();
     let mut values = Map::new();
     values.insert(
@@ -659,7 +831,7 @@ async fn store<R: AdminResource>(
     req: Request,
 ) -> Result<Response> {
     cx.authorize(&user, "create", None)?;
-    let form: R::Form = match read_form(&state, req).await {
+    let form: R::Form = match read_form(&state, req, &cx.money_fields()).await {
         Ok(form) => form,
         Err(answer) => return Ok(*answer),
     };
@@ -735,7 +907,7 @@ async fn edit<R: AdminResource>(
     let record = cx.find(&state.db, &id, false).await?;
     cx.authorize(&user, "update", Some(&record))?;
     let json = to_json(&record)?;
-    let fields = cx.fields(&state.db, Some(&json)).await?;
+    let fields = cx.fields(&state, Some(&json)).await?;
     let base = cx.base();
     let id = record.id().to_string();
     let label = cx.resource.label().to_owned();
@@ -773,7 +945,7 @@ async fn update<R: AdminResource>(
     cx.panel.check(&user)?;
     let mut record = cx.find(&state.db, &id, false).await?;
     cx.authorize(&user, "update", Some(&record))?;
-    let form: R::Form = match read_form(&state, req).await {
+    let form: R::Form = match read_form(&state, req, &cx.money_fields()).await {
         Ok(form) => form,
         Err(answer) => return Ok(*answer),
     };
@@ -977,5 +1149,41 @@ async fn row_action<R: AdminResource>(
         Ok(toast.into_response())
     } else {
         Ok(done(&htmx, toast, &cx.base()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn money_moves_between_whole_and_smallest_units() {
+        assert_eq!(whole_units(1299, 2), "12.99");
+        assert_eq!(whole_units(5, 2), "0.05");
+        assert_eq!(whole_units(-1250, 2), "-12.50");
+        assert_eq!(whole_units(7, 3), "0.007");
+        let unit = |text: &str| smallest_unit(text, 2);
+        assert_eq!(unit("12.99").as_deref(), Some("1299"));
+        assert_eq!(unit(" 12 ").as_deref(), Some("1200"));
+        assert_eq!(unit("12.5").as_deref(), Some("1250"));
+        assert_eq!(unit(".5").as_deref(), Some("50"));
+        assert_eq!(unit("0.305").as_deref(), Some("31"));
+        assert_eq!(unit("0.304").as_deref(), Some("30"));
+        assert_eq!(unit("-1.00").as_deref(), Some("-100"));
+        assert_eq!(unit("0.00").as_deref(), Some("0"));
+        assert_eq!(unit("-0.001").as_deref(), Some("0"));
+        for bad in [
+            "",
+            ".",
+            "abc",
+            "1,5",
+            "1e3",
+            "12.3.4",
+            "99999999999999999999",
+        ] {
+            assert_eq!(unit(bad), None, "{bad}");
+        }
+        assert_eq!(url_decode("a%20b+c%2"), "a b c%2");
+        assert_eq!(url_decode("price%5B0%5D"), "price[0]");
     }
 }

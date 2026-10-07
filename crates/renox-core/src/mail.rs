@@ -861,10 +861,10 @@ mod tests {
     fn html_becomes_readable_text() {
         let html = r#"<html><head><style>p{color:red}</style></head><body>
             <h1>Hello &amp; welcome</h1><p>Click <a href="https://x.id/a?b=1&amp;c=2">here</a>.</p>
-            <table><tr><td>Total</td><td>Rp 10.000</td></tr></table></body></html>"#;
+            <table><tr><td>Total</td><td>$10.00</td></tr></table></body></html>"#;
         assert_eq!(
             html_to_text(html),
-            "Hello & welcome\n\nClick here (https://x.id/a?b=1&c=2).\n\nTotal Rp 10.000\n"
+            "Hello & welcome\n\nClick here (https://x.id/a?b=1&c=2).\n\nTotal $10.00\n"
         );
         // Without a <body>: a style block is skipped, and a title that is
         // never closed is dropped as a tag.

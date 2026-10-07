@@ -131,7 +131,7 @@ async fn guests_log_in_and_new_staff_verify_first() {
 #[renox::test]
 async fn each_role_changes_only_its_own_things() {
     let app = app().await;
-    let coffee = product(&app, "COFFEE", 50_000, 10).await;
+    let coffee = product(&app, "COFFEE", 1_250, 10).await;
     let buyer = customer(&app).await;
 
     staff(&app, "warehouse").await;
@@ -173,16 +173,17 @@ async fn each_role_changes_only_its_own_things() {
 #[renox::test]
 async fn issuing_takes_the_stock_and_voiding_brings_it_back() {
     let app = app().await;
-    let coffee = product(&app, "COFFEE", 50_000, 10).await;
-    let sugar = product(&app, "SUGAR", 20_000, 3).await;
+    let coffee = product(&app, "COFFEE", 1_250, 10).await;
+    let sugar = product(&app, "SUGAR", 400, 3).await;
     let buyer = customer(&app).await;
     staff(&app, "cashier").await;
 
     let invoice = draft(&app, &buyer, &[(&coffee, 2), (&sugar, 1)]).await;
     // The price of the product, 11% tax, the number from the settings.
-    assert_eq!(invoice.subtotal, 120_000);
-    assert_eq!(invoice.tax, 13_200);
-    assert_eq!(invoice.total, 133_200);
+    // In cents: 2 × $12.50 + $4.00, and 11% of it rounded to the cent.
+    assert_eq!(invoice.subtotal, 2_900);
+    assert_eq!(invoice.tax, 319);
+    assert_eq!(invoice.total, 3_219);
     assert_eq!(invoice.number, format!("INV-{:05}", invoice.id));
     assert_eq!(invoice.status, "draft");
     assert_eq!(stock_of(&app, coffee.id).await, 10, "a draft takes nothing");
@@ -228,8 +229,8 @@ async fn issuing_takes_the_stock_and_voiding_brings_it_back() {
 #[renox::test]
 async fn an_invoice_short_of_stock_changes_nothing() {
     let app = app().await;
-    let coffee = product(&app, "COFFEE", 50_000, 10).await;
-    let sugar = product(&app, "SUGAR", 20_000, 1).await;
+    let coffee = product(&app, "COFFEE", 1_250, 10).await;
+    let sugar = product(&app, "SUGAR", 400, 1).await;
     let buyer = customer(&app).await;
     staff(&app, "cashier").await;
 
@@ -294,7 +295,7 @@ async fn the_invoice_form_checks_each_line() {
 #[renox::test]
 async fn cash_pays_an_issued_invoice_and_tells_the_cashiers() {
     let app = app().await;
-    let coffee = product(&app, "COFFEE", 50_000, 10).await;
+    let coffee = product(&app, "COFFEE", 1_250, 10).await;
     let buyer = customer(&app).await;
     let cashier = staff(&app, "cashier").await;
     let invoice = draft(&app, &buyer, &[(&coffee, 1)]).await;
@@ -319,7 +320,7 @@ async fn cash_pays_an_issued_invoice_and_tells_the_cashiers() {
 #[renox::test]
 async fn stock_is_received_counted_and_never_below_zero() {
     let app = app().await;
-    let coffee = product(&app, "COFFEE", 50_000, 10).await;
+    let coffee = product(&app, "COFFEE", 1_250, 10).await;
     staff(&app, "warehouse").await;
     let url = format!("/products/{}/stock", coffee.id);
     app.htmx()
@@ -358,11 +359,11 @@ async fn stock_is_received_counted_and_never_below_zero() {
 #[renox::test]
 async fn products_import_from_csv_line_by_line() {
     let app = app().await;
-    product(&app, "COFFEE", 50_000, 10).await;
+    product(&app, "COFFEE", 1_250, 10).await;
     staff(&app, "warehouse").await;
     let csv = "sku,name,price,stock\n\
-               COFFEE,Arabica coffee,55000,5\n\
-               tea-01,\"Tea, jasmine\",18000,20\n\
+               COFFEE,Arabica coffee,13.50,5\n\
+               tea-01,\"Tea, jasmine\",4.50,20\n\
                BAD SKU,Nope,1,1\n\
                SUGAR,Sugar,pricey,1\n";
     let res = app
@@ -387,7 +388,7 @@ async fn products_import_from_csv_line_by_line() {
         .unwrap();
     assert_eq!(
         (coffee.name.as_str(), coffee.price, coffee.stock),
-        ("Arabica coffee", 55_000, 15)
+        ("Arabica coffee", 1_350, 15)
     );
     let tea = Product::where_eq("sku", "TEA-01")
         .first(app.db())
@@ -407,7 +408,7 @@ async fn products_import_from_csv_line_by_line() {
 #[renox::test]
 async fn new_products_duplicates_and_the_ledger_export() {
     let app = app().await;
-    let coffee = product(&app, "COFFEE", 50_000, 10).await;
+    let coffee = product(&app, "COFFEE", 1_250, 10).await;
     staff(&app, "warehouse").await;
     // The wizard's page and the product's action group.
     app.get("/products")
@@ -436,7 +437,7 @@ async fn new_products_duplicates_and_the_ledger_export() {
             &[
                 ("sku", "tea"),
                 ("name", "Tea"),
-                ("price", "18000"),
+                ("price", "4.50"),
                 ("opening_stock", "3"),
             ],
         )
@@ -449,6 +450,7 @@ async fn new_products_duplicates_and_the_ledger_export() {
     res.assert_ok()
         .assert_header("hx-redirect", &format!("/products/{}", tea.id));
     assert_eq!(tea.stock, 3);
+    assert_eq!(tea.price, 450, "typed in dollars, kept in cents");
 
     // Duplicate: the form filled from a copy, without the unique SKU.
     app.get(&format!("/products/{}/replicate", coffee.id))
@@ -456,7 +458,7 @@ async fn new_products_duplicates_and_the_ledger_export() {
         .assert_ok()
         .assert_see("A copy of Product COFFEE (COFFEE)")
         .assert_see(r#"value="Product COFFEE (copy)""#)
-        .assert_see(r#"value="50000""#)
+        .assert_see(r#"value="12.50""#)
         .assert_dont_see(r#"value="COFFEE""#);
 
     // The ledger as CSV, outside the grid's page.
@@ -476,7 +478,7 @@ async fn new_products_duplicates_and_the_ledger_export() {
 #[renox::test]
 async fn exports_run_in_the_background_with_the_grids_filters() {
     let app = app().await;
-    let coffee = product(&app, "COFFEE", 50_000, 100).await;
+    let coffee = product(&app, "COFFEE", 1_250, 100).await;
     let buyer = customer(&app).await;
     let cashier = staff(&app, "cashier").await;
     let first = draft(&app, &buyer, &[(&coffee, 1)]).await;
@@ -529,7 +531,7 @@ async fn exports_run_in_the_background_with_the_grids_filters() {
 #[renox::test]
 async fn a_xendit_payment_page_and_its_webhook_pay_the_invoice() {
     let app = app().await;
-    let coffee = product(&app, "COFFEE", 50_000, 10).await;
+    let coffee = product(&app, "COFFEE", 1_250, 10).await;
     let buyer = customer(&app).await;
     let cashier = staff(&app, "cashier").await;
     let invoice = draft(&app, &buyer, &[(&coffee, 1)]).await;
@@ -599,7 +601,7 @@ async fn a_xendit_payment_page_and_its_webhook_pay_the_invoice() {
 #[renox::test]
 async fn a_midtrans_settlement_pays_the_invoice() {
     let app = app().await;
-    let coffee = product(&app, "COFFEE", 50_000, 10).await;
+    let coffee = product(&app, "COFFEE", 1_250, 10).await;
     let buyer = customer(&app).await;
     staff(&app, "cashier").await;
     let invoice = draft(&app, &buyer, &[(&coffee, 1)]).await;
@@ -717,11 +719,11 @@ async fn settings_shape_invoices_and_the_pages() {
     app.assert_database_has("audit_logs", &[("action", &"settings.updated")])
         .await;
 
-    let coffee = product(&app, "COFFEE", 10_000, 10).await;
+    let coffee = product(&app, "COFFEE", 1_000, 10).await;
     let buyer = customer(&app).await;
     let invoice = draft(&app, &buyer, &[(&coffee, 1)]).await;
     assert!(invoice.number.starts_with("NWC-"));
-    assert_eq!((invoice.tax, invoice.total), (1_000, 11_000));
+    assert_eq!((invoice.tax, invoice.total), (100, 1_100));
     assert_eq!(
         invoice.due_on - invoice.issued_on,
         renox::chrono::TimeDelta::days(7)
@@ -731,13 +733,13 @@ async fn settings_shape_invoices_and_the_pages() {
 #[renox::test]
 async fn the_dashboard_shows_what_needs_doing() {
     let app = app().await;
-    let low = product(&app, "SUGAR", 20_000, 2).await;
+    let low = product(&app, "SUGAR", 400, 2).await;
     Product::where_eq("id", low.id)
         .update(app.db(), &[("min_stock", &5_i64)])
         .await
         .unwrap();
     let buyer = customer(&app).await;
-    let coffee = product(&app, "COFFEE", 50_000, 10).await;
+    let coffee = product(&app, "COFFEE", 1_250, 10).await;
     let cashier = staff(&app, "cashier").await;
     let invoice = draft(&app, &buyer, &[(&coffee, 1)]).await;
     app.post(&format!("/invoices/{}/issue", invoice.id), &[])

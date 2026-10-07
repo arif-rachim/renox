@@ -10,7 +10,7 @@ const FULL: &[(&str, &str)] = &[
     ("description", "Arabica"),
     ("stock", "12"),
     ("weight_kg", "0.25"),
-    ("price", "85000"),
+    ("price", "16.99"),
     ("available", "on"),
     ("size", "large"),
     ("colors", "black"),
@@ -32,7 +32,7 @@ async fn a_product_round_trips_from_the_form_to_the_database_and_back() {
     assert_eq!(product.description.as_deref(), Some("Arabica"));
     assert_eq!(
         (product.stock, product.weight_kg, product.price),
-        (12, 0.25, 85_000)
+        (12, 0.25, 1_699)
     );
     assert!(product.available);
     assert_eq!(product.size, Size::Large);
@@ -54,6 +54,8 @@ async fn a_product_round_trips_from_the_form_to_the_database_and_back() {
         .assert_see(r#"name="name" type="text" value="Highland Coffee""#)
         .assert_see(">Arabica</textarea>")
         .assert_see(r#"value="0.25""#)
+        // The price in dollars, stored in cents.
+        .assert_see(r#"name="price" type="number" value="16.99""#)
         .assert_see(r#"name="available" value="on" checked"#)
         .assert_see(r#"name="size" value="large" checked"#)
         .assert_see(r#"value="black" checked"#)
@@ -243,7 +245,7 @@ async fn the_show_page_formats_every_field() {
         .assert_see(&format!(r#"data-rx-copy-text="{}""#, product.id))
         // Markdown, with the HTML typed in shown as text.
         .assert_see("<strong>Single</strong> origin &lt;b&gt;beans&lt;/b&gt;")
-        .assert_see("Rp 85,000")
+        .assert_see("$16.99")
         .assert_see("0.25<span class=\"rx-entry__affix\">kg</span>")
         .assert_see("</svg>Yes</span>")
         .assert_see(r#"<span class="rx-badge rx-badge--info">Large</span>"#)
@@ -287,7 +289,7 @@ async fn the_index_lists_products_in_a_table_or_says_it_is_empty() {
         .await
         .assert_dont_see("No products yet")
         .assert_see(r#"<table class="rx-table">"#)
-        .assert_see("Rp 85,000")
+        .assert_see("$16.99")
         .assert_see(r#"<span class="rx-badge rx-badge--info">Medium</span>"#)
         .assert_see(&format!(r#"href="/products/{}/edit""#, coffee.id))
         .assert_see(&format!(r#"action="/products/{}""#, coffee.id));

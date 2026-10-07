@@ -44,16 +44,16 @@ fn sample() -> OrderView {
             channel: Channel::Online,
             fulfilment: Fulfilment::Delivery,
             status: OrderStatus::Paid,
-            subtotal: 13_200_000,
-            discount: 20_000,
-            delivery_fee: 25_000,
-            total: 13_205_000,
+            subtotal: 113_998,
+            discount: 400,
+            delivery_fee: 1_000,
+            total: 114_598,
             placed_at: Some(renox::db::now()),
             ..Default::default()
         },
         lines: vec![
-            line(1, "Trek FX 3", "M · Grey", 1, 13_000_000),
-            line(2, "Shimano chain", "", 1, 200_000),
+            line(1, "Trek FX 3", "M · Grey", 1, 109_999),
+            line(2, "Shimano chain", "", 1, 3_999),
         ],
         store: Some(Store {
             name: "North".into(),
@@ -92,7 +92,7 @@ pub async fn index(State(state): State<AppState>, lang: Lang) -> Result<View> {
             context! {
                 order => order.clone(),
                 url => "https://bikeshop.example/orders/1/view?signature=…",
-                refund => Some(200_000),
+                refund => Some(3_999),
                 name => "Sofia Wijaya",
             },
         )?;

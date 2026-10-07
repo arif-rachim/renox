@@ -140,7 +140,7 @@ async fn world() -> World {
     let cashier_south = fixtures::person(db, "cs@example.com", &[(CASHIER, Some(south.id))])
         .await
         .unwrap();
-    let helmet = variant(db, "Helmet", CategoryKind::Gear, 450_000).await;
+    let helmet = variant(db, "Helmet", CategoryKind::Gear, 4_500).await;
     put(db, helmet.id, north.id, north.id, 10).await;
     World {
         app,
@@ -336,7 +336,7 @@ async fn a_consignment_goes_from_request_to_recall_and_sales_at_b_are_booked_to_
     w.app
         .post(
             "/staff/counter/pay",
-            &[("method", "cash"), ("tendered", "10000000")],
+            &[("method", "cash"), ("tendered", "100")],
         )
         .await
         .assert_status(303);
@@ -347,11 +347,11 @@ async fn a_consignment_goes_from_request_to_recall_and_sales_at_b_are_booked_to_
     let entries = IntercompanyEntry::query().get(db).await.unwrap();
     assert_eq!(
         owed(&entries, w.south.id, w.north.id, EntryKind::SaleRevenue),
-        900_000
+        9_000
     );
     assert_eq!(
         owed(&entries, w.north.id, w.south.id, EntryKind::SellingFee),
-        fee(900_000, w.south.fee_rate_bp)
+        fee(9_000, w.south.fee_rate_bp)
     );
     let selling_fee = entries
         .iter()
@@ -500,7 +500,7 @@ async fn a_purchase_order_is_sent_received_in_part_and_costs_are_averaged() {
                 ("supplier", &supplier.id.to_string()),
                 ("lines[0][variant]", &w.helmet.id.to_string()),
                 ("lines[0][quantity]", "10"),
-                ("lines[0][unit_cost]", "300000"),
+                ("lines[0][unit_cost]", "30"),
                 ("lines[1][variant]", &w.helmet.id.to_string()),
                 ("lines[1][quantity]", ""),
             ],
@@ -510,7 +510,7 @@ async fn a_purchase_order_is_sent_received_in_part_and_costs_are_averaged() {
     let order = PurchaseOrder::query().first(db).await.unwrap().unwrap();
     assert_eq!(
         (order.status, order.total, order.store_id),
-        (PurchaseStatus::Draft, 3_000_000, w.north.id)
+        (PurchaseStatus::Draft, 30_000, w.north.id)
     );
     let url = format!("/staff/purchase-orders/{}", order.id);
     w.app
@@ -577,7 +577,7 @@ async fn a_purchase_order_is_sent_received_in_part_and_costs_are_averaged() {
         .unwrap()
         .unwrap()
         .cost;
-    assert_eq!(cost, average_cost(10, 225_000, 4, 300_000));
+    assert_eq!(cost, average_cost(10, 2_250, 4, 3_000));
     w.app
         .post(
             &format!("{url}/receive"),
@@ -602,7 +602,7 @@ async fn a_purchase_order_is_sent_received_in_part_and_costs_are_averaged() {
             .unwrap()
             .unwrap()
             .cost,
-        average_cost(14, cost, 6, 300_000)
+        average_cost(14, cost, 6, 3_000)
     );
     assert_eq!(ledger::mismatches(db).await.unwrap(), vec![]);
 }
@@ -627,9 +627,9 @@ async fn a_price_list_saves_good_rows_reports_bad_ones_and_queues_large_files() 
         .unwrap();
     let csv = format!(
         "sku,product,size,colour,cost,price,barcode\n\
-         {},,,,260000,,8712345678901\n\
-         NEW-1,{},M,red,100000,180000,\n\
-         NEW-2,no-such-product,,,50000,90000,\n\
+         {},,,,26.00,,8712345678901\n\
+         NEW-1,{},M,red,10.00,18.00,\n\
+         NEW-2,no-such-product,,,5,9,\n\
          BAD,,,,,,\n",
         w.helmet.sku, product.slug
     );
@@ -645,7 +645,7 @@ async fn a_price_list_saves_good_rows_reports_bad_ones_and_queues_large_files() 
         .await
         .unwrap()
         .unwrap();
-    assert_eq!((helmet.cost, helmet.price), (260_000, 450_000));
+    assert_eq!((helmet.cost, helmet.price), (2_600, 4_500));
     let barcode: Option<String> =
         renox::db::sql("SELECT barcode FROM product_variants WHERE id = ?")
             .bind(helmet.id)
@@ -660,7 +660,7 @@ async fn a_price_list_saves_good_rows_reports_bad_ones_and_queues_large_files() 
         .unwrap();
     assert_eq!(
         (new.product_id, new.price, new.cost),
-        (product.id, 180_000, 100_000)
+        (product.id, 1_800, 1_000)
     );
     // The refused row left nothing behind (its savepoint rolled back).
     assert!(
@@ -681,7 +681,7 @@ async fn a_price_list_saves_good_rows_reports_bad_ones_and_queues_large_files() 
     // A large file: queued, imported by the job, the report mailed.
     let mut large = String::from("sku,cost\n");
     for _ in 0..250 {
-        large.push_str(&format!("{},270000\n", w.helmet.sku));
+        large.push_str(&format!("{},27\n", w.helmet.sku));
     }
     let res = w
         .app
@@ -696,7 +696,7 @@ async fn a_price_list_saves_good_rows_reports_bad_ones_and_queues_large_files() 
             .unwrap()
             .unwrap()
             .cost,
-        260_000
+        2_600
     );
     w.app.run_jobs().await;
     assert_eq!(
@@ -705,7 +705,7 @@ async fn a_price_list_saves_good_rows_reports_bad_ones_and_queues_large_files() 
             .unwrap()
             .unwrap()
             .cost,
-        270_000
+        2_700
     );
     assert!(
         w.app.sent_mail().iter().any(
@@ -742,7 +742,7 @@ async fn the_daily_reorder_check_suggests_an_order_and_a_consignment() {
         SupplierItem {
             supplier_id: supplier.id,
             variant_id: helmet.id,
-            cost: 280_000,
+            cost: 2_800,
             ..Default::default()
         },
     )
@@ -776,7 +776,7 @@ async fn the_daily_reorder_check_suggests_an_order_and_a_consignment() {
         .await
         .unwrap();
     assert_eq!(drafts.len(), 1);
-    assert_eq!(drafts[0].total, 8 * 280_000);
+    assert_eq!(drafts[0].total, 8 * 2_800);
     // South's manager hears of it, North's doesn't.
     let mails = w.app.sent_mail();
     let alert = mails
@@ -882,7 +882,7 @@ async fn a_stock_take_adjusts_and_charges_missing_consigned_goods_to_the_holder(
 async fn bikes_move_between_sale_stock_and_the_fleet() {
     let w = world().await;
     let db = w.app.db();
-    let bike = variant(db, "Trail 5", CategoryKind::Bike, 12_000_000).await;
+    let bike = variant(db, "Trail 5", CategoryKind::Bike, 120_000).await;
     let shelf = put(db, bike.id, w.north.id, w.north.id, 2).await;
     w.app.acting_as(&w.manager_north);
     w.app
@@ -896,9 +896,9 @@ async fn bikes_move_between_sale_stock_and_the_fleet() {
             &[
                 ("level", &shelf.id.to_string()),
                 ("frame_number", "FR-NEW-1"),
-                ("hourly_rate", "30000"),
-                ("daily_rate", "150000"),
-                ("deposit", "500000"),
+                ("hourly_rate", "15"),
+                ("daily_rate", "60"),
+                ("deposit", "300"),
             ],
         )
         .await
@@ -915,6 +915,15 @@ async fn bikes_move_between_sale_stock_and_the_fleet() {
             rental_bike.asset_value
         ),
         (w.north.id, BikeStatus::Available, bike.cost)
+    );
+    // Rates typed in dollars, kept in cents.
+    assert_eq!(
+        (
+            rental_bike.hourly_rate,
+            rental_bike.daily_rate,
+            rental_bike.deposit
+        ),
+        (1_500, 6_000, 30_000)
     );
     assert_eq!(level(db, bike.id, w.north.id, w.north.id).await.on_hand, 1);
     // The same frame number twice is refused.
@@ -1021,7 +1030,7 @@ async fn every_stock_page_answers_and_lists_run_a_fixed_number_of_queries() {
     let (_, few_shipments) = capture_queries(w.app.get("/staff/consignments?view=all")).await;
     let (_, few_orders) = capture_queries(w.app.get("/staff/purchase-orders?status=all")).await;
     for n in 0..8 {
-        let v = variant(db, &format!("Lamp {n}"), CategoryKind::Gear, 100_000).await;
+        let v = variant(db, &format!("Lamp {n}"), CategoryKind::Gear, 1_000).await;
         put(db, v.id, w.north.id, w.north.id, 3).await;
         ConsignmentShipment::create(
             db,

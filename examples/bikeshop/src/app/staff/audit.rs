@@ -22,7 +22,7 @@
 //! # async fn demo(db: &Db, user: &User) -> Result {
 //! audit::record(db, user, ORDERS_REFUND, "order.refunded")
 //!     .subject("orders", 42)
-//!     .data(json!({ "amount": 75_000, "reason": "Wrong size" }))
+//!     .data(json!({ "amount": 7_500, "reason": "Wrong size" }))
 //!     .save()
 //!     .await?;
 //! # Ok(()) }

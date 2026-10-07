@@ -63,12 +63,12 @@
         {% call infolist() %}
           {% call entry(t('plans.fields.status')) %}{{ status_badge(status) }}{% endcall %}
           {{ entry(t('plans.fields.plan'), plan.name) }}
-          {% call entry(t('plans.fields.monthly')) %}<strong>{{ monthly | money }}</strong> / {{ t('blocks.plans.month') }}{% endcall %}
+          {% call entry(t('plans.fields.monthly')) %}<strong>{{ monthly | money(currency=monthly_currency) }}</strong> / {{ t('blocks.plans.month') }}{% endcall %}
           {{ entry(t('plans.fields.store'), store.name if store else none) }}
           {{ entry(t('plans.fields.weekday'), t('plans.weekday.' ~ ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'][sub.preferred_weekday - 1])) }}
           {{ entry(t('plans.fields.discount'), (discount ~ " %")) }}
           {%- if billing %}
-          {{ entry(t('plans.fields.gateway'), t('plans.pay_with.' ~ billing.gateway)) }}
+          {{ entry(t('plans.fields.gateway'), t('plans.pay_with.' ~ billing.gateway, rate=rate)) }}
           {%- if billing.ends_at %}{{ entry(t('plans.fields.ends'), billing.ends_at, format="date") }}{% else %}{{ entry(t('plans.fields.renews'), billing.renews_on, format="date") }}{% endif %}
           {%- else %}
           {{ entry(t('plans.fields.gateway'), t('plans.pay_with.counter')) }}
@@ -97,7 +97,7 @@
         {%- if invoices %}
         {% call table([t('plans.invoice.date'), [t('plans.fields.amount'), 'num'], t('plans.fields.status')], caption=t('plans.show.invoices')) %}
           {%- for i in invoices %}
-          <tr><td>{{ i.created_at | date }}</td><td class="rx-num">{{ i.amount | money }}</td><td>{{ t('plans.invoice.paid' if i.paid else 'plans.invoice.failed') }}</td></tr>
+          <tr><td>{{ i.created_at | date }}</td><td class="rx-num">{{ i.amount | money(currency=i.currency) }}</td><td>{{ t('plans.invoice.paid' if i.paid else 'plans.invoice.failed') }}</td></tr>
           {%- endfor %}
         {% endcall %}
         {%- else %}<p class="rx-subtitle">{{ t('plans.show.no_invoices') }}</p>{% endif %}

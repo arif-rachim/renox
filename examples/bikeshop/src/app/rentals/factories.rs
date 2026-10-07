@@ -15,7 +15,7 @@ use crate::seed::unique;
 
 impl Factory for RentalBike {
     fn definition() -> Self {
-        let daily = (12..30).fake::<i64>() * 10_000;
+        let daily = (40..90).fake::<i64>() * 100;
         RentalBike {
             frame_number: format!("WBK{:08}", unique()),
             condition: BikeCondition::Good,
@@ -132,8 +132,8 @@ impl Factory for Rental {
             starts_at: starts,
             due_at: starts + Duration::days(1),
             status: RentalStatus::Reserved,
-            price: 150_000,
-            deposit: 750_000,
+            price: 6_000,
+            deposit: 30_000,
             ..Default::default()
         }
     }

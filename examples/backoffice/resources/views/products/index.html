@@ -24,7 +24,7 @@
         {{ input("name", "Name", required=true, autocomplete="off", id="new-product-name") }}
       {% endcall %}
       {% call wizard_step("new-product", "stock") %}
-        {{ input("price", "Price", type="number", required=true, prefix="Rp", attrs={'min': 0}, id="new-product-price") }}
+        {{ input("price", "Price", type="number", required=true, prefix="$", attrs={'min': 0, 'step': '0.01'}, id="new-product-price") }}
         {% call form_grid(2) %}
           {{ input("opening_stock", "On the shelf now", type="number", attrs={'min': 0}, id="new-product-opening") }}
           {{ input("min_stock", "Minimum", type="number", attrs={'min': 0}, hint="Below it, the dashboard warns.", id="new-product-min") }}

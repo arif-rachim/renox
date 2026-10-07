@@ -98,7 +98,7 @@ impl ProductStates for FactoryBuilder<Product> {
 
 impl Factory for ProductVariant {
     fn definition() -> Self {
-        let price = (50..5_000).fake::<i64>() * 10_000;
+        let price = (50..5_000).fake::<i64>() * 100;
         ProductVariant {
             sku: format!("SKU-{:06}", unique()),
             price,
