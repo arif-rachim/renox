@@ -112,7 +112,8 @@ for (const csp of ['relaxed', 'strict']) {
             }
             // The scheme reached the kit's tokens (and so the blocks).
             const surface = await page.eval(() => getComputedStyle(document.querySelector('.bs-plan')).backgroundColor);
-            assert.equal(surface, scheme === 'dark' ? 'rgb(28, 26, 24)' : 'rgb(255, 255, 255)', 'cards follow the scheme');
+            // The shop's surface colour (public/theme.css: #fffdf9, dark #1d1b18).
+            assert.equal(surface, scheme === 'dark' ? 'rgb(29, 27, 24)' : 'rgb(255, 253, 249)', 'cards follow the scheme');
             assert.ok(await fitsWidth(page), 'no sideways scrolling');
             if (size === 'phone') {
               // The month becomes a list of the days with something on.

@@ -34,10 +34,16 @@ pub fn entries() -> Vec<Explanation> {
                       than by comparing paths.",
             },
             Feature {
-                api: "UI kit: columns + card",
-                why: "The three ways to use the shop sit side by side on a CSS grid \
-                      (`columns(3)`), one under the other on phones, with no CSS of the \
-                      shop's own.",
+                api: "Brand tokens over the kit",
+                why: "The storefront's look (cream page, teal and terracotta, large \
+                      headlines, pill buttons, rounder corners; #328) is the kit's own \
+                      tokens set to the shop's values in `public/theme.css` \
+                      (`--rx-bg`, `--rx-accent`, `--rx-radius-l`, `--rx-type-title`…), \
+                      so every kit component on every page follows, in light and dark \
+                      mode, without a component of the shop's own. The hero, the photo \
+                      tiles and the service tiles are CSS grids on the kit's spacing \
+                      tokens; the hero is a macro (`layouts/_hero.html`) the rent and \
+                      plans pages share.",
             },
             Feature {
                 api: "App::share",
@@ -51,9 +57,11 @@ pub fn entries() -> Vec<Explanation> {
             Feature {
                 api: "UI kit: card_grid + media_card",
                 why: "The featured bikes are the same `media_card`s as the catalogue's, in a \
-                      `card_grid`, so a bike looks the same everywhere. The categories are \
-                      kit cards (`rx-card`) on a small grid of the catalogue's \
-                      (`public/catalog/catalog.css`), each with its sub-categories.",
+                      `card_grid`, so a bike looks the same everywhere; on public pages \
+                      `theme.css` shows them as a photo with the text under it. The \
+                      photos are free Unsplash photos (`public/images/CREDITS.md`) in \
+                      WebP; the seeders give each product one of its category's photos. \
+                      The categories are photo tiles linking to the catalogue.",
             },
             Feature {
                 api: "Routes::etag",
@@ -92,10 +100,11 @@ pub fn entries() -> Vec<Explanation> {
             },
         ],
         under_hood: "The handler returns `view(\"home/index.html\")` with no data of its \
-                     own. The catalog area's `storefront` share runs six queries: one for \
-                     the category tree, one for the ten best-selling bikes (by units sold \
+                     own. The catalog area's `storefront` share runs eight queries: one for \
+                     the category tree, one for the eight best-selling bikes (by units sold \
                      in `order_items`), and four for their cards (photos, brands, \
-                     categories, variants, loaded for all ten at once). The view \
+                     categories, variants, loaded for all eight at once), and two small ones \
+                     for the hero's figures (how many bikes, the stores). The view \
                      middleware renders the page inside `layouts/app.html`, with the \
                      shared `explain_panels` value and this explanation (the \
                      `about_page(…)` template function). After the page loads, the cart \
@@ -122,6 +131,9 @@ pub fn entries() -> Vec<Explanation> {
             "examples/bikeshop/resources/views/layouts/_nav_cart.html",
             "examples/bikeshop/src/app/accounts/locale.rs",
             "examples/bikeshop/public/app.js",
+            "examples/bikeshop/public/theme.css",
+            "examples/bikeshop/resources/views/layouts/_hero.html",
+            "examples/bikeshop/public/images/CREDITS.md",
             "examples/bikeshop/tests/about.rs",
             "examples/bikeshop/tests/catalog.rs",
             "tests/browser/bikeshop-about.test.mjs",

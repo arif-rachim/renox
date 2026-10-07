@@ -510,7 +510,7 @@ async fn catalogue(tx: &mut Transaction, world: &mut World) -> Result {
         }
         photos.push(ProductPhoto {
             product_id: product.id,
-            path: format!("images/categories/{}.svg", spec.slug),
+            path: content::product_photo(spec.slug, product.id),
             alt: product.name.clone(),
             ..Default::default()
         });

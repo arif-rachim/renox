@@ -300,6 +300,41 @@ pub const CATEGORIES: &[CategorySpec] = &[
 ];
 
 /// Brands and their websites.
+/// How many photos each category has in `public/images/products/`
+/// (`{slug}-1.webp` … `{slug}-N.webp`, credited in `public/images/CREDITS.md`).
+/// A product shows photo `(id % N) + 1` of its category, so neighbours differ;
+/// migration `20260108000000_use_product_photos` points older databases at them.
+pub const PHOTOS: &[(&str, i64)] = &[
+    ("road-bikes", 5),
+    ("mountain-bikes", 3),
+    ("city-bikes", 5),
+    ("folding-bikes", 4),
+    ("e-bikes", 4),
+    ("kids-bikes", 4),
+    ("helmets", 5),
+    ("lights", 2),
+    ("locks", 2),
+    ("clothing", 3),
+    ("bags", 3),
+    ("chains", 3),
+    ("tyres", 3),
+    ("brakes", 3),
+    ("drivetrain", 4),
+    ("saddles", 2),
+];
+
+/// A product's photo: one of its category's photos, or the category's drawing
+/// when the category has none.
+pub fn product_photo(category: &str, product_id: i64) -> String {
+    match PHOTOS.iter().find(|(slug, _)| *slug == category) {
+        Some((_, count)) => format!(
+            "images/products/{category}-{}.webp",
+            product_id.rem_euclid(*count) + 1
+        ),
+        None => format!("images/categories/{category}.svg"),
+    }
+}
+
 pub const BRANDS: &[(&str, &str)] = &[
     ("Trek", "https://www.trekbikes.com"),
     ("Specialized", "https://www.specialized.com"),

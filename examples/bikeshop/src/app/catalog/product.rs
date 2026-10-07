@@ -88,24 +88,32 @@ pub fn pick<'a>(
         .or_else(|| variants.first())
 }
 
-/// A colour's swatch: a few named colours; others get none (the label
-/// still names it).
+/// A colour's swatch: a few named colours, and names that end in one
+/// ("Matte Black", "Hi-vis Yellow", "Signal Red") take its colour; others get
+/// none (the label still names it).
 pub fn colour_hex(name: &str) -> Option<&'static str> {
-    Some(match name.to_ascii_lowercase().as_str() {
-        "black" => "#1d1d1f",
-        "blue" => "#2563eb",
-        "red" => "#dc2626",
-        "green" => "#16a34a",
-        "orange" => "#ea580c",
-        "grey" | "gray" => "#8e8e93",
-        "white" => "#f5f5f7",
-        "teal" => "#0f766e",
-        "silver" => "#c7c7cc",
-        "racing green" => "#14532d",
-        "flame lacquer" => "#9a3412",
-        "yellow" => "#eab308",
-        _ => return None,
-    })
+    let name = name.trim().to_ascii_lowercase();
+    let named = |n: &str| -> Option<&'static str> {
+        Some(match n {
+            "black" => "#1d1d1f",
+            "blue" => "#2563eb",
+            "navy" => "#1e3a8a",
+            "red" => "#dc2626",
+            "green" => "#16a34a",
+            "orange" => "#ea580c",
+            "grey" | "gray" => "#8e8e93",
+            "white" => "#f5f5f7",
+            "teal" => "#0f766e",
+            "silver" => "#c7c7cc",
+            "purple" => "#7e22ce",
+            "racing green" => "#14532d",
+            "flame lacquer" => "#9a3412",
+            "hi-vis yellow" => "#d4f000",
+            "yellow" => "#eab308",
+            _ => return None,
+        })
+    };
+    named(&name).or_else(|| name.rsplit([' ', '-']).next().and_then(named))
 }
 
 /// The product's description as one line of plain text, for the page's
@@ -377,5 +385,17 @@ mod tests {
         let text = "# Title\n\nThe **Domane** is a road bike.\nLight and fast.\n\nMore.";
         assert_eq!(summary(text), "The Domane is a road bike. Light and fast.");
         assert!(summary(&"word ".repeat(100)).chars().count() <= 160);
+    }
+
+    #[test]
+    fn swatches_for_named_colours_and_their_shades() {
+        assert_eq!(colour_hex("Black"), Some("#1d1d1f"));
+        assert_eq!(colour_hex("Matte Black"), Some("#1d1d1f"));
+        assert_eq!(colour_hex("Signal Red"), Some("#dc2626"));
+        assert_eq!(colour_hex("Hi-vis Yellow"), Some("#d4f000"));
+        assert_eq!(colour_hex("Purple"), Some("#7e22ce"));
+        assert_eq!(colour_hex("Navy"), Some("#1e3a8a"));
+        assert_eq!(colour_hex("Racing Green"), Some("#14532d"));
+        assert_eq!(colour_hex("Chartreuse"), None);
     }
 }

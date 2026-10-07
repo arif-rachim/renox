@@ -9,7 +9,7 @@
   {% include "layouts/_head.html" %}
   {{ stack('head') }}
 </head>
-<body class="rx-page">
+<body class="rx-page bs-auth">
   {% from "renox/ui.html" import open_button %}
   {%- set about = about_page(request.route, request.path) if explain_panels else none %}
   <main class="rx-auth{% block main_class %}{% endblock %}" id="main">
@@ -19,6 +19,11 @@
       {%- if about %}<p class="rx-auth__alt">{{ open_button("about-page", t('about.button'), variant="plain", size="small") }}</p>{% endif %}
     </div>
   </main>
+  {#- Wide screens: a photo beside the form (public/theme.css, `bs-auth`). -#}
+  <aside class="bs-auth__art" aria-hidden="true">
+    <img src="/images/site/trail.webp" alt="" width="1200" height="800">
+    <p class="bs-auth__quote">{{ t('auth_art.quote') }}</p>
+  </aside>
   {%- if about %}{% include "about/_panel.html" %}{% endif %}
   {{ toasts() }}
   {% include "layouts/_scripts.html" %}

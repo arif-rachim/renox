@@ -209,6 +209,26 @@ The owner's rules for every page (#231):
    `prefers-reduced-motion` ([public/app.js](public/app.js)).
 5. Professional, modern and tidy, at 390 px and on a desktop, light and dark.
 
+**The storefront's look (#328).** The owner compared three mockups (bold sport, warm
+editorial, playful bento) and chose **warm editorial**: a cream page, the shop's teal with a
+terracotta accent, large Poppins headlines with one coloured phrase, pill buttons, rounder
+corners, and real photos. It lives in [public/theme.css](public/theme.css), loaded after
+`app.css`: the kit's own tokens set to the shop's values (`--rx-bg`, `--rx-surface`,
+`--rx-radius-*`, `--rx-type-title`, pill `--rx-button-radius` on public and sign-in pages), so
+every kit component follows in light and dark mode, plus four tokens of the shop's
+(`--bs-clay`, `--bs-sand`, `--bs-hero`, `--bs-section`) and the public pages' parts: the hero
+([layouts/_hero.html](resources/views/layouts/_hero.html), on the home, rent and plans pages),
+category chips and photo tiles, service tiles, the stores strip, product cards as photos with
+their text under them, the sign-in pages' photo, the phone's floating tab bar. This relaxes
+rule 3 for those brand tokens only (recorded in #231); spacing stays the kit's.
+
+**Photos.** 68 free [Unsplash](https://unsplash.com/license) photos in WebP (3.6 MB):
+`public/images/products/{category}-{n}.webp` (4:3, 880 × 660) and `public/images/site/` (the
+hero, the stores, rentals, the workshop), each credited in
+[public/images/CREDITS.md](public/images/CREDITS.md). The seeders give each product a photo of
+its category (`content::product_photo`: photo `(id % n) + 1`); migration
+`20260108000000_use_product_photos` points a database seeded before then at the same photos.
+
 ### Blocks
 
 The epic's rule was that a missing basic component stops the page and goes to the Renox team.

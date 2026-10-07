@@ -39,7 +39,7 @@
 .bs-chip:focus-visible { outline: 2px solid var(--rx-focus); outline-offset: 2px; }
 
 /* Two cards side by side on a phone. */
-@media (max-width: 40rem) { .bs-catalog__results, .bs-home__section, .bs-product__related { --rx-card-min: 9.5rem; } }
+@media (max-width: 40rem) { .bs-catalog__results, .bs-product__related { --rx-card-min: 9.5rem; } }
 
 @media (max-width: 52rem) {
   .bs-catalog { grid-template-columns: minmax(0, 1fr); gap: var(--rx-space-4); }
@@ -101,12 +101,6 @@
 
 /* ---------- the home page's storefront ---------- */
 
-.bs-home__section { display: grid; gap: var(--rx-space-4); }
-.bs-home__heading { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--rx-space-3); }
-.bs-home__heading > h2, .bs-home__section > h2 { margin: 0; }
-.bs-home__categories { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr)); gap: var(--rx-space-4); }
-.bs-home__category { display: grid; gap: var(--rx-space-3); align-content: start; }
-.bs-home__category-title { font: var(--rx-type-heading); }
 
 @media (prefers-reduced-motion: reduce) {
   .bs-catalog__results { transition: none; }
