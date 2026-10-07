@@ -23,8 +23,11 @@
       {% endcall %}
 
       {% call wizard_step("checkout", "delivery", title=t('sales.checkout.step.delivery')) %}
-        {#- These fields ask for the summary again when they change (the fee). -#}
-        <div class="bs-checkout__where" hx-get="{{ route('checkout.show') }}" hx-trigger="change" hx-include="[name=fulfilment],[name=city_id]" hx-target="#summary" hx-swap="outerHTML" hx-sync="this:replace">
+        {#- These fields ask for the summary again when they change (the fee).
+            `queue last` waits for a request in flight and then sends only the
+            latest change: `replace` would abort it, which htmx reports as an
+            error in the console (htmx:sendAbort) on every quick double change. -#}
+        <div class="bs-checkout__where" hx-get="{{ route('checkout.show') }}" hx-trigger="change" hx-include="[name=fulfilment],[name=city_id]" hx-target="#summary" hx-swap="outerHTML" hx-sync="this:queue last">
           {{ toggle_buttons("fulfilment", t('sales.checkout.fulfilment'), [["pickup", t('sales.checkout.pickup')], ["delivery", t('sales.checkout.delivery')]], selected=prefill.fulfilment, required=true) }}
           {{ select("store_id", t('sales.checkout.store'), stores, selected=(prefill.store_id | string if prefill.store_id else none), required=true, hint=t('sales.checkout.store_hint')) }}
           {% call show_when("fulfilment", "delivery") %}
