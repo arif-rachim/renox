@@ -130,6 +130,15 @@ async fn contact_details_and_address_are_saved() {
         .assert_invalid("line1");
 }
 
+/// `text` HTML-escaped the way Renox's views escape it.
+fn escaped(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#x27;")
+}
+
 /// Mails the invitation for `customer` as a cashier and returns the link's path.
 async fn invite(app: &TestApp, customer: &Customer, email: &str) -> String {
     let north = fixtures::store(app.db(), "North").await.unwrap();
@@ -142,7 +151,11 @@ async fn invite(app: &TestApp, customer: &Customer, email: &str) -> String {
     .unwrap();
     app.acting_as(&cashier);
     let page = format!("/staff/customers/{}/invite", customer.id);
-    app.get(&page).await.assert_ok().assert_see(&customer.name);
+    // As the page writes it: a fake name can be "Ethel O'Connell".
+    app.get(&page)
+        .await
+        .assert_ok()
+        .assert_see(&escaped(&customer.name));
     app.post(&page, &[("email", email)])
         .await
         .assert_redirect(&page);
