@@ -140,7 +140,7 @@ impl Field {
                 "{{{{ input(\"{name}\", \"{label}\", type=\"number\", value={value}, required=true) }}}}"
             ),
             Kind::Money => format!(
-                "{{{{ input(\"{name}\", \"{label}\", value={value}, required=true, hint=\"In the smallest unit (rupiah, cents), without dots.\", attrs={{\"inputmode\": \"numeric\"}}) }}}}"
+                "{{{{ input(\"{name}\", \"{label}\", value={value}, required=true, hint=\"In cents (the smallest unit), without dots.\", attrs={{\"inputmode\": \"numeric\"}}) }}}}"
             ),
             Kind::Float => format!(
                 "{{{{ input(\"{name}\", \"{label}\", type=\"number\", value={value}, required=true, attrs={{\"step\": \"any\"}}) }}}}"

@@ -94,7 +94,7 @@ rnx tailwind --watch                                   # rebuild public/css/app.
 - A handler that won't compile as a route ("the trait `Handler` is not implemented", or
   "`Send` is not general enough"): don't keep a closure or iterator that borrows a local across
   an `.await`; collect into a `Vec` first.
-- Money is `i64` in the smallest unit (rupiah, cents), never `f64`.
+- Money is `i64` in the smallest unit (cents for USD, the default `APP_CURRENCY`), never `f64`.
 - Read forms with `Valid<T>`, even a form with no rules (`#[derive(Deserialize, Validate)]`,
   no `#[validate]` attributes): it turns a ticked checkbox's `on` into `true`, an unticked one
   into `false`, and empty inputs into `None`. The prelude's `Form<T>` is axum's and doesn't: a
@@ -116,7 +116,9 @@ rnx tailwind --watch                                   # rebuild public/css/app.
   a `BIGINT` with text).
   A record's page (show) is an infolist, not hand-written markup: `{% call infolist(columns=2) %}`
   with `entry(label, value, format="money"|"date"|"since"|"bool"|…, badge=…)`; prices go
-  through `| money` (`APP_CURRENCY`), never a hand-made "Rp" filter.
+  through `| money` (`APP_CURRENCY`, USD by default), never a hand-made "$" filter. `money`,
+  `entry(…, format="money")`, `chart(…, format="money")` and the grid's `Column::money` all
+  take the stored smallest unit (`1299` → `$12.99`): never divide by 100 in a template.
   Dashboards: `renox::chart::Trend::of(query, "created_at").over(period).sum(&state, "total")`
   with the `Period` extractor, then `stat(…)`, `chart("line", series, format="money")`,
   `widget(…)` and `period_filter(period)` in the template (presets, `12w` per week, and a

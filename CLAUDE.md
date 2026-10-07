@@ -25,7 +25,9 @@ repo, and every trap hit so far, so you don't have to rediscover them.
   in the repo is English: code, comments, docs, example content (seed data, names, pages,
   mails), tests, commit messages and PRs. No Indonesian anywhere, and no built-in Indonesian
   locale (M32): Renox ships English texts; an example that needs a second language uses
-  Spanish (hello, shop). Currency (`IDR`, "Rp") is not language and may stay.
+  Spanish (hello, shop). Prices are in US dollars by default (`APP_CURRENCY=USD`, amounts
+  in cents); other currencies through `APP_CURRENCY` (IDR stays for Xendit/Midtrans, which
+  charge rupiah).
 - **Open source**, `MIT OR Apache-2.0`. Repo: https://github.com/arif-rachim/renox (default branch
   `main`). crates.io: `renox` and `renox-cli` have placeholder `0.0.1` releases (to reserve the
   names). `renox-core` and `renox-macros` are not published yet. Until real releases, `rnx new`
@@ -101,7 +103,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            assets/cally.js (Cally 0.9.2, MIT: the date range calendar)
   src/view_stack.rs        push/prepend/stack: markers filled in after the page renders (Scope)
   src/view_filters.rs      built-in template filters `number`, `money`, `date`, `since`, `words`,
-                           `markdown`; pub format_number, format_money
+                           `markdown`; pub format_number, format_money (whole units;
+                           the `money` filter takes the smallest unit, like the grid)
   src/htmx.rs              Htmx extractor, HxRedirect/HxRefresh/HxTrigger/HxRetarget/HxReswap/
                            HxPushUrl, Back; add_trigger (JSON HX-Trigger, non-ASCII \u-escaped)
   src/assets.rs            embedded htmx/Alpine/renox.js with hashed URLs; renox.js source lives here
@@ -644,6 +647,11 @@ a closure borrowing `req` alive across `next.run(req).await` (scope it in a bloc
 - Auth pages/mails take a `text` object from `auth/module.rs::texts(&lang)`: the built-in
   English dictionary with the app's `renox.auth.*` translations on top. Auth handlers take a
   `Lang` extractor (background code uses `Lang::of(state, &state.config.locale)`).
+- Money in templates is in the currency's smallest unit everywhere: the `money` filter,
+  `entry(…, format="money")`, `chart(…, format="money")` and the grid's `Column::money` divide
+  by `10^currency_decimals(code)` (`view_filters::money_divisor`; `divide_by=` overrides it,
+  `divide_by=1` for whole units). `renox::format_money` (Rust) takes whole units. renox-admin's
+  money fields show and take whole units and convert in `read_form` (#335).
 - Validation messages live in `validation/messages.rs` (keys like `required`, `min.string`,
   `max.file`, `auth.failed`); apps override them with `renox.validation.<key>` and name fields with
   `renox.validation.attributes.<field>` (`messages::template_for`). Built-in labels for Renox's own
@@ -918,7 +926,7 @@ Parsed in `crates/renox-core/src/config.rs`; defaults in parentheses.
   testing|test, production|prod; anything else fails at boot), `APP_DEBUG` (on in local),
   `APP_URL`, `APP_KEY` (required in production; `base64:…`, `rnx key:generate`), `APP_HOST`
   (127.0.0.1, an IP), `APP_PORT` (3000), `APP_LOCALE` (en; English is built in, other locales come from the app's `lang/*.json`),
-  `APP_FALLBACK_LOCALE` (en), `APP_CURRENCY` (IDR; the `money` filter), `APP_TIMEZONE` (`UTC`, an offset like `+07:00`, or an IANA name like
+  `APP_FALLBACK_LOCALE` (en), `APP_CURRENCY` (USD; the `money` filter, the kit's money entries/charts and the grid's money columns, all in the smallest unit), `APP_TIMEZONE` (`UTC`, an offset like `+07:00`, or an IANA name like
   `Asia/Jakarta`, with DST).
 - **Paths:** `VIEWS_PATH` (resources/views), `LANG_PATH` (resources/lang), `PUBLIC_PATH`
   (public), `STORAGE_PATH` (storage; holds `framework/down` for maintenance mode and `app/` for the
@@ -1252,7 +1260,7 @@ picks the build, not the terminal.
   `OptionQuery`), one URL for search/lookup/add/rename; the combobox adds fetched options to
   the native select as they're chosen; shop's admin categories use it. Merged (#92).
   Then infolists (Filament's as the yardstick): `infolist`/`entry`/`repeatable` in the kit,
-  the filters `money` (`APP_CURRENCY`, default `IDR`), `since`, `words`, `markdown`
+  the filters `money` (`APP_CURRENCY`, default `IDR` then, `USD` since #335), `since`, `words`, `markdown`
   (pulldown-cmark, raw HTML shown as text); shop's order page and fields' product page use
   them. Merged (#94). Then notifications (Filament's as the yardstick): toasts with a body,
   actions, a duration, an id and a position (`Renox.toast`), `DatabaseMessage`,

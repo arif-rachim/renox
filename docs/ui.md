@@ -226,7 +226,7 @@ Here are fields side by side, and a group with a title:
 ```html
 {% from "renox/ui.html" import input, radio, checkbox_list, form_grid, fieldset %}
 {% call form_grid(2) %}
-  {{ input("price", "Price", type="number", prefix="Rp", required=true) }}
+  {{ input("price", "Price", type="number", prefix="$", required=true, attrs={"step": "0.01"}) }}
   {{ input("weight", "Weight", type="number", suffix="kg") }}
   {{ input("city", "City", datalist=["Jakarta", "Bandung", "Surabaya"], span="full") }}
 {% endcall %}
@@ -637,7 +637,7 @@ name the font family.
 ### Infolists: read-only details
 
 A record's page (an order, a customer) is mostly labels and values: "Status: Paid",
-"Total: Rp 75,000". The kit calls this an **infolist**.
+"Total: $75.00". The kit calls this an **infolist**.
 
 - `infolist` lays the entries out in a grid: one column on phones, `columns` from tablet
   width up.
@@ -685,7 +685,7 @@ This card shows an order in two columns:
 |---|---|
 | `infolist(columns=1, inline=false)` | The `<dl>` (description list) around the entries. `inline=true` puts each label beside its value (from tablet width up). |
 | `entry(label, value, format=…, …)` | A label and its value. With `{% call entry(label) %}…{% endcall %}` the block is the value. `span=2` or `"full"` makes it wider. `inline=true` puts this label beside its value. `hide_label=true` keeps the label for screen readers only. `hint` adds a line under the value, `tooltip` a title shown on hover. `id` sets the entry's `id`, for a link or a script to find it. |
-| `format` | `"date"` and `"datetime"` (with `date_format`, using chrono's codes; in `APP_TIMEZONE`). `"since"`: "3 hours ago", with the date as its tooltip. `"money"`: in `APP_CURRENCY`, or `currency="USD"`. `"number"` (with `decimals`). `"markdown"`. `"bool"`: a check and "Yes", or a cross and "No". `"color"`: a colour sample and its code. `"image"`: a URL (with `image_size`, `circular`). `"key_value"`: pairs or a map, such as `KeyValues`, as a table. |
+| `format` | `"date"` and `"datetime"` (with `date_format`, using chrono's codes; in `APP_TIMEZONE`). `"since"`: "3 hours ago", with the date as its tooltip. `"money"`: an amount in the smallest unit (cents), shown in `APP_CURRENCY` like the `money` filter, or `currency="EUR"`, `divide_by=1` for whole units. `"number"` (with `decimals`). `"markdown"`. `"bool"`: a check and "Yes", or a cross and "No". `"color"`: a colour sample and its code. `"image"`: a URL (with `image_size`, `circular`). `"key_value"`: pairs or a map, such as `KeyValues`, as a table. |
 | `badge`, `labels` | `badge=true`, a kind (`"success"`), or kinds by value (`{"paid": "success"}`). `labels` gives raw values friendly names (`{"paid": "Paid"}`), with or without a badge. |
 | `url`, `new_tab`, `copyable` | A link; a copy button (it copies the raw value). |
 | `prefix_actions`, `suffix_actions` | Buttons before or after the value, a list of mappings: `label` (also the tooltip of an icon-only button), `icon` (a kit icon such as `"edit"`, `"external"`, `"refresh"`, `"trash"`, `"download"`; without one the label is shown), and what it does: `url` (a link, with `new_tab`), `action` (a small form posted there, with the CSRF token; `method` `"PUT"`, `"PATCH"` or `"DELETE"` for the others), or neither, with `attrs` for htmx (`{"hx-post": …, "hx-confirm": "Sure?"}`). `variant` (`"plain"` by default) and `disabled_reason` as for buttons. |
@@ -715,7 +715,7 @@ after a `|`: `{{ order.total | money }}`. The infolist uses them too.
 | Filter | Gives |
 |---|---|
 | `number`, `number(2)` | `75,000` in `en`, `75.000` in `es` or `de`: the page's language picks the separators. |
-| `money` | The amount in `APP_CURRENCY` (default `IDR`): `Rp 75,000` (en), `Rp 75.000` (es), `$1,250.50` with `USD`. Options: `currency="USD"` for another currency, `decimals=0`, `divide_by=100` for amounts stored in cents. `renox::format_money` does the same in Rust; `renox::currency_decimals("USD")` (2) is a currency's usual decimals. |
+| `money` | An amount in the currency's smallest unit (cents), as the model stores it and as the data grid's `money` columns take it, shown in `APP_CURRENCY` (default `USD`): `7500` is `$75.00` (en), `$75,00` (es). It divides by the currency's usual decimals (`renox::currency_decimals`: 100 for `USD`, 1 for `IDR` or `JPY`, so `75000` is `Rp 75,000` with `IDR`). Options: `currency="EUR"` for another currency, `decimals=0`, `divide_by=…` to divide by something else (`divide_by=1` for an amount already in whole units). `renox::format_money` formats in Rust, but takes **whole units** (`12.99`), not cents. |
 | `date`, `date('%d/%m/%Y %H:%M')` | A date, with chrono's format codes. A moment in time (`created_at`) is shown in `APP_TIMEZONE`. |
 | `since` | "3 hours ago", "in 2 days", "just now" (translated with `ui.since.*`). It uses the clock that `TestApp::travel` moves, so tests can check it. |
 | `words(20)` | The first 20 words, then "…" (change it with `end="…"`). |
@@ -1465,7 +1465,9 @@ The parts, one by one:
     `pie`/`doughnut`, or `scatter`/`bubble` (below).
   - `data` is a `Series`, a list of numbers, or a list of series (`{name, values}` maps).
     Or pass `labels=…` with `series=[…]` or `values=[…]`.
-  - Options: `format` (`number`, `money` in `APP_CURRENCY` or `currency=…`, `percent`),
+  - Options: `format` (`number`, `money` in `APP_CURRENCY` or `currency=…`, `percent`;
+    money data is in the smallest unit, cents, like the `money` filter's, or say
+    `divide_by=1`),
     `decimals`, `height` (240 px), `title` (for screen readers), `name` (one series' name),
     `x_format` (chrono's codes for date labels; otherwise `Oct 2`, `Oct 2026`),
     `x_title` and `y_title` (shown along the axes), `legend=false`, `table=false`, `id`.

@@ -43,7 +43,7 @@ columns are what to write in your migration's `CREATE TABLE`, for SQLite or Post
 | `type=number`, smaller ranges | `i16`, `i32` (also `i8` on SQLite: on PostgreSQL `i8` reads only the one-byte `"CHAR"` type, not `SMALLINT`; `u8`, `u16`, `u32` only in builds without the `postgres` feature, whatever database the app runs on: PostgreSQL has no unsigned columns) | `INTEGER` | `SMALLINT`, `INTEGER` |
 | `type=number step=0.01` (measures) | `f64` | `REAL` | `DOUBLE PRECISION` |
 | `type=number step=0.01`, single precision | `f32` | `REAL` | `REAL` |
-| money | `i64` in the smallest unit (rupiah, cents), never `f64` | `INTEGER` | `BIGINT` |
+| money | `i64` in the smallest unit (cents), never `f64` | `INTEGER` | `BIGINT` |
 | `type=checkbox` (one) | `bool`: with `Valid<T>`, `on` (or `1`, `yes`, `checked`) → `true`, unchecked (nothing sent; or `off`, `0`, `no`) → `false` (see [Checkboxes](#checkboxes)) | `INTEGER` 0/1 | `BOOLEAN` |
 | `<select>` | an enum with `#[derive(DbEnum)]` | `TEXT` | `TEXT` |
 | `<select multiple>`, checkboxes sharing a name | `Vec<String>` with `#[serde(default)]`; stored as `Json<Vec<String>>` | `TEXT` | `JSONB` |
@@ -181,8 +181,10 @@ Advice for the cases where the wrong type causes trouble later.
 
 ### Money
 
-Use `i64` in the smallest unit, `price: i64 // rupiah`, and format it for display (the
-`money` template filter, in `APP_CURRENCY`). So 12.50 dollars is stored as `1250` cents.
+Use `i64` in the smallest unit, `price: i64 // cents`, and format it for display (the
+`money` template filter, in `APP_CURRENCY`, which is `USD` by default). So 12.50 dollars is
+stored as `1250` cents, and `{{ 1250 | money }}` shows `$12.50`. A currency without decimals
+(IDR, JPY) stores the amount as it is.
 
 Why not a float (`f64`)? Floats round: `0.1 + 0.2 != 0.3`. And why not a decimal type? sqlx
 (the database library Renox uses) deliberately has no decimal type on SQLite, so a `Decimal`

@@ -5,7 +5,7 @@
 //! # use renox::prelude::*;
 //! # use std::time::Duration;
 //! #[derive(serde::Deserialize)]
-//! struct Rates { idr: f64 }
+//! struct Rates { eur: f64 }
 //!
 //! # async fn demo(state: AppState, token: &str) -> Result {
 //! let rates: Rates = state
@@ -23,7 +23,7 @@
 //! let created = state
 //!     .http
 //!     .post("https://api.example.com/orders")
-//!     .json(&renox::serde_json::json!({ "total": 75_000 }))
+//!     .json(&renox::serde_json::json!({ "total": 7_500 }))
 //!     .send()
 //!     .await?;
 //! assert!(created.ok());
@@ -38,11 +38,11 @@
 //! use renox::http::FakeResponse;
 //! # async fn demo(app: renox::testing::TestApp) {
 //! let http = app.fake_http();
-//! http.on("https://api.example.com/rates*", FakeResponse::json(200, json!({ "idr": 16_000.0 })));
+//! http.on("https://api.example.com/rates*", FakeResponse::json(200, json!({ "eur": 0.92 })));
 //! http.on("POST https://api.example.com/orders", FakeResponse::status(503)); // then…
 //! http.on("POST https://api.example.com/orders", FakeResponse::json(201, json!({ "id": 7 })));
 //! // … exercise the app …
-//! http.assert_sent(|r| r.method == "POST" && r.body.contains("75000"));
+//! http.assert_sent(|r| r.method == "POST" && r.body.contains("7500"));
 //! # }
 //! ```
 //!

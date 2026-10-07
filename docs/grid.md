@@ -141,8 +141,8 @@ What else you can do with the page and the grid:
 - `GridRequest::new(&db, path, &params)` builds a request by hand, for tests and commands. It
   acts as a guest, in UTC. `request.param("export")` reads one value from the query string.
   It doesn't read the app's `APP_CURRENCY`: money columns use the decimals of the default
-  currency (IDR, which has none). So with another currency, money columns are scaled wrongly
-  there.
+  currency (USD, two). So with a currency of other decimals (IDR, JPY), money columns are
+  scaled wrongly there.
 
 ```rust
 # use renox::prelude::*;
@@ -255,7 +255,8 @@ A few things to know about the table:
 - "Smallest unit" for `money` means you store a whole number of, say, cents. The grid divides
   it for you and shows whole units of `APP_CURRENCY`: `12550` cents shows as `125.50` in USD.
   Currencies without decimals (IDR, JPY) show the number as it is. There's no currency symbol,
-  and the from–to filter takes whole units too.
+  and the from–to filter takes whole units too. The `money` template filter takes the same
+  smallest unit, so a cell and a page written with `| money` agree.
 
 ### Options every column takes
 

@@ -105,7 +105,7 @@ fn views() -> tempfile::TempDir {
     write("home.html", "home");
     write(
         "prices.html",
-        "{{ price | number }}|{{ 1234.5 | number(2) }}|{{ price | rupiah }}|{{ at | date('%d/%m/%Y %H:%M') }}|{{ day | date }}",
+        "{{ price | number }}|{{ 1234.5 | number(2) }}|{{ price | euros }}|{{ at | date('%d/%m/%Y %H:%M') }}|{{ day | date }}",
     );
     write("menu.html", "{{ cart_count }} items for {{ who }}");
     write("typo.html", "<h1>{{ prodcut }}</h1>");
@@ -120,8 +120,8 @@ fn app() -> App {
         .module(Auth::new())
         .module(Pages)
         .templates(|env| {
-            env.add_filter("rupiah", |n: i64| {
-                format!("Rp {}", renox::format_number(n as f64, 0, "de"))
+            env.add_filter("euros", |cents: i64| {
+                format!("{} €", renox::format_number(cents as f64 / 100.0, 2, "de"))
             });
         })
         .share("cart_count", |ctx: ViewContext| async move {
@@ -166,11 +166,11 @@ async fn filters_and_template_hooks() {
     app.get("/prices")
         .await
         .assert_ok()
-        .assert_see("75.000|1.234,50|Rp 75.000|02/10/2026 00:30|2026-10-01");
+        .assert_see("75.000|1.234,50|750,00 €|02/10/2026 00:30|2026-10-01");
     let app = test_app(&dir, "en", true).await;
     app.get("/prices")
         .await
-        .assert_see("75,000|1,234.50|Rp 75.000|");
+        .assert_see("75,000|1,234.50|750,00 €|");
 }
 
 #[renox::test]
