@@ -62,7 +62,7 @@ struct Row {
 
 /// `GET /plans/mails` (`plans.mails`).
 pub async fn index(State(state): State<AppState>, lang: Lang) -> Result<View> {
-    let amount = crate::app::rentals::reserve::money(&state, 250_000);
+    let amount = crate::app::rentals::reserve::money(&state, 6_000);
     let params: [(&str, &dyn std::fmt::Display); 5] = [
         ("plan", &"Monthly tune-up"),
         ("bike", &"Blue roadie"),

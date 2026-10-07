@@ -74,7 +74,7 @@ async fn world_with(gateways: bool) -> World {
             name: "Check".into(),
             slug: format!("check-{}", unique()),
             minutes: 30,
-            price: 50_000,
+            price: 3_000,
             ..Default::default()
         },
     )
@@ -96,7 +96,7 @@ async fn world_with(gateways: bool) -> World {
             "Monthly tune-up",
             "monthly-tune-up",
             Frequency::Monthly,
-            250_000,
+            6_000,
             1_000,
         ),
     )
@@ -108,7 +108,7 @@ async fn world_with(gateways: bool) -> World {
             "Commuter check",
             "commuter-check",
             Frequency::Weekly,
-            60_000,
+            800,
             500,
         ),
     )
@@ -231,7 +231,7 @@ async fn stripe_invoice(app: &TestApp, id: &str, paid: bool, amount: i64) -> Tes
         "subscription": "sub_1",
         "amount_paid": if paid { amount } else { 0 },
         "amount_due": amount,
-        "currency": "idr",
+        "currency": "usd",
     });
     stripe_webhook(app, &format!("evt_{id}_{paid}"), kind, invoice).await
 }
@@ -339,12 +339,14 @@ async fn the_plans_page_compares_the_plans_by_the_month() {
     page.assert_ok()
         .assert_see("Monthly tune-up")
         .assert_see("Commuter check")
-        // 250,000 a visit, monthly; 60,000 a visit weekly is 260,000 a month.
-        .assert_see(&money(250_000))
-        .assert_see(&money(260_000))
+        // $60.00 a visit, monthly; $8.00 a visit weekly is $35.00 a month.
+        .assert_see("$60.00")
+        .assert_see("$35.00")
+        .assert_see(&money(6_000))
+        .assert_see(&money(3_500))
         .assert_see("10 % off spare parts")
         .assert_see("/plans/subscribe?plan=monthly-tune-up");
-    assert_eq!(w.weekly.monthly_price(), 260_000);
+    assert_eq!(w.weekly.monthly_price(), 3_500);
     // The comparison costs the same whatever the number of plans.
     let (_, few) = capture_queries(w.app.get("/plans")).await;
     for n in 0..3 {
@@ -395,7 +397,7 @@ async fn subscribing_checks_out_at_stripe_and_the_webhook_starts_the_plan() {
     w.app.assert_notified(&w.rider, "plans-visit-booked");
 
     // The first payment: an invoice, and the "plan started" mail.
-    stripe_invoice(&w.app, "in_1", true, 250_000)
+    stripe_invoice(&w.app, "in_1", true, 6_000)
         .await
         .assert_ok();
     w.app.run_jobs().await;
@@ -405,10 +407,10 @@ async fn subscribing_checks_out_at_stripe_and_the_webhook_starts_the_plan() {
         .unwrap();
     assert_eq!(invoices.len(), 1);
     assert!(invoices[0].paid);
-    assert_eq!(invoices[0].amount, 250_000);
+    assert_eq!(invoices[0].amount, 6_000);
     w.app.assert_notified(&w.rider, "plans-started");
     // The next month's payment is a renewal.
-    stripe_invoice(&w.app, "in_2", true, 250_000)
+    stripe_invoice(&w.app, "in_2", true, 6_000)
         .await
         .assert_ok();
     w.app.run_jobs().await;
@@ -736,7 +738,7 @@ async fn a_failed_payment_holds_the_visits_until_it_is_paid() {
     let period_end = now(&w.app).await + 30 * DAY.as_secs() as i64;
 
     // The renewal fails: Stripe marks the subscription past due.
-    stripe_invoice(&w.app, "in_9", false, 250_000)
+    stripe_invoice(&w.app, "in_9", false, 6_000)
         .await
         .assert_ok();
     stripe_webhook(
@@ -784,7 +786,7 @@ async fn a_failed_payment_holds_the_visits_until_it_is_paid() {
         .assert_see("On hold");
 
     // Paid on the retry: booked again.
-    stripe_invoice(&w.app, "in_9", true, 250_000)
+    stripe_invoice(&w.app, "in_9", true, 6_000)
         .await
         .assert_ok();
     stripe_webhook(
@@ -951,8 +953,8 @@ async fn the_parts_discount_is_for_subscribers_only() {
     let visit = visits_of(&w, &sub).await.remove(0);
     let plan_order = order_of(&w, &visit).await;
     assert_eq!(
-        plans::part_price(db, &plan_order, 100_000).await.unwrap(),
-        90_000
+        plans::part_price(db, &plan_order, 10_000).await.unwrap(),
+        9_000
     );
     let booking = WorkOrder {
         source: WorkSource::Booking,
@@ -963,8 +965,8 @@ async fn the_parts_discount_is_for_subscribers_only() {
         ..booking
     };
     assert_eq!(
-        plans::part_price(db, &booking, 100_000).await.unwrap(),
-        100_000
+        plans::part_price(db, &booking, 10_000).await.unwrap(),
+        10_000
     );
     // A cancelled plan gives nothing.
     let mut sub = sub;
@@ -976,8 +978,8 @@ async fn the_parts_discount_is_for_subscribers_only() {
         0
     );
     assert_eq!(
-        plans::part_price(db, &plan_order, 100_000).await.unwrap(),
-        100_000
+        plans::part_price(db, &plan_order, 10_000).await.unwrap(),
+        10_000
     );
 }
 
@@ -1058,9 +1060,10 @@ async fn xendit_charges_the_monthly_price_in_rupiah() {
         .find(|r| r.url.ends_with("/recurring/plans"))
         .unwrap()
         .json();
-    // The seeded content's price for the commuter check: 60,000 a visit, weekly.
+    // The seeded content's price for the commuter check: $8.00 a visit,
+    // weekly, so $35.00 a month; Xendit charges rupiah at the shop's rate.
     assert_eq!(plan["currency"], "IDR");
-    assert_eq!(plan["amount"], 260_000);
+    assert_eq!(plan["amount"], 560_000);
     assert_eq!(plan["metadata"]["renox_plan"], "commuter-check-xendit");
     assert_eq!(
         plan["metadata"]["renox_name"],

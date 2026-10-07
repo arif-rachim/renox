@@ -360,7 +360,8 @@ pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Resu
 pub struct OrderLine {
     pub variant: i64,
     pub quantity: Option<i64>,
-    pub unit_cost: Option<i64>,
+    /// In whole units as typed (`12.50`); stored in the smallest unit.
+    pub unit_cost: Option<f64>,
 }
 
 impl Validate for OrderLine {
@@ -414,7 +415,13 @@ pub async fn store(
         .lines
         .iter()
         .filter(|l| l.quantity.unwrap_or(0) > 0)
-        .map(|l| (l.variant, l.quantity.unwrap_or(0), l.unit_cost.unwrap_or(0)))
+        .map(|l| {
+            (
+                l.variant,
+                l.quantity.unwrap_or(0),
+                crate::money::from_form(l.unit_cost),
+            )
+        })
         .collect();
     let order = draft(
         &state.db,

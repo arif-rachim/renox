@@ -86,8 +86,8 @@ pub struct ServicePlan {
 
 impl ServicePlan {
     /// What the plan costs a month: the visits of a year at its price,
-    /// spread over twelve months and rounded to a thousand (a weekly plan
-    /// at 60,000 a visit is 260,000 a month).
+    /// spread over twelve months and rounded to a whole dollar (a weekly
+    /// plan at $8.00 a visit is $35.00 a month).
     pub fn monthly_price(&self) -> i64 {
         monthly_price(self.price, self.frequency)
     }
@@ -95,8 +95,9 @@ impl ServicePlan {
 
 /// [`ServicePlan::monthly_price`] from a price per visit and a frequency.
 pub fn monthly_price(per_visit: i64, frequency: Frequency) -> i64 {
+    // Cents: rounded to whole dollars, so a month reads `$35.00`.
     let monthly = per_visit * frequency.visits_a_year() / 12;
-    (monthly + 500) / 1_000 * 1_000
+    (monthly + 50) / 100 * 100
 }
 
 /// The tasks of each plan: plan → service tasks.

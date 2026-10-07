@@ -192,7 +192,8 @@
   // ---------- range_slider ----------
 
   /** How a range shows its values: money (from the server's "0" in that
-   *  currency, e.g. "Rp 0" or "$0.00"), a number, or as it is. */
+   *  currency, e.g. "$0.00": the values are in its smallest unit, cents
+   *  here, so they are divided by 10^decimals), a number, or as it is. */
   function formatter(field) {
     var kind = field.getAttribute("data-bs-format");
     var locale = field.getAttribute("data-bs-locale") || undefined;
@@ -211,8 +212,9 @@
       var zero = (unit.match(/0[.,]?0*/) || ["0"])[0];
       var decimals = zero.length > 1 ? zero.length - 2 : 0;
       var money = numbers(decimals);
+      var scale = Math.pow(10, decimals);
       return function (value) {
-        return unit.replace(zero, money.format(value));
+        return unit.replace(zero, money.format(value / scale));
       };
     }
     if (kind === "number") {

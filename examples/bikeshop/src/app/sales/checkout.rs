@@ -41,11 +41,11 @@ use crate::app::catalog::model::{Product, ProductVariant};
 use crate::app::staff::model::{Store, fee};
 
 /// Delivery in a city with one of our stores.
-pub const DELIVERY_LOCAL: i64 = 25_000;
+pub const DELIVERY_LOCAL: i64 = 1_000;
 /// Delivery elsewhere in the same country.
-pub const DELIVERY_COUNTRY: i64 = 60_000;
+pub const DELIVERY_COUNTRY: i64 = 2_500;
 /// Delivery abroad.
-pub const DELIVERY_ABROAD: i64 = 150_000;
+pub const DELIVERY_ABROAD: i64 = 6_000;
 
 /// The checkout form: four steps of one form.
 #[derive(Deserialize, Serialize, Validate, Debug, Clone, Default)]

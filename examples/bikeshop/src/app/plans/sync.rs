@@ -145,6 +145,8 @@ pub async fn payment(state: &AppState, paid: Paid<'_>) -> Result {
     let Some(mut sub) = local_of(db, subscription).await? else {
         return Ok(());
     };
+    // `USD` for card plans, `IDR` for Xendit's (Stripe writes `usd`).
+    let currency = paid.currency.to_ascii_uppercase();
     let earlier_paid = PlanInvoice::where_eq("plan_subscription_id", sub.id)
         .where_eq("paid", true)
         .where_op("payment_id", "!=", paid.payment_id)
@@ -171,7 +173,7 @@ pub async fn payment(state: &AppState, paid: Paid<'_>) -> Result {
                     gateway: paid.gateway.to_owned(),
                     payment_id: paid.payment_id.to_owned(),
                     amount: paid.amount,
-                    currency: paid.currency.to_owned(),
+                    currency: currency.clone(),
                     paid: paid.succeeded,
                     ..Default::default()
                 },
@@ -209,7 +211,16 @@ pub async fn payment(state: &AppState, paid: Paid<'_>) -> Result {
             )
         }
     };
-    tell(state, &sub, kind, title, body, tone, paid.amount).await
+    tell(
+        state,
+        &sub,
+        kind,
+        title,
+        body,
+        tone,
+        (paid.amount, &currency),
+    )
+    .await
 }
 
 /// A billing message to the plan's customer, with the amount and the link
@@ -221,7 +232,7 @@ async fn tell(
     title: &'static str,
     body: &'static str,
     tone: Tone,
-    amount: i64,
+    (amount, currency): (i64, &str),
 ) -> Result {
     let Some(bike) = CustomerBike::find(&state.db, sub.customer_bike_id).await? else {
         return Ok(());
@@ -233,7 +244,7 @@ async fn tell(
     };
     let plan = ServicePlan::find(&state.db, sub.service_plan_id).await?;
     let url = crate::app::rentals::link(state, "plans.show", Some(sub.id))?;
-    let amount = crate::app::rentals::reserve::money(state, amount);
+    let amount = crate::money::format(amount, currency, &state.current_lang().locale);
     let next = sub
         .next_visit_on
         .map(|d| d.to_string())

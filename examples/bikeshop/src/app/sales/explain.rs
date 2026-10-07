@@ -259,7 +259,9 @@ pub fn entries() -> Vec<Explanation> {
             purpose: "Stands in for Midtrans' hosted payment page when `MIDTRANS_SERVER_KEY` \
                       isn't set, so the whole buying flow can be followed on a laptop. \"Pay\" \
                       (or \"Cancel\") sends the app exactly what Midtrans would: a signed \
-                      notification to the webhook.",
+                      notification to the webhook. It takes the shop's dollars; the real \
+                      Midtrans only charges rupiah, so a shop using it runs with \
+                      `APP_CURRENCY=IDR`.",
             who: "Developers and anyone trying the demo; never real customers (with Midtrans \
                   configured no link to it is given, and paying on it answers 404).",
             audience: &[Audience::Visitor, Audience::Developer],

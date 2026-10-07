@@ -270,7 +270,7 @@ async fn rentals(tx: &mut Transaction, world: &mut World, books: &mut Books) -> 
                     rental.late_fee = (back - due).num_hours().max(1) * bike.hourly_rate;
                 }
                 if world.rng.chance(2) {
-                    rental.damage_fee = world.rng.price(100_000, 800_000);
+                    rental.damage_fee = world.rng.price(2_500, 20_000);
                 }
                 if world.rng.chance(3) {
                     rental.status = RentalStatus::Cancelled;
@@ -645,11 +645,15 @@ async fn orders(
         }
         let subtotal: i64 = items.iter().map(|i| i.total).sum();
         let discount = if world.rng.chance(10) {
-            subtotal / 10 / 1_000 * 1_000
+            subtotal / 10 / 100 * 100
         } else {
             0
         };
-        let delivery_fee = if delivery { 25_000 } else { 0 };
+        let delivery_fee = if delivery {
+            crate::app::sales::checkout::DELIVERY_LOCAL
+        } else {
+            0
+        };
         let paid = !matches!(status, OrderStatus::Pending | OrderStatus::Cancelled);
         orders.push(Order {
             number: format!("{}-{:06}", prefixes[&store], n + 1),

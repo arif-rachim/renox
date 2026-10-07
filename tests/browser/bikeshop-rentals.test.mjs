@@ -122,12 +122,12 @@ describe('the counter', () => {
       // Damaged: the damage fields appear (show_when), then take it back.
       await page.eval(() => document.querySelector('#return-form input[type=checkbox][name=damaged]').click());
       await page.waitFor(() => !document.querySelector('#return-form [data-rx-show-when]').hidden, { message: 'the damage fields show' });
-      await page.type('#rx-damage_fee', '150000');
+      await page.type('#rx-damage_fee', '150');
       await page.type('#rx-damage_note', 'Scratched frame');
       await page.click('#return-form button[type=submit]');
       await page.waitFor(() => /\/receipt$/.test(location.pathname), { message: 'the receipt' });
       const receipt = await page.text('main');
-      assert.match(receipt, /150,000/, 'the damage fee on the receipt');
+      assert.match(receipt, /\$150\.00/, 'the damage fee on the receipt');
       assert.match(receipt, /Between the stores/);
       assert.ok(await fitsWidth(page));
       await shot(page, 'rentals-receipt');

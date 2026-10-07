@@ -67,9 +67,9 @@ async fn world() -> World {
         .await
         .unwrap();
     let mut bike = fixtures::bike(db, north.id, north.id).await.unwrap();
-    bike.hourly_rate = 30_000;
-    bike.daily_rate = 150_000;
-    bike.deposit = 500_000;
+    bike.hourly_rate = 1_500;
+    bike.daily_rate = 6_000;
+    bike.deposit = 30_000;
     bike.save(db).await.unwrap();
     World {
         app,
@@ -227,8 +227,8 @@ async fn reserving_online_shows_the_price_then_holds_the_bike_once_paid() {
         .assert_ok()
         .assert_view("rentals/search.html")
         .assert_see(&w.bike.frame_number)
-        .assert_see("90,000")
-        .assert_see("500,000")
+        .assert_see("$45.00")
+        .assert_see("$300.00")
         .assert_see("Log in to reserve");
 
     w.app.acting_as(&user);
@@ -247,7 +247,7 @@ async fn reserving_online_shows_the_price_then_holds_the_bike_once_paid() {
         .unwrap()
         .unwrap();
     res.assert_redirect(&format!("/rentals/{}", rental.reservation_code));
-    assert_eq!((rental.price, rental.deposit), (90_000, 500_000));
+    assert_eq!((rental.price, rental.deposit), (4_500, 30_000));
     assert_eq!(rental.deposit_status, DepositStatus::Unpaid);
     w.app
         .get(&format!("/rentals/{}", rental.reservation_code))
@@ -278,7 +278,7 @@ async fn reserving_online_shows_the_price_then_holds_the_bike_once_paid() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(payment.amount, 500_000);
+    assert_eq!(payment.amount, 30_000);
     payments::mark_paid(w.app.state(), payment.id, "gw-1")
         .await
         .unwrap();
@@ -313,7 +313,7 @@ async fn reserving_online_shows_the_price_then_holds_the_bike_once_paid() {
     let rental = Rental::find(w.app.db(), rental.id).await.unwrap().unwrap();
     assert_eq!(rental.status, RentalStatus::Cancelled);
     assert_eq!(rental.deposit_status, DepositStatus::Refunded);
-    assert_eq!(rental.deposit_refunded, 500_000);
+    assert_eq!(rental.deposit_refunded, 30_000);
 }
 
 #[renox::test]
@@ -507,7 +507,7 @@ async fn a_bike_owned_by_north_rented_out_by_south_comes_back_late_and_damaged_a
         .sum(db, "amount")
         .await
         .unwrap();
-    assert_eq!(paid, 90_000 + 500_000);
+    assert_eq!(paid, 4_500 + 30_000);
 
     // Back at West 1 h 20 min late (two started hours), damaged.
     w.app.travel(HOUR * 3 + MINUTE * 80);
@@ -517,7 +517,7 @@ async fn a_bike_owned_by_north_rented_out_by_south_comes_back_late_and_damaged_a
         .await
         .assert_ok()
         .assert_see("Take the bike back")
-        .assert_see("60,000");
+        .assert_see("$30.00");
     w.app
         .get("/staff/rentals?q=rider")
         .await
@@ -530,7 +530,7 @@ async fn a_bike_owned_by_north_rented_out_by_south_comes_back_late_and_damaged_a
             &[
                 ("checklist", "frame"),
                 ("damaged", "on"),
-                ("damage_fee", "200000"),
+                ("damage_fee", "80"),
                 ("damage_note", "Bent rear wheel"),
                 ("method", "cash"),
             ],
@@ -540,10 +540,10 @@ async fn a_bike_owned_by_north_rented_out_by_south_comes_back_late_and_damaged_a
     res.assert_redirect(&format!("/staff/rentals/{}/receipt", rental.id));
     let back = Rental::find(db, rental.id).await.unwrap().unwrap();
     assert_eq!(back.status, RentalStatus::Returned);
-    assert_eq!(back.late_fee, 60_000);
-    assert_eq!(back.damage_fee, 200_000);
+    assert_eq!(back.late_fee, 3_000);
+    assert_eq!(back.damage_fee, 8_000);
     assert_eq!(back.deposit_status, DepositStatus::Settled);
-    assert_eq!(back.deposit_refunded, 500_000 - 260_000);
+    assert_eq!(back.deposit_refunded, 30_000 - 11_000);
     assert_eq!(back.return_store_id, Some(w.west.id));
     assert_eq!(
         (back.owner_store_id, back.operating_store_id),
@@ -572,7 +572,7 @@ async fn a_bike_owned_by_north_rented_out_by_south_comes_back_late_and_damaged_a
         .assert_ok()
         .assert_see("Send it back to South")
         .assert_see("fee (20 %)")
-        .assert_see("18,000");
+        .assert_see("$9.00");
     // A mechanic of a fourth store sees rentals, but not this one: it isn't
     // theirs, and it isn't out any more (a bike out may come back anywhere).
     let east = fixtures::store(db, "East").await.unwrap();
@@ -684,7 +684,7 @@ async fn no_shows_unpaid_reservations_reminders_and_overdue_rentals() {
     let missed = Rental::find(db, no_show.id).await.unwrap().unwrap();
     assert_eq!(missed.status, RentalStatus::NoShow);
     assert_eq!(missed.deposit_status, DepositStatus::Forfeited);
-    assert_eq!(missed.deposit_refunded, 500_000 - missed.price);
+    assert_eq!(missed.deposit_refunded, 30_000 - missed.price);
     assert_eq!(
         RentalBike::find(db, w.bike.id)
             .await

@@ -135,12 +135,12 @@ async fn the_month_calendar_works_out_its_grid() {
 #[renox::test]
 async fn the_price_filter_and_a_free_slot_come_back_in_the_address() {
     let app = TestApp::new(bikeshop::app()).await;
-    app.get("/about/blocks?price_min=2000000&price_max=6000000")
+    app.get("/about/blocks?price_min=200000&price_max=600000")
         .await
         .assert_ok()
-        .assert_see("Showing bikes from")
-        .assert_see(r#"value="2000000""#)
-        .assert_see(r#"value="6000000""#);
+        .assert_see("Showing bikes from $2,000.00 to $6,000.00.")
+        .assert_see(r#"value="200000""#)
+        .assert_see(r#"value="600000""#);
     app.get("/about/blocks?slot=Trail%205%2010%3A00")
         .await
         .assert_see("Booking Trail 5 10:00");

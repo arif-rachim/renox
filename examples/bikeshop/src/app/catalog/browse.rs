@@ -184,8 +184,8 @@ pub struct Facets {
     pub fits: Options,
 }
 
-/// The step of the price slider: 100,000 in the smallest unit.
-pub const PRICE_STEP: i64 = 100_000;
+/// The step of the price slider: 10,000 in the smallest unit ($100).
+pub const PRICE_STEP: i64 = 10_000;
 
 /// What the listing shows: a category, a search, or everything.
 pub enum Scope {

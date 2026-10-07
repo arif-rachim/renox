@@ -168,7 +168,7 @@ async fn shop(app: &TestApp) -> Shop {
         trek.id,
         "A light road bike for long days.",
         &[("Frame", "Carbon"), ("Wheels", "700c")],
-        &[("S", 10_000_000), ("M", 12_000_000)],
+        &[("S", 100_000), ("M", 120_000)],
         30,
     )
     .await;
@@ -179,7 +179,7 @@ async fn shop(app: &TestApp) -> Shop {
         giant.id,
         "An easy bike for the city.",
         &[("Frame", "Aluminium"), ("Wheels", "700c")],
-        &[("M", 6_000_000)],
+        &[("M", 60_000)],
         5,
     )
     .await;
@@ -190,7 +190,7 @@ async fn shop(app: &TestApp) -> Shop {
         giant.id,
         "An e-bike with a strong motor.",
         &[("Frame", "Aluminium"), ("Motor", "Shimano EP8")],
-        &[("M", 30_000_000)],
+        &[("M", 300_000)],
         1,
     )
     .await;
@@ -201,7 +201,7 @@ async fn shop(app: &TestApp) -> Shop {
         giant.id,
         "Twelve speeds.",
         &[("Speeds", "12")],
-        &[("One size", 450_000)],
+        &[("One size", 4_500)],
         10,
     )
     .await;
@@ -212,7 +212,7 @@ async fn shop(app: &TestApp) -> Shop {
         trek.id,
         "Pedals, and a spare chain link for your chain.",
         &[],
-        &[("One size", 300_000)],
+        &[("One size", 3_000)],
         10,
     )
     .await;
@@ -223,7 +223,7 @@ async fn shop(app: &TestApp) -> Shop {
         trek.id,
         "Not sold any more.",
         &[],
-        &[("M", 5_000_000)],
+        &[("M", 50_000)],
         900,
     )
     .await;
@@ -286,7 +286,7 @@ async fn filters_and_sort_combine() {
     );
     assert_eq!(giant, ["Giant Explore E+", "Giant Escape"]);
     let two = names(
-        &app.get("/shop/bikes?brand=giant&brand=trek&price_max=11000000")
+        &app.get("/shop/bikes?brand=giant&brand=trek&price_max=110000")
             .await
             .text(),
     );
@@ -360,7 +360,7 @@ async fn pages_keep_the_filters_and_never_overlap() {
             s.escape.brand_id,
             "Another road bike.",
             &[("Frame", "Steel")],
-            &[("M", 1_000_000 + n * 10_000)],
+            &[("M", 10_000 + n * 100)],
             40,
         )
         .await;
@@ -408,7 +408,7 @@ async fn both_ends_of_the_price_range_apply_to_the_same_variant() {
     // other below the high end.
     assert!(
         names(
-            &app.get("/shop/bikes?price_min=11000000&price_max=11500000")
+            &app.get("/shop/bikes?price_min=110000&price_max=115000")
                 .await
                 .assert_ok()
                 .text()
@@ -417,7 +417,7 @@ async fn both_ends_of_the_price_range_apply_to_the_same_variant() {
     );
     assert_eq!(
         names(
-            &app.get("/shop/bikes?price_min=11000000&price_max=12500000")
+            &app.get("/shop/bikes?price_min=110000&price_max=125000")
                 .await
                 .text()
         ),
@@ -570,7 +570,7 @@ async fn the_product_page_shows_stock_fits_and_remembers_the_visit() {
         .get(&format!("/products/{}?size=M", s.domane.slug))
         .await;
     page.assert_ok()
-        .assert_see("Rp 12,000,000")
+        .assert_see("$1,200.00")
         .assert_see("2 at North")
         .assert_see("Out of stock at South")
         .assert_see("Parts and accessories that fit")
@@ -588,7 +588,7 @@ async fn the_product_page_shows_stock_fits_and_remembers_the_visit() {
         buybox.trim_start().starts_with("<section id=\"buybox\""),
         "{buybox}"
     );
-    assert!(buybox.contains("Rp 10,000,000") && buybox.contains("Sold out in every store"));
+    assert!(buybox.contains("$1,000.00") && buybox.contains("Sold out in every store"));
     // A part lists the bikes it fits, with the pivot's note.
     app.get(&format!("/products/{}", s.chain.slug))
         .await

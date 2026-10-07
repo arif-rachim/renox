@@ -3,7 +3,7 @@
 //! unit test away (`cargo test -p bikeshop --lib pricing`) and the pages,
 //! the counter and the scheduled tasks all use the same numbers.
 //!
-//! Money is an integer in the smallest unit of `APP_CURRENCY` (rupiah
+//! Money is an integer in the smallest unit of `APP_CURRENCY` (cents
 //! here), never a float.
 
 use renox::chrono::Duration;
@@ -68,14 +68,14 @@ impl Quote {
 /// use bikeshop::app::rentals::model::RentalBike;
 /// use renox::chrono::{Duration, Utc};
 ///
-/// let bike = RentalBike { hourly_rate: 30_000, daily_rate: 150_000, deposit: 750_000, ..Default::default() };
+/// let bike = RentalBike { hourly_rate: 1_500, daily_rate: 6_000, deposit: 30_000, ..Default::default() };
 /// let start = Utc::now();
 /// // 2 h 10 min: three started hours.
-/// assert_eq!(quote(&bike, start, start + Duration::minutes(130)).price, 90_000);
-/// // 7 hours would be 210,000: capped at the daily rate.
-/// assert_eq!(quote(&bike, start, start + Duration::hours(7)).price, 150_000);
+/// assert_eq!(quote(&bike, start, start + Duration::minutes(130)).price, 4_500);
+/// // 7 hours would be $105.00: capped at the daily rate.
+/// assert_eq!(quote(&bike, start, start + Duration::hours(7)).price, 6_000);
 /// // A day and two hours.
-/// assert_eq!(quote(&bike, start, start + Duration::hours(26)).price, 210_000);
+/// assert_eq!(quote(&bike, start, start + Duration::hours(26)).price, 9_000);
 /// ```
 pub fn quote(bike: &RentalBike, start: DateTime, end: DateTime) -> Quote {
     let minutes = (end - start).num_minutes().max(0);
@@ -177,9 +177,9 @@ mod tests {
 
     fn bike() -> RentalBike {
         RentalBike {
-            hourly_rate: 30_000,
-            daily_rate: 150_000,
-            deposit: 750_000,
+            hourly_rate: 1_500,
+            daily_rate: 6_000,
+            deposit: 30_000,
             ..Default::default()
         }
     }
@@ -193,58 +193,58 @@ mod tests {
     #[test]
     fn hours_are_counted_when_started_and_capped_at_a_day() {
         let start = at(9, 0);
-        assert_eq!(quote(&bike(), start, at(10, 0)).price, 30_000);
-        assert_eq!(quote(&bike(), start, at(10, 1)).price, 60_000);
-        assert_eq!(quote(&bike(), start, at(14, 0)).price, 150_000);
+        assert_eq!(quote(&bike(), start, at(10, 0)).price, 1_500);
+        assert_eq!(quote(&bike(), start, at(10, 1)).price, 3_000);
+        assert_eq!(quote(&bike(), start, at(14, 0)).price, 6_000);
         let q = quote(&bike(), start, at(9 + 72, 0));
-        assert_eq!((q.days, q.hours, q.price), (3, 0, 450_000));
+        assert_eq!((q.days, q.hours, q.price), (3, 0, 18_000));
         assert_eq!(q.rate, RentalRate::Daily);
         assert_eq!(quote(&bike(), start, at(11, 0)).rate, RentalRate::Hourly);
-        assert_eq!(quote(&bike(), start, at(11, 0)).due_now(), 60_000 + 750_000);
+        assert_eq!(quote(&bike(), start, at(11, 0)).due_now(), 3_000 + 30_000);
     }
 
     #[test]
     fn the_late_fee_starts_after_the_grace_period() {
         let due = at(18, 0);
-        assert_eq!(late_fee(30_000, due, at(17, 0)), 0);
-        assert_eq!(late_fee(30_000, due, at(18, 15)), 0);
-        assert_eq!(late_fee(30_000, due, at(18, 16)), 30_000);
-        assert_eq!(late_fee(30_000, due, at(19, 0)), 30_000);
-        assert_eq!(late_fee(30_000, due, at(19, 1)), 60_000);
+        assert_eq!(late_fee(1_500, due, at(17, 0)), 0);
+        assert_eq!(late_fee(1_500, due, at(18, 15)), 0);
+        assert_eq!(late_fee(1_500, due, at(18, 16)), 1_500);
+        assert_eq!(late_fee(1_500, due, at(19, 0)), 1_500);
+        assert_eq!(late_fee(1_500, due, at(19, 1)), 3_000);
     }
 
     #[test]
     fn the_deposit_settles_against_the_fees() {
         assert_eq!(
-            settle(750_000, 0),
+            settle(30_000, 0),
             Settlement {
                 fees: 0,
                 kept: 0,
-                refund: 750_000,
+                refund: 30_000,
                 due: 0
             }
         );
         assert_eq!(
-            settle(750_000, 200_000),
+            settle(30_000, 8_000),
             Settlement {
-                fees: 200_000,
-                kept: 200_000,
-                refund: 550_000,
+                fees: 8_000,
+                kept: 8_000,
+                refund: 22_000,
                 due: 0
             }
         );
         assert_eq!(
-            settle(750_000, 900_000),
+            settle(30_000, 36_000),
             Settlement {
-                fees: 900_000,
-                kept: 750_000,
+                fees: 36_000,
+                kept: 30_000,
                 refund: 0,
-                due: 150_000
+                due: 6_000
             }
         );
-        assert_eq!(settle(0, 90_000).due, 90_000);
-        assert_eq!(no_show_fee(150_000, 750_000), 150_000);
-        assert_eq!(no_show_fee(900_000, 750_000), 750_000);
+        assert_eq!(settle(0, 4_500).due, 4_500);
+        assert_eq!(no_show_fee(6_000, 30_000), 6_000);
+        assert_eq!(no_show_fee(36_000, 30_000), 30_000);
     }
 
     #[test]

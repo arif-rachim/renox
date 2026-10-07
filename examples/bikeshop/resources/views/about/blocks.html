@@ -98,8 +98,8 @@
   <div id="filter">
   {% call card(t('blocks.page.filter_title'), subtitle=t('blocks.page.filter_lead')) %}
     <form class="rx-stack" method="get" action="{{ route('about.blocks') }}#filter">
-      {{ range_slider("price_min", "price_max", price_min, price_max, step=250000,
-                      value_min=price_filter.low if price_filter else 1000000, value_max=price_filter.high if price_filter else 8000000,
+      {{ range_slider("price_min", "price_max", price_min, price_max, step=25000,
+                      value_min=price_filter.low if price_filter else 100000, value_max=price_filter.high if price_filter else 500000,
                       label="Price", format="money") }}
       <div>{{ button(t('blocks.page.filter'), variant="secondary") }}</div>
     </form>

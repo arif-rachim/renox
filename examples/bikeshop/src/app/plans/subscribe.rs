@@ -280,12 +280,18 @@ pub async fn form(
         .or_else(|| weekdays.first().map(|(n, _)| *n));
     let today = visits::today(&state.config);
     let first = weekday.map(|w| first_visit(today, w).to_string());
+    let rate = crate::money::format(
+        super::billing::RUPIAH_PER_DOLLAR,
+        super::billing::XENDIT_CURRENCY,
+        &lang.locale,
+    );
     let ways: Vec<(String, String)> = ways_to_pay(&state.config)
         .into_iter()
         .map(|(with, gateway)| {
             (
                 with.key().to_owned(),
-                lang.t(&format!("plans.pay_with.{gateway}"), &[]),
+                // Xendit charges rupiah: its label names the shop's rate.
+                lang.t(&format!("plans.pay_with.{gateway}"), &[("rate", &rate)]),
             )
         })
         .collect();

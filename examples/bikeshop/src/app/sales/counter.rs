@@ -81,7 +81,11 @@ pub async fn show(State(db): State<Db>, session: Session) -> Result<View> {
     let store = Store::find_or_404(&db, store_id).await?;
     Ok(view(
         "sales/counter/show.html",
-        context! { sale => data, customer, totals, store },
+        context! {
+            sale => data, customer, totals, store,
+            // Typed amounts are whole units; the total is in the smallest.
+            scale => crate::money::scale(&crate::money::currency()),
+        },
     )
     .fragment("sale"))
 }
@@ -133,9 +137,7 @@ pub async fn variants(
         &variants.iter().map(|v| v.id).collect::<Vec<_>>(),
     )
     .await?;
-    let money = |amount: i64| {
-        renox::format_money(amount as f64, &state.config.currency, None, &lang.locale)
-    };
+    let money = |amount: i64| crate::money::format(amount, &state.config.currency, &lang.locale);
     Ok(Json(
         variants
             .iter()
@@ -297,10 +299,12 @@ pub async fn clear(session: Session) -> Result<Redirect> {
 pub struct PayForm {
     #[validate(required, one_of(&["cash", "card"]))]
     pub method: String,
-    /// What the customer handed over, for cash (the change is worked out).
+    /// What the customer handed over, for cash (the change is worked
+    /// out), in whole units as typed: `50`, `50.00` or `50,00`
+    /// ([`crate::money::parse`]).
     #[serde(default)]
-    #[validate(min = 0)]
-    pub tendered: Option<i64>,
+    #[validate(max = 20)]
+    pub tendered: Option<String>,
 }
 
 /// `POST /staff/counter/pay` (`sales.counter.pay`): rings the sale up (see
@@ -331,7 +335,18 @@ pub async fn pay(
     } else {
         PaymentMethod::Cash
     };
-    if method == PaymentMethod::Cash && form.tendered.is_some_and(|t| t < totals.total) {
+    let tendered = match form.tendered.as_deref().map(str::trim) {
+        Some(text) if !text.is_empty() => {
+            let Some(amount) = crate::money::parse(text, &state.config.currency) else {
+                let mut errors = renox::validation::Errors::default();
+                errors.add("tendered", lang.t("sales.counter.not_an_amount", &[]));
+                return Err(errors.into());
+            };
+            Some(amount)
+        }
+        _ => None,
+    };
+    if method == PaymentMethod::Cash && tendered.is_some_and(|t| t < totals.total) {
         let mut errors = renox::validation::Errors::default();
         errors.add("tendered", lang.t("sales.counter.not_enough", &[]));
         return Err(errors.into());
@@ -425,7 +440,7 @@ pub async fn pay(
         )
         .await?;
     session.remove(&key(store_id));
-    if let Some(tendered) = form.tendered.filter(|_| method == PaymentMethod::Cash) {
+    if let Some(tendered) = tendered.filter(|_| method == PaymentMethod::Cash) {
         session.flash("change", tendered - order.total)?;
     }
     Ok((
