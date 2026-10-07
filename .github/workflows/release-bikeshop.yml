@@ -1,7 +1,7 @@
 name: Release build (bikeshop demo)
 
 # Builds examples/bikeshop on the same Ubuntu (glibc) as the server that runs
-# the live demo at bikeshop.renoxium.com. The server pulls the newest
+# the live demo at bikeshop.renox.rs. The server pulls the newest
 # `bikeshop-<sha>` artifact from main every few minutes (autodeploy); CI holds
 # no server keys. Builds on pull requests too, so a change can be tried on the
 # server by run id before it is merged.
