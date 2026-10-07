@@ -1,0 +1,14 @@
+# /etc/systemd/system/bikeshop-update.timer
+# Looks for a new build every hour (a few minutes apart on each server).
+# Turn it off with: sudo systemctl disable --now bikeshop-update.timer
+[Unit]
+Description=Look for a new Bikeshop build every hour
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

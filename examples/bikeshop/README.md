@@ -335,8 +335,12 @@ $ cargo run -- schedule:list
   debug.
 - **Maintenance:** `cargo run -- down` (503 with `Retry-After` and the shop's page; `/health`
   keeps answering), `cargo run -- up`.
-- **Deploy:** [Dockerfile](Dockerfile) and [deploy/](deploy/) (a systemd service and socket,
-  Litestream) are exactly what `rnx make:deploy` writes; read [deploy/README.md](deploy/README.md).
+- **Deploy:** every push to `main` is built and published as the public release
+  `bikeshop-latest` (`.github/workflows/release-bikeshop.yml`); a server installs and then
+  updates itself from it with one command, [deploy/update.sh](deploy/update.sh) (checksum,
+  migrations, switch, `/health`, roll back; an hourly timer). See "The quick way" in
+  [deploy/README.md](deploy/README.md). [Dockerfile](Dockerfile) and the systemd service and
+  socket, Litestream, are what `rnx make:deploy` writes.
   As in every example, `renox.workspace = true` means the Dockerfile builds in an app made by
   `rnx new`, not in this repository's folder.
 - **CSP:** every page works under `CSP=strict` (scripts load from the app with the page's nonce,

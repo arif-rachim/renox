@@ -1,0 +1,11 @@
+# /etc/systemd/system/bikeshop-update.service
+# Pulls the newest Bikeshop build and switches to it (deploy/update.sh,
+# installed as /usr/local/sbin/bikeshop-update). Started by the timer.
+[Unit]
+Description=Update Bikeshop to the newest build
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/bikeshop-update --dir /opt/bikeshop

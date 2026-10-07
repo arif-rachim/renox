@@ -9,8 +9,9 @@ After=network.target
 User=bikeshop
 WorkingDirectory=/opt/bikeshop
 EnvironmentFile=/opt/bikeshop/.env
-ExecStartPre=/opt/bikeshop/bikeshop migrate
-ExecStart=/opt/bikeshop/bikeshop
+# /opt/bikeshop/current points at the running build (deploy/update.sh).
+ExecStartPre=/opt/bikeshop/current/bikeshop migrate
+ExecStart=/opt/bikeshop/current/bikeshop
 Restart=on-failure
 # Renox finishes running jobs on SIGTERM (up to 30 s).
 KillSignal=SIGTERM

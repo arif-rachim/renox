@@ -902,7 +902,10 @@ PostgreSQL suite 2.5x slower (reconnects).
   `tests/cli/run.sh`), **tutorial** (`tests/tutorial/run.sh`), **docker** (`make:deploy` image answers `/health`), **s3** (SeaweedFS; renox's `it/s3.rs` and examples/uploads),
   **cargo-deny**, **coverage** (informational); a separate workflow, **Release build (site)**
   (release-site.yml: on pushes to main that touch the docs, builds site/ for the owner's server,
-  which pulls it),
+  which pulls it), **Release build (bikeshop)** (release-bikeshop.yml: on pushes to main that
+  touch the bike shop or Renox, builds it on Ubuntu 22.04 for x86_64 and arm64 and replaces the
+  public pre-release `bikeshop-latest`; a `bikeshop-v*` tag makes a release of its own; servers
+  pull it with examples/bikeshop/deploy/update.sh),
   **semver checks** (pull requests:
   `cargo semver-checks -p renox-core -p renox --baseline-rev origin/<base> --release-type
   minor`, informational until the first release; install it with `cargo install --locked

@@ -1,0 +1,108 @@
+name: Release build (bikeshop)
+
+# Builds examples/bikeshop for Linux servers and publishes it as a public
+# GitHub release, so any server can pull it with curl (no GitHub token, no
+# server keys in CI): examples/bikeshop/deploy/update.sh downloads it,
+# checks it and switches to it.
+#
+# - Every push to main that touches the app or Renox: the rolling pre-release
+#   `bikeshop-latest` is replaced by the new build.
+# - A tag `bikeshop-v*` (e.g. bikeshop-v1.0.0): a release of its own, for
+#   servers that pin a version (`update.sh --version bikeshop-v1.0.0`).
+#
+# Built on Ubuntu 22.04 (glibc 2.35), so the binary runs on Ubuntu 22.04+ and
+# Debian 12+; x86_64 and arm64.
+on:
+  push:
+    branches: [main]
+    tags: ["bikeshop-v*"]
+    paths:
+      - "examples/bikeshop/**"
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/release-bikeshop.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-bikeshop-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: build bikeshop (${{ matrix.arch }}-linux)
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-22.04
+          - arch: aarch64
+            runner: ubuntu-22.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: bikeshop-release
+      # Views, translations and public/ are compiled in (App::embed), so the
+      # binary is the whole app; .env.example and deploy/ go next to it.
+      - run: cargo build --release --locked -p bikeshop
+      - name: Package
+        run: |
+          name="bikeshop-${{ matrix.arch }}-linux"
+          mkdir -p "dist/$name"
+          cp target/release/bikeshop "dist/$name/"
+          strip "dist/$name/bikeshop"
+          cp examples/bikeshop/.env.example "dist/$name/"
+          cp -r examples/bikeshop/deploy "dist/$name/"
+          echo "${GITHUB_SHA}" > "dist/$name/REVISION"
+          tar -C dist -czf "dist/$name.tar.gz" "$name"
+          (cd dist && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256")
+          ls -la dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bikeshop-${{ matrix.arch }}-linux
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+          retention-days: 30
+          if-no-files-found: error
+
+  publish:
+    name: publish the release
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          cd dist
+          cat *.sha256 > SHA256SUMS
+          echo "${GITHUB_SHA}" > REVISION
+          notes="examples/bikeshop built from ${GITHUB_SHA}. Install or update a server with examples/bikeshop/deploy/update.sh (see examples/bikeshop/deploy/README.md)."
+          if [[ "${GITHUB_REF}" == refs/tags/bikeshop-v* ]]; then
+            tag="${GITHUB_REF#refs/tags/}"
+            gh release create "$tag" -R "$REPO" --title "Bikeshop $tag" --notes "$notes" \
+              *.tar.gz SHA256SUMS REVISION
+          else
+            # The rolling build: replace the release and move its tag to this commit.
+            gh release delete bikeshop-latest -R "$REPO" --cleanup-tag --yes || true
+            gh release create bikeshop-latest -R "$REPO" --target "${GITHUB_SHA}" --prerelease \
+              --title "Bikeshop (latest build of main)" --notes "$notes" \
+              *.tar.gz SHA256SUMS REVISION
+          fi
