@@ -46,7 +46,7 @@ pub const REPOSITORY: &str = "https://github.com/arif-rachim/renox/blob/main/";
 
 /// The documentation site, for links to the guides (`docs/ui.md` is
 /// `/docs/ui` there).
-pub const DOCS_SITE: &str = "https://www.renox.rs/docs/";
+pub const DOCS_SITE: &str = "https://docs.renox.rs/docs/";
 
 /// The explanation of one page (one named GET route).
 ///

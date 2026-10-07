@@ -365,7 +365,7 @@ site/                      the documentation site (package `renox-site`, publish
                            src/icons.rs (Lucide SVGs, `icon()` in templates; each page in
                            content.rs has an icon and a one-line blurb), search, sitemap, ETags;
                            deploy/ has its systemd units; .github/workflows/release-site.yml
-                           builds it for https://www.renox.rs, whose server pulls
+                           builds it for https://docs.renox.rs, whose server pulls
                            each new build (#141). A new guide in docs/ needs a line in
                            content.rs PAGES (and site/build.rs already watches docs/).
                            The owner hosts it on their own server (not GitHub Pages: the
@@ -819,7 +819,7 @@ PostgreSQL suite 2.5x slower (reconnects).
   1.0.0-rc.1 it has the crates.io/docs.rs badges, installs from crates.io (`--version` while
   1.0 is a release candidate) and has a "Use Renox with Claude Code" section. Its docs links
   stay repository files (they work on GitHub and crates.io, and the site rewrites them to its
-  own pages); the top and "Documentation" point readers at https://www.renox.rs (#141),
+  own pages); the top and "Documentation" point readers at https://docs.renox.rs (#141),
   which is also the crates' `homepage`.
 - `CHEATSHEET.md` is compiled: every ```rust block must build on its own (visible `use` lines, no
   `# ` hidden lines since GitHub shows them; define items only, no top-level statements, so the
@@ -1320,9 +1320,10 @@ picks the build, not the terminal.
   `cargo install renox-cli --version 1.0.0-rc.1` + `rnx new` checked). Then the README's
   start and coding-agent sections: merged (#123). GitHub Pages was tried and dropped
   (the owner's account serves project sites on a personal domain): the docs site runs on the
-  owner's own server, built with Renox: https://www.renox.rs (renox.renoxium.com from
-  2026-10-04, the project's own domain since 2026-10-07, #331; the bikeshop demo is
-  https://bikeshop.renox.rs) (#141;
+  owner's own server, built with Renox: https://docs.renox.rs (renox.renoxium.com from
+  2026-10-04, the project's own domain since 2026-10-07, #331). The project's domain is
+  renox.rs: the landing page at https://renox.rs (www too, its own app, planned), the docs
+  at docs.renox.rs, the bikeshop demo at https://bikeshop.renox.rs (#141;
   the server pulls each build of `.github/workflows/release-site.yml`).
   Then #124 (new apps failed `cargo fmt --check`): `rnx` formats what it writes, merged
   (#125); GitHub Pages switched off (2026-10-04). Release candidate `1.0.0-rc.2` with that

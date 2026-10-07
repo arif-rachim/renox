@@ -362,7 +362,7 @@ async fn the_panel_shows_features_docs_and_sources() {
         .assert_see("Renox features used, and why")
         .assert_see("App::detect_locale")
         // Guides on the docs site, sources on GitHub.
-        .assert_see("https://www.renox.rs/docs/routing#apps-modules-and-routes")
+        .assert_see("https://docs.renox.rs/docs/routing#apps-modules-and-routes")
         .assert_see(
             "https://github.com/arif-rachim/renox/blob/main/examples/bikeshop/src/app/home/mod.rs",
         );
