@@ -89,7 +89,10 @@ describe('API tokens', () => {
       await page.eval((d) => document.querySelector(`[data-rx-open="${d}"]`).click(), dialog);
       await page.waitFor((d) => document.getElementById(d)?.open, { message: 'the confirmation' }, dialog);
       await page.eval((d) => document.querySelector(`#${d} button.rx-button--danger`).click(), dialog);
-      await page.waitFor(() => /Revoked/.test(document.querySelector('main').textContent), { message: 'revoked' });
+      // The confirmation posts a plain form and the page loads again (no
+      // <main> while the next document is being parsed).
+      await page.waitFor(() => /Revoked/.test(document.querySelector('main')?.textContent || ''), { message: 'revoked' });
+      await page.settle();
       const gone = await page.eval(async (t) => (await fetch('/api/v1/kiosk/bikes', { credentials: 'omit', headers: { Authorization: `Bearer ${t}`, Accept: 'application/json' } })).status, token);
       assert.equal(gone, 401);
       page.assertClean({ allow: [/status of 401/] }); // the revoked token's call, on purpose
