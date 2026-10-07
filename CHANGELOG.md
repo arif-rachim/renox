@@ -10,6 +10,10 @@ changes by milestone (each one pull request; details in its description and in
 
 ## Unreleased
 
+- **The docs moved to https://renox.rs:** the crates' `homepage`, the README, `llms.txt`
+  and the `AGENTS.md` that `rnx new` writes point there; https://renox.renoxium.com
+  redirects. The bikeshop demo moved to https://bikeshop.renox.rs.
+
 ## 1.0.0-rc.6 · 2026-10-06
 
 The fixes found by testing every untested path (the coverage epic #246), and two UI kit

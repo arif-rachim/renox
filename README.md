@@ -12,7 +12,7 @@ Under the hood, Renox uses well-known parts. Axum is the web server library. HTM
 Alpine.js are two small scripts that make pages update in the browser without a reload.
 SQLite (or PostgreSQL) stores the data. You add one dependency, `renox`, and you get all of it.
 
-**Read the docs at [renox.renoxium.com](https://renox.renoxium.com).** New here? Start with
+**Read the docs at [renox.rs](https://renox.rs).** New here? Start with
 [the tutorial](docs/tutorial.md): it builds one small app step by step and explains every word.
 Already know Laravel? Read [coming from Laravel](docs/laravel.md); every guide is listed under
 [Documentation](#documentation). API reference: [docs.rs/renox](https://docs.rs/renox).
@@ -604,7 +604,7 @@ Not planned: runtime-reflected Eloquent-style models, Redis, and a REPL.
 ## Documentation
 
 The files below are also a documentation site with search, built with Renox itself
-([`site/`](site)): **[renox.renoxium.com](https://renox.renoxium.com)**, rebuilt whenever they
+([`site/`](site)): **[renox.rs](https://renox.rs)**, rebuilt whenever they
 change on `main`.
 
 - [The tutorial](docs/tutorial.md): build one app from `rnx new` to a server, step by step.
