@@ -24,7 +24,7 @@ pub fn app() -> App {
         .module(app::tasks::Tasks)
         // `cargo run -- db:seed`: a few tasks, one of them overdue.
         .seeder(|state| async move {
-            let db = state.db;
+            let db = state.db.clone();
             if Task::query().exists(&db).await? {
                 return Ok(()); // seeded already
             }

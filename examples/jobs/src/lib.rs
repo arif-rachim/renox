@@ -49,7 +49,7 @@ pub fn app() -> App {
             renox::mail::MailConfig::from_env(config, "REPORTS")
         })
         .seeder(|state| async move {
-            let db = state.db;
+            let db = state.db.clone();
             // Seeding twice is harmless: a seeded database stays as it is.
             if User::find_by_email(&db, "admin@example.com")
                 .await?

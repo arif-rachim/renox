@@ -170,6 +170,8 @@ field for you.
   `import::ImportReport`, `import::FailedRow`, `auth::permissions::Assignment`
   (`auth::permissions::Scope` has private fields: make one with `Scope::of`, `of_id`, `new`
   or `global`; `Scopes` stays `All` / `Only`, so a `match` on it needs no `_` arm)
+- `AppStateInner`: what an `AppState` holds, read as the state's fields
+  (`state.db`, `state.config`) through `Deref`; only Renox builds one (#334)
 
 ### New variants on enums
 

@@ -234,7 +234,7 @@ pub fn app() -> App {
         // es), else APP_LOCALE; /language/{locale} still wins.
         .detect_locale()
         .seeder(|state| async move {
-            let db = state.db;
+            let db = state.db.clone();
             Entry::factory().count(30).create(&db).await?;
             Ok(())
         })

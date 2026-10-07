@@ -764,7 +764,7 @@ impl App {
             failover.push((name.clone(), mailer.clone()));
         }
         let mailer = Mailer::from_config(&config)?.with_failover(failover);
-        let state = AppState {
+        let state = AppState::new(crate::state::AppStateInner {
             security,
             webhooks: Arc::new(webhooks),
             mailer,
@@ -823,7 +823,7 @@ impl App {
             provided: Arc::new(module_provided),
             throttle: Arc::new(LoginThrottle::new(shared_counters.clone())),
             detect_locale: self.detect_locale,
-        };
+        });
         if let Some(second) = &state.second_factor
             && state.url(&second.challenge, &[]).is_err()
         {

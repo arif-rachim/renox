@@ -468,12 +468,12 @@ async fn paginate_counts_pages() {
 async fn seeders_run_in_order() {
     let (kernel, _dir) = kernel_with(|app| {
         app.seeder(|state| async move {
-            let db = state.db;
+            let db = state.db.clone();
             Product::factory().count(3).create(&db).await?;
             Ok(())
         })
         .seeder(|state| async move {
-            let db = state.db;
+            let db = state.db.clone();
             let first = Product::query()
                 .order_by("id")
                 .first(&db)

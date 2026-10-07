@@ -48,7 +48,7 @@ pub fn app() -> App {
 }
 
 async fn seed(state: AppState) -> Result {
-    let db = state.db;
+    let db = state.db.clone();
     // Seeding twice is harmless: a seeded database stays as it is.
     if Category::query().exists(&db).await? {
         return Ok(());

@@ -14,8 +14,34 @@ use crate::storage::Storage;
 use crate::{Config, Result, RouteTable, Views};
 
 /// Shared state available to every handler through `State<AppState>`.
+///
+/// One `Arc` around [`AppStateInner`]: every middleware layer, the request's
+/// extensions and each handler's `State` clone it, so a clone is one atomic
+/// increment (it was a struct of about 35 fields, cloned tens of times per
+/// request: #334). Read its parts as fields, through `Deref`:
+/// `state.db`, `state.config`, `state.queue`…
 #[derive(Clone)]
-pub struct AppState {
+pub struct AppState(Arc<AppStateInner>);
+
+impl std::ops::Deref for AppState {
+    type Target = AppStateInner;
+
+    fn deref(&self) -> &AppStateInner {
+        &self.0
+    }
+}
+
+impl AppState {
+    /// Wraps the parts made at boot (`App::boot`).
+    pub(crate) fn new(inner: AppStateInner) -> Self {
+        AppState(Arc::new(inner))
+    }
+}
+
+/// What an [`AppState`] holds. Apps read these as the state's fields
+/// (`state.db`); only Renox builds one, at boot.
+#[non_exhaustive]
+pub struct AppStateInner {
     /// The configuration.
     pub config: Arc<Config>,
     /// Named routes, to build URLs (`state.url(name, params)`).
