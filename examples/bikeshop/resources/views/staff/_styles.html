@@ -9,7 +9,7 @@
 /* The role × permission matrix: the permission, then one switch per role.
    A real grid (role="table"), with sticky role headings, scrolling sideways
    inside its card on a phone rather than the page. */
-.bs-matrix-wrap { overflow-x: auto; }
+.bs-matrix-wrap { position: relative; overflow-x: auto; }
 .bs-matrix { display: grid; grid-template-columns: minmax(14rem, 2fr) repeat(var(--bs-roles), minmax(5.5rem, 1fr)); min-width: min-content; }
 .bs-matrix [role="row"] { display: contents; }
 .bs-matrix [role="columnheader"], .bs-matrix [role="rowheader"], .bs-matrix [role="cell"] { padding: var(--rx-space-2) var(--rx-space-3); border-bottom: 0.5px solid var(--rx-separator); display: grid; align-items: center; }

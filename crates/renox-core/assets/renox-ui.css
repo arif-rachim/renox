@@ -927,7 +927,9 @@
 
 /* ---------- Tables ---------- */
 
-.rx-table-wrap { overflow-x: auto; border: var(--rx-surface-border); border-radius: var(--rx-radius); background: var(--rx-surface); -webkit-overflow-scrolling: touch; }
+/* `position: relative` keeps an absolutely placed child (a visually hidden caption)
+   inside the scrolling frame: without it, it widened the page on phones. */
+.rx-table-wrap { position: relative; overflow-x: auto; border: var(--rx-surface-border); border-radius: var(--rx-radius); background: var(--rx-surface); -webkit-overflow-scrolling: touch; }
 .rx-table { width: 100%; border-collapse: collapse; font-size: var(--rx-text-subhead); }
 .rx-table th { text-align: left; font: var(--rx-type-caption); text-transform: var(--rx-caption-case); letter-spacing: var(--rx-caption-tracking); color: var(--rx-secondary-label); padding: 10px var(--rx-space-4); border-bottom: 0.5px solid var(--rx-separator); white-space: nowrap; }
 .rx-table td { padding: 12px var(--rx-space-4); border-bottom: 0.5px solid var(--rx-separator); vertical-align: middle; }

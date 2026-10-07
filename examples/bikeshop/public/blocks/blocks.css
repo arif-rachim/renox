@@ -123,7 +123,7 @@
 
 /* ---------- kanban ---------- */
 
-.bs-kanban { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(15rem, 1fr); gap: var(--rx-space-4); overflow-x: auto; padding-bottom: var(--rx-space-2); }
+.bs-kanban { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(15rem, 1fr); gap: var(--rx-space-4); overflow-x: auto; padding-bottom: var(--rx-space-2); }
 .bs-kanban__column { display: grid; grid-template-rows: auto 1fr; gap: var(--rx-space-3); padding: var(--rx-space-3); border-radius: var(--rx-radius); background: var(--rx-fill); min-width: 0; }
 .bs-kanban__column[data-bs-over] { box-shadow: inset 0 0 0 2px var(--rx-accent); }
 .bs-kanban__heading { display: grid; grid-auto-flow: column; justify-content: space-between; align-items: center; margin: 0; font: var(--rx-type-heading); }
@@ -202,13 +202,17 @@
 
 /* ---------- availability ---------- */
 
-.bs-availability { overflow-x: auto; border: var(--rx-surface-border); border-radius: var(--rx-radius); background: var(--rx-surface); }
+/* `position: relative`: the screen reader text inside (rx-visually-hidden, absolute)
+   stays in the scrolling frame instead of widening the page on phones. */
+.bs-availability { position: relative; overflow-x: auto; border: var(--rx-surface-border); border-radius: var(--rx-radius); background: var(--rx-surface); }
 .bs-availability__table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: calc(10rem + var(--bs-columns, 8) * 4.5rem); font: var(--rx-type-body); }
 .bs-availability__table th, .bs-availability__table td { padding: var(--rx-space-1); border-bottom: 0.5px solid var(--rx-separator); text-align: center; }
 .bs-availability__table thead th { font: var(--rx-type-caption); text-transform: var(--rx-caption-case); letter-spacing: var(--rx-caption-tracking); color: var(--rx-secondary-label); padding-block: var(--rx-space-2); }
 .bs-availability__table tbody tr:last-child > * { border-bottom: 0; }
 .bs-availability__corner, .bs-availability__resource { position: sticky; left: 0; z-index: 1; background: var(--rx-surface); text-align: left !important; padding-inline: var(--rx-space-3) !important; box-shadow: 1px 0 0 var(--rx-separator); }
-.bs-availability__resource { display: grid; gap: 0; }
+/* The resource stays a table cell (as tall as its row), so the slots scrolled
+   under it never show through; its name and note are lines inside it. */
+.bs-availability__name, .bs-availability__note { display: block; }
 .bs-availability__name { font: var(--rx-type-label); }
 .bs-availability__note { font: var(--rx-type-note); color: var(--rx-secondary-label); }
 .bs-availability__label, .bs-availability__book {
@@ -325,7 +329,7 @@
 .bs-plan__perks { display: grid; align-content: start; gap: var(--rx-space-2); margin: 0; padding: 0; list-style: none; font: var(--rx-type-body); }
 .bs-plan__perks li { display: grid; grid-template-columns: auto 1fr; gap: var(--rx-space-2); align-items: start; }
 .bs-plan__perks svg { color: var(--rx-success); margin-top: 3px; }
-.bs-plans__table { overflow-x: auto; border: var(--rx-surface-border); border-radius: var(--rx-radius); background: var(--rx-surface); }
+.bs-plans__table { position: relative; overflow-x: auto; border: var(--rx-surface-border); border-radius: var(--rx-radius); background: var(--rx-surface); }
 .bs-plans__compare { min-width: 32rem; }
 .bs-plans__compare th[scope="row"] { position: sticky; left: 0; background: var(--rx-surface); text-align: left; font: var(--rx-type-label); text-transform: none; letter-spacing: normal; color: var(--rx-label); }
 .bs-plans__caption { caption-side: top; text-align: left; padding: var(--rx-space-3) var(--rx-space-4); font: var(--rx-type-heading); }

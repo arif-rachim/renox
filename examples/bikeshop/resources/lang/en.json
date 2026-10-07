@@ -12,7 +12,16 @@
     "logout": "Log out",
     "dashboard": "Dashboard",
     "shop": "Shop",
-    "storefront": "Storefront"
+    "storefront": "Storefront",
+    "menu": "Menu",
+    "language": "Language",
+    "tabs": {
+      "label": "Main sections",
+      "home": "Home",
+      "shop": "Shop",
+      "rent": "Rent",
+      "workshop": "Service"
+    }
   },
   "home": {
     "title": "Bikes to buy, rent and keep riding",
@@ -2149,6 +2158,19 @@
       "email_hint": "Saved on the record; the link works for seven days.",
       "send": "Send the invitation",
       "sent": "The invitation is on its way to :email."
+    },
+    "demo": {
+      "title": "Try the demo",
+      "lead": "Log in as one of these people (tap one to fill the form). Every password is",
+      "two_factor": "Staff accounts are asked to turn on two-factor login before they reach the staff pages.",
+      "who": {
+        "shopper": "Customer: orders, rentals, bikes, a plan",
+        "shop_owner": "Owner: every store, reports, admin",
+        "store_manager": "Manager of the North store",
+        "till": "Cashier at North: the till",
+        "workshop": "Mechanic at North: the workshop",
+        "two_stores": "Cashier in two stores"
+      }
     }
   },
   "plans": {

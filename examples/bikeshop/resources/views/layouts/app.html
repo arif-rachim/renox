@@ -15,35 +15,52 @@
   {#- This page's "About this page" entry (src/explain.rs), unless
       BIKESHOP_EXPLAIN=false hides the panels. -#}
   {%- set about = about_page(request.route, request.path) if explain_panels else none %}
+  {#- The public navigation, once, for the bar (desktop) and the menu panel
+      (phones). One line per area; append yours. -#}
+  {%- set nav = [
+    {"href": route('home'), "label": t('nav.home'), "active": route_is('home')},
+    {"href": route('catalog.index'), "label": t('nav.shop'), "active": route_is('catalog.*')},
+    {"href": route('rentals.create'), "label": t('rentals.nav.rent'), "active": route_is('rentals.create', 'rentals.show', 'rentals.mine', 'rentals.identity')},
+    {"href": route('workshop.book'), "label": t('workshop.nav.book'), "active": route_is('workshop.book', 'workshop.bikes', 'workshop.bikes.show', 'workshop.service.show')},
+    {"href": route('plans.index'), "label": t('plans.nav'), "active": route_is('plans.*')},
+  ] %}
   {#- `width="full"`: logged in, the bar holds the links, the search, the cart,
       the language, the bell and the account menu; the wide container's
-      72rem put the account menu on a second line at 1280 px. -#}
+      72rem put the account menu on a second line at 1280 px.
+      Phones (public/app.css, max-width 40rem) keep one row on top: the
+      brand, a search button, the cart, "About this page" and the bell. The links move to a tab
+      bar at the bottom (layouts/_nav_menu.html), whose last tab opens a
+      panel with the rest: plans, the language and the account. The search box opens under the top row when its button is
+      pressed. -#}
   {% call navbar(t('shop.name'), href=route('home'), mark=true, width="full") %}
     {% call nav_links() %}
-      {#- --- Public navigation (one line per area; append yours) --- -#}
-      {{ nav_link(route('home'), t('nav.home'), active=route_is('home')) }}
-      {{ nav_link(route('catalog.index'), t('nav.shop'), active=route_is('catalog.*')) }}
-      {{ nav_link(route('rentals.create'), t('rentals.nav.rent'), active=route_is('rentals.create', 'rentals.show', 'rentals.mine', 'rentals.identity')) }}
-      {{ nav_link(route('workshop.book'), t('workshop.nav.book'), active=route_is('workshop.book', 'workshop.bikes', 'workshop.bikes.show', 'workshop.service.show')) }}
-      {{ nav_link(route('plans.index'), t('plans.nav'), active=route_is('plans.*')) }}
-      {#- --- end of public navigation --- -#}
+      {%- for link in nav %}{{ nav_link(link.href, link.label, active=link.active) }}{% endfor %}
     {% endcall %}
     <span class="rx-spacer"></span>
+    {#- Phones: shows the search box (public/app.js). -#}
+    <button class="rx-icon-button rx-icon-button--plain bs-phone-only" type="button" id="nav-search-toggle"
+            aria-label="{{ t('catalog.search.label') }}" aria-controls="nav-search-form" aria-expanded="false" data-bs-search-toggle>
+      <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12.3 12.3L17 17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
     {#- Slots the areas fill with a file of their own: the search box
         (catalogue, #233) and the cart (#234). -#}
     {% include "layouts/_nav_search.html" ignore missing %}
     {% include "layouts/_nav_cart.html" ignore missing %}
     {#- "About this page" as the kit's icon button (its label is the tooltip
-        and what screen readers say), so the bar keeps to one line. -#}
+        and what screen readers say), so the bar keeps to one line; phones
+        keep it too, as it is what the demo is for. -#}
     {%- if about %}{{ icon_button("info", t('about.button'), attrs={"data-rx-open": "about-page", "aria-haspopup": "dialog"}) }}{% endif %}
     {#- The language: a kit menu; each item posts to `locale.update`. -#}
+    <span class="bs-desktop-only">
     {% call menu(app.locale | upper, id="language-menu", variant="plain") %}
       {{ menu_action(route('locale.update', 'en'), "English") }}
       {{ menu_action(route('locale.update', 'es'), "Español") }}
     {% endcall %}
+    </span>
     {% if auth.check %}
       {#- The bell: unread notifications, new ones live (Auth::notifications, #238). -#}
       {% from "renox/ui.html" import notification_bell %}{{ notification_bell(unread_notifications) }}
+      <span class="bs-desktop-only">
       {% call menu(auth.user.name, id="account-menu", variant="plain") %}
         {{ menu_link(route('account.show'), t('nav.account')) }}
         {{ menu_link(route('plans.mine'), t('plans.mine.title')) }}
@@ -53,11 +70,15 @@
         {{ menu_separator() }}
         {{ menu_action(route('logout'), t('nav.logout')) }}
       {% endcall %}
+      </span>
     {% else %}
+      <span class="bs-desktop-only bs-nav-guest">
       {{ link_button(route('login'), t('nav.login'), variant="plain", size="small") }}
       {{ link_button(route('register'), t('nav.register'), variant="primary", size="small") }}
+      </span>
     {% endif %}
   {% endcall %}
+  {% include "layouts/_nav_menu.html" %}
   <main class="rx-container rx-container--wide" id="main">
     <div class="rx-stack">
       {% if flash.status %}{% from "renox/ui.html" import alert %}{{ alert(flash.status, kind="success") }}{% endif %}

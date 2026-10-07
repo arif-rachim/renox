@@ -175,11 +175,25 @@ describe('bikeshop in Spanish', () => {
   });
   after(() => app?.stop());
 
-  /** Chooses Español in the navbar's language menu. */
+  /** Chooses Español in the navbar's language menu, or on a phone in the
+   *  menu panel the tab bar opens (#323). */
   async function spanish(page) {
-    await page.click('[aria-controls="language-menu"]');
-    await page.waitFor(() => !document.querySelector('#language-menu').hidden, { message: 'the menu open' });
-    await page.click('#language-menu form:nth-of-type(2) button');
+    const phone = await page.eval(() => getComputedStyle(document.querySelector('.bs-tabbar')).display !== 'none');
+    if (phone) {
+      await page.click('.bs-tabbar [data-rx-open="site-menu"]');
+      await page.waitFor(
+        () => {
+          const menu = document.querySelector('#site-menu');
+          return menu?.open && menu.getAnimations({ subtree: true }).every((a) => a.playState !== 'running');
+        },
+        { message: 'the menu open' },
+      );
+      await page.click('#site-menu form:nth-of-type(2) button');
+    } else {
+      await page.click('[aria-controls="language-menu"]');
+      await page.waitFor(() => !document.querySelector('#language-menu').hidden, { message: 'the menu open' });
+      await page.click('#language-menu form:nth-of-type(2) button');
+    }
     // The choice is a form post and the page loads again; mid-load the
     // document may have no root element yet, hence the `?.` below.
     await page.waitFor(() => document.documentElement?.lang === 'es', { message: 'the page in Spanish' });

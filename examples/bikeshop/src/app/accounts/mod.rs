@@ -31,6 +31,7 @@
 //! mails in `resources/views/mail/accounts/`. Tests: `tests/accounts.rs`.
 
 pub mod claim;
+pub mod demo_logins;
 pub mod explain;
 pub mod factories;
 pub mod locale;
