@@ -11,13 +11,17 @@ import { join } from 'node:path';
 import { Browser } from './lib/cdp.mjs';
 import { start } from './lib/app.mjs';
 
+// Demo staff log in without setting up two-factor login (#239 makes it
+// required; tests/browser/bikeshop-staff.test.mjs checks that it is).
+const STAFF_2FA_OPTIONAL = { BIKESHOP_STAFF_2FA: 'optional' };
+
 const PHONE = { width: 390, height: 844 };
 let browser;
 let app;
 
 before(async () => {
   browser = await Browser.launch();
-  app = await start('bikeshop', 'examples/bikeshop', { seed: true });
+  app = await start('bikeshop', 'examples/bikeshop', { seed: true, env: STAFF_2FA_OPTIONAL });
 });
 
 after(async () => {
