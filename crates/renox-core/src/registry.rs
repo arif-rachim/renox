@@ -98,13 +98,14 @@ impl Registry {
         self
     }
 
-    /// Adds template functions, filters or globals, e.g. a `rupiah` filter:
+    /// Adds template functions, filters or globals, e.g. a `euros` filter
+    /// that always writes cents the German way:
     ///
     /// ```
     /// # use renox::prelude::*;
     /// # let _ =
     /// App::new().templates(|env| {
-    ///     env.add_filter("rupiah", |n: i64| format!("Rp {}", renox::format_number(n as f64, 0, "de")));
+    ///     env.add_filter("euros", |cents: i64| format!("{} €", renox::format_number(cents as f64 / 100.0, 2, "de")));
     /// })
     /// # ;
     /// ```

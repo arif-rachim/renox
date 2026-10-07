@@ -246,7 +246,7 @@ mail apps ignore style sheets.
 {% block content %}
 <p>{{ t('mail.thanks') }}</p>
 {% call panel() %}Order #{{ order_id }} ships tomorrow.{% endcall %}
-{{ table([["Coffee", "Rp 18.000"]], head=["Item", "Price"], total=["Total", "Rp 18.000"]) }}
+{{ table([["Coffee", "$4.50"]], head=["Item", "Price"], total=["Total", "$4.50"]) }}
 {{ divider() }}
 {{ button(app.url ~ "/orders/" ~ order_id, "View your order") }}
 {% endblock %}

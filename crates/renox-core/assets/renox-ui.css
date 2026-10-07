@@ -505,7 +505,7 @@
    read, copied and sent with the form). */
 .rx-input[readonly], .rx-textarea[readonly] { background: var(--rx-fill); }
 
-/* Prefix and suffix ("Rp", "kg"): one box around the text and the input. */
+/* Prefix and suffix ("$", "kg"): one box around the text and the input. */
 .rx-affix {
   display: flex; align-items: stretch; min-height: var(--rx-target);
   background: var(--rx-surface); border: 1px solid var(--rx-border); border-radius: var(--rx-radius-s);

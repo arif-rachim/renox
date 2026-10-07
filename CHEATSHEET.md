@@ -203,7 +203,7 @@ Views (templates) are HTML files with blanks the app fills in. `{{ … }}` print
 {% if can('admin') %}<a href="/admin">Admin</a>{% endif %}    {# gate #}
 <p>{{ product.price | number }}</p>                            {# 75,000 (en) / 75.000 (es); number(2) #}
 <p>{{ order.created_at | date('%d/%m/%Y %H:%M') }}</p>        {# in APP_TIMEZONE; default %Y-%m-%d #}
-<p>{{ order.total | money }}</p>                               {# APP_CURRENCY: Rp 75,000 (en); money(currency='USD', divide_by=100) #}
+<p>{{ order.total | money }}</p>                               {# cents → $75.00 (APP_CURRENCY=USD); money(currency='EUR'), money(divide_by=1) for whole units #}
 <p>{{ order.created_at | since }}</p>                          {# 3 hours ago / in 2 days #}
 <p>{{ post.body | words(30) }}</p>                             {# the first 30 words… #}
 <div>{{ post.body | markdown }}</div>                          {# HTML typed in is shown as text #}
@@ -306,7 +306,7 @@ part is a macro: you import it into a template, then call it like a function.
     {{ select("size", "Size", [["s", "Small"], ["m", "Medium"]]) }}
     {{ checkbox("featured", "Featured", switch=true) }}
     {% call form_grid(2) %}
-      {{ input("price", "Price", type="number", prefix="Rp") }}
+      {{ input("price", "Price", type="number", prefix="$", attrs={"step": "0.01"}) }}
       {{ radio("unit", "Unit", ["pcs", "kg"], selected="pcs", inline=true) }}
     {% endcall %}
     {{ checkbox_list("tags", "Tags", [["new", "New"], ["sale", "On sale"]]) }} {# Vec + #[serde(default)] #}
@@ -948,7 +948,7 @@ enum Size { Small, #[default] Medium, Large } // <select>; TEXT "small" | "mediu
 struct Product {
     id: i64,
     name: String,                 // <input>            TEXT
-    price: i64,                   // money in rupiah    INTEGER / BIGINT
+    price: i64,                   // money in cents     INTEGER / BIGINT
     weight_kg: f64,               // step="0.01"        REAL / DOUBLE PRECISION
     available: bool,              // checkbox           INTEGER 0/1 / BOOLEAN
     size: Size,                   // <select>           TEXT
@@ -1857,7 +1857,7 @@ use renox::prelude::*;
 use std::time::Duration;
 
 #[derive(serde::Deserialize)]
-struct Rate { idr: f64 }
+struct Rate { eur: f64 }
 
 async fn rate(state: &AppState) -> Result<f64> {
     let rate: Rate = state
@@ -1871,12 +1871,12 @@ async fn rate(state: &AppState) -> Result<f64> {
         .await?
         .error_for_status()? // 4xx/5xx → Err
         .json()?;
-    Ok(rate.idr)
+    Ok(rate.eur)
 }
 ```
 
 In tests: `let http = app.fake_http(); http.on("https://api.example.com/*",
-FakeResponse::json(200, json!({ "idr": 16000.0 })));` then `http.assert_sent(|r| …)`. Requests
+FakeResponse::json(200, json!({ "eur": 0.92 })));` then `http.assert_sent(|r| …)`. Requests
 without a fake fail, so tests never reach the network. Scheduled tasks can ping health checks:
 `.ping_before(url)`, `.then_ping(url)`, `.ping_on_success(url)`, `.ping_on_failure(url)`.
 
@@ -2145,7 +2145,7 @@ async fn signed_up(session: Session) -> Result<Redirect> {
 
 async fn paid(State(state): State<AppState>, GaClientId(client): GaClientId) -> Result<StatusCode> {
     // From the server (GA4 Measurement Protocol), so ad blockers can't drop it.
-    state.dispatch(ServerEvent::new(client, "purchase").param("value", 18_000).param("currency", "IDR")).await?;
+    state.dispatch(ServerEvent::new(client, "purchase").param("value", 49.99).param("currency", "USD")).await?;
     Ok(StatusCode::OK)
 }
 ```
@@ -2295,7 +2295,7 @@ Settings live in the `.env` file, one `NAME=value` per line. These are the ones 
 value, such as `staging`, stops the app at boot), `APP_KEY` (`rnx key:generate`; required in
 production), `APP_DEBUG` (on by default in `local`), `APP_NAME`, `APP_URL`, `APP_HOST` (an IP
 address, `127.0.0.1`; `0.0.0.0` in a container) and `APP_PORT` (3000), `APP_LOCALE`,
-`APP_FALLBACK_LOCALE`, `APP_TIMEZONE` (`Asia/Jakarta`, `+07:00` or `UTC`), `APP_CURRENCY` (`IDR`; the `money` filter),
+`APP_FALLBACK_LOCALE`, `APP_TIMEZONE` (`Asia/Jakarta`, `+07:00` or `UTC`), `APP_CURRENCY` (`USD`; the `money` filter, which takes cents),
 `SESSION_LIFETIME` (minutes, 120), `REMEMBER_LIFETIME` (minutes, 43200 = 30 days),
 `SESSION_COOKIE` (`renox_session`), `SESSION_DRIVER` (`cookie` | `database`: the `sessions`
 table, no 4 KB limit, a new id at each login/logout), `MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME` (defaults to `APP_NAME`),

@@ -39,8 +39,8 @@ const ORDER: &str = r##"{% from "renox/ui.html" import infolist, entry, repeatab
 {{ entry("Status", "paid", badge={"paid": "success"}, labels={"paid": "Paid"}) }}
 {{ entry("Placed", placed, format="since") }}
 {{ entry("Day", "2026-10-02", format="date", date_format="%d/%m/%Y") }}
-{{ entry("Total", 75000, format="money") }}
-{{ entry("Price", 1250.5, format="money", currency="usd") }}
+{{ entry("Total", 125050, format="money") }}
+{{ entry("Price", 75000, format="money", currency="idr") }}
 {{ entry("Weight", 1234.5, format="number", decimals=1, suffix="kg") }}
 {{ entry("Note", "**Hi** <b>x</b>", format="markdown", span="full") }}
 {{ entry("Nothing", none) }}
@@ -88,8 +88,8 @@ async fn entries_format_their_values() {
     has(r#"<span class="rx-badge rx-badge--success">Paid</span>"#);
     has(">3 hours ago</time>");
     has(">02/10/2026<");
-    has("Rp 75,000");
     has("$1,250.50");
+    has("Rp 75,000");
     has("1,234.5<span class=\"rx-entry__affix\">kg</span>");
     has("<strong>Hi</strong> &lt;b&gt;x&lt;/b&gt;");
     has(r#"<span class="rx-entry__empty">—</span>"#);
@@ -131,6 +131,7 @@ async fn entries_follow_the_locale() {
     app.get("/order")
         .await
         .assert_see(">hace 3 horas</time>")
+        .assert_see("$1.250,50")
         .assert_see("Rp 75.000")
         .assert_see("1.234,5")
         .assert_see("</svg>Sí</span>")
@@ -143,7 +144,7 @@ async fn the_currency_comes_from_the_config() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("price.html"),
-        "{{ 1250 | money }}|{{ 1250 | money(currency='IDR') }}|{{ 125050 | money(divide_by=100) }}|{{ 3 | money(decimals=0) }}",
+        "{{ 1250 | money }}|{{ 1250 | money(currency='IDR') }}|{{ 1299 | money(currency='usd') }}|{{ 500 | money(currency='JPY') }}|{{ 125050 | money(divide_by=100) }}|{{ 1250 | money(divide_by=1) }}|{{ 300 | money(decimals=0) }}",
     )
     .unwrap();
     struct Price;
@@ -163,7 +164,7 @@ async fn the_currency_comes_from_the_config() {
     .await;
     app.get("/price")
         .await
-        .assert_see("€1,250.00|Rp 1,250|€1,250.50|€3");
+        .assert_see("€12.50|Rp 1,250|$12.99|¥500|€1,250.50|€1,250.00|€3");
 }
 
 #[renox::test]

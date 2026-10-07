@@ -51,10 +51,14 @@ fn to_number(filter: &str, value: &Value) -> Result<f64, Error> {
     })
 }
 
-/// `{{ order.total | money }}` → `Rp 75.000` with `APP_CURRENCY=IDR`,
-/// `$75.00` with `USD`, with the page's separators. Keywords: `currency`
-/// (another ISO 4217 code for this amount), `decimals`, and `divide_by`
-/// for amounts kept in cents (`divide_by=100`).
+/// `{{ order.total | money }}` → `$75.00` for `7500` with `APP_CURRENCY=USD`
+/// (the default), `Rp 75,000` for `75000` with `IDR`, with the page's
+/// separators. The amount is in the currency's smallest unit (cents), as
+/// the data grid's money columns take it: it is divided by
+/// `10^currency_decimals(code)` (100 for `USD`, 1 for `IDR`). Keywords:
+/// `currency` (another ISO 4217 code for this amount), `decimals`, and
+/// `divide_by`, which replaces that divisor (`divide_by=1` for an amount
+/// already in whole units).
 pub(crate) fn money(
     currency: String,
 ) -> impl Fn(&State, Value, Kwargs) -> Result<String, Error> + Send + Sync + 'static {
@@ -63,18 +67,24 @@ pub(crate) fn money(
         let decimals: Option<u32> = kwargs.get("decimals")?;
         let divide_by: Option<f64> = kwargs.get("divide_by")?;
         kwargs.assert_all_used()?;
-        let mut amount = to_number("money", &value)?;
-        if let Some(divisor) = divide_by.filter(|d| *d != 0.0) {
-            amount /= divisor;
-        }
         let code = code.map_or_else(|| currency.clone(), |c| c.trim().to_ascii_uppercase());
+        let amount = to_number("money", &value)? / money_divisor(&code, divide_by);
         Ok(format_money(amount, &code, decimals, &locale(state)))
     }
 }
 
-/// `amount` in the currency `code` (ISO 4217), with its symbol, its usual
-/// decimals (or `decimals`) and the locale's separators: `Rp 75.000`,
-/// `$1,250.50`, `€1.250,50` in `de` (what the `money` template filter
+/// What an amount in `code`'s smallest unit is divided by to give whole
+/// units: `divide_by` when given (and not 0), else `10^currency_decimals`.
+pub(crate) fn money_divisor(code: &str, divide_by: Option<f64>) -> f64 {
+    divide_by
+        .filter(|d| *d != 0.0)
+        .unwrap_or_else(|| 10f64.powi(currency_decimals(code) as i32))
+}
+
+/// `amount` in **whole units** of the currency `code` (ISO 4217; unlike
+/// the `money` template filter, which takes the smallest unit), with its
+/// symbol, its usual decimals (or `decimals`) and the locale's separators: `$1,250.50`,
+/// `€1.250,50` in `de`, `Rp 75.000` in `es` (what the `money` template filter
 /// uses). An unknown code is written before the amount (`CHF 12.00`).
 pub fn format_money(amount: f64, code: &str, decimals: Option<u32>, locale: &str) -> String {
     let (symbol, usual) = currency(code);
@@ -525,6 +535,18 @@ mod tests {
         assert_eq!(format_money(12.0, "CHF", None, "en"), "CHF 12.00");
         assert_eq!(format_money(12.0, "MYR", Some(0), "en"), "RM 12");
         assert_eq!(format_money(-0.001, "USD", None, "en"), "$0.00");
+    }
+
+    #[test]
+    fn money_is_divided_by_the_currencys_smallest_unit() {
+        // Cents for USD, nothing for IDR and JPY; `divide_by` wins.
+        assert_eq!(money_divisor("USD", None), 100.0);
+        assert_eq!(money_divisor("IDR", None), 1.0);
+        assert_eq!(money_divisor("JPY", None), 1.0);
+        assert_eq!(money_divisor("XYZ", None), 100.0);
+        assert_eq!(money_divisor("USD", Some(1.0)), 1.0);
+        assert_eq!(money_divisor("IDR", Some(100.0)), 100.0);
+        assert_eq!(money_divisor("USD", Some(0.0)), 100.0);
     }
 
     #[test]

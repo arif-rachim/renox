@@ -37,7 +37,7 @@ fn views() -> tempfile::TempDir {
     std::fs::write(
         dir.path().join("mail/receipt.html"),
         r#"{% extends "renox/mail/layout.html" %}{% from "renox/mail/button.html" import button %}
-{% block content %}<h1>Thank you, {{ name }}</h1><table><tr><td>Total</td><td>Rp {{ total }}</td></tr></table>{{ button("https://shop.test/o/1", "View order") }}{% endblock %}"#,
+{% block content %}<h1>Thank you, {{ name }}</h1><table><tr><td>Total</td><td>${{ total }}</td></tr></table>{{ button("https://shop.test/o/1", "View order") }}{% endblock %}"#,
     )
     .unwrap();
     std::fs::write(
@@ -64,7 +64,7 @@ async fn mail_views_render_html_and_text() {
             "ben@example.com",
             "Receipt",
             "mail/receipt",
-            context! { name => "Ben", total => "25.000" },
+            context! { name => "Ben", total => "25.00" },
         )
         .unwrap();
     let html = mail.html.as_deref().unwrap();
@@ -74,7 +74,7 @@ async fn mail_views_render_html_and_text() {
     );
     assert!(html.contains(r#"href="https://shop.test/o/1""#));
     assert!(mail.text.contains("Thank you, Ben"), "{}", mail.text);
-    assert!(mail.text.contains("Total Rp 25.000"), "{}", mail.text);
+    assert!(mail.text.contains("Total $25.00"), "{}", mail.text);
     assert!(
         mail.text.contains("View order (https://shop.test/o/1)"),
         "{}",

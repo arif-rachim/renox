@@ -44,7 +44,7 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 
 {#- A text field: text, email, password, number, date, url, tel, search…
     `id`: when a page has two fields of the same name (in separate forms).
-    `prefix`/`suffix`: text joined to the field ("Rp", "kg", ".com").
+    `prefix`/`suffix`: text joined to the field ("$", "kg", ".com").
     `datalist`: suggestions (values, or [value, label] pairs) the field
     still accepts anything besides. `span`: columns taken in a `form_grid`.
     `revealable`: a button that shows the password; `copyable`: a button
@@ -977,11 +977,11 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 {%- endmacro -%}
 
 {#- One value of an entry, formatted. -#}
-{%- macro _entry_item(item, format, badge, labels, decimals, currency, date_format, limit, words, image_size, circular) -%}
+{%- macro _entry_item(item, format, badge, labels, decimals, currency, divide_by, date_format, limit, words, image_size, circular) -%}
 {%- set text = labels[item] if labels and labels[item] is defined else item %}
 {%- if format == "date" %}{% set text = text | date(date_format or "%Y-%m-%d") %}
 {%- elif format == "datetime" %}{% set text = text | date(date_format or "%Y-%m-%d %H:%M") %}
-{%- elif format == "money" %}{% set text = text | money(currency=currency, decimals=decimals) %}
+{%- elif format == "money" %}{% set text = text | money(currency=currency, decimals=decimals, divide_by=divide_by) %}
 {%- elif format == "number" %}{% set text = text | number(decimals or 0) %}
 {%- endif %}
 {%- if words %}{% set text = text | words(words) %}{% endif %}
@@ -1014,7 +1014,8 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     `{% call entry("Customer") %}…{% endcall %}` the call block is the value.
 
     `format`: "date", "datetime" (`date_format` with chrono's codes), "since"
-    ("3 hours ago", the date as its tooltip), "money" (`APP_CURRENCY`, or `currency`),
+    ("3 hours ago", the date as its tooltip), "money" (`APP_CURRENCY`, or `currency`;
+    the value in its smallest unit, cents, unless `divide_by` says otherwise),
     "number" (`decimals`), "markdown", "bool" (a check and Yes, or a cross
     and No), "color" (a swatch), "image" (a URL; `image_size`, `circular`)
     or "key_value" (pairs or a map, such as `KeyValues`, as a table).
@@ -1054,7 +1055,7 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
   {%- endfor -%}
 </span>
 {%- endmacro -%}
-{% macro entry(label, value=none, format=none, badge=none, labels=none, url=none, new_tab=false, copyable=false, tooltip=none, placeholder="—", hint=none, prefix=none, suffix=none, limit=none, words=none, list="comma", limit_list=none, decimals=none, currency=none, date_format=none, image_size=40, circular=false, span=none, inline=false, hide_label=false, id=none, prefix_actions=none, suffix_actions=none) -%}
+{% macro entry(label, value=none, format=none, badge=none, labels=none, url=none, new_tab=false, copyable=false, tooltip=none, placeholder="—", hint=none, prefix=none, suffix=none, limit=none, words=none, list="comma", limit_list=none, decimals=none, currency=none, divide_by=none, date_format=none, image_size=40, circular=false, span=none, inline=false, hide_label=false, id=none, prefix_actions=none, suffix_actions=none) -%}
 <div class="rx-entry{% if span %} rx-span-{{ span }}{% endif %}{% if inline %} rx-entry--inline{% endif %}{% if format in ['money', 'number'] %} rx-entry--numeric{% endif %}{% if prefix_actions or suffix_actions %} rx-entry--actions{% endif %}"{% if id %} id="{{ id }}"{% endif %}>
   <dt class="rx-entry__label{% if hide_label %} rx-visually-hidden{% endif %}">{{ label }}</dt>
   <dd class="rx-entry__value"{% if tooltip %} title="{{ tooltip }}"{% endif %}>
@@ -1075,13 +1076,13 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
       {%- if prefix %}<span class="rx-entry__affix">{{ prefix }}</span>{% endif %}
       {%- if many and list in ["lines", "bullets"] %}
       <ul class="rx-entry__list rx-entry__list--{{ list }}"{% if list == 'lines' %} role="list"{% endif %}>
-        {%- for item in shown %}<li>{{ _entry_item(item, format, badge, labels, decimals, currency, date_format, limit, words, image_size, circular) }}</li>{% endfor -%}
+        {%- for item in shown %}<li>{{ _entry_item(item, format, badge, labels, decimals, currency, divide_by, date_format, limit, words, image_size, circular) }}</li>{% endfor -%}
       </ul>
       {%- elif many %}
       <span class="rx-entry__items{% if badge or format in ['image', 'color', 'bool'] %} rx-entry__items--row{% endif %}">
-        {%- for item in shown %}{{ _entry_item(item, format, badge, labels, decimals, currency, date_format, limit, words, image_size, circular) }}{% if not loop.last and not badge and format not in ['image', 'color', 'bool'] %}, {% endif %}{% endfor -%}
+        {%- for item in shown %}{{ _entry_item(item, format, badge, labels, decimals, currency, divide_by, date_format, limit, words, image_size, circular) }}{% if not loop.last and not badge and format not in ['image', 'color', 'bool'] %}, {% endif %}{% endfor -%}
       </span>
-      {%- else %}{{ _entry_item(value, format, badge, labels, decimals, currency, date_format, limit, words, image_size, circular) }}
+      {%- else %}{{ _entry_item(value, format, badge, labels, decimals, currency, divide_by, date_format, limit, words, image_size, circular) }}
       {%- endif %}
       {%- if suffix %}<span class="rx-entry__affix">{{ suffix }}</span>{% endif %}
     {%- endset %}
@@ -1094,11 +1095,11 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
       {%- set rest = items[limit_list:] %}
       {%- if list in ["lines", "bullets"] %}
       <ul class="rx-entry__list rx-entry__list--{{ list }}"{% if list == 'lines' %} role="list"{% endif %}>
-        {%- for item in rest %}<li>{{ _entry_item(item, format, badge, labels, decimals, currency, date_format, limit, words, image_size, circular) }}</li>{% endfor -%}
+        {%- for item in rest %}<li>{{ _entry_item(item, format, badge, labels, decimals, currency, divide_by, date_format, limit, words, image_size, circular) }}</li>{% endfor -%}
       </ul>
       {%- else %}
       <span class="rx-entry__items{% if badge or format in ['image', 'color', 'bool'] %} rx-entry__items--row{% endif %}">
-        {%- for item in rest %}{{ _entry_item(item, format, badge, labels, decimals, currency, date_format, limit, words, image_size, circular) }}{% if not loop.last and not badge and format not in ['image', 'color', 'bool'] %}, {% endif %}{% endfor -%}
+        {%- for item in rest %}{{ _entry_item(item, format, badge, labels, decimals, currency, divide_by, date_format, limit, words, image_size, circular) }}{% if not loop.last and not badge and format not in ['image', 'color', 'bool'] %}, {% endif %}{% endfor -%}
       </span>
       {%- endif %}
     </details>
