@@ -373,6 +373,18 @@ site/                      the documentation site (package `renox-site`, publish
                            content.rs PAGES (and site/build.rs already watches docs/).
                            The owner hosts it on their own server (not GitHub Pages: the
                            account's user site maps project sites to a personal domain)
+www/                       renox.rs: the landing page and blog (package `renox-www`, publish =
+                           false; #337), a Renox app compiled into one binary. src/landing.rs (the
+                           page's content as data, code coloured on the server with the docs'
+                           highlighter), src/blog.rs (posts = content/blog/*.md with front matter,
+                           compiled in by build.rs; adding a file adds the page, feed and sitemap
+                           entries), src/lib.rs (routes, JSON-LD, Atom feed, sitemap, llms.txt,
+                           llms-full.txt, /blog/{slug}.md), public/www.js (motion only: every word
+                           is in the HTML), content/benchmarks.json (from benchmarks/run.sh; the
+                           section hides while it is null), deploy/ (systemd, port 3090);
+                           .github/workflows/release-www.yml builds it for the owner's server.
+                           Links into the docs must name a page in site/src/content.rs PAGES
+                           (tests/www.rs checks)
 tests/chaos/               app + run.sh (postgres|sqlite) that the `chaos` CI job injects faults
                            into (docker pause/stop/restart, python3 holding SQLite's lock)
 tests/cli/run.sh           `rnx new` + every `make:*`, then build and test the app (CI `cli`/`docker`);
