@@ -217,7 +217,8 @@ describe('bikeshop in Spanish', () => {
         // The catalogue: Spanish texts, money with Spanish separators.
         await page.goto(`${app.url}/shop`);
         const shop = await page.text('main');
-        assert.match(shop, /Rp \d{1,3}(\.\d{3})+/, 'Rp 1.250.000, not Rp 1,250,000');
+        assert.match(shop, /\$\d{1,3}(\.\d{3})*,\d{2}\b/, '$1.249,99 in Spanish');
+        assert.doesNotMatch(shop, /\$\d{1,3}(,\d{3})*\.\d{2}\b/, 'not $1,249.99');
         assert.ok(await fitsWidth(page));
         await shot(page, `shop-es-${size}`);
         // The index of every page, in Spanish.

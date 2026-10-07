@@ -32,7 +32,7 @@ impl Factory for ServiceTask {
             name: format!("Task {n}"),
             slug: format!("task-{n}"),
             minutes: (2..10).fake::<i64>() * 10,
-            price: (5..40).fake::<i64>() * 10_000,
+            price: (20..80).fake::<i64>() * 100,
             ..Default::default()
         }
     }
@@ -126,7 +126,7 @@ impl Factory for WorkOrderTask {
     fn definition() -> Self {
         WorkOrderTask {
             minutes: 30,
-            price: 90_000,
+            price: 3_000,
             ..Default::default()
         }
     }

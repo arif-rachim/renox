@@ -77,9 +77,9 @@ async fn world() -> World {
         .await
         .unwrap();
     let mut bike = fixtures::bike(db, north.id, north.id).await.unwrap();
-    bike.hourly_rate = 30_000;
-    bike.daily_rate = 150_000;
-    bike.deposit = 500_000;
+    bike.hourly_rate = 1_500;
+    bike.daily_rate = 6_000;
+    bike.deposit = 30_000;
     bike.save(db).await.unwrap();
     World {
         app,
@@ -160,7 +160,7 @@ async fn a_bike_owned_by_north_rented_out_by_south_books_revenue_to_north_and_a_
         .create_one(db)
         .await
         .unwrap();
-    rental.price = 90_000;
+    rental.price = 4_500;
     rental.deposit_status = DepositStatus::Held;
     rental.due_at = renox::db::now() + HOUR;
     rental.save(db).await.unwrap();
@@ -177,7 +177,7 @@ async fn a_bike_owned_by_north_rented_out_by_south_books_revenue_to_north_and_a_
             &format!("/staff/rentals/{}/return", rental.id),
             &[
                 ("damaged", "on"),
-                ("damage_fee", "200000"),
+                ("damage_fee", "80"),
                 ("damage_note", "Bent wheel"),
                 ("method", "card"),
             ],
@@ -196,11 +196,11 @@ async fn a_bike_owned_by_north_rented_out_by_south_books_revenue_to_north_and_a_
     // and damage fees to the owner; the deposit isn't booked.
     assert_eq!(
         owed(&entries, w.south.id, w.north.id, EntryKind::RentalRevenue),
-        90_000
+        4_500
     );
     assert_eq!(
         owed(&entries, w.north.id, w.south.id, EntryKind::OperatingFee),
-        fee(90_000, w.south.fee_rate_bp)
+        fee(4_500, w.south.fee_rate_bp)
     );
     assert_eq!(
         owed(&entries, w.south.id, w.north.id, EntryKind::LateFee),
@@ -208,7 +208,7 @@ async fn a_bike_owned_by_north_rented_out_by_south_books_revenue_to_north_and_a_
     );
     assert_eq!(
         owed(&entries, w.south.id, w.north.id, EntryKind::DamageFee),
-        200_000
+        8_000
     );
     assert_eq!(entries.len(), 4);
     let fee_entry = entries
@@ -230,7 +230,7 @@ async fn a_bike_owned_by_north_rented_out_by_south_books_revenue_to_north_and_a_
 
     // A rental of North's bike served by North books nothing.
     let mut home_bike = fixtures::bike(db, w.north.id, w.north.id).await.unwrap();
-    home_bike.daily_rate = 100_000;
+    home_bike.daily_rate = 4_000;
     home_bike.save(db).await.unwrap();
     let own = rentals()
         .of_bike(&home_bike)
@@ -252,7 +252,7 @@ async fn a_fleet_repair_by_another_store_is_charged_to_the_owner() {
         .await
         .unwrap();
     order.billed_store_id = Some(w.north.id);
-    order.total = 175_000;
+    order.total = 17_500;
     order.save(db).await.unwrap();
     status::set_status(w.app.state(), &mut order, WorkStatus::Completed)
         .await
@@ -263,7 +263,7 @@ async fn a_fleet_repair_by_another_store_is_charged_to_the_owner() {
         .unwrap();
     assert_eq!(
         owed(&entries, w.north.id, w.west.id, EntryKind::Repair),
-        175_000
+        17_500
     );
     assert_eq!(entries.len(), 1);
     company_adds_up(&entries);
@@ -274,7 +274,7 @@ async fn consigned_sales_and_returns_book_both_ways_and_the_rate_in_force_is_cop
     let w = world().await;
     let db = w.app.db();
     let mut tx = db.begin().await.unwrap();
-    books::consigned_sale(&mut tx, 77, w.south.id, w.north.id, 400_000, false)
+    books::consigned_sale(&mut tx, 77, w.south.id, w.north.id, 40_000, false)
         .await
         .unwrap();
     tx.commit().await.unwrap();
@@ -284,7 +284,7 @@ async fn consigned_sales_and_returns_book_both_ways_and_the_rate_in_force_is_cop
         .await
         .unwrap();
     let mut tx = db.begin().await.unwrap();
-    books::consigned_sale(&mut tx, 77, w.south.id, w.north.id, 400_000, true)
+    books::consigned_sale(&mut tx, 77, w.south.id, w.north.id, 40_000, true)
         .await
         .unwrap();
     tx.commit().await.unwrap();
@@ -296,16 +296,16 @@ async fn consigned_sales_and_returns_book_both_ways_and_the_rate_in_force_is_cop
     assert_eq!(entries.len(), 4);
     assert_eq!(
         (entries[1].kind, entries[1].amount, entries[1].fee_rate_bp),
-        (EntryKind::SellingFee, 80_000, Some(2_000))
+        (EntryKind::SellingFee, 8_000, Some(2_000))
     );
     assert_eq!(
         (entries[3].kind, entries[3].amount, entries[3].fee_rate_bp),
-        (EntryKind::SellingFee, 100_000, Some(2_500))
+        (EntryKind::SellingFee, 10_000, Some(2_500))
     );
     // The return reverses the sale.
     assert_eq!(
         owed(&entries, w.north.id, w.south.id, EntryKind::SaleRevenue),
-        400_000
+        40_000
     );
     company_adds_up(&entries);
 }
@@ -691,11 +691,11 @@ async fn monthly_settlements_balance_per_pair_and_both_stores_confirm() {
     let last_month = settlements::month_of(settlements::month_of(today) - Span::days(1));
     let at = last_month.and_hms_opt(12, 0, 0).unwrap().and_utc() + Span::days(3);
     let (n, s, x) = (w.north.id, w.south.id, w.west.id);
-    entry(db, s, n, 900_000, at).await;
-    entry(db, n, s, 180_000, at).await;
-    entry(db, s, n, 50_000, at).await;
-    entry(db, n, x, 120_000, at).await;
-    entry(db, x, n, 30_000, at).await;
+    entry(db, s, n, 90_000, at).await;
+    entry(db, n, s, 18_000, at).await;
+    entry(db, s, n, 5_000, at).await;
+    entry(db, n, x, 12_000, at).await;
+    entry(db, x, n, 3_000, at).await;
     // This month's entry waits for next month.
     entry(db, s, n, 1_000, renox::db::now()).await;
 
@@ -711,7 +711,7 @@ async fn monthly_settlements_balance_per_pair_and_both_stores_confirm() {
         .unwrap();
     assert_eq!(
         (ns.debtor_store_id, ns.creditor_store_id, ns.amount),
-        (s, n, 770_000)
+        (s, n, 77_000)
     );
     let nw = made
         .iter()
@@ -719,7 +719,7 @@ async fn monthly_settlements_balance_per_pair_and_both_stores_confirm() {
         .unwrap();
     assert_eq!(
         (nw.debtor_store_id, nw.creditor_store_id, nw.amount),
-        (n, x, 90_000)
+        (n, x, 9_000)
     );
     // Each settlement holds exactly its pair's entries, and nets them.
     for settlement in &made {
@@ -777,7 +777,7 @@ async fn monthly_settlements_balance_per_pair_and_both_stores_confirm() {
     // Confirmed by both stores: managers may see but not settle; the owner settles either side.
     let url = format!("/staff/books/settlements/{}", ns.id);
     w.app.acting_as(&w.manager_south);
-    w.app.get(&url).await.assert_ok().assert_see("770,000");
+    w.app.get(&url).await.assert_ok().assert_see("$770.00");
     w.app
         .post(&format!("{url}/confirm"), &[("side", "debtor")])
         .await

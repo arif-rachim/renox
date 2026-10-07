@@ -10,7 +10,7 @@ use crate::seed::today;
 impl Factory for IntercompanyEntry {
     fn definition() -> Self {
         IntercompanyEntry {
-            amount: 100_000,
+            amount: 10_000,
             kind: EntryKind::RentalRevenue,
             booked_at: renox::db::now(),
             ..Default::default()

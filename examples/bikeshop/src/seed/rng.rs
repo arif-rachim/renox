@@ -53,9 +53,16 @@ impl Rng {
         weights.len() - 1
     }
 
-    /// A price rounded to a thousand, between `low` and `high`.
+    /// A price in whole dollars between `low` and `high` (cents): `4500`
+    /// for $45.00, for rates and fees.
     pub fn price(&mut self, low: i64, high: i64) -> i64 {
-        self.range(low / 1_000, high / 1_000 + 1) * 1_000
+        self.range(low / 100, high / 100 + 1) * 100
+    }
+
+    /// A shelf price between `low` and `high` (cents), ending in 9.99 as
+    /// shops write them: $19.99, $1,249.99.
+    pub fn retail(&mut self, low: i64, high: i64) -> i64 {
+        (self.range(low / 1_000, high / 1_000 + 1) * 1_000).max(1_000) - 1
     }
 }
 

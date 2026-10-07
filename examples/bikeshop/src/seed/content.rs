@@ -1,7 +1,7 @@
 //! What the demo shop sells and where it is: categories, brands, model
 //! names, places, people's names and service tasks. English content; the
-//! prices are in rupiah (`APP_CURRENCY=IDR` in `.env.example`), in the
-//! smallest unit like all money in the app.
+//! prices are in US dollars (`APP_CURRENCY=USD` in `.env.example`), in
+//! cents, the smallest unit, like all money in the app.
 
 use crate::app::catalog::model::CategoryKind;
 
@@ -18,7 +18,7 @@ pub struct CategorySpec {
     pub sizes: &'static [&'static str],
     /// Colours of the variants (`&[]`: one colour).
     pub colours: &'static [&'static str],
-    /// Price range (rupiah).
+    /// Price range (cents).
     pub price: (i64, i64),
     /// Specification keys and their possible values.
     pub specs: &'static [(&'static str, &'static [&'static str])],
@@ -46,7 +46,7 @@ pub const CATEGORIES: &[CategorySpec] = &[
         brands: &["Trek", "Specialized", "Giant", "Cannondale", "Orbea"],
         sizes: &["50 cm", "52 cm", "54 cm", "56 cm", "58 cm"],
         colours: &["Black", "Blue", "Red"],
-        price: (12_000_000, 85_000_000),
+        price: (120_000, 850_000),
         specs: &[FRAME, ("Wheels", &["700c"]), GEARS, BRAKES, WEIGHT],
     },
     CategorySpec {
@@ -66,7 +66,7 @@ pub const CATEGORIES: &[CategorySpec] = &[
         brands: &["Trek", "Specialized", "Giant", "Cannondale", "Orbea"],
         sizes: &["S", "M", "L", "XL"],
         colours: &["Green", "Black", "Orange"],
-        price: (8_000_000, 70_000_000),
+        price: (80_000, 700_000),
         specs: &[
             FRAME,
             ("Wheels", &["27.5\"", "29\""]),
@@ -85,7 +85,7 @@ pub const CATEGORIES: &[CategorySpec] = &[
         brands: &["Trek", "Specialized", "Giant", "Cannondale", "Orbea"],
         sizes: &["S", "M", "L"],
         colours: &["Grey", "White", "Teal"],
-        price: (5_000_000, 18_000_000),
+        price: (50_000, 180_000),
         specs: &[
             FRAME,
             ("Wheels", &["700c"]),
@@ -102,7 +102,7 @@ pub const CATEGORIES: &[CategorySpec] = &[
         brands: &["Brompton"],
         sizes: &["One size"],
         colours: &["Racing Green", "Black", "Flame Lacquer"],
-        price: (18_000_000, 45_000_000),
+        price: (90_000, 320_000),
         specs: &[
             FRAME,
             ("Wheels", &["16\""]),
@@ -125,7 +125,7 @@ pub const CATEGORIES: &[CategorySpec] = &[
         brands: &["Trek", "Specialized", "Giant", "Cannondale", "Orbea"],
         sizes: &["S", "M", "L"],
         colours: &["Black", "Silver"],
-        price: (25_000_000, 95_000_000),
+        price: (250_000, 900_000),
         specs: &[
             FRAME,
             (
@@ -144,7 +144,7 @@ pub const CATEGORIES: &[CategorySpec] = &[
         brands: &["Trek", "Specialized", "Giant", "Orbea"],
         sizes: &["16\"", "20\"", "24\""],
         colours: &["Purple", "Yellow", "Blue"],
-        price: (2_500_000, 7_500_000),
+        price: (25_000, 75_000),
         specs: &[FRAME, ("Gears", &["Single speed", "1 × 7"])],
     },
     CategorySpec {
@@ -155,7 +155,7 @@ pub const CATEGORIES: &[CategorySpec] = &[
         brands: &["Giro", "POC"],
         sizes: &["S", "M", "L"],
         colours: &["Matte Black", "White", "Hi-vis Yellow"],
-        price: (450_000, 4_500_000),
+        price: (4_500, 30_000),
         specs: &[
             ("MIPS", &["Yes", "No"]),
             ("Certification", &["CPSC", "EN 1078"]),
@@ -175,7 +175,7 @@ pub const CATEGORIES: &[CategorySpec] = &[
         brands: &["Lezyne", "Knog"],
         sizes: &[],
         colours: &[],
-        price: (250_000, 2_200_000),
+        price: (2_500, 22_000),
         specs: &[
             ("Output", &["100 lm", "400 lm", "800 lm", "1200 lm"]),
             ("Charging", &["USB-C"]),
@@ -189,7 +189,7 @@ pub const CATEGORIES: &[CategorySpec] = &[
         brands: &["Abus", "Kryptonite"],
         sizes: &[],
         colours: &[],
-        price: (350_000, 2_600_000),
+        price: (3_500, 16_000),
         specs: &[
             ("Security level", &["7/15", "10/15", "15/15"]),
             ("Kind", &["U-lock", "Folding", "Chain"]),
@@ -209,7 +209,7 @@ pub const CATEGORIES: &[CategorySpec] = &[
         brands: &["POC", "Giro"],
         sizes: &["XS", "S", "M", "L", "XL"],
         colours: &["Black", "Navy"],
-        price: (300_000, 3_500_000),
+        price: (3_000, 25_000),
         specs: &[("Material", &["Polyester", "Merino", "Nylon"])],
     },
     CategorySpec {
@@ -220,7 +220,7 @@ pub const CATEGORIES: &[CategorySpec] = &[
         brands: &["Ortlieb"],
         sizes: &[],
         colours: &["Black", "Signal Red"],
-        price: (900_000, 3_200_000),
+        price: (6_000, 22_000),
         specs: &[
             ("Volume", &["5 l", "11 l", "20 l", "40 l"]),
             ("Waterproof", &["Yes"]),
@@ -234,7 +234,7 @@ pub const CATEGORIES: &[CategorySpec] = &[
         brands: &["Shimano", "SRAM"],
         sizes: &[],
         colours: &[],
-        price: (250_000, 1_100_000),
+        price: (2_000, 9_000),
         specs: &[("Speeds", &["8", "11", "12"])],
     },
     CategorySpec {
@@ -251,7 +251,7 @@ pub const CATEGORIES: &[CategorySpec] = &[
         brands: &["Continental", "Schwalbe"],
         sizes: &["700 × 25c", "700 × 28c", "29 × 2.35", "16 × 1.35"],
         colours: &[],
-        price: (300_000, 1_300_000),
+        price: (3_000, 11_000),
         specs: &[("Puncture protection", &["Yes", "No"])],
     },
     CategorySpec {
@@ -267,7 +267,7 @@ pub const CATEGORIES: &[CategorySpec] = &[
         brands: &["Shimano", "SRAM"],
         sizes: &[],
         colours: &[],
-        price: (120_000, 900_000),
+        price: (1_500, 18_000),
         specs: &[("Kind", &["Resin", "Metal", "Rotor"])],
     },
     CategorySpec {
@@ -283,7 +283,7 @@ pub const CATEGORIES: &[CategorySpec] = &[
         brands: &["Shimano", "SRAM"],
         sizes: &[],
         colours: &[],
-        price: (400_000, 4_500_000),
+        price: (4_000, 35_000),
         specs: &[("Speeds", &["11", "12"])],
     },
     CategorySpec {
@@ -294,7 +294,7 @@ pub const CATEGORIES: &[CategorySpec] = &[
         brands: &["Brooks", "Specialized"],
         sizes: &["143 mm", "155 mm"],
         colours: &[],
-        price: (650_000, 3_000_000),
+        price: (4_000, 20_000),
         specs: &[("Rails", &["Steel", "Titanium", "Carbon"])],
     },
 ];
@@ -439,23 +439,23 @@ pub const STREETS: &[&str] = &[
     "Hauptstrasse",
 ];
 
-/// Service tasks: name, slug, minutes, price (rupiah).
+/// Service tasks: name, slug, minutes, price (cents).
 pub const SERVICE_TASKS: &[(&str, &str, i64, i64)] = &[
-    ("Safety check", "safety-check", 20, 75_000),
-    ("Tyre and tube change", "tyre-change", 20, 60_000),
-    ("Brake adjustment", "brake-adjustment", 25, 90_000),
-    ("Brake pads replacement", "brake-pads", 30, 110_000),
-    ("Gear indexing", "gear-indexing", 25, 90_000),
-    ("Chain clean and lube", "chain-clean", 20, 60_000),
-    ("Chain replacement", "chain-replacement", 20, 80_000),
-    ("Wheel truing", "wheel-truing", 40, 140_000),
-    ("Hydraulic brake bleed", "brake-bleed", 45, 200_000),
-    ("Suspension service", "suspension-service", 90, 450_000),
-    ("E-bike diagnostics", "ebike-diagnostics", 40, 180_000),
-    ("Full service", "full-service", 150, 650_000),
+    ("Safety check", "safety-check", 20, 3_000),
+    ("Tyre and tube change", "tyre-change", 20, 2_000),
+    ("Brake adjustment", "brake-adjustment", 25, 2_500),
+    ("Brake pads replacement", "brake-pads", 30, 3_500),
+    ("Gear indexing", "gear-indexing", 25, 2_500),
+    ("Chain clean and lube", "chain-clean", 20, 2_000),
+    ("Chain replacement", "chain-replacement", 20, 2_500),
+    ("Wheel truing", "wheel-truing", 40, 3_500),
+    ("Hydraulic brake bleed", "brake-bleed", 45, 6_000),
+    ("Suspension service", "suspension-service", 90, 15_000),
+    ("E-bike diagnostics", "ebike-diagnostics", 40, 6_000),
+    ("Full service", "full-service", 150, 15_000),
 ];
 
-/// Service plans: name, slug, frequency, price (rupiah), description, task slugs.
+/// Service plans: name, slug, frequency, price per visit (cents), description, task slugs.
 pub type PlanSpec = (
     &'static str,
     &'static str,
@@ -471,7 +471,7 @@ pub const SERVICE_PLANS: &[PlanSpec] = &[
         "Commuter check",
         "commuter-check",
         "weekly",
-        60_000,
+        800,
         "A quick look every week: tyres, brakes and chain, so the daily ride never stops.",
         &["safety-check", "chain-clean"],
     ),
@@ -479,7 +479,7 @@ pub const SERVICE_PLANS: &[PlanSpec] = &[
         "E-bike care",
         "ebike-care",
         "fortnightly",
-        180_000,
+        3_000,
         "Every two weeks: diagnostics, brakes and drivetrain for bikes with a motor.",
         &["ebike-diagnostics", "brake-adjustment", "chain-clean"],
     ),
@@ -487,7 +487,7 @@ pub const SERVICE_PLANS: &[PlanSpec] = &[
         "Monthly tune-up",
         "monthly-tune-up",
         "monthly",
-        250_000,
+        6_000,
         "Once a month: gears indexed, brakes adjusted, chain cleaned and the bike checked.",
         &[
             "safety-check",
@@ -500,7 +500,7 @@ pub const SERVICE_PLANS: &[PlanSpec] = &[
         "Quarterly full service",
         "quarterly-full-service",
         "quarterly",
-        600_000,
+        21_000,
         "Every three months the full service, with wheel truing and a brake bleed.",
         &["full-service", "wheel-truing", "brake-bleed"],
     ),

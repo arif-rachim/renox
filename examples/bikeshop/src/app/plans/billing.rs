@@ -13,14 +13,22 @@
 //! **Keys.** A plan paid by card is the service plan's slug
 //! (`monthly-tune-up`): Stripe when `STRIPE_SECRET` is set, else the
 //! [demo gateway](super::demo) (local only). The same plan paid through
-//! Xendit, in rupiah by card or e-wallet, is `monthly-tune-up-xendit`
+//! Xendit, by card or e-wallet, is `monthly-tune-up-xendit`
 //! (`.via("xendit")`), offered when `XENDIT_SECRET_KEY` is set.
 //!
+//! **Currencies.** The shop's prices are US dollars (`APP_CURRENCY=USD`,
+//! amounts in cents), and the card plans are charged in [`CURRENCY`].
+//! Xendit only charges rupiah, so the Xendit copies carry their own price
+//! in [`XENDIT_CURRENCY`]: the dollar price at the shop's fixed rate
+//! [`RUPIAH_PER_DOLLAR`], rounded to a thousand rupiah ([`xendit_price`]).
+//! The subscribe form says so next to the Xendit choice, and the
+//! customer's invoices are shown in the currency they were paid in.
+//!
 //! **Prices.** A service plan's price is per visit; every plan is charged
-//! monthly ([`monthly_price`]): a weekly check at 60,000 a visit is 260,000
-//! a month. Plan changes take effect from the next period
-//! (`without_proration`), and after subscribing, changing or cancelling the
-//! customer comes back to their plans (`redirect_to`).
+//! monthly ([`monthly_price`]): a weekly check at $8.00 a visit is $35.00
+//! a month (Rp 560,000 through Xendit). Plan changes take effect from the
+//! next period (`without_proration`), and after subscribing, changing or
+//! cancelling the customer comes back to their plans (`redirect_to`).
 
 use renox::Config;
 use renox_billing::{Billing, Gateway, Interval, Plan, Stripe, Xendit};
@@ -29,15 +37,30 @@ use super::demo::DemoGateway;
 use super::model::{Frequency, monthly_price};
 use crate::seed::content::{SERVICE_PLANS, SERVICE_TASKS};
 
-/// The currency plans are charged in (the shop's prices are rupiah).
-pub const CURRENCY: &str = "IDR";
+/// The currency card plans are charged in (the shop's prices are dollars).
+pub const CURRENCY: &str = "USD";
+
+/// The currency of the Xendit plans: Xendit only charges rupiah.
+pub const XENDIT_CURRENCY: &str = "IDR";
+
+/// Rupiah to the dollar for the Xendit plans' prices: a rate the shop
+/// fixes (a plan's price can't change under a subscriber), not a live one.
+pub const RUPIAH_PER_DOLLAR: i64 = 16_000;
+
+/// A monthly price in cents as the Xendit plan's price in rupiah, rounded
+/// to a thousand: $35.00 → Rp 560,000.
+pub fn xendit_price(cents: i64) -> i64 {
+    let rupiah = cents * RUPIAH_PER_DOLLAR / 100;
+    (rupiah + 500) / 1_000 * 1_000
+}
 
 /// How a customer pays for a plan, as the subscribe form offers it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PayWith {
     /// A card: Stripe, or the demo gateway without Stripe's keys.
     Card,
-    /// Xendit: a card or an e-wallet, in rupiah.
+    /// Xendit: a card or an e-wallet, charged in rupiah
+    /// ([`XENDIT_CURRENCY`]).
     Xendit,
 }
 
@@ -95,9 +118,9 @@ pub fn billing() -> Billing {
             .filter(|(_, task, _, _)| task_slugs.contains(task))
             .map(|(task, _, _, _)| *task)
             .collect();
-        let plan = |key: String, label: String| {
+        let plan = |key: String, label: String, (amount, currency): (i64, &str)| {
             let mut plan = Plan::new(key, label)
-                .price(monthly, CURRENCY, Interval::Month)
+                .price(amount, currency, Interval::Month)
                 .description(*description);
             for feature in &features {
                 plan = plan.feature(*feature);
@@ -105,11 +128,16 @@ pub fn billing() -> Billing {
             plan
         };
         billing = billing
-            .plan(plan(billing_key(slug, PayWith::Card), (*name).to_owned()))
+            .plan(plan(
+                billing_key(slug, PayWith::Card),
+                (*name).to_owned(),
+                (monthly, CURRENCY),
+            ))
             .plan(
                 plan(
                     billing_key(slug, PayWith::Xendit),
                     format!("{name} (Xendit)"),
+                    (xendit_price(monthly), XENDIT_CURRENCY),
                 )
                 .via("xendit"),
             );

@@ -4,9 +4,9 @@
 
     {% from "blocks/compare_plans.html" import compare_plans %}
     {{ compare_plans([
-         {"key": "basic", "name": "Basic", "price": 150000, "interval": "month",
+         {"key": "basic", "name": "Basic", "price": 2900, "interval": "month",
           "description": "One check-up a month.", "url": route('plans.show', 'basic'), "perks": ["Monthly check-up"]},
-         {"key": "rider", "name": "Rider", "price": 300000, "interval": "month", "url": route('plans.show', 'rider')}
+         {"key": "rider", "name": "Rider", "price": 4900, "interval": "month", "url": route('plans.show', 'rider')}
        ], [
          {"label": "Visits a month", "values": {"basic": "1", "rider": "2"}},
          {"label": "Pickup and delivery", "values": {"basic": false, "rider": true}}

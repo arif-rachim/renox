@@ -20,9 +20,9 @@
           {{ select("level", t('stock.fleet.bike'), options, required=true, searchable=true) }}
           {% call form_grid(2) %}
             {{ input("frame_number", t('stock.fleet.frame'), required=true) }}
-            {{ input("deposit", t('stock.fleet.deposit'), type="number", required=true, attrs={"min": 0}) }}
-            {{ input("hourly_rate", t('stock.fleet.hourly'), type="number", required=true, attrs={"min": 0}) }}
-            {{ input("daily_rate", t('stock.fleet.daily'), type="number", required=true, attrs={"min": 0}) }}
+            {{ input("deposit", t('stock.fleet.deposit'), type="number", required=true, attrs={"min": 0, "step": money_step}, prefix=money_symbol) }}
+            {{ input("hourly_rate", t('stock.fleet.hourly'), type="number", required=true, attrs={"min": 0, "step": money_step}, prefix=money_symbol) }}
+            {{ input("daily_rate", t('stock.fleet.daily'), type="number", required=true, attrs={"min": 0, "step": money_step}, prefix=money_symbol) }}
           {% endcall %}
           {{ button(t('stock.fleet.add'), icon="plus") }}
         </form>

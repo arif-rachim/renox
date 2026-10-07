@@ -6,6 +6,9 @@
 //! `state.http`) and the customer pays there; Midtrans then calls
 //! `POST /webhooks/midtrans` with an HTTP notification whose `signature_key`
 //! is the SHA-512 of order id, status code, amount and the server key.
+//! Midtrans only charges rupiah: with a real key the shop runs with
+//! `APP_CURRENCY=IDR` (amounts are then whole rupiah, as Midtrans counts
+//! them). The demo gateway takes the shop's dollars (cents) as they are.
 //!
 //! **The demo gateway**, without a key: a page of the app itself
 //! (`/pay/demo/{payment}`, a signed URL) stands in for Midtrans' page, so
@@ -80,7 +83,9 @@ pub fn signature(order_id: &str, status_code: &str, gross_amount: &str, key: &st
     webhook::sha512_hex(format!("{order_id}{status_code}{gross_amount}{key}"))
 }
 
-/// An amount as Midtrans writes it: `450000.00`.
+/// An amount as Midtrans writes it: `450000.00` (whole rupiah). The demo
+/// gateway writes the shop's smallest unit (cents) the same way, signed and
+/// checked alike.
 pub fn gross(amount: i64) -> String {
     format!("{amount}.00")
 }

@@ -118,7 +118,7 @@ impl Factory for PurchaseOrderLine {
     fn definition() -> Self {
         PurchaseOrderLine {
             quantity: (2..12).fake(),
-            unit_cost: (10..500).fake::<i64>() * 10_000,
+            unit_cost: (10..500).fake::<i64>() * 100,
             ..Default::default()
         }
     }

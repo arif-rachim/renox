@@ -89,9 +89,9 @@ async fn world(app: &TestApp) -> World {
     let db = app.db();
     let north = fixtures::store(db, "North").await.unwrap();
     let south = fixtures::store(db, "South").await.unwrap();
-    let helmet = variant(db, "Helmet", CategoryKind::Gear, 450_000).await;
-    let chain = variant(db, "Chain", CategoryKind::Part, 200_000).await;
-    let bike = variant(db, "Road bike", CategoryKind::Bike, 12_000_000).await;
+    let helmet = variant(db, "Helmet", CategoryKind::Gear, 9_000).await;
+    let chain = variant(db, "Chain", CategoryKind::Part, 3_000).await;
+    let bike = variant(db, "Road bike", CategoryKind::Bike, 120_000).await;
     stock(db, helmet.id, north.id, 3).await;
     stock(db, helmet.id, south.id, 1).await;
     stock(db, chain.id, north.id, 10).await;
@@ -439,7 +439,7 @@ async fn a_guest_order_is_reserved_then_paid_by_the_signed_webhook() {
     let order = last_order(&app).await;
     assert_eq!(order.status, OrderStatus::Pending);
     assert_eq!(order.channel, Channel::Online);
-    assert_eq!(order.total, 12_000_000 + 2 * 200_000);
+    assert_eq!(order.total, 120_000 + 2 * 3_000);
     assert_eq!(order.locale.as_deref(), Some("en"));
     assert_eq!(level(&app, w.bike.id, w.north.id).await, (1, 1));
     assert_eq!(level(&app, w.chain.id, w.north.id).await, (10, 2));
@@ -745,11 +745,8 @@ async fn customers_get_their_cart_mails_notifications_and_the_plan_discount() {
         .assert_status(303);
     let order = last_order(&app).await;
     assert_eq!(order.customer_id, Some(me.id), "the account's customer");
-    assert_eq!(
-        order.discount, 20_000,
-        "10 % of the chain, not of the helmet"
-    );
-    assert_eq!(order.total, 200_000 + 450_000 - 20_000);
+    assert_eq!(order.discount, 300, "10 % of the chain, not of the helmet");
+    assert_eq!(order.total, 3_000 + 9_000 - 300);
     gateway_says(&app, &order, "settlement").await.assert_ok();
     app.run_jobs().await;
     let notes: i64 = renox::db::sql("SELECT COUNT(*) FROM notifications WHERE user_id = ?")
@@ -884,7 +881,7 @@ async fn staff_move_orders_on_and_take_returns_within_fourteen_days() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(refund.amount, 2 * 200_000);
+    assert_eq!(refund.amount, 2 * 3_000);
     let order = Order::find(db, order.id).await.unwrap().unwrap();
     assert_eq!(
         order.status,
@@ -949,7 +946,7 @@ async fn a_counter_sale_follows_the_same_rules() {
     let res = app
         .post(
             "/staff/counter/pay",
-            &[("method", "cash"), ("tendered", "1000000")],
+            &[("method", "cash"), ("tendered", "200.50")],
         )
         .await;
     res.assert_status(303);
@@ -969,13 +966,15 @@ async fn a_counter_sale_follows_the_same_rules() {
         .unwrap();
     assert_eq!(
         (payment.method, payment.status, payment.amount),
-        (PaymentMethod::Cash, PaymentStatus::Paid, 900_000)
+        (PaymentMethod::Cash, PaymentStatus::Paid, 18_000)
     );
     app.get(&format!("/orders/{}/invoice?receipt=1", order.id))
         .await
         .assert_ok()
         .assert_see("Receipt")
-        .assert_see("Change to give");
+        .assert_see("Change to give")
+        // $200.50 handed over for $180.00: the change is in cents too.
+        .assert_see("$20.50");
 }
 
 #[renox::test]

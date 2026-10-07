@@ -47,12 +47,12 @@ struct World {
 /// Three stores and their people, and one of each kind of income in the
 /// last week:
 ///
-/// | What | Owner store (books) | Operating store (work) | Amount |
+/// | What | Owner store (books) | Operating store (work) | Amount (cents in the code) |
 /// |---|---|---|---|
-/// | A rental of North's bike, rented out at South, back late | North | South | 100,000 + 20,000 late fee |
-/// | An order at South: a line of North's consigned goods and one of South's | North / South | South | 50,000 + 30,000 |
-/// | A service at West | West | West | 40,000 |
-/// | A plan visit at North | North | North | 25,000 |
+/// | A rental of North's bike, rented out at South, back late | North | South | $1,000 + $200 late fee |
+/// | An order at South: a line of North's consigned goods and one of South's | North / South | South | $500 + $300 |
+/// | A service at West | West | West | $400 |
+/// | A plan visit at North | North | North | $250 |
 async fn world() -> World {
     let app = TestApp::new(bikeshop::app()).await;
     let db = app.db().clone();
@@ -211,7 +211,7 @@ async fn the_numbers_match_the_data_by_work_and_by_books() {
     assert_eq!(stream(&north, "plans"), 25_000);
     assert_eq!(north.revenue, 25_000);
     assert_eq!(north.active_plans, 1);
-    assert_eq!(north.recurring_monthly, 250_000);
+    assert_eq!(north.recurring_monthly, 6_000);
 
     // In whose books: North's bike and goods, wherever they earned.
     let north = numbers(&w, Some(w.north.id), By::Books, week).await;
@@ -413,9 +413,14 @@ async fn the_grids_filter_group_sum_and_export() {
         .await;
     none.assert_ok();
     none.assert_dont_see(&w.order.number);
-    // The advanced filter: totals over 100,000 (whole units) — none.
+    // The advanced filter, in whole units: the order's $800.00 is over
+    // $500, not over $1,000.
     w.app
-        .get("/staff/reports/orders?r.0.c=total&r.0.o=gt&r.0.v=100000")
+        .get("/staff/reports/orders?r.0.c=total&r.0.o=gt&r.0.v=500")
+        .await
+        .assert_see(&w.order.number);
+    w.app
+        .get("/staff/reports/orders?r.0.c=total&r.0.o=gt&r.0.v=1000")
         .await
         .assert_dont_see(&w.order.number);
 

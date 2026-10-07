@@ -86,7 +86,7 @@
           {{ checkbox_list("checklist", t('rentals.desk.checklist'), items.list, selected=old('checklist', checklist | list), columns=2) }}
           {{ checkbox("damaged", t('rentals.desk.damaged'), checked=(old('damaged', '') == 'on'), switch=true) }}
           {% call show_when("damaged", ["on", "true", "1"]) %}
-            {{ input("damage_fee", t('rentals.fields.damage_fee'), type="number", attrs={"min": 0, "step": 1000}, prefix="Rp") }}
+            {{ input("damage_fee", t('rentals.fields.damage_fee'), type="number", attrs={"min": 0, "step": money_step}, prefix=money_symbol) }}
             {{ textarea("damage_note", t('rentals.desk.damage_note'), rows=3) }}
             {{ file("photos", t('rentals.desk.damage_photos'), accept="image/*", multiple=true, preview=true, hint=t('rentals.desk.photos_hint')) }}
           {% endcall %}

@@ -13,7 +13,7 @@
     {%- if need and row.available < row.reorder_level %} · {{ t('stock.purchasing.low', available=row.available, level=row.reorder_level) }}{% endif %}
     {%- if need and not row.sold_by_supplier %} · {{ t('stock.purchasing.not_listed') }}{% endif %}</small></span>
   <span class="bs-row__figure bs-row__figure--extra">{{ row.reorder_level or "—" }}</span>
-  <span>{{ input("lines[" ~ i ~ "][unit_cost]", t('stock.purchasing.unit_cost_of', name=row.name), type="number", value=row.unit_cost, hide_label=true, attrs={"min": 0}) }}</span>
+  <span>{{ input("lines[" ~ i ~ "][unit_cost]", t('stock.purchasing.unit_cost_of', name=row.name), type="number", value=(row.unit_cost / money_scale), hide_label=true, attrs={"min": 0, "step": money_step}) }}</span>
   <span><input type="hidden" name="lines[{{ i }}][variant]" value="{{ row.variant_id }}">{{ input("lines[" ~ i ~ "][quantity]", t('stock.purchasing.quantity_of', name=row.name), type="number", value=(row.quantity if need else none), hide_label=true, attrs={"min": 0, "inputmode": "numeric"}) }}</span>
 </li>
 {%- endmacro %}

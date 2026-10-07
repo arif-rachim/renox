@@ -623,7 +623,7 @@ async fn deleting_the_account_leaves_no_personal_data_and_keeps_the_books() {
     let order = orders()
         .at(north.id)
         .for_customer(customer.id)
-        .totalling(1_250_000)
+        .totalling(125_000)
         .paid()
         .create_one(app.db())
         .await
@@ -681,7 +681,7 @@ async fn deleting_the_account_leaves_no_personal_data_and_keeps_the_books() {
 
     // The books keep the order and its total, on the anonymous record.
     let kept = Order::find(app.db(), order.id).await.unwrap().unwrap();
-    assert_eq!(kept.total, 1_250_000);
+    assert_eq!(kept.total, 125_000);
     assert_eq!(kept.customer_id, Some(customer.id));
     // The plan is cancelled.
     let subscription = PlanSubscription::find(app.db(), subscription.id)

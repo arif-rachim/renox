@@ -45,14 +45,26 @@
     var hint = form && form.querySelector("#rx-tendered-hint");
     if (!total || !hint) return;
     if (!hint.dataset.bsText) hint.dataset.bsText = hint.textContent;
-    var given = parseInt((input.value || "").replace(/[^0-9]/g, ""), 10);
+    // The total is in the smallest unit (cents); what is typed is whole
+    // units, with `.` or `,` before one or two decimals (as the server reads it).
+    var scale = parseInt(total.dataset.bsCounterScale || "1", 10) || 1;
+    var decimals = Math.round(Math.log10(scale));
+    var typed = (input.value || "").replace(/\s/g, "");
+    var point = Math.max(typed.lastIndexOf("."), typed.lastIndexOf(","));
+    var fraction = point >= 0 && typed.length - point - 1 <= 2 && typed.length - point - 1 >= 1 ? typed.slice(point + 1) : "";
+    var whole = (fraction ? typed.slice(0, point) : typed).replace(/[^0-9]/g, "");
+    var given = Math.round(parseFloat((whole || "0") + "." + (fraction || "0")) * scale);
     var due = parseInt(total.dataset.bsCounterTotal, 10);
-    if (isNaN(given)) { hint.textContent = hint.dataset.bsText; return; }
+    if (!/[0-9]/.test(typed) || isNaN(given)) { hint.textContent = hint.dataset.bsText; return; }
     var change = given - due;
     var money = total.textContent.replace(/[0-9.,\s]+/g, " ").trim();
+    var shown = function (amount) {
+      // `$12.50`, but `Rp 12.500`.
+      return (/[A-Za-z]$/.test(money) ? " " : "") + (amount / scale).toLocaleString(document.documentElement.lang, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    };
     hint.textContent = change >= 0
-      ? (form.dataset.bsChangeLabel || "Change") + ": " + money + " " + change.toLocaleString(document.documentElement.lang)
-      : (form.dataset.bsShortLabel || "Short") + ": " + money + " " + (-change).toLocaleString(document.documentElement.lang);
+      ? (form.dataset.bsChangeLabel || "Change") + ": " + money + shown(change)
+      : (form.dataset.bsShortLabel || "Short") + ": " + money + shown(-change);
   }
   document.addEventListener("input", function (event) {
     if (event.target && event.target.id === "rx-tendered") showChange(event.target);

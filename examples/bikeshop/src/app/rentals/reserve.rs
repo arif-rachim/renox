@@ -532,14 +532,10 @@ pub async fn mine(State(state): State<AppState>, user: AuthUser) -> Result<View>
     ))
 }
 
-/// The amount in the `money` filter's format, for mails built in Rust.
+/// The amount (smallest unit) in the `money` filter's format, for mails
+/// built in Rust.
 pub fn money(state: &AppState, amount: i64) -> String {
-    renox::format_money(
-        amount as f64,
-        &state.config.currency,
-        None,
-        &state.current_lang().locale,
-    )
+    crate::money::format(amount, &state.config.currency, &state.current_lang().locale)
 }
 
 /// `PaymentSucceeded` for a rental: an **online** payment is the deposit

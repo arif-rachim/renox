@@ -23,6 +23,7 @@
 
 pub mod app;
 pub mod explain;
+pub mod money;
 pub mod report;
 pub mod seed;
 
@@ -47,6 +48,18 @@ pub fn app() -> App {
         // The demo accounts and their password on the login page of a seeded
         // demo, hidden with BIKESHOP_DEMO_LOGINS=false (src/app/accounts/demo_logins.rs).
         .share("demo_logins", app::accounts::demo_logins::for_view)
+        // Amounts are stored in cents but typed in dollars (src/money.rs):
+        // a number input's `step` (`0.01`), the scale to divide a stored
+        // amount by to fill one (100), and the symbol before it (`$`).
+        .share("money_step", |ctx: renox::view::ViewContext| async move {
+            Ok(money::step(&ctx.state.config.currency))
+        })
+        .share("money_scale", |ctx: renox::view::ViewContext| async move {
+            Ok(money::scale(&ctx.state.config.currency))
+        })
+        .share("money_symbol", |ctx: renox::view::ViewContext| async move {
+            Ok(money::symbol(&ctx.state.config.currency))
+        })
         // Login, register, password reset, email verification, /account with
         // the areas' sections, and the notification bell's list and stream;
         // signing up makes a customer (src/app/accounts).

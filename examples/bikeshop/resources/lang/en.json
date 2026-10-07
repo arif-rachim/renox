@@ -475,7 +475,7 @@
     },
     "money": {
       "title": "Money as integers",
-      "text": "Every amount is an `i64` in the smallest unit of `APP_CURRENCY` (`INTEGER` on SQLite, `BIGINT` on PostgreSQL), never a float: `0.1 + 0.2` isn't `0.3` in floating point, and a sum of prices must be exact. Templates show it with the `money` filter; fees are worked out in basis points with integer rounding (`staff::model::fee`).",
+      "text": "Every amount is an `i64` in the smallest unit of `APP_CURRENCY` (cents with `USD`; `INTEGER` on SQLite, `BIGINT` on PostgreSQL), never a float: `0.1 + 0.2` isn't `0.3` in floating point, and a sum of prices must be exact. Templates show it with the `money` filter; fees are worked out in basis points with integer rounding (`staff::model::fee`).",
       "stored": "Stored",
       "shown": "Shown"
     },
@@ -860,6 +860,7 @@
       "none_left": "None left at this store.",
       "changed": "The store has fewer of something in this sale now: check it.",
       "not_enough": "That's less than the total.",
+      "not_an_amount": "Write the amount received, like 50 or 50.00.",
       "sold": "Sale :number is done.",
       "new_sale": "New sale",
       "change": "Change",
@@ -2219,7 +2220,7 @@
       "choose": "Choose this plan",
       "how_title": "How a plan works",
       "how_1": "Choose one of your bikes, a plan, the store whose workshop looks after it and the weekday that suits you.",
-      "how_2": "Pay monthly by card (or through Xendit, in rupiah). Each visit is booked a week ahead on your weekday, or the next day with room.",
+      "how_2": "Pay monthly by card (or through Xendit, charged in rupiah). Each visit is booked a week ahead on your weekday, or the next day with room.",
       "how_3": "Skip or move a visit, change plan from the next month, pause, or cancel at the end of the month you paid for.",
       "eyebrow": "Keep your bike running"
     },
@@ -2275,7 +2276,7 @@
     "pay_with": {
       "stripe": "Card (Stripe)",
       "demo": "Demo card (no real money)",
-      "xendit": "Card or e-wallet in rupiah (Xendit)",
+      "xendit": "Card or e-wallet, charged in rupiah at :rate to the dollar (Xendit)",
       "counter": "At the store's counter"
     },
     "subscribe": {
