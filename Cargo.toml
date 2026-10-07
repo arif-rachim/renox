@@ -9,7 +9,7 @@ edition = "2024"
 rust-version = "1.94"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/arif-rachim/renox"
-homepage = "https://renox.renoxium.com"
+homepage = "https://www.renox.rs"
 keywords = ["web", "framework", "htmx", "sqlite", "postgres"]
 categories = ["web-programming::http-server"]
 

@@ -28,7 +28,7 @@ the commit it was built from.
 
 ## Where it runs
 
-The site runs at **https://renox.renoxium.com**, on the owner's Ubuntu 24.04 server, which
+The site runs at **https://www.renox.rs**, on the owner's Ubuntu 24.04 server, which
 pulls its releases; GitHub holds no key to the server.
 
 - [`.github/workflows/release-site.yml`](../.github/workflows/release-site.yml) ("Release
