@@ -57,6 +57,30 @@ async function addHelmet(page) {
   await page.waitFor(() => !!document.querySelector('#nav-cart .rx-button__badge'));
 }
 
+/**
+ * Picks a store with two or more of the cart's line, so its stepper can go up.
+ * The seeded stock depends on the time of day, and the tests before this one
+ * buy helmets too: in CI the first store once had a single one left.
+ */
+async function storeWithTwo(page) {
+  const plus = () => !document.querySelector('.bs-cart__qty [data-bs-step="1"]').disabled;
+  const stores = await page.eval(() =>
+    [...document.querySelectorAll('#cart-store option')].map((o) => o.value).filter(Boolean),
+  );
+  for (const store of stores) {
+    if (await page.eval(plus)) return;
+    await page.eval((value) => {
+      document.querySelector('#cart').dataset.old = '';
+      const select = document.querySelector('#cart-store');
+      select.value = value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    }, store);
+    await page.waitFor(() => !('old' in document.querySelector('#cart').dataset));
+    await page.settle();
+  }
+  assert.ok(await page.eval(plus), 'no store has two of the helmet');
+}
+
 describe('bikeshop sales', () => {
   for (const [size, options] of [
     ['desktop', undefined],
@@ -71,6 +95,7 @@ describe('bikeshop sales', () => {
           // The cart: the stepper changes the line and the navbar's count, no reload.
           await page.goto(`${app.url}/cart`);
           assert.ok(await fitsWidth(page), 'no sideways scrolling on the cart');
+          await storeWithTwo(page);
           await page.eval(() => (window.__same = true));
           await page.click('.bs-cart__qty [data-bs-step="1"]');
           await page.waitFor(() => document.querySelector('#nav-cart .rx-button__badge')?.textContent.trim() === '2');

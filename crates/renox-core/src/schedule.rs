@@ -1186,7 +1186,14 @@ mod tests {
             offset,
             schedule.run(state.clone(), Zone::UTC, stopped),
         ));
-        tokio::time::sleep(Duration::from_millis(2500)).await;
+        // Wait for the loop to reach that minute: about a second, but longer
+        // under a slow run (coverage on PostgreSQL took over 2.5 s).
+        for _ in 0..100 {
+            if logs.has(&["skipped: another process runs it", "minutely"]) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
         stop.send(true).unwrap();
         looping.await.unwrap();
         assert_eq!(runs.load(Ordering::SeqCst), 0);

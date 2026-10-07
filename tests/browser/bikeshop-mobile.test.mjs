@@ -54,19 +54,22 @@ async function openMenu(page) {
 }
 
 /** Logs in as a seeded demo user (password `password`) through the login
- *  form, filled in the page: the demo accounts' box has a test of its own
+ *  form's fields, sent from the page: the demo accounts' box has a test of its own
  *  below, so the others don't depend on it. */
 async function logIn(page, email) {
   await page.send('Network.clearBrowserCookies');
   await page.goto(`${app.url}/login`);
   await page.waitFor(() => location.pathname === '/login' && !!document.querySelector('form input[name=email]'), { message: 'the login form' });
-  await page.eval((e) => {
+  // The form's own fields (its CSRF token too), sent with fetch: a submit
+  // clicked or requested in CI sometimes never left the page (#342).
+  const status = await page.eval(async (e) => {
     const form = document.querySelector('form input[name=email]').form;
     form.elements.email.value = e;
     form.elements.password.value = 'password';
-    form.requestSubmit();
+    const res = await fetch(form.action, { method: 'POST', body: new URLSearchParams(new FormData(form)) });
+    return `${res.status} ${new URL(res.url).pathname}`;
   }, email);
-  await page.waitFor(() => location.pathname !== '/login', { message: 'logged in' });
+  assert.ok(!status.endsWith(' /login'), `logged in as ${email} (${status})`);
 }
 
 describe('bikeshop on a phone', () => {
