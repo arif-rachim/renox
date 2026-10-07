@@ -53,11 +53,19 @@ async function openMenu(page) {
   );
 }
 
+/** Logs in as a seeded demo user (password `password`) through the login
+ *  form, filled in the page: the demo accounts' box has a test of its own
+ *  below, so the others don't depend on it. */
 async function logIn(page, email) {
   await page.send('Network.clearBrowserCookies');
   await page.goto(`${app.url}/login`);
-  await page.click(`[data-bs-demo-email="${email}"]`);
-  await page.click('form button[type=submit]');
+  await page.waitFor(() => location.pathname === '/login' && !!document.querySelector('form input[name=email]'), { message: 'the login form' });
+  await page.eval((e) => {
+    const form = document.querySelector('form input[name=email]').form;
+    form.elements.email.value = e;
+    form.elements.password.value = 'password';
+    form.requestSubmit();
+  }, email);
   await page.waitFor(() => location.pathname !== '/login', { message: 'logged in' });
 }
 
@@ -96,11 +104,12 @@ describe('bikeshop on a phone', () => {
       await shot(page, 'mobile-03-menu');
       // The language from the menu.
       await page.click('#site-menu form:nth-of-type(2) button');
-      await page.waitFor(() => document.documentElement.lang === 'es', { message: 'Spanish' });
+      // Mid-load the document may have no root element yet, hence the `?.`.
+      await page.waitFor(() => document.documentElement?.lang === 'es', { message: 'Spanish' });
       assert.equal(await page.eval(() => document.querySelector('.bs-tabbar__tab span').textContent.trim()), 'Inicio');
       await openMenu(page);
       await page.click('#site-menu form:nth-of-type(1) button');
-      await page.waitFor(() => document.documentElement.lang === 'en', { message: 'English again' });
+      await page.waitFor(() => document.documentElement?.lang === 'en', { message: 'English again' });
     }));
 
   test('logged in: the bell in the bar, the account in the menu', () =>
