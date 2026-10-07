@@ -104,7 +104,7 @@ describe('a stock take', () => {
         input.value = String(Math.max(0, Number(input.placeholder) - 1));
       });
       await submit(page, '#take-form', '/staff/stock/take');
-      await page.waitFor(() => /Count saved/.test(document.body.textContent), { message: 'the toast' });
+      await page.waitFor(() => /Count saved/.test(document.body?.textContent || ''), { message: 'the toast' });
       page.assertClean();
     }, PHONE));
 });

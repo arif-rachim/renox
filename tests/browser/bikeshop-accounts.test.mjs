@@ -100,7 +100,7 @@ describe('bikeshop customer accounts', () => {
       // Spanish, then the page speaks it.
       await page.click('#account-language input[value="es"] + .rx-toggle__label');
       await page.click('#account-language button[type=submit]');
-      await page.waitFor(() => document.documentElement.lang === 'es', { message: 'the page is in Spanish' });
+      await page.waitFor(() => document.documentElement?.lang === 'es', { message: 'the page is in Spanish' });
       assert.ok((await page.text('main')).includes('Datos de contacto'));
       await shot(page, 'account-spanish');
       page.assertClean();

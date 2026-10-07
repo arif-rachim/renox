@@ -55,7 +55,7 @@ describe('help between stores', () => {
       const form = await page.eval(() => document.querySelector('form[id^="approve-"]')?.id);
       assert.ok(form, 'a request waiting for South');
       await page.eval((id) => document.getElementById(id).requestSubmit(), form);
-      await page.waitFor(() => /Approved: the role is given/.test(document.body.textContent), { message: 'the toast' });
+      await page.waitFor(() => /Approved: the role is given/.test(document.body?.textContent || ''), { message: 'the toast' });
       page.assertClean();
     }));
 

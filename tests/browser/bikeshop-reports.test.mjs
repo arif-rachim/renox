@@ -130,7 +130,7 @@ describe('the monthly report', () => {
       await login(page, 'owner@bikeshop.test');
       await page.goto(`${app.url}/staff/reports/monthly`);
       await page.click('form[action$="/staff/reports/monthly"] button[type=submit]');
-      await page.waitFor(() => /is on its way/.test(document.body.textContent), { message: 'the toast' });
+      await page.waitFor(() => /is on its way/.test(document.body?.textContent || ''), { message: 'the toast' });
       // The widget polls the runs until the batch has run and mailed.
       await page.waitFor(() => /Mailed/.test(document.getElementById('monthly-runs')?.textContent || ''), { timeout: 30_000, message: 'the run finished' });
       const files = await page.eval(() => document.querySelectorAll('#monthly-runs a[href*="/staff/reports/monthly/"]').length);

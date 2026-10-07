@@ -180,7 +180,9 @@ describe('bikeshop in Spanish', () => {
     await page.click('[aria-controls="language-menu"]');
     await page.waitFor(() => !document.querySelector('#language-menu').hidden, { message: 'the menu open' });
     await page.click('#language-menu form:nth-of-type(2) button');
-    await page.waitFor(() => document.documentElement.lang === 'es', { message: 'the page in Spanish' });
+    // The choice is a form post and the page loads again; mid-load the
+    // document may have no root element yet, hence the `?.` below.
+    await page.waitFor(() => document.documentElement?.lang === 'es', { message: 'the page in Spanish' });
   }
 
   for (const [size, options] of [
