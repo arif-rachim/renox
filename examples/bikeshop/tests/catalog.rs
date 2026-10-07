@@ -649,10 +649,12 @@ async fn the_home_page_features_bikes_and_categories() {
     app.get("/")
         .await
         .assert_ok()
-        .assert_see("Popular bikes")
+        .assert_see("Popular <em>this week</em>")
         .assert_see("Trek Domane")
-        .assert_see("Shop by category")
-        .assert_see("Road bikes");
+        .assert_see("Shop by <em>ride</em>")
+        .assert_see("Road bikes")
+        // The products and the category tiles show photos (#328).
+        .assert_see("/images/products/road-bikes-");
 }
 
 /// The queries a GET runs.

@@ -86,7 +86,7 @@ impl renox::Module for Catalog {
 }
 
 /// How many bikes the home page features.
-pub const FEATURED: u64 = 10;
+pub const FEATURED: u64 = 8;
 
 /// A top category on the home page, with its sub-categories.
 #[derive(Serialize, Debug, Clone)]
@@ -108,6 +108,11 @@ pub struct Storefront {
     pub rent_url: Option<String>,
     /// The workshop's booking page, once the app has it (#236).
     pub service_url: Option<String>,
+    /// How many bikes the shop sells (the hero's figure).
+    pub bikes: u64,
+    /// The stores, by name, with their slug (the stores strip's photos are
+    /// `public/images/site/store-{slug}.webp`).
+    pub stores: Vec<(String, String)>,
 }
 
 /// The home page's storefront: the eight best-selling bikes (one query
@@ -121,7 +126,7 @@ pub async fn storefront(db: &Db) -> Result<Storefront> {
         .map(|c| c.id)
         .collect();
     let featured = Product::query()
-        .where_in("category_id", bike_categories)
+        .where_in("category_id", bike_categories.clone())
         .order_by_raw(
             "(SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi \
              JOIN product_variants pv ON pv.id = oi.variant_id \
@@ -145,11 +150,21 @@ pub async fn storefront(db: &Db) -> Result<Storefront> {
                 .collect(),
         })
         .collect();
+    let bikes = Product::query()
+        .where_in("category_id", bike_categories)
+        .count(db)
+        .await?;
+    let stores = crate::app::staff::model::Store::query()
+        .order_by("id")
+        .select_as::<(String, String), _>(db, "name, slug")
+        .await?;
     Ok(Storefront {
         featured: Card::load(db, featured).await?,
         categories,
         rent_url: None,
         service_url: None,
+        bikes,
+        stores,
     })
 }
 

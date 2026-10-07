@@ -1,24 +1,78 @@
 {% extends "layouts/app.html" %}
-{% from "renox/ui.html" import page_header, columns, card, link_button %}
+{% from "renox/ui.html" import link_button %}
+{% from "layouts/_hero.html" import page_hero %}
 {% block seo %}{{ seo(title=t('shop.name'), description=t('home.lead')) }}{% endblock %}
 
+{#- The storefront (#328, "warm editorial"): a hero, the category chips, the
+    popular bikes, the categories as photo tiles, the three services and
+    the stores. Each part is a CSS grid (public/theme.css); the cards are the
+    kit's media_card. `storefront` comes from the catalog area (only on `/`). -#}
 {% block content %}
-<div class="rx-stack" data-bs-reveal>
-  {% call page_header(t('home.title'), subtitle=t('home.lead')) %}
-    {{ link_button(route('about.pages'), t('about.index_link')) }}
+<div class="rx-stack bs-home" data-bs-reveal>
+  {%- set wrench = '<svg viewBox="0 0 20 20" width="20" height="20"><path d="M12.5 3.5a3.5 3.5 0 00-3.3 4.6L3.8 13.5a1.6 1.6 0 002.3 2.3l5.4-5.4a3.5 3.5 0 004.6-3.3l-2 2-2-.5-.5-2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>' | safe %}
+  {% call page_hero(t('home.hero.title'), accent=t('home.hero.accent'), lead=t('home.lead'), eyebrow=t('home.hero.eyebrow'),
+                    photo="/images/site/hero.webp", inset="/images/site/workshop-2.webp",
+                    badge={"icon": wrench, "title": t('home.hero.badge_title'), "text": t('home.hero.badge_text')}) %}
+    <p class="bs-hero__actions">
+      {{ link_button(route('catalog.index'), t('catalog.home.shop'), variant="primary") }}
+      {%- if storefront and storefront.rent_url %}{{ link_button(storefront.rent_url, t('catalog.home.rent')) }}{% endif %}
+    </p>
+    {%- if storefront %}
+    <ul class="bs-hero__figures" role="list">
+      <li><b>{{ storefront.bikes | number }}</b>{{ t('home.hero.bikes') }}</li>
+      <li><b>{{ storefront.stores | length }}</b>{{ t('home.hero.stores') }}</li>
+      <li><b>{{ t('home.hero.hours_figure') }}</b>{{ t('home.hero.hours') }}</li>
+    </ul>
+    {%- endif %}
   {% endcall %}
-  {#- Buy, rent, service: the three ways to use the shop, side by side on a
-      CSS grid (the kit's `columns`), one under the other on phones. -#}
-  {% call columns(3) %}
-    {% call card(t('home.buy.title')) %}<p>{{ t('home.buy.text') }}</p>
-      <p>{{ link_button(route('catalog.index'), t('catalog.home.shop'), variant="primary") }}</p>{% endcall %}
-    {% call card(t('home.rent.title')) %}<p>{{ t('home.rent.text') }}</p>
-      {%- if storefront and storefront.rent_url %}<p>{{ link_button(storefront.rent_url, t('catalog.home.rent')) }}</p>{% endif %}{% endcall %}
-    {% call card(t('home.service.title')) %}<p>{{ t('home.service.text') }}</p>
-      {%- if storefront and storefront.service_url %}<p>{{ link_button(storefront.service_url, t('catalog.home.service')) }}</p>{% endif %}{% endcall %}
-  {% endcall %}
+
+  {%- if storefront %}
+  {#- The categories as chips: a quick way in. -#}
+  <nav aria-label="{{ t('catalog.home.categories') }}">
+    <ul class="bs-pills" role="list">
+      <li><a class="bs-pill bs-pill--on" href="{{ route('catalog.index') }}">{{ t('home.all') }}</a></li>
+      {%- for root in storefront.categories %}{% for child in root.children %}
+      <li><a class="bs-pill" href="{{ child[1] }}">{{ child[0] }}</a></li>
+      {%- endfor %}{% endfor %}
+    </ul>
+  </nav>
+  {%- endif %}
+
   {#- The catalogue's featured bikes and categories (#233). -#}
   {% include "catalog/_home.html" ignore missing %}
-  {% call card(t('home.stores.title'), subtitle=t('home.stores.text')) %}{% endcall %}
+
+  {#- The three services. -#}
+  <section class="bs-services" aria-label="{{ t('home.services.label') }}">
+    <article class="bs-service bs-service--photo">
+      <img src="/images/site/workshop-1.webp" alt="" width="1200" height="800" loading="lazy">
+      <div><h2 class="bs-service__title">{{ t('home.services.workshop.title') }}</h2><p class="bs-service__text">{{ t('home.service.text') }}</p></div>
+      {%- if storefront and storefront.service_url %}{{ link_button(storefront.service_url, t('catalog.home.service')) }}{% endif %}
+    </article>
+    <article class="bs-service bs-service--teal">
+      <div><h2 class="bs-service__title">{{ t('home.services.rent.title') }}</h2><p class="bs-service__text">{{ t('home.rent.text') }}</p></div>
+      {%- if storefront and storefront.rent_url %}{{ link_button(storefront.rent_url, t('home.services.rent.button')) }}{% endif %}
+    </article>
+    <article class="bs-service bs-service--clay">
+      <div><h2 class="bs-service__title">{{ t('home.services.plans.title') }}</h2><p class="bs-service__text">{{ t('home.services.plans.text') }}</p></div>
+      {{ link_button(route('plans.index'), t('home.services.plans.button')) }}
+    </article>
+  </section>
+
+  {%- if storefront and storefront.stores %}
+  <section class="bs-section" aria-labelledby="stores-title">
+    <div class="bs-section__head">
+      <div><h2 class="bs-section__title" id="stores-title">{{ t('home.stores.title') }}</h2>
+      <p class="bs-store__text">{{ t('home.stores.text') }}</p></div>
+    </div>
+    <ul class="bs-stores" role="list">
+      {%- for name, slug in storefront.stores %}
+      <li class="bs-store">
+        <img src="/images/site/store-{{ slug }}.webp" alt="" width="1200" height="800" loading="lazy">
+        <h3 class="bs-store__name">{{ t('home.stores.store', name=name) }}</h3>
+      </li>
+      {%- endfor %}
+    </ul>
+  </section>
+  {%- endif %}
 </div>
 {% endblock %}

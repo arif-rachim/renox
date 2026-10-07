@@ -40,7 +40,44 @@
     },
     "stores": {
       "title": "Three stores, working together",
-      "text": "Staff help each other's stores, bikes move to where riders need them, and the stores settle up every month."
+      "text": "Staff help each other's stores, bikes move to where riders need them, and the stores settle up every month.",
+      "store": "The :name store"
+    },
+    "hero": {
+      "eyebrow": "Three stores · one shop",
+      "title": "Bikes to buy, rent and",
+      "accent": "keep riding.",
+      "bikes": "bikes to choose from",
+      "stores": "stores in town",
+      "hours_figure": "7 days",
+      "hours": "a week, Sundays too",
+      "badge_title": "Our own workshop",
+      "badge_text": "Book a service online"
+    },
+    "all": "All",
+    "popular": {
+      "title": "Popular",
+      "accent": "this week"
+    },
+    "ride": {
+      "title": "Shop by",
+      "accent": "ride",
+      "all": "Every category"
+    },
+    "services": {
+      "label": "Our services",
+      "workshop": {
+        "title": "A workshop that tells you what it's doing."
+      },
+      "rent": {
+        "title": "Rent by the hour",
+        "button": "See what's free"
+      },
+      "plans": {
+        "title": "Service plans",
+        "text": "Visits booked for you, weekly or monthly, with parts and labour priced in advance.",
+        "button": "Compare plans"
+      }
     }
   },
   "staff": {
@@ -899,7 +936,8 @@
       "none_title": "No bike is free then",
       "none_text": "Try another time, another type or size, or another store.",
       "day": "The store's day",
-      "taken": "Taken"
+      "taken": "Taken",
+      "eyebrow": "By the hour or the day"
     },
     "fields": {
       "store": "Store",
@@ -2182,7 +2220,8 @@
       "how_title": "How a plan works",
       "how_1": "Choose one of your bikes, a plan, the store whose workshop looks after it and the weekday that suits you.",
       "how_2": "Pay monthly by card (or through Xendit, in rupiah). Each visit is booked a week ahead on your weekday, or the next day with room.",
-      "how_3": "Skip or move a visit, change plan from the next month, pause, or cancel at the end of the month you paid for."
+      "how_3": "Skip or move a visit, change plan from the next month, pause, or cancel at the end of the month you paid for.",
+      "eyebrow": "Keep your bike running"
     },
     "every": {
       "weekly": "A visit every week",
@@ -2816,5 +2855,8 @@
     "not_found": "That page isn't here. The link may be old or mistyped.",
     "failed": "Sorry, that didn't work.",
     "home": "Go to the home page"
+  },
+  "auth_art": {
+    "quote": "Ride further. We'll keep the bike ready."
   }
 }

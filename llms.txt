@@ -104,6 +104,12 @@ Every example has a README.md that walks through it.
     [reports/dashboard.rs](examples/bikeshop/src/app/reports/dashboard.rs),
     [reports/monthly.rs](examples/bikeshop/src/app/reports/monthly.rs); seeds:
     [src/seed/](examples/bikeshop/src/seed); tests: [tests/](examples/bikeshop/tests)
+  - The storefront's look (#328): brand tokens over the kit and the public pages' parts in
+    [public/theme.css](examples/bikeshop/public/theme.css), the hero macro
+    [layouts/_hero.html](examples/bikeshop/resources/views/layouts/_hero.html), Unsplash
+    photos credited in [public/images/CREDITS.md](examples/bikeshop/public/images/CREDITS.md);
+    the login page's demo accounts:
+    [accounts/demo_logins.rs](examples/bikeshop/src/app/accounts/demo_logins.rs)
 
 - [examples/shop](examples/shop): a whole online shop, the example to read for how everything
   fits: catalog with htmx search, sort and pagination, a cached home page, SEO and a sitemap; a

@@ -40,7 +40,44 @@
     },
     "stores": {
       "title": "Tres tiendas que trabajan juntas",
-      "text": "El personal ayuda en otras tiendas, las bicicletas van adonde hacen falta y las tiendas liquidan cuentas cada mes."
+      "text": "El personal ayuda en otras tiendas, las bicicletas van adonde hacen falta y las tiendas liquidan cuentas cada mes.",
+      "store": "Tienda :name"
+    },
+    "hero": {
+      "eyebrow": "Tres tiendas · una sola tienda",
+      "title": "Bicis para comprar, alquilar y",
+      "accent": "seguir rodando.",
+      "bikes": "bicis para elegir",
+      "stores": "tiendas en la ciudad",
+      "hours_figure": "7 días",
+      "hours": "a la semana, también domingos",
+      "badge_title": "Taller propio",
+      "badge_text": "Reserva un servicio en línea"
+    },
+    "all": "Todo",
+    "popular": {
+      "title": "Lo más visto",
+      "accent": "esta semana"
+    },
+    "ride": {
+      "title": "Compra por",
+      "accent": "tipo de ruta",
+      "all": "Todas las categorías"
+    },
+    "services": {
+      "label": "Nuestros servicios",
+      "workshop": {
+        "title": "Un taller que te cuenta lo que hace."
+      },
+      "rent": {
+        "title": "Alquila por horas",
+        "button": "Ver qué está libre"
+      },
+      "plans": {
+        "title": "Planes de servicio",
+        "text": "Visitas reservadas para ti, cada semana o cada mes, con piezas y mano de obra con precio por adelantado.",
+        "button": "Comparar planes"
+      }
     }
   },
   "staff": {
@@ -2695,7 +2732,8 @@
       "none_title": "No hay bicis libres entonces",
       "none_text": "Prueba otra hora, otro tipo o talla, u otra tienda.",
       "day": "El día de la tienda",
-      "taken": "Ocupada"
+      "taken": "Ocupada",
+      "eyebrow": "Por horas o por días"
     },
     "fields": {
       "store": "Tienda",
@@ -3978,7 +4016,8 @@
       "how_title": "Cómo funciona un plan",
       "how_1": "Elige una de tus bicis, un plan, la tienda cuyo taller la cuida y el día de la semana que te venga bien.",
       "how_2": "Paga cada mes con tarjeta (o con Xendit, en rupias). Cada visita se reserva una semana antes en tu día, o el siguiente con hueco.",
-      "how_3": "Salta o mueve una visita, cambia de plan desde el mes siguiente, pausa, o cancela al final del mes pagado."
+      "how_3": "Salta o mueve una visita, cambia de plan desde el mes siguiente, pausa, o cancela al final del mes pagado.",
+      "eyebrow": "Tu bici, siempre a punto"
     },
     "every": {
       "weekly": "Una visita cada semana",
@@ -5364,5 +5403,8 @@
     "not_found": "Esa página no está aquí. Puede que el enlace sea antiguo o tenga un error.",
     "failed": "Lo sentimos, eso no ha funcionado.",
     "home": "Ir a la página de inicio"
+  },
+  "auth_art": {
+    "quote": "Rueda más lejos. Nosotros dejamos la bici lista."
   }
 }

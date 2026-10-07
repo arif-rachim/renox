@@ -1,0 +1,35 @@
+{#- A public page's hero (#328): the headline with its coloured phrase, a lead,
+    the call block's buttons and figures, and a photo with a rounded corner
+    (styles: public/theme.css, `bs-hero`).
+
+    {% from "layouts/_hero.html" import page_hero %}
+    {% call page_hero(t('x.title'), accent=t('x.accent'), lead=t('x.lead'),
+                      photo="/images/site/rent-1.webp", compact=true) %}
+      {{ link_button(…) }}
+    {% endcall %}
+
+    `accent`: the words after the title, in the brand colour. `eyebrow`: a
+    small line above the title. `inset`: a second, smaller photo over the
+    first's corner; `badge` ({icon, title, text}): a card over the photo.
+    `compact`: a smaller headline and a wide photo, for pages other than the
+    home page. The photos are decoration: the text says it all, so their
+    `alt` is empty. -#}
+{% macro page_hero(title, accent=none, lead=none, eyebrow=none, photo=none, inset=none, badge=none, compact=false, id="page-title") -%}
+<section class="bs-hero{% if compact %} bs-hero--compact{% endif %}" aria-labelledby="{{ id }}">
+  <div class="bs-hero__text">
+    {%- if eyebrow %}<p class="bs-hero__eyebrow">{{ eyebrow }}</p>{% endif %}
+    <h1 class="bs-hero__title" id="{{ id }}">{{ title }}{% if accent %} <em>{{ accent }}</em>{% endif %}</h1>
+    {%- if lead %}<p class="bs-hero__lead">{{ lead }}</p>{% endif %}
+    {%- if caller is defined %}{{ caller() }}{% endif %}
+  </div>
+  {%- if photo %}
+  <div class="bs-hero__art">
+    <img class="bs-hero__photo" src="{{ photo }}" alt="" width="960" height="1200" fetchpriority="high">
+    {%- if inset %}<img class="bs-hero__inset" src="{{ inset }}" alt="" width="440" height="550" loading="lazy">{% endif %}
+    {%- if badge %}
+    <p class="bs-hero__badge"><span class="bs-hero__badge-icon" aria-hidden="true">{{ badge.icon }}</span><span><b>{{ badge.title }}</b>{{ badge.text }}</span></p>
+    {%- endif %}
+  </div>
+  {%- endif %}
+</section>
+{%- endmacro %}

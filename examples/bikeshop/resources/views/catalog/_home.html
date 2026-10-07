@@ -1,35 +1,47 @@
 {#- The catalogue's part of the home page (included by home/index.html):
-    the featured bikes and the categories. `storefront` is shared with the
-    home view by the catalog area (src/app/catalog/mod.rs: `App::share`,
-    computed only on `/`). -#}
+    the popular bikes and the categories as photo tiles. `storefront` is
+    shared with the home view by the catalog area (src/app/catalog/mod.rs:
+    `App::share`, computed only on `/`). A tile's photo is the category's
+    first product photo (public/images/products/{slug}-1.webp). -#}
 {%- if storefront %}
-{% from "renox/ui.html" import card_grid, media_card, link_button %}
+{% from "renox/ui.html" import card_grid, media_card %}
 {% call push('head') %}<link rel="stylesheet" href="{{ asset('catalog/catalog.css') }}">{% endcall %}
-<section class="bs-home__section" aria-labelledby="featured-title">
-  <div class="bs-home__heading">
-    <h2 class="rx-title" id="featured-title">{{ t('catalog.home.featured') }}</h2>
-    {{ link_button(route('catalog.category', 'bikes'), t('catalog.home.all_bikes'), variant="plain", size="small") }}
+<section class="bs-section" aria-labelledby="featured-title">
+  <div class="bs-section__head">
+    <h2 class="bs-section__title" id="featured-title">{{ t('home.popular.title') }} <em>{{ t('home.popular.accent') }}</em></h2>
+    <a class="bs-section__more" href="{{ route('catalog.category', 'bikes') }}">{{ t('catalog.home.all_bikes') }} →</a>
   </div>
   <div data-bs-reveal>
   {% call card_grid() %}
     {%- for c in storefront.featured %}
     {{ media_card(route('catalog.show', c.slug), c.name, image=c.photo, image_alt=c.photo_alt,
                   subtitle=(t('catalog.price_from', price=(c.price_from | money)) if c.price_from is not none else none),
-                  note=(c.brand.name if c.brand else none)) }}
+                  note=([c.brand.name if c.brand else none, c.category.name if c.category else none] | select | join(" · "))) }}
     {%- endfor %}
   {% endcall %}
   </div>
 </section>
-<section class="bs-home__section" aria-labelledby="categories-title">
-  <h2 class="rx-title" id="categories-title">{{ t('catalog.home.categories') }}</h2>
-  <div class="bs-home__categories" data-bs-reveal>
+<section class="bs-section" aria-labelledby="categories-title">
+  <div class="bs-section__head">
+    <h2 class="bs-section__title" id="categories-title">{{ t('home.ride.title') }} <em>{{ t('home.ride.accent') }}</em></h2>
+    <a class="bs-section__more" href="{{ route('catalog.index') }}">{{ t('home.ride.all') }} →</a>
+  </div>
+  <div class="bs-tiles" data-bs-reveal>
     {%- for root in storefront.categories %}
-    <nav class="rx-card bs-home__category" aria-label="{{ root.name }}">
-      <a class="bs-home__category-title rx-link" href="{{ root.href }}">{{ root.name }}</a>
-      <ul class="bs-tree" role="list">
-        {%- for child in root.children %}<li><a class="rx-link" href="{{ child[1] }}">{{ child[0] }}</a></li>{% endfor %}
-      </ul>
-    </nav>
+    {%- if root.kind == "bike" %}
+    {%- for child in root.children %}
+    <a class="bs-tile" href="{{ child[1] }}">
+      <img src="/images/products/{{ child[1] | replace('/shop/', '') }}-1.webp" alt="" width="880" height="660" loading="lazy">
+      <span class="bs-tile__name">{{ child[0] }}</span>
+    </a>
+    {%- endfor %}
+    {%- else %}
+    <a class="bs-tile" href="{{ root.href }}">
+      {%- if root.children %}<img src="/images/products/{{ root.children[0][1] | replace('/shop/', '') }}-1.webp" alt="" width="880" height="660" loading="lazy">{% endif %}
+      <span class="bs-tile__name">{{ root.name }}</span>
+      <span class="bs-tile__more">{% for child in root.children %}{{ child[0] }}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+    </a>
+    {%- endif %}
     {%- endfor %}
   </div>
 </section>
