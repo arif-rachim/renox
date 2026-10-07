@@ -41,7 +41,11 @@ async fn the_home_page_has_its_words_its_tags_and_its_structured_data() {
         .assert_see("<span class=\"hl-kw\">")
         .assert_see("tower-sessions")
         .assert_see("Not a hello world.")
-        .assert_see("href=\"/blog/why-we-built-renox\"");
+        .assert_see("href=\"/blog/why-we-built-renox\"")
+        // The benchmark section, from content/benchmarks.json.
+        .assert_see("<h2 id=\"bench-title\">")
+        .assert_see("<tr class=\"me\"><th scope=\"row\">Renox</th>")
+        .assert_see("9,630");
     let html = page.text();
     assert_eq!(html.matches("<h1").count(), 1, "one h1");
     assert!(html.contains("rel=\"alternate\" type=\"application/atom+xml\""));
