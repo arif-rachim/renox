@@ -20,7 +20,7 @@ pub fn app() -> App {
         .migrations(renox::migrations!())
         .module(app::payments::Payments)
         .seeder(|state| async move {
-            let db = state.db;
+            let db = state.db.clone();
             // Seeding twice is harmless: a seeded database stays as it is.
             if Order::query().exists(&db).await? {
                 return Ok(());

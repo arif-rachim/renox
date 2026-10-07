@@ -81,7 +81,7 @@ pub fn app() -> App {
 /// `rnx db:seed`: two teams, three users (password `password123`), and a few
 /// projects. Alice is in both teams, so she can switch between them.
 async fn seed(state: AppState) -> Result {
-    let db = state.db;
+    let db = state.db.clone();
     // Seeding twice is harmless: a seeded database stays as it is.
     if User::find_by_email(&db, "alice@example.com")
         .await?

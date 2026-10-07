@@ -46,7 +46,7 @@ const CUSTOMERS: [(&str, &str, &str); 8] = [
 ];
 
 pub async fn run(state: AppState) -> Result {
-    let db = state.db;
+    let db = state.db.clone();
     if User::find_by_email(&db, "admin@example.com")
         .await?
         .is_some()

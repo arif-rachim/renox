@@ -17,7 +17,7 @@ pub fn app() -> App {
         .module(app::products::Products)
         // `cargo run -- db:seed`: two products to open and edit.
         .seeder(|state| async move {
-            let db = state.db;
+            let db = state.db.clone();
             if Product::query().exists(&db).await? {
                 return Ok(()); // seeded already
             }

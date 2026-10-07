@@ -124,7 +124,7 @@ async fn app() -> (TestApp, tempfile::TempDir) {
                 (ability == "publish" && user.has_role("editor")).then_some(true)
             })
             .seeder(|state| async move {
-                let db = state.db;
+                let db = state.db.clone();
                 // Seeders see the app now.
                 let state = renox::context::app().expect("seeders run in the app's context");
                 let sealed = state.encrypt("seeded");

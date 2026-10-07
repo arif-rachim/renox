@@ -19,7 +19,7 @@ pub fn app() -> App {
         .module(Auth::new())
         .module(app::products::Products)
         .seeder(|state| async move {
-            let db = state.db;
+            let db = state.db.clone();
             // Seeding twice is harmless: a seeded database stays as it is.
             if User::find_by_email(&db, "demo@example.com")
                 .await?

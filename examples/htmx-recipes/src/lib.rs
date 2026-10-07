@@ -29,7 +29,7 @@ pub fn app() -> App {
         .migrations(renox::migrations!())
         .module(app::tasks::Tasks)
         .seeder(|state| async move {
-            let db = state.db;
+            let db = state.db.clone();
             Task::factory().count(40).create(&db).await?;
             Ok(())
         })

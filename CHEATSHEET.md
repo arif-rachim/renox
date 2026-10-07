@@ -1123,7 +1123,7 @@ impl Factory for Product {
 fn seeders(app: App) -> App {
     // `rnx db:seed`, or `rnx migrate:fresh --seed`
     app.seeder(|state| async move {
-        let db = state.db;
+        let db = state.db.clone();
         Product::factory().count(50).create(&db).await?; // in one transaction
         // Seeders run in the app's context: config, encrypt, the cache, random_token().
         let state = renox::context::app().expect("in a seeder");
