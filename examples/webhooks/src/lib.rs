@@ -25,7 +25,7 @@ pub fn app() -> App {
             if Order::query().exists(&db).await? {
                 return Ok(());
             }
-            for (code, amount) in [("INV-1", 150_000), ("INV-2", 75_000), ("INV-3", 20_000)] {
+            for (code, amount) in [("INV-1", 4_999), ("INV-2", 2_500), ("INV-3", 999)] {
                 Order::create(&db, Order::new(code, amount)).await?;
             }
             Ok(())

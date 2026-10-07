@@ -45,7 +45,8 @@ pub struct ProductForm {
     category_id: Option<i64>,
     #[serde(default)]
     description: String,
-    price: i64,
+    /// In dollars as typed (`4.50`); stored in cents.
+    price: f64,
     stock: i64,
     active: bool,
     photo: Option<Upload>,
@@ -57,7 +58,7 @@ impl Validate for ProductForm {
         v.field("category_id", &self.category_id)
             .exists("categories", "id");
         v.field("description", &self.description).max(2000);
-        v.field("price", &self.price).min(0);
+        v.field("price", &self.price).min(0).decimal(0, 2);
         v.field("stock", &self.stock).min(0);
         v.field("photo", &self.photo).image().max(2048);
     }
@@ -95,7 +96,8 @@ pub async fn edit(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
     let category_name = product.category(&db).await?.map(|c| c.name);
     Ok(view(
         "admin/products/form.html",
-        context! { product, category_name },
+        // The price in dollars, as the form takes it.
+        context! { price => format!("{:.2}", product.price as f64 / 100.0), product, category_name },
     ))
 }
 
@@ -184,7 +186,7 @@ async fn fill(state: &AppState, product: &mut Product, form: ProductForm) -> Res
     product.name = form.name;
     product.category_id = form.category_id;
     product.description = form.description;
-    product.price = form.price;
+    product.price = (form.price * 100.0).round() as i64;
     product.stock = form.stock;
     product.active = form.active;
     if let Some(photo) = form.photo {

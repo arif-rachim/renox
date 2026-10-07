@@ -14,6 +14,10 @@ STRIPE_WEBHOOK_SECRET=whsec_...          # Stripe endpoint signing secret
 
 Only the providers you use need theirs; a call to a provider whose secret is missing fails.
 
+Orders are in US dollars, stored in cents (`APP_CURRENCY=USD`). Stripe charges dollars; Midtrans
+and Xendit charge rupiah (IDR) only, so their payloads carry IDR amounts (the Midtrans test
+payload's `gross_amount` is `150000.00`), and a live account there charges in IDR.
+
 ```bash
 cd examples/webhooks
 cp .env.example .env    # optional: the settings this example reads

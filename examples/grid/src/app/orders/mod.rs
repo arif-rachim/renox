@@ -130,7 +130,7 @@ pub fn orders_grid(can_edit: bool) -> Grid {
                 .summary(Summary::Sum),
         )
         .column(
-            Column::money("total", "Total (Rp)")
+            Column::money("total", "Total ($)")
                 .under(["Amounts"])
                 .editable()
                 // In the footer (every filtered row) and under each group.
@@ -211,7 +211,7 @@ pub fn regions_grid() -> Grid {
         .column(Column::text("number", "Order").mobile().searchable())
         .column(Column::text("customer", "Customer").searchable())
         .column(Column::select("status", "Status", STATUSES))
-        .column(Column::money("total", "Total (Rp)"))
+        .column(Column::money("total", "Total ($)"))
         .column(Column::date("ordered_on", "Ordered"))
         .sort_by("region,city,-total")
         .row_url("/orders/{id}")
@@ -241,7 +241,7 @@ pub fn unpaid_grid() -> Grid {
                 .mobile(),
         )
         .column(Column::text("city", "City"))
-        .column(Column::money("total", "Total (Rp)").mobile())
+        .column(Column::money("total", "Total ($)").mobile())
         .column(Column::date("ordered_on", "Ordered"))
         .sort_by("ordered_on")
 }
@@ -269,7 +269,7 @@ pub fn largest_grid() -> Grid {
         // range instead of text.
         .column(Column::related("account", "Account #", "customers", "customer_id", "id").numeric())
         .column(
-            Column::money("total", "Total (Rp)")
+            Column::money("total", "Total ($)")
                 .filterable(false)
                 .mobile(),
         )

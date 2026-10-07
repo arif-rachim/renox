@@ -15,11 +15,12 @@ fn t(key: &str, params: &[(&str, &dyn std::fmt::Display)]) -> String {
     }
 }
 
-/// An amount the way the `money` filter writes it (`APP_CURRENCY`).
+/// An amount in cents the way the `money` filter writes it
+/// (`APP_CURRENCY`). `format_money` takes whole units, hence the division.
 fn money(amount: i64) -> String {
     match renox::context::app() {
         Some(state) => renox::format_money(
-            amount as f64,
+            amount as f64 / 10f64.powi(renox::currency_decimals(&state.config.currency) as i32),
             &state.config.currency,
             None,
             &state.current_lang().locale,

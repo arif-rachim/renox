@@ -40,11 +40,15 @@ async fn users_create_products() {
         "{head}"
     );
 
-    app.post("/products", &[("name", "Tea"), ("price", "9000")])
+    app.post("/products", &[("name", "Tea"), ("price", "4.50")])
         .await
         .assert_redirect("/products");
-    app.assert_database_has("products", &[("name", &"Tea"), ("user_id", &me.id)])
-        .await;
+    // Typed in dollars, stored in cents.
+    app.assert_database_has(
+        "products",
+        &[("name", &"Tea"), ("user_id", &me.id), ("price", &450)],
+    )
+    .await;
 }
 
 #[renox::test]
@@ -59,6 +63,11 @@ async fn invalid_products_are_rejected() {
         .assert_invalid("price");
     app.htmx()
         .post("/products", &[("name", "Tea"), ("price", "cheap")])
+        .await
+        .assert_invalid("price");
+    // Not a fraction of a cent.
+    app.htmx()
+        .post("/products", &[("name", "Tea"), ("price", "4.505")])
         .await
         .assert_invalid("price");
     app.assert_database_count("products", 0).await;
@@ -157,7 +166,7 @@ async fn the_saving_hook_fills_the_slug_on_create_and_update() {
 
     app.post(
         "/products",
-        &[("name", "Iced Latte  Brown Sugar"), ("price", "18000")],
+        &[("name", "Iced Latte  Brown Sugar"), ("price", "5.99")],
     )
     .await
     .assert_redirect("/products");
@@ -166,7 +175,7 @@ async fn the_saving_hook_fills_the_slug_on_create_and_update() {
 
     app.put(
         &format!("/products/{}", product.id),
-        &[("name", "Iced Tea"), ("price", "18000")],
+        &[("name", "Iced Tea"), ("price", "5.99")],
     )
     .await
     .assert_redirect("/products");
@@ -238,7 +247,7 @@ async fn save_changes_writes_only_the_changed_columns() {
         app.db(),
         Product {
             name: "Tea".into(),
-            price: 5_000,
+            price: 450,
             ..Product::for_owner(&owner)
         },
     )
@@ -247,13 +256,13 @@ async fn save_changes_writes_only_the_changed_columns() {
 
     // Someone changes the price after we loaded the product...
     Product::where_eq("id", original.id)
-        .update(app.db(), &[("price", &7_000)])
+        .update(app.db(), &[("price", &550)])
         .await
         .unwrap();
 
     // ...and we rename it. Only `name`, `slug` (from the hook) and
     // `updated_at` are written, so their price survives; `save` would have
-    // written our stale 5000 back.
+    // written our stale 450 back.
     let mut product = original.clone();
     product.name = "Black Tea".into();
     assert!(product.save_changes(app.db(), &original).await.unwrap());
@@ -263,7 +272,7 @@ async fn save_changes_writes_only_the_changed_columns() {
             ("id", &original.id),
             ("name", &"Black Tea"),
             ("slug", &"black-tea"),
-            ("price", &7_000),
+            ("price", &550),
         ],
     )
     .await;
@@ -326,7 +335,7 @@ async fn the_form_tidies_the_name_before_the_rules() {
     app.acting_as(&owner);
     app.post(
         "/products",
-        &[("name", "  Coffee   Latte "), ("price", "18000")],
+        &[("name", "  Coffee   Latte "), ("price", "5.99")],
     )
     .await
     .assert_redirect("/products");
@@ -351,7 +360,7 @@ async fn an_import_skips_bad_lines_and_keeps_the_rest() {
     let file = dir.join("products.csv");
     std::fs::write(
         &file,
-        "name,price\nCoffee Latte,18000\nTea, abc\n!!!,5000\n\nBrown Sugar,12000\n",
+        "name,price\nCoffee Latte,5.99\nTea, abc\n!!!,3.50\n\nBrown Sugar,2.99\n",
     )
     .unwrap();
     let path = file.display().to_string();
@@ -408,7 +417,7 @@ async fn the_form_checks_a_field_as_you_type() {
         .request()
         .htmx()
         .header("x-renox-validate", "name")
-        .post("/products", &[("name", ""), ("price", "1000")])
+        .post("/products", &[("name", ""), ("price", "10")])
         .await;
     res.assert_ok().assert_json_path("field", "name");
     assert!(!res.json_path("errors").as_array().unwrap().is_empty());
@@ -416,7 +425,7 @@ async fn the_form_checks_a_field_as_you_type() {
         .request()
         .htmx()
         .header("x-renox-validate", "name")
-        .post("/products", &[("name", "Coffee"), ("price", "1000")])
+        .post("/products", &[("name", "Coffee"), ("price", "10")])
         .await;
     assert!(res.json_path("errors").as_array().unwrap().is_empty());
     app.assert_database_count("products", 0).await;
@@ -433,16 +442,21 @@ async fn saving_without_changes_says_so() {
         app.db(),
         Product {
             name: "Coffee".into(),
-            price: 1000,
+            price: 1_000,
             ..Product::for_owner(&owner)
         },
     )
     .await
     .unwrap();
     app.acting_as(&owner);
+    // The form shows the price in dollars...
+    app.get(&format!("/products/{}/edit", product.id))
+        .await
+        .assert_see(r#"value="10.00""#);
+    // ...and sending it back unchanged changes nothing.
     app.put(
         &format!("/products/{}", product.id),
-        &[("name", "Coffee"), ("price", "1000")],
+        &[("name", "Coffee"), ("price", "10.00")],
     )
     .await
     .assert_redirect("/products");

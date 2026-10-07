@@ -258,7 +258,7 @@ describe('fields', () => {
       await page.type('#rx-description', 'Smooth *and* sweet');
       await page.type('#rx-stock', '12', { clear: true });
       await page.type('#rx-weight_kg', '0.75', { clear: true });
-      await page.type('#rx-price', '64000', { clear: true });
+      await page.type('#rx-price', '12.99', { clear: true });
       await page.click('label[for="rx-available"], #rx-available');
       await page.click('label[for="rx-size-3"]');
       await page.click('label[for="rx-colors-2"]');

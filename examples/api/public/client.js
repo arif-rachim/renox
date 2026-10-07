@@ -49,8 +49,9 @@ async function show() {
   await loadMore(me.abilities.includes("products:write"));
 }
 
-function money(amount) {
-  return "Rp " + Number(amount).toLocaleString("en-US");
+// Prices travel in cents (an integer): 450 is $4.50.
+function money(cents) {
+  return (Number(cents) / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
 
 // A row of the kit's `list`: the name takes the room, then the price and
@@ -114,7 +115,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const product = await api("POST", "/api/products", {
         name: form.elements.name.value,
-        price: Number(form.elements.price.value),
+        price: Math.round(Number(form.elements.price.value) * 100),
       });
       showErrors(form, {});
       form.reset();

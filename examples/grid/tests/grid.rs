@@ -341,7 +341,8 @@ async fn totals_and_groups() {
     let html = app.get("/").await.text();
     let foot = html.split("<tfoot>").nth(1).expect("a footer");
     assert!(
-        foot.contains(&renox::format_number(total as f64, 0, "en")),
+        // The total is in cents; the footer shows dollars.
+        foot.contains(&renox::format_number(total as f64 / 100.0, 2, "en")),
         "{foot}"
     );
     let grouped = app.get("/?group=region&per_page=100").await.text();

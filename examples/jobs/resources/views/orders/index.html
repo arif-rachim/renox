@@ -9,7 +9,7 @@
     {{ input("customer_email", "Your email", type="email", required=true, autocomplete="email") }}
     {% call form_grid(2) %}
       {{ input("item", "Item", required=true) }}
-      {{ input("total", "Total", type="number", required=true, prefix="Rp", attrs={"min": 1}) }}
+      {{ input("total", "Total", type="number", required=true, prefix="$", attrs={"min": "0.01", "step": "0.01"}) }}
     {% endcall %}
     <div class="rx-card__footer">{{ button("Order") }}</div>
   {% endcall %}

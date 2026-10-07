@@ -11,7 +11,7 @@
   {% call card() %}
     {% call form_grid(2) %}
       {{ input("sku", "SKU", required=true, autocomplete="off", hint="Letters, digits and dashes.", value=product.sku) }}
-      {{ input("price", "Price", type="number", required=true, prefix="Rp", attrs={'min': 0}, value=product.price) }}
+      {{ input("price", "Price", type="number", required=true, prefix="$", attrs={'min': 0, 'step': '0.01'}, value=price) }}
     {% endcall %}
     {{ input("name", "Name", required=true, autocomplete="off", value=product.name) }}
     {% call form_grid(2) %}

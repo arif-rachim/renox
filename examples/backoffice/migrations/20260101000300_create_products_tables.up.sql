@@ -2,7 +2,7 @@ CREATE TABLE products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sku TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
-    -- In rupiah.
+    -- In cents (APP_CURRENCY, USD).
     price INTEGER NOT NULL DEFAULT 0,
     -- Kept equal to the sum of the product's stock_movements.
     stock INTEGER NOT NULL DEFAULT 0,

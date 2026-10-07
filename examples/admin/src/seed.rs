@@ -14,23 +14,23 @@ const CATEGORIES: [(&str, &str); 4] = [
     ("Syrups", "For the sweet ones."),
 ];
 
-/// Name, SKU, category (index), price, stock, status, featured.
+/// Name, SKU, category (index), price (in cents), stock, status, featured.
 #[rustfmt::skip]
 const PRODUCTS: [(&str, &str, usize, i64, i64, &str, bool); 14] = [
-    ("Arabica coffee 250 g",  "COF-ARB",   0, 65_000,  42, "live",     true),
-    ("Robusta coffee 250 g",  "COF-ROB",   0, 45_000,  18, "live",     false),
-    ("Decaf coffee 250 g",    "COF-DEC",   0, 70_000,   3, "draft",    false),
-    ("Jasmine tea 100 g",     "TEA-JAS",   1, 18_000,  25, "live",     true),
-    ("Green tea 100 g",       "TEA-GRN",   1, 22_000,   0, "live",     false),
-    ("Earl grey 100 g",       "TEA-EGR",   1, 27_000,   9, "archived", false),
-    ("Paper cups 12 oz (50)", "CUP-12",    2, 38_000, 120, "live",     false),
-    ("Paper cups 16 oz (50)", "CUP-16",    2, 44_000,   4, "live",     false),
-    ("Cup lids 90 mm (50)",   "LID-90",    2, 19_000,  60, "live",     false),
-    ("Wooden spoons (100)",   "SPOON-WD",  2, 25_000,   2, "draft",    false),
-    ("Vanilla syrup 750 ml",  "SYRUP-VAN", 3, 89_000,  11, "live",     true),
-    ("Caramel syrup 750 ml",  "SYRUP-CRM", 3, 89_000,   7, "live",     false),
-    ("Hazelnut syrup 750 ml", "SYRUP-HAZ", 3, 92_000,   0, "draft",    false),
-    ("Cocoa powder 500 g",    "COCOA-PWD", 3, 74_000,  15, "live",     false),
+    ("Arabica coffee 250 g",  "COF-ARB",   0, 1_299,  42, "live",     true),
+    ("Robusta coffee 250 g",  "COF-ROB",   0,   899,  18, "live",     false),
+    ("Decaf coffee 250 g",    "COF-DEC",   0, 1_399,   3, "draft",    false),
+    ("Jasmine tea 100 g",     "TEA-JAS",   1,   499,  25, "live",     true),
+    ("Green tea 100 g",       "TEA-GRN",   1,   599,   0, "live",     false),
+    ("Earl grey 100 g",       "TEA-EGR",   1,   699,   9, "archived", false),
+    ("Paper cups 12 oz (50)", "CUP-12",    2,   799, 120, "live",     false),
+    ("Paper cups 16 oz (50)", "CUP-16",    2,   899,   4, "live",     false),
+    ("Cup lids 90 mm (50)",   "LID-90",    2,   399,  60, "live",     false),
+    ("Wooden spoons (100)",   "SPOON-WD",  2,   499,   2, "draft",    false),
+    ("Vanilla syrup 750 ml",  "SYRUP-VAN", 3, 1_499,  11, "live",     true),
+    ("Caramel syrup 750 ml",  "SYRUP-CRM", 3, 1_499,   7, "live",     false),
+    ("Hazelnut syrup 750 ml", "SYRUP-HAZ", 3, 1_599,   0, "draft",    false),
+    ("Cocoa powder 500 g",    "COCOA-PWD", 3, 1_199,  15, "live",     false),
 ];
 
 /// Name, city, tier.

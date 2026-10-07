@@ -5,6 +5,9 @@ through Stripe (Pro with a 14-day trial), and Pro (IDR) through Xendit for custo
 Indonesia. The plans page, the subscription's card on the account page and the webhooks come
 from the module; the app declares its plans and guards two pages.
 
+Prices are in US dollars, in cents (`.price(900, "USD", …)` is $9.00), except Pro (IDR):
+Xendit charges rupiah only, so that plan is priced in IDR.
+
 ```text
 cp .env.example .env    # then the gateways' test keys and Stripe's price ids
 cargo run -- migrate

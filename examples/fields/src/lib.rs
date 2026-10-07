@@ -22,8 +22,8 @@ pub fn app() -> App {
                 return Ok(()); // seeded already
             }
             for (name, price, stock, size) in [
-                ("Highland Coffee", 85_000, 12, Size::Medium),
-                ("Jasmine Tea", 25_000, 40, Size::Small),
+                ("Highland Coffee", 1_699, 12, Size::Medium),
+                ("Jasmine Tea", 650, 40, Size::Small),
             ] {
                 let product = Product {
                     name: name.into(),

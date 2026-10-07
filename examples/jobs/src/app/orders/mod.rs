@@ -39,7 +39,7 @@ pub struct Order {
     pub id: i64,
     pub customer_email: String,
     pub item: String,
-    /// In rupiah.
+    /// In cents (`APP_CURRENCY`'s smallest unit).
     pub total: i64,
     pub status: OrderStatus,
     pub created_at: Option<DateTime>,
@@ -129,8 +129,9 @@ struct OrderForm {
     customer_email: String,
     #[validate(required, max = 100)]
     item: String,
-    #[validate(min = 1)]
-    total: i64,
+    /// In dollars as typed (`4.50`); stored in cents.
+    #[validate(min = 0.01, decimal(0, 2))]
+    total: f64,
 }
 
 async fn index(State(db): State<Db>) -> Result<View> {
@@ -146,7 +147,7 @@ async fn store(
     let order = Order {
         customer_email: form.customer_email,
         item: form.item,
-        total: form.total,
+        total: (form.total * 100.0).round() as i64,
         ..Default::default()
     };
     let order = Order::create(&state.db, order).await?;
@@ -214,11 +215,13 @@ async fn report_failed(err: Error, state: AppState) {
     }
 }
 
-/// An amount the way the `money` template filter writes it (`APP_CURRENCY`,
-/// `Rp 150.000` by default), for mail written in Rust.
+/// An amount in the smallest unit (cents) the way the `money` template
+/// filter writes it (`APP_CURRENCY`: 450 is `$4.50`), for mail written in
+/// Rust. `format_money` takes whole units, hence the division.
 pub fn money(state: &AppState, amount: i64) -> String {
+    let unit = 10f64.powi(renox::currency_decimals(&state.config.currency) as i32);
     renox::format_money(
-        amount as f64,
+        amount as f64 / unit,
         &state.config.currency,
         None,
         &state.config.locale,

@@ -45,7 +45,7 @@ the routes that change data sit behind `require_auth`).
   with a copy button.
 - **Other tables, advanced rules.** Tier comes from `customers` and Notes counts
   `order_notes` rows; both sort and filter. The sliders button builds rules
-  ("Total > 30,000,000", "Tier is gold", "Email is empty"), all or any. Leave
+  ("Total > 2,000", "Tier is gold", "Email is empty"), all or any. Leave
   and come back: the grid remembers its filters; it also refreshes itself
   every 30 seconds when nobody is busy with it.
 - **Filters by kind.** Text (contains, starts with, ends with, equals, or a

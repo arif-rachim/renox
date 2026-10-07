@@ -67,12 +67,12 @@ async fn stock(app: &TestApp, id: i64) -> i64 {
 async fn customers_browse_search_filter_and_sort() {
     let app = shop().await;
     let drinks = category(&app, "Drinks").await;
-    let mut coffee = product(&app, "Coffee Latte", 25_000, 5).await;
+    let mut coffee = product(&app, "Coffee Latte", 450, 5).await;
     coffee.category_id = Some(drinks.id);
     coffee.save(app.db()).await.unwrap();
-    product(&app, "Milk Tea", 18_000, 5).await;
-    product(&app, "Black Coffee", 15_000, 0).await;
-    let mut hidden = product(&app, "Secret Coffee", 99_000, 5).await;
+    product(&app, "Milk Tea", 350, 5).await;
+    product(&app, "Black Coffee", 300, 0).await;
+    let mut hidden = product(&app, "Secret Coffee", 1_299, 5).await;
     hidden.active = false;
     hidden.save(app.db()).await.unwrap();
 
@@ -82,7 +82,7 @@ async fn customers_browse_search_filter_and_sort() {
         .assert_ok()
         .assert_view("catalog/home.html")
         .assert_see("Coffee Latte")
-        .assert_see("Rp 25,000")
+        .assert_see("$4.50")
         .assert_dont_see("Black Coffee")
         .assert_dont_see("Secret Coffee");
 
@@ -119,7 +119,7 @@ async fn customers_browse_search_filter_and_sort() {
 #[renox::test]
 async fn product_pages_have_seo_tags() {
     let app = shop().await;
-    let coffee = product(&app, "Coffee Latte", 25_000, 5).await;
+    let coffee = product(&app, "Coffee Latte", 450, 5).await;
     app.get(&format!("/products/{}", coffee.slug))
         .await
         .assert_ok()
@@ -136,7 +136,7 @@ async fn product_pages_have_seo_tags() {
 #[renox::test]
 async fn the_cart_adds_up_and_stays_private() {
     let app = shop().await;
-    let coffee = product(&app, "Coffee Latte", 25_000, 5).await;
+    let coffee = product(&app, "Coffee Latte", 450, 5).await;
     let id = coffee.id.to_string();
 
     app.post("/cart", &[("product_id", &id), ("quantity", "1")])
@@ -152,7 +152,7 @@ async fn the_cart_adds_up_and_stays_private() {
     app.get("/cart")
         .await
         .assert_see(r#"<span>Cart</span><span class="rx-nav-badge">3</span>"#)
-        .assert_see("Rp 75,000");
+        .assert_see("$13.50");
     app.htmx()
         .post("/cart", &[("product_id", &id), ("quantity", "0")])
         .await
@@ -195,8 +195,8 @@ async fn the_cart_adds_up_and_stays_private() {
 async fn checkout_takes_the_stock_and_confirms_by_mail() {
     let app = shop().await;
     let boss = admin(&app).await;
-    let coffee = product(&app, "Coffee Latte", 25_000, 5).await;
-    let tea = product(&app, "Milk Tea", 18_000, 1).await;
+    let coffee = product(&app, "Coffee Latte", 450, 5).await;
+    let tea = product(&app, "Milk Tea", 350, 1).await;
     let ben = customer(&app, "ben@example.com").await;
     app.acting_as(&ben);
     for (id, quantity) in [(coffee.id, "2"), (tea.id, "1")] {
@@ -211,7 +211,7 @@ async fn checkout_takes_the_stock_and_confirms_by_mail() {
         .await
         .assert_ok()
         .assert_view("orders/checkout.html")
-        .assert_see("Rp 68,000");
+        .assert_see("$12.50");
     app.htmx()
         .post("/checkout", &[("address", "short")])
         .await
@@ -228,7 +228,7 @@ async fn checkout_takes_the_stock_and_confirms_by_mail() {
         .await
         .unwrap();
     res.assert_redirect(&format!("/orders/{}", order.id));
-    assert_eq!(order.total, 68_000);
+    assert_eq!(order.total, 1_250);
     assert_eq!(order.status, OrderStatus::Pending);
     assert_eq!(stock(&app, coffee.id).await, 3);
     assert_eq!(stock(&app, tea.id).await, 0);
@@ -239,7 +239,7 @@ async fn checkout_takes_the_stock_and_confirms_by_mail() {
         .assert_view("orders/show.html")
         .assert_see("Thank you! Order #")
         .assert_see(">Coffee Latte</dd>")
-        .assert_see("2<span class=\"rx-entry__affix\">× Rp 25,000</span>")
+        .assert_see("2<span class=\"rx-entry__affix\">× $4.50</span>")
         .assert_see("Waiting for payment");
 
     // The confirmation goes through the queue; the admin is told at once.
@@ -264,8 +264,8 @@ async fn checkout_takes_the_stock_and_confirms_by_mail() {
 #[renox::test]
 async fn checkout_never_oversells() {
     let app = shop().await;
-    let coffee = product(&app, "Coffee Latte", 25_000, 5).await;
-    let tea = product(&app, "Milk Tea", 18_000, 1).await;
+    let coffee = product(&app, "Coffee Latte", 450, 5).await;
+    let tea = product(&app, "Milk Tea", 350, 1).await;
     let ben = customer(&app, "ben@example.com").await;
     app.acting_as(&ben);
     app.post(
@@ -311,7 +311,7 @@ async fn checkout_never_oversells() {
 #[renox::test]
 async fn a_pickup_needs_no_address() {
     let app = shop().await;
-    let coffee = product(&app, "Coffee Latte", 25_000, 5).await;
+    let coffee = product(&app, "Coffee Latte", 450, 5).await;
     let ben = customer(&app, "ben@example.com").await;
     app.acting_as(&ben);
     app.post(
@@ -369,7 +369,7 @@ async fn placed_order(app: &TestApp, buyer: &User, product: &Product, quantity: 
 async fn orders_are_seen_by_their_customer_and_admins_only() {
     let app = shop().await;
     let boss = admin(&app).await;
-    let coffee = product(&app, "Coffee Latte", 25_000, 5).await;
+    let coffee = product(&app, "Coffee Latte", 450, 5).await;
     let ben = customer(&app, "ben@example.com").await;
     let order = placed_order(&app, &ben, &coffee, 1).await;
     let url = format!("/orders/{}", order.id);
@@ -445,7 +445,7 @@ async fn only_admins_get_into_the_admin() {
 async fn order_status_changes_are_audited() {
     let app = shop().await;
     let boss = admin(&app).await;
-    let coffee = product(&app, "Coffee Latte", 25_000, 5).await;
+    let coffee = product(&app, "Coffee Latte", 450, 5).await;
     let ben = customer(&app, "ben@example.com").await;
     let order = placed_order(&app, &ben, &coffee, 1).await;
     let status = format!("/admin/orders/{}/status", order.id);
@@ -500,7 +500,7 @@ async fn admins_manage_products_with_photos() {
             ("name", "Coffee Latte"),
             ("category_id", &drinks.id.to_string()),
             ("description", "Creamy"),
-            ("price", "25000"),
+            ("price", "4.50"),
             ("stock", "10"),
             ("active", "on"),
         ],
@@ -547,7 +547,7 @@ async fn admins_manage_products_with_photos() {
     // Another product with the same name gets its own address.
     app.post(
         "/admin/products",
-        &[("name", "Coffee Latte"), ("price", "1000"), ("stock", "1")],
+        &[("name", "Coffee Latte"), ("price", "10"), ("stock", "1")],
     )
     .await
     .assert_redirect("/admin/products");
@@ -579,7 +579,7 @@ async fn admins_manage_products_with_photos() {
         &format!("/admin/products/{}", coffee.id),
         &[
             ("name", "Coffee Latte Brown Sugar"),
-            ("price", "27000"),
+            ("price", "4.75"),
             ("stock", "8"),
             ("active", "on"),
         ],
@@ -589,7 +589,7 @@ async fn admins_manage_products_with_photos() {
     let coffee = Product::find_or_404(app.db(), coffee.id).await.unwrap();
     assert_eq!(
         (coffee.slug.as_str(), coffee.price),
-        ("coffee-latte-brown-sugar", 27_000)
+        ("coffee-latte-brown-sugar", 475)
     );
     assert_eq!(
         coffee.photo.as_deref(),
@@ -647,7 +647,7 @@ async fn admins_manage_products_with_photos() {
 async fn admins_move_orders_along_and_customers_hear_about_it() {
     let app = shop().await;
     let boss = admin(&app).await;
-    let coffee = product(&app, "Coffee Latte", 25_000, 5).await;
+    let coffee = product(&app, "Coffee Latte", 450, 5).await;
     let ben = customer(&app, "ben@example.com").await;
     let order = placed_order(&app, &ben, &coffee, 2).await;
     app.run_jobs().await; // the confirmation
@@ -695,7 +695,7 @@ async fn admins_move_orders_along_and_customers_hear_about_it() {
 async fn the_bell_tells_customers_and_admins_about_orders() {
     let app = shop().await;
     let boss = admin(&app).await;
-    let coffee = product(&app, "Coffee Latte", 25_000, 5).await;
+    let coffee = product(&app, "Coffee Latte", 450, 5).await;
     let ben = customer(&app, "ben@example.com").await;
     let order = placed_order(&app, &ben, &coffee, 2).await;
 
@@ -706,7 +706,7 @@ async fn the_bell_tells_customers_and_admins_about_orders() {
     app.get("/notifications")
         .await
         .assert_see(&format!(">Order #{} received</button>", order.id))
-        .assert_see("Pay Rp 50,000 by bank transfer within 3 days.");
+        .assert_see("Pay $9.00 by bank transfer within 3 days.");
     let id = ben.notifications(app.db(), 1).await.unwrap()[0].id;
     app.post(&format!("/notifications/{id}/open"), &[])
         .await
@@ -717,7 +717,7 @@ async fn the_bell_tells_customers_and_admins_about_orders() {
     app.get("/notifications")
         .await
         .assert_see(&format!(">New order #{}</button>", order.id))
-        .assert_see("Rp 50,000, to 1 Main Street, Springfield 40111")
+        .assert_see("$9.00, to 1 Main Street, Springfield 40111")
         .assert_see(r#"href="/admin/orders?status=pending">All orders</a>"#);
 }
 
@@ -725,7 +725,7 @@ async fn the_bell_tells_customers_and_admins_about_orders() {
 async fn the_dashboard_shows_figures_and_charts_for_a_period() {
     let app = shop().await;
     let boss = admin(&app).await;
-    let coffee = product(&app, "Coffee Latte", 25_000, 9).await;
+    let coffee = product(&app, "Coffee Latte", 450, 9).await;
     let ben = customer(&app, "ben@example.com").await;
     let paid = placed_order(&app, &ben, &coffee, 2).await;
     placed_order(&app, &ben, &coffee, 1).await; // stays pending: not revenue
@@ -742,7 +742,7 @@ async fn the_dashboard_shows_figures_and_charts_for_a_period() {
         .assert_ok()
         .assert_see(r#"href="?period=7d" aria-current="page">7 days</a>"#)
         .assert_see(r#"<p class="rx-stat__label">Revenue</p>"#)
-        .assert_see(r#"<p class="rx-stat__value">Rp 50,000</p>"#)
+        .assert_see(r#"<p class="rx-stat__value">$9.00</p>"#)
         .assert_see(r#"<p class="rx-stat__value">1</p>"#)
         // Nothing the week before: no delta, only the figure.
         .assert_dont_see("rx-stat__change")
@@ -752,20 +752,20 @@ async fn the_dashboard_shows_figures_and_charts_for_a_period() {
         .assert_see(r#"hx-get="/admin/widgets/statuses" hx-trigger="load, every 60s""#)
         // Products sold as bubbles (price, units, revenue), orders as points.
         .assert_see(r#"<figure class="rx-chart rx-chart--bubble rx-chart--points""#)
-        .assert_see(r#"<tr><th scope="row">Coffee Latte</th><td class="rx-num">Rp 25,000</td><td class="rx-num">2</td><td class="rx-num">Rp 50,000</td></tr>"#)
+        .assert_see(r#"<tr><th scope="row">Coffee Latte</th><td class="rx-num">$4.50</td><td class="rx-num">2</td><td class="rx-num">$9.00</td></tr>"#)
         .assert_see(r#"<figure class="rx-chart rx-chart--scatter rx-chart--points""#)
-        .assert_see(&format!(r#"<tr><th scope="row">Order #{}</th><td class="rx-num">2</td><td class="rx-num">Rp 50,000</td></tr>"#, paid.id));
+        .assert_see(&format!(r#"<tr><th scope="row">Order #{}</th><td class="rx-num">2</td><td class="rx-num">$9.00</td></tr>"#, paid.id));
     // Twelve weeks, per week; a custom range of dates from the filter.
     app.get("/admin?period=12w")
         .await
         .assert_see(r#"aria-current="page">12 weeks</a>"#)
-        .assert_see(r#"<p class="rx-stat__value">Rp 50,000</p>"#);
+        .assert_see(r#"<p class="rx-stat__value">$9.00</p>"#);
     let today = renox::db::now().date_naive();
     let yesterday = today.pred_opt().unwrap();
     app.get(&format!("/admin?period=custom&from={yesterday}&to={today}"))
         .await
         .assert_see(r#"<summary class="rx-period__toggle" aria-current="true">"#)
-        .assert_see(r#"<p class="rx-stat__value">Rp 50,000</p>"#);
+        .assert_see(r#"<p class="rx-stat__value">$9.00</p>"#);
     app.htmx()
         .get("/admin/widgets/statuses")
         .await
@@ -777,11 +777,11 @@ async fn the_dashboard_shows_figures_and_charts_for_a_period() {
     app.acting_as(&boss); // the session ran out meanwhile
     app.get("/admin?period=7d")
         .await
-        .assert_see(r#"<p class="rx-stat__value">Rp 0</p>"#)
+        .assert_see(r#"<p class="rx-stat__value">$0.00</p>"#)
         .assert_see("No sales in this period");
     app.get("/admin?period=90d")
         .await
-        .assert_see(r#"<p class="rx-stat__value">Rp 50,000</p>"#);
+        .assert_see(r#"<p class="rx-stat__value">$9.00</p>"#);
 
     app.acting_as(&ben);
     app.get("/admin/widgets/statuses").await.assert_forbidden();
@@ -794,7 +794,7 @@ async fn status(app: &TestApp, order_id: i64) -> OrderStatus {
 #[renox::test]
 async fn unpaid_orders_are_cancelled_after_three_days() {
     let app = shop().await;
-    let coffee = product(&app, "Coffee Latte", 25_000, 5).await;
+    let coffee = product(&app, "Coffee Latte", 450, 5).await;
     let ben = customer(&app, "ben@example.com").await;
     let old = placed_order(&app, &ben, &coffee, 2).await;
     // Two days later, another order; then two more days pass.
@@ -832,7 +832,7 @@ async fn unpaid_orders_are_cancelled_after_three_days() {
 async fn checkout_emits_order_placed_and_notifies_without_sending() {
     let app = shop().await;
     let boss = admin(&app).await;
-    let coffee = product(&app, "Coffee Latte", 25_000, 5).await;
+    let coffee = product(&app, "Coffee Latte", 450, 5).await;
     let ben = customer(&app, "ben@example.com").await;
 
     // The listener runs, but its notifications are only recorded: no mail,
@@ -856,15 +856,15 @@ async fn checkout_emits_order_placed_and_notifies_without_sending() {
 #[renox::test]
 async fn the_shop_speaks_spanish_with_plurals() {
     let app = shop().await;
-    product(&app, "Coffee Latte", 25_000, 1).await;
-    product(&app, "Black Coffee", 15_000, 7).await;
+    product(&app, "Coffee Latte", 450, 1).await;
+    product(&app, "Black Coffee", 300, 7).await;
     app.get("/language/es").await;
     app.get("/products")
         .await
         .assert_see("<html lang=\"es\">")
         .assert_see("2 productos encontrados")
         .assert_see(">Registrarse<")
-        .assert_see("Rp 25.000");
+        .assert_see("$4,50");
     app.get("/products?q=latte")
         .await
         .assert_see("Un producto encontrado");
@@ -901,7 +901,7 @@ async fn the_shop_runs_the_same_with_database_sessions() {
         c.session_driver = renox::SessionDriver::Database
     })
     .await;
-    let coffee = product(&app, "Coffee Latte", 25_000, 5).await;
+    let coffee = product(&app, "Coffee Latte", 450, 5).await;
     let ben = customer(&app, "ben@example.com").await;
     app.acting_as(&ben);
     app.get("/language/es").await;
@@ -913,7 +913,7 @@ async fn the_shop_runs_the_same_with_database_sessions() {
     app.get("/cart")
         .await
         .assert_see("Coffee Latte está en tu carrito.")
-        .assert_see("Rp 50.000");
+        .assert_see("$9,00");
     assert_eq!(app.session_get::<String>("_locale").as_deref(), Some("es"));
 }
 
@@ -941,7 +941,7 @@ async fn the_home_page_shows_recently_viewed_products() {
         ("Coffee D", 5),
         ("Coffee E", 5),
     ] {
-        product(&app, name, 10_000, stock).await;
+        product(&app, name, 200, stock).await;
     }
     app.get("/").await.assert_dont_see("Recently viewed");
     for slug in [
@@ -977,8 +977,8 @@ async fn the_home_page_shows_recently_viewed_products() {
 #[renox::test]
 async fn stock_texts_use_plural_ranges_and_sold_out_cards_are_marked() {
     let app = shop().await;
-    product(&app, "Coffee Latte", 25_000, 3).await;
-    product(&app, "Black Coffee", 15_000, 0).await;
+    product(&app, "Coffee Latte", 450, 3).await;
+    product(&app, "Black Coffee", 300, 0).await;
     let ben = customer(&app, "ben@example.com").await;
     app.acting_as(&ben);
     app.get("/products/coffee-latte")
@@ -999,7 +999,7 @@ async fn the_category_select_searches_adds_and_renames() {
     let app = shop().await;
     let drinks = category(&app, "Drinks").await;
     category(&app, "Snacks").await;
-    let mut coffee = product(&app, "Coffee Latte", 25_000, 5).await;
+    let mut coffee = product(&app, "Coffee Latte", 450, 5).await;
     coffee.category_id = Some(drinks.id);
     coffee.save(app.db()).await.unwrap();
 
@@ -1095,7 +1095,7 @@ async fn the_category_select_searches_adds_and_renames() {
 async fn admins_adjust_stock_from_the_list() {
     let app = shop().await;
     let boss = admin(&app).await;
-    let coffee = product(&app, "Coffee", 20000, 3).await;
+    let coffee = product(&app, "Coffee", 400, 3).await;
     app.acting_as(&boss);
     // The list has the action's button and its sheet, with a field per row.
     app.get("/admin/products")
@@ -1139,7 +1139,7 @@ async fn mail_and_notifications_speak_the_customers_language() {
         .execute(app.db())
         .await
         .unwrap();
-    let coffee = product(&app, "Coffee Latte", 25_000, 5).await;
+    let coffee = product(&app, "Coffee Latte", 450, 5).await;
     let ben = customer(&app, "ben@example.com").await;
     app.acting_as(&ben);
     app.get("/language/es").await; // saved on the user
@@ -1193,7 +1193,7 @@ async fn mail_and_notifications_speak_the_customers_language() {
 async fn a_stale_cancel_changes_nothing() {
     let app = shop().await;
     let boss = admin(&app).await;
-    let coffee = product(&app, "Coffee Latte", 25_000, 5).await;
+    let coffee = product(&app, "Coffee Latte", 450, 5).await;
     let ben = customer(&app, "ben@example.com").await;
     let order = placed_order(&app, &ben, &coffee, 1).await;
     // Paid by someone else after the admin opened the page.
