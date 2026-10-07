@@ -1,0 +1,38 @@
+{#- `staff.catalog.fits`: for a part, the bike models it fits; for a bike,
+    the parts that fit it; each with its note (`part_fits`, a Pivot). Gear
+    fits nothing. (src/app/staff/catalog_tools.rs) -#}
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, list, select, input, form_grid, button, confirm, empty %}
+{% block seo %}{{ seo(title=t('staff.catalog.fits_title', product=product.name)) }}{% endblock %}
+
+{% block content %}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('staff.catalog.fits_title', product=product.name), subtitle=category.name, back=route('admin.products.index'), back_label=t('staff.catalog.products')) }}
+  {%- if gear %}
+  <div class="rx-card">{{ empty(t('staff.catalog.gear')) }}</div>
+  {%- else %}
+  {% call card(title=t('staff.catalog.fits_bikes') if part else t('staff.catalog.fits_parts')) %}
+    {% call list(id="fits", label=t('staff.catalog.fits_title', product=product.name)) %}
+      {%- for f in fitted %}
+      <li>
+        <span class="rx-list__main"><strong>{{ f.product.name }}</strong>{% if f.note %}<span class="rx-subtitle">{{ f.note }}</span>{% endif %}</span>
+        {{ confirm("unfit-" ~ f.product.id, t('staff.catalog.remove'), route('staff.catalog.fits.destroy', product.id, f.product.id), t('staff.catalog.remove_title', product=f.product.name), t('staff.catalog.remove_text')) }}
+      </li>
+      {%- else %}
+      <li><span class="rx-subtitle">{{ t('staff.catalog.none_yet') }}</span></li>
+      {%- endfor %}
+    {% endcall %}
+  {% endcall %}
+  <form method="post" action="{{ route('staff.catalog.fits.store', product.id) }}" data-live-validate>
+    {{ csrf_field() }}
+    {% call card(title=t('staff.catalog.add_fit')) %}
+      {% call form_grid(2) %}
+        {{ select("other_id", t('staff.catalog.bike') if part else t('staff.catalog.part'), choices, required=true, searchable=true, placeholder=t('staff.catalog.choose')) }}
+        {{ input("note", t('staff.catalog.note'), hint=t('staff.catalog.note_hint')) }}
+      {% endcall %}
+      <div class="rx-card__footer">{{ button(t('staff.catalog.add_fit')) }}</div>
+    {% endcall %}
+  </form>
+  {%- endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,22 @@
+{#- `staff.catalog.move`: the products chosen in the panel's "Move to a
+    category…" action, and the category to move them to
+    (src/app/staff/catalog_tools.rs). -#}
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, list, select, button, link_button %}
+{% block seo %}{{ seo(title=t('staff.catalog.move_title')) }}{% endblock %}
+
+{% block content %}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('staff.catalog.move_title'), subtitle=t('staff.catalog.move_lead', count=products | length), back=route('admin.products.index'), back_label=t('staff.catalog.products')) }}
+  <form method="post" action="{{ route('staff.catalog.move.store', token) }}">
+    {{ csrf_field() }}
+    {% call card() %}
+      {% call list(label=t('staff.catalog.products')) %}
+        {%- for p in products %}<li><span class="rx-list__main">{{ p.name }}</span></li>{% endfor %}
+      {% endcall %}
+      {{ select("category_id", t('staff.catalog.category'), categories, required=true, searchable=true, placeholder=t('staff.catalog.choose_category')) }}
+      <div class="rx-card__footer">{{ link_button(route('admin.products.index'), t('staff.cancel'), variant="plain") }}{{ button(t('staff.catalog.move_button')) }}</div>
+    {% endcall %}
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "layouts/app.html" %}
+{#- renox-billing's plans page (`billing.plans`), replaced by the shop: it
+    sells plans per bike, so instead of subscribing the user's `default`
+    subscription it lists the plans and sends people to subscribe a bike
+    (src/app/plans). renox-billing's guard and links lead here. -#}
+{% from "renox/ui.html" import page_header, link_button, list %}
+{% from "plans/_parts.html" import assets %}
+{% block seo %}{{ seo(title=t('plans.index.title')) }}{% endblock %}
+
+{% block content %}
+{{ assets() }}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('plans.index.title'), subtitle=t('plans.billing_page.lead')) }}
+  <div class="rx-card">
+    {% call list(label=t('plans.index.title')) %}
+      {%- for plan in plans %}{% if plan.key[-7:] != '-xendit' %}
+      <li class="bs-billing-plan">
+        <span><strong>{{ plan.label }}</strong> <span class="rx-subtitle">{{ plan.price }}</span></span>
+        {{ link_button(route('plans.subscribe') ~ "?plan=" ~ plan.key, t('plans.index.choose'), size="small") }}
+      </li>
+      {%- endif %}{% endfor %}
+    {% endcall %}
+  </div>
+  <p>{{ link_button(route('plans.mine'), t('plans.mine.title'), variant="plain") }}</p>
+</div>
+{% endblock %}

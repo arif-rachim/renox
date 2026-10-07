@@ -1,0 +1,82 @@
+{#- Bike shop blocks: the UI pieces Renox's kit doesn't have, written like a
+    small library (one macro file each, `bs-` classes on the kit's tokens,
+    behaviour in public/blocks/blocks.js, styles in public/blocks/blocks.css).
+    See /about/blocks for every block working, and the README's "Blocks".
+
+    gallery: a product's photos as a carousel, with thumbnails under it.
+
+    {% from "blocks/gallery.html" import gallery %}
+    {{ gallery([
+         {"src": "/img/city-1.jpg", "alt": "The City 3 from the side"},
+         {"src": "/img/city-2.jpg", "alt": "Its handlebar", "large": "/img/city-2-big.jpg", "caption": "Swept-back bars"}
+       ], id="city-photos", label="Photos of the City 3") }}
+
+    `photos`: a list of {src, alt, thumb?, large?, caption?}: `thumb` is a
+    smaller file for the thumbnail (else `src`), `large` the file shown when
+    enlarged (else `src`). `id`: the gallery's id (two on a page need their
+    own). `label`: what screen readers call it. `enlarge=false` leaves out
+    the enlarge button and its sheet.
+
+    How it is used: the arrows, the thumbnails, a swipe, or the keyboard
+    (Left/Right, Home/End while the focus is in the gallery) change the
+    photo; "Enlarge" opens the photo in the kit's `sheet`. The photos slide
+    with Motion (transform), and jump without it under
+    prefers-reduced-motion. Without JavaScript the photos scroll sideways
+    and the thumbnails are links to each photo. -#}
+{% from "renox/ui.html" import sheet, button %}
+
+{% macro gallery(photos, id="gallery", label=none, enlarge=true) -%}
+{%- set label = label or t('blocks.gallery.label') %}
+{%- set total = photos | length %}
+<div class="bs-gallery" id="{{ id }}" data-bs-gallery role="region" aria-roledescription="{{ t('blocks.gallery.carousel') }}" aria-label="{{ label }}">
+  <div class="bs-gallery__stage">
+    <div class="bs-gallery__viewport" data-bs-gallery-viewport tabindex="0" role="group" aria-label="{{ t('blocks.gallery.keys') }}">
+      <ul class="bs-gallery__track" data-bs-gallery-track role="list">
+        {%- for photo in photos %}
+        <li class="bs-gallery__slide" id="{{ id }}-slide-{{ loop.index }}" role="group" aria-roledescription="{{ t('blocks.gallery.slide') }}" aria-label="{{ t('blocks.gallery.position', n=loop.index, total=total) }}" data-large="{{ photo.large or photo.src }}" data-alt="{{ photo.alt }}" data-caption="{{ photo.caption or '' }}">
+          <img class="bs-gallery__image" src="{{ photo.src }}" alt="{{ photo.alt }}" draggable="false"{% if not loop.first %} loading="lazy"{% endif %}>
+          {%- if photo.caption %}<p class="bs-gallery__caption">{{ photo.caption }}</p>{% endif %}
+        </li>
+        {%- endfor %}
+      </ul>
+    </div>
+    {%- if total > 1 %}
+    <button class="bs-gallery__arrow bs-gallery__arrow--prev" type="button" data-bs-gallery-prev aria-controls="{{ id }}" aria-label="{{ t('blocks.gallery.previous') }}" hidden>
+      <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M12.5 4.5L7 10l5.5 5.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="bs-gallery__arrow bs-gallery__arrow--next" type="button" data-bs-gallery-next aria-controls="{{ id }}" aria-label="{{ t('blocks.gallery.next') }}" hidden>
+      <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M7.5 4.5L13 10l-5.5 5.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    {%- endif %}
+    {%- if enlarge %}
+    <button class="bs-gallery__enlarge rx-button rx-button--secondary rx-button--small" type="button" data-rx-open="{{ id }}-zoom" data-bs-gallery-enlarge aria-haspopup="dialog">
+      <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M12 3h5v5M8 17H3v-5M17 3l-6 6M3 17l6-6" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>{{ t('blocks.gallery.enlarge') }}</span>
+    </button>
+    {%- endif %}
+    <p class="rx-visually-hidden" aria-live="polite" data-bs-gallery-status></p>
+  </div>
+  {%- if total > 1 %}
+  <ul class="bs-gallery__thumbs" role="list" aria-label="{{ t('blocks.gallery.thumbnails') }}">
+    {%- for photo in photos %}
+    <li>
+      <a class="bs-gallery__thumb" href="#{{ id }}-slide-{{ loop.index }}" data-bs-gallery-thumb="{{ loop.index0 }}" aria-label="{{ t('blocks.gallery.show', n=loop.index, alt=photo.alt) }}"{% if loop.first %} aria-current="true"{% endif %}>
+        <img src="{{ photo.thumb or photo.src }}" alt="" draggable="false" loading="lazy">
+      </a>
+    </li>
+    {%- endfor %}
+  </ul>
+  {%- endif %}
+</div>
+{%- if enlarge %}
+{% call sheet(id ~ "-zoom", label, width="xl") %}
+  <figure class="bs-gallery__zoom">
+    <img class="bs-gallery__zoom-image" src="{{ (photos | first).large or (photos | first).src if photos else '' }}" alt="{{ (photos | first).alt if photos else '' }}" data-bs-gallery-zoom>
+    <figcaption class="rx-subtitle" data-bs-gallery-zoom-caption>{{ (photos | first).caption or '' if photos else '' }}</figcaption>
+  </figure>
+  <div class="rx-sheet__actions">
+    {{ button(t('blocks.gallery.close'), variant="primary", type="button", attrs={"data-rx-close": id ~ "-zoom"}) }}
+  </div>
+{% endcall %}
+{%- endif %}
+{%- endmacro %}

@@ -1,0 +1,75 @@
+{#- `staff.team.show`: one person (src/app/staff/team.rs): their roles in
+    every store, with dates (the ones in this store can be taken away here),
+    a form to give a role in this store from / until a date (#244), and
+    deactivation. `store`, `member`, `assignments`, `roles` (what the viewer
+    may give here), `is_me`. -#}
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, list, badge, select, date_picker, form_grid, button, confirm, infolist, entry %}
+{% from "layouts/_text.html" import tx %}
+{% block seo %}{{ seo(title=member.name) }}{% endblock %}
+
+{% block content %}
+{% include "staff/_styles.html" %}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(member.name, subtitle=member.email, back=route('staff.team.index'), back_label=t('staff.team.title', store=store.name),
+                 badge=(t('staff.team.active') if member.staff.active else t('staff.team.inactive')), badge_kind=("success" if member.staff.active else "warning")) }}
+  <div class="bs-split">
+    <div class="rx-stack">
+      {% call card(title=t('staff.team.roles'), subtitle=t('staff.team.roles_lead')) %}
+        {% call list(id="assignments", label=t('staff.team.roles')) %}
+          {%- for a in assignments %}
+          <li>
+            <span class="rx-list__main">
+              <strong>{{ tx(a.role) }}</strong>
+              <span class="rx-subtitle">{% if a.global %}{{ t('staff.team.everywhere') }}{% else %}{{ a.store }}{% endif %}
+                {%- if a.starts_at %} · {{ t('staff.team.from', date=a.starts_at | date) }}{% endif %}
+                {%- if a.ends_at %} · {{ t('staff.team.until', date=a.ends_at | date) }}{% endif %}</span>
+            </span>
+            {%- if not a.active %}{{ badge(t('staff.team.not_in_force'), "warning") }}{% endif %}
+            {%- if a.here and not is_me and (roles | selectattr(0, "equalto", a.role) | list) %}
+            {{ confirm("remove-" ~ a.role, t('staff.team.remove'), route('staff.team.roles.destroy', member.staff.id, a.role), t('staff.team.remove_title', role=tx(a.role)), t('staff.team.remove_text', store=store.name)) }}
+            {%- endif %}
+          </li>
+          {%- else %}
+          <li><span class="rx-subtitle">{{ t('staff.team.no_role') }}</span></li>
+          {%- endfor %}
+        {% endcall %}
+      {% endcall %}
+      {%- if roles and not is_me %}
+      <form method="post" action="{{ route('staff.team.roles.store', member.staff.id) }}" id="give-role" data-live-validate>
+        {{ csrf_field() }}
+        {% call card(title=t('staff.team.give', store=store.name), subtitle=t('staff.team.give_lead')) %}
+          {% call form_grid(2) %}
+            {%- set ns = namespace(roles=[]) %}{% for r in roles %}{% set ns.roles = ns.roles + [[r[0], tx(r[1]) | string]] %}{% endfor %}
+            {{ select("role", t('staff.team.role'), ns.roles, required=true, span="full", placeholder=t('staff.team.choose_role')) }}
+            {{ date_picker("starts_on", t('staff.team.starts_on'), hint=t('staff.team.starts_hint')) }}
+            {{ date_picker("ends_on", t('staff.team.ends_on'), hint=t('staff.team.ends_hint')) }}
+          {% endcall %}
+          <div class="rx-card__footer">{{ button(t('staff.team.give_button')) }}</div>
+        {% endcall %}
+      </form>
+      {%- endif %}
+    </div>
+    <div class="rx-stack">
+      {% call card(title=t('staff.team.details')) %}
+        {% call infolist() %}
+          {{ entry(t('staff.team.home'), member.home_store) }}
+          {{ entry(t('staff.team.hired'), member.staff.hired_on, format="date") }}
+          {{ entry(t('staff.stores.phone'), member.staff.phone) }}
+        {% endcall %}
+      {% endcall %}
+      {%- if not is_me %}
+      {% call card(title=t('staff.team.access'), subtitle=t('staff.team.deactivate_lead') if member.staff.active else t('staff.team.reactivate_lead')) %}
+        <div class="rx-card__footer">
+        {%- if member.staff.active %}
+          {{ confirm("deactivate", t('staff.team.deactivate'), route('staff.team.deactivate', member.staff.id), t('staff.team.deactivate_title', name=member.name), t('staff.team.deactivate_text'), method="POST", confirm_label=t('staff.team.deactivate')) }}
+        {%- else %}
+          <form method="post" action="{{ route('staff.team.reactivate', member.staff.id) }}">{{ csrf_field() }}{{ button(t('staff.team.reactivate'), variant="secondary") }}</form>
+        {%- endif %}
+        </div>
+      {% endcall %}
+      {%- endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

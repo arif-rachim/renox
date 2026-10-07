@@ -1,0 +1,29 @@
+{#- Small pieces the API pages share (#241). -#}
+{% from "renox/ui.html" import card, input, checkbox_list, button, form_errors, table, confirm, alert %}
+
+{#- The pages' styles (public/api/api.css), once. -#}
+{% macro assets() -%}
+{% call push('head', once='api-css') %}<link rel="stylesheet" href="{{ asset('api/api.css') }}">{% endcall %}
+{%- endmacro %}
+
+{#- A token just made, shown once with the kit's copy button, and how to use it. -#}
+{% macro fresh_token(token, base) -%}
+<div class="bs-token-once" data-bs-reveal>
+  {{ alert(t('api.tokens.once'), kind="warning", title=t('api.tokens.once_title')) }}
+  {{ input("token", t('api.tokens.token'), value=token, readonly=true, copyable=true, id="fresh-token") }}
+  <pre class="bs-code"><code>curl -H "Authorization: Bearer {{ token }}" {{ base }}/api/v1/me</code></pre>
+</div>
+{%- endmacro %}
+
+{#- The form for a new token: a name and its abilities. -#}
+{% macro token_form(action, abilities, name_hint) -%}
+<form method="post" action="{{ action }}" class="bs-token-form" novalidate>
+  {{ csrf_field() }}
+  {{ form_errors() }}
+  {{ input("name", t('api.tokens.name'), required=true, hint=name_hint) }}
+  {%- set opts = namespace(list=[]) %}
+  {%- for a in abilities %}{% set opts.list = opts.list + [[a[0], a[0], t(a[1])]] %}{% endfor %}
+  {{ checkbox_list("abilities", t('api.tokens.abilities'), opts.list, required=true) }}
+  {{ button(t('api.tokens.make'), icon="plus") }}
+</form>
+{%- endmacro %}

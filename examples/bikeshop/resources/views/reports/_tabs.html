@@ -1,0 +1,10 @@
+{#- The report pages' tabs (src/app/reports/grids.rs `REPORTS`): the dashboard and the six
+    grids, as the kit's `link_tabs` (it scrolls sideways on phones). `tabs` comes from the
+    handler; the current page is `request.route`. -#}
+{% from "renox/ui.html" import link_tabs %}
+{%- set report_tabs = namespace(items=[], current=none) %}
+{%- for item in tabs %}
+  {%- set report_tabs.items = report_tabs.items + [[route(item.route), t('reports.tab.' ~ item.key)]] %}
+  {%- if item.route == request.route %}{% set report_tabs.current = route(item.route) %}{% endif %}
+{%- endfor %}
+{{ link_tabs(report_tabs.items, current=report_tabs.current, label=t('reports.tabs')) }}

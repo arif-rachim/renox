@@ -1,0 +1,89 @@
+{% extends "layouts/staff.html" %}
+{#- The counter (src/app/sales/counter.rs): find a product by SKU, barcode
+    text or name, ring it up, attach a customer or sell to a walk-in, take
+    cash (with the keypad) or card, print the receipt. Keyboard: P pays,
+    X starts again. The forms are boosted by htmx (no full reload) and plain
+    forms without JavaScript. -#}
+{% from "renox/ui.html" import page_header, card, select, button, link_button, toggle_buttons, input, empty, alert, badge, thumbnail %}
+{% from "blocks/quantity.html" import quantity %}
+{% from "blocks/keypad.html" import keypad %}
+{% block seo %}{{ seo(title=t('sales.counter.title')) }}{% endblock %}
+
+{% block content %}
+{% include "sales/_assets.html" %}
+<div class="rx-stack" hx-boost="true">
+  {% call page_header(t('sales.counter.title'), subtitle=t('sales.counter.lead', store=store.name), back=route('sales.orders.index'), back_label=t('sales.staff.title')) %}
+    <form method="post" action="{{ route('sales.counter.clear') }}">{{ csrf_field() }}{{ button(t('sales.counter.clear'), variant="plain", key="x") }}</form>
+  {% endcall %}
+  {% block sale %}
+  <div class="bs-counter" id="counter">
+    <section class="bs-counter__left">
+      {% call card(t('sales.counter.find')) %}
+        <form class="bs-counter__find" method="post" action="{{ route('sales.counter.add') }}">
+          {{ csrf_field() }}
+          {{ select("variant_id", t('sales.counter.product'), [], searchable=true, options_url=route('sales.counter.variants'), placeholder=t('sales.counter.product_hint'), required=true, id="counter-product") }}
+          {{ quantity("quantity", 1, min=1, max=20, label=t('sales.orders.quantity'), id="counter-quantity") }}
+          {{ button(t('sales.counter.add'), variant="primary", key="a") }}
+        </form>
+      {% endcall %}
+      {% call card(t('sales.counter.sale')) %}
+        {%- if sale.changed %}{{ alert(t('sales.counter.changed'), kind="warning") }}{% endif %}
+        {%- if sale.lines %}
+        <ul class="bs-cart__list" role="list">
+          {%- for line in sale.lines %}
+          <li class="bs-cart__line bs-cart__line--counter">
+            {%- if line.photo %}{{ thumbnail(line.photo, alt="") }}{% else %}<span></span>{% endif %}
+            <div class="bs-cart__what">
+              <span class="bs-cart__name">{{ line.product.name }}</span>
+              <p class="rx-subtitle">{{ line.variant.sku }}{% if line.variant.size %} · {{ line.variant.size }}{% endif %}{% if line.variant.colour %} · {{ line.variant.colour }}{% endif %} · {{ line.variant.price | money }} · {{ t('sales.counter.here', count=line.available) }}</p>
+            </div>
+            <form class="bs-cart__qty" method="post" action="{{ route('sales.counter.update', line.variant.id) }}"
+                  hx-post="{{ route('sales.counter.update', line.variant.id) }}" hx-trigger="change delay:300ms" hx-target="#counter" hx-select="#counter" hx-swap="outerHTML">
+              {{ csrf_field() }}{{ method_field('PATCH') }}
+              {{ quantity("quantity", line.quantity, min=1, max=([line.available, 20] | min if line.available > 0 else line.quantity), label=t('sales.cart.quantity_of', name=line.product.name), hide_label=true, id="cq-" ~ line.variant.id) }}
+            </form>
+            <p class="bs-cart__total rx-num">{{ line.total | money }}</p>
+            <form method="post" action="{{ route('sales.counter.remove', line.variant.id) }}">
+              {{ csrf_field() }}{{ method_field('DELETE') }}
+              <button class="rx-icon-button rx-icon-button--small" type="submit" aria-label="{{ t('sales.cart.remove', name=line.product.name) }}">
+                <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            </form>
+          </li>
+          {%- endfor %}
+        </ul>
+        {%- else %}
+        {{ empty(t('sales.counter.empty'), t('sales.counter.empty_text')) }}
+        {%- endif %}
+      {% endcall %}
+    </section>
+
+    <aside class="bs-counter__right">
+      {% call card(t('sales.counter.customer')) %}
+        <form method="post" action="{{ route('sales.counter.customer') }}"
+              hx-post="{{ route('sales.counter.customer') }}" hx-trigger="change" hx-target="#counter" hx-select="#counter" hx-swap="outerHTML">
+          {{ csrf_field() }}
+          {{ select("customer_id", t('sales.counter.customer'), ([[customer.id | string, customer.name]] if customer else []), selected=(customer.id | string if customer else none), searchable=true, options_url=route('sales.counter.customers'), placeholder=t('sales.counter.walk_in'), id="counter-customer", hide_label=true) }}
+          <noscript>{{ button(t('sales.counter.attach'), variant="secondary", size="small") }}</noscript>
+        </form>
+        {%- if customer %}<p class="rx-hint">{{ t('sales.counter.customer_hint') }}</p>{% endif %}
+      {% endcall %}
+      {% call card(t('sales.counter.pay_title')) %}
+        <dl class="bs-totals">
+          <div><dt>{{ t('sales.cart.items', count=sale.count) }}</dt><dd class="rx-num">{{ totals.subtotal | money }}</dd></div>
+          {%- if totals.discount > 0 %}<div><dt>{{ t('sales.checkout.plan_discount', percent=totals.discount_percent) }}</dt><dd class="rx-num">− {{ totals.discount | money }}</dd></div>{% endif %}
+          <div class="bs-totals__total"><dt>{{ t('sales.orders.total') }}</dt><dd class="rx-num" data-bs-counter-total="{{ totals.total }}">{{ totals.total | money }}</dd></div>
+        </dl>
+        <form class="bs-counter__pay" method="post" action="{{ route('sales.counter.pay') }}" hx-boost="false" data-bs-change-label="{{ t('sales.counter.change') }}" data-bs-short-label="{{ t('sales.counter.short') }}">
+          {{ csrf_field() }}
+          {{ toggle_buttons("method", t('sales.counter.method'), [["cash", t('sales.method.cash')], ["card", t('sales.method.card')]], selected="cash", required=true) }}
+          {{ input("tendered", t('sales.counter.tendered'), type="text", attrs={"inputmode": "numeric", "autocomplete": "off"}, hint=t('sales.counter.tendered_hint'), id="rx-tendered") }}
+          {{ keypad("rx-tendered", label=t('sales.counter.keypad'), enter_label=t('sales.counter.pay')) }}
+          {{ button(t('sales.counter.pay_amount', amount=(totals.total | money)), variant="primary", block=true, key="p", disabled_reason=(none if sale.lines else t('sales.counter.empty'))) }}
+        </form>
+      {% endcall %}
+    </aside>
+  </div>
+  {% endblock %}
+</div>
+{% endblock %}

@@ -308,6 +308,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "bikeshop"
+version = "0.0.0"
+dependencies = [
+ "renox",
+ "renox-2fa",
+ "renox-admin",
+ "renox-billing",
+ "renox-editors",
+ "renox-oauth",
+ "rust_xlsxwriter",
+ "serde",
+ "tracing",
+]
+
+[[package]]
 name = "billing"
 version = "0.0.0"
 dependencies = [

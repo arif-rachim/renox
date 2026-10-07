@@ -1,0 +1,66 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, select, button, alert, empty, radio, link_button, form_errors %}
+{% from "blocks/datetime_range.html" import datetime_range %}
+{% from "blocks/availability.html" import availability %}
+{% from "rentals/_parts.html" import styles %}
+{% block seo %}{{ seo(title=t('rentals.search.title'), description=t('rentals.search.lead')) }}{% endblock %}
+
+{#- Find a bike (#235): the filters are a GET form that htmx re-sends as they
+    change, swapping only #rent-results (the address follows, so it can be
+    shared); without JavaScript it is a plain form. -#}
+{% block content %}
+{{ styles() }}
+<div class="bs-rent">
+  <div class="bs-rent__header">{{ page_header(t('rentals.search.title'), subtitle=t('rentals.search.lead')) }}</div>
+
+  <form class="rx-card bs-rent__filters" method="get" action="{{ route('rentals.create') }}"
+        hx-get="{{ route('rentals.create') }}" hx-trigger="change, submit" hx-target="#rent-results"
+        hx-select="#rent-results" hx-swap="outerHTML" hx-push-url="true" aria-label="{{ t('rentals.search.filters') }}">
+    {%- set opts = namespace(stores=[], types=[["", t('rentals.search.any_type')]], sizes=[["", t('rentals.search.any_size')]]) %}
+    {%- for s in stores %}{% set opts.stores = opts.stores + [[s.id, s.name]] %}{% endfor %}
+    {%- for c in categories %}{% set opts.types = opts.types + [[c.id, c.name]] %}{% endfor %}
+    {%- for s in sizes %}{% set opts.sizes = opts.sizes + [[s, s]] %}{% endfor %}
+    {{ select("store", t('rentals.fields.store'), opts.stores, selected=store_id, required=true) }}
+    {{ datetime_range("starts_at", "ends_at", label=t('rentals.fields.period'), value_start=starts_at, value_end=ends_at,
+                      min=min_day, max=max_day, step=60, opens=8, closes=20, required=true) }}
+    {{ select("category", t('rentals.fields.type'), opts.types, selected=category or "") }}
+    {{ select("size", t('rentals.fields.size'), opts.sizes, selected=size) }}
+    {{ button(t('rentals.search.show'), variant="secondary", icon="search") }}
+  </form>
+
+  <section class="bs-rent__results" id="rent-results" aria-live="polite" aria-label="{{ t('rentals.search.results') }}" data-bs-reveal>
+    {%- if problem %}
+    {{ alert(problem, kind="warning") }}
+    {%- elif not offers %}
+    <div class="rx-card">{{ empty(t('rentals.search.none_title'), t('rentals.search.none_text')) }}</div>
+    {%- else %}
+    <form class="rx-card bs-rent__filters" method="post" action="{{ route('rentals.reserve') }}" id="reserve-form">
+      {{ csrf_field() }}
+      <input type="hidden" name="store" value="{{ store_id }}">
+      <input type="hidden" name="starts_at" value="{{ starts_at }}">
+      <input type="hidden" name="ends_at" value="{{ ends_at }}">
+      {{ form_errors() }}
+      {%- set bikes = namespace(options=[]) %}
+      {%- for o in offers %}
+        {%- set hint = (o.quote.price | money) ~ " · " ~ t('rentals.fields.deposit') ~ " " ~ (o.quote.deposit | money) ~ " · " ~ o.frame_number %}
+        {%- set hint = hint ~ (" · " ~ t('rentals.search.placed_by', store=o.owner_store) if o.placed_here else "") %}
+        {%- set bikes.options = bikes.options + [[o.id, o.model ~ (" (" ~ o.size ~ ")" if o.size else ""), hint]] %}
+      {%- endfor %}
+      {{ radio("bike", t('rentals.search.pick', count=offers | length), bikes.options, selected=old('bike', offers[0].id), required=true) }}
+      <p class="rx-hint">{{ t('rentals.search.rule', grace=15) }}</p>
+      {%- if signed_in %}
+      {{ button(t('rentals.search.reserve'), icon="check") }}
+      {%- else %}
+      {{ link_button(route('login'), t('rentals.search.login'), variant="primary") }}
+      {%- endif %}
+    </form>
+    {%- endif %}
+    {%- if timeline.rows %}
+    <div class="rx-card">
+      <h2 class="rx-card__title">{{ t('rentals.search.day') }}</h2>
+      {{ availability(timeline.columns, timeline.rows, label=t('rentals.search.day'), corner=t('rentals.fields.bike'), id="rent-day") }}
+    </div>
+    {%- endif %}
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, infolist, entry, table, button, input, checkbox, alert, form_errors, confirm %}
+{% from "blocks/history.html" import history %}
+{% from "stock/_parts.html" import styles, steps as stepper, shipment_status %}
+{% block seo %}{{ seo(title="CS-" ~ shipment.id) }}{% endblock %}
+
+{#- One consignment shipment (#240, #245): its steps, its lines (sent, received, sent back),
+    and the buttons for the step the person may take, each checked in the store that matters. -#}
+{% block content %}
+{{ styles() }}
+<div class="rx-stack">
+  {% call page_header("CS-" ~ shipment.id, subtitle=t('stock.consignments.from_to', owner=owner, location=location), back=route('stock.consignments'), back_label=t('stock.consignments.title')) %}
+    {%- if actions.approve %}
+    <form method="post" action="{{ route('stock.consignments.decide', shipment.id) }}">{{ csrf_field() }}<input type="hidden" name="decision" value="refuse">{{ button(t('stock.consignments.refuse'), variant="secondary") }}</form>
+    <form method="post" action="{{ route('stock.consignments.decide', shipment.id) }}">{{ csrf_field() }}<input type="hidden" name="decision" value="approve">{{ button(t('stock.consignments.approve'), icon="check") }}</form>
+    {%- endif %}
+    {%- if actions.ship %}<form method="post" action="{{ route('stock.consignments.ship', shipment.id) }}" id="ship-form">{{ csrf_field() }}{{ button(t('stock.consignments.ship'), icon="box", attrs={"title": t('stock.consignments.ship_text', location=location)}) }}</form>{% endif %}
+    {%- if actions.recall %}{{ confirm("recall", t('stock.consignments.recall'), route('stock.consignments.recall', shipment.id), t('stock.consignments.recall'), t('stock.consignments.recall_text', location=location), method="POST") }}{% endif %}
+    {%- if actions.send_back %}<form method="post" action="{{ route('stock.consignments.send_back', shipment.id) }}" id="send-back-form">{{ csrf_field() }}{{ button(t('stock.consignments.send_back'), icon="box", attrs={"title": t('stock.consignments.send_back_text', owner=owner)}) }}</form>{% endif %}
+    {%- if actions.receive_back %}<form method="post" action="{{ route('stock.consignments.receive_back', shipment.id) }}" id="receive-back-form">{{ csrf_field() }}{{ button(t('stock.consignments.receive_back'), icon="check", attrs={"title": t('stock.consignments.receive_back_text')}) }}</form>{% endif %}
+  {% endcall %}
+  {%- if status == "refused" %}{{ alert(t('stock.consignments.refused_text', owner=owner), kind="warning") }}{% endif %}
+  {%- if in_transit %}{{ alert(t('stock.consignments.in_transit_text'), kind="info") }}{% endif %}
+  {{ stepper(steps, "stock.consignments.status.", t("stock.consignments.steps")) }}
+  <div class="bs-split">
+    <div>
+      {%- if actions.receive %}
+      <form method="post" action="{{ route('stock.consignments.receive', shipment.id) }}" id="receive-form" novalidate>
+        {{ csrf_field() }}
+        {{ form_errors() }}
+        {% call card(title=t('stock.consignments.receive'), subtitle=t('stock.consignments.receive_lead')) %}
+          <ul class="bs-rows" role="list">
+            <li class="bs-row bs-row--head" aria-hidden="true"><span>{{ t('stock.fields.product') }}</span><span class="bs-row__figure">{{ t('stock.consignments.to_arrive') }}</span><span>{{ t('stock.consignments.arrived') }}</span></li>
+            {%- for l in lines if l.open > 0 %}
+            <li class="bs-row">
+              <span class="bs-row__name">{{ l.name }}<small>{{ l.sku }}</small></span>
+              <span class="bs-row__figure">{{ l.open }}</span>
+              <span><input type="hidden" name="lines[{{ loop.index0 }}][line]" value="{{ l.id }}">{{ input("lines[" ~ loop.index0 ~ "][received]", t('stock.consignments.arrived_of', name=l.name), type="number", value=l.open, hide_label=true, attrs={"min": 0, "max": l.open}) }}</span>
+            </li>
+            {%- endfor %}
+          </ul>
+          {{ checkbox("close", t('stock.consignments.close'), hint=t('stock.consignments.close_hint')) }}
+          {{ button(t('stock.consignments.receive'), icon="check") }}
+        {% endcall %}
+      </form>
+      {%- endif %}
+      {% call card(title=t('stock.consignments.lines')) %}
+        {% call table([t('stock.fields.product'), [t('stock.consignments.sent'), "num"], [t('stock.consignments.received'), "num"], [t('stock.consignments.returned'), "num"]], caption=t('stock.consignments.lines')) %}
+          {%- for l in lines %}
+          <tr><td>{{ l.name }}<br><span class="rx-subtitle">{{ l.sku }}</span></td><td class="rx-num">{{ l.quantity }}</td><td class="rx-num">{{ l.received_quantity }}</td><td class="rx-num">{{ l.returned_quantity }}</td></tr>
+          {%- endfor %}
+        {% endcall %}
+      {% endcall %}
+    </div>
+    <div>
+      {% call card(title=t('stock.consignments.details')) %}
+        {% call infolist() %}
+          {% call entry(t('stock.fields.status')) %}{{ shipment_status(status) }}{% endcall %}
+          {{ entry(t('stock.fields.owner_store'), owner, hint=t('stock.consignments.owner_hint')) }}
+          {{ entry(t('stock.fields.location_store'), location, hint=t('stock.consignments.location_hint')) }}
+          {{ entry(t('stock.consignments.note'), shipment.note) }}
+        {% endcall %}
+      {% endcall %}
+      {% call card(title=t('stock.consignments.history')) %}
+        {%- set h = namespace(items=[]) %}
+        {%- for e in events %}{% set h.items = h.items + [{"time": e.time, "title": t('stock.consignments.status.' ~ e.title), "kind": e.kind}] %}{% endfor %}
+        {{ history(h.items, label=t('stock.consignments.history'), date_format="%d %b %Y %H:%M") }}
+      {% endcall %}
+    </div>
+  </div>
+</div>
+{% endblock %}

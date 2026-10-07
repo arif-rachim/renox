@@ -1,0 +1,43 @@
+{#- `staff.stores.edit`: one store's form (src/app/staff/stores.rs). The
+    opening hours are the kit's `repeater`, a row per day (day, opens,
+    closes) laid out on a CSS grid; the fee rate shows only with
+    `settings.fees` in this store. -#}
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, input, select, repeater, form_grid, button, link_button, form_errors %}
+{% block seo %}{{ seo(title=store.name) }}{% endblock %}
+
+{% block content %}
+{% include "staff/_styles.html" %}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(store.name, subtitle=t('staff.stores.edit_lead'), back=route('staff.stores.index'), back_label=t('staff.stores.title')) }}
+  <form method="post" action="{{ route('staff.stores.update', store.id) }}" class="rx-stack" id="store-form" data-live-validate>
+    {{ csrf_field() }}{{ method_field('PUT') }}
+    {{ form_errors() }}
+    {% call card(title=t('staff.stores.details')) %}
+      {% call form_grid(2) %}
+        {{ input("name", t('staff.stores.name'), value=store.name, required=true) }}
+        {{ input("phone", t('staff.stores.phone'), type="tel", value=store.phone, required=true) }}
+        {{ input("email", t('staff.stores.email'), type="email", value=store.email, required=true, span="full") }}
+        {{ input("line1", t('accounts.contact.line1'), value=address.line1, required=true, span="full") }}
+        {{ input("line2", t('accounts.contact.line2'), value=address.line2) }}
+        {{ input("postal_code", t('accounts.contact.postal_code'), value=address.postal_code) }}
+        {{ input("workshop_minutes_per_day", t('staff.stores.workshop'), type="number", value=store.workshop_minutes_per_day, required=true, attrs={"min": 0, "max": 1440}, suffix=t('staff.stores.minutes_unit'), hint=t('staff.stores.workshop_hint')) }}
+        {%- if can_fees %}
+        {{ input("fee_percent", t('staff.stores.fee'), type="number", value=fee_percent, attrs={"min": 0, "max": 100, "step": "0.01"}, suffix="%", hint=t('staff.stores.fee_hint')) }}
+        {%- endif %}
+      {% endcall %}
+    {% endcall %}
+    {% call card(title=t('staff.stores.hours'), subtitle=t('staff.stores.hours_lead')) %}
+      {%- set days = [["mon", t('staff.stores.days.mon')], ["tue", t('staff.stores.days.tue')], ["wed", t('staff.stores.days.wed')], ["thu", t('staff.stores.days.thu')], ["fri", t('staff.stores.days.fri')], ["sat", t('staff.stores.days.sat')], ["sun", t('staff.stores.days.sun')]] %}
+      {% call(row, prefix) repeater("hours", t('staff.stores.hours'), rows=hours, item_label=t('staff.stores.day'), add_label=t('staff.stores.add_day'), max=7) %}
+        <div class="bs-hours">
+          {{ select(prefix ~ "[day]", t('staff.stores.day'), days, selected=row.day, required=true) }}
+          {{ input(prefix ~ "[opens]", t('staff.stores.opens'), type="time", value=row.opens, required=true) }}
+          {{ input(prefix ~ "[closes]", t('staff.stores.closes'), type="time", value=row.closes, required=true) }}
+        </div>
+      {% endcall %}
+    {% endcall %}
+    <div class="rx-row">{{ button(t('accounts.save')) }} {{ link_button(route('staff.stores.index'), t('staff.cancel'), variant="plain") }}</div>
+  </form>
+</div>
+{% endblock %}

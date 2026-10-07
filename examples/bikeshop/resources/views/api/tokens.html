@@ -1,0 +1,34 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, card, table, confirm, empty, link_button %}
+{% from "api/_parts.html" import assets, fresh_token, token_form %}
+{% block seo %}{{ seo(title=t('api.tokens.title')) }}{% endblock %}
+
+{#- A customer's personal API tokens (#241): make one, see it once, revoke. -#}
+{% block content %}
+{{ assets() }}
+<div class="rx-stack">
+  {{ page_header(t('api.tokens.title'), subtitle=t('api.tokens.lead')) }}
+  {%- if fresh %}{{ fresh_token(fresh, base) }}{% endif %}
+  <div class="bs-tokens">
+    {% call card(title=t('api.tokens.yours')) %}
+      {%- if tokens %}
+      {% call table([t('api.tokens.name'), t('api.tokens.abilities'), t('api.tokens.last_used'), t('api.tokens.expires'), ""], caption=t('api.tokens.yours')) %}
+        {%- for tk in tokens %}
+        <tr>
+          <td>{{ tk.name }}</td>
+          <td>{{ tk.abilities | join(", ") }}</td>
+          <td>{{ (tk.last_used_at | since) if tk.last_used_at else t('api.tokens.never') }}</td>
+          <td>{{ (tk.expires_at | date) if tk.expires_at else "—" }}</td>
+          <td>{{ confirm("revoke-" ~ tk.id, t('api.tokens.revoke'), route('api.tokens.destroy', tk.id), t('api.tokens.revoke_title'), t('api.tokens.revoke_text'), method="POST", size="small") }}</td>
+        </tr>
+        {%- endfor %}
+      {% endcall %}
+      {%- else %}{{ empty(t('api.tokens.none'), t('api.tokens.none_text')) }}{% endif %}
+    {% endcall %}
+    {% call card(title=t('api.tokens.new')) %}
+      {{ token_form(route('api.tokens.store'), abilities, t('api.tokens.name_hint')) }}
+      <p class="rx-hint">{{ link_button(route('api.about'), t('api.about.link'), variant="plain", size="small") }}</p>
+    {% endcall %}
+  </div>
+</div>
+{% endblock %}

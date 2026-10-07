@@ -1,0 +1,6 @@
+{#- The products list's custom column (src/app/staff/admin.rs): a link to
+    what the product fits (a part) or what fits it (a bike). -#}
+{%- from "renox/ui.html" import link_button -%}
+{%- if column.key == "fits" -%}
+{{ link_button(route('staff.catalog.fits', row.id), t('staff.catalog.fits_link'), size="small") }}
+{%- endif -%}

@@ -1,0 +1,18 @@
+{% extends "layouts/app.html" %}
+{#- Every mail the sales area sends, for a made-up order
+    (src/app/sales/mails.rs). Each is shown in a sandboxed frame, as a
+    mail client would. -#}
+{% from "renox/ui.html" import page_header, card %}
+{% block seo %}{{ seo(title=t('sales.mails.title') ~ " · " ~ t('shop.name')) }}{% endblock %}
+
+{% block content %}
+{% include "sales/_assets.html" %}
+{{ page_header(t('sales.mails.title'), subtitle=t('sales.mails.lead')) }}
+<div class="bs-mails" data-bs-reveal>
+  {%- for p in previews %}
+  {% call card(t('sales.mails.' ~ p.key), subtitle=p.subject) %}
+    <iframe class="bs-mails__frame" sandbox title="{{ p.subject }}" srcdoc="{{ p.html }}" loading="lazy"></iframe>
+  {% endcall %}
+  {%- endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,24 @@
+{#- Account section (src/app/accounts/mod.rs, order 10): the customer's
+    phone and home address, sent to `accounts.contact`. `section.data`:
+    customer, address (line1, line2, district, postal_code, city, country),
+    country_id, countries. A login without a customer record (staff) shows
+    nothing. -#}
+{%- if section.data.customer %}
+{% from "renox/ui.html" import card, input, select, form_grid, button %}
+<form method="post" action="{{ route('accounts.contact') }}" id="account-contact" data-live-validate>
+  {{ csrf_field() }}{{ method_field('PUT') }}
+  {% call card(title=t('accounts.contact.title'), subtitle=t('accounts.contact.lead')) %}
+    {%- set a = section.data.address %}
+    {% call form_grid(2) %}
+      {{ input("phone", t('accounts.contact.phone'), type="tel", value=section.data.customer.phone, autocomplete="tel", span="full") }}
+      {{ input("line1", t('accounts.contact.line1'), value=(a.line1 if a else none), required=true, autocomplete="address-line1", span="full") }}
+      {{ input("line2", t('accounts.contact.line2'), value=(a.line2 if a else none), autocomplete="address-line2", span="full") }}
+      {{ input("district", t('accounts.contact.district'), value=(a.district if a else none)) }}
+      {{ input("postal_code", t('accounts.contact.postal_code'), value=(a.postal_code if a else none), autocomplete="postal-code") }}
+      {{ input("city", t('accounts.contact.city'), value=(a.city if a else none), required=true, autocomplete="address-level2") }}
+      {{ select("country_id", t('accounts.contact.country'), section.data.countries, selected=section.data.country_id, required=true, searchable=true, placeholder=t('accounts.contact.choose_country')) }}
+    {% endcall %}
+    <div class="rx-card__footer">{{ button(t('accounts.save')) }}</div>
+  {% endcall %}
+</form>
+{%- endif %}

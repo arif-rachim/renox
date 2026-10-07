@@ -1,0 +1,22 @@
+{#- `staff.invitations.create`: invite someone to the active store's team
+    with a role there (src/app/staff/team.rs). `store`, `roles` (the roles
+    the viewer may give here). -#}
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, input, select, button %}
+{% from "layouts/_text.html" import tx %}
+{% block seo %}{{ seo(title=t('staff.invitations.title')) }}{% endblock %}
+
+{% block content %}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('staff.invitations.title'), subtitle=t('staff.invitations.lead', store=store.name), back=route('staff.team.index'), back_label=t('staff.team.title', store=store.name)) }}
+  <form method="post" action="{{ route('staff.invitations.store') }}" data-live-validate>
+    {{ csrf_field() }}
+    {% call card() %}
+      {{ input("email", t('staff.invitations.email'), type="email", required=true, autocomplete="off") }}
+      {%- set ns = namespace(roles=[]) %}{% for r in roles %}{% set ns.roles = ns.roles + [[r[0], tx(r[1]) | string]] %}{% endfor %}
+            {{ select("role", t('staff.team.role'), ns.roles, required=true, placeholder=t('staff.team.choose_role'), hint=t('staff.invitations.role_hint')) }}
+      <div class="rx-card__footer">{{ button(t('staff.invitations.send')) }}</div>
+    {% endcall %}
+  </form>
+</div>
+{% endblock %}

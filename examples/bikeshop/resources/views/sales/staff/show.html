@@ -1,0 +1,98 @@
+{% extends "layouts/staff.html" %}
+{#- One order for the staff (src/app/sales/staff.rs `show`): its lines, its
+    payments, its ledger, and the actions its status and the user's
+    permissions in its store allow. -#}
+{% from "renox/ui.html" import page_header, card, infolist, entry, table, badge, button, link_button, action_sheet, confirm, input, textarea, alert %}
+{% from "blocks/quantity.html" import quantity %}
+{% block seo %}{{ seo(title=t('sales.orders.title', number=data.number)) }}{% endblock %}
+
+{% block content %}
+{% include "sales/_assets.html" %}
+{%- set o = data %}
+<div class="rx-stack" data-bs-reveal>
+  {% call page_header(t('sales.orders.title', number=o.number), subtitle=t('sales.channel.' ~ o.channel) ~ " · " ~ t('sales.checkout.' ~ o.fulfilment), back=route('sales.orders.index'), back_label=t('sales.staff.title'), badge=t('sales.status.' ~ o.status)) %}
+    {{ link_button(route('orders.invoice', o.id), t('sales.orders.invoice')) }}
+    {%- if data.can_sell and o.status == "paid" %}
+      <form method="post" action="{{ route('sales.orders.ready', o.id) }}">{{ csrf_field() }}{{ button(t('sales.staff.mark_shipped' if o.delivery else 'sales.staff.mark_ready'), key="r") }}</form>
+    {%- endif %}
+    {%- if data.can_sell and o.status in ["paid", "ready"] %}
+      {% call action_sheet("complete-order", t('sales.staff.hand_over'), route('sales.orders.complete', o.id), t('sales.staff.hand_over_title', number=o.number), description=t('sales.staff.hand_over_text'), variant="primary", key="h") %}
+        {%- for bike in data.bikes %}
+          <input type="hidden" name="frames[{{ loop.index0 }}][bike_id]" value="{{ bike.id }}">
+          {{ input("frames[" ~ loop.index0 ~ "][number]", t('sales.staff.frame_of', name=bike.name), value=bike.frame_number, id="frame-" ~ bike.id) }}
+        {%- else %}
+          <p class="rx-subtitle">{{ t('sales.staff.no_bikes') }}</p>
+        {%- endfor %}
+      {% endcall %}
+    {%- endif %}
+    {%- if data.can_sell and o.status == "pending" %}
+      {{ confirm("cancel-order", t('sales.staff.cancel'), route('sales.orders.cancel', o.id), t('sales.staff.cancel_title', number=o.number), t('sales.staff.cancel_text'), method="POST") }}
+    {%- endif %}
+    {%- if data.can_refund and data.returnable %}
+      {% call action_sheet("return-order", t('sales.staff.return'), route('sales.orders.return', o.id), t('sales.staff.return_title', number=o.number), description=t('sales.staff.return_text', days=14), danger=true, width="lg") %}
+        {%- for line in o.lines %}
+          <input type="hidden" name="lines[{{ loop.index0 }}][item_id]" value="{{ line.id }}">
+          {{ quantity("lines[" ~ loop.index0 ~ "][quantity]", 0, min=0, max=line.quantity, label=line.name ~ (" · " ~ line.variant if line.variant else ""), id="return-" ~ line.id) }}
+        {%- endfor %}
+        {{ textarea("reason", t('sales.staff.reason'), rows=2, required=true) }}
+      {% endcall %}
+    {%- endif %}
+  {% endcall %}
+
+  <div class="bs-order">
+    <div class="bs-order__main">
+      {% call card(t('sales.orders.lines')) %}
+        {% call table([t('sales.orders.product'), t('sales.staff.owner'), [t('sales.orders.quantity'), "num"], [t('sales.orders.price'), "num"], [t('sales.orders.line_total'), "num"]], caption=t('sales.orders.lines')) %}
+          {%- for line in o.lines %}
+          <tr>
+            <td>{{ line.name }}<br><span class="rx-subtitle">{{ line.sku }}{% if line.variant %} · {{ line.variant }}{% endif %}</span></td>
+            <td>{% if line.owner_store_id != o.operating_store_id %}{{ badge(t('sales.staff.consigned'), kind="info") }}{% else %}—{% endif %}</td>
+            <td class="rx-num">{{ line.quantity }}</td>
+            <td class="rx-num">{{ line.unit_price | money }}</td>
+            <td class="rx-num">{{ line.total | money }}</td>
+          </tr>
+          {%- endfor %}
+        {% endcall %}
+        {% include "sales/orders/_totals.html" %}
+      {% endcall %}
+      {% call card(t('sales.staff.ledger'), subtitle=t('sales.staff.ledger_lead')) %}
+        {% call table([t('sales.staff.when'), t('sales.staff.reason_col'), [t('sales.orders.quantity'), "num"], t('sales.staff.note')], caption=t('sales.staff.ledger')) %}
+          {%- for m in data.movements %}
+          <tr><td>{{ m.created_at | date("%Y-%m-%d %H:%M") }}</td><td>{{ t('sales.movement.' ~ m.reason) }}</td><td class="rx-num">{{ m.quantity }}</td><td>{{ m.note or "" }}</td></tr>
+          {%- endfor %}
+        {% endcall %}
+      {% endcall %}
+    </div>
+    <aside class="bs-order__side">
+      {% call card(t('sales.orders.details')) %}
+        {% call infolist() %}
+          {{ entry(t('sales.orders.customer'), o.customer.name if o.customer else t('sales.staff.walk_in')) }}
+          {%- if o.customer and o.customer.email %}{{ entry(t('sales.checkout.email'), o.customer.email, copyable=true) }}{% endif %}
+          {%- if o.customer and o.customer.phone %}{{ entry(t('sales.checkout.phone'), o.customer.phone, copyable=true) }}{% endif %}
+          {%- if o.address %}{{ entry(t('sales.orders.address'), o.address) }}{% endif %}
+          {{ entry(t('sales.orders.placed_at'), o.placed_at, format="datetime") }}
+          {{ entry(t('sales.orders.paid_at'), o.paid_at, format="datetime") }}
+          {{ entry(t('sales.orders.completed_at'), o.completed_at, format="datetime") }}
+          {%- if data.return_until %}{{ entry(t('sales.staff.return_until'), data.return_until, format="date") }}{% endif %}
+        {% endcall %}
+      {% endcall %}
+      {% call card(t('sales.orders.payments')) %}
+        <ul class="bs-plain-list" role="list">
+          {%- for p in data.payments %}
+          <li><span>{{ t('sales.payment_status.' ~ p.status) }} · {{ t('sales.method.' ~ p.method) }}</span><span class="rx-num">{{ p.amount | money }}</span></li>
+          {%- else %}
+          <li><span class="rx-subtitle">{{ t('sales.staff.no_payments') }}</span></li>
+          {%- endfor %}
+        </ul>
+      {% endcall %}
+      {%- if data.bikes %}
+      {% call card(t('sales.staff.bikes')) %}
+        <ul class="bs-plain-list" role="list">
+          {%- for bike in data.bikes %}<li><span>{{ bike.name }}</span><span class="rx-subtitle">{{ bike.frame_number or t('sales.staff.no_frame') }}</span></li>{% endfor %}
+        </ul>
+      {% endcall %}
+      {%- endif %}
+    </aside>
+  </div>
+</div>
+{% endblock %}

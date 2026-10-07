@@ -1,0 +1,12 @@
+{#- Account section (order 120): the language of the pages and the mails,
+    sent to `accounts.language`, which saves it on the account and in the
+    session. The kit's `toggle_buttons` (a segmented control) with one
+    option per language the shop is written in (`home::LOCALES`). -#}
+{% from "renox/ui.html" import card, toggle_buttons, button %}
+<form method="post" action="{{ route('accounts.language') }}" id="account-language">
+  {{ csrf_field() }}{{ method_field('PUT') }}
+  {% call card(title=t('accounts.language.title'), subtitle=t('accounts.language.lead')) %}
+    {{ toggle_buttons("locale", t('accounts.language.label'), section.data.locales, selected=section.data.current, required=true) }}
+    <div class="rx-card__footer">{{ button(t('accounts.save'), variant="secondary") }}</div>
+  {% endcall %}
+</form>

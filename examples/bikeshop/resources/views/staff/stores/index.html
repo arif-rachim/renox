@@ -1,0 +1,32 @@
+{#- `staff.stores.index`: the stores the person manages (`stores.manage` in
+    each), as cards on a grid (src/app/staff/stores.rs). `cards`: store,
+    address (one line), fee_percent; `can_fees`. -#}
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, infolist, entry, link_button, empty %}
+{% block seo %}{{ seo(title=t('staff.stores.title')) }}{% endblock %}
+
+{% block content %}
+{% include "staff/_styles.html" %}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('staff.stores.title'), subtitle=t('staff.stores.lead')) }}
+  {%- if cards %}
+  <div class="bs-tiles" id="stores">
+    {%- for c in cards %}
+    {% call card(title=c.store.name, subtitle=c.address) %}
+      {% call infolist(columns=2) %}
+        {{ entry(t('staff.stores.phone'), c.store.phone) }}
+        {{ entry(t('staff.stores.email'), c.store.email) }}
+        {{ entry(t('staff.stores.workshop'), t('staff.stores.minutes', minutes=c.store.workshop_minutes_per_day)) }}
+        {{ entry(t('staff.stores.fee'), c.fee_percent, suffix=" %", decimals=2) }}
+        {{ entry(t('staff.stores.hours'), c.store.opening_hours | map(attribute="day") | list, list="comma", span="full",
+                 labels={"mon": t('staff.stores.days.mon'), "tue": t('staff.stores.days.tue'), "wed": t('staff.stores.days.wed'), "thu": t('staff.stores.days.thu'), "fri": t('staff.stores.days.fri'), "sat": t('staff.stores.days.sat'), "sun": t('staff.stores.days.sun')}) }}
+      {% endcall %}
+      <div class="rx-card__footer">{{ link_button(route('staff.stores.edit', c.store.id), t('staff.stores.edit'), icon="edit") }}</div>
+    {% endcall %}
+    {%- endfor %}
+  </div>
+  {%- else %}
+  <div class="rx-card">{{ empty(t('staff.stores.none')) }}</div>
+  {%- endif %}
+</div>
+{% endblock %}

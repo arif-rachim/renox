@@ -1,0 +1,27 @@
+/* The bike shop's own styles, on top of the Renox UI kit (rx-* classes, docs/ui.md).
+   Only two things live here:
+   1. The brand: a deep teal replaces the kit's accent. White on the button colour is
+      6.1:1 (5.5:1 in dark mode), the link colour 6.9:1 on the page (9.5:1 in dark mode),
+      so both pass WCAG AA.
+   2. The page structure, as CSS grids spaced with the kit's tokens (--rx-space-*).
+      Type and spacing are the kit's: no font sizes or spacing values of our own. */
+:root { --rx-accent: #0b6e66; --rx-accent-hover: #0d7a71; --rx-accent-pressed: #095b55; --rx-accent-text: #0a5f58; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --rx-accent: #0f766e; --rx-accent-hover: #12837a; --rx-accent-pressed: #0b625b; --rx-accent-text: #5fd4c6; } }
+:root[data-theme="dark"] { --rx-accent: #0f766e; --rx-accent-hover: #12837a; --rx-accent-pressed: #0b625b; --rx-accent-text: #5fd4c6; }
+
+/* The public layout: the bar, the page, the footer, top to bottom. */
+.bs-public { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr auto; min-height: 100vh; min-height: 100dvh; }
+.bs-footer { display: grid; grid-auto-flow: column; justify-content: space-between; align-items: center; gap: var(--rx-space-3); padding-block: var(--rx-space-6); border-top: 0.5px solid var(--rx-separator); }
+@media (max-width: 40rem) { .bs-footer { grid-auto-flow: row; justify-content: start; } }
+/* The bar's search box gives way first when the bar gets full (logged in, in
+   Spanish), so the account menu stays on the first line; on phones it has a
+   row of its own (catalog.css). */
+@media (min-width: 40.0625rem) { .bs-public .rx-navbar .bs-search { flex: 4 1 0; width: auto; min-width: 7rem; max-width: 20rem; } }
+/* Phones: the cart is its icon and count (the word stays for screen readers, as
+   the kit's .rx-visually-hidden does), so the account menu fits the same row. */
+@media (max-width: 36rem) { .bs-public .bs-cart-link .rx-button__label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } }
+
+/* Lists inside the "About this page" panel and on /about/pages. */
+.bs-links { display: grid; gap: var(--rx-space-1); margin: 0; padding: 0; list-style: none; }
+.bs-badges { display: flex; flex-wrap: wrap; gap: var(--rx-space-1); }
+.bs-page-row { display: grid; gap: var(--rx-space-2); padding-block: var(--rx-space-2); }

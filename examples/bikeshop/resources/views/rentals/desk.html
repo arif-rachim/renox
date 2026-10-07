@@ -1,0 +1,117 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, infolist, entry, alert, button, link_button, checkbox_list, toggle_buttons, checkbox, input, textarea, file, form_errors, show_when %}
+{% from "rentals/_parts.html" import styles, status %}
+{% block seo %}{{ seo(title=t('rentals.desk.title', code=row.reservation_code)) }}{% endblock %}
+
+{#- One rental at the counter (#235): the facts on one side, the pick-up or return form on the other. -#}
+{% block content %}
+{{ styles() }}
+{%- set items = namespace(list=[]) %}
+{%- for item in checklist %}{% set items.list = items.list + [[item, t('rentals.checklist.' ~ item)]] %}{% endfor %}
+{%- set methods = [["cash", t('rentals.methods.cash')], ["card", t('rentals.methods.card')]] %}
+<div class="rx-stack">
+  {{ page_header(row.model or t('rentals.fields.bike'), subtitle=row.reservation_code, back=route('rentals.counter'), back_label=t('rentals.counter.title')) }}
+  <div class="bs-desk" data-bs-reveal>
+    <div class="bs-desk__side">
+      {% call card(title=t('rentals.desk.rental')) %}
+        {% call infolist() %}
+          {% call entry(t('rentals.fields.status')) %}{{ status(row, row.overdue) }}{% endcall %}
+          {{ entry(t('rentals.fields.code'), row.reservation_code, copyable=true) }}
+          {{ entry(t('rentals.fields.frame'), row.bike.frame_number if row.bike else none, url=route('rentals.fleet.show', row.rental_bike_id) if can('fleet.view') else none) }}
+          {{ entry(t('rentals.fields.starts'), row.starts_at, format="datetime") }}
+          {{ entry(t('rentals.fields.ends'), row.due_at, format="datetime") }}
+          {{ entry(t('rentals.fields.operating'), row.operating_store.name if row.operating_store else none) }}
+          {{ entry(t('rentals.fields.owner'), row.owner_store.name if row.owner_store else none) }}
+          {{ entry(t('rentals.fields.price'), row.price, format="money") }}
+          {{ entry(t('rentals.fields.deposit'), row.deposit, format="money", hint=t('rentals.deposit.' ~ row.deposit_status)) }}
+        {% endcall %}
+      {% endcall %}
+      {% call card(title=t('rentals.desk.customer')) %}
+        {% call infolist() %}
+          {{ entry(t('rentals.fields.customer'), customer.name if customer else none) }}
+          {{ entry(t('rentals.identity.number'), masked) }}
+          {% call entry(t('rentals.desk.id_check')) %}
+            {%- if verified %}<span class="rx-badge rx-badge--success">{{ t('rentals.desk.verified') }}</span>
+            {%- else %}<span class="rx-badge rx-badge--warning">{{ t('rentals.desk.not_verified') }}</span>{% endif %}
+          {% endcall %}
+        {% endcall %}
+{%- if customer and customer.user_id is none and can('customers.manage') %}
+        <p>{{ link_button(route('accounts.invite', customer.id), t('accounts.invite.title'), variant="plain", size="small") }}</p>
+        {%- endif %}
+        {%- if not verified and document and can('rentals.verify_id') %}
+        <div class="rx-stack">
+          {{ link_button(route('rentals.identities.photo', document.id), t('rentals.identities.open_photo'), new_tab=true) }}
+          <form method="post" action="{{ route('rentals.identities.approve', document.id) }}">{{ csrf_field() }}{{ button(t('rentals.identities.approve'), variant="secondary", icon="check") }}</form>
+        </div>
+        {%- endif %}
+      {% endcall %}
+      {%- if photos %}
+      {% call card(title=t('rentals.desk.photos')) %}
+        <ul class="bs-photos">
+          {%- for photo in photos %}<li><a class="rx-link" href="{{ route('rentals.photo', row.id, photo.id) }}" target="_blank" rel="noopener">{{ t('rentals.photos.' ~ photo.kind) }} {{ loop.index }}</a></li>{% endfor %}
+        </ul>
+      {% endcall %}
+      {%- endif %}
+    </div>
+
+    <div class="bs-desk__main">
+      {%- if wrong_store %}
+      {{ alert(t('rentals.desk.other_store', store=(row.operating_store.name if row.operating_store else "")), kind="info") }}
+      {%- endif %}
+
+      {%- if can_pickup %}
+      <form method="post" action="{{ route('rentals.pickup', row.id) }}" id="pickup-form" novalidate>
+        {{ csrf_field() }}
+        {% call card(title=t('rentals.desk.pickup'), subtitle=t('rentals.desk.pickup_lead')) %}
+          {{ form_errors() }}
+          {%- if not verified %}{{ alert(t('rentals.errors.unverified'), kind="warning") }}{% endif %}
+          {{ checkbox_list("checklist", t('rentals.desk.checklist'), items.list, selected=old('checklist', checklist | list), columns=2) }}
+          <dl class="bs-figures">
+            <dt>{{ t('rentals.fields.price') }}</dt><dd>{{ row.price | money }}</dd>
+            <dt>{{ t('rentals.fields.deposit') }}</dt><dd>{{ (row.deposit | money) if row.deposit_status == "unpaid" else t('rentals.deposit.paid_online') }}</dd>
+            <dt class="bs-figures__total">{{ t('rentals.desk.due_now') }}</dt><dd class="bs-figures__total">{{ due_at_pickup | money }}</dd>
+          </dl>
+          {{ toggle_buttons("method", t('rentals.desk.method'), methods, selected=old('method', 'card')) }}
+          {{ button(t('rentals.desk.hand_over'), icon="check", disabled=not verified, disabled_reason=t('rentals.errors.unverified') if not verified else none) }}
+        {% endcall %}
+      </form>
+      {%- endif %}
+
+      {%- if can_return %}
+      <form method="post" action="{{ route('rentals.return', row.id) }}" enctype="multipart/form-data" id="return-form" novalidate>
+        {{ csrf_field() }}
+        {% call card(title=t('rentals.desk.return'), subtitle=t('rentals.desk.return_lead')) %}
+          {{ form_errors() }}
+          {%- if preview.late_fee %}{{ alert(t('rentals.desk.late', minutes=preview.late_minutes, fee=(preview.late_fee | money)), kind="warning") }}{% endif %}
+          {{ checkbox_list("checklist", t('rentals.desk.checklist'), items.list, selected=old('checklist', checklist | list), columns=2) }}
+          {{ checkbox("damaged", t('rentals.desk.damaged'), checked=(old('damaged', '') == 'on'), switch=true) }}
+          {% call show_when("damaged", ["on", "true", "1"]) %}
+            {{ input("damage_fee", t('rentals.fields.damage_fee'), type="number", attrs={"min": 0, "step": 1000}, prefix="Rp") }}
+            {{ textarea("damage_note", t('rentals.desk.damage_note'), rows=3) }}
+            {{ file("photos", t('rentals.desk.damage_photos'), accept="image/*", multiple=true, preview=true, hint=t('rentals.desk.photos_hint')) }}
+          {% endcall %}
+          <dl class="bs-figures">
+            <dt>{{ t('rentals.fields.late_fee') }}</dt><dd>{{ preview.late_fee | money }}</dd>
+            <dt>{{ t('rentals.desk.deposit_held') }}</dt><dd>{{ preview.held | money }}</dd>
+            <dt>{{ t('rentals.fields.refund') }}</dt><dd>{{ preview.settlement.refund | money }}</dd>
+            <dt class="bs-figures__total">{{ t('rentals.desk.to_pay') }}</dt><dd class="bs-figures__total">{{ preview.settlement.due | money }}</dd>
+          </dl>
+          <p class="rx-hint">{{ t('rentals.desk.settle_hint') }}</p>
+          {{ toggle_buttons("method", t('rentals.desk.method'), methods, selected=old('method', 'card')) }}
+          {{ button(t('rentals.desk.take_back'), icon="check") }}
+        {% endcall %}
+      </form>
+      {%- endif %}
+
+      {%- if row.status == "returned" %}
+      {% call card() %}
+        <p>{{ t('rentals.desk.closed') }}</p>
+        {{ link_button(route('rentals.receipt', row.id), t('rentals.receipt.title'), variant="primary") }}
+      {% endcall %}
+      {%- elif not can_pickup and not can_return and not wrong_store %}
+      {% call card() %}<p>{{ t('rentals.desk.nothing') }}</p>{% endcall %}
+      {%- endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

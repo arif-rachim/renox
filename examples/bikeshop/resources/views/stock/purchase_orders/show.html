@@ -1,0 +1,73 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, infolist, entry, table, button, input, alert, form_errors, confirm, link_button, list %}
+{% from "stock/_parts.html" import styles, steps as stepper, order_status %}
+{% block seo %}{{ seo(title="PO-" ~ order.id) }}{% endblock %}
+
+{#- A purchase order (#240): its steps, lines, what work orders wait for, and the actions:
+    send (mailed to the supplier with the signed printable page), receive (also partly),
+    cancel. -#}
+{% block content %}
+{{ styles() }}
+<div class="rx-stack">
+  {% call page_header("PO-" ~ order.id, subtitle=supplier.name ~ " · " ~ store, back=route('stock.purchasing'), back_label=t('stock.purchasing.title')) %}
+    {{ link_button(print_url, t('stock.purchasing.print'), icon="external", new_tab=true) }}
+    {%- if actions.cancel %}{{ confirm("cancel-po", t('stock.purchasing.cancel'), route('stock.purchasing.cancel', order.id), t('stock.purchasing.cancel'), t('stock.purchasing.cancel_text'), method="POST") }}{% endif %}
+    {%- if actions.send %}<form method="post" action="{{ route('stock.purchasing.send', order.id) }}" id="send-po-form">{{ csrf_field() }}{{ button(t('stock.purchasing.send'), icon="external", attrs={"title": t('stock.purchasing.send_text', supplier=supplier.name, email=(supplier.email or "—"))}) }}</form>{% endif %}
+  {% endcall %}
+  {%- if status == "cancelled" %}{{ alert(t('stock.purchasing.cancelled_text'), kind="warning") }}{% endif %}
+  {%- if order.suggested and status == "draft" %}{{ alert(t('stock.purchasing.suggested_text'), kind="info") }}{% endif %}
+  {{ stepper(steps, "stock.purchasing.status.", t('stock.purchasing.steps')) }}
+  <div class="bs-split">
+    <div>
+      {%- if actions.receive %}
+      <form method="post" action="{{ route('stock.purchasing.receive', order.id) }}" id="receive-po" novalidate>
+        {{ csrf_field() }}
+        {{ form_errors() }}
+        {% call card(title=t('stock.purchasing.receive'), subtitle=t('stock.purchasing.receive_lead', store=store)) %}
+          <ul class="bs-rows" role="list">
+            <li class="bs-row bs-row--head" aria-hidden="true"><span>{{ t('stock.fields.product') }}</span><span class="bs-row__figure">{{ t('stock.purchasing.open') }}</span><span>{{ t('stock.purchasing.arrived') }}</span></li>
+            {%- for l in lines if l.open > 0 %}
+            <li class="bs-row">
+              <span class="bs-row__name">{{ l.name }}<small>{{ l.sku }} · {{ l.unit_cost | money }}</small></span>
+              <span class="bs-row__figure">{{ l.open }}</span>
+              <span><input type="hidden" name="lines[{{ loop.index0 }}][line]" value="{{ l.id }}">{{ input("lines[" ~ loop.index0 ~ "][received]", t('stock.purchasing.arrived_of', name=l.name), type="number", value=l.open, hide_label=true, attrs={"min": 0, "max": l.open}) }}</span>
+            </li>
+            {%- endfor %}
+          </ul>
+          {{ button(t('stock.purchasing.receive'), icon="check") }}
+        {% endcall %}
+      </form>
+      {%- endif %}
+      {% call card(title=t('stock.purchasing.lines')) %}
+        {% call table([t('stock.fields.product'), [t('stock.purchasing.ordered'), "num"], [t('stock.purchasing.arrived'), "num"], [t('stock.purchasing.unit_cost'), "num"], [t('stock.purchasing.total'), "num"]], caption=t('stock.purchasing.lines')) %}
+          {%- for l in lines %}
+          <tr><td>{{ l.name }}<br><span class="rx-subtitle">{{ l.sku }}</span></td><td class="rx-num">{{ l.quantity }}</td><td class="rx-num">{{ l.received_quantity }}</td><td class="rx-num">{{ l.unit_cost | money }}</td><td class="rx-num">{{ l.total | money }}</td></tr>
+          {%- endfor %}
+          <tr><th scope="row" colspan="4">{{ t('stock.purchasing.total') }}</th><td class="rx-num"><strong>{{ order.total | money }}</strong></td></tr>
+        {% endcall %}
+      {% endcall %}
+    </div>
+    <div>
+      {% call card(title=t('stock.purchasing.details')) %}
+        {% call infolist() %}
+          {% call entry(t('stock.fields.status')) %}{{ order_status(status) }}{% endcall %}
+          {{ entry(t('stock.purchasing.supplier'), supplier.name, url=route('stock.suppliers.show', supplier.id)) }}
+          {{ entry(t('stock.purchasing.store'), store, hint=t('stock.purchasing.store_hint')) }}
+          {{ entry(t('stock.purchasing.ordered_at'), order.ordered_at, format="datetime") }}
+          {{ entry(t('stock.purchasing.expected'), order.expected_on, format="date") }}
+          {{ entry(t('stock.purchasing.note'), order.note) }}
+        {% endcall %}
+      {% endcall %}
+      {%- if waiting %}
+      {% call card(title=t('stock.purchasing.waiting_title'), subtitle=t('stock.purchasing.waiting_lead')) %}
+        {% call list(id="waiting-work", label=t('stock.purchasing.waiting_title')) %}
+          {%- for need in waiting %}
+          <li><div class="rx-list__main"><strong>{{ need.name }}</strong><p class="rx-subtitle">{% for wo in need.work_orders %}<a class="rx-link" href="{{ route('workshop.order', wo) }}">WO-{{ wo }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p></div></li>
+          {%- endfor %}
+        {% endcall %}
+      {% endcall %}
+      {%- endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

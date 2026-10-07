@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="{{ app.locale }}">
+<head>
+  {% block seo %}{{ seo() }}{% endblock %}
+  {% include "layouts/_head.html" %}
+  {{ stack('head') }}
+</head>
+{#- The staff layout: the kit's back-office shell. `rx-shell` is a CSS grid
+    (the sidebar, then the main column); the main column has a full-width
+    `navbar` for the store switcher, "About this page" and the account menu. -#}
+<body class="rx-page rx-shell">
+  {% from "renox/ui.html" import sidebar, sidebar_link, sidebar_section, navbar, menu, menu_link, menu_action, menu_separator, open_button %}
+  {%- set about = about_page(request.route, request.path) if explain_panels else none %}
+  {% call sidebar(t('shop.name'), href=route('staff.dashboard')) %}
+    {#- --- Staff navigation (one line per area; append yours, behind the
+        permission it needs: {% if can('…') %}…{% endif %}) --- -#}
+    {{ sidebar_link(route('staff.dashboard'), t('nav.dashboard'), active=route_is('staff.dashboard')) }}
+    {% if can('orders.view') %}{{ sidebar_link(route('sales.orders.index'), t('sales.staff.title'), active=route_is('sales.orders.*')) }}{% endif %}
+    {% if can('orders.sell') %}{{ sidebar_link(route('sales.counter'), t('sales.counter.title'), active=route_is('sales.counter*')) }}{% endif %}
+    {% if can('rentals.view') %}{{ sidebar_link(route('rentals.counter'), t('rentals.nav.counter'), active=route_is('rentals.counter', 'rentals.desk', 'rentals.receipt', 'rentals.walkin')) }}{% endif %}
+    {% if can('fleet.view') %}{{ sidebar_link(route('rentals.fleet'), t('rentals.nav.fleet'), active=route_is('rentals.fleet', 'rentals.fleet.show')) }}{% endif %}
+    {% if can('rentals.verify_id') %}{{ sidebar_link(route('rentals.identities'), t('rentals.nav.identities'), active=route_is('rentals.identities')) }}{% endif %}
+    {% if can('workorders.view') %}{{ sidebar_link(route('workshop.board'), t('workshop.nav.board'), active=route_is('workshop.board', 'workshop.order', 'workshop.walkin')) }}{% endif %}
+    {% if can('stock.view') %}{{ sidebar_link(route('stock.index'), t('stock.index.title'), active=route_is('stock.index', 'stock.ledger', 'stock.take', 'stock.fleet')) }}{% endif %}
+    {% if can('stock.view') %}{{ sidebar_link(route('stock.consignments'), t('stock.consignments.title'), active=route_is('stock.consignments*')) }}{% endif %}
+    {% if can('purchasing.manage') %}{{ sidebar_link(route('stock.purchasing'), t('stock.purchasing.title'), active=route_is('stock.purchasing*', 'stock.suppliers*')) }}{% endif %}
+    {% if can('staff.help') %}{{ sidebar_link(route('multistore.help'), t('multistore.help.title'), active=route_is('multistore.help*')) }}{% endif %}
+    {% if can('fleet.view') %}{{ sidebar_link(route('multistore.placements'), t('multistore.placements.title'), active=route_is('multistore.placements*')) }}{% endif %}
+    {% if can('intercompany.view') %}{{ sidebar_link(route('multistore.books'), t('multistore.books.title'), active=route_is('multistore.books', 'multistore.settlements*', 'multistore.fees*')) }}{% endif %}
+    {%- if can('staff.manage') %}{{ sidebar_link(route('staff.team.index'), t('staff.nav.team'), active=route_is('staff.team.*') or route_is('staff.invitations.*')) }}{% endif %}
+    {%- if can('stores.manage') %}{{ sidebar_link(route('staff.stores.index'), t('staff.nav.stores'), active=route_is('staff.stores.*')) }}{% endif %}
+    {%- if can('roles.manage') %}{{ sidebar_link(route('staff.roles.index'), t('staff.nav.roles'), active=route_is('staff.roles.*')) }}{% endif %}
+    {%- if can('audit.view') %}{{ sidebar_link(route('staff.audit.index'), t('staff.nav.audit'), active=route_is('staff.audit.*')) }}{% endif %}
+    {%- if can('catalog.manage') or can('plans.manage') or can('purchasing.manage') or can('stores.manage') %}{{ sidebar_link(route('admin.dashboard'), t('staff.nav.admin')) }}{% endif %}
+    {% if can('fleet.manage') %}{{ sidebar_link(route('api.kiosks'), t('api.kiosks.nav'), active=route_is('api.kiosks')) }}{% endif %}
+    {% if can('reports.view') %}{{ sidebar_link(route('reports.dashboard'), t('reports.nav'), active=route_is('reports.*')) }}{% endif %}
+    {#- --- end of staff navigation --- -#}
+    {{ sidebar_section(t('nav.shop')) }}
+    {{ sidebar_link(route('home'), t('nav.storefront')) }}
+    {{ sidebar_link(route('about.pages'), t('about.index_link'), active=route_is('about.*')) }}
+  {% endcall %}
+  <div class="rx-shell__main">
+    {% call navbar(none, width="full", skip=false) %}
+      {#- The store switcher (the access foundations, `src/app/access`):
+          which store's work this person is doing now. -#}
+      {% include "layouts/_store_switcher.html" ignore missing %}
+      <span class="rx-spacer"></span>
+      {%- if about %}{{ open_button("about-page", t('about.button'), variant="plain", size="small") }}{% endif %}
+      {% call menu(app.locale | upper, id="language-menu", variant="plain") %}
+        {{ menu_action(route('locale.update', 'en'), "English") }}
+        {{ menu_action(route('locale.update', 'es'), "Español") }}
+      {% endcall %}
+      {%- if auth.check %}
+      {#- The bell: unread notifications, new ones live (Auth::notifications, #238). -#}
+      {% from "renox/ui.html" import notification_bell %}{{ notification_bell(unread_notifications) }}
+      {% call menu(auth.user.name, id="account-menu", variant="plain") %}
+        {{ menu_link(route('account.show'), t('nav.account')) }}
+        {{ menu_separator() }}
+        {{ menu_action(route('logout'), t('nav.logout')) }}
+      {% endcall %}
+      {%- endif %}
+    {% endcall %}
+    <main class="rx-shell__content" id="main">
+      {% if flash.status %}{% from "renox/ui.html" import alert %}{{ alert(flash.status, kind="success") }}{% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  {%- if about %}{% include "about/_panel.html" %}{% endif %}
+  {{ toasts() }}
+  {% include "layouts/_scripts.html" %}
+  {{ stack('scripts') }}
+</body>
+</html>

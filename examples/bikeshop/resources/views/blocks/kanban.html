@@ -1,0 +1,78 @@
+{#- kanban: columns of cards moved between columns by dragging, or with the
+    keyboard, each move sent to the server with htmx. The workshop's jobs
+    (waiting, in the stand, ready) are the bike shop's board.
+
+    {% from "blocks/kanban.html" import kanban, kanban_card %}
+    {{ kanban("jobs", [
+         {"key": "waiting", "title": "Waiting", "cards": [{"id": 7, "title": "Tune-up", "subtitle": "City 3 · Ana"}]},
+         {"key": "working", "title": "In the stand", "cards": []},
+         {"key": "ready", "title": "Ready", "cards": []}
+       ], url=route('workshop.move'), label="Workshop jobs") }}
+
+    `id`: the board's id. `columns`: a list of {key, title, cards}; each card
+    is {id, title, subtitle?, badge?, badge_kind?, url?} (see `kanban_card`).
+    `url`: where each move is sent, as an htmx POST with the fields `card`
+    (the card's id), `column` (the new column's key) and `position` (0 for
+    the top), plus `values` ({"store": 2}) and the CSRF header htmx gets
+    from Renox. Answer 2xx to keep the move; any other status puts the card
+    back and says so (validate `column` with `one_of`, and check the
+    person may move that card). `label`: the board's name for screen
+    readers.
+
+    Moving with a pointer: drag a card with the mouse, or by its handle
+    (the dots) with a finger or a pen, so a swipe elsewhere still scrolls
+    the page on a phone; drop it where the gap opens. With the keyboard: Tab to a card, Space or Enter picks it
+    up, the arrow keys move it (Up/Down in its column, Left/Right to the
+    next column), Space or Enter drops it, Escape puts it back. Every step
+    is announced in a live region. The card glides into place with Motion
+    (transform), and jumps under prefers-reduced-motion. A card's own
+    link (`url`) still opens it.
+
+    The page sends `bs:kanban-moved` on the board after the server
+    answered, with detail {card, column, position, ok}. Needs JavaScript
+    to move cards; without it the board is a read-only list. -#}
+{% macro kanban_card(card) -%}
+<li class="bs-kanban__card" data-bs-card="{{ card.id }}">
+  <span class="bs-kanban__grip" aria-hidden="true">
+    <svg viewBox="0 0 12 20" width="10" height="16"><circle cx="3" cy="4" r="1.5" fill="currentColor"/><circle cx="9" cy="4" r="1.5" fill="currentColor"/><circle cx="3" cy="10" r="1.5" fill="currentColor"/><circle cx="9" cy="10" r="1.5" fill="currentColor"/><circle cx="3" cy="16" r="1.5" fill="currentColor"/><circle cx="9" cy="16" r="1.5" fill="currentColor"/></svg>
+  </span>
+  <span class="bs-kanban__body">
+    <strong class="bs-kanban__title" data-bs-card-title>{% if card.url %}<a class="rx-link" href="{{ card.url }}">{{ card.title }}</a>{% else %}{{ card.title }}{% endif %}</strong>
+    {%- if card.subtitle %}<span class="bs-kanban__subtitle">{{ card.subtitle }}</span>{% endif %}
+    {%- if card.badge %}<span class="rx-badge{% if card.badge_kind %} rx-badge--{{ card.badge_kind }}{% endif %}">{{ card.badge }}</span>{% endif %}
+  </span>
+</li>
+{%- endmacro %}
+
+{% macro kanban(id, columns, url, label=none, values={}) -%}
+{%- set texts = {
+  "picked": t('blocks.kanban.picked'),
+  "moved": t('blocks.kanban.moved'),
+  "dropped": t('blocks.kanban.dropped'),
+  "cancelled": t('blocks.kanban.cancelled'),
+  "failed": t('blocks.kanban.failed')
+} %}
+<div class="bs-kanban" id="{{ id }}" data-bs-kanban role="group" aria-label="{{ label or t('blocks.kanban.label') }}" aria-describedby="{{ id }}-help" data-bs-texts='{{ texts | tojson }}'>
+  <p class="rx-visually-hidden" id="{{ id }}-help">{{ t('blocks.kanban.help') }}</p>
+  <p class="rx-visually-hidden" aria-live="assertive" aria-atomic="true" data-bs-kanban-live></p>
+  <form class="bs-kanban__form" hidden hx-post="{{ url }}" hx-trigger="bs:move" hx-swap="none" data-bs-kanban-form>
+    <input type="hidden" name="card" value="">
+    <input type="hidden" name="column" value="">
+    <input type="hidden" name="position" value="">
+    {%- for key, value in values | items %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+  </form>
+  {%- for column in columns %}
+  <section class="bs-kanban__column" data-bs-column="{{ column.key }}" data-bs-column-title="{{ column.title }}" aria-labelledby="{{ id }}-{{ column.key }}-title">
+    <h3 class="bs-kanban__heading" id="{{ id }}-{{ column.key }}-title">
+      <span>{{ column.title }}</span>
+      <span class="rx-badge" data-bs-column-count aria-hidden="true">{{ column.cards | length }}</span>
+    </h3>
+    <ul class="bs-kanban__list" role="list" data-bs-kanban-list aria-labelledby="{{ id }}-{{ column.key }}-title">
+      {%- for card in column.cards %}
+      {{ kanban_card(card) }}
+      {%- endfor %}
+    </ul>
+  </section>
+  {%- endfor %}
+</div>
+{%- endmacro %}

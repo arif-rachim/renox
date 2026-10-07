@@ -1,0 +1,69 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, infolist, entry, list, badge, table, empty, action_sheet, input, alert %}
+{% from "stock/_parts.html" import styles %}
+{% block seo %}{{ seo(title=t('stock.ledger.title', name=label)) }}{% endblock %}
+
+{#- One stock level and its ledger (#240): every movement that made the number, newest first,
+    each linked to the document that caused it; what each store may do with these goods. -#}
+{% block content %}
+{{ styles() }}
+<div class="rx-stack" data-bs-reveal>
+  {% call page_header(label, subtitle=variant.sku, back=route('stock.index'), back_label=t('stock.index.title'), badge=(t('stock.ledger.consigned') if consigned else none), badge_kind="info") %}
+    {%- if can_write_off %}
+    {% call action_sheet("write-off", t('stock.ledger.write_off'), route('stock.write_off', level.id), t('stock.ledger.write_off'), description=t('stock.ledger.write_off_lead', owner=owner), danger=true, icon="trash") %}
+      {{ input("quantity", t('stock.fields.quantity'), type="number", required=true, attrs={"min": 1, "max": level.on_hand}) }}
+      {{ input("reason", t('stock.fields.reason'), required=true) }}
+    {% endcall %}
+    {%- endif %}
+  {% endcall %}
+  {%- if consigned %}{{ alert(t('stock.ledger.consigned_text', owner=owner, location=location), kind="info") }}{% endif %}
+  <div class="bs-split">
+    <div>
+      {% call card(title=t('stock.ledger.movements')) %}
+        {%- if movements.items %}
+        {% call table([t('stock.fields.when'), t('stock.fields.reason'), [t('stock.fields.change'), "num"], [t('stock.fields.after'), "num"], t('stock.fields.source'), t('stock.fields.by')], caption=t('stock.ledger.movements')) %}
+          {%- for m in movements.items %}
+          <tr>
+            <td>{{ m.created_at | date("%Y-%m-%d %H:%M") }}</td>
+            <td>{{ t('stock.reason.' ~ m.reason) }}{% if m.note %}<br><span class="rx-subtitle">{{ m.note }}</span>{% endif %}</td>
+            <td class="rx-num">{% set change %}{% if m.quantity > 0 %}+{% endif %}{{ m.quantity }}{% endset %}{% if m.reason in ["reserved", "released"] %}<span class="rx-subtitle">{{ change }}</span>{% else %}{{ change }}{% endif %}</td>
+            <td class="rx-num">{{ m.after }}</td>
+            <td>{% if m.source %}<a class="rx-link" href="{{ m.source[1] }}">{{ m.source[0] }}</a>{% else %}—{% endif %}</td>
+            <td>{{ m.by or "—" }}</td>
+          </tr>
+          {%- endfor %}
+        {% endcall %}
+        {% from "renox/pagination.html" import pagination %}{{ pagination(movements) }}
+        {%- else %}{{ empty(t('stock.ledger.empty')) }}{% endif %}
+      {% endcall %}
+    </div>
+    <div>
+      {% call card(title=t('stock.ledger.level')) %}
+        {% call infolist() %}
+          {{ entry(t('stock.fields.owner_store'), owner, hint=t('stock.ledger.owner_hint')) }}
+          {{ entry(t('stock.fields.location_store'), location, hint=t('stock.ledger.location_hint')) }}
+          {{ entry(t('stock.fields.on_hand'), level.on_hand, format="number") }}
+          {{ entry(t('stock.fields.reserved'), level.reserved, format="number") }}
+          {{ entry(t('stock.fields.available'), available, format="number") }}
+          {{ entry(t('stock.fields.reorder_level'), variant.reorder_level, format="number") }}
+          {{ entry(t('stock.fields.cost'), variant.cost, format="money") }}
+          {{ entry(t('stock.fields.value'), value, format="money") }}
+        {% endcall %}
+      {% endcall %}
+      {% call card(title=t('stock.abilities.title'), subtitle=t('stock.abilities.lead')) %}
+        {% call list(id="abilities", label=t('stock.abilities.title')) %}
+          {%- for a in abilities %}
+          <li>
+            <div class="rx-list__main">
+              <strong>{{ t(a.action) }}</strong>
+              <p class="rx-subtitle">{{ t('stock.abilities.checked_in', store=a.store, attribute=t('stock.fields.' ~ a.attribute)) }} · <code>{{ a.permission }}</code></p>
+            </div>
+            {{ badge(t('stock.abilities.yes') if a.allowed else t('stock.abilities.no'), kind="success" if a.allowed else none) }}
+          </li>
+          {%- endfor %}
+        {% endcall %}
+      {% endcall %}
+    </div>
+  </div>
+</div>
+{% endblock %}

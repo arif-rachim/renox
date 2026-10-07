@@ -1,0 +1,79 @@
+{#- availability: a timeline of resources (bikes, mechanics, stands) against
+    hours or days, with the booked and free slots; a free slot is a link or
+    a small form that books it.
+
+    {% from "blocks/availability.html" import availability %}
+    {{ availability(["09:00", "10:00", "11:00", "12:00"], [
+         {"label": "Trail 5", "note": "M · #12", "slots": [
+            {"state": "booked", "span": 2, "title": "Ana R."},
+            {"state": "free", "url": "/rent?bike=12&at=11"},
+            {"state": "free", "action": "/rentals", "fields": {"bike": 12, "at": "12:00"}}]}
+       ], label="Bikes free today") }}
+
+    `columns`: the time labels across the top (hours, or days such as
+    "Mon 6"). `rows`: a list of {label, note?, slots}; `slots` fill the row
+    from the left, each {state, span?, title?, url?, action?, fields?}:
+    `state` is "free", "booked" or "closed"; `span` how many columns it
+    covers (a three-hour rental is one slot of span 3); `title` what a
+    booked slot says (who has it). A free slot with `url` is a link; with
+    `action` it is a form POSTed there with `fields` as hidden inputs (and
+    the CSRF field), so booking needs no JavaScript at all; with neither it
+    only says "Free". `label`: the table's caption (for screen readers).
+    `corner`: the top-left heading (the resources' name, e.g. "Bike").
+
+    It is a table: each row's resource is its row heading and each time a
+    column heading, so a screen reader reads "Trail 5, 11:00, Book". Every
+    link says what it books ("Book Trail 5 at 11:00"). States differ by
+    pattern and text, not colour alone. On a phone the table scrolls
+    sideways inside its frame, the resource column staying put. -#}
+{% macro availability(columns, rows, label=none, corner=none, id="bs-availability") -%}
+<div class="bs-availability" id="{{ id }}" role="region" aria-labelledby="{{ id }}-caption" tabindex="0">
+  <table class="bs-availability__table" style="--bs-columns: {{ columns | length }}">
+    <caption class="rx-visually-hidden" id="{{ id }}-caption">{{ label or t('blocks.availability.label') }}</caption>
+    <thead>
+      <tr>
+        <th scope="col" class="bs-availability__corner">{{ corner or t('blocks.availability.resource') }}</th>
+        {%- for column in columns %}<th scope="col">{{ column }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {%- for row in rows %}
+      {%- set at = namespace(column=0) %}
+      <tr>
+        <th scope="row" class="bs-availability__resource">
+          <span class="bs-availability__name">{{ row.label }}</span>
+          {%- if row.note %}<span class="bs-availability__note">{{ row.note }}</span>{% endif %}
+        </th>
+        {%- for slot in row.slots %}
+        {%- set span = slot.span or 1 %}
+        {%- set when = columns[at.column] if at.column < (columns | length) else "" %}
+        <td class="bs-availability__slot bs-availability__slot--{{ slot.state }}"{% if span > 1 %} colspan="{{ span }}"{% endif %}>
+          {%- if slot.state == "free" and slot.url %}
+          <a class="bs-availability__book" href="{{ slot.url }}" aria-label="{{ t('blocks.availability.book', resource=row.label, slot=when) }}">{{ t('blocks.availability.free') }}</a>
+          {%- elif slot.state == "free" and slot.action %}
+          <form class="bs-availability__form" method="post" action="{{ slot.action }}">
+            {{ csrf_field() }}
+            {%- for key, value in (slot.fields or {}) | items %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+            <button class="bs-availability__book" type="submit" aria-label="{{ t('blocks.availability.book', resource=row.label, slot=when) }}">{{ t('blocks.availability.free') }}</button>
+          </form>
+          {%- elif slot.state == "free" %}
+          <span class="bs-availability__label">{{ t('blocks.availability.free') }}</span>
+          {%- elif slot.state == "booked" %}
+          <span class="bs-availability__label">{% if slot.title %}<span class="rx-visually-hidden">{{ t('blocks.availability.booked') }}: </span>{{ slot.title }}{% else %}{{ t('blocks.availability.booked') }}{% endif %}</span>
+          {%- else %}
+          <span class="bs-availability__label">{{ t('blocks.availability.closed') }}</span>
+          {%- endif %}
+        </td>
+        {%- set at.column = at.column + span %}
+        {%- endfor %}
+      </tr>
+      {%- endfor %}
+    </tbody>
+  </table>
+</div>
+<ul class="bs-availability__legend" role="list" aria-label="{{ t('blocks.availability.legend') }}">
+  <li><span class="bs-availability__key bs-availability__key--free" aria-hidden="true"></span>{{ t('blocks.availability.free') }}</li>
+  <li><span class="bs-availability__key bs-availability__key--booked" aria-hidden="true"></span>{{ t('blocks.availability.booked') }}</li>
+  <li><span class="bs-availability__key bs-availability__key--closed" aria-hidden="true"></span>{{ t('blocks.availability.closed') }}</li>
+</ul>
+{%- endmacro %}

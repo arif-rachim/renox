@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="{{ app.locale }}">
+<head>
+  {{ seo(title="PO-" ~ order.id ~ " · " ~ store.name) }}
+  {% include "layouts/_head.html" %}
+  {% from "stock/_parts.html" import styles, scripts %}{{ styles() }}{{ scripts() }}
+  {{ stack('head') }}
+</head>
+{#- The supplier's printable order (#240): reached through a signed link mailed to the
+    supplier (ValidSignature), no login and no shop chrome; the kit's table and buttons. -#}
+<body class="rx-page">
+{% from "renox/ui.html" import table, infolist, entry %}
+<main class="bs-print" id="main">
+  <div class="bs-print__head">
+    <div>
+      <h1 class="rx-title">{{ t('stock.print.title', number=order.id) }}</h1>
+      <p class="rx-subtitle">{{ t('shop.name') }} · {{ store.name }} · {{ store.phone }} · {{ store.email }}</p>
+    </div>
+    <div class="bs-print__tools"><button class="rx-button rx-button--secondary" type="button" data-bs-print>{{ t('stock.print.print') }}</button></div>
+  </div>
+  {% call infolist(columns=2) %}
+    {{ entry(t('stock.print.supplier'), supplier.name) }}
+    {{ entry(t('stock.print.deliver_to'), store.name) }}
+    {{ entry(t('stock.print.ordered'), order.ordered_at, format="date") }}
+    {{ entry(t('stock.print.expected'), order.expected_on, format="date") }}
+  {% endcall %}
+  {% call table([t('stock.fields.sku'), t('stock.fields.product'), [t('stock.purchasing.ordered'), "num"], [t('stock.purchasing.unit_cost'), "num"], [t('stock.purchasing.total'), "num"]], caption=t('stock.print.title', number=order.id)) %}
+    {%- for l in lines %}
+    <tr><td>{{ l.sku }}</td><td>{{ l.name }}</td><td class="rx-num">{{ l.quantity }}</td><td class="rx-num">{{ l.unit_cost | money }}</td><td class="rx-num">{{ l.total | money }}</td></tr>
+    {%- endfor %}
+    <tr><th scope="row" colspan="4">{{ t('stock.purchasing.total') }}</th><td class="rx-num"><strong>{{ order.total | money }}</strong></td></tr>
+  {% endcall %}
+  {%- if order.note %}<p>{{ order.note }}</p>{% endif %}
+</main>
+{% include "layouts/_scripts.html" %}
+{{ stack('scripts') }}
+</body>
+</html>

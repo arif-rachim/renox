@@ -1,0 +1,51 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, card, select, radio, checkbox_list, textarea, button, form_errors, empty, link_button %}
+{% from "blocks/date_picker_blocked.html" import date_picker_blocked %}
+{% from "workshop/_parts.html" import styles %}
+{% block seo %}{{ seo(title=t('workshop.book.title'), description=t('workshop.book.lead')) }}{% endblock %}
+
+{#- Book a service (#236). The form posts to `workshop.book.store`; while it
+    changes, htmx asks this page again (hx-get with the form's values) and
+    swaps the day picker (full days depend on the store and the minutes) and
+    the estimate. -#}
+{% block content %}
+{{ styles() }}
+<div class="rx-stack">
+  {{ page_header(t('workshop.book.title'), subtitle=t('workshop.book.lead'), back=route('workshop.bikes'), back_label=t('workshop.bikes.title')) }}
+  {%- if not bikes %}
+  <div class="rx-card">{{ empty(t('workshop.book.no_bike'), t('workshop.book.no_bike_text'), route('workshop.bikes'), t('workshop.bikes.add')) }}</div>
+  {%- else %}
+  <form method="post" action="{{ route('workshop.book.store') }}" id="book-form" novalidate
+        hx-get="{{ route('workshop.book') }}" hx-trigger="change" hx-select="#booking-live" hx-target="#booking-live" hx-swap="outerHTML">
+    {{ csrf_field() }}
+    <div class="bs-booking">
+      {% call card() %}
+        {{ form_errors() }}
+        {{ select("bike", t('workshop.fields.bike'), bikes, selected=bike, required=true) }}
+        {{ select("store", t('workshop.fields.store'), stores, selected=store_id, required=true) }}
+        {%- set pk = namespace(list=[["none", t('workshop.book.no_package')]]) %}
+        {%- for p in packages %}{% set pk.list = pk.list + [[p, t('workshop.packages.' ~ p ~ '.name'), t('workshop.packages.' ~ p ~ '.text')]] %}{% endfor %}
+        {{ radio("package", t('workshop.book.package'), pk.list, selected=(package or "none")) }}
+        {{ checkbox_list("tasks", t('workshop.book.tasks'), task_options, selected=ticked, columns=2, hint=t('workshop.book.tasks_hint')) }}
+        {{ textarea("note", t('workshop.book.note'), rows=3, hint=t('workshop.book.note_hint')) }}
+      {% endcall %}
+      <div id="booking-live" class="bs-booking__summary rx-stack" aria-live="polite" data-bs-reveal>
+        {% call card(title=t('workshop.book.when')) %}
+          {{ date_picker_blocked("day", t('workshop.fields.day'), full, closed_weekdays=closed, value=day, min=min_day, max=max_day, required=true, hint=t('workshop.book.day_hint', minutes=capacity or 0)) }}
+        {% endcall %}
+        {% call card(title=t('workshop.book.estimate')) %}
+          {%- if chosen %}
+          <dl class="bs-lines">
+            {%- for task in chosen %}<dt>{{ task.name }} <small>{{ task.minutes }} min</small></dt><dd>{{ task.price | money }}</dd>{% endfor %}
+            <dt><strong>{{ t('workshop.book.total', minutes=estimate.minutes) }}</strong></dt><dd><strong>{{ estimate.price | money }}</strong></dd>
+          </dl>
+          <p class="rx-hint">{{ t('workshop.book.estimate_hint') }}</p>
+          {%- else %}<p class="rx-subtitle">{{ t('workshop.book.pick') }}</p>{% endif %}
+          {{ button(t('workshop.book.submit'), icon="check", block=true) }}
+        {% endcall %}
+      </div>
+    </div>
+  </form>
+  {%- endif %}
+</div>
+{% endblock %}

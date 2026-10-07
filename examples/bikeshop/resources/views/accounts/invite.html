@@ -1,0 +1,23 @@
+{#- `accounts.invite` (staff, `customers.manage`): invite a walk-in customer
+    to claim their record. The address is saved on the record and gets a
+    signed link that works for seven days (src/app/accounts/claim.rs). -#}
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, input, button, infolist, entry %}
+{% block seo %}{{ seo(title=t('accounts.invite.title')) }}{% endblock %}
+
+{% block content %}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('accounts.invite.title'), subtitle=t('accounts.invite.lead')) }}
+  <form method="post" action="{{ route('accounts.invite.send', customer.id) }}" data-live-validate>
+    {{ csrf_field() }}
+    {% call card(title=customer.name) %}
+      {% call infolist(columns=2) %}
+        {{ entry(t('accounts.contact.phone'), customer.phone) }}
+        {{ entry(t('accounts.invite.since'), customer.created_at, format="date") }}
+      {% endcall %}
+      {{ input("email", t('accounts.invite.email'), type="email", value=customer.email, required=true, hint=t('accounts.invite.email_hint')) }}
+      <div class="rx-card__footer">{{ button(t('accounts.invite.send')) }}</div>
+    {% endcall %}
+  </form>
+</div>
+{% endblock %}

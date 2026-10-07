@@ -1,0 +1,33 @@
+{#- `accounts.claim`: a walk-in customer opens the signed link from their
+    invitation (src/app/accounts/claim.rs). Logged in by now (the route needs
+    it); `summary` (name, orders, rentals, bikes), `email` (where the
+    invitation went), `problem` (none, "taken" or "other_email") and
+    `action` (this signed address, which the button posts back to). -#}
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, card, stats, stat, button, alert, link_button %}
+{% block seo %}{{ seo(title=t('accounts.claim.title')) }}{% endblock %}
+
+{% block content %}
+{% include "accounts/_styles.html" %}
+<div class="bs-claim" data-bs-reveal>
+  {{ page_header(t('accounts.claim.title'), subtitle=t('accounts.claim.lead', name=summary.name)) }}
+  {%- if problem == "taken" %}
+  {{ alert(t('accounts.claim.taken'), kind="warning") }}
+  {{ link_button(route('account.show'), t('nav.account')) }}
+  {%- elif problem == "other_email" %}
+  {{ alert(t('accounts.claim.other_email', email=email, current=auth.user.email), kind="error") }}
+  {%- else %}
+  {% call card(title=summary.name, subtitle=t('accounts.claim.what')) %}
+    {% call stats(3) %}
+      {{ stat(t('accounts.claim.orders'), summary.orders) }}
+      {{ stat(t('accounts.claim.rentals'), summary.rentals) }}
+      {{ stat(t('accounts.claim.bikes'), summary.bikes) }}
+    {% endcall %}
+    <form method="post" action="{{ action }}">
+      {{ csrf_field() }}
+      <div class="rx-card__footer">{{ button(t('accounts.claim.button')) }}</div>
+    </form>
+  {% endcall %}
+  {%- endif %}
+</div>
+{% endblock %}

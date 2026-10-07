@@ -1,0 +1,37 @@
+{#- Small pieces the stock and multi-store pages share. -#}
+{% from "renox/ui.html" import badge %}
+
+{#- The pages' stylesheet (public/areas/stock.css), once. -#}
+{% macro styles() -%}
+{% call push('head', once='stock-css') %}<link rel="stylesheet" href="{{ asset('areas/stock.css') }}">{% endcall %}
+{{ scripts() }}
+{%- endmacro %}
+
+{#- The pages' small script (public/areas/stock.js), once. -#}
+{% macro scripts() -%}
+{% call push('scripts', once='stock-js') %}<script src="{{ asset('areas/stock.js') }}" nonce="{{ csp_nonce() }}"></script>{% endcall %}
+{%- endmacro %}
+
+{#- A status stepper: `steps` is a list of {key, done, current}; each step's label is
+    t(prefix ~ key). An ordered list, the current step marked with aria-current. Its bars
+    slide in one after the other (public/areas/stock.js, Motion), not under
+    prefers-reduced-motion. -#}
+{% macro steps(items, prefix, label) -%}
+<ol class="bs-flow" aria-label="{{ label }}">
+  {%- for step in items %}
+  <li{% if step.done %} data-done{% endif %}{% if step.current %} aria-current="step"{% endif %}>{{ t(prefix ~ step.key) }}</li>
+  {%- endfor %}
+</ol>
+{%- endmacro %}
+
+{#- A shipment's status as a badge. -#}
+{% macro shipment_status(key) -%}
+{%- set tones = {"requested": "info", "approved": "info", "refused": none, "sent": "warning", "partly_received": "warning", "received": "success", "recall_requested": "warning", "recall_sent": "warning", "recalled": none, "draft": none} %}
+{{ badge(t('stock.consignments.status.' ~ key), kind=tones[key]) }}
+{%- endmacro %}
+
+{#- A purchase order's status as a badge. -#}
+{% macro order_status(key) -%}
+{%- set tones = {"draft": none, "ordered": "info", "partial": "warning", "received": "success", "cancelled": none} %}
+{{ badge(t('stock.purchasing.status.' ~ key), kind=tones[key]) }}
+{%- endmacro %}

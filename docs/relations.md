@@ -56,6 +56,8 @@ Instead, Renox gives you four plain tools:
 
 [`examples/relations`](../examples/relations) shows all of them on a small blog (belongs to,
 has many, a pivot with columns of its own, a polymorphic relation, counts and reports).
+[examples/bikeshop](../examples/bikeshop) uses them at volume (`Pivot` for which parts fit which bikes, `Morph` for its stock
+ledger and payments, `has_many_through`), with a test that counts queries on 15,000 rentals.
 
 ### The tables used on this page
 

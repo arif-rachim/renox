@@ -1,0 +1,35 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, table, confirm, empty, badge, link_button %}
+{% from "api/_parts.html" import assets, fresh_token, token_form %}
+{% block seo %}{{ seo(title=t('api.kiosks.title')) }}{% endblock %}
+
+{#- The active store's kiosk tokens (#241, managers): make one for a kiosk,
+    see it once, revoke it when a kiosk is lost. -#}
+{% block content %}
+{{ assets() }}
+<div class="rx-stack">
+  {{ page_header(t('api.kiosks.title'), subtitle=t('api.kiosks.lead', store=store.name)) }}
+  {%- if fresh %}{{ fresh_token(fresh, base) }}{% endif %}
+  <div class="bs-tokens">
+    {% call card(title=t('api.kiosks.list', store=store.name)) %}
+      {%- if kiosks %}
+      {% call table([t('api.tokens.name'), t('api.tokens.abilities'), t('api.tokens.last_used'), t('api.kiosks.state'), ""], caption=t('api.kiosks.list', store=store.name)) %}
+        {%- for row in kiosks %}
+        <tr>
+          <td>{{ row.kiosk.name }}</td>
+          <td>{{ row.kiosk.abilities | join(", ") }}</td>
+          <td>{{ (row.last_used_at | since) if row.last_used_at else t('api.tokens.never') }}</td>
+          <td>{{ badge(t('api.kiosks.revoked'), kind=none) if row.kiosk.revoked_at else badge(t('api.kiosks.active'), kind="success") }}</td>
+          <td>{%- if not row.kiosk.revoked_at %}{{ confirm("revoke-kiosk-" ~ row.kiosk.id, t('api.tokens.revoke'), route('api.kiosks.destroy', row.kiosk.id), t('api.kiosks.revoke_title'), t('api.kiosks.revoke_text'), method="POST", size="small") }}{% endif %}</td>
+        </tr>
+        {%- endfor %}
+      {% endcall %}
+      {%- else %}{{ empty(t('api.kiosks.none'), t('api.kiosks.none_text')) }}{% endif %}
+    {% endcall %}
+    {% call card(title=t('api.kiosks.new')) %}
+      {{ token_form(route('api.kiosks.store'), abilities, t('api.kiosks.name_hint')) }}
+      <p class="rx-hint">{{ link_button(route('api.about'), t('api.about.link'), variant="plain", size="small") }}</p>
+    {% endcall %}
+  </div>
+</div>
+{% endblock %}

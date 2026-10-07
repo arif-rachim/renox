@@ -1,0 +1,49 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, infolist, entry, link_button, import_action, table, empty, list, badge %}
+{% from "stock/_parts.html" import styles, order_status %}
+{% block seo %}{{ seo(title=supplier.name) }}{% endblock %}
+
+{#- A supplier (#240): contact, their price list (renox::import's sheet loads it from a CSV),
+    and the active store's orders with them. -#}
+{% block content %}
+{{ styles() }}
+<div class="rx-stack">
+  {% call page_header(supplier.name, subtitle=t('stock.suppliers.lead_time', days=supplier.lead_days), back=route('stock.suppliers'), back_label=t('stock.suppliers.title')) %}
+    {{ link_button(route('stock.suppliers.edit', supplier.id), t('stock.suppliers.edit'), icon="edit") }}
+    {{ import_action("price-list", t('stock.import.button'), route('stock.suppliers.import', supplier.id), t('stock.import.title', supplier=supplier.name), description=t('stock.import.lead', rows=200), columns=columns, template_url=route('stock.suppliers.template')) }}
+    {{ link_button(route('stock.purchasing.create', supplier=supplier.id), t('stock.purchasing.new'), variant="primary", icon="plus") }}
+  {% endcall %}
+  <div class="bs-split" data-bs-reveal>
+    <div>
+      {% call card(title=t('stock.suppliers.price_list'), subtitle=t('stock.suppliers.price_list_lead')) %}
+        {%- if items.items %}
+        {% call table([t('stock.fields.product'), t('stock.fields.sku'), [t('stock.suppliers.their_cost'), "num"], [t('stock.suppliers.our_price'), "num"]], caption=t('stock.suppliers.price_list')) %}
+          {%- for i in items.items %}
+          <tr><td>{{ i.name }}</td><td>{{ i.sku }}</td><td class="rx-num">{{ i.item.cost | money }}</td><td class="rx-num">{{ i.price | money }}</td></tr>
+          {%- endfor %}
+        {% endcall %}
+        {% from "renox/pagination.html" import pagination %}{{ pagination(items) }}
+        {%- else %}{{ empty(t('stock.suppliers.no_items')) }}{% endif %}
+      {% endcall %}
+    </div>
+    <div>
+      {% call card(title=t('stock.suppliers.contact')) %}
+        {% call infolist() %}
+          {{ entry(t('stock.suppliers.email'), supplier.email, copyable=true) }}
+          {{ entry(t('stock.suppliers.phone'), supplier.phone) }}
+          {{ entry(t('stock.suppliers.lead_days'), supplier.lead_days, format="number") }}
+        {% endcall %}
+      {% endcall %}
+      {% call card(title=t('stock.suppliers.orders')) %}
+        {%- if orders %}
+        {% call list(id="supplier-orders", label=t('stock.suppliers.orders')) %}
+          {%- for o in orders %}
+          <li><div class="rx-list__main"><a class="rx-link" href="{{ route('stock.purchasing.show', o.id) }}">PO-{{ o.id }}</a><p class="rx-subtitle">{{ o.total | money }}</p></div>{{ order_status(o.status) }}</li>
+          {%- endfor %}
+        {% endcall %}
+        {%- else %}{{ empty(t('stock.suppliers.no_orders')) }}{% endif %}
+      {% endcall %}
+    </div>
+  </div>
+</div>
+{% endblock %}

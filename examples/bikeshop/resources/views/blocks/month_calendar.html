@@ -1,0 +1,90 @@
+{#- month_calendar: one month as a grid of days with what happens on each
+    (service visits, rental bookings), and links to the months around it.
+    On a phone it becomes a list of the days that have something.
+
+    {% from "blocks/month_calendar.html" import month_calendar %}
+    {{ month_calendar("2026-10", [
+         {"date": "2026-10-06", "time": "09:30", "title": "Tune-up · City 3", "url": "/visits/4", "kind": "info"},
+         {"date": "2026-10-06", "title": "Rental: Trail 5", "kind": "success"}
+       ], url=route('visits.index'), today="2026-10-06", label="Service visits") }}
+
+    `month`: "YYYY-MM". `events`: a list of {date ("YYYY-MM-DD", or a
+    date-time: its first ten characters count), title, time?, url?, kind?};
+    `kind` colours the event like the kit's badges (info, success, warning,
+    error) and is never the only signal (the title says what it is).
+    `url`: the page's address; the previous and next months link to it with
+    `?month=YYYY-MM` (`param` renames it; `url` may already have a query).
+    `today`: "YYYY-MM-DD", marked in the grid (pass the shop's date from the
+    handler: the template has no clock). `first_day`: 1 for Monday (the
+    default), 0 for Sunday. `label`: the calendar's name. `heading`: the
+    level of the month's title (h2 by default).
+
+    The grid is an ordered list of days placed on a seven-column CSS grid
+    (the first day starts on its weekday column), so a screen reader reads
+    the days in order, each with its full weekday and "today" when it is.
+    The month is worked out in the template (Sakamoto's weekday formula),
+    no Rust helper needed. -#}
+{%- macro _pad(n) -%}{{ ("0" ~ n)[-2:] }}{%- endmacro -%}
+
+{%- macro _link(url, param, y, m) -%}{{ url }}{{ "&" if "?" in url else "?" }}{{ param }}={{ y }}-{{ _pad(m) }}{%- endmacro -%}
+
+{% macro month_calendar(month, events=[], url=none, param="month", today=none, first_day=1, label=none, heading="h2", id=none) -%}
+{%- set y = month[:4] | int %}
+{%- set m = month[5:7] | int %}
+{%- set leap = (y % 4 == 0 and y % 100 != 0) or y % 400 == 0 %}
+{%- set days = [31, 29 if leap else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m - 1] %}
+{%- set yy = y - 1 if m < 3 else y %}
+{%- set first_dow = (yy + yy // 4 - yy // 100 + yy // 400 + [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4][m - 1] + 1) % 7 %}
+{%- set lead = (first_dow - first_day + 7) % 7 %}
+{%- set id = id or ("bs-month-" ~ month) %}
+{%- set title = t('blocks.calendar.month_' ~ m) ~ " " ~ y %}
+{%- set ns = namespace(any=false) %}
+{%- for e in events %}{% if (e.date | string)[:7] == month %}{% set ns.any = true %}{% endif %}{% endfor %}
+<section class="bs-month" id="{{ id }}" aria-labelledby="{{ id }}-title">
+  <header class="bs-month__header">
+    <{{ heading }} class="bs-month__title" id="{{ id }}-title">{% if label %}<span class="rx-visually-hidden">{{ label }}: </span>{% endif %}{{ title }}</{{ heading }}>
+    {%- if url %}
+    <nav class="bs-month__nav" aria-label="{{ t('blocks.calendar.months') }}">
+      <a class="rx-icon-button rx-icon-button--plain" href="{{ _link(url, param, y - 1 if m == 1 else y, 12 if m == 1 else m - 1) }}" aria-label="{{ t('blocks.calendar.previous') }}" data-bs-month-prev rel="prev">
+        <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M12.5 4.5L7 10l5.5 5.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      {%- if today and today[:7] != month %}
+      <a class="rx-button rx-button--secondary rx-button--small" href="{{ _link(url, param, today[:4] | int, today[5:7] | int) }}">{{ t('blocks.calendar.today') }}</a>
+      {%- endif %}
+      <a class="rx-icon-button rx-icon-button--plain" href="{{ _link(url, param, y + 1 if m == 12 else y, 1 if m == 12 else m + 1) }}" aria-label="{{ t('blocks.calendar.next') }}" data-bs-month-next rel="next">
+        <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M7.5 4.5L13 10l-5.5 5.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+    </nav>
+    {%- endif %}
+  </header>
+  <div class="bs-month__weekdays" aria-hidden="true">
+    {%- for n in range(7) %}<span>{{ t('blocks.calendar.day_' ~ ((n + first_day) % 7)) }}</span>{% endfor %}
+  </div>
+  <ol class="bs-month__days" role="list" data-bs-month>
+    {%- for d in range(1, days + 1) %}
+    {%- set iso = month ~ "-" ~ _pad(d) %}
+    {%- set weekday = (first_dow + d - 1) % 7 %}
+    {%- set day = namespace(events=[]) %}
+    {%- for e in events %}{% if (e.date | string)[:10] == iso %}{% set day.events = day.events + [e] %}{% endif %}{% endfor %}
+    <li class="bs-month__day{% if iso == today %} bs-month__day--today{% endif %}{% if not day.events %} bs-month__day--empty{% endif %}{% if weekday == 0 or weekday == 6 %} bs-month__day--weekend{% endif %}"{% if d == 1 %} style="--bs-start: {{ lead + 1 }}"{% endif %}>
+      <p class="bs-month__date">
+        <time datetime="{{ iso }}"><span class="bs-month__weekday">{{ t('blocks.calendar.day_long_' ~ weekday) }} </span><span class="bs-month__number">{{ d }}</span></time>
+        {%- if iso == today %}<span class="bs-month__today">{{ t('blocks.calendar.today') }}</span>{% endif %}
+      </p>
+      {%- if day.events %}
+      <ul class="bs-month__events" role="list">
+        {%- for e in day.events %}
+        <li class="bs-month__event{% if e.kind %} bs-month__event--{{ e.kind }}{% endif %}">
+          {%- if e.url %}<a class="bs-month__event-link" href="{{ e.url }}">{% endif -%}
+          {%- if e.time %}<span class="bs-month__time">{{ e.time }}</span> {% endif %}<span class="bs-month__event-title">{{ e.title }}</span>
+          {%- if e.url %}</a>{% endif %}
+        </li>
+        {%- endfor %}
+      </ul>
+      {%- endif %}
+    </li>
+    {%- endfor %}
+  </ol>
+  {%- if not ns.any %}<p class="bs-month__none rx-subtitle">{{ t('blocks.calendar.none') }}</p>{% endif %}
+</section>
+{%- endmacro %}

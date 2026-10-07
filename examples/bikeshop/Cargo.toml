@@ -1,0 +1,21 @@
+[package]
+name = "bikeshop"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+renox = { workspace = true, features = ["xlsx"] }
+renox-2fa.workspace = true
+renox-admin.workspace = true
+# Service plans billed as subscriptions (#237): Stripe, and Xendit for IDR.
+renox-billing.workspace = true
+renox-editors.workspace = true
+renox-oauth.workspace = true
+serde = { version = "1.0.229", features = ["derive"] }
+# Logs a gateway that didn't answer, and a plan visit that found no room (#237).
+tracing = "0.1.44"
+# The monthly report's workbooks (src/app/reports/monthly.rs): several sheets in one file,
+# which renox::grid's one-sheet exports don't make. The same version and features Renox's
+# `xlsx` feature already builds, so no new crate is compiled.
+rust_xlsxwriter = { version = "0.99.1", default-features = false, features = ["chrono"] }

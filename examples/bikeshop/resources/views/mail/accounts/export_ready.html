@@ -1,0 +1,10 @@
+{#- "Your data is ready" (src/app/accounts/privacy.rs, `ExportMyData`):
+    `name`, `link` (temporary, signed), `days`. In the customer's language. -#}
+{% extends "renox/mail/layout.html" %}
+{% from "renox/mail/components.html" import button %}
+{% block content %}
+<p>{{ t('accounts.privacy.mail.hello', name=name) }}</p>
+<p>{{ t('accounts.privacy.mail.text') }}</p>
+{{ button(link, t('accounts.privacy.mail.button')) }}
+<p>{{ t('accounts.privacy.mail.expires', days=days) }}</p>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, table, empty, badge %}
+{% from "stock/_parts.html" import styles %}
+{% block seo %}{{ seo(title=t('multistore.settlements.title')) }}{% endblock %}
+
+{#- Monthly settlements between stores (#245), made on the 1st and confirmed by both stores. -#}
+{% block content %}
+{{ styles() }}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('multistore.settlements.title'), subtitle=t('multistore.settlements.lead'), back=route('multistore.books'), back_label=t('multistore.books.title')) }}
+  {%- if rows %}
+  <div class="rx-card">
+  {% call table([t('multistore.settlements.month'), t('multistore.settlements.pays'), t('multistore.settlements.paid'), [t('multistore.settlements.amount'), "num"], t('multistore.settlements.status')], caption=t('multistore.settlements.title')) %}
+    {%- for s in rows %}
+    <tr>
+      <td><a class="rx-link" href="{{ route('multistore.settlements.show', s.id) }}">{{ s.period_start | date("%B %Y") }}</a></td>
+      <td>{{ s.debtor }}{% if s.debtor_confirmed %} {{ badge(t('multistore.settlements.confirmed_short'), kind="success") }}{% endif %}</td>
+      <td>{{ s.creditor }}{% if s.creditor_confirmed %} {{ badge(t('multistore.settlements.confirmed_short'), kind="success") }}{% endif %}</td>
+      <td class="rx-num">{{ s.amount | money }}</td>
+      <td>{{ badge(t('multistore.settlements.status_' ~ s.status), kind=("success" if s.status == "settled" else "warning")) }}</td>
+    </tr>
+    {%- endfor %}
+  {% endcall %}
+  </div>
+  {% from "renox/pagination.html" import pagination %}{{ pagination(pages) }}
+  {%- else %}<div class="rx-card">{{ empty(t('multistore.settlements.empty')) }}</div>{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends "layouts/app.html" %}
+{#- The cart (src/app/sales/cart.rs). With htmx a change answers the `lines`
+    block and the navbar's `mini` block (swapped out of band). The macros are
+    imported at the top so the blocks see them when rendered alone. -#}
+{% from "renox/ui.html" import page_header, card, button, link_button, select, alert, empty, thumbnail %}
+{% from "blocks/quantity.html" import quantity %}
+{% block seo %}{{ seo(title=t('sales.cart.title') ~ " · " ~ t('shop.name')) }}{% endblock %}
+
+{% block content %}
+{% include "sales/_assets.html" %}
+{{ page_header(t('sales.cart.title'), subtitle=t('sales.cart.lead'), back=route('catalog.index'), back_label=t('sales.cart.keep_shopping')) }}
+{% block lines %}
+<div id="cart" class="bs-cart">
+  {%- if cart.changed %}{{ alert(t('sales.cart.changed'), kind="warning") }}{% endif %}
+  {%- if cart.lines %}
+  <section class="rx-card bs-cart__lines" aria-label="{{ t('sales.cart.lines') }}">
+    <ul class="bs-cart__list" role="list" data-bs-reveal>
+      {%- for line in cart.lines %}
+      <li class="bs-cart__line" id="line-{{ line.variant.id }}">
+        {%- if line.photo %}{{ thumbnail(line.photo, alt=line.product.name, href=route('catalog.show', line.product.slug)) }}{% else %}<span></span>{% endif %}
+        <div class="bs-cart__what">
+          <a class="rx-link bs-cart__name" href="{{ route('catalog.show', line.product.slug) }}">{{ line.product.name }}</a>
+          <p class="rx-subtitle">{{ line.variant.sku }}{% if line.variant.size %} · {{ line.variant.size }}{% endif %}{% if line.variant.colour %} · {{ line.variant.colour }}{% endif %} · {{ line.variant.price | money }}</p>
+          {%- if line.lowered %}<p class="rx-hint bs-cart__lowered" role="status">{{ t('sales.cart.line_lowered', count=line.available) }}</p>{% endif %}
+        </div>
+        <form class="bs-cart__qty" method="post" action="{{ route('cart.update', line.variant.id) }}"
+              hx-patch="{{ route('cart.update', line.variant.id) }}" hx-trigger="change delay:300ms" hx-target="#cart" hx-swap="outerHTML">
+          {{ csrf_field() }}{{ method_field('PATCH') }}
+          {{ quantity("quantity", line.quantity, min=1, max=([line.available, 20] | min if line.available > 0 else line.quantity), label=t('sales.cart.quantity_of', name=line.product.name), hide_label=true, id="qty-" ~ line.variant.id) }}
+          <noscript>{{ button(t('sales.cart.update'), variant="secondary", size="small") }}</noscript>
+        </form>
+        <p class="bs-cart__total rx-num">{{ line.total | money }}</p>
+        <form method="post" action="{{ route('cart.remove', line.variant.id) }}" hx-delete="{{ route('cart.remove', line.variant.id) }}" hx-target="#cart" hx-swap="outerHTML">
+          {{ csrf_field() }}{{ method_field('DELETE') }}
+          <button class="rx-icon-button rx-icon-button--small" type="submit" aria-label="{{ t('sales.cart.remove', name=line.product.name) }}">
+            <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
+        </form>
+      </li>
+      {%- endfor %}
+    </ul>
+  </section>
+  <aside class="rx-card bs-cart__summary" aria-label="{{ t('sales.cart.summary') }}">
+    <form method="post" action="{{ route('cart.store') }}" hx-post="{{ route('cart.store') }}" hx-trigger="change" hx-target="#cart" hx-swap="outerHTML">
+      {{ csrf_field() }}
+      {%- set ns = namespace(options=[]) %}{% for s in cart.stores %}{% set ns.options = ns.options + [[s.id | string, s.name]] %}{% endfor %}
+      {{ select("store_id", t('sales.cart.store'), ns.options, selected=(cart.store.id | string if cart.store else none), hint=t('sales.cart.store_hint'), required=true, id="cart-store") }}
+      <noscript>{{ button(t('sales.cart.change_store'), variant="secondary", size="small") }}</noscript>
+    </form>
+    <dl class="bs-totals">
+      <div><dt>{{ t('sales.cart.items', count=cart.count) }}</dt><dd class="rx-num">{{ cart.subtotal | money }}</dd></div>
+    </dl>
+    <p class="rx-hint">{{ t('sales.cart.fees_later') }}</p>
+    {{ link_button(route('checkout.show'), t('sales.cart.checkout'), variant="primary", attrs={"data-rx-key": "c"}) }}
+  </aside>
+  {%- else %}
+  <div class="rx-card">{{ empty(t('sales.cart.empty_title'), t('sales.cart.empty_text'), route('catalog.index'), t('sales.cart.browse')) }}</div>
+  {%- endif %}
+</div>
+{% endblock %}
+{% endblock %}
+
+{#- The navbar's count, swapped out of band after a change (`.also("mini")`).
+    Not part of the page itself: only rendered on its own. -#}
+{% block mini %}{% set count = cart.count %}{% include "sales/cart/_mini.html" %}{% endblock %}

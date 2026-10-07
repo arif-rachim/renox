@@ -1,0 +1,46 @@
+{#- history: a vertical timeline of what happened to something: an order, a
+    rental, a bike in the workshop.
+
+    {% from "blocks/history.html" import history %}
+    {{ history([
+         {"time": "2026-10-06T09:12:00Z", "title": "Checked in", "body": "Brakes squeal; chain dry.", "kind": "info"},
+         {"time": "2026-10-06T11:40:00Z", "title": "Ready for pickup", "kind": "success", "by": "Marta"}
+       ], label="Service history") }}
+
+    `items`: a list of {time, title, body?, kind?, by?, when?}, in the order
+    they are shown (newest first or last, as the page prefers). `time` is
+    an RFC 3339 time or a date ("2026-10-06"), written in the `<time>`
+    element's `datetime` and shown with the `date` filter in `date_format`
+    (`when` replaces the shown text, e.g. "2 hours ago" from the `since`
+    filter). `kind`: info, success, warning or error, the dot's colour
+    *and* its icon (never colour alone); none is a plain dot. `body` is
+    Markdown (the `markdown` filter: raw HTML is shown as text). `by`: who
+    did it. `label`: the list's name for screen readers.
+
+    An ordered list (`<ol>`), each event a list item with its time first.
+    The events fade in one after the other through the app's
+    `data-bs-reveal` (Motion), not under prefers-reduced-motion. -#}
+{% macro history(items, label=none, date_format="%Y-%m-%d %H:%M", id=none) -%}
+<ol class="bs-history"{% if id %} id="{{ id }}"{% endif %} role="list" aria-label="{{ label or t('blocks.history.label') }}" data-bs-reveal>
+  {%- for item in items %}
+  <li class="bs-history__item{% if item.kind %} bs-history__item--{{ item.kind }}{% endif %}">
+    <span class="bs-history__marker" aria-hidden="true">
+      {%- if item.kind == "success" %}<svg viewBox="0 0 20 20" width="14" height="14"><path d="M5 10.5l3 3L15 6.5" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      {%- elif item.kind == "warning" %}<svg viewBox="0 0 20 20" width="14" height="14"><path d="M10 4.5v7M10 15h.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+      {%- elif item.kind == "error" %}<svg viewBox="0 0 20 20" width="14" height="14"><path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+      {%- elif item.kind == "info" %}<svg viewBox="0 0 20 20" width="14" height="14"><path d="M10 9v6M10 5.5h.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+      {%- endif %}
+    </span>
+    <div class="bs-history__content">
+      <p class="bs-history__meta">
+        <time datetime="{{ item.time }}">{{ item.when or (item.time | date(date_format)) }}</time>
+        {%- if item.by %}<span> · {{ item.by }}</span>{% endif %}
+        {%- if item.kind %}<span class="rx-visually-hidden"> · {{ t('blocks.history.kind_' ~ item.kind) }}</span>{% endif %}
+      </p>
+      <p class="bs-history__title">{{ item.title }}</p>
+      {%- if item.body %}<div class="bs-history__body rx-prose">{{ item.body | markdown }}</div>{% endif %}
+    </div>
+  </li>
+  {%- endfor %}
+</ol>
+{%- endmacro %}

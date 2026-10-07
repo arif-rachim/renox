@@ -1,0 +1,54 @@
+{#- The admin panel's frame (renox-admin/layout.html), replaced by a file of
+    the same name: the plugin's back-office shell with the shop's head (the
+    brand, the blocks and Motion), the store switcher (permissions here count
+    the store being worked in, src/app/staff/admin.rs), a way back to the
+    staff side, and the "About this page" panel, which explains each
+    resource's list, form and view page (src/app/staff/explain.rs). -#}
+<!doctype html>
+<html lang="{{ app.locale }}">
+<head>
+  <title>{% block title %}{{ tr(admin.title) }}{% endblock %}</title>
+  {% include "layouts/_head.html" %}
+  {{ stack('head') }}
+</head>
+<body class="rx-page rx-shell">
+  {% from "renox/ui.html" import sidebar, sidebar_link, sidebar_section, navbar, menu, menu_link, menu_action, menu_separator, open_button %}
+  {% from "layouts/_text.html" import tx as tr %}
+  {%- set about = about_page(request.route, request.path) if explain_panels else none %}
+  {% call sidebar(tr(admin.title), href=admin.home, label=t('admin_panel.navigation')) %}
+    {{ sidebar_link(admin.home, t('admin_panel.dashboard'), active=admin.dashboard) }}
+    {%- for group in admin.nav %}
+    {%- if group.title %}{{ sidebar_section(tr(group.title)) }}{% endif %}
+    {%- for item in group.items %}
+    {{ sidebar_link(item.url, tr(item.label), active=item.active) }}
+    {%- endfor %}
+    {%- endfor %}
+    {{ sidebar_section(t('nav.shop')) }}
+    {{ sidebar_link(route('staff.dashboard'), t('staff.nav.back_office')) }}
+    {{ sidebar_link(route('about.pages'), t('about.index_link')) }}
+  {% endcall %}
+  <div class="rx-shell__main">
+    {% call navbar(none, width="full", skip=false, label=t('nav.account')) %}
+      {% include "layouts/_store_switcher.html" ignore missing %}
+      <span class="rx-spacer"></span>
+      {%- if about %}{{ open_button("about-page", t('about.button'), variant="plain", size="small") }}{% endif %}
+      {%- if auth.check %}
+      {% call menu(auth.user.name, id="rx-admin-account", variant="plain") %}
+        {%- if admin.account_url %}
+        {{ menu_link(admin.account_url, t('nav.account')) }}
+        {{ menu_separator() }}
+        {%- endif %}
+        {%- if admin.logout_url %}{{ menu_action(admin.logout_url, t('nav.logout')) }}{% endif %}
+      {% endcall %}
+      {%- endif %}
+    {% endcall %}
+    <main class="rx-shell__content" id="main">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  {%- if about %}{% include "about/_panel.html" %}{% endif %}
+  {{ toasts() }}
+  {% include "layouts/_scripts.html" %}
+  {{ stack('scripts') }}
+</body>
+</html>

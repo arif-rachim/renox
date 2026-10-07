@@ -1,0 +1,31 @@
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, card, alert, button %}
+{% from "workshop/_parts.html" import styles %}
+{% block seo %}{{ seo(title=t('workshop.approve.title')) }}{% endblock %}
+
+{#- Extra work, approved or refused through a signed link (#236): no login. -#}
+{% block content %}
+{{ styles() }}
+{% call push('head') %}<meta name="robots" content="noindex">{% endcall %}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('workshop.approve.title'), subtitle=t('workshop.approve.lead', number=order.id, store=(store.name if store else ""))) }}
+  {%- if not pending %}
+  {{ alert(t('workshop.approve.done_' ~ status), kind="success" if status == "approved" else "info") }}
+  {%- endif %}
+  {% call card(title=(bike.name if bike else t('workshop.fields.bike'))) %}
+    <p>{{ extra.description }}</p>
+    <dl class="bs-lines">
+      {%- for item in extra.items %}<dt>{{ item.name }}{% if item.kind == "part" %} <small>× {{ item.quantity }}</small>{% endif %}</dt><dd>{{ item.price | money }}</dd>{% endfor %}
+      <dt><strong>{{ t('workshop.fields.extra_total') }}</strong></dt><dd><strong>{{ extra.total | money }}</strong></dd>
+    </dl>
+    {%- if pending %}
+    <p class="rx-hint">{{ t('workshop.approve.until', time=(extra.expires_at | date('%d %b %H:%M'))) }}</p>
+    <form method="post" action="{{ action }}" class="bs-board__filters">
+      {{ csrf_field() }}
+      {{ button(t('workshop.approve.yes'), name="decision", value="approve", icon="check") }}
+      {{ button(t('workshop.approve.no'), variant="secondary", name="decision", value="refuse") }}
+    </form>
+    {%- endif %}
+  {% endcall %}
+</div>
+{% endblock %}

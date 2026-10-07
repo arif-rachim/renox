@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="{{ app.locale }}">
+<head>
+  {#- Title, description, canonical URL and social cards; a page overrides it with
+      {% block seo %}{{ seo(title="…", description="…") }}{% endblock %} -#}
+  {% block seo %}{{ seo() }}{% endblock %}
+  {% include "layouts/_head.html" %}
+  {#- What pages and components push: {% call push('head') %}…{% endcall %} -#}
+  {{ stack('head') }}
+</head>
+{#- The public layout: the kit's navbar, the page, a footer, stacked by a CSS
+    grid (.bs-public in public/app.css). Pages fill `content`. -#}
+<body class="rx-page bs-public">
+  {% from "renox/ui.html" import navbar, nav_links, nav_link, menu, menu_link, menu_action, menu_separator, link_button, icon_button %}
+  {#- This page's "About this page" entry (src/explain.rs), unless
+      BIKESHOP_EXPLAIN=false hides the panels. -#}
+  {%- set about = about_page(request.route, request.path) if explain_panels else none %}
+  {#- `width="full"`: logged in, the bar holds the links, the search, the cart,
+      the language, the bell and the account menu; the wide container's
+      72rem put the account menu on a second line at 1280 px. -#}
+  {% call navbar(t('shop.name'), href=route('home'), mark=true, width="full") %}
+    {% call nav_links() %}
+      {#- --- Public navigation (one line per area; append yours) --- -#}
+      {{ nav_link(route('home'), t('nav.home'), active=route_is('home')) }}
+      {{ nav_link(route('catalog.index'), t('nav.shop'), active=route_is('catalog.*')) }}
+      {{ nav_link(route('rentals.create'), t('rentals.nav.rent'), active=route_is('rentals.create', 'rentals.show', 'rentals.mine', 'rentals.identity')) }}
+      {{ nav_link(route('workshop.book'), t('workshop.nav.book'), active=route_is('workshop.book', 'workshop.bikes', 'workshop.bikes.show', 'workshop.service.show')) }}
+      {{ nav_link(route('plans.index'), t('plans.nav'), active=route_is('plans.*')) }}
+      {#- --- end of public navigation --- -#}
+    {% endcall %}
+    <span class="rx-spacer"></span>
+    {#- Slots the areas fill with a file of their own: the search box
+        (catalogue, #233) and the cart (#234). -#}
+    {% include "layouts/_nav_search.html" ignore missing %}
+    {% include "layouts/_nav_cart.html" ignore missing %}
+    {#- "About this page" as the kit's icon button (its label is the tooltip
+        and what screen readers say), so the bar keeps to one line. -#}
+    {%- if about %}{{ icon_button("info", t('about.button'), attrs={"data-rx-open": "about-page", "aria-haspopup": "dialog"}) }}{% endif %}
+    {#- The language: a kit menu; each item posts to `locale.update`. -#}
+    {% call menu(app.locale | upper, id="language-menu", variant="plain") %}
+      {{ menu_action(route('locale.update', 'en'), "English") }}
+      {{ menu_action(route('locale.update', 'es'), "Español") }}
+    {% endcall %}
+    {% if auth.check %}
+      {#- The bell: unread notifications, new ones live (Auth::notifications, #238). -#}
+      {% from "renox/ui.html" import notification_bell %}{{ notification_bell(unread_notifications) }}
+      {% call menu(auth.user.name, id="account-menu", variant="plain") %}
+        {{ menu_link(route('account.show'), t('nav.account')) }}
+        {{ menu_link(route('plans.mine'), t('plans.mine.title')) }}
+        {{ menu_link(route('api.tokens'), t('api.tokens.title')) }}
+        {#- Everyone sees it until the access foundations put it behind a permission. -#}
+        {{ menu_link(route('staff.dashboard'), t('nav.staff')) }}
+        {{ menu_separator() }}
+        {{ menu_action(route('logout'), t('nav.logout')) }}
+      {% endcall %}
+    {% else %}
+      {{ link_button(route('login'), t('nav.login'), variant="plain", size="small") }}
+      {{ link_button(route('register'), t('nav.register'), variant="primary", size="small") }}
+    {% endif %}
+  {% endcall %}
+  <main class="rx-container rx-container--wide" id="main">
+    <div class="rx-stack">
+      {% if flash.status %}{% from "renox/ui.html" import alert %}{{ alert(flash.status, kind="success") }}{% endif %}
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+  <footer class="rx-container rx-container--wide bs-footer">
+    <p class="rx-subtitle">{{ t('shop.footer') }}</p>
+    <a class="rx-link" href="{{ route('about.pages') }}">{{ t('about.index_link') }}</a>
+  </footer>
+  {%- if about %}{% include "about/_panel.html" %}{% endif %}
+  {#- Toasts from `Toast::success(…)`, after a redirect or an htmx request. -#}
+  {{ toasts() }}
+  {% include "layouts/_scripts.html" %}
+  {#- Scripts pushed by pages and components, e.g. a chart library, once. -#}
+  {{ stack('scripts') }}
+</body>
+</html>

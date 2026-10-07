@@ -1,0 +1,25 @@
+{% extends "layouts/staff.html" %}
+{% from "renox/ui.html" import page_header, card, table, empty, stats, stat %}
+{% from "stock/_parts.html" import styles %}
+{% block seo %}{{ seo(title=t('multistore.help.hours_title')) }}{% endblock %}
+
+{#- Hours helped per person and store (#245), for reports: never charged between stores. -#}
+{% block content %}
+{{ styles() }}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('multistore.help.hours_title'), subtitle=t('multistore.help.hours_lead'), back=route('multistore.help'), back_label=t('multistore.help.title')) }}
+  {% call stats(2) %}
+    {{ stat(t('multistore.help.total_hours'), total_hours | round(1)) }}
+    {{ stat(t('multistore.help.people'), rows | length) }}
+  {% endcall %}
+  {% call card() %}
+    {%- if rows %}
+    {% call table([t('multistore.help.person'), t('multistore.help.home'), t('multistore.help.helped'), [t('multistore.help.days'), "num"], [t('multistore.help.hours'), "num"]], caption=t('multistore.help.hours_title')) %}
+      {%- for r in rows %}
+      <tr><td>{{ r.name }}</td><td>{{ r.home }}</td><td>{{ r.store }}</td><td class="rx-num">{{ r.days }}</td><td class="rx-num">{{ r.hours | round(1) }}</td></tr>
+      {%- endfor %}
+    {% endcall %}
+    {%- else %}{{ empty(t('multistore.help.no_hours')) }}{% endif %}
+  {% endcall %}
+</div>
+{% endblock %}

@@ -7,8 +7,8 @@
 #   tests/process/run.sh fixture     # the fixture's checks only
 #   tests/process/run.sh examples    # the examples only
 #   PROCESS_POSTGRES=postgres://user:pw@host:port tests/process/run.sh postgres
-#                                    # the engine checks, postgres-app and
-#                                    # fields on PostgreSQL (each in a database
+#                                    # the engine checks, postgres-app,
+#                                    # fields and bikeshop on PostgreSQL (each in a database
 #                                    # of its own, dropped afterwards)
 #
 # RNX_BUILD=1 adds `rnx build` (a release build) to the Tailwind check.
@@ -33,13 +33,13 @@ if [ "$part" = all ] || [ "$part" = fixture ]; then
 fi
 
 if [ "$part" = all ] || [ "$part" = examples ]; then
-  build hello crud api jobs uploads shop htmx-recipes relations grid backoffice teams admin billing webhooks fields
+  build hello crud api jobs uploads shop htmx-recipes relations grid backoffice teams admin billing webhooks fields bikeshop
   python3 tests/process/examples.py
 fi
 
 if [ "$part" = postgres ]; then
   : "${PROCESS_POSTGRES:?set PROCESS_POSTGRES to a PostgreSQL server, e.g. postgres://postgres:postgres@localhost:5432}"
-  FEATURES=renox/postgres build browser-fixture postgres-app fields
+  FEATURES=renox/postgres build browser-fixture postgres-app fields bikeshop
   python3 tests/process/process.py
   python3 tests/process/examples.py
 fi

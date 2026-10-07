@@ -1,0 +1,83 @@
+{#- "My account" (`account.show`): Renox's account page, replaced by a file of
+    the same name so it sits in the shop's layout instead of the narrow sign-in
+    one. Renox's handler still runs it and gives it the same context: `text`
+    (its own labels, in the page's language), `user`, `has_password`,
+    `verify_email` and `sections`, the cards every module adds with
+    `Registry::account_section` (src/app/accounts/mod.rs lists the order:
+    contact, ID check, bikes, orders, rentals, service visits, plan, payments,
+    two-factor, linked logins, notifications, language, privacy).
+
+    The cards sit on a CSS grid (`.bs-account`, accounts/_styles.html): two
+    columns on a wide screen, one on a phone, each section one cell; the forms
+    are Renox's own (`account.profile`, `account.password`,
+    `account.logout_others`, `account.destroy`), so nothing about passwords is
+    written here. -#}
+{% extends "layouts/app.html" %}
+{% from "renox/ui.html" import page_header, card, input, button, alert, open_button, sheet, link_button %}
+{% block seo %}{{ seo(title=text.account_title) }}{% endblock %}
+
+{% block content %}
+{% include "accounts/_styles.html" %}
+<div class="rx-stack" data-bs-reveal>
+  {% call page_header(text.account_title, subtitle=t('accounts.page.lead', name=user.name)) %}
+    {%- if unread_notifications is defined %}{{ link_button(route('notifications.index'), t('accounts.page.notifications'), badge=(unread_notifications or none)) }}{% endif %}
+  {% endcall %}
+
+  <div class="bs-account">
+    <form method="post" action="{{ route('account.profile') }}" hx-post="{{ route('account.profile') }}" id="account-profile">
+      {{ csrf_field() }}{{ method_field('PUT') }}
+      {% call card(title=text.profile_title) %}
+        {{ input("name", text.name, value=user.name, required=true, autocomplete="name") }}
+        {{ input("email", text.email, type="email", value=user.email, required=true, autocomplete="email") }}
+        {% if verify_email and not user.email_verified_at %}{{ alert(text.email_unverified, kind="warning") }}{% endif %}
+        <div class="rx-card__footer">{{ button(text.save) }}</div>
+      {% endcall %}
+    </form>
+
+    {#- Every module's section, in order (src/app/accounts/mod.rs: section_order). -#}
+    {%- for section in sections | default([]) %}
+    <div class="bs-account__section">{% include section.template %}</div>
+    {%- endfor %}
+
+    <form method="post" action="{{ route('account.password') }}" hx-post="{{ route('account.password') }}" id="account-password">
+      {{ csrf_field() }}{{ method_field('PUT') }}
+      {#- A user made by a social login has no password yet: they choose one
+          without a current one (after confirming it's them, docs/oauth.md). -#}
+      {% call card(title=text.password_title if has_password else text.set_password_title, subtitle=none if has_password else text.set_password_intro) %}
+        {% if has_password %}{{ input("current_password", text.current_password, type="password", revealable=true, required=true, autocomplete="current-password") }}{% endif %}
+        {{ input("password", text.new_password, type="password", revealable=true, required=true, autocomplete="new-password") }}
+        {{ input("password_confirmation", text.password_confirmation, type="password", revealable=true, required=true, autocomplete="new-password") }}
+        <div class="rx-card__footer">{{ button(text.save, variant="secondary") }}</div>
+      {% endcall %}
+    </form>
+
+    <form method="post" action="{{ route('account.logout_others') }}" hx-post="{{ route('account.logout_others') }}" id="account-devices">
+      {{ csrf_field() }}
+      {% call card(title=text.other_devices_title, subtitle=text.other_devices_intro) %}
+        {% if has_password %}{{ input("password", text.password, type="password", revealable=true, required=true, autocomplete="current-password", id="rx-password-others") }}{% endif %}
+        <div class="rx-card__footer">{{ button(text.other_devices_button, variant="secondary") }}</div>
+      {% endcall %}
+    </form>
+
+    {#- Destructive: red text here, the filled red button only in the sheet,
+        which asks for the password. What happens to the customer's data is
+        said before they confirm (src/app/accounts/privacy.rs). -#}
+    <div class="bs-account__wide" id="account-delete">
+      {% call card(title=text.delete_title, subtitle=t('accounts.privacy.delete_intro')) %}
+        <div class="rx-card__footer">{{ open_button("delete-account", text.delete_button, variant="plain-danger") }}</div>
+      {% endcall %}
+    </div>
+  </div>
+</div>
+
+{% call sheet("delete-account", text.delete_title, t('accounts.privacy.delete_confirm')) %}
+  <form method="post" action="{{ route('account.destroy') }}" hx-post="{{ route('account.destroy') }}" class="rx-stack">
+    {{ csrf_field() }}{{ method_field('DELETE') }}
+    {% if has_password %}{{ input("password", text.password, type="password", revealable=true, required=true, autocomplete="current-password", id="rx-password-delete") }}{% endif %}
+    <div class="rx-sheet__actions">
+      <button class="rx-button rx-button--secondary" type="button" data-rx-close autofocus><span class="rx-button__label">{{ t('ui.cancel') }}</span></button>
+      {{ button(text.delete_button, variant="danger") }}
+    </div>
+  </form>
+{% endcall %}
+{% endblock %}

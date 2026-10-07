@@ -1,0 +1,14 @@
+{#- Translating texts that come from Rust in English (the role and
+    permission catalogue, the data page's tables, renox-admin's labels):
+    `tx(text)` looks the English text up under `text.<text>` in
+    resources/lang/<locale>.json and shows it as it is when the language has
+    no translation, as Laravel's JSON translations keyed by the English text
+    do. `tk(key, fallback)` does the same for a key of the app's own
+    (`api.endpoints.<route>.purpose`). -#}
+{%- macro tk(key, fallback) -%}
+{%- set found = t(key) -%}
+{{ found if found != key else fallback }}
+{%- endmacro -%}
+{%- macro tx(text) -%}
+{{ tk('text.' ~ text, text) }}
+{%- endmacro -%}

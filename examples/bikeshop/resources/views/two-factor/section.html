@@ -1,0 +1,22 @@
+{#- renox-2fa's card on the account page (`section.data`: enabled, since,
+    recovery_codes_left), replaced by the bike shop for its translations
+    (`plugins.two_factor.*`, with a plural range for the codes left). -#}
+{% from "renox/ui.html" import card, button, confirm %}
+{% if section.data.enabled %}
+{% call card(title=t('plugins.two_factor.title'), subtitle=t('plugins.two_factor.on_since', date=(section.data.since | date))) %}
+  <p class="rx-subtitle">{{ t('plugins.two_factor.codes_left', count=section.data.recovery_codes_left) }}</p>
+  <div class="rx-card__footer">
+    <form method="post" action="{{ route('two-factor.recovery-codes.regenerate') }}">
+      {{ csrf_field() }}{{ button(t('plugins.two_factor.new_codes'), variant="secondary") }}
+    </form>
+    {{ confirm("two-factor-off", t('plugins.two_factor.turn_off'), route('two-factor.disable'), t('plugins.two_factor.turn_off_question'), t('plugins.two_factor.turn_off_text'), confirm_label=t('plugins.two_factor.turn_off')) }}
+  </div>
+{% endcall %}
+{% else %}
+{% call card(title=t('plugins.two_factor.title'), subtitle=t('plugins.two_factor.off')) %}
+  <form method="post" action="{{ route('two-factor.enable') }}">
+    {{ csrf_field() }}
+    <div class="rx-card__footer">{{ button(t('plugins.two_factor.turn_on'), variant="secondary") }}</div>
+  </form>
+{% endcall %}
+{% endif %}

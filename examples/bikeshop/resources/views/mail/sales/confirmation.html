@@ -1,0 +1,15 @@
+{#- Sent from the queue when an order is paid (src/app/sales/notify.rs). -#}
+{% extends "renox/mail/layout.html" %}
+{% from "renox/mail/components.html" import table, panel, button, divider %}
+{% block title %}{{ t('sales.mail.confirmation.subject', number=order.number) }}{% endblock %}
+{% block content %}
+<p>{{ t('sales.mail.hello', name=name) }}</p>
+<p>{{ t('sales.mail.confirmation.thanks', number=order.number) }}</p>
+{% include "mail/sales/_lines.html" %}
+{% call panel() %}
+{%- if order.delivery %}{{ t('sales.mail.confirmation.delivery', address=order.address) }}{% else %}{{ t('sales.mail.confirmation.pickup', store=order.store.name) }}{% endif %}
+{% endcall %}
+<p>{{ t('sales.mail.confirmation.returns', days=14) }}</p>
+{{ divider() }}
+{{ button(url, t('sales.mail.view_order')) }}
+{% endblock %}
