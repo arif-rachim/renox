@@ -259,13 +259,51 @@ export class Page {
     throw new Error(box ? `${selector} isn't visible` : `no element ${selector}`);
   }
 
-  /** A real mouse click in the middle of the element. */
-  async click(selector) {
-    const { x, y } = await this.point(selector);
-    for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
-      await this.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 });
+  /**
+   * A real mouse click in the middle of the element. It waits until the
+   * element stands still (an entrance animation can move it), then checks the
+   * page got the mouse events, and clicks again if it got none (#327: in CI,
+   * clicks on logged-in pages sometimes never arrived). The events may land on
+   * whatever is on top there (a hidden input over a chip, a disabled button):
+   * that counts, as does a click that leaves the page.
+   */
+  async click(selector, { timeout = TIMEOUT } = {}) {
+    const until = Date.now() + timeout;
+    for (;;) {
+      const { x, y } = await this.steadyPoint(selector);
+      await this.eval(() => {
+        window.__cdpPressed = false;
+        const seen = () => (window.__cdpPressed = true);
+        for (const type of ['pointerdown', 'mousedown']) {
+          window.addEventListener(type, seen, { once: true, capture: true });
+        }
+      });
+      for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
+        await this.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 });
+      }
+      await sleep(30);
+      let arrived;
+      try {
+        arrived = (await this.eval(() => window.__cdpPressed)) !== false;
+      } catch {
+        arrived = true; // the page navigated away
+      }
+      if (arrived) return;
+      if (Date.now() > until) throw new Error(`the page never got the click on ${selector}`);
+      await sleep(100);
     }
-    await sleep(30);
+  }
+
+  /** The middle of `selector` once it has stopped moving (two seconds at most). */
+  async steadyPoint(selector) {
+    const until = Date.now() + 2000;
+    let last = await this.point(selector);
+    for (;;) {
+      await sleep(50);
+      const now = await this.point(selector);
+      if ((Math.abs(last.x - now.x) < 0.5 && Math.abs(last.y - now.y) < 0.5) || Date.now() > until) return now;
+      last = now;
+    }
   }
 
   /** A click at a point of the window (e.g. an empty corner, to click "outside"). */
