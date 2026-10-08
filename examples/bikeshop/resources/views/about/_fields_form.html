@@ -36,6 +36,7 @@
                      selected=sample.colors if sample else []) }}
   {% endcall %}
 
+  {# [explain:fields.template] #}
   {% call fieldset(t('fields.form.details')) %}
     {{ tags_input("tags", t('fields.form.tags'), value=sample.tags if sample else [], suggestions=["commuter", "e-bike", "gravel", "kids"], hint=t('fields.form.tags_hint')) }}
     {{ key_value("specs", t('fields.form.specs'), value=sample.specs if sample else none, key_label=t('fields.form.spec_name'), value_label=t('fields.form.spec_value'), add_label=t('fields.form.spec_add')) }}
@@ -43,6 +44,7 @@
     {{ rich_editor("details", t('fields.form.rich'), value=sample.details if sample else none, rows=5, hint=t('fields.form.rich_hint')) }}
     {{ code_editor("settings", t('fields.form.settings'), value=value('settings'), language="json", rows=5, placeholder='{"wheel": "700c", "gears": 9}', hint=t('fields.form.settings_hint')) }}
   {% endcall %}
+  {# [/explain:fields.template] #}
 
   {% call fieldset(t('fields.form.dates'), columns=3) %}
     {{ input("pickup_at", t('fields.form.pickup'), type="time", value=value('pickup_at')) }}
@@ -51,12 +53,14 @@
     {{ date_picker("released_on", t('fields.form.released'), value=value('released_on')) }}
   {% endcall %}
 
+  {# [explain:fields.files] #}
   {% call fieldset(t('fields.form.files'), columns=2) %}
     {#- The photo is public (`store_public`: an address anyone can open); the
         manual private (`store`: only the app sends it, to its owner). -#}
     {{ file("photo", t('fields.form.photo'), accept="image/*", preview=true, current=photo_url, hint=t('fields.form.photo_hint')) }}
     {{ file("manual", t('fields.form.manual'), accept="application/pdf", current=(route('about.fields.manual', sample.id) if sample and sample.manual else none), current_name=(sample.manual_name if sample else none), hint=t('fields.form.manual_hint')) }}
   {% endcall %}
+  {# [/explain:fields.files] #}
 
   <div class="rx-row rx-row--end">
     {%- if sample %}{{ link_button(route('about.fields.show', sample.id), t('fields.cancel'), variant="plain") }}{% endif %}

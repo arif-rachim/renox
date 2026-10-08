@@ -7,6 +7,7 @@
 {% from "layouts/_text.html" import tx %}
 {% block title %}{{ t('staff.join.title', store=store.name) }}{% endblock %}
 {% block content %}
+{# [explain:staff.invitations.accept.template] #}
 {% call card(title=t('staff.join.title', store=store.name), subtitle=t('staff.join.lead', role=tx(role), store=store.name)) %}
 {%- if used %}
 {{ alert(t('staff.join.used'), kind="info") }}
@@ -28,4 +29,5 @@
 </form>
 {%- endif %}
 {% endcall %}
+{# [/explain:staff.invitations.accept.template] #}
 {% endblock %}

@@ -16,6 +16,7 @@
       ["in_app", t('accounts.notifications.choice.in_app')],
       ["none", t('accounts.notifications.choice.none')],
     ] %}
+    {# [explain:notifications.template] #}
     <div class="bs-prefs" role="group" aria-label="{{ t('accounts.notifications.title') }}">
       {%- for row in section.data.rows %}
       <div class="bs-prefs__row" data-bs-pref="{{ row.kind }}">
@@ -27,6 +28,7 @@
       </div>
       {%- endfor %}
     </div>
+    {# [/explain:notifications.template] #}
     <div class="rx-card__footer">{{ button(t('accounts.save')) }}</div>
   {% endcall %}
 </form>

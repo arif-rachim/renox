@@ -289,6 +289,9 @@ part is a macro: you import it into a template, then call it like a function.
 {{ page_header("Products", subtitle="All items", back=route('home')) }}
 {% call toolbar() %}{{ link_button(route('products.create'), "New product") }}{% endcall %} {# above a table #}
 {# in a table row: {% call row_actions() %}…icon buttons…{% endcall %}; also list(), card_grid() + media_card(href, title, image=…), link_tabs(items, current=…), progress(42) #}
+{# Phones: navbar(…, tabs=[{"href": …, "label": "Shop", "icon": "shopping-bag", "active": route_is('shop.*')}, {"open": "menu-sheet", "label": "Menu", "icon": "menu"}]) = a bottom tab bar under 36rem;
+   {% call nav_search() %}<form role="search">…</form>{% endcall %} = search behind a button there; rx-hide-narrow leaves the phone's bar #}
+{# Icons (Lucide, docs/ui.md#icons): {% from "renox/ui.html" import icon %} {{ icon("bike") }} {{ icon("truck", size=16) }}; hidden from screen readers unless {{ icon("lock", label="Private") }}; the same names in icon="…" on buttons and menus #}
 {# A back office: <body class="rx-page rx-shell">, then {% call sidebar(app.name) %}{{ sidebar_section("Sales") }}{{ sidebar_link(…) }}{% endcall %}
    and <div class="rx-shell__main">{{ navbar(none, width="full", skip=false) }}<main class="rx-shell__content" id="main">…</main></div>.
    Also thumbnail(src), menu_button(label) in a menu, hide_label=true on input, textarea,
@@ -314,6 +317,7 @@ part is a macro: you import it into a template, then call it like a function.
     {{ toggle_buttons("delivery", "Delivery", [["courier", "Courier"], ["pickup", "Pickup"]], selected="courier") }}
     {% call show_when("delivery", "courier") %}{{ input("address", "Address") }}{% endcall %} {# required_if #}
     {{ date_picker("ships_on", "Ships on") }} {# NaiveDate #}
+    {{ date_picker("visit_on", "Visit", disabled_dates=full_days, closed_weekdays=[0]) }} {# 0 = Sunday; also none_of on the server #}
     {{ file("photo", "Photo", accept="image/*", preview=true) }} {# enctype="multipart/form-data" #}
     {{ input("api_key", "API key", value=key, readonly=true, copyable=true) }}
     {{ tags_input("keywords", "Keywords") }} {# Vec<String> + #[serde(default)] #}

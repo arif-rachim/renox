@@ -9,6 +9,7 @@
     "choose_file": "Elige un archivo o suéltalo aquí",
     "current_file": "Archivo actual",
     "choose_date": "Elige una fecha",
+    "date_unavailable": "Ese día no se puede elegir: elige otro.",
     "yes": "Sí",
     "no": "No",
     "show_more": "Mostrar :count más",

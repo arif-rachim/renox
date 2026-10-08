@@ -45,6 +45,7 @@ pub fn pattern() -> String {
 }
 
 /// The routes on a store's host.
+// [explain:stores.routes]
 pub fn routes() -> Routes {
     Routes::new().domain(
         &pattern(),
@@ -55,6 +56,7 @@ pub fn routes() -> Routes {
             .fallback(|| async { Redirect::to("/") }),
     )
 }
+// [/explain:stores.routes]
 
 /// The address of a store's page: `APP_URL`'s scheme and port with the
 /// store's host, e.g. `http://north.localhost:3000/` for
@@ -97,6 +99,7 @@ struct Site {
 
 /// `GET /` on `{store}.<domain>`: the store's name, photo, address, hours
 /// and what it has, with links back to the shop. An unknown store is a 404.
+// [explain:stores.handler]
 async fn site(State(state): State<AppState>, domain: DomainParams) -> Result<View> {
     let db = &state.db;
     let slug = domain.get("store").unwrap_or_default();
@@ -116,6 +119,7 @@ async fn site(State(state): State<AppState>, domain: DomainParams) -> Result<Vie
         )
     };
     let bikes_here = here().count(db).await? as i64;
+    // [/explain:stores.handler]
     let bikes_free = here()
         .where_eq("status", BikeStatus::Available)
         .count(db)

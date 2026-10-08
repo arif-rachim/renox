@@ -108,11 +108,13 @@ pub fn slug_of(key: &str) -> &str {
 /// The module, registered in `src/lib.rs`: every service plan twice (card
 /// and Xendit), Stripe, the demo gateway and Xendit, in that order (a card
 /// plan goes to the first one set up: Stripe, else the demo).
+// [explain:billing.plans.module]
 pub fn billing() -> Billing {
     let mut billing = Billing::new();
     for (name, slug, frequency, price, description, task_slugs) in SERVICE_PLANS {
         let frequency = frequency.parse::<Frequency>().unwrap_or_default();
         let monthly = monthly_price(*price, frequency);
+        // [/explain:billing.plans.module]
         let features: Vec<&str> = SERVICE_TASKS
             .iter()
             .filter(|(_, task, _, _)| task_slugs.contains(task))
@@ -127,6 +129,7 @@ pub fn billing() -> Billing {
             }
             plan
         };
+        // [explain:billing.plans.module]
         billing = billing
             .plan(plan(
                 billing_key(slug, PayWith::Card),
@@ -149,6 +152,7 @@ pub fn billing() -> Billing {
         .without_proration()
         .redirect_to("/plans/mine")
 }
+// [/explain:billing.plans.module]
 
 /// The ways of paying set up now, with the gateway that takes each: card
 /// (`stripe` or `demo`) and `xendit`.

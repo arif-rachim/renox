@@ -617,6 +617,7 @@ async fn the_sitemap_lists_categories_and_products_still_sold() {
     );
 }
 
+// [explain:sitemap.test]
 #[renox::test]
 async fn catalogue_routes_carry_etags_and_the_sitemap_answers_304() {
     let app = TestApp::new(bikeshop::app()).await;
@@ -641,6 +642,7 @@ async fn catalogue_routes_carry_etags_and_the_sitemap_answers_304() {
         .await
         .assert_status(304);
 }
+// [/explain:sitemap.test]
 
 #[renox::test]
 async fn the_home_page_features_bikes_and_categories() {

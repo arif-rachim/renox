@@ -32,6 +32,7 @@ use crate::app::sales::payments::{self, Charge, Payable};
 use crate::app::staff::model::Store;
 use crate::app::stock::model::{MovementReason, StockLevel, StockMovement};
 
+// [explain:workshop.order.policy]
 /// The work order `id` for someone who may work on it (404 when it isn't
 /// visible to them, 403 when they may only look).
 async fn workable(db: &Db, user: &User, id: i64) -> Result<WorkOrder> {
@@ -44,6 +45,7 @@ async fn workable(db: &Db, user: &User, id: i64) -> Result<WorkOrder> {
     )?;
     Ok(order)
 }
+// [/explain:workshop.order.policy]
 
 /// The catalogue product of the bike on the bench (a customer's bike's
 /// model, or a fleet bike's), for "parts that fit".
@@ -417,6 +419,7 @@ pub async fn part_options(
 /// work order), or records it as **waiting** and puts the order in
 /// "waiting for parts" when the stock is short. `existing` is a waiting
 /// line to fill now. Returns whether it was taken.
+// [explain:workshop.order.part]
 pub async fn take_part(
     state: &AppState,
     order: &mut WorkOrder,
@@ -424,10 +427,12 @@ pub async fn take_part(
     quantity: i64,
     existing: Option<WorkOrderPart>,
 ) -> Result<bool> {
+    // [/explain:workshop.order.part]
     let db = &state.db;
     let variant = ProductVariant::find_or_404(db, variant_id).await?;
     // A plan's visit gets the plan's parts discount (#237).
     let unit_price = crate::app::plans::part_price(db, order, variant.price).await?;
+    // [explain:workshop.order.part]
     let mut tx = db.begin_immediate().await?;
     let available = StockLevel::where_eq("variant_id", variant.id)
         .where_eq("owner_store_id", order.store_id)
@@ -454,6 +459,7 @@ pub async fn take_part(
         )
         .await?;
     }
+    // [/explain:workshop.order.part]
     let status = if taken {
         PartStatus::Used
     } else {

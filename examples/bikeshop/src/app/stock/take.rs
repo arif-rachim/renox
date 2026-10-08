@@ -86,6 +86,7 @@ pub async fn sheet(State(db): State<Db>, Query(query): Query<TakeQuery>) -> Resu
     ))
 }
 
+// [explain:stock.take.form]
 /// One counted line: `lines[3][level]`, `lines[3][counted]`.
 #[derive(Deserialize, Debug, Clone)]
 pub struct TakeLine {
@@ -118,6 +119,7 @@ impl Validate for TakeForm {
         v.nested("lines", &self.lines);
     }
 }
+// [/explain:stock.take.form]
 
 /// What a take changed.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -161,6 +163,7 @@ pub async fn apply(
         text
     };
     let mut result = TakeResult::default();
+    // [explain:stock.take.apply]
     let mut tx = db.begin().await?;
     for line in counted {
         let Some(level) = StockLevel::find(&mut tx, line.level).await? else {
@@ -174,6 +177,7 @@ pub async fn apply(
             continue;
         }
         let movement = StockMovement::record(
+            // [/explain:stock.take.apply]
             &mut tx,
             StockMovement {
                 variant_id: level.variant_id,
@@ -187,6 +191,7 @@ pub async fn apply(
             },
         )
         .await?;
+        // [explain:stock.take.apply]
         result.adjusted += 1;
         if level.consigned() && diff < 0 {
             let cost = costs.get(&level.id).copied().unwrap_or(0) * -diff;
@@ -206,6 +211,7 @@ pub async fn apply(
         }
     }
     tx.commit().await?;
+    // [/explain:stock.take.apply]
     Ok(result)
 }
 

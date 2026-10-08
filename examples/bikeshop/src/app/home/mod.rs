@@ -18,6 +18,7 @@ impl Module for Home {
         "home"
     }
 
+    // [explain:home.routes]
     fn routes(&self) -> Routes {
         Routes::new()
             .get("/", index)
@@ -29,14 +30,17 @@ impl Module for Home {
             // Each store's own page, on its own host (#351).
             .merge(stores::routes())
     }
+    // [/explain:home.routes]
 }
 
 /// The languages the shop is written in (`resources/lang/<locale>.json`).
 pub const LOCALES: [(&str, &str); 2] = [("en", "English"), ("es", "Español")];
 
+// [explain:home.routes]
 async fn index() -> View {
     view("home/index.html", context! {})
 }
+// [/explain:home.routes]
 
 /// Remembers the visitor's language (the layout's language menu) and goes
 /// back to the page they were on. An unknown language is ignored.

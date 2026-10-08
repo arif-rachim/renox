@@ -82,6 +82,7 @@ pub fn store_options(stores: &[Store]) -> Vec<(String, String)> {
 }
 
 /// What every report grid shares.
+// [explain:reports.orders.grid]
 fn report_grid(id: &str, lang: &Lang, empty: &str) -> Grid {
     Grid::new(id)
         .per_page(25)
@@ -91,8 +92,10 @@ fn report_grid(id: &str, lang: &Lang, empty: &str) -> Grid {
         .exports()
         .empty_state(&lang.t(empty, &[]), None)
 }
+// [/explain:reports.orders.grid]
 
 /// The orders grid.
+// [explain:reports.orders.grid]
 pub fn orders_grid(lang: &Lang, stores: &[Store]) -> Grid {
     let f = |key: &str| field(lang, key);
     report_grid("report-orders", lang, "reports.empty.orders")
@@ -104,6 +107,7 @@ pub fn orders_grid(lang: &Lang, stores: &[Store]) -> Grid {
                 .copyable(),
         )
         .column(Column::datetime("placed_at", &f("placed_at")).mobile())
+        // [/explain:reports.orders.grid]
         .column(Column::select("store", &f("store"), store_options(stores)))
         .column(
             Column::text("customer", &f("customer"))
@@ -148,6 +152,7 @@ pub fn orders_grid(lang: &Lang, stores: &[Store]) -> Grid {
                 .summary(Summary::Sum)
                 .hidden(),
         )
+        // [explain:reports.orders.grid]
         .column(
             Column::money("total", &f("total"))
                 .summary(Summary::Sum)
@@ -159,8 +164,10 @@ pub fn orders_grid(lang: &Lang, stores: &[Store]) -> Grid {
         .sort_by("-placed_at")
         .row_url("/staff/orders/{id}")
 }
+// [/explain:reports.orders.grid]
 
 /// The rentals grid.
+// [explain:reports.rentals.grid]
 pub fn rentals_grid(lang: &Lang, stores: &[Store]) -> Grid {
     let f = |key: &str| field(lang, key);
     report_grid("report-rentals", lang, "reports.empty.rentals")
@@ -173,6 +180,7 @@ pub fn rentals_grid(lang: &Lang, stores: &[Store]) -> Grid {
         )
         .column(Column::datetime("starts_at", &f("starts_at")).mobile())
         .column(Column::select("store", &f("store"), store_options(stores)))
+        // [/explain:reports.rentals.grid]
         .column(Column::select(
             "owner_store",
             &f("owner_store"),
@@ -212,6 +220,7 @@ pub fn rentals_grid(lang: &Lang, stores: &[Store]) -> Grid {
             ])
             .mobile(),
         )
+        // [explain:reports.rentals.grid]
         .column(Column::money("price", &f("price")).summary(Summary::Sum))
         .column(Column::money("late_fee", &f("late_fee")).summary(Summary::Sum))
         .column(
@@ -230,14 +239,17 @@ pub fn rentals_grid(lang: &Lang, stores: &[Store]) -> Grid {
         .sort_by("-starts_at")
         .row_url("/staff/rentals/{id}")
 }
+// [/explain:reports.rentals.grid]
 
 /// The work orders grid.
+// [explain:reports.work_orders.grid]
 pub fn work_orders_grid(lang: &Lang, stores: &[Store]) -> Grid {
     let f = |key: &str| field(lang, key);
     report_grid("report-work-orders", lang, "reports.empty.work_orders")
         .column(Column::number("id", &f("work_order")).frozen().mobile())
         .column(Column::datetime("scheduled_for", &f("scheduled_for")).mobile())
         .column(Column::select("store", &f("store"), store_options(stores)))
+        // [/explain:reports.work_orders.grid]
         .column(Column::select(
             "source",
             &f("source"),
@@ -276,6 +288,7 @@ pub fn work_orders_grid(lang: &Lang, stores: &[Store]) -> Grid {
             ])
             .mobile(),
         )
+        // [explain:reports.work_orders.grid]
         .column(Column::text("customer", &f("customer")).searchable())
         .column(Column::text("bike", &f("bike")).searchable().limit(32))
         .column(Column::text("mechanic_name", &f("mechanic_name")).searchable())
@@ -292,8 +305,10 @@ pub fn work_orders_grid(lang: &Lang, stores: &[Store]) -> Grid {
         .sort_by("-scheduled_for")
         .row_url("/staff/workshop/{id}")
 }
+// [/explain:reports.work_orders.grid]
 
 /// The payments grid.
+// [explain:reports.payments.grid]
 pub fn payments_grid(lang: &Lang, stores: &[Store]) -> Grid {
     let f = |key: &str| field(lang, key);
     report_grid("report-payments", lang, "reports.empty.payments")
@@ -301,6 +316,7 @@ pub fn payments_grid(lang: &Lang, stores: &[Store]) -> Grid {
         .column(Column::datetime("paid_at", &f("paid_at")).mobile())
         .column(Column::select("store", &f("store"), store_options(stores)))
         .column(Column::text("customer", &f("customer")).searchable())
+        // [/explain:reports.payments.grid]
         .column(
             Column::select(
                 "kind",
@@ -336,6 +352,7 @@ pub fn payments_grid(lang: &Lang, stores: &[Store]) -> Grid {
                 ("refunded", "neutral"),
             ]),
         )
+        // [explain:reports.payments.grid]
         .column(
             Column::money("amount", &f("amount"))
                 .summary(Summary::Sum)
@@ -349,8 +366,10 @@ pub fn payments_grid(lang: &Lang, stores: &[Store]) -> Grid {
         .groups(&["store", "kind", "method", "status"])
         .sort_by("-paid_at")
 }
+// [/explain:reports.payments.grid]
 
 /// The customers grid, with their lifetime value per stream.
+// [explain:reports.customers.grid]
 pub fn customers_grid(lang: &Lang) -> Grid {
     let f = |key: &str| field(lang, key);
     report_grid("report-customers", lang, "reports.empty.customers")
@@ -369,6 +388,7 @@ pub fn customers_grid(lang: &Lang) -> Grid {
                 .summary(Summary::Sum)
                 .under([f("value")]),
         )
+        // [/explain:reports.customers.grid]
         .column(
             Column::money("rentals_value", &f("rentals_value"))
                 .summary(Summary::Sum)
@@ -384,6 +404,7 @@ pub fn customers_grid(lang: &Lang) -> Grid {
                 .summary(Summary::Sum)
                 .under([f("value")]),
         )
+        // [explain:reports.customers.grid]
         .column(
             Column::money("lifetime_value", &f("lifetime_value"))
                 .summary(Summary::Sum)
@@ -396,10 +417,13 @@ pub fn customers_grid(lang: &Lang) -> Grid {
         .groups(&["city"])
         .sort_by("-lifetime_value")
 }
+// [/explain:reports.customers.grid]
 
 /// The books between stores.
+// [explain:reports.entries.grid]
 pub fn entries_grid(lang: &Lang, stores: &[Store]) -> Grid {
     let f = |key: &str| field(lang, key);
+    // [/explain:reports.entries.grid]
     let kinds = [
         "rental_revenue",
         "operating_fee",
@@ -410,6 +434,7 @@ pub fn entries_grid(lang: &Lang, stores: &[Store]) -> Grid {
         "repair",
         "consignment_loss",
     ];
+    // [explain:reports.entries.grid]
     report_grid("report-entries", lang, "reports.empty.entries")
         .column(
             Column::datetime("booked_at", &f("booked_at"))
@@ -439,6 +464,7 @@ pub fn entries_grid(lang: &Lang, stores: &[Store]) -> Grid {
                 .summary(Summary::Sum)
                 .mobile(),
         )
+        // [/explain:reports.entries.grid]
         .column(Column::number("fee_rate_bp", &f("fee_rate_bp")).hidden())
         .column(Column::custom("source", &f("source")))
         .column(
@@ -466,6 +492,7 @@ fn page(tab: &str, rows: impl Serialize) -> View {
     view("reports/grid.html", context! { rows, tab, tabs => tabs() })
 }
 
+// [explain:reports.orders.handler]
 /// `GET /staff/reports/orders` (`reports.orders`).
 pub async fn orders(State(db): State<Db>, lang: Lang, request: GridRequest) -> Result<Response> {
     let stores = Store::all_by_name(&db).await?;
@@ -477,7 +504,9 @@ pub async fn orders(State(db): State<Db>, lang: Lang, request: GridRequest) -> R
     let rows = grid.page(rows(), &request).await?;
     Ok(page("orders", rows).into_response())
 }
+// [/explain:reports.orders.handler]
 
+// [explain:reports.rentals.handler]
 /// `GET /staff/reports/rentals` (`reports.rentals`).
 pub async fn rentals(State(db): State<Db>, lang: Lang, request: GridRequest) -> Result<Response> {
     let stores = Store::all_by_name(&db).await?;
@@ -489,7 +518,9 @@ pub async fn rentals(State(db): State<Db>, lang: Lang, request: GridRequest) -> 
     let rows = grid.page(rows(), &request).await?;
     Ok(page("rentals", rows).into_response())
 }
+// [/explain:reports.rentals.handler]
 
+// [explain:reports.work_orders.handler]
 /// `GET /staff/reports/work-orders` (`reports.work_orders`).
 pub async fn work_orders(
     State(db): State<Db>,
@@ -505,7 +536,9 @@ pub async fn work_orders(
     let rows = grid.page(rows(), &request).await?;
     Ok(page("work_orders", rows).into_response())
 }
+// [/explain:reports.work_orders.handler]
 
+// [explain:reports.payments.handler]
 /// `GET /staff/reports/payments` (`reports.payments`).
 pub async fn payments(State(db): State<Db>, lang: Lang, request: GridRequest) -> Result<Response> {
     let stores = Store::all_by_name(&db).await?;
@@ -517,7 +550,9 @@ pub async fn payments(State(db): State<Db>, lang: Lang, request: GridRequest) ->
     let rows = grid.page(rows(), &request).await?;
     Ok(page("payments", rows).into_response())
 }
+// [/explain:reports.payments.handler]
 
+// [explain:reports.customers.query]
 /// The customers a person may see in the reports: everyone for a global
 /// role, else those with income at one of their stores (the store that
 /// did the work, or owns what was sold or rented).
@@ -550,7 +585,9 @@ pub async fn customers(lang: Lang, request: GridRequest) -> Result<Response> {
     let rows = grid.page(visible_customers(), &request).await?;
     Ok(page("customers", rows).into_response())
 }
+// [/explain:reports.customers.query]
 
+// [explain:reports.entries.handler]
 /// `GET /staff/reports/intercompany` (`reports.entries`).
 pub async fn entries(State(db): State<Db>, lang: Lang, request: GridRequest) -> Result<Response> {
     let stores = Store::all_by_name(&db).await?;
@@ -567,3 +604,4 @@ pub async fn entries(State(db): State<Db>, lang: Lang, request: GridRequest) -> 
     });
     Ok(page("entries", rows).into_response())
 }
+// [/explain:reports.entries.handler]

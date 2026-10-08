@@ -43,6 +43,7 @@ pub fn routes() -> Routes {
     )
 }
 
+// [explain:staff.stores.index.handler]
 /// The stores the user manages: every store for a global role.
 async fn manageable(db: &Db, user: &User) -> Result<Vec<Store>> {
     Ok(Store::all_by_name(db)
@@ -51,6 +52,7 @@ async fn manageable(db: &Db, user: &User) -> Result<Vec<Store>> {
         .filter(|s| can_in(user, STORES_MANAGE, s.id))
         .collect())
 }
+// [/explain:staff.stores.index.handler]
 
 /// One store the user manages, or a 404.
 async fn find(db: &Db, user: &User, id: i64) -> Result<Store> {
@@ -61,6 +63,7 @@ async fn find(db: &Db, user: &User, id: i64) -> Result<Store> {
     Ok(store)
 }
 
+// [explain:staff.stores.index.handler]
 /// `GET /staff/stores`: a card per store, with its address and hours.
 pub async fn index(State(db): State<Db>, user: AuthUser) -> Result<View> {
     let stores = manageable(&db, &user).await?;
@@ -80,6 +83,7 @@ pub async fn index(State(db): State<Db>, user: AuthUser) -> Result<View> {
         context! { cards, can_fees => user.allows(SETTINGS_FEES) },
     ))
 }
+// [/explain:staff.stores.index.handler]
 
 /// `GET /staff/stores/{store}/edit`.
 pub async fn edit(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Result<View> {
@@ -98,6 +102,7 @@ pub async fn edit(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> 
     ))
 }
 
+// [explain:staff.stores.edit.form]
 /// One row of the opening hours repeater.
 #[derive(Deserialize, Debug)]
 pub struct HoursRow {
@@ -117,6 +122,7 @@ impl Validate for HoursRow {
             .matches(r"^([01][0-9]|2[0-3]):[0-5][0-9]$");
     }
 }
+// [/explain:staff.stores.edit.form]
 
 /// The store form.
 #[derive(Deserialize, Debug)]
@@ -134,6 +140,7 @@ pub struct StoreForm {
     pub hours: Vec<HoursRow>,
 }
 
+// [explain:staff.stores.edit.form]
 impl Validate for StoreForm {
     fn rules(&self, v: &mut Validator) {
         v.field("name", &self.name).required().max(100);
@@ -147,6 +154,7 @@ impl Validate for StoreForm {
         v.nested("hours", &self.hours);
     }
 }
+// [/explain:staff.stores.edit.form]
 
 /// `PUT /staff/stores/{store}`: saves the store; a fee change is audited.
 pub async fn update(
@@ -178,6 +186,7 @@ pub async fn update(
             })
             .collect(),
     );
+    // [explain:staff.stores.edit.fee]
     let fee_changed = match form.fee_percent {
         Some(percent) if can_in(&user, SETTINGS_FEES, store.id) => {
             store.fee_rate_bp = (percent * 100.0).round() as i64;
@@ -198,6 +207,7 @@ pub async fn update(
             .save()
             .await?;
     }
+    // [/explain:staff.stores.edit.fee]
     Ok((
         Toast::success(
             state

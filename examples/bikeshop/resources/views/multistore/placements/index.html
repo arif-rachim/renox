@@ -19,6 +19,7 @@
     <div>
       {% call card(title=t('multistore.placements.list'), subtitle=t('multistore.placements.list_lead')) %}
         {%- if rows %}
+        {# [explain:multistore.placements.template] #}
         {% call list(id="placements", label=t('multistore.placements.list')) %}
           {%- for p in rows %}
           <li>
@@ -37,6 +38,7 @@
           </li>
           {%- endfor %}
         {% endcall %}
+        {# [/explain:multistore.placements.template] #}
         {%- else %}{{ empty(t('multistore.placements.none')) }}{% endif %}
       {% endcall %}
     </div>

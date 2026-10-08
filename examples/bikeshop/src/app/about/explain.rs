@@ -1,6 +1,6 @@
 //! "About this page" entries for the about area (see `crate::explain`).
 
-use crate::explain::{Audience, Explanation, Feature, Flow, NotAPage};
+use crate::explain::{Audience, Code, Explanation, Feature, Flow, NotAPage};
 
 /// The explanation of every page in this area.
 pub fn entries() -> Vec<Explanation> {
@@ -56,8 +56,12 @@ pub fn entries() -> Vec<Explanation> {
                     why: "The \"About this page\" panel on every page comes from the \
                       `about_page(request.route, request.path)` template function the app \
                       registers, so no handler passes anything for it: the layouts ask \
-                      for it themselves. The panel is the kit's `sheet` (`slide_over`) \
-                      with an `infolist` inside.",
+                      for it themselves. From 1200 px it is docked beside the page \
+                      (`about/_dock.html`: sticky, scrolling on its own, folding to a \
+                      rail); below, the navbar's button opens the same content in the \
+                      kit's `sheet`. The fold is a plain cookie the browser writes and an \
+                      app layer (`explain::dock_layer`) reads into `renox::context`, so a \
+                      folded panel is drawn folded from the first byte, with no jump.",
                 },
                 Feature {
                     api: "App::share",
@@ -65,13 +69,26 @@ pub fn entries() -> Vec<Explanation> {
                       so the layouts can hide the panels for a clean demo without any \
                       handler knowing about it. This page stays either way.",
                 },
+                Feature {
+                    api: "build.rs code regions",
+                    why: "The code on each panel is cut from the shop's own files when it \
+                      is built: lines between `// [explain:name]` and \
+                      `// [/explain:name]` (`{# … #}` in templates) become a region in a \
+                      generated table (`src/code.rs`), coloured on the server by a copy \
+                      of the docs site's highlighter (`src/highlight.rs`). A sample can't \
+                      drift from the code that runs, and the walker test fails for a \
+                      marker left open or a sample naming a region no file has.",
+                },
             ],
             under_hood: "No database: the explanations are Rust values in each area's \
                      `explain.rs`, collected by `crate::explain::all()`. The handler \
                      filters them, localizes them and sorts them by title. \
                      `tests/about.rs` walks every GET route of the app and fails when a \
                      page has no explanation, or when a docs link or a source path here \
-                     doesn't exist.",
+                     doesn't exist. The code samples cost nothing at run time: `build.rs` \
+                     scanned `src/`, `resources/views/`, `tests/`, `migrations/` and \
+                     `public/` for markers and compiled the regions in; each page colours \
+                     the one to three it shows.",
             docs: &[
                 "docs/routing.md#what-a-handler-can-take",
                 "docs/routing.md#route-urls-and-the-current-route",
@@ -84,9 +101,29 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/about/mod.rs",
                 "examples/bikeshop/src/explain.rs",
                 "examples/bikeshop/resources/views/about/pages.html",
+                "examples/bikeshop/resources/views/about/_explain.html",
+                "examples/bikeshop/resources/views/about/_dock.html",
                 "examples/bikeshop/resources/views/about/_panel.html",
+                "examples/bikeshop/src/code.rs",
+                "examples/bikeshop/build.rs",
+                "examples/bikeshop/src/highlight.rs",
+                "examples/bikeshop/public/explain.js",
                 "examples/bikeshop/tests/about.rs",
                 "tests/browser/bikeshop-about.test.mjs",
+            ],
+            code: &[
+                Code {
+                    title: "Handler: every explanation, filtered by feature and by role",
+                    region: "about.pages.handler",
+                },
+                Code {
+                    title: "Template: a plain GET form, so a filtered list has its own address",
+                    region: "about.pages.template",
+                },
+                Code {
+                    title: "Test: the walker fails for a GET route without an explanation",
+                    region: "about.pages.test",
+                },
             ],
         },
         Explanation {
@@ -96,8 +133,8 @@ pub fn entries() -> Vec<Explanation> {
             purpose: "Every UI block the bike shop uses beyond Renox's kit, working, with its \
                   macro's signature: a photo gallery, a two-handle range, a quantity \
                   stepper, a counter keypad, a kanban board, a month calendar, an \
-                  availability timeline, a date and time range, a date picker with closed \
-                  days, variant chips, a history timeline and plan cards. The other pages \
+                  availability timeline, a date and time range, variant chips, a history \
+                  timeline and plan cards. The other pages \
                   use them; this one shows them side by side.",
             who: "Developers who want one of the blocks on their own page, and anyone \
               checking how they look and behave (keyboard, phone, dark mode).",
@@ -114,7 +151,8 @@ pub fn entries() -> Vec<Explanation> {
                       macros use `rx-` classes on the kit's `--rx-*` tokens and call the \
                       kit's own macros (`sheet`, `date_picker`); a page loads a block's \
                       script only when it has that block. The date picker with closed \
-                      days is still the shop's own, in `resources/views/blocks/`.",
+                      days became the kit's own `date_picker` (`disabled_dates`, \
+                      `closed_weekdays`).",
                 },
                 Feature {
                     api: "UI kit: sheet",
@@ -128,9 +166,8 @@ pub fn entries() -> Vec<Explanation> {
                       digits, one date-time per end, a radio's value), so \
                       `Valid<BlocksForm>` reads them like any form: `between(1, 5)`, \
                       `gt(\"starts_at\", …)` for the end, and `one_of` without the \
-                      sold-out size. Its `after` hook refuses closed days and past dates \
-                      again on the server: the greyed-out calendar is only a help, and \
-                      anyone can send any date.",
+                      sold-out size. Its `after` hook refuses a rental starting in the \
+                      past again on the server: anyone can send any date.",
                 },
                 Feature {
                     api: "Query<T>",
@@ -184,10 +221,23 @@ pub fn entries() -> Vec<Explanation> {
                 "crates/renox-blocks/assets/parts/gallery.js",
                 "crates/renox-blocks/assets/parts/kanban.js",
                 "crates/renox-blocks/assets/blocks.css",
-                "examples/bikeshop/resources/views/blocks/date_picker_blocked.html",
                 "examples/bikeshop/tests/blocks.rs",
                 "tests/browser/bikeshop-blocks.test.mjs",
                 "tests/browser/blocks.test.mjs",
+            ],
+            code: &[
+                Code {
+                    title: "Form: the blocks' fields checked by `Validate`, then by the shop's date",
+                    region: "about.blocks.rules",
+                },
+                Code {
+                    title: "Template: `quantity` and `keypad` in a plain POST form",
+                    region: "about.blocks.template",
+                },
+                Code {
+                    title: "Kanban: a move answered with 204, or Renox's 422",
+                    region: "about.blocks.kanban",
+                },
             ],
         },
         data_page(),
@@ -292,6 +342,20 @@ fn fields_page() -> Explanation {
             "examples/bikeshop/migrations/20260109000100_create_field_samples_table.postgres.up.sql",
             "examples/bikeshop/tests/fields.rs",
         ],
+        code: &[
+            Code {
+                title: "Form: one rule per field, files by content",
+                region: "fields.rules",
+            },
+            Code {
+                title: "Template: tags, pairs and the editors",
+                region: "fields.template",
+            },
+            Code {
+                title: "PostgreSQL: the column for each type",
+                region: "fields.postgres",
+            },
+        ],
     }
 }
 
@@ -348,6 +412,16 @@ fn field_sample_page() -> Explanation {
             "examples/bikeshop/resources/views/about/fields_show.html",
             "examples/bikeshop/tests/fields.rs",
         ],
+        code: &[
+            Code {
+                title: "Template: each entry formatted by its kind",
+                region: "fields.show.template",
+            },
+            Code {
+                title: "Handler: the private manual, sent inline",
+                region: "fields.manual",
+            },
+        ],
     }
 }
 
@@ -393,6 +467,16 @@ fn field_sample_edit_page() -> Explanation {
             "examples/bikeshop/resources/views/about/fields_edit.html",
             "examples/bikeshop/resources/views/about/_fields_form.html",
             "examples/bikeshop/tests/fields.rs",
+        ],
+        code: &[
+            Code {
+                title: "Handler: save, then delete the replaced files",
+                region: "fields.update",
+            },
+            Code {
+                title: "Template: the stored files above their fields",
+                region: "fields.files",
+            },
         ],
     }
 }
@@ -536,6 +620,20 @@ fn data_page() -> Explanation {
             "examples/bikeshop/tests/data.rs",
             "examples/bikeshop/tests/seed.rs",
             "tests/browser/bikeshop-data.test.mjs",
+        ],
+        code: &[
+            Code {
+                title: "Query: every table's row count in one `UNION ALL`",
+                region: "about.data.counts",
+            },
+            Code {
+                title: "Handler: the roles as the database has them now",
+                region: "about.data.handler",
+            },
+            Code {
+                title: "Template: the kit's `card` and `table`, one per area",
+                region: "about.data.template",
+            },
         ],
     }
 }

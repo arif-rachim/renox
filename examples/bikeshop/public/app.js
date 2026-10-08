@@ -31,7 +31,7 @@
     var opener = event.target.closest && event.target.closest("[data-rx-open='about-page']");
     if (!opener || !window.Motion || reduce.matches) return;
     var panel = document.getElementById("about-page");
-    var items = panel ? panel.querySelectorAll(".rx-infolist > .rx-entry") : [];
+    var items = panel ? panel.querySelectorAll(".bs-explain > *") : [];
     if (items.length) {
       Motion.animate(
         items,
@@ -39,29 +39,6 @@
         { duration: 0.3, delay: Motion.stagger(0.04, { startDelay: 0.1 }), ease: [0.22, 1, 0.36, 1] }
       );
     }
-  });
-
-  // Phones: the search button opens the search box under the top bar (and
-  // closes it again); the box gets the focus, Escape in it closes it.
-  document.addEventListener("click", function (event) {
-    var toggle = event.target.closest && event.target.closest("[data-bs-search-toggle]");
-    if (!toggle) return;
-    var bar = toggle.closest(".rx-navbar");
-    var open = !bar.classList.contains("bs-searching");
-    bar.classList.toggle("bs-searching", open);
-    toggle.setAttribute("aria-expanded", open ? "true" : "false");
-    var input = bar.querySelector(".bs-search__input");
-    if (open && input) input.focus();
-  });
-  document.addEventListener("keydown", function (event) {
-    if (event.key !== "Escape" || !event.target.closest) return;
-    var bar = event.target.closest(".rx-navbar.bs-searching");
-    var toggle = bar && bar.querySelector("[data-bs-search-toggle]");
-    if (!toggle || event.target.closest(".bs-suggest")) return;
-    if (bar.querySelector(".bs-suggest:not(:empty)")) return;
-    bar.classList.remove("bs-searching");
-    toggle.setAttribute("aria-expanded", "false");
-    toggle.focus();
   });
 
   // The login page's demo accounts: a tap fills the form's email and

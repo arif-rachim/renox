@@ -1,5 +1,6 @@
 // The bike shop's skeleton (#232, part 1) in a browser: the public and staff
-// layouts at desktop and phone width, the "About this page" panel, the index
+// layouts at desktop and phone width, the "About this page" panel (docked
+// beside the page at desktop width, a sheet on a phone), the index
 // of every page, Motion (vendored) under the default CSP and CSP=strict, and
 // prefers-reduced-motion, and the shop in Spanish (the language menu, the
 // panel, the staff side, money) at desktop and phone width. Staff log in with
@@ -42,21 +43,34 @@ const revealed = (page) =>
     ),
   );
 
-/** Opens the panel with its button and checks what it shows. */
+/** Checks what "About this page" shows: docked beside the page on a wide
+ *  screen (75rem and up), else in the sheet its button opens. */
 async function openPanel(page, title, parts = ENGLISH) {
-  await page.click('[data-rx-open="about-page"]');
-  await page.waitFor(() => document.querySelector('#about-page')?.open, { message: 'the panel open' });
-  const text = await page.text('#about-page');
+  const docked = await page.eval(() => (document.querySelector('#explain-dock')?.getBoundingClientRect().width ?? 0) > 0);
+  if (!docked) {
+    await page.click('[data-rx-open="about-page"]');
+    await page.waitFor(() => document.querySelector('#about-page')?.open, { message: 'the panel open' });
+  }
+  const where = docked ? '#explain-dock' : '#about-page';
+  const text = await page.text(where);
   assert.ok(text.includes(title), `the panel is about "${title}"`);
   for (const part of parts) {
     assert.ok(text.includes(part), `the panel shows "${part}"`);
   }
-  // Its entries slide in with Motion and end fully shown.
-  await page.waitFor(() =>
-    [...document.querySelectorAll('#about-page .rx-infolist > .rx-entry')].every(
-      (el) => getComputedStyle(el).opacity === '1',
-    ),
+  // Its sections slide in with Motion (in the sheet) and end fully shown.
+  await page.waitFor(
+    (w) => [...document.querySelectorAll(`${w} .bs-explain > *`)].every((el) => getComputedStyle(el).opacity === '1'),
+    {},
+    where,
   );
+  return docked;
+}
+
+/** Closes the sheet with Esc (a docked panel stays). */
+async function closePanel(page, docked) {
+  if (docked) return;
+  await page.press('Escape');
+  await page.waitFor(() => !document.querySelector('#about-page').open, { message: 'Esc closes it' });
 }
 
 for (const csp of ['relaxed', 'strict']) {
@@ -85,10 +99,10 @@ for (const csp of ['relaxed', 'strict']) {
           await revealed(page);
           assert.ok(await fitsWidth(page), 'no sideways scrolling');
           await shot(page, `home-${size}-${csp}`);
-          await openPanel(page, 'Home');
+          const docked = await openPanel(page, 'Home');
+          assert.equal(docked, size === 'desktop', 'docked on a wide screen, a sheet on a phone');
           await shot(page, `home-panel-${size}-${csp}`);
-          await page.press('Escape');
-          await page.waitFor(() => !document.querySelector('#about-page').open, { message: 'Esc closes it' });
+          await closePanel(page, docked);
           page.assertClean();
         }, options));
     }
@@ -121,8 +135,7 @@ for (const csp of ['relaxed', 'strict']) {
         assert.ok(await fitsWidth(page));
         await revealed(page);
         await shot(page, `staff-desktop-${csp}`);
-        await openPanel(page, 'Staff dashboard');
-        await page.press('Escape');
+        await closePanel(page, await openPanel(page, 'Staff dashboard'));
         await page.send('Emulation.setDeviceMetricsOverride', { ...PHONE, deviceScaleFactor: 1, mobile: true });
         await page.goto(`${app.url}/staff`);
         assert.ok(await fitsWidth(page), 'no sideways scrolling on a phone');
@@ -178,9 +191,9 @@ describe('bikeshop in Spanish', () => {
   /** Chooses Español in the navbar's language menu, or on a phone in the
    *  menu panel the tab bar opens (#323). */
   async function spanish(page) {
-    const phone = await page.eval(() => getComputedStyle(document.querySelector('.bs-tabbar')).display !== 'none');
+    const phone = await page.eval(() => getComputedStyle(document.querySelector('.rx-tabbar')).display !== 'none');
     if (phone) {
-      await page.click('.bs-tabbar [data-rx-open="site-menu"]');
+      await page.click('.rx-tabbar [data-rx-open="site-menu"]');
       await page.waitFor(
         () => {
           const menu = document.querySelector('#site-menu');
@@ -211,9 +224,9 @@ describe('bikeshop in Spanish', () => {
         await revealed(page);
         assert.ok(await fitsWidth(page), 'no sideways scrolling');
         await shot(page, `home-es-${size}`);
-        await openPanel(page, 'Inicio', SPANISH);
+        const docked = await openPanel(page, 'Inicio', SPANISH);
         await shot(page, `home-panel-es-${size}`);
-        await page.press('Escape');
+        await closePanel(page, docked);
         // The catalogue: Spanish texts, money with Spanish separators.
         await page.goto(`${app.url}/shop`);
         const shop = await page.text('main');
@@ -248,8 +261,7 @@ describe('bikeshop in Spanish', () => {
         await shot(page, `staff-roles-es-${size}`);
         await page.goto(`${app.url}/staff`);
         await revealed(page);
-        await openPanel(page, 'Panel del personal', SPANISH);
-        await page.press('Escape');
+        await closePanel(page, await openPanel(page, 'Panel del personal', SPANISH));
         await shot(page, `staff-es-${size}`);
         page.assertClean();
       }, options));

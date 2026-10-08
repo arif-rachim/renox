@@ -88,6 +88,7 @@ pub mod events;
 pub mod grid;
 mod health;
 mod htmx;
+mod icons;
 pub mod http;
 pub mod i18n;
 pub mod import;

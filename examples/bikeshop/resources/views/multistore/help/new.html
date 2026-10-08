@@ -20,6 +20,7 @@
     {% call card() %}
       {{ form_errors() }}
       {%- if people %}
+      {# [explain:multistore.help.create.template] #}
       {% call form_grid(2) %}
         {{ select("staff", t('multistore.help.person'), people, required=true, searchable=true) }}
         {%- set r = namespace(items=[]) %}{% for name, label in roles %}{% set r.items = r.items + [[name, tx(label) | string]] %}{% endfor %}
@@ -27,6 +28,7 @@
         {{ date_picker("starts_on", t('multistore.help.starts_on'), min=today, required=true) }}
         {{ date_picker("ends_on", t('multistore.help.ends_on'), min=today, required=true, hint=t('multistore.help.ends_hint')) }}
       {% endcall %}
+      {# [/explain:multistore.help.create.template] #}
       {{ textarea("reason", t('multistore.help.reason'), rows=2, required=true) }}
       {{ button(t('multistore.help.send'), icon="check") }}
       {%- else %}{{ empty(t('multistore.help.no_people')) }}{% endif %}

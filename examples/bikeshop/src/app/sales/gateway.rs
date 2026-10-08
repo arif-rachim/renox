@@ -190,6 +190,7 @@ impl Notification {
 /// The Midtrans webhook (`POST /webhooks/midtrans`), through `renox::webhook`.
 pub struct Midtrans;
 
+// [explain:pay.show.webhook]
 impl Webhook for Midtrans {
     const PROVIDER: &'static str = "midtrans";
 
@@ -209,6 +210,7 @@ impl Webhook for Midtrans {
         Ok(format!("{}:{}", n.transaction_id, n.transaction_status))
     }
 
+    // [/explain:pay.show.webhook]
     async fn handle(call: WebhookCall, ctx: JobContext) -> Result {
         let n: Notification = call.json()?;
         let Some(id) = payment_id(&n.order_id) else {
@@ -227,6 +229,7 @@ impl Webhook for Midtrans {
                 payment.amount
             )));
         }
+        // [explain:pay.show.webhook]
         let paid = n.transaction_status == "settlement"
             || (n.transaction_status == "capture" && n.fraud_status.as_deref() == Some("accept"));
         if paid {
@@ -239,6 +242,7 @@ impl Webhook for Midtrans {
         }
         Ok(())
     }
+    // [/explain:pay.show.webhook]
 }
 
 /// The demo gateway's notification, sent to this app's webhook from the
@@ -248,6 +252,7 @@ pub struct DemoNotify {
     pub notification: Notification,
 }
 
+// [explain:pay.demo.job]
 impl Job for DemoNotify {
     const NAME: &'static str = "bikeshop.demo-gateway-notify";
     const MAX_ATTEMPTS: u32 = 5;
@@ -273,6 +278,7 @@ impl Job for DemoNotify {
         Ok(())
     }
 }
+// [/explain:pay.demo.job]
 
 /// What a payment pays for, as the pages show it.
 #[derive(Serialize, Debug, Clone)]
@@ -351,6 +357,7 @@ pub struct ReturnToken {
 /// after paying. While the webhook hasn't arrived it says so and htmx asks
 /// again every two seconds (the `status` block); then it shows the result.
 /// A paid order is reported to analytics once (`purchase`).
+// [explain:pay.show.handler]
 pub async fn show(
     State(state): State<AppState>,
     session: Session,
@@ -360,6 +367,7 @@ pub async fn show(
 ) -> Result<View> {
     let payment = own_payment(&state, &session, user.as_deref(), id, back.token.as_deref()).await?;
     let data = paying(&state.db, payment).await?;
+    // [/explain:pay.show.handler]
     if data.payment.status == PaymentStatus::Paid
         && let Some(order) = &data.order
     {
@@ -378,6 +386,7 @@ pub async fn show(
             session.put(SESSION_REPORTED, &reported)?;
         }
     }
+    // [explain:pay.show.handler]
     let guest = user.is_none();
     let expired = data
         .order
@@ -389,9 +398,11 @@ pub async fn show(
     )
     .fragment("status"))
 }
+// [/explain:pay.show.handler]
 
 /// `GET /pay/demo/{payment}` (`pay.demo`): the demo gateway's hosted page
 /// (only through the signed link `payments::start` gave).
+// [explain:pay.demo.handler]
 pub async fn demo(
     _: ValidSignature,
     State(db): State<Db>,
@@ -407,6 +418,7 @@ pub async fn demo(
         context! { paying => data, action },
     ))
 }
+// [/explain:pay.demo.handler]
 
 /// What the demo page sends: pay or cancel.
 #[derive(Deserialize, Validate, Debug)]
@@ -418,6 +430,7 @@ pub struct DemoForm {
 /// `POST /pay/demo/{payment}` (`pay.demo.complete`): the demo gateway
 /// "takes" the payment, queues its notification to the webhook, and sends
 /// the customer back to the shop, as Midtrans would.
+// [explain:pay.demo.handler]
 pub async fn demo_complete(
     _: ValidSignature,
     State(state): State<AppState>,
@@ -436,3 +449,4 @@ pub async fn demo_complete(
     }
     Ok(Redirect::to(&back_url(&state, id)?))
 }
+// [/explain:pay.demo.handler]

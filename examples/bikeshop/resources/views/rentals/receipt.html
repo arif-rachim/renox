@@ -24,6 +24,7 @@
       </dl>
       {%- if row.damage_note %}<p class="rx-hint">{{ t('rentals.desk.damage_note') }}: {{ row.damage_note }}</p>{% endif %}
     {% endcall %}
+    {# [explain:rentals.receipt.template] #}
     {% call card(title=t('rentals.receipt.books'), subtitle=t('rentals.receipt.books_lead')) %}
       {% call infolist() %}
         {{ entry(t('rentals.fields.owner'), books.owner) }}
@@ -36,6 +37,7 @@
         {%- endif %}
       {% endcall %}
     {% endcall %}
+    {# [/explain:rentals.receipt.template] #}
   {% endcall %}
   {% call card(title=t('rentals.receipt.payments')) %}
     {%- if payments %}

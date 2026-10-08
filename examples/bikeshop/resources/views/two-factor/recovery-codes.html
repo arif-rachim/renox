@@ -4,6 +4,7 @@
 {% from "renox/ui.html" import card, alert, link_button %}
 {% block title %}{{ t('plugins.two_factor.codes_title') }} · {{ app.name }}{% endblock %}
 {% block content %}
+{# [explain:two-factor.recovery-codes.template] #}
 {% call card(title=t('plugins.two_factor.codes_title'), subtitle=t('plugins.two_factor.codes_lead')) %}
   <pre class="rx-2fa__codes">{{ text }}</pre>
   <div class="rx-card__footer">
@@ -11,4 +12,5 @@
     {{ link_button(account, t('plugins.two_factor.done'), variant="primary") }}
   </div>
 {% endcall %}
+{# [/explain:two-factor.recovery-codes.template] #}
 {% endblock %}

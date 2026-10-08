@@ -22,6 +22,7 @@
           {{ entry(t('rentals.fields.code'), row.reservation_code, copyable=true) }}
         {% endcall %}
       {% endcall %}
+      {# [explain:rentals.show.actions] #}
       {%- if needs_payment or row.status == "reserved" %}
       <div class="rx-card rx-stack">
         {%- if needs_payment %}
@@ -37,6 +38,7 @@
         {%- endif %}
       </div>
       {%- endif %}
+      {# [/explain:rentals.show.actions] #}
     </div>
     {% call card(title=t('rentals.show.details')) %}
       {% call infolist(columns=2) %}

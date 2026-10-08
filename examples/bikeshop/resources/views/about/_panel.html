@@ -1,37 +1,13 @@
-{#- The "About this page" panel (#231): this page's entry from src/explain.rs
-    (`about` is set by the layout), in a sheet that slides over from the side.
-    The kit's `open_button("about-page", …)` in the layout's bar opens it; Esc,
-    the backdrop or the close button shut it. -#}
-{% from "renox/ui.html" import sheet, infolist, entry, repeatable, link_button, button, badge %}
-{% call sheet("about-page", about.title, message=about.purpose, slide_over=true, width="lg") %}
-  {% call infolist() %}
-    {{ entry(t('about.panel.who'), about.who) }}
-    {% call entry(t('about.panel.roles')) %}
-      <span class="bs-badges">{% for role in about.audience %}{{ badge(role.label) }}{% endfor %}{{ badge(about.flow.label, kind="info") }}</span>
-    {% endcall %}
-    {% call(feature) repeatable(t('about.panel.features'), about.features) %}
-      {#- The API is the entry's title, in code type; the why, below it. -#}
-      {% call entry(feature.api, hide_label=true) %}<code>{{ feature.api }}</code><div class="rx-prose">{{ feature.why | markdown }}</div>{% endcall %}
-    {% endcall %}
-    {{ entry(t('about.panel.under_hood'), about.under_hood, format="markdown") }}
-    {% call entry(t('about.panel.docs')) %}
-      <ul class="bs-links" role="list">
-        {%- for doc in about.docs %}
-        <li><a class="rx-link" href="{{ doc.site }}" target="_blank" rel="noopener">{{ doc.path }}</a></li>
-        {%- endfor %}
-      </ul>
-    {% endcall %}
-    {% call entry(t('about.panel.sources')) %}
-      <ul class="bs-links" role="list">
-        {%- for source in about.sources %}
-        <li><a class="rx-link" href="{{ source.github }}" target="_blank" rel="noopener"><code>{{ source.path }}</code></a></li>
-        {%- endfor %}
-      </ul>
-    {% endcall %}
-  {% endcall %}
+{#- "About this page" as the kit's sheet (#231), for screens narrower than
+    75rem, where the panel isn't docked beside the page (about/_dock.html):
+    the same content (about/_explain.html), code included. The navbar's
+    "About this page" button (`data-rx-open="about-page"`) opens it; Esc, the
+    backdrop or the close button shut it. -#}
+{% from "renox/ui.html" import sheet, button %}
+{% from "about/_explain.html" import explain %}
+{% call sheet("about-page", about.title, slide_over=true, width="lg") %}
+  {{ explain(about, "about-page") }}
   <div class="rx-sheet__actions">
-    {#- `about_base`: the shop's address on a store's own host (layouts/store.html). -#}
-    {{ link_button((about_base | default('')) ~ route('about.pages'), t('about.index_link')) }}
     {{ button(t('about.panel.close'), variant="primary", type="button", attrs={"data-rx-close": "about-page"}) }}
   </div>
 {% endcall %}

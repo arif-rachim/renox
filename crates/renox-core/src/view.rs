@@ -331,6 +331,22 @@ impl Views {
             env.add_function("renox_calendar", || {
                 Value::from_safe_string(crate::assets::calendar_tags())
             });
+            // The kit's `icon(…)` macro: a Lucide icon as inline SVG.
+            env.add_function(
+                "renox_icon",
+                |name: String, kwargs: minijinja::value::Kwargs| {
+                    let size: Option<u32> = kwargs.get("size")?;
+                    let label: Option<String> = kwargs.get("label")?;
+                    let class: Option<String> = kwargs.get("class")?;
+                    kwargs.assert_all_used()?;
+                    Ok::<_, minijinja::Error>(Value::from_safe_string(crate::icons::svg(
+                        &name,
+                        size.unwrap_or(20),
+                        label.as_deref(),
+                        class.as_deref(),
+                    )))
+                },
+            );
             env.add_function("renox_grid", || {
                 Value::from_safe_string(crate::assets::grid_tags())
             });

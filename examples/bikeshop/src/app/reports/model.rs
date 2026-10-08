@@ -128,6 +128,7 @@ impl StoreRecord for OrderRow {
 }
 
 /// A rental (`report_rentals`).
+// [explain:reports.rentals.model]
 #[derive(Model, Serialize, Default, Debug, Clone)]
 #[model(table = "report_rentals")]
 pub struct RentalRow {
@@ -136,6 +137,7 @@ pub struct RentalRow {
     pub code: String,
     pub operating_store_id: i64,
     pub owner_store_id: i64,
+    // [/explain:reports.rentals.model]
     /// The store that served it.
     pub store: String,
     /// The bike's owner store.
@@ -157,6 +159,7 @@ pub struct RentalRow {
     /// Price + late fee + damage fee.
     pub total: i64,
     pub deposit: i64,
+    // [explain:reports.rentals.model]
 }
 
 impl StoreRecord for RentalRow {
@@ -170,6 +173,7 @@ impl StoreRecord for RentalRow {
         }
     }
 }
+// [/explain:reports.rentals.model]
 
 /// A work order (`report_work_orders`).
 #[derive(Model, Serialize, Default, Debug, Clone)]

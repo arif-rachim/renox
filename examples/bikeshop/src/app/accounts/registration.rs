@@ -17,6 +17,7 @@ use renox::prelude::*;
 
 use super::model::Customer;
 
+// [explain:register.hook]
 /// `Auth::on_registered`: a `customers` row for the new user, and the
 /// language they signed up in saved on the account.
 pub async fn on_registered(mut user: User, _form: Registration, state: AppState) -> Result {
@@ -37,6 +38,7 @@ pub async fn on_registered(mut user: User, _form: Registration, state: AppState)
     }
     Ok(())
 }
+// [/explain:register.hook]
 
 /// The customer record of `user`, made now if they have none (an account
 /// that existed before the shop had customers, or a member of staff who

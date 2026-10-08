@@ -348,6 +348,7 @@ pub struct SampleForm {
     manual: Option<Upload>, // <input type="file" accept="application/pdf">
 }
 
+// [explain:fields.rules]
 impl Validate for SampleForm {
     fn rules(&self, v: &mut Validator) {
         v.field("name", &self.name).required().max(100);
@@ -381,6 +382,7 @@ impl Validate for SampleForm {
         v.field("manual", &self.manual).mimes(&["pdf"]).max(5120);
     }
 }
+// [/explain:fields.rules]
 
 impl SampleForm {
     /// Copies the form into the sample, storing the files: the photo on
@@ -525,6 +527,7 @@ async fn edit(State(state): State<AppState>, user: AuthUser, Path(id): Path<Uuid
 
 /// `PUT /about/fields/{sample}`: saves the changes; a new photo or manual
 /// replaces the old file, which is deleted once the row is saved.
+// [explain:fields.update]
 async fn update(
     State(state): State<AppState>,
     user: AuthUser,
@@ -543,6 +546,7 @@ async fn update(
         Redirect::route("about.fields.show", &[&id])?,
     ))
 }
+// [/explain:fields.update]
 
 /// `DELETE /about/fields/{sample}`, behind the kit's `confirm` sheet: the
 /// row, then its files (a file left behind by a failed delete is only
@@ -567,6 +571,7 @@ async fn destroy(
 /// `GET /about/fields/{sample}/manual`: the private PDF, sent by the app
 /// with its original name, shown in the browser (`inline`). Only its owner
 /// gets it: the file has no public address.
+// [explain:fields.manual]
 async fn manual(
     State(state): State<AppState>,
     user: AuthUser,
@@ -579,3 +584,4 @@ async fn manual(
         .await?
         .inline())
 }
+// [/explain:fields.manual]

@@ -135,6 +135,7 @@ pub async fn rows(db: &Db, user: &User, requests: Vec<StaffHelpRequest>) -> Resu
         .collect())
 }
 
+// [explain:multistore.help.handler]
 /// `GET /staff/help` (`multistore.help`): help asked by the active store,
 /// help asked of it, and who is helping now, both ways.
 pub async fn index(State(db): State<Db>, user: AuthUser) -> Result<View> {
@@ -158,6 +159,7 @@ pub async fn index(State(db): State<Db>, user: AuthUser) -> Result<View> {
         context! { asked_by_us, asked_of_us, store },
     ))
 }
+// [/explain:multistore.help.handler]
 
 /// `?store=` on the new-request page: the store to ask.
 #[derive(Deserialize, Default)]
@@ -166,6 +168,7 @@ pub struct NewQuery {
     pub store: Option<i64>,
 }
 
+// [explain:multistore.help.create.handler]
 /// `GET /staff/help/new` (`multistore.help.create`): ask another store for
 /// someone: who, with which role here, from when to when, and why.
 pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Result<View> {
@@ -184,6 +187,7 @@ pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Resu
         .where_eq("active", true)
         .get(&db)
         .await?;
+    // [/explain:multistore.help.create.handler]
     let users = renox::db::relations::belongs_to::<User, _, _>(&db, &staff, |s| s.user_id).await?;
     let mut people: Vec<(i64, String)> = staff
         .iter()
@@ -191,12 +195,14 @@ pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Resu
         .collect();
     people.sort_by(|a, b| a.1.cmp(&b.1));
     let roles: Vec<(&str, &str)> = roles();
+    // [explain:multistore.help.create.handler]
     let today = crate::seed::today();
     Ok(view(
         "multistore/help/new.html",
         context! { others, lending, people, roles, today },
     ))
 }
+// [/explain:multistore.help.create.handler]
 
 /// The request form.
 #[derive(Deserialize, Debug)]
@@ -213,6 +219,7 @@ pub struct HelpForm {
     pub reason: String,
 }
 
+// [explain:multistore.help.create.form]
 impl Validate for HelpForm {
     fn rules(&self, v: &mut Validator) {
         let names: Vec<&str> = roles().into_iter().map(|(name, _)| name).collect();
@@ -236,18 +243,21 @@ impl Validate for HelpForm {
                 errors.add("starts_on", lang.t("multistore.help.errors.past", &[]));
             }
         }
+        // [/explain:multistore.help.create.form]
         if let (Some(staff), Some(store)) = (self.staff, self.store) {
             let found = Staff::find(&form.state.db, staff).await?;
             if found.is_none_or(|s| s.home_store_id != store || !s.active) {
                 errors.add("staff", lang.t("multistore.help.errors.staff", &[]));
             }
         }
+        // [explain:multistore.help.create.form]
         if active_store::current() == self.store {
             errors.add("store", lang.t("multistore.help.errors.store", &[]));
         }
         Ok(())
     }
 }
+// [/explain:multistore.help.create.form]
 
 /// Midnight starting `day` in `APP_TIMEZONE`, as a moment.
 pub fn day_start(config: &Config, day: NaiveDate) -> DateTime {
@@ -360,6 +370,7 @@ async fn advance(
 /// lending store says yes; the helper gets the role in the helped store
 /// between the two dates. Refused when they already hold that role there
 /// for good (the dates would replace it).
+// [explain:multistore.help.approve]
 pub async fn approve(
     State(state): State<AppState>,
     user: AuthUser,
@@ -370,6 +381,7 @@ pub async fn approve(
     if !can_in(&user, catalogue::STAFF_HELP, request.from_store_id) {
         return Err(Error::Forbidden);
     }
+    // [/explain:multistore.help.approve]
     let helper_staff = Staff::find_or_404(db, request.staff_id).await?;
     let helper = User::find_or_404(db, helper_staff.user_id).await?;
     let scope = store_scope(request.to_store_id);
@@ -394,11 +406,13 @@ pub async fn approve(
     {
         return Err(moved_on(&state));
     }
+    // [explain:multistore.help.approve]
     helper
         .assign_role_in(db, &request.role, &scope)
         .from(request.starts_at)
         .until(request.ends_at)
         .await?;
+    // [/explain:multistore.help.approve]
     audit::record(
         &state,
         &user,
@@ -602,6 +616,7 @@ pub struct HoursForm {
     pub note: Option<String>,
 }
 
+// [explain:multistore.help.hours.log]
 /// `POST /staff/help/{request}/hours` (`multistore.help.log`): the helped
 /// store records a day's hours (for reports; never charged).
 pub async fn log_hours(
@@ -624,6 +639,7 @@ pub async fn log_hours(
             lang.t("multistore.help.errors.day", &[]),
         ));
     }
+    // [/explain:multistore.help.hours.log]
     let minutes = (form.hours.unwrap_or(0.0) * 60.0).round() as i64;
     let hour = StaffHelpHour::create(
         &state.db,
@@ -662,6 +678,7 @@ pub struct HoursLine {
     pub minutes: i64,
 }
 
+// [explain:multistore.help.hours.query]
 /// `GET /staff/help/hours` (`multistore.help.hours`): hours helped per
 /// person and store, for the stores the person may see: help given **to**
 /// them (the helped store is theirs) and **by** them (the helper's home
@@ -692,6 +709,7 @@ pub async fn hours(State(db): State<Db>, user: AuthUser) -> Result<View> {
             "staff_id, store_id, COUNT(DISTINCT worked_on) AS days, CAST(SUM(minutes) AS BIGINT) AS minutes",
         )
         .await?;
+    // [/explain:multistore.help.hours.query]
     let staff = Staff::find_many(&db, lines.iter().map(|l| l.staff_id).collect::<Vec<_>>()).await?;
     let users = renox::db::relations::belongs_to::<User, _, _>(&db, &staff, |s| s.user_id).await?;
     let stores: HashMap<i64, String> = Store::all_by_name(&db)

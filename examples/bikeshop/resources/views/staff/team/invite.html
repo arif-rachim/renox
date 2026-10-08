@@ -9,6 +9,7 @@
 {% block content %}
 <div class="rx-stack" data-bs-reveal>
   {{ page_header(t('staff.invitations.title'), subtitle=t('staff.invitations.lead', store=store.name), back=route('staff.team.index'), back_label=t('staff.team.title', store=store.name)) }}
+  {# [explain:staff.invitations.create.template] #}
   <form method="post" action="{{ route('staff.invitations.store') }}" data-live-validate>
     {{ csrf_field() }}
     {% call card() %}
@@ -18,5 +19,6 @@
       <div class="rx-card__footer">{{ button(t('staff.invitations.send')) }}</div>
     {% endcall %}
   </form>
+  {# [/explain:staff.invitations.create.template] #}
 </div>
 {% endblock %}

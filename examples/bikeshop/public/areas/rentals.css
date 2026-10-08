@@ -14,7 +14,8 @@
 /* A rental in a list: what it is, then its status and link. */
 .bs-rental { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--rx-space-1) var(--rx-space-3); width: 100%; }
 .bs-rental__title { font: var(--rx-type-label); }
-.bs-rental__meta { grid-column: 1; font: var(--rx-type-note); color: var(--rx-secondary-label); }
+/* A reservation code (a ULID, 26 letters) breaks inside a narrow column (three on the counter, beside the docked "About this page"). */
+.bs-rental__meta { grid-column: 1; font: var(--rx-type-note); color: var(--rx-secondary-label); overflow-wrap: anywhere; }
 .bs-rental__side { grid-column: 2; grid-row: 1 / span 2; display: grid; justify-items: end; gap: var(--rx-space-1); }
 
 /* The counter's desk: the rental's facts beside the form. */

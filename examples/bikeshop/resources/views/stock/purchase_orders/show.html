@@ -9,16 +9,19 @@
 {% block content %}
 {{ styles() }}
 <div class="rx-stack">
+  {# [explain:stock.purchasing.show.template] #}
   {% call page_header("PO-" ~ order.id, subtitle=supplier.name ~ " · " ~ store, back=route('stock.purchasing'), back_label=t('stock.purchasing.title')) %}
     {{ link_button(print_url, t('stock.purchasing.print'), icon="external", new_tab=true) }}
     {%- if actions.cancel %}{{ confirm("cancel-po", t('stock.purchasing.cancel'), route('stock.purchasing.cancel', order.id), t('stock.purchasing.cancel'), t('stock.purchasing.cancel_text'), method="POST") }}{% endif %}
     {%- if actions.send %}<form method="post" action="{{ route('stock.purchasing.send', order.id) }}" id="send-po-form">{{ csrf_field() }}{{ button(t('stock.purchasing.send'), icon="external", attrs={"title": t('stock.purchasing.send_text', supplier=supplier.name, email=(supplier.email or "—"))}) }}</form>{% endif %}
   {% endcall %}
+  {# [/explain:stock.purchasing.show.template] #}
   {%- if status == "cancelled" %}{{ alert(t('stock.purchasing.cancelled_text'), kind="warning") }}{% endif %}
   {%- if order.suggested and status == "draft" %}{{ alert(t('stock.purchasing.suggested_text'), kind="info") }}{% endif %}
   {{ stepper(steps, "stock.purchasing.status.", t('stock.purchasing.steps')) }}
   <div class="bs-split">
     <div>
+      {# [explain:stock.purchasing.show.template] #}
       {%- if actions.receive %}
       <form method="post" action="{{ route('stock.purchasing.receive', order.id) }}" id="receive-po" novalidate>
         {{ csrf_field() }}
@@ -38,6 +41,7 @@
         {% endcall %}
       </form>
       {%- endif %}
+      {# [/explain:stock.purchasing.show.template] #}
       {% call card(title=t('stock.purchasing.lines')) %}
         {% call table([t('stock.fields.product'), [t('stock.purchasing.ordered'), "num"], [t('stock.purchasing.arrived'), "num"], [t('stock.purchasing.unit_cost'), "num"], [t('stock.purchasing.total'), "num"]], caption=t('stock.purchasing.lines')) %}
           {%- for l in lines %}

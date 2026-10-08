@@ -45,6 +45,7 @@ pub const RETURN_DAYS: i64 = 14;
 /// The session key of the orders this browser placed (guests too).
 pub const SESSION_ORDERS: &str = "my_orders";
 
+// [explain:orders.show.paid]
 /// The `PaymentSucceeded` listener for orders: the order becomes paid.
 pub async fn on_payment(event: PaymentSucceeded, state: AppState) -> Result {
     if let Payable::Order(id) = event.payable {
@@ -52,6 +53,7 @@ pub async fn on_payment(event: PaymentSucceeded, state: AppState) -> Result {
     }
     Ok(())
 }
+// [/explain:orders.show.paid]
 
 /// The `PaymentFailed` listener for orders: the order is cancelled.
 pub async fn on_payment_failed(event: PaymentFailed, state: AppState) -> Result {
@@ -63,6 +65,7 @@ pub async fn on_payment_failed(event: PaymentFailed, state: AppState) -> Result 
     Ok(())
 }
 
+// [explain:orders.show.paid]
 /// Marks the order paid (once): its reservation becomes a sale, each bike
 /// bought becomes one of the customer's bikes, and the confirmation mail
 /// is queued. `staff_id`: who sold it, at the counter.
@@ -91,6 +94,7 @@ pub async fn paid(state: &AppState, order_id: i64, staff_id: Option<i64>) -> Res
     notify::tell(state, &order, Moment::Paid, None).await?;
     Ok(true)
 }
+// [/explain:orders.show.paid]
 
 /// Cancels a pending order (once): the reservation is released, a pending
 /// payment fails, and the customer hears why.
@@ -265,6 +269,7 @@ pub async fn may_see(
     })
 }
 
+// [explain:orders.show.handler]
 /// The order, or a 404 when this visitor may not see it (another
 /// customer's order doesn't exist for them).
 pub async fn visible(db: &Db, session: &Session, user: Option<&User>, id: i64) -> Result<Order> {
@@ -274,6 +279,7 @@ pub async fn visible(db: &Db, session: &Session, user: Option<&User>, id: i64) -
     }
     Ok(order)
 }
+// [/explain:orders.show.handler]
 
 /// Payments of an order, for its page.
 #[derive(Serialize, Debug, Clone)]
@@ -301,6 +307,7 @@ async fn page_data(db: &Db, order: Order) -> Result<OrderPage> {
     })
 }
 
+// [explain:orders.show.handler]
 /// `GET /orders/{order}` (`orders.show`): the order's status, lines,
 /// totals, payments and what happens next.
 pub async fn show(
@@ -314,7 +321,9 @@ pub async fn show(
     let steps = steps(&page.view.order);
     Ok(view("sales/orders/show.html", context! { page, steps }))
 }
+// [/explain:orders.show.handler]
 
+// [explain:orders.invoice.handler]
 /// `GET /orders/{order}/invoice` (`orders.invoice`): the printable invoice
 /// (or the counter's receipt).
 pub async fn invoice(
@@ -335,6 +344,7 @@ pub async fn signed(_: ValidSignature, session: Session, Path(id): Path<i64>) ->
     remember(&session, id)?;
     Ok(Redirect::to(&format!("/orders/{id}")))
 }
+// [/explain:orders.invoice.handler]
 
 /// One step of the order's progress, for the page's history.
 #[derive(Serialize, Debug, Clone)]

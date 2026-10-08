@@ -17,6 +17,7 @@
     {% call entry(t('data_page.glance.volume')) %}<code>cargo run -- demo:seed --size large</code>{% endcall %}
   {% endcall %}
 
+  {# [explain:about.data.template] #}
   {% call card(t('data_page.tables.title'), subtitle=t('data_page.tables.lead')) %}
     {%- for area in areas %}
     <div class="rx-prose"><h3>{{ tx(area.title) }} · <a class="rx-link" href="{{ repository }}{{ area.file }}" target="_blank" rel="noopener"><code>{{ area.file | replace("examples/bikeshop/", "") }}</code></a></h3></div>
@@ -32,6 +33,7 @@
     {% endcall %}
     {%- endfor %}
   {% endcall %}
+  {# [/explain:about.data.template] #}
 
   {% call card(t('data_page.relations.title'), subtitle=t('data_page.relations.lead')) %}
     {% call table([t('data_page.relations.from'), t('data_page.relations.kind'), t('data_page.relations.to'), t('data_page.relations.how')], caption=t('data_page.relations.title')) %}

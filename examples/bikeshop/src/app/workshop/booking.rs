@@ -54,11 +54,13 @@ impl Validate for BookQuery {
 /// `GET /service/book` (`workshop.book`): the booking form. As it changes,
 /// htmx asks the same page again and swaps the estimate and the day picker
 /// (whose full days depend on the store and the minutes chosen).
+// [explain:workshop.book.handler]
 pub async fn form(
     State(state): State<AppState>,
     user: AuthUser,
     Valid(query): Valid<BookQuery>,
 ) -> Result<View> {
+    // [/explain:workshop.book.handler]
     let db = &state.db;
     let customer = customer_of(db, &user).await?;
     let bikes: Vec<(i64, String)> = CustomerBike::where_eq("customer_id", customer.id)
@@ -74,6 +76,7 @@ pub async fn form(
         .and_then(|id| stores.iter().find(|s| s.id == id))
         .or_else(|| stores.first())
         .cloned();
+    // [explain:workshop.book.handler]
     let all = ServiceTask::query().order_by("name").get(db).await?;
     let tasks = chosen_tasks(&all, query.package.as_deref(), &query.tasks);
     let est = estimate(&tasks);
@@ -81,6 +84,7 @@ pub async fn form(
         Some(store) => capacity::full_days(db, &state.config, store, est.minutes).await?,
         None => Vec::new(),
     };
+    // [/explain:workshop.book.handler]
     let today = to_local(&state.config, renox::db::now()).date();
     let task_options: Vec<(i64, String, String)> = all
         .iter()
@@ -246,6 +250,7 @@ async fn confirm(state: &AppState, customer: &Customer, order: &WorkOrder) -> Re
 
 /// The customer's own work order, or a 404 (fleet repairs and other
 /// customers' bikes don't exist for them).
+// [explain:workshop.service.show.owner]
 pub async fn own_order(db: &Db, user: &User, id: i64) -> Result<WorkOrder> {
     let customer = customer_of(db, user).await?;
     let order = WorkOrder::find_or_404(db, id).await?;
@@ -260,6 +265,7 @@ pub async fn own_order(db: &Db, user: &User, id: i64) -> Result<WorkOrder> {
         Err(Error::NotFound)
     }
 }
+// [/explain:workshop.service.show.owner]
 
 /// A line of the work order's page.
 #[derive(Serialize)]
@@ -274,6 +280,7 @@ struct Line {
 /// its customer: status, tasks (ticked as the mechanic does them), parts,
 /// notes, extra work and its answer, the total; reschedule or cancel until
 /// 24 hours before; pay online when it's ready.
+// [explain:workshop.service.show.handler]
 pub async fn show(
     State(state): State<AppState>,
     user: AuthUser,
@@ -281,6 +288,7 @@ pub async fn show(
 ) -> Result<View> {
     let db = &state.db;
     let order = own_order(db, &user, id).await?;
+    // [/explain:workshop.service.show.handler]
     let tasks = WorkOrderTask::where_eq("work_order_id", order.id)
         .get(db)
         .await?;
@@ -343,12 +351,14 @@ pub async fn show(
         None => None,
     };
     let store = Store::find(db, order.store_id).await?;
+    // [explain:workshop.service.show.handler]
     let steps: Vec<(&str, bool)> = status::BOARD
         .iter()
         .filter(|s| !matches!(s, WorkStatus::WaitingParts | WorkStatus::WaitingApproval))
         .chain([WorkStatus::Completed].iter())
         .map(|s| (key(*s), position(*s) <= position(order.status)))
         .collect();
+    // [/explain:workshop.service.show.handler]
     Ok(view(
         "workshop/service.html",
         context! {

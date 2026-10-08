@@ -45,6 +45,7 @@ struct Filters {
 
 /// Every page with its purpose and features, filtered by a feature and by
 /// who uses it.
+// [explain:about.pages.handler]
 async fn pages(
     State(state): State<AppState>,
     lang: Lang,
@@ -52,6 +53,7 @@ async fn pages(
 ) -> Result<View> {
     let translate = about_this_page::translator(lang);
     let all = about_this_page::all();
+    // [/explain:about.pages.handler]
 
     // The filters' options: every feature used anywhere, every audience.
     let features: BTreeSet<&str> = all
@@ -67,6 +69,7 @@ async fn pages(
         .first(&state.db)
         .await?
         .map(|store| crate::app::home::stores::site_url(&state.config, &store.slug));
+    // [explain:about.pages.handler]
     let mut pages: Vec<about_this_page::Page> = all
         .iter()
         .filter(|e| {
@@ -87,6 +90,7 @@ async fn pages(
         })
         .collect();
     pages.sort_by(|a, b| a.title.cmp(&b.title));
+    // [/explain:about.pages.handler]
 
     // The audience filter's options, as the kit's `select` takes them.
     let audiences: Vec<_> = Audience::ALL

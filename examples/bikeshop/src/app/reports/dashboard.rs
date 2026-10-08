@@ -55,6 +55,7 @@ pub fn stream_name(lang: &Lang, key: &str) -> String {
     lang.t(&format!("reports.stream.{key}"), &[])
 }
 
+// [explain:reports.dashboard.handler]
 /// `GET /staff/reports` (`reports.dashboard`).
 pub async fn show(
     State(state): State<AppState>,
@@ -69,6 +70,7 @@ pub async fn show(
     }
     let by = By::parse(query.by.as_deref());
     let numbers = Numbers::for_page(&state, &reach, by, period).await?;
+    // [/explain:reports.dashboard.handler]
     // The charts' series, named in the visitor's language.
     let revenue: Vec<Line> = numbers
         .streams
@@ -94,6 +96,7 @@ pub async fn show(
                 .collect(),
         })
         .collect();
+    // [explain:reports.dashboard.handler]
     let store_name = reach.store.map(|id| reach.name_of(id));
     Ok(view(
         "reports/dashboard.html",
@@ -113,6 +116,7 @@ pub async fn show(
         },
     ))
 }
+// [/explain:reports.dashboard.handler]
 
 /// The staff home page's short version of the dashboard: the active
 /// store's last 7 days, by the work it did. `None` when the person may not

@@ -370,7 +370,9 @@ Every example has a README.md that walks through it.
   actions: `action_sheet`, `confirm`, `action_group` + `menu_open`, `wizard_action`,
   `import_action` with `renox::import`, duplicating with `Model::replicate`, exports with
   `Grid::export_as`;
-  the page's frame: `navbar`/`nav_links`/`nav_link`, `sidebar` + `rx-shell` for back
+  `date_picker` with `disabled_dates`/`closed_weekdays`; `icon(name)` (Lucide line icons);
+  the page's frame: `navbar`/`nav_links`/`nav_link` (`tabs=[…]`: a bottom tab bar on phones,
+  `nav_search`: the search behind a button there), `sidebar` + `rx-shell` for back
   offices, `page_header`, `toolbar`, `row_actions`, `list`, `card_grid`/`media_card`,
   `link_tabs`, `thumbnail`, `progress`, `rx-page--fill`: build pages from these, not app CSS;
   themes and the type scale: the warm default, `data-rx-theme="classic"`, `--rx-type-*`),

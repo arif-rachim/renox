@@ -99,6 +99,7 @@ impl<'a> Record<'a> {
         self
     }
 
+    // [explain:staff.audit.index.record]
     /// Writes it, with the active store and the role used.
     pub async fn save(self) -> Result {
         let store = active_store::current();
@@ -124,6 +125,7 @@ impl<'a> Record<'a> {
         .await?;
         Ok(())
     }
+    // [/explain:staff.audit.index.record]
 }
 
 /// The role that grants `permission` to `user_id` now: a global one first,
@@ -168,6 +170,7 @@ pub async fn role_used(
     .map_err(Into::into)
 }
 
+// [explain:staff.audit.index.grid]
 /// The audit page's grid: newest first, filtered by any column's heading
 /// (who, what, which store, which role, when), searched by action.
 pub fn grid() -> renox::grid::Grid {
@@ -187,6 +190,7 @@ pub fn grid() -> renox::grid::Grid {
         .sort_by("-created_at")
         .per_page(50)
 }
+// [/explain:staff.audit.index.grid]
 
 /// The route (`audit.view`).
 pub fn routes() -> Routes {
@@ -198,9 +202,11 @@ pub fn routes() -> Routes {
     )
 }
 
+// [explain:staff.audit.index.grid]
 /// `GET /staff/audit`: the audit log, every store's (the trail is the
 /// company's: only `audit.view`, the owner's, opens it).
 pub async fn index(request: renox::grid::GridRequest) -> Result<View> {
     let page = grid().page(AuditEntry::query(), &request).await?;
     Ok(view("staff/audit/index.html", context! { entries => page }))
 }
+// [/explain:staff.audit.index.grid]

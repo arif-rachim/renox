@@ -1,6 +1,6 @@
 //! "About this page" entries for the staff area (see `crate::explain`).
 
-use crate::explain::{Audience, Explanation, Feature, Flow, NotAPage};
+use crate::explain::{Audience, Code, Explanation, Feature, Flow, NotAPage};
 
 /// The staff side's browser test (two-factor, the matrix, hours, team, panel).
 const BROWSER: &str = "tests/browser/bikeshop-staff.test.mjs";
@@ -87,6 +87,20 @@ pub fn entries() -> Vec<Explanation> {
             "examples/bikeshop/resources/views/reports/_overview.html",
             "examples/bikeshop/tests/access.rs",
         ],
+        code: &[
+            Code {
+                title: "Routes: the area behind `staff_routes`, and a handler that asks reports",
+                region: "staff.dashboard.handler",
+            },
+            Code {
+                title: "Store: the active store, picked once per request into `renox::context`",
+                region: "staff.dashboard.store",
+            },
+            Code {
+                title: "Template: the store's last 7 days in the kit's `stats`",
+                region: "staff.dashboard.template",
+            },
+        ],
     }];
     entries.extend(two_factor());
     entries.extend(back_office());
@@ -158,6 +172,16 @@ fn two_factor() -> Vec<Explanation> {
                 "crates/renox-2fa/views/challenge.html",
                 "examples/bikeshop/src/app/staff/two_factor.rs",
             ],
+            code: &[
+                Code {
+                    title: "Template: renox-2fa's code page, overridden for its translations",
+                    region: "two-factor.challenge.template",
+                },
+                Code {
+                    title: "Listener: `LoggedIn` notes staff who have no second factor",
+                    region: "two-factor.note",
+                },
+            ],
         },
         Explanation {
             route: "two-factor.setup",
@@ -201,6 +225,20 @@ fn two_factor() -> Vec<Explanation> {
                 "examples/bikeshop/tests/staff.rs",
                 BROWSER,
             ],
+            code: &[
+                Code {
+                    title: "Template: the QR code, the key and the first code",
+                    region: "two-factor.setup.template",
+                },
+                Code {
+                    title: "Guard: a noted member of staff is sent here from the back office",
+                    region: "two-factor.guard",
+                },
+                Code {
+                    title: "Listener: turning it on lifts the note, turning it off sets it again",
+                    region: "two-factor.note",
+                },
+            ],
         },
         Explanation {
             route: "two-factor.recovery-codes",
@@ -231,6 +269,16 @@ fn two_factor() -> Vec<Explanation> {
                 "crates/renox-2fa/src/handlers.rs",
                 "crates/renox-2fa/src/recovery.rs",
                 "crates/renox-2fa/views/recovery-codes.html",
+            ],
+            code: &[
+                Code {
+                    title: "Template: the codes shown once, and downloaded as a file",
+                    region: "two-factor.recovery-codes.template",
+                },
+                Code {
+                    title: "Listener: `TwoFactorEnabled` lifts the staff note",
+                    region: "two-factor.note",
+                },
             ],
         },
     ]
@@ -317,6 +365,16 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/staff/model.rs",
                 "examples/bikeshop/src/app/access/policy.rs",
             ],
+            code: &[
+                Code {
+                    title: "Handler: only the stores where the person holds `stores.manage`",
+                    region: "staff.stores.index.handler",
+                },
+                Code {
+                    title: "Template: a card per store with the kit's `infolist`",
+                    region: "staff.stores.index.template",
+                },
+            ],
         },
         Explanation {
             route: "staff.stores.edit",
@@ -375,6 +433,20 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/tests/staff.rs",
                 BROWSER,
             ],
+            code: &[
+                Code {
+                    title: "Form: the store's rules, and each hours row checked by `nested`",
+                    region: "staff.stores.edit.form",
+                },
+                Code {
+                    title: "Update: the fee rate needs its own permission, and is audited",
+                    region: "staff.stores.edit.fee",
+                },
+                Code {
+                    title: "Template: the opening hours as the kit's `repeater`",
+                    region: "staff.stores.edit.template",
+                },
+            ],
         },
         Explanation {
             route: "staff.team.index",
@@ -408,6 +480,20 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/staff/team.rs",
                 "examples/bikeshop/resources/views/staff/team/index.html",
                 BROWSER,
+            ],
+            code: &[
+                Code {
+                    title: "Query: everyone with a home or a role in the store, in three queries",
+                    region: "staff.team.index.members",
+                },
+                Code {
+                    title: "Handler: the active store's team",
+                    region: "staff.team.index.handler",
+                },
+                Code {
+                    title: "Template: the kit's `table` with role badges",
+                    region: "staff.team.index.template",
+                },
             ],
         },
         Explanation {
@@ -463,6 +549,20 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/tests/staff.rs",
                 BROWSER,
             ],
+            code: &[
+                Code {
+                    title: "Assign: a role in this store, with optional dates (`assign_role_in`)",
+                    region: "staff.team.show.assign",
+                },
+                Code {
+                    title: "Deactivate: every role removed, every session ended",
+                    region: "staff.team.show.deactivate",
+                },
+                Code {
+                    title: "Template: the give-a-role form with two date pickers",
+                    region: "staff.team.show.template",
+                },
+            ],
         },
         Explanation {
             route: "staff.invitations.create",
@@ -498,6 +598,16 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/staff/team/invite.html",
                 "examples/bikeshop/resources/views/mail/staff/invitation.html",
                 "examples/bikeshop/tests/staff.rs",
+            ],
+            code: &[
+                Code {
+                    title: "Handler: a signed link for the store, the role and the address",
+                    region: "staff.invitations.create.send",
+                },
+                Code {
+                    title: "Template: an email and a role, checked live",
+                    region: "staff.invitations.create.template",
+                },
             ],
         },
         Explanation {
@@ -540,6 +650,20 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/staff/team/join.html",
                 "examples/bikeshop/src/app/staff/two_factor.rs",
                 "examples/bikeshop/tests/staff.rs",
+            ],
+            code: &[
+                Code {
+                    title: "Handler: `ValidSignature` guards the page the link opens",
+                    region: "staff.invitations.accept.join",
+                },
+                Code {
+                    title: "Accept: the account, the staff row and the role, then log in again",
+                    region: "staff.invitations.accept.accept",
+                },
+                Code {
+                    title: "Template: what to show for a used link, a known address or a new one",
+                    region: "staff.invitations.accept.template",
+                },
             ],
         },
         Explanation {
@@ -592,6 +716,20 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/tests/staff.rs",
                 BROWSER,
             ],
+            code: &[
+                Code {
+                    title: "Handler: the role × permission matrix, from `permissions::roles`",
+                    region: "staff.roles.index.handler",
+                },
+                Code {
+                    title: "Toggle: `permissions::grant` or `revoke`, audited, a toast for htmx",
+                    region: "staff.roles.index.toggle",
+                },
+                Code {
+                    title: "Template: one switch per cell, each posting with `hx-post`",
+                    region: "staff.roles.index.template",
+                },
+            ],
         },
         Explanation {
             route: "staff.audit.index",
@@ -642,6 +780,20 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/migrations/20260102000200_add_store_and_role_to_audit_logs.up.sql",
                 BROWSER,
             ],
+            code: &[
+                Code {
+                    title: "Grid: the audit log in `renox::grid`, related columns by name",
+                    region: "staff.audit.index.grid",
+                },
+                Code {
+                    title: "Record: every entry knows the active store and the role used",
+                    region: "staff.audit.index.record",
+                },
+                Code {
+                    title: "Template: the grid, with a custom cell for the details",
+                    region: "staff.audit.index.template",
+                },
+            ],
         },
         Explanation {
             route: "staff.catalog.move",
@@ -677,6 +829,20 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/staff/catalog_tools.rs",
                 "examples/bikeshop/resources/views/staff/catalog/move.html",
                 "examples/bikeshop/src/app/staff/admin.rs",
+            ],
+            code: &[
+                Code {
+                    title: "Action: the panel's selection kept in the cache, a toast links here",
+                    region: "staff.catalog.move.action",
+                },
+                Code {
+                    title: "Handler: one `update` moves them all, then back to the panel",
+                    region: "staff.catalog.move.handler",
+                },
+                Code {
+                    title: "Template: the products and a searchable category select",
+                    region: "staff.catalog.move.template",
+                },
             ],
         },
         Explanation {
@@ -718,6 +884,20 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/staff/catalog/fits.html",
                 "examples/bikeshop/src/app/catalog/model.rs",
                 "examples/bikeshop/tests/staff.rs",
+            ],
+            code: &[
+                Code {
+                    title: "Pivot: `part_fits` seen from a part, or its inverse from a bike",
+                    region: "staff.catalog.fits.pivot",
+                },
+                Code {
+                    title: "Attach: a fit with its note on the pivot row",
+                    region: "staff.catalog.fits.attach",
+                },
+                Code {
+                    title: "Template: the add form, a searchable select and a note",
+                    region: "staff.catalog.fits.template",
+                },
             ],
         },
     ]
@@ -860,6 +1040,56 @@ const ADMIN_SOURCES: &[&str] = &[
     "examples/bikeshop/tests/staff.rs",
 ];
 
+/// Every admin page's last sample: the models' policy.
+const ADMIN_POLICY_CODE: Code = Code {
+    title: "Policy: every model answers by a permission in the active store",
+    region: "admin.policy",
+};
+
+/// The code samples of one admin page: the resource's part that makes it
+/// (`admin.<slug>.columns`, `.form`, `.show`, marked in
+/// `src/app/staff/admin.rs`), then the policy.
+fn admin_code(slug: &str, one: &str, page: &str) -> &'static [Code] {
+    let region = |part: &str| leak(format!("admin.{slug}.{part}"));
+    let mut code = Vec::new();
+    match page {
+        "index" => {
+            code.push(Code {
+                title: leak(format!(
+                    "Resource: the list's columns, declared once for every {one}"
+                )),
+                region: region("columns"),
+            });
+            if slug == "products" {
+                code.push(Code {
+                    title: "Actions: bulk price changes, a move, and discontinue (with `row()`)",
+                    region: region("actions"),
+                });
+            }
+        }
+        "create" if slug == "stores" => code.push(Code {
+            title: "Allows: the stores resource refuses `create` whatever the permission",
+            region: region("allows"),
+        }),
+        "create" | "edit" => code.push(Code {
+            title: leak(format!(
+                "Form: a typed form with `#[derive(Validate)]`, then the {one}'s fields"
+            )),
+            region: region("form"),
+        }),
+        _ => code.push(Code {
+            title: if slug == "products" {
+                "Resource: the model, its labels, and the view page's entries"
+            } else {
+                "Resource: the model, its labels and the record's title"
+            },
+            region: region("show"),
+        }),
+    }
+    code.push(ADMIN_POLICY_CODE);
+    Box::leak(code.into_boxed_slice())
+}
+
 /// Leaks a string once (the explanations are `&'static`, made once per run).
 fn leak(text: String) -> &'static str {
     Box::leak(text.into_boxed_str())
@@ -896,6 +1126,17 @@ fn admin_pages() -> Vec<Explanation> {
                 under_hood: "One `COUNT(*)` per resource the person may see.",
                 docs: ADMIN_DOCS,
                 sources: ADMIN_SOURCES,
+                code: &[
+                    Code {
+                        title: "Panel: `Admin::new()`, who may open it, and nine resources",
+                        region: "admin.panel",
+                    },
+                    ADMIN_POLICY_CODE,
+                    Code {
+                        title: "Layer: the active store for `/admin` too",
+                        region: "admin.layer",
+                    },
+                ],
             }];
             for (slug, plural, one, permission, holds) in RESOURCES {
                 let stores = *slug == "stores";
@@ -1047,6 +1288,7 @@ fn admin_pages() -> Vec<Explanation> {
                         under_hood: leak(under_hood),
                         docs: ADMIN_DOCS,
                         sources: ADMIN_SOURCES,
+                        code: admin_code(slug, one, page),
                     });
                 }
             }

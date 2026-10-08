@@ -110,6 +110,7 @@ impl Module for Accounts {
                 privacy::prune_exports(&state).await.map(|_| ())
             });
 
+        // [explain:account.show.sections]
         app.account_section(
             "accounts/sections/contact.html",
             section_order::CONTACT,
@@ -128,6 +129,7 @@ impl Module for Accounts {
                 }))
             },
         );
+        // [/explain:account.show.sections]
         app.account_section(
             "accounts/sections/notifications.html",
             section_order::NOTIFICATIONS,
@@ -192,6 +194,7 @@ async fn contact_section(db: &Db, user: &User) -> Result<renox::serde_json::Valu
     }))
 }
 
+// [explain:account.show.contact]
 /// The contact form: a phone number and the home address.
 #[derive(Deserialize, Validate)]
 pub struct ContactForm {
@@ -210,6 +213,7 @@ pub struct ContactForm {
     #[validate(required, exists("countries", "id"))]
     pub country_id: i64,
 }
+// [/explain:account.show.contact]
 
 /// `PUT /account/contact`: saves the phone and the home address (the city
 /// is found by name in the country, or added).

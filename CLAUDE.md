@@ -102,6 +102,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
                            export); assets/renox-grid.css|js, and
                            assets/cally.js (Cally 0.9.2, MIT: the date range calendar)
   src/view_stack.rs        push/prepend/stack: markers filled in after the page renders (Scope)
+  src/icons.rs             the kit's icons: Lucide paths (lucide-static 1.53.0, ISC; assets/NOTICE,
+                           assets/lucide-LICENSE) drawn by `renox_icon`, behind ui.html's `icon(…)`
   src/view_filters.rs      built-in template filters `number`, `money`, `date`, `since`, `words`,
                            `markdown`; pub format_number, format_money (whole units;
                            the `money` filter takes the smallest unit, like the grid)
@@ -368,8 +370,8 @@ examples/                  workspace members, each with a README.md and its own 
                            catalog, home, multistore, plans, rentals, reports, sales, staff,
                            stock, workshop; src/seed/ (`db:seed`, `demo:seed --size large`,
                            test fixtures); the blocks from renox-blocks (#347; /about/blocks
-                           shows them), plus its own date_picker_blocked in
-                           resources/views/blocks/ + public/blocks/; public/vendor/motion (motion.dev, vendored); errors/
+                           shows them; public/blocks/blocks.css styles that page);
+                           public/vendor/motion (motion.dev, vendored); errors/
                            (default + 503); migrations for SQLite and PostgreSQL;
                            Dockerfile + deploy/ (make:deploy); tests/<area>.rs,
                            tests/queries.rs (main pages on the large seed, no N+1),

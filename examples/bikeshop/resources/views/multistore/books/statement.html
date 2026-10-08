@@ -5,6 +5,7 @@
 
 {#- A two-party statement (#245): each store's side by kind, the net, each store's
     confirmation, the entries. -#}
+{# [explain:multistore.settlements.show.template] #}
 {% macro side(name, data, confirmed, can, which) -%}
 {% call card(title=t('multistore.statement.owes', store=name)) %}
   {%- if data.lines %}
@@ -21,6 +22,7 @@
   {%- endif %}
 {% endcall %}
 {%- endmacro %}
+{# [/explain:multistore.settlements.show.template] #}
 
 {% block content %}
 {{ styles() }}

@@ -1,5 +1,6 @@
 -- /about/fields (src/app/about/fields.rs) on PostgreSQL: each column the
 -- type its Rust field decodes from.
+-- [explain:fields.postgres]
 CREATE TABLE field_samples (
     id UUID PRIMARY KEY,
     user_id BIGINT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
@@ -25,4 +26,5 @@ CREATE TABLE field_samples (
     created_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ
 );
+-- [/explain:fields.postgres]
 CREATE INDEX field_samples_user_id_index ON field_samples (user_id);

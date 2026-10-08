@@ -297,6 +297,56 @@ test('the date picker names the month it shows and tells the field it changed', 
   assert.equal(await page.eval(() => document.querySelector('#rx-on-calendar').matches(':popover-open')), false);
 }));
 
+// The visit picker: 7 and 8 October can't be chosen, nor any Sunday.
+test('the date picker greys out disabled days and the arrow keys step over them', () => onWidgets(async (page) => {
+  const cal = '#rx-visit-calendar calendar-date';
+  const focused = () => page.eval((sel) => String(document.querySelector(sel).focusedDate), cal);
+  await page.click('[popovertarget="rx-visit-calendar"]');
+  await page.waitFor(() => document.querySelector('#rx-visit-calendar').matches(':popover-open'));
+  await page.waitFor(() => typeof document.querySelector('#rx-visit-calendar calendar-date').isDateDisallowed === 'function');
+  // Shown as disabled: the listed days and the Sundays of October 2026 (4, 11, 18, 25).
+  await sleep(200);
+  const disabled = await page.eval((sel) => {
+    const month = document.querySelector(sel).querySelector('calendar-month');
+    return [...month.shadowRoot.querySelectorAll('button[aria-disabled="true"]')]
+      .filter((b) => !(b.getAttribute('part') || '').includes('outside'))
+      .map((b) => b.getAttribute('aria-label'));
+  }, cal);
+  assert.deepEqual(disabled, ['October 4', 'October 7', 'October 8', 'October 11', 'October 18', 'October 25']);
+  // From Tuesday the 6th, one step right skips the 7th and the 8th.
+  await page.eval((sel) => document.querySelector(sel).focus(), cal);
+  await sleep(100);
+  await page.press('ArrowRight');
+  await page.waitFor(() => String(document.querySelector('#rx-visit-calendar calendar-date').focusedDate) === '2026-10-09', {
+    message: 'the 9th focused',
+  });
+  // Saturday the 10th, then Sunday the 11th is skipped to Monday the 12th.
+  await page.press('ArrowRight');
+  await page.press('ArrowRight');
+  await page.waitFor(() => String(document.querySelector('#rx-visit-calendar calendar-date').focusedDate) === '2026-10-12', {
+    message: 'Sunday skipped',
+  });
+  // Back a week: Monday the 5th is open.
+  await page.press('ArrowUp');
+  await page.waitFor(() => String(document.querySelector('#rx-visit-calendar calendar-date').focusedDate) === '2026-10-05');
+  await page.press('Enter');
+  await page.waitFor(() => document.querySelector('#rx-visit').value === '2026-10-05', { message: 'the 5th picked' });
+  assert.equal(await focused(), '2026-10-05');
+}));
+
+test('a disabled day typed into the date picker is refused with the error under the field', () => onWidgets(async (page) => {
+  await page.type('#rx-visit', '2026-10-11', { clear: true });
+  assert.equal(await page.eval(() => document.querySelector('#rx-visit').getAttribute('aria-invalid')), 'true');
+  assert.equal(await page.eval(() => document.querySelector('#rx-visit').validity.customError), true);
+  assert.match(await page.text('#rx-visit-error'), /That day can't be chosen/);
+  assert.equal(await page.eval(() => document.querySelector('#fields').checkValidity()), false, 'the form is not sent');
+  // An open day clears it.
+  await page.type('#rx-visit', '2026-10-12', { clear: true });
+  assert.equal(await page.eval(() => document.querySelector('#rx-visit').hasAttribute('aria-invalid')), false);
+  assert.equal(await page.eval(() => document.querySelector('#rx-visit').validity.customError), false);
+  assert.equal(await page.text('#rx-visit-error'), '');
+}));
+
 test('a hidden show_when group is left out of what the form sends', () => onWidgets(async (page) => {
   await page.click('#ship-send');
   await page.waitFor(() => document.querySelector('#ship-result').textContent !== '');

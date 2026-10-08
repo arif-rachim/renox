@@ -85,6 +85,7 @@ pub fn shown_status(sub: &PlanSubscription) -> &'static str {
 
 /// `GET /plans/mine` (`plans.mine`): the customer's plans, in six queries
 /// whatever their number.
+// [explain:plans.mine.handler]
 pub async fn index(State(state): State<AppState>, user: AuthUser) -> Result<View> {
     let db = &state.db;
     let customer = customer_of(db, &user).await?;
@@ -108,7 +109,9 @@ pub async fn index(State(state): State<AppState>, user: AuthUser) -> Result<View
         context! { current, past, has_bikes => !bikes.is_empty() },
     ))
 }
+// [/explain:plans.mine.handler]
 
+// [explain:plans.mine.query]
 async fn lines(db: &Db, subs: Vec<PlanSubscription>, bikes: &[CustomerBike]) -> Result<Vec<Line>> {
     let plans = ServicePlan::find_many(
         db,
@@ -129,6 +132,7 @@ async fn lines(db: &Db, subs: Vec<PlanSubscription>, bikes: &[CustomerBike]) -> 
         .order_by_desc("id")
         .get(db)
         .await?;
+    // [/explain:plans.mine.query]
     Ok(subs
         .into_iter()
         .map(|s| Line {
@@ -243,6 +247,7 @@ pub async fn show(
         .order_by_desc("id")
         .get(db)
         .await?;
+    // [explain:plans.show.billing]
     let billing = if sub.online() {
         let customer = Billing::of(&state, &*user).named(sub.billing_name());
         let can_resume = customer.can_resume().await?;
@@ -256,6 +261,7 @@ pub async fn show(
     } else {
         None
     };
+    // [/explain:plans.show.billing]
     let others: Vec<(String, String)> = ServicePlan::where_eq("active", true)
         .order_by("price")
         .get(db)
@@ -370,6 +376,7 @@ pub struct SwapForm {
 /// the next period: renox-billing's `swap` without proration (the gateway
 /// charges the new price from the next invoice); the visits follow on the
 /// period's first day.
+// [explain:plans.show.swap]
 pub async fn swap(
     State(state): State<AppState>,
     user: AuthUser,
@@ -379,6 +386,7 @@ pub async fn swap(
 ) -> Result<Response> {
     let db = &state.db;
     let mut sub = own_subscription(db, &user, id).await?;
+    // [/explain:plans.show.swap]
     let slug = form.plan.unwrap_or_default();
     let plan = ServicePlan::where_eq("slug", slug.as_str())
         .where_eq("active", true)
@@ -393,6 +401,7 @@ pub async fn swap(
             Toast::error(state.current_lang().t("plans.errors.not_running", &[])),
         );
     }
+    // [explain:plans.show.swap]
     if sub.online() {
         let key = billing_key(&plan.slug, PayWith::of_gateway(&sub.gateway));
         let result = Billing::of(&state, &*user)
@@ -401,6 +410,7 @@ pub async fn swap(
             .await;
         return outcome(&state, &htmx, id, result, "plans.show.swapped");
     }
+    // [/explain:plans.show.swap]
     // Paid at the counter: from the next visit on.
     sub.next_plan_id = Some(plan.id);
     sub.swap_on = Some(visits::today(&state.config));

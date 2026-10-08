@@ -11,6 +11,7 @@
   {{ tags_input("labels", "Labels", value=["new"]) }}
   {{ select("size", "Size", [["s", "Small"], ["m", "Medium"], ["l", "Large"], ["xl", "Extra large"]], searchable=true, required=true, placeholder="Pick a size") }}
   {{ date_picker("on", "Delivery date", value="2026-10-02", min="2026-10-01", max="2026-12-31") }}
+  {{ date_picker("visit", "Workshop visit", value="2026-10-06", min="2026-10-01", max="2026-12-31", disabled_dates=["2026-10-07", "2026-10-08"], closed_weekdays=[0]) }}
 </form>
 
 <form id="order" method="post" action="/order" hx-post="/order" hx-target="#order-result" data-live-validate>

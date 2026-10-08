@@ -35,6 +35,7 @@ pub const VALID_FOR: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 /// The tables whose rows belong to a customer, moved when a record is claimed.
 pub const CUSTOMER_TABLES: [&str; 4] = ["orders", "payments", "rentals", "customer_bikes"];
 
+// [explain:accounts.invite.routes]
 /// Staff routes: the invitation form and sending it (`customers.manage`
 /// in the active store).
 pub fn staff_routes() -> Routes {
@@ -47,6 +48,7 @@ pub fn staff_routes() -> Routes {
             .require_permission(CUSTOMERS_MANAGE),
     )
 }
+// [/explain:accounts.invite.routes]
 
 /// The customer's routes: the signed link, for someone logged in.
 pub fn routes() -> Routes {
@@ -78,13 +80,16 @@ pub async fn create(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
     Ok(view("accounts/invite.html", context! { customer }))
 }
 
+// [explain:accounts.invite.send]
 /// The invitation form.
 #[derive(serde::Deserialize, Validate)]
 pub struct InviteForm {
     #[validate(required, email, max = 255)]
     pub email: String,
 }
+// [/explain:accounts.invite.send]
 
+// [explain:accounts.invite.send]
 /// `POST /staff/customers/{customer}/invite`: saves the address on the
 /// record and mails the signed link (queued: the counter doesn't wait for
 /// the mail server).
@@ -105,6 +110,7 @@ pub async fn send(
         context! { customer, link, days => VALID_FOR.as_secs() / 86_400 },
     )?;
     state.queue_mail(mail).await?;
+    // [/explain:accounts.invite.send]
     let sent = state
         .current_lang()
         .t("accounts.invite.sent", &[("email", &email)]);
@@ -139,6 +145,7 @@ async fn summary(db: &Db, customer: &Customer) -> Result<Summary> {
     })
 }
 
+// [explain:accounts.claim.show]
 /// `GET /claim/{customer}/{email}` (signed): the record and a "This is me"
 /// button, or why it can't be claimed.
 pub async fn show(
@@ -161,6 +168,7 @@ pub async fn show(
         },
     ))
 }
+// [/explain:accounts.claim.show]
 
 /// Why `user` can't claim `customer` with an invitation sent to `email`.
 fn problem(user: &User, customer: &Customer, email: &str) -> Option<&'static str> {
@@ -202,6 +210,7 @@ pub async fn claim(
     ))
 }
 
+// [explain:accounts.claim.link]
 /// Links the walk-in record `walk_in_id` to `user`, moving what their own
 /// record had onto it. In one transaction; the `user_id IS NULL` condition
 /// makes a second, concurrent claim change nothing.
@@ -221,6 +230,7 @@ pub async fn link(db: &Db, user: &User, walk_in_id: i64) -> Result {
     if claimed == 0 {
         return Err(Error::NotFound);
     }
+    // [/explain:accounts.claim.link]
     if let Some(own) = own.filter(|own| own.id != walk_in_id) {
         for table in CUSTOMER_TABLES {
             renox::db::sql(format!(
@@ -236,6 +246,8 @@ pub async fn link(db: &Db, user: &User, walk_in_id: i64) -> Result {
             .execute(&mut tx)
             .await?;
     }
+    // [explain:accounts.claim.link]
     tx.commit().await?;
     Ok(())
 }
+// [/explain:accounts.claim.link]

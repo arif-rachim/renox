@@ -1,12 +1,12 @@
 {% extends "layouts/staff.html" %}
-{% from "renox/ui.html" import page_header, card, select, input, checkbox_list, textarea, button, form_errors, form_grid, fieldset %}
-{% from "blocks/date_picker_blocked.html" import date_picker_blocked %}
+{% from "renox/ui.html" import page_header, card, select, input, checkbox_list, textarea, button, form_errors, form_grid, fieldset, date_picker %}
 {% block seo %}{{ seo(title=t('workshop.walkin.title')) }}{% endblock %}
 
 {#- A walk-in work order (#236): a known customer or a new one, the bike, the tasks, the day. -#}
 {% block content %}
 <div class="rx-stack" data-bs-reveal>
   {{ page_header(t('workshop.walkin.title'), subtitle=t('workshop.walkin.lead'), back=route('workshop.board'), back_label=t('workshop.board.title')) }}
+  {# [explain:workshop.walkin.template] #}
   <form method="post" action="{{ route('workshop.walkin.store') }}" novalidate>
     {{ csrf_field() }}
     {% call card() %}
@@ -20,10 +20,11 @@
       {% endcall %}
       {{ input("bike", t('workshop.fields.bike'), required=true, placeholder=t('workshop.bikes.name_hint')) }}
       {{ checkbox_list("tasks", t('workshop.book.tasks'), tasks, columns=2, required=true) }}
-      {{ date_picker_blocked("day", t('workshop.fields.day'), full, closed_weekdays=closed, value=today, min=today, required=true) }}
+      {{ date_picker("day", t('workshop.fields.day'), disabled_dates=full, closed_weekdays=closed, value=today, min=today, required=true) }}
       {{ textarea("note", t('workshop.book.note'), rows=2) }}
       {{ button(t('workshop.walkin.submit'), icon="check") }}
     {% endcall %}
   </form>
+  {# [/explain:workshop.walkin.template] #}
 </div>
 {% endblock %}

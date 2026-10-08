@@ -8,6 +8,7 @@
 {% block content %}
 <div class="rx-stack" data-bs-reveal>
   {{ page_header(t('accounts.invite.title'), subtitle=t('accounts.invite.lead')) }}
+  {# [explain:accounts.invite.template] #}
   <form method="post" action="{{ route('accounts.invite.send', customer.id) }}" data-live-validate>
     {{ csrf_field() }}
     {% call card(title=customer.name) %}
@@ -19,5 +20,6 @@
       <div class="rx-card__footer">{{ button(t('accounts.invite.send')) }}</div>
     {% endcall %}
   </form>
+  {# [/explain:accounts.invite.template] #}
 </div>
 {% endblock %}

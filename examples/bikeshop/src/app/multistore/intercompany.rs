@@ -78,6 +78,7 @@ pub struct Balance {
     pub amount: i64,
 }
 
+// [explain:multistore.books.netting]
 /// The open balance of every store pair in `entries` (unsettled ones):
 /// each pair's entries netted, in the direction of the debt. Pairs that net
 /// to zero are left out.
@@ -101,6 +102,7 @@ pub fn balances(entries: &[(i64, i64, i64)], stores: &HashMap<i64, String>) -> V
         })
         .collect()
 }
+// [/explain:multistore.books.netting]
 
 /// Each store's position (owed to it minus owed by it) over `entries`:
 /// added up over every store it is zero, the company's own total.
@@ -113,6 +115,7 @@ pub fn positions(entries: &[(i64, i64, i64)]) -> BTreeMap<i64, i64> {
     positions
 }
 
+// [explain:multistore.books.handler]
 /// `GET /staff/books` (`multistore.books`): what the active store owes and
 /// is owed, pair by pair (entries not settled yet), and every entry it may
 /// see in a grid with the total under the amounts.
@@ -141,6 +144,7 @@ pub async fn index(
             "debtor_store_id, creditor_store_id, CAST(SUM(amount) AS BIGINT)",
         )
         .await?;
+    // [/explain:multistore.books.handler]
     let stores: HashMap<i64, String> = Store::all_by_name(db)
         .await?
         .into_iter()
@@ -219,6 +223,7 @@ pub struct FeeForm {
     pub percent: Option<f64>,
 }
 
+// [explain:multistore.fees.handler]
 /// `POST /staff/books/fees/{store}` (`multistore.fees.update`): the owner
 /// changes a store's fee rate; the change is audited (old and new rate).
 /// Entries already booked keep the rate they were booked with.
@@ -250,6 +255,7 @@ pub async fn update_fee(
         Redirect::route("multistore.fees", &[])?,
     ))
 }
+// [/explain:multistore.fees.handler]
 
 #[cfg(test)]
 mod tests {

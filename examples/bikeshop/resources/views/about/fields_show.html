@@ -27,6 +27,7 @@
       {{ entry(t('fields.form.weight'), sample.weight_kg, format="number", decimals=2, suffix="kg") }}
       {{ entry(t('fields.form.available'), sample.available, format="bool") }}
       {{ entry(t('fields.form.size'), sample.size, badge="info", labels={"small": t('fields.size.small'), "medium": t('fields.size.medium'), "large": t('fields.size.large')}) }}
+      {# [explain:fields.show.template] #}
       {{ entry(t('fields.form.colours'), sample.colors, format="color") }}
       {{ entry(t('fields.form.tags'), sample.tags, badge=true, limit_list=3) }}
       {{ entry(t('fields.form.specs'), sample.specs, format="key_value", span="full") }}
@@ -34,6 +35,7 @@
       {%- if sample.details %}{% call entry(t('fields.form.rich'), span="full") %}<div class="rx-prose">{{ sample.details | rich_text }}</div>{% endcall %}
       {%- else %}{{ entry(t('fields.form.rich'), none, span="full", placeholder=t('fields.show.none')) }}{% endif %}
       {{ code_entry(t('fields.form.settings'), sample.settings, language="json", placeholder=t('fields.show.none')) }}
+      {# [/explain:fields.show.template] #}
       {{ entry(t('fields.form.pickup'), sample.pickup_at) }}
       {{ entry(t('fields.form.launch'), sample.launch_at, format="datetime", date_format="%d %b %Y, %H:%M") }}
       {{ entry(t('fields.form.released'), sample.released_on, format="date", date_format="%d %b %Y") }}

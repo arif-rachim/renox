@@ -84,9 +84,11 @@ fn anchors(markdown: &str) -> HashSet<String> {
     found
 }
 
+// [explain:about.pages.test]
 #[renox::test]
 async fn every_get_route_has_an_explanation() {
     let app = TestApp::new(bikeshop::app()).await;
+    // [/explain:about.pages.test]
     let explanations = explain::all();
     let not_pages = explain::not_pages();
     let mut problems = Vec::new();
@@ -103,6 +105,7 @@ async fn every_get_route_has_an_explanation() {
     }
     let skipped: HashSet<&str> = not_pages.iter().map(|n| n.route).collect();
 
+    // [explain:about.pages.test]
     // Every GET route of the app (Renox's own `/_renox/*`, `/health`… aside).
     let mut get_routes = HashSet::new();
     for route in app.kernel().routes() {
@@ -125,6 +128,7 @@ async fn every_get_route_has_an_explanation() {
             ));
         }
     }
+    // [/explain:about.pages.test]
 
     // Each entry's path is its route's, and the panel finds the entry on the
     // page itself. Renox names the current route from the path alone (the
@@ -249,6 +253,102 @@ fn every_explanation_is_complete_and_links_to_what_exists() {
 }
 
 #[test]
+fn code_markers_are_closed_and_named_once() {
+    assert!(
+        bikeshop::code::PROBLEMS.is_empty(),
+        "\n{}\n",
+        bikeshop::code::PROBLEMS.join("\n")
+    );
+}
+
+#[test]
+fn every_code_sample_is_a_short_region_that_exists() {
+    let mut problems = Vec::new();
+    let mut shown = HashSet::new();
+    for e in explain::all() {
+        let route = e.route;
+        if e.code.is_empty() {
+            problems.push(format!(
+                "`{route}`: no code sample: mark the handler (and the template's key part) \
+                 and name them in `code`"
+            ));
+        } else if e.code.len() > 3 {
+            problems.push(format!(
+                "`{route}`: {} code samples, keep to three",
+                e.code.len()
+            ));
+        }
+        for code in e.code {
+            shown.insert(code.region);
+            let (tab, caption) = explain::Code::split_title(code.title);
+            if tab.is_empty() || tab.chars().count() > 14 || caption.is_empty() {
+                problems.push(format!(
+                    "`{route}`: the title `{}` should read \"Tab: what it shows\", with a short tab name",
+                    code.title
+                ));
+            }
+            match bikeshop::code::region(code.region) {
+                None => problems.push(format!(
+                    "`{route}`: no file marks the region `{}` (`[explain:{}]` … `[/explain:{}]`)",
+                    code.region, code.region, code.region
+                )),
+                Some(region) if region.lines() > 40 => problems.push(format!(
+                    "`{route}`: the region `{}` has {} lines, keep a sample under 40",
+                    code.region,
+                    region.lines()
+                )),
+                Some(_) => {}
+            }
+        }
+    }
+    // A marked region nobody shows is left over from a sample that moved.
+    for region in bikeshop::code::REGIONS {
+        if !shown.contains(region.name) {
+            problems.push(format!(
+                "{}:{}: the region `{}` isn't shown on any page",
+                region.path, region.first_line, region.name
+            ));
+        }
+    }
+    assert!(problems.is_empty(), "\n{}\n", problems.join("\n"));
+}
+
+#[test]
+fn a_region_is_the_marked_lines_without_their_indentation() {
+    let routes = bikeshop::code::region("home.routes").expect("the home page's routes are marked");
+    assert_eq!(routes.path, "examples/bikeshop/src/app/home/mod.rs");
+    assert_eq!(routes.language, "rust");
+    assert!(
+        routes.text.starts_with("fn routes(&self) -> Routes {"),
+        "{}",
+        routes.text
+    );
+    // Two parts, joined by a `…` line.
+    assert!(
+        routes.text.contains("\n// …\nasync fn index() -> View {"),
+        "{}",
+        routes.text
+    );
+    assert!(!routes.text.contains("[explain:"));
+    // The lines on GitHub are the ones in the file.
+    let file = std::fs::read_to_string(repo_root().join(routes.path)).unwrap();
+    let lines: Vec<&str> = file.lines().collect();
+    assert!(
+        lines[routes.first_line - 1]
+            .trim_start()
+            .starts_with("fn routes")
+    );
+    assert_eq!(lines[routes.last_line - 1], "}");
+    let template = bikeshop::code::region("home.template").unwrap();
+    assert_eq!(template.language, "html");
+    assert!(
+        template.text.starts_with("{% call page_hero("),
+        "{}",
+        template.text
+    );
+}
+
+#[test]
 fn addresses_match_the_most_specific_pattern() {
     use bikeshop::explain::path_matches;
     assert_eq!(path_matches("/", "/"), Some(1));
@@ -347,6 +447,8 @@ async fn every_page_shows_its_panel_with_motion() {
         page.assert_ok()
             .assert_see("data-rx-open=\"about-page\"")
             .assert_see("id=\"about-page\"")
+            .assert_see("id=\"explain-dock\"")
+            .assert_see("bs-docked")
             .assert_see(title)
             .assert_see("vendor/motion/motion.js")
             .assert_see("app.js");
@@ -369,6 +471,44 @@ async fn the_panel_shows_features_docs_and_sources() {
 }
 
 #[renox::test]
+async fn the_panel_shows_the_code_coloured_with_its_file_on_github() {
+    let app = TestApp::new(bikeshop::app()).await;
+    let page = app.get("/").await;
+    page.assert_ok()
+        .assert_see("The code")
+        // The kit's tabs, one per sample, in the docked panel and the sheet.
+        .assert_see(r#"id="explain-dock-code-tab-0""#)
+        .assert_see(r#"id="about-page-code-tab-0""#)
+        .assert_see(">Routes</button>")
+        // Coloured on the server, with the lines' link and a copy button.
+        .assert_see(r#"<span class="hl-kw">fn</span> <span class="hl-fn">routes</span>"#)
+        .assert_see(
+            "https://github.com/arif-rachim/renox/blob/main/examples/bikeshop/src/app/home/mod.rs#L",
+        )
+        .assert_see("data-rx-copy-text=\"fn routes(&amp;self) -&gt; Routes {");
+    // Not folded unless the cookie says so.
+    assert!(!page.text().contains("bs-docked--rail"));
+}
+
+#[renox::test]
+async fn the_folded_panel_is_drawn_folded_from_its_cookie() {
+    let app = TestApp::new(bikeshop::app()).await;
+    app.request()
+        .header("Cookie", "bikeshop_explain=rail")
+        .get("/")
+        .await
+        .assert_ok()
+        .assert_see("bs-docked bs-docked--rail")
+        .assert_see(r#"<div class="bs-dock__panel" id="explain-dock-panel" hidden>"#);
+    app.request()
+        .header("Cookie", "bikeshop_explain=open")
+        .get("/")
+        .await
+        .assert_see(r#"<div class="bs-dock__panel" id="explain-dock-panel">"#)
+        .assert_dont_see("bs-docked--rail");
+}
+
+#[renox::test]
 async fn bikeshop_explain_false_hides_the_panels() {
     let app = TestApp::with_config(bikeshop::app(), |c| {
         c.vars.insert("BIKESHOP_EXPLAIN".into(), "false".into());
@@ -378,6 +518,8 @@ async fn bikeshop_explain_false_hides_the_panels() {
         .await
         .assert_ok()
         .assert_dont_see("id=\"about-page\"")
+        .assert_dont_see("id=\"explain-dock\"")
+        .assert_dont_see("bs-docked")
         .assert_dont_see("data-rx-open=\"about-page\"");
     // The index of every page stays.
     app.get("/about/pages").await.assert_ok().assert_see("Home");

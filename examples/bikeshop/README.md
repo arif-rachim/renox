@@ -23,9 +23,15 @@ It keeps the shape of the Sakila/Pagila sample database (stock per store → ren
 returned, maybe late → paid), grown into a bike shop: see [`/about/data`](src/app/about/data.rs)
 in the app.
 
-**Every page explains itself.** An "About this page" button opens a panel with what the page is
-for, who uses it, which Renox features it uses **and why**, what happens under the hood
-(queries, transactions, jobs, events, mails), and links to the guide and to the source files.
+**Every page explains itself, side by side with its code.** On a wide screen (1200 px and
+up) a panel beside the page says what the page is for, who uses it, which Renox features it
+uses **and why**, and shows the code that makes it work: the handler, the key part of the
+template, a query, a policy or a test, one tab each, coloured, with the file's lines on
+GitHub and a copy button. Then what happens under the hood (queries, transactions, jobs,
+events, mails) and links to the guide. The panel folds to a slim rail (remembered in a
+cookie); on a narrower screen the "About this page" button opens the same content in a
+sheet. The code is cut from the shop's own files when it is built, so it never goes stale
+(see [Adding a page](#adding-a-page)).
 
 > **Start on [`/about/pages`](src/app/about/mod.rs)**: every page of the shop, filtered by
 > Renox feature ("which pages use `renox::grid`?", "where is `Pivot`?") or by role (visitor,
@@ -95,7 +101,7 @@ Paths are relative to this folder.
 | Renting: `datetime_range` and `availability` blocks, two overlap checks (form hook + `Db::begin_immediate` + `lock_for_update`) | `/rent`, `/rentals`, `/rentals/{code}` | [src/app/rentals/reserve.rs](src/app/rentals/reserve.rs), [src/app/rentals/booking.rs](src/app/rentals/booking.rs), [src/app/rentals/pricing.rs](src/app/rentals/pricing.rs) |
 | ID check: `Upload`, `Encrypted<String>`, reviewed by staff | `/rentals/identity` | [src/app/rentals/identity.rs](src/app/rentals/identity.rs) |
 | My bikes and their service history (`has_many`, the `history` block) | `/bikes`, `/bikes/{bike}` | [src/app/workshop/bikes.rs](src/app/workshop/bikes.rs) |
-| Booking a service within the workshop's capacity (`date_picker_blocked` block) | `/service/book`, `/service/{order}` | [src/app/workshop/booking.rs](src/app/workshop/booking.rs), [src/app/workshop/capacity.rs](src/app/workshop/capacity.rs) |
+| Booking a service within the workshop's capacity (the kit's `date_picker` with `disabled_dates` and `closed_weekdays`) | `/service/book`, `/service/{order}` | [src/app/workshop/booking.rs](src/app/workshop/booking.rs), [src/app/workshop/capacity.rs](src/app/workshop/capacity.rs) |
 | Approving extra work from a signed, single-use link | `/service/approve/{extra}` | [src/app/workshop/approval.rs](src/app/workshop/approval.rs) |
 | Service plans with renox-billing (Stripe, Xendit, a demo gateway), the `compare_plans` and `month_calendar` blocks | `/plans`, `/plans/subscribe`, `/plans/mine`, `/plans/mine/{subscription}` | [src/app/plans/](src/app/plans/) |
 | Accounts: Renox's `Auth` (login, register, reset, verification), account sections (`Registry::account_section`), language, privacy (download, delete) | `/login`, `/register`, `/account` | [src/app/accounts/](src/app/accounts/) |
@@ -135,7 +141,8 @@ Paths are relative to this folder.
 | Feature | Where |
 |---|---|
 | The app: modules, plugins, layers, the reporter | [src/lib.rs](src/lib.rs) |
-| "About this page": `Explanation`, the registry, the panel, `BIKESHOP_EXPLAIN` | [src/explain.rs](src/explain.rs), each area's `explain.rs`, [resources/views/about/_panel.html](resources/views/about/_panel.html) |
+| "About this page": `Explanation`, the registry, the docked panel and the sheet, `BIKESHOP_EXPLAIN` | [src/explain.rs](src/explain.rs), each area's `explain.rs`, [resources/views/about/_explain.html](resources/views/about/_explain.html), [_dock.html](resources/views/about/_dock.html), [_panel.html](resources/views/about/_panel.html), [public/explain.css](public/explain.css), [public/explain.js](public/explain.js) |
+| Its code samples: regions marked in the source, cut out by `build.rs`, coloured on the server | [src/code.rs](src/code.rs), [build.rs](build.rs), [src/highlight.rs](src/highlight.rs) (a copy of the docs site's) |
 | Models and factories per area, migrations for SQLite and PostgreSQL, money as integers (US dollars in cents, `APP_CURRENCY=USD`; typed amounts converted in [src/money.rs](src/money.rs)) | `src/app/<area>/model.rs`, `src/app/<area>/factories.rs`, [migrations/](migrations/) |
 | Seeds (`db:seed`, the typed `demo:seed` command) and test fixtures | [src/seed/](src/seed/) |
 | Scheduled tasks (below), jobs, events and listeners | each area's `tasks.rs` / `mod.rs` |
@@ -219,7 +226,8 @@ every kit component follows in light and dark mode, plus four tokens of the shop
 (`--bs-clay`, `--bs-sand`, `--bs-hero`, `--bs-section`) and the public pages' parts: the hero
 ([layouts/_hero.html](resources/views/layouts/_hero.html), on the home, rent and plans pages),
 category chips and photo tiles, service tiles, the stores strip, product cards as photos with
-their text under them, the sign-in pages' photo, the phone's floating tab bar. This relaxes
+their text under them, the sign-in pages' photo. The phone's floating tab bar is the kit's
+(`navbar(…, tabs=…)`, #346). This relaxes
 rule 3 for those brand tokens only (recorded in #231); spacing stays the kit's.
 
 **Photos.** 68 free [Unsplash](https://unsplash.com/license) photos in WebP (3.6 MB):
@@ -242,11 +250,8 @@ on the kit's tokens, and the crate's script loads a block's code only on pages t
 (Web Animations on `transform`, nothing under `prefers-reduced-motion`, no inline handlers, so
 `CSP=strict` works).
 
-One block is still the shop's own: `date_picker_blocked`, in
-[resources/views/blocks/](resources/views/blocks/) with its behaviour in
-[public/blocks/blocks.js](public/blocks/blocks.js) and its style in
-[public/blocks/blocks.css](public/blocks/blocks.css) (`bs-` classes, `data-bs-*` attributes).
-Form blocks send plain fields, so `Valid<T>` reads them; the server still checks every value.
+The workshop's booking days (full and closed days greyed out) are the kit's own `date_picker`
+with `disabled_dates` and `closed_weekdays`. Form blocks send plain fields, so `Valid<T>` reads them; the server still checks every value.
 [`/about/blocks`](src/app/about/blocks.rs) shows each one working.
 
 | Macro | What it is | Used on |
@@ -259,7 +264,6 @@ Form blocks send plain fields, so `Valid<T>` reads them; the server still checks
 | `month_calendar(month, events, url, param, today, first_day, label, heading)` | A month of events, a list on phones | a plan's visits |
 | `availability(columns, rows, label, corner)` | Resources × hours/days, booked and free slots | renting |
 | `datetime_range(name_start, name_end, label, …)` | Two date pickers + time selects, the duration shown | renting, walk-ins |
-| `date_picker_blocked(name, label, disabled_dates, closed_weekdays, …)` | The kit's `date_picker` with days that can't be picked (the shop's own) | service booking |
 | `swatches(name, label, options, selected, kind, attrs)` | Size or colour chips as radios | product page |
 | `history(items, label, date_format)` | A vertical timeline | a bike's service history |
 | `compare_plans(plans, features, highlight, …)` | Pricing cards and a comparison table | service plans |
@@ -368,7 +372,7 @@ $ cargo run -- schedule:list
   As in every example, `renox.workspace = true` means the Dockerfile builds in an app made by
   `rnx new`, not in this repository's folder.
 - **CSP:** every page works under `CSP=strict` (scripts load from the app with the page's nonce,
-  behaviour lives in the app's scripts under [public/](public/) (`app.js`, `blocks/blocks.js`, one per area; renox-blocks' module), no inline handlers;
+  behaviour lives in the app's scripts under [public/](public/) (`app.js`, one per area; renox-blocks' module), no inline handlers;
   `tests/browser/bikeshop-walk.test.mjs` walks the main pages under it with a clean console).
 
 ## Tests
@@ -391,12 +395,31 @@ The Rust tests are in [tests/](tests/), one file per area; the browser tests are
    who uses it, the Renox features and why, what happens under the hood, `docs/*.md#anchor`
    links and the source files. Use the same `api` text as other pages for the same feature
    (`/about/pages` groups by it).
-3. A GET route that isn't a page (JSON, a file, a stream) goes in `not_pages()` with the reason.
-4. `cargo test -p bikeshop --test about` tells you what is missing.
+3. Give it one to three code samples (`code`): mark each region in its file, then name it
+   with a title that reads "Tab: what it shows":
+
+   ```rust
+   // [explain:rentals.create.handler]
+   async fn create(…) -> Result<View> {
+       …
+   }
+   // [/explain:rentals.create.handler]
+   ```
+
+   In a template the markers are comments, `{# [explain:rentals.create.form] #}` …
+   `{# [/explain:rentals.create.form] #}`; in SQL `-- [explain:…]`, in CSS
+   `/* [explain:…] */`. Opening the same name again later in the file adds a part (joined
+   with a `…` line), to skip what doesn't matter. Then, in the explanation:
+   ``code: &[Code { title: "Handler: `Valid<Booking>` checks the form", region: "rentals.create.handler" }]``.
+   Keep a sample short (5–30 lines).
+4. A GET route that isn't a page (JSON, a file, a stream) goes in `not_pages()` with the reason.
+5. `cargo test -p bikeshop --test about` tells you what is missing: a page without an
+   explanation, a link to a guide section or a file that doesn't exist, a marker never closed,
+   a sample naming a region no file marks, or a marked region no page shows.
 
 Spanish texts for an explanation go in `resources/lang/es.json` under
-`about_page.<route name>` (`title`, `purpose`, `who`, `under_hood`, `features.<n>`); whatever
-is missing there is shown in English.
+`about_page.<route name>` (`title`, `purpose`, `who`, `under_hood`, `features.<n>`, and,
+optionally, `code.<n>` for a sample's title); whatever is missing there is shown in English.
 
 ## What building it found in Renox
 
