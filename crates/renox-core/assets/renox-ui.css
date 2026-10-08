@@ -423,6 +423,8 @@
 .rx-sidebar__link { display: flex; }
 .rx-sidebar__link > span:first-child { flex: 1; }
 .rx-sidebar__link[aria-current="page"] { background: color-mix(in srgb, var(--rx-accent) 12%, transparent); }
+.rx-sidebar__link > .rx-icon { color: var(--rx-secondary-label); }
+.rx-sidebar__link[aria-current="page"] > .rx-icon { color: var(--rx-accent-text); }
 .rx-sidebar__section { margin: var(--rx-space-4) 10px 4px; font: var(--rx-type-caption); text-transform: uppercase; letter-spacing: var(--rx-caption-tracking); color: var(--rx-secondary-label); }
 @media (max-width: 48rem) {
   /* The bar on top keeps its height; the main column takes the rest. */
@@ -1222,6 +1224,12 @@
 }
 a.rx-stat:hover { background: color-mix(in srgb, var(--rx-surface) 92%, var(--rx-label)); }
 a.rx-stat:focus-visible { outline: 2px solid var(--rx-accent); outline-offset: 2px; }
+/* With an icon: the figures on the left, the icon in a tinted circle in the corner. */
+.rx-stat--icon { grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--rx-space-3); }
+.rx-stat--icon > * { grid-column: 1; }
+.rx-stat--icon > .rx-stat__icon { grid-column: 2; grid-row: 1 / span 2; }
+.rx-stat__icon, .rx-empty__icon { display: grid; place-items: center; border-radius: 50%; background: var(--rx-accent-soft); color: var(--rx-accent-text); }
+.rx-stat__icon { width: 2.5rem; height: 2.5rem; }
 .rx-stat__label { margin: 0; font: var(--rx-type-caption); text-transform: var(--rx-caption-case); letter-spacing: var(--rx-caption-tracking); color: var(--rx-secondary-label); }
 /* The figure that matters: the largest thing on its card, shrinking with the
    card (`cqi`: a share of its width) so it fits on one line; on a card too
@@ -1296,6 +1304,7 @@ a.rx-stat:focus-visible { outline: 2px solid var(--rx-accent); outline-offset: 2
 
 .rx-empty { text-align: center; padding: var(--rx-space-8) var(--rx-space-4); display: grid; gap: var(--rx-space-2); justify-items: center; }
 .rx-empty__title { font: var(--rx-type-heading); margin: 0; }
+.rx-empty__icon { width: 3.5rem; height: 3.5rem; margin-bottom: var(--rx-space-2); }
 .rx-empty__message { color: var(--rx-secondary-label); margin: 0 0 var(--rx-space-2); max-width: 28rem; }
 
 /* ---------- Segmented control (tabs) ---------- */

@@ -456,7 +456,7 @@ The rest of the kit's everyday components:
 | `action_group(label=none, icon=none)`, `wizard_action(…)`, `import_action(…)` | Several actions behind one button, an action with steps, a CSV import. See [Actions](#action-groups). |
 | `tabs(id, items, selected=…, label=…)` + `tab_panel(id, key, selected=…)` | A segmented control: tabs that switch between panels on one page. The arrow keys, Home and End move between tabs. |
 | `table(head, caption=…)` | A table in a card. A heading `["Total", "num"]` lines its column up on the right (for numbers), and `["Slug", "hide-narrow"]` hides the column on phones. |
-| `empty(title, message=…, action_href=…, action_label=…)` | What an empty list says. With `action_href` (and its `action_label`), it adds a link to add the first item. |
+| `empty(title, message=…, action_href=…, action_label=…, icon=…)` | What an empty list says; `icon` draws one of the kit's icons in a tinted circle above it. With `action_href` (and its `action_label`), it adds a link to add the first item. |
 | `notification_bell(count=none, id="rx-notifications")` | The logged-in user's notifications, in the navigation bar: a badge with the unread count, a panel, and new ones arriving live as toasts. Needs `Auth::new().notifications()`; pass `unread_notifications`. See [docs/mail.md](mail.md#the-bell). |
 | `event_stream()` | Opens the same live stream on a page without the bell, so the app's events (`state.broadcast(…)`) arrive as DOM events. Nothing for guests. See [docs/mail.md](mail.md#your-own-live-events). |
 
@@ -482,19 +482,24 @@ in the page, in the text's colour:
   `refresh`, `prev`, `next`, `up`, `down`, `box` and `home`.
 - An unknown name draws nothing.
 
-The set has 91 icons, the ones a shop or a back office needs:
+The set has 111 icons, the ones a shop or a back office needs:
 
-- Navigation and actions: `menu`, `x`, `search`, `plus`, `minus`, `pencil`, `trash-2`, `check`, `chevron-left`, `chevron-right`, `chevron-up`, `chevron-down`, `arrow-left`, `arrow-right`, `external-link`, `download`, `upload`, `refresh-cw`, `settings`, `ellipsis`, `filter`, `sliders-horizontal`, `eye`, `eye-off`, `copy`, `log-in`, `log-out`, `house`, `bell`, `heart`, `star`, `printer`, `list`, `layout-dashboard`.
-- Shop and money: `shopping-cart`, `shopping-bag`, `tag`, `credit-card`, `receipt`, `package`, `boxes`, `truck`, `store`, `banknote`, `percent`, `gift`.
-- Bikes, service and places: `bike`, `wrench`, `hammer`, `gauge`, `droplets`, `ruler`, `key-round`, `lock`, `battery-charging`, `mountain`, `baby`, `hard-hat`, `lightbulb`, `building-2`, `route`, `map`, `map-pin`, `calendar`, `calendar-days`, `clock`, `history`.
-- People: `user`, `users`, `circle-user`, `shield`, `shield-check`.
+- Navigation and actions: `menu`, `x`, `search`, `plus`, `minus`, `pencil`, `trash-2`, `check`, `chevron-left`, `chevron-right`, `chevron-up`, `chevron-down`, `arrow-left`, `arrow-right`, `external-link`, `download`, `upload`, `refresh-cw`, `settings`, `ellipsis`, `filter`, `sliders-horizontal`, `eye`, `eye-off`, `copy`, `log-in`, `log-out`, `house`, `bell`, `heart`, `star`, `printer`, `list`, `layout-dashboard`, `scan-barcode`, `inbox`.
+- Shop and money: `shopping-cart`, `shopping-bag`, `tag`, `credit-card`, `receipt`, `package`, `boxes`, `truck`, `store`, `banknote`, `percent`, `gift`, `shirt`, `backpack`, `award`, `sparkles`.
+- Bikes, service and places: `bike`, `wrench`, `hammer`, `gauge`, `droplets`, `ruler`, `key-round`, `lock`, `battery-charging`, `mountain`, `baby`, `hard-hat`, `lightbulb`, `building-2`, `route`, `map`, `map-pin`, `calendar`, `calendar-days`, `calendar-check`, `clock`, `timer`, `history`, `zap`, `flashlight`, `link`, `cog`, `disc-3`, `circle-dot`, `armchair`, `train-front`.
+- People: `user`, `users`, `circle-user`, `shield`, `shield-check`, `id-card`, `handshake`.
 - Charts: `chart-column`, `chart-line`, `chart-pie`, `trending-up`, `trending-down`.
-- Files and messages: `file`, `file-text`, `folder`, `image`, `paperclip`, `clipboard-list`, `mail`, `phone`.
+- Files and messages: `file`, `file-text`, `folder`, `image`, `paperclip`, `clipboard-list`, `mail`, `phone`, `book-open`, `tablet-smartphone`.
 - Status: `info`, `circle-check`, `circle-alert`, `triangle-alert`, `circle-x`, `circle-help`.
 
 Lucide has no bike types; for categories use the closest: `bike`, `mountain`, `building-2`
-(city), `battery-charging` (e-bikes), `baby` (kids), `hard-hat` (helmets), `lightbulb`
-(lights), `lock` (locks). Another Lucide icon is a line in `crates/renox-core/src/icons.rs`,
+(city), `train-front` (folding), `zap` or `battery-charging` (e-bikes), `baby` (kids),
+`hard-hat` (helmets), `flashlight` (lights), `lock` (locks), `shirt` (clothing), `backpack`
+(bags), `circle-dot` (tyres), `link` (chains), `disc-3` (brakes), `cog` (drivetrain),
+`armchair` (saddles).
+
+`sidebar_link`, `stat` and `empty` take an `icon` too: beside the link's label, and in a
+tinted circle on a stat card's corner or above an empty state's title. Another Lucide icon is a line in `crates/renox-core/src/icons.rs`,
 copied from lucide-static's `icons/<name>.svg`.
 
 ### Navigation and page structure
@@ -604,7 +609,7 @@ top holds the notification bell, and the page's content goes under it.
 | `navbar(brand, href="/", logo=…, mark=…, width="narrow", label=…, skip=true, tabs=[…], tabs_label=…)` | The bar on top: see-through, it stays at the top while you scroll ("sticky"), with a hairline under it. `brand` links to `href` (`none` for no brand). `logo` is an image URL; `mark=true` shows the name's first letter in the accent colour. `width` matches the page: `narrow` (`rx-container`), `wide` (`rx-container--wide`) or `full`. It starts with a "Skip to content" link to `#main`, for keyboard users. `tabs`: a tab bar at the bottom on phones ([above](#tabs-at-the-bottom-on-phones)). |
 | `nav_search(label=…, id=…)` | A search form in the bar; on phones behind a search button that opens it on a row under the bar. |
 | `nav_links()` + `nav_link(href, label, active=…, badge=…)` | The bar's sections. `active` (usually `route_is('….*')`) marks the current one, with `aria-current` for screen readers. `badge` shows a count. On phones the links get a row of their own that scrolls sideways (with `tabs`, the tab bar replaces them). |
-| `sidebar(brand, href="/", logo=…, mark=true, label=…, skip=true)` + `sidebar_link(href, label, active=…, badge=…)`, `sidebar_section(title)` | Sections down the side, for back offices. The page is built like this: `rx-shell` on `<body>`, the sidebar, then `rx-shell__main` holding a full-width `navbar` and `<main class="rx-shell__content">`. On phones the sidebar becomes a bar of links on top. |
+| `sidebar(brand, href="/", logo=…, mark=true, label=…, skip=true)` + `sidebar_link(href, label, active=…, badge=…, icon=…)`, `sidebar_section(title)` | Sections down the side, for back offices. The page is built like this: `rx-shell` on `<body>`, the sidebar, then `rx-shell__main` holding a full-width `navbar` and `<main class="rx-shell__content">`. On phones the sidebar becomes a bar of links on top. |
 | `page_header(title, subtitle=…, back=…, back_label=…, badge=…, badge_kind=…)` | A page's heading: the title (with a badge), a line under it, a link back (`back`), and the call block's buttons at the end of the row (under the title on phones). |
 | `toolbar()` | Filter fields side by side. They wrap onto more lines on narrow screens, and line up with their buttons. There are no "(optional)" marks, since filters are all optional. Put it inside the `<form>`. |
 | `row_actions()` | A table row's buttons, at the end of the row. On phones only the icons show (the labels stay for screen readers). |
@@ -1657,12 +1662,13 @@ The parts, one by one:
   - Every chart also has a "Show the data" table, so no value is only in a colour or a
     tooltip.
 - **`stat(label, value, delta=…, delta_label=…, good="up", trend=…, url=…, hint=…,
-  decimals=1)`** is one figure.
+  decimals=1, icon=…)`** is one figure.
   - `value` is written as it should read: `total | money`.
   - `delta` is its change in percent, with an arrow and its sign. It's green when it goes the
     `good` way: `"up"`, `"down"` or `"none"`. `decimals` is how many decimals the percent
     shows (1 by default).
   - `trend` draws a sparkline (a tiny line chart); `url` makes it a link.
+  - `icon` is one of the kit's icons, in a tinted circle at the card's corner.
   - `stats(columns)` sets stats side by side (two per row on phones).
 - **`dashboard(columns)` + `widget(title, description=…, span=…, url=…, poll=…, id=…)`**:
   cards in a grid (one column on phones; `span=2` or `"full"` for wider cards). `id` names the

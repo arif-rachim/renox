@@ -261,7 +261,11 @@ fn views() -> tempfile::TempDir {
 {% call navbar("Shop", tabs=[{"href": "/", "label": "Home", "icon": "house", "active": true}, {"href": "/orders", "label": "Orders", "icon": "receipt", "badge": 2}, {"open": "more", "label": "More", "icon": "menu"}]) %}
 {% call nav_search(label="Find") %}<form role="search"><input name="q"></form>{% endcall %}
 {% endcall %}
-{{ navbar("Plain") }}"#,
+{{ navbar("Plain") }}
+{% from "renox/ui.html" import sidebar_link, stat, empty %}
+<nav id="side">{{ sidebar_link("/stock", "Stock", icon="boxes") }}{{ sidebar_link("/plain", "Plain") }}</nav>
+<div id="stat">{{ stat("Rentals", 4, icon="bike") }}</div>
+<div id="empty">{{ empty("Nothing here", icon="inbox") }}</div>"#,
     );
     dir
 }
@@ -510,6 +514,12 @@ async fn the_icon_macro_draws_lucide_icons_hidden_unless_labelled() {
         .assert_see(r#"<button class="rx-tabbar__tab" type="button" data-rx-open="more" aria-haspopup="dialog">"#)
         .assert_see(r#"aria-label="Find" aria-controls="rx-nav-search" aria-expanded="false" data-rx-search-toggle>"#)
         .assert_see(r#"<div class="rx-navbar__search" id="rx-nav-search"><form role="search">"#);
+    // A sidebar link, a stat and an empty state take an icon too; without
+    // one they are as before.
+    page.assert_see(r#"<a class="rx-sidebar__link" href="/stock"><svg class="rx-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18""#)
+        .assert_see(r#"<a class="rx-sidebar__link" href="/plain"><span>Plain</span></a>"#)
+        .assert_see(r#"<div class="rx-stat rx-stat--icon"><span class="rx-stat__icon"><svg class="rx-icon""#)
+        .assert_see(r#"<div class="rx-empty"><span class="rx-empty__icon"><svg class="rx-icon""#);
     // Without tabs the navbar is as before.
     assert_eq!(html.matches("rx-tabbar\"").count(), 1, "{html}");
     assert!(html.contains("<header class=\"rx-navbar\">"), "{html}");
