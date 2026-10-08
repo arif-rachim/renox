@@ -2,7 +2,7 @@
 
 **Laravel's productivity, Rust's performance, one binary to deploy.**
 
-[![CI](https://github.com/arif-rachim/renox/actions/workflows/ci.yml/badge.svg)](https://github.com/arif-rachim/renox/actions/workflows/ci.yml) [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license) [![crates.io](https://img.shields.io/crates/v/renox.svg?include_prereleases)](https://crates.io/crates/renox) [![docs.rs](https://docs.rs/renox/badge.svg)](https://docs.rs/renox) ![Rust: 1.94 or later](https://img.shields.io/badge/rust-1.94%2B-dea584.svg)
+[![CI](https://github.com/arif-rachim/renox/actions/workflows/ci.yml/badge.svg)](https://github.com/arif-rachim/renox/actions/workflows/ci.yml) [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license) [![crates.io](https://img.shields.io/crates/v/renox.svg)](https://crates.io/crates/renox) [![docs.rs](https://docs.rs/renox/badge.svg)](https://docs.rs/renox) ![Rust: 1.94 or later](https://img.shields.io/badge/rust-1.94%2B-dea584.svg)
 
 A web framework is a toolbox for building websites and web apps, so you don't start from zero.
 Renox is one for Rust, and it is "batteries included": the pieces most apps need (pages,
@@ -12,7 +12,7 @@ Under the hood, Renox uses well-known parts. Axum is the web server library. HTM
 Alpine.js are two small scripts that make pages update in the browser without a reload.
 SQLite (or PostgreSQL) stores the data. You add one dependency, `renox`, and you get all of it.
 
-**Read the docs at [renox.renoxium.com](https://renox.renoxium.com).** New here? Start with
+**Read the docs at [docs.renox.rs](https://docs.renox.rs)**, or start at [renox.rs](https://renox.rs). New here? Start with
 [the tutorial](docs/tutorial.md): it builds one small app step by step and explains every word.
 Already know Laravel? Read [coming from Laravel](docs/laravel.md); every guide is listed under
 [Documentation](#documentation). API reference: [docs.rs/renox](https://docs.rs/renox).
@@ -45,19 +45,17 @@ SQLite; on Linux `build-essential` or your distribution's equivalent, on macOS
 `xcode-select --install`).
 
 ```bash
-cargo install renox-cli --version 1.0.0-rc.6   # installs `rnx`, Renox's command-line tool
-rnx new blog && cd blog                        # or: --starter, --database postgres, --tailwind
-rnx serve                                      # http://127.0.0.1:3000
+cargo install renox-cli       # installs `rnx`, Renox's command-line tool
+rnx new blog && cd blog       # or: --starter, --database postgres, --tailwind
+rnx serve                     # http://127.0.0.1:3000
 ```
 
 An app's name uses lowercase letters, digits, `-` and `_`, and starts with a letter (`blog`,
 `coffee-shop`). Rust keywords and the names of crates the app uses (`renox`, `serde`, `tokio`,
 `std`, `test`, …) are refused, so `rnx new MyApp` and `rnx new test` fail.
 
-`--version` is needed for now: 1.0 is still a release candidate (a test version before the
-final one), and Cargo only installs one of those when you ask for it by number. For the
-latest `main` instead: `cargo install --locked --git https://github.com/arif-rachim/renox
-renox-cli`.
+For the latest `main` instead of the release: `cargo install --locked --git
+https://github.com/arif-rachim/renox renox-cli`.
 
 Then, in the app:
 
@@ -129,7 +127,7 @@ pages. Run `cargo test` after changes.
    instead of fetching or guessing:
 
    ```bash
-   git clone --depth 1 --branch v1.0.0-rc.6 https://github.com/arif-rachim/renox ~/src/renox
+   git clone --depth 1 --branch v1.0.0 https://github.com/arif-rachim/renox ~/src/renox
    claude --add-dir ~/src/renox     # or, inside a session: /add-dir ~/src/renox
    ```
 
@@ -506,7 +504,7 @@ Sentry or a chat channel. Error pages use the app's layout. While developing,
 | Jobs | Queue in your database (SQLite or PostgreSQL), run inside the same binary | Queue in Redis, PostgreSQL or SQLite, or in-process tasks | Up to you |
 | Auth, mail, uploads, i18n | Built in, with pages and translations | Mailers and storage built in; auth comes with the SaaS starter | Assemble from crates |
 | Deploy | One binary with its assets + `.env`; Dockerfile, systemd, Litestream generated | Binary + config; Dockerfile, nginx or AWS Lambda generated | Up to you |
-| Maturity | 1.0 release candidates on crates.io, one maintainer | Released on crates.io, larger community | Mature, widely used |
+| Maturity | 1.0 on crates.io, one maintainer | Released on crates.io, larger community | Mature, widely used |
 
 Choose **Loco** if you prefer Rails conventions, SeaORM or a JavaScript front end. Choose
 **Axum on its own** if you want to assemble every piece yourself. Choose **Renox** if you want
@@ -514,47 +512,25 @@ Laravel's everything-included workflow and HTML over the wire, deployed as a sin
 
 ## Examples
 
-Every example is built with the UI kit, so they also show what a Renox app looks like
-out of the box.
+Two examples, both on the UI kit:
 
-- [`examples/shop`](examples/shop): a whole online shop: htmx search, a cart, checkout in one
-  transaction that never oversells, queued mail and notifications, an admin for the `admin` role
-  with photo uploads and an audit trail, a typed `shop:make-admin` command that asks for what's
-  missing, English and Spanish texts, and its deploy files (with the systemd socket). Start here.
-- [`examples/htmx-recipes`](examples/htmx-recipes): a modal form, inline edit, infinite scroll,
-  delete in place, tabs and a dropdown, with htmx, Alpine and fragment-returning handlers.
-- [`examples/relations`](examples/relations): a public blog on Tailwind (Markdown posts, `seo()`
-  tags, an RSS feed, a sitemap and search) over belongs-to, has-many and many-to-many (a pivot
-  with its own columns and `sync`), polymorphic likes, loaded without N+1 with counts per post,
-  a category's latest comments through its posts (`has_many_through`), and reports with
-  `group_by` and SQL joins.
-- [`examples/teams`](examples/teams): a multi-tenant SaaS: teams and members, a default scope
-  that keeps each team's projects apart, a super-admin, an encrypted team secret, and a form
-  request (`prepare`, `authorize`, `after`) for adding members.
-- [`examples/grid`](examples/grid): a sales dashboard on one data grid, on a phone and a desktop,
-  and a follow-up page with two grids.
-- [`examples/backoffice`](examples/backoffice): the back office of a small business: invoices
-  issued from a stock ledger and printed, Midtrans/Xendit payment pages and their webhooks, a
-  CSV import, exports made in the background, staff roles, the activity log and settings.
-- [`examples/crud`](examples/crud): one resource end to end on the UI kit, with pagination, live
-  validation, toasts, owner-only edit and delete through a policy (behind a confirmation sheet),
-  soft deletes with a trash, model hooks, an error page in the layout, and tests.
-- [`examples/api`](examples/api): a JSON API for a mobile app, with tokens that carry abilities
-  and expire, Bearer auth, cursor pagination, JSON validation errors, CORS and a named rate
-  limiter (per user, per IP for guests), plus a small browser client that calls it.
-- [`examples/jobs`](examples/jobs): an event, a queued receipt mail (with reply-to), admin
-  notifications, a statement mailed with a CSV attachment and a bcc, daily and weekly reports
-  scheduled in a time zone, and the queue's chains, batches with a progress bar, unique and
-  encrypted jobs.
-- [`examples/uploads`](examples/uploads): public photos checked by content, and private invoices
-  behind expiring links, on the local disk or S3 (tested against a real S3 server in CI).
-- [`examples/fields`](examples/fields): every form input type saved and shown back, on SQLite
-  and PostgreSQL ([docs/types.md](docs/types.md)).
-- [`examples/postgres`](examples/postgres): one app, tested on PostgreSQL and SQLite.
-- [`examples/webhooks`](examples/webhooks): Midtrans, Xendit and Stripe webhooks marking orders
-  paid, each tested with good, forged and repeated calls.
-- [`examples/hello`](examples/hello): the guestbook from the GIF, with an HTMX form, a photo upload,
-  an event that queues mail, a scheduled task, English and Spanish texts, login and an account page.
+- [`examples/bikeshop`](examples/bikeshop): **the one complete use case.** A bike shop with
+  three stores that sell, rent and service bikes, on real-sized data. It has:
+  - a storefront with search, a cart and checkout, rentals by the hour, workshop bookings and
+    service plans (renox-billing);
+  - a back office with a till, stock across stores, consignment, roles per store, reports and
+    exports, the admin panel, and a JSON API;
+  - each store's page on its own host;
+  - `/about/fields` (every input type ↔ Rust ↔ SQLite ↔ PostgreSQL) and `/about/htmx`
+    (every htmx recipe, live);
+  - English and Spanish.
+
+  Every page explains itself beside its own code: from 1200 px, "About this page" is docked
+  next to the page with the handler, template and queries behind it, cut from the source at
+  build time. Live at [bikeshop.renox.rs](https://bikeshop.renox.rs). Start here.
+- [`examples/hello`](examples/hello): the smallest app, the guestbook from the GIF. It has an
+  HTMX form, a photo upload, an event that queues mail, a scheduled task, English and Spanish
+  texts, login and an account page.
 
 ## Coming from Laravel
 
@@ -597,15 +573,15 @@ out of the box.
 | Livewire | htmx and Alpine.js, with handlers that return fragments |
 | Filament tables | `renox::grid` with `renox/grid.html` ([docs/grid.md](docs/grid.md)) |
 | Filament forms, infolists, actions, notifications, widgets | the kit's fields, `infolist`, `action_sheet`, `Toast` and `notification_bell`, `stat`/`chart(…)` with `renox::chart` ([docs/ui.md](docs/ui.md)) |
-| Filament's demo app | [`examples/backoffice`](examples/backoffice) |
+| Filament's demo app | [`examples/bikeshop`](examples/bikeshop) (its back office and admin panel) |
 
 Not planned: runtime-reflected Eloquent-style models, Redis, and a REPL.
 
 ## Documentation
 
 The files below are also a documentation site with search, built with Renox itself
-([`site/`](site)): **[renox.renoxium.com](https://renox.renoxium.com)**, rebuilt whenever they
-change on `main`.
+([`site/`](site)): **[docs.renox.rs](https://docs.renox.rs)**, rebuilt whenever they
+change on `main`. The landing page and blog are [renox.rs](https://renox.rs) ([`www/`](www)).
 
 - [The tutorial](docs/tutorial.md): build one app from `rnx new` to a server, step by step.
 - [Coming from Laravel](docs/laravel.md): each Laravel concept and its Renox counterpart.
@@ -618,16 +594,17 @@ change on `main`.
   [the queue](docs/queue.md), [field types](docs/types.md),
   [PostgreSQL](docs/postgresql.md), [production](docs/operations.md),
   [faster builds](docs/development.md), [stability and versions](docs/stability.md).
+- Plugins: [the admin panel](docs/admin.md), [billing](docs/billing.md),
+  [social login](docs/oauth.md), [editors](docs/editors.md), [UI blocks](docs/blocks.md).
 - [llms.txt](llms.txt): a map of the docs and examples for coding agents.
 - The API reference: [docs.rs/renox](https://docs.rs/renox).
 - [ROADMAP.md](ROADMAP.md) and [CHANGELOG.md](CHANGELOG.md).
 
 ## Status
 
-Renox **1.0.0-rc.6**, the release candidate for 1.0, is on crates.io (`renox`,
-`renox-core`, `renox-macros`, `renox-cli`, and the plugins `renox-2fa`, `renox-editors`,
-`renox-oauth`, `renox-admin` and `renox-billing`). If nothing turns up, the same code becomes 1.0.0,
-and from there Renox follows semver ([docs/stability.md](docs/stability.md)). The [Laravel parity review](docs/audit/2026-10-laravel-parity.md)
+Renox **1.0.0** is on crates.io: `renox`, `renox-core`, `renox-macros`, `renox-cli`, and the
+plugins `renox-2fa`, `renox-editors`, `renox-blocks`, `renox-oauth`, `renox-admin` and
+`renox-billing`. From here Renox follows semver ([docs/stability.md](docs/stability.md)). The [Laravel parity review](docs/audit/2026-10-laravel-parity.md)
 compares it with Laravel and Filament feature by feature, as of October 2026. Since the first
 review (after M17), milestones M18–M32 closed its gaps:
 
@@ -652,9 +629,14 @@ review (after M17), milestones M18–M32 closed its gaps:
 - **M34:** the rest of the review's small additions: `current_password`, the breach check,
   session `keep`/`flash_now`, named error bags, several mailers with failover, `has_many_through`.
 
-Then v1.0: the API audit and its fixes, semver checks in CI, the documentation site with the
-tutorial and the Laravel guide, the starter kit (`rnx new --starter`) and the 1.x promise.
-Breaking changes up to the release candidate are listed in [CHANGELOG.md](CHANGELOG.md).
+Then v1.0. It brought:
+- the API audit and its fixes, and semver checks in CI;
+- the documentation site with the tutorial and the Laravel guide;
+- the starter kit (`rnx new --starter`) and the 1.x promise;
+- the bike shop example and its design system: the editorial default theme, icons, the phone
+  tab bar, renox-blocks, and the starter's page patterns.
+
+Breaking changes up to 1.0 are listed in [CHANGELOG.md](CHANGELOG.md).
 
 An app made by `rnx` from crates.io depends on that release (`renox = { version = "…" }`); to
 upgrade, raise the version and read the changelog. An `rnx` installed from Git pins its apps

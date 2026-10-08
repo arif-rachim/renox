@@ -115,6 +115,9 @@ Set these in `/opt/renox-www/.env`:
 - `APP_URL=https://renox.rs` (canonical links, the sitemap, the feed and the JSON-LD use it);
 - `APP_PORT=3090` (the socket's port);
 - `TRUSTED_PROXIES=127.0.0.1` and `TRUSTED_HOSTS=renox.rs,www.renox.rs`.
+- `GA4_MEASUREMENT_ID` only to use another Google Analytics property: renox.rs's own
+  (`G-48GJK3ZM4J`, `landing::GA4`) is the default. The tag is sent in production only, with the
+  request's CSP nonce, and the CSP allows Google's script and collection hosts.
 
 Then the proxy, for example Caddy. `www` redirects to the bare domain, so search engines see one
 address:

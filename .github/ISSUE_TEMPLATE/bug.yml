@@ -27,7 +27,7 @@ body:
     attributes:
       label: Version
       description: "`renox` in your Cargo.toml (a version or a git rev), and `rnx --version`."
-      placeholder: renox 1.0.0-rc.6, rnx 1.0.0-rc.6
+      placeholder: renox 1.0.0, rnx 1.0.0
     validations:
       required: true
   - type: dropdown

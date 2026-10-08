@@ -29,6 +29,26 @@ pub fn app() -> App {
         .share("links", |_ctx: renox::view::ViewContext| async move {
             Ok(json!({ "docs": landing::DOCS, "github": landing::REPOSITORY, "demo": landing::DEMO }))
         })
+        // Google Analytics 4, in production only: the measurement id the
+        // layout's gtag snippet uses (with the request's CSP nonce).
+        .share("ga4", |ctx: renox::view::ViewContext| async move {
+            let config = &ctx.state.config;
+            let id = (config.env == renox::Environment::Production).then(|| {
+                config
+                    .analytics
+                    .ga4_measurement_id
+                    .clone()
+                    .unwrap_or_else(|| landing::GA4.to_owned())
+            });
+            Ok(json!(id))
+        })
+        // What gtag.js loads and talks to.
+        .csp(|csp| {
+            csp.allow("script-src", "https://www.googletagmanager.com")
+                .allow("connect-src", "https://*.google-analytics.com")
+                .allow("connect-src", "https://*.analytics.google.com")
+                .allow("connect-src", "https://*.googletagmanager.com");
+        })
         .module(Www)
 }
 
