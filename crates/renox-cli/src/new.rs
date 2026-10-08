@@ -723,7 +723,9 @@ mod tests {
         assert!(tests.contains("use desk::roles"), "{tests}");
         // AGENTS.md says where the page patterns live, once, before the traps.
         let agents = read_lf(root.join("AGENTS.md"));
-        let notes = agents.find("## The starter kit's pages").expect("the starter's notes");
+        let notes = agents
+            .find("## The starter kit's pages")
+            .expect("the starter's notes");
         assert!(notes < agents.find("## Things that trip agents up").unwrap());
         assert_eq!(agents.matches("resources/views/patterns.html").count(), 1);
         // The plain app has none of it.

@@ -37,7 +37,7 @@
   {% call section_head(t('home.steps.title'), "steps-title", accent=t('home.steps.accent'), lead=t('home.steps.lead')) %}
   {{ steps([
     {"title": t('home.steps.edit.title'), "text": t('home.steps.edit.text'), "code": "resources/views/home/index.html"},
-    {"title": t('home.steps.module.title'), "text": t('home.steps.module.text'), "code": "rnx make:module notes --resource"},
+    {"title": t('home.steps.module.title'), "text": t('home.steps.module.text'), "code": "rnx make:module notes"},
     {"title": t('home.steps.ship.title'), "text": t('home.steps.ship.text'), "code": "rnx build"},
   ], label=t('home.steps.title')) }}
     <p class="rx-subtitle">{{ t('home.edit') }}</p>

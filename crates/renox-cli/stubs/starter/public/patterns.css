@@ -129,10 +129,10 @@ a.app-card:hover .app-card__icon { transform: scale(1.06); }
 
 /* ---------- a summary with totals (`summary`) ---------- */
 
-.app-summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--rx-space-3) var(--rx-space-4); margin: 0; font: var(--rx-type-body); }
+.app-summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--rx-space-3) 0; margin: 0; font: var(--rx-type-body); }
 .app-summary dt { display: flex; align-items: center; gap: var(--rx-space-2); min-width: 0; color: var(--rx-secondary-label); }
 .app-summary dt .rx-icon { flex: none; color: var(--rx-tertiary-label); }
-.app-summary dd { margin: 0; text-align: right; color: var(--rx-label); font-variant-numeric: tabular-nums; }
+.app-summary dd { margin: 0; padding-left: var(--rx-space-4); text-align: right; color: var(--rx-label); font-variant-numeric: tabular-nums; }
 .app-summary .app-summary__total { margin-top: var(--rx-space-1); padding-top: var(--rx-space-3); border-top: 1px solid var(--rx-separator); color: var(--rx-label); font: var(--rx-type-heading); }
 
 /* ---------- a steps list (`steps`) ---------- */
@@ -170,9 +170,11 @@ a.app-card:hover .app-card__icon { transform: scale(1.06); }
 .app-nav-link .rx-icon { flex: none; color: var(--rx-secondary-label); }
 .app-nav-link[aria-current="page"] .rx-icon { color: var(--rx-accent-text); }
 /* Phones: the tab bar at the bottom holds the links, so the bar on top keeps
-   only the name. */
+   only the name, with the bell and the account menu on the same row. */
 @media (max-width: 36rem) {
+  .rx-shell:has(.rx-tabbar) { position: relative; }
   .rx-shell:has(.rx-tabbar) .rx-sidebar__links { display: none; }
+  .rx-shell:has(.rx-tabbar) .rx-shell__main > .rx-navbar { position: absolute; top: 0; right: 0; border: 0; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 
 /* ---------- the sign-in pages (renox/auth/layout.html) ---------- */
