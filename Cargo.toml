@@ -22,6 +22,7 @@ renox-macros = { path = "crates/renox-macros", version = "=1.0.0-rc.6" }
 # The plugin crates, released with renox at the same version.
 renox-2fa = { path = "crates/renox-2fa", version = "=1.0.0-rc.6" }
 renox-editors = { path = "crates/renox-editors", version = "=1.0.0-rc.6" }
+renox-blocks = { path = "crates/renox-blocks", version = "=1.0.0-rc.6" }
 renox-admin = { path = "crates/renox-admin", version = "=1.0.0-rc.6" }
 renox-oauth = { path = "crates/renox-oauth", version = "=1.0.0-rc.6" }
 renox-billing = { path = "crates/renox-billing", version = "=1.0.0-rc.6" }

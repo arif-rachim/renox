@@ -315,6 +315,7 @@ dependencies = [
  "renox-2fa",
  "renox-admin",
  "renox-billing",
+ "renox-blocks",
  "renox-editors",
  "renox-oauth",
  "rust_xlsxwriter",
@@ -2470,6 +2471,14 @@ dependencies = [
  "serde",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "renox-blocks"
+version = "1.0.0-rc.6"
+dependencies = [
+ "renox",
+ "serde",
 ]
 
 [[package]]
