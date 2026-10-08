@@ -10,6 +10,7 @@
   {%- if not bikes %}
   <div class="rx-card">{{ empty(t('rentals.walkin.no_bikes'), t('rentals.walkin.no_bikes_text')) }}</div>
   {%- else %}
+  {# [explain:rentals.walkin.template] #}
   <form method="post" action="{{ route('rentals.walkin.store') }}" novalidate>
     {{ csrf_field() }}
     {% call card() %}
@@ -20,6 +21,7 @@
       {{ button(t('rentals.walkin.submit'), icon="check") }}
     {% endcall %}
   </form>
+  {# [/explain:rentals.walkin.template] #}
   {%- endif %}
 </div>
 {% endblock %}

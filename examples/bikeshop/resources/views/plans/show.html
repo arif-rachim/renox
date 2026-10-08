@@ -18,6 +18,7 @@
   {%- if next_plan %}{{ alert(t('plans.show.next_plan', plan=next_plan.name, day=(sub.swap_on | date)), kind="info") }}{% endif %}
   <div class="bs-plan-page">
     <div class="bs-plan-page__main">
+      {# [explain:plans.show.template] #}
       {% call card(title=t('plans.show.upcoming')) %}
         {%- if upcoming %}
         {{ month_calendar(month, events, today=today, label=t('plans.show.upcoming'), heading="h3", id="plan-calendar") }}
@@ -44,6 +45,7 @@
         {{ empty(t('plans.show.no_upcoming'), t('plans.show.no_upcoming_text')) }}
         {%- endif %}
       {% endcall %}
+      {# [/explain:plans.show.template] #}
       {%- if past %}
       {% call card(title=t('plans.show.past')) %}
         <ul class="rx-list bs-visits">

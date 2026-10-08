@@ -1,6 +1,6 @@
 //! "About this page" entries for the rentals area's pages (see `crate::explain`).
 
-use crate::explain::{Audience, Explanation, Feature, Flow, NotAPage};
+use crate::explain::{Audience, Code, Explanation, Feature, Flow, NotAPage};
 
 const MOD: &str = "examples/bikeshop/src/app/rentals/mod.rs";
 const MODEL: &str = "examples/bikeshop/src/app/rentals/model.rs";
@@ -121,7 +121,20 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Template: the filters, a GET form htmx re-sends as they change",
+                    region: "rentals.create.filters",
+                },
+                Code {
+                    title: "Form: `Validate::after` checks the period and the bike",
+                    region: "rentals.create.form",
+                },
+                Code {
+                    title: "Transaction: the second check, under `begin_immediate` and `lock_for_update`",
+                    region: "rentals.create.book",
+                },
+            ],
         },
         Explanation {
             route: "rentals.show",
@@ -203,7 +216,20 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Handler: only the customer's own reservation, else a 404",
+                    region: "rentals.show.handler",
+                },
+                Code {
+                    title: "Template: pay the deposit, or cancel with the kit's `confirm`",
+                    region: "rentals.show.actions",
+                },
+                Code {
+                    title: "Payment: the deposit goes to the gateway through `payments::start`",
+                    region: "rentals.show.pay",
+                },
+            ],
         },
         Explanation {
             route: "rentals.mine",
@@ -252,7 +278,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/rentals/mine.html",
                 TESTS,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Handler: current and past rentals from one `RentalRow::load`",
+                    region: "rentals.mine.handler",
+                },
+                Code {
+                    title: "Query: a page of rentals with their relations in five queries",
+                    region: "rentals.rows",
+                },
+                Code {
+                    title: "Template: the kit's `list` with a shared `rental_item` macro",
+                    region: "rentals.mine.template",
+                },
+            ],
         },
         Explanation {
             route: "rentals.identity",
@@ -316,7 +355,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/rentals/identity.html",
                 TESTS,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Form: `prepare` tidies the number, `image()` sniffs the photo",
+                    region: "rentals.identity.form",
+                },
+                Code {
+                    title: "Handler: the photo to private storage, the number `Encrypted`",
+                    region: "rentals.identity.store",
+                },
+                Code {
+                    title: "Template: a multipart form with the kit's `file` field",
+                    region: "rentals.identity.template",
+                },
+            ],
         },
         Explanation {
             route: "rentals.identities",
@@ -385,7 +437,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/rentals/identities.html",
                 TESTS,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Handler: `access::visible` keeps it to the stores one checks for",
+                    region: "rentals.identities.handler",
+                },
+                Code {
+                    title: "Photo: a signed link that works for five minutes",
+                    region: "rentals.identities.photo",
+                },
+                Code {
+                    title: "Template: approve in a form, refuse with a note in an `action_sheet`",
+                    region: "rentals.identities.template",
+                },
+            ],
         },
         Explanation {
             route: "rentals.counter",
@@ -444,7 +509,16 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Handler: the active store's day in one query, rows in one load",
+                    region: "rentals.counter.handler",
+                },
+                Code {
+                    title: "Template: three columns of the kit's `list`",
+                    region: "rentals.counter.template",
+                },
+            ],
         },
         Explanation {
             route: "rentals.walkin",
@@ -497,7 +571,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/blocks/datetime_range.html",
                 TESTS,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Template: a searchable `select` that asks the server for options",
+                    region: "rentals.walkin.template",
+                },
+                Code {
+                    title: "Options: `OptionQuery` answers searches and lookups",
+                    region: "rentals.walkin.options",
+                },
+                Code {
+                    title: "Form: `after` checks the customer, the period and the bike",
+                    region: "rentals.walkin.form",
+                },
+            ],
         },
         Explanation {
             route: "rentals.desk",
@@ -591,7 +678,20 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Handler: what this person may do here, store by store",
+                    region: "rentals.desk.handler",
+                },
+                Code {
+                    title: "Pick-up: verified customers only, then one transaction",
+                    region: "rentals.desk.handover",
+                },
+                Code {
+                    title: "Return: one transaction, then `FleetRepairNeeded` and `RentalClosed`",
+                    region: "rentals.desk.return",
+                },
+            ],
         },
         Explanation {
             route: "rentals.receipt",
@@ -645,7 +745,16 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Handler: the payments, and the fee the operating store earns",
+                    region: "rentals.receipt.handler",
+                },
+                Code {
+                    title: "Template: how the rental is booked between two stores",
+                    region: "rentals.receipt.template",
+                },
+            ],
         },
         Explanation {
             route: "rentals.fleet",
@@ -724,7 +833,20 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Grid: `renox::grid` with related columns, cards on phones and `poll`",
+                    region: "rentals.fleet.grid",
+                },
+                Code {
+                    title: "Handler: within what the person may see, narrowed by the tab",
+                    region: "rentals.fleet.handler",
+                },
+                Code {
+                    title: "Template: the grid with two cells drawn by the page",
+                    region: "rentals.fleet.template",
+                },
+            ],
         },
         Explanation {
             route: "rentals.fleet.show",
@@ -777,7 +899,16 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Handler: each action checked in the store it depends on",
+                    region: "rentals.fleet.show.handler",
+                },
+                Code {
+                    title: "Template: the answers as a kit `list` with badges",
+                    region: "rentals.fleet.show.template",
+                },
+            ],
         },
     ]
 }

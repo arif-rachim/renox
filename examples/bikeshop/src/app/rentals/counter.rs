@@ -91,6 +91,7 @@ pub struct CounterQuery {
 /// counter (pick-ups due today, bikes out, overdue ones) and a search by
 /// reservation code or customer. All lists in one `RentalRow::load` (six
 /// queries) whatever their length.
+// [explain:rentals.counter.handler]
 pub async fn index(
     State(state): State<AppState>,
     user: AuthUser,
@@ -120,6 +121,7 @@ pub async fn index(
         .limit(200)
         .get(db)
         .await?;
+    // [/explain:rentals.counter.handler]
     let q = query.q.trim().to_owned();
     let mut found_ids: Vec<i64> = Vec::new();
     if !q.is_empty() {
@@ -150,7 +152,9 @@ pub async fn index(
             }
         }
     }
+    // [explain:rentals.counter.handler]
     let rows = RentalRow::load(db, rentals).await?;
+    // [/explain:rentals.counter.handler]
     let mut pickups = Vec::new();
     let mut out = Vec::new();
     let mut overdue = Vec::new();
@@ -207,6 +211,7 @@ fn held(rental: &Rental) -> i64 {
 /// `GET /staff/rentals/{rental}` (`rentals.desk`): one rental at the
 /// counter: the customer (verified or not, the ID masked), the bike, the
 /// period, and the pick-up or the return form, whichever applies here.
+// [explain:rentals.desk.handler]
 pub async fn desk(
     State(state): State<AppState>,
     user: AuthUser,
@@ -228,6 +233,7 @@ pub async fn desk(
             &rental,
         );
     let can_return = rental.is_out() && access::can_in(&user, catalogue::RENTALS_RETURN, store);
+    // [/explain:rentals.desk.handler]
     let now = renox::db::now();
     let late = late_fee(
         RentalBike::find(db, rental.rental_bike_id)
@@ -346,6 +352,7 @@ pub async fn pickup(
 /// price, the deposit when it wasn't paid online) is recorded as counter
 /// payments after the rental is saved. `staff`: who handed it over (`None`
 /// for a kiosk).
+// [explain:rentals.desk.handover]
 pub async fn hand_over(
     state: &AppState,
     rental: &mut Rental,
@@ -375,6 +382,7 @@ pub async fn hand_over(
         .update(&mut tx, &[("status", &BikeStatus::Rented)])
         .await?;
     tx.commit().await?;
+    // [/explain:rentals.desk.handover]
     let charge = |amount: i64| Charge {
         payable: Payable::Rental(rental.id),
         customer_id: Some(customer.id),
@@ -512,6 +520,7 @@ pub async fn take_back(
     let settlement = settle(held(rental), rental.fees());
     let minutes = pricing::ridden_minutes(rental.picked_up_at.unwrap_or(rental.starts_at), now);
 
+    // [explain:rentals.desk.return]
     let mut tx = db.begin().await?;
     rental.status = RentalStatus::Returned;
     rental.returned_at = Some(now);
@@ -525,6 +534,7 @@ pub async fn take_back(
         rental.deposit_refunded = settlement.refund;
     }
     rental.save(&mut tx).await?;
+    // [/explain:rentals.desk.return]
     bike.location_store_id = store;
     bike.ridden_hours += pricing::ridden_hours(minutes);
     if damaged {
@@ -550,7 +560,9 @@ pub async fn take_back(
         )
         .await?;
     }
+    // [explain:rentals.desk.return]
     tx.commit().await?;
+    // [/explain:rentals.desk.return]
 
     if settlement.due > 0 {
         payments::record_counter(
@@ -566,6 +578,7 @@ pub async fn take_back(
         )
         .await?;
     }
+    // [explain:rentals.desk.return]
     if damaged {
         state
             .emit(FleetRepairNeeded {
@@ -583,6 +596,7 @@ pub async fn take_back(
             rental_id: rental.id,
         })
         .await?;
+    // [/explain:rentals.desk.return]
     if let Some(customer) = Customer::find(db, rental.customer_id).await? {
         notify::customer(
             state,
@@ -637,6 +651,7 @@ pub fn percent(bp: i64) -> String {
 /// customer paid and got back, the payments recorded, how it is booked
 /// between the owner and the operating store, and where the bike should go
 /// next.
+// [explain:rentals.receipt.handler]
 pub async fn receipt(
     State(state): State<AppState>,
     user: AuthUser,
@@ -650,6 +665,7 @@ pub async fn receipt(
         .order_by("id")
         .get(db)
         .await?;
+    // [/explain:rentals.receipt.handler]
     let bike = RentalBike::find_or_404(db, rental.rental_bike_id).await?;
     let home = home_store(db, &bike).await?;
     let stores =
@@ -661,6 +677,7 @@ pub async fn receipt(
             .map(|s| s.name.clone())
             .unwrap_or_default()
     };
+    // [explain:rentals.receipt.handler]
     let operating = stores.iter().find(|s| s.id == rental.operating_store_id);
     let fee = if rental.owner_store_id != rental.operating_store_id {
         operating.map(|s| s.fee_on(rental.price)).unwrap_or(0)
@@ -677,6 +694,7 @@ pub async fn receipt(
         fee,
         owner_share: rental.total() - fee,
     };
+    // [/explain:rentals.receipt.handler]
     let send_back = (rental.status == RentalStatus::Returned && bike.location_store_id != home)
         .then(|| name(home));
     let settlement = settle(
@@ -719,6 +737,7 @@ pub async fn photo(
 
 /// `GET /staff/rentals/customers` (`rentals.customers`): verified
 /// customers for the walk-in form's searchable select (`renox::select`).
+// [explain:rentals.walkin.options]
 pub async fn customer_options(
     State(db): State<Db>,
     query: OptionQuery,
@@ -741,6 +760,7 @@ pub async fn customer_options(
             .get(&db)
             .await?
     };
+    // [/explain:rentals.walkin.options]
     Ok(Json(
         customers
             .iter()
@@ -808,6 +828,7 @@ pub struct WalkInForm {
     pub ends_at: NaiveDateTime,
 }
 
+// [explain:rentals.walkin.form]
 impl Validate for WalkInForm {
     fn rules(&self, _v: &mut Validator) {}
 
@@ -840,6 +861,7 @@ impl Validate for WalkInForm {
         Ok(())
     }
 }
+// [/explain:rentals.walkin.form]
 
 /// `POST /staff/rentals/walk-in` (`rentals.walkin.store`): books the bike
 /// in the same transaction as a reservation (served by this person, in the

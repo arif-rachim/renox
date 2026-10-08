@@ -11,6 +11,7 @@
 {{ assets() }}
 <div class="rx-stack" data-bs-reveal>
   {{ page_header(t('plans.index.title'), subtitle=t('plans.billing_page.lead')) }}
+  {# [explain:billing.plans.template] #}
   <div class="rx-card">
     {% call list(label=t('plans.index.title')) %}
       {%- for plan in plans %}{% if plan.key[-7:] != '-xendit' %}
@@ -21,6 +22,7 @@
       {%- endif %}{% endfor %}
     {% endcall %}
   </div>
+  {# [/explain:billing.plans.template] #}
   <p>{{ link_button(route('plans.mine'), t('plans.mine.title'), variant="plain") }}</p>
 </div>
 {% endblock %}

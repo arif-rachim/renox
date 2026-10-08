@@ -1,6 +1,6 @@
 //! "About this page" entries for the plans area's pages (see `crate::explain`).
 
-use crate::explain::{Audience, Explanation, Feature, Flow, NotAPage};
+use crate::explain::{Audience, Code, Explanation, Feature, Flow, NotAPage};
 
 const MODEL: &str = "examples/bikeshop/src/app/plans/model.rs";
 const BILLING: &str = "examples/bikeshop/src/app/plans/billing.rs";
@@ -88,7 +88,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/blocks/compare_plans.html",
                 TESTS,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Query: the plans and their tasks, the pivot read with `fetch_as`",
+                    region: "plans.index.query",
+                },
+                Code {
+                    title: "Handler: one card per plan for the `compare_plans` block",
+                    region: "plans.index.cards",
+                },
+                Code {
+                    title: "Template: the shop's `compare_plans` block, then how it works",
+                    region: "plans.index.template",
+                },
+            ],
         },
         Explanation {
             route: "plans.subscribe",
@@ -190,7 +203,20 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Template: htmx swaps the weekdays and the summary as the form changes",
+                    region: "plans.subscribe.template",
+                },
+                Code {
+                    title: "Form: one plan per bike, a weekday the store opens, a gateway set up",
+                    region: "plans.subscribe.form",
+                },
+                Code {
+                    title: "Checkout: renox-billing's `Billing::of(…).named(…).checkout(…)`",
+                    region: "plans.subscribe.checkout",
+                },
+            ],
         },
         Explanation {
             route: "plans.mine",
@@ -240,7 +266,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/plans/_parts.html",
                 TESTS,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Handler: the customer's bikes and their subscriptions",
+                    region: "plans.mine.handler",
+                },
+                Code {
+                    title: "Query: visits done per plan with `group_by` and `select_as`",
+                    region: "plans.mine.query",
+                },
+                Code {
+                    title: "Template: a CSS grid of cards with the kit's `infolist`",
+                    region: "plans.mine.template",
+                },
+            ],
         },
         Explanation {
             route: "plans.show",
@@ -334,7 +373,20 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Template: the `month_calendar` block, Move in a sheet, Skip with `confirm`",
+                    region: "plans.show.template",
+                },
+                Code {
+                    title: "Billing: the gateway's side, read through renox-billing",
+                    region: "plans.show.billing",
+                },
+                Code {
+                    title: "Swap: renox-billing's `swap`, or the next visit for counter plans",
+                    region: "plans.show.swap",
+                },
+            ],
         },
         Explanation {
             route: "plans.mails",
@@ -388,7 +440,16 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/plans/mails.html",
                 TESTS,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Handler: each mail rendered with `mail_view_in`, as it is sent",
+                    region: "plans.mails.handler",
+                },
+                Code {
+                    title: "Template: every mail in a sandboxed frame",
+                    region: "plans.mails.template",
+                },
+            ],
         },
         Explanation {
             route: "plans.demo",
@@ -446,7 +507,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/plans/demo.html",
                 TESTS,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Gateway: the demo's checkout is a signed link to this page",
+                    region: "plans.demo.checkout",
+                },
+                Code {
+                    title: "Handler: `ValidSignature`, then the webhook queued as a job",
+                    region: "plans.demo.complete",
+                },
+                Code {
+                    title: "Job: the webhook posted, signed, to the app's own endpoint",
+                    region: "plans.demo.job",
+                },
+            ],
         },
         Explanation {
             route: "billing.plans",
@@ -479,7 +553,16 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/billing/section.html",
                 TESTS,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Module: each plan given to renox-billing in USD and in IDR",
+                    region: "billing.plans.module",
+                },
+                Code {
+                    title: "Template: the plugin's page replaced by a file of the same name",
+                    region: "billing.plans.template",
+                },
+            ],
         },
     ]
 }

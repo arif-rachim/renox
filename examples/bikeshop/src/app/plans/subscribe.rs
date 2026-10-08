@@ -44,6 +44,7 @@ pub struct Row {
 
 /// The sold plans and each one's tasks (the `plan_tasks` pivot,
 /// `PLAN_TASKS`), in three queries.
+// [explain:plans.index.query]
 pub async fn plans_with_tasks(db: &Db) -> Result<Vec<(ServicePlan, Vec<ServiceTask>)>> {
     let plans = ServicePlan::where_eq("active", true)
         .order_by("price")
@@ -68,10 +69,12 @@ pub async fn plans_with_tasks(db: &Db) -> Result<Vec<(ServicePlan, Vec<ServiceTa
     out.sort_by_key(|(p, _)| p.monthly_price());
     Ok(out)
 }
+// [/explain:plans.index.query]
 
 /// `GET /plans` (`plans.index`): the plans side by side (the
 /// `compare_plans` block), each a month's price with what it includes, and
 /// a table comparing them task by task.
+// [explain:plans.index.cards]
 pub async fn index(State(state): State<AppState>, lang: Lang) -> Result<View> {
     let plans = plans_with_tasks(&state.db).await?;
     let mut cards = Vec::new();
@@ -95,6 +98,7 @@ pub async fn index(State(state): State<AppState>, lang: Lang) -> Result<View> {
             cta: lang.t("plans.index.choose", &[]),
         });
     }
+    // [/explain:plans.index.cards]
     let mut rows = vec![
         Row {
             label: lang.t("plans.compare.how_often", &[]),
@@ -334,6 +338,7 @@ impl Validate for SubscribeForm {
     /// The bike is the customer's and has no plan yet ("a bike can have one
     /// active plan"), the plan is sold, the store opens that weekday, and
     /// that way of paying is set up.
+    // [explain:plans.subscribe.form]
     async fn after(&self, form: &FormContext<'_>, errors: &mut Errors) -> Result {
         let db = &form.state.db;
         let lang = form.state.current_lang();
@@ -351,6 +356,7 @@ impl Validate for SubscribeForm {
         } else if !bikes_on_a_plan(db, vec![bike]).await?.is_empty() {
             errors.add("bike", lang.t("plans.errors.one_plan", &[]));
         }
+        // [/explain:plans.subscribe.form]
         if let Some(slug) = &self.plan
             && !ServicePlan::where_eq("slug", slug.as_str())
                 .where_eq("active", true)
@@ -366,11 +372,13 @@ impl Validate for SubscribeForm {
         {
             errors.add("weekday", lang.t("plans.errors.closed", &[]));
         }
+        // [explain:plans.subscribe.form]
         let with = self.pay_with.as_deref().and_then(PayWith::from_key);
         if with.is_some_and(|w| !ways_to_pay(&form.state.config).iter().any(|(x, _)| *x == w)) {
             errors.add("pay_with", lang.t("plans.errors.pay_with", &[]));
         }
         Ok(())
+        // [/explain:plans.subscribe.form]
     }
 }
 
@@ -378,12 +386,14 @@ impl Validate for SubscribeForm {
 /// then renox-billing's checkout for the bike's subscription
 /// (`Billing::of(&state, &user).named("bike-…").checkout(…)`): the
 /// customer goes to the gateway's page; the webhook starts the plan.
+// [explain:plans.subscribe.checkout]
 pub async fn store(
     State(state): State<AppState>,
     user: AuthUser,
     htmx: Htmx,
     Valid(form): Valid<SubscribeForm>,
 ) -> Result<Response> {
+    // [/explain:plans.subscribe.checkout]
     let db = &state.db;
     let bike = form.bike.unwrap_or_default();
     let slug = form.plan.clone().unwrap_or_default();
@@ -398,6 +408,7 @@ pub async fn store(
         .unwrap_or(PayWith::Card);
     let weekday = form.weekday.unwrap_or(1);
     let today = visits::today(&state.config);
+    // [explain:plans.subscribe.checkout]
     // An abandoned checkout of this bike is reused, not left behind.
     let pending = PlanSubscription::where_eq("customer_bike_id", bike)
         .where_eq("status", SubscriptionStatus::Pending)
@@ -425,6 +436,7 @@ pub async fn store(
         } else {
             Redirect::to(&url).into_response()
         }),
+        // [/explain:plans.subscribe.checkout]
         Err(Error::BadRequest(message)) => {
             let mut errors = Errors::new();
             errors.add("plan", message);

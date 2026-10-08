@@ -70,9 +70,11 @@ pub async fn index(State(state): State<AppState>, lang: Lang) -> Result<View> {
         ("day", &"2026-10-14"),
         ("number", &1042),
     ];
+    // [explain:plans.mails.handler]
     let mut previews = Vec::new();
     for (key, event, title, body) in MAILS {
         let subject = lang.t(title, &params);
+        // [/explain:plans.mails.handler]
         let rows = vec![
             Row {
                 label: lang.t("plans.fields.amount", &[]),
@@ -83,6 +85,7 @@ pub async fn index(State(state): State<AppState>, lang: Lang) -> Result<View> {
                 value: "2026-10-14".into(),
             },
         ];
+        // [explain:plans.mails.handler]
         let mail = state.mail_view_in(
             &lang.locale,
             "customer@example.com",
@@ -104,4 +107,5 @@ pub async fn index(State(state): State<AppState>, lang: Lang) -> Result<View> {
         });
     }
     Ok(view("plans/mails.html", context! { previews }))
+    // [/explain:plans.mails.handler]
 }

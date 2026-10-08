@@ -22,6 +22,7 @@
       {% endcall %}
       <p>{{ link_button(route('workshop.book', bike=bike.id), t('workshop.book.title'), variant="primary") }}</p>
     {% endcall %}
+    {# [explain:workshop.bikes.show.template] #}
     {% call card(title=t('workshop.bikes.open')) %}
       {%- if open %}
       {% call list(id="open-orders", label=t('workshop.bikes.open')) %}
@@ -34,5 +35,6 @@
     {%- if events %}{{ history(events, label=t('workshop.bikes.history'), date_format="%d %b %Y") }}
     {%- else %}{{ empty(t('workshop.bikes.never')) }}{% endif %}
   {% endcall %}
+    {# [/explain:workshop.bikes.show.template] #}
 </div>
 {% endblock %}

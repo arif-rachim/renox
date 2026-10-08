@@ -15,6 +15,7 @@
   {%- if not bikes %}
   <div class="rx-card">{{ empty(t('workshop.book.no_bike'), t('workshop.book.no_bike_text'), route('workshop.bikes'), t('workshop.bikes.add')) }}</div>
   {%- else %}
+  {# [explain:workshop.book.template] #}
   <form method="post" action="{{ route('workshop.book.store') }}" id="book-form" novalidate
         hx-get="{{ route('workshop.book') }}" hx-trigger="change" hx-select="#booking-live" hx-target="#booking-live" hx-swap="outerHTML">
     {{ csrf_field() }}
@@ -33,6 +34,7 @@
         {% call card(title=t('workshop.book.when')) %}
           {{ date_picker_blocked("day", t('workshop.fields.day'), full, closed_weekdays=closed, value=day, min=min_day, max=max_day, required=true, hint=t('workshop.book.day_hint', minutes=capacity or 0)) }}
         {% endcall %}
+  {# [/explain:workshop.book.template] #}
         {% call card(title=t('workshop.book.estimate')) %}
           {%- if chosen %}
           <dl class="bs-lines">

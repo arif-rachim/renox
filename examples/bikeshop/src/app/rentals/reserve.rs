@@ -304,6 +304,7 @@ impl ReserveForm {
     }
 }
 
+// [explain:rentals.create.form]
 impl Validate for ReserveForm {
     fn rules(&self, v: &mut Validator) {
         v.field("store", &self.store).exists("stores", "id");
@@ -336,6 +337,7 @@ impl Validate for ReserveForm {
         Ok(())
     }
 }
+// [/explain:rentals.create.form]
 
 /// `POST /rent` (`rentals.reserve`): books the bike (the transaction
 /// checks the overlap again; the loser of a race gets the "just taken"
@@ -394,6 +396,7 @@ pub async fn own_rental(db: &Db, user: &User, code: &str) -> Result<(Customer, R
 /// `GET /rentals/{code}` (`rentals.show`): the reservation, its code, the
 /// bike, the store, the price and the deposit, with "Pay the deposit"
 /// until it is paid and "Cancel" until an hour before the start.
+// [explain:rentals.show.handler]
 pub async fn show(
     State(state): State<AppState>,
     user: AuthUser,
@@ -420,11 +423,13 @@ pub async fn show(
         },
     ))
 }
+// [/explain:rentals.show.handler]
 
 /// `POST /rentals/{code}/pay` (`rentals.pay`): starts the online deposit
 /// payment (the shared payments contract) and sends the customer to the
 /// gateway's page. Its webhook emits `PaymentSucceeded`, which
 /// [`deposit_paid`] turns into a held deposit.
+// [explain:rentals.show.pay]
 pub async fn pay(
     State(state): State<AppState>,
     user: AuthUser,
@@ -446,6 +451,7 @@ pub async fn pay(
     .await?;
     Ok(Redirect::to(&checkout.redirect_url))
 }
+// [/explain:rentals.show.pay]
 
 /// `POST /rentals/{code}/cancel` (`rentals.cancel`): until an hour before
 /// the start; a paid deposit is given back whole.
@@ -511,6 +517,7 @@ pub async fn cancel_rental(
 /// `GET /rentals` (`rentals.mine`): the customer's rentals, current first,
 /// then past ones with their fees. Six queries whatever the number of
 /// rentals (`RentalRow::load`).
+// [explain:rentals.mine.handler]
 pub async fn mine(State(state): State<AppState>, user: AuthUser) -> Result<View> {
     let customer = customer_of(&state.db, &user).await?;
     let rentals = Rental::where_eq("customer_id", customer.id)
@@ -531,6 +538,7 @@ pub async fn mine(State(state): State<AppState>, user: AuthUser) -> Result<View>
         context! { current, past, verified => customer.id_verified(), identity },
     ))
 }
+// [/explain:rentals.mine.handler]
 
 /// The amount (smallest unit) in the `money` filter's format, for mails
 /// built in Rust.

@@ -18,6 +18,7 @@
       {%- for item in extra.items %}<dt>{{ item.name }}{% if item.kind == "part" %} <small>× {{ item.quantity }}</small>{% endif %}</dt><dd>{{ item.price | money }}</dd>{% endfor %}
       <dt><strong>{{ t('workshop.fields.extra_total') }}</strong></dt><dd><strong>{{ extra.total | money }}</strong></dd>
     </dl>
+    {# [explain:workshop.extra.show.template] #}
     {%- if pending %}
     <p class="rx-hint">{{ t('workshop.approve.until', time=(extra.expires_at | date('%d %b %H:%M'))) }}</p>
     <form method="post" action="{{ action }}" class="bs-board__filters">
@@ -26,6 +27,7 @@
       {{ button(t('workshop.approve.no'), variant="secondary", name="decision", value="refuse") }}
     </form>
     {%- endif %}
+    {# [/explain:workshop.extra.show.template] #}
   {% endcall %}
 </div>
 {% endblock %}

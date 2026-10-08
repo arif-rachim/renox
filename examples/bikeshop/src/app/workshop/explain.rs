@@ -1,6 +1,6 @@
 //! "About this page" entries for the workshop area's pages (see `crate::explain`).
 
-use crate::explain::{Audience, Explanation, Feature, Flow, NotAPage};
+use crate::explain::{Audience, Code, Explanation, Feature, Flow, NotAPage};
 
 const MOD: &str = "examples/bikeshop/src/app/workshop/mod.rs";
 const MODEL: &str = "examples/bikeshop/src/app/workshop/model.rs";
@@ -78,7 +78,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/workshop/bikes.html",
                 TESTS,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Handler: each bike's work orders in one `has_many` query",
+                    region: "workshop.bikes.handler",
+                },
+                Code {
+                    title: "Form: `#[derive(Validate)]` with an optional photo checked by content",
+                    region: "workshop.bikes.form",
+                },
+                Code {
+                    title: "Template: a multipart form on the kit's `form_grid`",
+                    region: "workshop.bikes.template",
+                },
+            ],
         },
         Explanation {
             route: "workshop.bikes.show",
@@ -133,7 +146,16 @@ pub fn entries() -> Vec<Explanation> {
                 HISTORY,
                 TESTS,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Handler: the history in a fixed number of queries, however long",
+                    region: "workshop.bikes.show.handler",
+                },
+                Code {
+                    title: "Template: open orders, then the timeline as the `history` block",
+                    region: "workshop.bikes.show.template",
+                },
+            ],
         },
         Explanation {
             route: "workshop.book",
@@ -210,7 +232,20 @@ pub fn entries() -> Vec<Explanation> {
                 BLOCKED,
                 TESTS,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Template: htmx asks the page again and swaps only the day and estimate",
+                    region: "workshop.book.template",
+                },
+                Code {
+                    title: "Handler: the full days for this store and these minutes",
+                    region: "workshop.book.handler",
+                },
+                Code {
+                    title: "Transaction: the day checked again with the store's row locked",
+                    region: "workshop.book.capacity",
+                },
+            ],
         },
         Explanation {
             route: "workshop.service.show",
@@ -277,7 +312,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/workshop/service.html",
                 TESTS,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Policy: only the bike's owner sees its work orders",
+                    region: "workshop.service.show.owner",
+                },
+                Code {
+                    title: "Handler: the progress steps from the order's status",
+                    region: "workshop.service.show.handler",
+                },
+                Code {
+                    title: "Template: pay, move the day in an `action_sheet`, or cancel",
+                    region: "workshop.service.show.template",
+                },
+            ],
         },
         Explanation {
             route: "workshop.extra.show",
@@ -323,7 +371,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/workshop/approve.html",
                 TESTS,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Handler: `ValidSignature` instead of a login",
+                    region: "workshop.extra.show.handler",
+                },
+                Code {
+                    title: "Decision: single use, refused once answered or expired",
+                    region: "workshop.extra.show.decide",
+                },
+                Code {
+                    title: "Template: two buttons posting back to the same signed address",
+                    region: "workshop.extra.show.template",
+                },
+            ],
         },
         Explanation {
             route: "workshop.board",
@@ -382,7 +443,20 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Template: filters, then the `kanban` block that reloads every minute",
+                    region: "workshop.board.template",
+                },
+                Code {
+                    title: "Handler: the active store's open orders, filtered by mechanic and day",
+                    region: "workshop.board.handler",
+                },
+                Code {
+                    title: "Move: each drag is a POST checked against the allowed steps",
+                    region: "workshop.board.move",
+                },
+            ],
         },
         Explanation {
             route: "workshop.walkin",
@@ -431,7 +505,20 @@ pub fn entries() -> Vec<Explanation> {
                 BLOCKED,
                 TESTS,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Template: a known customer from a searchable select, or a new one",
+                    region: "workshop.walkin.template",
+                },
+                Code {
+                    title: "Form: the new name is `required_if` no customer was picked",
+                    region: "workshop.walkin.form",
+                },
+                Code {
+                    title: "Handler: finds the customer or creates one at the counter",
+                    region: "workshop.walkin.store",
+                },
+            ],
         },
         Explanation {
             route: "workshop.order",
@@ -509,7 +596,20 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Policy: visible in the store, and `workorders.update` to work on it",
+                    region: "workshop.order.policy",
+                },
+                Code {
+                    title: "Stock: a part taken in one transaction, or left waiting",
+                    region: "workshop.order.part",
+                },
+                Code {
+                    title: "Template: the parts, with a searchable select fed by the server",
+                    region: "workshop.order.template",
+                },
+            ],
         },
     ]
 }

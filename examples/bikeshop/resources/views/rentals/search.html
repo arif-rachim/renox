@@ -14,6 +14,7 @@
 <div class="bs-rent">
   <div class="bs-rent__header">{{ page_hero(t('rentals.search.title'), lead=t('rentals.search.lead'), eyebrow=t('rentals.search.eyebrow'), photo="/images/site/rent-1.webp", compact=true) }}</div>
 
+  {# [explain:rentals.create.filters] #}
   <form class="rx-card bs-rent__filters" method="get" action="{{ route('rentals.create') }}"
         hx-get="{{ route('rentals.create') }}" hx-trigger="change, submit" hx-target="#rent-results"
         hx-select="#rent-results" hx-swap="outerHTML" hx-push-url="true" aria-label="{{ t('rentals.search.filters') }}">
@@ -28,6 +29,7 @@
     {{ select("size", t('rentals.fields.size'), opts.sizes, selected=size) }}
     {{ button(t('rentals.search.show'), variant="secondary", icon="search") }}
   </form>
+  {# [/explain:rentals.create.filters] #}
 
   <section class="bs-rent__results" id="rent-results" aria-live="polite" aria-label="{{ t('rentals.search.results') }}" data-bs-reveal>
     {%- if problem %}
