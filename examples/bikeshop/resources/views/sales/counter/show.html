@@ -5,8 +5,7 @@
     X starts again. The forms are boosted by htmx (no full reload) and plain
     forms without JavaScript. -#}
 {% from "renox/ui.html" import page_header, card, select, button, link_button, toggle_buttons, input, empty, alert, badge, thumbnail %}
-{% from "blocks/quantity.html" import quantity %}
-{% from "blocks/keypad.html" import keypad %}
+{% from "renox-blocks/blocks.html" import quantity, keypad %}
 {% block seo %}{{ seo(title=t('sales.counter.title')) }}{% endblock %}
 
 {% block content %}

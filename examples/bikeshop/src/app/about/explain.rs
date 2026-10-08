@@ -93,7 +93,7 @@ pub fn entries() -> Vec<Explanation> {
             route: "about.blocks",
             path: "/about/blocks",
             title: "Bike shop blocks",
-            purpose: "Every UI block the bike shop adds to Renox's kit, working, with its \
+            purpose: "Every UI block the bike shop uses beyond Renox's kit, working, with its \
                   macro's signature: a photo gallery, a two-handle range, a quantity \
                   stepper, a counter keypad, a kanban board, a month calendar, an \
                   availability timeline, a date and time range, a date picker with closed \
@@ -105,15 +105,16 @@ pub fn entries() -> Vec<Explanation> {
             flow: Flow::Learn,
             features: &[
                 Feature {
-                    api: "Bike shop blocks",
-                    why: "The kit has no gallery, kanban or calendar, and the owner chose to \
-                      build them in the example rather than in Renox: macros in \
-                      `resources/views/blocks/`, written like the kit's (keyword \
-                      arguments, `bs-` classes on the kit's `--rx-*` tokens), with one \
-                      stylesheet and one script in `public/blocks/`, so they can move to \
-                      a crate later. A page imports one like a kit component \
-                      (`{% from \"blocks/gallery.html\" import gallery %}`); inside, the \
-                      blocks call the kit's own macros (`sheet`, `date_picker`).",
+                    api: "renox-blocks",
+                    why: "The kit has no gallery, kanban or calendar. They were built in \
+                      this example first, then moved to the `renox-blocks` crate, a \
+                      plugin like renox-editors: the app adds `Blocks::new()` and a page \
+                      imports a block like a kit component \
+                      (`{% from \"renox-blocks/blocks.html\" import gallery %}`). The \
+                      macros use `rx-` classes on the kit's `--rx-*` tokens and call the \
+                      kit's own macros (`sheet`, `date_picker`); a page loads a block's \
+                      script only when it has that block. The date picker with closed \
+                      days is still the shop's own, in `resources/views/blocks/`.",
                 },
                 Feature {
                     api: "UI kit: sheet",
@@ -148,17 +149,19 @@ pub fn entries() -> Vec<Explanation> {
                       gets Renox's CSRF header like any htmx request.",
                 },
                 Feature {
-                    api: "motion.dev (vendored)",
-                    why: "The gallery's slides and the kanban's cards glide with Motion on \
-                      `transform`; under `prefers-reduced-motion` they jump instead.",
+                    api: "Web Animations",
+                    why: "The gallery's slides and the kanban's cards glide with the \
+                      browser's own Web Animations on `transform` (no library); under \
+                      `prefers-reduced-motion` they jump instead.",
                 },
             ],
             under_hood: "No database. `src/app/about/blocks.rs` builds the demo data (a \
                      month of visits on fixed days of whichever month is shown, today's \
                      bookings, a workshop board) and renders `about/blocks.html`. \
-                     `public/blocks/blocks.js` sets every block up from its `data-bs-*` \
-                     attributes, on the page and in whatever htmx swaps in \
-                     (`htmx:load`), with no inline handlers, so it runs under `CSP=strict`. \
+                     The crate's `blocks.js` module finds the blocks on the page and in \
+                     whatever htmx swaps in (`htmx:load`) and imports each one's code \
+                     (`gallery.js`, `kanban.js`…) from their `data-rx-*` attributes, with \
+                     no inline handlers, so it runs under `CSP=strict`. \
                      Sending the form posts to `POST /about/blocks/form`: `Valid<T>` \
                      checks it, and a success redirects back to the form with a flash \
                      message (nothing is saved); a kanban move posts the card, the \
@@ -176,12 +179,15 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/about/blocks.rs",
                 "examples/bikeshop/resources/views/about/blocks.html",
                 "examples/bikeshop/resources/views/about/_variant.html",
-                "examples/bikeshop/resources/views/blocks/gallery.html",
-                "examples/bikeshop/resources/views/blocks/kanban.html",
-                "examples/bikeshop/public/blocks/blocks.js",
-                "examples/bikeshop/public/blocks/blocks.css",
+                "crates/renox-blocks/views/blocks.html",
+                "crates/renox-blocks/assets/blocks.js",
+                "crates/renox-blocks/assets/parts/gallery.js",
+                "crates/renox-blocks/assets/parts/kanban.js",
+                "crates/renox-blocks/assets/blocks.css",
+                "examples/bikeshop/resources/views/blocks/date_picker_blocked.html",
                 "examples/bikeshop/tests/blocks.rs",
                 "tests/browser/bikeshop-blocks.test.mjs",
+                "tests/browser/blocks.test.mjs",
             ],
         },
         data_page(),

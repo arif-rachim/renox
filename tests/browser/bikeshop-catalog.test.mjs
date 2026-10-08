@@ -62,7 +62,7 @@ describe('bikeshop catalogue', () => {
 
           const href = await page.eval(() => document.querySelector('#results .rx-media-card__link').getAttribute('href'));
           await page.goto(`${app.url}${href}`);
-          await page.waitFor(() => !!document.querySelector('[data-bs-gallery][data-bs-ready]'));
+          await page.waitFor(() => !!document.querySelector('[data-rx-gallery][data-rx-blocks-ready]'));
           assert.ok(await page.eval(() => !!document.querySelector('#buybox .bs-buybox__price')));
           assert.ok(await fitsWidth(page), 'no sideways scrolling on a product');
           await shot(page, `catalog-product-${size}-${colours}`);
@@ -105,7 +105,7 @@ describe('bikeshop catalogue', () => {
   test('the price range slider narrows the results', () =>
     browser.with(async (page) => {
       await page.goto(`${app.url}/shop/bikes`);
-      await page.waitFor(() => !!document.querySelector('[data-bs-range][data-bs-ready]'));
+      await page.waitFor(() => !!document.querySelector('[data-rx-range][data-rx-blocks-ready]'));
       await page.focus('#filter-price-max');
       for (let i = 0; i < 20; i++) await page.press('PageDown');
       await page.waitFor(() => location.search.includes('price_max='));
@@ -158,7 +158,7 @@ describe('bikeshop catalogue', () => {
       const sizes = await page.eval(() => [...document.querySelectorAll('input[name=size]')].map((i) => i.value));
       assert.ok(sizes.length > 1, 'sizes to pick from');
       const sku = await page.text('#buybox .rx-subtitle');
-      await page.click(`input[name=size][value="${sizes[sizes.length - 1]}"] + .bs-swatch__chip`);
+      await page.click(`input[name=size][value="${sizes[sizes.length - 1]}"] + .rx-swatches__chip`);
       await page.waitFor((s) => location.search.includes(`size=${encodeURIComponent(s).replace(/%20/g, '+')}`) || location.search.includes(`size=${encodeURIComponent(s)}`), {}, sizes[sizes.length - 1]);
       await page.settle();
       assert.notEqual(await page.text('#buybox .rx-subtitle'), sku, 'another SKU in the buy box');

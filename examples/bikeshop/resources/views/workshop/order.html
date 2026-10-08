@@ -1,6 +1,6 @@
 {% extends "layouts/staff.html" %}
 {% from "renox/ui.html" import page_header, card, infolist, entry, alert, button, checkbox_list, textarea, select, input, file, toggle_buttons, form_errors, action_sheet, empty, list, form_grid, link_button %}
-{% from "blocks/history.html" import history %}
+{% from "renox-blocks/blocks.html" import history %}
 {% from "workshop/_parts.html" import styles, status as status_badge %}
 {% block seo %}{{ seo(title=t('workshop.order.title', number=order.id)) }}{% endblock %}
 

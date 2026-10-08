@@ -11,6 +11,9 @@ renox-admin.workspace = true
 # Service plans billed as subscriptions (#237): Stripe in USD, and Xendit
 # (which only charges rupiah) at its own IDR price.
 renox-billing.workspace = true
+# The interactive blocks (gallery, swatches, stepper, keypad, kanban, calendars…):
+# macros from renox-blocks/blocks.html, their script loaded only where used (#347).
+renox-blocks.workspace = true
 renox-editors.workspace = true
 renox-oauth.workspace = true
 serde = { version = "1.0.229", features = ["derive"] }

@@ -478,7 +478,7 @@ pub fn entries() -> Vec<Explanation> {
                 },
                 AUDITED,
                 Feature {
-                    api: "Bike shop blocks",
+                    api: "renox-blocks",
                     why: "The changes are the `history` block over the audit log's \
                           `store.fee_rate_changed` rows (old and new rate, who, when): the audit \
                           trail already holds them, so no extra table is kept.",
@@ -499,7 +499,7 @@ pub fn entries() -> Vec<Explanation> {
                 INTERCOMPANY,
                 MOD,
                 "examples/bikeshop/resources/views/multistore/books/fees.html",
-                "examples/bikeshop/resources/views/blocks/history.html",
+                "crates/renox-blocks/views/blocks.html",
                 TESTS,
             ],
         },

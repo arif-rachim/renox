@@ -1,6 +1,6 @@
 {% extends "layouts/app.html" %}
 {% from "renox/ui.html" import page_header, card, infolist, entry, alert, button, confirm, action_sheet, select, empty, table, link_button %}
-{% from "blocks/month_calendar.html" import month_calendar %}
+{% from "renox-blocks/blocks.html" import month_calendar %}
 {% from "blocks/date_picker_blocked.html" import date_picker_blocked %}
 {% from "plans/_parts.html" import assets, status as status_badge, visit_status %}
 {% block seo %}{{ seo(title=t('plans.show.title', bike=bike.name)) }}{% endblock %}

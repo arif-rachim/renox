@@ -4,7 +4,7 @@
     Macros are imported at the top, so the `results` block sees them when
     htmx asks for it alone. -#}
 {% from "renox/ui.html" import page_header, card_grid, media_card, empty, button, link_button, checkbox_list, select, checkbox, input %}
-{% from "blocks/range_slider.html" import range_slider %}
+{% from "renox-blocks/blocks.html" import range_slider %}
 {% block seo %}{{ seo(title=title ~ " · " ~ t('shop.name'), description=description, canonical=reset) }}{% endblock %}
 
 {% block content %}

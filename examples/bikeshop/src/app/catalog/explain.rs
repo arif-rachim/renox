@@ -72,9 +72,9 @@ const SOFT_DELETES: Feature = Feature {
 };
 
 const RANGE_SLIDER: Feature = Feature {
-    api: "Bike shop blocks",
+    api: "renox-blocks",
     why: "The kit has no price range slider, so the `range_slider` block \
-          (`resources/views/blocks/range_slider.html`) sends two plain fields, `price_min` \
+          (the renox-blocks crate) sends two plain fields, `price_min` \
           and `price_max`, that the filters read like any other.",
 };
 
@@ -279,10 +279,11 @@ pub fn entries() -> Vec<Explanation> {
                           the brand's site.",
                 },
                 Feature {
-                    api: "Bike shop blocks",
+                    api: "renox-blocks",
                     why: "The kit has no photo gallery, variant chips or quantity stepper: \
                           the `gallery`, `swatches` and `quantity` blocks fill the gap \
-                          (keyboard-usable, Motion on `transform`, plain fields underneath).",
+                          (keyboard-usable, Web Animations on `transform`, plain fields \
+                          underneath).",
                 },
                 Feature {
                     api: "htmx fragments",
@@ -341,9 +342,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/catalog/product.rs",
                 "examples/bikeshop/src/app/catalog/model.rs",
                 "examples/bikeshop/resources/views/catalog/show.html",
-                "examples/bikeshop/resources/views/blocks/gallery.html",
-                "examples/bikeshop/resources/views/blocks/swatches.html",
-                "examples/bikeshop/resources/views/blocks/quantity.html",
+                "crates/renox-blocks/views/blocks.html",
                 "examples/bikeshop/tests/catalog.rs",
                 "tests/browser/bikeshop-catalog.test.mjs",
             ],

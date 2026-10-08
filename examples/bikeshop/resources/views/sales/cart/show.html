@@ -3,7 +3,7 @@
     block and the navbar's `mini` block (swapped out of band). The macros are
     imported at the top so the blocks see them when rendered alone. -#}
 {% from "renox/ui.html" import page_header, card, button, link_button, select, alert, empty, thumbnail %}
-{% from "blocks/quantity.html" import quantity %}
+{% from "renox-blocks/blocks.html" import quantity %}
 {% block seo %}{{ seo(title=t('sales.cart.title') ~ " · " ~ t('shop.name')) }}{% endblock %}
 
 {% block content %}

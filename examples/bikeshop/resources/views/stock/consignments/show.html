@@ -1,6 +1,6 @@
 {% extends "layouts/staff.html" %}
 {% from "renox/ui.html" import page_header, card, infolist, entry, table, button, input, checkbox, alert, form_errors, confirm %}
-{% from "blocks/history.html" import history %}
+{% from "renox-blocks/blocks.html" import history %}
 {% from "stock/_parts.html" import styles, steps as stepper, shipment_status %}
 {% block seo %}{{ seo(title="CS-" ~ shipment.id) }}{% endblock %}
 

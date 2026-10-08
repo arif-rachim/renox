@@ -63,7 +63,7 @@ async function addHelmet(page) {
  * buy helmets too: in CI the first store once had a single one left.
  */
 async function storeWithTwo(page) {
-  const plus = () => !document.querySelector('.bs-cart__qty [data-bs-step="1"]').disabled;
+  const plus = () => !document.querySelector('.bs-cart__qty [data-rx-quantity-step="1"]').disabled;
   const stores = await page.eval(() =>
     [...document.querySelectorAll('#cart-store option')].map((o) => o.value).filter(Boolean),
   );
@@ -97,7 +97,7 @@ describe('bikeshop sales', () => {
           assert.ok(await fitsWidth(page), 'no sideways scrolling on the cart');
           await storeWithTwo(page);
           await page.eval(() => (window.__same = true));
-          await page.click('.bs-cart__qty [data-bs-step="1"]');
+          await page.click('.bs-cart__qty [data-rx-quantity-step="1"]');
           await page.waitFor(() => document.querySelector('#nav-cart .rx-button__badge')?.textContent.trim() === '2');
           assert.equal(await page.eval(() => window.__same), true, 'the page was not reloaded');
           await shot(page, `sales-cart-${size}-${colours}`);
@@ -139,7 +139,7 @@ describe('bikeshop sales', () => {
           await page.waitFor(() => !!document.querySelector('.bs-pay__icon--paid'), { timeout: 20_000, message: 'the webhook to arrive' });
           await shot(page, `sales-paid-${size}-${colours}`);
           await clickAndLoad(page, '.bs-pay a[href^="/orders/"]');
-          assert.ok(await page.eval(() => !!document.querySelector('.bs-history')));
+          assert.ok(await page.eval(() => !!document.querySelector('.rx-history')));
           assert.ok(await fitsWidth(page), 'no sideways scrolling on the order');
           await shot(page, `sales-order-${size}-${colours}`);
           page.assertClean();
@@ -168,8 +168,8 @@ describe('bikeshop sales', () => {
       await page.waitFor(() => document.querySelectorAll('.bs-cart__line--counter').length === 1);
       await page.settle();
       // The keypad types the amount received; the change is worked out.
-      await page.waitFor(() => !!document.querySelector('[data-bs-keypad][data-bs-ready]'));
-      for (const key of ['9', '9', '9', '9', '9', '9', '9']) await page.click(`[data-bs-key="${key}"]`);
+      await page.waitFor(() => !!document.querySelector('[data-rx-keypad][data-rx-blocks-ready]'));
+      for (const key of ['9', '9', '9', '9', '9', '9', '9']) await page.click(`[data-rx-keypad-key="${key}"]`);
       await page.waitFor(() => /Change/.test(document.querySelector('#rx-tendered-hint')?.textContent || ''));
       await shot(page, 'sales-counter');
       // P takes the payment: the receipt.

@@ -1,20 +1,12 @@
 {% extends "layouts/app.html" %}
-{#- /about/blocks: every bike shop block working, with its macro's signature
-    (src/app/about/blocks.rs builds the demo data). The blocks themselves are
-    in resources/views/blocks/, public/blocks/blocks.css and blocks.js. -#}
+{#- /about/blocks: every block working, with its macro's signature
+    (src/app/about/blocks.rs builds the demo data). The blocks come from the
+    renox-blocks crate (renox-blocks/blocks.html, docs/blocks.md); the date
+    picker with closed days is still the shop's own (resources/views/blocks/,
+    public/blocks/). -#}
 {% from "renox/ui.html" import page_header, card, input, button, link_button, alert, form_errors %}
-{% from "blocks/gallery.html" import gallery %}
-{% from "blocks/range_slider.html" import range_slider %}
-{% from "blocks/quantity.html" import quantity %}
-{% from "blocks/keypad.html" import keypad %}
-{% from "blocks/kanban.html" import kanban %}
-{% from "blocks/month_calendar.html" import month_calendar %}
-{% from "blocks/availability.html" import availability %}
-{% from "blocks/datetime_range.html" import datetime_range %}
+{% from "renox-blocks/blocks.html" import gallery, range_slider, quantity, keypad, kanban, month_calendar, availability, datetime_range, swatches, history, compare_plans %}
 {% from "blocks/date_picker_blocked.html" import date_picker_blocked %}
-{% from "blocks/swatches.html" import swatches %}
-{% from "blocks/history.html" import history %}
-{% from "blocks/compare_plans.html" import compare_plans %}
 {% block seo %}{{ seo(title=t('blocks.page.title'), description=t('blocks.page.lead')) }}{% endblock %}
 
 {%- macro signature(text) -%}
@@ -40,7 +32,7 @@
   {% call card("gallery", subtitle=t('blocks.page.gallery')) %}
     <div class="bs-showcase__demo">
       {{ gallery(photos, id="demo-gallery", label="City 3") }}
-      {{ signature('gallery(photos, id="gallery", label=none, enlarge=true)
+      {{ signature('gallery(photos, id="rx-gallery", label=none, enlarge=true)
   photos: [{src, alt, thumb?, large?, caption?}]') }}
     </div>
   {% endcall %}
@@ -134,7 +126,7 @@ kanban_card(card)') }}
   {% call card("availability", subtitle=t('blocks.page.availability')) %}
     {%- if slot %}{{ alert(t('blocks.page.booked', slot=slot), kind="info") }}{% endif %}
     {{ availability(hours, rows, label="Bikes free today", corner="Bike") }}
-    {{ signature('availability(columns, rows, label=none, corner=none, id="bs-availability")
+    {{ signature('availability(columns, rows, label=none, corner=none, id="rx-availability")
   rows: [{label, note?, slots: [{state, span?, title?, url?, action?, fields?}]}]') }}
   {% endcall %}
   </div>
@@ -151,7 +143,7 @@ kanban_card(card)') }}
   {% call card("compare_plans", subtitle=t('blocks.page.plans')) %}
     {{ compare_plans(plans, features, highlight="rider", label="Service plans") }}
     {{ signature('compare_plans(plans, features=[], highlight=none, highlight_label=none,
-              label=none, table=true, id="bs-plans")
+              label=none, table=true, id="rx-plans")
   plans: [{key, name, price, interval?, description?, perks?, url?, cta?, price_label?}]
   features: [{label, values: {plan key: true | false | text}}]') }}
   {% endcall %}

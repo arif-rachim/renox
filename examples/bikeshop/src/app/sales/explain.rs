@@ -47,7 +47,7 @@ pub fn entries() -> Vec<Explanation> {
                       cart is (`find_many`, `has_many`), instead of a few queries per line.",
                 },
                 Feature {
-                    api: "Bike shop blocks",
+                    api: "renox-blocks",
                     why: "The quantity of each line is the `quantity` block (− / number / +), \
                       big enough to tap on a phone; each step sends `change`, which htmx turns \
                       into a `PATCH` after 300 ms (`hx-trigger=\"change delay:300ms\"`), so \
@@ -79,7 +79,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/sales/cart/show.html",
                 "examples/bikeshop/resources/views/sales/cart/_mini.html",
                 "examples/bikeshop/resources/views/layouts/_nav_cart.html",
-                "examples/bikeshop/resources/views/blocks/quantity.html",
+                "crates/renox-blocks/views/blocks.html",
                 "examples/bikeshop/migrations/20260102000700_create_carts_table.up.sql",
                 "examples/bikeshop/tests/sales.rs",
             ],
@@ -360,7 +360,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/sales/orders.rs",
                 "examples/bikeshop/src/app/sales/notify.rs",
                 "examples/bikeshop/resources/views/sales/orders/show.html",
-                "examples/bikeshop/resources/views/blocks/history.html",
+                "crates/renox-blocks/views/blocks.html",
                 "examples/bikeshop/tests/sales.rs",
             ],
         },
@@ -559,7 +559,7 @@ pub fn entries() -> Vec<Explanation> {
                           with.",
                 },
                 Feature {
-                    api: "Bike shop blocks",
+                    api: "renox-blocks",
                     why: "The `keypad` block types the amount received on a touch screen \
                           (and works from a keyboard too); `quantity` changes a line.",
                 },
@@ -590,7 +590,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/sales/counter.rs",
                 "examples/bikeshop/src/app/sales/payments.rs",
                 "examples/bikeshop/resources/views/sales/counter/show.html",
-                "examples/bikeshop/resources/views/blocks/keypad.html",
+                "crates/renox-blocks/views/blocks.html",
                 "examples/bikeshop/tests/sales.rs",
             ],
         },

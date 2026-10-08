@@ -13,7 +13,7 @@ const ORDER: &str = "examples/bikeshop/src/app/workshop/order.rs";
 const APPROVAL: &str = "examples/bikeshop/src/app/workshop/approval.rs";
 const TASKS: &str = "examples/bikeshop/src/app/workshop/tasks.rs";
 const NOTIFY: &str = "examples/bikeshop/src/app/rentals/notify.rs";
-const HISTORY: &str = "examples/bikeshop/resources/views/blocks/history.html";
+const HISTORY: &str = "crates/renox-blocks/views/blocks.html";
 const BLOCKED: &str = "examples/bikeshop/resources/views/blocks/date_picker_blocked.html";
 const TESTS: &str = "examples/bikeshop/tests/workshop.rs";
 const BROWSER: &str = "tests/browser/bikeshop-workshop.test.mjs";
@@ -373,7 +373,7 @@ pub fn entries() -> Vec<Explanation> {
                 BOARD,
                 STATUS,
                 "examples/bikeshop/resources/views/workshop/board.html",
-                "examples/bikeshop/resources/views/blocks/kanban.html",
+                "crates/renox-blocks/views/blocks.html",
                 TESTS,
                 BROWSER,
             ],

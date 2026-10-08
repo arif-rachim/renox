@@ -91,14 +91,14 @@ describe('the workshop board', () => {
     browser.with(async (page) => {
       await login(page, 'manager.north@bikeshop.test');
       await page.goto(`${app.url}/staff/workshop`);
-      await page.waitFor(() => !!document.querySelector('[data-bs-kanban][data-bs-ready]'), { message: 'the board is ready' });
-      const card = await page.eval(() => document.querySelector('[data-bs-column="booked"] [data-bs-card]')?.dataset.bsCard);
+      await page.waitFor(() => !!document.querySelector('[data-rx-kanban][data-rx-blocks-ready]'), { message: 'the board is ready' });
+      const card = await page.eval(() => document.querySelector('[data-rx-kanban-column="booked"] [data-rx-kanban-card]')?.dataset.rxKanbanCard);
       assert.ok(card, 'a scheduled work order to check in');
       await page.eval(() => {
         window.__moves = [];
-        document.addEventListener('bs:kanban-moved', (e) => window.__moves.push(e.detail));
+        document.addEventListener('rx:kanban-moved', (e) => window.__moves.push(e.detail));
       });
-      await page.focus(`[data-bs-card="${card}"]`);
+      await page.focus(`[data-rx-kanban-card="${card}"]`);
       await page.press(' ');
       await page.press('ArrowRight');
       await page.press(' ');
@@ -122,7 +122,7 @@ describe('the workshop board', () => {
     browser.with(async (page) => {
       await login(page, 'manager.north@bikeshop.test');
       await page.goto(`${app.url}/staff/workshop`);
-      await page.waitFor(() => !!document.querySelector('[data-bs-kanban][data-bs-ready]'), { message: 'the board is ready' });
+      await page.waitFor(() => !!document.querySelector('[data-rx-kanban][data-rx-blocks-ready]'), { message: 'the board is ready' });
       assert.ok(await fitsWidth(page), 'the columns scroll inside the board, not the page');
       await shot(page, 'workshop-board-phone');
       page.assertClean();
