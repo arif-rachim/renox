@@ -123,7 +123,7 @@ cargo test -p shop
 (`acting_as`, `htmx()`, `assert_see`, `assert_view("orders/checkout.html")`,
 `assert_invalid`). Time and side effects are faked, not waited for or undone:
 - `app.travel(2 * DAY)` places a second order two days after the first, and two more days
-  later `app.at_travelled_time(app.kernel().run_scheduled("cancel-unpaid-orders"))` cancels
+  later `app.run_scheduled("cancel-unpaid-orders")` cancels
   only the older one (a day after that, the second goes too).
 - `app.fake_notifications()` records the confirmation and the admins' "new order" without
   mail, jobs or database rows (`assert_notified(&ben, "order-confirmation")`);

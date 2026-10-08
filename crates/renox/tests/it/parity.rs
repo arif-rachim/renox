@@ -101,6 +101,7 @@ impl Module for Pages {
             .redirect("/old-about", "/about")
             .permanent_redirect("/info", "/about")
             .get("/catalogue", || async { "coffee, tea" })
+            .view("/menu", "menu.html")
             .etag()
             .get("/fresh", || async { "no etag here" })
     }
@@ -110,13 +111,19 @@ async fn pages_app() -> (TestApp, tempfile::TempDir) {
     let views = tempfile::tempdir().unwrap();
     std::fs::write(
         views.path().join("about.html"),
-        "<h1>About {{ app.name }}</h1><a href=\"{{ route('about') }}\">here</a>",
+        "<h1>About {{ app.name }}</h1><a href=\"{{ route('about') }}\">here</a><p>Prices in {{ app.currency }}</p>",
+    )
+    .unwrap();
+    std::fs::write(
+        views.path().join("menu.html"),
+        "<h1>Menu</h1><script nonce=\"{{ csp_nonce() }}\">let x = 1;</script>",
     )
     .unwrap();
     let path = views.path().to_path_buf();
     let app = TestApp::with_config(App::new().module(Pages), |c| {
         c.views_path = path;
         c.name = "Roastery".into();
+        c.currency = "EUR".into();
     })
     .await;
     (app, views)
@@ -130,7 +137,9 @@ async fn view_and_redirect_routes_need_no_handler() {
         .assert_ok()
         .assert_view("about.html")
         .assert_see("About Roastery")
-        .assert_see("href=\"/about\"");
+        .assert_see("href=\"/about\"")
+        // Script that formats money reads the currency from the page (#305).
+        .assert_see("Prices in EUR");
     let moved = app.get("/old-about").await;
     moved.assert_status(302).assert_header("location", "/about");
     let gone = app.get("/info").await;
@@ -171,6 +180,30 @@ async fn etag_routes_answer_304_when_the_browser_has_the_page() {
 
     // Only routes added before `.etag()` get one.
     assert_eq!(app.get("/fresh").await.header("etag"), None);
+}
+
+/// #306: a page with the request's CSP nonce in it (every layout with
+/// scripts) gets the same ETag each time, so it can be answered 304; the 304
+/// carries no CSP header, so the browser keeps the one it stored with the
+/// page, whose nonce matches the page's.
+#[renox::test]
+async fn pages_with_a_nonce_still_answer_304() {
+    let (app, _views) = pages_app().await;
+    let first = app.get("/menu").await;
+    first.assert_ok().assert_see("<script nonce=");
+    assert!(first.header("content-security-policy").is_some());
+    let tag = first.header("etag").expect("an ETag").to_owned();
+    let second = app.get("/menu").await;
+    assert_ne!(first.text(), second.text(), "a new nonce each time");
+    assert_eq!(second.header("etag"), Some(tag.as_str()), "the same ETag");
+
+    let cached = app
+        .request()
+        .header("if-none-match", &tag)
+        .get("/menu")
+        .await;
+    cached.assert_status(304);
+    assert_eq!(cached.header("content-security-policy"), None);
 }
 
 struct Api;

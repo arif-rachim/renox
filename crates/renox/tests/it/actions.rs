@@ -63,6 +63,9 @@ const PRODUCTS: &str = r##"{% from "renox/ui.html" import action_sheet, icon_but
 {{ icon_button("refresh", "Reload", disabled=true, badge=2) }}
 {{ button("Save", key="mod+s", icon="check") }}
 {{ button("Publish", disabled_reason="Add a photo first.") }}
+{{ button("Ship", disabled=false, disabled_reason="Pick a carrier first.") }}
+{{ button("Refund", disabled=true, disabled_reason="Paid by card: refund at the bank.") }}
+{{ icon_button("trash", "Remove Coffee", disabled=false, disabled_reason="Sold already.") }}
 {{ button("Archive", disabled=true) }}
 {{ link_button("/orders", "Orders", icon="box", badge=4, new_tab=true) }}
 {{ link_button("/orders", "None waiting", badge=0) }}
@@ -124,6 +127,13 @@ async fn icon_buttons_and_buttons_carry_icons_counts_keys_and_reasons() {
         .assert_see(r#"<span class="rx-button__badge">2</span></button>"#)
         .assert_see(r#"type="submit" data-rx-key="mod+s"><span class="rx-button__icon" aria-hidden="true"><svg"#)
         .assert_see(r#"type="submit" aria-disabled="true" data-rx-tip="Add a photo first."><span class="rx-button__label">Publish</span></button>"#)
+        // #308: `disabled=false` wins over a reason (none shown); `disabled=true`
+        // with one is focusable with its tooltip.
+        .assert_see(r#"type="submit"><span class="rx-button__label">Ship</span></button>"#)
+        .assert_dont_see("Pick a carrier first.")
+        .assert_see(r#"type="submit" aria-disabled="true" data-rx-tip="Paid by card: refund at the bank."><span class="rx-button__label">Refund</span></button>"#)
+        .assert_see(r#"aria-label="Remove Coffee" data-rx-tip="Remove Coffee"><svg"#)
+        .assert_dont_see("Sold already.")
         .assert_see(r#"type="submit" disabled><span class="rx-button__label">Archive</span></button>"#)
         .assert_see(r#"<a class="rx-button rx-button--secondary" href="/orders" target="_blank" rel="noopener"><span class="rx-button__icon" aria-hidden="true"><svg"#)
         .assert_see(r#"<span class="rx-button__label">Orders</span><span class="rx-button__badge">4</span></a>"#)

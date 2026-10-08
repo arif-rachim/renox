@@ -657,15 +657,11 @@ async fn unpaid_orders_expire_after_thirty_minutes_and_release_the_stock() {
 
     // 29 minutes: still held.
     app.travel(Duration::from_secs(29 * 60));
-    app.at_travelled_time(app.kernel().run_scheduled("sales:expire-orders"))
-        .await
-        .unwrap();
+    app.run_scheduled("sales:expire-orders").await.unwrap();
     assert_eq!(last_order(&app).await.status, OrderStatus::Pending);
     // 31 minutes: cancelled, released, the payment failed, the customer told.
     app.travel(Duration::from_secs(2 * 60));
-    app.at_travelled_time(app.kernel().run_scheduled("sales:expire-orders"))
-        .await
-        .unwrap();
+    app.run_scheduled("sales:expire-orders").await.unwrap();
     app.run_jobs().await;
     let order = Order::find(app.db(), order.id).await.unwrap().unwrap();
     assert_eq!(order.status, OrderStatus::Cancelled);

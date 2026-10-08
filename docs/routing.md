@@ -852,6 +852,10 @@ rarely change.
 
 Only these answers get one: `GET`/`HEAD` requests, status 200, and a body of at most 2 MB.
 
+HTML pages work too: the request's CSP nonce (in every layout with scripts) changes on each
+request, so it's left out of the hash, and a 304 carries no `Content-Security-Policy`, so the
+browser keeps the policy it stored with the page, whose nonce matches that page.
+
 ```rust
 use renox::prelude::*;
 # async fn feed() -> &'static str { "" }

@@ -676,6 +676,12 @@ impl App {
         }
         listing.extend(framework_routes(&config));
         listing.sort_by(|a, b| (&a.path, &a.method).cmp(&(&b.path, &b.method)));
+        // The current route's name follows the request's method (#299).
+        for info in &listing {
+            if let Some(name) = &info.name {
+                routes.set_method(name, &info.method);
+            }
+        }
         // `throttle_by("name")` needs `App::rate_limiter("name", …)`.
         for route in &listing {
             for mark in &route.middleware {
@@ -1267,7 +1273,8 @@ impl Kernel {
     }
 
     /// Runs the scheduled task `name` now, with its hooks (what
-    /// `schedule:run` does), e.g. from a test.
+    /// `schedule:run` does). In a test, `TestApp::run_scheduled` does the same
+    /// at the time `TestApp::travel` moved the clock to.
     pub async fn run_scheduled(&self, name: &str) -> Result {
         self.schedule.run_now(self.state.clone(), name).await
     }

@@ -240,7 +240,7 @@ tools let you run the work, or record it and check it.
 | `app.fake_broadcasts()` | Records `state.broadcast` / `broadcast_to` instead of sending them to open pages. Check them with `assert_broadcast("order-updated", \|b\| b.data["id"] == 7)` or `broadcasts()` (each a `SentBroadcast`: `user_id`, `event`, `data`). |
 | `app.sent_mail()`, `app.assert_mail_sent(to, subject)` | The mail sent so far (the test mailer keeps it). |
 | `app.fake_http()` | Answers `state.http` requests with fakes and records them. A request without a fake is an error, so nothing reaches the network. |
-| `app.kernel().run_scheduled("report")` | Runs a scheduled task now. |
+| `app.run_scheduled("report")` | Runs a scheduled task now, at the travelled time. |
 | `app.kernel().call("products:import", ["a.csv"])` | Runs one of the app's own commands. |
 | `renox::prompt::answering(["a.csv", "yes"], app.kernel().call("products:import", [""; 0])).await` | Runs a command that asks questions (`renox::prompt::ask`, `confirm`, …), answering them in order. |
 | `my_app::app().run_args(["migrate:status"]).await` | Runs any command the binary has, built-ins included (`migrate`, `queue:failed`, `down`…), as `my-app migrate:status` would. Give the app a file database: each call boots it anew. |
@@ -258,7 +258,7 @@ clock forward. This is called **travel**.
 - `app.travel(Duration::from_secs(3600))` moves the clock one hour forward for what the
   `TestApp` does next: requests, `run_jobs` and `run_all_jobs`.
 - `app.at_travelled_time(fut)` runs other code at that time, such as a model call, a scheduled
-  task (`app.kernel().run_scheduled(..)`) or a command.
+  task (`app.run_scheduled(..)`) or a command.
 - `app.travel_back()` returns to the present.
 - Travel adds up: two hours, then one more, is three hours ahead.
 
@@ -329,7 +329,8 @@ can copy into an app: Node's own test runner and WebSocket speaking CDP to headl
 (Chrome without a window), with no npm packages.
 
 - `lib/cdp.mjs` starts Chrome with a throwaway profile and gives each test a fresh page:
-  `goto`, real mouse clicks, typing (`Input.insertText`), key presses
+  `goto`, real mouse clicks (on the element once it stands still; a click Chrome didn't
+  deliver is sent again, then through the DOM with a line on stderr), typing (`Input.insertText`), key presses
   (`Input.dispatchKeyEvent`: events made up by a script don't trigger every handler),
   `waitFor` a condition, `settle` until htmx is idle. It collects console errors, uncaught
   exceptions and CSP violations (scripts or styles the page's security policy blocked), and

@@ -538,3 +538,50 @@ async fn a_third_searched_column_ranks_below_the_first_two() {
     search::rebuild::<Recipe>(db).await.unwrap();
     assert_eq!(Recipe::search("knead").count(db).await.unwrap(), 1);
 }
+
+/// #304: codes with hyphens and numbers, typed whole or in part, find the
+/// same rows on SQLite and PostgreSQL (whose parser reads `-1` in
+/// `GIR-JER-0001-1` as a signed number, and `-12.5` as one).
+#[renox::test]
+async fn codes_with_hyphens_are_found_typed_whole_or_in_part() {
+    let app = TestApp::new(App::new().migrations(&[
+        RECIPES,
+        search::migration::<Recipe>("20300101000011_search_recipes"),
+    ]))
+    .await;
+    let db = app.db();
+    for (title, summary) in [
+        ("GIR-JER-0001-1", "Jersey, size one."),
+        ("SKU-12.5", "A bottle of 12.5 cl."),
+        ("Plain", "Nothing to see."),
+    ] {
+        Recipe {
+            title: title.into(),
+            summary: summary.into(),
+            steps: "None.".into(),
+            ..Default::default()
+        }
+        .save(db)
+        .await
+        .unwrap();
+    }
+    let found = |words: &'static str| async move {
+        Recipe::search(words)
+            .get(db)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|r| r.title)
+            .collect::<Vec<_>>()
+    };
+    for (words, title) in [
+        ("GIR-JER-0001-1", "GIR-JER-0001-1"),
+        ("gir-jer-0001", "GIR-JER-0001-1"),
+        ("GIR-JER-00", "GIR-JER-0001-1"),
+        ("SKU-12.5", "SKU-12.5"),
+        ("sku", "SKU-12.5"),
+    ] {
+        assert_eq!(found(words).await, [title], "{words}");
+    }
+    assert!(found("GIR-JER-0002").await.is_empty());
+}

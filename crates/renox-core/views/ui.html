@@ -491,12 +491,16 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 {%- if badge is not none and badge != "" %}<span class="rx-button__badge">{{ badge }}</span>{% endif -%}
 {%- endmacro -%}
 
+{#- `disabled` unset: a reason alone disables the button. `disabled=false`
+    wins (no reason shown), `disabled=true` with a reason keeps it
+    focusable with the reason as its tooltip. -#}
 {%- macro _button_state(key, disabled, disabled_reason) -%}
 {%- if key %} data-rx-key="{{ key }}"{% endif -%}
-{%- if disabled_reason %} aria-disabled="true" data-rx-tip="{{ disabled_reason }}"{% elif disabled %} disabled{% endif -%}
+{%- set off = disabled if disabled is not none else (disabled_reason is not none and disabled_reason != "") -%}
+{%- if off and disabled_reason %} aria-disabled="true" data-rx-tip="{{ disabled_reason }}"{% elif off %} disabled{% endif -%}
 {%- endmacro -%}
 
-{% macro button(label, variant="primary", type="submit", name=none, value=none, size=none, block=false, attrs={}, icon=none, badge=none, key=none, disabled=false, disabled_reason=none) -%}
+{% macro button(label, variant="primary", type="submit", name=none, value=none, size=none, block=false, attrs={}, icon=none, badge=none, key=none, disabled=none, disabled_reason=none) -%}
 <button class="rx-button rx-button--{{ variant }}{% if size %} rx-button--{{ size }}{% endif %}{% if block %} rx-button--block{% endif %}" type="{{ type }}"
   {%- if name %} name="{{ name }}"{% endif %}{% if value is not none %} value="{{ value }}"{% endif %}{{ _button_state(key, disabled, disabled_reason) }}{{ _attrs(attrs) }}>{{ _button_inner(label, icon, badge) }}</button>
 {%- endmacro %}
@@ -507,12 +511,12 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
 
 {#- A button with only an icon: `label` is what screen readers say and its
     tooltip. A link with `href`, else a button (`type`, `attrs` for htmx). -#}
-{% macro icon_button(icon, label, href=none, variant="plain", type="button", size=none, attrs={}, key=none, badge=none, disabled=false, disabled_reason=none, new_tab=false) -%}
+{% macro icon_button(icon, label, href=none, variant="plain", type="button", size=none, attrs={}, key=none, badge=none, disabled=none, disabled_reason=none, new_tab=false) -%}
 {%- set classes = "rx-icon-button rx-icon-button--" ~ variant ~ (" rx-icon-button--" ~ size if size else "") %}
 {%- if href %}
 <a class="{{ classes }}" href="{{ href }}" aria-label="{{ label }}" data-rx-tip="{{ label }}"{% if new_tab %} target="_blank" rel="noopener"{% endif %}{{ _button_state(key, false, none) }}{{ _attrs(attrs) }}>{{ _icon(icon) }}{% if badge is not none and badge != "" %}<span class="rx-button__badge">{{ badge }}</span>{% endif %}</a>
 {%- else %}
-<button class="{{ classes }}" type="{{ type }}" aria-label="{{ label }}"{% if not disabled_reason %} data-rx-tip="{{ label }}"{% endif %}{{ _button_state(key, disabled, disabled_reason) }}{{ _attrs(attrs) }}>{{ _icon(icon) }}{% if badge is not none and badge != "" %}<span class="rx-button__badge">{{ badge }}</span>{% endif %}</button>
+<button class="{{ classes }}" type="{{ type }}" aria-label="{{ label }}"{% if not disabled_reason or disabled == false %} data-rx-tip="{{ label }}"{% endif %}{{ _button_state(key, disabled, disabled_reason) }}{{ _attrs(attrs) }}>{{ _icon(icon) }}{% if badge is not none and badge != "" %}<span class="rx-button__badge">{{ badge }}</span>{% endif %}</button>
 {%- endif %}
 {%- endmacro %}
 

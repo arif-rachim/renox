@@ -816,10 +816,7 @@ async fn the_monthly_task_settles_last_month_on_the_first() {
         .num_days();
     entry(db, w.south.id, w.north.id, 5_000, renox::db::now()).await;
     w.app.travel(DAY * (to_first as u32) + HOUR * 3);
-    w.app
-        .at_travelled_time(w.app.kernel().run_scheduled("books:settle"))
-        .await
-        .unwrap();
+    w.app.run_scheduled("books:settle").await.unwrap();
     let made = Settlement::query().get(db).await.unwrap();
     assert_eq!(made.len(), 1);
     assert_eq!(made[0].period_start, settlements::month_of(today));
