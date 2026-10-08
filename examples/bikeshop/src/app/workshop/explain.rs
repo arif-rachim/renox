@@ -78,6 +78,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/workshop/bikes.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "workshop.bikes.show",
@@ -132,6 +133,7 @@ pub fn entries() -> Vec<Explanation> {
                 HISTORY,
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "workshop.book",
@@ -208,6 +210,7 @@ pub fn entries() -> Vec<Explanation> {
                 BLOCKED,
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "workshop.service.show",
@@ -274,6 +277,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/workshop/service.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "workshop.extra.show",
@@ -319,6 +323,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/workshop/approve.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "workshop.board",
@@ -377,6 +382,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "workshop.walkin",
@@ -425,6 +431,7 @@ pub fn entries() -> Vec<Explanation> {
                 BLOCKED,
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "workshop.order",
@@ -502,6 +509,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
     ]
 }

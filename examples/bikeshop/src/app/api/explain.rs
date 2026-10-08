@@ -101,6 +101,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/api/about.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "api.tokens",
@@ -156,6 +157,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/api/_parts.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "api.kiosks",
@@ -209,6 +211,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/migrations/20260103001100_create_kiosks_table.up.sql",
                 TESTS,
             ],
+            code: &[],
         },
     ]
 }

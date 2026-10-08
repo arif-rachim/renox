@@ -8,9 +8,9 @@
 {#- The staff layout: the kit's back-office shell. `rx-shell` is a CSS grid
     (the sidebar, then the main column); the main column has a full-width
     `navbar` for the store switcher, "About this page" and the account menu. -#}
-<body class="rx-page rx-shell">
+{%- set about = about_page(request.route, request.path) if explain_panels else none %}
+<body class="rx-page rx-shell{% if about %} bs-docked{% if about.rail %} bs-docked--rail{% endif %}{% endif %}">
   {% from "renox/ui.html" import sidebar, sidebar_link, sidebar_section, navbar, menu, menu_link, menu_action, menu_separator, open_button %}
-  {%- set about = about_page(request.route, request.path) if explain_panels else none %}
   {% call sidebar(t('shop.name'), href=route('staff.dashboard')) %}
     {#- --- Staff navigation (one line per area; append yours, behind the
         permission it needs: {% if can('…') %}…{% endif %}) --- -#}
@@ -65,7 +65,9 @@
       {% block content %}{% endblock %}
     </main>
   </div>
-  {%- if about %}{% include "about/_panel.html" %}{% endif %}
+  {#- "About this page": docked beside the page on wide screens, a sheet on
+      narrower ones (about/_dock.html, about/_panel.html). -#}
+  {%- if about %}{% include "about/_dock.html" %}{% include "about/_panel.html" %}{% endif %}
   {{ toasts() }}
   {% include "layouts/_scripts.html" %}
   {{ stack('scripts') }}

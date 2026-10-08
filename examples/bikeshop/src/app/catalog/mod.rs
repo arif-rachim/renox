@@ -60,6 +60,7 @@ impl renox::Module for Catalog {
     }
 
     fn register(&self, app: &mut Registry) {
+        // [explain:home.storefront]
         // The home page's featured bikes and categories, only for `/`, so
         // other pages run no query for it.
         app.share("storefront", |ctx: renox::view::ViewContext| async move {
@@ -82,6 +83,7 @@ impl renox::Module for Catalog {
             );
             Ok(Some(front))
         });
+        // [/explain:home.storefront]
     }
 }
 

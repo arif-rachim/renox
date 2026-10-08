@@ -128,6 +128,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "multistore.help.create",
@@ -171,6 +172,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/multistore/help/new.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "multistore.help.hours",
@@ -214,6 +216,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/multistore/help/hours.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "multistore.placements",
@@ -267,6 +270,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "multistore.placements.create",
@@ -305,6 +309,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/multistore/placements/new.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "multistore.books",
@@ -356,6 +361,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "multistore.settlements",
@@ -402,6 +408,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/multistore/books/settlements.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "multistore.settlements.show",
@@ -449,6 +456,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "multistore.fees",
@@ -502,6 +510,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/blocks/history.html",
                 TESTS,
             ],
+            code: &[],
         },
     ]
 }

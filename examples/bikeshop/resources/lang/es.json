@@ -256,7 +256,13 @@
       "under_hood": "Por dentro",
       "docs": "En la guía",
       "sources": "Archivos fuente",
-      "close": "Cerrar"
+      "close": "Cerrar",
+      "code": "El código",
+      "github": "Abrir estas líneas en GitHub",
+      "copy": "Copiar el código",
+      "copied": "Copiado",
+      "hide": "Plegar la explicación",
+      "show": "Cómo está hecha esta página"
     },
     "pages": {
       "title": "Todas las páginas y sus funciones",

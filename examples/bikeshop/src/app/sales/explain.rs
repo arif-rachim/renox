@@ -83,6 +83,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/migrations/20260102000700_create_carts_table.up.sql",
                 "examples/bikeshop/tests/sales.rs",
             ],
+            code: &[],
         },
         Explanation {
             route: "checkout.show",
@@ -176,6 +177,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/sales/checkout/show.html",
                 "examples/bikeshop/tests/sales.rs",
             ],
+            code: &[],
         },
         Explanation {
             route: "pay.show",
@@ -251,6 +253,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/sales/pay/show.html",
                 "examples/bikeshop/tests/sales.rs",
             ],
+            code: &[],
         },
         Explanation {
             route: "pay.demo",
@@ -304,6 +307,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/sales/pay/demo.html",
                 "examples/bikeshop/tests/sales.rs",
             ],
+            code: &[],
         },
         Explanation {
             route: "orders.show",
@@ -363,6 +367,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/blocks/history.html",
                 "examples/bikeshop/tests/sales.rs",
             ],
+            code: &[],
         },
         Explanation {
             route: "orders.invoice",
@@ -397,6 +402,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/public/sales/sales.js",
                 "examples/bikeshop/tests/sales.rs",
             ],
+            code: &[],
         },
         Explanation {
             route: "sales.orders.index",
@@ -451,6 +457,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/access/active_store.rs",
                 "examples/bikeshop/tests/sales.rs",
             ],
+            code: &[],
         },
         Explanation {
             route: "sales.orders.show",
@@ -518,6 +525,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/sales/staff/show.html",
                 "examples/bikeshop/tests/sales.rs",
             ],
+            code: &[],
         },
         Explanation {
             route: "sales.counter",
@@ -593,6 +601,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/blocks/keypad.html",
                 "examples/bikeshop/tests/sales.rs",
             ],
+            code: &[],
         },
         Explanation {
             route: "sales.mails",
@@ -639,6 +648,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/mail/sales/confirmation.html",
                 "examples/bikeshop/tests/sales.rs",
             ],
+            code: &[],
         },
     ]
 }

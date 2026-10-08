@@ -87,6 +87,7 @@ pub fn entries() -> Vec<Explanation> {
             "examples/bikeshop/resources/views/reports/_overview.html",
             "examples/bikeshop/tests/access.rs",
         ],
+        code: &[],
     }];
     entries.extend(two_factor());
     entries.extend(back_office());
@@ -158,6 +159,7 @@ fn two_factor() -> Vec<Explanation> {
                 "crates/renox-2fa/views/challenge.html",
                 "examples/bikeshop/src/app/staff/two_factor.rs",
             ],
+            code: &[],
         },
         Explanation {
             route: "two-factor.setup",
@@ -201,6 +203,7 @@ fn two_factor() -> Vec<Explanation> {
                 "examples/bikeshop/tests/staff.rs",
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "two-factor.recovery-codes",
@@ -232,6 +235,7 @@ fn two_factor() -> Vec<Explanation> {
                 "crates/renox-2fa/src/recovery.rs",
                 "crates/renox-2fa/views/recovery-codes.html",
             ],
+            code: &[],
         },
     ]
 }
@@ -317,6 +321,7 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/staff/model.rs",
                 "examples/bikeshop/src/app/access/policy.rs",
             ],
+            code: &[],
         },
         Explanation {
             route: "staff.stores.edit",
@@ -375,6 +380,7 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/tests/staff.rs",
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "staff.team.index",
@@ -409,6 +415,7 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/staff/team/index.html",
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "staff.team.show",
@@ -463,6 +470,7 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/tests/staff.rs",
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "staff.invitations.create",
@@ -499,6 +507,7 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/mail/staff/invitation.html",
                 "examples/bikeshop/tests/staff.rs",
             ],
+            code: &[],
         },
         Explanation {
             route: "staff.invitations.accept",
@@ -541,6 +550,7 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/staff/two_factor.rs",
                 "examples/bikeshop/tests/staff.rs",
             ],
+            code: &[],
         },
         Explanation {
             route: "staff.roles.index",
@@ -592,6 +602,7 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/tests/staff.rs",
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "staff.audit.index",
@@ -642,6 +653,7 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/migrations/20260102000200_add_store_and_role_to_audit_logs.up.sql",
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "staff.catalog.move",
@@ -678,6 +690,7 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/staff/catalog/move.html",
                 "examples/bikeshop/src/app/staff/admin.rs",
             ],
+            code: &[],
         },
         Explanation {
             route: "staff.catalog.fits",
@@ -719,6 +732,7 @@ fn back_office() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/catalog/model.rs",
                 "examples/bikeshop/tests/staff.rs",
             ],
+            code: &[],
         },
     ]
 }
@@ -896,6 +910,7 @@ fn admin_pages() -> Vec<Explanation> {
                 under_hood: "One `COUNT(*)` per resource the person may see.",
                 docs: ADMIN_DOCS,
                 sources: ADMIN_SOURCES,
+                code: &[],
             }];
             for (slug, plural, one, permission, holds) in RESOURCES {
                 let stores = *slug == "stores";
@@ -1047,6 +1062,7 @@ fn admin_pages() -> Vec<Explanation> {
                         under_hood: leak(under_hood),
                         docs: ADMIN_DOCS,
                         sources: ADMIN_SOURCES,
+                        code: &[],
                     });
                 }
             }

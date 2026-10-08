@@ -131,6 +131,7 @@ pub fn entries() -> Vec<Explanation> {
                 "docs/ui.md#navigation-and-page-structure",
             ],
             sources: SOURCES_LISTING,
+            code: &[],
         },
         Explanation {
             route: "catalog.category",
@@ -179,6 +180,7 @@ pub fn entries() -> Vec<Explanation> {
                 "docs/ui.md#fragments-and-out-of-band-swaps",
             ],
             sources: SOURCES_LISTING,
+            code: &[],
         },
         Explanation {
             route: "catalog.search",
@@ -246,6 +248,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/tests/catalog.rs",
                 "tests/browser/bikeshop-catalog.test.mjs",
             ],
+            code: &[],
         },
         Explanation {
             route: "catalog.show",
@@ -347,6 +350,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/tests/catalog.rs",
                 "tests/browser/bikeshop-catalog.test.mjs",
             ],
+            code: &[],
         },
         Explanation {
             route: "sitemap",
@@ -383,6 +387,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/catalog/mod.rs",
                 "examples/bikeshop/tests/catalog.rs",
             ],
+            code: &[],
         },
     ]
 }

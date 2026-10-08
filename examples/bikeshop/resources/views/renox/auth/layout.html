@@ -9,9 +9,9 @@
   {% include "layouts/_head.html" %}
   {{ stack('head') }}
 </head>
-<body class="rx-page bs-auth">
+{%- set about = about_page(request.route, request.path) if explain_panels else none %}
+<body class="rx-page bs-auth{% if about %} bs-docked{% if about.rail %} bs-docked--rail{% endif %}{% endif %}">
   {% from "renox/ui.html" import open_button %}
-  {%- set about = about_page(request.route, request.path) if explain_panels else none %}
   <main class="rx-auth{% block main_class %}{% endblock %}" id="main">
     <div class="rx-auth__inner" data-bs-reveal>
       <p class="rx-auth__brand"><a href="{{ route('home') }}"><span class="rx-brand-mark" aria-hidden="true">{{ t('shop.name')[:1] | upper }}</span> {{ t('shop.name') }}</a></p>
@@ -24,7 +24,9 @@
     <img src="/images/site/trail.webp" alt="" width="1200" height="800">
     <p class="bs-auth__quote">{{ t('auth_art.quote') }}</p>
   </aside>
-  {%- if about %}{% include "about/_panel.html" %}{% endif %}
+  {#- "About this page": docked beside the page on wide screens, a sheet on
+      narrower ones (about/_dock.html, about/_panel.html). -#}
+  {%- if about %}{% include "about/_dock.html" %}{% include "about/_panel.html" %}{% endif %}
   {{ toasts() }}
   {% include "layouts/_scripts.html" %}
   {{ stack('scripts') }}

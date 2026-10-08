@@ -88,6 +88,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/blocks/compare_plans.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "plans.subscribe",
@@ -189,6 +190,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "plans.mine",
@@ -238,6 +240,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/plans/_parts.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "plans.show",
@@ -331,6 +334,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "plans.mails",
@@ -384,6 +388,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/plans/mails.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "plans.demo",
@@ -441,6 +446,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/plans/demo.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "billing.plans",
@@ -473,6 +479,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/billing/section.html",
                 TESTS,
             ],
+            code: &[],
         },
     ]
 }

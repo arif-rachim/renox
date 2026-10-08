@@ -1,6 +1,6 @@
 //! "About this page" entries for the home area (see `crate::explain`).
 
-use crate::explain::{Audience, Explanation, Feature, Flow, NotAPage};
+use crate::explain::{Audience, Code, Explanation, Feature, Flow, NotAPage};
 
 /// The explanation of every page in this area.
 pub fn entries() -> Vec<Explanation> {
@@ -137,6 +137,20 @@ pub fn entries() -> Vec<Explanation> {
             "examples/bikeshop/tests/about.rs",
             "examples/bikeshop/tests/catalog.rs",
             "tests/browser/bikeshop-about.test.mjs",
+        ],
+        code: &[
+            Code {
+                title: "Routes: one named `GET /` with an ETag, and a handler with no data",
+                region: "home.routes",
+            },
+            Code {
+                title: "Template: the hero, a macro the rent and plans pages share",
+                region: "home.template",
+            },
+            Code {
+                title: "Share: the catalogue gives `/` its storefront, and nothing else",
+                region: "home.storefront",
+            },
         ],
     }]
 }

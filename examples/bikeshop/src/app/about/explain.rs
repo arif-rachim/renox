@@ -88,6 +88,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/tests/about.rs",
                 "tests/browser/bikeshop-about.test.mjs",
             ],
+            code: &[],
         },
         Explanation {
             route: "about.blocks",
@@ -183,6 +184,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/tests/blocks.rs",
                 "tests/browser/bikeshop-blocks.test.mjs",
             ],
+            code: &[],
         },
         data_page(),
     ]
@@ -328,6 +330,7 @@ fn data_page() -> Explanation {
             "examples/bikeshop/tests/seed.rs",
             "tests/browser/bikeshop-data.test.mjs",
         ],
+        code: &[],
     }
 }
 

@@ -185,6 +185,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/migrations/20260102001000_create_report_views.up.sql",
                 "examples/bikeshop/tests/reports.rs",
             ],
+            code: &[],
         },
         Explanation {
             route: "reports.orders",
@@ -210,6 +211,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/reports/grid.html",
                 "examples/bikeshop/migrations/20260102001000_create_report_views.up.sql",
             ],
+            code: &[],
         },
         Explanation {
             route: "reports.rentals",
@@ -235,6 +237,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/reports/grid.html",
                 "examples/bikeshop/migrations/20260102001000_create_report_views.up.sql",
             ],
+            code: &[],
         },
         Explanation {
             route: "reports.work_orders",
@@ -259,6 +262,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/reports/grid.html",
                 "examples/bikeshop/migrations/20260102001000_create_report_views.up.sql",
             ],
+            code: &[],
         },
         Explanation {
             route: "reports.payments",
@@ -283,6 +287,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/reports/grid.html",
                 "examples/bikeshop/migrations/20260102001000_create_report_views.up.sql",
             ],
+            code: &[],
         },
         Explanation {
             route: "reports.customers",
@@ -332,6 +337,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/reports/grid.html",
                 "examples/bikeshop/migrations/20260102001000_create_report_views.up.sql",
             ],
+            code: &[],
         },
         Explanation {
             route: "reports.entries",
@@ -357,6 +363,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/reports/grid.html",
                 "examples/bikeshop/src/app/multistore/model.rs",
             ],
+            code: &[],
         },
         Explanation {
             route: "reports.monthly",
@@ -432,6 +439,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/mail/reports/monthly.html",
                 "examples/bikeshop/tests/reports.rs",
             ],
+            code: &[],
         },
     ]
 }

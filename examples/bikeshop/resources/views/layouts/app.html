@@ -10,11 +10,12 @@
 </head>
 {#- The public layout: the kit's navbar, the page, a footer, stacked by a CSS
     grid (.bs-public in public/app.css). Pages fill `content`. -#}
-<body class="rx-page bs-public">
+{#- This page's "About this page" entry (src/explain.rs), unless
+    BIKESHOP_EXPLAIN=false hides the panels; set before <body>, whose class
+    says whether it is docked (about/_dock.html). -#}
+{%- set about = about_page(request.route, request.path) if explain_panels else none %}
+<body class="rx-page bs-public{% if about %} bs-docked{% if about.rail %} bs-docked--rail{% endif %}{% endif %}">
   {% from "renox/ui.html" import navbar, nav_links, nav_link, menu, menu_link, menu_action, menu_separator, link_button, icon_button %}
-  {#- This page's "About this page" entry (src/explain.rs), unless
-      BIKESHOP_EXPLAIN=false hides the panels. -#}
-  {%- set about = about_page(request.route, request.path) if explain_panels else none %}
   {#- The public navigation, once, for the bar (desktop) and the menu panel
       (phones). One line per area; append yours. -#}
   {%- set nav = [
@@ -89,7 +90,9 @@
     <p class="rx-subtitle">{{ t('shop.footer') }}</p>
     <a class="rx-link" href="{{ route('about.pages') }}">{{ t('about.index_link') }}</a>
   </footer>
-  {%- if about %}{% include "about/_panel.html" %}{% endif %}
+  {#- "About this page": docked beside the page on wide screens, a sheet on
+      narrower ones (about/_dock.html, about/_panel.html). -#}
+  {%- if about %}{% include "about/_dock.html" %}{% include "about/_panel.html" %}{% endif %}
   {#- Toasts from `Toast::success(…)`, after a redirect or an htmx request. -#}
   {{ toasts() }}
   {% include "layouts/_scripts.html" %}

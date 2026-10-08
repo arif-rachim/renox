@@ -132,6 +132,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "stock.ledger",
@@ -189,6 +190,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/stock/ledger.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "stock.take",
@@ -259,6 +261,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "stock.consignments",
@@ -303,6 +306,7 @@ pub fn entries() -> Vec<Explanation> {
                 PARTS,
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "stock.consignments.create",
@@ -357,6 +361,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "stock.consignments.show",
@@ -414,6 +419,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "stock.suppliers",
@@ -449,6 +455,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/stock/suppliers/index.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "stock.suppliers.create",
@@ -474,6 +481,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/stock/suppliers/form.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "stock.suppliers.edit",
@@ -508,6 +516,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/stock/suppliers/form.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "stock.suppliers.show",
@@ -563,6 +572,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "stock.purchasing",
@@ -616,6 +626,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/mail/stock/notice.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "stock.purchasing.create",
@@ -663,6 +674,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "stock.purchasing.show",
@@ -723,6 +735,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "stock.purchasing.print",
@@ -763,6 +776,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/public/areas/stock.js",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "stock.fleet",
@@ -813,6 +827,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 MOD,
             ],
+            code: &[],
         },
     ]
 }

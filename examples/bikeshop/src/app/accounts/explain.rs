@@ -130,6 +130,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/staff/two_factor.rs",
                 "examples/bikeshop/tests/accounts.rs",
             ],
+            code: &[],
         },
         Explanation {
             route: "register",
@@ -202,6 +203,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/renox/auth/layout.html",
                 "examples/bikeshop/tests/accounts.rs",
             ],
+            code: &[],
         },
         Explanation {
             route: "password.request",
@@ -238,6 +240,7 @@ pub fn entries() -> Vec<Explanation> {
                 "crates/renox-core/views/auth/forgot-password.html",
                 "examples/bikeshop/resources/views/renox/auth/layout.html",
             ],
+            code: &[],
         },
         Explanation {
             route: "password.reset",
@@ -275,6 +278,7 @@ pub fn entries() -> Vec<Explanation> {
                 "crates/renox-core/views/auth/reset-password.html",
                 "examples/bikeshop/resources/views/renox/auth/layout.html",
             ],
+            code: &[],
         },
         Explanation {
             route: "password.confirm",
@@ -323,6 +327,7 @@ pub fn entries() -> Vec<Explanation> {
                 "crates/renox-oauth/src/lib.rs",
                 "examples/bikeshop/resources/views/renox/auth/layout.html",
             ],
+            code: &[],
         },
         Explanation {
             route: "verification.notice",
@@ -359,6 +364,7 @@ pub fn entries() -> Vec<Explanation> {
                 "crates/renox-core/views/auth/verify-email.html",
                 "examples/bikeshop/resources/views/renox/auth/layout.html",
             ],
+            code: &[],
         },
         Explanation {
             route: "account.show",
@@ -483,6 +489,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/tests/accounts.rs",
                 "crates/renox-core/src/auth/account.rs",
             ],
+            code: &[],
         },
         Explanation {
             route: "notifications.index",
@@ -553,6 +560,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/layouts/staff.html",
                 "examples/bikeshop/tests/accounts.rs",
             ],
+            code: &[],
         },
         Explanation {
             route: "accounts.claim",
@@ -613,6 +621,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/mail/accounts/claim_invitation.html",
                 "examples/bikeshop/tests/accounts.rs",
             ],
+            code: &[],
         },
         Explanation {
             route: "accounts.invite",
@@ -666,6 +675,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/mail/accounts/claim_invitation.html",
                 "examples/bikeshop/tests/accounts.rs",
             ],
+            code: &[],
         },
     ]
 }

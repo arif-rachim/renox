@@ -121,6 +121,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "rentals.show",
@@ -202,6 +203,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "rentals.mine",
@@ -250,6 +252,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/rentals/mine.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "rentals.identity",
@@ -313,6 +316,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/rentals/identity.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "rentals.identities",
@@ -381,6 +385,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/rentals/identities.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "rentals.counter",
@@ -439,6 +444,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "rentals.walkin",
@@ -491,6 +497,7 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/blocks/datetime_range.html",
                 TESTS,
             ],
+            code: &[],
         },
         Explanation {
             route: "rentals.desk",
@@ -584,6 +591,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "rentals.receipt",
@@ -637,6 +645,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "rentals.fleet",
@@ -715,6 +724,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
         Explanation {
             route: "rentals.fleet.show",
@@ -767,6 +777,7 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[],
         },
     ]
 }
