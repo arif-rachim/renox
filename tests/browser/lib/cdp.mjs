@@ -289,7 +289,35 @@ export class Page {
         arrived = true; // the page navigated away
       }
       if (arrived) return;
-      if (Date.now() > until) throw new Error(`the page never got the click on ${selector}`);
+      if (Date.now() > until) {
+        // What the page looks like at that point, to find out why (#327).
+        let why = '';
+        try {
+          why = await this.eval(
+            (s, px, py) => {
+              const top = document.elementFromPoint(px, py);
+              const name = (el) => el ? `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}${el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).join('.') : ''}` : 'nothing';
+              const inert = document.querySelector('[inert]');
+              const open = [...document.querySelectorAll('dialog[open]')].map(name).join(', ');
+              return [
+                `at (${Math.round(px)}, ${Math.round(py)}): ${name(top)}`,
+                `target: ${name(document.querySelector(s))}`,
+                `html/body pointer-events: ${getComputedStyle(document.documentElement).pointerEvents}/${getComputedStyle(document.body).pointerEvents}`,
+                `inert: ${inert ? name(inert) : 'none'}`,
+                `open dialogs: ${open || 'none'}`,
+                `visibility: ${document.visibilityState}, focus: ${document.hasFocus()}, ready: ${document.readyState}`,
+                `viewport: ${innerWidth}x${innerHeight}, scroll: ${scrollX},${scrollY}`,
+              ].join('; ');
+            },
+            selector,
+            x,
+            y,
+          );
+        } catch (e) {
+          why = `(no details: ${e.message})`;
+        }
+        throw new Error(`the page never got the click on ${selector}: ${why}`);
+      }
       await sleep(100);
     }
   }
