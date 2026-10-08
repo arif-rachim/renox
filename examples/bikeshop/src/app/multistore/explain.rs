@@ -1,6 +1,6 @@
 //! "About this page" entries for the multistore area's pages (see `crate::explain`).
 
-use crate::explain::{Audience, Explanation, Feature, Flow, NotAPage};
+use crate::explain::{Audience, Code, Explanation, Feature, Flow, NotAPage};
 
 const MOD: &str = "examples/bikeshop/src/app/multistore/mod.rs";
 const MODEL: &str = "examples/bikeshop/src/app/multistore/model.rs";
@@ -128,6 +128,20 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[
+                Code {
+                    title: "Handler: help asked by and of the active store, in one query",
+                    region: "multistore.help.handler",
+                },
+                Code {
+                    title: "Approve: a role in the helped store, between two dates",
+                    region: "multistore.help.approve",
+                },
+                Code {
+                    title: "Template: the kit's `row_actions` with an `action_sheet` for hours",
+                    region: "multistore.help.template",
+                },
+            ],
         },
         Explanation {
             route: "multistore.help.create",
@@ -171,6 +185,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/multistore/help/new.html",
                 TESTS,
             ],
+            code: &[
+                Code {
+                    title: "Handler: the lending store's people, by `belongs_to`",
+                    region: "multistore.help.create.handler",
+                },
+                Code {
+                    title: "Form: `Validate` rules, then an `after` hook that reads the database",
+                    region: "multistore.help.create.form",
+                },
+                Code {
+                    title: "Template: `form_grid` with a searchable select and date pickers",
+                    region: "multistore.help.create.template",
+                },
+            ],
         },
         Explanation {
             route: "multistore.help.hours",
@@ -213,6 +241,20 @@ pub fn entries() -> Vec<Explanation> {
                 HELP,
                 "examples/bikeshop/resources/views/multistore/help/hours.html",
                 TESTS,
+            ],
+            code: &[
+                Code {
+                    title: "Query: hours per person and store, grouped in one statement",
+                    region: "multistore.help.hours.query",
+                },
+                Code {
+                    title: "Logging: the helped store records a day, within the request's dates",
+                    region: "multistore.help.hours.log",
+                },
+                Code {
+                    title: "Template: the kit's `stats` over a `table`",
+                    region: "multistore.help.hours.template",
+                },
             ],
         },
         Explanation {
@@ -267,6 +309,20 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[
+                Code {
+                    title: "Handler: placements to and from the store, and bikes away from home",
+                    region: "multistore.placements.handler",
+                },
+                Code {
+                    title: "Move: the bike's row locked in one transaction",
+                    region: "multistore.placements.move",
+                },
+                Code {
+                    title: "Template: each placement with the actions its state allows",
+                    region: "multistore.placements.template",
+                },
+            ],
         },
         Explanation {
             route: "multistore.placements.create",
@@ -304,6 +360,20 @@ pub fn entries() -> Vec<Explanation> {
                 ACTIVE_STORE,
                 "examples/bikeshop/resources/views/multistore/placements/new.html",
                 TESTS,
+            ],
+            code: &[
+                Code {
+                    title: "Handler: our bikes to place, or theirs to ask for",
+                    region: "multistore.placements.create.handler",
+                },
+                Code {
+                    title: "Form: `#[derive(Validate)]` with `one_of`",
+                    region: "multistore.placements.create.form",
+                },
+                Code {
+                    title: "Store: our own bike is approved at once, theirs is asked for",
+                    region: "multistore.placements.create.store",
+                },
             ],
         },
         Explanation {
@@ -356,6 +426,20 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[
+                Code {
+                    title: "Handler: the grid of entries, and the open sums per store pair",
+                    region: "multistore.books.handler",
+                },
+                Code {
+                    title: "Netting: each pair's entries, in the direction of the debt",
+                    region: "multistore.books.netting",
+                },
+                Code {
+                    title: "Template: your position, the open balances, then the grid",
+                    region: "multistore.books.template",
+                },
+            ],
         },
         Explanation {
             route: "multistore.settlements",
@@ -401,6 +485,20 @@ pub fn entries() -> Vec<Explanation> {
                 MODEL,
                 "examples/bikeshop/resources/views/multistore/books/settlements.html",
                 TESTS,
+            ],
+            code: &[
+                Code {
+                    title: "Task: on the 1st, net last month per pair, then mail the statements",
+                    region: "multistore.settlements.month",
+                },
+                Code {
+                    title: "Handler: the statements the person may see, paginated",
+                    region: "multistore.settlements.handler",
+                },
+                Code {
+                    title: "Template: the kit's `table` with badges per side",
+                    region: "multistore.settlements.template",
+                },
             ],
         },
         Explanation {
@@ -448,6 +546,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/mail/multistore/statement.html",
                 TESTS,
                 BROWSER,
+            ],
+            code: &[
+                Code {
+                    title: "Handler: `access::find`, then each side's lines by kind",
+                    region: "multistore.settlements.show.handler",
+                },
+                Code {
+                    title: "Confirm: a guarded update; both sides settle it",
+                    region: "multistore.settlements.show.confirm",
+                },
+                Code {
+                    title: "Template: one macro draws each store's side",
+                    region: "multistore.settlements.show.template",
+                },
             ],
         },
         Explanation {
@@ -501,6 +613,16 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/multistore/books/fees.html",
                 "crates/renox-blocks/views/blocks.html",
                 TESTS,
+            ],
+            code: &[
+                Code {
+                    title: "Handler: `Found<Store>` and `Valid<FeeForm>`, the change audited",
+                    region: "multistore.fees.handler",
+                },
+                Code {
+                    title: "Template: an `action_sheet` per store to change its rate",
+                    region: "multistore.fees.template",
+                },
             ],
         },
     ]

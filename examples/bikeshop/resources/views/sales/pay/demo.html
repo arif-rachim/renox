@@ -17,6 +17,7 @@
       {%- if paying.order %}{{ entry(t('sales.orders.number'), paying.order.number) }}{% endif %}
       {{ entry(t('sales.demo.status'), t('sales.payment_status.' ~ paying.payment.status)) }}
     {% endcall %}
+    {# [explain:pay.demo.template] #}
     {%- if paying.payment.status == "pending" %}
     <form class="bs-demo-gateway__form" method="post" action="{{ action }}">
       {{ csrf_field() }}
@@ -29,6 +30,7 @@
       {{ button(t('sales.demo.cancel'), variant="plain", block=true) }}
     </form>
     {%- endif %}
+    {# [/explain:pay.demo.template] #}
   {% endcall %}
 </div>
 {% endblock %}

@@ -27,6 +27,7 @@
         {%- endif %}
       {% endcall %}
     {% endcall %}
+    {# [explain:staff.stores.edit.template] #}
     {% call card(title=t('staff.stores.hours'), subtitle=t('staff.stores.hours_lead')) %}
       {%- set days = [["mon", t('staff.stores.days.mon')], ["tue", t('staff.stores.days.tue')], ["wed", t('staff.stores.days.wed')], ["thu", t('staff.stores.days.thu')], ["fri", t('staff.stores.days.fri')], ["sat", t('staff.stores.days.sat')], ["sun", t('staff.stores.days.sun')]] %}
       {% call(row, prefix) repeater("hours", t('staff.stores.hours'), rows=hours, item_label=t('staff.stores.day'), add_label=t('staff.stores.add_day'), max=7) %}
@@ -37,6 +38,7 @@
         </div>
       {% endcall %}
     {% endcall %}
+    {# [/explain:staff.stores.edit.template] #}
     <div class="rx-row">{{ button(t('accounts.save')) }} {{ link_button(route('staff.stores.index'), t('staff.cancel'), variant="plain") }}</div>
   </form>
 </div>

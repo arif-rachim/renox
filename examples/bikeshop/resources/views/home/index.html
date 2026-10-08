@@ -10,6 +10,7 @@
 {% block content %}
 <div class="rx-stack bs-home" data-bs-reveal>
   {%- set wrench = '<svg viewBox="0 0 20 20" width="20" height="20"><path d="M12.5 3.5a3.5 3.5 0 00-3.3 4.6L3.8 13.5a1.6 1.6 0 002.3 2.3l5.4-5.4a3.5 3.5 0 004.6-3.3l-2 2-2-.5-.5-2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>' | safe %}
+  {# [explain:home.template] #}
   {% call page_hero(t('home.hero.title'), accent=t('home.hero.accent'), lead=t('home.lead'), eyebrow=t('home.hero.eyebrow'),
                     photo="/images/site/hero.webp", inset="/images/site/workshop-2.webp",
                     badge={"icon": wrench, "title": t('home.hero.badge_title'), "text": t('home.hero.badge_text')}) %}
@@ -25,6 +26,7 @@
     </ul>
     {%- endif %}
   {% endcall %}
+  {# [/explain:home.template] #}
 
   {%- if storefront %}
   {#- The categories as chips: a quick way in. -#}

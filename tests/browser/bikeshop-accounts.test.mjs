@@ -67,11 +67,8 @@ describe('bikeshop customer accounts', () => {
       assert.ok(await fitsWidth(page));
       await shot(page, 'account-desktop');
 
-      // The panel explains the page.
-      await page.click('[data-rx-open="about-page"]');
-      await page.waitFor(() => document.querySelector('#about-page')?.open);
-      assert.ok((await page.text('#about-page')).includes('Registry::account_section'));
-      await page.press('Escape');
+      // The panel, docked beside the page on a wide screen, explains it.
+      assert.ok((await page.text('#explain-dock')).includes('Registry::account_section'));
 
       await page.send('Emulation.setDeviceMetricsOverride', { ...PHONE, deviceScaleFactor: 1, mobile: true });
       await page.goto(`${app.url}/account`);

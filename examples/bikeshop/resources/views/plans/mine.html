@@ -10,6 +10,7 @@
 <div class="rx-stack">
   {{ page_header(t('plans.mine.title'), subtitle=t('plans.mine.lead')) }}
   {%- if current %}
+  {# [explain:plans.mine.template] #}
   <div class="bs-my-plans" id="my-plans" data-bs-reveal>
     {%- for line in current %}
     <article class="rx-card bs-my-plan" data-bs-plan="{{ line.subscription.id }}">
@@ -29,6 +30,7 @@
     </article>
     {%- endfor %}
   </div>
+  {# [/explain:plans.mine.template] #}
   {%- else %}
   <div class="rx-card">{{ empty(t('plans.mine.none'), t('plans.mine.none_text'), route('plans.index'), t('plans.index.title')) }}</div>
   {%- endif %}

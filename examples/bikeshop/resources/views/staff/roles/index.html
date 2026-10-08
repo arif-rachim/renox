@@ -28,6 +28,7 @@
       {%- if row.group != ns.group %}{% set ns.group = row.group %}
       <div role="row"><div role="rowheader" class="bs-matrix__group" aria-level="2">{{ tx(row.group) }}</div></div>
       {%- endif %}
+      {# [explain:staff.roles.index.template] #}
       <div role="row" data-bs-permission="{{ row.name }}">
         <div role="rowheader"><code>{{ row.name }}</code><span>{{ tx(row.description) }}</span></div>
         {%- for cell in row.cells %}
@@ -38,6 +39,7 @@
         </div>
         {%- endfor %}
       </div>
+      {# [/explain:staff.roles.index.template] #}
       {%- endfor %}
     </div>
   </div>

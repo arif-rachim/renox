@@ -50,6 +50,7 @@ fn status_column(lang: &Lang) -> Column {
 /// The fleet board's grid: columns, filters, badges, cards on phones, and a
 /// reload every 30 seconds (`poll`), so a bike coming back at the counter
 /// shows up without anyone refreshing.
+// [explain:rentals.fleet.grid]
 pub fn fleet_grid(lang: &Lang) -> Grid {
     Grid::new("fleet")
         .title(&lang.t("rentals.fleet.title", &[]))
@@ -69,6 +70,7 @@ pub fn fleet_grid(lang: &Lang) -> Grid {
             "owner_store_id",
             "name",
         ))
+        // [/explain:rentals.fleet.grid]
         .column(
             Column::related(
                 "location_store",
@@ -91,6 +93,7 @@ pub fn fleet_grid(lang: &Lang) -> Grid {
             "service",
             &lang.t("rentals.fields.service", &[]),
         ))
+        // [explain:rentals.fleet.grid]
         .sort_by("frame_number")
         .per_page(25)
         .row_url("/staff/fleet/{id}")
@@ -98,6 +101,7 @@ pub fn fleet_grid(lang: &Lang) -> Grid {
         .poll(30)
         .empty_state(&lang.t("rentals.fleet.empty", &[]), None)
 }
+// [/explain:rentals.fleet.grid]
 
 /// `?view=` on the board.
 #[derive(Deserialize, Default)]
@@ -107,6 +111,7 @@ pub struct FleetQuery {
 }
 
 /// `GET /staff/fleet` (`rentals.fleet`): the board.
+// [explain:rentals.fleet.handler]
 pub async fn index(
     State(state): State<AppState>,
     lang: Lang,
@@ -114,11 +119,13 @@ pub async fn index(
     Query(query): Query<FleetQuery>,
 ) -> Result<View> {
     let store = active_store()?;
+    // [/explain:rentals.fleet.handler]
     let tab = if VIEWS.contains(&query.view.as_str()) {
         query.view.clone()
     } else {
         "all".to_owned()
     };
+    // [explain:rentals.fleet.handler]
     // Always within what the person may see ("mine or at my store",
     // `scopes_with`), then narrowed to the active store and the tab.
     let bikes = access::visible::<RentalBike>(catalogue::FLEET_VIEW);
@@ -143,6 +150,7 @@ pub async fn index(
     };
     let grid = fleet_grid(&lang);
     let page = grid.page(bikes, &request).await?;
+    // [/explain:rentals.fleet.handler]
     let names = variant_names(
         &state.db,
         page.items().iter().map(|b| b.variant_id).collect(),
@@ -190,6 +198,7 @@ struct Ability {
 /// the location's business, its rates and retiring it the owner's), and
 /// its history: rentals, placements, work orders. Visible to staff of the
 /// owner **and** of the location store (`access::find`).
+// [explain:rentals.fleet.show.handler]
 pub async fn show(
     State(state): State<AppState>,
     user: AuthUser,
@@ -197,6 +206,7 @@ pub async fn show(
 ) -> Result<View> {
     let db = &state.db;
     let bike = access::find::<RentalBike>(db, &user, id).await?;
+    // [/explain:rentals.fleet.show.handler]
     let home = home_store(db, &bike).await?;
     let stores: HashMap<i64, Store> =
         Store::find_many(db, [bike.owner_store_id, bike.location_store_id, home])
@@ -237,6 +247,7 @@ pub async fn show(
             StoreAttr::Owner,
         ),
     ];
+    // [explain:rentals.fleet.show.handler]
     let abilities: Vec<Ability> = actions
         .iter()
         .map(|(action, permission, attr)| {
@@ -254,6 +265,7 @@ pub async fn show(
             }
         })
         .collect();
+    // [/explain:rentals.fleet.show.handler]
     let rentals = Rental::where_eq("rental_bike_id", bike.id)
         .order_by_desc("starts_at")
         .limit(20)

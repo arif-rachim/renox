@@ -44,6 +44,7 @@
           {{ entry(t('workshop.fields.minutes'), order.minutes, format="number") }}
           {{ entry(t('workshop.fields.paid'), order.paid_at, format="datetime", placeholder=t('workshop.service.not_paid')) }}
         {% endcall %}
+        {# [explain:workshop.service.show.template] #}
         {%- if payable %}
         <form method="post" action="{{ route('workshop.service.pay', order.id) }}">{{ csrf_field() }}{{ button(t('workshop.service.pay', amount=(order.total | money)), icon="check", block=true) }}</form>
         {%- endif %}
@@ -53,6 +54,7 @@
         {% endcall %}
         {{ confirm("cancel-service", t('workshop.service.cancel'), route('workshop.service.cancel', order.id), t('workshop.service.cancel_title'), t('workshop.service.cancel_text'), method="POST") }}
         {%- elif status == "booked" %}<p class="rx-hint">{{ t('workshop.service.no_change') }}</p>{% endif %}
+        {# [/explain:workshop.service.show.template] #}
       {% endcall %}
     </div>
   </div>

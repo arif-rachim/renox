@@ -11,12 +11,15 @@
     {{ link_button(route('stock.suppliers'), t('stock.suppliers.title')) }}
     {{ link_button(route('stock.purchasing.create'), t('stock.purchasing.new'), variant="primary", icon="plus") }}
   {% endcall %}
+  {# [explain:stock.purchasing.template] #}
   {%- set ns = namespace(items=[]) %}
   {%- for key in tabs %}{% set ns.items = ns.items + [[route('stock.purchasing', status=key), t('stock.purchasing.tab.' ~ key)]] %}{% endfor %}
   {{ link_tabs(ns.items, current=route('stock.purchasing', status=tab), label=t('stock.purchasing.tabs')) }}
+  {# [/explain:stock.purchasing.template] #}
   {%- if orders.items %}
   <div class="rx-card">
   {% call table([t('stock.purchasing.number'), t('stock.purchasing.supplier'), t('stock.fields.status'), t('stock.purchasing.expected'), [t('stock.purchasing.total'), "num"]], caption=t('stock.purchasing.title')) %}
+    {# [explain:stock.purchasing.template] #}
     {%- for row in orders.items %}
     <tr>
       <td><a class="rx-link" href="{{ route('stock.purchasing.show', row.order.id) }}">PO-{{ row.order.id }}</a>{% if row.order.suggested %} {{ badge(t('stock.purchasing.suggested'), kind="info") }}{% endif %}</td>
@@ -25,6 +28,7 @@
       <td>{{ row.order.expected_on | date("%d %b %Y") if row.order.expected_on else "—" }}</td>
       <td class="rx-num">{{ row.order.total | money }}</td>
     </tr>
+    {# [/explain:stock.purchasing.template] #}
     {%- endfor %}
   {% endcall %}
   </div>

@@ -38,6 +38,7 @@ impl Module for Staff {
         "staff"
     }
 
+    // [explain:staff.dashboard.handler]
     fn routes(&self) -> Routes {
         // Logged in, and working in a store where a role grants
         // `staff.access` today (the active store, src/app/access).
@@ -52,6 +53,7 @@ impl Module for Staff {
         .merge(audit::routes())
         .merge(catalog_tools::routes())
     }
+    // [/explain:staff.dashboard.handler]
 
     fn register(&self, app: &mut Registry) {
         // Two-factor login is required for staff (two_factor.rs).
@@ -61,9 +63,11 @@ impl Module for Staff {
     }
 }
 
+// [explain:staff.dashboard.handler]
 /// `GET /staff` (`staff.dashboard`): for people who see reports in the
 /// active store, its last 7 days (`reports::dashboard::overview`, #242).
 async fn dashboard(State(state): State<AppState>, user: AuthUser) -> Result<View> {
     let overview = crate::app::reports::dashboard::overview(&state, &user).await?;
     Ok(view("staff/dashboard.html", context! { overview }))
 }
+// [/explain:staff.dashboard.handler]

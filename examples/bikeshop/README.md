@@ -23,9 +23,15 @@ It keeps the shape of the Sakila/Pagila sample database (stock per store → ren
 returned, maybe late → paid), grown into a bike shop: see [`/about/data`](src/app/about/data.rs)
 in the app.
 
-**Every page explains itself.** An "About this page" button opens a panel with what the page is
-for, who uses it, which Renox features it uses **and why**, what happens under the hood
-(queries, transactions, jobs, events, mails), and links to the guide and to the source files.
+**Every page explains itself, side by side with its code.** On a wide screen (1200 px and
+up) a panel beside the page says what the page is for, who uses it, which Renox features it
+uses **and why**, and shows the code that makes it work: the handler, the key part of the
+template, a query, a policy or a test, one tab each, coloured, with the file's lines on
+GitHub and a copy button. Then what happens under the hood (queries, transactions, jobs,
+events, mails) and links to the guide. The panel folds to a slim rail (remembered in a
+cookie); on a narrower screen the "About this page" button opens the same content in a
+sheet. The code is cut from the shop's own files when it is built, so it never goes stale
+(see [Adding a page](#adding-a-page)).
 
 > **Start on [`/about/pages`](src/app/about/mod.rs)**: every page of the shop, filtered by
 > Renox feature ("which pages use `renox::grid`?", "where is `Pivot`?") or by role (visitor,
@@ -135,7 +141,8 @@ Paths are relative to this folder.
 | Feature | Where |
 |---|---|
 | The app: modules, plugins, layers, the reporter | [src/lib.rs](src/lib.rs) |
-| "About this page": `Explanation`, the registry, the panel, `BIKESHOP_EXPLAIN` | [src/explain.rs](src/explain.rs), each area's `explain.rs`, [resources/views/about/_panel.html](resources/views/about/_panel.html) |
+| "About this page": `Explanation`, the registry, the docked panel and the sheet, `BIKESHOP_EXPLAIN` | [src/explain.rs](src/explain.rs), each area's `explain.rs`, [resources/views/about/_explain.html](resources/views/about/_explain.html), [_dock.html](resources/views/about/_dock.html), [_panel.html](resources/views/about/_panel.html), [public/explain.css](public/explain.css), [public/explain.js](public/explain.js) |
+| Its code samples: regions marked in the source, cut out by `build.rs`, coloured on the server | [src/code.rs](src/code.rs), [build.rs](build.rs), [src/highlight.rs](src/highlight.rs) (a copy of the docs site's) |
 | Models and factories per area, migrations for SQLite and PostgreSQL, money as integers (US dollars in cents, `APP_CURRENCY=USD`; typed amounts converted in [src/money.rs](src/money.rs)) | `src/app/<area>/model.rs`, `src/app/<area>/factories.rs`, [migrations/](migrations/) |
 | Seeds (`db:seed`, the typed `demo:seed` command) and test fixtures | [src/seed/](src/seed/) |
 | Scheduled tasks (below), jobs, events and listeners | each area's `tasks.rs` / `mod.rs` |
@@ -388,12 +395,31 @@ The Rust tests are in [tests/](tests/), one file per area; the browser tests are
    who uses it, the Renox features and why, what happens under the hood, `docs/*.md#anchor`
    links and the source files. Use the same `api` text as other pages for the same feature
    (`/about/pages` groups by it).
-3. A GET route that isn't a page (JSON, a file, a stream) goes in `not_pages()` with the reason.
-4. `cargo test -p bikeshop --test about` tells you what is missing.
+3. Give it one to three code samples (`code`): mark each region in its file, then name it
+   with a title that reads "Tab: what it shows":
+
+   ```rust
+   // [explain:rentals.create.handler]
+   async fn create(…) -> Result<View> {
+       …
+   }
+   // [/explain:rentals.create.handler]
+   ```
+
+   In a template the markers are comments, `{# [explain:rentals.create.form] #}` …
+   `{# [/explain:rentals.create.form] #}`; in SQL `-- [explain:…]`, in CSS
+   `/* [explain:…] */`. Opening the same name again later in the file adds a part (joined
+   with a `…` line), to skip what doesn't matter. Then, in the explanation:
+   ``code: &[Code { title: "Handler: `Valid<Booking>` checks the form", region: "rentals.create.handler" }]``.
+   Keep a sample short (5–30 lines).
+4. A GET route that isn't a page (JSON, a file, a stream) goes in `not_pages()` with the reason.
+5. `cargo test -p bikeshop --test about` tells you what is missing: a page without an
+   explanation, a link to a guide section or a file that doesn't exist, a marker never closed,
+   a sample naming a region no file marks, or a marked region no page shows.
 
 Spanish texts for an explanation go in `resources/lang/es.json` under
-`about_page.<route name>` (`title`, `purpose`, `who`, `under_hood`, `features.<n>`); whatever
-is missing there is shown in English.
+`about_page.<route name>` (`title`, `purpose`, `who`, `under_hood`, `features.<n>`, and,
+optionally, `code.<n>` for a sample's title); whatever is missing there is shown in English.
 
 ## What building it found in Renox
 

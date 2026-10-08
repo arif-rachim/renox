@@ -6,6 +6,7 @@
 {#- A new purchase order (#240): pick a supplier; the lines start with what the store needs
     (parts work orders wait for, #236; goods under their reorder level), then the rest of the
     supplier's price list. A blank quantity isn't ordered. -#}
+{# [explain:stock.purchasing.create.template] #}
 {% macro line(row, i, need) -%}
 <li class="bs-row">
   <span class="bs-row__name">{{ row.name }}<small>{{ row.sku }}
@@ -17,6 +18,7 @@
   <span><input type="hidden" name="lines[{{ i }}][variant]" value="{{ row.variant_id }}">{{ input("lines[" ~ i ~ "][quantity]", t('stock.purchasing.quantity_of', name=row.name), type="number", value=(row.quantity if need else none), hide_label=true, attrs={"min": 0, "inputmode": "numeric"}) }}</span>
 </li>
 {%- endmacro %}
+{# [/explain:stock.purchasing.create.template] #}
 
 {% block content %}
 {{ styles() }}

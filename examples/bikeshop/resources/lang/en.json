@@ -256,7 +256,13 @@
       "under_hood": "Under the hood",
       "docs": "In the guide",
       "sources": "Source files",
-      "close": "Close"
+      "close": "Close",
+      "code": "The code",
+      "github": "Open these lines on GitHub",
+      "copy": "Copy the code",
+      "copied": "Copied",
+      "hide": "Fold the explanation away",
+      "show": "How this page is built"
     },
     "pages": {
       "title": "Every page and its features",

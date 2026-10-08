@@ -50,6 +50,7 @@ async fn bike_models(db: &Db) -> Result<Vec<(i64, String)>> {
 
 /// `GET /bikes` (`workshop.bikes`): the customer's bikes, each with its
 /// last service, and the form to add one.
+// [explain:workshop.bikes.handler]
 pub async fn index(State(state): State<AppState>, user: AuthUser) -> Result<View> {
     let db = &state.db;
     let customer = customer_of(db, &user).await?;
@@ -65,6 +66,7 @@ pub async fn index(State(state): State<AppState>, user: AuthUser) -> Result<View
         |o: &WorkOrder| o.customer_bike_id.unwrap_or_default(),
     )
     .await?;
+    // [/explain:workshop.bikes.handler]
     let rows: Vec<renox::serde_json::Value> = bikes
         .iter()
         .map(|bike| {
@@ -82,6 +84,7 @@ pub async fn index(State(state): State<AppState>, user: AuthUser) -> Result<View
 }
 
 /// The form to add a bike.
+// [explain:workshop.bikes.form]
 #[derive(Deserialize, Validate)]
 pub struct BikeForm {
     /// A catalogue model, or none for free text.
@@ -97,6 +100,7 @@ pub struct BikeForm {
     #[validate(image, max = 5120)]
     pub photo: Option<Upload>,
 }
+// [/explain:workshop.bikes.form]
 
 /// `POST /bikes` (`workshop.bikes.store`): registers a bike (the photo is
 /// a private upload).
@@ -162,6 +166,7 @@ struct Event {
 /// `GET /bikes/{bike}` (`workshop.bikes.show`): the bike and its service
 /// history: every work order with its tasks, parts and notes, as a
 /// timeline. Seven queries however long the history is.
+// [explain:workshop.bikes.show.handler]
 pub async fn show(
     State(state): State<AppState>,
     user: AuthUser,
@@ -181,6 +186,7 @@ pub async fn show(
         |t: &WorkOrderTask| t.work_order_id,
     )
     .await?;
+    // [/explain:workshop.bikes.show.handler]
     let all_tasks: Vec<WorkOrderTask> = tasks.values().flatten().cloned().collect();
     let names = belongs_to::<ServiceTask, _, _>(db, &all_tasks, |t| t.service_task_id).await?;
     let parts = has_many::<WorkOrderPart, _, _>(
@@ -191,6 +197,7 @@ pub async fn show(
         |p: &WorkOrderPart| p.work_order_id,
     )
     .await?;
+    // [explain:workshop.bikes.show.handler]
     let notes = has_many::<WorkOrderNote, _, _>(
         db,
         &orders,
@@ -200,6 +207,7 @@ pub async fn show(
     )
     .await?;
     let stores = belongs_to::<Store, _, _>(db, &orders, |o| o.store_id).await?;
+    // [/explain:workshop.bikes.show.handler]
     let all_parts: Vec<WorkOrderPart> = parts.values().flatten().cloned().collect();
     let part_names = crate::app::rentals::reserve::variant_names(
         db,

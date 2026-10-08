@@ -39,6 +39,7 @@ impl renox::Module for Catalog {
         "catalog"
     }
 
+    // [explain:catalog.routes]
     fn routes(&self) -> Routes {
         Routes::new()
             .get("/shop", browse::index)
@@ -58,8 +59,10 @@ impl renox::Module for Catalog {
             // covers the routes added before it: all of the above).
             .etag()
     }
+    // [/explain:catalog.routes]
 
     fn register(&self, app: &mut Registry) {
+        // [explain:home.storefront]
         // The home page's featured bikes and categories, only for `/`, so
         // other pages run no query for it.
         app.share("storefront", |ctx: renox::view::ViewContext| async move {
@@ -82,6 +85,7 @@ impl renox::Module for Catalog {
             );
             Ok(Some(front))
         });
+        // [/explain:home.storefront]
     }
 }
 
@@ -175,6 +179,7 @@ pub fn first_route(state: &AppState, names: &[&str]) -> Option<String> {
     names.iter().find_map(|name| state.url(name, &[]).ok())
 }
 
+// [explain:sitemap.handler]
 /// `GET /sitemap.xml` (`sitemap`): the shop's pages for search engines:
 /// the home page, the catalogue, every category and every product still
 /// sold (discontinued ones are soft deleted, so not listed), with their
@@ -199,3 +204,4 @@ pub async fn sitemap(State(state): State<AppState>) -> Result<renox::seo::Sitema
     }
     Ok(map)
 }
+// [/explain:sitemap.handler]

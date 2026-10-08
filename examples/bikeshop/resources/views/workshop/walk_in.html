@@ -6,6 +6,7 @@
 {% block content %}
 <div class="rx-stack" data-bs-reveal>
   {{ page_header(t('workshop.walkin.title'), subtitle=t('workshop.walkin.lead'), back=route('workshop.board'), back_label=t('workshop.board.title')) }}
+  {# [explain:workshop.walkin.template] #}
   <form method="post" action="{{ route('workshop.walkin.store') }}" novalidate>
     {{ csrf_field() }}
     {% call card() %}
@@ -24,5 +25,6 @@
       {{ button(t('workshop.walkin.submit'), icon="check") }}
     {% endcall %}
   </form>
+  {# [/explain:workshop.walkin.template] #}
 </div>
 {% endblock %}

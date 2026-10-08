@@ -95,6 +95,7 @@ impl Cart {
         }
     }
 
+    // [explain:cart.show.load]
     /// The cart of this visitor: the account's saved cart for a logged-in
     /// customer (with the session's guest cart merged into it, once), else
     /// the session's.
@@ -118,6 +119,7 @@ impl Cart {
         }
         Ok(cart)
     }
+    // [/explain:cart.show.load]
 
     /// Stores the cart where [`Cart::load`] finds it.
     pub async fn save(&self, db: &Db, session: &Session, user: Option<&User>) -> Result {
@@ -444,6 +446,7 @@ pub struct QuantityForm {
     pub quantity: i64,
 }
 
+// [explain:cart.show.htmx]
 /// `PATCH /cart/{variant}` (`cart.update`): a new quantity, held to what
 /// the store has.
 pub async fn update(
@@ -467,6 +470,7 @@ pub async fn update(
     };
     answer(htmx, toast, data)
 }
+// [/explain:cart.show.htmx]
 
 /// `DELETE /cart/{variant}` (`cart.remove`).
 pub async fn remove(
@@ -522,6 +526,7 @@ pub async fn store(
 
 /// htmx: the `lines` block plus the navbar's count out of band, and the
 /// toast; a plain form: back to the cart page with the toast.
+// [explain:cart.show.htmx]
 fn answer(htmx: Htmx, toast: Toast, data: CartView) -> Result<Response> {
     if htmx.wants_fragment() {
         return Ok((
@@ -537,3 +542,4 @@ fn answer(htmx: Htmx, toast: Toast, data: CartView) -> Result<Response> {
     }
     Ok((toast, Redirect::to("/cart")).into_response())
 }
+// [/explain:cart.show.htmx]

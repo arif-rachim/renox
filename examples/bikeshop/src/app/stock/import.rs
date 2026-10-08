@@ -142,6 +142,7 @@ pub async fn write_row(tx: &mut Transaction, supplier_id: i64, row: PriceRow) ->
 }
 
 /// Runs the import of `data` for `supplier_id`, messages in `lang`.
+// [explain:stock.suppliers.show.import]
 pub async fn run(
     state: &AppState,
     supplier_id: i64,
@@ -155,6 +156,7 @@ pub async fn run(
         })
         .await
 }
+// [/explain:stock.suppliers.show.import]
 
 /// The import form: one CSV file.
 #[derive(Deserialize, Validate)]
@@ -182,6 +184,7 @@ pub async fn import(
     Found(supplier): Found<Supplier>,
     Valid(form): Valid<ImportForm>,
 ) -> Result<Response> {
+    // [explain:stock.suppliers.show.import]
     let file = form.file.ok_or(Error::NotFound)?;
     if rows_in(file.bytes()) > LARGE_IMPORT {
         let key = format!(
@@ -205,6 +208,7 @@ pub async fn import(
         )
             .into_response());
     }
+    // [/explain:stock.suppliers.show.import]
     Ok(run(&state, supplier.id, file.bytes(), &lang)
         .await?
         .into_response())
@@ -229,6 +233,7 @@ pub struct ImportPriceList {
     pub locale: String,
 }
 
+// [explain:stock.suppliers.show.job]
 impl Job for ImportPriceList {
     const NAME: &'static str = "stock-import-price-list";
 
@@ -255,6 +260,7 @@ impl Job for ImportPriceList {
         Ok(())
     }
 }
+// [/explain:stock.suppliers.show.job]
 
 /// The mail with an import's report.
 pub fn report_mail(

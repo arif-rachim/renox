@@ -41,6 +41,7 @@
       </nav>
       {%- endif %}
 
+      {# [explain:catalog.index.form] #}
       <form id="catalog-filters" class="bs-catalog__form" method="get" action="{{ path }}" role="search" aria-label="{{ t('catalog.filters.title') }}"
             hx-get="{{ path }}" hx-target="#results" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace"
             hx-trigger="change delay:250ms, submit" hx-indicator="#results">
@@ -58,6 +59,7 @@
         {{ range_slider("price_min", "price_max", facets.price_low, facets.price_high, step=facets.price_step,
                         value_min=filters.price_min, value_max=filters.price_max, label=t('catalog.filters.price'), format="money", id="filter-price") }}
         {%- endif %}
+      {# [/explain:catalog.index.form] #}
         {%- if facets.sizes %}
         {{ checkbox_list("size", t('catalog.filters.size'), facets.sizes, selected=filters.sizes, inline=true, id="filter-size") }}
         {%- endif %}
@@ -79,6 +81,7 @@
     </div>
   </details>
 
+  {# [explain:catalog.index.results] #}
   {% block results %}
   <section id="results" class="bs-catalog__results" aria-labelledby="results-count">
     <div class="bs-catalog__summary">
@@ -101,15 +104,18 @@
       {%- endfor %}
     {% endcall %}
     </div>
+  {# [/explain:catalog.index.results] #}
     {%- else %}
     <div class="rx-card">
       {{ empty(t('catalog.empty.title'), t('catalog.empty.search', q=filters.q) if search and filters.q else t('catalog.empty.text'), reset, t('catalog.filters.clear')) }}
     </div>
     {%- endif %}
+    {# [explain:catalog.index.results] #}
     <div class="bs-catalog__pages" hx-boost="true" hx-target="#results" hx-select="#results" hx-swap="outerHTML">
       {% from "renox/pagination.html" import pagination %}{{ pagination(pages) }}
     </div>
   </section>
   {% endblock %}
+    {# [/explain:catalog.index.results] #}
 </div>
 {% endblock %}

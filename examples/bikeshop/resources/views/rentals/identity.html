@@ -17,6 +17,7 @@
   {% call card() %}{% call infolist() %}{{ entry(t('rentals.identity.number'), masked) }}{% endcall %}{% endcall %}
   {%- endif %}
   {%- if not verified %}
+  {# [explain:rentals.identity.template] #}
   <form method="post" action="{{ route('rentals.identity.store') }}" enctype="multipart/form-data" novalidate>
     {{ csrf_field() }}
     {% call card(title=t('rentals.identity.send')) %}
@@ -27,6 +28,7 @@
       {{ button(t('rentals.identity.submit'), icon="check") }}
     {% endcall %}
   </form>
+  {# [/explain:rentals.identity.template] #}
   {%- endif %}
 </div>
 {% endblock %}

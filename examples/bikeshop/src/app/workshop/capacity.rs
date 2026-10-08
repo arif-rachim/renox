@@ -237,6 +237,7 @@ pub async fn book(
     Ok(result)
 }
 
+// [explain:workshop.book.capacity]
 async fn book_in(
     tx: &mut Transaction,
     config: &Config,
@@ -251,6 +252,7 @@ async fn book_in(
     if let Some(problem) = check_day(&mut *tx, config, &store, new.day, needed.minutes).await? {
         return Ok(Err(problem));
     }
+    // [/explain:workshop.book.capacity]
     let bike = CustomerBike::find_or_404(&mut *tx, new.bike_id).await?;
     let order = WorkOrder::create(
         &mut *tx,

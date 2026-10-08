@@ -89,12 +89,14 @@
 .bs-invoice__head p, .bs-invoice__head h1 { margin: 0; }
 .bs-invoice__meta { display: grid; justify-items: end; gap: var(--rx-space-1); }
 .bs-invoice__shop { font: var(--rx-type-heading); }
+/* [explain:orders.invoice.print] */
 @media print {
   .rx-navbar, .bs-footer, .bs-print-actions, .rx-toasts, .rx-skip, [data-rx-open="about-page"] { display: none !important; }
   .bs-public { display: block; }
   .bs-invoice { box-shadow: none; border: 0; }
   .rx-container { max-width: none; padding: 0; }
 }
+/* [/explain:orders.invoice.print] */
 
 /* ---------- the counter: find + sale | customer + pay ---------- */
 

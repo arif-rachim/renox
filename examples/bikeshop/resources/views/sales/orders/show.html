@@ -8,9 +8,11 @@
 {% block content %}
 {% include "sales/_assets.html" %}
 {%- set o = page %}
+{# [explain:orders.show.template] #}
 {% call page_header(t('sales.orders.title', number=o.number), subtitle=t('sales.orders.placed', date=(o.placed_at | date("%Y-%m-%d %H:%M"))), badge=t('sales.status.' ~ o.status), badge_kind=("success" if o.status in ["paid", "ready", "completed"] else ("warning" if o.status == "pending" else none))) %}
   {{ link_button(route('orders.invoice', o.id), t('sales.orders.invoice')) }}
 {% endcall %}
+{# [/explain:orders.show.template] #}
 
 <div class="bs-order" data-bs-reveal>
   <div class="bs-order__main">
@@ -39,12 +41,14 @@
     {% endcall %}
     {%- endif %}
   </div>
+  {# [explain:orders.show.template] #}
   <aside class="bs-order__side">
     {% call card(t('sales.orders.progress')) %}
       {%- set ns = namespace(items=[]) %}
       {%- for step in steps %}{% if step.done %}{% set ns.items = ns.items + [{"time": step.at, "title": t('sales.step.' ~ step.key), "kind": ("error" if step.key == "cancelled" else ("info" if step.key == "refunded" else "success"))}] %}{% endif %}{% endfor %}
       {{ history(ns.items, label=t('sales.orders.progress')) }}
     {% endcall %}
+  {# [/explain:orders.show.template] #}
     {% call card(t('sales.orders.details')) %}
       {% call infolist() %}
         {{ entry(t('sales.orders.store'), o.store.name if o.store else none) }}

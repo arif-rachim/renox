@@ -74,6 +74,7 @@ pub struct Demo {
     pub accounts: &'static [DemoLogin],
 }
 
+// [explain:login.demo]
 /// The `demo_logins` view value: the [`Demo`] on the login page of a
 /// seeded demo, else `none`.
 pub async fn for_view(ctx: renox::view::ViewContext) -> Result<Option<Demo>> {
@@ -91,3 +92,4 @@ pub async fn for_view(ctx: renox::view::ViewContext) -> Result<Option<Demo>> {
         accounts: LOGINS,
     }))
 }
+// [/explain:login.demo]

@@ -87,6 +87,7 @@ impl Gateway for DemoGateway {
         Box::pin(async move { Ok(format!("demo_cus_{}", owner.key().replace(':', "_"))) })
     }
 
+    // [explain:plans.demo.checkout]
     /// The demo's page, signed: who, which subscription, which plan.
     fn checkout<'a>(
         &'a self,
@@ -102,6 +103,7 @@ impl Gateway for DemoGateway {
             Ok(Checkout::redirect(url))
         })
     }
+    // [/explain:plans.demo.checkout]
 
     fn swap<'a>(
         &'a self,
@@ -261,6 +263,7 @@ pub struct DemoBillingNotify {
     pub event: DemoEvent,
 }
 
+// [explain:plans.demo.job]
 impl Job for DemoBillingNotify {
     const NAME: &'static str = "bikeshop.demo-billing-notify";
     const MAX_ATTEMPTS: u32 = 5;
@@ -289,6 +292,7 @@ impl Job for DemoBillingNotify {
         Ok(())
     }
 }
+// [/explain:plans.demo.job]
 
 /// What the demo page shows.
 #[derive(Serialize)]
@@ -339,6 +343,7 @@ pub struct DemoForm {
 /// `POST /plans/demo-pay/{user}/{name}/{plan}` (`plans.demo.complete`):
 /// "takes" the payment, queues the gateway's webhook, and sends the
 /// customer back as a gateway would (renox-billing's `billing.return`).
+// [explain:plans.demo.complete]
 pub async fn complete(
     _: ValidSignature,
     State(state): State<AppState>,
@@ -355,6 +360,7 @@ pub async fn complete(
     state.dispatch(DemoBillingNotify { event }).await?;
     Redirect::route("billing.return", &[])
 }
+// [/explain:plans.demo.complete]
 
 /// Renew now, paid or failed.
 #[derive(Deserialize, Validate, Debug)]

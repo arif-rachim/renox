@@ -27,6 +27,7 @@
         {% endcall %}
       </form>
 
+      {# [explain:workshop.order.template] #}
       {% call card(title=t('workshop.order.parts')) %}
         {%- if parts %}
         {% call list(id="order-parts", label=t('workshop.order.parts')) %}
@@ -51,6 +52,7 @@
         </form>
         {%- endif %}
       {% endcall %}
+      {# [/explain:workshop.order.template] #}
 
       {% call card(title=t('workshop.order.notes')) %}
         {%- if notes %}

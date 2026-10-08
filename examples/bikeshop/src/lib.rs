@@ -22,7 +22,9 @@
 //! ```
 
 pub mod app;
+pub mod code;
 pub mod explain;
+pub mod highlight;
 pub mod money;
 pub mod report;
 pub mod seed;
@@ -105,6 +107,8 @@ pub fn app() -> App {
         // side's sensitive changes (src/app/staff/audit.rs) and the books'
         // (src/app/multistore/audit.rs).
         .module(renox::audit::Audit)
+        // Whether "About this page" is docked or folded, from its cookie (src/explain.rs).
+        .layer(renox::axum::middleware::from_fn(explain::dock_layer))
         // The language follows the account to every device (src/app/accounts/locale.rs).
         .layer(renox::axum::middleware::from_fn(
             app::accounts::locale::middleware,

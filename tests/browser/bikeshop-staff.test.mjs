@@ -119,10 +119,8 @@ describe('bikeshop staff side', () => {
       await logIn(page, app, 'owner@bikeshop.test');
       await page.goto(`${app.url}/admin/products`);
       assert.ok((await page.text('main')).includes('What fits'));
-      await page.click('[data-rx-open="about-page"]');
-      await page.waitFor(() => document.querySelector('#about-page')?.open);
-      assert.ok((await page.text('#about-page')).includes('renox-admin'));
-      await page.press('Escape');
+      // "About this page", docked beside the panel's page on a wide screen.
+      assert.ok((await page.text('#explain-dock')).includes('renox-admin'));
       await shot(page, 'admin-products');
       await page.goto(`${app.url}/admin/products/create`);
       await page.waitFor(() => document.querySelector('textarea[name="description"]'), { message: 'the editor' });

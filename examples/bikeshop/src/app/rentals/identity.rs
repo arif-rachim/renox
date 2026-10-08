@@ -68,6 +68,7 @@ pub async fn edit(State(state): State<AppState>, user: AuthUser) -> Result<View>
 }
 
 /// The ID form.
+// [explain:rentals.identity.form]
 #[derive(Deserialize)]
 pub struct IdentityForm {
     pub id_number: String,
@@ -94,10 +95,12 @@ impl Validate for IdentityForm {
             .max(5 * 1024);
     }
 }
+// [/explain:rentals.identity.form]
 
 /// `POST /rentals/identity` (`rentals.identity.store`): stores the photo
 /// privately, seals the number, and asks the chosen store's staff to check
 /// it (an in-app notification to everyone there who may verify IDs).
+// [explain:rentals.identity.store]
 pub async fn store(
     State(state): State<AppState>,
     user: AuthUser,
@@ -112,11 +115,13 @@ pub async fn store(
     customer
         .save_only(&state.db, &["id_number", "id_verified_at"])
         .await?;
+    // [/explain:rentals.identity.store]
     // Earlier pending documents are replaced by this one.
     IdentityDocument::where_eq("customer_id", customer.id)
         .where_eq("status", IdentityStatus::Pending)
         .update(&state.db, &[("status", &IdentityStatus::Refused)])
         .await?;
+    // [explain:rentals.identity.store]
     IdentityDocument::create(
         &state.db,
         IdentityDocument {
@@ -129,6 +134,7 @@ pub async fn store(
         },
     )
     .await?;
+    // [/explain:rentals.identity.store]
     notify::staff(
         &state,
         catalogue::RENTALS_VERIFY_ID,
@@ -191,6 +197,7 @@ struct Waiting {
 /// waiting at the stores where the user may verify IDs (`visible`, i.e.
 /// `scopes_with` over the document's store), oldest first, each with a
 /// button that opens the photo through a signed link. Three queries.
+// [explain:rentals.identities.handler]
 pub async fn index(State(state): State<AppState>) -> Result<View> {
     let documents = access::visible::<IdentityDocument>(catalogue::RENTALS_VERIFY_ID)
         .where_eq("status", IdentityStatus::Pending)
@@ -220,10 +227,12 @@ pub async fn index(State(state): State<AppState>) -> Result<View> {
         .collect();
     Ok(view("rentals/identities.html", context! { waiting }))
 }
+// [/explain:rentals.identities.handler]
 
 /// `GET /staff/identities/{document}/photo` (`rentals.identities.photo`):
 /// the photo, for staff who may check this document, through a signed
 /// temporary URL (five minutes).
+// [explain:rentals.identities.photo]
 pub async fn photo(
     State(state): State<AppState>,
     user: AuthUser,
@@ -236,6 +245,7 @@ pub async fn photo(
         .await?;
     Ok(Redirect::to(&url))
 }
+// [/explain:rentals.identities.photo]
 
 /// `POST /staff/identities/{document}/approve`: the customer is verified
 /// (in every store) and told so.

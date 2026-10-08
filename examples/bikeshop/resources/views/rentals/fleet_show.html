@@ -22,6 +22,7 @@
         {{ entry(t('rentals.fields.ridden'), bike.ridden_hours, format="number", hint=t('rentals.fleet.hours_left', hours=hours_to_service)) }}
       {% endcall %}
     {% endcall %}
+    {# [explain:rentals.fleet.show.template] #}
     {% call card(title=t('rentals.abilities.title'), subtitle=t('rentals.abilities.lead')) %}
       {% call list(id="abilities", label=t('rentals.abilities.title')) %}
         {%- for a in abilities %}
@@ -35,6 +36,7 @@
         {%- endfor %}
       {% endcall %}
     {% endcall %}
+    {# [/explain:rentals.fleet.show.template] #}
   {% endcall %}
   {{ tabs("history", [["rentals", t('rentals.fleet.rentals')], ["placements", t('rentals.fleet.placements')], ["work", t('rentals.fleet.work_orders')]], label=t('rentals.fleet.history')) }}
   {% call tab_panel("history", "rentals", selected=true) %}

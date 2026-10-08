@@ -87,6 +87,7 @@ pub struct SendBack {
     pub can_send: bool,
 }
 
+// [explain:multistore.placements.handler]
 /// `GET /staff/placements` (`multistore.placements`): placements to and
 /// from the active store, and bikes away from their home with a "send back"
 /// task. A fixed number of queries.
@@ -102,6 +103,7 @@ pub async fn index(State(db): State<Db>, user: AuthUser) -> Result<View> {
         .limit(50)
         .get(&db)
         .await?;
+    // [/explain:multistore.placements.handler]
     let bikes = RentalBike::find_many(
         &db,
         placements
@@ -110,6 +112,7 @@ pub async fn index(State(db): State<Db>, user: AuthUser) -> Result<View> {
             .collect::<Vec<_>>(),
     )
     .await?;
+    // [explain:multistore.placements.handler]
     // Bikes here or ours, standing somewhere other than their home.
     let around = access::visible::<RentalBike>(catalogue::FLEET_VIEW)
         .where_any(|q| {
@@ -120,6 +123,7 @@ pub async fn index(State(db): State<Db>, user: AuthUser) -> Result<View> {
         .get(&db)
         .await?;
     let homes = homes(&db, &around).await?;
+    // [/explain:multistore.placements.handler]
     let mut ids: Vec<i64> = bikes.iter().map(|b| b.variant_id).collect();
     ids.extend(around.iter().map(|b| b.variant_id));
     let names = variant_names(&db, ids).await?;
@@ -184,6 +188,7 @@ pub struct NewQuery {
     pub store: Option<i64>,
 }
 
+// [explain:multistore.placements.create.handler]
 /// `GET /staff/placements/new` (`multistore.placements.create`): place one
 /// of our bikes at another store (approved at once: it's ours), or ask
 /// another store for one of its bikes standing at home.
@@ -212,6 +217,7 @@ pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Resu
         .limit(200)
         .get(&db)
         .await?;
+    // [/explain:multistore.placements.create.handler]
     let names = variant_names(&db, bikes.iter().map(|b| b.variant_id).collect()).await?;
     let options: Vec<(i64, String)> = bikes
         .iter()
@@ -235,6 +241,7 @@ pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Resu
     ))
 }
 
+// [explain:multistore.placements.create.form]
 /// The placement form.
 #[derive(Deserialize, Validate, Debug)]
 pub struct PlacementForm {
@@ -248,6 +255,7 @@ pub struct PlacementForm {
     #[validate(max = 300)]
     pub note: Option<String>,
 }
+// [/explain:multistore.placements.create.form]
 
 /// `POST /staff/placements` (`multistore.placements.store`).
 pub async fn store(
@@ -278,6 +286,7 @@ pub async fn store(
             lang.t("multistore.placements.errors.bike", &[]),
         ));
     }
+    // [explain:multistore.placements.create.store]
     let ours = owner == store;
     let staff = Staff::of_user(db, user.id).await?.map(|s| s.id);
     let now = renox::db::now();
@@ -301,6 +310,7 @@ pub async fn store(
         },
     )
     .await?;
+    // [/explain:multistore.placements.create.store]
     audit::record(
         &state,
         &user,
@@ -409,6 +419,7 @@ pub async fn decide(
     ))
 }
 
+// [explain:multistore.placements.move]
 /// `POST /staff/placements/{placement}/move` (`multistore.placements.move`):
 /// the bike goes; its location is now the other store.
 pub async fn move_bike(
@@ -439,6 +450,7 @@ pub async fn move_bike(
         .save_only(&mut tx, &["status", "moved_at"])
         .await?;
     tx.commit().await?;
+    // [/explain:multistore.placements.move]
     audit::record(
         &state,
         &user,

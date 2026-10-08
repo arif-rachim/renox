@@ -8,6 +8,7 @@
 </head>
 {#- The supplier's printable order (#240): reached through a signed link mailed to the
     supplier (ValidSignature), no login and no shop chrome; the kit's table and buttons. -#}
+{# [explain:stock.purchasing.print.template] #}
 <body class="rx-page">
 {% from "renox/ui.html" import table, infolist, entry %}
 <main class="bs-print" id="main">
@@ -18,6 +19,7 @@
     </div>
     <div class="bs-print__tools"><button class="rx-button rx-button--secondary" type="button" data-bs-print>{{ t('stock.print.print') }}</button></div>
   </div>
+{# [/explain:stock.purchasing.print.template] #}
   {% call infolist(columns=2) %}
     {{ entry(t('stock.print.supplier'), supplier.name) }}
     {{ entry(t('stock.print.deliver_to'), store.name) }}

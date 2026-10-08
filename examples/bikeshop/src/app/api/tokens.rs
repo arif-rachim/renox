@@ -31,6 +31,7 @@ pub struct TokenForm {
     pub abilities: Vec<String>,
 }
 
+// [explain:api.tokens.rules]
 /// The abilities a form may tick, by who makes the token.
 fn check(form: &TokenForm, v: &mut Validator, allowed: &[&str]) {
     v.field("name", &form.name).required().max(60);
@@ -44,6 +45,7 @@ impl Validate for TokenForm {
         check(self, v, &allowed);
     }
 }
+// [/explain:api.tokens.rules]
 
 /// A kiosk's form.
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -102,6 +104,7 @@ pub async fn index(State(db): State<Db>, user: AuthUser, session: Session) -> Re
     ))
 }
 
+// [explain:api.tokens.store]
 /// `POST /account/api-tokens` (`api.tokens.store`): a personal token with
 /// the abilities ticked, for a year; shown once on the next page.
 pub async fn store(
@@ -122,6 +125,7 @@ pub async fn store(
         Redirect::route("api.tokens", &[])?,
     ))
 }
+// [/explain:api.tokens.store]
 
 /// `POST /account/api-tokens/{token}/revoke` (`api.tokens.destroy`).
 pub async fn destroy(
@@ -185,6 +189,7 @@ pub async fn kiosks(State(db): State<Db>, session: Session) -> Result<View> {
     ))
 }
 
+// [explain:api.kiosks.store]
 /// `POST /staff/api-tokens` (`api.kiosks.store`): a kiosk for the active
 /// store: its own user (a random password nobody is told), a token with
 /// the abilities ticked (no expiry: the manager revokes it), shown once.
@@ -199,15 +204,18 @@ pub async fn kiosk_store(
     if !access::can_in(&user, catalogue::FLEET_MANAGE, store_id) {
         return Err(Error::Forbidden);
     }
+    // [/explain:api.kiosks.store]
     let email = format!(
         "kiosk-{}@kiosk.invalid",
         renox::random_token()[..16].to_lowercase()
     );
+    // [explain:api.kiosks.store]
     let kiosk_user = User::register(&db, form.name.trim(), &email, &renox::random_token()).await?;
     let abilities: Vec<&str> = form.abilities.iter().map(String::as_str).collect();
     let token = kiosk_user
         .create_token_with(&db, form.name.trim(), &abilities, None)
         .await?;
+    // [/explain:api.kiosks.store]
     Kiosk::create(
         &db,
         Kiosk {
@@ -221,11 +229,13 @@ pub async fn kiosk_store(
         },
     )
     .await?;
+    // [explain:api.kiosks.store]
     session.flash(FLASH, token.plain)?;
     Ok((
         Toast::success(lang.t("api.tokens.made", &[])),
         Redirect::route("api.kiosks", &[])?,
     ))
+    // [/explain:api.kiosks.store]
 }
 
 /// `POST /staff/api-tokens/{kiosk}/revoke` (`api.kiosks.destroy`): the

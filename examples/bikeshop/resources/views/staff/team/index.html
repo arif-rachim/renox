@@ -12,6 +12,7 @@
     {{ link_button(route('staff.invitations.create'), t('staff.invitations.title'), variant="primary", icon="plus") }}
   {% endcall %}
   {%- if members %}
+  {# [explain:staff.team.index.template] #}
   {% call table([t('staff.team.name'), t('staff.team.roles'), t('staff.team.home'), t('staff.team.status'), ""], caption=t('staff.team.title', store=store.name)) %}
     {%- for m in members %}
     <tr id="member-{{ m.staff.id }}">
@@ -23,6 +24,7 @@
     </tr>
     {%- endfor %}
   {% endcall %}
+  {# [/explain:staff.team.index.template] #}
   {%- else %}
   <div class="rx-card">{{ empty(t('staff.team.empty'), none, route('staff.invitations.create'), t('staff.invitations.title')) }}</div>
   {%- endif %}

@@ -11,6 +11,7 @@
 {{ styles() }}
 <div class="bs-board">
   {{ page_header(t('workshop.board.title'), subtitle=t('workshop.board.lead', count=count)) }}
+  {# [explain:workshop.board.template] #}
   <form class="bs-board__filters" method="get" action="{{ route('workshop.board') }}" aria-label="{{ t('workshop.board.filters') }}">
     {%- set m = namespace(list=[["", t('workshop.board.everyone')], ["none", t('workshop.board.unassigned')]]) %}
     {%- for x in mechanics %}{% set m.list = m.list + [[x[0], x[1]]] %}{% endfor %}
@@ -24,5 +25,6 @@
   <div id="workshop-board" class="bs-board__body" hx-get="{{ request.path }}{% if request.query %}?{{ request.query }}{% endif %}" hx-trigger="every 60s" hx-select="#workshop-board" hx-swap="outerHTML">
     {{ kanban("workshop-kanban", columns, url=route('workshop.move'), label=t('workshop.board.title')) }}
   </div>
+  {# [/explain:workshop.board.template] #}
 </div>
 {% endblock %}

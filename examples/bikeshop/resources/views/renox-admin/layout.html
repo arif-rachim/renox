@@ -11,10 +11,10 @@
   {% include "layouts/_head.html" %}
   {{ stack('head') }}
 </head>
-<body class="rx-page rx-shell">
+{%- set about = about_page(request.route, request.path) if explain_panels else none %}
+<body class="rx-page rx-shell{% if about %} bs-docked{% if about.rail %} bs-docked--rail{% endif %}{% endif %}">
   {% from "renox/ui.html" import sidebar, sidebar_link, sidebar_section, navbar, menu, menu_link, menu_action, menu_separator, open_button %}
   {% from "layouts/_text.html" import tx as tr %}
-  {%- set about = about_page(request.route, request.path) if explain_panels else none %}
   {% call sidebar(tr(admin.title), href=admin.home, label=t('admin_panel.navigation')) %}
     {{ sidebar_link(admin.home, t('admin_panel.dashboard'), active=admin.dashboard) }}
     {%- for group in admin.nav %}
@@ -46,7 +46,9 @@
       {% block content %}{% endblock %}
     </main>
   </div>
-  {%- if about %}{% include "about/_panel.html" %}{% endif %}
+  {#- "About this page": docked beside the page on wide screens, a sheet on
+      narrower ones (about/_dock.html, about/_panel.html). -#}
+  {%- if about %}{% include "about/_dock.html" %}{% include "about/_panel.html" %}{% endif %}
   {{ toasts() }}
   {% include "layouts/_scripts.html" %}
   {{ stack('scripts') }}

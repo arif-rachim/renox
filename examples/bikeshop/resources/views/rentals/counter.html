@@ -29,6 +29,7 @@
     {%- endif %}
   </section>
   {%- endif %}
+  {# [explain:rentals.counter.template] #}
   {% call columns(3) %}
     {%- for key, rows in [["pickups", pickups], ["out", out], ["overdue", overdue]] %}
     <section class="rx-stack" aria-labelledby="{{ key }}-title">
@@ -43,5 +44,6 @@
     </section>
     {%- endfor %}
   {% endcall %}
+  {# [/explain:rentals.counter.template] #}
 </div>
 {% endblock %}

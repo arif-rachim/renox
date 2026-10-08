@@ -1,0 +1,88 @@
+{#- What "About this page" says about a page (src/explain.rs), shared by the
+    panel docked beside the page (about/_dock.html) and the sheet narrower
+    screens open (about/_panel.html):
+    `{% from "about/_explain.html" import explain %}{{ explain(about, "explain-dock") }}`,
+    where `about` is the page's explanation and the second argument a prefix
+    that keeps the two copies' ids apart. Top to bottom: what the page is for
+    and who uses it, the Renox features as chips (each opens its "why"), the
+    code in tabs, what happens under the hood, and the links. -#}
+{% from "renox/ui.html" import badge, tabs, tab_panel, icon_button %}
+{% macro explain(about, explain_id) -%}
+<div class="bs-explain">
+  {#- Both may hold Markdown (`code`, **bold**). -#}
+  <div class="bs-explain__purpose">{{ about.purpose | markdown }}</div>
+  <div class="bs-explain__who">
+    <div class="bs-explain__who-text">{{ about.who | markdown }}</div>
+    <span class="bs-badges" aria-label="{{ t('about.panel.roles') }}">{% for role in about.audience %}{{ badge(role.label) }}{% endfor %}{{ badge(about.flow.label, kind="info") }}</span>
+  </div>
+
+  <section class="bs-explain__section" aria-labelledby="{{ explain_id }}-features">
+    <h3 class="bs-explain__heading" id="{{ explain_id }}-features">{{ t('about.panel.features') }}</h3>
+    {#- A chip per feature; pressing one shows why the page uses it
+        (public/app.js), one at a time. -#}
+    <ul class="bs-chips" role="list">
+      {%- for feature in about.features %}
+      <li><button class="bs-chip" type="button" aria-expanded="false" aria-controls="{{ explain_id }}-why-{{ loop.index0 }}" data-bs-chip><code>{{ feature.api }}</code></button></li>
+      {%- endfor %}
+    </ul>
+    {%- for feature in about.features %}
+    <div class="bs-explain__why rx-prose" id="{{ explain_id }}-why-{{ loop.index0 }}" hidden>
+      <p class="bs-explain__why-api"><code>{{ feature.api }}</code></p>
+      {{ feature.why | markdown }}
+    </div>
+    {%- endfor %}
+  </section>
+
+  {%- if about.code %}
+  <section class="bs-explain__section" aria-labelledby="{{ explain_id }}-code">
+    <h3 class="bs-explain__heading" id="{{ explain_id }}-code">{{ t('about.panel.code') }}</h3>
+    {{ tabs(explain_id ~ "-code", about.code_tabs, label=t('about.panel.code')) }}
+    {%- for sample in about.code %}
+    {% call tab_panel(explain_id ~ "-code", loop.index0 | string, selected=loop.first) %}
+      <figure class="bs-code">
+        {%- if sample.caption %}<figcaption class="bs-code__caption">{{ sample.caption | markdown }}</figcaption>{% endif %}
+        <div class="bs-code__frame">
+          <div class="bs-code__bar">
+            <span class="bs-code__lang">{{ sample.language }}</span>
+            <a class="bs-code__path" href="{{ sample.github }}" target="_blank" rel="noopener" title="{{ t('about.panel.github') }}"><code>{{ sample.path | replace("examples/bikeshop/", "") }}</code></a>
+            {{ icon_button("external", t('about.panel.github'), href=sample.github, size="small", new_tab=true) }}
+            <button class="rx-icon-button rx-icon-button--plain rx-icon-button--small bs-copy" type="button" data-rx-copy data-rx-copy-text="{{ sample.text }}" aria-label="{{ t('about.panel.copy') }}" data-rx-tip="{{ t('about.panel.copy') }}" data-label-done="{{ t('about.panel.copied') }}">
+              <svg class="bs-copy__idle" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><rect x="6.5" y="6.5" width="10" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M13.5 6.5V5a1.5 1.5 0 00-1.5-1.5H5A1.5 1.5 0 003.5 5v7A1.5 1.5 0 005 13.5h1.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+              <svg class="bs-copy__done" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M4.5 10.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="rx-visually-hidden" aria-live="polite"></span>
+            </button>
+          </div>
+          <pre class="bs-code__pre"><code class="bs-code__code">{{ sample.html | safe }}</code></pre>
+        </div>
+      </figure>
+    {% endcall %}
+    {%- endfor %}
+  </section>
+  {%- endif %}
+
+  <section class="bs-explain__section" aria-labelledby="{{ explain_id }}-hood">
+    <h3 class="bs-explain__heading" id="{{ explain_id }}-hood">{{ t('about.panel.under_hood') }}</h3>
+    <div class="rx-prose bs-explain__prose">{{ about.under_hood | markdown }}</div>
+  </section>
+
+  <section class="bs-explain__section bs-explain__links" aria-labelledby="{{ explain_id }}-docs">
+    <div>
+      <h3 class="bs-explain__heading" id="{{ explain_id }}-docs">{{ t('about.panel.docs') }}</h3>
+      <ul class="bs-links" role="list">
+        {%- for doc in about.docs %}
+        <li><a class="rx-link" href="{{ doc.site }}" target="_blank" rel="noopener">{{ doc.path | replace("docs/", "") }}</a></li>
+        {%- endfor %}
+      </ul>
+    </div>
+    <div>
+      <h3 class="bs-explain__heading">{{ t('about.panel.sources') }}</h3>
+      <ul class="bs-links" role="list">
+        {%- for source in about.sources %}
+        <li><a class="rx-link" href="{{ source.github }}" target="_blank" rel="noopener"><code>{{ source.path | replace("examples/bikeshop/", "") }}</code></a></li>
+        {%- endfor %}
+      </ul>
+    </div>
+  </section>
+  <p class="bs-explain__index"><a class="rx-link" href="{{ route('about.pages') }}">{{ t('about.index_link') }}</a></p>
+</div>
+{%- endmacro %}

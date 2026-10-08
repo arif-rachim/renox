@@ -255,6 +255,7 @@ pub async fn listing(
     };
     let fits = fits_models(filters.fits.as_deref(), &bikes);
 
+    // [explain:catalog.listing]
     // What's in scope, before the filters: the facets come from it.
     let in_scope = || {
         Product::query()
@@ -269,6 +270,7 @@ pub async fn listing(
         .await?;
     let total = page.total;
     let cards = Card::load(db, page.items.clone()).await?;
+    // [/explain:catalog.listing]
     let facets = facets(db, lang, in_scope(), bikes).await?;
     // The slider sends both ends every time: an end at the scale's edge is
     // no filter (no chip, and links without it).
@@ -308,6 +310,7 @@ pub async fn listing(
     };
     let reset = path.to_owned();
     let paginated = page.map(|_| ());
+    // [explain:catalog.listing]
     Ok(view(
         "catalog/index.html",
         context! {
@@ -330,6 +333,7 @@ pub async fn listing(
         },
     )
     .fragment("results"))
+    // [/explain:catalog.listing]
 }
 
 /// The filter choices for the products in `scope` (six queries).
@@ -503,6 +507,7 @@ fn menu(tree: &Tree, current: Option<i64>) -> Vec<CategoryLink> {
         .collect()
 }
 
+// [explain:catalog.index.handler]
 /// `GET /shop` (`catalog.index`): every product.
 pub async fn index(
     State(db): State<Db>,
@@ -514,7 +519,9 @@ pub async fn index(
     filters.q.clear();
     listing(&db, &lang, user.as_deref(), Scope::All, "/shop", filters).await
 }
+// [/explain:catalog.index.handler]
 
+// [explain:catalog.category.handler]
 /// `GET /shop/{slug}` (`catalog.category`): a category and the ones under it.
 pub async fn category(
     State(db): State<Db>,
@@ -536,7 +543,9 @@ pub async fn category(
     )
     .await
 }
+// [/explain:catalog.category.handler]
 
+// [explain:catalog.search.handler]
 /// `GET /search?q=` (`catalog.search`): search results, with the same filters.
 pub async fn search(
     State(db): State<Db>,
@@ -555,6 +564,7 @@ pub async fn search(
     )
     .await
 }
+// [/explain:catalog.search.handler]
 
 /// One suggestion under the navbar's search box.
 #[derive(Serialize, Debug, Clone)]
@@ -586,6 +596,7 @@ pub async fn suggest(
     } else {
         q
     };
+    // [explain:catalog.search.suggest]
     let suggestions = if q.is_empty() {
         Vec::new()
     } else {
@@ -607,4 +618,5 @@ pub async fn suggest(
             .collect()
     };
     Ok(view("catalog/_suggest.html", context! { q, suggestions }))
+    // [/explain:catalog.search.suggest]
 }

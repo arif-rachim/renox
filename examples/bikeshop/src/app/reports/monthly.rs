@@ -72,6 +72,7 @@ pub fn file_name(month: NaiveDate, slug: &str) -> String {
     format!("bikeshop-{slug}-{}.xlsx", month.format("%Y-%m"))
 }
 
+// [explain:reports.monthly.batch]
 /// Starts a run for `month` over `stores`: the batch, its id.
 pub async fn start(state: &AppState, month: NaiveDate, stores: &[i64]) -> Result<i64> {
     let month = month_of(month);
@@ -97,6 +98,7 @@ pub async fn start(state: &AppState, month: NaiveDate, stores: &[i64]) -> Result
         .dispatch()
         .await
 }
+// [/explain:reports.monthly.batch]
 
 /// Writes one store's workbook for one month to storage.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -580,6 +582,7 @@ pub struct RunForm {
 
 /// `POST /staff/reports/monthly` (`reports.monthly.run`): runs the month
 /// for the stores where the person holds `reports.view`.
+// [explain:reports.monthly.handler]
 pub async fn run(
     State(state): State<AppState>,
     user: AuthUser,
@@ -599,6 +602,7 @@ pub async fn run(
         return Err(Error::Forbidden);
     }
     start(&state, month, &reach.chosen).await?;
+    // [/explain:reports.monthly.handler]
     Ok((
         Toast::success(lang.t(
             "reports.monthly.started",

@@ -17,6 +17,7 @@
     {{ input("q", t('stock.consignments.search'), value=q, attrs={"type": "search"}) }}
     {{ button(t('stock.consignments.show_goods'), variant="secondary", icon="search") }}
   </form>
+  {# [explain:stock.consignments.create.template] #}
   <form method="post" action="{{ route('stock.consignments.store') }}" id="consignment-form" novalidate>
     {{ csrf_field() }}
     <input type="hidden" name="direction" value="{{ direction }}">
@@ -36,6 +37,7 @@
           </span>
         </li>
         {%- endfor %}
+  {# [/explain:stock.consignments.create.template] #}
       </ul>
       {%- else %}{{ empty(t('stock.consignments.no_goods')) }}{% endif %}
     {% endcall %}

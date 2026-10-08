@@ -65,6 +65,7 @@ pub fn workable(user: &User) -> Scopes<i64> {
 /// );
 /// # let _ = routes;
 /// ```
+// [explain:staff.dashboard.store]
 pub fn staff_routes(routes: Routes) -> Routes {
     routes
         .require_permission(STAFF_ACCESS)
@@ -99,6 +100,7 @@ pub async fn middleware(
     }
     next.run(req).await
 }
+// [/explain:staff.dashboard.store]
 
 /// The store to start in: the home store when the user may work there,
 /// else the first store they may work in (the first store at all for a

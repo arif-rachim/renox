@@ -43,6 +43,7 @@ use crate::app::workshop::model::{PartStatus, WorkOrder, WorkOrderPart, WorkStat
 
 /// `GET /staff/suppliers` (`stock.suppliers`): every supplier, with how
 /// many items their price list has and the active store's open orders.
+// [explain:stock.suppliers.handler]
 pub async fn suppliers(State(db): State<Db>, Page(page): Page) -> Result<View> {
     let store = active_store::current().ok_or(Error::Forbidden)?;
     let suppliers = Supplier::query()
@@ -55,6 +56,7 @@ pub async fn suppliers(State(db): State<Db>, Page(page): Page) -> Result<View> {
         .group_by("supplier_id")
         .select_as(&db, "supplier_id, COUNT(*)")
         .await?;
+    // [/explain:stock.suppliers.handler]
     let open: Vec<(i64, i64)> = PurchaseOrder::query()
         .where_in("supplier_id", ids)
         .where_eq("store_id", store)
@@ -69,6 +71,7 @@ pub async fn suppliers(State(db): State<Db>, Page(page): Page) -> Result<View> {
         .group_by("supplier_id")
         .select_as(&db, "supplier_id, COUNT(*)")
         .await?;
+    // [explain:stock.suppliers.handler]
     let items: HashMap<i64, i64> = items.into_iter().collect();
     let open: HashMap<i64, i64> = open.into_iter().collect();
     let suppliers = suppliers.map(|s| {
@@ -80,7 +83,9 @@ pub async fn suppliers(State(db): State<Db>, Page(page): Page) -> Result<View> {
     });
     Ok(view("stock/suppliers/index.html", context! { suppliers }))
 }
+// [/explain:stock.suppliers.handler]
 
+// [explain:stock.suppliers.form]
 /// The supplier form.
 #[derive(Deserialize, Serialize, Validate, Debug, Default)]
 pub struct SupplierForm {
@@ -102,7 +107,9 @@ impl SupplierForm {
         supplier.lead_days = self.lead_days.unwrap_or(7);
     }
 }
+// [/explain:stock.suppliers.form]
 
+// [explain:stock.suppliers.create.handler]
 /// `GET /staff/suppliers/new` (`stock.suppliers.create`).
 pub async fn supplier_create() -> View {
     view(
@@ -124,7 +131,9 @@ pub async fn supplier_store(
         Redirect::route("stock.suppliers.show", &[&supplier.id])?,
     ))
 }
+// [/explain:stock.suppliers.create.handler]
 
+// [explain:stock.suppliers.edit.handler]
 /// `GET /staff/suppliers/{supplier}/edit` (`stock.suppliers.edit`).
 pub async fn supplier_edit(Found(supplier): Found<Supplier>) -> View {
     view("stock/suppliers/form.html", context! { supplier })
@@ -143,6 +152,7 @@ pub async fn supplier_update(
         Redirect::route("stock.suppliers.show", &[&supplier.id])?,
     ))
 }
+// [/explain:stock.suppliers.edit.handler]
 
 /// `GET /staff/suppliers/{supplier}` (`stock.suppliers.show`): the
 /// supplier, their price list (from the CSV import) and the active store's
@@ -188,6 +198,7 @@ pub struct ListQuery {
 
 /// `GET /staff/purchase-orders` (`stock.purchasing`): the active store's
 /// orders. Three queries a page.
+// [explain:stock.purchasing.handler]
 pub async fn index(
     State(db): State<Db>,
     Page(page): Page,
@@ -200,6 +211,7 @@ pub async fn index(
         .unwrap_or_else(|| "open".to_owned());
     let orders =
         access::visible::<PurchaseOrder>(catalogue::STOCK_VIEW).where_eq("store_id", store);
+    // [/explain:stock.purchasing.handler]
     let orders = match tab.as_str() {
         "open" => orders.where_in(
             "status",
@@ -212,10 +224,12 @@ pub async fn index(
         "received" => orders.where_eq("status", PurchaseStatus::Received),
         _ => orders,
     };
+    // [explain:stock.purchasing.handler]
     let orders = orders.order_by_desc("id").paginate(&db, page, 25).await?;
     let suppliers =
         renox::db::relations::belongs_to::<Supplier, _, _>(&db, &orders.items, |o| o.supplier_id)
             .await?;
+    // [/explain:stock.purchasing.handler]
     let orders = orders.map(|o| {
         json!({
             "supplier": suppliers.get(&o.supplier_id).map(|s| s.name.clone()),
@@ -246,6 +260,7 @@ pub struct Need {
     pub sold_by_supplier: bool,
 }
 
+// [explain:stock.purchasing.needs]
 /// What `store` needs: parts that work orders at the store wait for
 /// (#236's "waiting for parts"), and its own goods under their reorder
 /// level, topped up to twice the level. One map by variant.
@@ -271,6 +286,7 @@ pub async fn needs(db: &Db, store: i64) -> Result<BTreeMap<i64, Need>> {
             need.work_orders.push(part.work_order_id);
         }
     }
+    // [/explain:stock.purchasing.needs]
     let here: Vec<StockRow> = StockRow::where_eq("location_store_id", store)
         .where_op("reorder_level", ">", 0)
         .get(db)
@@ -316,6 +332,7 @@ pub struct NewQuery {
 /// supplier; the lines start with what the store **needs** (parts work
 /// orders wait for, goods under their reorder level), then the rest of the
 /// supplier's price list. Quantities left blank aren't ordered.
+// [explain:stock.purchasing.create.handler]
 pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Result<View> {
     let store = active_store::current().ok_or(Error::Forbidden)?;
     let suppliers = Supplier::query().order_by("name").get(&db).await?;
@@ -328,6 +345,7 @@ pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Resu
         let items = SupplierItem::where_eq("supplier_id", supplier.id)
             .get(&db)
             .await?;
+        // [/explain:stock.purchasing.create.handler]
         let names = variant_names(&db, items.iter().map(|i| i.variant_id).collect()).await?;
         for item in items {
             if let Some(need) = needs.get_mut(&item.variant_id) {
@@ -348,12 +366,14 @@ pub async fn create(State(db): State<Db>, Query(query): Query<NewQuery>) -> Resu
         }
         rest.sort_by(|a, b| a.name.cmp(&b.name));
     }
+    // [explain:stock.purchasing.create.handler]
     let needs: Vec<Need> = needs.into_values().collect();
     Ok(view(
         "stock/purchase_orders/new.html",
         context! { suppliers, supplier, needs, rest },
     ))
 }
+// [/explain:stock.purchasing.create.handler]
 
 /// A line of a new order.
 #[derive(Deserialize, Debug, Clone)]
@@ -523,6 +543,7 @@ async fn lines_of(db: &Db, order: &PurchaseOrder) -> Result<Vec<LineView>> {
         .collect())
 }
 
+// [explain:stock.purchasing.print.handler]
 /// The printable page's signed link (30 days: what a supplier needs).
 pub fn print_link(state: &AppState, order: &PurchaseOrder) -> Result<String> {
     state.signed_url(
@@ -531,8 +552,10 @@ pub fn print_link(state: &AppState, order: &PurchaseOrder) -> Result<String> {
         Duration::from_secs(30 * 24 * 60 * 60),
     )
 }
+// [/explain:stock.purchasing.print.handler]
 
 /// `GET /staff/purchase-orders/{order}` (`stock.purchasing.show`).
+// [explain:stock.purchasing.show.handler]
 pub async fn show(
     State(state): State<AppState>,
     user: AuthUser,
@@ -556,6 +579,7 @@ pub async fn show(
         "cancel": manage && matches!(s, PurchaseStatus::Draft | PurchaseStatus::Ordered) && nothing_in,
         "receive": receive && matches!(s, PurchaseStatus::Ordered | PurchaseStatus::Partial),
     });
+    // [/explain:stock.purchasing.show.handler]
     // Work orders at the store waiting for these parts.
     let needs = needs(db, order.store_id).await?;
     let waiting: Vec<Need> = lines
@@ -594,6 +618,7 @@ pub async fn show(
     ))
 }
 
+// [explain:stock.purchasing.print.handler]
 /// `GET /purchase-orders/{order}/print` (`stock.purchasing.print`): the
 /// order as the supplier prints it. A **signed** link (`ValidSignature`),
 /// mailed to the supplier, who has no account: anyone with the link may
@@ -612,6 +637,7 @@ pub async fn print(
         context! { order, supplier, store, lines },
     ))
 }
+// [/explain:stock.purchasing.print.handler]
 
 async fn manageable(db: &Db, user: &User, id: i64) -> Result<PurchaseOrder> {
     let order = access::find::<PurchaseOrder>(db, user, id).await?;
@@ -739,6 +765,7 @@ impl Validate for ReceiveForm {
     }
 }
 
+// [explain:stock.purchasing.show.receive]
 /// The new average cost after `received` units at `unit_cost` join
 /// `on_hand` units at `cost`: `(on_hand × cost + received × unit_cost) /
 /// (on_hand + received)`, rounded half up. Stock below zero counts as none.
@@ -750,6 +777,7 @@ pub fn average_cost(on_hand: i64, cost: i64, received: i64, unit_cost: i64) -> i
     }
     (on_hand * cost + received * unit_cost + units / 2) / units
 }
+// [/explain:stock.purchasing.show.receive]
 
 /// Receives `form`'s quantities on `order` in one transaction: a
 /// `purchase` movement per line into the order's store (owner = location
@@ -771,6 +799,7 @@ pub async fn receive_lines(
         .get(&mut tx)
         .await?;
     let mut open = 0;
+    // [explain:stock.purchasing.show.receive]
     for mut line in lines {
         let left = line.quantity - line.received_quantity;
         let now_in = counted.get(&line.id).copied().unwrap_or(0).clamp(0, left);
@@ -791,6 +820,7 @@ pub async fn receive_lines(
                 .bind(line.variant_id)
                 .execute(&mut tx)
                 .await?;
+            // [/explain:stock.purchasing.show.receive]
             StockMovement::record(
                 &mut tx,
                 StockMovement {

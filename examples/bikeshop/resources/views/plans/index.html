@@ -11,6 +11,7 @@
 {{ assets() }}
 <div class="rx-stack">
   {{ page_hero(t('plans.index.title'), lead=t('plans.index.lead'), eyebrow=t('plans.index.eyebrow'), photo="/images/site/plans.webp", compact=true) }}
+  {# [explain:plans.index.template] #}
   <div class="bs-plans-page" data-bs-reveal>
     {{ compare_plans(cards, rows, highlight=highlight, label=t('plans.index.title')) }}
     <section class="rx-card bs-plans-page__how" aria-labelledby="plans-how">
@@ -25,6 +26,7 @@
         {{ link_button(route('plans.mails'), t('plans.mails.title'), variant="plain") }}
       </div>
     </section>
+  {# [/explain:plans.index.template] #}
   </div>
 </div>
 {% endblock %}

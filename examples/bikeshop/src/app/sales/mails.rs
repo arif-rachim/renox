@@ -69,6 +69,7 @@ fn sample() -> OrderView {
     }
 }
 
+// [explain:sales.mails.handler]
 /// `GET /sales/mails` (`sales.mails`).
 pub async fn index(State(state): State<AppState>, lang: Lang) -> Result<View> {
     let order = sample();
@@ -104,3 +105,4 @@ pub async fn index(State(state): State<AppState>, lang: Lang) -> Result<View> {
     }
     Ok(view("sales/mails.html", context! { previews }))
 }
+// [/explain:sales.mails.handler]

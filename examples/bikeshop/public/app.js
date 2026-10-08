@@ -31,7 +31,7 @@
     var opener = event.target.closest && event.target.closest("[data-rx-open='about-page']");
     if (!opener || !window.Motion || reduce.matches) return;
     var panel = document.getElementById("about-page");
-    var items = panel ? panel.querySelectorAll(".rx-infolist > .rx-entry") : [];
+    var items = panel ? panel.querySelectorAll(".bs-explain > *") : [];
     if (items.length) {
       Motion.animate(
         items,

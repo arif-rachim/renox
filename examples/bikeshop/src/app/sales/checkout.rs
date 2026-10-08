@@ -47,6 +47,7 @@ pub const DELIVERY_COUNTRY: i64 = 2_500;
 /// Delivery abroad.
 pub const DELIVERY_ABROAD: i64 = 6_000;
 
+// [explain:checkout.show.form]
 /// The checkout form: four steps of one form.
 #[derive(Deserialize, Serialize, Validate, Debug, Clone, Default)]
 #[validate(hooks)]
@@ -73,6 +74,7 @@ pub struct CheckoutForm {
     #[validate(max = 20)]
     pub postal_code: Option<String>,
 }
+// [/explain:checkout.show.form]
 
 impl ValidateHooks for CheckoutForm {
     /// Tidies what was typed before the rules run.
@@ -290,6 +292,7 @@ pub async fn show(
 
 /// `POST /checkout` (`checkout.place`): places the order (see the module
 /// docs) and sends the customer to the gateway's page.
+// [explain:checkout.show.place]
 pub async fn place(
     State(state): State<AppState>,
     session: Session,
@@ -297,6 +300,7 @@ pub async fn place(
     lang: Lang,
     Valid(form): Valid<CheckoutForm>,
 ) -> Result<Response> {
+    // [/explain:checkout.show.place]
     let db = &state.db;
     let user = user.as_deref();
     let mut cart = Cart::load(db, &session, user).await?;
@@ -370,9 +374,11 @@ pub async fn place(
     let levels =
         ledger::levels_at(db, store_id, &lines.iter().map(|l| l.0).collect::<Vec<_>>()).await?;
 
+    // [explain:checkout.show.place]
     let now = renox::db::now();
     let number = number(&state, store_id).await?;
     let mut tx = db.begin().await?;
+    // [/explain:checkout.show.place]
     let mut order = Order {
         number,
         customer_id: Some(customer.id),
@@ -393,6 +399,7 @@ pub async fn place(
         locale: Some(lang.locale.clone()),
         ..Default::default()
     };
+    // [explain:checkout.show.place]
     order.insert(&mut tx).await?;
     let taken = match ledger::reserve(&mut tx, order.id, store_id, &lines, &levels, None).await? {
         Ok(taken) => taken,
@@ -401,6 +408,7 @@ pub async fn place(
             return Ok(sold_out(db, &lang, short).await?.into_response());
         }
     };
+    // [/explain:checkout.show.place]
     let items: Vec<OrderItem> = taken
         .iter()
         .map(|t| {
@@ -416,10 +424,12 @@ pub async fn place(
             }
         })
         .collect();
+    // [explain:checkout.show.place]
     OrderItem::insert_many(&mut tx, items).await?;
     tx.commit().await?;
 
     Cart::clear(db, &session, user).await?;
+    // [/explain:checkout.show.place]
     orders::remember(&session, order.id)?;
     let checkout = payments::start(
         &state,

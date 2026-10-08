@@ -49,10 +49,12 @@ pub const LIFETIME: Duration = Duration::from_secs(10 * 60);
 /// Marks every cached report stale: the next visit computes afresh. Called
 /// by the listeners in `super::Reports` when a rental closes, a work order
 /// is collected or a payment succeeds.
+// [explain:reports.dashboard.cache]
 pub async fn changed(state: &AppState) -> Result {
     state.cache.increment(GENERATION_KEY, 1).await?;
     Ok(())
 }
+// [/explain:reports.dashboard.cache]
 
 /// One income stream in the period.
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
@@ -171,6 +173,7 @@ pub fn change(now: i64, before: i64) -> Option<f64> {
 impl Numbers {
     /// The numbers for `reach`'s chosen stores, counted `by`, over `period`:
     /// from the cache when nothing changed since they were computed.
+    // [explain:reports.dashboard.cache]
     pub async fn for_page(
         state: &AppState,
         reach: &Reach,
@@ -193,6 +196,7 @@ impl Numbers {
             })
             .await
     }
+    // [/explain:reports.dashboard.cache]
 
     /// Computes the numbers (no cache): a fixed number of queries.
     pub async fn compute(state: AppState, reach: Reach, by: By, period: Period) -> Result<Numbers> {

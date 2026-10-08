@@ -154,6 +154,7 @@ impl Moment {
 /// Queues the mail for `moment` (when the customer gave an address) and
 /// notifies their account (when they have one), as they chose for orders.
 /// `refund`: the amount paid back, for the refund mail.
+// [explain:sales.mails.tell]
 pub async fn tell(state: &AppState, order: &Order, moment: Moment, refund: Option<i64>) -> Result {
     if order.customer_id.is_none() {
         return Ok(()); // a walk-in at the counter
@@ -169,6 +170,7 @@ pub async fn tell(state: &AppState, order: &Order, moment: Moment, refund: Optio
     let lang = state.lang(&locale);
     let number = order.number.clone();
     let url = state.signed_url("orders.signed", &[&order.id], LINK_TTL)?;
+    // [/explain:sales.mails.tell]
     let subject = lang.t(
         &format!("sales.mail.{}.subject", moment.key()),
         &[("number", &number)],
@@ -183,6 +185,7 @@ pub async fn tell(state: &AppState, order: &Order, moment: Moment, refund: Optio
         (None, Some(email)) => Recipient::to("mail", email),
         (None, None) => return Ok(()),
     };
+    // [explain:sales.mails.tell]
     let channels = channels_for(&to, Kind::Order);
     if let Some(email) = email
         && channels.contains(&Channel::Mail)
@@ -196,6 +199,7 @@ pub async fn tell(state: &AppState, order: &Order, moment: Moment, refund: Optio
         )?;
         state.queue_mail(mail).await?;
     }
+    // [/explain:sales.mails.tell]
     if let Some(user) = &user {
         let body = lang.t(
             &format!("sales.notice.{}", moment.key()),

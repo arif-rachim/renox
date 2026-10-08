@@ -67,6 +67,7 @@ pub fn required(config: &renox::Config) -> bool {
         .is_some_and(|v| v.trim().eq_ignore_ascii_case("optional"))
 }
 
+// [explain:two-factor.note]
 /// Notes `user_id` when they are staff without two-factor login.
 async fn note_if_needed(state: &AppState, user_id: i64) -> Result {
     if required(&state.config)
@@ -95,7 +96,9 @@ pub async fn on_disabled(event: TwoFactorDisabled, state: AppState) -> Result {
 pub async fn on_enabled(event: TwoFactorEnabled, state: AppState) -> Result {
     state.cache.forget(&note_key(event.user_id)).await
 }
+// [/explain:two-factor.note]
 
+// [explain:two-factor.guard]
 /// Sends a noted member of staff from the back office (`/staff…`,
 /// `/admin…`) to their account page until two-factor login is on.
 pub async fn middleware(
@@ -127,3 +130,4 @@ pub async fn middleware(
     }
     next.run(req).await
 }
+// [/explain:two-factor.guard]

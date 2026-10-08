@@ -358,6 +358,7 @@ pub struct BlocksForm {
     pub colour: Option<String>,
 }
 
+// [explain:about.blocks.rules]
 impl Validate for BlocksForm {
     fn rules(&self, v: &mut Validator) {
         v.field("quantity", &self.quantity).required().between(1, 5);
@@ -366,6 +367,7 @@ impl Validate for BlocksForm {
         v.field("ends_at", &self.ends_at)
             .required()
             .gt("starts_at", &self.starts_at);
+        // [/explain:about.blocks.rules]
         // The sold-out size can't be bought, whatever the page sent.
         let sizes: Vec<&str> = SIZES
             .iter()
@@ -377,6 +379,7 @@ impl Validate for BlocksForm {
         v.field("colour", &self.colour).required().one_of(&colours);
     }
 
+    // [explain:about.blocks.rules]
     // The check that needs the shop's date: anyone can send any date.
     async fn after(&self, form: &FormContext<'_>, errors: &mut Errors) -> Result {
         let today = today(&form.state.config);
@@ -388,6 +391,7 @@ impl Validate for BlocksForm {
         }
         Ok(())
     }
+    // [/explain:about.blocks.rules]
 }
 
 async fn submit(session: Session, lang: Lang, Valid(form): Valid<BlocksForm>) -> Result<Response> {
@@ -449,6 +453,7 @@ impl Validate for MoveForm {
     }
 }
 
+// [explain:about.blocks.kanban]
 /// Accepts a move (204: nothing to swap; the board has already moved the
 /// card). A real board would save the card's column and order here, after
 /// checking the person may move it. An invalid move gets Renox's 422, and
@@ -456,3 +461,4 @@ impl Validate for MoveForm {
 async fn move_card(Valid(_form): Valid<MoveForm>) -> StatusCode {
     StatusCode::NO_CONTENT
 }
+// [/explain:about.blocks.kanban]

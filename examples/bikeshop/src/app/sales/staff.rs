@@ -66,6 +66,7 @@ pub struct Row {
 /// `GET /staff/orders` (`sales.orders.index`): the active store's orders,
 /// newest first, by status. Three queries for a page of 25 (count, page,
 /// customers).
+// [explain:sales.orders.index.handler]
 pub async fn index(
     State(db): State<Db>,
     Page(page): Page,
@@ -93,6 +94,7 @@ pub async fn index(
         .paginate(&db, page, PER_PAGE)
         .await?;
     let customers = belongs_to::<Customer, _, _>(&db, &orders.items, |o| o.customer_id).await?;
+    // [/explain:sales.orders.index.handler]
     let orders = orders.map(|order| Row {
         customer: order
             .customer_id
@@ -122,6 +124,7 @@ pub struct StaffOrder {
     pub return_until: Option<DateTime>,
 }
 
+// [explain:sales.orders.show.handler]
 /// `GET /staff/orders/{order}` (`sales.orders.show`).
 pub async fn show(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Result<View> {
     let order = access::find::<Order>(&db, &user, id).await?;
@@ -133,6 +136,7 @@ pub async fn show(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> 
         &order,
     );
     let returnable = orders::returnable(&order);
+    // [/explain:sales.orders.show.handler]
     let return_until = order
         .completed_at
         .or(order.paid_at)
@@ -179,6 +183,7 @@ async fn staff_id(db: &Db, user: &User) -> Result<Option<i64>> {
     Ok(Staff::of_user(db, user.id).await?.map(|s| s.id))
 }
 
+// [explain:sales.orders.show.handler]
 /// `POST /staff/orders/{order}/ready` (`sales.orders.ready`): a paid
 /// order is ready to collect, or (a delivery) sent out; the customer hears.
 pub async fn ready(
@@ -199,6 +204,7 @@ pub async fn ready(
         StatusCode::CONFLICT,
         lang.t("sales.staff.not_paid", &[]),
     )?;
+    // [/explain:sales.orders.show.handler]
     let moment = if order.fulfilment == Fulfilment::Delivery {
         Moment::Shipped
     } else {
@@ -209,8 +215,10 @@ pub async fn ready(
         &format!("sales.staff.{}_done", moment.key()),
         &[("number", &order.number)],
     );
+    // [explain:sales.orders.show.handler]
     Ok(done(&htmx, Toast::success(text), id))
 }
+// [/explain:sales.orders.show.handler]
 
 /// A bike's frame number, written at the handover.
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
