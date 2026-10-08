@@ -259,13 +259,89 @@ export class Page {
     throw new Error(box ? `${selector} isn't visible` : `no element ${selector}`);
   }
 
-  /** A real mouse click in the middle of the element. */
+  /**
+   * A real mouse click in the middle of the element, once it stands still (an
+   * entrance animation can move it).
+   *
+   * #327: in CI, now and then the mouse events of `Input.dispatchMouseEvent`
+   * never reach the page, although it is visible, focused, uncovered, and
+   * `Runtime.evaluate` still runs in it. So the click checks the page saw a
+   * `pointerdown` or `mousedown` (on whatever is on top there: a hidden input
+   * over a chip and a disabled button count, as does a click that leaves the
+   * page). If not, it brings the tab to the front and tries again. After three
+   * tries it clicks through the DOM (`element.click()`) and says so on stderr,
+   * so the run still tests the page and the log shows how often it happens.
+   */
   async click(selector) {
-    const { x, y } = await this.point(selector);
-    for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
-      await this.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 });
+    for (let attempt = 1; ; attempt++) {
+      const { x, y } = await this.steadyPoint(selector);
+      await this.eval(() => {
+        window.__cdpPressed = false;
+        const seen = () => (window.__cdpPressed = true);
+        for (const type of ['pointerdown', 'mousedown']) {
+          window.addEventListener(type, seen, { once: true, capture: true });
+        }
+      });
+      for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
+        await this.send('Input.dispatchMouseEvent', {
+          type,
+          x,
+          y,
+          button: type === 'mouseMoved' ? 'none' : 'left',
+          buttons: type === 'mousePressed' ? 1 : 0,
+          clickCount: type === 'mouseMoved' ? 0 : 1,
+        });
+      }
+      await sleep(30);
+      let arrived;
+      try {
+        arrived = (await this.eval(() => window.__cdpPressed)) !== false;
+      } catch {
+        arrived = true; // the page navigated away
+      }
+      if (arrived) return;
+      if (attempt >= 3) {
+        const frames = await this.eval(
+          () => new Promise((done) => {
+            const timer = setTimeout(() => done('no frame in 1 s'), 1000);
+            requestAnimationFrame(() => {
+              clearTimeout(timer);
+              done('frames drawn');
+            });
+          }),
+        );
+        process.stderr.write(`cdp: the mouse events for ${selector} never reached the page (${frames}); clicking through the DOM\n`);
+        await this.eval((s) => document.querySelector(s).click(), selector);
+        await sleep(30);
+        return;
+      }
+      await this.send('Page.bringToFront');
+      await sleep(100 * attempt);
     }
-    await sleep(30);
+  }
+
+  /**
+   * The middle of `selector` once it has stopped moving (two seconds at
+   * most). It scrolls the element into view once, then waits for htmx: a
+   * scroll can reveal an `hx-trigger="revealed"` element, whose request would
+   * otherwise race the click's (and its session cookie win over the click's).
+   */
+  async steadyPoint(selector) {
+    await this.point(selector);
+    await this.settle();
+    const rect = () =>
+      this.eval((s) => {
+        const r = document.querySelector(s).getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      }, selector);
+    const until = Date.now() + 2000;
+    let last = await rect();
+    for (;;) {
+      await sleep(50);
+      const now = await rect();
+      if ((Math.abs(last.x - now.x) < 0.5 && Math.abs(last.y - now.y) < 0.5) || Date.now() > until) return now;
+      last = now;
+    }
   }
 
   /** A click at a point of the window (e.g. an empty corner, to click "outside"). */
