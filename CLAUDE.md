@@ -10,7 +10,7 @@ repo, and every trap hit so far, so you don't have to rediscover them.
 - `CONTRIBUTING.md`: the checks every change needs. `SECURITY.md`: how vulnerabilities are reported.
   `RELEASING.md`: how a release goes to crates.io (the owner publishes).
 - `CHEATSHEET.md` and `llms.txt`: the app author's view (patterns, and which example shows what).
-- `docs/*.md`: guides (routing, validation, types, relations, authorization, queue, mail, scheduling, ui, grid, testing, PostgreSQL, operations, development, stability, and the plugins: two-factor, editors, oauth, admin, billing).
+- `docs/*.md`: guides (routing, validation, types, relations, authorization, queue, mail, scheduling, ui, grid, testing, PostgreSQL, operations, development, stability, and the plugins: two-factor, editors, blocks, oauth, admin, billing).
 - `docs/audit/`: the pre-1.0 audit (finding IDs W*, D*, A* used in ROADMAP M13/M14).
 
 ## 1. What Renox is
@@ -246,6 +246,21 @@ crates/renox-editors/      the editors plugin (#149, #150): Editors module (lib.
                            module that imports Trix / Prism + CodeJar when a page needs them)
                            and editors.css, assets/vendor/ (pinned files + NOTICE + licences);
                            guide docs/editors.md (doctested from lib.rs `Guide`)
+crates/renox-blocks/       the blocks plugin (#347): Blocks module (lib.rs: views registered
+                           in `templates` unless the app has a file of the name,
+                           `renox_blocks()` (the tags, once per page via `once`),
+                           `renox_blocks_t(key, **params)`: the app's `t`, else the English
+                           in texts.rs `TEXTS`, keys `blocks.*`), assets.rs (hashed files
+                           served with `Registry::asset` under /_renox/blocks/),
+                           views/blocks.html (quantity, range_slider, keypad, swatches,
+                           datetime_range, gallery, history, compare_plans, month_calendar,
+                           availability, kanban + kanban_card; `rx-` classes,
+                           `data-rx-<block>-*` attributes: the kit owns data-rx-key/-step),
+                           assets/blocks.css, assets/blocks.js (the loader: imports
+                           assets/parts/<block>.js only when a page has that block; Web
+                           Animations, no library); its own tests/; guide docs/blocks.md
+                           (doctested from lib.rs `Guide`); browser tests
+                           tests/browser/blocks.test.mjs on examples/bikeshop's /about/blocks
 crates/renox-oauth/        the social login plugin (#147): OAuth module (lib.rs: providers,
                            `oauth_providers` shared with every view for the buttons, the
                            account section, events to the audit log when `audit_logs`
@@ -352,9 +367,9 @@ examples/                  workspace members, each with a README.md and its own 
                            store, ABAC policy: owner/location/operating store), accounts, api,
                            catalog, home, multistore, plans, rentals, reports, sales, staff,
                            stock, workshop; src/seed/ (`db:seed`, `demo:seed --size large`,
-                           test fixtures); resources/views/blocks/ + public/blocks/ (the
-                           "blocks": UI the kit lacks, kept in the example by the owner's
-                           decision); public/vendor/motion (motion.dev, vendored); errors/
+                           test fixtures); the blocks from renox-blocks (#347; /about/blocks
+                           shows them), plus its own date_picker_blocked in
+                           resources/views/blocks/ + public/blocks/; public/vendor/motion (motion.dev, vendored); errors/
                            (default + 503); migrations for SQLite and PostgreSQL;
                            Dockerfile + deploy/ (make:deploy); tests/<area>.rs,
                            tests/queries.rs (main pages on the large seed, no N+1),
@@ -448,6 +463,7 @@ docs/authorization.md      gates, policies, roles/permissions, token abilities, 
                            second login step, logging in another way (doctest
                            `AuthorizationGuide`)
 docs/oauth.md              social login with renox-oauth (doctest: renox-oauth's `Guide`)
+docs/blocks.md             blocks beyond the kit with renox-blocks (doctest: its `Guide`)
 docs/admin.md              the admin panel with renox-admin (doctest: renox-admin's `Guide`)
 docs/billing.md            subscriptions with renox-billing (doctest: renox-billing's `Guide`)
 docs/queue.md              jobs, retries, priority, unique, middleware, chains, batches (doctest

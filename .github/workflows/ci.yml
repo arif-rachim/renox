@@ -344,7 +344,7 @@ jobs:
           cargo llvm-cov --no-report
           -p renox -p renox-core -p renox-cli -p renox-macros
           -p renox-2fa -p renox-oauth -p renox-admin -p renox-billing -p renox-editors
-          --features renox/xlsx
+          -p renox-blocks --features renox/xlsx
       - run: >-
           cargo llvm-cov --no-report
           -p renox -p renox-core -p renox-cli

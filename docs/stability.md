@@ -66,6 +66,13 @@ template macros' arguments follow the same promise. Which tags `sanitize` keeps 
 any release if one turns out to be unsafe; the versions of the bundled JavaScript libraries
 may change in minor releases. It depends publicly on no other crate.
 
+`renox-blocks` is the optional plugin crate of interactive blocks beyond the UI kit
+([blocks.md](blocks.md)), at the same version as `renox`. Its public items (the `Blocks`
+module and `TEXTS`) and its template macros' arguments follow the same promise. Its `rx-`
+class names and `data-rx-*` attributes may change in minor releases (style the blocks through
+the kit's tokens, not their inner classes), and texts may be added to `TEXTS`. It depends
+publicly on no other crate.
+
 `renox-oauth` is the optional social login plugin crate ([oauth.md](oauth.md)), at the same
 version as `renox`. Its public items (the `OAuth` module, the `Provider` trait, `Profile`,
 `Token`, `TokenRequest`, `Credentials`, `Google`, `GitHub`, the `OAuthAccount` model and its
