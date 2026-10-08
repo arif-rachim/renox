@@ -105,7 +105,7 @@ test('the code editor keeps its textarea in step and lets Escape leave', () =>
     await page.type('[data-rx-code-editor] [contenteditable]', '{"grind": "fine"}');
     await page.waitFor(() => document.querySelector('#rx-settings').value.includes('"grind"'));
     // Highlighted by Prism.
-    assert.ok(await page.eval(() => !!document.querySelector('[data-rx-code-editor] .token')));
+    await page.waitFor(() => !!document.querySelector('[data-rx-code-editor] .token'), { message: 'Prism highlighted the code' });
     // Escape, then Tab, leaves the editor (keyboard users aren't trapped).
     await page.press('Escape');
     await page.press('Tab');

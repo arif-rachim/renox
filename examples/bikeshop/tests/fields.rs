@@ -592,12 +592,14 @@ mod on_s3 {
         let manual = sample.manual.clone().unwrap();
         assert_eq!(storage.get(&manual).await.unwrap().as_deref(), Some(PDF));
 
-        // The page shows the photo at its address on the bucket, which
-        // answers without the app.
-        let url = storage.url(sample.photo.as_deref().unwrap());
+        // The page shows the photo at its address on the bucket. (Whether
+        // the bucket answers anonymous reads is the bucket's policy, which
+        // CI's SeaweedFS doesn't set, so the file is read through Storage.)
+        let photo = sample.photo.as_deref().unwrap();
+        let url = storage.url(photo);
         assert!(url.starts_with("http://"), "{url}");
         app.get(&show).await.assert_see(&url);
-        assert_eq!(http_get(&url).await, (200, PNG.to_vec()));
+        assert_eq!(storage.get(photo).await.unwrap().as_deref(), Some(PNG));
         // A presigned link to the private manual works without the app too…
         let link = storage
             .temporary_url(app.state(), &manual, std::time::Duration::from_secs(300))
