@@ -260,16 +260,20 @@ export class Page {
   }
 
   /**
-   * A real mouse click in the middle of the element. It waits until the
-   * element stands still (an entrance animation can move it), then checks the
-   * page got the mouse events, and clicks again if it got none (#327: in CI,
-   * clicks on logged-in pages sometimes never arrived). The events may land on
-   * whatever is on top there (a hidden input over a chip, a disabled button):
-   * that counts, as does a click that leaves the page.
+   * A real mouse click in the middle of the element, once it stands still (an
+   * entrance animation can move it).
+   *
+   * #327: in CI, now and then the mouse events of `Input.dispatchMouseEvent`
+   * never reach the page, although it is visible, focused, uncovered, and
+   * `Runtime.evaluate` still runs in it. So the click checks the page saw a
+   * `pointerdown` or `mousedown` (on whatever is on top there: a hidden input
+   * over a chip and a disabled button count, as does a click that leaves the
+   * page). If not, it brings the tab to the front and tries again. After three
+   * tries it clicks through the DOM (`element.click()`) and says so on stderr,
+   * so the run still tests the page and the log shows how often it happens.
    */
-  async click(selector, { timeout = TIMEOUT } = {}) {
-    const until = Date.now() + timeout;
-    for (;;) {
+  async click(selector) {
+    for (let attempt = 1; ; attempt++) {
       const { x, y } = await this.steadyPoint(selector);
       await this.eval(() => {
         window.__cdpPressed = false;
@@ -279,7 +283,14 @@ export class Page {
         }
       });
       for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
-        await this.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 });
+        await this.send('Input.dispatchMouseEvent', {
+          type,
+          x,
+          y,
+          button: type === 'mouseMoved' ? 'none' : 'left',
+          buttons: type === 'mousePressed' ? 1 : 0,
+          clickCount: type === 'mouseMoved' ? 0 : 1,
+        });
       }
       await sleep(30);
       let arrived;
@@ -289,46 +300,45 @@ export class Page {
         arrived = true; // the page navigated away
       }
       if (arrived) return;
-      if (Date.now() > until) {
-        // What the page looks like at that point, to find out why (#327).
-        let why = '';
-        try {
-          why = await this.eval(
-            (s, px, py) => {
-              const top = document.elementFromPoint(px, py);
-              const name = (el) => el ? `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}${el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).join('.') : ''}` : 'nothing';
-              const inert = document.querySelector('[inert]');
-              const open = [...document.querySelectorAll('dialog[open]')].map(name).join(', ');
-              return [
-                `at (${Math.round(px)}, ${Math.round(py)}): ${name(top)}`,
-                `target: ${name(document.querySelector(s))}`,
-                `html/body pointer-events: ${getComputedStyle(document.documentElement).pointerEvents}/${getComputedStyle(document.body).pointerEvents}`,
-                `inert: ${inert ? name(inert) : 'none'}`,
-                `open dialogs: ${open || 'none'}`,
-                `visibility: ${document.visibilityState}, focus: ${document.hasFocus()}, ready: ${document.readyState}`,
-                `viewport: ${innerWidth}x${innerHeight}, scroll: ${scrollX},${scrollY}`,
-              ].join('; ');
-            },
-            selector,
-            x,
-            y,
-          );
-        } catch (e) {
-          why = `(no details: ${e.message})`;
-        }
-        throw new Error(`the page never got the click on ${selector}: ${why}`);
+      if (attempt >= 3) {
+        const frames = await this.eval(
+          () => new Promise((done) => {
+            const timer = setTimeout(() => done('no frame in 1 s'), 1000);
+            requestAnimationFrame(() => {
+              clearTimeout(timer);
+              done('frames drawn');
+            });
+          }),
+        );
+        process.stderr.write(`cdp: the mouse events for ${selector} never reached the page (${frames}); clicking through the DOM\n`);
+        await this.eval((s) => document.querySelector(s).click(), selector);
+        await sleep(30);
+        return;
       }
-      await sleep(100);
+      await this.send('Page.bringToFront');
+      await sleep(100 * attempt);
     }
   }
 
-  /** The middle of `selector` once it has stopped moving (two seconds at most). */
+  /**
+   * The middle of `selector` once it has stopped moving (two seconds at
+   * most). It scrolls the element into view once, then waits for htmx: a
+   * scroll can reveal an `hx-trigger="revealed"` element, whose request would
+   * otherwise race the click's (and its session cookie win over the click's).
+   */
   async steadyPoint(selector) {
+    await this.point(selector);
+    await this.settle();
+    const rect = () =>
+      this.eval((s) => {
+        const r = document.querySelector(s).getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      }, selector);
     const until = Date.now() + 2000;
-    let last = await this.point(selector);
+    let last = await rect();
     for (;;) {
       await sleep(50);
-      const now = await this.point(selector);
+      const now = await rect();
       if ((Math.abs(last.x - now.x) < 0.5 && Math.abs(last.y - now.y) < 0.5) || Date.now() > until) return now;
       last = now;
     }
