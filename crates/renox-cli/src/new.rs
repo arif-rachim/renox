@@ -104,6 +104,41 @@ const STARTER: &[(&str, &str)] = &[
         "resources/lang/en.json",
         include_str!("../stubs/starter/resources/lang/en.json"),
     ),
+    // The page patterns (from examples/bikeshop): the app's own macros and CSS.
+    (
+        "resources/views/patterns.html",
+        include_str!("../stubs/starter/resources/views/patterns.html"),
+    ),
+    (
+        "public/patterns.css",
+        include_str!("../stubs/starter/public/patterns.css"),
+    ),
+    (
+        "resources/views/layouts/public.html",
+        include_str!("../stubs/starter/resources/views/layouts/public.html"),
+    ),
+    (
+        "resources/views/errors/default.html",
+        include_str!("../stubs/starter/resources/views/errors/default.html"),
+    ),
+    // Renox's sign-in pages in the app's look, with the seeded accounts
+    // on the login page in local.
+    (
+        "resources/views/renox/auth/layout.html",
+        include_str!("../stubs/starter/resources/views/renox/auth/layout.html"),
+    ),
+    (
+        "resources/views/renox/auth/login_options.html",
+        include_str!("../stubs/starter/resources/views/renox/auth/login_options.html"),
+    ),
+    (
+        "public/demo-logins.js",
+        include_str!("../stubs/starter/public/demo-logins.js"),
+    ),
+    (
+        "src/app/demo.rs",
+        include_str!("../stubs/starter/src/app/demo.rs"),
+    ),
 ];
 
 /// `--notifications` on the plain app (the starter kit has them already):
@@ -160,6 +195,19 @@ async fn the_bell_shows_notifications() {
         .assert_see("No notifications");
 }
 "#;
+
+/// The starter kit's part of AGENTS.md: where its page patterns live and how
+/// to change them, before the traps.
+const STARTER_NOTES: &str = include_str!("../stubs/starter/AGENTS.starter.stub");
+
+/// AGENTS.md with [`STARTER_NOTES`] in it.
+fn with_starter_notes(contents: &str) -> String {
+    let contents = contents.replace("\r\n", "\n");
+    let notes = STARTER_NOTES.replace("\r\n", "\n");
+    let anchor = "## Things that trip agents up";
+    assert!(contents.contains(anchor), "AGENTS.md lost `{anchor}`");
+    contents.replacen(anchor, &format!("{notes}{anchor}"), 1)
+}
 
 /// The files of a new app: the stubs, with the starter kit's over them.
 fn files(starter: bool) -> Vec<(&'static str, &'static str)> {
@@ -316,6 +364,8 @@ fn run_in(parent: &Path, name: &str, renox_path: Option<&Path>, options: Options
     for (file, contents) in files(starter) {
         let contents = if notifications && !starter {
             with_notifications(file, contents)
+        } else if starter && file == "AGENTS.md" {
+            with_starter_notes(contents)
         } else {
             contents.to_owned()
         };
@@ -386,13 +436,23 @@ fn use_tailwind_with(root: &Path, build: impl FnOnce(&Path) -> Result<()>) -> Re
         ),
     )?;
 
-    let layout = root.join("resources/views/layouts/app.html");
-    let html = fs::read_to_string(&layout)?.replace(
-        "<link rel=\"stylesheet\" href=\"{{ asset('app.css') }}\">",
-        "{#- Built by Tailwind from resources/css/app.css (`rnx serve`, `rnx build`). -#}\n  \
-         <link rel=\"stylesheet\" href=\"{{ asset('css/app.css') }}\">",
-    );
-    fs::write(&layout, html)?;
+    // Every layout that links the app's CSS (the starter kit has three).
+    for layout in [
+        "resources/views/layouts/app.html",
+        "resources/views/layouts/public.html",
+        "resources/views/renox/auth/layout.html",
+    ] {
+        let layout = root.join(layout);
+        if !layout.is_file() {
+            continue;
+        }
+        let html = fs::read_to_string(&layout)?.replace(
+            "<link rel=\"stylesheet\" href=\"{{ asset('app.css') }}\">",
+            "{#- Built by Tailwind from resources/css/app.css (`rnx serve`, `rnx build`). -#}\n  \
+             <link rel=\"stylesheet\" href=\"{{ asset('css/app.css') }}\">",
+        );
+        fs::write(&layout, html)?;
+    }
     let home = root.join("resources/views/home/index.html");
     let html = fs::read_to_string(&home)?.replace(
         "    <p class=\"rx-subtitle\">{{ t('home.edit') }}</p>",
@@ -549,6 +609,33 @@ mod tests {
         }
     }
 
+    /// The starter kit with `--tailwind`: its three layouts link the built
+    /// CSS, and the patterns keep their own file.
+    #[test]
+    fn tailwind_reaches_every_layout_of_the_starter_kit() {
+        let dir = tempfile::tempdir().unwrap();
+        let starter = Options {
+            starter: true,
+            ..SQLITE
+        };
+        run_in(dir.path(), "desk", None, starter).unwrap();
+        let root = dir.path().join("desk");
+        use_tailwind_with(&root, |_| Ok(())).unwrap();
+        for layout in [
+            "layouts/app.html",
+            "layouts/public.html",
+            "renox/auth/layout.html",
+        ] {
+            let html = read_lf(root.join("resources/views").join(layout));
+            assert!(html.contains("{{ asset('css/app.css') }}"), "{layout}");
+            assert!(!html.contains("{{ asset('app.css') }}"), "{layout}");
+            assert!(html.contains("{{ asset('patterns.css') }}"), "{layout}");
+        }
+        assert!(root.join("public/patterns.css").is_file());
+        let home = read_lf(root.join("resources/views/home/index.html"));
+        assert!(home.contains("Tailwind is on"), "{home}");
+    }
+
     #[test]
     fn makes_an_app_with_every_placeholder_filled() {
         let dir = tempfile::tempdir().unwrap();
@@ -617,7 +704,7 @@ mod tests {
         let root = dir.path().join("desk");
         // Every stub once, the kit's version where it has one, and its own files.
         let files = files(true);
-        assert_eq!(files.len(), STUBS.len() + 8);
+        assert_eq!(files.len(), STUBS.len() + 15);
         for (file, _) in &files {
             assert!(root.join(file).is_file(), "{file}");
         }
@@ -634,6 +721,15 @@ mod tests {
         assert!(root.join("src/app/users/mod.rs").is_file());
         let tests = fs::read_to_string(root.join("tests/home.rs")).unwrap();
         assert!(tests.contains("use desk::roles"), "{tests}");
+        // AGENTS.md says where the page patterns live, once, before the traps.
+        let agents = read_lf(root.join("AGENTS.md"));
+        let notes = agents.find("## The starter kit's pages").expect("the starter's notes");
+        assert!(notes < agents.find("## Things that trip agents up").unwrap());
+        assert_eq!(agents.matches("resources/views/patterns.html").count(), 1);
+        // The plain app has none of it.
+        run_in(dir.path(), "plain", None, SQLITE).unwrap();
+        let plain = read_lf(dir.path().join("plain/AGENTS.md"));
+        assert!(!plain.contains("## The starter kit's pages"));
     }
 
     #[test]

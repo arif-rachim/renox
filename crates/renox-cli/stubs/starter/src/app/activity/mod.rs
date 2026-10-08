@@ -64,13 +64,15 @@ pub fn grid() -> Grid {
         .column(Column::text("ip", "IP").hidden())
         .sort_by("-created_at")
         .exports()
-        .empty_state("Nothing recorded yet", None)
+        .empty_state("Nothing recorded in this view", None)
 }
 
-async fn index(request: GridRequest) -> Result<Response> {
+async fn index(State(db): State<Db>, request: GridRequest) -> Result<Response> {
     if let Some(file) = grid().export(Entry::query(), &request).await? {
         return Ok(file);
     }
     let activity = grid().page(Entry::query(), &request).await?;
-    Ok(view("activity/index.html", context! { activity }).into_response())
+    // Nothing recorded at all: the page shows an empty state instead of the grid.
+    let recorded = Entry::query().count(&db).await? > 0;
+    Ok(view("activity/index.html", context! { activity, recorded }).into_response())
 }

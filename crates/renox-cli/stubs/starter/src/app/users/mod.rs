@@ -48,6 +48,10 @@ pub fn grid() -> Grid {
         .column(Column::custom("actions", "Change"))
         .sort_by("-created_at")
         .cards_on_mobile()
+        .empty_state(
+            "Nobody has signed up yet",
+            Some("People show up here once they register."),
+        )
 }
 
 /// Every user's roles, by user id.
@@ -84,9 +88,20 @@ async fn index(State(db): State<Db>, request: GridRequest) -> Result<View> {
     let users =
         page.extend(|user| json!({ "roles": roles.get(&user.id).cloned().unwrap_or_default() }));
     let role_names: Vec<&str> = ROLES.iter().map(|(name, _)| *name).collect();
+    // The figures over the grid.
+    let people = User::query().count(&db).await?;
+    let verified = User::query()
+        .where_not_null("email_verified_at")
+        .count(&db)
+        .await?;
+    let admins = roles
+        .values()
+        .filter(|names| names.iter().any(|name| name == ADMIN))
+        .count();
+    let totals = json!({ "people": people, "admins": admins, "verified": verified });
     Ok(view(
         "users/index.html",
-        context! { users, members, role_names },
+        context! { users, members, role_names, totals },
     ))
 }
 
