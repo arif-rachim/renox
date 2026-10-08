@@ -23,7 +23,7 @@
         </tr>
         {%- endfor %}
       {% endcall %}
-      {%- else %}{{ empty(t('api.tokens.none'), t('api.tokens.none_text')) }}{% endif %}
+      {%- else %}{{ empty(t('api.tokens.none'), t('api.tokens.none_text'), icon="key-round") }}{% endif %}
     {% endcall %}
     {% call card(title=t('api.tokens.new')) %}
       {{ token_form(route('api.tokens.store'), abilities, t('api.tokens.name_hint')) }}

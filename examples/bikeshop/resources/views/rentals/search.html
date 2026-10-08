@@ -34,7 +34,7 @@
     {%- if problem %}
     {{ alert(problem, kind="warning") }}
     {%- elif not offers %}
-    <div class="rx-card">{{ empty(t('rentals.search.none_title'), t('rentals.search.none_text')) }}</div>
+    <div class="rx-card">{{ empty(t('rentals.search.none_title'), t('rentals.search.none_text'), icon="calendar") }}</div>
     {%- else %}
     <form class="rx-card bs-rent__filters" method="post" action="{{ route('rentals.reserve') }}" id="reserve-form">
       {{ csrf_field() }}

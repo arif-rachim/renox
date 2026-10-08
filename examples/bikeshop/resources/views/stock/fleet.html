@@ -28,7 +28,7 @@
           {{ button(t('stock.fleet.add'), icon="plus") }}
         </form>
         {# [/explain:stock.fleet.template] #}
-        {%- else %}{{ empty(t('stock.fleet.no_bikes_in_stock')) }}{% endif %}
+        {%- else %}{{ empty(t('stock.fleet.no_bikes_in_stock'), icon="bike") }}{% endif %}
       {% endcall %}
     </div>
     <div>
@@ -42,7 +42,7 @@
           </li>
           {%- endfor %}
         {% endcall %}
-        {%- else %}{{ empty(t('stock.fleet.no_fleet')) }}{% endif %}
+        {%- else %}{{ empty(t('stock.fleet.no_fleet'), icon="bike") }}{% endif %}
       {% endcall %}
     </div>
   </div>

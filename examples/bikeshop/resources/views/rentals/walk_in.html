@@ -8,7 +8,7 @@
 <div class="rx-stack" data-bs-reveal>
   {{ page_header(t('rentals.walkin.title'), subtitle=t('rentals.walkin.lead'), back=route('rentals.counter'), back_label=t('rentals.counter.title')) }}
   {%- if not bikes %}
-  <div class="rx-card">{{ empty(t('rentals.walkin.no_bikes'), t('rentals.walkin.no_bikes_text')) }}</div>
+  <div class="rx-card">{{ empty(t('rentals.walkin.no_bikes'), t('rentals.walkin.no_bikes_text'), icon="bike") }}</div>
   {%- else %}
   {# [explain:rentals.walkin.template] #}
   <form method="post" action="{{ route('rentals.walkin.store') }}" novalidate>

@@ -12,7 +12,7 @@
 <div class="rx-stack">
   {{ page_header(t('workshop.book.title'), subtitle=t('workshop.book.lead'), back=route('workshop.bikes'), back_label=t('workshop.bikes.title')) }}
   {%- if not bikes %}
-  <div class="rx-card">{{ empty(t('workshop.book.no_bike'), t('workshop.book.no_bike_text'), route('workshop.bikes'), t('workshop.bikes.add')) }}</div>
+  <div class="rx-card">{{ empty(t('workshop.book.no_bike'), t('workshop.book.no_bike_text'), route('workshop.bikes'), t('workshop.bikes.add'), icon="bike") }}</div>
   {%- else %}
   {# [explain:workshop.book.template] #}
   <form method="post" action="{{ route('workshop.book.store') }}" id="book-form" novalidate

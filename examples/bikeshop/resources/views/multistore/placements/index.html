@@ -39,7 +39,7 @@
           {%- endfor %}
         {% endcall %}
         {# [/explain:multistore.placements.template] #}
-        {%- else %}{{ empty(t('multistore.placements.none')) }}{% endif %}
+        {%- else %}{{ empty(t('multistore.placements.none'), icon="map-pin") }}{% endif %}
       {% endcall %}
     </div>
     <div>
@@ -53,7 +53,7 @@
           </li>
           {%- endfor %}
         {% endcall %}
-        {%- else %}{{ empty(t('multistore.placements.all_home')) }}{% endif %}
+        {%- else %}{{ empty(t('multistore.placements.all_home'), icon="house") }}{% endif %}
       {% endcall %}
     </div>
   </div>

@@ -3,8 +3,9 @@
 The bike shop's photos come from [Unsplash](https://unsplash.com) and are used under the
 [Unsplash License](https://unsplash.com/license): free for commercial and non-commercial use,
 no permission or attribution required. We credit the photographers anyway. Each was
-downloaded through Unsplash's download link, cropped (product photos 4:3, 880 × 660) and saved
-as WebP. The category drawings in `categories/` are the shop's own.
+downloaded through Unsplash's download link, cropped (product photos 4:3, 880 × 660; the
+newer site photos 4:3, 1200 × 900) and saved as WebP. The category drawings in
+`categories/` are the shop's own.
 
 | File | Photographer | Source |
 |---|---|---|
@@ -63,16 +64,22 @@ as WebP. The category drawings in `categories/` are the shop's own.
 | `products/tyres-1.webp` | Alessandra Caretto | [unsplash.com/photos/cAY9X4rPG3g](https://unsplash.com/photos/cAY9X4rPG3g) |
 | `products/tyres-2.webp` | Alex S | [unsplash.com/photos/HYjQDT23z94](https://unsplash.com/photos/HYjQDT23z94) |
 | `products/tyres-3.webp` | Anton Savinov | [unsplash.com/photos/DeurQWSxhFQ](https://unsplash.com/photos/DeurQWSxhFQ) |
+| `site/bench.webp` | Anton Savinov | [unsplash.com/photos/rwZpsSZuKuE](https://unsplash.com/photos/rwZpsSZuKuE) |
 | `site/city.webp` | Micheile Henderson | [unsplash.com/photos/GrdAN0NEIKY](https://unsplash.com/photos/GrdAN0NEIKY) |
+| `site/fitting.webp` | Anton Savinov | [unsplash.com/photos/PfWzxTA-uV8](https://unsplash.com/photos/PfWzxTA-uV8) |
+| `site/fleet.webp` | Ben Wicks | [unsplash.com/photos/aiRLsNasr40](https://unsplash.com/photos/aiRLsNasr40) |
 | `site/hero.webp` | Ahmad | [unsplash.com/photos/IBaeEAPOhOs](https://unsplash.com/photos/IBaeEAPOhOs) |
 | `site/plans.webp` | Taylor Smith | [unsplash.com/photos/GNSIOmiBFaY](https://unsplash.com/photos/GNSIOmiBFaY) |
 | `site/rent-1.webp` | Kbo Bike | [unsplash.com/photos/W6Wu2O6MtYU](https://unsplash.com/photos/W6Wu2O6MtYU) |
 | `site/rent-2.webp` | Michael Myers | [unsplash.com/photos/JhBq2X697b8](https://unsplash.com/photos/JhBq2X697b8) |
+| `site/riders.webp` | Martin Magnemyr | [unsplash.com/photos/nGt71kRwUOw](https://unsplash.com/photos/nGt71kRwUOw) |
 | `site/store-north.webp` | Nuno Alves | [unsplash.com/photos/XwZKcZes8xo](https://unsplash.com/photos/XwZKcZes8xo) |
 | `site/store-south.webp` | Luba Glazunova | [unsplash.com/photos/OSravhVhmw0](https://unsplash.com/photos/OSravhVhmw0) |
 | `site/store-west.webp` | Manny Becerra | [unsplash.com/photos/-4gfGVL7Sxw](https://unsplash.com/photos/-4gfGVL7Sxw) |
 | `site/trail.webp` | Algi | [unsplash.com/photos/vSlsqF0aHJw](https://unsplash.com/photos/vSlsqF0aHJw) |
+| `site/wash.webp` | Yazid N | [unsplash.com/photos/5RIw7gwQQso](https://unsplash.com/photos/5RIw7gwQQso) |
 | `site/workshop-1.webp` | Anton Savinov | [unsplash.com/photos/o6wceYJw2Tw](https://unsplash.com/photos/o6wceYJw2Tw) |
 | `site/workshop-2.webp` | Bohdan Kadun | [unsplash.com/photos/d284XSho6gU](https://unsplash.com/photos/d284XSho6gU) |
 | `site/workshop-3.webp` | Syauqy Ayyash | [unsplash.com/photos/2R89AuluRI4](https://unsplash.com/photos/2R89AuluRI4) |
 | `site/workshop-4.webp` | Hendra Kurniawan | [unsplash.com/photos/HfVg8WeUVS0](https://unsplash.com/photos/HfVg8WeUVS0) |
+| `site/workshop-tools.webp` | Anton Savinov | [unsplash.com/photos/2Qlj2Gaft7w](https://unsplash.com/photos/2Qlj2Gaft7w) |

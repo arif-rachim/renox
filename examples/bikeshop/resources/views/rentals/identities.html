@@ -25,7 +25,7 @@
   {% endcall %}
   {# [/explain:rentals.identities.template] #}
   {%- else %}
-  <div class="rx-card">{{ empty(t('rentals.identities.none'), t('rentals.identities.none_text')) }}</div>
+  <div class="rx-card">{{ empty(t('rentals.identities.none'), t('rentals.identities.none_text'), icon="id-card") }}</div>
   {%- endif %}
 </div>
 {% endblock %}

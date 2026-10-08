@@ -482,10 +482,10 @@ in the page, in the text's colour:
   `refresh`, `prev`, `next`, `up`, `down`, `box` and `home`.
 - An unknown name draws nothing.
 
-The set has 111 icons, the ones a shop or a back office needs:
+The set has 112 icons, the ones a shop or a back office needs:
 
 - Navigation and actions: `menu`, `x`, `search`, `plus`, `minus`, `pencil`, `trash-2`, `check`, `chevron-left`, `chevron-right`, `chevron-up`, `chevron-down`, `arrow-left`, `arrow-right`, `external-link`, `download`, `upload`, `refresh-cw`, `settings`, `ellipsis`, `filter`, `sliders-horizontal`, `eye`, `eye-off`, `copy`, `log-in`, `log-out`, `house`, `bell`, `heart`, `star`, `printer`, `list`, `layout-dashboard`, `scan-barcode`, `inbox`.
-- Shop and money: `shopping-cart`, `shopping-bag`, `tag`, `credit-card`, `receipt`, `package`, `boxes`, `truck`, `store`, `banknote`, `percent`, `gift`, `shirt`, `backpack`, `award`, `sparkles`.
+- Shop and money: `shopping-cart`, `shopping-bag`, `tag`, `credit-card`, `receipt`, `package`, `boxes`, `truck`, `store`, `banknote`, `percent`, `gift`, `hand-coins`, `shirt`, `backpack`, `award`, `sparkles`.
 - Bikes, service and places: `bike`, `wrench`, `hammer`, `gauge`, `droplets`, `ruler`, `key-round`, `lock`, `battery-charging`, `mountain`, `baby`, `hard-hat`, `lightbulb`, `building-2`, `route`, `map`, `map-pin`, `calendar`, `calendar-days`, `calendar-check`, `clock`, `timer`, `history`, `zap`, `flashlight`, `link`, `cog`, `disc-3`, `circle-dot`, `armchair`, `train-front`.
 - People: `user`, `users`, `circle-user`, `shield`, `shield-check`, `id-card`, `handshake`.
 - Charts: `chart-column`, `chart-line`, `chart-pie`, `trending-up`, `trending-down`.

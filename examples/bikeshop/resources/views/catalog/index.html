@@ -107,7 +107,7 @@
   {# [/explain:catalog.index.results] #}
     {%- else %}
     <div class="rx-card">
-      {{ empty(t('catalog.empty.title'), t('catalog.empty.search', q=filters.q) if search and filters.q else t('catalog.empty.text'), reset, t('catalog.filters.clear')) }}
+      {{ empty(t('catalog.empty.title'), t('catalog.empty.search', q=filters.q) if search and filters.q else t('catalog.empty.text'), reset, t('catalog.filters.clear'), icon="search") }}
     </div>
     {%- endif %}
     {# [explain:catalog.index.results] #}

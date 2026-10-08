@@ -29,7 +29,7 @@
   </div>
   {% from "renox/pagination.html" import pagination %}{{ pagination(suppliers) }}
   {%- else %}
-  <div class="rx-card">{{ empty(t('stock.suppliers.empty'), action_href=route('stock.suppliers.create'), action_label=t('stock.suppliers.new')) }}</div>
+  <div class="rx-card">{{ empty(t('stock.suppliers.empty'), action_href=route('stock.suppliers.create'), action_label=t('stock.suppliers.new'), icon="building-2") }}</div>
   {%- endif %}
 </div>
 {% endblock %}

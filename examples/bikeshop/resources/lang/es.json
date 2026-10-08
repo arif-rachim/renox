@@ -85,7 +85,15 @@
       "title": "Panel",
       "lead": "La trastienda de las tres tiendas.",
       "empty_title": "Aún no hay nada aquí",
-      "empty_text": "Las ventas, los alquileres, el taller y el stock de cada tienda aparecerán aquí a medida que crezca el ejemplo."
+      "empty_text": "Las ventas, los alquileres, el taller y el stock de cada tienda aparecerán aquí a medida que crezca el ejemplo.",
+      "welcome": "Qué bueno verte, :name.",
+      "ways": {
+        "label": "El trabajo de hoy",
+        "rentals": "Recogidas, bicis fuera y retrasos",
+        "workshop": "Órdenes de trabajo por estado",
+        "counter": "Vender en caja",
+        "stock": "Lo que hay en las estanterías"
+      }
     },
     "two_factor": {
       "required": "Las cuentas del personal necesitan el acceso en dos pasos. Actívalo abajo para abrir la trastienda."
@@ -97,7 +105,13 @@
       "stores": "Tiendas",
       "roles": "Roles",
       "audit": "Registro de auditoría",
-      "admin": "Panel de administración"
+      "admin": "Panel de administración",
+      "sections": {
+        "front": "Mostrador",
+        "work": "Taller y existencias",
+        "stores": "Entre tiendas",
+        "manage": "Gestión"
+      }
     },
     "stores": {
       "title": "Tiendas",

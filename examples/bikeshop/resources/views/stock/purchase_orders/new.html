@@ -40,7 +40,7 @@
         <li class="bs-row bs-row--head" aria-hidden="true"><span>{{ t('stock.fields.product') }}</span><span class="bs-row__figure">{{ t('stock.fields.reorder_level') }}</span><span>{{ t('stock.purchasing.unit_cost') }}</span><span>{{ t('stock.fields.quantity') }}</span></li>
         {%- for row in needs %}{{ line(row, loop.index0, true) }}{% endfor %}
       </ul>
-      {%- else %}{{ empty(t('stock.purchasing.no_needs')) }}{% endif %}
+      {%- else %}{{ empty(t('stock.purchasing.no_needs'), icon="circle-check") }}{% endif %}
     {% endcall %}
     {%- if rest %}
     {% call card(title=t('stock.purchasing.price_list', supplier=supplier.name)) %}

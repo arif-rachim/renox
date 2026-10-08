@@ -44,7 +44,7 @@
     {% call list(id="bike-rentals", label=t('rentals.fleet.rentals')) %}
       {%- for row in rentals %}{{ rental_item(row, route('rentals.desk', row.id)) }}{% endfor %}
     {% endcall %}
-    {%- else %}<div class="rx-card">{{ empty(t('rentals.fleet.no_rentals')) }}</div>{% endif %}
+    {%- else %}<div class="rx-card">{{ empty(t('rentals.fleet.no_rentals'), icon="key-round") }}</div>{% endif %}
   {% endcall %}
   {% call tab_panel("history", "placements") %}
     {%- if placements %}
@@ -53,7 +53,7 @@
       <li><div class="rx-list__main"><strong>{{ p.from }} → {{ p.to }}</strong><p class="rx-subtitle">{{ p.placement.requested_at | date('%d %b %Y') }}</p></div>{{ badge(p.placement.status) }}</li>
       {%- endfor %}
     {% endcall %}
-    {%- else %}<div class="rx-card">{{ empty(t('rentals.fleet.no_placements')) }}</div>{% endif %}
+    {%- else %}<div class="rx-card">{{ empty(t('rentals.fleet.no_placements'), icon="map-pin") }}</div>{% endif %}
   {% endcall %}
   {% call tab_panel("history", "work") %}
     {%- if work_orders %}
@@ -62,7 +62,7 @@
       <li><div class="rx-list__main"><strong>#{{ w.order.id }} · {{ w.store }}</strong><p class="rx-subtitle">{{ w.order.scheduled_for | date('%d %b %Y') }}{% if w.billed %} · {{ t('rentals.fleet.billed_to', store=w.billed) }}{% endif %}{% if w.order.customer_note %} · {{ w.order.customer_note }}{% endif %}</p></div>{{ badge(w.order.status) }}</li>
       {%- endfor %}
     {% endcall %}
-    {%- else %}<div class="rx-card">{{ empty(t('rentals.fleet.no_work')) }}</div>{% endif %}
+    {%- else %}<div class="rx-card">{{ empty(t('rentals.fleet.no_work'), icon="wrench") }}</div>{% endif %}
   {% endcall %}
 </div>
 {% endblock %}

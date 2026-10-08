@@ -58,9 +58,11 @@ pub fn entries() -> Vec<Explanation> {
                       changes, so the home page costs a few queries.",
             },
             Feature {
-                api: "UI kit: page_header + empty",
-                why: "The page's title row and the placeholder message with its link, so \
-                      even a page with nothing on it yet looks finished.",
+                api: "UI kit: icon, stat + empty",
+                why: "Lucide line icons from the kit (`icon(\"wrench\")`) on the ways into \
+                      the day's work and in the tinted circles of the stat cards, and the \
+                      placeholder message with its link, so even a page with nothing on \
+                      it yet looks finished.",
             },
         ],
         under_hood: "The auth middleware has already loaded the user and every role \

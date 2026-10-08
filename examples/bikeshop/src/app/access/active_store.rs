@@ -148,6 +148,9 @@ pub struct Switcher {
 pub struct SwitcherStore {
     pub id: i64,
     pub name: String,
+    /// Names the store's photo (`public/images/site/store-{slug}.webp`) on
+    /// the staff dashboard's welcome card.
+    pub slug: String,
 }
 
 /// The switcher for the request being rendered.
@@ -165,6 +168,7 @@ pub async fn switcher(db: &Db) -> Result<Option<Switcher>> {
         .map(|s| SwitcherStore {
             id: s.id,
             name: s.name,
+            slug: s.slug,
         })
         .collect();
     let active = current();

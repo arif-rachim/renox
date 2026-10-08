@@ -1,0 +1,11 @@
+{#- A person as their initials in a tinted circle (the shop shows no photos
+    of people): `{% from "layouts/_avatar.html" import avatar %}{{ avatar(name) }}`.
+    The tint (teal, sand or terracotta) follows the name, so one person keeps
+    one colour on every page. `size`: "s" (1.75rem), "m" (2.25rem) or "l"
+    (3rem). Decorative: the name is always written beside it. -#}
+{% macro avatar(name, size="m") -%}
+{%- set words = (name or "?") | split %}
+<span class="bs-avatar bs-avatar--{{ size }} bs-avatar--tone-{{ (name or '') | length % 3 }}" aria-hidden="true">
+  {%- for w in words[:2] %}{{ w[:1] | upper }}{% endfor -%}
+</span>
+{%- endmacro %}

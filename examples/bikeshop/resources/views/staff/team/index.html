@@ -26,7 +26,7 @@
   {% endcall %}
   {# [/explain:staff.team.index.template] #}
   {%- else %}
-  <div class="rx-card">{{ empty(t('staff.team.empty'), none, route('staff.invitations.create'), t('staff.invitations.title')) }}</div>
+  <div class="rx-card">{{ empty(t('staff.team.empty'), none, route('staff.invitations.create'), t('staff.invitations.title'), icon="users") }}</div>
   {%- endif %}
 </div>
 {% endblock %}

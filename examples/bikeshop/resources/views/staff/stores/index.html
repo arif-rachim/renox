@@ -28,7 +28,7 @@
     {%- endfor %}
   </div>
   {%- else %}
-  <div class="rx-card">{{ empty(t('staff.stores.none')) }}</div>
+  <div class="rx-card">{{ empty(t('staff.stores.none'), icon="store") }}</div>
   {%- endif %}
 </div>
 {% endblock %}

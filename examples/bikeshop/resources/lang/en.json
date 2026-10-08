@@ -85,7 +85,15 @@
       "title": "Dashboard",
       "lead": "The back office of the three stores.",
       "empty_title": "Nothing here yet",
-      "empty_text": "Each store's sales, rentals, workshop and stock appear here as the example grows."
+      "empty_text": "Each store's sales, rentals, workshop and stock appear here as the example grows.",
+      "welcome": "Good to see you, :name.",
+      "ways": {
+        "label": "Today's work",
+        "rentals": "Pick-ups, bikes out and overdue",
+        "workshop": "Work orders by status",
+        "counter": "Sell at the till",
+        "stock": "What is on the shelves"
+      }
     },
     "two_factor": {
       "required": "Staff accounts need two-factor login. Turn it on below to open the back office."
@@ -97,7 +105,13 @@
       "stores": "Stores",
       "roles": "Roles",
       "audit": "Audit log",
-      "admin": "Admin panel"
+      "admin": "Admin panel",
+      "sections": {
+        "front": "Front desk",
+        "work": "Workshop and stock",
+        "stores": "Between stores",
+        "manage": "Manage"
+      }
     },
     "stores": {
       "title": "Stores",

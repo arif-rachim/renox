@@ -31,7 +31,7 @@
       {# [/explain:multistore.help.create.template] #}
       {{ textarea("reason", t('multistore.help.reason'), rows=2, required=true) }}
       {{ button(t('multistore.help.send'), icon="check") }}
-      {%- else %}{{ empty(t('multistore.help.no_people')) }}{% endif %}
+      {%- else %}{{ empty(t('multistore.help.no_people'), icon="users") }}{% endif %}
     {% endcall %}
   </form>
 </div>

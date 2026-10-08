@@ -35,7 +35,7 @@
   {% from "renox/pagination.html" import pagination %}{{ pagination(orders) }}
     {# [/explain:sales.orders.index.template] #}
   {%- else %}
-  <div class="rx-card">{{ empty(t('sales.staff.empty')) }}</div>
+  <div class="rx-card">{{ empty(t('sales.staff.empty'), icon="receipt") }}</div>
   {%- endif %}
 </div>
 {% endblock %}

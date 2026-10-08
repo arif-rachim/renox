@@ -1224,10 +1224,12 @@
 }
 a.rx-stat:hover { background: color-mix(in srgb, var(--rx-surface) 92%, var(--rx-label)); }
 a.rx-stat:focus-visible { outline: 2px solid var(--rx-accent); outline-offset: 2px; }
-/* With an icon: the figures on the left, the icon in a tinted circle in the corner. */
+/* With an icon: the icon in a tinted circle beside the label, the figures
+   under both, so a long figure on a narrow card never runs into it. */
 .rx-stat--icon { grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--rx-space-3); }
-.rx-stat--icon > * { grid-column: 1; }
-.rx-stat--icon > .rx-stat__icon { grid-column: 2; grid-row: 1 / span 2; }
+.rx-stat--icon > * { grid-column: 1 / -1; }
+.rx-stat--icon > .rx-stat__label { grid-column: 1; align-self: center; }
+.rx-stat--icon > .rx-stat__icon { grid-column: 2; grid-row: 1; }
 .rx-stat__icon, .rx-empty__icon { display: grid; place-items: center; border-radius: 50%; background: var(--rx-accent-soft); color: var(--rx-accent-text); }
 .rx-stat__icon { width: 2.5rem; height: 2.5rem; }
 .rx-stat__label { margin: 0; font: var(--rx-type-caption); text-transform: var(--rx-caption-case); letter-spacing: var(--rx-caption-tracking); color: var(--rx-secondary-label); }
