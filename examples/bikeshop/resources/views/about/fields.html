@@ -11,6 +11,9 @@
   {{ page_header(t('fields.title'), subtitle=t('fields.lead')) }}
 
   {% call card(t('fields.reference.title'), subtitle=t('fields.reference.lead')) %}
+    {#- `bs-types`: the type names stay whole; on a phone the table scrolls
+        sideways inside its frame, not the page. -#}
+    <div class="bs-types">
     {% call table([t('fields.reference.field'), t('fields.reference.input'), t('fields.reference.form'), t('fields.reference.model'), "SQLite", "PostgreSQL"], caption=t('fields.reference.title')) %}
       {%- for r in reference %}
       <tr>
@@ -23,6 +26,7 @@
       </tr>
       {%- endfor %}
     {% endcall %}
+    </div>
   {% endcall %}
 
   {%- if logged_in %}

@@ -1,8 +1,9 @@
-// /about/fields in a browser (#351; examples/fields' round trip in
-// examples-flows.test.mjs until then): every kind of field is sent, saved
-// and comes back into the edit form as it was, and the pages fit a phone
-// and a desktop, light and dark. The editors themselves are
-// editors.test.mjs. Screenshots go to BIKESHOP_SCREENS when it's set.
+// /about/fields in a browser under CSP=strict (#351; examples/fields' round
+// trip in examples-flows.test.mjs and crud's live validation in
+// examples.test.mjs until then): a field checked live as it is left, every
+// kind of field sent, saved and back in the edit form as it was, and the
+// pages at a phone's and a desktop's width, light and dark. The editors
+// themselves are editors.test.mjs. Screenshots go to BIKESHOP_SCREENS.
 
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,7 +17,11 @@ let app;
 
 before(async () => {
   browser = await Browser.launch();
-  app = await start('bikeshop', 'examples/bikeshop', { seed: true });
+  app = await start('bikeshop', 'examples/bikeshop', { seed: true, env: { CSP: 'strict' } });
+  // Logged in from a tab of its own: in headless Chrome the tab that sent
+  // the bike shop's login form gets no key presses afterwards (the cookie
+  // is the browser's, so the tests' tabs are logged in too).
+  await browser.with((page) => logIn(page));
 });
 
 after(async () => {
@@ -43,6 +48,17 @@ async function logIn(page) {
   await page.type('#rx-password', 'password');
   await submitAndLoad(page, 'form button[type=submit]');
 }
+
+test('a field is checked live as it is left, and the error goes once it is fixed', () =>
+  browser.with(async (page) => {
+    await page.goto(`${app.url}/about/fields`);
+    await page.type('[name=price]', '-5', { clear: true });
+    await page.press('Tab');
+    await page.waitFor(() => document.querySelector('[name=price]').getAttribute('aria-invalid') === 'true', { message: 'live validation' });
+    await page.type('[name=price]', '4.50', { clear: true });
+    await page.waitFor(() => !document.querySelector('[name=price]').hasAttribute('aria-invalid'), { message: 'the error gone' });
+    page.assertClean({ allow: [/422/] });
+  }));
 
 test('every kind of field comes back as it was sent', () =>
   browser.with(async (page) => {

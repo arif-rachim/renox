@@ -7,7 +7,10 @@
 {% from "renox/ui.html" import input, checkbox, radio, checkbox_list, tags_input, key_value, date_picker, file, form_grid, fieldset, form_errors, button, link_button %}
 {% from "renox-editors/editors.html" import rich_editor, markdown_editor, code_editor %}
 {% macro value(name) %}{{ sample[name] if sample and sample[name] is not none else '' }}{% endmacro %}
-<form class="rx-stack" method="post" enctype="multipart/form-data" novalidate id="sample-form"
+{#- `data-live-validate`: each field is checked by the server as it is left
+    (renox.js sends the form with `X-Renox-Validate`; `Valid<T>` answers with
+    the errors only, nothing is saved). -#}
+<form class="rx-stack" method="post" enctype="multipart/form-data" novalidate id="sample-form" data-live-validate
       action="{{ route('about.fields.update', sample.id) if sample else route('about.fields.store') }}">
   {{ csrf_field() }}{% if sample %}{{ method_field('PUT') }}{% endif %}
   {{ form_errors() }}

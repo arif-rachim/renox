@@ -15,6 +15,10 @@ let app;
 before(async () => {
   app = await start('bikeshop', 'examples/bikeshop', { seed: true });
   browser = await Browser.launch();
+  // Logged in from a tab of its own: in headless Chrome the tab that sent
+  // the bike shop's login form gets no key presses afterwards (the cookie
+  // is the browser's, so the tests' tabs are logged in too).
+  await browser.with((page) => logIn(page));
 });
 
 after(async () => {

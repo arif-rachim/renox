@@ -2870,7 +2870,7 @@
       "products_hint": "Bikes, gear and parts in stock here",
       "workshop": "Workshop time per day",
       "workshop_hint": "Book a service online",
-      "minutes": ":minutes minutes",
+      "hours_value": ":hours hours",
       "visit": "Visit us",
       "address": "Address",
       "phone": "Phone",
