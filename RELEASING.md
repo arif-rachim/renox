@@ -29,13 +29,12 @@ version and are released together.
    `renox-core`, `renox-macros`, `renox-2fa`, `renox-editors`, `renox-blocks`, `renox-oauth`, `renox-admin` and `renox-billing` under `[workspace.dependencies]` (written
    `=1.2.0`: the crates are released in lockstep and pin each other exactly, since the macros
    write code against renox-core's items of the same release).
-   While 1.0 is a release candidate, other places name the version too; change all of them:
-   - the install lines in `README.md` (quick start) and `docs/tutorial.md`
-     (`cargo install renox-cli --version …`);
+   Other places name the version too; change all of them:
    - the `git clone --branch v…` line in `README.md` ("Use Renox with Claude Code");
    - the version in `README.md`'s "Status" section;
-   - the example dependency line in `docs/stability.md` (`renox = "…"`).
-   `grep -rn "1.0.0-rc" README.md docs` finds them.
+   - the plugin guides' dependency lines (`renox = "1.0"`, docs/*.md) on a new minor or major;
+   - the landing page's version (www/resources/views: the badge and the terminal).
+   `grep -rn "1\.0\.0" README.md docs www/resources` finds them.
 3. **The changelog.** In `CHANGELOG.md`, rename "Unreleased" to `## 1.2.0 · 2026-11-01` (the
    version and the date) and start a new empty "Unreleased" above it.
 4. **Check everything** (as in [CONTRIBUTING.md](CONTRIBUTING.md)), then a dry run of the
@@ -74,13 +73,12 @@ version and are released together.
      `renox = { version = "1.2" }` and `cargo test` passes in it.
 9. **A GitHub release** for the tag, with the version's changelog section as its notes.
 
-## After the first release
+## Since the first release (1.0.0, 2026-10-08)
 
-- The README gets the crates.io and docs.rs badges, and the quick start becomes
-  `cargo install renox-cli` (keep the `--git` line for the latest `main`).
-- The `semver` CI job compares with the release on crates.io instead of the base branch, and
-  stops being informational: drop `--baseline-rev` and `continue-on-error` in
-  `.github/workflows/ci.yml`.
+- The README has the crates.io and docs.rs badges, and the quick start is
+  `cargo install renox-cli` (with the `--git` line for the latest `main`).
+- The `semver` CI job compares with the latest release on crates.io and fails on a breaking
+  change (#139).
 - `rnx new` keeps pinning git commits when `rnx` itself is installed from git, so the
   development flow doesn't change.
 

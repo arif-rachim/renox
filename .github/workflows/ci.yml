@@ -123,12 +123,9 @@ jobs:
 
   semver:
     name: semver checks
-    # Public API changes against the branch a pull request goes into. Until
-    # the first real release this only reports them (every change of a 0.0.x
-    # crate counts as breaking); after 1.0 the baseline becomes the release on
-    # crates.io and a breaking change without a major version fails here.
+    # The public API against the latest release on crates.io (1.0.0 and up,
+    # #139): a breaking change fails here, since 1.x promises none.
     if: github.event_name == 'pull_request'
-    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -140,9 +137,10 @@ jobs:
         with:
           tool: cargo-semver-checks
       # renox-macros is a proc-macro crate, which cargo-semver-checks can't read.
-      # `--release-type minor`: the version doesn't change between commits, and
-      # an unchanged 0.0.x version would let every check be skipped.
-      - run: cargo semver-checks -p renox-core -p renox --baseline-rev origin/${{ github.base_ref }} --release-type minor
+      # `--release-type minor`: the version only changes at a release, so an
+      # unreleased change is checked as the next minor (additions pass, breaking
+      # changes fail).
+      - run: cargo semver-checks -p renox-core -p renox --release-type minor
 
   cli:
     name: rnx new + make:* (${{ matrix.database }})
