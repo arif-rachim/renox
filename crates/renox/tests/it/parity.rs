@@ -111,7 +111,7 @@ async fn pages_app() -> (TestApp, tempfile::TempDir) {
     let views = tempfile::tempdir().unwrap();
     std::fs::write(
         views.path().join("about.html"),
-        "<h1>About {{ app.name }}</h1><a href=\"{{ route('about') }}\">here</a>",
+        "<h1>About {{ app.name }}</h1><a href=\"{{ route('about') }}\">here</a><p>Prices in {{ app.currency }}</p>",
     )
     .unwrap();
     std::fs::write(
@@ -123,6 +123,7 @@ async fn pages_app() -> (TestApp, tempfile::TempDir) {
     let app = TestApp::with_config(App::new().module(Pages), |c| {
         c.views_path = path;
         c.name = "Roastery".into();
+        c.currency = "EUR".into();
     })
     .await;
     (app, views)
@@ -136,7 +137,9 @@ async fn view_and_redirect_routes_need_no_handler() {
         .assert_ok()
         .assert_view("about.html")
         .assert_see("About Roastery")
-        .assert_see("href=\"/about\"");
+        .assert_see("href=\"/about\"")
+        // Script that formats money reads the currency from the page (#305).
+        .assert_see("Prices in EUR");
     let moved = app.get("/old-about").await;
     moved.assert_status(302).assert_header("location", "/about");
     let gone = app.get("/info").await;

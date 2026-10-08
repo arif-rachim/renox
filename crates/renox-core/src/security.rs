@@ -232,7 +232,7 @@ async fn etag(
     let Ok(bytes) = axum::body::to_bytes(body, ETAG_LIMIT as usize).await else {
         return (StatusCode::INTERNAL_SERVER_ERROR, "could not read the page").into_response();
     };
-    let hash = crate::webhook::sha256_hex(&without(&bytes, nonce.as_bytes()));
+    let hash = crate::webhook::sha256_hex(without(&bytes, nonce.as_bytes()));
     let tag = format!("\"{}\"", &hash[..32]);
     let matches = if_none_match
         .as_ref()

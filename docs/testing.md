@@ -329,7 +329,8 @@ can copy into an app: Node's own test runner and WebSocket speaking CDP to headl
 (Chrome without a window), with no npm packages.
 
 - `lib/cdp.mjs` starts Chrome with a throwaway profile and gives each test a fresh page:
-  `goto`, real mouse clicks, typing (`Input.insertText`), key presses
+  `goto`, real mouse clicks (on the element once it stands still; a click Chrome didn't
+  deliver is sent again, then through the DOM with a line on stderr), typing (`Input.insertText`), key presses
   (`Input.dispatchKeyEvent`: events made up by a script don't trigger every handler),
   `waitFor` a condition, `settle` until htmx is idle. It collects console errors, uncaught
   exceptions and CSP violations (scripts or styles the page's security policy blocked), and

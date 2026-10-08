@@ -219,7 +219,7 @@ and so is `{{ flash.anything }}`.
 
 Every view also gets: `request.path`, `request.query`, `request.route` (the route's name),
 `request.htmx`, `request.boosted` (`hx-boost`), `app.name`, `app.env`,
-`app.debug`, `app.url`, `app.locale`, `auth.check`, `auth.user`, `auth.roles`, `flash`, `errors`,
+`app.debug`, `app.url`, `app.locale`, `app.currency` (`APP_CURRENCY`), `auth.check`, `auth.user`, `auth.roles`, `flash`, `errors`,
 `csrf_token` (the CSRF token as text, for a header or your own hidden field),
 and the functions `old()`, `has_old()`, `error(field)` (also `error(field, bag='login')`),
 `errors_in('login')` (every error of a named bag), `csrf_field()`,

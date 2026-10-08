@@ -1158,6 +1158,7 @@ fn globals(
             debug => config.debug,
             url => config.url,
             locale => locale,
+            currency => config.currency,
         },
         auth => context! {
             check => user.is_some(),

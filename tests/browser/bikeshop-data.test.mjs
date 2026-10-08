@@ -80,9 +80,8 @@ describe('the store switcher', () => {
       await page.goto(`${app.url}/staff`);
       assert.ok((await page.text('.bs-store-switcher')).includes('Working in North'));
       await shot(page, 'switcher-closed');
-      // The kit's menu: open it, pick South. Clicked through the DOM: on CI the
-      // pointer click sometimes misses the sidebar's button (#305, #317).
-      await page.eval(() => document.querySelector('.bs-store-switcher [aria-haspopup="menu"]').click());
+      // The kit's menu: open it, pick South.
+      await page.click('.bs-store-switcher [aria-haspopup="menu"]');
       await page.waitFor(() => !document.querySelector('#store-menu').hidden, { message: 'the menu open' });
       const items = await page.eval(() => [...document.querySelectorAll('#store-menu [role=menuitem]')].map((b) => b.textContent.trim()));
       assert.deepEqual(items, ['North', 'South'], 'only the stores with a role');

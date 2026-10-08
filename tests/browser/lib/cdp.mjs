@@ -329,10 +329,16 @@ export class Page {
   async steadyPoint(selector) {
     await this.point(selector);
     await this.settle();
+    // In the window's coordinates, which is what the mouse events take: on
+    // a phone-width page the visual viewport can sit away from the layout
+    // one after a scroll, and layout coordinates then land elsewhere (#305).
     const rect = () =>
       this.eval((s) => {
         const r = document.querySelector(s).getBoundingClientRect();
-        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        const vv = window.visualViewport;
+        const x = r.left + r.width / 2;
+        const y = r.top + r.height / 2;
+        return vv ? { x: (x - vv.offsetLeft) * vv.scale, y: (y - vv.offsetTop) * vv.scale } : { x, y };
       }, selector);
     const until = Date.now() + 2000;
     let last = await rect();
@@ -383,6 +389,7 @@ export class Page {
       Escape: { code: 'Escape', keyCode: 27 },
       Tab: { code: 'Tab', keyCode: 9 },
       Backspace: { code: 'Backspace', keyCode: 8 },
+      Delete: { code: 'Delete', keyCode: 46 },
       ArrowDown: { code: 'ArrowDown', keyCode: 40 },
       ArrowUp: { code: 'ArrowUp', keyCode: 38 },
       ArrowLeft: { code: 'ArrowLeft', keyCode: 37 },
