@@ -38,12 +38,9 @@ const visible = (page, selector) =>
     return box.width > 0 && box.height > 0 && getComputedStyle(el).visibility !== 'hidden';
   }, selector);
 
-/** Opens the menu panel from the tab bar and waits until it stops sliding.
- *  The tab is clicked through the DOM: on CI, mouse events sent to a page with
- *  a live notification stream sometimes never reach it (#317, #327). */
+/** Opens the menu panel from the tab bar and waits until it stops sliding. */
 async function openMenu(page) {
-  await page.point('.rx-tabbar [data-rx-open="site-menu"]');
-  await page.eval(() => document.querySelector('.rx-tabbar [data-rx-open="site-menu"]').click());
+  await page.click('.rx-tabbar [data-rx-open="site-menu"]');
   await page.waitFor(
     () => {
       const menu = document.querySelector('#site-menu');

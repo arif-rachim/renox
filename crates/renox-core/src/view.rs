@@ -748,7 +748,7 @@ pub(crate) async fn middleware(
     let method = req.method().clone();
     let path = req.uri().path().to_owned();
     let query = req.uri().query().unwrap_or_default().to_owned();
-    let route = crate::routing::CurrentRoute::of(req.extensions(), &state)
+    let route = crate::routing::CurrentRoute::of(req.method(), req.extensions(), &state)
         .name()
         .map(str::to_owned);
     let nonce = req
@@ -1049,7 +1049,20 @@ pub(crate) fn translate_function(state: &AppState, locale: &str) -> Value {
             for name in kwargs.args() {
                 let value: Value = kwargs.get(name)?;
                 if name == "count" {
-                    count = i64::try_from(value).ok();
+                    match i64::try_from(value.clone()) {
+                        Ok(whole) => count = Some(whole),
+                        // Not a whole number (a fraction, or text such as
+                        // "1,204"): `:count` shows it as given, and a plural
+                        // form is still picked by its value when it has one.
+                        Err(_) => {
+                            let shown = value.to_string();
+                            let number = f64::try_from(value)
+                                .ok()
+                                .or_else(|| shown.trim().parse::<f64>().ok());
+                            count = number.map(plural_count);
+                            params.push((name.to_owned(), shown));
+                        }
+                    }
                 } else {
                     params.push((name.to_owned(), value.to_string()));
                 }
@@ -1063,6 +1076,20 @@ pub(crate) fn translate_function(state: &AppState, locale: &str) -> Value {
             Ok(Value::from(crate::i18n::format(&text, &params, count)))
         },
     )
+}
+
+/// The count a number stands for when picking a plural form: one only for
+/// exactly 1 (so 1.5 or 0.5 kilos are plural), else the nearest whole one
+/// (for ranges such as `[2,5]`).
+fn plural_count(number: f64) -> i64 {
+    if number == 1.0 {
+        1
+    } else {
+        match number.round() as i64 {
+            1 => 2,
+            other => other,
+        }
+    }
 }
 
 fn globals(
@@ -1147,6 +1174,7 @@ fn globals(
             debug => config.debug,
             url => config.url,
             locale => locale,
+            currency => config.currency,
         },
         auth => context! {
             check => user.is_some(),

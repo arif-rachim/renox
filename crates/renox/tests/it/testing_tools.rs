@@ -266,3 +266,31 @@ async fn the_app_can_be_served_for_a_browser() {
         .unwrap();
     assert!(page.ok() && page.text().contains("<h1>Page</h1>"));
 }
+
+/// What the "stamp" task last saw as the time (unix seconds).
+static STAMPED: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+
+/// #311: a scheduled task run from a test sees the travelled clock, as
+/// requests and jobs do.
+#[renox::test]
+async fn scheduled_tasks_run_at_the_travelled_time() {
+    let app = TestApp::new(App::new().schedule(|s| {
+        s.daily_at("03:00", "stamp", |_| async {
+            STAMPED.store(
+                renox::db::now().timestamp(),
+                std::sync::atomic::Ordering::SeqCst,
+            );
+            Ok(())
+        });
+    }))
+    .await;
+    let real = renox::db::now().timestamp();
+    app.travel(std::time::Duration::from_secs(40 * 24 * 3600));
+    app.run_scheduled("stamp").await.unwrap();
+    let seen = STAMPED.load(std::sync::atomic::Ordering::SeqCst);
+    assert!(
+        seen >= real + 39 * 24 * 3600,
+        "the task saw {seen}, the real time is {real}"
+    );
+    assert!(app.run_scheduled("nope").await.is_err(), "an unknown task");
+}

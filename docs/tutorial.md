@@ -1349,16 +1349,14 @@ async fn the_weekly_digest_mails_what_is_new() {
     user(&app, "ben@example.com").await; // saved nothing: gets no mail
 
     // Run the task now, then the jobs it queued.
-    app.kernel().run_scheduled("weekly-digest").await.unwrap();
+    app.run_scheduled("weekly-digest").await.unwrap();
     assert_eq!(app.run_jobs().await, 2); // a job per user
     app.assert_mail_sent("ana@example.com", "Your week in bookmarks");
     assert_eq!(app.sent_mail().len(), 1);
 
     // Eight days later nothing is new, so nobody gets mail.
     app.travel(Duration::from_secs(8 * 24 * 60 * 60));
-    app.at_travelled_time(app.kernel().run_scheduled("weekly-digest"))
-        .await
-        .unwrap();
+    app.run_scheduled("weekly-digest").await.unwrap();
     app.run_jobs().await;
     assert_eq!(app.sent_mail().len(), 1);
 }
@@ -1377,8 +1375,9 @@ The test tools you used:
   `assert_forbidden()` (a 403), `assert_invalid("title")` (that field had an error). If a check
   fails, the test fails and tells you what it got instead.
 - `assert_database_has` and `assert_database_count` look in the database.
-- The test doesn't run the scheduler by itself: `run_scheduled` runs a task now, `run_jobs`
-  runs what it queued, and `sent_mail()` lists the mails, which are kept in memory.
+- The test doesn't run the scheduler by itself: `run_scheduled` runs a task now (at the
+  travelled time), `run_jobs` runs what it queued, and `sent_mail()` lists the mails, which are
+  kept in memory.
 - `travel` moves the app's clock forward, so "eight days later" takes no time at all.
 
 [testing.md](testing.md) lists every check, and how to fake mail, events and calls to other

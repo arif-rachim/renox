@@ -225,7 +225,7 @@ fn ascii_json(json: &str) -> String {
 /// ```
 /// # use renox::prelude::*;
 /// async fn store(back: Back, session: Session) -> Result<Back> {
-///     session.flash("status", "Tersimpan")?;
+///     session.flash("status", "Saved")?;
 ///     Ok(back)
 /// }
 /// ```

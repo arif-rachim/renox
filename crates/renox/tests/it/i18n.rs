@@ -54,6 +54,7 @@ fn write_lang(dir: &std::path::Path) {
     std::fs::write(
         lang.join("en.json"),
         r#"{ "welcome": "Welcome, :name!", "items": "One item|:count items", "only_en": "fallback works",
+             "orders": "Orders: :count", "kilos": "One kilo|:count kilos",
              "renox": { "validation": { "attributes": { "email": "email address" } } } }"#,
     )
     .unwrap();
@@ -75,7 +76,7 @@ async fn kernel(dir: &std::path::Path, debug: bool) -> Kernel {
     std::fs::create_dir_all(dir.join("views")).unwrap();
     std::fs::write(
         dir.join("views/page.html"),
-        "{{ t('welcome', name='anna') }}|{{ t('items', count=1) }}|{{ t('items', count=3) }}|{{ t('only_en') }}|{{ t('missing.key') }}|{{ app.locale }}",
+        "{{ t('welcome', name='anna') }}|{{ t('items', count=1) }}|{{ t('items', count=3) }}|{{ t('only_en') }}|{{ t('missing.key') }}|{{ t('orders', count=12) }}|{{ t('orders', count='1,204') }}|{{ t('kilos', count=2.5) }}|{{ t('kilos', count='1') }}|{{ app.locale }}",
     )
     .unwrap();
     let config = {
@@ -135,12 +136,14 @@ async fn templates_translate_for_each_visitor() {
 
     assert_eq!(
         visitor.get("/").await.1,
-        "Welcome, anna!|One item|3 items|fallback works|missing.key|en"
+        // #318: a count that isn't a whole number is shown as given, and
+        // still picks the plural form by its value.
+        "Welcome, anna!|One item|3 items|fallback works|missing.key|Orders: 12|Orders: 1,204|2.5 kilos|One kilo|en"
     );
     visitor.get("/lang/es").await;
     assert_eq!(
         visitor.get("/").await.1,
-        "¡Bienvenido, Anna!|Un artículo|3 artículos|fallback works|missing.key|es",
+        "¡Bienvenido, Anna!|Un artículo|3 artículos|fallback works|missing.key|Orders: 12|Orders: 1,204|2.5 kilos|One kilo|es",
         "missing Spanish keys fall back to English"
     );
     assert_eq!(

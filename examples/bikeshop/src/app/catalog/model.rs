@@ -161,10 +161,9 @@ impl Product {
 /// The `keywords` text: the brand, then each SKU as written and with its
 /// parts apart (`GIR-JER-0001-1 GIR JER 0001 1`).
 ///
-/// Why both: a search splits what people type at every `-`, and SQLite's
-/// index splits the SKU the same way, but PostgreSQL's English parser
-/// keeps `0001-1` together (a hyphenated word, or a negative number), so
-/// the SKU typed whole wouldn't match there without the spaced copy.
+/// Why both: the parts let a search for `0001` find the variant on either
+/// database. (A SKU typed whole is found on PostgreSQL too since Renox
+/// #304, which reads `-1` in `0001-1` as a signed number.)
 pub fn keywords(brand: &str, skus: &[String]) -> String {
     let mut words = vec![brand.to_owned()];
     for sku in skus {

@@ -1329,7 +1329,9 @@ the disabled reason at the end of the list:
   - The button gets `aria-keyshortcuts`, and its tooltip (or `title`) names the shortcut.
 - **A reason it's disabled**: `disabled_reason="Add a photo first."` The button can still get
   focus and shows the reason as its tooltip (on a tap too), but a click does nothing. Plain
-  `disabled=true` instead takes it out of the tab order entirely. Only `button` and
+  `disabled=true` instead takes it out of the tab order entirely. A reason alone disables the
+  button; with a condition, pass both: `disabled=(not photo), disabled_reason="Add a photo
+  first."` (when `disabled` is false the button works and the reason isn't shown). Only `button` and
   `icon_button` (without `href`) take `disabled` and `disabled_reason`; `link_button` and
   `open_button` take neither.
 

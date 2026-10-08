@@ -105,8 +105,13 @@ test('hiding a column in the menu is remembered across visits', () =>
     // Reset brings it back.
     await page.click('[popovertarget="grid-orders-columns"]');
     await page.click('[data-grid-reset]');
-    await page.waitFor(async () => true);
-    await page.settle();
+    // Two requests in turn (the DELETE, then the grid reloaded): waited for
+    // the column itself, since the page can look settled between them.
+    await page.waitFor(
+      () => !!document.querySelector('tbody tr[data-grid-row]:first-of-type td[data-col="city"]') &&
+        getComputedStyle(document.querySelector('tbody tr[data-grid-row]:first-of-type td[data-col="city"]')).display !== 'none',
+      { message: 'city shown again after the reset' },
+    );
     assert.ok((await columnOrder(page)).includes('city'));
   }));
 

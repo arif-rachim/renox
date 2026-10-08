@@ -114,8 +114,24 @@ impl TestApp {
             .expect("the queue runs")
     }
 
+    /// Runs the scheduled task `name` now (as `schedule:run` does), at the
+    /// time [`TestApp::travel`] moved the clock to.
+    ///
+    /// ```
+    /// # use renox::prelude::*;
+    /// # use std::time::Duration;
+    /// # async fn demo(app: renox::testing::TestApp) -> Result {
+    /// app.travel(Duration::from_secs(31 * 24 * 60 * 60)); // a month later
+    /// app.run_scheduled("monthly-report").await?;
+    /// # Ok(()) }
+    /// ```
+    pub async fn run_scheduled(&self, name: &str) -> crate::Result {
+        self.at_travelled_time(self.kernel.run_scheduled(name))
+            .await
+    }
+
     /// Moves the clock forward by `by` for what this `TestApp` does next:
-    /// requests, `run_jobs`, and code run in [`TestApp::at_travelled_time`]
+    /// requests, `run_jobs`, `run_scheduled`, and code run in [`TestApp::at_travelled_time`]
     /// (`renox::db::now()`, sessions, signed URLs, the queue, the cache).
     /// Adds up; [`TestApp::travel_back`] returns to the present.
     ///

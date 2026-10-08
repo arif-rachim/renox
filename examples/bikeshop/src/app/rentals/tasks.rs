@@ -15,7 +15,7 @@
 //!   their service interval go to the workshop (`FleetRepairNeeded`).
 //!
 //! Each step is a plain `async fn(&AppState)`, so tests call them directly
-//! after `TestApp::travel`, and `kernel().run_scheduled("rentals:watch")`
+//! after `TestApp::travel`, and `app.run_scheduled("rentals:watch")`
 //! runs them all.
 
 use renox::chrono::Duration;

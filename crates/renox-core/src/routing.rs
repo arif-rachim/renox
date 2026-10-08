@@ -616,6 +616,8 @@ pub struct RouteTable {
     paths: HashMap<String, String>,
     /// The `Routes::domain` pattern of names defined inside one.
     domains: HashMap<String, String>,
+    /// The methods of each named route, as listed: `GET`, `PUT|PATCH`, `*`.
+    methods: HashMap<String, String>,
 }
 
 impl RouteTable {
@@ -632,21 +634,47 @@ impl RouteTable {
         self.paths.get(name).map(String::as_str)
     }
 
+    /// Records the methods `name` answers (`GET`, `PUT|PATCH`, `*` for any).
+    pub(crate) fn set_method(&mut self, name: &str, method: &str) {
+        self.methods.insert(name.to_owned(), method.to_owned());
+    }
+
     /// Records that `name` belongs to the routes of `domain`.
     pub(crate) fn set_domain(&mut self, name: &str, domain: &str) {
         self.domains.insert(name.to_owned(), domain.to_owned());
     }
 
-    /// The name of the route with this path pattern (axum's `MatchedPath`,
-    /// e.g. `/products/{id}`) on `domain` (`None` for routes without one).
-    pub fn name_of(&self, path: &str, domain: Option<&str>) -> Option<&str> {
-        self.paths
-            .iter()
-            .filter(|(name, p)| {
-                p.as_str() == path && self.domains.get(*name).map(String::as_str) == domain
-            })
-            .map(|(name, _)| name.as_str())
-            .min()
+    /// The name of the route `method` reached at the path pattern `path`
+    /// (axum's `MatchedPath`, e.g. `/products/{id}`) on `domain` (`None` for
+    /// routes without one): several routes can share a path, one per method, such as
+    /// `GET /account` (`account.show`) and `DELETE /account`
+    /// (`account.destroy`). `HEAD` counts as `GET`. Without `method`, or when
+    /// no route names that method, the first name in order.
+    pub(crate) fn name_of(
+        &self,
+        path: &str,
+        domain: Option<&str>,
+        method: Option<&str>,
+    ) -> Option<&str> {
+        let on_path = || {
+            self.paths
+                .iter()
+                .filter(move |(name, p)| {
+                    p.as_str() == path && self.domains.get(*name).map(String::as_str) == domain
+                })
+                .map(|(name, _)| name.as_str())
+        };
+        let wanted = method.map(|m| if m == "HEAD" { "GET" } else { m });
+        let by_method = wanted.and_then(|wanted| {
+            on_path()
+                .filter(|name| {
+                    self.methods.get(*name).is_some_and(|listed| {
+                        listed == "*" || listed.split('|').any(|m| m == wanted)
+                    })
+                })
+                .min()
+        });
+        by_method.or_else(|| on_path().min())
     }
 
     /// Builds the URL path of a named route, filling its parameters in order.
@@ -847,7 +875,11 @@ impl CurrentRoute {
             .is_some_and(|name| route_name_matches(name, pattern))
     }
 
-    pub(crate) fn of(extensions: &axum::http::Extensions, state: &AppState) -> Self {
+    pub(crate) fn of(
+        method: &axum::http::Method,
+        extensions: &axum::http::Extensions,
+        state: &AppState,
+    ) -> Self {
         let path = extensions
             .get::<axum::extract::MatchedPath>()
             .map(|p| p.as_str().to_owned());
@@ -856,7 +888,7 @@ impl CurrentRoute {
             .map(|d| &*d.0);
         let name = path
             .as_deref()
-            .and_then(|p| state.routes.name_of(p, domain))
+            .and_then(|p| state.routes.name_of(p, domain, Some(method.as_str())))
             .map(str::to_owned);
         Self { name, path }
     }
@@ -870,7 +902,7 @@ impl<S: Send + Sync> axum::extract::FromRequestParts<S> for CurrentRoute {
         _: &S,
     ) -> Result<Self, Infallible> {
         Ok(match parts.extensions.get::<AppState>() {
-            Some(state) => Self::of(&parts.extensions, state),
+            Some(state) => Self::of(&parts.method, &parts.extensions, state),
             None => Self {
                 name: None,
                 path: None,
