@@ -1431,6 +1431,24 @@ picks the build, not the terminal.
   added `tests/queries.rs` (the main pages on the large seed: same query count as the small
   one). What Renox lacked became issues #299–#319 (listed in its README), worked around in the
   example. Open in #243: the Spanish pass, the explanations' review, the owner's sign-off.
+- **#343, the bike shop's design system in Renox** (stories #344–#349 and #351, one branch
+  `feat/issue-343-design-system`, one PR; the owner chose where each part goes):
+  - #344: the kit's default theme is the bike shop's "editorial" look. `data-rx-theme="warm"`
+    is the look before 1.1, `classic` the first one. New tokens `--rx-accent-2`, `--rx-tint`,
+    `--rx-accent-soft`, `--rx-ink`, `--rx-type-hero`, `--rx-type-section`. Pill buttons,
+    except in `rx-shell`.
+  - #345: `date_picker(disabled_dates=…, closed_weekdays=…)`.
+  - #346: `navbar(tabs=…)` (a phone tab bar), `nav_search`, and the public `icon()` macro
+    (Lucide, crates/renox-core/src/icons.rs; `sidebar_link`, `stat` and `empty` take `icon=`).
+  - #347: crates/renox-blocks.
+  - #348: the starter's page patterns (stubs/starter: patterns.html + patterns.css, owned by
+    the app).
+  - #349: the kit's rarely used parts load on demand.
+  - The bike shop: "About this page" is docked beside every page from 1200 px, with code
+    samples cut from the source at build time (`[explain:name]` markers, build.rs →
+    `code::REGIONS`, checked by tests/about.rs). A visual pass added icons, Unsplash photos
+    (CREDITS.md) and initials avatars. The grid, charts and the kit's basics stay in core
+    (the owner's decision).
 - **#351, two examples** (the owner's choice, after the design-system work #343): only
   examples/bikeshop and examples/hello remain. Before the other fifteen went, what they showed
   and the bike shop lacked moved in: each store's page on its own host (home/stores.rs,
