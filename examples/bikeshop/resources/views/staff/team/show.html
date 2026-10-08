@@ -36,6 +36,7 @@
         {% endcall %}
       {% endcall %}
       {%- if roles and not is_me %}
+      {# [explain:staff.team.show.template] #}
       <form method="post" action="{{ route('staff.team.roles.store', member.staff.id) }}" id="give-role" data-live-validate>
         {{ csrf_field() }}
         {% call card(title=t('staff.team.give', store=store.name), subtitle=t('staff.team.give_lead')) %}
@@ -48,6 +49,7 @@
           <div class="rx-card__footer">{{ button(t('staff.team.give_button')) }}</div>
         {% endcall %}
       </form>
+      {# [/explain:staff.team.show.template] #}
       {%- endif %}
     </div>
     <div class="rx-stack">

@@ -54,6 +54,7 @@ fn key(token: &str) -> String {
     format!("bikeshop:move-category:{token}")
 }
 
+// [explain:staff.catalog.move.action]
 /// The panel's "Move to a category…" action: keeps the selection, links here.
 pub async fn start_move(products: Vec<Product>, cx: ActionContext) -> Result<Toast> {
     let token = renox::random_token();
@@ -74,6 +75,7 @@ pub async fn start_move(products: Vec<Product>, cx: ActionContext) -> Result<Toa
             .persistent(),
     )
 }
+// [/explain:staff.catalog.move.action]
 
 async fn selection(state: &AppState, user: &User, token: &str) -> Result<Selection> {
     match state.cache.get::<Selection>(&key(token)).await? {
@@ -114,6 +116,7 @@ pub struct MoveForm {
     pub category_id: i64,
 }
 
+// [explain:staff.catalog.move.handler]
 /// `POST /staff/catalog/move/{token}`: moves them and goes back to the panel.
 pub async fn move_products(
     State(state): State<AppState>,
@@ -132,6 +135,7 @@ pub async fn move_products(
         .data(json!({ "products": chosen.products }))
         .save()
         .await?;
+    // [/explain:staff.catalog.move.handler]
     Ok((
         Toast::success(
             state
@@ -149,6 +153,7 @@ async fn product(db: &Db, id: i64) -> Result<(Product, Category)> {
     Ok((product, category))
 }
 
+// [explain:staff.catalog.fits.pivot]
 /// The pivot seen from this product (a part → bikes, a bike → parts), and
 /// the kind of product on the other side; `None` for gear.
 fn side(kind: CategoryKind) -> Option<(Pivot, CategoryKind)> {
@@ -158,7 +163,9 @@ fn side(kind: CategoryKind) -> Option<(Pivot, CategoryKind)> {
         CategoryKind::Gear => None,
     }
 }
+// [/explain:staff.catalog.fits.pivot]
 
+// [explain:staff.catalog.fits.pivot]
 /// `GET /staff/catalog/fits/{product}`: for a part, the bike models it
 /// fits; for a bike, the parts that fit it; each with its note, and a form
 /// to add one. Three queries.
@@ -176,6 +183,7 @@ pub async fn fits(State(db): State<Db>, Path(id): Path<i64>) -> Result<View> {
         .remove(&product.id)
         .unwrap_or_default();
     let fitted_ids: Vec<i64> = fitted.iter().map(|(p, _)| p.id).collect();
+    // [/explain:staff.catalog.fits.pivot]
     let choices: Vec<(String, String)> = Product::query()
         .where_raw(
             "category_id IN (SELECT id FROM categories WHERE kind = ?)",
@@ -207,6 +215,7 @@ pub struct FitForm {
     pub note: Option<String>,
 }
 
+// [explain:staff.catalog.fits.attach]
 /// `POST /staff/catalog/fits/{product}`.
 pub async fn add_fit(
     State(state): State<AppState>,
@@ -220,6 +229,7 @@ pub async fn add_fit(
     pivot
         .attach_with(&state.db, product.id, form.other_id, &[("note", &note)])
         .await?;
+    // [/explain:staff.catalog.fits.attach]
     audit::record(&state.db, &user, CATALOG_MANAGE, "catalog.fit_added")
         .subject("products", product.id)
         .data(json!({ "with": form.other_id }))

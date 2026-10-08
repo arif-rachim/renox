@@ -14,6 +14,7 @@
   <div class="bs-split" data-bs-reveal>
     <div>
       {% call card(title=t('multistore.fees.rates')) %}
+        {# [explain:multistore.fees.template] #}
         {% call list(id="fee-rates", label=t('multistore.fees.rates')) %}
           {%- for r in rates %}{% set s = r.store %}
           <li>
@@ -26,6 +27,7 @@
           </li>
           {%- endfor %}
         {% endcall %}
+        {# [/explain:multistore.fees.template] #}
         {%- if not can_change %}<p class="rx-subtitle">{{ t('multistore.fees.owner_only') }}</p>{% endif %}
       {% endcall %}
     </div>

@@ -5,6 +5,7 @@
 {% from "renox/ui.html" import card, input, button %}
 {% block title %}{{ t('plugins.two_factor.title') }} · {{ app.name }}{% endblock %}
 {% block content %}
+{# [explain:two-factor.challenge.template] #}
 <form method="post" action="{{ route('two-factor.verify') }}" hx-post="{{ route('two-factor.verify') }}">
   {{ csrf_field() }}
   {% call card(title=t('plugins.two_factor.title'), subtitle=t('plugins.two_factor.challenge_lead', app=app.name)) %}
@@ -12,4 +13,5 @@
     {{ button(t('plugins.two_factor.log_in'), block=true) }}
   {% endcall %}
 </form>
+{# [/explain:two-factor.challenge.template] #}
 {% endblock %}

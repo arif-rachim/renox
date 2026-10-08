@@ -28,12 +28,14 @@
   <p class="rx-subtitle">{{ t('reports.by.hint_' ~ by) }}</p>
 
   {#- Income. -#}
+  {# [explain:reports.dashboard.template] #}
   {% call stats(4) %}
     {{ stat(t('reports.stat.revenue'), n.revenue | money, delta=n.revenue_change, trend=n.revenue_trend) }}
     {{ stat(t('reports.stat.orders'), n.orders | number, delta=n.orders_change, url=route('reports.orders')) }}
     {{ stat(t('reports.stat.average_order'), n.average_order | money, hint=t('reports.stat.average_order_hint')) }}
     {{ stat(t('reports.stat.rentals'), n.rentals | number, hint=t('reports.stat.rentals_hint'), url=route('reports.rentals')) }}
   {% endcall %}
+  {# [/explain:reports.dashboard.template] #}
   {#- The fleet, the workshop, plans. -#}
   {% call stats(4) %}
     {{ stat(t('reports.stat.fleet_use'), (n.fleet_use | number(1)) ~ " %", hint=t('reports.stat.fleet_use_hint', bikes=n.fleet)) }}
@@ -49,10 +51,12 @@
     {{ stat(t('reports.stat.fees_paid'), n.fees_paid | money, hint=t('reports.stat.fees_paid_hint')) }}
   {% endcall %}
 
+  {# [explain:reports.dashboard.template] #}
   {% call dashboard(3) %}
     {% call widget(t('reports.widget.revenue'), description=t('reports.widget.revenue_hint'), span=2) %}
       {{ chart("bar", labels=n.labels, series=revenue, stacked=true, format="money", title=t('reports.widget.revenue'), id="chart-revenue") }}
     {% endcall %}
+  {# [/explain:reports.dashboard.template] #}
     {% call widget(t('reports.widget.mix'), description=t('reports.widget.mix_hint')) %}
       {%- if n.revenue > 0 %}
       {{ chart("doughnut", labels=stream_labels, values=stream_amounts, format="money", title=t('reports.widget.mix'), id="chart-mix") }}

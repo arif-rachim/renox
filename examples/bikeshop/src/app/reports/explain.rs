@@ -1,6 +1,6 @@
 //! "About this page" entries for the reports area's pages (see `crate::explain`).
 
-use crate::explain::{Audience, Explanation, Feature, Flow, NotAPage};
+use crate::explain::{Audience, Code, Explanation, Feature, Flow, NotAPage};
 
 const WHO: &str = "The owner, who sees every store and compares them, and store managers, who \
                    see the stores where a role gives them `reports.view` (a manager helping \
@@ -185,7 +185,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/migrations/20260102001000_create_report_views.up.sql",
                 "examples/bikeshop/tests/reports.rs",
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Handler: who may see which stores, then the cached numbers",
+                    region: "reports.dashboard.handler",
+                },
+                Code {
+                    title: "Cache: one key per period, store and day, dropped when income changes",
+                    region: "reports.dashboard.cache",
+                },
+                Code {
+                    title: "Template: the kit's `stats` and a `chart(…)` in a `widget`",
+                    region: "reports.dashboard.template",
+                },
+            ],
         },
         Explanation {
             route: "reports.orders",
@@ -211,7 +224,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/reports/grid.html",
                 "examples/bikeshop/migrations/20260102001000_create_report_views.up.sql",
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Grid: one shared toolbox, then the order columns with sums",
+                    region: "reports.orders.grid",
+                },
+                Code {
+                    title: "Handler: only the stores the person may see, export or page",
+                    region: "reports.orders.handler",
+                },
+                Code {
+                    title: "Template: `renox/grid.html` draws the whole grid",
+                    region: "reports.grid.template",
+                },
+            ],
         },
         Explanation {
             route: "reports.rentals",
@@ -237,7 +263,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/reports/grid.html",
                 "examples/bikeshop/migrations/20260102001000_create_report_views.up.sql",
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Grid: both stores as columns, sums under the money",
+                    region: "reports.rentals.grid",
+                },
+                Code {
+                    title: "Model: a view with two store columns, read through `StoreRecord`",
+                    region: "reports.rentals.model",
+                },
+                Code {
+                    title: "Handler: `access::visible` keeps the person's stores",
+                    region: "reports.rentals.handler",
+                },
+            ],
         },
         Explanation {
             route: "reports.work_orders",
@@ -262,7 +301,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/reports/grid.html",
                 "examples/bikeshop/migrations/20260102001000_create_report_views.up.sql",
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Grid: labour and parts summed, grouped by store or status",
+                    region: "reports.work_orders.grid",
+                },
+                Code {
+                    title: "Handler: one function answers the page and its exports",
+                    region: "reports.work_orders.handler",
+                },
+                Code {
+                    title: "Template: `renox/grid.html` draws the whole grid",
+                    region: "reports.grid.template",
+                },
+            ],
         },
         Explanation {
             route: "reports.payments",
@@ -287,7 +339,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/reports/grid.html",
                 "examples/bikeshop/migrations/20260102001000_create_report_views.up.sql",
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Grid: payments by kind, method and status, amounts summed",
+                    region: "reports.payments.grid",
+                },
+                Code {
+                    title: "Handler: the visible rows, exported or paged",
+                    region: "reports.payments.handler",
+                },
+                Code {
+                    title: "Template: `renox/grid.html` draws the whole grid",
+                    region: "reports.grid.template",
+                },
+            ],
         },
         Explanation {
             route: "reports.customers",
@@ -337,7 +402,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/reports/grid.html",
                 "examples/bikeshop/migrations/20260102001000_create_report_views.up.sql",
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Query: customers who did business with the person's stores",
+                    region: "reports.customers.query",
+                },
+                Code {
+                    title: "Grid: lifetime value per stream, under one grouped heading",
+                    region: "reports.customers.grid",
+                },
+                Code {
+                    title: "Template: `renox/grid.html` draws the whole grid",
+                    region: "reports.grid.template",
+                },
+            ],
         },
         Explanation {
             route: "reports.entries",
@@ -363,7 +441,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/reports/grid.html",
                 "examples/bikeshop/src/app/multistore/model.rs",
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Handler: each row links to the record it came from (`extend`)",
+                    region: "reports.entries.handler",
+                },
+                Code {
+                    title: "Grid: debtor, creditor and settlement as filters and groups",
+                    region: "reports.entries.grid",
+                },
+                Code {
+                    title: "Template: a custom cell for the entry's source",
+                    region: "reports.grid.template",
+                },
+            ],
         },
         Explanation {
             route: "reports.monthly",
@@ -439,7 +530,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/mail/reports/monthly.html",
                 "examples/bikeshop/tests/reports.rs",
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Job: one batch per month, a job per store, then the mail",
+                    region: "reports.monthly.batch",
+                },
+                Code {
+                    title: "Handler: `Valid<RunForm>` checks the month, then starts the batch",
+                    region: "reports.monthly.handler",
+                },
+                Code {
+                    title: "Template: a form, and a `widget` that polls while a run is going",
+                    region: "reports.monthly.template",
+                },
+            ],
         },
     ]
 }

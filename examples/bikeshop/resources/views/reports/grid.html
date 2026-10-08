@@ -14,8 +14,10 @@
     {{ link_button(route('reports.monthly'), t('reports.monthly.title'), icon="calendar") }}
   {% endcall %}
   {% include "reports/_tabs.html" %}
+  {# [explain:reports.grid.template] #}
   {% call(row, column) grid(rows) %}
     {%- if column.key == "source" %}{% if row.source_url %}<a class="rx-link" href="{{ row.source_url }}">{{ row.source_label }}</a>{% else %}{{ row.source_label }}{% endif %}{% endif %}
   {% endcall %}
+  {# [/explain:reports.grid.template] #}
 </div>
 {% endblock %}

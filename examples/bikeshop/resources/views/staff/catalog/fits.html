@@ -23,6 +23,7 @@
       {%- endfor %}
     {% endcall %}
   {% endcall %}
+  {# [explain:staff.catalog.fits.template] #}
   <form method="post" action="{{ route('staff.catalog.fits.store', product.id) }}" data-live-validate>
     {{ csrf_field() }}
     {% call card(title=t('staff.catalog.add_fit')) %}
@@ -33,6 +34,7 @@
       <div class="rx-card__footer">{{ button(t('staff.catalog.add_fit')) }}</div>
     {% endcall %}
   </form>
+  {# [/explain:staff.catalog.fits.template] #}
   {%- endif %}
 </div>
 {% endblock %}

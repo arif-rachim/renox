@@ -8,6 +8,7 @@
 {% block content %}
 <div class="rx-stack" data-bs-reveal>
   {{ page_header(t('staff.catalog.move_title'), subtitle=t('staff.catalog.move_lead', count=products | length), back=route('admin.products.index'), back_label=t('staff.catalog.products')) }}
+  {# [explain:staff.catalog.move.template] #}
   <form method="post" action="{{ route('staff.catalog.move.store', token) }}">
     {{ csrf_field() }}
     {% call card() %}
@@ -18,5 +19,6 @@
       <div class="rx-card__footer">{{ link_button(route('admin.products.index'), t('staff.cancel'), variant="plain") }}{{ button(t('staff.catalog.move_button')) }}</div>
     {% endcall %}
   </form>
+  {# [/explain:staff.catalog.move.template] #}
 </div>
 {% endblock %}

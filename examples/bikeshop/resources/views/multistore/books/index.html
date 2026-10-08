@@ -13,6 +13,7 @@
     {{ link_button(route('multistore.fees'), t('multistore.fees.title')) }}
     {{ link_button(route('multistore.settlements'), t('multistore.settlements.title'), variant="primary") }}
   {% endcall %}
+  {# [explain:multistore.books.template] #}
   {% call stats(2) %}
     {{ stat(t('multistore.books.position', store=store_name), mine | money, hint=t('multistore.books.position_hint')) }}
     {{ stat(t('multistore.books.pairs'), balances | length) }}
@@ -29,5 +30,6 @@
   {% call(row, column) grid(entries) %}
     {%- if column.key == "source" %}{% if row.source_url %}<a class="rx-link" href="{{ row.source_url }}">{{ row.source_label }}</a>{% else %}{{ row.source_label }}{% endif %}{% endif %}
   {% endcall %}
+  {# [/explain:multistore.books.template] #}
 </div>
 {% endblock %}

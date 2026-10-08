@@ -73,6 +73,7 @@ fn locked(role: &str, permission: &str) -> bool {
     is_global(role) && [ROLES_MANAGE, STAFF_ACCESS].contains(&permission)
 }
 
+// [explain:staff.roles.index.handler]
 /// `GET /staff/roles`: the matrix. Two queries (Renox's `permissions::roles`).
 pub async fn index(State(db): State<Db>) -> Result<View> {
     let roles = permissions::roles(&db).await?;
@@ -107,6 +108,7 @@ pub async fn index(State(db): State<Db>) -> Result<View> {
         .collect();
     Ok(view("staff/roles/index.html", context! { columns, rows }))
 }
+// [/explain:staff.roles.index.handler]
 
 /// The switch's value: present when it was switched on.
 #[derive(Deserialize, Debug, Default)]
@@ -114,6 +116,7 @@ pub struct ToggleForm {
     pub granted: Option<String>,
 }
 
+// [explain:staff.roles.index.toggle]
 /// `POST /staff/roles/{role}/{permission}`: grants or revokes one
 /// permission; answers with a toast (htmx) or goes back (a plain form).
 pub async fn toggle(
@@ -123,6 +126,7 @@ pub async fn toggle(
     Path((role, permission)): Path<(String, String)>,
     Form(form): Form<ToggleForm>,
 ) -> Result<Response> {
+    // [/explain:staff.roles.index.toggle]
     let db = &state.db;
     if !PERMISSIONS.iter().any(|p| p.name == permission) {
         return Err(Error::NotFound);
@@ -134,6 +138,7 @@ pub async fn toggle(
     {
         return Err(Error::NotFound);
     }
+    // [explain:staff.roles.index.toggle]
     let grant = form.granted.is_some();
     if !grant && locked(&role, &permission) {
         return Err(Error::Forbidden);
@@ -155,4 +160,5 @@ pub async fn toggle(
         return Ok(toast.into_response());
     }
     Ok((toast, Redirect::to(&state.url("staff.roles.index", &[])?)).into_response())
+    // [/explain:staff.roles.index.toggle]
 }
