@@ -725,3 +725,39 @@ async fn catalogue_pages_use_a_fixed_number_of_queries_on_the_large_seed() {
     // The home page.
     assert!(queries(&app, "/").await <= 15);
 }
+
+#[renox::test]
+async fn each_store_has_its_own_page_on_its_own_host() {
+    let app = TestApp::new(bikeshop::app()).await;
+    let north = fixtures::store(app.db(), "North").await.unwrap();
+    let host = format!("{}.localhost:3000", north.slug);
+    let on = |host: String, path: &'static str| {
+        let app = &app;
+        async move { app.request().header("host", &host).get(path).await }
+    };
+
+    // Anyone: the store's name, address and hours, links back to the shop.
+    let page = on(host.clone(), "/").await;
+    page.assert_ok()
+        .assert_view("home/store.html")
+        .assert_see("The North store")
+        .assert_see("Main Street")
+        .assert_see("Opening hours")
+        // Links to the shop are absolute: this host has only this page.
+        .assert_see(r#"href="http://127.0.0.1:3000/""#)
+        .assert_see(r#"href="http://127.0.0.1:3000/rent""#)
+        // Its own "About this page", not the home page's.
+        .assert_see("Store page on its own host")
+        // whose link to every page goes to the shop's host.
+        .assert_see(r#"href="http://127.0.0.1:3000/about/pages""#);
+
+    // Any other path on a store's host goes to its page; an unknown store is a 404.
+    on(host.clone(), "/shop").await.assert_redirect("/");
+    on("nowhere.localhost".into(), "/").await.assert_not_found();
+
+    // The shop itself stays on its own host, and its home page links to each store's.
+    app.get("/")
+        .await
+        .assert_view("home/index.html")
+        .assert_see(&format!(r#"href="http://{host}/""#));
+}

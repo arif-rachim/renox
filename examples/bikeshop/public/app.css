@@ -157,3 +157,12 @@
   .bs-profile__body { grid-template-columns: minmax(0, 1fr); padding: 0 var(--rx-space-4) var(--rx-space-4); }
   .bs-profile__band { height: 6rem; }
 }
+
+/* /about/fields: a sample's photo on its read-only page. */
+.bs-sample-photo { display: block; width: 100%; max-width: 20rem; height: auto; border-radius: var(--rx-radius); background: var(--rx-tint); }
+/* /about/htmx: the checklist's bar (count, tabs, the new-item button) wraps on phones. */
+.bs-checklist__bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rx-space-3); }
+.bs-checklist__done { color: var(--rx-secondary-label); text-decoration: line-through; }
+.bs-checklist__edit { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: var(--rx-space-2); flex: 1; }
+/* /about/fields: the reference table keeps each type name whole. */
+.bs-types .rx-table code { overflow-wrap: normal; white-space: nowrap; }

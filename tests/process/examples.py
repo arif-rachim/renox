@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Every example binary as a real process (#270): migrate, seed twice, serve,
-then ask for every GET route without parameters (from `route:list`) as a
-guest; a 5xx anywhere fails. tests/process/run.sh builds the binaries first.
+"""Both example binaries as real processes (#270): migrate, seed twice,
+serve, then ask for every GET route without parameters (from `route:list`)
+as a guest; a 5xx anywhere fails. tests/process/run.sh builds the binaries
+first.
 
-  python3 tests/process/examples.py              # every example
-  python3 tests/process/examples.py shop grid    # some
+  python3 tests/process/examples.py              # both
+  python3 tests/process/examples.py bikeshop     # one
 
-Examples with accounts are crawled a second time, logged in: with their
-seeded account, or one signed up for the run (hello, billing). With
-PROCESS_POSTGRES naming a PostgreSQL server (postgres://user:pw@host:port),
-postgres-app, fields and bikeshop run there instead, each in a database of its own
-(built with `--features renox/postgres`; tests/process/run.sh postgres).
+Both are crawled a second time, logged in: the bike shop with its seeded
+owner, hello with an account signed up for the run. With PROCESS_POSTGRES
+naming a PostgreSQL server (postgres://user:pw@host:port), the bike shop
+runs there instead, in a database of its own (built with
+`--features renox/postgres`; tests/process/run.sh postgres).
 """
 
 import base64
@@ -31,38 +32,15 @@ import urllib.request
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TARGET = os.environ.get("CARGO_TARGET_DIR", os.path.join(ROOT, "target"))
 
-# Package (binary) → directory. examples/postgres is PostgreSQL-only.
+# Package (binary) → directory.
 EXAMPLES = {
     "hello": "hello",
-    "crud": "crud",
-    "api": "api",
-    "jobs": "jobs",
-    "uploads": "uploads",
-    "shop": "shop",
-    "htmx-recipes": "htmx-recipes",
-    "relations": "relations",
-    "grid": "grid",
-    "backoffice": "backoffice",
-    "teams": "teams",
-    "admin": "admin",
-    "billing": "billing",
-    "webhooks": "webhooks",
-    "fields": "fields",
     "bikeshop": "bikeshop",
 }
 
 # The account to log in with: seeded ones, or None to sign up.
 ACCOUNTS = {
     "hello": None,
-    "crud": ("demo@example.com", "password123"),
-    "api": ("demo@example.com", "password123"),
-    "jobs": ("admin@example.com", "password123"),
-    "shop": ("admin@example.com", "password123"),
-    "grid": ("demo@example.com", "password"),
-    "backoffice": ("admin@example.com", "password123"),
-    "teams": ("alice@example.com", "password123"),
-    "admin": ("admin@example.com", "password123"),
-    "billing": None,
     "bikeshop": ("owner@bikeshop.test", "password"),
 }
 
@@ -74,7 +52,7 @@ EXTRA_ENV = {
 }
 
 POSTGRES = os.environ.get("PROCESS_POSTGRES", "").rstrip("/")
-POSTGRES_EXAMPLES = {"postgres-app": "postgres", "fields": "fields", "bikeshop": "bikeshop"}
+POSTGRES_EXAMPLES = {"bikeshop": "bikeshop"}
 
 
 def free_port():

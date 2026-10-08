@@ -67,11 +67,12 @@
       <p class="bs-store__text">{{ t('home.stores.text') }}</p></div>
     </div>
     <ul class="bs-stores" role="list">
-      {%- for name, slug in storefront.stores %}
+      {%- for name, slug, site in storefront.stores %}
       <li class="bs-store">
+        {#- Each store's own page lives on its own host (src/app/home/stores.rs). -#}
         <div class="bs-store__photo"><img src="/images/site/store-{{ slug }}.webp" alt="" width="1200" height="800" loading="lazy"></div>
         <div class="bs-store__body">
-          <h3 class="bs-store__name"><span class="bs-icon-circle bs-icon-circle--small">{{ icon("map-pin", size=18) }}</span>{{ t('home.stores.store', name=name) }}</h3>
+          <h3 class="bs-store__name"><span class="bs-icon-circle bs-icon-circle--small">{{ icon("map-pin", size=18) }}</span><a class="bs-store__link" href="{{ site }}">{{ t('home.stores.store', name=name) }}</a></h3>
           <ul class="bs-store__does" role="list">
             <li>{{ icon("shopping-bag", size=16) }}{{ t('home.stores.buy') }}</li>
             <li>{{ icon("key-round", size=16) }}{{ t('home.stores.rent') }}</li>

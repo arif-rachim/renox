@@ -117,6 +117,8 @@
 .bs-store__does { display: flex; flex-wrap: wrap; gap: var(--rx-space-2); margin: 0; padding: 0; list-style: none; }
 .bs-store__does li { display: inline-flex; align-items: center; gap: var(--rx-space-1); padding: var(--rx-space-1) var(--rx-space-3); border-radius: 999px; background: var(--rx-tint); color: var(--rx-label); font: var(--rx-type-note); }
 .bs-store__does .rx-icon { color: var(--rx-accent-text); }
+.bs-store__link { color: inherit; text-decoration: none; }
+.bs-store__link:hover, .bs-store__link:focus-visible { color: var(--rx-accent-text); text-decoration: underline; text-underline-offset: 0.2em; }
 .bs-store__text { margin: 0; font: var(--rx-type-note); color: var(--rx-secondary-label); }
 
 /* A hero's promises: an icon in a tinted circle and a line each. */

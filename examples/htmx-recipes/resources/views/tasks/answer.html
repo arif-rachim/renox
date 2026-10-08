@@ -1,6 +1,0 @@
-{#- What a row action answers htmx with: the row (or nothing, after a delete) and,
-    out of band, the open count at the top of the page (`.fragment("row").also("count")`).
-    htmx swaps the first part into the row and the second into #open-count. -#}
-{% block row %}{% if task %}{% include "tasks/_row.html" %}{% endif %}{% endblock %}
-{% block count %}<span class="rx-subtitle" id="open-count" hx-swap-oob="true">{{ open }} open</span>{% endblock %}
-{% block empty %}{% include "tasks/_empty.html" %}{% endblock %}

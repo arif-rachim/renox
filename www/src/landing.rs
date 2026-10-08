@@ -346,32 +346,8 @@ pub fn examples() -> Vec<Example> {
             text: "Three stores that sell, rent and service bikes",
         },
         Example {
-            name: "shop",
-            text: "Catalog, cart, checkout and an admin",
-        },
-        Example {
-            name: "teams",
-            text: "Multi-tenant SaaS with two-factor login and OAuth",
-        },
-        Example {
-            name: "backoffice",
-            text: "Invoices from a stock ledger, CSV imports",
-        },
-        Example {
-            name: "grid",
-            text: "A sales dashboard on one data grid",
-        },
-        Example {
-            name: "billing",
-            text: "Subscriptions with Stripe and Xendit",
-        },
-        Example {
-            name: "api",
-            text: "A JSON API with tokens and rate limits",
-        },
-        Example {
-            name: "admin",
-            text: "An admin panel from three models",
+            name: "hello",
+            text: "The smallest app: a guestbook",
         },
     ]
 }

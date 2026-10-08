@@ -28,4 +28,4 @@ What it adds:
 - Google and GitHub; another provider is one impl of the `Provider` trait.
 
 The guide is [docs/oauth.md](https://github.com/arif-rachim/renox/blob/main/docs/oauth.md);
-examples/teams uses it. Versioned with `renox`: use the same version for both.
+examples/bikeshop uses it (Google and GitHub, when their keys are set). Versioned with `renox`: use the same version for both.

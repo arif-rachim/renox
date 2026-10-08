@@ -1,7 +1,0 @@
-{#- The kit's mail layout and components (renox/mail/*): styled inline for mail clients. -#}
-{% extends "renox/mail/layout.html" %}
-{% from "renox/mail/components.html" import table %}
-{% block content %}
-<p>Thank you for your order!</p>
-{{ table([[order.item, order.total | money]], head=["Order #" ~ order.id, "Total"]) }}
-{% endblock %}

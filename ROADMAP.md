@@ -19,7 +19,8 @@ framework where a new app works out of the box.
    axum, sqlx, minijinja, lettre and friends (the queue is Renox's own, see Decisions).
 4. **HTMX-first.** Response helpers know whether a request wants a full page or a fragment.
 5. **Single-binary deploys.** SQLite, templates and htmx/Alpine assets ship inside the binary.
-6. **Dogfooded.** Every feature is exercised by an app in `examples/`.
+6. **Dogfooded.** Features are exercised by the apps in `examples/` (the bike shop and hello,
+   #351), the guides' doctests and the integration tests.
 
 ## Application layout
 
@@ -1978,6 +1979,16 @@ Notes:
   swatches, a timeline and a plan comparison are examples/bikeshop's "blocks"
   (`resources/views/blocks/`, `public/blocks/`), written like a library on the kit's tokens so
   they can move to a crate later; Renox's kit isn't changed for them.
+- **Two examples: the bike shop and hello** (#351, the owner, 2026-10-08): the sixteen
+  examples became two, examples/bikeshop (the one complete use case) and examples/hello (the
+  smallest app: the quick start and the README's GIF). What the other fifteen showed and the
+  bike shop lacked moved into it first: each store's page on its own host (`Routes::domain`),
+  `/about/fields` (every input ↔ Rust ↔ SQLite ↔ PostgreSQL, files public and private, S3 in
+  CI) and `/about/htmx` (the htmx recipes, live). The data grid's pages that the browser tests
+  drive moved into tests/browser/fixture (`/grid`). APIs no example shows any more (default
+  scopes, model hooks, `gate_before`, job chains, cursor pagination…) are shown by the guides'
+  doctests and tested in `crates/renox/tests/it`. The milestone notes above keep the old
+  examples' names: they are history.
 
 ## Not planned
 

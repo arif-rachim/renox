@@ -1,0 +1,109 @@
+{% extends "layouts/app.html" %}
+{#- /about/htmx (src/app/about/htmx.rs): htmx and Alpine recipes, live, on a
+    pre-ride checklist kept in the session and the catalogue's bikes. Each is
+    a few htmx attributes on the kit's components and a handler answering
+    with a fragment (about/htmx/_*.html); the table at the end names the
+    recipe, what to try, the answer and where the shop uses it. -#}
+{% from "renox/ui.html" import page_header, card, action_sheet, input, button, list, table, link_button %}
+{% block seo %}{{ seo(title=t('htmx.title'), description=t('htmx.lead')) }}{% endblock %}
+
+{% block content %}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('htmx.title'), subtitle=t('htmx.lead')) }}
+
+  {#- One Alpine component for the checklist: the active tab. Its logic is in
+      `Alpine.data` below, so the page also works under CSP=strict. -#}
+  <div x-data="checklist">
+  {% call card(t('htmx.checklist.title'), subtitle=t('htmx.checklist.lead')) %}
+    <div class="bs-checklist__bar">
+      <span class="rx-badge rx-badge--info" id="open-count">{{ t('htmx.open', count=open) }}</span>
+      {#- Tabs: filtering happens in the browser (each row's x-show), no request. -#}
+      <div class="rx-segmented" role="tablist" aria-label="{{ t('htmx.show') }}">
+        <button class="rx-segmented__item" type="button" role="tab" :aria-selected="ariaAll" @click="showAll">{{ t('htmx.tabs.all') }}</button>
+        <button class="rx-segmented__item" type="button" role="tab" :aria-selected="ariaOpen" @click="showOpen">{{ t('htmx.tabs.open') }}</button>
+        <button class="rx-segmented__item" type="button" role="tab" :aria-selected="ariaDone" @click="showDone">{{ t('htmx.tabs.done') }}</button>
+      </div>
+      <span class="rx-spacer"></span>
+      {#- Modal form: the kit's `action_sheet` sends it with htmx, and the new
+          row goes to the top of the list (`target`, `swap="afterbegin"`). A
+          422 keeps the sheet open with the error under the field; a success
+          closes it and clears the form. -#}
+      {% call action_sheet("new-item", t('htmx.new'), route('about.htmx.store'), t('htmx.new'),
+                           submit_label=t('htmx.add'), variant="primary", icon="plus", key="n",
+                           target="#checklist", swap="afterbegin") %}
+        {{ input("title", t('htmx.item'), placeholder=t('htmx.placeholder'), required=true, autocomplete="off", id="new-title", attrs={"maxlength": 60}) }}
+      {% endcall %}
+    </div>
+    {% call list(id="checklist", label=t('htmx.checklist.title')) %}
+      {%- for item in items %}{% include "about/htmx/_row.html" %}{% endfor %}
+    {% endcall %}
+    {% include "about/htmx/_empty.html" %}
+    <div class="rx-row">
+      {#- Plain forms htmx takes over: HX-Refresh reloads this page,
+          HX-Redirect goes to another one. -#}
+      <form method="post" action="{{ route('about.htmx.clear_done') }}" hx-post="{{ route('about.htmx.clear_done') }}">
+        {{ csrf_field() }}{{ button(t('htmx.clear'), variant="secondary") }}
+      </form>
+      <form method="post" action="{{ route('about.htmx.ready') }}" hx-post="{{ route('about.htmx.ready') }}">
+        {{ csrf_field() }}{{ button(t('htmx.ready_button'), variant="secondary") }}
+      </form>
+    </div>
+  {% endcall %}
+  </div>
+
+  {% call card(t('htmx.scroll.title'), subtitle=t('htmx.scroll.lead')) %}
+    {% call list(id="bikes", label=t('htmx.scroll.title')) %}{% include "about/htmx/_bikes.html" %}{% endcall %}
+  {% endcall %}
+
+  {% call card(t('htmx.recipes.title'), subtitle=t('htmx.recipes.lead')) %}
+    {% call table([t('htmx.recipes.recipe'), t('htmx.recipes.try'), t('htmx.recipes.answer'), t('htmx.recipes.shop')], caption=t('htmx.recipes.title')) %}
+      {%- for r in [
+        ["modal", "action_sheet(…, target=\"#checklist\", swap=\"afterbegin\")", none],
+        ["oob", "view(…).fragment(\"row\").also(\"count\")", route('cart.show')],
+        ["retarget", "HxRetarget + HxReswap + HxTrigger", none],
+        ["inline", "hx-trigger=\"dblclick\", hx-trigger=\"bs-cancel\"", none],
+        ["toggle", "checkbox(…, attrs={\"hx-patch\": …})", route('staff.roles.index')],
+        ["menu", "menu_button(…, attrs={\"hx-delete\": …, \"hx-confirm\": …})", none],
+        ["tabs", "Alpine.data(\"checklist\") + x-show", none],
+        ["refresh", "(Toast, HxRefresh)", route('sales.orders.index')],
+        ["redirect", "(Toast, htmx.redirect(…))", route('plans.mine')],
+        ["scroll", "hx-trigger=\"revealed\" hx-swap=\"outerHTML\"", none],
+      ] %}
+      <tr>
+        <td>{{ t('htmx.recipes.' ~ r[0] ~ '.name') }}</td>
+        <td>{{ t('htmx.recipes.' ~ r[0] ~ '.try') }}</td>
+        <td><code>{{ r[1] }}</code></td>
+        <td>{% if r[2] %}<a class="rx-link" href="{{ r[2] }}">{{ t('htmx.recipes.' ~ r[0] ~ '.shop') }}</a>{% else %}—{% endif %}</td>
+      </tr>
+      {%- endfor %}
+    {% endcall %}
+  {% endcall %}
+</div>
+
+{% call push('scripts', once='about-htmx-checklist') %}
+<script nonce="{{ csp_nonce() }}">
+  // Escape in an inline edit asks for the row as it was: the input listens
+  // for `bs-cancel` (a trigger filter would need eval, refused by CSP=strict).
+  document.addEventListener("keyup", function (event) {
+    if (event.key === "Escape" && event.target.matches("[data-bs-cancel]")) {
+      htmx.trigger(event.target, "bs-cancel");
+    }
+  });
+  document.addEventListener("alpine:init", function () {
+    Alpine.data("checklist", function () {
+      return {
+        tab: "all",
+        get showsOpen() { return this.tab !== "done"; },
+        get showsDone() { return this.tab !== "open"; },
+        get ariaAll() { return String(this.tab === "all"); },
+        get ariaOpen() { return String(this.tab === "open"); },
+        get ariaDone() { return String(this.tab === "done"); },
+        showAll: function () { this.tab = "all"; },
+        showOpen: function () { this.tab = "open"; },
+        showDone: function () { this.tab = "done"; }
+      };
+    });
+  });
+</script>
+{% endcall %}
+{% endblock %}

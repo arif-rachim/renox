@@ -1,8 +1,0 @@
-{{ t('mail.confirmation.thanks', id=order.id) }}
-
-{% for item in items %}{{ item.quantity }} x {{ item.name }}: {{ (item.price * item.quantity) | money }}
-{% endfor %}
-{{ t('mail.confirmation.total') }}: {{ order.total | money }}
-
-{{ t('mail.confirmation.pay', total=order.total | money, days=3, id=order.id) }}
-{{ t('mail.confirmation.pickup' if order.pickup else 'mail.confirmation.to', address=order.address) }}

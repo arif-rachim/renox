@@ -356,7 +356,7 @@ fn resolve(from: &str, path: &str) -> String {
     parts.join("/")
 }
 
-/// Folders (`examples/crud`) have no extension.
+/// Folders (`examples/hello`) have no extension.
 fn is_directory(path: &str) -> bool {
     path.trim_end_matches('/')
         .rsplit('/')
@@ -381,12 +381,12 @@ mod tests {
         );
         assert_eq!(link_target("#models", "README.md"), "#models");
         assert_eq!(
-            link_target("examples/crud", "README.md"),
-            format!("{REPOSITORY}/tree/main/examples/crud")
+            link_target("examples/hello", "README.md"),
+            format!("{REPOSITORY}/tree/main/examples/hello")
         );
         assert_eq!(
-            link_target("examples/crud/src/lib.rs", "README.md"),
-            format!("{REPOSITORY}/blob/main/examples/crud/src/lib.rs")
+            link_target("examples/hello/src/lib.rs", "README.md"),
+            format!("{REPOSITORY}/blob/main/examples/hello/src/lib.rs")
         );
         assert_eq!(
             link_target("https://htmx.org", "README.md"),

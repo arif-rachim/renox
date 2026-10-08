@@ -74,6 +74,10 @@ impl renox::Module for Catalog {
                 &ctx.state,
                 &["rentals.create", "rentals.new", "rentals.index"],
             );
+            // Each store's own page, on its own host (Routes::domain).
+            for store in &mut front.stores {
+                store.2 = crate::app::home::stores::site_url(&ctx.state.config, &store.1);
+            }
             front.service_url = first_route(
                 &ctx.state,
                 &[
@@ -115,8 +119,9 @@ pub struct Storefront {
     /// How many bikes the shop sells (the hero's figure).
     pub bikes: u64,
     /// The stores, by name, with their slug (the stores strip's photos are
-    /// `public/images/site/store-{slug}.webp`).
-    pub stores: Vec<(String, String)>,
+    /// `public/images/site/store-{slug}.webp`) and their own page's address,
+    /// on the store's host (`src/app/home/stores.rs`).
+    pub stores: Vec<(String, String, String)>,
 }
 
 /// The home page's storefront: the eight best-selling bikes (one query
@@ -161,7 +166,10 @@ pub async fn storefront(db: &Db) -> Result<Storefront> {
     let stores = crate::app::staff::model::Store::query()
         .order_by("id")
         .select_as::<(String, String), _>(db, "name, slug")
-        .await?;
+        .await?
+        .into_iter()
+        .map(|(name, slug)| (name, slug, String::new()))
+        .collect();
     Ok(Storefront {
         featured: Card::load(db, featured).await?,
         categories,

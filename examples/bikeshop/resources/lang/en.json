@@ -2913,5 +2913,213 @@
   },
   "auth_art": {
     "quote": "Ride further. We'll keep the bike ready."
+  },
+  "stores": {
+    "site": {
+      "lead": "The :name store: buy, rent and service bikes, with our own workshop on site.",
+      "rent": "Rent a bike here",
+      "service": "Book a service",
+      "bikes_free": "Bikes free to rent now",
+      "bikes_here": ":count rental bikes at this store",
+      "products": "Products on the shelves",
+      "products_hint": "Bikes, gear and parts in stock here",
+      "workshop": "Workshop time per day",
+      "workshop_hint": "Book a service online",
+      "hours_value": ":hours hours",
+      "visit": "Visit us",
+      "address": "Address",
+      "phone": "Phone",
+      "email": "Email",
+      "hours": "Opening hours",
+      "day": "Day",
+      "open": "Open",
+      "closed": "Closed every day for now.",
+      "all": "All three stores"
+    }
+  },
+  "fields": {
+    "title": "Form fields and their types",
+    "lead": "Every kind of form input, the Rust type it is read into, and the column it is stored in on SQLite and on PostgreSQL. Try them all in the form below.",
+    "reference": {
+      "title": "Input, Rust and database",
+      "lead": "One row per field of the form below, from the browser to the column and back.",
+      "field": "Field",
+      "input": "Input",
+      "form": "Form type",
+      "model": "Model type"
+    },
+    "samples": {
+      "title": "Your samples",
+      "lead": "Only you see the samples you save.",
+      "none": "No samples yet",
+      "none_text": "Fill in the form below to save your first one."
+    },
+    "try": {
+      "title": "Try every field",
+      "lead": "Save a sample bike, then open it to see each value read back from the database.",
+      "login": "Log in to try the form: the samples you save are kept with your account."
+    },
+    "form": {
+      "basics": "Basics",
+      "key": "Sample ID",
+      "key_hint": "A UUID v7, made when the sample was saved.",
+      "name": "Name",
+      "brand": "Brand",
+      "brand_hint": "Type freely, or pick one of the shop's brands.",
+      "description": "Description",
+      "description_hint": "Markdown: **bold**, _italic_, lists, links.",
+      "stock": "Stock",
+      "weight": "Weight",
+      "price": "Price",
+      "available": "Available",
+      "options": "Options",
+      "size": "Frame size",
+      "colours": "Colours",
+      "details": "Details",
+      "tags": "Tags",
+      "tags_hint": "Press Enter or a comma after each.",
+      "specs": "Specifications",
+      "spec_name": "Name",
+      "spec_value": "Value",
+      "spec_add": "Add a specification",
+      "rich": "Rich text",
+      "rich_hint": "Formatted text, cleaned on the server.",
+      "settings": "Settings",
+      "settings_hint": "JSON, checked when saved.",
+      "dates": "Dates and times",
+      "pickup": "Pick-up time",
+      "launch": "Launch",
+      "released": "Released on",
+      "files": "Files",
+      "photo": "Photo",
+      "photo_hint": "An image up to 2 MB; anyone with its address can see it.",
+      "manual": "Manual",
+      "manual_hint": "A PDF up to 5 MB; only you can open it."
+    },
+    "size": {
+      "small": "Small",
+      "medium": "Medium",
+      "large": "Large"
+    },
+    "colour": {
+      "teal": "Teal",
+      "tan": "Sand",
+      "slategray": "Graphite",
+      "black": "Black"
+    },
+    "yes": "Yes",
+    "no": "No",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirm": {
+      "title": "Delete “:name”?",
+      "text": "The sample and its files are removed for good."
+    },
+    "cancel": "Cancel",
+    "save": "Save changes",
+    "create": "Save the sample",
+    "show": {
+      "lead": "Every field of the form, read back from the database.",
+      "none": "None",
+      "in_stock": "in stock",
+      "photo_alt": "The photo of :name",
+      "updated": "Updated"
+    },
+    "edit_title": "Edit :name",
+    "edit_lead": "Each stored value is back in the format its input expects.",
+    "saved": "Sample saved.",
+    "updated": "Changes saved.",
+    "deleted": "“:name” deleted."
+  },
+  "htmx": {
+    "title": "htmx recipes",
+    "lead": "The interactions people reach for a JavaScript framework for, each a few htmx attributes on the kit's components and a handler that answers with a fragment. Try them on a pre-ride checklist and the catalogue's bikes.",
+    "checklist": {
+      "title": "Pre-ride checklist",
+      "lead": "Kept in your session: add, tick, double-click to rename, delete from the row's menu."
+    },
+    "open": "{0} nothing left to do|{1} :count to do|[2,*] :count to do",
+    "show": "Show",
+    "tabs": {
+      "all": "All",
+      "open": "To do",
+      "done": "Done"
+    },
+    "new": "New item",
+    "add": "Add",
+    "item": "Item",
+    "placeholder": "What needs checking?",
+    "done_label": "Done: :title",
+    "dblclick": "Double-click to rename",
+    "more": "More",
+    "edit": "Rename",
+    "delete": "Delete",
+    "confirm": "Delete “:title”?",
+    "save": "Save",
+    "empty": "Nothing on the list. Add an item.",
+    "clear": "Clear the done items",
+    "ready_button": "Ready: take me to the shop",
+    "already": "That item is already on the list.",
+    "full": "The checklist holds at most :max items.",
+    "deleted": "“:title” deleted.",
+    "cleared": "{0} Nothing was done yet.|{1} One done item cleared.|[2,*] :count done items cleared.",
+    "ready": "{0} Have a good ride.|{1} One item checked. Have a good ride.|[2,*] :count items checked. Have a good ride.",
+    "more_bikes": "More bikes…",
+    "scroll": {
+      "title": "Infinite scroll",
+      "lead": "The catalogue's bikes, eight at a time: the next ones load as the last row scrolls into view."
+    },
+    "recipes": {
+      "title": "The recipes",
+      "lead": "What each one does, how to try it here, what the server answers, and where the shop uses it.",
+      "recipe": "Recipe",
+      "try": "Try it",
+      "answer": "Answer",
+      "shop": "In the shop",
+      "modal": {
+        "name": "A modal form that adds a row",
+        "try": "Press N, or the New item button"
+      },
+      "oob": {
+        "name": "Two places change at once",
+        "try": "Tick an item: the count at the top follows",
+        "shop": "The cart"
+      },
+      "retarget": {
+        "name": "The server picks where its answer goes",
+        "try": "Add an item that is already on the list"
+      },
+      "inline": {
+        "name": "Inline edit",
+        "try": "Double-click an item; Escape cancels"
+      },
+      "toggle": {
+        "name": "A checkbox that saves itself",
+        "try": "Tick an item",
+        "shop": "The role matrix"
+      },
+      "menu": {
+        "name": "A menu whose Delete asks first",
+        "try": "More, then Delete"
+      },
+      "tabs": {
+        "name": "Tabs with no request",
+        "try": "All, To do, Done"
+      },
+      "refresh": {
+        "name": "Reload after a change to many rows",
+        "try": "Clear the done items",
+        "shop": "Staff orders"
+      },
+      "redirect": {
+        "name": "Go to another page after an action",
+        "try": "Ready: take me to the shop",
+        "shop": "Your plans"
+      },
+      "scroll": {
+        "name": "Infinite scroll",
+        "try": "Scroll the bikes down"
+      }
+    }
   }
 }

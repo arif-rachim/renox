@@ -54,10 +54,13 @@ Instead, Renox gives you four plain tools:
 > `with('category')` on the query. You write a small method for one row, or call a loader for a
 > page of rows. The table at the end of this page maps Laravel's names to Renox's.
 
-[`examples/relations`](../examples/relations) shows all of them on a small blog (belongs to,
-has many, a pivot with columns of its own, a polymorphic relation, counts and reports).
-[examples/bikeshop](../examples/bikeshop) uses them at volume (`Pivot` for which parts fit which bikes, `Morph` for its stock
-ledger and payments, `has_many_through`), with a test that counts queries on 15,000 rentals.
+[examples/bikeshop](../examples/bikeshop) uses them at volume: `Pivot` for which parts fit which bikes
+([src/app/catalog/model.rs](../examples/bikeshop/src/app/catalog/model.rs)), `Morph` for its stock ledger and
+payments ([src/app/stock/model.rs](../examples/bikeshop/src/app/stock/model.rs)), `has_many_through` for a
+customer's work orders through their bikes
+([src/app/workshop/model.rs](../examples/bikeshop/src/app/workshop/model.rs)), with tests that count queries
+on 15,000 rentals ([tests/queries.rs](../examples/bikeshop/tests/queries.rs)). Its `/about/data` page explains the
+whole data model.
 
 ### The tables used on this page
 
@@ -417,7 +420,7 @@ Filters and order go on either query.
 
 > [!WARNING]
 > A `limit` on the children's query counts across all the parents, not per parent. So use it
-> with one parent (examples/relations' category page shows its five latest comments that way).
+> with one parent (say, the five latest comments of one post).
 
 > [!NOTE]
 > **Coming from Laravel:** this is `hasManyThrough`.

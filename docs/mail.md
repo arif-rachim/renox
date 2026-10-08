@@ -39,11 +39,10 @@ again when sending fails.
 Want working code to look at?
 
 - The short version is in the [cheat-sheet](../CHEATSHEET.md) ("Mail and notifications").
-- [examples/jobs](../examples/jobs) queues receipts and reports (with cc, bcc, reply-to and
-  attachments).
-- [examples/shop](../examples/shop) sends order notifications with the bell.
-- [examples/backoffice](../examples/backoffice) tells users in the bell when a payment
-  arrives or an export is ready.
+- [examples/bikeshop](../examples/bikeshop) queues order mails and notifications with the bell
+  ([src/app/sales/notify.rs](../examples/bikeshop/src/app/sales/notify.rs)), mails each store its monthly report
+  with workbooks attached ([src/app/reports/monthly.rs](../examples/bikeshop/src/app/reports/monthly.rs)), and
+  previews every mail on `/sales/mails` ([src/app/sales/mails.rs](../examples/bikeshop/src/app/sales/mails.rs)).
 
 ## Configuration
 

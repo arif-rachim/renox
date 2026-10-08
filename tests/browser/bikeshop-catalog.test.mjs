@@ -92,7 +92,7 @@ describe('bikeshop catalogue', () => {
       await page.waitFor(() => location.search.includes('sort=price_asc'));
       await page.settle();
       // The chip takes the brand off again.
-      await page.click('.bs-chip');
+      await page.click('main .bs-chip');
       await page.waitFor(() => !location.search.includes('brand='));
       await page.settle();
       assert.equal(await page.eval(() => document.querySelectorAll('main .bs-chip').length), 0);

@@ -37,5 +37,5 @@ What each resource gets:
 
 The pages are templates (`renox-admin/*.html`) an app replaces with files of the same name.
 The guide is [docs/admin.md](https://github.com/arif-rachim/renox/blob/main/docs/admin.md);
-examples/admin is a shop's back office made with it. Versioned with `renox`: use the same
+examples/bikeshop puts its catalogue, workshop, suppliers and stores in a panel made with it. Versioned with `renox`: use the same
 version for both.

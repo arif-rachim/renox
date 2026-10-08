@@ -32,4 +32,4 @@ What it adds:
 The bundled libraries, their versions and licences are listed in
 [assets/vendor/NOTICE](assets/vendor/NOTICE). The guide is
 [docs/editors.md](https://github.com/arif-rachim/renox/blob/main/docs/editors.md);
-examples/fields uses it. Versioned with `renox`: use the same version for both.
+examples/bikeshop uses it (its /about/fields form and the admin panel). Versioned with `renox`: use the same version for both.

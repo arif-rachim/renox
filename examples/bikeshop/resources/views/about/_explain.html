@@ -83,6 +83,6 @@
       </ul>
     </div>
   </section>
-  <p class="bs-explain__index"><a class="rx-link" href="{{ route('about.pages') }}">{{ t('about.index_link') }}</a></p>
+  <p class="bs-explain__index"><a class="rx-link" href="{{ (about_base | default('')) ~ route('about.pages') }}">{{ t('about.index_link') }}</a></p>
 </div>
 {%- endmacro %}

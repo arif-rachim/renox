@@ -1,0 +1,19 @@
+{#- One checklist row (src/app/about/htmx.rs): included by the list and
+    rendered alone by the handlers, so one place draws a row. `x-show` reads
+    the Alpine tabs' state (`checklist` in about/htmx.html). -#}
+{% from "renox/ui.html" import checkbox, menu, menu_button %}
+{# [explain:about.htmx.row] #}
+<li id="item-{{ item.id }}" x-show="{{ 'showsDone' if item.done else 'showsOpen' }}">
+  {#- Toggle in place: the answer is this row, re-rendered. -#}
+  {{ checkbox("done", t('htmx.done_label', title=item.title), checked=item.done, hide_label=true, id="done-" ~ item.id,
+              attrs={"hx-patch": route('about.htmx.toggle', item.id), "hx-target": "closest li", "hx-swap": "outerHTML"}) }}
+  {#- Inline edit: a double-click swaps the row for a small form. -#}
+  <span class="{{ class_names('rx-list__main', {'bs-checklist__done': item.done}) }}" title="{{ t('htmx.dblclick') }}"
+        hx-get="{{ route('about.htmx.edit', item.id) }}" hx-trigger="dblclick" hx-target="closest li" hx-swap="outerHTML">{{ item.title }}</span>
+  {#- The kit's menu; its items carry htmx attributes. Delete asks first, then swaps the row for nothing. -#}
+  {% call menu(t('htmx.more'), id="item-menu-" ~ item.id, variant="plain") %}
+    {{ menu_button(t('htmx.edit'), icon="edit", attrs={"hx-get": route('about.htmx.edit', item.id), "hx-target": "closest li", "hx-swap": "outerHTML"}) }}
+    {{ menu_button(t('htmx.delete'), danger=true, icon="trash", attrs={"hx-delete": route('about.htmx.destroy', item.id), "hx-target": "closest li", "hx-swap": "outerHTML", "hx-confirm": t('htmx.confirm', title=item.title)}) }}
+  {% endcall %}
+</li>
+{# [/explain:about.htmx.row] #}

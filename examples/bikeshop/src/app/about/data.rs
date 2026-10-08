@@ -250,6 +250,15 @@ pub const AREAS: &[Area] = &[
         ],
     },
     Area {
+        title: "Pages about Renox",
+        file: "examples/bikeshop/src/app/about/fields.rs",
+        tables: &[t(
+            "field_samples",
+            "FieldSample",
+            "A visitor's sample bike on /about/fields: one column per kind of form input.",
+        )],
+    },
+    Area {
         title: "Renox's tables",
         file: "examples/bikeshop/src/lib.rs",
         tables: &[

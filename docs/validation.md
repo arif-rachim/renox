@@ -12,8 +12,10 @@ Want the short version? It's in the [cheat-sheet](../CHEATSHEET.md) ("Form + val
 Complete, working forms are in:
 
 - [examples/hello](../examples/hello): an upload and translated labels;
-- [examples/crud](../examples/crud): `#[derive(Validate)]` with a `prepare` hook;
-- [examples/fields](../examples/fields): every input type, `each`, `one_of`, `distinct`.
+- the bike shop's checkout: `#[derive(Validate)]` with hooks, checked live
+  ([src/app/sales/checkout.rs](../examples/bikeshop/src/app/sales/checkout.rs));
+- the bike shop's `/about/fields`: every input type, files, `each`, `one_of`, `distinct`
+  ([src/app/about/fields.rs](../examples/bikeshop/src/app/about/fields.rs)).
 
 ### Words you'll meet
 

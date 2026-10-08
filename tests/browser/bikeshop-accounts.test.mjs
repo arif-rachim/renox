@@ -2,10 +2,13 @@
 // account" with every area's section on its CSS grid (desktop and phone),
 // the notification bell, the preferences' segmented controls, the language
 // switch remembered on the account, "About this page", and deleting the
-// account from its sheet. Screenshots go to BIKESHOP_SCREENS when it's set.
+// account from its sheet, and two-factor login turned on with a code, then
+// asked for after the password (renox-2fa; the teams example's until #351).
+// Screenshots go to BIKESHOP_SCREENS when it's set.
 
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
 import { join } from 'node:path';
 import { Browser } from './lib/cdp.mjs';
 import { start } from './lib/app.mjs';
@@ -116,6 +119,66 @@ describe('bikeshop customer accounts', () => {
       await page.waitFor(() => location.pathname === '/', { message: 'back home' });
       await page.goto(`${app.url}/account`);
       await page.waitFor(() => location.pathname === '/login', { message: 'logged out' });
+      page.assertClean();
+    }));
+  test('two-factor login: turned on with a code, then asked for after the password', () =>
+    browser.with(async (page) => {
+      // RFC 6238 from the key the setup page shows.
+      const totp = (secret, offset = 0) => {
+        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+        let bits = '';
+        for (const ch of secret.replace(/[\s=]/g, '').toUpperCase()) bits += alphabet.indexOf(ch).toString(2).padStart(5, '0');
+        const key = Buffer.from(bits.match(/.{8}/g).map((b) => parseInt(b, 2)));
+        const step = Math.floor(Date.now() / 1000 / 30) + offset;
+        const counter = Buffer.alloc(8);
+        counter.writeBigUInt64BE(BigInt(step));
+        const mac = createHmac('sha1', key).update(counter).digest();
+        const at = mac[mac.length - 1] & 0xf;
+        const n = (mac.readUInt32BE(at) & 0x7fffffff) % 1_000_000;
+        return String(n).padStart(6, '0');
+      };
+      await signUp(page, 'nia.secure@example.com');
+      await page.goto(`${app.url}/account`);
+      let loaded = page.once('Page.loadEventFired');
+      await page.click('form[action*="two-factor"] button');
+      await loaded;
+      await page.settle();
+      // Turning it on asks for the password again first.
+      if ((await page.eval(() => location.pathname)) === '/confirm-password') {
+        await page.type('#rx-password', 'password123');
+        loaded = page.once('Page.loadEventFired');
+        await page.click('form button[type=submit]');
+        await loaded;
+        await page.settle();
+        // Confirmed: the account page again, and Turn on once more.
+        await page.goto(`${app.url}/account`);
+        loaded = page.once('Page.loadEventFired');
+        await page.click('form[action*="two-factor"] button');
+        await loaded;
+        await page.settle();
+      }
+      const secret = await page.text('.rx-2fa__key');
+      assert.match(secret, /^[A-Z2-7 ]+$/);
+      await page.type('#rx-code', totp(secret));
+      await page.click('form[action*="two-factor/confirm"] button[type=submit]');
+      await page.waitFor(() => !!document.querySelector('.rx-2fa__codes'), { message: 'the recovery codes' });
+      await shot(page, 'account-2fa-codes');
+      // The password, then the code (the next one: a code works once).
+      await page.send('Network.clearBrowserCookies');
+      await page.goto(`${app.url}/login`);
+      await page.type('#rx-email', 'nia.secure@example.com');
+      await page.type('#rx-password', 'password123');
+      loaded = page.once('Page.loadEventFired');
+      await page.click('form button[type=submit]');
+      await loaded;
+      await page.settle();
+      assert.match(await page.eval(() => location.pathname), /two-factor/);
+      await page.type('#rx-code', totp(secret, 1));
+      loaded = page.once('Page.loadEventFired');
+      await page.click('form[action*="two-factor"] button[type=submit]');
+      await loaded;
+      await page.settle();
+      assert.doesNotMatch(await page.eval(() => location.pathname), /two-factor|login/);
       page.assertClean();
     }));
 });

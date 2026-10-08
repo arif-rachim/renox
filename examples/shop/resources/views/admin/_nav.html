@@ -1,7 +1,0 @@
-{#- The admin's sections: the kit's `link_tabs`; `route_is` picks the
-    current one by route name (`admin.products.*`), whatever the query. -#}
-{% from "renox/ui.html" import link_tabs %}
-{% set sections = [(route('admin.dashboard'), "Dashboard", "admin.dashboard"), (route('admin.products.index'), "Products", "admin.products.*"), (route('admin.orders.index'), "Orders", "admin.orders.*")] %}
-{% set ns = namespace(current=none) %}
-{% for href, label, section in sections %}{% if route_is(section) %}{% set ns.current = href %}{% endif %}{% endfor %}
-{{ link_tabs(sections, current=ns.current, label="Admin") }}
