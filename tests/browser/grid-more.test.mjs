@@ -1,4 +1,4 @@
-// #267, the rest of renox-grid.js on examples/grid: phone and desktop
+// #267, the rest of renox-grid.js on the fixture's /grid pages: phone and desktop
 // columns, frozen columns while scrolling, a URL without defaults, pins from
 // the menu, a heading dragged, a width reset, the date range calendar,
 // groups, copy buttons, the advanced filter, polling, exports, two grids on
@@ -12,13 +12,13 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Browser, sleep } from './lib/cdp.mjs';
-import { start } from './lib/app.mjs';
+import { fixture } from './lib/app.mjs';
 
 let browser;
 let app;
 
 before(async () => {
-  app = await start('grid', 'examples/grid', { seed: true });
+  app = await fixture({ seed: true });
   browser = await Browser.launch();
 });
 
@@ -31,7 +31,7 @@ after(async () => {
 // starts from a cleared state (`state=1` alone).
 const onGrid = (fn, options) =>
   browser.with(async (page) => {
-    await page.goto(`${app.url}/?state=1`);
+    await page.goto(`${app.url}/grid?state=1`);
     await fn(page);
     page.assertClean({ allow: [/422/] });
   }, options);
@@ -197,7 +197,7 @@ describe('as a guest', () => {
       // Both are kept: after a reload the column is where it was dropped,
       // and as wide as it was made.
       await sleep(800); // the width is saved a moment after the last change
-      await page.goto(`${app.url}/?state=1`);
+      await page.goto(`${app.url}/grid?state=1`);
       const reloaded = await order();
       assert.equal(reloaded.indexOf('city'), reloaded.indexOf('customer') - 1, JSON.stringify(reloaded));
       assert.equal(await width(), widened, 'the width came back');
@@ -338,7 +338,7 @@ describe('as a guest', () => {
       page.on('Network.requestWillBeSent', (p) => {
         if (p.request.headers['HX-Request'] && p.request.method === 'GET') polls.push(Date.now());
       });
-      await page.goto(`${app.url}/?state=1`);
+      await page.goto(`${app.url}/grid?state=1`);
       await page.waitFor(() => true);
       const start = polls.length;
       await sleep(1500);
@@ -389,7 +389,7 @@ describe('as a guest', () => {
 
   test('two grids on one page page and sort apart', () =>
     browser.with(async (page) => {
-      await page.goto(`${app.url}/follow-up`);
+      await page.goto(`${app.url}/grid/follow-up`);
       const current = (id) => page.eval((g) => document.querySelector(`#${g} [data-grid-page][aria-current="page"]`).textContent.trim(), id);
       const first = await page.eval(() => document.querySelector('#grid-largest tbody tr[data-id]').getAttribute('data-id'));
       await page.click('#grid-unpaid [data-grid-page="2"]');
@@ -438,7 +438,7 @@ describe('logged in', () => {
       const loaded = page.once('Page.loadEventFired');
       await page.click('form button[type=submit]');
       await loaded;
-      await page.goto(`${app.url}/?state=1`);
+      await page.goto(`${app.url}/grid?state=1`);
       assert.ok(!(await visible(page, 'thead th[data-col]')).includes('city'), 'still hidden');
       await page.click('[popovertarget="grid-orders-columns"]');
       await redraw(page, () => page.click('[data-grid-reset]'));
@@ -463,7 +463,7 @@ describe('logged in', () => {
           urls.push(p.request.url);
         }
       });
-      await page.goto(`${app.url}/?state=1`);
+      await page.goto(`${app.url}/grid?state=1`);
       await page.settle();
       await editCell(page, 'customer');
       await page.waitFor((s) => !!document.querySelector(`${s} [data-grid-input]`), { message: 'a cell being edited' }, cell('customer'));
@@ -531,9 +531,9 @@ describe('logged in', () => {
 
   test('rows sorted by # are put in order by dragging and with the keyboard', () =>
     browser.with(async (page) => {
-      await page.goto(`${app.url}/?state=1&sort=position`);
+      await page.goto(`${app.url}/grid?state=1&sort=position`);
       const ids = () => page.eval(() => [...document.querySelectorAll('tbody tr[data-id]')].slice(0, 3).map((tr) => tr.dataset.id));
-      const saved = () => page.once('Network.responseReceived', (p) => p.response.url.endsWith('/orders/reorder'));
+      const saved = () => page.once('Network.responseReceived', (p) => p.response.url.endsWith('/grid/orders/reorder'));
       const [a, b] = await ids();
       // The first row's grip with the keyboard: one down.
       await page.focus('tbody tr[data-id]:first-of-type [data-grid-drag]');
@@ -553,7 +553,7 @@ describe('logged in', () => {
       await page.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: grip.x, y: top.y - top.h / 4, button: 'left', clickCount: 1 });
       await done;
       // Read back from the server.
-      await page.goto(`${app.url}/?state=1&sort=position`);
+      await page.goto(`${app.url}/grid?state=1&sort=position`);
       assert.deepEqual((await ids()).slice(0, 2), [a, b]);
       page.assertClean();
     }));
@@ -569,7 +569,7 @@ describe('logged in', () => {
       // A dangerous one asks first, in the grid's own dialog.
       const requests = [];
       page.on('Network.requestWillBeSent', (p) => {
-        if (p.request.url.includes('/orders/bulk/')) requests.push(p.request.url);
+        if (p.request.url.includes('/grid/orders/bulk/')) requests.push(p.request.url);
       });
       await page.eval(() => [...document.querySelectorAll('[data-grid-bulk-action]')].find((b) => b.textContent.trim() === 'Delete').click());
       await page.waitFor(() => document.querySelector('dialog[data-grid-dialog]').open);

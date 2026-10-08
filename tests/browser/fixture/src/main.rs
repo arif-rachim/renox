@@ -1,7 +1,9 @@
 //! The pages `tests/browser` drives in headless Chrome: forms that fail
 //! validation, the UI kit's widgets and overlays. Each page uses the kit
 //! the way an app would; the browser tests check what renox.js and
-//! renox-ui.js then do with it.
+//! renox-ui.js then do with it. The data grid's pages are in `grid.rs`.
+
+mod grid;
 
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -305,8 +307,13 @@ impl Job for Nap {
 
 fn main() -> Result {
     let mut app = App::new()
+        // The grid pages' tables (orders, customers, notes).
+        .migrations(renox::migrations!())
         // Accounts (a login rotates the CSRF token) and the bell.
         .module(Auth::new().notifications())
+        // The data grid's pages (src/grid.rs), and their `db:seed`.
+        .module(grid::Orders)
+        .seeder(grid::seed)
         .module(Pages)
         .job::<Touch>()
         .job::<Nap>()
