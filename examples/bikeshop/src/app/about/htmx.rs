@@ -246,6 +246,7 @@ async fn store(
         .iter()
         .find(|i| i.title.eq_ignore_ascii_case(&title))
         .cloned();
+    // [explain:about.htmx.store]
     if let Some(item) = existing {
         let toast = Toast::info(lang.t("htmx.already", &[]));
         if !htmx.request {
@@ -260,6 +261,7 @@ async fn store(
         )
             .into_response());
     }
+    // [/explain:about.htmx.store]
     if list.items.len() >= MAX_ITEMS {
         let mut errors = Errors::new();
         errors.add("title", lang.t("htmx.full", &[("max", &MAX_ITEMS)]));
@@ -331,7 +333,12 @@ async fn toggle(session: Session, htmx: Htmx, Path(id): Path<u32>) -> Result<Res
 /// `DELETE /about/htmx/items/{item}`: htmx swaps the row with an empty
 /// answer, which removes it; the count comes along out of band, and a
 /// toast confirms it.
-async fn destroy(session: Session, htmx: Htmx, lang: Lang, Path(id): Path<u32>) -> Result<Response> {
+async fn destroy(
+    session: Session,
+    htmx: Htmx,
+    lang: Lang,
+    Path(id): Path<u32>,
+) -> Result<Response> {
     let mut list = Checklist::of(&session);
     let title = list.find(id)?.title.clone();
     list.items.retain(|i| i.id != id);

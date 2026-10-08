@@ -54,3 +54,7 @@
 .bs-page-row { display: grid; gap: var(--rx-space-2); padding-block: var(--rx-space-2); }
 /* /about/fields: a sample's photo on its read-only page. */
 .bs-sample-photo { display: block; width: 100%; max-width: 20rem; height: auto; border-radius: var(--rx-radius-m); background: var(--rx-tint); }
+/* /about/htmx: the checklist's bar (count, tabs, the new-item button) wraps on phones. */
+.bs-checklist__bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--rx-space-3); }
+.bs-checklist__done { color: var(--rx-secondary-label); text-decoration: line-through; }
+.bs-checklist__edit { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: var(--rx-space-2); flex: 1; }

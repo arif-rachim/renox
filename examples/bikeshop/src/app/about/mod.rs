@@ -3,7 +3,7 @@
 //! page); `/about/data`, the data model explained ([`data`]); and
 //! `/about/blocks`, the bike shop's own UI blocks working (`blocks.rs`);
 //! `/about/fields`, every form input with its Rust and database types
-//! (`fields.rs`).
+//! (`fields.rs`); `/about/htmx`, htmx and Alpine recipes, live (`htmx.rs`).
 //!
 //! The "About this page" mechanism is in `src/explain.rs`; the panel every
 //! page shows is `resources/views/about/_panel.html`.
@@ -12,6 +12,7 @@ pub mod blocks;
 pub mod data;
 pub mod explain;
 pub mod fields;
+pub mod htmx;
 
 use crate::explain::{self as about_this_page, Audience};
 use renox::prelude::*;
@@ -33,6 +34,7 @@ impl Module for About {
             .name("about.data")
             .merge(blocks::routes())
             .merge(fields::routes())
+            .merge(htmx::routes())
     }
 }
 

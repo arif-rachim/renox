@@ -244,7 +244,116 @@ pub fn entries() -> Vec<Explanation> {
         fields_page(),
         field_sample_page(),
         field_sample_edit_page(),
+        htmx_page(),
     ]
+}
+
+/// `/about/htmx`: htmx and Alpine recipes, live.
+fn htmx_page() -> Explanation {
+    Explanation {
+        route: "about.htmx",
+        path: "/about/htmx",
+        title: "htmx recipes",
+        purpose: "The interactions people usually reach for a JavaScript framework for, \
+                  live on a pre-ride checklist and the catalogue's bikes: a modal form that \
+                  adds a row, two places changing at once, the server picking where its \
+                  answer goes, inline edit, a checkbox that saves itself, a menu whose \
+                  Delete asks first, tabs with no request, a reload and a redirect after an \
+                  action, and infinite scroll. The table at the end links to where the \
+                  shop's own pages use each one.",
+        who: "Developers who want a page to feel like an app without writing JavaScript.",
+        audience: &[Audience::Developer],
+        flow: Flow::Learn,
+        features: &[
+            Feature {
+                api: "Htmx",
+                why: "The extractor tells a handler whether htmx asked: it answers htmx \
+                      with the smallest fragment that changes and a plain form with a \
+                      redirect back, so every action works without JavaScript too.",
+            },
+            Feature {
+                api: "View::also",
+                why: "`view(\"about/htmx/_answer.html\", …).fragment(\"row\").also(\"count\")` \
+                      sends the row and, out of band (`hx-swap-oob`), the open count and \
+                      the empty note: adding, ticking, renaming and deleting all keep \
+                      \"N to do\" right with no second request.",
+            },
+            Feature {
+                api: "HxRetarget",
+                why: "An item already on the list isn't added twice: the server answers \
+                      with `HxRetarget(\"#item-3\")` and `HxReswap(\"outerHTML\")`, so htmx \
+                      refreshes that row instead of putting a copy at the top, and \
+                      `HxTrigger(\"item-added\")` lets anything on the page react.",
+            },
+            Feature {
+                api: "HxRefresh",
+                why: "Clearing the done items changes many rows: simplest to reload the page \
+                      (`HX-Refresh`). \"Ready\" goes to the shop with `htmx.redirect(…)`: \
+                      `HX-Redirect` for htmx, a 303 for a plain form. Their toasts wait in \
+                      the session for the next page.",
+            },
+            Feature {
+                api: "Toast",
+                why: "A toast returned with a fragment rides the `HX-Trigger` header and \
+                      shows at once; with a reload or a redirect it waits in the session and \
+                      the next page's `toasts()` shows it, once.",
+            },
+            Feature {
+                api: "UI kit: action_sheet + menu",
+                why: "The modal is the kit's `action_sheet` with `target=\"#checklist\"` and \
+                      `swap=\"afterbegin\"`: a 422 keeps it open with the error under the \
+                      field, a success closes and clears it, and `key=\"n\"` opens it from the \
+                      keyboard. The row's `menu_button`s and the `checkbox` carry their htmx \
+                      attributes in `attrs`, `hx-confirm` included.",
+            },
+            Feature {
+                api: "Alpine.data",
+                why: "The tabs filter the rows in the browser: one Alpine component \
+                      (`x-data=\"checklist\"`) holds the active tab and each row's `x-show` \
+                      reads it. Its logic is in `Alpine.data` in a nonce'd script, so the page \
+                      works under `CSP=strict`, whose Alpine build refuses statements in \
+                      attributes.",
+            },
+        ],
+        under_hood: "The checklist lives in the visitor's session (at most twelve short \
+                     items, so the cookie stays small): each action reads it, changes it and \
+                     writes it back, and no visitor sees another's. The bikes are the \
+                     catalogue's, eight per load, by id (`before=…`): the last row has \
+                     `hx-trigger=\"revealed\"` and is replaced by the next load, so a bike \
+                     added meanwhile never repeats a row. CSRF needs no wiring: \
+                     `renox_head()` sends the token with every htmx request, and 422 errors \
+                     land in the fields' `data-error-for` slots.",
+        docs: &[
+            "docs/ui.md#fragments-and-out-of-band-swaps",
+            "docs/ui.md#htmx-response-headers",
+            "docs/ui.md#toasts",
+            "docs/ui.md#actions",
+            "docs/laravel.md#blade--minijinja",
+        ],
+        sources: &[
+            "examples/bikeshop/src/app/about/htmx.rs",
+            "examples/bikeshop/resources/views/about/htmx.html",
+            "examples/bikeshop/resources/views/about/htmx/_row.html",
+            "examples/bikeshop/resources/views/about/htmx/_answer.html",
+            "examples/bikeshop/resources/views/about/htmx/_bikes.html",
+            "examples/bikeshop/tests/htmx.rs",
+            "tests/browser/bikeshop-htmx.test.mjs",
+        ],
+        code: &[
+            Code {
+                title: "Handler: the server picks where its answer goes",
+                region: "about.htmx.store",
+            },
+            Code {
+                title: "Template: the row, then the count out of band",
+                region: "about.htmx.answer",
+            },
+            Code {
+                title: "Row: toggle, inline edit, a menu that asks",
+                region: "about.htmx.row",
+            },
+        ],
+    }
 }
 
 /// `/about/fields`: every input, its Rust types and its columns.
@@ -640,5 +749,10 @@ fn data_page() -> Explanation {
 
 /// GET routes of this area that aren't pages (JSON, files, streams).
 pub fn not_pages() -> Vec<NotAPage> {
-    [super::blocks::not_pages(), super::fields::not_pages()].concat()
+    [
+        super::blocks::not_pages(),
+        super::fields::not_pages(),
+        super::htmx::not_pages(),
+    ]
+    .concat()
 }

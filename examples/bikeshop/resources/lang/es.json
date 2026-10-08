@@ -2086,6 +2086,11 @@
         "2": "Un `fallback` dentro del dominio lleva cualquier otra ruta del host de una tienda (un enlace viejo, una errata) a la página de la tienda en vez de a un 404, sin tocar el fallback de la tienda en línea.",
         "3": "La ruta tiene un nombre, `stores.site`, como cualquier otra, así que `route:list` la muestra (con su DOMAIN) y es la clave de esta explicación. Renox nombra la ruta actual por host, así que el panel encuentra esta página y no la de inicio, aunque las dos sean `/`.",
         "4": "La página son los `stat` del kit para las cifras, un `infolist` para los datos de contacto (un enlace `tel:` y un botón para copiar el correo) y una `table` para el horario, bajo el hero de la tienda, así que se ve como la tienda sin CSS propio más allá de la rejilla del layout."
+      },
+      "code": {
+        "0": "Rutas: el host de la tienda, su página y su fallback",
+        "1": "Handler: la tienda desde el host con `DomainParams`",
+        "2": "Plantilla: las cifras del kit con enlaces absolutos"
       }
     },
     "about.fields": {
@@ -2101,6 +2106,11 @@
         "4": "Los editores de Markdown, texto enriquecido y código son campos normales: un `String`, un `RichText` (su HTML limpiado de scripts al leer el formulario, un editor vaciado cuenta como vacío) y un `String` comprobado con `.json()`. La página carga el script de los editores solo porque los tiene.",
         "5": "Cada campo es del kit: `input` con prefijo, sufijo, un `datalist` de las marcas de la tienda o un botón para copiar, `checkbox` como interruptor, `radio`, `checkbox_list`, `tags_input`, `key_value`, `date_picker`, `file` con vista previa, en `fieldset`s; cada uno muestra lo enviado tras un guardado fallido.",
         "6": "La referencia es pública; guardar una muestra exige iniciar sesión, y cada muestra pertenece a quien la hizo, así que los visitantes de la demo nunca ven las de los demás."
+      },
+      "code": {
+        "0": "Formulario: una regla por campo, archivos por contenido",
+        "1": "Plantilla: etiquetas, pares y los editores",
+        "2": "PostgreSQL: la columna de cada tipo"
       }
     },
     "about.fields.show": {
@@ -2112,6 +2122,10 @@
         "0": "La dirección lleva el UUID de la muestra; `renox::Path<Uuid>` responde 404 a uno que no se puede leer, y una muestra de otra persona también es un 404, así que la página nunca dice que existe.",
         "1": "Cada `entry` formatea su valor según su tipo: `money` en `APP_CURRENCY`, `bool`, `color`, `key_value`, `markdown` (el HTML escrito se muestra como texto), `date`, `datetime`, `since`; hay botones junto a la clave y las existencias (`suffix_actions`). `code_entry` de renox-editors resalta el JSON, y el filtro `rich_text` vuelve a limpiar el HTML guardado al mostrarlo.",
         "2": "El manual no tiene dirección pública: su enlace pregunta a la app, que comprueba que la muestra es tuya y envía el archivo con `Download::from_storage(…).inline()`, con el nombre con el que se subió, para que el navegador lo muestre. La foto, guardada como pública, se muestra directamente desde `storage.url(key)`."
+      },
+      "code": {
+        "0": "Plantilla: cada entrada según su tipo",
+        "1": "Handler: el manual privado, enviado en línea"
       }
     },
     "about.fields.edit": {
@@ -2122,6 +2136,30 @@
       "features": {
         "0": "La misma estructura de formulario que para una muestra nueva; el formulario dice `PUT` con `method_field('PUT')`. Tras un guardado fallido cada campo muestra lo enviado (`old()`), incluida una casilla o un color sin marcar (`has_old()`), y nunca un archivo.",
         "1": "Primero se guarda el archivo nuevo, luego la fila, y solo entonces se borra el archivo viejo: un fallo a mitad deja como mucho un archivo sin usar, nunca una fila que apunta a uno que falta."
+      },
+      "code": {
+        "0": "Handler: guardar y luego borrar los archivos sustituidos",
+        "1": "Plantilla: los archivos guardados sobre sus campos"
+      }
+    },
+    "about.htmx": {
+      "title": "Recetas de htmx",
+      "purpose": "Las interacciones para las que se suele recurrir a un framework de JavaScript, en vivo sobre una lista de antes de salir y las bicis del catálogo: un formulario modal que añade una fila, dos sitios que cambian a la vez, el servidor eligiendo dónde va su respuesta, edición en línea, una casilla que se guarda sola, un menú cuyo Eliminar pregunta antes, pestañas sin petición, una recarga y una redirección tras una acción, y desplazamiento infinito. La tabla del final enlaza a las páginas de la tienda que usan cada una.",
+      "who": "Desarrolladores que quieren que una página se sienta como una app sin escribir JavaScript.",
+      "under_hood": "La lista vive en la sesión del visitante (como mucho doce elementos cortos, para que la cookie siga pequeña): cada acción la lee, la cambia y la vuelve a escribir, y ningún visitante ve la de otro. Las bicis son las del catálogo, ocho por carga, por id (`before=…`): la última fila tiene `hx-trigger=\"revealed\"` y la sustituye la carga siguiente, así que una bici añadida entretanto nunca repite una fila. El CSRF no necesita nada: `renox_head()` envía el token con cada petición de htmx, y los errores 422 caen en los huecos `data-error-for` de los campos.",
+      "features": {
+        "0": "El extractor le dice a un handler si preguntó htmx: responde a htmx con el fragmento más pequeño que cambia y a un formulario normal con una redirección de vuelta, así que cada acción funciona también sin JavaScript.",
+        "1": "`view(\"about/htmx/_answer.html\", …).fragment(\"row\").also(\"count\")` envía la fila y, fuera de banda (`hx-swap-oob`), el contador y la nota de lista vacía: añadir, marcar, renombrar y eliminar mantienen bien \"N pendientes\" sin una segunda petición.",
+        "2": "Un elemento que ya está en la lista no se añade dos veces: el servidor responde con `HxRetarget(\"#item-3\")` y `HxReswap(\"outerHTML\")`, así que htmx actualiza esa fila en vez de poner una copia arriba, y `HxTrigger(\"item-added\")` deja reaccionar a cualquier cosa de la página.",
+        "3": "Quitar lo hecho cambia muchas filas: lo más sencillo es recargar la página (`HX-Refresh`). \"Listo\" va a la tienda con `htmx.redirect(…)`: `HX-Redirect` para htmx, un 303 para un formulario normal. Sus avisos esperan en la sesión a la página siguiente.",
+        "4": "Un aviso devuelto con un fragmento viaja en la cabecera `HX-Trigger` y se muestra al momento; con una recarga o una redirección espera en la sesión y lo muestra `toasts()` de la página siguiente, una vez.",
+        "5": "El modal es el `action_sheet` del kit con `target=\"#checklist\"` y `swap=\"afterbegin\"`: un 422 lo deja abierto con el error bajo el campo, un éxito lo cierra y lo vacía, y `key=\"n\"` lo abre desde el teclado. Los `menu_button` de la fila y la `checkbox` llevan sus atributos de htmx en `attrs`, `hx-confirm` incluido.",
+        "6": "Las pestañas filtran las filas en el navegador: un componente de Alpine (`x-data=\"checklist\"`) guarda la pestaña activa y el `x-show` de cada fila la lee. Su lógica está en `Alpine.data` en un script con nonce, así que la página funciona con `CSP=strict`, cuya versión de Alpine rechaza sentencias en los atributos."
+      },
+      "code": {
+        "0": "Handler: el servidor elige dónde va su respuesta",
+        "1": "Plantilla: la fila, luego el contador fuera de banda",
+        "2": "Fila: marcar, editar en línea, un menú que pregunta"
       }
     }
   },
@@ -5445,7 +5483,9 @@
     "owner": "dueño",
     "manager": "encargado",
     "cashier": "cajero",
-    "mechanic": "mecánico"
+    "mechanic": "mecánico",
+    "Pages about Renox": "Páginas sobre Renox",
+    "A visitor's sample bike on /about/fields: one column per kind of form input.": "La bici de muestra de un visitante en /about/fields: una columna por tipo de campo de formulario."
   },
   "errors": {
     "maintenance": {
@@ -5575,5 +5615,96 @@
     "saved": "Muestra guardada.",
     "updated": "Cambios guardados.",
     "deleted": "«:name» eliminada."
+  },
+  "htmx": {
+    "title": "Recetas de htmx",
+    "lead": "Las interacciones para las que se suele recurrir a un framework de JavaScript, cada una con unos pocos atributos de htmx en los componentes del kit y un handler que responde con un fragmento. Pruébalas en una lista de antes de salir y en las bicis del catálogo.",
+    "checklist": {
+      "title": "Lista de antes de salir",
+      "lead": "Guardada en tu sesión: añade, marca, haz doble clic para renombrar, elimina desde el menú de la fila."
+    },
+    "open": "{0} nada pendiente|{1} :count pendiente|[2,*] :count pendientes",
+    "show": "Mostrar",
+    "tabs": {
+      "all": "Todo",
+      "open": "Pendiente",
+      "done": "Hecho"
+    },
+    "new": "Nuevo elemento",
+    "add": "Añadir",
+    "item": "Elemento",
+    "placeholder": "¿Qué hay que revisar?",
+    "done_label": "Hecho: :title",
+    "dblclick": "Doble clic para renombrar",
+    "more": "Más",
+    "edit": "Renombrar",
+    "delete": "Eliminar",
+    "confirm": "¿Eliminar «:title»?",
+    "save": "Guardar",
+    "empty": "La lista está vacía. Añade un elemento.",
+    "clear": "Quitar lo hecho",
+    "ready_button": "Listo: llévame a la tienda",
+    "already": "Ese elemento ya está en la lista.",
+    "full": "La lista admite como mucho :max elementos.",
+    "deleted": "«:title» eliminado.",
+    "cleared": "{0} Aún no había nada hecho.|{1} Se quitó un elemento hecho.|[2,*] Se quitaron :count elementos hechos.",
+    "ready": "{0} Buen paseo.|{1} Un elemento revisado. Buen paseo.|[2,*] :count elementos revisados. Buen paseo.",
+    "more_bikes": "Más bicis…",
+    "scroll": {
+      "title": "Desplazamiento infinito",
+      "lead": "Las bicis del catálogo, de ocho en ocho: las siguientes se cargan cuando la última fila aparece en pantalla."
+    },
+    "recipes": {
+      "title": "Las recetas",
+      "lead": "Qué hace cada una, cómo probarla aquí, qué responde el servidor y dónde la usa la tienda.",
+      "recipe": "Receta",
+      "try": "Pruébala",
+      "answer": "Respuesta",
+      "shop": "En la tienda",
+      "modal": {
+        "name": "Un formulario modal que añade una fila",
+        "try": "Pulsa N, o el botón Nuevo elemento"
+      },
+      "oob": {
+        "name": "Dos sitios cambian a la vez",
+        "try": "Marca un elemento: el contador de arriba le sigue",
+        "shop": "El carrito"
+      },
+      "retarget": {
+        "name": "El servidor elige dónde va su respuesta",
+        "try": "Añade un elemento que ya está en la lista"
+      },
+      "inline": {
+        "name": "Edición en línea",
+        "try": "Doble clic en un elemento; Escape cancela"
+      },
+      "toggle": {
+        "name": "Una casilla que se guarda sola",
+        "try": "Marca un elemento",
+        "shop": "La matriz de roles"
+      },
+      "menu": {
+        "name": "Un menú cuyo Eliminar pregunta antes",
+        "try": "Más, luego Eliminar"
+      },
+      "tabs": {
+        "name": "Pestañas sin petición",
+        "try": "Todo, Pendiente, Hecho"
+      },
+      "refresh": {
+        "name": "Recargar tras cambiar muchas filas",
+        "try": "Quitar lo hecho",
+        "shop": "Pedidos del personal"
+      },
+      "redirect": {
+        "name": "Ir a otra página tras una acción",
+        "try": "Listo: llévame a la tienda",
+        "shop": "Tus planes"
+      },
+      "scroll": {
+        "name": "Desplazamiento infinito",
+        "try": "Baja por las bicis"
+      }
+    }
   }
 }

@@ -1,0 +1,12 @@
+{#- A load of bikes, newest first. When there are more, the last item loads
+    the next ones (older than the last shown) as soon as it scrolls into
+    view, and is replaced by them. -#}
+{% for bike in bikes %}
+<li><a class="rx-link" href="{{ route('catalog.show', bike.slug) }}">{{ bike.name }}</a></li>
+{% endfor %}
+{% if next %}
+{#- route() with a named argument adds it as the query string: ?before=… -#}
+<li class="rx-subtitle" hx-get="{{ route('about.htmx.bikes', before=next) }}" hx-trigger="revealed" hx-swap="outerHTML">
+  <a class="rx-link" href="{{ route('about.htmx.bikes', before=next) }}">{{ t('htmx.more_bikes') }}</a>
+</li>
+{% endif %}

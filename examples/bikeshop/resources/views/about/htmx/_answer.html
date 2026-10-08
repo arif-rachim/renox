@@ -1,0 +1,9 @@
+{#- What a row action answers htmx with (`.fragment("row").also("count").also("empty")`):
+    the row (or nothing, after a delete) and, out of band, the open count at
+    the top and the empty note. htmx swaps the first part into the row and the
+    others by their ids. -#}
+{# [explain:about.htmx.answer] #}
+{% block row %}{% if item %}{% include "about/htmx/_row.html" %}{% endif %}{% endblock %}
+{% block count %}<span class="rx-badge rx-badge--info" id="open-count" hx-swap-oob="true">{{ t('htmx.open', count=open) }}</span>{% endblock %}
+{% block empty %}{% include "about/htmx/_empty.html" %}{% endblock %}
+{# [/explain:about.htmx.answer] #}

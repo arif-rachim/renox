@@ -2975,5 +2975,96 @@
     "saved": "Sample saved.",
     "updated": "Changes saved.",
     "deleted": "“:name” deleted."
+  },
+  "htmx": {
+    "title": "htmx recipes",
+    "lead": "The interactions people reach for a JavaScript framework for, each a few htmx attributes on the kit's components and a handler that answers with a fragment. Try them on a pre-ride checklist and the catalogue's bikes.",
+    "checklist": {
+      "title": "Pre-ride checklist",
+      "lead": "Kept in your session: add, tick, double-click to rename, delete from the row's menu."
+    },
+    "open": "{0} nothing left to do|{1} :count to do|[2,*] :count to do",
+    "show": "Show",
+    "tabs": {
+      "all": "All",
+      "open": "To do",
+      "done": "Done"
+    },
+    "new": "New item",
+    "add": "Add",
+    "item": "Item",
+    "placeholder": "What needs checking?",
+    "done_label": "Done: :title",
+    "dblclick": "Double-click to rename",
+    "more": "More",
+    "edit": "Rename",
+    "delete": "Delete",
+    "confirm": "Delete “:title”?",
+    "save": "Save",
+    "empty": "Nothing on the list. Add an item.",
+    "clear": "Clear the done items",
+    "ready_button": "Ready: take me to the shop",
+    "already": "That item is already on the list.",
+    "full": "The checklist holds at most :max items.",
+    "deleted": "“:title” deleted.",
+    "cleared": "{0} Nothing was done yet.|{1} One done item cleared.|[2,*] :count done items cleared.",
+    "ready": "{0} Have a good ride.|{1} One item checked. Have a good ride.|[2,*] :count items checked. Have a good ride.",
+    "more_bikes": "More bikes…",
+    "scroll": {
+      "title": "Infinite scroll",
+      "lead": "The catalogue's bikes, eight at a time: the next ones load as the last row scrolls into view."
+    },
+    "recipes": {
+      "title": "The recipes",
+      "lead": "What each one does, how to try it here, what the server answers, and where the shop uses it.",
+      "recipe": "Recipe",
+      "try": "Try it",
+      "answer": "Answer",
+      "shop": "In the shop",
+      "modal": {
+        "name": "A modal form that adds a row",
+        "try": "Press N, or the New item button"
+      },
+      "oob": {
+        "name": "Two places change at once",
+        "try": "Tick an item: the count at the top follows",
+        "shop": "The cart"
+      },
+      "retarget": {
+        "name": "The server picks where its answer goes",
+        "try": "Add an item that is already on the list"
+      },
+      "inline": {
+        "name": "Inline edit",
+        "try": "Double-click an item; Escape cancels"
+      },
+      "toggle": {
+        "name": "A checkbox that saves itself",
+        "try": "Tick an item",
+        "shop": "The role matrix"
+      },
+      "menu": {
+        "name": "A menu whose Delete asks first",
+        "try": "More, then Delete"
+      },
+      "tabs": {
+        "name": "Tabs with no request",
+        "try": "All, To do, Done"
+      },
+      "refresh": {
+        "name": "Reload after a change to many rows",
+        "try": "Clear the done items",
+        "shop": "Staff orders"
+      },
+      "redirect": {
+        "name": "Go to another page after an action",
+        "try": "Ready: take me to the shop",
+        "shop": "Your plans"
+      },
+      "scroll": {
+        "name": "Infinite scroll",
+        "try": "Scroll the bikes down"
+      }
+    }
   }
 }

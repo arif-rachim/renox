@@ -92,6 +92,7 @@ const TABLES: &[&str] = &[
     "settlements",
     "roles",
     "role_user",
+    "field_samples",
 ];
 
 async fn table_exists(db: &Db, table: &str) -> bool {
