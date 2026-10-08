@@ -244,7 +244,9 @@ impl Module for Pages {
             .post("/picked", || async { "picked" })
             .get("/charts", || async { view("charts.html", context! {}) })
             .get("/parts", || async { view("parts.html", context! {}) })
-            .get("/parts/more", || async { view("parts_more.html", context! {}) })
+            .get("/parts/more", || async {
+                view("parts_more.html", context! {})
+            })
             .get("/nav", || async { view("nav.html", context! {}) })
             .get("/shell", || async { view("shell.html", context! {}) })
             // The bell: a page with it, and a notification for the user.
