@@ -10,6 +10,9 @@ pub const DOCS: &str = "https://docs.renox.rs";
 pub const REPOSITORY: &str = "https://github.com/arif-rachim/renox";
 /// The live demo.
 pub const DEMO: &str = "https://bikeshop.renox.rs";
+/// renox.rs's Google Analytics 4 property. `GA4_MEASUREMENT_ID` overrides it;
+/// the tag is only sent in production (see the layout's `ga4`).
+pub const GA4: &str = "G-48GJK3ZM4J";
 
 /// A figure in the strip under the hero (counted from the repository).
 #[derive(Serialize)]

@@ -41,7 +41,7 @@ async fn the_home_page_has_its_words_its_tags_and_its_structured_data() {
         .assert_see("<span class=\"hl-kw\">")
         .assert_see("tower-sessions")
         .assert_see("Not a hello world.")
-        .assert_see("href=\"/blog/why-we-built-renox\"")
+        .assert_see("href=\"/blog/renox-1-0\"")
         // The benchmark section, from content/benchmarks.json.
         .assert_see("<h2 id=\"bench-title\">")
         .assert_see("<tr class=\"me\"><th scope=\"row\">Renox</th>")
@@ -154,4 +154,31 @@ async fn a_missing_page_says_so_and_is_not_indexed() {
     app.get("/docs")
         .await
         .assert_redirect("https://docs.renox.rs");
+}
+
+#[renox::test]
+async fn google_analytics_is_sent_in_production_only() {
+    // Local (the tests' default): no tag.
+    let app = site().await;
+    app.get("/")
+        .await
+        .assert_ok()
+        .assert_dont_see("googletagmanager.com/gtag");
+    // Production: the tag with the request's nonce, and a CSP that lets it load.
+    let app = TestApp::with_config(renox_www::app(), |c| {
+        c.url = "https://renox.rs".into();
+        c.env = renox::Environment::Production;
+        c.debug = false;
+    })
+    .await;
+    let page = app.get("/").await;
+    page.assert_ok()
+        .assert_see("<script async src=\"https://www.googletagmanager.com/gtag/js?id=G-48GJK3ZM4J\" nonce=\"")
+        .assert_see("gtag('config', 'G-48GJK3ZM4J');");
+    let csp = page
+        .header("content-security-policy")
+        .unwrap_or_default()
+        .to_owned();
+    assert!(csp.contains("https://www.googletagmanager.com"), "{csp}");
+    assert!(csp.contains("https://*.google-analytics.com"), "{csp}");
 }

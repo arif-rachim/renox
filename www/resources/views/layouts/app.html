@@ -24,6 +24,11 @@
   <script type="application/ld+json">{{ json_ld | safe }}</script>
   {%- endif %}
   <script src="{{ asset('www.js') }}" nonce="{{ csp_nonce() }}" defer></script>
+  {%- if ga4 %}
+  {#- Google tag (gtag.js), production only (src/lib.rs shares `ga4`). -#}
+  <script async src="https://www.googletagmanager.com/gtag/js?id={{ ga4 }}" nonce="{{ csp_nonce() }}"></script>
+  <script nonce="{{ csp_nonce() }}">window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', '{{ ga4 }}');</script>
+  {%- endif %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
 <a class="skip" href="#main">Skip to content</a>
