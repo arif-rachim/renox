@@ -23,6 +23,7 @@
     {%- if unread_notifications is defined %}{{ link_button(route('notifications.index'), t('accounts.page.notifications'), badge=(unread_notifications or none)) }}{% endif %}
   {% endcall %}
 
+  {# [explain:account.show.template] #}
   <div class="bs-account">
     <form method="post" action="{{ route('account.profile') }}" hx-post="{{ route('account.profile') }}" id="account-profile">
       {{ csrf_field() }}{{ method_field('PUT') }}
@@ -38,6 +39,7 @@
     {%- for section in sections | default([]) %}
     <div class="bs-account__section">{% include section.template %}</div>
     {%- endfor %}
+  {# [/explain:account.show.template] #}
 
     <form method="post" action="{{ route('account.password') }}" hx-post="{{ route('account.password') }}" id="account-password">
       {{ csrf_field() }}{{ method_field('PUT') }}

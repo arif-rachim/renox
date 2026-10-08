@@ -55,6 +55,7 @@ pub const CUSTOMER_ABILITIES: [(&str, &str); 3] = [
     ("order", "api.abilities.order"),
 ];
 
+// [explain:api.about.limit]
 /// The rate limit of an API request: [`PER_MINUTE`] per token (the
 /// token's id, the part before `|`), else per user, else 30 a minute per
 /// IP address.
@@ -72,6 +73,7 @@ pub fn limit(req: &LimitRequest) -> Limit {
         _ => Limit::per_minute(30),
     }
 }
+// [/explain:api.about.limit]
 
 /// The base URL shown in the pages' `curl` examples.
 pub fn base_url() -> String {
@@ -89,6 +91,7 @@ impl Module for Api {
     }
 
     fn routes(&self) -> Routes {
+        // [explain:api.about.routes]
         // Kiosks: each ability guards the routes added before it.
         let kiosk = Routes::new()
             .get("/api/v1/kiosk/bikes", kiosk::bikes)
@@ -96,6 +99,7 @@ impl Module for Api {
             .get("/api/v1/kiosk/rentals/{code}", kiosk::rental)
             .name("api.kiosk.rental")
             .require_ability("rentals:read")
+            // [/explain:api.about.routes]
             .merge(
                 Routes::new()
                     .post("/api/v1/kiosk/rentals/{code}/checkout", kiosk::checkout)
@@ -138,6 +142,7 @@ impl Module for Api {
                     .name("api.me.orders")
                     .require_ability("order"),
             );
+        // [explain:api.about.routes]
         // Added last, so they run first: CORS answers preflights, the
         // limit counts every call, a missing or wrong token is a 401.
         let api = kiosk
@@ -145,6 +150,7 @@ impl Module for Api {
             .require_auth()
             .throttle_by(LIMITER)
             .cors(&[APP_ORIGIN]);
+        // [/explain:api.about.routes]
 
         let pages = Routes::new().get("/about/api", about).name("api.about");
         let personal = Routes::new()

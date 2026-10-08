@@ -1,6 +1,6 @@
 //! "About this page" entries for the catalog area's pages (see `crate::explain`).
 
-use crate::explain::{Audience, Explanation, Feature, Flow, NotAPage};
+use crate::explain::{Audience, Code, Explanation, Feature, Flow, NotAPage};
 
 const SOURCES_LISTING: &[&str] = &[
     "examples/bikeshop/src/app/catalog/browse.rs",
@@ -131,7 +131,20 @@ pub fn entries() -> Vec<Explanation> {
                 "docs/ui.md#navigation-and-page-structure",
             ],
             sources: SOURCES_LISTING,
-            code: &[],
+            code: &[
+                Code {
+                    title: "Handler: every product, through the one `listing` the three pages share",
+                    region: "catalog.index.handler",
+                },
+                Code {
+                    title: "Query: one page of products and their cards, then the `results` fragment",
+                    region: "catalog.listing",
+                },
+                Code {
+                    title: "Template: a plain GET form htmx sends on every change",
+                    region: "catalog.index.form",
+                },
+            ],
         },
         Explanation {
             route: "catalog.category",
@@ -180,7 +193,20 @@ pub fn entries() -> Vec<Explanation> {
                 "docs/ui.md#fragments-and-out-of-band-swaps",
             ],
             sources: SOURCES_LISTING,
-            code: &[],
+            code: &[
+                Code {
+                    title: "Handler: `Found<Category>` finds the category by its slug",
+                    region: "catalog.category.handler",
+                },
+                Code {
+                    title: "Query: the category and those under it, filtered and paginated",
+                    region: "catalog.listing",
+                },
+                Code {
+                    title: "Template: the `results` block, the fragment htmx swaps",
+                    region: "catalog.index.results",
+                },
+            ],
         },
         Explanation {
             route: "catalog.search",
@@ -248,7 +274,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/tests/catalog.rs",
                 "tests/browser/bikeshop-catalog.test.mjs",
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Model: `#[model(search = …)]` indexes three columns",
+                    region: "catalog.search.model",
+                },
+                Code {
+                    title: "Handler: the same listing, scoped to the words searched for",
+                    region: "catalog.search.handler",
+                },
+                Code {
+                    title: "Suggest: the navbar's best matches with `Product::search`",
+                    region: "catalog.search.suggest",
+                },
+            ],
         },
         Explanation {
             route: "catalog.show",
@@ -350,7 +389,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/tests/catalog.rs",
                 "tests/browser/bikeshop-catalog.test.mjs",
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Handler: `Found<Product>` by slug, answered with the `buybox` fragment",
+                    region: "catalog.show.handler",
+                },
+                Code {
+                    title: "Template: a GET form for the variant, the buy box htmx swaps",
+                    region: "catalog.show.template",
+                },
+                Code {
+                    title: "Pivot: what fits what, with the pivot's note",
+                    region: "catalog.show.fits",
+                },
+            ],
         },
         Explanation {
             route: "sitemap",
@@ -387,7 +439,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/catalog/mod.rs",
                 "examples/bikeshop/tests/catalog.rs",
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Handler: `renox::seo::Sitemap` from routes and rows",
+                    region: "sitemap.handler",
+                },
+                Code {
+                    title: "Routes: the catalogue's routes, an ETag layer over them all",
+                    region: "catalog.routes",
+                },
+                Code {
+                    title: "Test: the second request answers 304",
+                    region: "sitemap.test",
+                },
+            ],
         },
     ]
 }

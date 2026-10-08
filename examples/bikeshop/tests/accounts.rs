@@ -44,6 +44,7 @@ async fn sign_up(app: &TestApp, name: &str, email: &str) -> User {
         .expect("the user was made")
 }
 
+// [explain:register.test]
 #[renox::test]
 async fn signing_up_makes_a_customer() {
     let app = boot().await;
@@ -58,6 +59,7 @@ async fn signing_up_makes_a_customer() {
     assert_eq!(user.get::<String>("locale").as_deref(), Some("en"));
     app.assert_authenticated(None);
 }
+// [/explain:register.test]
 
 #[renox::test]
 async fn the_account_page_shows_the_customers_sections() {
@@ -372,6 +374,7 @@ async fn preferences_decide_the_channels() {
     assert_eq!(saved.choice(Kind::Rental), Choice::InApp);
     assert_eq!(saved.choice(Kind::Workshop), Choice::None);
 
+    // [explain:notifications.test]
     // Sent for real: mail only, the bell only, nothing.
     let state = app.state();
     for kind in [Kind::Order, Kind::Rental, Kind::Workshop] {
@@ -389,6 +392,7 @@ async fn preferences_decide_the_channels() {
         .unwrap();
     assert_eq!(stored.len(), 1);
     assert!(stored[0].contains("Ping rental"));
+    // [/explain:notifications.test]
 
     // An unknown choice is refused.
     app.htmx()
@@ -718,6 +722,7 @@ async fn deleting_the_account_leaves_no_personal_data_and_keeps_the_books() {
     assert_eq!(erased, 1);
 }
 
+// [explain:login.test]
 #[renox::test]
 async fn logins_are_throttled_and_locked() {
     let app = boot().await;
@@ -738,6 +743,99 @@ async fn logins_are_throttled_and_locked() {
     .await;
     app.assert_guest();
 }
+// [/explain:login.test]
+
+/// The address of the last mail's link that starts with `path`, without
+/// the app's host: `/reset-password/…`, `/verify-email/…`.
+fn mailed_link(app: &TestApp, path: &str) -> String {
+    let mail = app.sent_mail().pop().expect("a mail was sent");
+    let at = mail.text.find(path).expect("the mail has the link");
+    mail.text[at..]
+        .split_whitespace()
+        .next()
+        .unwrap()
+        .to_owned()
+}
+
+// [explain:password.request.test]
+#[renox::test]
+async fn a_forgotten_password_is_chosen_again_from_the_mailed_link() {
+    let app = boot().await;
+    sign_up(&app, "Nia", "nia@example.com").await;
+    app.logout();
+    // The same answer whether the address has an account or not.
+    app.post("/forgot-password", &[("email", "NIA@example.com")])
+        .await
+        .assert_redirect("/forgot-password");
+    let link = mailed_link(&app, "/reset-password/");
+    app.get(&link)
+        .await
+        .assert_ok()
+        .assert_see("nia@example.com");
+    // [/explain:password.request.test]
+    // [explain:password.reset.test]
+    let token = link["/reset-password/".len()..].split('?').next().unwrap();
+    app.post(
+        "/reset-password",
+        &[
+            ("token", token),
+            ("email", "nia@example.com"),
+            ("password", "a-new-password-9"),
+            ("password_confirmation", "a-new-password-9"),
+        ],
+    )
+    .await
+    .assert_redirect("/login");
+    app.post(
+        "/login",
+        &[
+            ("email", "nia@example.com"),
+            ("password", "a-new-password-9"),
+        ],
+    )
+    .await;
+    app.assert_authenticated(None);
+}
+// [/explain:password.reset.test]
+
+// [explain:password.confirm.test]
+#[renox::test]
+async fn turning_two_factor_on_asks_for_the_password_again() {
+    let app = boot().await;
+    let user = sign_up(&app, "Nia", "nia@example.com").await;
+    app.logout();
+    app.acting_as(&user); // logged in, but no password typed lately
+    app.get("/two-factor/setup")
+        .await
+        .assert_redirect("/confirm-password");
+    app.get("/confirm-password")
+        .await
+        .assert_ok()
+        .assert_see("Confirm your password");
+    app.post("/confirm-password", &[("password", "password123")])
+        .await
+        .assert_redirect("/two-factor/setup");
+}
+// [/explain:password.confirm.test]
+
+// [explain:verification.notice.test]
+#[renox::test]
+async fn a_new_account_verifies_its_email_from_a_signed_link() {
+    let app = boot().await;
+    let user = sign_up(&app, "Nia", "nia@example.com").await;
+    assert!(user.email_verified_at.is_none());
+    app.get("/verify-email").await.assert_ok();
+    // Another link, signed and valid for an hour.
+    app.post("/email/verification-notification", &[]).await;
+    let link = mailed_link(&app, "/verify-email/");
+    assert!(link.contains("&signature="), "{link}");
+    app.get(&link).await.assert_redirect("/");
+    let user = User::find(app.db(), user.id).await.unwrap().unwrap();
+    assert!(user.email_verified_at.is_some());
+    // Nothing left to verify.
+    app.get("/verify-email").await.assert_redirect("/");
+}
+// [/explain:verification.notice.test]
 
 /// Staff reach a walk-in customer's invitation from the pages that show the
 /// customer: the rental desk and the work order (#243).

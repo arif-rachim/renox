@@ -84,9 +84,11 @@ fn anchors(markdown: &str) -> HashSet<String> {
     found
 }
 
+// [explain:about.pages.test]
 #[renox::test]
 async fn every_get_route_has_an_explanation() {
     let app = TestApp::new(bikeshop::app()).await;
+    // [/explain:about.pages.test]
     let explanations = explain::all();
     let not_pages = explain::not_pages();
     let mut problems = Vec::new();
@@ -103,6 +105,7 @@ async fn every_get_route_has_an_explanation() {
     }
     let skipped: HashSet<&str> = not_pages.iter().map(|n| n.route).collect();
 
+    // [explain:about.pages.test]
     // Every GET route of the app (Renox's own `/_renox/*`, `/health`… aside).
     let mut get_routes = HashSet::new();
     for route in app.kernel().routes() {
@@ -125,6 +128,7 @@ async fn every_get_route_has_an_explanation() {
             ));
         }
     }
+    // [/explain:about.pages.test]
 
     // Each entry's path is its route's, and the panel finds the entry on the
     // page itself. Renox names the current route from the path alone (the

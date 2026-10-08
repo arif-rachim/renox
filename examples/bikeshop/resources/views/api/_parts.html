@@ -6,6 +6,7 @@
 {% call push('head', once='api-css') %}<link rel="stylesheet" href="{{ asset('api/api.css') }}">{% endcall %}
 {%- endmacro %}
 
+{# [explain:api.tokens.template] #}
 {#- A token just made, shown once with the kit's copy button, and how to use it. -#}
 {% macro fresh_token(token, base) -%}
 <div class="bs-token-once" data-bs-reveal>
@@ -27,3 +28,4 @@
   {{ button(t('api.tokens.make'), icon="plus") }}
 </form>
 {%- endmacro %}
+{# [/explain:api.tokens.template] #}

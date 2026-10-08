@@ -1,6 +1,6 @@
 //! "About this page" entries for the about area (see `crate::explain`).
 
-use crate::explain::{Audience, Explanation, Feature, Flow, NotAPage};
+use crate::explain::{Audience, Code, Explanation, Feature, Flow, NotAPage};
 
 /// The explanation of every page in this area.
 pub fn entries() -> Vec<Explanation> {
@@ -56,8 +56,12 @@ pub fn entries() -> Vec<Explanation> {
                     why: "The \"About this page\" panel on every page comes from the \
                       `about_page(request.route, request.path)` template function the app \
                       registers, so no handler passes anything for it: the layouts ask \
-                      for it themselves. The panel is the kit's `sheet` (`slide_over`) \
-                      with an `infolist` inside.",
+                      for it themselves. From 1200 px it is docked beside the page \
+                      (`about/_dock.html`: sticky, scrolling on its own, folding to a \
+                      rail); below, the navbar's button opens the same content in the \
+                      kit's `sheet`. The fold is a plain cookie the browser writes and an \
+                      app layer (`explain::dock_layer`) reads into `renox::context`, so a \
+                      folded panel is drawn folded from the first byte, with no jump.",
                 },
                 Feature {
                     api: "App::share",
@@ -65,13 +69,26 @@ pub fn entries() -> Vec<Explanation> {
                       so the layouts can hide the panels for a clean demo without any \
                       handler knowing about it. This page stays either way.",
                 },
+                Feature {
+                    api: "build.rs code regions",
+                    why: "The code on each panel is cut from the shop's own files when it \
+                      is built: lines between `// [explain:name]` and \
+                      `// [/explain:name]` (`{# … #}` in templates) become a region in a \
+                      generated table (`src/code.rs`), coloured on the server by a copy \
+                      of the docs site's highlighter (`src/highlight.rs`). A sample can't \
+                      drift from the code that runs, and the walker test fails for a \
+                      marker left open or a sample naming a region no file has.",
+                },
             ],
             under_hood: "No database: the explanations are Rust values in each area's \
                      `explain.rs`, collected by `crate::explain::all()`. The handler \
                      filters them, localizes them and sorts them by title. \
                      `tests/about.rs` walks every GET route of the app and fails when a \
                      page has no explanation, or when a docs link or a source path here \
-                     doesn't exist.",
+                     doesn't exist. The code samples cost nothing at run time: `build.rs` \
+                     scanned `src/`, `resources/views/`, `tests/`, `migrations/` and \
+                     `public/` for markers and compiled the regions in; each page colours \
+                     the one to three it shows.",
             docs: &[
                 "docs/routing.md#what-a-handler-can-take",
                 "docs/routing.md#route-urls-and-the-current-route",
@@ -84,11 +101,30 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/about/mod.rs",
                 "examples/bikeshop/src/explain.rs",
                 "examples/bikeshop/resources/views/about/pages.html",
+                "examples/bikeshop/resources/views/about/_explain.html",
+                "examples/bikeshop/resources/views/about/_dock.html",
                 "examples/bikeshop/resources/views/about/_panel.html",
+                "examples/bikeshop/src/code.rs",
+                "examples/bikeshop/build.rs",
+                "examples/bikeshop/src/highlight.rs",
+                "examples/bikeshop/public/explain.js",
                 "examples/bikeshop/tests/about.rs",
                 "tests/browser/bikeshop-about.test.mjs",
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Handler: every explanation, filtered by feature and by role",
+                    region: "about.pages.handler",
+                },
+                Code {
+                    title: "Template: a plain GET form, so a filtered list has its own address",
+                    region: "about.pages.template",
+                },
+                Code {
+                    title: "Test: the walker fails for a GET route without an explanation",
+                    region: "about.pages.test",
+                },
+            ],
         },
         Explanation {
             route: "about.blocks",
@@ -184,7 +220,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/tests/blocks.rs",
                 "tests/browser/bikeshop-blocks.test.mjs",
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Form: the blocks' fields checked by `Validate`, then by the shop's date",
+                    region: "about.blocks.rules",
+                },
+                Code {
+                    title: "Template: `quantity` and `keypad` in a plain POST form",
+                    region: "about.blocks.template",
+                },
+                Code {
+                    title: "Kanban: a move answered with 204, or Renox's 422",
+                    region: "about.blocks.kanban",
+                },
+            ],
         },
         data_page(),
     ]
@@ -330,7 +379,20 @@ fn data_page() -> Explanation {
             "examples/bikeshop/tests/seed.rs",
             "tests/browser/bikeshop-data.test.mjs",
         ],
-        code: &[],
+        code: &[
+            Code {
+                title: "Query: every table's row count in one `UNION ALL`",
+                region: "about.data.counts",
+            },
+            Code {
+                title: "Handler: the roles as the database has them now",
+                region: "about.data.handler",
+            },
+            Code {
+                title: "Template: the kit's `card` and `table`, one per area",
+                region: "about.data.template",
+            },
+        ],
     }
 }
 

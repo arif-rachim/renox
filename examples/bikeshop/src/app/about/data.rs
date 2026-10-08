@@ -529,6 +529,7 @@ struct RoleDoc {
     permissions: Vec<String>,
 }
 
+// [explain:about.data.counts]
 /// Rows per table, in one query.
 async fn counts(db: &Db) -> Result<HashMap<String, i64>> {
     let names: Vec<&str> = AREAS
@@ -543,7 +544,9 @@ async fn counts(db: &Db) -> Result<HashMap<String, i64>> {
     let rows: Vec<(String, i64)> = sql(union).fetch_as(db).await?;
     Ok(rows.into_iter().collect())
 }
+// [/explain:about.data.counts]
 
+// [explain:about.data.handler]
 /// `GET /about/data`.
 pub async fn show(State(db): State<Db>) -> Result<View> {
     let counts = counts(&db).await?;
@@ -565,6 +568,7 @@ pub async fn show(State(db): State<Db>) -> Result<View> {
         })
         .collect();
     let total: i64 = counts.values().sum();
+    // [/explain:about.data.handler]
     Ok(view(
         "about/data.html",
         context! {

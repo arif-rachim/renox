@@ -46,6 +46,7 @@
   {% endcall %}
   </div>
 
+  {# [explain:about.blocks.template] #}
   <div id="form">
   {% call card(t('blocks.page.form_title'), subtitle=t('blocks.page.form_lead')) %}
     <form class="rx-stack" method="post" action="{{ route('about.blocks.submit') }}" id="blocks-form">
@@ -65,6 +66,7 @@
           {{ signature('keypad(target, label=none, decimal=false, zeros=true, enter_label=none)') }}
         </div>
       </div>
+  {# [/explain:about.blocks.template] #}
       <div class="bs-showcase__demo">
         {{ datetime_range("starts_at", "ends_at", label="Rental", min=today, max=max_day, step=30, opens=9, closes=19, required=true) }}
         <p class="rx-hint">{{ t('blocks.page.datetime') }}</p>

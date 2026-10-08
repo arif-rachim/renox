@@ -2,7 +2,7 @@
 //! The JSON endpoints aren't pages: each is listed in [`not_pages`], and
 //! explained on `/about/api` ([`super::endpoints`]).
 
-use crate::explain::{Audience, Explanation, Feature, Flow, NotAPage};
+use crate::explain::{Audience, Code, Explanation, Feature, Flow, NotAPage};
 
 const MOD: &str = "examples/bikeshop/src/app/api/mod.rs";
 const KIOSK: &str = "examples/bikeshop/src/app/api/kiosk.rs";
@@ -101,7 +101,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/api/about.html",
                 TESTS,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Routes: an ability per group; then auth, the limit and CORS over all",
+                    region: "api.about.routes",
+                },
+                Code {
+                    title: "Limiter: a budget per token, else per user, else per address",
+                    region: "api.about.limit",
+                },
+                Code {
+                    title: "Template: one card per endpoint, its `curl` ready to paste",
+                    region: "api.about.template",
+                },
+            ],
         },
         Explanation {
             route: "api.tokens",
@@ -157,7 +170,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/api/_parts.html",
                 TESTS,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Handler: `create_token_with` and its abilities, shown once",
+                    region: "api.tokens.store",
+                },
+                Code {
+                    title: "Form: each ability one of those a customer may have",
+                    region: "api.tokens.rules",
+                },
+                Code {
+                    title: "Template: the new token with the kit's copy button, the form",
+                    region: "api.tokens.template",
+                },
+            ],
         },
         Explanation {
             route: "api.kiosks",
@@ -211,7 +237,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/migrations/20260103001100_create_kiosks_table.up.sql",
                 TESTS,
             ],
-            code: &[],
+            code: &[
+                Code {
+                    title: "Handler: a kiosk is a user of its own with one token",
+                    region: "api.kiosks.store",
+                },
+                Code {
+                    title: "Test: a revoked token is a 401 at once; a cashier gets a 403",
+                    region: "api.kiosks.test",
+                },
+                Code {
+                    title: "Template: the same parts as the customers' token page",
+                    region: "api.tokens.template",
+                },
+            ],
         },
     ]
 }

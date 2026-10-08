@@ -5,6 +5,7 @@
     also lists the demo accounts (`demo_logins`, src/app/accounts/demo_logins.rs):
     a tap fills the form (public/app.js), and without JavaScript the email
     and the password are there to type. -#}
+{# [explain:accounts.oauth_buttons] #}
 {%- set providers = oauth_providers | default([]) %}
 {%- if providers %}
 <div class="rx-stack rx-oauth">
@@ -14,6 +15,8 @@
   {%- endfor %}
 </div>
 {%- endif %}
+{# [/explain:accounts.oauth_buttons] #}
+{# [explain:login.demo.template] #}
 {%- set demo = demo_logins | default(none) %}
 {%- if page == "login" and demo %}
 <section class="bs-demo-logins" aria-labelledby="demo-logins-title">
@@ -32,3 +35,4 @@
   {%- if demo.staff_2fa %}<p class="bs-demo-logins__note">{{ t('accounts.demo.two_factor') }}</p>{% endif %}
 </section>
 {%- endif %}
+{# [/explain:login.demo.template] #}
