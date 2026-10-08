@@ -1,7 +1,6 @@
 {% extends "layouts/app.html" %}
 {% from "renox/ui.html" import page_header, select, button, alert, empty, radio, link_button, form_errors %}
-{% from "blocks/datetime_range.html" import datetime_range %}
-{% from "blocks/availability.html" import availability %}
+{% from "renox-blocks/blocks.html" import datetime_range, availability %}
 {% from "rentals/_parts.html" import styles %}
 {% from "layouts/_hero.html" import page_hero %}
 {% block seo %}{{ seo(title=t('rentals.search.title'), description=t('rentals.search.lead')) }}{% endblock %}

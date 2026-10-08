@@ -394,7 +394,7 @@
     },
     "page": {
       "title": "Bike shop blocks",
-      "lead": "The UI pieces Renox's kit doesn't have, built inside this example as macros on the kit's tokens. Each one works here, with its signature.",
+      "lead": "The UI pieces Renox's kit doesn't have, from the renox-blocks crate (and one of the shop's own), as macros on the kit's tokens. Each one works here, with its signature.",
       "contents": "On this page",
       "signature": "Macro",
       "gallery": "A product's photos: arrows, thumbnails, swipes and the arrow keys, and an enlarged view in the kit's sheet.",

@@ -1,4 +1,5 @@
-//! The bike shop's blocks (`resources/views/blocks/`) on `/about/blocks`:
+//! The blocks (renox-blocks, and the shop's own date picker with closed
+//! days in `resources/views/blocks/`) on `/about/blocks`:
 //! every block renders with its demo data, the month calendar works out its
 //! grid in the template, and the demo routes behind the blocks check what
 //! they get on the server (the form blocks through `Valid<T>`, the variant
@@ -29,19 +30,19 @@ async fn the_page_shows_every_block_with_its_signature() {
     let page = app.get("/about/blocks").await;
     page.assert_ok().assert_view("about/blocks.html");
     for marker in [
-        "data-bs-gallery",
-        "data-bs-range",
-        "data-bs-quantity",
-        "data-bs-keypad=\"rx-paid\"",
-        "data-bs-kanban",
-        "class=\"bs-month\"",
-        "class=\"bs-availability\"",
-        "data-bs-datetime",
+        "data-rx-gallery",
+        "data-rx-range",
+        "data-rx-quantity",
+        "data-rx-keypad=\"rx-paid\"",
+        "data-rx-kanban",
+        "class=\"rx-month\"",
+        "class=\"rx-availability\"",
+        "data-rx-datetime-range",
         "data-bs-blocked",
-        "bs-swatches--size",
-        "bs-swatches--colour",
-        "class=\"bs-history\"",
-        "class=\"bs-plans\"",
+        "rx-swatches--size",
+        "rx-swatches--colour",
+        "class=\"rx-history\"",
+        "class=\"rx-plans\"",
     ] {
         page.assert_see(marker);
     }
@@ -62,9 +63,13 @@ async fn the_page_shows_every_block_with_its_signature() {
     ] {
         page.assert_see(signature);
     }
-    // Both layouts load the blocks' stylesheet and script.
-    page.assert_see("blocks/blocks.css")
+    // The crate's stylesheet and loader, once; the layouts still load the
+    // shop's own (the date picker with closed days).
+    page.assert_see("/_renox/blocks/blocks-")
+        .assert_see("data-renox-blocks")
+        .assert_see("blocks/blocks.css")
         .assert_see("blocks/blocks.js");
+    assert_eq!(page.text().matches("data-renox-blocks").count(), 1);
     // Its "About this page" panel.
     page.assert_see("id=\"about-page\"")
         .assert_see("Bike shop blocks");
@@ -75,7 +80,7 @@ async fn the_blocks_render_their_fields_for_valid_t() {
     let app = TestApp::new(bikeshop::app()).await;
     let page = app.get("/about/blocks").await;
     // Plain fields: two range inputs, a number, the hidden date-times, radios.
-    page.assert_see(r#"type="range" id="bs-price_min-range-min" name="price_min""#)
+    page.assert_see(r#"type="range" id="rx-price_min-range-min" name="price_min""#)
         .assert_see(r#"name="price_max""#)
         .assert_see(r#"name="quantity" type="number""#)
         .assert_see(r#"type="hidden" name="starts_at""#)
@@ -86,7 +91,7 @@ async fn the_blocks_render_their_fields_for_valid_t() {
         .assert_see(r#"name="size" value="XL" disabled"#)
         .assert_see("(sold out)")
         // The kanban's hidden form posts to the demo route with htmx.
-        .assert_see(r#"hx-post="/about/blocks/kanban" hx-trigger="bs:move""#)
+        .assert_see(r#"hx-post="/about/blocks/kanban" hx-trigger="rx:kanban-move""#)
         // Every free slot says what it books.
         .assert_see("Book Trail 5 at 09:00")
         // The variant chips ask for the price and the stock.
@@ -107,8 +112,8 @@ async fn the_month_calendar_works_out_its_grid() {
         .assert_see("February 2026")
         .assert_see(r#"<time datetime="2026-02-28">"#)
         .assert_dont_see(r#"datetime="2026-02-29""#)
-        .assert_see("--bs-start: 7")
-        .assert_see(r#"<span class="bs-month__weekday">Sunday </span><span class="bs-month__number">1</span>"#)
+        .assert_see("--rx-month-start: 7")
+        .assert_see(r#"<span class="rx-month__weekday">Sunday </span><span class="rx-month__number">1</span>"#)
         // The months around it.
         .assert_see("/about/blocks?month=2026-01")
         .assert_see("/about/blocks?month=2026-03")
@@ -117,7 +122,7 @@ async fn the_month_calendar_works_out_its_grid() {
     app.get("/about/blocks?month=2024-02")
         .await
         .assert_see(r#"datetime="2024-02-29""#)
-        .assert_see("--bs-start: 4");
+        .assert_see("--rx-month-start: 4");
     // December links to January of the next year.
     app.get("/about/blocks?month=2026-12")
         .await
@@ -129,7 +134,7 @@ async fn the_month_calendar_works_out_its_grid() {
         .await
         .assert_ok()
         .assert_see(&format!(r#"datetime="{}""#, today))
-        .assert_see("bs-month__day--today");
+        .assert_see("rx-month__day--today");
 }
 
 #[renox::test]

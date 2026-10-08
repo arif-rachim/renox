@@ -1,6 +1,6 @@
 {% extends "layouts/staff.html" %}
 {% from "renox/ui.html" import page_header, card, select, button, form_errors, empty %}
-{% from "blocks/datetime_range.html" import datetime_range %}
+{% from "renox-blocks/blocks.html" import datetime_range %}
 {% block seo %}{{ seo(title=t('rentals.walkin.title')) }}{% endblock %}
 
 {#- A walk-in rental (#235): a verified customer, a bike standing here, a period from now. -#}

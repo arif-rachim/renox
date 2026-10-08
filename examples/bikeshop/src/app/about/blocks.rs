@@ -1,11 +1,12 @@
-//! `/about/blocks`: the bike shop's own UI blocks, each one working.
+//! `/about/blocks`: the UI blocks beyond Renox's kit, each one working.
 //!
-//! The blocks are the pieces Renox's kit doesn't have (a photo gallery, a
-//! two-handle range, a kanban board, a month calendar…). The owner chose to
-//! build them inside the example rather than in the kit, written like a
-//! small library so they can move to a crate later: one macro file each in
-//! `resources/views/blocks/`, one stylesheet and one script in
-//! `public/blocks/`, loaded by both layouts.
+//! The blocks are the pieces the kit doesn't have (a photo gallery, a
+//! two-handle range, a kanban board, a month calendar…). They were built in
+//! this example first, then moved to the `renox-blocks` crate (#347):
+//! macros in `renox-blocks/blocks.html`, a script and a stylesheet the
+//! crate serves to the pages that use them. One block is still the shop's
+//! own: the date picker with closed days (`resources/views/blocks/`,
+//! `public/blocks/`).
 //!
 //! This page shows each block with demo data and its macro's signature.
 //! The routes behind the demos:

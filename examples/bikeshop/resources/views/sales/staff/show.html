@@ -3,7 +3,7 @@
     payments, its ledger, and the actions its status and the user's
     permissions in its store allow. -#}
 {% from "renox/ui.html" import page_header, card, infolist, entry, table, badge, button, link_button, action_sheet, confirm, input, textarea, alert %}
-{% from "blocks/quantity.html" import quantity %}
+{% from "renox-blocks/blocks.html" import quantity %}
 {% block seo %}{{ seo(title=t('sales.orders.title', number=data.number)) }}{% endblock %}
 
 {% block content %}

@@ -88,10 +88,10 @@ Every example has a README.md that walks through it.
   catalogue by permission), renox-oauth, renox-2fa (required for staff), renox-editors;
   webhooks (Midtrans); signed single-use links; `Encrypted<String>` ID numbers; a JSON API
   for kiosks and a mobile app (token abilities, `throttle_by`, CORS, `Ulid` codes); the
-  kit's dashboard, charts, wizard, action sheets, repeater, infolists; "blocks" for what the
+  kit's dashboard, charts, wizard, action sheets, repeater, infolists; renox-blocks for what the
   kit lacks (gallery, range slider, quantity, keypad, kanban, month calendar, availability,
-  date-time range, swatches, history, plan comparison: resources/views/blocks/,
-  public/blocks/), Motion (motion.dev, vendored) on `transform`; English and Spanish;
+  date-time range, swatches, history, plan comparison; the closed-days date picker is still
+  the shop's own in resources/views/blocks/), Motion (motion.dev, vendored) on `transform`; English and Spanish;
   `CSP=strict`; `App::report`; `make:deploy` files; tests in Rust (SQLite and PostgreSQL),
   in headless Chrome (tests/browser/bikeshop-*.test.mjs) and as a process.
   - The app and its modules: [src/lib.rs](examples/bikeshop/src/lib.rs); areas in
@@ -394,6 +394,12 @@ Every example has a README.md that walks through it.
 - [docs/editors.md](docs/editors.md): the renox-editors crate: `rich_editor` (Trix; read as
   `RichText`, cleaned with ammonia; shown with `| rich_text`), `markdown_editor` (toolbar and
   a server-rendered preview), `code_editor` (CodeJar + Prism), `code_entry`; how the files load.
+- [docs/blocks.md](docs/blocks.md): the renox-blocks crate (`Blocks::new()`, macros from
+  `renox-blocks/blocks.html`): `quantity`, `range_slider`, `keypad`, `swatches`,
+  `datetime_range` (plain fields for `Valid<T>`), `gallery`, `history`, `compare_plans`,
+  `month_calendar`, `availability`, `kanban` (+ `kanban_card`, htmx POST per move,
+  `rx:kanban-moved`); each block's options, keyboard use, translations (`renox_blocks::TEXTS`,
+  `blocks.*` keys), how the files load.
 - [docs/grid.md](docs/grid.md): data grids (`renox::grid` + `renox/grid.html`): columns and their
   kinds, filters per heading, search, filter chips, the advanced filter, preferences (per user
   or in the session), details under a row, editing in place, reordering rows, merged cells,
@@ -458,6 +464,14 @@ Every example has a README.md that walks through it.
   `code_editor`, `code_entry`), `assets/editors.js|css` and the vendored Trix, Prism and CodeJar
   (`assets/vendor/NOTICE`). Guide: [docs/editors.md](docs/editors.md); used in examples/fields and
   examples/bikeshop (the admin panel's forms).
+- `crates/renox-blocks`: the optional blocks plugin crate (same version as `renox`): the
+  `Blocks` module (`lib.rs`: its views registered unless the app has the file, `renox_blocks()`
+  for the tags, `renox_blocks_t()` for texts), `texts.rs` (`TEXTS`, the English), `assets.rs`
+  (hashed URLs, `Registry::asset`), `views/blocks.html` (the eleven macros),
+  `assets/blocks.css`, `assets/blocks.js` (the loader) and `assets/parts/*.js` (each block's
+  code, imported only when a page has it; Web Animations, no library). Guide:
+  [docs/blocks.md](docs/blocks.md); used in examples/bikeshop (every page with a block, and
+  `/about/blocks`); browser tests tests/browser/blocks.test.mjs.
 - `crates/renox-oauth`: the optional social login plugin crate (same version as `renox`): the
   `OAuth` module (`lib.rs`: the buttons' `oauth_providers`, the account card, events to the
   audit log), the routes (`handlers.rs`: redirect with `state` + PKCE, callback, unlink;

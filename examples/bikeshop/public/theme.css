@@ -121,7 +121,7 @@
 @media (max-width: 40rem) { .bs-public .rx-card-grid { --rx-card-min: 9.5rem; gap: var(--rx-space-5) var(--rx-space-3); } }
 
 /* The product page's photo. */
-.bs-public .bs-product__media img, .bs-public .bs-product__media .bs-gallery__viewport { border-radius: var(--rx-radius-l); }
+.bs-public .bs-product__media img, .bs-public .bs-product__media .rx-gallery__viewport { border-radius: var(--rx-radius-l); }
 
 /* ---------- the sign-in pages: the form beside a photo ---------- */
 

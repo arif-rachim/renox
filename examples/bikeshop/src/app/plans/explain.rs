@@ -54,9 +54,9 @@ pub fn entries() -> Vec<Explanation> {
                           `APP_CURRENCY` and nothing is formatted by hand.",
                 },
                 Feature {
-                    api: "Bike shop blocks",
-                    why: "The kit has no pricing cards or comparison table, so the shop's \
-                          `compare_plans` block draws both: cards on a CSS grid (one column \
+                    api: "renox-blocks",
+                    why: "The kit has no pricing cards or comparison table, so the \
+                          `compare_plans` block of renox-blocks draws both: cards on a CSS grid (one column \
                           on a phone), the monthly tune-up highlighted, and a table whose \
                           ticks and dashes have screen-reader text (\"Included\", \"Not \
                           included\"), so the comparison doesn't rest on an icon alone.",
@@ -85,7 +85,7 @@ pub fn entries() -> Vec<Explanation> {
                 MODEL,
                 "examples/bikeshop/src/seed/content.rs",
                 "examples/bikeshop/resources/views/plans/index.html",
-                "examples/bikeshop/resources/views/blocks/compare_plans.html",
+                "crates/renox-blocks/views/blocks.html",
                 TESTS,
             ],
         },
@@ -290,8 +290,8 @@ pub fn entries() -> Vec<Explanation> {
                 },
                 Feature {
                     api: "Bike shop blocks",
-                    why: "The kit has no calendar of events, so the shop's `month_calendar` \
-                          block shows the upcoming visits on a month grid that turns into a \
+                    why: "The kit has no calendar of events, so the `month_calendar` \
+                          block of renox-blocks shows the upcoming visits on a month grid that turns into a \
                           list on a phone; \"Move\" uses the `date_picker_blocked` block, \
                           the kit's date picker with the full and closed days greyed out (the \
                           server checks again).",
@@ -326,7 +326,7 @@ pub fn entries() -> Vec<Explanation> {
                 CAPACITY,
                 DEMO,
                 "examples/bikeshop/resources/views/plans/show.html",
-                "examples/bikeshop/resources/views/blocks/month_calendar.html",
+                "crates/renox-blocks/views/blocks.html",
                 "examples/bikeshop/resources/views/blocks/date_picker_blocked.html",
                 TESTS,
                 BROWSER,

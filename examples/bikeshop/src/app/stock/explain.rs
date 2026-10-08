@@ -388,7 +388,7 @@ pub fn entries() -> Vec<Explanation> {
                           styled as a stepper (the `steps` macro in `stock/_parts.html`, the \
                           current step marked `aria-current`; the done steps slide in through \
                           Motion, not under reduced motion), and the dated events are the \
-                          `history` block.",
+                          `history` block of renox-blocks.",
                 },
                 AUDITED,
             ],
@@ -409,7 +409,7 @@ pub fn entries() -> Vec<Explanation> {
                 MODEL,
                 "examples/bikeshop/resources/views/stock/consignments/show.html",
                 PARTS,
-                "examples/bikeshop/resources/views/blocks/history.html",
+                "crates/renox-blocks/views/blocks.html",
                 "examples/bikeshop/public/areas/stock.js",
                 TESTS,
                 BROWSER,

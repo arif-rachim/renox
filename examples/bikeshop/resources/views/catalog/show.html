@@ -3,9 +3,7 @@
     so the `buybox` block sees them when htmx asks for it alone (a change of
     size or colour). -#}
 {% from "renox/ui.html" import page_header, card, card_grid, media_card, infolist, entry, button, link_button, badge, alert %}
-{% from "blocks/gallery.html" import gallery as photo_gallery %}
-{% from "blocks/swatches.html" import swatches %}
-{% from "blocks/quantity.html" import quantity %}
+{% from "renox-blocks/blocks.html" import gallery as photo_gallery, swatches, quantity %}
 {% block seo %}{{ seo(title=product.name ~ " · " ~ t('shop.name'), description=summary, image=og_image, type="product") }}{% endblock %}
 
 {% block content %}

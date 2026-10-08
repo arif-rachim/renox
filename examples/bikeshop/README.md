@@ -233,15 +233,20 @@ its category (`content::product_photo`: photo `(id % n) + 1`); migration
 
 The epic's rule was that a missing basic component stops the page and goes to the Renox team.
 **The owner decided otherwise for this example** (2026-10-06, a comment on #231): the components
-the kit doesn't have yet live here, as **blocks**, written like a small library so they can move
-to a crate later if other apps need them; Renox's kit isn't changed for them.
+the kit didn't have were built here first, as **blocks**, written like a small library so they
+could move to a crate. They since have (#347): eleven of them are the
+[renox-blocks](../../crates/renox-blocks) plugin (guide: [docs/blocks.md](../../docs/blocks.md)),
+which the app adds with `.module(renox_blocks::Blocks::new())` and a page imports like a kit
+component (`{% from "renox-blocks/blocks.html" import gallery %}`). Their classes are `rx-` ones
+on the kit's tokens, and the crate's script loads a block's code only on pages that have it
+(Web Animations on `transform`, nothing under `prefers-reduced-motion`, no inline handlers, so
+`CSP=strict` works).
 
-Each block is one macro file in [resources/views/blocks/](resources/views/blocks/) (documented at
-the top, keyword arguments like the kit's), `bs-` classes on the kit's `--rx-*` tokens in
-[public/blocks/blocks.css](public/blocks/blocks.css), and the behaviour in
-[public/blocks/blocks.js](public/blocks/blocks.js) (set up from `data-bs-*` attributes, on the page
-and after htmx swaps; no inline handlers, so `CSP=strict` works; Motion on `transform`). Form
-blocks send plain fields, so `Valid<T>` reads them; the server still checks every value.
+One block is still the shop's own: `date_picker_blocked`, in
+[resources/views/blocks/](resources/views/blocks/) with its behaviour in
+[public/blocks/blocks.js](public/blocks/blocks.js) and its style in
+[public/blocks/blocks.css](public/blocks/blocks.css) (`bs-` classes, `data-bs-*` attributes).
+Form blocks send plain fields, so `Valid<T>` reads them; the server still checks every value.
 [`/about/blocks`](src/app/about/blocks.rs) shows each one working.
 
 | Macro | What it is | Used on |
@@ -254,7 +259,7 @@ blocks send plain fields, so `Valid<T>` reads them; the server still checks ever
 | `month_calendar(month, events, url, param, today, first_day, label, heading)` | A month of events, a list on phones | a plan's visits |
 | `availability(columns, rows, label, corner)` | Resources × hours/days, booked and free slots | renting |
 | `datetime_range(name_start, name_end, label, …)` | Two date pickers + time selects, the duration shown | renting, walk-ins |
-| `date_picker_blocked(name, label, disabled_dates, closed_weekdays, …)` | The kit's `date_picker` with days that can't be picked | service booking |
+| `date_picker_blocked(name, label, disabled_dates, closed_weekdays, …)` | The kit's `date_picker` with days that can't be picked (the shop's own) | service booking |
 | `swatches(name, label, options, selected, kind, attrs)` | Size or colour chips as radios | product page |
 | `history(items, label, date_format)` | A vertical timeline | a bike's service history |
 | `compare_plans(plans, features, highlight, …)` | Pricing cards and a comparison table | service plans |
@@ -363,7 +368,7 @@ $ cargo run -- schedule:list
   As in every example, `renox.workspace = true` means the Dockerfile builds in an app made by
   `rnx new`, not in this repository's folder.
 - **CSP:** every page works under `CSP=strict` (scripts load from the app with the page's nonce,
-  behaviour lives in the app's scripts under [public/](public/) (`app.js`, `blocks/blocks.js`, one per area), no inline handlers;
+  behaviour lives in the app's scripts under [public/](public/) (`app.js`, `blocks/blocks.js`, one per area; renox-blocks' module), no inline handlers;
   `tests/browser/bikeshop-walk.test.mjs` walks the main pages under it with a clean console).
 
 ## Tests

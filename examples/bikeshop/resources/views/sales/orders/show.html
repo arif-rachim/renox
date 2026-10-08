@@ -2,7 +2,7 @@
 {#- The customer's order page (src/app/sales/orders.rs `show`): where the
     order stands, its lines, totals and payments. -#}
 {% from "renox/ui.html" import page_header, card, infolist, entry, link_button, badge, table, alert %}
-{% from "blocks/history.html" import history %}
+{% from "renox-blocks/blocks.html" import history %}
 {% block seo %}{{ seo(title=t('sales.orders.title', number=page.number) ~ " · " ~ t('shop.name')) }}{% endblock %}
 
 {% block content %}
