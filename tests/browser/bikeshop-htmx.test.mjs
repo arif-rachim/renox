@@ -107,6 +107,9 @@ describe('/about/htmx under CSP=strict', () => {
       page.on('Network.requestWillBeSent', (p) => p.request.method === 'PATCH' && patches.push(p.request.url));
       const title = await page.text(`#${id} .rx-list__main`);
       const dblclick = (i) => document.querySelector(`#${i} .rx-list__main`).dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      // A row htmx just swapped in listens once htmx has processed it.
+      const ready = (i) => !!document.querySelector(`#${i} .rx-list__main`)?.['htmx-internal-data'];
+      await page.waitFor(ready, { message: 'the row ready for htmx' }, id);
       await page.eval(dblclick, id);
       await page.waitFor((i) => !!document.querySelector(`#${i} input[name=title]`), {}, id);
       await page.type(`#${id} input[name=title]`, 'Never saved', { clear: true });
@@ -116,6 +119,7 @@ describe('/about/htmx under CSP=strict', () => {
       assert.deepEqual(patches, []);
 
       // Double-click the title: a form; Enter saves.
+      await page.waitFor(ready, { message: 'the row ready for htmx' }, id);
       await page.eval(dblclick, id);
       await page.waitFor((i) => !!document.querySelector(`#${i} input[name=title]`), {}, id);
       await page.type(`#${id} input[name=title]`, 'Renamed item', { clear: true });

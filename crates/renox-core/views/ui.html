@@ -394,7 +394,7 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
   </div>
   <template data-rx-row-template>{{ _repeater_row(name, "__INDEX__", item, reorderable, caller, {}) }}</template>
   <p class="rx-error" id="{{ id }}-error" data-error-for="{{ _key(name) }}" aria-live="polite">{{ message }}</p>
-  <div><button class="rx-button rx-button--secondary rx-button--small" type="button" data-rx-row-add>{{ _icon("plus") }}<span class="rx-button__label">{{ add_label or t('ui.add_row') }}</span></button></div>
+  <div><button class="rx-button rx-button--secondary rx-button--small" type="button" data-rx-row-add{% if max and current | length >= max %} disabled{% endif %}>{{ _icon("plus") }}<span class="rx-button__label">{{ add_label or t('ui.add_row') }}</span></button></div>
 </fieldset>
 {%- endmacro %}
 

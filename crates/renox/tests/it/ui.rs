@@ -208,6 +208,9 @@ fn views() -> tempfile::TempDir {
 {{ input(prefix ~ "[name]", "Name", value=row.name, required=true) }}
 {{ input(prefix ~ "[qty]", "Quantity", type="number", value=row.qty) }}
 {% endcall %}
+{% call(row, prefix) repeater("pair", "Pair", rows=[{"n": "a"}, {"n": "b"}], max=2) %}
+{{ input(prefix ~ "[n]", "N", value=row.n) }}
+{% endcall %}
 {% endcall %}
 {% call wizard_step("w", "extra") %}
 {{ tags_input("tags", "Tags", value=["new", "sale"], suggestions=["gift"]) }}
@@ -652,6 +655,10 @@ async fn repeaters_tags_key_values_and_wizards() {
         .assert_see(r#"data-error-for="lines.0.name""#)
         .assert_see(r#"name="lines[__INDEX__][name]""#)
         .assert_see(r#"aria-label="Move up""#)
+        // Under its `max`, the add button works; at it, it is disabled
+        // before the repeater's script loads (#349).
+        .assert_see(r#"type="button" data-rx-row-add><svg"#)
+        .assert_see(r#"type="button" data-rx-row-add disabled><svg"#)
         // Tags: a chip and a hidden input per tag, then the box to type in.
         .assert_see(r#"<span class="rx-tag__text">new</span>"#)
         .assert_see(r#"<input type="hidden" name="tags" value="sale">"#)
