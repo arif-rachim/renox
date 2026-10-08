@@ -1,4 +1,0 @@
-Thank you for your order!
-
-{{ order.item }}: {{ order.total | money }}
-Order #{{ order.id }}

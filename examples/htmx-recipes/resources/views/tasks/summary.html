@@ -1,7 +1,0 @@
-{% extends "layouts/app.html" %}
-{% from "renox/ui.html" import page_header, link_button %}
-
-{% block content %}
-{{ page_header("Summary", subtitle=(open ~ " task" ~ ("" if open == 1 else "s") ~ " still open.")) }}
-<p>{{ link_button(route('tasks.index'), "Back to the list") }}</p>
-{% endblock %}

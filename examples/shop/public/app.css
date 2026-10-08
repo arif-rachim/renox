@@ -1,6 +1,0 @@
-/* The shop's own styles, on top of the Renox UI kit (rx-* classes, docs/ui.md). The coffee
-   brown replaces the kit's blue accent; the shades keep WCAG AA contrast: white on the
-   button colour 6.5:1 or more, the link colour 7:1 or more on the page in both appearances. */
-:root { --rx-accent: #7a4520; --rx-accent-hover: #86502a; --rx-accent-pressed: #663a1b; --rx-accent-text: #7a4520; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --rx-accent: #8a4f26; --rx-accent-hover: #965a30; --rx-accent-pressed: #764321; --rx-accent-text: #e0a878; } }
-:root[data-theme="dark"] { --rx-accent: #8a4f26; --rx-accent-hover: #965a30; --rx-accent-pressed: #764321; --rx-accent-text: #e0a878; }
