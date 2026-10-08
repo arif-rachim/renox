@@ -2080,6 +2080,42 @@
         "3": "La ruta tiene un nombre, `stores.site`, como cualquier otra, así que `route:list` la muestra (con su DOMAIN) y es la clave de esta explicación. Renox nombra la ruta actual por host, así que el panel encuentra esta página y no la de inicio, aunque las dos sean `/`.",
         "4": "La página son los `stat` del kit para las cifras, un `infolist` para los datos de contacto (un enlace `tel:` y un botón para copiar el correo) y una `table` para el horario, bajo el hero de la tienda, así que se ve como la tienda sin CSS propio más allá de la rejilla del layout."
       }
+    },
+    "about.fields": {
+      "title": "Campos de formulario y sus tipos",
+      "purpose": "La referencia para elegir tipos: cada tipo de campo de formulario con el tipo de Rust en el que `Valid<T>` lo lee, el tipo del modelo y la columna en SQLite y en PostgreSQL, y luego un formulario que prueba cada fila. `docs/types.md` apunta aquí. Un visitante con sesión guarda una bici de muestra, la abre leída de la base de datos, la edita y la elimina.",
+      "who": "Desarrolladores que eligen el tipo de un campo o comprueban cómo viaja un valor del navegador a la base de datos y de vuelta.",
+      "under_hood": "Ninguna consulta para un invitado; para alguien con sesión, una para sus muestras y otra para las marcas que sugiere el campo de la marca. La tabla sale de `fields::REFERENCE`, la misma lista de Rust que sigue el formulario. Enviar el formulario lee el cuerpo multipart (con nombres `specs[0][key]`, como un árbol), comprueba cada regla, guarda la foto en la parte pública del disco (`Upload::store_public`, servida en `/storage/…`, o desde el bucket en S3) y el manual en privado (`Upload::store`), e inserta la fila con una nueva clave UUID v7. Su migración tiene un gemelo `.postgres.up.sql` con columnas `UUID`, `DOUBLE PRECISION`, `BOOLEAN`, `JSONB`, `TIME`, `TIMESTAMP` y `DATE`; las pruebas se ejecutan en las dos bases de datos.",
+      "features": {
+        "0": "Una estructura de formulario lee cada tipo de campo: números, una casilla (`on` o nada se vuelve un `bool`), un enum de un grupo de radios, listas de casillas y etiquetas, pares `specs[0][key]` como `KeyValues`, horas y fechas, y archivos como `Upload`, de un solo cuerpo multipart. Un campo vacío se vuelve `None`; cada valor erróneo se informa a la vez, junto a su campo.",
+        "1": "`v.each(\"colors\", …, |c| c.one_of(COLOURS))` comprueba cada color marcado y `v.distinct` rechaza uno enviado dos veces; el error va con la clave `colors.1`, y el hueco de `colors` muestra el primero. `decimal(0, 2)`, `.json()`, `image()`, `dimensions(…)` y `mimes([\"pdf\"])` también son reglas; los archivos se comprueban por su contenido, no por su nombre.",
+        "2": "La talla del cuadro es un enum guardado como palabra (`small`, `medium`, `large`): el grupo de radios envía una, una desconocida falla la validación, y la columna se lee de vuelta como el enum.",
+        "3": "Los colores y las etiquetas son `Json<Vec<String>>`, las especificaciones `Json<KeyValues>` (una lista de pares, así que su orden se mantiene en el `JSONB` de PostgreSQL, que reordena las claves de un objeto): `TEXT` en SQLite, `JSONB` en PostgreSQL, el mismo código en las dos.",
+        "4": "Los editores de Markdown, texto enriquecido y código son campos normales: un `String`, un `RichText` (su HTML limpiado de scripts al leer el formulario, un editor vaciado cuenta como vacío) y un `String` comprobado con `.json()`. La página carga el script de los editores solo porque los tiene.",
+        "5": "Cada campo es del kit: `input` con prefijo, sufijo, un `datalist` de las marcas de la tienda o un botón para copiar, `checkbox` como interruptor, `radio`, `checkbox_list`, `tags_input`, `key_value`, `date_picker`, `file` con vista previa, en `fieldset`s; cada uno muestra lo enviado tras un guardado fallido.",
+        "6": "La referencia es pública; guardar una muestra exige iniciar sesión, y cada muestra pertenece a quien la hizo, así que los visitantes de la demo nunca ven las de los demás."
+      }
+    },
+    "about.fields.show": {
+      "title": "Una muestra leída de vuelta",
+      "purpose": "Cada campo de una muestra guardada, leído de la base de datos y mostrado como mejor se lee su tipo: dinero, un sí o no, muestras de color, etiquetas, las especificaciones como tabla, Markdown, texto enriquecido, JSON resaltado, fechas, la foto y un enlace al manual privado.",
+      "who": "Desarrolladores que comprueban que cada valor volvió tal como se escribió.",
+      "under_hood": "Una consulta para la muestra (por id y dueño). La dirección de la foto viene del driver de almacenamiento: `/storage/samples/…` en el disco local, la dirección del bucket en S3. Eliminar es la hoja `confirm` del kit; borra la fila y luego sus archivos.",
+      "features": {
+        "0": "La dirección lleva el UUID de la muestra; `renox::Path<Uuid>` responde 404 a uno que no se puede leer, y una muestra de otra persona también es un 404, así que la página nunca dice que existe.",
+        "1": "Cada `entry` formatea su valor según su tipo: `money` en `APP_CURRENCY`, `bool`, `color`, `key_value`, `markdown` (el HTML escrito se muestra como texto), `date`, `datetime`, `since`; hay botones junto a la clave y las existencias (`suffix_actions`). `code_entry` de renox-editors resalta el JSON, y el filtro `rich_text` vuelve a limpiar el HTML guardado al mostrarlo.",
+        "2": "El manual no tiene dirección pública: su enlace pregunta a la app, que comprueba que la muestra es tuya y envía el archivo con `Download::from_storage(…).inline()`, con el nombre con el que se subió, para que el navegador lo muestre. La foto, guardada como pública, se muestra directamente desde `storage.url(key)`."
+      }
+    },
+    "about.fields.edit": {
+      "title": "Editar una muestra",
+      "purpose": "El formulario de `/about/fields` relleno con los valores guardados de una muestra, cada uno en el formato que espera su campo (`2026-10-01`, `08:00:00`, `2026-10-01T10:30:00`, el precio de nuevo en dólares). Una foto o un manual nuevos sustituyen al archivo guardado.",
+      "who": "Desarrolladores que comprueban el viaje de vuelta de la base de datos a un formulario.",
+      "under_hood": "Dos consultas: la muestra (por id y dueño) y las marcas para las sugerencias del nombre. Guardar lee el formulario multipart, guarda cualquier archivo nuevo, guarda la fila (el modelo pone `updated_at`) y borra los archivos que sustituyó.",
+      "features": {
+        "0": "La misma estructura de formulario que para una muestra nueva; el formulario dice `PUT` con `method_field('PUT')`. Tras un guardado fallido cada campo muestra lo enviado (`old()`), incluida una casilla o un color sin marcar (`has_old()`), y nunca un archivo.",
+        "1": "Primero se guarda el archivo nuevo, luego la fila, y solo entonces se borra el archivo viejo: un fallo a mitad deja como mucho un archivo sin usar, nunca una fila que apunta a uno que falta."
+      }
     }
   },
   "blocks": {
@@ -5443,5 +5479,99 @@
       "closed": "Por ahora cerrada todos los días.",
       "all": "Las tres tiendas"
     }
+  },
+  "fields": {
+    "title": "Campos de formulario y sus tipos",
+    "lead": "Cada tipo de campo de formulario, el tipo de Rust en el que se lee y la columna en la que se guarda en SQLite y en PostgreSQL. Pruébalos todos en el formulario de abajo.",
+    "reference": {
+      "title": "Campo, Rust y base de datos",
+      "lead": "Una fila por campo del formulario de abajo, del navegador a la columna y de vuelta.",
+      "field": "Campo",
+      "input": "Entrada",
+      "form": "Tipo del formulario",
+      "model": "Tipo del modelo"
+    },
+    "samples": {
+      "title": "Tus muestras",
+      "lead": "Solo tú ves las muestras que guardas.",
+      "none": "Aún no hay muestras",
+      "none_text": "Rellena el formulario de abajo para guardar la primera."
+    },
+    "try": {
+      "title": "Prueba cada campo",
+      "lead": "Guarda una bici de muestra y ábrela para ver cada valor leído de la base de datos.",
+      "login": "Inicia sesión para probar el formulario: las muestras que guardes se quedan en tu cuenta."
+    },
+    "form": {
+      "basics": "Lo básico",
+      "key": "ID de la muestra",
+      "key_hint": "Un UUID v7, creado al guardar la muestra.",
+      "name": "Nombre",
+      "brand": "Marca",
+      "brand_hint": "Escribe lo que quieras o elige una de las marcas de la tienda.",
+      "description": "Descripción",
+      "description_hint": "Markdown: **negrita**, _cursiva_, listas, enlaces.",
+      "stock": "Existencias",
+      "weight": "Peso",
+      "price": "Precio",
+      "available": "Disponible",
+      "options": "Opciones",
+      "size": "Talla del cuadro",
+      "colours": "Colores",
+      "details": "Detalles",
+      "tags": "Etiquetas",
+      "tags_hint": "Pulsa Intro o una coma después de cada una.",
+      "specs": "Especificaciones",
+      "spec_name": "Nombre",
+      "spec_value": "Valor",
+      "spec_add": "Añadir una especificación",
+      "rich": "Texto enriquecido",
+      "rich_hint": "Texto con formato, limpiado en el servidor.",
+      "settings": "Ajustes",
+      "settings_hint": "JSON, comprobado al guardar.",
+      "dates": "Fechas y horas",
+      "pickup": "Hora de recogida",
+      "launch": "Lanzamiento",
+      "released": "Publicada el",
+      "files": "Archivos",
+      "photo": "Foto",
+      "photo_hint": "Una imagen de hasta 2 MB; cualquiera con su dirección puede verla.",
+      "manual": "Manual de uso",
+      "manual_hint": "Un PDF de hasta 5 MB; solo tú puedes abrirlo."
+    },
+    "size": {
+      "small": "Pequeña",
+      "medium": "Mediana",
+      "large": "Grande"
+    },
+    "colour": {
+      "teal": "Verde azulado",
+      "tan": "Arena",
+      "slategray": "Grafito",
+      "black": "Negro"
+    },
+    "yes": "Sí",
+    "no": "No",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "confirm": {
+      "title": "¿Eliminar «:name»?",
+      "text": "La muestra y sus archivos se eliminan para siempre."
+    },
+    "cancel": "Cancelar",
+    "save": "Guardar los cambios",
+    "create": "Guardar la muestra",
+    "show": {
+      "lead": "Cada campo del formulario, leído de la base de datos.",
+      "none": "Ninguno",
+      "in_stock": "en existencias",
+      "photo_alt": "La foto de :name",
+      "updated": "Actualizada"
+    },
+    "edit_title": "Editar :name",
+    "edit_lead": "Cada valor guardado vuelve en el formato que espera su campo.",
+    "saved": "Muestra guardada.",
+    "updated": "Cambios guardados.",
+    "deleted": "«:name» eliminada."
   }
 }

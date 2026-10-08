@@ -1,0 +1,65 @@
+{% extends "layouts/app.html" %}
+{#- /about/fields (src/app/about/fields.rs): every HTML input with the Rust type
+    it is read into, the model's type and the column on SQLite and on
+    PostgreSQL (`reference`), the visitor's samples, and the form that tries
+    every row (about/_fields_form.html). Only the kit. -#}
+{% from "renox/ui.html" import page_header, card, table, badge, empty, alert, link_button, confirm, row_actions %}
+{% block seo %}{{ seo(title=t('fields.title'), description=t('fields.lead')) }}{% endblock %}
+
+{% block content %}
+<div class="rx-stack" data-bs-reveal>
+  {{ page_header(t('fields.title'), subtitle=t('fields.lead')) }}
+
+  {% call card(t('fields.reference.title'), subtitle=t('fields.reference.lead')) %}
+    {% call table([t('fields.reference.field'), t('fields.reference.input'), t('fields.reference.form'), t('fields.reference.model'), "SQLite", "PostgreSQL"], caption=t('fields.reference.title')) %}
+      {%- for r in reference %}
+      <tr>
+        <td><code>{{ r.field }}</code></td>
+        <td><code>{{ r.input }}</code></td>
+        <td><code>{{ r.form }}</code></td>
+        <td><code>{{ r.model }}</code></td>
+        <td><code>{{ r.sqlite }}</code></td>
+        <td><code>{{ r.postgres }}</code></td>
+      </tr>
+      {%- endfor %}
+    {% endcall %}
+  {% endcall %}
+
+  {%- if logged_in %}
+  {% call card(t('fields.samples.title'), subtitle=t('fields.samples.lead')) %}
+    {%- if samples %}
+    {% call table([t('fields.form.name'), [t('fields.form.price'), "num"], [t('fields.form.size'), "hide-narrow"], [t('fields.form.available'), "hide-narrow"], ["", "num"]], caption=t('fields.samples.title')) %}
+      {%- for s in samples %}
+      <tr>
+        <td><a class="rx-link" href="{{ route('about.fields.show', s.id) }}"><strong>{{ s.name }}</strong></a></td>
+        <td class="rx-num">{{ s.price | money }}</td>
+        <td class="rx-hide-narrow">{{ badge(t('fields.size.' ~ s.size), kind="info") }}</td>
+        <td class="rx-hide-narrow">{{ badge(t('fields.yes'), kind="success") if s.available else badge(t('fields.no')) }}</td>
+        <td class="rx-num">
+          {% call row_actions() %}
+            {{ link_button(route('about.fields.edit', s.id), t('fields.edit'), variant="plain", size="small", icon="edit") }}
+            {{ confirm("delete-" ~ s.id, t('fields.delete'), route('about.fields.destroy', s.id),
+                       t('fields.confirm.title', name=s.name), t('fields.confirm.text'),
+                       confirm_label=t('fields.delete'), size="small", icon="trash") }}
+          {% endcall %}
+        </td>
+      </tr>
+      {%- endfor %}
+    {% endcall %}
+    {%- else %}
+    {{ empty(t('fields.samples.none'), t('fields.samples.none_text')) }}
+    {%- endif %}
+  {% endcall %}
+
+  {% call card(t('fields.try.title'), subtitle=t('fields.try.lead')) %}
+    {% set sample = none %}
+    {% include "about/_fields_form.html" %}
+  {% endcall %}
+  {%- else %}
+  {% call card(t('fields.try.title'), subtitle=t('fields.try.lead')) %}
+    {{ alert(t('fields.try.login'), kind="info") }}
+    <p>{{ link_button(route('login'), t('nav.login'), variant="primary") }}</p>
+  {% endcall %}
+  {%- endif %}
+</div>
+{% endblock %}

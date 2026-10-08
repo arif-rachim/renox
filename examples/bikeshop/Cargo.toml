@@ -5,7 +5,8 @@ edition = "2024"
 publish = false
 
 [dependencies]
-renox = { workspace = true, features = ["xlsx"] }
+# `uuid`: /about/fields keys its samples by a UUID (src/app/about/fields.rs).
+renox = { workspace = true, features = ["xlsx", "uuid"] }
 renox-2fa.workspace = true
 renox-admin.workspace = true
 # Service plans billed as subscriptions (#237): Stripe in USD, and Xendit
@@ -23,3 +24,9 @@ tracing = "0.1.44"
 # which renox::grid's one-sheet exports don't make. The same version and features Renox's
 # `xlsx` feature already builds, so no new crate is compiled.
 rust_xlsxwriter = { version = "0.99.1", default-features = false, features = ["chrono"] }
+
+[features]
+# Files on S3 (or any S3-compatible store) instead of the local disk:
+# `cargo run --features s3` with STORAGE_DISK=s3 and the S3_* settings in
+# .env. CI's `s3` job runs tests/fields.rs on SeaweedFS with it.
+s3 = ["renox/s3"]

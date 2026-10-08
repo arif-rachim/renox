@@ -191,7 +191,210 @@ pub fn entries() -> Vec<Explanation> {
             ],
         },
         data_page(),
+        fields_page(),
+        field_sample_page(),
+        field_sample_edit_page(),
     ]
+}
+
+/// `/about/fields`: every input, its Rust types and its columns.
+fn fields_page() -> Explanation {
+    Explanation {
+        route: "about.fields",
+        path: "/about/fields",
+        title: "Form fields and their types",
+        purpose: "The reference for choosing types: every kind of form input with the Rust \
+                  type `Valid<T>` reads it into, the model's type and the column on SQLite \
+                  and on PostgreSQL, then a form that tries every row. `docs/types.md` \
+                  points here. A logged-in visitor saves a sample bike, opens it read back \
+                  from the database, edits it and deletes it.",
+        who: "Developers choosing a field type or checking how a value travels from the \
+              browser to the database and back.",
+        audience: &[Audience::Developer],
+        flow: Flow::Learn,
+        features: &[
+            Feature {
+                api: "Valid<T>",
+                why: "One form struct reads every kind of input: numbers, a checkbox (`on` \
+                      or nothing becomes a `bool`), an enum from a radio group, lists from \
+                      checkboxes and tags, `specs[0][key]` pairs as `KeyValues`, times and \
+                      dates, and files as `Upload`s, from one multipart body. An empty \
+                      input becomes `None`; every wrong value is reported at once, next to \
+                      its field.",
+            },
+            Feature {
+                api: "Validator::each",
+                why: "`v.each(\"colors\", …, |c| c.one_of(COLOURS))` checks each ticked \
+                      colour and `v.distinct` refuses one sent twice; the error is keyed \
+                      `colors.1`, and the `colors` slot shows the first. `decimal(0, 2)`, \
+                      `.json()`, `image()`, `dimensions(…)` and `mimes([\"pdf\"])` are \
+                      rules too, files checked by their content, not their name.",
+            },
+            Feature {
+                api: "#[derive(DbEnum)]",
+                why: "The frame size is an enum stored as a word (`small`, `medium`, \
+                      `large`): the radio group sends one, an unknown one fails \
+                      validation, and the column reads back as the enum.",
+            },
+            Feature {
+                api: "db::Json",
+                why: "Colours and tags are `Json<Vec<String>>`, the specifications \
+                      `Json<KeyValues>` (a list of pairs, so their order holds in \
+                      PostgreSQL's `JSONB`, which reorders an object's keys): `TEXT` on \
+                      SQLite, `JSONB` on PostgreSQL, the same code on both.",
+            },
+            Feature {
+                api: "renox-editors",
+                why: "The Markdown, rich text and code editors are plain fields: a `String`, \
+                      a `RichText` (its HTML cleaned of scripts as the form is read, an \
+                      emptied editor counted as empty) and a `String` checked with \
+                      `.json()`. The page loads the editors' script only because it has \
+                      them.",
+            },
+            Feature {
+                api: "UI kit: form fields",
+                why: "Every field is the kit's: `input` with a prefix, a suffix, a \
+                      `datalist` of the shop's brands or a copy button, `checkbox` as a \
+                      switch, `radio`, `checkbox_list`, `tags_input`, `key_value`, \
+                      `date_picker`, `file` with a preview, in `fieldset`s; each shows the \
+                      old input after a failed save.",
+            },
+            Feature {
+                api: "Routes::require_auth",
+                why: "The reference is public; saving a sample needs a login, and each \
+                      sample belongs to the person who made it, so the demo's visitors \
+                      never see each other's.",
+            },
+        ],
+        under_hood: "No query for a guest; for someone logged in, one for their samples and \
+                     one for the brands the name field suggests. The table comes from \
+                     `fields::REFERENCE`, the same Rust list the form follows. Sending the \
+                     form reads the multipart body (with `specs[0][key]` names, as a tree), \
+                     checks every rule, stores the photo on the public part of the disk \
+                     (`Upload::store_public`, served at `/storage/…`, or from the bucket on \
+                     S3) and the manual privately (`Upload::store`), and inserts the row \
+                     with a new UUID v7 key. Its migration has a `.postgres.up.sql` twin \
+                     with `UUID`, `DOUBLE PRECISION`, `BOOLEAN`, `JSONB`, `TIME`, \
+                     `TIMESTAMP` and `DATE` columns; the tests run on both databases.",
+        docs: &[
+            "docs/types.md#the-table",
+            "docs/types.md#forms",
+            "docs/types.md#nested-names-rows-inside-a-form",
+            "docs/validation.md#uploads",
+            "docs/ui.md#form-fields",
+            "docs/editors.md#the-fields-in-a-form",
+        ],
+        sources: &[
+            "examples/bikeshop/src/app/about/fields.rs",
+            "examples/bikeshop/resources/views/about/fields.html",
+            "examples/bikeshop/resources/views/about/_fields_form.html",
+            "examples/bikeshop/migrations/20260109000100_create_field_samples_table.up.sql",
+            "examples/bikeshop/migrations/20260109000100_create_field_samples_table.postgres.up.sql",
+            "examples/bikeshop/tests/fields.rs",
+        ],
+    }
+}
+
+/// `/about/fields/{sample}`: a sample read back.
+fn field_sample_page() -> Explanation {
+    Explanation {
+        route: "about.fields.show",
+        path: "/about/fields/{sample}",
+        title: "A sample read back",
+        purpose: "Every field of a saved sample, read back from the database and shown the \
+                  way its kind reads best: money, a yes or no, colour swatches, tag \
+                  badges, the specifications as a table, Markdown, rich text, highlighted \
+                  JSON, dates, the photo and a link to the private manual.",
+        who: "Developers checking that each value came back as it was typed.",
+        audience: &[Audience::Developer],
+        flow: Flow::Learn,
+        features: &[
+            Feature {
+                api: "Path<T>",
+                why: "The address carries the sample's UUID; `renox::Path<Uuid>` answers \
+                      404 for one that doesn't parse, and a sample of someone else's is a \
+                      404 too, so the page never says it exists.",
+            },
+            Feature {
+                api: "UI kit: infolist",
+                why: "Each `entry` formats its value by kind: `money` in `APP_CURRENCY`, \
+                      `bool`, `color`, `key_value`, `markdown` (HTML typed in shown as \
+                      text), `date`, `datetime`, `since`; buttons sit beside the key and the \
+                      stock (`suffix_actions`). `code_entry` from renox-editors highlights \
+                      the JSON, and the `rich_text` filter cleans the stored HTML again on \
+                      the way out.",
+            },
+            Feature {
+                api: "Download",
+                why: "The manual has no public address: its link asks the app, which checks \
+                      the sample is yours and sends the file with \
+                      `Download::from_storage(…).inline()`, under the name it was uploaded \
+                      with, for the browser to show. The photo, stored public, is shown \
+                      straight from `storage.url(key)`.",
+            },
+        ],
+        under_hood: "One query for the sample (by id and owner). The photo's address comes \
+                     from the storage driver: `/storage/samples/…` on the local disk, the \
+                     bucket's address on S3. Delete is the kit's `confirm` sheet; it removes \
+                     the row, then its files.",
+        docs: &[
+            "docs/ui.md#infolists-read-only-details",
+            "docs/ui.md#formatting-values",
+            "docs/routing.md#what-a-handler-can-return",
+            "docs/types.md#keys",
+        ],
+        sources: &[
+            "examples/bikeshop/src/app/about/fields.rs",
+            "examples/bikeshop/resources/views/about/fields_show.html",
+            "examples/bikeshop/tests/fields.rs",
+        ],
+    }
+}
+
+/// `/about/fields/{sample}/edit`: the form with the stored values.
+fn field_sample_edit_page() -> Explanation {
+    Explanation {
+        route: "about.fields.edit",
+        path: "/about/fields/{sample}/edit",
+        title: "Editing a sample",
+        purpose: "The form of `/about/fields` filled with a sample's stored values, each \
+                  in the format its input expects (`2026-10-01`, `08:00:00`, \
+                  `2026-10-01T10:30:00`, the price back in dollars). A new photo or manual \
+                  replaces the stored file.",
+        who: "Developers checking the round trip from the database back into a form.",
+        audience: &[Audience::Developer],
+        flow: Flow::Learn,
+        features: &[
+            Feature {
+                api: "Valid<T>",
+                why: "The same form struct as for a new sample; the form says `PUT` with \
+                      `method_field('PUT')`. After a failed save each field shows what was \
+                      sent (`old()`), a checkbox or colour left unticked included \
+                      (`has_old()`), and never a file.",
+            },
+            Feature {
+                api: "Storage",
+                why: "A new file is stored first, the row saved, and only then the old file \
+                      deleted: a failure halfway leaves at worst an unused file, never a \
+                      row pointing at a missing one.",
+            },
+        ],
+        under_hood: "Two queries: the sample (by id and owner) and the brands for the name's \
+                     suggestions. Saving reads the multipart form, stores any new file, \
+                     saves the row (`updated_at` set by the model) and deletes the files it \
+                     replaced.",
+        docs: &[
+            "docs/validation.md#showing-errors-and-old-input-in-templates",
+            "docs/types.md#dates-and-times",
+            "docs/routing.md#method-spoofing",
+        ],
+        sources: &[
+            "examples/bikeshop/src/app/about/fields.rs",
+            "examples/bikeshop/resources/views/about/fields_edit.html",
+            "examples/bikeshop/resources/views/about/_fields_form.html",
+            "examples/bikeshop/tests/fields.rs",
+        ],
+    }
 }
 
 /// `/about/data`: the data model explained.
@@ -339,5 +542,5 @@ fn data_page() -> Explanation {
 
 /// GET routes of this area that aren't pages (JSON, files, streams).
 pub fn not_pages() -> Vec<NotAPage> {
-    super::blocks::not_pages()
+    [super::blocks::not_pages(), super::fields::not_pages()].concat()
 }

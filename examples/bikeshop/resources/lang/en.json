@@ -2882,5 +2882,99 @@
       "closed": "Closed every day for now.",
       "all": "All three stores"
     }
+  },
+  "fields": {
+    "title": "Form fields and their types",
+    "lead": "Every kind of form input, the Rust type it is read into, and the column it is stored in on SQLite and on PostgreSQL. Try them all in the form below.",
+    "reference": {
+      "title": "Input, Rust and database",
+      "lead": "One row per field of the form below, from the browser to the column and back.",
+      "field": "Field",
+      "input": "Input",
+      "form": "Form type",
+      "model": "Model type"
+    },
+    "samples": {
+      "title": "Your samples",
+      "lead": "Only you see the samples you save.",
+      "none": "No samples yet",
+      "none_text": "Fill in the form below to save your first one."
+    },
+    "try": {
+      "title": "Try every field",
+      "lead": "Save a sample bike, then open it to see each value read back from the database.",
+      "login": "Log in to try the form: the samples you save are kept with your account."
+    },
+    "form": {
+      "basics": "Basics",
+      "key": "Sample ID",
+      "key_hint": "A UUID v7, made when the sample was saved.",
+      "name": "Name",
+      "brand": "Brand",
+      "brand_hint": "Type freely, or pick one of the shop's brands.",
+      "description": "Description",
+      "description_hint": "Markdown: **bold**, _italic_, lists, links.",
+      "stock": "Stock",
+      "weight": "Weight",
+      "price": "Price",
+      "available": "Available",
+      "options": "Options",
+      "size": "Frame size",
+      "colours": "Colours",
+      "details": "Details",
+      "tags": "Tags",
+      "tags_hint": "Press Enter or a comma after each.",
+      "specs": "Specifications",
+      "spec_name": "Name",
+      "spec_value": "Value",
+      "spec_add": "Add a specification",
+      "rich": "Rich text",
+      "rich_hint": "Formatted text, cleaned on the server.",
+      "settings": "Settings",
+      "settings_hint": "JSON, checked when saved.",
+      "dates": "Dates and times",
+      "pickup": "Pick-up time",
+      "launch": "Launch",
+      "released": "Released on",
+      "files": "Files",
+      "photo": "Photo",
+      "photo_hint": "An image up to 2 MB; anyone with its address can see it.",
+      "manual": "Manual",
+      "manual_hint": "A PDF up to 5 MB; only you can open it."
+    },
+    "size": {
+      "small": "Small",
+      "medium": "Medium",
+      "large": "Large"
+    },
+    "colour": {
+      "teal": "Teal",
+      "tan": "Sand",
+      "slategray": "Graphite",
+      "black": "Black"
+    },
+    "yes": "Yes",
+    "no": "No",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirm": {
+      "title": "Delete “:name”?",
+      "text": "The sample and its files are removed for good."
+    },
+    "cancel": "Cancel",
+    "save": "Save changes",
+    "create": "Save the sample",
+    "show": {
+      "lead": "Every field of the form, read back from the database.",
+      "none": "None",
+      "in_stock": "in stock",
+      "photo_alt": "The photo of :name",
+      "updated": "Updated"
+    },
+    "edit_title": "Edit :name",
+    "edit_lead": "Each stored value is back in the format its input expects.",
+    "saved": "Sample saved.",
+    "updated": "Changes saved.",
+    "deleted": "“:name” deleted."
   }
 }

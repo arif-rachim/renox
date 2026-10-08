@@ -74,3 +74,5 @@
 /* Long code names in explanations break where they must. */
 .rx-prose code, .rx-entry code, .rx-table code { overflow-wrap: anywhere; }
 .bs-page-row { display: grid; gap: var(--rx-space-2); padding-block: var(--rx-space-2); }
+/* /about/fields: a sample's photo on its read-only page. */
+.bs-sample-photo { display: block; width: 100%; max-width: 20rem; height: auto; border-radius: var(--rx-radius-m); background: var(--rx-tint); }
