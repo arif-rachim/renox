@@ -98,6 +98,8 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   views/ui.html            the UI kit (renox/ui.html): fields, buttons, sheets, menus, tables,
                            infolists, dashboards, and the page's frame (navbar, sidebar +
                            rx-shell, page_header, toolbar, list, card_grid…); assets/renox-ui.css|js
+                           (+ renox-ui-{chart,wizard,repeater,tags}.js: modules renox-ui.js loads
+                           when it finds their markup; assets.rs fills their hashed URLs in, #349)
   views/grid.html          the data grid macro (renox/grid.html), grid_print.html (its print
                            export); assets/renox-grid.css|js, and
                            assets/cally.js (Cally 0.9.2, MIT: the date range calendar)

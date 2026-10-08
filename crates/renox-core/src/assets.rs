@@ -18,7 +18,39 @@ const ALPINE: &str = include_str!("../assets/alpine.min.js");
 const ALPINE_CSP: &str = include_str!("../assets/alpine-csp.min.js");
 /// The UI kit's styles and behavior (renox/ui.html).
 pub(crate) const UI_CSS: &str = include_str!("../assets/renox-ui.css");
-pub(crate) const UI_JS: &str = include_str!("../assets/renox-ui.js");
+const UI_JS_SOURCE: &str = include_str!("../assets/renox-ui.js");
+
+/// The kit's parts few pages have, each a JavaScript module renox-ui.js
+/// loads when it finds the part's markup (`MARKERS` there): `(name, body)`.
+const UI_PARTS: [(&str, &str); 4] = [
+    ("chart", include_str!("../assets/renox-ui-chart.js")),
+    ("wizard", include_str!("../assets/renox-ui-wizard.js")),
+    ("repeater", include_str!("../assets/renox-ui-repeater.js")),
+    ("tags", include_str!("../assets/renox-ui-tags.js")),
+];
+
+/// Where renox-ui.js finds its parts' URLs.
+const UI_PARTS_SLOT: &str = "{/*renox:parts*/}";
+
+/// The parts' hashed URLs, in `UI_PARTS`' order.
+static UI_PART_URLS: LazyLock<Vec<String>> = LazyLock::new(|| {
+    UI_PARTS
+        .iter()
+        .map(|(name, body)| format!("/_renox/ui-{name}-{:016x}.js", fnv1a(body)))
+        .collect()
+});
+
+/// renox-ui.js with its parts' URLs filled in, so its own hash changes
+/// whenever a part does.
+pub(crate) static UI_JS: LazyLock<String> = LazyLock::new(|| {
+    let urls = UI_PARTS
+        .iter()
+        .zip(UI_PART_URLS.iter())
+        .map(|((name, _), url)| format!("{name}: \"{url}\""))
+        .collect::<Vec<_>>()
+        .join(", ");
+    UI_JS_SOURCE.replace(UI_PARTS_SLOT, &format!("{{ {urls} }}"))
+});
 
 /// The data grid's styles and behavior (renox/grid.html), and the date
 /// range calendar its date filters use.
@@ -77,7 +109,7 @@ pub(crate) fn calendar_tags() -> String {
 static UI_URLS: LazyLock<[String; 2]> = LazyLock::new(|| {
     [
         format!("/_renox/ui-{:016x}.css", fnv1a(UI_CSS)),
-        format!("/_renox/ui-{:016x}.js", fnv1a(UI_JS)),
+        format!("/_renox/ui-{:016x}.js", fnv1a(&UI_JS)),
     ]
 });
 
@@ -273,12 +305,15 @@ pub(crate) fn router() -> Router<AppState> {
     for (path, bytes) in FONTS {
         router = router.route(path, get(move || async move { font(bytes) }));
     }
+    for (&(_, body), url) in UI_PARTS.iter().zip(UI_PART_URLS.iter()) {
+        router = router.route(url, get(move || async move { js(body) }));
+    }
     router
         .route(
             ui_css,
             get(|| async { asset("text/css; charset=utf-8", UI_CSS) }),
         )
-        .route(ui_js, get(|| async { js(UI_JS) }))
+        .route(ui_js, get(|| async { js(UI_JS.as_str()) }))
         .route(
             &GRID_URLS[0],
             get(|| async { asset("text/css; charset=utf-8", GRID_CSS) }),
@@ -403,6 +438,30 @@ mod ui_tests {
         assert!(tags.contains("<link rel=\"stylesheet\""), "{tags}");
     }
 
+    /// renox-ui.js loads its rarely used parts as modules (#349): it has a
+    /// slot for their URLs, filled in with each part's hashed one, and a
+    /// marker per part to find it by.
+    #[test]
+    fn the_kit_script_names_its_parts() {
+        assert_eq!(super::UI_JS_SOURCE.matches(super::UI_PARTS_SLOT).count(), 1);
+        assert!(!super::UI_JS.contains(super::UI_PARTS_SLOT));
+        for ((name, body), url) in super::UI_PARTS.iter().zip(super::UI_PART_URLS.iter()) {
+            assert!(url.starts_with(&format!("/_renox/ui-{name}-")), "{url}");
+            assert!(
+                super::UI_JS.contains(&format!("{name}: \"{url}\"")),
+                "{name}'s URL"
+            );
+            assert!(
+                super::UI_JS_SOURCE.contains(&format!("\n    {name}: \"[data-rx-")),
+                "{name}'s marker"
+            );
+            assert!(body.contains(&format!("kit.ready(\"{name}\"")), "{name}");
+        }
+        // Published kits (`renox_ui(styles=false)`) load the same script.
+        let [_, js] = &*super::UI_URLS;
+        assert!(super::ui_tags(false).contains(js.as_str()));
+    }
+
     /// A card stretched to its row's height keeps its title next to its body (#128).
     #[test]
     fn a_stretched_card_keeps_its_rows_at_the_top() {
@@ -437,7 +496,7 @@ mod ui_tests {
     fn event_streams_close_on_pagehide_and_reopen_on_pageshow() {
         for (script, opened) in [
             (super::RENOX, "new EventSource(\"/_renox/live\")"),
-            (super::UI_JS, "new EventSource(streamUrl)"),
+            (super::UI_JS.as_str(), "new EventSource(streamUrl)"),
         ] {
             let start = script.find(opened).expect(opened);
             let (mut from, mut to) = (start.saturating_sub(1200), (start + 1200).min(script.len()));

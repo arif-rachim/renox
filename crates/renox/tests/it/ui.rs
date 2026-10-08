@@ -311,6 +311,34 @@ async fn components_see_the_request_and_refill_forms() {
     res.assert_ok()
         .assert_header("cache-control", "public, max-age=31536000, immutable");
     assert!(res.text().contains("--rx-accent"));
+    // The script names its parts loaded on demand (charts, the wizard, the
+    // repeater, tags), each a module at a hashed URL, cached for good too.
+    let url = css
+        .split("src=\"")
+        .filter_map(|rest| rest.split('"').next())
+        .find(|url| url.starts_with("/_renox/ui-") && url.ends_with(".js"))
+        .unwrap()
+        .to_owned();
+    let res = app.get(&url).await;
+    res.assert_ok()
+        .assert_header("cache-control", "public, max-age=31536000, immutable");
+    let script = res.text();
+    assert!(!script.contains("renox:parts"), "the parts' URLs are filled in");
+    for part in ["chart", "wizard", "repeater", "tags"] {
+        let start = script
+            .find(&format!("/_renox/ui-{part}-"))
+            .unwrap_or_else(|| panic!("{part}'s URL in the script"));
+        let part_url = &script[start..start + script[start..].find('"').unwrap()];
+        assert!(part_url.ends_with(".js"), "{part_url}");
+        let res = app.get(part_url).await;
+        res.assert_ok()
+            .assert_header("cache-control", "public, max-age=31536000, immutable")
+            .assert_header("content-type", "text/javascript; charset=utf-8");
+        assert!(
+            res.text().contains(&format!("kit.ready(\"{part}\"")),
+            "{part} says it's ready"
+        );
+    }
 
     let res = app.get("/components").await;
     let html = res.text();

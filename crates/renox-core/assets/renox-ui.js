@@ -370,247 +370,6 @@
     });
   }
 
-  // ---------- Charts (chart(…)) ----------
-
-  // A crosshair and one tooltip for every series at the nearest label (line,
-  // area), or per band (bar) and slice (pie); arrow keys move it too.
-  function setupChart(figure) {
-    if (figure._rxChart) return;
-    figure._rxChart = true;
-    var data;
-    try { data = JSON.parse(figure.getAttribute("data-rx-chart")); } catch (e) { return; }
-    var plot = figure.querySelector(".rx-chart__plot");
-    var tip = figure.querySelector(".rx-chart__tip");
-    var cross = figure.querySelector(".rx-chart__cross");
-    if (data.points) { setupPoints(figure, data.points, plot, tip); return; }
-    if (!plot || !tip || !data.labels || !data.labels.length) return;
-    var n = data.labels.length;
-    var pie = data.kind === "pie" || data.kind === "doughnut";
-    var bar = data.kind === "bar";
-    var current = -1;
-
-    function position(i) {
-      if (bar) return (i + 0.5) / n * 100;
-      return n > 1 ? i / (n - 1) * 100 : 50;
-    }
-
-    function row(key, value, name) {
-      var line = document.createElement("p");
-      line.className = "rx-chart__tip-row";
-      if (key) {
-        var mark = document.createElement("span");
-        mark.className = "rx-chart__key rx-chart__key--line " + key;
-        line.appendChild(mark);
-      }
-      var strong = document.createElement("span");
-      strong.className = "rx-chart__tip-value";
-      strong.textContent = value;
-      line.appendChild(strong);
-      if (name) {
-        var label = document.createElement("span");
-        label.className = "rx-chart__tip-name";
-        label.textContent = name;
-        line.appendChild(label);
-      }
-      return line;
-    }
-
-    function show(i, pointX) {
-      current = i;
-      tip.textContent = "";
-      var title = document.createElement("p");
-      title.className = "rx-chart__tip-label";
-      title.textContent = data.labels[i];
-      tip.appendChild(title);
-      data.series.forEach(function (series) {
-        var value = series.values[i];
-        if (value === null || value === undefined) return;
-        tip.appendChild(row(pie ? "" : series.slot, value, pie || data.series.length < 2 ? "" : series.name));
-      });
-      tip.hidden = false;
-      var width = plot.clientWidth;
-      if (pie) {
-        figure.querySelectorAll(".rx-chart__slice").forEach(function (s) {
-          if (s.getAttribute("data-index") === String(i)) s.setAttribute("data-on", ""); else s.removeAttribute("data-on");
-        });
-        var x = pointX === undefined ? width / 2 : pointX;
-        tip.style.left = Math.min(Math.max(x - tip.offsetWidth / 2, 0), Math.max(width - tip.offsetWidth, 0)) + "px";
-        return;
-      }
-      var left = position(i) / 100 * width;
-      if (cross && !bar) { cross.hidden = false; cross.style.left = left + "px"; }
-      if (bar) {
-        figure.querySelectorAll(".rx-chart__band").forEach(function (b) {
-          if (b.getAttribute("data-index") === String(i)) b.setAttribute("data-on", ""); else b.removeAttribute("data-on");
-        });
-      }
-      var tipLeft = left + 12;
-      if (tipLeft + tip.offsetWidth > width) tipLeft = left - 12 - tip.offsetWidth;
-      tip.style.left = Math.max(tipLeft, 0) + "px";
-    }
-
-    function hide() {
-      current = -1;
-      tip.hidden = true;
-      if (cross) cross.hidden = true;
-      figure.querySelectorAll("[data-on]").forEach(function (el) { el.removeAttribute("data-on"); });
-    }
-
-    function indexAt(clientX) {
-      var rect = plot.getBoundingClientRect();
-      var x = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1);
-      return bar ? Math.min(Math.floor(x * n), n - 1) : Math.round(x * (n - 1));
-    }
-
-    plot.addEventListener("pointermove", function (event) {
-      if (pie) {
-        var slice = event.target.closest && event.target.closest(".rx-chart__slice");
-        if (!slice) { hide(); return; }
-        var rect = plot.getBoundingClientRect();
-        show(parseInt(slice.getAttribute("data-index"), 10), event.clientX - rect.left);
-        return;
-      }
-      show(indexAt(event.clientX));
-    });
-    plot.addEventListener("pointerleave", hide);
-    plot.addEventListener("blur", hide);
-    plot.addEventListener("focus", function () { show(current < 0 ? n - 1 : current); });
-    plot.addEventListener("keydown", function (event) {
-      var next = current < 0 ? n - 1 : current;
-      if (event.key === "ArrowLeft") next = Math.max(next - 1, 0);
-      else if (event.key === "ArrowRight") next = Math.min(next + 1, n - 1);
-      else if (event.key === "Home") next = 0;
-      else if (event.key === "End") next = n - 1;
-      else if (event.key === "Escape") { hide(); return; }
-      else return;
-      event.preventDefault();
-      show(next);
-    });
-  }
-
-  // Scatter and bubble charts: the tooltip of the point nearest the pointer
-  // (within reach of its edge), or of the one the arrow keys reach, left to
-  // right.
-  function setupPoints(figure, points, plot, tip) {
-    var n = points.length;
-    if (!plot || !tip || !n) return;
-    var marks = [];
-    figure.querySelectorAll(".rx-chart__point").forEach(function (el) {
-      marks[parseInt(el.getAttribute("data-index"), 10)] = el;
-    });
-    var current = -1;
-
-    function text(tag, className, value) {
-      var el = document.createElement(tag);
-      el.className = className;
-      el.textContent = value;
-      return el;
-    }
-
-    function show(i) {
-      current = i;
-      var point = points[i];
-      tip.textContent = "";
-      if (point.title) tip.appendChild(text("p", "rx-chart__tip-label", point.title));
-      if (point.name) {
-        var series = text("p", "rx-chart__tip-row", "");
-        var mark = text("span", "rx-chart__key rx-chart__key--dot " + point.slot, "");
-        series.appendChild(mark);
-        series.appendChild(text("span", "rx-chart__tip-name", point.name));
-        tip.appendChild(series);
-      }
-      point.rows.forEach(function (pair) {
-        var line = text("p", "rx-chart__tip-row", "");
-        line.appendChild(text("span", "rx-chart__tip-name", pair[0]));
-        line.appendChild(text("span", "rx-chart__tip-value", pair[1]));
-        tip.appendChild(line);
-      });
-      tip.hidden = false;
-      marks.forEach(function (el, k) {
-        if (!el) return;
-        if (k === i) el.setAttribute("data-on", ""); else el.removeAttribute("data-on");
-      });
-      var width = plot.clientWidth, height = plot.clientHeight;
-      var x = point.left / 100 * width, y = (1 - point.bottom / 100) * height;
-      var reach = (marks[i] ? marks[i].offsetWidth / 2 : 4) + 8;
-      var left = x + reach;
-      if (left + tip.offsetWidth > width) left = x - reach - tip.offsetWidth;
-      tip.style.left = Math.max(left, 0) + "px";
-      var top = y - tip.offsetHeight / 2;
-      tip.style.top = Math.min(Math.max(top, 0), Math.max(height - tip.offsetHeight, 0)) + "px";
-    }
-
-    function hide() {
-      current = -1;
-      tip.hidden = true;
-      marks.forEach(function (el) { if (el) el.removeAttribute("data-on"); });
-    }
-
-    plot.addEventListener("pointermove", function (event) {
-      var rect = plot.getBoundingClientRect();
-      var px = event.clientX - rect.left, py = event.clientY - rect.top;
-      var best = -1, bestDistance = Infinity;
-      points.forEach(function (point, i) {
-        var dx = point.left / 100 * rect.width - px;
-        var dy = (1 - point.bottom / 100) * rect.height - py;
-        var distance = Math.sqrt(dx * dx + dy * dy);
-        var reach = (marks[i] ? marks[i].offsetWidth / 2 : 4) + 16;
-        if (distance <= reach && distance < bestDistance) { best = i; bestDistance = distance; }
-      });
-      if (best < 0) hide(); else if (best !== current) show(best);
-    });
-    plot.addEventListener("pointerleave", hide);
-    plot.addEventListener("blur", hide);
-    plot.addEventListener("focus", function () { show(current < 0 ? 0 : current); });
-    plot.addEventListener("keydown", function (event) {
-      var next = current < 0 ? 0 : current;
-      if (event.key === "ArrowLeft" || event.key === "ArrowDown") next = Math.max(next - 1, 0);
-      else if (event.key === "ArrowRight" || event.key === "ArrowUp") next = Math.min(next + 1, n - 1);
-      else if (event.key === "Home") next = 0;
-      else if (event.key === "End") next = n - 1;
-      else if (event.key === "Escape") { hide(); return; }
-      else return;
-      event.preventDefault();
-      show(next);
-    });
-  }
-
-  // ---------- The period filter's custom range (period_filter) ----------
-
-  // Its panel stays on screen and, opened from its button, takes focus;
-  // Escape (outside the calendar) closes it back to the button, and so does
-  // a click elsewhere.
-  document.addEventListener("click", function (event) {
-    var summary = event.target.closest && event.target.closest("details[data-rx-period] > summary");
-    if (summary) summary.parentElement._rxOpenedHere = true;
-    document.querySelectorAll("details[data-rx-period][open]").forEach(function (details) {
-      if (!details.contains(event.target)) details.open = false;
-    });
-  });
-  document.addEventListener("toggle", function (event) {
-    var details = event.target;
-    if (!details.matches || !details.matches("details[data-rx-period]") || !details.open) return;
-    var form = details.querySelector(".rx-period__form");
-    if (!form) return;
-    form.style.left = "";
-    var rect = form.getBoundingClientRect();
-    var over = rect.right - (document.documentElement.clientWidth - 16);
-    if (over > 0) form.style.left = -Math.max(Math.min(over, rect.left - 16), 0) + "px";
-    if (details._rxOpenedHere) {
-      details._rxOpenedHere = false;
-      var first = form.querySelector("input:not([type=hidden])");
-      if (first) first.focus();
-    }
-  }, true);
-  document.addEventListener("keydown", function (event) {
-    if (event.key !== "Escape") return;
-    var details = event.target.closest && event.target.closest("details[data-rx-period][open]");
-    if (!details || details.querySelector(":popover-open")) return;
-    details.open = false;
-    var summary = details.querySelector("summary");
-    if (summary) summary.focus();
-  });
-
   // ---------- Sheets (dialogs) ----------
 
   function openSheet(id, opener) {
@@ -626,31 +385,21 @@
   // An action sheet's form: a success closes the sheet (a 422 isn't one:
   // renox.js shows its errors in the form); closing it any way resets the
   // form and clears its errors, so the next open starts fresh.
-  // A wizard in the form starts over at its first step; an import's report
-  // goes away.
+  // An import's report goes away; parts loaded later add their own resets
+  // (`Renox._kit.onClear`: a wizard starts over at its first step).
+  var clearHooks = [];
   function clearActionForm(form) {
     form.reset();
     form.querySelectorAll("[data-renox-error]").forEach(function (el) { el.remove(); });
     form.querySelectorAll("[data-error-for]").forEach(function (el) { el.textContent = ""; });
     form.querySelectorAll("[aria-invalid]").forEach(function (el) { el.removeAttribute("aria-invalid"); });
     form.querySelectorAll("[data-rx-action-result]").forEach(function (el) { el.innerHTML = ""; });
-    form.querySelectorAll("[data-rx-wizard][data-rx-ready]").forEach(function (wizard) { showStep(wizard, 0, false); });
+    clearHooks.forEach(function (hook) { hook(form); });
   }
   document.addEventListener("htmx:afterRequest", function (event) {
     var form = event.target;
     if (!form.matches || !form.matches("form[data-rx-action]")) return;
-    if (!event.detail.successful) {
-      // A 422 after a wizard's last step: show the first step with an error.
-      var wizard = form.querySelector("[data-rx-wizard][data-rx-ready]");
-      var panels = wizard ? wizardParts(wizard).panels : [];
-      var bad = panels.findIndex(function (p) { return p.querySelector('[aria-invalid="true"]'); });
-      if (bad >= 0) {
-        showStep(wizard, bad, false);
-        var invalid = panels[bad].querySelector('[aria-invalid="true"]');
-        if (invalid) invalid.focus();
-      }
-      return;
-    }
+    if (!event.detail.successful) return;
     // An answer that asks to stay (an import's report of refused rows).
     if (form.querySelector("[data-rx-keep-open]")) return;
     var dialog = form.closest("dialog");
@@ -744,6 +493,11 @@
       if (found) return found;
     }
     return null;
+  }
+
+  // The first field a user fills in `root`.
+  function firstField(root) {
+    return root.querySelector("input:not([type=hidden]):not([disabled]), select:not([data-rx-enhanced]), textarea, [role=combobox]");
   }
 
   // ---------- Clicks ----------
@@ -1292,195 +1046,6 @@
     });
   });
 
-  // ---------- Tags ----------
-
-  function tagValues(box) {
-    return Array.prototype.map.call(box.querySelectorAll('.rx-tag input[type="hidden"]'), function (i) { return i.value; });
-  }
-
-  function addTags(box, text) {
-    var entry = box.querySelector("[data-rx-tags-entry]");
-    var list = box.querySelector(".rx-tags__list");
-    var name = box.getAttribute("data-rx-tags");
-    var have = tagValues(box).map(function (v) { return v.toLowerCase(); });
-    var added = false;
-    text.split(",").map(function (t) { return t.trim(); }).filter(Boolean).forEach(function (tag) {
-      if (have.indexOf(tag.toLowerCase()) >= 0) return;
-      have.push(tag.toLowerCase());
-      var li = document.createElement("li");
-      li.className = "rx-tag";
-      var label = document.createElement("span");
-      label.className = "rx-tag__text";
-      label.textContent = tag;
-      var remove = document.createElement("button");
-      remove.type = "button";
-      remove.className = "rx-tag__remove";
-      remove.setAttribute("data-rx-tag-remove", "");
-      remove.setAttribute("aria-label", (box.getAttribute("data-remove") || "Remove") + " " + tag);
-      remove.innerHTML = CLOSE;
-      var hidden = document.createElement("input");
-      hidden.type = "hidden";
-      hidden.name = name;
-      hidden.value = tag;
-      li.append(label, remove, hidden);
-      list.appendChild(li);
-      added = true;
-    });
-    if (entry) entry.value = "";
-    if (added && entry) entry.dispatchEvent(new Event("change", { bubbles: true }));
-  }
-
-  document.addEventListener("keydown", function (event) {
-    var entry = event.target;
-    if (!entry.hasAttribute || !entry.hasAttribute("data-rx-tags-entry")) return;
-    var box = entry.closest("[data-rx-tags]");
-    if (event.key === "Enter" || event.key === ",") {
-      if (event.isComposing) return;
-      event.preventDefault();
-      addTags(box, entry.value);
-    } else if (event.key === "Backspace" && !entry.value) {
-      var last = box.querySelector(".rx-tag:last-of-type");
-      if (last) { last.remove(); entry.dispatchEvent(new Event("change", { bubbles: true })); }
-    }
-  });
-  document.addEventListener("input", function (event) {
-    var entry = event.target;
-    if (!entry.hasAttribute || !entry.hasAttribute("data-rx-tags-entry") || entry.value.indexOf(",") < 0) return;
-    // A pasted "a, b, c": all but what follows the last comma become tags.
-    var cut = entry.value.lastIndexOf(",");
-    var rest = entry.value.slice(cut + 1);
-    addTags(entry.closest("[data-rx-tags]"), entry.value.slice(0, cut));
-    entry.value = rest;
-  });
-  document.addEventListener("focusout", function (event) {
-    var entry = event.target;
-    if (entry.hasAttribute && entry.hasAttribute("data-rx-tags-entry") && entry.value.trim()) {
-      addTags(entry.closest("[data-rx-tags]"), entry.value);
-    }
-  });
-  // Text still in the box when the form is sent is a tag too.
-  document.addEventListener("submit", function (event) {
-    event.target.querySelectorAll && event.target.querySelectorAll("[data-rx-tags-entry]").forEach(function (entry) {
-      if (entry.value.trim()) addTags(entry.closest("[data-rx-tags]"), entry.value);
-    });
-  }, true);
-  document.addEventListener("click", function (event) {
-    var target = event.target.closest ? event.target : event.target.parentElement;
-    if (!target) return;
-    var remove = target.closest("[data-rx-tag-remove]");
-    if (remove) {
-      var box = remove.closest("[data-rx-tags]");
-      remove.closest(".rx-tag").remove();
-      var entry = box.querySelector("[data-rx-tags-entry]");
-      if (entry) { entry.focus(); entry.dispatchEvent(new Event("change", { bubbles: true })); }
-      return;
-    }
-    var tags = target.closest(".rx-tags");
-    if (tags && target === tags) {
-      var input = tags.querySelector("input:not([type=hidden])");
-      if (input) input.focus();
-    }
-  });
-
-  // ---------- Repeater ----------
-
-  function idOf(name) {
-    return "rx-" + name.replace(/\./g, "-").replace(/\[/g, "-").replace(/\]/g, "");
-  }
-
-  function rowsOf(rep) {
-    var holder = rep.querySelector("[data-rx-rows]");
-    return Array.prototype.filter.call(holder.children, function (el) { return el.hasAttribute("data-rx-row"); });
-  }
-
-  // Names, ids and references follow the row's place: `lines[2][name]`,
-  // `lines.2.name`, `rx-lines-2-name`.
-  function renumber(rep) {
-    var name = rep.getAttribute("data-rx-repeater");
-    var dotted = errorKey(name), idp = idOf(name);
-    rowsOf(rep).forEach(function (row, n) {
-      var o = row.getAttribute("data-rx-index");
-      if (o !== String(n)) {
-        var swaps = [[name + "[" + o + "]", name + "[" + n + "]"], [dotted + "." + o + ".", dotted + "." + n + "."], [idp + "-" + o + "-", idp + "-" + n + "-"]];
-        [row].concat(Array.prototype.slice.call(row.querySelectorAll("*"))).forEach(function (el) {
-          Array.prototype.forEach.call(el.attributes, function (attr) {
-            var value = attr.value, next = value;
-            swaps.forEach(function (s) { next = next.split(s[0]).join(s[1]); });
-            if (next !== value) el.setAttribute(attr.name, next);
-          });
-        });
-        row.setAttribute("data-rx-index", String(n));
-      }
-      var number = row.querySelector("[data-rx-row-number]");
-      if (number) number.textContent = String(n + 1);
-    });
-    limits(rep);
-  }
-
-  function limits(rep) {
-    var count = rowsOf(rep).length;
-    var min = parseInt(rep.getAttribute("data-rx-min") || "0", 10);
-    var max = parseInt(rep.getAttribute("data-rx-max") || "0", 10);
-    rep.querySelectorAll("[data-rx-row-remove]").forEach(function (b) { if (b.closest("[data-rx-repeater]") === rep) b.disabled = count <= min; });
-    var add = rep.querySelector("[data-rx-row-add]");
-    if (add) add.disabled = max > 0 && count >= max;
-  }
-
-  function firstField(root) {
-    return root.querySelector("input:not([type=hidden]):not([disabled]), select:not([data-rx-enhanced]), textarea, [role=combobox]");
-  }
-
-  function addRow(rep) {
-    var template = Array.prototype.find.call(rep.querySelectorAll("template[data-rx-row-template]"), function (t) { return t.closest("[data-rx-repeater]") === rep; });
-    if (!template) return;
-    var index = rowsOf(rep).length;
-    var holder = document.createElement("template");
-    holder.innerHTML = template.innerHTML.split("__INDEX__").join(String(index));
-    var row = holder.content.querySelector("[data-rx-row]");
-    // Scripts cloned from a template don't run: put them back as new ones,
-    // once per source.
-    holder.content.querySelectorAll("script").forEach(function (old) {
-      if (old.src && document.querySelector('script[src="' + old.getAttribute("src") + '"]')) { old.remove(); return; }
-      var fresh = document.createElement("script");
-      Array.prototype.forEach.call(old.attributes, function (a) { fresh.setAttribute(a.name, a.value); });
-      fresh.textContent = old.textContent;
-      old.replaceWith(fresh);
-    });
-    rep.querySelector("[data-rx-rows]").appendChild(holder.content);
-    renumber(rep);
-    setup(row);
-    if (window.htmx && window.htmx.process) window.htmx.process(row);
-    var first = firstField(row);
-    if (first) first.focus();
-  }
-
-  document.addEventListener("click", function (event) {
-    var target = event.target.closest ? event.target : event.target.parentElement;
-    if (!target) return;
-    var button = target.closest("[data-rx-row-add], [data-rx-row-remove], [data-rx-row-up], [data-rx-row-down]");
-    if (!button || button.disabled) return;
-    var rep = button.closest("[data-rx-repeater]");
-    if (button.hasAttribute("data-rx-row-add")) { addRow(rep); return; }
-    var row = button.closest("[data-rx-row]");
-    if (button.hasAttribute("data-rx-row-remove")) {
-      var next = row.nextElementSibling || row.previousElementSibling;
-      row.remove();
-      renumber(rep);
-      var focus = next && firstField(next) || rep.querySelector("[data-rx-row-add]");
-      if (focus) focus.focus();
-    } else if (button.hasAttribute("data-rx-row-up") && row.previousElementSibling) {
-      row.parentNode.insertBefore(row, row.previousElementSibling);
-      renumber(rep);
-      button.focus();
-    } else if (button.hasAttribute("data-rx-row-down") && row.nextElementSibling) {
-      row.parentNode.insertBefore(row.nextElementSibling, row);
-      renumber(rep);
-      button.focus();
-    }
-    var form = rep.closest("form");
-    if (form) form.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-
   // ---------- Searchable select (combobox) ----------
 
   var comboCount = 0;
@@ -1900,116 +1465,6 @@
     renderChips();
   }
 
-  // ---------- Wizard ----------
-
-  function wizardParts(wizard) {
-    return {
-      panels: Array.prototype.filter.call(wizard.querySelectorAll("[data-rx-step]"), function (p) { return p.closest("[data-rx-wizard]") === wizard; }),
-      tabs: Array.prototype.filter.call(wizard.querySelectorAll("[data-rx-step-tab]"), function (t) { return t.closest("[data-rx-wizard]") === wizard; })
-    };
-  }
-
-  function showStep(wizard, index, focus) {
-    var parts = wizardParts(wizard);
-    var last = parts.panels.length - 1;
-    parts.panels.forEach(function (panel, i) {
-      panel.hidden = i !== index;
-      if (!panel.hasAttribute("aria-label") && parts.tabs[i]) panel.setAttribute("aria-label", parts.tabs[i].textContent.trim());
-      panel.setAttribute("tabindex", "-1");
-    });
-    parts.tabs.forEach(function (tab, i) {
-      if (i === index) tab.setAttribute("aria-current", "step"); else tab.removeAttribute("aria-current");
-      if (i < index) tab.setAttribute("data-done", ""); else tab.removeAttribute("data-done");
-    });
-    wizard.setAttribute("data-rx-step-index", String(index));
-    var back = wizard.querySelector("[data-rx-wizard-back]");
-    var next = wizard.querySelector("[data-rx-wizard-next]");
-    var submit = wizard.querySelector("[data-rx-wizard-submit]");
-    if (back) back.hidden = index === 0;
-    if (next) next.hidden = index >= last;
-    if (submit) submit.hidden = index < last;
-    if (focus && parts.panels[index]) {
-      var first = firstField(parts.panels[index]);
-      (first || parts.panels[index]).focus();
-    }
-  }
-
-  // The step's fields pass the browser's rules, then (data-live-validate)
-  // the server's.
-  function checkStep(wizard, panel) {
-    var form = wizard.closest("form");
-    var fields = Array.prototype.filter.call(panel.querySelectorAll("input, select, textarea"), function (el) {
-      return el.name && !el.disabled && el.type !== "hidden" && el.type !== "button" && el.type !== "submit";
-    });
-    for (var i = 0; i < fields.length; i++) {
-      if (!fields[i].checkValidity()) {
-        if (fields[i].hasAttribute("data-rx-enhanced")) fields[i].dispatchEvent(new Event("invalid"));
-        fields[i].reportValidity();
-        return Promise.resolve(false);
-      }
-    }
-    if (!form || !form.hasAttribute("data-live-validate")) return Promise.resolve(true);
-    var seen = {};
-    var unique = fields.filter(function (el) {
-      if (seen[el.name] || el.type === "file") return false;
-      seen[el.name] = true;
-      return true;
-    });
-    return Promise.all(unique.map(function (el) { return validate(form, el); })).then(function (results) {
-      var bad = results.some(function (messages) { return messages && messages.length; });
-      if (bad) {
-        var first = panel.querySelector('[aria-invalid="true"]');
-        if (first) first.focus();
-      }
-      return !bad;
-    });
-  }
-
-  function stepIndex(wizard) {
-    return parseInt(wizard.getAttribute("data-rx-step-index") || "0", 10);
-  }
-
-  function nextStep(wizard) {
-    var parts = wizardParts(wizard);
-    var index = stepIndex(wizard);
-    var button = wizard.querySelector("[data-rx-wizard-next]");
-    if (button) button.setAttribute("aria-busy", "true");
-    checkStep(wizard, parts.panels[index]).then(function (ok) {
-      if (button) button.removeAttribute("aria-busy");
-      if (ok) showStep(wizard, Math.min(index + 1, parts.panels.length - 1), true);
-    });
-  }
-
-  function setupWizard(wizard) {
-    if (wizard.hasAttribute("data-rx-ready")) return;
-    wizard.setAttribute("data-rx-ready", "");
-    var parts = wizardParts(wizard);
-    // After a failed submit, open the first step with an error.
-    var start = parts.panels.findIndex(function (p) { return p.querySelector('[aria-invalid="true"]'); });
-    showStep(wizard, start < 0 ? 0 : start, start >= 0);
-  }
-
-  document.addEventListener("click", function (event) {
-    var target = event.target.closest ? event.target : event.target.parentElement;
-    if (!target) return;
-    var next = target.closest("[data-rx-wizard-next]");
-    if (next) { nextStep(next.closest("[data-rx-wizard]")); return; }
-    var back = target.closest("[data-rx-wizard-back]");
-    if (back) { var w = back.closest("[data-rx-wizard]"); showStep(w, Math.max(stepIndex(w) - 1, 0), true); }
-  });
-  // Enter in a field before the last step goes on, it doesn't send the form.
-  document.addEventListener("keydown", function (event) {
-    if (event.key !== "Enter" || event.defaultPrevented || event.isComposing) return;
-    var el = event.target;
-    var wizard = el.closest && el.closest("[data-rx-wizard][data-rx-ready]");
-    if (!wizard || el.tagName === "TEXTAREA" || el.tagName === "BUTTON") return;
-    if (stepIndex(wizard) < wizardParts(wizard).panels.length - 1) { event.preventDefault(); nextStep(wizard); }
-  });
-  document.addEventListener("submit", function (event) {
-    var wizard = event.target.querySelector && event.target.querySelector("[data-rx-wizard][data-rx-ready]");
-    if (wizard && stepIndex(wizard) < wizardParts(wizard).panels.length - 1) { event.preventDefault(); event.stopImmediatePropagation(); nextStep(wizard); }
-  }, true);
-
   // ---------- Disabled with a reason, keyboard shortcuts ----------
 
   // `aria-disabled` keeps a button focusable (its reason shows as a
@@ -2156,6 +1611,74 @@
     }
   });
 
+  // ---------- Parts loaded on demand ----------
+
+  // Charts and the period filter, the wizard, the repeater (key/value is
+  // one) and tags are modules of their own, loaded the first time setup()
+  // finds their markup on the page or in what htmx swaps in. The server
+  // fills PARTS in with their hashed URLs. A module runs once per page,
+  // however often it's asked for; it says it's ready with
+  // `Renox._kit.ready(name, setup)` and is then handed every root that has
+  // its markup, those found while it loaded first. Script tags added before
+  // the page's load event hold that event back until they have run.
+  var PARTS = {/*renox:parts*/};
+  var MARKERS = {
+    chart: "[data-rx-chart], details[data-rx-period]",
+    wizard: "[data-rx-wizard]",
+    repeater: "[data-rx-repeater]",
+    tags: "[data-rx-tags]"
+  };
+  var nonce = document.currentScript ? document.currentScript.nonce : "";
+  var parts = {};
+
+  function part(name) {
+    return parts[name] || (parts[name] = { setup: null, waiting: [], script: null });
+  }
+
+  function loadPart(name, root) {
+    var p = part(name);
+    if (p.setup) { p.setup(root); return; }
+    p.waiting.push(root);
+    if (p.script || !PARTS[name]) return;
+    p.script = document.createElement("script");
+    p.script.type = "module";
+    p.script.src = PARTS[name];
+    if (nonce) p.script.nonce = nonce;
+    document.head.appendChild(p.script);
+  }
+
+  function partReady(name, setupPart) {
+    var p = part(name);
+    if (p.setup) return;
+    p.setup = setupPart;
+    p.waiting.splice(0).forEach(function (root) { setupPart(root); });
+  }
+
+  function loadParts(root, scope) {
+    Object.keys(MARKERS).forEach(function (name) {
+      var marker = MARKERS[name];
+      if ((root.matches && root.matches(marker)) || scope.querySelector(marker)) loadPart(name, root);
+    });
+  }
+
+  // `fn` for `root` and every element in it that matches `selector`.
+  function each(root, selector, fn) {
+    if (root.matches && root.matches(selector)) fn(root);
+    (root.querySelectorAll ? root : document).querySelectorAll(selector).forEach(fn);
+  }
+
+  // What the parts use of the core. Internal: not an API for apps.
+  window.Renox._kit = {
+    ready: partReady,
+    each: each,
+    setup: function (root) { setup(root); },
+    validate: validate,
+    errorKey: errorKey,
+    firstField: firstField,
+    onClear: function (hook) { clearHooks.push(hook); },
+    CLOSE: CLOSE
+  };
+
   // Everything that sets itself up from the markup, on the page and in
   // what htmx swaps in.
   function setup(root) {
@@ -2163,16 +1686,13 @@
     var scope = root.querySelectorAll ? root : document;
     if (root.matches && root.matches("select[data-rx-combobox]")) enhanceSelect(root);
     scope.querySelectorAll("select[data-rx-combobox]").forEach(enhanceSelect);
-    scope.querySelectorAll("[data-rx-repeater]").forEach(limits);
-    scope.querySelectorAll("[data-rx-wizard]").forEach(setupWizard);
     scope.querySelectorAll("[data-rx-bell]").forEach(setupBell);
     scope.querySelectorAll("[data-rx-event-stream]").forEach(function (el) { openStream(el.getAttribute("data-rx-event-stream")); });
-    if (root.matches && root.matches("[data-rx-chart]")) setupChart(root);
-    scope.querySelectorAll("[data-rx-chart]").forEach(setupChart);
     if (root.matches && root.matches("[data-rx-key]")) setupKey(root);
     scope.querySelectorAll("[data-rx-key]").forEach(setupKey);
     scope.querySelectorAll("[data-rx-disabled-dates]").forEach(setupDatePicker);
     applyAllWhen(scope);
+    loadParts(root, scope);
   }
 
   // Toasts rendered with the page leave on their own too; conditional
