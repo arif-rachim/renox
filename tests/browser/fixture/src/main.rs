@@ -1,7 +1,9 @@
 //! The pages `tests/browser` drives in headless Chrome: forms that fail
 //! validation, the UI kit's widgets and overlays. Each page uses the kit
 //! the way an app would; the browser tests check what renox.js and
-//! renox-ui.js then do with it.
+//! renox-ui.js then do with it. The data grid's pages are in `grid.rs`.
+
+mod grid;
 
 use renox::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -183,6 +185,11 @@ impl Module for Pages {
                 Redirect::to("/widgets")
             })
             .get("/overlays", || async { view("overlays.html", context! {}) })
+            // The navbar with a phone tab bar and a search behind a button.
+            .get("/tabs", || async { view("tabs.html", context! {}) })
+            .name("tabs.home")
+            .get("/tabs/orders", || async { view("tabs.html", context! {}) })
+            .name("tabs.orders")
             .post("/toast", || async {
                 Toast::warning("Stock is low.")
                     .link("Unsafe", "javascript:alert(1)")
@@ -238,6 +245,10 @@ impl Module for Pages {
             .put("/categories", rename_category)
             .post("/picked", || async { "picked" })
             .get("/charts", || async { view("charts.html", context! {}) })
+            .get("/parts", || async { view("parts.html", context! {}) })
+            .get("/parts/more", || async {
+                view("parts_more.html", context! {})
+            })
             .get("/nav", || async { view("nav.html", context! {}) })
             .get("/shell", || async { view("shell.html", context! {}) })
             // The bell: a page with it, and a notification for the user.
@@ -300,8 +311,13 @@ impl Job for Nap {
 
 fn main() -> Result {
     let mut app = App::new()
+        // The grid pages' tables (orders, customers, notes).
+        .migrations(renox::migrations!())
         // Accounts (a login rotates the CSRF token) and the bell.
         .module(Auth::new().notifications())
+        // The data grid's pages (src/grid.rs), and their `db:seed`.
+        .module(grid::Orders)
+        .seeder(grid::seed)
         .module(Pages)
         .job::<Touch>()
         .job::<Nap>()

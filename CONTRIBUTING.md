@@ -74,7 +74,7 @@ cargo test --workspace
   docker run -d --rm --name renox-pg --shm-size=512m -e POSTGRES_PASSWORD=postgres \
       -e POSTGRES_DB=renox_test -p 55432:5432 postgres:17-alpine
   TEST_DATABASE_URL=postgres://postgres:postgres@localhost:55432/renox_test \
-      cargo test -p renox -p renox-core -p renox-cli -p postgres-app -p fields --features renox/postgres
+      cargo test -p renox -p renox-core -p renox-cli -p bikeshop --features renox/postgres
   ```
 - **Docs that compile.** Public items have doc comments (`#![warn(missing_docs)]` in `renox`,
   `renox-core` and `renox-macros`, so clippy's `-D warnings` refuses a public item without
@@ -102,7 +102,7 @@ Other CI jobs you can run locally when your change touches their area:
 `cargo clippy -p renox --no-default-features -- -D warnings`, the guard against C crypto in
 default builds (`cargo tree -p hello -e normal -i aws-lc-rs` must print nothing),
 `tests/chaos/run.sh sqlite|postgres`, `tests/cli/run.sh sqlite|postgres`, the S3 tests (see
-the top of `crates/renox/tests/it/s3.rs`, and `cargo test -p uploads --features s3`),
+the top of `crates/renox/tests/it/s3.rs`, and `cargo test -p bikeshop --features s3 --test fields`),
 `cargo hack check -p renox-core -p renox --each-feature --no-dev-deps`, `cargo deny check`, and
 `cargo semver-checks -p renox-core -p renox --baseline-rev origin/main --release-type minor`
 (public API changes; `cargo install --locked cargo-semver-checks`). Releases: [RELEASING.md](RELEASING.md).
@@ -114,7 +114,7 @@ the top of `crates/renox/tests/it/s3.rs`, and `cargo test -p uploads --features 
   ```bash
   rustup component add llvm-tools-preview && cargo install --locked cargo-llvm-cov
   cargo llvm-cov --no-report -p renox -p renox-core -p renox-cli -p renox-macros \
-      -p renox-2fa -p renox-oauth -p renox-admin -p renox-billing -p renox-editors --features renox/xlsx
+      -p renox-2fa -p renox-oauth -p renox-admin -p renox-billing -p renox-editors -p renox-blocks --features renox/xlsx
   TEST_DATABASE_URL=postgres://postgres:postgres@localhost:55432/renox_test cargo llvm-cov --no-report \
       -p renox -p renox-core -p renox-cli -p renox-2fa -p renox-oauth -p renox-admin \
       -p renox-billing -p renox-editors --features renox/postgres
@@ -130,11 +130,11 @@ the top of `crates/renox/tests/it/s3.rs`, and `cargo test -p uploads --features 
 - **Processes.** `tests/process/run.sh` runs the app binary and `rnx` as real processes:
   stopping on signals with a request in flight, `queue:work`, `schedule:work` twice on one
   database, systemd's socket, `LOG_FORMAT`/`LOG_FILE`, `db:shell` and prompts from a pipe and
-  a terminal, `rnx serve` restarting (and keeping the old app on a failed build), and every
-  example binary served and asked for its pages, as a guest and logged in. Run it after
+  a terminal, `rnx serve` restarting (and keeping the old app on a failed build), and both
+  example binaries served and asked for its pages, as a guest and logged in. Run it after
   changing `serve`, the commands, logging or an example; `tests/process/run.sh fixture` or
   `examples` runs one half. With `PROCESS_POSTGRES=postgres://postgres:postgres@localhost:55432`,
-  `tests/process/run.sh postgres` runs the database checks and postgres-app/fields on
+  `tests/process/run.sh postgres` runs the database checks and the bike shop on
   PostgreSQL (each in a database it makes and drops); `RNX_BUILD=1` adds `rnx build` (a release
   build, slow). CI's `process` job runs all of it.
 

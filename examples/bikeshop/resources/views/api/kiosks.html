@@ -24,7 +24,7 @@
         </tr>
         {%- endfor %}
       {% endcall %}
-      {%- else %}{{ empty(t('api.kiosks.none'), t('api.kiosks.none_text')) }}{% endif %}
+      {%- else %}{{ empty(t('api.kiosks.none'), t('api.kiosks.none_text'), icon="tablet-smartphone") }}{% endif %}
     {% endcall %}
     {% call card(title=t('api.kiosks.new')) %}
       {{ token_form(route('api.kiosks.store'), abilities, t('api.kiosks.name_hint')) }}

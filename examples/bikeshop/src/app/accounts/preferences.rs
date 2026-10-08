@@ -174,6 +174,7 @@ impl Preferences {
     }
 }
 
+// [explain:notifications.channels]
 /// The channels a notification of `kind` goes out on for `to`: the
 /// customer's choice for that kind. Someone without an account (a walk-in
 /// mailed at the address they gave) gets mail for their own business and
@@ -185,6 +186,7 @@ pub fn channels_for(to: &Recipient, kind: Kind) -> Vec<Channel> {
         None => vec![Channel::Mail],
     }
 }
+// [/explain:notifications.channels]
 
 /// Saves `preferences` on `user`.
 pub async fn save(db: &renox::db::Db, user: &mut User, preferences: &Preferences) -> renox::Result {

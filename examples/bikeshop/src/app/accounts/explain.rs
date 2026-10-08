@@ -5,7 +5,7 @@
 //! its look (`resources/views/renox/auth/layout.html`). Their entries live
 //! here, with the customer account pages #238 adds.
 
-use crate::explain::{Audience, Explanation, Feature, Flow, NotAPage};
+use crate::explain::{Audience, Code, Explanation, Feature, Flow, NotAPage};
 
 /// The sign-in pages and the account page are Renox's `Auth` module.
 const AUTH_MODULE: Feature = Feature {
@@ -130,6 +130,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/staff/two_factor.rs",
                 "examples/bikeshop/tests/accounts.rs",
             ],
+            code: &[
+                Code {
+                    title: "Share: the demo accounts, only on `/login` of a seeded shop",
+                    region: "login.demo",
+                },
+                Code {
+                    title: "Template: Renox's login options, replaced by a file of the name",
+                    region: "login.demo.template",
+                },
+                Code {
+                    title: "Test: five wrong passwords lock even the right one out",
+                    region: "login.test",
+                },
+            ],
         },
         Explanation {
             route: "register",
@@ -202,6 +216,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/renox/auth/layout.html",
                 "examples/bikeshop/tests/accounts.rs",
             ],
+            code: &[
+                Code {
+                    title: "Hook: `Auth::on_registered` makes the customer",
+                    region: "register.hook",
+                },
+                Code {
+                    title: "Template: the social buttons under Renox's form",
+                    region: "accounts.oauth_buttons",
+                },
+                Code {
+                    title: "Test: signing up makes a customer, in the visitor's language",
+                    region: "register.test",
+                },
+            ],
         },
         Explanation {
             route: "password.request",
@@ -238,6 +266,10 @@ pub fn entries() -> Vec<Explanation> {
                 "crates/renox-core/views/auth/forgot-password.html",
                 "examples/bikeshop/resources/views/renox/auth/layout.html",
             ],
+            code: &[Code {
+                title: "Test: the same answer for any address; the link comes by mail",
+                region: "password.request.test",
+            }],
         },
         Explanation {
             route: "password.reset",
@@ -275,6 +307,10 @@ pub fn entries() -> Vec<Explanation> {
                 "crates/renox-core/views/auth/reset-password.html",
                 "examples/bikeshop/resources/views/renox/auth/layout.html",
             ],
+            code: &[Code {
+                title: "Test: the mailed token sets a new password, which logs in",
+                region: "password.reset.test",
+            }],
         },
         Explanation {
             route: "password.confirm",
@@ -323,6 +359,16 @@ pub fn entries() -> Vec<Explanation> {
                 "crates/renox-oauth/src/lib.rs",
                 "examples/bikeshop/resources/views/renox/auth/layout.html",
             ],
+            code: &[
+                Code {
+                    title: "Test: `require_password_confirmed` sends the user here first",
+                    region: "password.confirm.test",
+                },
+                Code {
+                    title: "Template: a linked Google or GitHub login can confirm too",
+                    region: "accounts.oauth_buttons",
+                },
+            ],
         },
         Explanation {
             route: "verification.notice",
@@ -359,6 +405,10 @@ pub fn entries() -> Vec<Explanation> {
                 "crates/renox-core/views/auth/verify-email.html",
                 "examples/bikeshop/resources/views/renox/auth/layout.html",
             ],
+            code: &[Code {
+                title: "Test: a signed link, valid for an hour, verifies the address",
+                region: "verification.notice.test",
+            }],
         },
         Explanation {
             route: "account.show",
@@ -483,6 +533,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/tests/accounts.rs",
                 "crates/renox-core/src/auth/account.rs",
             ],
+            code: &[
+                Code {
+                    title: "Sections: each area adds its card with `Registry::account_section`",
+                    region: "account.show.sections",
+                },
+                Code {
+                    title: "Template: Renox's forms, then every module's section in order",
+                    region: "account.show.template",
+                },
+                Code {
+                    title: "Form: `#[derive(Validate)]` with `exists` for the country",
+                    region: "account.show.contact",
+                },
+            ],
         },
         Explanation {
             route: "notifications.index",
@@ -553,6 +617,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/layouts/staff.html",
                 "examples/bikeshop/tests/accounts.rs",
             ],
+            code: &[
+                Code {
+                    title: "Channels: the customer's choice decides mail, the bell, or both",
+                    region: "notifications.channels",
+                },
+                Code {
+                    title: "Template: the kit's `toggle_buttons`, one row per kind",
+                    region: "notifications.template",
+                },
+                Code {
+                    title: "Test: sent for real, each kind goes where it was asked to",
+                    region: "notifications.test",
+                },
+            ],
         },
         Explanation {
             route: "accounts.claim",
@@ -613,6 +691,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/mail/accounts/claim_invitation.html",
                 "examples/bikeshop/tests/accounts.rs",
             ],
+            code: &[
+                Code {
+                    title: "Handler: `ValidSignature` guards the link from the mail",
+                    region: "accounts.claim.show",
+                },
+                Code {
+                    title: "Transaction: the record is linked once, even if clicked twice",
+                    region: "accounts.claim.link",
+                },
+                Code {
+                    title: "Template: what the record holds, or why it can't be claimed",
+                    region: "accounts.claim.template",
+                },
+            ],
         },
         Explanation {
             route: "accounts.invite",
@@ -665,6 +757,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/accounts/invite.html",
                 "examples/bikeshop/resources/views/mail/accounts/claim_invitation.html",
                 "examples/bikeshop/tests/accounts.rs",
+            ],
+            code: &[
+                Code {
+                    title: "Handler: a signed link for seven days, mailed from the queue",
+                    region: "accounts.invite.send",
+                },
+                Code {
+                    title: "Routes: staff routes behind `customers.manage`",
+                    region: "accounts.invite.routes",
+                },
+                Code {
+                    title: "Template: a form checked live as the address is typed",
+                    region: "accounts.invite.template",
+                },
             ],
         },
     ]

@@ -1,2 +1,0 @@
-ALTER TABLE products ADD COLUMN tags JSONB NOT NULL DEFAULT '[]'::jsonb;
-ALTER TABLE products ADD COLUMN specs JSONB NOT NULL DEFAULT '{}'::jsonb;

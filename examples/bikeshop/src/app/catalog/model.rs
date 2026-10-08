@@ -64,6 +64,7 @@ pub struct Brand {
     pub updated_at: Option<DateTime>,
 }
 
+// [explain:catalog.search.model]
 /// A product: a bike model, a piece of gear or a spare part.
 #[derive(Model, Serialize, Default, Debug, Clone)]
 #[model(
@@ -91,6 +92,7 @@ pub struct Product {
     pub created_at: Option<DateTime>,
     pub updated_at: Option<DateTime>,
 }
+// [/explain:catalog.search.model]
 
 /// A variant: what is sold, stocked and rented (one SKU).
 #[derive(Model, Serialize, Default, Debug, Clone)]

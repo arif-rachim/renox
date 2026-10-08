@@ -1,6 +1,6 @@
 {% extends "layouts/app.html" %}
 {% from "renox/ui.html" import page_header, card, infolist, entry, link_button, empty, columns, list %}
-{% from "blocks/history.html" import history %}
+{% from "renox-blocks/blocks.html" import history %}
 {% from "workshop/_parts.html" import styles, status %}
 {% block seo %}{{ seo(title=bike.name) }}{% endblock %}
 
@@ -22,17 +22,19 @@
       {% endcall %}
       <p>{{ link_button(route('workshop.book', bike=bike.id), t('workshop.book.title'), variant="primary") }}</p>
     {% endcall %}
+    {# [explain:workshop.bikes.show.template] #}
     {% call card(title=t('workshop.bikes.open')) %}
       {%- if open %}
       {% call list(id="open-orders", label=t('workshop.bikes.open')) %}
         {%- for o in open %}<li><a class="rx-link rx-list__main" href="{{ route('workshop.service.show', o.id) }}">#{{ o.id }} · {{ o.scheduled_for | date('%d %b %Y') }}</a>{{ status(o.status) }}</li>{% endfor %}
       {% endcall %}
-      {%- else %}{{ empty(t('workshop.bikes.nothing_open')) }}{% endif %}
+      {%- else %}{{ empty(t('workshop.bikes.nothing_open'), icon="circle-check") }}{% endif %}
     {% endcall %}
   {% endcall %}
   {% call card(title=t('workshop.bikes.history')) %}
     {%- if events %}{{ history(events, label=t('workshop.bikes.history'), date_format="%d %b %Y") }}
-    {%- else %}{{ empty(t('workshop.bikes.never')) }}{% endif %}
+    {%- else %}{{ empty(t('workshop.bikes.never'), icon="wrench") }}{% endif %}
   {% endcall %}
+    {# [/explain:workshop.bikes.show.template] #}
 </div>
 {% endblock %}

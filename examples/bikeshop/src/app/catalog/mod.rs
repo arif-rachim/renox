@@ -39,6 +39,7 @@ impl renox::Module for Catalog {
         "catalog"
     }
 
+    // [explain:catalog.routes]
     fn routes(&self) -> Routes {
         Routes::new()
             .get("/shop", browse::index)
@@ -58,8 +59,10 @@ impl renox::Module for Catalog {
             // covers the routes added before it: all of the above).
             .etag()
     }
+    // [/explain:catalog.routes]
 
     fn register(&self, app: &mut Registry) {
+        // [explain:home.storefront]
         // The home page's featured bikes and categories, only for `/`, so
         // other pages run no query for it.
         app.share("storefront", |ctx: renox::view::ViewContext| async move {
@@ -71,6 +74,10 @@ impl renox::Module for Catalog {
                 &ctx.state,
                 &["rentals.create", "rentals.new", "rentals.index"],
             );
+            // Each store's own page, on its own host (Routes::domain).
+            for store in &mut front.stores {
+                store.2 = crate::app::home::stores::site_url(&ctx.state.config, &store.1);
+            }
             front.service_url = first_route(
                 &ctx.state,
                 &[
@@ -82,6 +89,7 @@ impl renox::Module for Catalog {
             );
             Ok(Some(front))
         });
+        // [/explain:home.storefront]
     }
 }
 
@@ -111,8 +119,9 @@ pub struct Storefront {
     /// How many bikes the shop sells (the hero's figure).
     pub bikes: u64,
     /// The stores, by name, with their slug (the stores strip's photos are
-    /// `public/images/site/store-{slug}.webp`).
-    pub stores: Vec<(String, String)>,
+    /// `public/images/site/store-{slug}.webp`) and their own page's address,
+    /// on the store's host (`src/app/home/stores.rs`).
+    pub stores: Vec<(String, String, String)>,
 }
 
 /// The home page's storefront: the eight best-selling bikes (one query
@@ -157,7 +166,10 @@ pub async fn storefront(db: &Db) -> Result<Storefront> {
     let stores = crate::app::staff::model::Store::query()
         .order_by("id")
         .select_as::<(String, String), _>(db, "name, slug")
-        .await?;
+        .await?
+        .into_iter()
+        .map(|(name, slug)| (name, slug, String::new()))
+        .collect();
     Ok(Storefront {
         featured: Card::load(db, featured).await?,
         categories,
@@ -175,6 +187,7 @@ pub fn first_route(state: &AppState, names: &[&str]) -> Option<String> {
     names.iter().find_map(|name| state.url(name, &[]).ok())
 }
 
+// [explain:sitemap.handler]
 /// `GET /sitemap.xml` (`sitemap`): the shop's pages for search engines:
 /// the home page, the catalogue, every category and every product still
 /// sold (discontinued ones are soft deleted, so not listed), with their
@@ -199,3 +212,4 @@ pub async fn sitemap(State(state): State<AppState>) -> Result<renox::seo::Sitema
     }
     Ok(map)
 }
+// [/explain:sitemap.handler]

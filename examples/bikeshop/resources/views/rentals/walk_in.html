@@ -1,6 +1,6 @@
 {% extends "layouts/staff.html" %}
 {% from "renox/ui.html" import page_header, card, select, button, form_errors, empty %}
-{% from "blocks/datetime_range.html" import datetime_range %}
+{% from "renox-blocks/blocks.html" import datetime_range %}
 {% block seo %}{{ seo(title=t('rentals.walkin.title')) }}{% endblock %}
 
 {#- A walk-in rental (#235): a verified customer, a bike standing here, a period from now. -#}
@@ -8,8 +8,9 @@
 <div class="rx-stack" data-bs-reveal>
   {{ page_header(t('rentals.walkin.title'), subtitle=t('rentals.walkin.lead'), back=route('rentals.counter'), back_label=t('rentals.counter.title')) }}
   {%- if not bikes %}
-  <div class="rx-card">{{ empty(t('rentals.walkin.no_bikes'), t('rentals.walkin.no_bikes_text')) }}</div>
+  <div class="rx-card">{{ empty(t('rentals.walkin.no_bikes'), t('rentals.walkin.no_bikes_text'), icon="bike") }}</div>
   {%- else %}
+  {# [explain:rentals.walkin.template] #}
   <form method="post" action="{{ route('rentals.walkin.store') }}" novalidate>
     {{ csrf_field() }}
     {% call card() %}
@@ -20,6 +21,7 @@
       {{ button(t('rentals.walkin.submit'), icon="check") }}
     {% endcall %}
   </form>
+  {# [/explain:rentals.walkin.template] #}
   {%- endif %}
 </div>
 {% endblock %}

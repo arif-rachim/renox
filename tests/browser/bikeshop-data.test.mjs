@@ -64,10 +64,15 @@ describe('/about/data', () => {
         // Wide tables scroll inside their frame, never the page.
         assert.ok(await fitsWidth(page), 'no sideways scrolling');
         await shot(page, `about-data-${size}`);
-        await page.click('[data-rx-open="about-page"]');
-        await page.waitFor(() => document.querySelector('#about-page')?.open, { message: 'the panel open' });
-        assert.ok((await page.text('#about-page')).includes('renox::db::relations'));
-        await page.press('Escape');
+        // "About this page": docked beside the page on a wide screen, a sheet on a phone.
+        if (size === 'phone') {
+          await page.click('[data-rx-open="about-page"]');
+          await page.waitFor(() => document.querySelector('#about-page')?.open, { message: 'the panel open' });
+          assert.ok((await page.text('#about-page')).includes('renox::db::relations'));
+          await page.press('Escape');
+        } else {
+          assert.ok((await page.text('#explain-dock')).includes('renox::db::relations'));
+        }
         page.assertClean();
       }, options));
   }

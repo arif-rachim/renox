@@ -9,7 +9,7 @@
 <div class="rx-stack" data-bs-reveal>
   {{ page_header(t('staff.catalog.fits_title', product=product.name), subtitle=category.name, back=route('admin.products.index'), back_label=t('staff.catalog.products')) }}
   {%- if gear %}
-  <div class="rx-card">{{ empty(t('staff.catalog.gear')) }}</div>
+  <div class="rx-card">{{ empty(t('staff.catalog.gear'), icon="tag") }}</div>
   {%- else %}
   {% call card(title=t('staff.catalog.fits_bikes') if part else t('staff.catalog.fits_parts')) %}
     {% call list(id="fits", label=t('staff.catalog.fits_title', product=product.name)) %}
@@ -23,6 +23,7 @@
       {%- endfor %}
     {% endcall %}
   {% endcall %}
+  {# [explain:staff.catalog.fits.template] #}
   <form method="post" action="{{ route('staff.catalog.fits.store', product.id) }}" data-live-validate>
     {{ csrf_field() }}
     {% call card(title=t('staff.catalog.add_fit')) %}
@@ -33,6 +34,7 @@
       <div class="rx-card__footer">{{ button(t('staff.catalog.add_fit')) }}</div>
     {% endcall %}
   </form>
+  {# [/explain:staff.catalog.fits.template] #}
   {%- endif %}
 </div>
 {% endblock %}

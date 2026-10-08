@@ -31,12 +31,14 @@ use crate::app::access::{self, StoreAttr, can_in, catalogue};
 use crate::app::rentals::notify::staff_with_permission;
 use crate::app::staff::model::Store;
 
+// [explain:multistore.settlements.month]
 /// Registers the monthly task.
 pub fn schedule(s: &mut Schedule) {
     s.monthly_on(1, "02:00", "books:settle", |state: AppState| async move {
         settle_previous_month(&state).await.map(|_| ())
     });
 }
+// [/explain:multistore.settlements.month]
 
 /// The first day of `day`'s month.
 pub fn month_of(day: NaiveDate) -> NaiveDate {
@@ -60,6 +62,7 @@ pub async fn settle_previous_month(state: &AppState) -> Result<Vec<Settlement>> 
 /// statements as a batch. Safe to run twice: a second run finds no
 /// unsettled entries for the month, and adds to a pair's settlement only
 /// entries that arrived since.
+// [explain:multistore.settlements.month]
 pub async fn settle_month(state: &AppState, first: NaiveDate) -> Result<Vec<Settlement>> {
     let db = &state.db;
     let from = day_start(&state.config, first);
@@ -76,6 +79,7 @@ pub async fn settle_month(state: &AppState, first: NaiveDate) -> Result<Vec<Sett
             "debtor_store_id, creditor_store_id, CAST(SUM(amount) AS BIGINT)",
         )
         .await?;
+    // [/explain:multistore.settlements.month]
     let mut pairs: BTreeMap<(i64, i64), i64> = BTreeMap::new();
     for (debtor, creditor, amount) in sums {
         let (low, high) = (debtor.min(creditor), debtor.max(creditor));
@@ -133,6 +137,7 @@ pub async fn settle_month(state: &AppState, first: NaiveDate) -> Result<Vec<Sett
             .await?;
         settled.push(settlement);
     }
+    // [explain:multistore.settlements.month]
     tx.commit().await?;
     if !settled.is_empty() {
         let mut batch = state.queue.batch("settlement-statements");
@@ -145,6 +150,7 @@ pub async fn settle_month(state: &AppState, first: NaiveDate) -> Result<Vec<Sett
     }
     Ok(settled)
 }
+// [/explain:multistore.settlements.month]
 
 /// What `low` owes the other store of settlement `id`, net (negative: it
 /// is owed).
@@ -194,6 +200,7 @@ async fn statements(db: &Db, list: Vec<Settlement>) -> Result<Vec<Statement>> {
         .collect())
 }
 
+// [explain:multistore.settlements.handler]
 /// `GET /staff/books/settlements` (`multistore.settlements`): the monthly
 /// statements the person may see, newest first. Three queries a page.
 pub async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
@@ -208,6 +215,7 @@ pub async fn index(State(db): State<Db>, Page(page): Page) -> Result<View> {
         context! { rows, pages => list },
     ))
 }
+// [/explain:multistore.settlements.handler]
 
 /// One side of a statement: what one store owes the other, by kind.
 #[derive(Serialize, Debug, Clone, Default)]
@@ -216,6 +224,7 @@ pub struct Side {
     pub total: i64,
 }
 
+// [explain:multistore.settlements.show.handler]
 /// `GET /staff/books/settlements/{settlement}` (`multistore.settlements.show`):
 /// the two-party statement: each store's side by kind, the net, the
 /// entries, and each store's confirmation.
@@ -248,6 +257,7 @@ pub async fn show(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> 
     };
     let debtor_side = side(settlement.debtor_store_id);
     let creditor_side = side(settlement.creditor_store_id);
+    // [/explain:multistore.settlements.show.handler]
     let can_debtor = !settlement.debtor_confirmed()
         && can_in(
             &user,
@@ -310,6 +320,7 @@ pub async fn confirm_side(
     } else {
         StoreAttr::Owner
     };
+    // [explain:multistore.settlements.show.confirm]
     access::require(user, catalogue::INTERCOMPANY_SETTLE, attr, &*settlement)?;
     let now = renox::db::now();
     let changed = Settlement::where_eq("id", settlement.id)
@@ -340,6 +351,7 @@ pub async fn confirm_side(
             .save_only(&state.db, &["status", "settled_at", "settled_by"])
             .await?;
     }
+    // [/explain:multistore.settlements.show.confirm]
     audit::record(
         state,
         user,

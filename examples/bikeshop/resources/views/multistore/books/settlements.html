@@ -10,6 +10,7 @@
   {{ page_header(t('multistore.settlements.title'), subtitle=t('multistore.settlements.lead'), back=route('multistore.books'), back_label=t('multistore.books.title')) }}
   {%- if rows %}
   <div class="rx-card">
+  {# [explain:multistore.settlements.template] #}
   {% call table([t('multistore.settlements.month'), t('multistore.settlements.pays'), t('multistore.settlements.paid'), [t('multistore.settlements.amount'), "num"], t('multistore.settlements.status')], caption=t('multistore.settlements.title')) %}
     {%- for s in rows %}
     <tr>
@@ -21,8 +22,9 @@
     </tr>
     {%- endfor %}
   {% endcall %}
+  {# [/explain:multistore.settlements.template] #}
   </div>
   {% from "renox/pagination.html" import pagination %}{{ pagination(pages) }}
-  {%- else %}<div class="rx-card">{{ empty(t('multistore.settlements.empty')) }}</div>{% endif %}
+  {%- else %}<div class="rx-card">{{ empty(t('multistore.settlements.empty'), icon="book-open") }}</div>{% endif %}
 </div>
 {% endblock %}

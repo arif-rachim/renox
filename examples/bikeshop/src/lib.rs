@@ -22,7 +22,9 @@
 //! ```
 
 pub mod app;
+pub mod code;
 pub mod explain;
+pub mod highlight;
 pub mod money;
 pub mod report;
 pub mod seed;
@@ -105,6 +107,8 @@ pub fn app() -> App {
         // side's sensitive changes (src/app/staff/audit.rs) and the books'
         // (src/app/multistore/audit.rs).
         .module(renox::audit::Audit)
+        // Whether "About this page" is docked or folded, from its cookie (src/explain.rs).
+        .layer(renox::axum::middleware::from_fn(explain::dock_layer))
         // The language follows the account to every device (src/app/accounts/locale.rs).
         .layer(renox::axum::middleware::from_fn(
             app::accounts::locale::middleware,
@@ -114,6 +118,10 @@ pub fn app() -> App {
         // the editors its forms use (renox-editors).
         .module(app::staff::admin::panel())
         .module(renox_editors::Editors::new())
+        // The blocks the kit doesn't have (renox-blocks, #347): the product
+        // gallery and variant chips, the cart's stepper, the counter's keypad,
+        // the workshop board, the rental timeline, the plans' table.
+        .module(renox_blocks::Blocks::new())
         // The active store for the panel's pages too (src/app/staff/admin.rs).
         .layer(renox::axum::middleware::from_fn(app::staff::admin::layer))
         // Staff without two-factor login are sent to set it up (src/app/staff/two_factor.rs).

@@ -3,12 +3,13 @@
     block and the navbar's `mini` block (swapped out of band). The macros are
     imported at the top so the blocks see them when rendered alone. -#}
 {% from "renox/ui.html" import page_header, card, button, link_button, select, alert, empty, thumbnail %}
-{% from "blocks/quantity.html" import quantity %}
+{% from "renox-blocks/blocks.html" import quantity %}
 {% block seo %}{{ seo(title=t('sales.cart.title') ~ " · " ~ t('shop.name')) }}{% endblock %}
 
 {% block content %}
 {% include "sales/_assets.html" %}
 {{ page_header(t('sales.cart.title'), subtitle=t('sales.cart.lead'), back=route('catalog.index'), back_label=t('sales.cart.keep_shopping')) }}
+{# [explain:cart.show.template] #}
 {% block lines %}
 <div id="cart" class="bs-cart">
   {%- if cart.changed %}{{ alert(t('sales.cart.changed'), kind="warning") }}{% endif %}
@@ -17,12 +18,14 @@
     <ul class="bs-cart__list" role="list" data-bs-reveal>
       {%- for line in cart.lines %}
       <li class="bs-cart__line" id="line-{{ line.variant.id }}">
+{# [/explain:cart.show.template] #}
         {%- if line.photo %}{{ thumbnail(line.photo, alt=line.product.name, href=route('catalog.show', line.product.slug)) }}{% else %}<span></span>{% endif %}
         <div class="bs-cart__what">
           <a class="rx-link bs-cart__name" href="{{ route('catalog.show', line.product.slug) }}">{{ line.product.name }}</a>
           <p class="rx-subtitle">{{ line.variant.sku }}{% if line.variant.size %} · {{ line.variant.size }}{% endif %}{% if line.variant.colour %} · {{ line.variant.colour }}{% endif %} · {{ line.variant.price | money }}</p>
           {%- if line.lowered %}<p class="rx-hint bs-cart__lowered" role="status">{{ t('sales.cart.line_lowered', count=line.available) }}</p>{% endif %}
         </div>
+        {# [explain:cart.show.template] #}
         <form class="bs-cart__qty" method="post" action="{{ route('cart.update', line.variant.id) }}"
               hx-patch="{{ route('cart.update', line.variant.id) }}" hx-trigger="change delay:300ms" hx-target="#cart" hx-swap="outerHTML">
           {{ csrf_field() }}{{ method_field('PATCH') }}
@@ -36,6 +39,7 @@
             <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           </button>
         </form>
+        {# [/explain:cart.show.template] #}
       </li>
       {%- endfor %}
     </ul>
@@ -54,12 +58,14 @@
     {{ link_button(route('checkout.show'), t('sales.cart.checkout'), variant="primary", attrs={"data-rx-key": "c"}) }}
   </aside>
   {%- else %}
-  <div class="rx-card">{{ empty(t('sales.cart.empty_title'), t('sales.cart.empty_text'), route('catalog.index'), t('sales.cart.browse')) }}</div>
+  <div class="rx-card">{{ empty(t('sales.cart.empty_title'), t('sales.cart.empty_text'), route('catalog.index'), t('sales.cart.browse'), icon="shopping-cart") }}</div>
   {%- endif %}
 </div>
 {% endblock %}
 {% endblock %}
 
+{# [explain:cart.show.template] #}
 {#- The navbar's count, swapped out of band after a change (`.also("mini")`).
     Not part of the page itself: only rendered on its own. -#}
 {% block mini %}{% set count = cart.count %}{% include "sales/cart/_mini.html" %}{% endblock %}
+{# [/explain:cart.show.template] #}

@@ -11,6 +11,7 @@
   {{ page_header(t('staff.stores.title'), subtitle=t('staff.stores.lead')) }}
   {%- if cards %}
   <div class="bs-tiles" id="stores">
+    {# [explain:staff.stores.index.template] #}
     {%- for c in cards %}
     {% call card(title=c.store.name, subtitle=c.address) %}
       {% call infolist(columns=2) %}
@@ -23,10 +24,11 @@
       {% endcall %}
       <div class="rx-card__footer">{{ link_button(route('staff.stores.edit', c.store.id), t('staff.stores.edit'), icon="edit") }}</div>
     {% endcall %}
+    {# [/explain:staff.stores.index.template] #}
     {%- endfor %}
   </div>
   {%- else %}
-  <div class="rx-card">{{ empty(t('staff.stores.none')) }}</div>
+  <div class="rx-card">{{ empty(t('staff.stores.none'), icon="store") }}</div>
   {%- endif %}
 </div>
 {% endblock %}

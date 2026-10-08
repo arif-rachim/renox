@@ -1,6 +1,6 @@
 //! "About this page" entries for the sales area's pages (see `crate::explain`).
 
-use crate::explain::{Audience, Explanation, Feature, Flow, NotAPage};
+use crate::explain::{Audience, Code, Explanation, Feature, Flow, NotAPage};
 
 /// The explanation of every page in this area.
 pub fn entries() -> Vec<Explanation> {
@@ -47,7 +47,7 @@ pub fn entries() -> Vec<Explanation> {
                       cart is (`find_many`, `has_many`), instead of a few queries per line.",
                 },
                 Feature {
-                    api: "Bike shop blocks",
+                    api: "renox-blocks",
                     why: "The quantity of each line is the `quantity` block (− / number / +), \
                       big enough to tap on a phone; each step sends `change`, which htmx turns \
                       into a `PATCH` after 300 ms (`hx-trigger=\"change delay:300ms\"`), so \
@@ -79,9 +79,23 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/sales/cart/show.html",
                 "examples/bikeshop/resources/views/sales/cart/_mini.html",
                 "examples/bikeshop/resources/views/layouts/_nav_cart.html",
-                "examples/bikeshop/resources/views/blocks/quantity.html",
+                "crates/renox-blocks/views/blocks.html",
                 "examples/bikeshop/migrations/20260102000700_create_carts_table.up.sql",
                 "examples/bikeshop/tests/sales.rs",
+            ],
+            code: &[
+                Code {
+                    title: "Model: a guest's cart in the session, a customer's in `carts`",
+                    region: "cart.show.load",
+                },
+                Code {
+                    title: "Handler: a change answers the `lines` block plus the count out of band",
+                    region: "cart.show.htmx",
+                },
+                Code {
+                    title: "Template: `hx-patch` on change, the `mini` block for `.also()`",
+                    region: "cart.show.template",
+                },
             ],
         },
         Explanation {
@@ -176,6 +190,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/sales/checkout/show.html",
                 "examples/bikeshop/tests/sales.rs",
             ],
+            code: &[
+                Code {
+                    title: "Form: `#[derive(Validate)]` rules, `required_if` for delivery",
+                    region: "checkout.show.form",
+                },
+                Code {
+                    title: "Handler: the order and its reservation in one transaction",
+                    region: "checkout.show.place",
+                },
+                Code {
+                    title: "Template: the kit's `wizard`, checked live, the summary asked again",
+                    region: "checkout.show.template",
+                },
+            ],
         },
         Explanation {
             route: "pay.show",
@@ -251,6 +279,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/sales/pay/show.html",
                 "examples/bikeshop/tests/sales.rs",
             ],
+            code: &[
+                Code {
+                    title: "Handler: the payment this visitor started, reported to analytics once",
+                    region: "pay.show.handler",
+                },
+                Code {
+                    title: "Template: htmx asks for the `status` block every two seconds",
+                    region: "pay.show.template",
+                },
+                Code {
+                    title: "Webhook: `renox::webhook` checks the signature, then marks it paid",
+                    region: "pay.show.webhook",
+                },
+            ],
         },
         Explanation {
             route: "pay.demo",
@@ -303,6 +345,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/sales/payments.rs",
                 "examples/bikeshop/resources/views/sales/pay/demo.html",
                 "examples/bikeshop/tests/sales.rs",
+            ],
+            code: &[
+                Code {
+                    title: "Handler: only the signed link opens it; paying queues the notification",
+                    region: "pay.demo.handler",
+                },
+                Code {
+                    title: "Job: the notification Midtrans would send, posted to our own webhook",
+                    region: "pay.demo.job",
+                },
+                Code {
+                    title: "Template: two forms posting to the same signed address",
+                    region: "pay.demo.template",
+                },
             ],
         },
         Explanation {
@@ -360,8 +416,22 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/sales/orders.rs",
                 "examples/bikeshop/src/app/sales/notify.rs",
                 "examples/bikeshop/resources/views/sales/orders/show.html",
-                "examples/bikeshop/resources/views/blocks/history.html",
+                "crates/renox-blocks/views/blocks.html",
                 "examples/bikeshop/tests/sales.rs",
+            ],
+            code: &[
+                Code {
+                    title: "Handler: another customer's order is a 404, not a 403",
+                    region: "orders.show.handler",
+                },
+                Code {
+                    title: "Template: the page header's badge and the `history` block",
+                    region: "orders.show.template",
+                },
+                Code {
+                    title: "Listener: `PaymentSucceeded` marks the order paid, exactly once",
+                    region: "orders.show.paid",
+                },
             ],
         },
         Explanation {
@@ -396,6 +466,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/public/sales/sales.css",
                 "examples/bikeshop/public/sales/sales.js",
                 "examples/bikeshop/tests/sales.rs",
+            ],
+            code: &[
+                Code {
+                    title: "Handler: the same visibility check, and the signed link from the mails",
+                    region: "orders.invoice.handler",
+                },
+                Code {
+                    title: "Template: a print button and the kit's `table`",
+                    region: "orders.invoice.template",
+                },
+                Code {
+                    title: "CSS: print styles hide everything but the invoice",
+                    region: "orders.invoice.print",
+                },
             ],
         },
         Explanation {
@@ -450,6 +534,16 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/access/policy.rs",
                 "examples/bikeshop/src/app/access/active_store.rs",
                 "examples/bikeshop/tests/sales.rs",
+            ],
+            code: &[
+                Code {
+                    title: "Handler: `access::visible` scopes the query, `belongs_to` loads customers",
+                    region: "sales.orders.index.handler",
+                },
+                Code {
+                    title: "Template: `link_tabs` by status and the kit's `table`",
+                    region: "sales.orders.index.template",
+                },
             ],
         },
         Explanation {
@@ -518,6 +612,16 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/sales/staff/show.html",
                 "examples/bikeshop/tests/sales.rs",
             ],
+            code: &[
+                Code {
+                    title: "Handler: `access::find`, then each action checked in the order's store",
+                    region: "sales.orders.show.handler",
+                },
+                Code {
+                    title: "Template: `action_sheet` and `confirm` only where the user may act",
+                    region: "sales.orders.show.template",
+                },
+            ],
         },
         Explanation {
             route: "sales.counter",
@@ -559,7 +663,7 @@ pub fn entries() -> Vec<Explanation> {
                           with.",
                 },
                 Feature {
-                    api: "Bike shop blocks",
+                    api: "renox-blocks",
                     why: "The `keypad` block types the amount received on a touch screen \
                           (and works from a keyboard too); `quantity` changes a line.",
                 },
@@ -590,8 +694,22 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/src/app/sales/counter.rs",
                 "examples/bikeshop/src/app/sales/payments.rs",
                 "examples/bikeshop/resources/views/sales/counter/show.html",
-                "examples/bikeshop/resources/views/blocks/keypad.html",
+                "crates/renox-blocks/views/blocks.html",
                 "examples/bikeshop/tests/sales.rs",
+            ],
+            code: &[
+                Code {
+                    title: "Handler: the sale rung up lives in the session, per store",
+                    region: "sales.counter.handler",
+                },
+                Code {
+                    title: "Pay: change worked out, paid at once, receipt next",
+                    region: "sales.counter.pay",
+                },
+                Code {
+                    title: "Template: a searchable `select` from the server and the `keypad`",
+                    region: "sales.counter.template",
+                },
             ],
         },
         Explanation {
@@ -638,6 +756,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/sales/mails.html",
                 "examples/bikeshop/resources/views/mail/sales/confirmation.html",
                 "examples/bikeshop/tests/sales.rs",
+            ],
+            code: &[
+                Code {
+                    title: "Handler: every mail rendered with `mail_view_in` for a made-up order",
+                    region: "sales.mails.handler",
+                },
+                Code {
+                    title: "Mail: the confirmation on the kit's mail components",
+                    region: "sales.mails.template",
+                },
+                Code {
+                    title: "Notify: the real send, queued, with a signed link to the order",
+                    region: "sales.mails.tell",
+                },
             ],
         },
     ]

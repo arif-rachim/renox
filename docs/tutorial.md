@@ -1513,9 +1513,9 @@ several servers.
 You've built a complete app, and used most of what a typical app needs. From here:
 
 - [The cheat sheet](../CHEATSHEET.md): every common task in a few lines.
-- [examples/crud](../examples/crud): this tutorial's patterns with pagination, "soft" deletes
-  (a trash bin) and model hooks; [examples/shop](../examples/shop): a whole online shop with a
-  checkout, an admin area and translations.
+- [examples/bikeshop](../examples/bikeshop): a whole business (a shop with a checkout, rentals,
+  a workshop, an admin area, translations), where every page explains the Renox features it
+  uses; start on its `/about/pages`.
 - The guides: [routing](routing.md), [validation](validation.md), [views and the UI
   kit](ui.md), [mail and notifications](mail.md), [the queue](queue.md),
   [scheduling](scheduling.md), [relations](relations.md), [testing](testing.md) and

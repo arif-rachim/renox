@@ -1,6 +1,6 @@
 //! "About this page" entries for the plans area's pages (see `crate::explain`).
 
-use crate::explain::{Audience, Explanation, Feature, Flow, NotAPage};
+use crate::explain::{Audience, Code, Explanation, Feature, Flow, NotAPage};
 
 const MODEL: &str = "examples/bikeshop/src/app/plans/model.rs";
 const BILLING: &str = "examples/bikeshop/src/app/plans/billing.rs";
@@ -54,9 +54,9 @@ pub fn entries() -> Vec<Explanation> {
                           `APP_CURRENCY` and nothing is formatted by hand.",
                 },
                 Feature {
-                    api: "Bike shop blocks",
-                    why: "The kit has no pricing cards or comparison table, so the shop's \
-                          `compare_plans` block draws both: cards on a CSS grid (one column \
+                    api: "renox-blocks",
+                    why: "The kit has no pricing cards or comparison table, so the \
+                          `compare_plans` block of renox-blocks draws both: cards on a CSS grid (one column \
                           on a phone), the monthly tune-up highlighted, and a table whose \
                           ticks and dashes have screen-reader text (\"Included\", \"Not \
                           included\"), so the comparison doesn't rest on an icon alone.",
@@ -85,8 +85,22 @@ pub fn entries() -> Vec<Explanation> {
                 MODEL,
                 "examples/bikeshop/src/seed/content.rs",
                 "examples/bikeshop/resources/views/plans/index.html",
-                "examples/bikeshop/resources/views/blocks/compare_plans.html",
+                "crates/renox-blocks/views/blocks.html",
                 TESTS,
+            ],
+            code: &[
+                Code {
+                    title: "Query: the plans and their tasks, the pivot read with `fetch_as`",
+                    region: "plans.index.query",
+                },
+                Code {
+                    title: "Handler: one card per plan for the `compare_plans` block",
+                    region: "plans.index.cards",
+                },
+                Code {
+                    title: "Template: the shop's `compare_plans` block, then how it works",
+                    region: "plans.index.template",
+                },
             ],
         },
         Explanation {
@@ -189,6 +203,20 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[
+                Code {
+                    title: "Template: htmx swaps the weekdays and the summary as the form changes",
+                    region: "plans.subscribe.template",
+                },
+                Code {
+                    title: "Form: one plan per bike, a weekday the store opens, a gateway set up",
+                    region: "plans.subscribe.form",
+                },
+                Code {
+                    title: "Checkout: renox-billing's `Billing::of(…).named(…).checkout(…)`",
+                    region: "plans.subscribe.checkout",
+                },
+            ],
         },
         Explanation {
             route: "plans.mine",
@@ -237,6 +265,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/plans/mine.html",
                 "examples/bikeshop/resources/views/plans/_parts.html",
                 TESTS,
+            ],
+            code: &[
+                Code {
+                    title: "Handler: the customer's bikes and their subscriptions",
+                    region: "plans.mine.handler",
+                },
+                Code {
+                    title: "Query: visits done per plan with `group_by` and `select_as`",
+                    region: "plans.mine.query",
+                },
+                Code {
+                    title: "Template: a CSS grid of cards with the kit's `infolist`",
+                    region: "plans.mine.template",
+                },
             ],
         },
         Explanation {
@@ -290,11 +332,11 @@ pub fn entries() -> Vec<Explanation> {
                 },
                 Feature {
                     api: "Bike shop blocks",
-                    why: "The kit has no calendar of events, so the shop's `month_calendar` \
-                          block shows the upcoming visits on a month grid that turns into a \
-                          list on a phone; \"Move\" uses the `date_picker_blocked` block, \
-                          the kit's date picker with the full and closed days greyed out (the \
-                          server checks again).",
+                    why: "The kit has no calendar of events, so the `month_calendar` \
+                          block of renox-blocks shows the upcoming visits on a month grid that turns into a \
+                          list on a phone; \"Move\" uses the kit's `date_picker` with \
+                          `disabled_dates` and `closed_weekdays`: the full and closed days are \
+                          greyed out (the server checks again).",
                 },
                 Feature {
                     api: "UI kit: action_sheet",
@@ -326,10 +368,23 @@ pub fn entries() -> Vec<Explanation> {
                 CAPACITY,
                 DEMO,
                 "examples/bikeshop/resources/views/plans/show.html",
-                "examples/bikeshop/resources/views/blocks/month_calendar.html",
-                "examples/bikeshop/resources/views/blocks/date_picker_blocked.html",
+                "crates/renox-blocks/views/blocks.html",
                 TESTS,
                 BROWSER,
+            ],
+            code: &[
+                Code {
+                    title: "Template: the `month_calendar` block, Move in a sheet, Skip with `confirm`",
+                    region: "plans.show.template",
+                },
+                Code {
+                    title: "Billing: the gateway's side, read through renox-billing",
+                    region: "plans.show.billing",
+                },
+                Code {
+                    title: "Swap: renox-billing's `swap`, or the next visit for counter plans",
+                    region: "plans.show.swap",
+                },
             ],
         },
         Explanation {
@@ -383,6 +438,16 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/mail/plans/notice.html",
                 "examples/bikeshop/resources/views/plans/mails.html",
                 TESTS,
+            ],
+            code: &[
+                Code {
+                    title: "Handler: each mail rendered with `mail_view_in`, as it is sent",
+                    region: "plans.mails.handler",
+                },
+                Code {
+                    title: "Template: every mail in a sandboxed frame",
+                    region: "plans.mails.template",
+                },
             ],
         },
         Explanation {
@@ -441,6 +506,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/plans/demo.html",
                 TESTS,
             ],
+            code: &[
+                Code {
+                    title: "Gateway: the demo's checkout is a signed link to this page",
+                    region: "plans.demo.checkout",
+                },
+                Code {
+                    title: "Handler: `ValidSignature`, then the webhook queued as a job",
+                    region: "plans.demo.complete",
+                },
+                Code {
+                    title: "Job: the webhook posted, signed, to the app's own endpoint",
+                    region: "plans.demo.job",
+                },
+            ],
         },
         Explanation {
             route: "billing.plans",
@@ -472,6 +551,16 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/billing/plans.html",
                 "examples/bikeshop/resources/views/billing/section.html",
                 TESTS,
+            ],
+            code: &[
+                Code {
+                    title: "Module: each plan given to renox-billing in USD and in IDR",
+                    region: "billing.plans.module",
+                },
+                Code {
+                    title: "Template: the plugin's page replaced by a file of the same name",
+                    region: "billing.plans.template",
+                },
             ],
         },
     ]

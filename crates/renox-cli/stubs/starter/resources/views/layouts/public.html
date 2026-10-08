@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="{{ app.locale }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  {% block seo %}{{ seo() }}{% endblock %}
+  {{ renox_head() }}
+  {{ renox_ui() }}
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
+  {#- The page patterns (resources/views/patterns.html): yours to change. -#}
+  <link rel="stylesheet" href="{{ asset('patterns.css') }}">
+  {{ stack('head') }}
+</head>
+{#- The public layout (the home page): the kit's navbar on top, the page, a
+    footer, stacked by a CSS grid (`.app-public` in public/patterns.css). On
+    phones the links move to the kit's tab bar at the bottom of the screen
+    (`navbar(…, tabs=…)`). The signed-in pages use layouts/app.html. -#}
+<body class="rx-page app-public">
+  {% from "renox/ui.html" import navbar, nav_links, nav_link, menu, menu_link, menu_action, menu_separator, notification_bell, link_button, icon %}
+  {%- if auth.check %}
+  {%- set tabs = [
+    {"href": route('home'), "label": t('nav.home'), "icon": "house", "active": route_is('home')},
+    {"href": route('dashboard'), "label": t('nav.dashboard'), "icon": "layout-dashboard", "active": route_is('dashboard')},
+    {"href": route('notifications.index'), "label": t('nav.notifications'), "icon": "bell", "badge": unread_notifications or none},
+    {"href": route('account.show'), "label": t('nav.account'), "icon": "circle-user"},
+  ] %}
+  {%- else %}
+  {%- set tabs = [
+    {"href": route('home'), "label": t('nav.home'), "icon": "house", "active": route_is('home')},
+    {"href": route('login'), "label": t('nav.log_in'), "icon": "log-in"},
+    {"href": route('register'), "label": t('nav.register'), "icon": "circle-user"},
+  ] %}
+  {%- endif %}
+  {% call navbar(app.name, href=route('home'), mark=true, width="wide", tabs=tabs, tabs_label=t('nav.sections')) %}
+    {% call nav_links() %}
+      {{ nav_link(route('home'), t('nav.home'), active=route_is('home')) }}
+      {%- if auth.check %}{{ nav_link(route('dashboard'), t('nav.dashboard')) }}{% endif %}
+    {% endcall %}
+    <span class="rx-spacer"></span>
+    {%- if auth.check %}
+    {{ notification_bell(unread_notifications) }}
+    <span class="rx-hide-narrow">
+    {% call menu(auth.user.name, id="account-menu", variant="plain") %}
+      {{ menu_link(route('dashboard'), t('nav.dashboard')) }}
+      {{ menu_link(route('account.show'), t('nav.account')) }}
+      {{ menu_separator() }}
+      {{ menu_action(route('logout'), t('nav.log_out')) }}
+    {% endcall %}
+    </span>
+    {%- else %}
+    <span class="rx-hide-narrow">
+    {{ link_button(route('login'), t('nav.log_in'), variant="plain", size="small") }}
+    {{ link_button(route('register'), t('nav.register'), variant="primary", size="small") }}
+    </span>
+    {%- endif %}
+  {% endcall %}
+  <main class="rx-container rx-container--wide" id="main">
+    {% if flash.status %}{% from "renox/ui.html" import alert %}{{ alert(flash.status, kind="success") }}{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="rx-container rx-container--wide app-footer">
+    <p class="app-footer__brand"><span class="rx-brand-mark" aria-hidden="true">{{ (app.name | string)[:1] | upper }}</span>{{ app.name }}</p>
+    <p>{{ t('footer.made_with') }}</p>
+  </footer>
+  {{ toasts() }}
+  {{ stack('scripts') }}
+</body>
+</html>

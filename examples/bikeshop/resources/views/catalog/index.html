@@ -4,7 +4,8 @@
     Macros are imported at the top, so the `results` block sees them when
     htmx asks for it alone. -#}
 {% from "renox/ui.html" import page_header, card_grid, media_card, empty, button, link_button, checkbox_list, select, checkbox, input %}
-{% from "blocks/range_slider.html" import range_slider %}
+{% from "renox-blocks/blocks.html" import range_slider %}
+{% from "layouts/_category_icon.html" import category_icon %}
 {% block seo %}{{ seo(title=title ~ " · " ~ t('shop.name'), description=description, canonical=reset) }}{% endblock %}
 
 {% block content %}
@@ -27,11 +28,11 @@
         <ul class="bs-tree" role="list">
           {%- for root in category_menu %}
           <li>
-            <a class="rx-link" href="{{ root.href }}"{% if root.current %} aria-current="page"{% endif %}>{{ root.name }}</a>
+            <a class="rx-link bs-tree__root" href="{{ root.href }}"{% if root.current %} aria-current="page"{% endif %}><span class="bs-icon-circle bs-icon-circle--small">{{ category_icon(root.href) }}</span>{{ root.name }}</a>
             {%- if root.children %}
             <ul class="bs-tree" role="list">
               {%- for child in root.children %}
-              <li><a class="rx-link" href="{{ child.href }}"{% if child.current %} aria-current="page"{% endif %}>{{ child.name }}</a></li>
+              <li><a class="rx-link bs-tree__leaf" href="{{ child.href }}"{% if child.current %} aria-current="page"{% endif %}>{{ category_icon(child.href, size=16) }}{{ child.name }}</a></li>
               {%- endfor %}
             </ul>
             {%- endif %}
@@ -41,6 +42,7 @@
       </nav>
       {%- endif %}
 
+      {# [explain:catalog.index.form] #}
       <form id="catalog-filters" class="bs-catalog__form" method="get" action="{{ path }}" role="search" aria-label="{{ t('catalog.filters.title') }}"
             hx-get="{{ path }}" hx-target="#results" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace"
             hx-trigger="change delay:250ms, submit" hx-indicator="#results">
@@ -58,6 +60,7 @@
         {{ range_slider("price_min", "price_max", facets.price_low, facets.price_high, step=facets.price_step,
                         value_min=filters.price_min, value_max=filters.price_max, label=t('catalog.filters.price'), format="money", id="filter-price") }}
         {%- endif %}
+      {# [/explain:catalog.index.form] #}
         {%- if facets.sizes %}
         {{ checkbox_list("size", t('catalog.filters.size'), facets.sizes, selected=filters.sizes, inline=true, id="filter-size") }}
         {%- endif %}
@@ -79,6 +82,7 @@
     </div>
   </details>
 
+  {# [explain:catalog.index.results] #}
   {% block results %}
   <section id="results" class="bs-catalog__results" aria-labelledby="results-count">
     <div class="bs-catalog__summary">
@@ -101,15 +105,18 @@
       {%- endfor %}
     {% endcall %}
     </div>
+  {# [/explain:catalog.index.results] #}
     {%- else %}
     <div class="rx-card">
-      {{ empty(t('catalog.empty.title'), t('catalog.empty.search', q=filters.q) if search and filters.q else t('catalog.empty.text'), reset, t('catalog.filters.clear')) }}
+      {{ empty(t('catalog.empty.title'), t('catalog.empty.search', q=filters.q) if search and filters.q else t('catalog.empty.text'), reset, t('catalog.filters.clear'), icon="search") }}
     </div>
     {%- endif %}
+    {# [explain:catalog.index.results] #}
     <div class="bs-catalog__pages" hx-boost="true" hx-target="#results" hx-select="#results" hx-swap="outerHTML">
       {% from "renox/pagination.html" import pagination %}{{ pagination(pages) }}
     </div>
   </section>
   {% endblock %}
+    {# [/explain:catalog.index.results] #}
 </div>
 {% endblock %}

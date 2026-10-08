@@ -305,7 +305,8 @@ Good to know:
 
 - Matching uses the `Host` header, which the browser sends with every request.
 - There is one fallback per app, or one per domain inside `Routes::domain`.
-- [examples/teams](../examples/teams) serves public team pages on their own host.
+- [examples/bikeshop](../examples/bikeshop) serves each store's page on its own host,
+  `{store}.localhost` in development ([src/app/home/stores.rs](../examples/bikeshop/src/app/home/stores.rs)).
 
 > [!WARNING]
 > Behind a proxy (a server like Caddy or nginx in front of your app), the proxy must pass the

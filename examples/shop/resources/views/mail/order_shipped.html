@@ -1,5 +1,0 @@
-{#- The kit's mail layout (renox/mail/layout.html). -#}
-{% extends "renox/mail/layout.html" %}
-{% block content %}
-<p>{{ t('mail.shipped.ready' if order.pickup else 'mail.shipped.sent', id=order.id, address=order.address) }}</p>
-{% endblock %}

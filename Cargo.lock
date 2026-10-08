@@ -3,15 +3,6 @@
 version = 4
 
 [[package]]
-name = "admin"
-version = "0.0.0"
-dependencies = [
- "renox",
- "renox-admin",
- "serde",
-]
-
-[[package]]
 name = "aead"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -140,15 +131,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
-name = "api"
-version = "0.0.0"
-dependencies = [
- "renox",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "argon2"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -269,15 +251,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "backoffice"
-version = "0.0.0"
-dependencies = [
- "renox",
- "serde",
- "tracing",
-]
-
-[[package]]
 name = "base64"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -315,19 +288,12 @@ dependencies = [
  "renox-2fa",
  "renox-admin",
  "renox-billing",
+ "renox-blocks",
  "renox-editors",
  "renox-oauth",
  "rust_xlsxwriter",
  "serde",
  "tracing",
-]
-
-[[package]]
-name = "billing"
-version = "0.0.0"
-dependencies = [
- "renox",
- "renox-billing",
 ]
 
 [[package]]
@@ -673,14 +639,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a31eee39dddec8330830986fcd7625edb5a24ec90ea038215273bbc3adb08ac6"
 
 [[package]]
-name = "crud"
-version = "0.0.0"
-dependencies = [
- "renox",
- "serde",
-]
-
-[[package]]
 name = "crypto-common"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -867,15 +825,6 @@ name = "fastrand"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
-
-[[package]]
-name = "fields"
-version = "0.0.0"
-dependencies = [
- "renox",
- "renox-editors",
- "serde",
-]
 
 [[package]]
 name = "find-msvc-tools"
@@ -1080,14 +1029,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "grid"
-version = "0.0.0"
-dependencies = [
- "renox",
- "serde",
-]
-
-[[package]]
 name = "h2"
 version = "0.4.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1212,14 +1153,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
-]
-
-[[package]]
-name = "htmx-recipes"
-version = "0.0.0"
-dependencies = [
- "renox",
- "serde",
 ]
 
 [[package]]
@@ -1599,15 +1532,6 @@ checksum = "38c0b942f458fe50cdac086d2f946512305e5631e720728f2a61aabcd47a6264"
 dependencies = [
  "quote",
  "syn 2.0.119",
-]
-
-[[package]]
-name = "jobs"
-version = "0.0.0"
-dependencies = [
- "renox",
- "serde",
- "tracing",
 ]
 
 [[package]]
@@ -2160,14 +2084,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "postgres-app"
-version = "0.0.0"
-dependencies = [
- "renox",
- "serde",
-]
-
-[[package]]
 name = "potential_utf"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2413,14 +2329,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
-name = "relations"
-version = "0.0.0"
-dependencies = [
- "renox",
- "serde",
-]
-
-[[package]]
 name = "renox"
 version = "1.0.0-rc.6"
 dependencies = [
@@ -2470,6 +2378,14 @@ dependencies = [
  "serde",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "renox-blocks"
+version = "1.0.0-rc.6"
+dependencies = [
+ "renox",
+ "serde",
 ]
 
 [[package]]
@@ -2981,15 +2897,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
-name = "shop"
-version = "0.0.0"
-dependencies = [
- "renox",
- "serde",
- "tracing",
-]
-
-[[package]]
 name = "signal-hook-registry"
 version = "1.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3339,16 +3246,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.6",
-]
-
-[[package]]
-name = "teams"
-version = "0.0.0"
-dependencies = [
- "renox",
- "renox-2fa",
- "renox-oauth",
- "serde",
 ]
 
 [[package]]
@@ -3728,14 +3625,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
-name = "uploads"
-version = "0.0.0"
-dependencies = [
- "renox",
- "serde",
-]
-
-[[package]]
 name = "url"
 version = "2.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3907,15 +3796,6 @@ checksum = "5a6580f308b1fad9207618087a65c04e7a10bc77e02c8e84e9b00dd4b12fa0bb"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "webhooks"
-version = "0.0.0"
-dependencies = [
- "renox",
- "serde",
- "tracing",
 ]
 
 [[package]]

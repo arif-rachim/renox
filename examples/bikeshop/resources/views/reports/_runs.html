@@ -25,5 +25,5 @@
   {%- endfor %}
 {% endcall %}
 {%- else %}
-{{ empty(t('reports.monthly.empty'), t('reports.monthly.empty_text')) }}
+{{ empty(t('reports.monthly.empty'), t('reports.monthly.empty_text'), icon="file-text") }}
 {%- endif %}

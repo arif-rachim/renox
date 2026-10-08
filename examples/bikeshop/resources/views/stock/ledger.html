@@ -34,7 +34,7 @@
           {%- endfor %}
         {% endcall %}
         {% from "renox/pagination.html" import pagination %}{{ pagination(movements) }}
-        {%- else %}{{ empty(t('stock.ledger.empty')) }}{% endif %}
+        {%- else %}{{ empty(t('stock.ledger.empty'), icon="history") }}{% endif %}
       {% endcall %}
     </div>
     <div>

@@ -76,10 +76,10 @@ jobs:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      # The other examples are SQLite apps; examples/postgres runs on both,
-      # and so do fields and the bike shop (its own PostgreSQL migrations;
-      # tests/queries.rs walks its main pages on the large seed here too).
-      - run: cargo test -p renox -p renox-core -p renox-cli -p postgres-app -p fields -p bikeshop --features renox/postgres
+      # The bike shop runs on both databases (its own PostgreSQL migrations;
+      # tests/fields.rs round-trips every column type, tests/queries.rs walks
+      # its main pages on the large seed here too). examples/hello is SQLite.
+      - run: cargo test -p renox -p renox-core -p renox-cli -p bikeshop --features renox/postgres
 
   chaos:
     name: chaos (${{ matrix.database }})
@@ -195,9 +195,9 @@ jobs:
         with:
           node-version: 24
       # Headless Chrome (preinstalled on the runner) driven over the DevTools
-      # protocol by Node's own test runner: renox.js, the UI kit, the data
-      # grid, the editors and example flows (tests/browser, #262), and the
-      # bike shop's pages, flows and blocks (bikeshop-*.test.mjs).
+      # protocol by Node's own test runner: renox.js, the UI kit and the data
+      # grid on the fixture, the editors, the guestbook (tests/browser, #262),
+      # and the bike shop's pages, flows and blocks (bikeshop-*.test.mjs).
       - run: tests/browser/run.sh
         env:
           BROWSER_SCREENS: ${{ github.workspace }}/browser-screens
@@ -228,9 +228,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # The app binary and rnx as real processes (signals, workers, the
       # scheduler, systemd's socket, logs, prompts, rnx serve and build,
-      # Tailwind through a stand-in), and every example binary served and
-      # asked for its pages as a guest and logged in (tests/process, #270);
-      # then the engine checks and postgres-app/fields/bikeshop on PostgreSQL.
+      # Tailwind through a stand-in), and both example binaries served and
+      # asked for their pages as a guest and logged in (tests/process, #270);
+      # then the engine checks and the bike shop on PostgreSQL.
       - run: sudo apt-get update && sudo apt-get install -y systemd
       - run: tests/process/run.sh
         env:
@@ -300,8 +300,8 @@ jobs:
           docker logs renox-s3 | tail -40
           exit 1
       - run: cargo test -p renox --features s3 --test it s3
-      # examples/uploads with its files on the same server.
-      - run: cargo test -p uploads --features s3
+      # The bike shop's /about/fields photos and manuals on the same server.
+      - run: cargo test -p bikeshop --features s3 --test fields
 
   deny:
     name: cargo-deny
@@ -344,7 +344,7 @@ jobs:
           cargo llvm-cov --no-report
           -p renox -p renox-core -p renox-cli -p renox-macros
           -p renox-2fa -p renox-oauth -p renox-admin -p renox-billing -p renox-editors
-          --features renox/xlsx
+          -p renox-blocks --features renox/xlsx
       - run: >-
           cargo llvm-cov --no-report
           -p renox -p renox-core -p renox-cli

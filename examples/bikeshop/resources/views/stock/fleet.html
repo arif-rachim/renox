@@ -14,6 +14,7 @@
     <div>
       {% call card(title=t('stock.fleet.to_fleet'), subtitle=t('stock.fleet.to_fleet_lead')) %}
         {%- if options %}
+        {# [explain:stock.fleet.template] #}
         <form method="post" action="{{ route('stock.fleet.store') }}" id="to-fleet-form" novalidate>
           {{ csrf_field() }}
           {{ form_errors() }}
@@ -26,7 +27,8 @@
           {% endcall %}
           {{ button(t('stock.fleet.add'), icon="plus") }}
         </form>
-        {%- else %}{{ empty(t('stock.fleet.no_bikes_in_stock')) }}{% endif %}
+        {# [/explain:stock.fleet.template] #}
+        {%- else %}{{ empty(t('stock.fleet.no_bikes_in_stock'), icon="bike") }}{% endif %}
       {% endcall %}
     </div>
     <div>
@@ -40,7 +42,7 @@
           </li>
           {%- endfor %}
         {% endcall %}
-        {%- else %}{{ empty(t('stock.fleet.no_fleet')) }}{% endif %}
+        {%- else %}{{ empty(t('stock.fleet.no_fleet'), icon="bike") }}{% endif %}
       {% endcall %}
     </div>
   </div>

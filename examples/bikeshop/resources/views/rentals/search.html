@@ -1,7 +1,6 @@
 {% extends "layouts/app.html" %}
-{% from "renox/ui.html" import page_header, select, button, alert, empty, radio, link_button, form_errors %}
-{% from "blocks/datetime_range.html" import datetime_range %}
-{% from "blocks/availability.html" import availability %}
+{% from "renox/ui.html" import page_header, select, button, alert, empty, radio, link_button, form_errors, icon %}
+{% from "renox-blocks/blocks.html" import datetime_range, availability %}
 {% from "rentals/_parts.html" import styles %}
 {% from "layouts/_hero.html" import page_hero %}
 {% block seo %}{{ seo(title=t('rentals.search.title'), description=t('rentals.search.lead')) }}{% endblock %}
@@ -12,8 +11,17 @@
 {% block content %}
 {{ styles() }}
 <div class="bs-rent">
-  <div class="bs-rent__header">{{ page_hero(t('rentals.search.title'), lead=t('rentals.search.lead'), eyebrow=t('rentals.search.eyebrow'), photo="/images/site/rent-1.webp", compact=true) }}</div>
+  <div class="bs-rent__header">
+    {% call page_hero(t('rentals.search.title'), lead=t('rentals.search.lead'), eyebrow=t('rentals.search.eyebrow'), photo="/images/site/rent-1.webp", compact=true) %}
+    <ul class="bs-perks" role="list">
+      <li><span class="bs-icon-circle">{{ icon("store") }}</span>{{ t('rentals.search.perks.stores') }}</li>
+      <li><span class="bs-icon-circle">{{ icon("clock") }}</span>{{ t('rentals.search.perks.hours') }}</li>
+      <li><span class="bs-icon-circle">{{ icon("banknote") }}</span>{{ t('rentals.search.perks.deposit') }}</li>
+    </ul>
+    {% endcall %}
+  </div>
 
+  {# [explain:rentals.create.filters] #}
   <form class="rx-card bs-rent__filters" method="get" action="{{ route('rentals.create') }}"
         hx-get="{{ route('rentals.create') }}" hx-trigger="change, submit" hx-target="#rent-results"
         hx-select="#rent-results" hx-swap="outerHTML" hx-push-url="true" aria-label="{{ t('rentals.search.filters') }}">
@@ -28,12 +36,13 @@
     {{ select("size", t('rentals.fields.size'), opts.sizes, selected=size) }}
     {{ button(t('rentals.search.show'), variant="secondary", icon="search") }}
   </form>
+  {# [/explain:rentals.create.filters] #}
 
   <section class="bs-rent__results" id="rent-results" aria-live="polite" aria-label="{{ t('rentals.search.results') }}" data-bs-reveal>
     {%- if problem %}
     {{ alert(problem, kind="warning") }}
     {%- elif not offers %}
-    <div class="rx-card">{{ empty(t('rentals.search.none_title'), t('rentals.search.none_text')) }}</div>
+    <div class="rx-card">{{ empty(t('rentals.search.none_title'), t('rentals.search.none_text'), icon="calendar") }}</div>
     {%- else %}
     <form class="rx-card bs-rent__filters" method="post" action="{{ route('rentals.reserve') }}" id="reserve-form">
       {{ csrf_field() }}
@@ -52,7 +61,7 @@
       {%- if signed_in %}
       {{ button(t('rentals.search.reserve'), icon="check") }}
       {%- else %}
-      {{ link_button(route('login'), t('rentals.search.login'), variant="primary") }}
+      {{ link_button(route('login'), t('rentals.search.login'), variant="primary", icon="log-in") }}
       {%- endif %}
     </form>
     {%- endif %}

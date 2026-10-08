@@ -40,8 +40,6 @@ Want working code to look at?
 - The short version is in the [cheat-sheet](../CHEATSHEET.md) ("Jobs, events, schedule, mail"
   and "Cache, session, uploads, translations").
 - The queue has its own guide, [queue.md](queue.md).
-- [examples/jobs](../examples/jobs) has scheduled reports with a lock and a failure alert, an
-  event, and `App::report`.
 - [examples/hello](../examples/hello) has a typed `entries:prune` command and a scheduled task.
 - [examples/bikeshop](../examples/bikeshop) has nine scheduled tasks (every minute to monthly), events that keep cached
   dashboards fresh, `App::report` and a typed `demo:seed` command.
@@ -227,7 +225,7 @@ What if a task is still running when its next turn comes? In the same process, t
 
 > [!TIP]
 > For longer work, or a task you might also start by hand with `schedule:run`, protect it with
-> a cache lock (see [Locks](#locks) below; examples/jobs does this).
+> a cache lock (see [Locks](#locks) below).
 
 #### Several servers
 

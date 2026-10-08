@@ -1,1 +1,0 @@
-{{ t('mail.shipped.ready' if order.pickup else 'mail.shipped.sent', id=order.id, address=order.address) }}

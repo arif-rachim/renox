@@ -25,7 +25,59 @@ async fn the_home_page_works() {
         .await
         .assert_ok()
         .assert_view("home/index.html")
-        .assert_see("Create an account");
+        .assert_see("Create an account")
+        // The hero's coloured phrase, the phone tab bar, the figures strip.
+        .assert_see("<em>ready to grow.</em>")
+        .assert_see("rx-tabbar")
+        .assert_see("people signed up");
+}
+
+#[renox::test]
+async fn pages_that_are_not_there_are_in_the_layout() {
+    let app = TestApp::new({{crate_name}}::app()).await;
+    app.get("/nowhere")
+        .await
+        .assert_not_found()
+        .assert_see("Go to the home page");
+    let anna = person(&app, "anna@example.com", MEMBER).await;
+    app.acting_as(&anna);
+    app.get("/nowhere")
+        .await
+        .assert_not_found()
+        .assert_see("rx-shell");
+}
+
+#[renox::test]
+async fn the_login_page_lists_the_seeded_people_in_local_only() {
+    // TestApp runs with APP_ENV=testing: no list, even after seeding.
+    let app = TestApp::new({{crate_name}}::app()).await;
+    app.kernel().seed().await.unwrap();
+    app.get("/login")
+        .await
+        .assert_ok()
+        .assert_dont_see("admin@example.com");
+
+    let local = TestApp::with_config({{crate_name}}::app(), |config| {
+        config.env = renox::Environment::Local;
+    })
+    .await;
+    // Not before `db:seed` made them.
+    local
+        .get("/login")
+        .await
+        .assert_dont_see("admin@example.com");
+    local.kernel().seed().await.unwrap();
+    local
+        .get("/login")
+        .await
+        .assert_see("Seeded accounts")
+        .assert_see("data-demo-email=\"admin@example.com\"")
+        .assert_see("member@example.com");
+    // Only on the login page.
+    local
+        .get("/register")
+        .await
+        .assert_dont_see("admin@example.com");
 }
 
 #[renox::test]
@@ -61,7 +113,9 @@ async fn the_dashboard_is_for_verified_users() {
     app.get("/dashboard")
         .await
         .assert_ok()
-        .assert_see("Welcome back, Anna.");
+        .assert_see("Welcome back,")
+        .assert_see("<em>Anna.</em>")
+        .assert_see("Your recent activity");
 }
 
 #[renox::test]

@@ -439,21 +439,22 @@ async fn either_store_ends_help_early_and_hours_are_counted_not_charged() {
         .get("/staff/help/hours")
         .await
         .assert_ok()
-        .assert_see("7.5");
+        .assert_see(r#"<td class="rx-num">7.5</td>"#);
     // North, who lent the cashier, sees their person's hours at South too;
-    // West, in neither store, doesn't.
+    // West, in neither store, doesn't. (The table's cell: "7.5" alone is
+    // also in an icon's path on every page.)
     w.app.acting_as(&w.manager_north);
     w.app
         .get("/staff/help/hours")
         .await
         .assert_ok()
-        .assert_see("7.5");
+        .assert_see(r#"<td class="rx-num">7.5</td>"#);
     w.app.acting_as(&w.manager_west);
     w.app
         .get("/staff/help/hours")
         .await
         .assert_ok()
-        .assert_dont_see("7.5");
+        .assert_dont_see(r#"<td class="rx-num">7.5</td>"#);
     w.app.acting_as(&w.manager_south);
     // South ends it early: the helper can't work there any more.
     w.app

@@ -13,6 +13,7 @@
     {{ link_button(route('multistore.fees'), t('multistore.fees.title')) }}
     {{ link_button(route('multistore.settlements'), t('multistore.settlements.title'), variant="primary") }}
   {% endcall %}
+  {# [explain:multistore.books.template] #}
   {% call stats(2) %}
     {{ stat(t('multistore.books.position', store=store_name), mine | money, hint=t('multistore.books.position_hint')) }}
     {{ stat(t('multistore.books.pairs'), balances | length) }}
@@ -24,10 +25,11 @@
       <li><div class="rx-list__main"><strong>{{ t('multistore.books.owes', debtor=b.debtor, creditor=b.creditor) }}</strong></div><span class="rx-num">{{ b.amount | money }}</span></li>
       {%- endfor %}
     {% endcall %}
-    {%- else %}{{ empty(t('multistore.books.square')) }}{% endif %}
+    {%- else %}{{ empty(t('multistore.books.square'), icon="circle-check") }}{% endif %}
   {% endcall %}
   {% call(row, column) grid(entries) %}
     {%- if column.key == "source" %}{% if row.source_url %}<a class="rx-link" href="{{ row.source_url }}">{{ row.source_label }}</a>{% else %}{{ row.source_label }}{% endif %}{% endif %}
   {% endcall %}
+  {# [/explain:multistore.books.template] #}
 </div>
 {% endblock %}

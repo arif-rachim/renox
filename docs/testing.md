@@ -300,7 +300,7 @@ confirm-password page.
 > [!IMPORTANT]
 > Travel reaches only time read through Renox: `renox::db::now()` in app code, not
 > `SystemTime::now()` or `chrono::Utc::now()`. Use travel rather than rewriting `created_at`
-> with SQL or sleeping; examples/shop, jobs, api and hello show it.
+> with SQL or sleeping; examples/hello and the bike shop's tests (rentals, plans, stock) show it.
 
 [examples/bikeshop](../examples/bikeshop) has tests per area, a walk of its main pages counting queries on a large seed, and
 browser tests (`tests/browser/bikeshop-*.test.mjs`).

@@ -1,6 +1,8 @@
-// #268: editors.js (renox-editors) on examples/fields' product form: Trix
-// keeps its hidden input in step, the Markdown toolbar and preview, CodeJar
-// keeps its textarea in step, and each library loads only when needed.
+// #268: editors.js (renox-editors) on the bike shop's /about/fields form
+// (the fields example's product form until #351): Trix keeps its hidden input in
+// step, the Markdown toolbar and preview, CodeJar keeps its textarea in step,
+// and each library loads only when needed. The form needs a login: the
+// seeded customer's.
 
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,8 +13,12 @@ let browser;
 let app;
 
 before(async () => {
-  app = await start('fields', 'examples/fields', { seed: true });
+  app = await start('bikeshop', 'examples/bikeshop', { seed: true });
   browser = await Browser.launch();
+  // Logged in from a tab of its own: in headless Chrome the tab that sent
+  // the bike shop's login form gets no key presses afterwards (the cookie
+  // is the browser's, so the tests' tabs are logged in too).
+  await browser.with((page) => logIn(page));
 });
 
 after(async () => {
@@ -20,14 +26,49 @@ after(async () => {
   await app?.stop();
 });
 
+/** Logs the seeded customer in, unless this browser already is. */
+async function logIn(page) {
+  await page.goto(`${app.url}/login`);
+  if (!(await page.eval(() => !!document.querySelector('#rx-email')))) return;
+  await page.type('#rx-email', 'customer@bikeshop.test');
+  await page.type('#rx-password', 'password');
+  const loaded = page.once('Page.loadEventFired');
+  await page.click('form button[type=submit]');
+  await loaded;
+  await page.settle();
+}
+
 const onForm = (fn) =>
   browser.with(async (page) => {
+    await logIn(page);
     const loaded = [];
     page.on('Network.requestWillBeSent', (p) => loaded.push(new URL(p.request.url).pathname));
-    await page.goto(`${app.url}/products/new`);
+    await page.goto(`${app.url}/about/fields`);
+    // The bike shop's sections slide in (Motion); start once they're still.
+    await page.settle();
+    await page.waitFor(() => [...document.querySelectorAll('[data-bs-reveal] > *')].every((el) => getComputedStyle(el).opacity === '1'));
     await fn(page, loaded);
     page.assertClean();
   });
+
+test('the Markdown toolbar wraps the selection and the preview is drawn by the server', () =>
+  onForm(async (page) => {
+    await page.type('#rx-description', 'strong coffee');
+    await page.eval(() => {
+      const area = document.querySelector('#rx-description');
+      area.setSelectionRange(0, 6);
+    });
+    await page.click('[data-md="bold"]');
+    assert.equal(await page.eval(() => document.querySelector('#rx-description').value), '**strong** coffee');
+    // Undo keeps working (execCommand), so Ctrl+Z gives the old text back.
+    await page.click('[data-md-preview]');
+    await page.waitFor(() => document.querySelector('#rx-description-preview').innerHTML.includes('<strong>strong</strong>'), {
+      message: 'the preview',
+    });
+    assert.equal(await page.eval(() => document.querySelector('[data-md-preview]').getAttribute('aria-pressed')), 'true');
+    await page.click('[data-md-preview]');
+    assert.ok(await page.eval(() => document.querySelector('#rx-description-preview').hidden));
+  }));
 
 test('the rich text editor writes into its hidden field and takes no files', () =>
   onForm(async (page, loaded) => {
@@ -56,25 +97,6 @@ test('the rich text editor writes into its hidden field and takes no files', () 
     assert.equal(accepted, false);
   }));
 
-test('the Markdown toolbar wraps the selection and the preview is drawn by the server', () =>
-  onForm(async (page) => {
-    await page.type('#rx-description', 'strong coffee');
-    await page.eval(() => {
-      const area = document.querySelector('#rx-description');
-      area.setSelectionRange(0, 6);
-    });
-    await page.click('[data-md="bold"]');
-    assert.equal(await page.eval(() => document.querySelector('#rx-description').value), '**strong** coffee');
-    // Undo keeps working (execCommand), so Ctrl+Z gives the old text back.
-    await page.click('[data-md-preview]');
-    await page.waitFor(() => document.querySelector('#rx-description-preview').innerHTML.includes('<strong>strong</strong>'), {
-      message: 'the preview',
-    });
-    assert.equal(await page.eval(() => document.querySelector('[data-md-preview]').getAttribute('aria-pressed')), 'true');
-    await page.click('[data-md-preview]');
-    assert.ok(await page.eval(() => document.querySelector('#rx-description-preview').hidden));
-  }));
-
 test('the code editor keeps its textarea in step and lets Escape leave', () =>
   onForm(async (page, loaded) => {
     await page.waitFor(() => !!document.querySelector('[data-rx-code-editor] [contenteditable]'), { message: 'CodeJar ready' });
@@ -83,7 +105,7 @@ test('the code editor keeps its textarea in step and lets Escape leave', () =>
     await page.type('[data-rx-code-editor] [contenteditable]', '{"grind": "fine"}');
     await page.waitFor(() => document.querySelector('#rx-settings').value.includes('"grind"'));
     // Highlighted by Prism.
-    assert.ok(await page.eval(() => !!document.querySelector('[data-rx-code-editor] .token')));
+    await page.waitFor(() => !!document.querySelector('[data-rx-code-editor] .token'), { message: 'Prism highlighted the code' });
     // Escape, then Tab, leaves the editor (keyboard users aren't trapped).
     await page.press('Escape');
     await page.press('Tab');
@@ -102,27 +124,10 @@ async function ctrl(page, key) {
   await sleep(30);
 }
 
-test('each library loads only where a page needs it', () =>
-  browser.with(async (page) => {
-    const loaded = [];
-    page.on('Network.requestWillBeSent', (p) => loaded.push(new URL(p.request.url).pathname));
-    // The list: no editor at all.
-    await page.goto(`${app.url}/`);
-    await sleep(300);
-    assert.ok(!loaded.some((p) => /trix-|codejar-|prism-/.test(p)), loaded.join('\n'));
-    // A product's page: a highlighted code entry, so Prism, not Trix.
-    const href = await page.eval(() => document.querySelector('a[href^="/products/"]:not([href$="/new"])').getAttribute('href'));
-    loaded.length = 0;
-    await page.goto(`${app.url}${href.replace(/\/edit$/, '')}`);
-    await sleep(300);
-    assert.ok(!loaded.some((p) => p.includes('trix-')), 'no Trix on a page without rich text');
-    page.assertClean();
-  }));
-
-test('a product saved through every editor, cleaned by the server, its settings highlighted', () =>
+test('a sample saved through every editor, cleaned by the server, its settings highlighted', () =>
   onForm(async (page) => {
     await page.waitFor(() => !!document.querySelector('trix-editor')?.editor && !!document.querySelector('[data-rx-code-editor] [contenteditable]'));
-    await page.type('#rx-name', 'Editor roast');
+    await page.type('#rx-name', 'Editor bike');
     await page.type('#rx-stock', '3', { clear: true });
     await page.type('#rx-weight_kg', '0.25', { clear: true });
     await page.type('#rx-price', '12.50', { clear: true });
@@ -133,12 +138,12 @@ test('a product saved through every editor, cleaned by the server, its settings 
     await page.type('[data-rx-code-editor] [contenteditable]', '{"grind": ');
     // A broken setting: the form comes back with the error on the code editor.
     let loaded = page.once('Page.loadEventFired');
-    await page.click('form button[type=submit]');
+    await page.click('#sample-form button[type=submit]');
     await loaded;
     await page.settle();
     await page.waitFor(() => !!document.querySelector('[data-rx-code-editor] [contenteditable]'));
     assert.equal(await page.eval(() => document.querySelector('[data-rx-code-editor] .rx-editor__code').getAttribute('aria-invalid')), 'true');
-    assert.equal(await page.eval(() => document.querySelector('#rx-name').value), 'Editor roast', 'the old input is back');
+    assert.equal(await page.eval(() => document.querySelector('#rx-name').value), 'Editor bike', 'the old input is back');
     // Fixed; and HTML the page didn't make put into the rich text field.
     await page.eval(() => {
       const code = document.querySelector('[data-rx-code-editor] [contenteditable]');
@@ -152,7 +157,7 @@ test('a product saved through every editor, cleaned by the server, its settings 
         '<p><strong>Kept</strong></p><img src="x" onerror="alert(1)"><script>alert(2)</script>';
     });
     loaded = page.once('Page.loadEventFired');
-    await page.click('form button[type=submit]');
+    await page.click('#sample-form button[type=submit]');
     await loaded;
     await page.settle();
     // Saved: open its page.
@@ -163,6 +168,26 @@ test('a product saved through every editor, cleaned by the server, its settings 
     assert.doesNotMatch(details, /onerror|<script/);
     await page.waitFor(() => document.querySelector('code[data-rx-highlight]')?.hasAttribute('data-rx-highlighted'), { message: 'the code entry highlighted' });
     assert.ok(await page.eval(() => !!document.querySelector('code[data-rx-highlight] .token')));
+  }));
+
+test('each library loads only where a page needs it', () =>
+  browser.with(async (page) => {
+    const loaded = [];
+    page.on('Network.requestWillBeSent', (p) => loaded.push(new URL(p.request.url).pathname));
+    await logIn(page);
+    // A page without a form: no editor at all.
+    await page.goto(`${app.url}/about/pages`);
+    await sleep(300);
+    assert.ok(!loaded.some((p) => /trix-|codejar-|prism-/.test(p)), loaded.join('\n'));
+    // A sample's page (saved by the test before): a highlighted code
+    // entry, so Prism, not Trix.
+    await page.goto(`${app.url}/about/fields`);
+    const href = await page.eval(() => document.querySelector('a[href^="/about/fields/"]:not([href$="/edit"])').getAttribute('href'));
+    loaded.length = 0;
+    await page.goto(`${app.url}${href.replace(/\/edit$/, '')}`);
+    await sleep(300);
+    assert.ok(!loaded.some((p) => p.includes('trix-')), 'no Trix on a page without rich text');
+    page.assertClean();
   }));
 
 test('the rich text editor: Space on its toolbar, its label, no files', () =>
@@ -278,7 +303,7 @@ test('editors brought in by htmx start; the module runs once', () =>
       const box = document.createElement('div');
       box.id = 'swapped';
       document.body.append(box);
-      return htmx.ajax('GET', '/products/new', { target: '#swapped', select: 'form', swap: 'innerHTML' });
+      return htmx.ajax('GET', '/about/fields', { target: '#swapped', select: '#sample-form', swap: 'innerHTML' });
     });
     await page.waitFor(() => document.querySelectorAll('.rx-editor__code').length === 2, { message: 'the new code editor started' });
     await page.waitFor(() => [...document.querySelectorAll('trix-editor')].every((t) => t.editor), { message: 'both Trix editors ready' });
@@ -288,7 +313,7 @@ test('editors brought in by htmx start; the module runs once', () =>
     assert.equal(modules(), before, 'editors.js not loaded again');
     // The original form removed; the new one's editors work, and a toolbar
     // button acts once (a second copy of the module would act twice).
-    await page.eval(() => document.querySelector('form:not(#swapped form)').remove());
+    await page.eval(() => document.querySelector('#sample-form').remove());
     const area = '#swapped [data-rx-markdown] textarea';
     await page.type(area, 'beans');
     await page.eval((a) => document.querySelector(a).setSelectionRange(0, 5), area);

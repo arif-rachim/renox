@@ -1,0 +1,16 @@
+{#- A checklist row as a small form, swapped in on double-click. Save answers
+    with the row; Escape asks for the row as it was (the page's script turns
+    Escape into the `bs-cancel` event: htmx's `keyup[key=='Escape']` filter
+    needs `eval`, which CSP=strict forbids). Errors (422) appear under the
+    field without replacing anything. -#}
+{% from "renox/ui.html" import input, button %}
+<li id="item-{{ item.id }}">
+  <form class="bs-checklist__edit" method="post" action="{{ route('about.htmx.update', item.id) }}"
+        hx-patch="{{ route('about.htmx.update', item.id) }}" hx-target="closest li" hx-swap="outerHTML">
+    {{ csrf_field() }}{{ method_field('PATCH') }}
+    {{ input("title", t('htmx.item'), value=item.title, required=true, hide_label=true, id="title-" ~ item.id,
+             attrs={"autofocus": true, "maxlength": 60, "data-bs-cancel": true, "hx-get": route('about.htmx.row', item.id), "hx-trigger": "bs-cancel",
+                    "hx-target": "closest li", "hx-swap": "outerHTML"}) }}
+    {{ button(t('htmx.save'), size="small") }}
+  </form>
+</li>

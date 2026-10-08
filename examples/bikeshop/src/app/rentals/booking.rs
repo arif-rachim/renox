@@ -144,6 +144,7 @@ impl Refusal {
 /// (reserved, with its quote and a fresh `Ulid` code). The owner store is
 /// copied from the bike, so the books never change if the bike moves
 /// later. `Ok(Err(refusal))` when the bike was taken meanwhile.
+// [explain:rentals.create.book]
 pub async fn book(db: &Db, new: NewRental) -> Result<std::result::Result<Rental, Refusal>> {
     let mut tx = db.begin_immediate().await?;
     let result = book_in(&mut tx, &new).await?;
@@ -154,7 +155,9 @@ pub async fn book(db: &Db, new: NewRental) -> Result<std::result::Result<Rental,
     }
     Ok(result)
 }
+// [/explain:rentals.create.book]
 
+// [explain:rentals.create.book]
 async fn book_in(
     tx: &mut Transaction,
     new: &NewRental,
@@ -175,6 +178,7 @@ async fn book_in(
     {
         return Ok(Err(Refusal::Taken));
     }
+    // [/explain:rentals.create.book]
     let q = quote(&bike, new.start, new.end);
     let rental = Rental::create(
         &mut *tx,
@@ -196,8 +200,10 @@ async fn book_in(
         },
     )
     .await?;
+    // [explain:rentals.create.book]
     Ok(Ok(rental))
 }
+// [/explain:rentals.create.book]
 
 /// The local wall-clock time `local` in `APP_TIMEZONE`, as a moment (UTC).
 /// A time skipped by daylight saving time moves an hour on.

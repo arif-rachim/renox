@@ -1,5 +1,0 @@
-{#- An order's status as a badge; each has its own color and the word says it too. -#}
-{% macro status_badge(status, label=none) -%}
-{% from "renox/ui.html" import badge %}
-{{ badge(label or status, kind={"pending": "warning", "paid": "info", "shipped": "success", "cancelled": "error"}[status]) }}
-{%- endmacro %}

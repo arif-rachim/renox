@@ -3,7 +3,7 @@
     payments, its ledger, and the actions its status and the user's
     permissions in its store allow. -#}
 {% from "renox/ui.html" import page_header, card, infolist, entry, table, badge, button, link_button, action_sheet, confirm, input, textarea, alert %}
-{% from "blocks/quantity.html" import quantity %}
+{% from "renox-blocks/blocks.html" import quantity %}
 {% block seo %}{{ seo(title=t('sales.orders.title', number=data.number)) }}{% endblock %}
 
 {% block content %}
@@ -15,6 +15,7 @@
     {%- if data.can_sell and o.status == "paid" %}
       <form method="post" action="{{ route('sales.orders.ready', o.id) }}">{{ csrf_field() }}{{ button(t('sales.staff.mark_shipped' if o.delivery else 'sales.staff.mark_ready'), key="r") }}</form>
     {%- endif %}
+    {# [explain:sales.orders.show.template] #}
     {%- if data.can_sell and o.status in ["paid", "ready"] %}
       {% call action_sheet("complete-order", t('sales.staff.hand_over'), route('sales.orders.complete', o.id), t('sales.staff.hand_over_title', number=o.number), description=t('sales.staff.hand_over_text'), variant="primary", key="h") %}
         {%- for bike in data.bikes %}
@@ -28,6 +29,7 @@
     {%- if data.can_sell and o.status == "pending" %}
       {{ confirm("cancel-order", t('sales.staff.cancel'), route('sales.orders.cancel', o.id), t('sales.staff.cancel_title', number=o.number), t('sales.staff.cancel_text'), method="POST") }}
     {%- endif %}
+    {# [/explain:sales.orders.show.template] #}
     {%- if data.can_refund and data.returnable %}
       {% call action_sheet("return-order", t('sales.staff.return'), route('sales.orders.return', o.id), t('sales.staff.return_title', number=o.number), description=t('sales.staff.return_text', days=14), danger=true, width="lg") %}
         {%- for line in o.lines %}

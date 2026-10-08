@@ -8,6 +8,7 @@
 {{ styles() }}
 <div class="rx-stack" data-bs-reveal>
   {{ page_header(t('multistore.help.hours_title'), subtitle=t('multistore.help.hours_lead'), back=route('multistore.help'), back_label=t('multistore.help.title')) }}
+  {# [explain:multistore.help.hours.template] #}
   {% call stats(2) %}
     {{ stat(t('multistore.help.total_hours'), total_hours | round(1)) }}
     {{ stat(t('multistore.help.people'), rows | length) }}
@@ -19,7 +20,8 @@
       <tr><td>{{ r.name }}</td><td>{{ r.home }}</td><td>{{ r.store }}</td><td class="rx-num">{{ r.days }}</td><td class="rx-num">{{ r.hours | round(1) }}</td></tr>
       {%- endfor %}
     {% endcall %}
-    {%- else %}{{ empty(t('multistore.help.no_hours')) }}{% endif %}
+  {# [/explain:multistore.help.hours.template] #}
+    {%- else %}{{ empty(t('multistore.help.no_hours'), icon="clock") }}{% endif %}
   {% endcall %}
 </div>
 {% endblock %}

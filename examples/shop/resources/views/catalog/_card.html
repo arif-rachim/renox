@@ -1,7 +1,0 @@
-{#- A product as the kit's `media_card` (in a `card_grid`). -#}
-{% from "renox/ui.html" import media_card %}
-{{ media_card(route('products.show', product.slug), product.name,
-              image=(storage_url(product.photo) if product.photo else none),
-              subtitle=(product.price | money),
-              note=(t('products.sold_out') if product.stock == 0 else none),
-              dimmed=(product.stock == 0)) }}

@@ -1,0 +1,14 @@
+{#- A category's line icon, from its link (`/shop/road-bikes`): the kit's
+    `icon` with the closest Lucide drawing, as Lucide has no bike types
+    (docs/ui.md). A category without one gets the tag.
+    {% from "layouts/_category_icon.html" import category_icon %}{{ category_icon(child.href) }} -#}
+{%- set CATEGORY_ICONS = {
+  "bikes": "bike", "road-bikes": "bike", "mountain-bikes": "mountain", "city-bikes": "building-2",
+  "folding-bikes": "train-front", "e-bikes": "zap", "kids-bikes": "baby",
+  "gear": "hard-hat", "helmets": "hard-hat", "lights": "flashlight", "locks": "lock", "clothing": "shirt", "bags": "backpack",
+  "parts": "cog", "chains": "link", "tyres": "circle-dot", "brakes": "disc-3", "drivetrain": "cog", "saddles": "armchair",
+} %}
+{% macro category_icon(href, size=18) -%}
+{%- from "renox/ui.html" import icon %}
+{{- icon(CATEGORY_ICONS[(href | string | split('/') | last)] or "tag", size=size) -}}
+{%- endmacro %}

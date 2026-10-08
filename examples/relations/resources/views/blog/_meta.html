@@ -1,4 +1,0 @@
-<p class="rx-row rx-subtitle">
-  {% if post.category %}<a class="rx-link" href="{{ route('categories.show', post.category.id) }}">{{ post.category.name }}</a>{% else %}<span>Uncategorized</span>{% endif %}
-  {% for tag in post.tags %} <a class="rx-link" href="{{ route('tags.show', tag.id) }}">#{{ tag.name }}</a>{% endfor %}
-</p>

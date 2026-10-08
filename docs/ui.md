@@ -145,7 +145,9 @@ Add the kit's stylesheet and script to the layout, and the toast region to the b
 ```
 
 - `renox_head()` adds what every Renox page needs in `<head>`.
-- `renox_ui()` adds the kit's stylesheet and script.
+- `renox_ui()` adds the kit's stylesheet and script. The script loads the parts few pages
+  have (charts and the period filter, the wizard, the repeater and key/value, tags) only when
+  a page, or what htmx swaps in, has one.
 - `{{ toasts() }}` is the place where toasts appear.
 
 ### A first form
@@ -198,7 +200,7 @@ field uses a sensible default.
 | `checkbox_list(name, label, options, selected=[…], inline=…, columns=…)` | Several choices. Each ticked option sends `name` once. So the form's field in Rust is a `Vec`, with `#[serde(default)]` (when nothing is ticked, nothing is sent). |
 | `toggle_buttons(name, label, options, selected=…, multiple=…)` | The options as a row of buttons; the pressed ones are filled and checked. Without `multiple`, one choice (a radio group underneath). With `multiple`, several (checkboxes underneath). |
 | `file(name, label, accept=…, multiple=…, preview=…, current=…, current_name=…)` | An upload area: drop files on it, or click it to pick them. The chosen files are listed under it; images get a small picture when `preview` is on. `current` is the URL of the file stored now, and `current_name` the name shown for it. The form needs `enctype="multipart/form-data"`. The Rust field is an `Upload` when the file is required, an `Option<Upload>` when it may be left out (an edit form keeping the current file), and a `Vec<Upload>` with `multiple`. |
-| `date_picker(name, label, value=…, min=…, max=…, placeholder="YYYY-MM-DD", readonly=…)` | A date: typed as `2026-10-02`, or picked from a calendar. The calendar is Cally, opening in a small box under the field, with the month named in the page's language. The date is sent as `YYYY-MM-DD`, like `<input type="date">`, so the Rust field is a `NaiveDate`. Without JavaScript it is a plain text field. |
+| `date_picker(name, label, value=…, min=…, max=…, placeholder="YYYY-MM-DD", readonly=…, disabled_dates=[…], closed_weekdays=[…])` | A date: typed as `2026-10-02`, or picked from a calendar. The calendar is Cally, opening in a small box under the field, with the month named in the page's language. The date is sent as `YYYY-MM-DD`, like `<input type="date">`, so the Rust field is a `NaiveDate`. `disabled_dates` and `closed_weekdays` are days that can't be chosen: see [Days that can't be chosen](#days-that-cant-be-chosen). Without JavaScript it is a plain text field. |
 | `show_when(field, values)` + `hide_when(field, values)` | Fields shown (or hidden) while another field has one of `values`. Hidden fields are disabled, so the form doesn't send them. Check them on the server with `required_if`. Without JavaScript they stay visible. |
 | `select(…, multiple=true, searchable=true)` | Pick several values (a `Vec`), with a box to type in that filters the options. The chosen ones show as chips (small rounded labels). The browser's own select stays underneath: the form sends the same thing, and it works without JavaScript. |
 | `select(…, options_url=…, editable=true)` | The options come from the server as you type (`renox::select`), for lists too long to put in the page. With `editable`, what was typed can be added ("Add “…”") and is chosen at once, and the chosen option can be renamed (with the pencil). See [Options from the server](#options-from-the-server) below. |
@@ -244,8 +246,10 @@ suggests three cities. Below, a "Delivery" group asks for a speed (one choice) a
 ### Rows of fields
 
 Some forms have a list inside them: the people to invite to a team, the lines of an order.
-examples/teams' "New team" wizard does this. Each row's input is named `invites[0][email]`,
-`invites[1][email]`, and so on. `Valid` reads them into a `Vec`.
+The bike shop's store hours do this ([staff/stores/edit.html](../examples/bikeshop/resources/views/staff/stores/edit.html),
+a repeater row per day, named `hours[0][day]`, `hours[0][opens]`…). In the example below
+each row's input is named `invites[0][email]`, `invites[1][email]`, and so on. `Valid` reads
+them into a `Vec`.
 
 ```html
 {% from "renox/ui.html" import wizard, wizard_step, repeater, input %}
@@ -327,8 +331,8 @@ Here is what the kit sends to that URL, and what the handler answers:
 If adding or renaming fails, a 422 answer from `Valid` (say, "that name is already taken")
 shows its first message under the field. Escape gives up a rename.
 
-Who may add or rename is up to the route. examples/shop puts the three handlers inside its
-admin group, so only admins can.
+Who may add or rename is up to the route: put the three handlers inside a group that only
+the people allowed can reach (an admin group, a `require_permission`).
 
 Here is the handler that answers the `GET`s:
 
@@ -365,8 +369,9 @@ Without JavaScript, the browser's own select shows only the options in the page.
 
 ### A field that depends on another
 
-Sometimes a field matters only when another field has a certain value. examples/shop's
-checkout asks for an address only for delivery by courier, and requires it only then:
+Sometimes a field matters only when another field has a certain value. The bike shop's
+checkout ([sales/checkout/show.html](../examples/bikeshop/resources/views/sales/checkout/show.html)) asks
+for an address only for delivery, and requires it only then:
 
 ```html
 {% from "renox/ui.html" import toggle_buttons, show_when, textarea, date_picker %}
@@ -395,6 +400,48 @@ impl Validate for Checkout {
 
 `required_if(…)` makes the field required only when the condition is true.
 
+### Days that can't be chosen
+
+A booking form shouldn't offer a day the shop is closed or already full. `date_picker` takes
+those days, and examples/bikeshop's workshop booking uses them:
+
+```html
+{% from "renox/ui.html" import date_picker %}
+{{ date_picker("day", "Visit day", min="2026-10-06", max="2026-11-30", required=true,
+               disabled_dates=["2026-10-12", "2026-10-13"], closed_weekdays=[0]) }}
+```
+
+- `disabled_dates` is a list of days (`"YYYY-MM-DD"`, or `NaiveDate`s from the handler).
+- `closed_weekdays` are the weekdays that are never open: 0 is Sunday, 1 Monday … 6 Saturday,
+  as chrono's `weekday().num_days_from_sunday()` counts them.
+
+The calendar shows those days faint and struck through, and they can't be picked. The arrow
+keys step over them: from a Tuesday before two closed days, → lands on the Friday after. A
+closed day typed or pasted into the field is pointed out at once, under the field ("That day
+can't be chosen: pick another one", the text `ui.date_unavailable`), and the browser won't
+send the form until it's changed.
+
+That is only a help: anyone can send any date. The server refuses them too:
+
+```rust
+# use renox::prelude::*;
+# use renox::chrono::{Datelike, NaiveDate};
+# struct Booking { day: Option<NaiveDate>, full: Vec<NaiveDate> }
+/// The booking form: a day that is open and not full.
+impl Validate for Booking {
+    fn rules(&self, v: &mut Validator) {
+        let sunday = self.day.is_some_and(|d| d.weekday().num_days_from_sunday() == 0);
+        v.field("day", &self.day)
+            .required()
+            .none_of(&self.full)
+            .rule(!sunday, "We're closed on Sundays.");
+    }
+}
+```
+
+When the full days come from the database, check them in the form's `after` hook instead
+(see [docs/validation.md](validation.md#hooks-prepare-authorize-after)).
+
 ### Buttons, surfaces and other parts
 
 The rest of the kit's everyday components:
@@ -414,18 +461,60 @@ The rest of the kit's everyday components:
 | `action_group(label=none, icon=none)`, `wizard_action(…)`, `import_action(…)` | Several actions behind one button, an action with steps, a CSV import. See [Actions](#action-groups). |
 | `tabs(id, items, selected=…, label=…)` + `tab_panel(id, key, selected=…)` | A segmented control: tabs that switch between panels on one page. The arrow keys, Home and End move between tabs. |
 | `table(head, caption=…)` | A table in a card. A heading `["Total", "num"]` lines its column up on the right (for numbers), and `["Slug", "hide-narrow"]` hides the column on phones. |
-| `empty(title, message=…, action_href=…, action_label=…)` | What an empty list says. With `action_href` (and its `action_label`), it adds a link to add the first item. |
+| `empty(title, message=…, action_href=…, action_label=…, icon=…)` | What an empty list says; `icon` draws one of the kit's icons in a tinted circle above it. With `action_href` (and its `action_label`), it adds a link to add the first item. |
 | `notification_bell(count=none, id="rx-notifications")` | The logged-in user's notifications, in the navigation bar: a badge with the unread count, a panel, and new ones arriving live as toasts. Needs `Auth::new().notifications()`; pass `unread_notifications`. See [docs/mail.md](mail.md#the-bell). |
 | `event_stream()` | Opens the same live stream on a page without the bell, so the app's events (`state.broadcast(…)`) arrive as DOM events. Nothing for guests. See [docs/mail.md](mail.md#your-own-live-events). |
+
+### Icons
+
+The kit draws its icons from [Lucide](https://lucide.dev)'s line icons (ISC licence), inline
+in the page, in the text's colour:
+
+```html
+{% from "renox/ui.html" import icon %}
+<h2>{{ icon("bike") }} Workshop</h2>
+{{ icon("truck", size=16) }} Free delivery over $50
+{{ icon("lock", label="Private") }}
+```
+
+- `size` is in pixels (20 by default); the stroke is 1.75 at every size.
+- An icon is decorative: screen readers skip it (`aria-hidden`), since the text beside it says
+  the same. An icon that stands alone and means something gets a `label`, which makes it an
+  image with that name (`role="img"` and `aria-label`). A button with only an icon is an
+  `icon_button`, whose label does that.
+- Buttons, menu items and infolist actions take the same names (`icon="truck"`). The kit's
+  older short names still work there: `edit`, `trash`, `close`, `more`, `external`,
+  `refresh`, `prev`, `next`, `up`, `down`, `box` and `home`.
+- An unknown name draws nothing.
+
+The set has 112 icons, the ones a shop or a back office needs:
+
+- Navigation and actions: `menu`, `x`, `search`, `plus`, `minus`, `pencil`, `trash-2`, `check`, `chevron-left`, `chevron-right`, `chevron-up`, `chevron-down`, `arrow-left`, `arrow-right`, `external-link`, `download`, `upload`, `refresh-cw`, `settings`, `ellipsis`, `filter`, `sliders-horizontal`, `eye`, `eye-off`, `copy`, `log-in`, `log-out`, `house`, `bell`, `heart`, `star`, `printer`, `list`, `layout-dashboard`, `scan-barcode`, `inbox`.
+- Shop and money: `shopping-cart`, `shopping-bag`, `tag`, `credit-card`, `receipt`, `package`, `boxes`, `truck`, `store`, `banknote`, `percent`, `gift`, `hand-coins`, `shirt`, `backpack`, `award`, `sparkles`.
+- Bikes, service and places: `bike`, `wrench`, `hammer`, `gauge`, `droplets`, `ruler`, `key-round`, `lock`, `battery-charging`, `mountain`, `baby`, `hard-hat`, `lightbulb`, `building-2`, `route`, `map`, `map-pin`, `calendar`, `calendar-days`, `calendar-check`, `clock`, `timer`, `history`, `zap`, `flashlight`, `link`, `cog`, `disc-3`, `circle-dot`, `armchair`, `train-front`.
+- People: `user`, `users`, `circle-user`, `shield`, `shield-check`, `id-card`, `handshake`.
+- Charts: `chart-column`, `chart-line`, `chart-pie`, `trending-up`, `trending-down`.
+- Files and messages: `file`, `file-text`, `folder`, `image`, `paperclip`, `clipboard-list`, `mail`, `phone`, `book-open`, `tablet-smartphone`.
+- Status: `info`, `circle-check`, `circle-alert`, `triangle-alert`, `circle-x`, `circle-help`.
+
+Lucide has no bike types; for categories use the closest: `bike`, `mountain`, `building-2`
+(city), `train-front` (folding), `zap` or `battery-charging` (e-bikes), `baby` (kids),
+`hard-hat` (helmets), `flashlight` (lights), `lock` (locks), `shirt` (clothing), `backpack`
+(bags), `circle-dot` (tyres), `link` (chains), `disc-3` (brakes), `cog` (drivetrain),
+`armchair` (saddles).
+
+`sidebar_link`, `stat` and `empty` take an `icon` too: beside the link's label, and in a
+tinted circle on a stat card's corner or above an empty state's title. Another Lucide icon is a line in `crates/renox-core/src/icons.rs`,
+copied from lucide-static's `icons/<name>.svg`.
 
 ### Navigation and page structure
 
 The frame of a page comes from the kit too. So an app writes no CSS for its navigation bar,
 its sidebar or its page headings.
 
-Every example is built this way. examples/backoffice has a sidebar. examples/shop has a
-navigation bar with links, a cart count and menus. [examples/bikeshop](../examples/bikeshop) has both (a public navbar, a
-staff sidebar) and shows how to add what the kit lacks as "blocks" of the app's own.
+Both examples are built this way. [examples/bikeshop](../examples/bikeshop) has a public
+navigation bar with links, a cart count and menus, and a staff sidebar; its pages use
+renox-blocks for what the kit lacks. [examples/hello](../examples/hello) has a navigation bar.
 
 A navigation bar on top looks like this:
 
@@ -452,6 +541,52 @@ The bar shows the app's name (a link home), two links (Products, and Cart with a
 on the right a menu with the user's name. `active=route_is('products.*')` highlights
 "Products" on every products page.
 
+#### Tabs at the bottom on phones
+
+On a phone, a shop's main sections are easier to reach at the bottom of the screen, under
+the thumb. Give `navbar` its `tabs`, and under 36rem (the kit's phone width) the bar on top
+keeps one row while the sections become a tab bar floating at the bottom. examples/bikeshop's
+public pages work this way:
+
+```html
+{% from "renox/ui.html" import navbar, nav_links, nav_link, nav_search, sheet, sidebar_link %}
+{%- set tabs = [
+  {"href": route('home'), "label": "Home", "icon": "house", "active": route_is('home')},
+  {"href": route('catalog.index'), "label": "Shop", "icon": "shopping-bag", "active": route_is('catalog.*')},
+  {"href": route('orders.index'), "label": "Orders", "icon": "receipt", "active": route_is('orders.*'), "badge": open_orders},
+  {"open": "site-menu", "label": "Menu", "icon": "menu"},
+] %}
+{% call navbar(app.name, href=route('home'), width="wide", tabs=tabs) %}
+  {% call nav_links() %}…the same sections, for wider screens…{% endcall %}
+  <span class="rx-spacer"></span>
+  {% call nav_search(label="Search") %}
+    <form role="search" method="get" action="{{ route('catalog.search') }}">…</form>
+  {% endcall %}
+  <span class="rx-hide-narrow">{{ link_button(route('login'), "Log in", variant="plain", size="small") }}</span>
+{% endcall %}
+{% call sheet("site-menu", "Menu", slide_over=true, width="sm") %}
+  {{ sidebar_link(route('login'), "Log in") }}
+{% endcall %}
+```
+
+- Each tab is a link (`href`, `label`, an [icon](#icons), `active`), or, with `open`, a button
+  that opens the `sheet` of that id: the place for everything the tabs leave out. Four or
+  five tabs fit a phone; a long label is cut short. `badge` shows a count.
+- `active` marks the current tab with `aria-current="page"`, as `nav_link` does; the current
+  tab's icon sits on the accent colour, and its label is bold (not colour alone).
+- `nav_search` holds a search form: in the bar on wide screens; on phones behind a search
+  button, opening on a row under the bar with its field focused. Escape, or the button again,
+  closes it and puts the focus back on the button.
+- `nav_links` leave the phone's bar (the tabs replace them), and so does anything in an
+  element with `rx-hide-narrow` (a language menu, the account menu: put them in the sheet).
+- The tab bar keeps above the home indicator (`env(safe-area-inset-bottom)`; add
+  `viewport-fit=cover` to the viewport meta tag to use the whole screen), the page gets room
+  at its end so nothing hides behind the bar, and nothing is wider than the screen.
+- The tabs are links and buttons in the page's order, after the bar on top: Tab reaches each
+  one, with the focus ring on the dark bar. `tabs_label` names the tab bar for screen readers
+  ("Sections", the kit text `ui.sections`).
+- Without `tabs`, `navbar` is as before.
+
 A back office puts its sections down the side instead:
 
 ```html
@@ -476,9 +611,10 @@ top holds the notification bell, and the page's content goes under it.
 
 | Component | What it is |
 |---|---|
-| `navbar(brand, href="/", logo=…, mark=…, width="narrow", label=…, skip=true)` | The bar on top: see-through, it stays at the top while you scroll ("sticky"), with a hairline under it. `brand` links to `href` (`none` for no brand). `logo` is an image URL; `mark=true` shows the name's first letter in the accent colour. `width` matches the page: `narrow` (`rx-container`), `wide` (`rx-container--wide`) or `full`. It starts with a "Skip to content" link to `#main`, for keyboard users. |
-| `nav_links()` + `nav_link(href, label, active=…, badge=…)` | The bar's sections. `active` (usually `route_is('….*')`) marks the current one, with `aria-current` for screen readers. `badge` shows a count. On phones the links get a row of their own that scrolls sideways. |
-| `sidebar(brand, href="/", logo=…, mark=true, label=…, skip=true)` + `sidebar_link(href, label, active=…, badge=…)`, `sidebar_section(title)` | Sections down the side, for back offices. The page is built like this: `rx-shell` on `<body>`, the sidebar, then `rx-shell__main` holding a full-width `navbar` and `<main class="rx-shell__content">`. On phones the sidebar becomes a bar of links on top. |
+| `navbar(brand, href="/", logo=…, mark=…, width="narrow", label=…, skip=true, tabs=[…], tabs_label=…)` | The bar on top: see-through, it stays at the top while you scroll ("sticky"), with a hairline under it. `brand` links to `href` (`none` for no brand). `logo` is an image URL; `mark=true` shows the name's first letter in the accent colour. `width` matches the page: `narrow` (`rx-container`), `wide` (`rx-container--wide`) or `full`. It starts with a "Skip to content" link to `#main`, for keyboard users. `tabs`: a tab bar at the bottom on phones ([above](#tabs-at-the-bottom-on-phones)). |
+| `nav_search(label=…, id=…)` | A search form in the bar; on phones behind a search button that opens it on a row under the bar. |
+| `nav_links()` + `nav_link(href, label, active=…, badge=…)` | The bar's sections. `active` (usually `route_is('….*')`) marks the current one, with `aria-current` for screen readers. `badge` shows a count. On phones the links get a row of their own that scrolls sideways (with `tabs`, the tab bar replaces them). |
+| `sidebar(brand, href="/", logo=…, mark=true, label=…, skip=true)` + `sidebar_link(href, label, active=…, badge=…, icon=…)`, `sidebar_section(title)` | Sections down the side, for back offices. The page is built like this: `rx-shell` on `<body>`, the sidebar, then `rx-shell__main` holding a full-width `navbar` and `<main class="rx-shell__content">`. On phones the sidebar becomes a bar of links on top. |
 | `page_header(title, subtitle=…, back=…, back_label=…, badge=…, badge_kind=…)` | A page's heading: the title (with a badge), a line under it, a link back (`back`), and the call block's buttons at the end of the row (under the title on phones). |
 | `toolbar()` | Filter fields side by side. They wrap onto more lines on narrow screens, and line up with their buttons. There are no "(optional)" marks, since filters are all optional. Put it inside the `<form>`. |
 | `row_actions()` | A table row's buttons, at the end of the row. On phones only the icons show (the labels stay for screen readers). |
@@ -531,10 +667,10 @@ The kit's own texts ("optional", "Cancel", the error summary's title) are in Eng
 can change or translate them in `lang/<locale>.json` (for example `es.json` for Spanish):
 
 - the kit: `ui.optional`, `ui.cancel`, `ui.close`, `ui.dismiss`, `ui.more`, `ui.skip`
-  ("Skip to content"), `ui.main_navigation`, `ui.errors_title`, `ui.loading`, `ui.back` (the
+  ("Skip to content"), `ui.main_navigation`, `ui.sections` (the tab bar), `ui.errors_title`, `ui.loading`, `ui.back` (the
   wizard and `page_header`'s back link) and `ui.next` (the wizard);
 - the fields: `ui.show_password`, `ui.hide_password`, `ui.copy`, `ui.copied`,
-  `ui.choose_file`, `ui.choose_files`, `ui.current_file`, `ui.choose_date`,
+  `ui.choose_file`, `ui.choose_files`, `ui.current_file`, `ui.choose_date`, `ui.date_unavailable`,
   `ui.previous_month`, `ui.next_month`, `ui.remove`, `ui.add_row`, `ui.move_up`,
   `ui.move_down`, `ui.key` and `ui.value`;
 - the searchable select: `ui.search`, `ui.no_results`, `ui.searching`, `ui.load_failed`,
@@ -585,17 +721,40 @@ The look is a set of tokens on `:root` (in renox-ui.css):
 - the button shape;
 - and a type scale (the sizes of text).
 
-The default theme is "warm". `data-rx-theme="classic"` on `<html>` brings back the kit's
-first look: system fonts, Apple's web blue, cool greys, pill-shaped buttons, no hairlines and
-no small capitals.
+The default theme is **"editorial"** (from the bike shop example):
+- a cream page and white surfaces;
+- a teal accent with a terracotta second accent;
+- large Poppins headlines;
+- pill buttons and generous corners.
+
+Inside an app shell (`rx-shell`: a sidebar and dense pages) the buttons are rounded rectangles.
+
+Two other themes are a `data-rx-theme` on `<html>` away:
+- `"warm"` is the default before 1.1: an indigo accent on warm paper, rounded-rectangle
+  buttons.
+- `"classic"` is the kit's first look: system fonts, Apple's web blue, cool greys, pill-shaped
+  buttons, no hairlines and no small capitals.
 
 ```html
-<html lang="{{ app.locale }}" data-rx-theme="classic">
+<html lang="{{ app.locale }}" data-rx-theme="warm">
 ```
 
+Besides the colours every theme has, the editorial theme brings tokens for pages that sell or
+tell a story. Every theme defines them:
+
+| Token | For |
+|---|---|
+| `--rx-accent-2`, `--rx-accent-2-text` | a second accent (a badge, a word in a headline) |
+| `--rx-tint` | a sand-coloured band or photo background |
+| `--rx-accent-soft` | a soft accent background (an icon's circle) |
+| `--rx-ink` | a dark band, such as a footer |
+| `--rx-type-hero`, `--rx-type-section` | a landing page's headline, a section's heading |
+
+Every text colour keeps 4.5:1 on every background (WCAG AA), in light and dark.
+
 An app's own `:root` tokens, in a stylesheet loaded after `renox_ui()`, win over either
-theme. So a brand colour stays when the theme changes. examples/shop keeps its brown this
-way, and examples/backoffice a colour from its settings.
+theme. So a brand colour stays when the theme changes. The bike shop keeps its teal and
+terracotta this way ([public/theme.css](../examples/bikeshop/public/theme.css)).
 
 ### The type scale
 
@@ -604,10 +763,10 @@ family) in `rem`. Because it uses `rem`, it follows the reader's own text size s
 
 The kit's components use these roles, and an app can too: `font: var(--rx-type-heading)`.
 
-| Token | For | Warm | Classic |
+| Token | For | Editorial and warm | Classic |
 |---|---|---|---|
 | `--rx-type-display` | the figure that matters: a stat, a total | Poppins 600, 32 px | system 600, 28 px |
-| `--rx-type-title` | a page's title (`rx-title`, `page_header`) | Poppins 600, 28 px | system 700, 22 px |
+| `--rx-type-title` | a page's title (`rx-title`, `page_header`) | Poppins 700, 30–40 px (warm: 600, 28 px) | system 700, 22 px |
 | `--rx-type-heading` | a card, widget, sheet or grid title | Poppins 600, 17 px | system 600, 19 px |
 | `--rx-type-lead` | the line under a page's title | Inter 400, 16 px | system 400, 15 px |
 | `--rx-type-body` | text, table cells, fields | Inter 400, 15 px | system 400, 17 px |
@@ -617,7 +776,7 @@ The kit's components use these roles, and an app can too: `font: var(--rx-type-h
 
 (600 and 700 are font weights: how bold the text is. 400 is normal.)
 
-What the warm theme makes stand out:
+What the editorial and warm themes make stand out:
 
 - A stat's figure is the largest thing on its card. On a small card it shrinks rather than
   breaking in the middle of the number. Its change is shown in a tinted pill.
@@ -705,7 +864,8 @@ Code shown coloured, read-only and copyable (`code_entry`), and editors for rich
 and code, come from the `renox-editors` crate: see [editors.md](editors.md).
 
 For sections and tabs, use the kit's own `card`, `fieldset` and `tabs`, and put an infolist
-in each. examples/shop's order page and examples/fields' product page are built this way.
+in each. The bike shop's order page and the sample page of its `/about/fields`
+([about/fields_show.html](../examples/bikeshop/resources/views/about/fields_show.html)) are built this way.
 
 ### Formatting values
 
@@ -889,8 +1049,7 @@ The details:
 - From the page's own JavaScript: `Renox.request("POST", "/orders/7/retry")`.
 - A toast pushed from the server to open pages (`state.broadcast_to(user_id, "renox:toast",
   json!({ "toasts": [toast] }))`, see [mail.md](mail.md#your-own-live-events)) can carry one
-  too: [examples/jobs](../examples/jobs) tells the staff about a failed charge with a
-  "Reopen" button.
+  too, say a "Reopen" button on a failed charge.
 
 Toasts go away. For notifications that stay (a bell in the navigation bar, with new ones
 arriving live), see [mail.md](mail.md#the-bell).
@@ -1067,7 +1226,8 @@ holds all the versions in one line, using Laravel's plural ranges:
 
 For example: `"{0} Sold out|{1} Only one left|[2,5] Only :count
 left|[6,*] :count in stock"`. Print it with
-`{{ t('products.in_stock', count=product.stock) }}` (examples/shop).
+`{{ t('products.in_stock', count=product.stock) }}`. The bike shop counts its search results
+this way (`catalog.found` in [resources/lang/en.json](../examples/bikeshop/resources/lang/en.json)).
 
 ## Actions
 
@@ -1156,10 +1316,9 @@ The action sheet's other options:
 These work on every button (`button`, `link_button`, `open_button`, `icon_button`), except
 the disabled reason at the end of the list:
 
-- **An icon** before the label, by name: `icon="plus"`. The kit's icons are `plus`, `edit`,
-  `trash`, `check`, `close`, `copy`, `download`, `upload`, `external`, `refresh`, `search`,
-  `settings`, `more`, `box`, `calendar`, `eye`, `up`, `down`, `prev`, `next`, and the
-  status icons `info`, `success`, `warning`, `error`.
+- **An icon** before the label, by name: `icon="plus"`. Any name of the kit's
+  [icons](#icons) works, and so do the status marks `info`, `success`, `warning` and
+  `error`.
 - **A count**: `badge=3`. A 0 is shown; an empty string or `none` isn't.
 - **A keyboard shortcut**: `key="mod+s"`.
   - `mod` is ⌘ on a Mac and Ctrl elsewhere. You can also use `ctrl`, `alt`, `shift`, and keys
@@ -1180,14 +1339,14 @@ An `icon_button`'s `label` is read out by screen readers. It's also shown as a t
 a short hover, or at once when the button gets keyboard focus. Any element can have a tooltip
 with `data-rx-tip="…"`.
 
-examples/shop's admin product list has all of these:
+The bike shop has all of these:
 
-- an "Adjust stock" action on each row;
-- an edit `icon_button`;
-- a "view in the shop" button, disabled with a reason for hidden products;
-- the "New product" button on the `n` key.
-
-Its product form also saves on ⌘S / Ctrl+S.
+- a "Write off" `action_sheet` on a stock level's page
+  ([stock/ledger.html](../examples/bikeshop/resources/views/stock/ledger.html));
+- the counter's buttons on keys, and "Pay" disabled with a reason while the sale is empty
+  ([sales/counter/show.html](../examples/bikeshop/resources/views/sales/counter/show.html));
+- "New item" on the `n` key on `/about/htmx`
+  ([about/htmx.html](../examples/bikeshop/resources/views/about/htmx.html)).
 
 ### Action groups
 
@@ -1369,9 +1528,10 @@ format. The grid only says which columns: those shown by default, in their order
 {{ menu_link(route('products.ledger', product.id), "Export ledger (CSV)", icon="download", download=true) }}
 ```
 
-examples/backoffice uses all of these: "New product" is a `wizard_action`, "More" on the
-product list is an `action_group` with the `import_action` and its template, and a product's
-page has an action group with "Duplicate" and "Export ledger".
+The bike shop's stock page has an `action_group`
+([stock/index.html](../examples/bikeshop/resources/views/stock/index.html)), and a supplier's page
+the `import_action` with its template
+([stock/suppliers/show.html](../examples/bikeshop/resources/views/stock/suppliers/show.html)).
 
 ## Dashboards
 
@@ -1511,12 +1671,13 @@ The parts, one by one:
   - Every chart also has a "Show the data" table, so no value is only in a colour or a
     tooltip.
 - **`stat(label, value, delta=…, delta_label=…, good="up", trend=…, url=…, hint=…,
-  decimals=1)`** is one figure.
+  decimals=1, icon=…)`** is one figure.
   - `value` is written as it should read: `total | money`.
   - `delta` is its change in percent, with an arrow and its sign. It's green when it goes the
     `good` way: `"up"`, `"down"` or `"none"`. `decimals` is how many decimals the percent
     shows (1 by default).
   - `trend` draws a sparkline (a tiny line chart); `url` makes it a link.
+  - `icon` is one of the kit's icons, in a tinted circle at the card's corner.
   - `stats(columns)` sets stats side by side (two per row on phones).
 - **`dashboard(columns)` + `widget(title, description=…, span=…, url=…, poll=…, id=…)`**:
   cards in a grid (one column on phones; `span=2` or `"full"` for wider cards). `id` names the
@@ -1542,9 +1703,10 @@ The parts, one by one:
   - `query_fields("period", "from", "to")` writes the current query as hidden inputs, without
     `page` and the keys named, for any GET form that should keep the page's other filters.
 
-examples/shop's admin dashboard uses all of it: the period (with 12 weeks and a custom
-range), four figures, revenue against the period before, orders per day, orders by status
-(loaded on their own every minute), products sold as bubbles and orders as a scatter chart.
+The bike shop's reports dashboard ([reports/dashboard.html](../examples/bikeshop/resources/views/reports/dashboard.html))
+uses most of it: the period (with a custom range), figures against the period before with
+their trend, revenue as stacked bars, the mix of income as a doughnut and rental hours as
+bubbles.
 
 ## Data grids
 
@@ -1558,7 +1720,8 @@ server. It fills its container and has:
 - summaries, groups and exports.
 
 You define it in Rust and draw it with the `grid` macro of `renox/grid.html`.
-[docs/grid.md](grid.md) is its guide, and examples/grid is a dashboard built on it.
+[docs/grid.md](grid.md) is its guide, and the bike shop's report grids
+([src/app/reports/grids.rs](../examples/bikeshop/src/app/reports/grids.rs)) are built on it.
 
 `{{ sparkline(values) }}` (a small line or bar chart as inline SVG) works in any template,
 not only in a grid.

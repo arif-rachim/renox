@@ -147,6 +147,7 @@ impl Module for Pages {
             .get("/components", || async {
                 view("components.html", context! { note => "hi" })
             })
+            .get("/icons", || async { view("icons.html", context! {}) })
     }
 }
 
@@ -194,6 +195,7 @@ fn views() -> tempfile::TempDir {
 {{ file("docs", "Documents", multiple=true, required=true) }}
 {{ date_picker("on", "Delivery date", value="2026-10-02", min="2026-10-01", max="2026-12-31") }}
 {{ date_picker("back", "Return date") }}
+{{ date_picker("visit", "Visit", disabled_dates=["2026-10-07", "2026-10-08"], closed_weekdays=[0, 6]) }}
 </form>"#,
     );
     write(
@@ -205,6 +207,9 @@ fn views() -> tempfile::TempDir {
 {% call(row, prefix) repeater("lines", "Lines", rows=[{"name": "Coffee", "qty": 2}], item_label="Line", min=1, max=5) %}
 {{ input(prefix ~ "[name]", "Name", value=row.name, required=true) }}
 {{ input(prefix ~ "[qty]", "Quantity", type="number", value=row.qty) }}
+{% endcall %}
+{% call(row, prefix) repeater("pair", "Pair", rows=[{"n": "a"}, {"n": "b"}], max=2) %}
+{{ input(prefix ~ "[n]", "N", value=row.n) }}
 {% endcall %}
 {% endcall %}
 {% call wizard_step("w", "extra") %}
@@ -245,6 +250,25 @@ fn views() -> tempfile::TempDir {
 {% call table(["Name", ["Total", "num"]]) %}<tr><td>x</td><td class="rx-num">1</td></tr>{% endcall %}
 {{ empty("Nothing yet", "Add one") }}{{ checkbox("agree", "I agree", switch=true) }}
 {{ select("size", "Size", [["s", "Small"], ["m", "Medium"]], selected="m") }}{{ textarea("bio", "Bio", value="about") }}"#,
+    );
+    write(
+        "icons.html",
+        r#"{% from "renox/ui.html" import icon, button %}
+<p id="plain">{{ icon("bike") }}</p>
+<p id="small">{{ icon("truck", size=16) }}</p>
+<p id="named">{{ icon("lock", label="Private & \"locked\"") }}</p>
+<p id="old">{{ icon("trash") }}</p>
+<p id="unknown">{{ icon("no-such-icon") }}</p>
+{{ button("Ship", icon="truck") }}
+{% from "renox/ui.html" import navbar, nav_search %}
+{% call navbar("Shop", tabs=[{"href": "/", "label": "Home", "icon": "house", "active": true}, {"href": "/orders", "label": "Orders", "icon": "receipt", "badge": 2}, {"open": "more", "label": "More", "icon": "menu"}]) %}
+{% call nav_search(label="Find") %}<form role="search"><input name="q"></form>{% endcall %}
+{% endcall %}
+{{ navbar("Plain") }}
+{% from "renox/ui.html" import sidebar_link, stat, empty %}
+<nav id="side">{{ sidebar_link("/stock", "Stock", icon="boxes") }}{{ sidebar_link("/plain", "Plain") }}</nav>
+<div id="stat">{{ stat("Rentals", 4, icon="bike") }}</div>
+<div id="empty">{{ empty("Nothing here", icon="inbox") }}</div>"#,
     );
     dir
 }
@@ -294,6 +318,37 @@ async fn components_see_the_request_and_refill_forms() {
     res.assert_ok()
         .assert_header("cache-control", "public, max-age=31536000, immutable");
     assert!(res.text().contains("--rx-accent"));
+    // The script names its parts loaded on demand (charts, the wizard, the
+    // repeater, tags), each a module at a hashed URL, cached for good too.
+    let url = css
+        .split("src=\"")
+        .filter_map(|rest| rest.split('"').next())
+        .find(|url| url.starts_with("/_renox/ui-") && url.ends_with(".js"))
+        .unwrap()
+        .to_owned();
+    let res = app.get(&url).await;
+    res.assert_ok()
+        .assert_header("cache-control", "public, max-age=31536000, immutable");
+    let script = res.text();
+    assert!(
+        !script.contains("renox:parts"),
+        "the parts' URLs are filled in"
+    );
+    for part in ["chart", "wizard", "repeater", "tags"] {
+        let start = script
+            .find(&format!("/_renox/ui-{part}-"))
+            .unwrap_or_else(|| panic!("{part}'s URL in the script"));
+        let part_url = &script[start..start + script[start..].find('"').unwrap()];
+        assert!(part_url.ends_with(".js"), "{part_url}");
+        let res = app.get(part_url).await;
+        res.assert_ok()
+            .assert_header("cache-control", "public, max-age=31536000, immutable")
+            .assert_header("content-type", "text/javascript; charset=utf-8");
+        assert!(
+            res.text().contains(&format!("kit.ready(\"{part}\"")),
+            "{part} says it's ready"
+        );
+    }
 
     let res = app.get("/components").await;
     let html = res.text();
@@ -468,6 +523,48 @@ async fn form_fields_choices_affixes_and_layout() {
 }
 
 #[renox::test]
+async fn the_icon_macro_draws_lucide_icons_hidden_unless_labelled() {
+    let (app, _dir) = app().await;
+    let page = app.get("/icons").await;
+    let html = page.text();
+    page.assert_ok()
+        // Decorative by default: hidden from screen readers, 20 px, the text's colour.
+        .assert_see(r#"<p id="plain"><svg class="rx-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><circle cx="18.5" cy="17.5" r="3.5"/>"#)
+        .assert_see(r#"<p id="small"><svg class="rx-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16""#)
+        // With a label: an image with that name, escaped.
+        .assert_see(r#"focusable="false" role="img" aria-label="Private &amp; &quot;locked&quot;">"#)
+        // The kit's older names still work; an unknown one draws nothing.
+        .assert_see(r#"<p id="old"><svg class="rx-icon""#)
+        .assert_see(r#"<p id="unknown"></p>"#)
+        // A button's icon comes from the same set.
+        .assert_see(r#"<span class="rx-button__icon" aria-hidden="true"><svg class="rx-icon""#);
+    // A navbar with tabs: a tab bar after the header, the current tab marked,
+    // a button for a sheet; the search behind its button on phones.
+    page.assert_see(r#"<header class="rx-navbar rx-navbar--tabs">"#)
+        .assert_see(r#"<nav class="rx-tabbar" aria-label="Sections">"#)
+        .assert_see(r#"<a class="rx-tabbar__tab" href="/" aria-current="page"><span class="rx-tabbar__icon"><svg class="rx-icon""#)
+        .assert_see(r#"<a class="rx-tabbar__tab" href="/orders"><span class="rx-tabbar__icon">"#)
+        .assert_see(r#"<span class="rx-tabbar__label">Orders</span><span class="rx-tabbar__badge">2</span>"#)
+        .assert_see(r#"<button class="rx-tabbar__tab" type="button" data-rx-open="more" aria-haspopup="dialog">"#)
+        .assert_see(r#"aria-label="Find" aria-controls="rx-nav-search" aria-expanded="false" data-rx-search-toggle>"#)
+        .assert_see(r#"<div class="rx-navbar__search" id="rx-nav-search"><form role="search">"#);
+    // A sidebar link, a stat and an empty state take an icon too; without
+    // one they are as before.
+    page.assert_see(r#"<a class="rx-sidebar__link" href="/stock"><svg class="rx-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18""#)
+        .assert_see(r#"<a class="rx-sidebar__link" href="/plain"><span>Plain</span></a>"#)
+        .assert_see(r#"<div class="rx-stat rx-stat--icon"><span class="rx-stat__icon"><svg class="rx-icon""#)
+        .assert_see(r#"<div class="rx-empty"><span class="rx-empty__icon"><svg class="rx-icon""#);
+    // Without tabs the navbar is as before.
+    assert_eq!(html.matches("rx-tabbar\"").count(), 1, "{html}");
+    assert!(html.contains("<header class=\"rx-navbar\">"), "{html}");
+    let named = html.split(r#"<p id="named">"#).nth(1).unwrap();
+    assert!(
+        !named[..named.find("</svg>").unwrap()].contains("aria-hidden"),
+        "{named}"
+    );
+}
+
+#[renox::test]
 async fn form_fields_buttons_files_dates_and_conditions() {
     let (app, _dir) = app().await;
     let page = app.get("/more").await;
@@ -499,7 +596,11 @@ async fn form_fields_buttons_files_dates_and_conditions() {
         .assert_see(r#"name="on" type="text" inputmode="numeric" autocomplete="off" value="2026-10-02""#)
         .assert_see(r#"popovertarget="rx-on-calendar""#)
         .assert_see(r#"value="2026-10-02" min="2026-10-01" max="2026-12-31">"#)
-        .assert_see(r#"<calendar-date class="rx-calendar" locale="en" first-day-of-week="1">"#);
+        .assert_see(r#"<calendar-date class="rx-calendar" locale="en" first-day-of-week="1">"#)
+        // Days that can't be chosen, for the script, with the message it shows.
+        .assert_see(r#"data-rx-disabled-dates='["2026-10-07","2026-10-08"]' data-rx-closed-weekdays='[0,6]' data-rx-unavailable="That day can&#39;t be chosen: pick another one.""#);
+    // A picker without them carries none.
+    assert_eq!(html.matches("data-rx-disabled-dates").count(), 1, "{html}");
     // The calendar's script once per page, however many pickers.
     assert_eq!(html.matches("/_renox/cally-").count(), 1, "{html}");
     let tail = html.split("src=\"/_renox/cally-").nth(1).unwrap();
@@ -554,6 +655,10 @@ async fn repeaters_tags_key_values_and_wizards() {
         .assert_see(r#"data-error-for="lines.0.name""#)
         .assert_see(r#"name="lines[__INDEX__][name]""#)
         .assert_see(r#"aria-label="Move up""#)
+        // Under its `max`, the add button works; at it, it is disabled
+        // before the repeater's script loads (#349).
+        .assert_see(r#"type="button" data-rx-row-add><svg"#)
+        .assert_see(r#"type="button" data-rx-row-add disabled><svg"#)
         // Tags: a chip and a hidden input per tag, then the box to type in.
         .assert_see(r#"<span class="rx-tag__text">new</span>"#)
         .assert_see(r#"<input type="hidden" name="tags" value="sale">"#)
@@ -756,5 +861,7 @@ async fn the_kit_serves_its_fonts_and_preloads_the_text_one() {
     let css = app.get(&css_url).await.text();
     assert!(css.contains("/_renox/fonts/poppins-latin-600-4.003.woff2"));
     assert!(css.contains(r#":root:where([data-rx-theme="classic"])"#));
+    assert!(css.contains(r#":root:where([data-rx-theme="warm"])"#));
+    assert!(css.contains("--rx-type-hero:"));
     assert!(css.contains("--rx-type-display:"));
 }

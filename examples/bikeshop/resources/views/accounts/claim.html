@@ -11,6 +11,7 @@
 {% include "accounts/_styles.html" %}
 <div class="bs-claim" data-bs-reveal>
   {{ page_header(t('accounts.claim.title'), subtitle=t('accounts.claim.lead', name=summary.name)) }}
+  {# [explain:accounts.claim.template] #}
   {%- if problem == "taken" %}
   {{ alert(t('accounts.claim.taken'), kind="warning") }}
   {{ link_button(route('account.show'), t('nav.account')) }}
@@ -29,5 +30,6 @@
     </form>
   {% endcall %}
   {%- endif %}
+  {# [/explain:accounts.claim.template] #}
 </div>
 {% endblock %}

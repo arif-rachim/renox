@@ -1,7 +1,9 @@
 //! Pages about the example itself: `/about/pages`, the index of every page
 //! with the Renox features it uses (filtered by feature or by who uses the
 //! page); `/about/data`, the data model explained ([`data`]); and
-//! `/about/blocks`, the bike shop's own UI blocks working (`blocks.rs`).
+//! `/about/blocks`, the bike shop's own UI blocks working (`blocks.rs`);
+//! `/about/fields`, every form input with its Rust and database types
+//! (`fields.rs`); `/about/htmx`, htmx and Alpine recipes, live (`htmx.rs`).
 //!
 //! The "About this page" mechanism is in `src/explain.rs`; the panel every
 //! page shows is `resources/views/about/_panel.html`.
@@ -9,6 +11,8 @@
 pub mod blocks;
 pub mod data;
 pub mod explain;
+pub mod fields;
+pub mod htmx;
 
 use crate::explain::{self as about_this_page, Audience};
 use renox::prelude::*;
@@ -29,6 +33,8 @@ impl Module for About {
             .get("/about/data", data::show)
             .name("about.data")
             .merge(blocks::routes())
+            .merge(fields::routes())
+            .merge(htmx::routes())
     }
 }
 
@@ -41,6 +47,7 @@ struct Filters {
 
 /// Every page with its purpose and features, filtered by a feature and by
 /// who uses it.
+// [explain:about.pages.handler]
 async fn pages(
     State(state): State<AppState>,
     lang: Lang,
@@ -48,6 +55,7 @@ async fn pages(
 ) -> Result<View> {
     let translate = about_this_page::translator(lang);
     let all = about_this_page::all();
+    // [/explain:about.pages.handler]
 
     // The filters' options: every feature used anywhere, every audience.
     let features: BTreeSet<&str> = all
@@ -57,6 +65,13 @@ async fn pages(
     let feature = filters.feature.filter(|f| features.contains(f.as_str()));
     let audience = filters.audience.as_deref().and_then(Audience::from_key);
 
+    // A store's page is on its own host: link to the first store's.
+    let first_store = crate::app::staff::model::Store::query()
+        .order_by("id")
+        .first(&state.db)
+        .await?
+        .map(|store| crate::app::home::stores::site_url(&state.config, &store.slug));
+    // [explain:about.pages.handler]
     let mut pages: Vec<about_this_page::Page> = all
         .iter()
         .filter(|e| {
@@ -68,11 +83,16 @@ async fn pages(
         .map(|e| {
             let mut page = e.localize(&translate);
             // A link when the page needs no parameters.
-            page.url = state.url(e.route, &[]).ok();
+            page.url = if e.route == crate::app::home::stores::ROUTE {
+                first_store.clone()
+            } else {
+                state.url(e.route, &[]).ok()
+            };
             page
         })
         .collect();
     pages.sort_by(|a, b| a.title.cmp(&b.title));
+    // [/explain:about.pages.handler]
 
     // The audience filter's options, as the kit's `select` takes them.
     let audiences: Vec<_> = Audience::ALL

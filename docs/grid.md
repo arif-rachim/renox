@@ -13,8 +13,10 @@ Here is what it does for you:
 - The server does the paging, sorting and filtering, and keeps them in the page's address
   (the URL). So a filtered page has a link of its own that you can bookmark or send.
 
-`examples/grid` in the repository is a sales dashboard built on it. [examples/bikeshop](../examples/bikeshop), the flagship example,
-uses grids for a whole back office (a polled fleet board, report grids grouped, summed and exported).
+[examples/bikeshop](../examples/bikeshop) uses grids for a whole back office: a polled fleet board
+with cards on phones ([src/app/rentals/fleet.rs](../examples/bikeshop/src/app/rentals/fleet.rs)), and report grids
+grouped, summed, filtered with rules, remembered and exported
+([src/app/reports/grids.rs](../examples/bikeshop/src/app/reports/grids.rs)).
 
 ### In this guide
 
@@ -216,8 +218,7 @@ More about the template:
 > [!IMPORTANT]
 > The grid needs the element around it to have a height, or it has nothing to fill. Put
 > `rx-page--fill` on `<body>` (this makes the page as tall as the screen, with its `<main>`
-> taking the rest under the kit's `navbar`) and `rx-grid-fill` on the `<main>`, as
-> examples/grid does.
+> taking the rest under the kit's `navbar`) and `rx-grid-fill` on the `<main>`.
 
 ### Sparklines
 
@@ -770,8 +771,8 @@ async fn export_ledger(Path(id): Path<i64>, request: GridRequest) -> Result<Resp
   parameter too, so `GET /orders/export/{format}` with `Path(format): Path<ExportFormat>` takes
   `csv`, `xlsx` or `print` (anything else is a 404). `ExportFormat::Xlsx.available()` says
   whether this build can make Excel files.
-- A large export can run in a job instead: examples/backoffice's invoices build a
-  `GridRequest::new(…)` there and store the file.
+- A large export can run in a job instead: build a `GridRequest::new(…)` there from the
+  filters the page had, export into storage, and tell the user when the file is ready.
 
 ## Polling
 

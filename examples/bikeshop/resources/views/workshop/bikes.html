@@ -22,8 +22,9 @@
     {%- endfor %}
   </div>
   {%- else %}
-  <div class="rx-card">{{ empty(t('workshop.bikes.none'), t('workshop.bikes.none_text')) }}</div>
+  <div class="rx-card">{{ empty(t('workshop.bikes.none'), t('workshop.bikes.none_text'), icon="bike") }}</div>
   {%- endif %}
+  {# [explain:workshop.bikes.template] #}
   <form method="post" action="{{ route('workshop.bikes.store') }}" enctype="multipart/form-data" id="add-bike" novalidate>
     {{ csrf_field() }}
     {% call card(title=t('workshop.bikes.add')) %}
@@ -41,5 +42,6 @@
       {{ button(t('workshop.bikes.save'), icon="plus") }}
     {% endcall %}
   </form>
+  {# [/explain:workshop.bikes.template] #}
 </div>
 {% endblock %}

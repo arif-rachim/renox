@@ -1,7 +1,0 @@
-{#- The products list's `custom` column (renox-admin draws a resource's
-    custom cells with renox-admin/{slug}/cells.html, given `row` and
-    `column`): the stock as a number with a badge when it runs low. -#}
-{%- from "renox/ui.html" import badge -%}
-{%- if column.key == "level" -%}
-  {{ row.stock | number }} {% if row.stock <= 0 %}{{ badge("Out", "error") }}{% elif row.stock < 5 %}{{ badge("Low", "warning") }}{% endif %}
-{%- endif -%}

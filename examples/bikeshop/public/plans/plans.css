@@ -4,7 +4,10 @@
 
 /* /plans: the compared plans, then how a plan works. */
 .bs-plans-page { display: grid; gap: var(--rx-space-6); min-width: 0; }
-.bs-plans-steps { display: grid; gap: var(--rx-space-2); margin: 0; padding-inline-start: var(--rx-space-5); font: var(--rx-type-body); }
+/* How a plan works: three numbered steps, each led by an icon in a tinted
+   circle (the number stays for screen readers: it's an <ol>). */
+.bs-plans-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr)); gap: var(--rx-space-5); margin: 0; padding: 0; list-style: none; font: var(--rx-type-body); }
+.bs-plans-steps li { display: grid; gap: var(--rx-space-3); align-content: start; }
 .bs-plans-page__how { display: grid; gap: var(--rx-space-3); }
 .bs-plans-page__actions { display: grid; grid-auto-flow: column; justify-content: start; gap: var(--rx-space-2); }
 

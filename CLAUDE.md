@@ -10,7 +10,7 @@ repo, and every trap hit so far, so you don't have to rediscover them.
 - `CONTRIBUTING.md`: the checks every change needs. `SECURITY.md`: how vulnerabilities are reported.
   `RELEASING.md`: how a release goes to crates.io (the owner publishes).
 - `CHEATSHEET.md` and `llms.txt`: the app author's view (patterns, and which example shows what).
-- `docs/*.md`: guides (routing, validation, types, relations, authorization, queue, mail, scheduling, ui, grid, testing, PostgreSQL, operations, development, stability, and the plugins: two-factor, editors, oauth, admin, billing).
+- `docs/*.md`: guides (routing, validation, types, relations, authorization, queue, mail, scheduling, ui, grid, testing, PostgreSQL, operations, development, stability, and the plugins: two-factor, editors, blocks, oauth, admin, billing).
 - `docs/audit/`: the pre-1.0 audit (finding IDs W*, D*, A* used in ROADMAP M13/M14).
 
 ## 1. What Renox is
@@ -98,10 +98,14 @@ crates/renox-core/         ALL runtime code (see §3 for why one crate)
   views/ui.html            the UI kit (renox/ui.html): fields, buttons, sheets, menus, tables,
                            infolists, dashboards, and the page's frame (navbar, sidebar +
                            rx-shell, page_header, toolbar, list, card_grid…); assets/renox-ui.css|js
+                           (+ renox-ui-{chart,wizard,repeater,tags}.js: modules renox-ui.js loads
+                           when it finds their markup; assets.rs fills their hashed URLs in, #349)
   views/grid.html          the data grid macro (renox/grid.html), grid_print.html (its print
                            export); assets/renox-grid.css|js, and
                            assets/cally.js (Cally 0.9.2, MIT: the date range calendar)
   src/view_stack.rs        push/prepend/stack: markers filled in after the page renders (Scope)
+  src/icons.rs             the kit's icons: Lucide paths (lucide-static 1.53.0, ISC; assets/NOTICE,
+                           assets/lucide-LICENSE) drawn by `renox_icon`, behind ui.html's `icon(…)`
   src/view_filters.rs      built-in template filters `number`, `money`, `date`, `since`, `words`,
                            `markdown`; pub format_number, format_money (whole units;
                            the `money` filter takes the smallest unit, like the grid)
@@ -246,6 +250,21 @@ crates/renox-editors/      the editors plugin (#149, #150): Editors module (lib.
                            module that imports Trix / Prism + CodeJar when a page needs them)
                            and editors.css, assets/vendor/ (pinned files + NOTICE + licences);
                            guide docs/editors.md (doctested from lib.rs `Guide`)
+crates/renox-blocks/       the blocks plugin (#347): Blocks module (lib.rs: views registered
+                           in `templates` unless the app has a file of the name,
+                           `renox_blocks()` (the tags, once per page via `once`),
+                           `renox_blocks_t(key, **params)`: the app's `t`, else the English
+                           in texts.rs `TEXTS`, keys `blocks.*`), assets.rs (hashed files
+                           served with `Registry::asset` under /_renox/blocks/),
+                           views/blocks.html (quantity, range_slider, keypad, swatches,
+                           datetime_range, gallery, history, compare_plans, month_calendar,
+                           availability, kanban + kanban_card; `rx-` classes,
+                           `data-rx-<block>-*` attributes: the kit owns data-rx-key/-step),
+                           assets/blocks.css, assets/blocks.js (the loader: imports
+                           assets/parts/<block>.js only when a page has that block; Web
+                           Animations, no library); its own tests/; guide docs/blocks.md
+                           (doctested from lib.rs `Guide`); browser tests
+                           tests/browser/blocks.test.mjs on examples/bikeshop's /about/blocks
 crates/renox-oauth/        the social login plugin (#147): OAuth module (lib.rs: providers,
                            `oauth_providers` shared with every view for the buttons, the
                            account section, events to the audit log when `audit_logs`
@@ -305,43 +324,10 @@ crates/renox-cli/          `rnx`: main.rs (key:generate, forwarding), new.rs, se
                            new app's agent guide, named .stub so agents in this repo don't load
                            it); stubs/deploy/: Dockerfile, systemd service and socket (socket
                            activation), Litestream templates
-examples/                  workspace members, each with a README.md and its own tests:
-  hello/                   guestbook exercising many features (derive Validate, detect_locale);
-                           used for live/browser testing
-  crud/                    the reference CRUD module (policy, soft deletes, pagination, derive
-                           Validate + hooks, a CSV import with savepoints, factory states)
-  api/                     JSON API with tokens, CORS, rate limit, Ulid keys
-  jobs/                    events, queued mail, notifications, schedule
-  uploads/                 public / private files, several files, Download
-  postgres/                one app on PostgreSQL + SQLite (package `postgres-app`)
-  fields/                  every form field type ↔ Rust ↔ SQLite / PostgreSQL; products keyed by Uuid
-  webhooks/                Midtrans / Xendit / Stripe webhooks
-  shop/                    a whole online shop on the UI kit (auth, admin, checkout, mail, queue,
-                           i18n, deploy with the systemd socket, a rebranded accent, route_is,
-                           recently viewed, plural ranges, the kit's tabs on the admin dashboard,
-                           a category select answered by the server: admin/categories.rs)
-  htmx-recipes/            modal form, inline edit, infinite scroll, tabs, HxRefresh/HxRedirect,
-                           an out-of-band count (.also), HxRetarget/HxReswap, toasts
-  relations/               belongs to, has many, many to many (pivot columns), Morph, no N+1;
-                           also a public blog (Markdown, seo(), RSS, sitemap, search) on
-                           Tailwind (resources/css/app.css → committed public/css/app.css)
-  grid/                    a sales dashboard on one data grid (renox::grid): phone and desktop
-                           columns, filters by kind, frozen columns, grouped headings, sparklines
-  backoffice/              a small business's back office (Filament's demo as the yardstick): grids,
-                           invoices issued from a stock ledger, payment pages + webhooks,
-                           CSV import, exports from a job, roles, activity log, settings,
-                           branded sign-in pages (resources/views/renox/auth/layout.html)
-  teams/                   multi-tenant SaaS on the UI kit: default scopes, renox::context,
-                           gate_before, Encrypted<String>, a form request checked live, public
-                           team pages on their own host (Routes::domain), a wizard with a
-                           repeater, a datalist; renox-2fa and renox-oauth (Google/GitHub when
-                           their *_CLIENT_ID/_SECRET are set)
-  admin/                   an admin panel made by renox-admin from three models (products with
-                           soft deletes, categories, customers), two roles, an app-drawn
-                           custom column (resources/views/renox-admin/products/cells.html)
-  billing/                 subscriptions made with renox-billing: three plans (Stripe, and
-                           Xendit in IDR), trials without a card, require_subscription /
-                           require_plan pages, a mail on PaymentFailed
+examples/                  two workspace members (#351 removed the other fifteen), each with a
+                           README.md and its own tests:
+  hello/                   the smallest app: a guestbook (derive Validate, detect_locale, an
+                           upload, a typed command); the quick start and the README's GIF
   bikeshop/                THE FLAGSHIP (epic #231): three bike stores that sell, rent and
                            service, working together; every page explains itself. src/lib.rs
                            (modules, plugins, layers, `App::report` → src/report.rs);
@@ -352,14 +338,21 @@ examples/                  workspace members, each with a README.md and its own 
                            store, ABAC policy: owner/location/operating store), accounts, api,
                            catalog, home, multistore, plans, rentals, reports, sales, staff,
                            stock, workshop; src/seed/ (`db:seed`, `demo:seed --size large`,
-                           test fixtures); resources/views/blocks/ + public/blocks/ (the
-                           "blocks": UI the kit lacks, kept in the example by the owner's
-                           decision); public/vendor/motion (motion.dev, vendored); errors/
+                           test fixtures); the blocks from renox-blocks (#347; /about/blocks
+                           shows them; public/blocks/blocks.css styles that page);
+                           public/vendor/motion (motion.dev, vendored); errors/
                            (default + 503); migrations for SQLite and PostgreSQL;
                            Dockerfile + deploy/ (make:deploy); tests/<area>.rs,
                            tests/queries.rs (main pages on the large seed, no N+1),
                            tests/operations.rs; browser tests tests/browser/bikeshop-*.test.mjs.
-                           Code checks permissions, never role names (tests/access.rs)
+                           Code checks permissions, never role names (tests/access.rs).
+                           What the removed examples showed lives here too: each store's
+                           page on its own host (home/stores.rs, `Routes::domain`,
+                           `BIKESHOP_STORE_DOMAIN`), /about/fields (about/fields.rs: every
+                           input ↔ Rust ↔ SQLite ↔ PostgreSQL, files public and private,
+                           `Uuid` keys; docs/types.md points there; tests/fields.rs, also on
+                           S3 with the `s3` feature) and /about/htmx (about/htmx.rs: the
+                           htmx recipes, live)
 site/                      the documentation site (package `renox-site`, publish = false): a Renox
                            app that compiles the repo's Markdown in (src/content.rs lists the
                            pages, src/render.rs: pulldown-cmark, anchors, TOC, hidden doctest
@@ -404,9 +397,11 @@ tests/browser/            browser tests (#262, CI `browser`): run.sh builds the 
                            (start an app binary on a free port, migrated/seeded), fixture/ (a
                            workspace member: pages using the kit, Auth with notifications, jobs,
                            commands `jobs:push`/`jobs:nap`/`ask:me`, a route on its own host, a
-                           per-second task with FIXTURE_TICK); *.test.mjs for renox.js, the
-                           kit's forms and overlays, the grid (grid, grid-more: examples/grid),
-                           the editors (examples/fields), example flows (examples,
+                           per-second task with FIXTURE_TICK, and the data grid's pages at
+                           /grid (src/grid.rs, its own migrations and `db:seed`: 480 orders,
+                           demo@example.com); *.test.mjs for renox.js, the kit's forms and
+                           overlays, the grid (grid, grid-more: the fixture's /grid), the
+                           editors (on bikeshop's /about/fields), the guestbook (examples,
                            examples-flows), a11y (an accessibility smoke), assets.test.mjs
                            (no top-level JS function declared twice) and bikeshop-*.test.mjs
                            (each area of examples/bikeshop; bikeshop-walk: the main pages
@@ -416,9 +411,9 @@ tests/process/            process e2e (#270): process.py (signals with a request
                            APP_KEY in production, db:shell, prompts from a pipe and a terminal
                            via `script`, the commands' output, `rnx serve`/forwarding/Tailwind
                            with a stand-in TAILWIND_BIN, `rnx build` with RNX_BUILD=1) on the
-                           fixture; examples.py serves every example binary and GETs its pages
-                           as a guest and logged in; `run.sh postgres` with PROCESS_POSTGRES
-                           runs the database checks and postgres-app/fields/bikeshop on
+                           fixture; examples.py serves both example binaries and GETs their
+                           pages as a guest and logged in; `run.sh postgres` with
+                           PROCESS_POSTGRES runs the database checks and bikeshop on
                            PostgreSQL (EXTRA_ENV: per-example variables, e.g. bikeshop's
                            BIKESHOP_STAFF_2FA=optional)
 tests/tutorial/           run.sh + follow.py: docs/tutorial.md followed as a reader does (steps
@@ -448,6 +443,7 @@ docs/authorization.md      gates, policies, roles/permissions, token abilities, 
                            second login step, logging in another way (doctest
                            `AuthorizationGuide`)
 docs/oauth.md              social login with renox-oauth (doctest: renox-oauth's `Guide`)
+docs/blocks.md             blocks beyond the kit with renox-blocks (doctest: its `Guide`)
 docs/admin.md              the admin panel with renox-admin (doctest: renox-admin's `Guide`)
 docs/billing.md            subscriptions with renox-billing (doctest: renox-billing's `Guide`)
 docs/queue.md              jobs, retries, priority, unique, middleware, chains, batches (doctest
@@ -768,13 +764,14 @@ PostgreSQL suite 2.5x slower (reconnects).
   docker run -d --rm --name renox-pg --shm-size=512m -e POSTGRES_PASSWORD=postgres \
       -e POSTGRES_DB=renox_test -p 55432:5432 postgres:17-alpine
   TEST_DATABASE_URL=postgres://postgres:postgres@localhost:55432/renox_test \
-      cargo test -p renox -p renox-core -p renox-cli -p postgres-app -p fields -p bikeshop --features renox/postgres
+      cargo test -p renox -p renox-core -p renox-cli -p bikeshop --features renox/postgres
   ```
-  Not the other examples (SQLite migrations); examples/bikeshop has both.
+  Not examples/hello (SQLite migrations); examples/bikeshop has both.
 - **S3:** `cargo test -p renox --features s3 --test it s3` with `TEST_S3_ENDPOINT`,
   `TEST_S3_BUCKET`, `TEST_S3_ACCESS_KEY_ID`, `TEST_S3_SECRET_ACCESS_KEY` (without them the tests do
   nothing). The SeaweedFS commands are at the top of `it/s3.rs`. With the same variables,
-  `cargo test -p uploads --features s3` runs examples/uploads on that bucket (CI's `s3` job runs both).
+  `cargo test -p bikeshop --features s3 --test fields` runs the bike shop's /about/fields files
+  on that bucket (CI's `s3` job runs both).
 - Don't run tests with `--release` (slow compile, no debug assertions).
 - Run tests scoped while working (`cargo test -p renox --test it -- module::name`, `-p
   renox-core --lib path`, a plugin's `--test file name`), not the whole workspace: a full run
@@ -849,16 +846,20 @@ PostgreSQL suite 2.5x slower (reconnects).
 - `CHEATSHEET.md` is compiled: every ```rust block must build on its own (visible `use` lines, no
   `# ` hidden lines since GitHub shows them; define items only, no top-level statements, so the
   doctest's `main` does nothing). Check with `cargo test --doc -p renox`.
-- Examples are workspace members with their own tests and a README.md; each shows one pattern the
-  official way, and its module doc names the `rnx make:*` commands that made it. Keep `llms.txt`
-  and the example READMEs in step when adding or changing example files.
+- There are two examples (#351, the owner's choice): examples/bikeshop, the one complete use
+  case, and examples/hello, the smallest app (the quick start and the README's GIF). Both are
+  workspace members with their own tests and a README.md; module docs name the `rnx make:*`
+  commands that made them. A feature worth showing goes into the bike shop, as a page with its
+  "About this page" entry (`/about/fields` and `/about/htmx` are references of that kind),
+  not into a new example. Keep `llms.txt` and the two READMEs in step when adding or changing
+  example files; a docs link to an example must point at a file that exists.
 - A route group's index is `.get("/", …)` (not `""`, which panics).
 - Examples use `renox.workspace = true`, so their `make:deploy` Dockerfile builds only in a copy
   made by `rnx new` (the CI docker job covers that).
 - Examples without a `.env` run with `APP_DEBUG` off, i.e. with the views embedded at build time:
   restart after editing templates.
 - UI changes get a browser test in tests/browser (it replaced checking by hand; `run.sh <file>`
-  runs one file). Found by hand earlier in `examples/crud`: `hx-boost` on a whole section also
+  runs one file). Found by hand earlier in the crud example (removed in #351): `hx-boost` on a whole section also
   boosts its edit links and delete forms (scope it to the page links), and boosted requests get
   full pages (by design, `Htmx::wants_fragment`), so pair them with `hx-select`.
 - Under `CSP=strict`, Alpine's CSP build rejects statements in attributes (examples/hello's
@@ -924,7 +925,7 @@ PostgreSQL suite 2.5x slower (reconnects).
   aws-lc-rs`, doc), **test** on Ubuntu/macOS/Windows, **test (PostgreSQL)**, **chaos** (sqlite,
   postgres; `tests/chaos/run.sh`), **MSRV (1.94)**, **feature matrix** (`cargo hack check -p
   renox-core -p renox --each-feature --no-dev-deps`), **cli** (sqlite, postgres;
-  `tests/cli/run.sh`), **tutorial** (`tests/tutorial/run.sh`), **docker** (`make:deploy` image answers `/health`), **s3** (SeaweedFS; renox's `it/s3.rs` and examples/uploads),
+  `tests/cli/run.sh`), **tutorial** (`tests/tutorial/run.sh`), **docker** (`make:deploy` image answers `/health`), **s3** (SeaweedFS; renox's `it/s3.rs` and bikeshop's tests/fields.rs),
   **cargo-deny**, **coverage** (informational); a separate workflow, **Release build (site)**
   (release-site.yml: on pushes to main that touch the docs, builds site/ for the owner's server,
   which pulls it),
@@ -1179,7 +1180,7 @@ picks the build, not the terminal.
 - **M21b** (components that see the request via `RequestGlobal` + a thread-local of the page's
   globals, the HIG-style kit `views/ui.html` + `assets/renox-ui.{css,js}`, `toast.rs`,
   `View::also`, Hx headers, live validation via `X-Renox-Validate`, `ui:publish`,
-  `make:component`): merged (#57), browser-checked on examples/crud. Keep new kit
+  `make:component`): merged (#57), browser-checked on the crud example. Keep new kit
   components `rx-`-prefixed, keyboard-usable, and at WCAG AA contrast (docs/ui.md rules).
 - **M21c** (`Routes::resource`, `make:module --resource` in renox-cli/src/scaffold.rs, new
   generators, `rnx new` layout on the kit, `clock.rs` + `TestApp::travel`, event and
@@ -1208,7 +1209,7 @@ picks the build, not the terminal.
   values (a layout using one failed under strict undefined). Toasts must survive any response
   htmx turns into a new page: they go to the session there.
 - **M21i** (the examples' tests on `travel`, fakes, `assert_view`/`assert_json_path`;
-  `App::report` in examples/jobs; hello's typed `entries:prune`; fields with `each` +
+  `App::report` in the jobs example; hello's typed `entries:prune`; fields with `each` +
   `one_of` + `distinct`; the stubs): merged (#66). Two framework fixes found by
   travelling: in-memory rate limits and the login lock used `Instant` (now `clock::Stamp`), and
   `TestApp`'s session helpers read the cookie on the real clock (now the travelled one, via
@@ -1220,11 +1221,11 @@ picks the build, not the terminal.
   example logged a 404 console error when run in a browser); the workspace dev profile uses
   `debug = "line-tables-only"` (#68, after two OOM kills during workspace builds).
 - **M22** (model keys: `Model::Key` from the `id` field's type, `Ulid`, `Model::insert`,
-  relations generic over keys, `Pivot<L, R>`, `make:model --key`, examples/fields on `Uuid`):
+  relations generic over keys, `Pivot<L, R>`, `make:model --key`, the fields example on `Uuid`):
   merged (#69). Generic code over models that needs an integer id says
   `M: Model<Key = i64>`.
 - **M23** (B of the owner's B/C/D before 1.0: `Transaction::savepoint`, `db::Encrypted<T>`
-  with the key carried by `Db`/`Transaction`/`Row`, examples/teams on it): merged (#70).
+  with the key carried by `Db`/`Transaction`/`Row`, the teams example on it): merged (#70).
 - **M24** (C: `Routes::domain`/`fallback`, `route_is`/`CurrentRoute`, `Redirect::route`/
   `intended`, session `push`/`increment`, `Factory::factory()` states and sequences, plural
   ranges, `loop_controls`, `class_names`): merged (#71). A domain's host
@@ -1238,7 +1239,7 @@ picks the build, not the terminal.
   `RedirectExt` sealed, `InvalidUlid` non-exhaustive): merged (#74). M26c (tests for `renox-cli` and weak core files, `App::run_args`,
   `renox::Path` answers 500 for a parameter the route lacks): merged (#75). M26 is done.
 - **M27** (a data grid, asked by the owner before v1.0; three PRs): M27a (`renox::grid` +
-  `renox/grid.html`, Cally, `grid_preferences`, `sparkline`, examples/grid): merged (#76). M27b
+  `renox/grid.html`, Cally, `grid_preferences`, `sparkline`, the grid example): merged (#76). M27b
   (`audit`/`details`, `editable` + `edit_url`, `reorder` + `RowOrder`, `merge`, several
   default sort keys): merged (#77). M27c (`exports`/`export`: CSV, Excel behind
   the `xlsx` feature, a print page): merged (#78). M27d (move columns by their
@@ -1254,13 +1255,13 @@ picks the build, not the terminal.
   `APP_TIMEZONE` days (`day_start` in grid/mod.rs), `delete_account` also deletes
   `grid_preferences` rows, and `notifications:prune` / `auth::prune_read_notifications`.
 - **Guides for the remaining areas**: docs/routing.md, docs/validation.md, docs/mail.md and
-  docs/scheduling.md, which before lived only in CHEATSHEET.md: merged (#86). examples/grid's
+  docs/scheduling.md, which before lived only in CHEATSHEET.md: merged (#86). The grid example's
   `/follow-up` page (two prefixed grids, the rest of docs/grid.md's column options): merged
   (#87).
 - **UI kit form fields** (Filament's forms as the yardstick; stage 1 of 3): `radio`,
   `checkbox_list`, `form_grid`/`fieldset`, `span`, `prefix`/`suffix`, `datalist`,
   `disabled`/`readonly`, `has_old()` (a checkbox or radio missing from `old()` after a
-  failed submit was sent empty); examples/fields on the kit. Stage 2: `revealable`/`copyable`
+  failed submit was sent empty); the fields example on the kit. Stage 2: `revealable`/`copyable`
   inputs (auth pages reveal passwords), `toggle_buttons`, `file`, `date_picker` (Cally in a
   popover; its `change` doesn't bubble, so listen in the capture phase), `show_when`/
   `hide_when` (hidden groups are disabled fieldsets); shop checkout, uploads and fields use
@@ -1297,7 +1298,7 @@ picks the build, not the terminal.
 - **M29** (examples complete; three PRs after an audit of all 13 examples): M29a (example
   bugs, tests for README claims, seeders that run twice, `.env.example` everywhere,
   fields/webhooks/uploads on the kit, current patterns): merged (#101). M29b
-  (`examples/backoffice`: invoices with a stock ledger, Midtrans/Xendit payment pages and
+  (the backoffice example: invoices with a stock ledger, Midtrans/Xendit payment pages and
   webhooks, CSV import, exports from a job with the grid's filters, roles, activity log,
   settings, branded sign-in): merged (#102). M29c (relations as a public blog on Tailwind
   with Markdown/SEO/RSS/sitemap/search, an api browser client + `GET /api/me`, uploads on S3
@@ -1376,7 +1377,7 @@ picks the build, not the terminal.
   `{% include "renox/auth/login_options.html" ignore missing %}`.
 - **#148, `renox-admin`** (the admin panel: `Admin::new().authorize(…).resource(…)`,
   `impl AdminResource` with grid columns, form fields, filters, actions and the model's
-  `Policy`; lists, forms, view pages, the trash, exports; examples/admin): branch
+  `Policy`; lists, forms, view pages, the trash, exports; the admin example): branch
   `ccr-f926b004-17j95n`. It added to renox-core `Column::label`/`options` and
   `renox::currency_decimals`, and fixed `GridRequest`'s path inside a `Routes::group`
   (axum's nesting strips the prefix from `uri.path()`; it reads `OriginalUri` now, so a
@@ -1388,7 +1389,7 @@ picks the build, not the terminal.
 - **#155, `renox-billing`** (subscriptions: `Billing::new().plan(…).stripe().xendit()`,
   `Billing::of(&state, &user)` with `subscribed`/`checkout`/`swap`/`cancel`/`resume`, the
   `Gateway` trait, Stripe and Xendit, webhooks through `renox::webhook`, guards, pages;
-  examples/billing): branch `ccr-f926b004-17j95n`. It added `Registry::provide` to renox-core
+  the billing example): branch `ccr-f926b004-17j95n`. It added `Registry::provide` to renox-core
   (a module's settings for code without a request: `Webhook::verify`/`handle` get only the
   state). `Webhook::event_id` gets no state either: a plugin whose webhooks depend on its
   settings computes the id in a route layer and passes it in a header (billing's webhook.rs).
@@ -1430,6 +1431,34 @@ picks the build, not the terminal.
   added `tests/queries.rs` (the main pages on the large seed: same query count as the small
   one). What Renox lacked became issues #299–#319 (listed in its README), worked around in the
   example. Open in #243: the Spanish pass, the explanations' review, the owner's sign-off.
+- **#343, the bike shop's design system in Renox** (stories #344–#349 and #351, one branch
+  `feat/issue-343-design-system`, one PR; the owner chose where each part goes):
+  - #344: the kit's default theme is the bike shop's "editorial" look. `data-rx-theme="warm"`
+    is the look before 1.1, `classic` the first one. New tokens `--rx-accent-2`, `--rx-tint`,
+    `--rx-accent-soft`, `--rx-ink`, `--rx-type-hero`, `--rx-type-section`. Pill buttons,
+    except in `rx-shell`.
+  - #345: `date_picker(disabled_dates=…, closed_weekdays=…)`.
+  - #346: `navbar(tabs=…)` (a phone tab bar), `nav_search`, and the public `icon()` macro
+    (Lucide, crates/renox-core/src/icons.rs; `sidebar_link`, `stat` and `empty` take `icon=`).
+  - #347: crates/renox-blocks.
+  - #348: the starter's page patterns (stubs/starter: patterns.html + patterns.css, owned by
+    the app).
+  - #349: the kit's rarely used parts load on demand.
+  - The bike shop: "About this page" is docked beside every page from 1200 px, with code
+    samples cut from the source at build time (`[explain:name]` markers, build.rs →
+    `code::REGIONS`, checked by tests/about.rs). A visual pass added icons, Unsplash photos
+    (CREDITS.md) and initials avatars. The grid, charts and the kit's basics stay in core
+    (the owner's decision).
+- **#351, two examples** (the owner's choice, after the design-system work #343): only
+  examples/bikeshop and examples/hello remain. Before the other fifteen went, what they showed
+  and the bike shop lacked moved in: each store's page on its own host (home/stores.rs,
+  `Routes::domain`), `/about/fields` (the types reference docs/types.md points at; files public
+  and private; tests/fields.rs on SQLite, PostgreSQL and S3) and `/about/htmx` (the htmx
+  recipes). Their browser tests moved to bikeshop-*.test.mjs, and the grid example's pages to the
+  fixture's `/grid`. CI's PostgreSQL job tests bikeshop, its s3 job bikeshop's
+  tests/fields.rs. The entries above name removed examples: they are history. In headless
+  Chrome the tab that sent the bike shop's login form gets no key presses afterwards; tests
+  that type after logging in log in from a tab of their own.
 - **Still open** (ROADMAP `- [ ]`): none of the plugins; `renox-2fa` (#146),
   `renox-oauth` (#147), `renox-admin` (#148) and `renox-billing` (#155) are done. A Laravel gap review after M25 (in the
   conversation that planned M26) ranked them: release and docs first, then 2FA and social

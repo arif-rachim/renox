@@ -7,12 +7,20 @@
 //! show, in the visitor's language ([`Page`]).
 //!
 //! Two places show them:
-//! - the "About this page" panel in both layouts
-//!   (`resources/views/about/_panel.html`), filled by the
+//! - the "About this page" panel of every layout
+//!   (`resources/views/about/_explain.html`), filled by the
 //!   `about_page(request.route, request.path)` template function registered
-//!   in [`register`];
+//!   in [`register`]. On a wide screen (75rem, 1200 px, and up) it is docked
+//!   beside the page (`about/_dock.html`), and can be folded to a slim rail
+//!   ([`dock_layer`] reads the choice from a cookie, so the page is drawn
+//!   folded or not from the start); on a narrower one the navbar's "About
+//!   this page" button opens it as the kit's sheet (`about/_panel.html`);
 //! - `/about/pages`, the index of every page, filtered by Renox feature or by
 //!   who uses the page (`src/app/about/mod.rs`).
+//!
+//! Besides the texts, each page shows one to three code samples ([`Code`]),
+//! cut from the shop's own files when it is built (`src/code.rs`) and
+//! coloured on the server (`src/highlight.rs`).
 //!
 //! `BIKESHOP_EXPLAIN=false` hides the panels for a "clean" demo
 //! ([`enabled`]); `/about/pages` stays.
@@ -23,7 +31,9 @@
 //! `resources/lang/<locale>.json` under `about_page.<route name>.…`:
 //! `title`, `purpose`, `who`, `under_hood` and `features.<n>` (the n-th
 //! feature's "why", counted from 0); the API names, docs links and file
-//! paths are never translated. A text missing there falls back to English,
+//! paths are never translated. A code sample's title can be translated
+//! under `code.<n>` (optional: the samples' titles name the code). A text
+//! missing there falls back to English,
 //! so a page is never without its explanation. For the home page in
 //! Spanish (`resources/lang/es.json`):
 //!
@@ -36,7 +46,8 @@
 //! `tests/about.rs` walks every GET route of the app (`route:list`'s table)
 //! and fails when one has no explanation (or isn't in [`not_pages`] with a
 //! reason), when a docs link points to a file or `#anchor` that doesn't exist
-//! under `docs/`, or when a source file doesn't exist in the repository.
+//! under `docs/`, when a source file doesn't exist in the repository, or
+//! when a code sample names a region no file marks.
 
 use renox::minijinja::{self, Value};
 use serde::Serialize;
@@ -55,6 +66,8 @@ pub const DOCS_SITE: &str = "https://docs.renox.rs/docs/";
 /// ```
 /// use bikeshop::explain::{Audience, Explanation, Feature, Flow};
 ///
+/// use bikeshop::explain::Code;
+///
 /// let home = Explanation {
 ///     route: "home",
 ///     path: "/",
@@ -67,6 +80,7 @@ pub const DOCS_SITE: &str = "https://docs.renox.rs/docs/";
 ///     under_hood: "Nothing is read from the database.",
 ///     docs: &["docs/routing.md#apps-modules-and-routes"],
 ///     sources: &["examples/bikeshop/src/app/home/mod.rs"],
+///     code: &[Code { title: "Handler: one view, no data of its own", region: "home.handler" }],
 /// };
 /// assert_eq!(home.route, "home");
 /// ```
@@ -97,6 +111,33 @@ pub struct Explanation {
     pub docs: &'static [&'static str],
     /// Files in the repository (handler, template, test…), from its root.
     pub sources: &'static [&'static str],
+    /// The code that makes the page work, one tab each: usually the
+    /// handler, the template's key part, and a query, policy, job or test
+    /// when it explains something.
+    pub code: &'static [Code],
+}
+
+/// One code sample on a page's panel: a region of a source file
+/// (`src/code.rs`), which gives its file, language and text.
+#[derive(Debug, Clone, Copy)]
+pub struct Code {
+    /// `"Tab: what it shows"`: the part before `": "` names the tab
+    /// (`Handler`, `Template`, `Query`, `Test`…), the rest is the caption
+    /// over the code (Markdown, `code` is fine).
+    pub title: &'static str,
+    /// The region's name, as in its markers: `rentals.reserve`.
+    pub region: &'static str,
+}
+
+impl Code {
+    /// The tab's name and the caption: `"Handler: checks the form"` →
+    /// `("Handler", "checks the form")`.
+    pub fn split_title(title: &str) -> (&str, &str) {
+        match title.split_once(": ") {
+            Some((tab, caption)) => (tab.trim(), caption.trim()),
+            None => (title.trim(), ""),
+        }
+    }
 }
 
 /// One Renox feature a page uses.
@@ -325,6 +366,32 @@ pub struct Page {
     pub docs: Vec<DocLink>,
     /// Links to the source files.
     pub sources: Vec<SourceLink>,
+    /// The code samples, ready to show.
+    pub code: Vec<CodeSample>,
+    /// The samples' tabs for the kit's `tabs(id, items)`: `[key, name]`.
+    pub code_tabs: Vec<[String; 2]>,
+    /// Whether the docked panel is folded to its rail (the
+    /// `bikeshop_explain` cookie, see [`dock_layer`]).
+    pub rail: bool,
+}
+
+/// A code sample as the panel shows it.
+#[derive(Debug, Clone, Serialize)]
+pub struct CodeSample {
+    /// The tab's name: `Handler`.
+    pub tab: String,
+    /// What the sample shows (Markdown), may be empty.
+    pub caption: String,
+    /// The file, from the repository's root.
+    pub path: &'static str,
+    /// The language's name: `Rust`, `Template`, `SQL`…
+    pub language: &'static str,
+    /// The lines on GitHub (`…/blob/main/<path>#L12-L30`).
+    pub github: String,
+    /// The text, for the copy button.
+    pub text: &'static str,
+    /// The text as coloured HTML (escaped, `hl-*` spans).
+    pub html: String,
 }
 
 /// A key and its label in the page's language.
@@ -410,7 +477,59 @@ impl Explanation {
                     github: format!("{REPOSITORY}{path}"),
                 })
                 .collect(),
+            code: self
+                .code
+                .iter()
+                .enumerate()
+                .filter_map(|(n, code)| {
+                    let region = crate::code::region(code.region)?;
+                    let title = text(&format!("code.{n}"), code.title);
+                    let (tab, caption) = Code::split_title(&title);
+                    Some(CodeSample {
+                        tab: if tab.is_empty() {
+                            crate::highlight::label(region.language).to_owned()
+                        } else {
+                            tab.to_owned()
+                        },
+                        caption: capitalize(caption),
+                        path: region.path,
+                        language: crate::highlight::label(region.language),
+                        github: format!(
+                            "{REPOSITORY}{}#L{}-L{}",
+                            region.path, region.first_line, region.last_line
+                        ),
+                        text: region.text,
+                        html: crate::highlight::highlight(region.language, region.text),
+                    })
+                })
+                .collect(),
+            code_tabs: Vec::new(),
+            rail: false,
         }
+        .with_tabs()
+    }
+}
+
+impl Page {
+    /// Fills `code_tabs` from `code`: the n-th sample is the tab `n`.
+    fn with_tabs(mut self) -> Page {
+        self.code_tabs = self
+            .code
+            .iter()
+            .enumerate()
+            .map(|(n, sample)| [n.to_string(), sample.tab.clone()])
+            .collect();
+        self
+    }
+}
+
+/// The caption with its first letter in capitals (`"checks the form"` →
+/// `"Checks the form"`), as it starts a sentence under the tabs.
+fn capitalize(text: &str) -> String {
+    let mut chars = text.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().chain(chars).collect(),
+        None => String::new(),
     }
 }
 
@@ -471,7 +590,63 @@ pub fn register(env: &mut minijinja::Environment<'static>) {
                 let text = text.to_string();
                 (text != key).then_some(text)
             };
-            Value::from_serialize(explanation.localize(&translate))
+            let mut page = explanation.localize(&translate);
+            page.rail = renox::context::get::<Dock>() == Some(Dock::Rail);
+            Value::from_serialize(page)
         },
     );
+}
+
+/// The cookie that remembers whether the docked panel is folded: `rail`
+/// (folded) or `open`. `public/app.js` writes it when the panel's button is
+/// pressed; [`dock_layer`] reads it.
+pub const DOCK_COOKIE: &str = "bikeshop_explain";
+
+/// How the docked panel is drawn on this request, for `about_page(…)`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Dock {
+    /// Beside the page, with its content.
+    Open,
+    /// Folded to a slim rail with a button that opens it again.
+    Rail,
+}
+
+impl Dock {
+    /// The state a `Cookie` header asks for: [`Dock::Rail`] when it holds
+    /// `bikeshop_explain=rail`.
+    ///
+    /// ```
+    /// use bikeshop::explain::Dock;
+    /// assert_eq!(Dock::from_cookies("a=1; bikeshop_explain=rail"), Dock::Rail);
+    /// assert_eq!(Dock::from_cookies("bikeshop_explain=open"), Dock::Open);
+    /// ```
+    pub fn from_cookies(header: &str) -> Dock {
+        let rail = header.split(';').any(|pair| {
+            pair.trim()
+                .split_once('=')
+                .is_some_and(|(name, value)| name == DOCK_COOKIE && value == "rail")
+        });
+        if rail { Dock::Rail } else { Dock::Open }
+    }
+}
+
+/// An app layer that reads [`DOCK_COOKIE`] and keeps the state in
+/// `renox::context` for the page's render, so a folded panel is drawn folded
+/// from the first byte: no jump when the page loads. The cookie is a plain
+/// one (not the encrypted session) because the browser writes it, without a
+/// request to the server.
+pub async fn dock_layer(
+    req: renox::axum::extract::Request,
+    next: renox::axum::middleware::Next,
+) -> renox::axum::response::Response {
+    let dock = req
+        .headers()
+        .get_all(renox::axum::http::header::COOKIE)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .map(Dock::from_cookies)
+        .find(|d| *d == Dock::Rail)
+        .unwrap_or(Dock::Open);
+    renox::context::set(dock);
+    next.run(req).await
 }

@@ -1,6 +1,6 @@
 {% extends "layouts/staff.html" %}
 {% from "renox/ui.html" import page_header, card, infolist, entry, table, button, input, checkbox, alert, form_errors, confirm %}
-{% from "blocks/history.html" import history %}
+{% from "renox-blocks/blocks.html" import history %}
 {% from "stock/_parts.html" import styles, steps as stepper, shipment_status %}
 {% block seo %}{{ seo(title="CS-" ~ shipment.id) }}{% endblock %}
 
@@ -9,6 +9,7 @@
 {% block content %}
 {{ styles() }}
 <div class="rx-stack">
+  {# [explain:stock.consignments.show.template] #}
   {% call page_header("CS-" ~ shipment.id, subtitle=t('stock.consignments.from_to', owner=owner, location=location), back=route('stock.consignments'), back_label=t('stock.consignments.title')) %}
     {%- if actions.approve %}
     <form method="post" action="{{ route('stock.consignments.decide', shipment.id) }}">{{ csrf_field() }}<input type="hidden" name="decision" value="refuse">{{ button(t('stock.consignments.refuse'), variant="secondary") }}</form>
@@ -18,6 +19,7 @@
     {%- if actions.recall %}{{ confirm("recall", t('stock.consignments.recall'), route('stock.consignments.recall', shipment.id), t('stock.consignments.recall'), t('stock.consignments.recall_text', location=location), method="POST") }}{% endif %}
     {%- if actions.send_back %}<form method="post" action="{{ route('stock.consignments.send_back', shipment.id) }}" id="send-back-form">{{ csrf_field() }}{{ button(t('stock.consignments.send_back'), icon="box", attrs={"title": t('stock.consignments.send_back_text', owner=owner)}) }}</form>{% endif %}
     {%- if actions.receive_back %}<form method="post" action="{{ route('stock.consignments.receive_back', shipment.id) }}" id="receive-back-form">{{ csrf_field() }}{{ button(t('stock.consignments.receive_back'), icon="check", attrs={"title": t('stock.consignments.receive_back_text')}) }}</form>{% endif %}
+  {# [/explain:stock.consignments.show.template] #}
   {% endcall %}
   {%- if status == "refused" %}{{ alert(t('stock.consignments.refused_text', owner=owner), kind="warning") }}{% endif %}
   {%- if in_transit %}{{ alert(t('stock.consignments.in_transit_text'), kind="info") }}{% endif %}

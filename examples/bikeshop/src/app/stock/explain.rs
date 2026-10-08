@@ -1,6 +1,6 @@
 //! "About this page" entries for the stock area's pages (see `crate::explain`).
 
-use crate::explain::{Audience, Explanation, Feature, Flow, NotAPage};
+use crate::explain::{Audience, Code, Explanation, Feature, Flow, NotAPage};
 
 const MOD: &str = "examples/bikeshop/src/app/stock/mod.rs";
 const MODEL: &str = "examples/bikeshop/src/app/stock/model.rs";
@@ -132,6 +132,20 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[
+                Code {
+                    title: "Grid: `renox::grid` with sums, groups, exports and phone cards",
+                    region: "stock.index.grid",
+                },
+                Code {
+                    title: "Handler: each tab a scoped query, the same one for the page and the export",
+                    region: "stock.index.handler",
+                },
+                Code {
+                    title: "Template: `link_tabs` with counts over the kit's `grid`",
+                    region: "stock.index.template",
+                },
+            ],
         },
         Explanation {
             route: "stock.ledger",
@@ -188,6 +202,20 @@ pub fn entries() -> Vec<Explanation> {
                 AUDIT,
                 "examples/bikeshop/resources/views/stock/ledger.html",
                 TESTS,
+            ],
+            code: &[
+                Code {
+                    title: "Handler: `access::find`, then what each store may do with these goods",
+                    region: "stock.ledger.handler",
+                },
+                Code {
+                    title: "Query: the movements' documents with `Morph::parents`, one query per kind",
+                    region: "stock.ledger.sources",
+                },
+                Code {
+                    title: "Action: only the owner store writes goods off, in a transaction",
+                    region: "stock.ledger.write_off",
+                },
             ],
         },
         Explanation {
@@ -259,6 +287,20 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[
+                Code {
+                    title: "Form: nested `lines[3][counted]` checked with `v.nested`",
+                    region: "stock.take.form",
+                },
+                Code {
+                    title: "Transaction: each difference an adjustment; consigned shortfalls booked",
+                    region: "stock.take.apply",
+                },
+                Code {
+                    title: "Template: a macro writes the nested field names",
+                    region: "stock.take.template",
+                },
+            ],
         },
         Explanation {
             route: "stock.consignments",
@@ -302,6 +344,16 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/stock/consignments/index.html",
                 PARTS,
                 TESTS,
+            ],
+            code: &[
+                Code {
+                    title: "Handler: shipments where the store is owner or location",
+                    region: "stock.consignments.handler",
+                },
+                Code {
+                    title: "Template: tabs, then one row per shipment",
+                    region: "stock.consignments.template",
+                },
             ],
         },
         Explanation {
@@ -357,6 +409,20 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[
+                Code {
+                    title: "Handler: the owner store's goods on its shelf, searched",
+                    region: "stock.consignments.create.handler",
+                },
+                Code {
+                    title: "Rules: no line asks for more than is available now",
+                    region: "stock.consignments.create.rules",
+                },
+                Code {
+                    title: "Template: one quantity field per row, as `lines[i][quantity]`",
+                    region: "stock.consignments.create.template",
+                },
+            ],
         },
         Explanation {
             route: "stock.consignments.show",
@@ -388,7 +454,7 @@ pub fn entries() -> Vec<Explanation> {
                           styled as a stepper (the `steps` macro in `stock/_parts.html`, the \
                           current step marked `aria-current`; the done steps slide in through \
                           Motion, not under reduced motion), and the dated events are the \
-                          `history` block.",
+                          `history` block of renox-blocks.",
                 },
                 AUDITED,
             ],
@@ -409,10 +475,24 @@ pub fn entries() -> Vec<Explanation> {
                 MODEL,
                 "examples/bikeshop/resources/views/stock/consignments/show.html",
                 PARTS,
-                "examples/bikeshop/resources/views/blocks/history.html",
+                "crates/renox-blocks/views/blocks.html",
                 "examples/bikeshop/public/areas/stock.js",
                 TESTS,
                 BROWSER,
+            ],
+            code: &[
+                Code {
+                    title: "Handler: each button checked in the store that matters",
+                    region: "stock.consignments.show.handler",
+                },
+                Code {
+                    title: "Guard: a status moves only from what it still is",
+                    region: "stock.consignments.show.advance",
+                },
+                Code {
+                    title: "Template: the actions the person may take, in the page header",
+                    region: "stock.consignments.show.template",
+                },
             ],
         },
         Explanation {
@@ -449,6 +529,16 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/stock/suppliers/index.html",
                 TESTS,
             ],
+            code: &[
+                Code {
+                    title: "Handler: counts per supplier with `group_by` + `select_as`",
+                    region: "stock.suppliers.handler",
+                },
+                Code {
+                    title: "Template: the kit's `table`, one row per supplier",
+                    region: "stock.suppliers.template",
+                },
+            ],
         },
         Explanation {
             route: "stock.suppliers.create",
@@ -473,6 +563,20 @@ pub fn entries() -> Vec<Explanation> {
                 PURCHASING,
                 "examples/bikeshop/resources/views/stock/suppliers/form.html",
                 TESTS,
+            ],
+            code: &[
+                Code {
+                    title: "Handler: an empty form, then `Valid<SupplierForm>` creates",
+                    region: "stock.suppliers.create.handler",
+                },
+                Code {
+                    title: "Form: `#[derive(Validate)]` rules, tidied before saving",
+                    region: "stock.suppliers.form",
+                },
+                Code {
+                    title: "Template: one form for new and edit",
+                    region: "stock.suppliers.form.template",
+                },
             ],
         },
         Explanation {
@@ -507,6 +611,20 @@ pub fn entries() -> Vec<Explanation> {
                 PURCHASING,
                 "examples/bikeshop/resources/views/stock/suppliers/form.html",
                 TESTS,
+            ],
+            code: &[
+                Code {
+                    title: "Handler: `Found<Supplier>` binds the route's model",
+                    region: "stock.suppliers.edit.handler",
+                },
+                Code {
+                    title: "Form: the same rules as for a new supplier",
+                    region: "stock.suppliers.form",
+                },
+                Code {
+                    title: "Template: one form for new and edit",
+                    region: "stock.suppliers.form.template",
+                },
             ],
         },
         Explanation {
@@ -563,6 +681,20 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[
+                Code {
+                    title: "Import: `renox::import` checks each row as a form; large files go to a job",
+                    region: "stock.suppliers.show.import",
+                },
+                Code {
+                    title: "Job: the same import in the background, then the report by mail",
+                    region: "stock.suppliers.show.job",
+                },
+                Code {
+                    title: "Template: the kit's `import_action` sheet",
+                    region: "stock.suppliers.show.template",
+                },
+            ],
         },
         Explanation {
             route: "stock.purchasing",
@@ -616,6 +748,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/mail/stock/notice.html",
                 TESTS,
             ],
+            code: &[
+                Code {
+                    title: "Handler: the store's orders by tab, suppliers by `belongs_to`",
+                    region: "stock.purchasing.handler",
+                },
+                Code {
+                    title: "Schedule: the daily reorder check drafts suggested orders",
+                    region: "stock.purchasing.reorder",
+                },
+                Code {
+                    title: "Template: tabs and a badge on suggested orders",
+                    region: "stock.purchasing.template",
+                },
+            ],
         },
         Explanation {
             route: "stock.purchasing.create",
@@ -662,6 +808,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/stock/purchase_orders/new.html",
                 TESTS,
                 BROWSER,
+            ],
+            code: &[
+                Code {
+                    title: "Handler: what the store needs first, then the supplier's price list",
+                    region: "stock.purchasing.create.handler",
+                },
+                Code {
+                    title: "Query: parts work orders wait for, and goods under their level",
+                    region: "stock.purchasing.needs",
+                },
+                Code {
+                    title: "Template: a macro for one line with its reasons",
+                    region: "stock.purchasing.create.template",
+                },
             ],
         },
         Explanation {
@@ -723,6 +883,20 @@ pub fn entries() -> Vec<Explanation> {
                 TESTS,
                 BROWSER,
             ],
+            code: &[
+                Code {
+                    title: "Handler: `access::can` per action, in the order's store",
+                    region: "stock.purchasing.show.handler",
+                },
+                Code {
+                    title: "Receive: a purchase movement per line, the average cost updated",
+                    region: "stock.purchasing.show.receive",
+                },
+                Code {
+                    title: "Template: the actions, and a receiving form while the order is open",
+                    region: "stock.purchasing.show.template",
+                },
+            ],
         },
         Explanation {
             route: "stock.purchasing.print",
@@ -762,6 +936,16 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/stock/purchase_orders/print.html",
                 "examples/bikeshop/public/areas/stock.js",
                 TESTS,
+            ],
+            code: &[
+                Code {
+                    title: "Handler: a signed link for 30 days; `ValidSignature` guards the page",
+                    region: "stock.purchasing.print.handler",
+                },
+                Code {
+                    title: "Template: its own page, no shop chrome, for the supplier to print",
+                    region: "stock.purchasing.print.template",
+                },
             ],
         },
         Explanation {
@@ -812,6 +996,20 @@ pub fn entries() -> Vec<Explanation> {
                 "examples/bikeshop/resources/views/stock/fleet.html",
                 TESTS,
                 MOD,
+            ],
+            code: &[
+                Code {
+                    title: "Form: `unique(\"rental_bikes\", \"frame_number\")` and money as typed",
+                    region: "stock.fleet.form",
+                },
+                Code {
+                    title: "Handler: one bike off the shelf and into the fleet, in one transaction",
+                    region: "stock.fleet.handler",
+                },
+                Code {
+                    title: "Template: a searchable `select` and a `form_grid`",
+                    region: "stock.fleet.template",
+                },
             ],
         },
     ]

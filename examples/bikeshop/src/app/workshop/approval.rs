@@ -32,6 +32,7 @@ pub fn signed_link(state: &AppState, extra: &ExtraWork) -> Result<String> {
 /// `GET /service/approve/{extra}` (`workshop.extra.show`): the proposal,
 /// its items and price, and "Approve" / "Refuse" (or the answer already
 /// given). No login: the signature is the proof.
+// [explain:workshop.extra.show.handler]
 pub async fn show(
     _: ValidSignature,
     State(state): State<AppState>,
@@ -48,19 +49,20 @@ pub async fn show(
     Ok(view(
         "workshop/approve.html",
         context! {
-            // The buttons post to this same signed address.
-            action => uri.to_string(),
-            pending => extra.status == ExtraStatus::Pending,
-            status => match extra.status {
-                ExtraStatus::Pending => "pending",
-                ExtraStatus::Approved => "approved",
-                ExtraStatus::Refused => "refused",
-            },
-            store,
-            bike,
-            order,
-            extra,
-        },
+                    // The buttons post to this same signed address.
+                    action => uri.to_string(),
+                    pending => extra.status == ExtraStatus::Pending,
+        // [/explain:workshop.extra.show.handler]
+                    status => match extra.status {
+                        ExtraStatus::Pending => "pending",
+                        ExtraStatus::Approved => "approved",
+                        ExtraStatus::Refused => "refused",
+                    },
+                    store,
+                    bike,
+                    order,
+                    extra,
+                },
     ))
 }
 
@@ -75,6 +77,7 @@ pub struct Decision {
 /// answer once. Approved: the tasks join the work order and the parts are
 /// taken from stock (or waited for); either way the work goes on and the
 /// store's mechanics are told.
+// [explain:workshop.extra.show.decide]
 pub async fn decide(
     _: ValidSignature,
     State(state): State<AppState>,
@@ -100,6 +103,7 @@ pub async fn decide(
     };
     extra.decided_at = Some(renox::db::now());
     extra.save_only(db, &["status", "decided_at"]).await?;
+    // [/explain:workshop.extra.show.decide]
     if approve {
         for item in extra.items.iter() {
             if item.kind == "task" {

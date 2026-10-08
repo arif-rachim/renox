@@ -40,6 +40,7 @@ const SAME_IN_BOTH: &[&str] = &[
     "reports.workbook.total",             // "Total"
     "reports.hours",                      // ":hours h"
     "reports.payable.plan_subscriptions", // "Plan"
+    "fields.no",                          // "No"
 ];
 
 /// English a Spanish page may still show, and why.

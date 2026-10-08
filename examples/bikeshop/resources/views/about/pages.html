@@ -5,6 +5,7 @@
 {% block content %}
 <div class="rx-stack" data-bs-reveal>
   {{ page_header(t('about.pages.title'), subtitle=t('about.pages.lead')) }}
+  {# [explain:about.pages.template] #}
   {#- A plain GET form: a filtered list has its own URL to share. -#}
   <form method="get" action="{{ route('about.pages') }}" aria-label="{{ t('about.pages.filters') }}">
     {% call toolbar() %}
@@ -14,6 +15,7 @@
       {%- if feature or audience %}{{ link_button(route('about.pages'), t('about.pages.clear'), variant="plain") }}{% endif %}
     {% endcall %}
   </form>
+  {# [/explain:about.pages.template] #}
   <p class="rx-subtitle" aria-live="polite">{{ t('about.pages.count', shown=pages | length, total=total) }}</p>
   {%- if pages %}
   {% call list(id="about-pages", label=t('about.pages.title')) %}

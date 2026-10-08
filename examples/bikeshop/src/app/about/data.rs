@@ -250,6 +250,15 @@ pub const AREAS: &[Area] = &[
         ],
     },
     Area {
+        title: "Pages about Renox",
+        file: "examples/bikeshop/src/app/about/fields.rs",
+        tables: &[t(
+            "field_samples",
+            "FieldSample",
+            "A visitor's sample bike on /about/fields: one column per kind of form input.",
+        )],
+    },
+    Area {
         title: "Renox's tables",
         file: "examples/bikeshop/src/lib.rs",
         tables: &[
@@ -529,6 +538,7 @@ struct RoleDoc {
     permissions: Vec<String>,
 }
 
+// [explain:about.data.counts]
 /// Rows per table, in one query.
 async fn counts(db: &Db) -> Result<HashMap<String, i64>> {
     let names: Vec<&str> = AREAS
@@ -543,7 +553,9 @@ async fn counts(db: &Db) -> Result<HashMap<String, i64>> {
     let rows: Vec<(String, i64)> = sql(union).fetch_as(db).await?;
     Ok(rows.into_iter().collect())
 }
+// [/explain:about.data.counts]
 
+// [explain:about.data.handler]
 /// `GET /about/data`.
 pub async fn show(State(db): State<Db>) -> Result<View> {
     let counts = counts(&db).await?;
@@ -565,6 +577,7 @@ pub async fn show(State(db): State<Db>) -> Result<View> {
         })
         .collect();
     let total: i64 = counts.values().sum();
+    // [/explain:about.data.handler]
     Ok(view(
         "about/data.html",
         context! {

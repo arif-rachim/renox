@@ -6,6 +6,7 @@
 {#- The stock take (#240): one category at the active store, the store's own goods and the
     goods it holds for other stores apart (#245). Nested form names (lines[3][counted]) read
     as a list by Valid<T>; a blank count leaves the line as it is. -#}
+{# [explain:stock.take.template] #}
 {% macro rows(items, start) -%}
 <ul class="bs-rows bs-rows--3" role="list">
   <li class="bs-row bs-row--head" aria-hidden="true"><span>{{ t('stock.fields.product') }}</span><span class="bs-row__figure">{{ t('stock.fields.on_hand') }}</span><span class="bs-row__figure bs-row__figure--extra">{{ t('stock.fields.reserved') }}</span><span>{{ t('stock.take.counted') }}</span></li>
@@ -23,6 +24,7 @@
   {%- endfor %}
 </ul>
 {%- endmacro %}
+{# [/explain:stock.take.template] #}
 
 {% block content %}
 {{ styles() }}
@@ -34,7 +36,7 @@
     {{ button(t('stock.take.open'), variant="secondary") }}
   </form>
   {%- if not own and not held %}
-  <div class="rx-card">{{ empty(t('stock.take.nothing')) }}</div>
+  <div class="rx-card">{{ empty(t('stock.take.nothing'), icon="boxes") }}</div>
   {%- else %}
   <form method="post" action="{{ route('stock.take.store') }}" id="take-form" novalidate data-bs-reveal>
     {{ csrf_field() }}

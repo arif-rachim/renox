@@ -6,6 +6,7 @@
 {#- A new purchase order (#240): pick a supplier; the lines start with what the store needs
     (parts work orders wait for, #236; goods under their reorder level), then the rest of the
     supplier's price list. A blank quantity isn't ordered. -#}
+{# [explain:stock.purchasing.create.template] #}
 {% macro line(row, i, need) -%}
 <li class="bs-row">
   <span class="bs-row__name">{{ row.name }}<small>{{ row.sku }}
@@ -17,6 +18,7 @@
   <span><input type="hidden" name="lines[{{ i }}][variant]" value="{{ row.variant_id }}">{{ input("lines[" ~ i ~ "][quantity]", t('stock.purchasing.quantity_of', name=row.name), type="number", value=(row.quantity if need else none), hide_label=true, attrs={"min": 0, "inputmode": "numeric"}) }}</span>
 </li>
 {%- endmacro %}
+{# [/explain:stock.purchasing.create.template] #}
 
 {% block content %}
 {{ styles() }}
@@ -38,7 +40,7 @@
         <li class="bs-row bs-row--head" aria-hidden="true"><span>{{ t('stock.fields.product') }}</span><span class="bs-row__figure">{{ t('stock.fields.reorder_level') }}</span><span>{{ t('stock.purchasing.unit_cost') }}</span><span>{{ t('stock.fields.quantity') }}</span></li>
         {%- for row in needs %}{{ line(row, loop.index0, true) }}{% endfor %}
       </ul>
-      {%- else %}{{ empty(t('stock.purchasing.no_needs')) }}{% endif %}
+      {%- else %}{{ empty(t('stock.purchasing.no_needs'), icon="circle-check") }}{% endif %}
     {% endcall %}
     {%- if rest %}
     {% call card(title=t('stock.purchasing.price_list', supplier=supplier.name)) %}

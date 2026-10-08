@@ -1,17 +1,17 @@
-// #267: renox-grid.js on examples/grid (480 seeded orders): sorting and
+// #267: renox-grid.js on the fixture's /grid pages (480 seeded orders; the grid example's until #351): sorting and
 // paging through the URL, search as you type, the column menu remembered,
 // resizing and moving columns, row details, and the phone layout.
 
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Browser, sleep } from './lib/cdp.mjs';
-import { start } from './lib/app.mjs';
+import { fixture } from './lib/app.mjs';
 
 let browser;
 let app;
 
 before(async () => {
-  app = await start('grid', 'examples/grid', { seed: true });
+  app = await fixture({ seed: true });
   browser = await Browser.launch();
 });
 
@@ -22,7 +22,7 @@ after(async () => {
 
 const onGrid = (fn, options) =>
   browser.with(async (page) => {
-    await page.goto(`${app.url}/`);
+    await page.goto(`${app.url}/grid`);
     await fn(page);
     page.assertClean();
   }, options);
@@ -100,7 +100,7 @@ test('hiding a column in the menu is remembered across visits', () =>
       { message: 'city hidden' },
     );
     await sleep(500); // the preference is saved in the background
-    await page.goto(`${app.url}/`);
+    await page.goto(`${app.url}/grid`);
     assert.ok(!(await columnOrder(page)).includes('city'), 'still hidden after a reload');
     // Reset brings it back.
     await page.click('[popovertarget="grid-orders-columns"]');
@@ -159,7 +159,7 @@ test('a row opens its details', () =>
 test('a phone shows the phone columns', () =>
   browser.with(
     async (page) => {
-      await page.goto(`${app.url}/`);
+      await page.goto(`${app.url}/grid`);
       const shown = await page.eval(() =>
         [...document.querySelectorAll('thead th[data-col]')].filter((th) => getComputedStyle(th).display !== 'none').length,
       );

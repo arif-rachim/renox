@@ -12,12 +12,13 @@
 <div class="rx-stack">
   {{ page_header(t('plans.subscribe.title'), subtitle=t('plans.subscribe.lead'), back=route('plans.index'), back_label=t('plans.index.title')) }}
   {%- if not has_bikes %}
-  <div class="rx-card">{{ empty(t('plans.subscribe.no_bike'), t('plans.subscribe.no_bike_text'), route('workshop.bikes'), t('workshop.bikes.add')) }}</div>
+  <div class="rx-card">{{ empty(t('plans.subscribe.no_bike'), t('plans.subscribe.no_bike_text'), route('workshop.bikes'), t('workshop.bikes.add'), icon="bike") }}</div>
   {%- elif not bikes %}
-  <div class="rx-card">{{ empty(t('plans.subscribe.all_taken'), t('plans.subscribe.all_taken_text'), route('plans.mine'), t('plans.mine.title')) }}</div>
+  <div class="rx-card">{{ empty(t('plans.subscribe.all_taken'), t('plans.subscribe.all_taken_text'), route('plans.mine'), t('plans.mine.title'), icon="circle-check") }}</div>
   {%- elif not ways %}
   {{ alert(t('plans.subscribe.no_gateway'), kind="warning") }}
   {%- else %}
+  {# [explain:plans.subscribe.template] #}
   <form method="post" action="{{ route('plans.subscribe.store') }}" id="subscribe-form" novalidate data-bs-subscribe
         hx-get="{{ route('plans.subscribe') }}" hx-trigger="change" hx-select="#subscribe-live" hx-target="#subscribe-live" hx-swap="outerHTML">
     {{ csrf_field() }}
@@ -33,6 +34,7 @@
         {% call card(title=t('plans.subscribe.when')) %}
           {{ toggle_buttons("weekday", t('plans.fields.weekday'), weekdays, selected=weekday, required=true, hint=t('plans.subscribe.weekday_hint')) }}
         {% endcall %}
+  {# [/explain:plans.subscribe.template] #}
         {% call card(title=t('plans.subscribe.summary')) %}
           <div data-bs-plan-summary>
           {%- if plan %}

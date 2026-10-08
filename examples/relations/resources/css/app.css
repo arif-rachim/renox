@@ -1,9 +1,0 @@
-/* Tailwind CSS (https://tailwindcss.com/docs), built into public/css/app.css by
-   `rnx tailwind --minify` (or `rnx serve`) with the standalone CLI: no Node needed.
-   The built file is committed, so `cargo run` works without building it.
-
-   The components come from the Renox UI kit (rx-* classes, outside Tailwind's layers);
-   Tailwind sets the Markdown bodies' type (`prose`) and the odd bit of layout. */
-@import "tailwindcss";
-@plugin "@tailwindcss/typography";
-@source "../views";

@@ -19,10 +19,21 @@
 {% block content %}
 {% include "accounts/_styles.html" %}
 <div class="rx-stack" data-bs-reveal>
-  {% call page_header(text.account_title, subtitle=t('accounts.page.lead', name=user.name)) %}
-    {%- if unread_notifications is defined %}{{ link_button(route('notifications.index'), t('accounts.page.notifications'), badge=(unread_notifications or none)) }}{% endif %}
-  {% endcall %}
+  {#- The page's header: a band of photo, the person as initials, the title. -#}
+  {% from "layouts/_avatar.html" import avatar %}
+  <section class="bs-profile" aria-labelledby="account-title">
+    <div class="bs-profile__band"><img src="/images/site/riders.webp" alt="" width="1200" height="900"></div>
+    <div class="bs-profile__body">
+      {{ avatar(user.name, size="l") }}
+      <div class="bs-profile__text">
+        <h1 class="rx-title" id="account-title">{{ text.account_title }}</h1>
+        <p class="rx-subtitle">{{ t('accounts.page.lead', name=user.name) }}</p>
+      </div>
+      {%- if unread_notifications is defined %}<div class="bs-profile__actions">{{ link_button(route('notifications.index'), t('accounts.page.notifications'), badge=(unread_notifications or none), icon="bell") }}</div>{% endif %}
+    </div>
+  </section>
 
+  {# [explain:account.show.template] #}
   <div class="bs-account">
     <form method="post" action="{{ route('account.profile') }}" hx-post="{{ route('account.profile') }}" id="account-profile">
       {{ csrf_field() }}{{ method_field('PUT') }}
@@ -38,6 +49,7 @@
     {%- for section in sections | default([]) %}
     <div class="bs-account__section">{% include section.template %}</div>
     {%- endfor %}
+  {# [/explain:account.show.template] #}
 
     <form method="post" action="{{ route('account.password') }}" hx-post="{{ route('account.password') }}" id="account-password">
       {{ csrf_field() }}{{ method_field('PUT') }}

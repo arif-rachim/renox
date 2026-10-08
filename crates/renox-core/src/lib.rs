@@ -90,6 +90,7 @@ mod health;
 mod htmx;
 pub mod http;
 pub mod i18n;
+mod icons;
 pub mod import;
 mod inspector;
 mod live;

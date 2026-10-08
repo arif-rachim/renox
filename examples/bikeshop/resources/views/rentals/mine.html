@@ -16,6 +16,7 @@
   {{ alert(t('rentals.mine.unverified'), kind="warning") }}
   <p>{{ link_button(route('rentals.identity'), t('rentals.identity.title'), variant="primary") }}</p>
   {%- endif %}
+  {# [explain:rentals.mine.template] #}
   <section class="rx-stack" aria-labelledby="current-title">
     <h2 class="rx-card__title" id="current-title">{{ t('rentals.mine.current') }}</h2>
     {%- if current %}
@@ -23,9 +24,10 @@
       {%- for row in current %}{{ rental_item(row, route('rentals.show', row.reservation_code), show_customer=false) }}{% endfor %}
     {% endcall %}
     {%- else %}
-    <div class="rx-card">{{ empty(t('rentals.mine.none'), t('rentals.mine.none_text'), route('rentals.create'), t('rentals.search.title')) }}</div>
+    <div class="rx-card">{{ empty(t('rentals.mine.none'), t('rentals.mine.none_text'), route('rentals.create'), t('rentals.search.title'), icon="bike") }}</div>
     {%- endif %}
   </section>
+  {# [/explain:rentals.mine.template] #}
   {%- if past %}
   <section class="rx-stack" aria-labelledby="past-title">
     <h2 class="rx-card__title" id="past-title">{{ t('rentals.mine.past') }}</h2>

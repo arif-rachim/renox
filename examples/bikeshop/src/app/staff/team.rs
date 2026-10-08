@@ -88,6 +88,7 @@ pub struct Member {
     pub roles: Vec<String>,
 }
 
+// [explain:staff.team.index.members]
 /// Everyone who belongs to `store`: their home store, or a role given there
 /// (in force or later). Three queries however many there are.
 async fn members(db: &Db, store: i64) -> Result<Vec<Member>> {
@@ -104,6 +105,7 @@ async fn members(db: &Db, store: i64) -> Result<Vec<Member>> {
     let mut staff: Vec<Staff> = Staff::query().order_by("id").get(db).await?;
     staff.retain(|s| s.home_store_id == store || with_role.contains(&s.user_id));
     let user_ids: Vec<i64> = staff.iter().map(|s| s.user_id).collect();
+    // [/explain:staff.team.index.members]
     let users: HashMap<i64, User> = if user_ids.is_empty() {
         HashMap::new()
     } else {
@@ -121,6 +123,7 @@ async fn members(db: &Db, store: i64) -> Result<Vec<Member>> {
         .into_iter()
         .map(|s| (s.id, s.name))
         .collect();
+    // [explain:staff.team.index.members]
     let mut found: Vec<Member> = staff
         .into_iter()
         .filter_map(|s| {
@@ -136,6 +139,7 @@ async fn members(db: &Db, store: i64) -> Result<Vec<Member>> {
         .collect();
     found.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(found)
+    // [/explain:staff.team.index.members]
 }
 
 /// The roles in force now for each of `user_ids`, in `store` or global.
@@ -208,12 +212,14 @@ pub async fn assignable(db: &Db, user: &User, store: i64) -> Result<Vec<(String,
         .collect())
 }
 
+// [explain:staff.team.index.handler]
 /// `GET /staff/team`: the active store's team.
 pub async fn index(State(db): State<Db>) -> Result<View> {
     let store = Store::find_or_404(&db, active()?).await?;
     let members = members(&db, store.id).await?;
     Ok(view("staff/team/index.html", context! { store, members }))
 }
+// [/explain:staff.team.index.handler]
 
 /// `GET /staff/team/{staff}`: one person's roles everywhere, and the forms.
 pub async fn show(State(db): State<Db>, user: AuthUser, Path(id): Path<i64>) -> Result<View> {
@@ -266,6 +272,7 @@ pub struct AssignForm {
     pub ends_on: Option<renox::chrono::NaiveDate>,
 }
 
+// [explain:staff.team.show.assign]
 /// `POST /staff/team/{staff}/roles`: gives a role in the active store.
 pub async fn assign(
     State(state): State<AppState>,
@@ -292,6 +299,7 @@ pub async fn assign(
         assign = assign.until(midnight(day + renox::chrono::Duration::days(1)));
     }
     assign.await?;
+    // [/explain:staff.team.show.assign]
     audit::record(db, &user, STAFF_MANAGE, "staff.role_assigned")
         .subject("staff", member.staff.id)
         .data(json!({ "role": form.role, "from": form.starts_on, "until": form.ends_on }))
@@ -338,6 +346,7 @@ async fn has_global_role(db: &Db, user_id: i64) -> Result<bool> {
     Ok(count > 0)
 }
 
+// [explain:staff.team.show.deactivate]
 /// `POST /staff/team/{staff}/deactivate`: removes every role and ends every
 /// session of the person (see the module docs).
 pub async fn deactivate(
@@ -350,10 +359,12 @@ pub async fn deactivate(
     if member.staff.user_id == user.id || has_global_role(db, member.staff.user_id).await? {
         return Err(Error::Forbidden);
     }
+    // [/explain:staff.team.show.deactivate]
     // The home store's manager decides about the person, not a store they help.
     if !can_in(&user, STAFF_MANAGE, member.staff.home_store_id) {
         return Err(Error::Forbidden);
     }
+    // [explain:staff.team.show.deactivate]
     let person = User::find_or_404(db, member.staff.user_id).await?;
     let removed: Vec<_> = person
         .assignments(db)
@@ -368,6 +379,7 @@ pub async fn deactivate(
     member.staff.active = false;
     member.staff.save(db).await?;
     person.revoke_sessions(db).await?;
+    // [/explain:staff.team.show.deactivate]
     audit::record(db, &user, STAFF_MANAGE, "staff.deactivated")
         .subject("staff", member.staff.id)
         .data(json!({ "roles_removed": removed }))
@@ -426,12 +438,14 @@ pub struct InvitationForm {
     pub role: String,
 }
 
+// [explain:staff.invitations.create.send]
 /// `POST /staff/team/invite`: mails the signed link.
 pub async fn send_invitation(
     State(state): State<AppState>,
     user: AuthUser,
     Valid(form): Valid<InvitationForm>,
 ) -> Result<(Toast, Redirect)> {
+    // [/explain:staff.invitations.create.send]
     let store = Store::find_or_404(&state.db, active()?).await?;
     if !assignable(&state.db, &user, store.id)
         .await?
@@ -440,6 +454,7 @@ pub async fn send_invitation(
     {
         return Err(Error::Forbidden);
     }
+    // [explain:staff.invitations.create.send]
     let email = normalize_email(&form.email);
     let link = state.signed_url(
         "staff.invitations.accept",
@@ -461,6 +476,7 @@ pub async fn send_invitation(
         },
     )?;
     state.queue_mail(mail).await?;
+    // [/explain:staff.invitations.create.send]
     audit::record(&state.db, &user, STAFF_MANAGE, "staff.invited")
         .subject("stores", store.id)
         .data(json!({ "email": email, "role": form.role }))
@@ -493,6 +509,7 @@ async fn already_joined(db: &Db, email: &str, store: i64, role: &str) -> Result<
         .any(|a| a.role == role && a.scope.kind() == scope.kind() && a.scope.id() == scope.id()))
 }
 
+// [explain:staff.invitations.accept.join]
 /// `GET /staff/join/{store}/{role}/{email}` (signed): the page the
 /// invitation opens.
 pub async fn join(
@@ -523,6 +540,7 @@ pub async fn join(
         },
     ))
 }
+// [/explain:staff.invitations.accept.join]
 
 /// What a new member of staff types.
 #[derive(Deserialize)]
@@ -541,6 +559,7 @@ impl Validate for JoinForm {
     }
 }
 
+// [explain:staff.invitations.accept.accept]
 /// `POST /staff/join/{store}/{role}/{email}` (signed): makes the account if
 /// needed, the `staff` row and the role, then sends them to log in.
 pub async fn accept(
@@ -551,6 +570,7 @@ pub async fn accept(
     Path((store, role, email)): Path<(i64, String, String)>,
     Valid(form): Valid<JoinForm>,
 ) -> Result<(Toast, Redirect)> {
+    // [/explain:staff.invitations.accept.accept]
     let db = &state.db;
     let store = Store::find_or_404(db, store).await?;
     let email = normalize_email(&email);
@@ -601,6 +621,7 @@ pub async fn accept(
             .await?;
         }
     }
+    // [explain:staff.invitations.accept.accept]
     person
         .assign_role_in(db, &role, &store_scope(store.id))
         .await?;
@@ -616,6 +637,7 @@ pub async fn accept(
     if user.is_some() {
         session.flush();
     }
+    // [/explain:staff.invitations.accept.accept]
     Ok((
         Toast::success(
             state

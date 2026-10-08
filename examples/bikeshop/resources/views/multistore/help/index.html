@@ -17,6 +17,7 @@
       <p class="rx-subtitle">{{ t('multistore.help.from_to', from=r.from, to=r.to) }} · {{ r.starts_at | date("%d %b") }} – {{ (r.ends_at) | date("%d %b %Y") }}{% if r.minutes %} · {{ t('multistore.help.hours_done', hours=(r.minutes / 60) | round(1)) }}{% endif %}</p>
       <p class="rx-subtitle">{{ r.reason }}</p>
     </div>
+    {# [explain:multistore.help.template] #}
     {% call row_actions() %}
       {%- if r.can_decide %}{{ post(route('multistore.help.refuse', r.id), t('multistore.help.refuse')) }}{{ post(route('multistore.help.approve', r.id), t('multistore.help.approve'), variant="primary", icon="check", id="approve-" ~ r.id) }}{% endif %}
       {%- if r.can_withdraw %}{{ post(route('multistore.help.withdraw', r.id), t('multistore.help.withdraw')) }}{% endif %}
@@ -29,6 +30,7 @@
       {%- endif %}
       {%- if r.can_end %}{{ confirm("end-" ~ r.id, t('multistore.help.end'), route('multistore.help.end', r.id), t('multistore.help.end_title', name=r.helper), t('multistore.help.end_text', store=r.to), method="POST", size="small") }}{% endif %}
     {% endcall %}
+    {# [/explain:multistore.help.template] #}
   </li>
   {%- endfor %}
 {% endcall %}

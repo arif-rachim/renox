@@ -11,6 +11,7 @@
 {{ (found if found != key else english) | markdown }}
 {%- endmacro %}
 
+{# [explain:api.about.template] #}
 {% macro endpoint(e) -%}
 <article class="rx-card bs-endpoint" id="{{ e.route | replace('.', '-') }}">
   <header class="bs-endpoint__head">
@@ -26,6 +27,7 @@
   {% endcall %}
   <pre class="bs-code"><code>{{ e.curl | replace("$URL", base) }}</code></pre>
 </article>
+{# [/explain:api.about.template] #}
 {%- endmacro %}
 
 {% block content %}

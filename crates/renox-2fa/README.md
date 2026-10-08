@@ -23,4 +23,4 @@ What it adds:
   activity log when the app has the `Audit` module.
 
 The guide is [docs/two-factor.md](https://github.com/arif-rachim/renox/blob/main/docs/two-factor.md);
-examples/teams uses it. Versioned with `renox`: use the same version for both.
+examples/bikeshop uses it (optional for customers, required for staff). Versioned with `renox`: use the same version for both.

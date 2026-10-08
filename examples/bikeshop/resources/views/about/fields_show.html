@@ -1,0 +1,50 @@
+{% extends "layouts/app.html" %}
+{#- `about.fields.show`: a sample read back from the database, every field on
+    the kit's infolist formatted by its kind (money in APP_CURRENCY, a Yes/No,
+    swatches, badges, pairs, Markdown, rich text, highlighted JSON, dates),
+    some with buttons beside them (`suffix_actions`). -#}
+{% from "renox/ui.html" import page_header, card, infolist, entry, link_button, confirm %}
+{% from "renox-editors/editors.html" import code_entry %}
+{% block seo %}{{ seo(title=sample.name) }}{% endblock %}
+
+{% block content %}
+<div class="rx-stack" data-bs-reveal>
+  {% call page_header(sample.name, subtitle=t('fields.show.lead'), back=route('about.fields'), back_label=t('fields.title')) %}
+    {{ link_button(route('about.fields.edit', sample.id), t('fields.edit'), variant="primary", icon="edit") }}
+    {{ confirm("delete-sample", t('fields.delete'), route('about.fields.destroy', sample.id),
+               t('fields.confirm.title', name=sample.name), t('fields.confirm.text'),
+               confirm_label=t('fields.delete'), icon="trash") }}
+  {% endcall %}
+  {% call card() %}
+    {% call infolist(columns=2) %}
+      {{ entry(t('fields.form.key'), sample.id, copyable=true, span="full",
+               suffix_actions=[{"label": t('fields.edit'), "icon": "edit", "url": route('about.fields.edit', sample.id)}]) }}
+      {{ entry(t('fields.form.brand'), sample.brand) }}
+      {{ entry(t('fields.form.price'), sample.price, format="money") }}
+      {{ entry(t('fields.form.description'), sample.description, format="markdown", span="full", placeholder=t('fields.show.none')) }}
+      {{ entry(t('fields.form.stock'), sample.stock, format="number", suffix=t('fields.show.in_stock'),
+               suffix_actions=[{"label": t('fields.title'), "icon": "box", "url": route('about.fields')}]) }}
+      {{ entry(t('fields.form.weight'), sample.weight_kg, format="number", decimals=2, suffix="kg") }}
+      {{ entry(t('fields.form.available'), sample.available, format="bool") }}
+      {{ entry(t('fields.form.size'), sample.size, badge="info", labels={"small": t('fields.size.small'), "medium": t('fields.size.medium'), "large": t('fields.size.large')}) }}
+      {# [explain:fields.show.template] #}
+      {{ entry(t('fields.form.colours'), sample.colors, format="color") }}
+      {{ entry(t('fields.form.tags'), sample.tags, badge=true, limit_list=3) }}
+      {{ entry(t('fields.form.specs'), sample.specs, format="key_value", span="full") }}
+      {#- Stored rich text, cleaned again on the way out. -#}
+      {%- if sample.details %}{% call entry(t('fields.form.rich'), span="full") %}<div class="rx-prose">{{ sample.details | rich_text }}</div>{% endcall %}
+      {%- else %}{{ entry(t('fields.form.rich'), none, span="full", placeholder=t('fields.show.none')) }}{% endif %}
+      {{ code_entry(t('fields.form.settings'), sample.settings, language="json", placeholder=t('fields.show.none')) }}
+      {# [/explain:fields.show.template] #}
+      {{ entry(t('fields.form.pickup'), sample.pickup_at) }}
+      {{ entry(t('fields.form.launch'), sample.launch_at, format="datetime", date_format="%d %b %Y, %H:%M") }}
+      {{ entry(t('fields.form.released'), sample.released_on, format="date", date_format="%d %b %Y") }}
+      {%- if photo_url %}{% call entry(t('fields.form.photo')) %}<img class="bs-sample-photo" src="{{ photo_url }}" alt="{{ t('fields.show.photo_alt', name=sample.name) }}">{% endcall %}
+      {%- else %}{{ entry(t('fields.form.photo'), none, placeholder=t('fields.show.none')) }}{% endif %}
+      {%- if sample.manual %}{{ entry(t('fields.form.manual'), sample.manual_name, url=route('about.fields.manual', sample.id), new_tab=true) }}
+      {%- else %}{{ entry(t('fields.form.manual'), none, placeholder=t('fields.show.none')) }}{% endif %}
+      {{ entry(t('fields.show.updated'), sample.updated_at, format="since") }}
+    {% endcall %}
+  {% endcall %}
+</div>
+{% endblock %}

@@ -401,6 +401,7 @@ pub struct RentalRow {
 }
 
 impl RentalRow {
+    // [explain:rentals.rows]
     /// Rows for a page of rentals in five queries, however many rentals:
     /// bikes, their variants, the variants' products, customers, and the
     /// stores (operating and owner together).
@@ -420,6 +421,7 @@ impl RentalRow {
             .into_iter()
             .map(|s| (s.id, s))
             .collect();
+        // [/explain:rentals.rows]
         Ok(rentals
             .into_iter()
             .map(|rental| {

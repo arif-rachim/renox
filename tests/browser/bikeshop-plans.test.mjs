@@ -48,7 +48,7 @@ describe('service plans', () => {
   test('the plans compared on a phone', () =>
     browser.with(async (page) => {
       await page.goto(`${app.url}/plans`);
-      const cards = await page.eval(() => document.querySelectorAll('.bs-plan').length);
+      const cards = await page.eval(() => document.querySelectorAll('.rx-plan').length);
       assert.ok(cards >= 3, `the plans' cards (${cards})`);
       const text = await page.text('main');
       assert.match(text, /Monthly tune-up/);
@@ -63,7 +63,7 @@ describe('service plans', () => {
       await login(page, 'customer@bikeshop.test');
       await page.goto(`${app.url}/plans`);
       // "Choose this plan" on the highlighted card.
-      const choose = await page.eval(() => document.querySelector('.bs-plan--highlight .bs-plan__cta').getAttribute('href'));
+      const choose = await page.eval(() => document.querySelector('.rx-plan--highlight .rx-plan__cta').getAttribute('href'));
       assert.match(choose, /\/plans\/subscribe\?plan=/);
       await page.goto(`${app.url}${choose}`);
       await page.waitFor(() => location.pathname === '/plans/subscribe', { message: 'the subscribe form' });

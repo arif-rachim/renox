@@ -860,7 +860,8 @@ More htmx tools:
 - `<form data-live-validate>` is Precognition.
 - Alpine.js covers client-side state.
 
-`examples/htmx-recipes` has modals, inline editing, infinite scroll and tabs.
+The bike shop's `/about/htmx` page ([src/app/about/htmx.rs](../examples/bikeshop/src/app/about/htmx.rs))
+has modals, inline editing, infinite scroll and tabs, live.
 
 ## Auth: Breeze, Sanctum, gates and policies
 
@@ -871,8 +872,11 @@ file. Sanctum's tokens are part of it too.
 For what Breeze and Jetstream scaffold around those pages, `rnx new desk --starter` writes the
 starter kit:
 
-- a sidebar layout with the notification bell;
-- a dashboard;
+- a sidebar layout with the notification bell, and the kit's tab bar on phones;
+- a public home page and branded sign-in pages, made of page patterns the app owns
+  (`resources/views/patterns.html` and `public/patterns.css`: a hero, section headings,
+  feature cards, a figures strip, a summary with totals, steps, empty states);
+- a dashboard with a welcome card and stat cards;
 - roles (`admin`, `member`);
 - a users page where admins change roles;
 - the activity log;
@@ -1291,9 +1295,10 @@ Details: [operations.md](operations.md).
 Filament's panels are declared at run time. In Renox there are two ways. The `renox-admin`
 crate does the same: a resource declares its grid columns, its form fields and its policy
 once, and the panel gives it a list, forms, a view page, filters, bulk actions and exports
-([admin.md](admin.md), `examples/admin`). Or the pages are generated once and then edited:
+([admin.md](admin.md); the bike shop's panel is
+[src/app/staff/admin.rs](../examples/bikeshop/src/app/staff/admin.rs)). Or the pages are generated once and then edited:
 `rnx make:module orders --resource --fields "…"` writes the model, form, pages and tests on the
-kit. `examples/backoffice` is built the way Filament's demo is.
+kit. The bike shop's staff side is written by hand on the kit, the way Filament's demo is.
 
 A Filament table:
 
@@ -1365,10 +1370,10 @@ list.
 | Schema builder (`Blueprint`) | not planned | SQL migrations; a `.postgres.up.sql` file when the two databases differ |
 | Tinker | not planned | `db:shell` for SQL, and your own commands (`App::command`, `typed_command`) for code |
 | MySQL, several connections, read/write split | SQLite and PostgreSQL, one `Db` per app | `renox::db::sql` for reports; a second sqlx pool by hand if you must |
-| Livewire, Inertia | not planned | htmx + Alpine; for a SPA, a JSON API with tokens (`examples/api`) |
+| Livewire, Inertia | not planned | htmx + Alpine; for a SPA, a JSON API with tokens (the bike shop's `/api/v1`, [src/app/api/mod.rs](../examples/bikeshop/src/app/api/mod.rs)) |
 | Fortify 2FA, Socialite | `renox-2fa` and `renox-oauth` (optional plugin crates) | `renox-2fa`: TOTP turned on from `/account`, the code after the password, recovery codes ([two-factor.md](two-factor.md)); `renox-oauth`: Google and GitHub (another provider is one `Provider` impl), PKCE, linking by verified email, link and unlink from `/account` ([oauth.md](oauth.md)) |
 | Scout | the database engine, built in | `#[model(search = "title, body")]`, `renox::db::search::migration`, `Post::search(&q)`: SQLite FTS5 or PostgreSQL `tsvector`, kept current by the database, ranked, also behind the grid's search box ([search.md](search.md)); no Algolia/Meilisearch engines |
-| Cashier | the `renox-billing` crate (an optional plugin) | `Billing::new().plan(…).stripe().xendit()`: plans declared in code, trials (also without a payment method), `swap`, `cancel` with a grace period, `resume`, `require_subscription`, the gateways' webhooks verified and applied once; Stripe and Xendit (another gateway is one `Gateway` impl) ([billing.md](billing.md), `examples/billing`). One-off payment pages and webhooks by hand: `examples/backoffice`, `examples/webhooks` |
+| Cashier | the `renox-billing` crate (an optional plugin) | `Billing::new().plan(…).stripe().xendit()`: plans declared in code, trials (also without a payment method), `swap`, `cancel` with a grace period, `resume`, `require_subscription`, the gateways' webhooks verified and applied once; Stripe and Xendit (another gateway is one `Gateway` impl) ([billing.md](billing.md); the bike shop's service plans, [src/app/plans/billing.rs](../examples/bikeshop/src/app/plans/billing.rs)). One-off payment pages and webhooks by hand: the bike shop's checkout ([src/app/sales/gateway.rs](../examples/bikeshop/src/app/sales/gateway.rs)) |
 | Pennant feature flags | open | a setting or a gate |
 | Several guards / user tables | one `users` table | roles from the `Permissions` module |
 | Queued listeners | not built in | a listener that dispatches a job |

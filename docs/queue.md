@@ -45,8 +45,8 @@ More to read:
 
 - the short version of every API: the [cheat-sheet](../CHEATSHEET.md) ("Jobs, events, schedule,
   mail");
-- a complete app: [examples/jobs](../examples/jobs); a whole business: [examples/bikeshop](../examples/bikeshop) (batches for
-  its monthly report and statements, queued mails, listeners);
+- a whole business: [examples/bikeshop](../examples/bikeshop) (batches for its monthly report
+  and statements, queued mails, listeners);
 - running it in production (failed jobs, pruning): [operations.md](operations.md).
 
 > [!NOTE]

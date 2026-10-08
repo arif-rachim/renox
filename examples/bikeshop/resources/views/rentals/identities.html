@@ -7,6 +7,7 @@
 <div class="rx-stack" data-bs-reveal>
   {{ page_header(t('rentals.identities.title'), subtitle=t('rentals.identities.lead')) }}
   {%- if waiting %}
+  {# [explain:rentals.identities.template] #}
   {% call list(id="identities", label=t('rentals.identities.title')) %}
     {%- for w in waiting %}
     <li>
@@ -22,8 +23,9 @@
     </li>
     {%- endfor %}
   {% endcall %}
+  {# [/explain:rentals.identities.template] #}
   {%- else %}
-  <div class="rx-card">{{ empty(t('rentals.identities.none'), t('rentals.identities.none_text')) }}</div>
+  <div class="rx-card">{{ empty(t('rentals.identities.none'), t('rentals.identities.none_text'), icon="id-card") }}</div>
   {%- endif %}
 </div>
 {% endblock %}

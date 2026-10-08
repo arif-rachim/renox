@@ -1,6 +1,6 @@
 {% extends "layouts/staff.html" %}
-{% from "renox/ui.html" import page_header, select, button, link_button, date_picker %}
-{% from "blocks/kanban.html" import kanban %}
+{% from "renox/ui.html" import select, button, link_button, date_picker, icon %}
+{% from "renox-blocks/blocks.html" import kanban %}
 {% from "workshop/_parts.html" import styles %}
 {% block seo %}{{ seo(title=t('workshop.board.title')) }}{% endblock %}
 
@@ -10,7 +10,14 @@
 {% block content %}
 {{ styles() }}
 <div class="bs-board">
-  {{ page_header(t('workshop.board.title'), subtitle=t('workshop.board.lead', count=count)) }}
+  {#- The page's title over a photo of the workshop's tool wall (public/app.css, `bs-banner`). -#}
+  <header class="bs-banner">
+    <img src="/images/site/workshop-tools.webp" alt="" width="1200" height="900">
+    <p class="bs-banner__eyebrow">{{ icon("wrench", size=16) }}<span>{{ t('workshop.nav.board') }}</span></p>
+    <h1 class="bs-banner__title">{{ t('workshop.board.title') }}</h1>
+    <p class="bs-banner__lead">{{ t('workshop.board.lead', count=count) }}</p>
+  </header>
+  {# [explain:workshop.board.template] #}
   <form class="bs-board__filters" method="get" action="{{ route('workshop.board') }}" aria-label="{{ t('workshop.board.filters') }}">
     {%- set m = namespace(list=[["", t('workshop.board.everyone')], ["none", t('workshop.board.unassigned')]]) %}
     {%- for x in mechanics %}{% set m.list = m.list + [[x[0], x[1]]] %}{% endfor %}
@@ -24,5 +31,6 @@
   <div id="workshop-board" class="bs-board__body" hx-get="{{ request.path }}{% if request.query %}?{{ request.query }}{% endif %}" hx-trigger="every 60s" hx-select="#workshop-board" hx-swap="outerHTML">
     {{ kanban("workshop-kanban", columns, url=route('workshop.move'), label=t('workshop.board.title')) }}
   </div>
+  {# [/explain:workshop.board.template] #}
 </div>
 {% endblock %}

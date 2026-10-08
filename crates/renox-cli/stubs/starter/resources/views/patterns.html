@@ -1,0 +1,156 @@
+{#- This app's page patterns (from Renox's bike shop example): macros the pages
+    import, styled by public/patterns.css. They are this app's own files, not
+    the UI kit's: change the markup here and the look there. Texts come from
+    the caller (through `t()`, resources/lang/en.json).
+
+    {% from "patterns.html" import hero, section_head, feature_card, figures, summary, steps, empty_state, page_title, stat_card, icon_circle %}
+
+    Icons are the kit's `icon(name)` (Lucide line icons; docs/ui.md lists
+    the names). Tones: "teal" (the accent), "clay" (the second accent),
+    "ink" and "sand". -#}
+{% from "renox/ui.html" import icon, stat, link_button, page_header %}
+
+{#- A tinted circle with an icon (`tone`: none, "clay" or "sand"; `large`). -#}
+{% macro icon_circle(name, tone=none, large=false, size=20) -%}
+<span class="app-icon{% if tone %} app-icon--{{ tone }}{% endif %}{% if large %} app-icon--large{% endif %}">{{ icon(name, size=size) }}</span>
+{%- endmacro %}
+
+{#- A hero: the headline, then `accent` in the brand's colour (`<em>`), a
+    `lead`, the call block (buttons), and the art beside it (`art`: the name
+    of a macro below, "app" or "icons"). `compact`: a page's top rather than
+    the home page's (a smaller headline, in a card).
+
+    {% call hero(t('home.title'), accent=t('home.accent'), lead=t('home.lead')) %}
+      {{ link_button(route('register'), t('home.start'), variant="primary") }}
+    {% endcall %} -#}
+{% macro hero(title, accent=none, lead=none, eyebrow=none, eyebrow_icon=none, art="app", compact=false, id="page-title") -%}
+<section class="app-hero{% if compact %} app-hero--compact{% endif %}" aria-labelledby="{{ id }}">
+  <div class="app-hero__text">
+    {%- if eyebrow %}<p class="app-hero__eyebrow">{% if eyebrow_icon %}{{ icon(eyebrow_icon, size=16) }}{% endif %}<span>{{ eyebrow }}</span></p>{% endif %}
+    <h1 class="app-hero__title" id="{{ id }}">{{ title }}{% if accent %} <em>{{ accent }}</em>{% endif %}</h1>
+    {%- if lead %}<p class="app-hero__lead">{{ lead }}</p>{% endif %}
+    {%- if caller is defined %}<div class="app-hero__actions">{{ caller() }}</div>{% endif %}
+  </div>
+  {%- if art == "app" %}{{ art_app() }}{% elif art == "icons" %}{{ art_icons() }}{% endif %}
+</section>
+{%- endmacro %}
+
+{#- The home page's art: a small "window" of the app over the theme's colours.
+    Decoration only (hidden from screen readers); its words are in
+    resources/lang/en.json (`patterns.art`). -#}
+{% macro art_app() -%}
+<div class="app-art" aria-hidden="true">
+  <div class="app-art__window">
+    <div class="app-art__row">{{ icon_circle("chart-column") }}<span><b>{{ t('patterns.art.chart') }}</b><span>{{ t('patterns.art.chart_note') }}</span></span></div>
+    <div class="app-art__bars"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="app-art__row"><span class="app-art__people"><span>A</span><span>M</span><span>J</span></span><span><span>{{ t('patterns.art.people') }}</span></span></div>
+  </div>
+  <p class="app-art__chip app-art__chip--top">{{ icon_circle("shield-check") }}<span><b>{{ t('patterns.art.roles') }}</b>{{ t('patterns.art.roles_note') }}</span></p>
+  <p class="app-art__chip app-art__chip--bottom">{{ icon_circle("mail", tone="clay") }}<span><b>{{ t('patterns.art.verified') }}</b>{{ t('patterns.art.verified_note') }}</span></p>
+</div>
+{%- endmacro %}
+
+{#- The compact hero's art: three icons over the theme's colours. -#}
+{% macro art_icons(names=["users", "layout-dashboard", "bell"]) -%}
+<div class="app-art" aria-hidden="true">
+  <div class="app-art__icons">{% for name in names %}<span>{{ icon(name, size=26) }}</span>{% endfor %}</div>
+</div>
+{%- endmacro %}
+
+{#- A section: its heading (`accent` in italics), a `lead`, and a "see all"
+    link (`more_href`, `more_label`) at the end of the row; the call block is
+    the section's content. `compact`: a card's heading size, for back-office
+    pages. -#}
+{% macro section_head(title, id, accent=none, lead=none, more_href=none, more_label=none, compact=false) -%}
+<section class="app-section{% if compact %} app-section--compact{% endif %}" aria-labelledby="{{ id }}">
+  <div class="app-section__head">
+    <div>
+      <h2 class="app-section__title" id="{{ id }}">{{ title }}{% if accent %} <em>{{ accent }}</em>{% endif %}</h2>
+      {%- if lead %}<p class="app-section__lead">{{ lead }}</p>{% endif %}
+    </div>
+    {%- if more_href %}<a class="app-section__more" href="{{ more_href }}">{{ more_label }}{{ icon("arrow-right", size=16) }}</a>{% endif %}
+  </div>
+  {%- if caller is defined %}{{ caller() }}{% endif %}
+</section>
+{%- endmacro %}
+
+{#- A card with a coloured picture (an icon on the theme's colours, no photo
+    needed), a title and a text; a link when it has `href`. Put them in a
+    `<ul class="app-showcase">`, one `<li>` each: three columns, the first
+    card two wide. -#}
+{% macro feature_card(title, text, icon_name, tone="teal", href=none) -%}
+{%- set tag = "a" if href else "article" %}
+<{{ tag }} class="app-card app-card--{{ tone }}"{% if href %} href="{{ href }}"{% endif %}>
+  <span class="app-card__media"><span class="app-card__icon">{{ icon(icon_name, size=32) }}</span></span>
+  <span class="app-card__body">
+    <span class="app-card__title">{{ title }}</span>
+    <span class="app-card__text">{{ text }}</span>
+  </span>
+</{{ tag }}>
+{%- endmacro %}
+
+{#- Figures side by side, one row on every screen: `items` are
+    `{"value": …, "label": …, "icon": …}`. `label` names the strip for
+    screen readers. -#}
+{% macro figures(items, label) -%}
+<ul class="app-figures" aria-label="{{ label }}">
+  {%- for item in items %}
+  <li class="app-figures__item">{% if item.icon %}{{ icon_circle(item.icon, tone=item.tone | default(none)) }}{% endif %}<span class="app-figures__value">{{ item.value }}</span><span class="app-figures__label">{{ item.label }}</span></li>
+  {%- endfor %}
+</ul>
+{%- endmacro %}
+
+{#- Lines and their figures, then a total under a rule: `lines` are
+    `{"label": …, "value": …, "icon": …}`, `total` is `{"label": …, "value": …}`. -#}
+{% macro summary(lines, total=none) -%}
+<dl class="app-summary">
+  {%- for line in lines %}
+  <dt>{% if line.icon %}{{ icon(line.icon, size=16) }}{% endif %}<span>{{ line.label }}</span></dt><dd>{{ line.value }}</dd>
+  {%- endfor %}
+  {%- if total %}
+  <dt class="app-summary__total">{{ total.label }}</dt><dd class="app-summary__total">{{ total.value }}</dd>
+  {%- endif %}
+</dl>
+{%- endmacro %}
+
+{#- Numbered steps: `items` are `{"title": …, "text": …, "code": …}` (`code`
+    optional: a command to type). `label` names the list. -#}
+{% macro steps(items, label) -%}
+<ol class="app-steps" aria-label="{{ label }}">
+  {%- for item in items %}
+  <li class="app-steps__step">
+    <p class="app-steps__title">{{ item.title }}</p>
+    <p class="app-steps__text">{{ item.text }}</p>
+    {%- if item.code %}<code>{{ item.code }}</code>{% endif %}
+  </li>
+  {%- endfor %}
+</ol>
+{%- endmacro %}
+
+{#- What an empty list says, with an icon in a tinted circle, and a way on
+    (`action_href`, `action_label`, `action_icon`). -#}
+{% macro empty_state(icon_name, title, text=none, action_href=none, action_label=none, action_icon=none) -%}
+<div class="app-empty">
+  {{ icon_circle(icon_name, large=true, size=26) }}
+  <p class="app-empty__title">{{ title }}</p>
+  {%- if text %}<p class="app-empty__text">{{ text }}</p>{% endif %}
+  {%- if action_href %}{{ link_button(action_href, action_label, variant="primary", icon=action_icon) }}{% endif %}
+</div>
+{%- endmacro %}
+
+{#- The kit's `page_header` with an icon in a tinted square before it. -#}
+{% macro page_title(icon_name, title, subtitle=none) -%}
+<div class="app-page-title">
+  {{ icon_circle(icon_name, size=24) }}
+  {{ page_header(title, subtitle=subtitle) }}
+</div>
+{%- endmacro %}
+
+{#- The kit's `stat` with an icon in its corner (inside the kit's `stats`):
+    the same arguments, plus `icon_name` and `tone`. -#}
+{% macro stat_card(icon_name, label, value, tone=none, delta=none, trend=none, url=none, hint=none) -%}
+<div class="app-stat">
+  {{- stat(label, value, delta=delta, trend=trend, url=url, hint=hint) -}}
+  {{ icon_circle(icon_name, tone=tone, size=18) }}
+</div>
+{%- endmacro %}

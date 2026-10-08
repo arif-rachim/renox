@@ -1,0 +1,30 @@
+## The starter kit's pages
+
+This app was made with `rnx new --starter`. Its pages are built from the UI kit plus a few page
+patterns that belong to this app (they came from Renox's `examples/bikeshop`):
+
+- `resources/views/patterns.html`: the patterns as macros: `hero` (a headline with one coloured
+  phrase, `<em>`; `compact=true` for a page's top, as the dashboard's welcome card),
+  `section_head` (a section's heading with a "see all" link), `feature_card` in a
+  `<ul class="app-showcase">` grid, `figures` (a strip of numbers with icons), `summary` (lines and
+  a total), `steps` (a numbered list), `empty_state`, `page_title` (the kit's `page_header` with
+  an icon) and `stat_card` (the kit's `stat` with an icon).
+  Import them with `{% from "patterns.html" import hero, section_head %}`.
+- `public/patterns.css`: their styles (`app-*` classes), CSS grids on the kit's tokens
+  (`--rx-space-*`, `--rx-type-*`, `--rx-accent`, `--rx-accent-2`, `--rx-tint`, `--rx-ink`), light
+  and dark. The art beside the heroes and on the sign-in pages is CSS gradients on those tokens
+  and icons, so a rebrand in `public/app.css` (`:root { --rx-accent: … }`) recolours it too.
+- `resources/views/layouts/public.html` (the home page: the kit's `navbar` with the phone tab bar,
+  `tabs=[…]`) and `layouts/app.html` (signed-in pages: `rx-shell` with a sidebar whose links
+  have icons, and the same tab bar on phones). `resources/views/renox/auth/layout.html` gives
+  Renox's sign-in pages the app's look; `renox/auth/login_options.html` lists the seeded people
+  on the login page with `APP_ENV=local` only (`src/app/demo.rs`, `public/demo-logins.js`).
+- Texts go through `t('…')`, from `resources/lang/en.json` (`home.*`, `dashboard.*`, `users.*`,
+  `activity.*`, `sign_in.*`, `nav.*`); add a language with another file there.
+
+To change a pattern, edit its macro and its `app-*` rules; to make a new page from them, copy
+`resources/views/home/index.html` or `dashboard/show.html`. Icons are the kit's
+`icon(name, size=…)` (Lucide; the names are in Renox's docs/ui.md). Keep using the kit's tokens
+and type scale in `patterns.css`, check pages at 390 px wide and in dark mode, and keep scripts
+in files under `public/` (no inline scripts or `style=` attributes: they break under `CSP=strict`).
+

@@ -9,6 +9,7 @@
 {% block content %}
 {{ assets() }}
 {{ page_header(t('plans.mails.title'), subtitle=t('plans.mails.lead'), back=route('plans.index'), back_label=t('plans.index.title')) }}
+{# [explain:plans.mails.template] #}
 <div class="bs-plan-mails" data-bs-reveal>
   {%- for p in previews %}
   {% call card(t('plans.mails.' ~ p.key), subtitle=p.subject) %}
@@ -17,4 +18,5 @@
   {% endcall %}
   {%- endfor %}
 </div>
+{# [/explain:plans.mails.template] #}
 {% endblock %}

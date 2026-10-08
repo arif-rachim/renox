@@ -134,6 +134,7 @@ pub struct BoardQuery {
 /// `GET /staff/workshop` (`workshop.board`): the active store's open work
 /// orders by status. Customers' bookings, walk-ins, plan visits (#237) and
 /// fleet repairs (#235) share the board, labelled by source.
+// [explain:workshop.board.handler]
 pub async fn index(State(state): State<AppState>, Query(query): Query<BoardQuery>) -> Result<View> {
     let store = active_store()?;
     let db = &state.db;
@@ -152,6 +153,7 @@ pub async fn index(State(state): State<AppState>, Query(query): Query<BoardQuery
     }
     let orders = orders.order_by("scheduled_for").limit(300).get(db).await?;
     let cards = cards(&state, &orders).await?;
+    // [/explain:workshop.board.handler]
     let lang = state.current_lang();
     let columns: Vec<renox::serde_json::Value> = BOARD
         .iter()
@@ -196,6 +198,7 @@ pub struct Move {
 /// another column, if that step is allowed and the person may work on it
 /// in its store (`workorders.update`, checked in the work order's store);
 /// any other answer puts the card back.
+// [explain:workshop.board.move]
 pub async fn move_card(
     State(state): State<AppState>,
     user: AuthUser,
@@ -221,6 +224,7 @@ pub async fn move_card(
     status::set_status(&state, &mut order, to).await?;
     Ok(StatusCode::NO_CONTENT)
 }
+// [/explain:workshop.board.move]
 
 /// `GET /staff/workshop/customers` (`workshop.customers`): customers for
 /// the walk-in form's searchable select.
@@ -301,6 +305,7 @@ pub struct WalkInForm {
     pub note: Option<String>,
 }
 
+// [explain:workshop.walkin.form]
 impl Validate for WalkInForm {
     fn rules(&self, v: &mut Validator) {
         v.field("new_name", &self.new_name)
@@ -312,6 +317,7 @@ impl Validate for WalkInForm {
         v.field("day", &self.day).required();
         v.field("note", &self.note).max(500);
     }
+    // [/explain:workshop.walkin.form]
 
     async fn after(&self, form: &FormContext<'_>, errors: &mut Errors) -> Result {
         let db = &form.state.db;
@@ -342,6 +348,7 @@ impl Validate for WalkInForm {
 /// (found, or made without an account), the bike registered to them, and
 /// the work order booked in the same capacity transaction as online
 /// bookings; checked in at once when it is for today.
+// [explain:workshop.walkin.store]
 pub async fn walk_in_store(
     State(state): State<AppState>,
     Valid(form): Valid<WalkInForm>,
@@ -363,6 +370,7 @@ pub async fn walk_in_store(
             .await?
         }
     };
+    // [/explain:workshop.walkin.store]
     let bike_name = form.bike.clone().unwrap_or_default();
     let bike = match CustomerBike::where_eq("customer_id", customer.id)
         .where_eq("name", bike_name.trim())

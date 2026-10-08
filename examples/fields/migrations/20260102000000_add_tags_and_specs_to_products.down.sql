@@ -1,2 +1,0 @@
-ALTER TABLE products DROP COLUMN specs;
-ALTER TABLE products DROP COLUMN tags;

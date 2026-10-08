@@ -11,6 +11,7 @@
   {{ page_header(t('reports.monthly.title'), subtitle=t('reports.monthly.lead')) }}
   {% include "reports/_tabs.html" %}
   <div class="bs-monthly">
+    {# [explain:reports.monthly.template] #}
     {% call card(title=t('reports.monthly.run_title'), subtitle=t('reports.monthly.run_lead', stores=(reach.stores | map(attribute='name') | join(', ')))) %}
       <form method="post" action="{{ route('reports.monthly.run') }}" class="rx-stack">
         {{ csrf_field() }}
@@ -23,6 +24,7 @@
         {% include "reports/_runs.html" %}
       {% endcall %}
     {% endcall %}
+    {# [/explain:reports.monthly.template] #}
   </div>
 </div>
 {% endblock %}

@@ -32,12 +32,14 @@ use crate::app::access::catalogue;
 use crate::app::rentals::notify::{Notice, Tone};
 use crate::app::staff::model::Store;
 
+// [explain:stock.purchasing.reorder]
 /// Registers the task.
 pub fn schedule(s: &mut Schedule) {
     s.daily_at("06:30", "stock:reorder", |state: AppState| async move {
         run(&state).await.map(|_| ())
     });
 }
+// [/explain:stock.purchasing.reorder]
 
 /// A variant short at a store.
 #[derive(Serialize, Debug, Clone, Default, PartialEq, Eq)]
@@ -126,6 +128,7 @@ pub async fn low_at(db: &Db, store: i64) -> Result<Vec<Low>> {
         .collect())
 }
 
+// [explain:stock.purchasing.reorder]
 /// The whole check, for every store (see the module docs).
 pub async fn run(state: &AppState) -> Result<Vec<StoreReport>> {
     let mut reports = Vec::new();
@@ -146,6 +149,7 @@ pub async fn run(state: &AppState) -> Result<Vec<StoreReport>> {
     }
     Ok(reports)
 }
+// [/explain:stock.purchasing.reorder]
 
 /// Replaces the store's untouched suggested drafts with today's: one per
 /// supplier, for the variants it sells.

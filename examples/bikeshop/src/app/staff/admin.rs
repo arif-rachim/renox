@@ -58,6 +58,7 @@ pub const PANEL_PERMISSIONS: [&str; 4] = [
     STORES_MANAGE,
 ];
 
+// [explain:admin.panel]
 /// The panel, registered in `src/lib.rs`.
 pub fn panel() -> Admin {
     Admin::new()
@@ -75,7 +76,9 @@ pub fn panel() -> Admin {
         .resource(Suppliers)
         .resource(Stores)
 }
+// [/explain:admin.panel]
 
+// [explain:admin.layer]
 /// Runs the active-store middleware for `/admin…` (see the module docs).
 pub async fn layer(
     user: Option<AuthUser>,
@@ -89,7 +92,9 @@ pub async fn layer(
     }
     next.run(req).await
 }
+// [/explain:admin.layer]
 
+// [explain:admin.policy]
 /// Whether `user` may do `ability` on a resource managed with `manage`:
 /// that permission, and for the catalogue's prices `prices.change` as well
 /// (the catalogue is the company's, so a store's `prices.change` alone isn't
@@ -120,6 +125,7 @@ policy_by_permission! {
     Supplier => PURCHASING_MANAGE,
     Store => STORES_MANAGE,
 }
+// [/explain:admin.policy]
 
 /// The kinds of category, for selects.
 fn kinds() -> Vec<(String, String)> {
@@ -143,6 +149,7 @@ fn capitalize(word: &str) -> String {
 /// The categories resource.
 pub struct Categories;
 
+// [explain:admin.categories.form]
 /// A category's form.
 #[derive(Deserialize, Serialize, Validate)]
 pub struct CategoryForm {
@@ -156,7 +163,9 @@ pub struct CategoryForm {
     #[validate(min = 0)]
     pub position: i64,
 }
+// [/explain:admin.categories.form]
 
+// [explain:admin.categories.show]
 impl AdminResource for Categories {
     type Model = Category;
     type Form = CategoryForm;
@@ -173,6 +182,8 @@ impl AdminResource for Categories {
     fn record_title(&self, record: &Category) -> String {
         record.name.clone()
     }
+    // [/explain:admin.categories.show]
+    // [explain:admin.categories.columns]
     fn columns(&self) -> Vec<Column> {
         vec![
             Column::text("name", "Name").searchable(),
@@ -182,6 +193,8 @@ impl AdminResource for Categories {
             Column::number("position", "Position"),
         ]
     }
+    // [/explain:admin.categories.columns]
+    // [explain:admin.categories.form]
     fn fields(&self) -> Vec<Field> {
         vec![
             Field::text("name", "Name").required(),
@@ -203,6 +216,7 @@ impl AdminResource for Categories {
             rule.ignore(record.id);
         }
     }
+    // [/explain:admin.categories.form]
     fn fill(&self, category: &mut Category, form: CategoryForm) {
         category.name = form.name;
         category.slug = form.slug;
@@ -220,6 +234,7 @@ impl AdminResource for Categories {
 /// The brands resource.
 pub struct Brands;
 
+// [explain:admin.brands.form]
 /// A brand's form.
 #[derive(Deserialize, Serialize, Validate)]
 pub struct BrandForm {
@@ -230,7 +245,9 @@ pub struct BrandForm {
     #[validate(url, max = 255)]
     pub website: Option<String>,
 }
+// [/explain:admin.brands.form]
 
+// [explain:admin.brands.show]
 impl AdminResource for Brands {
     type Model = Brand;
     type Form = BrandForm;
@@ -247,6 +264,8 @@ impl AdminResource for Brands {
     fn record_title(&self, record: &Brand) -> String {
         record.name.clone()
     }
+    // [/explain:admin.brands.show]
+    // [explain:admin.brands.columns]
     fn columns(&self) -> Vec<Column> {
         vec![
             Column::text("name", "Name").searchable(),
@@ -254,6 +273,8 @@ impl AdminResource for Brands {
             Column::text("website", "Website"),
         ]
     }
+    // [/explain:admin.brands.columns]
+    // [explain:admin.brands.form]
     fn fields(&self) -> Vec<Field> {
         vec![
             Field::text("name", "Name").required(),
@@ -267,6 +288,7 @@ impl AdminResource for Brands {
             rule.ignore(record.id);
         }
     }
+    // [/explain:admin.brands.form]
     fn fill(&self, brand: &mut Brand, form: BrandForm) {
         brand.name = form.name;
         brand.slug = form.slug;
@@ -279,6 +301,7 @@ impl AdminResource for Brands {
 /// The products resource: bikes, gear and parts.
 pub struct Products;
 
+// [explain:admin.products.form]
 /// A product's form. The description is Markdown (`markdown_editor`).
 #[derive(Deserialize, Serialize, Validate)]
 pub struct ProductForm {
@@ -293,6 +316,7 @@ pub struct ProductForm {
     #[validate(max = 20000)]
     pub description: Option<String>,
 }
+// [/explain:admin.products.form]
 
 /// Raises or lowers every variant's price of `products` by `percent`,
 /// rounded to whole units, and records it.
@@ -334,6 +358,7 @@ fn price_action(key: &str, label: &str, percent: i64) -> AdminAction<Product> {
     ))
 }
 
+// [explain:admin.products.show]
 impl AdminResource for Products {
     type Model = Product;
     type Form = ProductForm;
@@ -350,6 +375,8 @@ impl AdminResource for Products {
     fn record_title(&self, record: &Product) -> String {
         record.name.clone()
     }
+    // [/explain:admin.products.show]
+    // [explain:admin.products.columns]
     fn columns(&self) -> Vec<Column> {
         vec![
             Column::text("name", "Name").searchable(),
@@ -361,6 +388,8 @@ impl AdminResource for Products {
             Column::custom("fits", "What fits"),
         ]
     }
+    // [/explain:admin.products.columns]
+    // [explain:admin.products.form]
     fn fields(&self) -> Vec<Field> {
         vec![
             Field::text("name", "Name").required(),
@@ -373,6 +402,8 @@ impl AdminResource for Products {
                 .hint("Markdown: **bold**, lists, links. Shown on the product page."),
         ]
     }
+    // [/explain:admin.products.form]
+    // [explain:admin.products.show]
     fn entries(&self) -> Vec<Entry> {
         vec![
             Entry::text("name", "Name"),
@@ -383,6 +414,7 @@ impl AdminResource for Products {
             Entry::new("updated_at", "Last changed").format("since"),
         ]
     }
+    // [/explain:admin.products.show]
     fn rules(&self, form: &ProductForm, record: Option<&Product>, v: &mut Validator) {
         let rule = v.field("slug", &form.slug).unique("products", "slug");
         if let Some(record) = record {
@@ -414,6 +446,7 @@ impl AdminResource for Products {
             })
             .collect()
     }
+    // [explain:admin.products.actions]
     fn actions(&self) -> Vec<AdminAction<Product>> {
         vec![
             price_action("prices-up-5", "Prices +5 %", 5),
@@ -444,6 +477,7 @@ impl AdminResource for Products {
             .row(),
         ]
     }
+    // [/explain:admin.products.actions]
 }
 
 // --- Variants ---
@@ -451,6 +485,7 @@ impl AdminResource for Products {
 /// The variants resource: SKUs with their price and cost.
 pub struct Variants;
 
+// [explain:admin.product_variants.form]
 /// A variant's form. Money in the smallest unit (`money` fields).
 #[derive(Deserialize, Serialize, Validate)]
 pub struct VariantForm {
@@ -469,7 +504,9 @@ pub struct VariantForm {
     #[validate(min = 0)]
     pub reorder_level: i64,
 }
+// [/explain:admin.product_variants.form]
 
+// [explain:admin.product_variants.show]
 impl AdminResource for Variants {
     type Model = ProductVariant;
     type Form = VariantForm;
@@ -486,6 +523,8 @@ impl AdminResource for Variants {
     fn record_title(&self, record: &ProductVariant) -> String {
         record.sku.clone()
     }
+    // [/explain:admin.product_variants.show]
+    // [explain:admin.product_variants.columns]
     fn columns(&self) -> Vec<Column> {
         vec![
             Column::text("sku", "SKU").searchable(),
@@ -497,6 +536,8 @@ impl AdminResource for Variants {
             Column::number("reorder_level", "Reorder at"),
         ]
     }
+    // [/explain:admin.product_variants.columns]
+    // [explain:admin.product_variants.form]
     fn fields(&self) -> Vec<Field> {
         vec![
             Field::belongs_to("product_id", "Product", "products", "name").required(),
@@ -516,6 +557,7 @@ impl AdminResource for Variants {
             rule.ignore(record.id);
         }
     }
+    // [/explain:admin.product_variants.form]
     fn fill(&self, variant: &mut ProductVariant, form: VariantForm) {
         variant.product_id = form.product_id;
         variant.sku = form.sku;
@@ -532,6 +574,7 @@ impl AdminResource for Variants {
 /// The product photos resource.
 pub struct Photos;
 
+// [explain:admin.product-photos.form]
 /// A photo's form: where the file is and its alternative text.
 #[derive(Deserialize, Serialize, Validate)]
 pub struct PhotoForm {
@@ -544,7 +587,9 @@ pub struct PhotoForm {
     #[validate(min = 0)]
     pub position: i64,
 }
+// [/explain:admin.product-photos.form]
 
+// [explain:admin.product-photos.show]
 impl AdminResource for Photos {
     type Model = ProductPhoto;
     type Form = PhotoForm;
@@ -561,6 +606,8 @@ impl AdminResource for Photos {
     fn navigation_group(&self) -> Option<&str> {
         Some("Catalogue")
     }
+    // [/explain:admin.product-photos.show]
+    // [explain:admin.product-photos.columns]
     fn columns(&self) -> Vec<Column> {
         vec![
             Column::related("product", "Product", "products", "product_id", "name").searchable(),
@@ -569,6 +616,8 @@ impl AdminResource for Photos {
             Column::number("position", "Position"),
         ]
     }
+    // [/explain:admin.product-photos.columns]
+    // [explain:admin.product-photos.form]
     fn fields(&self) -> Vec<Field> {
         vec![
             Field::belongs_to("product_id", "Product", "products", "name").required(),
@@ -589,6 +638,7 @@ impl AdminResource for Photos {
         photo.alt = form.alt;
         photo.position = form.position;
     }
+    // [/explain:admin.product-photos.form]
 }
 
 // --- Service tasks ---
@@ -596,6 +646,7 @@ impl AdminResource for Photos {
 /// The workshop's service tasks.
 pub struct ServiceTasks;
 
+// [explain:admin.service-tasks.form]
 /// A service task's form.
 #[derive(Deserialize, Serialize, Validate)]
 pub struct ServiceTaskForm {
@@ -608,7 +659,9 @@ pub struct ServiceTaskForm {
     #[validate(required, min = 0)]
     pub price: i64,
 }
+// [/explain:admin.service-tasks.form]
 
+// [explain:admin.service-tasks.show]
 impl AdminResource for ServiceTasks {
     type Model = ServiceTask;
     type Form = ServiceTaskForm;
@@ -628,6 +681,8 @@ impl AdminResource for ServiceTasks {
     fn record_title(&self, record: &ServiceTask) -> String {
         record.name.clone()
     }
+    // [/explain:admin.service-tasks.show]
+    // [explain:admin.service-tasks.columns]
     fn columns(&self) -> Vec<Column> {
         vec![
             Column::text("name", "Name").searchable(),
@@ -635,6 +690,8 @@ impl AdminResource for ServiceTasks {
             Column::money("price", "Price"),
         ]
     }
+    // [/explain:admin.service-tasks.columns]
+    // [explain:admin.service-tasks.form]
     fn fields(&self) -> Vec<Field> {
         vec![
             Field::text("name", "Name").required(),
@@ -652,6 +709,7 @@ impl AdminResource for ServiceTasks {
             rule.ignore(record.id);
         }
     }
+    // [/explain:admin.service-tasks.form]
     fn fill(&self, task: &mut ServiceTask, form: ServiceTaskForm) {
         task.name = form.name;
         task.slug = form.slug;
@@ -665,6 +723,7 @@ impl AdminResource for ServiceTasks {
 /// The service plans.
 pub struct ServicePlans;
 
+// [explain:admin.service-plans.form]
 /// A plan's form.
 #[derive(Deserialize, Serialize, Validate)]
 pub struct ServicePlanForm {
@@ -679,6 +738,7 @@ pub struct ServicePlanForm {
     pub description: Option<String>,
     pub active: bool,
 }
+// [/explain:admin.service-plans.form]
 
 fn frequencies() -> Vec<(String, String)> {
     Frequency::ALL
@@ -687,6 +747,7 @@ fn frequencies() -> Vec<(String, String)> {
         .collect()
 }
 
+// [explain:admin.service-plans.show]
 impl AdminResource for ServicePlans {
     type Model = ServicePlan;
     type Form = ServicePlanForm;
@@ -706,6 +767,8 @@ impl AdminResource for ServicePlans {
     fn record_title(&self, record: &ServicePlan) -> String {
         record.name.clone()
     }
+    // [/explain:admin.service-plans.show]
+    // [explain:admin.service-plans.columns]
     fn columns(&self) -> Vec<Column> {
         vec![
             Column::text("name", "Name").searchable(),
@@ -714,6 +777,8 @@ impl AdminResource for ServicePlans {
             Column::bool("active", "On sale"),
         ]
     }
+    // [/explain:admin.service-plans.columns]
+    // [explain:admin.service-plans.form]
     fn fields(&self) -> Vec<Field> {
         vec![
             Field::text("name", "Name").required(),
@@ -735,6 +800,7 @@ impl AdminResource for ServicePlans {
             rule.ignore(record.id);
         }
     }
+    // [/explain:admin.service-plans.form]
     fn fill(&self, plan: &mut ServicePlan, form: ServicePlanForm) {
         plan.name = form.name;
         plan.slug = form.slug;
@@ -750,6 +816,7 @@ impl AdminResource for ServicePlans {
 /// The suppliers the stores buy from.
 pub struct Suppliers;
 
+// [explain:admin.suppliers.form]
 /// A supplier's form.
 #[derive(Deserialize, Serialize, Validate)]
 pub struct SupplierForm {
@@ -762,7 +829,9 @@ pub struct SupplierForm {
     #[validate(required, min = 0, max = 365)]
     pub lead_days: i64,
 }
+// [/explain:admin.suppliers.form]
 
+// [explain:admin.suppliers.show]
 impl AdminResource for Suppliers {
     type Model = Supplier;
     type Form = SupplierForm;
@@ -779,6 +848,8 @@ impl AdminResource for Suppliers {
     fn record_title(&self, record: &Supplier) -> String {
         record.name.clone()
     }
+    // [/explain:admin.suppliers.show]
+    // [explain:admin.suppliers.columns]
     fn columns(&self) -> Vec<Column> {
         vec![
             Column::text("name", "Name").searchable(),
@@ -787,6 +858,8 @@ impl AdminResource for Suppliers {
             Column::number("lead_days", "Lead time (days)"),
         ]
     }
+    // [/explain:admin.suppliers.columns]
+    // [explain:admin.suppliers.form]
     fn fields(&self) -> Vec<Field> {
         vec![
             Field::text("name", "Name").required(),
@@ -805,6 +878,7 @@ impl AdminResource for Suppliers {
         supplier.phone = form.phone.filter(|p| !p.trim().is_empty());
         supplier.lead_days = form.lead_days;
     }
+    // [/explain:admin.suppliers.form]
 }
 
 // --- Stores ---
@@ -812,6 +886,7 @@ impl AdminResource for Suppliers {
 /// The stores (edit only; the hours and the fee rate are on the stores page).
 pub struct Stores;
 
+// [explain:admin.stores.form]
 /// A store's form in the panel.
 #[derive(Deserialize, Serialize, Validate)]
 pub struct StoreForm {
@@ -824,7 +899,9 @@ pub struct StoreForm {
     #[validate(required, min = 0, max = 1440)]
     pub workshop_minutes_per_day: i64,
 }
+// [/explain:admin.stores.form]
 
+// [explain:admin.stores.show]
 impl AdminResource for Stores {
     type Model = Store;
     type Form = StoreForm;
@@ -841,6 +918,8 @@ impl AdminResource for Stores {
     fn record_title(&self, record: &Store) -> String {
         record.name.clone()
     }
+    // [/explain:admin.stores.show]
+    // [explain:admin.stores.columns]
     fn columns(&self) -> Vec<Column> {
         vec![
             Column::text("name", "Name").searchable(),
@@ -849,6 +928,8 @@ impl AdminResource for Stores {
             Column::number("workshop_minutes_per_day", "Workshop minutes / day"),
         ]
     }
+    // [/explain:admin.stores.columns]
+    // [explain:admin.stores.form]
     fn fields(&self) -> Vec<Field> {
         vec![
             Field::text("name", "Name").required(),
@@ -866,6 +947,8 @@ impl AdminResource for Stores {
         store.email = form.email;
         store.workshop_minutes_per_day = form.workshop_minutes_per_day;
     }
+    // [/explain:admin.stores.form]
+    // [explain:admin.stores.allows]
     /// A store is made with its address and opening hours, not here;
     /// deleting one would orphan its stock and books.
     fn allows(&self, user: &AuthUser, ability: &str, record: Option<&Store>) -> bool {
@@ -877,4 +960,5 @@ impl AdminResource for Stores {
             },
         }
     }
+    // [/explain:admin.stores.allows]
 }

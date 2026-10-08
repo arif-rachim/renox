@@ -50,4 +50,6 @@ pub fn app() -> renox::App {
             app::roles::make_admin,
         )
         .seeder(app::seed::run)
+        // The seeded people on the login page, in local only (src/app/demo.rs).
+        .share("demo_logins", app::demo::for_view)
 }

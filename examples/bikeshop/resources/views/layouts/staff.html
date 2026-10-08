@@ -8,36 +8,41 @@
 {#- The staff layout: the kit's back-office shell. `rx-shell` is a CSS grid
     (the sidebar, then the main column); the main column has a full-width
     `navbar` for the store switcher, "About this page" and the account menu. -#}
-<body class="rx-page rx-shell">
+{%- set about = about_page(request.route, request.path) if explain_panels else none %}
+<body class="rx-page rx-shell{% if about %} bs-docked{% if about.rail %} bs-docked--rail{% endif %}{% endif %}">
   {% from "renox/ui.html" import sidebar, sidebar_link, sidebar_section, navbar, menu, menu_link, menu_action, menu_separator, open_button %}
-  {%- set about = about_page(request.route, request.path) if explain_panels else none %}
   {% call sidebar(t('shop.name'), href=route('staff.dashboard')) %}
     {#- --- Staff navigation (one line per area; append yours, behind the
         permission it needs: {% if can('…') %}…{% endif %}) --- -#}
-    {{ sidebar_link(route('staff.dashboard'), t('nav.dashboard'), active=route_is('staff.dashboard')) }}
-    {% if can('orders.view') %}{{ sidebar_link(route('sales.orders.index'), t('sales.staff.title'), active=route_is('sales.orders.*')) }}{% endif %}
-    {% if can('orders.sell') %}{{ sidebar_link(route('sales.counter'), t('sales.counter.title'), active=route_is('sales.counter*')) }}{% endif %}
-    {% if can('rentals.view') %}{{ sidebar_link(route('rentals.counter'), t('rentals.nav.counter'), active=route_is('rentals.counter', 'rentals.desk', 'rentals.receipt', 'rentals.walkin')) }}{% endif %}
-    {% if can('fleet.view') %}{{ sidebar_link(route('rentals.fleet'), t('rentals.nav.fleet'), active=route_is('rentals.fleet', 'rentals.fleet.show')) }}{% endif %}
-    {% if can('rentals.verify_id') %}{{ sidebar_link(route('rentals.identities'), t('rentals.nav.identities'), active=route_is('rentals.identities')) }}{% endif %}
-    {% if can('workorders.view') %}{{ sidebar_link(route('workshop.board'), t('workshop.nav.board'), active=route_is('workshop.board', 'workshop.order', 'workshop.walkin')) }}{% endif %}
-    {% if can('stock.view') %}{{ sidebar_link(route('stock.index'), t('stock.index.title'), active=route_is('stock.index', 'stock.ledger', 'stock.take', 'stock.fleet')) }}{% endif %}
-    {% if can('stock.view') %}{{ sidebar_link(route('stock.consignments'), t('stock.consignments.title'), active=route_is('stock.consignments*')) }}{% endif %}
-    {% if can('purchasing.manage') %}{{ sidebar_link(route('stock.purchasing'), t('stock.purchasing.title'), active=route_is('stock.purchasing*', 'stock.suppliers*')) }}{% endif %}
-    {% if can('staff.help') %}{{ sidebar_link(route('multistore.help'), t('multistore.help.title'), active=route_is('multistore.help*')) }}{% endif %}
-    {% if can('fleet.view') %}{{ sidebar_link(route('multistore.placements'), t('multistore.placements.title'), active=route_is('multistore.placements*')) }}{% endif %}
-    {% if can('intercompany.view') %}{{ sidebar_link(route('multistore.books'), t('multistore.books.title'), active=route_is('multistore.books', 'multistore.settlements*', 'multistore.fees*')) }}{% endif %}
-    {%- if can('staff.manage') %}{{ sidebar_link(route('staff.team.index'), t('staff.nav.team'), active=route_is('staff.team.*') or route_is('staff.invitations.*')) }}{% endif %}
-    {%- if can('stores.manage') %}{{ sidebar_link(route('staff.stores.index'), t('staff.nav.stores'), active=route_is('staff.stores.*')) }}{% endif %}
-    {%- if can('roles.manage') %}{{ sidebar_link(route('staff.roles.index'), t('staff.nav.roles'), active=route_is('staff.roles.*')) }}{% endif %}
-    {%- if can('audit.view') %}{{ sidebar_link(route('staff.audit.index'), t('staff.nav.audit'), active=route_is('staff.audit.*')) }}{% endif %}
-    {%- if can('catalog.manage') or can('plans.manage') or can('purchasing.manage') or can('stores.manage') %}{{ sidebar_link(route('admin.dashboard'), t('staff.nav.admin')) }}{% endif %}
-    {% if can('fleet.manage') %}{{ sidebar_link(route('api.kiosks'), t('api.kiosks.nav'), active=route_is('api.kiosks')) }}{% endif %}
-    {% if can('reports.view') %}{{ sidebar_link(route('reports.dashboard'), t('reports.nav'), active=route_is('reports.*')) }}{% endif %}
+    {{ sidebar_link(route('staff.dashboard'), t('nav.dashboard'), active=route_is('staff.dashboard'), icon="layout-dashboard") }}
+    {#- Each group's heading shows when the person may open one of its pages. -#}
+    {%- if can('orders.view') or can('orders.sell') or can('rentals.view') or can('fleet.view') or can('rentals.verify_id') %}{{ sidebar_section(t('staff.nav.sections.front')) }}{% endif %}
+    {% if can('orders.view') %}{{ sidebar_link(route('sales.orders.index'), t('sales.staff.title'), active=route_is('sales.orders.*'), icon="receipt") }}{% endif %}
+    {% if can('orders.sell') %}{{ sidebar_link(route('sales.counter'), t('sales.counter.title'), active=route_is('sales.counter*'), icon="scan-barcode") }}{% endif %}
+    {% if can('rentals.view') %}{{ sidebar_link(route('rentals.counter'), t('rentals.nav.counter'), active=route_is('rentals.counter', 'rentals.desk', 'rentals.receipt', 'rentals.walkin'), icon="key-round") }}{% endif %}
+    {% if can('fleet.view') %}{{ sidebar_link(route('rentals.fleet'), t('rentals.nav.fleet'), active=route_is('rentals.fleet', 'rentals.fleet.show'), icon="bike") }}{% endif %}
+    {% if can('rentals.verify_id') %}{{ sidebar_link(route('rentals.identities'), t('rentals.nav.identities'), active=route_is('rentals.identities'), icon="id-card") }}{% endif %}
+    {%- if can('workorders.view') or can('stock.view') or can('purchasing.manage') %}{{ sidebar_section(t('staff.nav.sections.work')) }}{% endif %}
+    {% if can('workorders.view') %}{{ sidebar_link(route('workshop.board'), t('workshop.nav.board'), active=route_is('workshop.board', 'workshop.order', 'workshop.walkin'), icon="wrench") }}{% endif %}
+    {% if can('stock.view') %}{{ sidebar_link(route('stock.index'), t('stock.index.title'), active=route_is('stock.index', 'stock.ledger', 'stock.take', 'stock.fleet'), icon="boxes") }}{% endif %}
+    {% if can('stock.view') %}{{ sidebar_link(route('stock.consignments'), t('stock.consignments.title'), active=route_is('stock.consignments*'), icon="truck") }}{% endif %}
+    {% if can('purchasing.manage') %}{{ sidebar_link(route('stock.purchasing'), t('stock.purchasing.title'), active=route_is('stock.purchasing*', 'stock.suppliers*'), icon="clipboard-list") }}{% endif %}
+    {%- if can('staff.help') or can('fleet.view') or can('intercompany.view') %}{{ sidebar_section(t('staff.nav.sections.stores')) }}{% endif %}
+    {% if can('staff.help') %}{{ sidebar_link(route('multistore.help'), t('multistore.help.title'), active=route_is('multistore.help*'), icon="handshake") }}{% endif %}
+    {% if can('fleet.view') %}{{ sidebar_link(route('multistore.placements'), t('multistore.placements.title'), active=route_is('multistore.placements*'), icon="map-pin") }}{% endif %}
+    {% if can('intercompany.view') %}{{ sidebar_link(route('multistore.books'), t('multistore.books.title'), active=route_is('multistore.books', 'multistore.settlements*', 'multistore.fees*'), icon="book-open") }}{% endif %}
+    {%- if can('staff.manage') or can('stores.manage') or can('roles.manage') or can('audit.view') or can('catalog.manage') or can('plans.manage') or can('purchasing.manage') or can('fleet.manage') or can('reports.view') %}{{ sidebar_section(t('staff.nav.sections.manage')) }}{% endif %}
+    {% if can('reports.view') %}{{ sidebar_link(route('reports.dashboard'), t('reports.nav'), active=route_is('reports.*'), icon="chart-column") }}{% endif %}
+    {%- if can('staff.manage') %}{{ sidebar_link(route('staff.team.index'), t('staff.nav.team'), active=route_is('staff.team.*') or route_is('staff.invitations.*'), icon="users") }}{% endif %}
+    {%- if can('stores.manage') %}{{ sidebar_link(route('staff.stores.index'), t('staff.nav.stores'), active=route_is('staff.stores.*'), icon="store") }}{% endif %}
+    {%- if can('roles.manage') %}{{ sidebar_link(route('staff.roles.index'), t('staff.nav.roles'), active=route_is('staff.roles.*'), icon="shield-check") }}{% endif %}
+    {%- if can('audit.view') %}{{ sidebar_link(route('staff.audit.index'), t('staff.nav.audit'), active=route_is('staff.audit.*'), icon="history") }}{% endif %}
+    {%- if can('catalog.manage') or can('plans.manage') or can('purchasing.manage') or can('stores.manage') %}{{ sidebar_link(route('admin.dashboard'), t('staff.nav.admin'), icon="settings") }}{% endif %}
+    {% if can('fleet.manage') %}{{ sidebar_link(route('api.kiosks'), t('api.kiosks.nav'), active=route_is('api.kiosks'), icon="tablet-smartphone") }}{% endif %}
     {#- --- end of staff navigation --- -#}
     {{ sidebar_section(t('nav.shop')) }}
-    {{ sidebar_link(route('home'), t('nav.storefront')) }}
-    {{ sidebar_link(route('about.pages'), t('about.index_link'), active=route_is('about.*')) }}
+    {{ sidebar_link(route('home'), t('nav.storefront'), icon="shopping-bag") }}
+    {{ sidebar_link(route('about.pages'), t('about.index_link'), active=route_is('about.*'), icon="info") }}
   {% endcall %}
   <div class="rx-shell__main">
     {% call navbar(none, width="full", skip=false) %}
@@ -65,7 +70,9 @@
       {% block content %}{% endblock %}
     </main>
   </div>
-  {%- if about %}{% include "about/_panel.html" %}{% endif %}
+  {#- "About this page": docked beside the page on wide screens, a sheet on
+      narrower ones (about/_dock.html, about/_panel.html). -#}
+  {%- if about %}{% include "about/_dock.html" %}{% include "about/_panel.html" %}{% endif %}
   {{ toasts() }}
   {% include "layouts/_scripts.html" %}
   {{ stack('scripts') }}

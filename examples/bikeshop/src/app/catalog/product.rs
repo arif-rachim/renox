@@ -144,6 +144,7 @@ pub struct Choice {
     colour: Option<String>,
 }
 
+// [explain:catalog.show.handler]
 /// `GET /products/{slug}` (`catalog.show`).
 pub async fn show(
     State(state): State<AppState>,
@@ -151,6 +152,7 @@ pub async fn show(
     Found(product): Found<Product>,
     Query(choice): Query<Choice>,
 ) -> Result<View> {
+    // [/explain:catalog.show.handler]
     let db = &state.db;
     let tree = Tree::load(db).await?;
     let category = tree
@@ -237,6 +239,7 @@ pub async fn show(
         }
     }
 
+    // [explain:catalog.show.fits]
     // What fits what, through the `part_fits` pivot (with its note).
     let kind = category.as_ref().map(|c| c.kind);
     let pivot = match kind {
@@ -266,6 +269,7 @@ pub async fn show(
             })
             .collect();
     }
+    // [/explain:catalog.show.fits]
 
     // A bike of this model in the rental fleet: "rent this model".
     let rentable = kind == Some(CategoryKind::Bike)
@@ -320,32 +324,36 @@ pub async fn show(
     let price_low = variants.iter().map(|v| v.price).min();
     let price_high = variants.iter().map(|v| v.price).max();
 
+    // [explain:catalog.show.handler]
     Ok(view(
         "catalog/show.html",
         context! {
-            product,
-            brand,
-            category,
-            breadcrumbs,
-            kind => kind.map(|k| k.as_str()),
-            variants => views,
-            chosen,
-            sizes,
-            colours,
-            gallery,
-            og_image,
-            summary,
-            specs,
-            price_low,
-            price_high,
-            related,
-            rent_url,
-            recently,
-            stores,
-        },
+        // [/explain:catalog.show.handler]
+                product,
+                brand,
+                category,
+                breadcrumbs,
+                kind => kind.map(|k| k.as_str()),
+                variants => views,
+                chosen,
+                sizes,
+                colours,
+                gallery,
+                og_image,
+                summary,
+                specs,
+                price_low,
+                price_high,
+                related,
+                rent_url,
+                recently,
+                stores,
+            },
+        // [explain:catalog.show.handler]
     )
     .fragment("buybox"))
 }
+// [/explain:catalog.show.handler]
 
 /// The rental story's page for this model, when the app has one (#235
 /// names it). `None` until then, so the link only shows once it works.

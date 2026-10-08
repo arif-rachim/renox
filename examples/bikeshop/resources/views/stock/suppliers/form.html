@@ -9,6 +9,7 @@
 {{ styles() }}
 <div class="rx-stack">
   {{ page_header(supplier.name if editing else t('stock.suppliers.new'), back=(route('stock.suppliers.show', supplier.id) if editing else route('stock.suppliers')), back_label=t('stock.suppliers.title')) }}
+  {# [explain:stock.suppliers.form.template] #}
   <form method="post" action="{{ route('stock.suppliers.update', supplier.id) if editing else route('stock.suppliers.store') }}" id="supplier-form" novalidate>
     {{ csrf_field() }}
     {% call card() %}
@@ -22,5 +23,6 @@
       {{ button(t('stock.suppliers.save'), icon="check") }}
     {% endcall %}
   </form>
+  {# [/explain:stock.suppliers.form.template] #}
 </div>
 {% endblock %}

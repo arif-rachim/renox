@@ -4,6 +4,7 @@
 {% from "renox/ui.html" import card, input, button, link_button %}
 {% block title %}{{ t('plugins.two_factor.setup_title') }} · {{ app.name }}{% endblock %}
 {% block content %}
+{# [explain:two-factor.setup.template] #}
 <form method="post" action="{{ route('two-factor.confirm') }}" hx-post="{{ route('two-factor.confirm') }}">
   {{ csrf_field() }}
   {% call card(title=t('plugins.two_factor.setup_title'), subtitle=t('plugins.two_factor.setup_lead')) %}
@@ -17,4 +18,5 @@
     </div>
   {% endcall %}
 </form>
+{# [/explain:two-factor.setup.template] #}
 {% endblock %}

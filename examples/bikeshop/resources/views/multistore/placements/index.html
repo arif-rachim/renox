@@ -19,6 +19,7 @@
     <div>
       {% call card(title=t('multistore.placements.list'), subtitle=t('multistore.placements.list_lead')) %}
         {%- if rows %}
+        {# [explain:multistore.placements.template] #}
         {% call list(id="placements", label=t('multistore.placements.list')) %}
           {%- for p in rows %}
           <li>
@@ -37,7 +38,8 @@
           </li>
           {%- endfor %}
         {% endcall %}
-        {%- else %}{{ empty(t('multistore.placements.none')) }}{% endif %}
+        {# [/explain:multistore.placements.template] #}
+        {%- else %}{{ empty(t('multistore.placements.none'), icon="map-pin") }}{% endif %}
       {% endcall %}
     </div>
     <div>
@@ -51,7 +53,7 @@
           </li>
           {%- endfor %}
         {% endcall %}
-        {%- else %}{{ empty(t('multistore.placements.all_home')) }}{% endif %}
+        {%- else %}{{ empty(t('multistore.placements.all_home'), icon="house") }}{% endif %}
       {% endcall %}
     </div>
   </div>

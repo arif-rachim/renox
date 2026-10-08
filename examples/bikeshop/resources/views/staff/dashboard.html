@@ -1,15 +1,49 @@
 {% extends "layouts/staff.html" %}
-{% from "renox/ui.html" import page_header, card, empty %}
+{% from "renox/ui.html" import empty, icon %}
+{% from "layouts/_avatar.html" import avatar %}
 {% block seo %}{{ seo(title=t('staff.dashboard.title')) }}{% endblock %}
 
+{#- The staff home: a welcome card with the active store's photo, the ways
+    into the day's work (each behind its permission), then the store's last
+    7 days (reports/_overview.html) for those who may see reports. -#}
 {% block content %}
 <div class="rx-stack" data-bs-reveal>
-  {{ page_header(t('staff.dashboard.title'), subtitle=t('staff.dashboard.lead')) }}
+  {%- set store = store_switcher.current if store_switcher else none %}
+  <section class="bs-welcome" aria-labelledby="page-title">
+    <div class="bs-welcome__text">
+      <p class="bs-welcome__eyebrow">{{ icon("store", size=16) }}<span>{{ t('staff.dashboard.title') }}{% if store %} · {{ store.name }}{% endif %}</span></p>
+      <h1 class="bs-welcome__title" id="page-title">{{ t('staff.dashboard.welcome', name=(auth.user.name | split | first)) }}</h1>
+      <p class="bs-welcome__lead">{{ t('staff.dashboard.lead') }}</p>
+      <p class="bs-welcome__who">{{ avatar(auth.user.name, size="s") }}<span>{{ auth.user.name }}</span></p>
+    </div>
+    {%- if store %}
+    <img class="bs-welcome__photo" src="/images/site/store-{{ store.slug }}.webp" alt="" width="1200" height="800">
+    {%- endif %}
+  </section>
+
+  {%- set ways = [
+    ["rentals.view", route('rentals.counter'), t('rentals.nav.counter'), t('staff.dashboard.ways.rentals'), "key-round"],
+    ["workorders.view", route('workshop.board'), t('workshop.nav.board'), t('staff.dashboard.ways.workshop'), "wrench"],
+    ["orders.sell", route('sales.counter'), t('sales.counter.title'), t('staff.dashboard.ways.counter'), "scan-barcode"],
+    ["stock.view", route('stock.index'), t('stock.index.title'), t('staff.dashboard.ways.stock'), "boxes"],
+  ] %}
+  <nav aria-label="{{ t('staff.dashboard.ways.label') }}">
+    <ul class="bs-ways" role="list">
+      {%- for permission, href, title, text, name in ways %}{% if can(permission) %}
+      <li><a class="bs-way" href="{{ href }}">
+        <span class="bs-icon-circle">{{ icon(name) }}</span>
+        <span class="bs-way__text"><b>{{ title }}</b><span>{{ text }}</span></span>
+        <span class="bs-way__go">{{ icon("chevron-right", size=18) }}</span>
+      </a></li>
+      {%- endif %}{% endfor %}
+    </ul>
+  </nav>
+
   {%- if overview %}
   {% include "reports/_overview.html" %}
   {%- else %}
   <div class="rx-card">
-    {{ empty(t('staff.dashboard.empty_title'), t('staff.dashboard.empty_text'), route('about.pages'), t('about.index_link')) }}
+    {{ empty(t('staff.dashboard.empty_title'), t('staff.dashboard.empty_text'), route('about.pages'), t('about.index_link'), icon="chart-column") }}
   </div>
   {%- endif %}
 </div>

@@ -3,8 +3,8 @@
 This page is a quick reference: one short example for each common task, written the way Renox
 recommends. It's for when you know roughly what you want and need to see how it's written.
 Every Rust example below is compiled and checked by `cargo test --doc -p renox`, so none of
-them can drift out of date. For whole apps, see [`examples/`](examples) (the list is in
-[llms.txt](llms.txt)).
+them can drift out of date. For whole apps, see [`examples/`](examples): `hello`, the smallest, and `bikeshop`, a whole
+business ([llms.txt](llms.txt) maps its files).
 
 > [!TIP]
 > New to Renox? Start with [the tutorial](docs/tutorial.md). It builds one small app step by
@@ -289,13 +289,17 @@ part is a macro: you import it into a template, then call it like a function.
 {{ page_header("Products", subtitle="All items", back=route('home')) }}
 {% call toolbar() %}{{ link_button(route('products.create'), "New product") }}{% endcall %} {# above a table #}
 {# in a table row: {% call row_actions() %}…icon buttons…{% endcall %}; also list(), card_grid() + media_card(href, title, image=…), link_tabs(items, current=…), progress(42) #}
+{# Phones: navbar(…, tabs=[{"href": …, "label": "Shop", "icon": "shopping-bag", "active": route_is('shop.*')}, {"open": "menu-sheet", "label": "Menu", "icon": "menu"}]) = a bottom tab bar under 36rem;
+   {% call nav_search() %}<form role="search">…</form>{% endcall %} = search behind a button there; rx-hide-narrow leaves the phone's bar #}
+{# Icons (Lucide, docs/ui.md#icons): {% from "renox/ui.html" import icon %} {{ icon("bike") }} {{ icon("truck", size=16) }}; hidden from screen readers unless {{ icon("lock", label="Private") }}; the same names in icon="…" on buttons and menus #}
 {# A back office: <body class="rx-page rx-shell">, then {% call sidebar(app.name) %}{{ sidebar_section("Sales") }}{{ sidebar_link(…) }}{% endcall %}
    and <div class="rx-shell__main">{{ navbar(none, width="full", skip=false) }}<main class="rx-shell__content" id="main">…</main></div>.
    Also thumbnail(src), menu_button(label) in a menu, hide_label=true on input, textarea,
    select or checkbox (label kept for screen readers; the other fields don't take it),
    <body class="rx-page rx-page--fill"> for a page that fills the window.
-   Themes: the warm default (Inter + Poppins, served by Renox); data-rx-theme="classic" on <html>
-   for the first look; your CSS uses the type scale: font: var(--rx-type-heading) (also -display,
+   Themes: the editorial default (teal, cream, pill buttons; Inter + Poppins, served by Renox);
+   data-rx-theme="warm" (indigo, before 1.1) or "classic" (the first look) on <html>; tokens
+   --rx-accent-2, --rx-tint, --rx-accent-soft, --rx-ink, --rx-type-hero, --rx-type-section; your CSS uses the type scale: font: var(--rx-type-heading) (also -display,
    -title, -lead, -body, -label, -note, -caption) and the brand token --rx-accent. #}
 {% from "renox/ui.html" import card, input, select, checkbox, radio, checkbox_list, toggle_buttons, show_when, date_picker, file, tags_input, key_value, repeater, form_grid, button, confirm, table, form_errors %}
 {# Several steps: {% call wizard("id", [["a", "First"], ["b", "Second"]], submit_label="Save") %} with wizard_step("id", "a") blocks #}
@@ -313,6 +317,7 @@ part is a macro: you import it into a template, then call it like a function.
     {{ toggle_buttons("delivery", "Delivery", [["courier", "Courier"], ["pickup", "Pickup"]], selected="courier") }}
     {% call show_when("delivery", "courier") %}{{ input("address", "Address") }}{% endcall %} {# required_if #}
     {{ date_picker("ships_on", "Ships on") }} {# NaiveDate #}
+    {{ date_picker("visit_on", "Visit", disabled_dates=full_days, closed_weekdays=[0]) }} {# 0 = Sunday; also none_of on the server #}
     {{ file("photo", "Photo", accept="image/*", preview=true) }} {# enctype="multipart/form-data" #}
     {{ input("api_key", "API key", value=key, readonly=true, copyable=true) }}
     {{ tags_input("keywords", "Keywords") }} {# Vec<String> + #[serde(default)] #}
@@ -1040,7 +1045,7 @@ async fn dashboard(State(state): State<AppState>, period: Period) -> Result<View
          x_format="money", size_format="money") }} {# format is y's; x_format / size_format: number, money, percent #}
 ```
 
-## Data grid (details in [docs/grid.md](docs/grid.md), example in examples/grid)
+## Data grid (details in [docs/grid.md](docs/grid.md), example in [the bike shop's reports](examples/bikeshop/src/app/reports/grids.rs))
 
 A data grid is a table with filters, sorting and pages, all kept in the URL. You describe the
 columns in Rust, and the template draws the table.
@@ -1098,7 +1103,7 @@ A whole admin panel over your models (Filament's resources): the `renox-admin` c
 with `impl AdminResource for ProductResource` (`type Model`, `type Form`, `columns()` as
 above, `fields()` with `Field::text`/`select`/`money`/`belongs_to`…, `fill`), and the model's
 `Policy` asked for `viewAny`, `create`, `update`, `delete`… ([docs/admin.md](docs/admin.md),
-examples/admin).
+[the bike shop's panel](examples/bikeshop/src/app/staff/admin.rs)).
 
 ## Seeders and factories
 
@@ -2109,7 +2114,7 @@ with `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `XENDIT_SECRE
 gateways' webhooks (`/billing/webhooks/{gateway}`), `Billing::of(&state, &user)` with
 `subscribed()`, `on_trial()`, `checkout(plan)`, `swap(plan)`, `cancel()`, `resume()`, and the
 guards `.require_subscription()` / `.require_plan(&["pro"])` (`use renox_billing::SubscriptionRoutes`)
-([docs/billing.md](docs/billing.md), examples/billing).
+([docs/billing.md](docs/billing.md), [the bike shop's plans](examples/bikeshop/src/app/plans/billing.rs)).
 
 With `CSP=strict`, an inline script needs `<script nonce="{{ csp_nonce() }}">`, and Alpine
 expressions must stay simple (move statements into `Alpine.data(...)`).

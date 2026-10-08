@@ -210,6 +210,7 @@ async fn managers_make_kiosk_tokens_shown_once_and_revoke_them() {
         .post("/staff/api-tokens", &[("name", "X"), ("abilities", "read")])
         .await
         .assert_status(422);
+    // [explain:api.kiosks.test]
     // Revoked: the kiosk is out at once.
     w.app
         .post(&format!("/staff/api-tokens/{}/revoke", kiosk.id), &[])
@@ -222,6 +223,7 @@ async fn managers_make_kiosk_tokens_shown_once_and_revoke_them() {
     // Cashiers don't manage kiosks.
     w.app.acting_as(&w.cashier);
     w.app.get("/staff/api-tokens").await.assert_status(403);
+    // [/explain:api.kiosks.test]
 }
 
 #[renox::test]

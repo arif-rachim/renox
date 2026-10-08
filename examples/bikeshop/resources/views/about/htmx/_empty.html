@@ -1,0 +1,4 @@
+{#- Shown while the checklist is empty; every row answer resends it out of
+    band, so it hides after the first item is added and comes back after the
+    last one goes. -#}
+<p id="checklist-empty" class="rx-subtitle"{% if total %} hidden{% endif %} hx-swap-oob="true">{{ t('htmx.empty') }}</p>

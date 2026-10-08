@@ -1,4 +1,4 @@
-//! The bike shop's blocks (`resources/views/blocks/`) on `/about/blocks`:
+//! The blocks of renox-blocks on `/about/blocks`:
 //! every block renders with its demo data, the month calendar works out its
 //! grid in the template, and the demo routes behind the blocks check what
 //! they get on the server (the form blocks through `Valid<T>`, the variant
@@ -14,13 +14,9 @@ fn today(app: &TestApp) -> NaiveDate {
     blocks::today(&app.state().config)
 }
 
-/// A day the demo shop is open, `from` days ahead or later.
+/// The day `from` days ahead.
 fn open_day(app: &TestApp, from: i64) -> NaiveDate {
-    let today = today(app);
-    (from..from + 14)
-        .map(|n| today + Duration::days(n))
-        .find(|d| !blocks::is_closed(today, *d))
-        .unwrap()
+    today(app) + Duration::days(from)
 }
 
 #[renox::test]
@@ -29,19 +25,18 @@ async fn the_page_shows_every_block_with_its_signature() {
     let page = app.get("/about/blocks").await;
     page.assert_ok().assert_view("about/blocks.html");
     for marker in [
-        "data-bs-gallery",
-        "data-bs-range",
-        "data-bs-quantity",
-        "data-bs-keypad=\"rx-paid\"",
-        "data-bs-kanban",
-        "class=\"bs-month\"",
-        "class=\"bs-availability\"",
-        "data-bs-datetime",
-        "data-bs-blocked",
-        "bs-swatches--size",
-        "bs-swatches--colour",
-        "class=\"bs-history\"",
-        "class=\"bs-plans\"",
+        "data-rx-gallery",
+        "data-rx-range",
+        "data-rx-quantity",
+        "data-rx-keypad=\"rx-paid\"",
+        "data-rx-kanban",
+        "class=\"rx-month\"",
+        "class=\"rx-availability\"",
+        "data-rx-datetime-range",
+        "rx-swatches--size",
+        "rx-swatches--colour",
+        "class=\"rx-history\"",
+        "class=\"rx-plans\"",
     ] {
         page.assert_see(marker);
     }
@@ -55,16 +50,19 @@ async fn the_page_shows_every_block_with_its_signature() {
         "month_calendar(month, events=[]",
         "availability(columns, rows",
         "datetime_range(name_start, name_end",
-        "date_picker_blocked(name, label, disabled_dates=[]",
         "swatches(name, label, options",
         "history(items",
         "compare_plans(plans, features=[]",
     ] {
         page.assert_see(signature);
     }
-    // Both layouts load the blocks' stylesheet and script.
-    page.assert_see("blocks/blocks.css")
-        .assert_see("blocks/blocks.js");
+    // The crate's stylesheet and loader, once; the layouts load the
+    // showcase page's own styles.
+    page.assert_see("/_renox/blocks/blocks-")
+        .assert_see("data-renox-blocks")
+        .assert_see("blocks/blocks.css")
+        .assert_dont_see("blocks/blocks.js");
+    assert_eq!(page.text().matches("data-renox-blocks").count(), 1);
     // Its "About this page" panel.
     page.assert_see("id=\"about-page\"")
         .assert_see("Bike shop blocks");
@@ -75,25 +73,21 @@ async fn the_blocks_render_their_fields_for_valid_t() {
     let app = TestApp::new(bikeshop::app()).await;
     let page = app.get("/about/blocks").await;
     // Plain fields: two range inputs, a number, the hidden date-times, radios.
-    page.assert_see(r#"type="range" id="bs-price_min-range-min" name="price_min""#)
+    page.assert_see(r#"type="range" id="rx-price_min-range-min" name="price_min""#)
         .assert_see(r#"name="price_max""#)
         .assert_see(r#"name="quantity" type="number""#)
         .assert_see(r#"type="hidden" name="starts_at""#)
         .assert_see(r#"type="hidden" name="ends_at""#)
-        .assert_see(r#"name="visit_on""#)
         .assert_see(r#"type="radio" name="size" value="M" checked"#)
         // The sold-out size is shown, disabled and said to be sold out.
         .assert_see(r#"name="size" value="XL" disabled"#)
         .assert_see("(sold out)")
         // The kanban's hidden form posts to the demo route with htmx.
-        .assert_see(r#"hx-post="/about/blocks/kanban" hx-trigger="bs:move""#)
+        .assert_see(r#"hx-post="/about/blocks/kanban" hx-trigger="rx:kanban-move""#)
         // Every free slot says what it books.
         .assert_see("Book Trail 5 at 09:00")
         // The variant chips ask for the price and the stock.
         .assert_see(r#"hx-get="/about/blocks/variant""#);
-    // The closed days, for the calendar to grey out.
-    let closed = blocks::closed_days(today(&app));
-    page.assert_see(&format!("data-bs-blocked='[\"{}\"", closed[0]));
 }
 
 #[renox::test]
@@ -107,8 +101,8 @@ async fn the_month_calendar_works_out_its_grid() {
         .assert_see("February 2026")
         .assert_see(r#"<time datetime="2026-02-28">"#)
         .assert_dont_see(r#"datetime="2026-02-29""#)
-        .assert_see("--bs-start: 7")
-        .assert_see(r#"<span class="bs-month__weekday">Sunday </span><span class="bs-month__number">1</span>"#)
+        .assert_see("--rx-month-start: 7")
+        .assert_see(r#"<span class="rx-month__weekday">Sunday </span><span class="rx-month__number">1</span>"#)
         // The months around it.
         .assert_see("/about/blocks?month=2026-01")
         .assert_see("/about/blocks?month=2026-03")
@@ -117,7 +111,7 @@ async fn the_month_calendar_works_out_its_grid() {
     app.get("/about/blocks?month=2024-02")
         .await
         .assert_see(r#"datetime="2024-02-29""#)
-        .assert_see("--bs-start: 4");
+        .assert_see("--rx-month-start: 4");
     // December links to January of the next year.
     app.get("/about/blocks?month=2026-12")
         .await
@@ -129,7 +123,7 @@ async fn the_month_calendar_works_out_its_grid() {
         .await
         .assert_ok()
         .assert_see(&format!(r#"datetime="{}""#, today))
-        .assert_see("bs-month__day--today");
+        .assert_see("rx-month__day--today");
 }
 
 #[renox::test]
@@ -150,7 +144,6 @@ async fn the_price_filter_and_a_free_slot_come_back_in_the_address() {
 async fn the_form_blocks_are_accepted_when_valid() {
     let app = TestApp::new(bikeshop::app()).await;
     let start = open_day(&app, 1);
-    let visit = open_day(&app, 1).to_string();
     let starts_at = format!("{start}T10:00");
     let ends_at = format!("{}T12:30", start + Duration::days(1));
     app.post(
@@ -160,7 +153,6 @@ async fn the_form_blocks_are_accepted_when_valid() {
             ("paid", "350000"),
             ("starts_at", &starts_at),
             ("ends_at", &ends_at),
-            ("visit_on", &visit),
             ("size", "M"),
             ("colour", "sand"),
         ],
@@ -176,7 +168,6 @@ async fn the_form_blocks_are_accepted_when_valid() {
 async fn the_server_refuses_what_the_blocks_only_discourage() {
     let app = TestApp::new(bikeshop::app()).await;
     let today = today(&app);
-    let closed = blocks::closed_days(today)[0].to_string();
     let start = open_day(&app, 1);
     let starts_at = format!("{start}T10:00");
     let before = format!("{start}T09:00");
@@ -186,7 +177,6 @@ async fn the_server_refuses_what_the_blocks_only_discourage() {
             ("paid", "1000".to_owned()),
             ("starts_at", starts_at.clone()),
             ("ends_at", format!("{start}T11:00")),
-            ("visit_on", open_day(&app, 1).to_string()),
             ("size", "S".to_owned()),
             ("colour", "teal".to_owned()),
         ];
@@ -198,12 +188,11 @@ async fn the_server_refuses_what_the_blocks_only_discourage() {
         form
     };
     for (field, value) in [
-        ("visit_on", closed.clone()),                          // a closed day
-        ("visit_on", (today - Duration::days(1)).to_string()), // the past
-        ("size", "XL".to_owned()),                             // sold out
-        ("ends_at", before.clone()),                           // ends before it starts
-        ("quantity", "9".to_owned()),                          // over the stepper's max
-        ("paid", "12a".to_owned()),                            // not digits
+        ("starts_at", format!("{}T10:00", today - Duration::days(1))), // the past
+        ("size", "XL".to_owned()),                                     // sold out
+        ("ends_at", before.clone()),                                   // ends before it starts
+        ("quantity", "9".to_owned()),                                  // over the stepper's max
+        ("paid", "12a".to_owned()),                                    // not digits
     ] {
         let form = good(field, value);
         let pairs: Vec<(&str, &str)> = form.iter().map(|(k, v)| (*k, v.as_str())).collect();

@@ -7,11 +7,13 @@
 {% block content %}
 {% include "sales/_assets.html" %}
 {%- set o = page %}
+{# [explain:orders.invoice.template] #}
 <div class="bs-print-actions">
   <button class="rx-button rx-button--primary" type="button" data-bs-print data-rx-key="r"><span class="rx-button__label">{{ t('sales.invoice.print') }}</span></button>
   {{ link_button(route('orders.show', o.id), t('sales.invoice.back')) }}
   {%- if o.channel == "counter" and can('orders.sell') %}{{ link_button(route('sales.counter'), t('sales.counter.new_sale'), attrs={"data-rx-key": "n"}) }}{% endif %}
 </div>
+{# [/explain:orders.invoice.template] #}
 {%- if flash.change %}{{ alert(t('sales.counter.change_due', amount=(flash.change | int | money)), kind="success") }}{% endif %}
 <article class="rx-card bs-invoice">
   <header class="bs-invoice__head">
@@ -28,12 +30,14 @@
   {%- if o.customer %}
   <p><strong>{{ t('sales.invoice.billed_to') }}</strong> {{ o.customer.name }}{% if o.customer.email %} · {{ o.customer.email }}{% endif %}{% if o.address %}<br>{{ o.address }}{% endif %}</p>
   {%- endif %}
+  {# [explain:orders.invoice.template] #}
   {% call table([t('sales.orders.product'), [t('sales.orders.quantity'), "num"], [t('sales.orders.price'), "num"], [t('sales.orders.line_total'), "num"]], caption=t('sales.orders.lines')) %}
     {%- for line in o.lines %}
     <tr><td>{{ line.name }}<br><span class="rx-subtitle">{{ line.sku }}{% if line.variant %} · {{ line.variant }}{% endif %}</span></td><td class="rx-num">{{ line.quantity }}</td><td class="rx-num">{{ line.unit_price | money }}</td><td class="rx-num">{{ line.total | money }}</td></tr>
     {%- endfor %}
   {% endcall %}
   {% include "sales/orders/_totals.html" %}
+  {# [/explain:orders.invoice.template] #}
   {%- if page.payments %}
   <p class="rx-subtitle">{% for p in page.payments %}{{ t('sales.method.' ~ p.method) }} · {{ t('sales.payment_status.' ~ p.status) }} · {{ p.amount | money }}{% if not loop.last %}; {% endif %}{% endfor %}</p>
   {%- endif %}
