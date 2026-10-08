@@ -1,4 +1,4 @@
-//! `/about/htmx` (#351, from examples/htmx-recipes): each recipe answers
+//! `/about/htmx` (#351, from the htmx-recipes example): each recipe answers
 //! htmx with the smallest fragment and a plain request with a redirect. The
 //! checklist lives in the session and starts with five items, the first
 //! done (`Checklist::default`).

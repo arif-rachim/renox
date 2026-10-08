@@ -3,8 +3,8 @@
 This page is a quick reference: one short example for each common task, written the way Renox
 recommends. It's for when you know roughly what you want and need to see how it's written.
 Every Rust example below is compiled and checked by `cargo test --doc -p renox`, so none of
-them can drift out of date. For whole apps, see [`examples/`](examples) (the list is in
-[llms.txt](llms.txt)).
+them can drift out of date. For whole apps, see [`examples/`](examples): `hello`, the smallest, and `bikeshop`, a whole
+business ([llms.txt](llms.txt) maps its files).
 
 > [!TIP]
 > New to Renox? Start with [the tutorial](docs/tutorial.md). It builds one small app step by
@@ -1045,7 +1045,7 @@ async fn dashboard(State(state): State<AppState>, period: Period) -> Result<View
          x_format="money", size_format="money") }} {# format is y's; x_format / size_format: number, money, percent #}
 ```
 
-## Data grid (details in [docs/grid.md](docs/grid.md), example in examples/grid)
+## Data grid (details in [docs/grid.md](docs/grid.md), example in [the bike shop's reports](examples/bikeshop/src/app/reports/grids.rs))
 
 A data grid is a table with filters, sorting and pages, all kept in the URL. You describe the
 columns in Rust, and the template draws the table.
@@ -1103,7 +1103,7 @@ A whole admin panel over your models (Filament's resources): the `renox-admin` c
 with `impl AdminResource for ProductResource` (`type Model`, `type Form`, `columns()` as
 above, `fields()` with `Field::text`/`select`/`money`/`belongs_to`…, `fill`), and the model's
 `Policy` asked for `viewAny`, `create`, `update`, `delete`… ([docs/admin.md](docs/admin.md),
-examples/admin).
+[the bike shop's panel](examples/bikeshop/src/app/staff/admin.rs)).
 
 ## Seeders and factories
 
@@ -2114,7 +2114,7 @@ with `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `XENDIT_SECRE
 gateways' webhooks (`/billing/webhooks/{gateway}`), `Billing::of(&state, &user)` with
 `subscribed()`, `on_trial()`, `checkout(plan)`, `swap(plan)`, `cancel()`, `resume()`, and the
 guards `.require_subscription()` / `.require_plan(&["pro"])` (`use renox_billing::SubscriptionRoutes`)
-([docs/billing.md](docs/billing.md), examples/billing).
+([docs/billing.md](docs/billing.md), [the bike shop's plans](examples/bikeshop/src/app/plans/billing.rs)).
 
 With `CSP=strict`, an inline script needs `<script nonce="{{ csp_nonce() }}">`, and Alpine
 expressions must stay simple (move statements into `Alpine.data(...)`).

@@ -27,9 +27,10 @@ value arrives safely at every one.
 
 ### The table
 
-The form inputs are exercised by [`examples/fields`](../examples/fields) (a form with every
-input, products keyed by `Uuid`). Every row is checked by Renox's own tests, on SQLite and
-PostgreSQL.
+The form inputs are exercised by the bike shop's `/about/fields` page
+([src/app/about/fields.rs](../examples/bikeshop/src/app/about/fields.rs): a form with every input, samples keyed
+by `Uuid`, its tests run on SQLite and PostgreSQL). Every row is checked by Renox's own
+tests, on SQLite and PostgreSQL.
 
 How to read it: find the form field you're adding in the first column. The second column is
 the type to give the field in your Rust form struct **and** in your model. The last two
@@ -208,7 +209,7 @@ A model's `id` is its key, and its type picks how rows are numbered:
 
 Pick a ULID or UUID when ids show up in URLs or APIs and shouldn't reveal how many rows there
 are. (With counted ids, `/orders/52` tells everyone you have about 52 orders.)
-examples/fields keys its products by `Uuid`.
+The bike shop's `/about/fields` keys its samples by `Uuid`, and its rentals carry a `Ulid` code.
 
 ### Soft deletes
 

@@ -6,9 +6,9 @@ search, filters, sorting, bulk actions and exports, and pages to create, view, e
 records. It is built on the [UI kit](ui.md) and the [data grid](grid.md), so it looks and
 works like the rest of a Renox app.
 
-`examples/admin` in the repository is a shop's back office with three resources and two roles,
-and no page written by hand. [examples/bikeshop](../examples/bikeshop) puts its catalogue, workshop, suppliers and stores in a
-panel authorized by permission.
+[examples/bikeshop](../examples/bikeshop) puts its catalogue, workshop, suppliers and stores in a
+panel authorized by permission, with a column of its own and the Markdown editor
+([src/app/staff/admin.rs](../examples/bikeshop/src/app/staff/admin.rs)).
 
 ### In this guide
 

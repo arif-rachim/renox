@@ -1,5 +1,5 @@
 //! The data grid's pages for tests/browser/grid*.test.mjs (they were
-//! examples/grid's, #351): an orders grid with every option `renox::grid`
+//! the grid example's until #351): an orders grid with every option `renox::grid`
 //! has, a second grid with merged cells and row details, and two prefixed
 //! grids on one page, at `/grid`, `/grid/regions` and `/grid/follow-up`.
 //! `db:seed` makes 480 orders and demo@example.com / password.

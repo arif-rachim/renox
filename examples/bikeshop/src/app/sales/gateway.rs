@@ -1,7 +1,7 @@
 //! The payment gateway: its hosted page, its signed webhook, and the
 //! page the customer comes back to.
 //!
-//! **Midtrans** (Snap), as examples/backoffice: with `MIDTRANS_SERVER_KEY`
+//! **Midtrans** (Snap): with `MIDTRANS_SERVER_KEY`
 //! set, [`hosted_page`] asks Midtrans for a payment page (through
 //! `state.http`) and the customer pays there; Midtrans then calls
 //! `POST /webhooks/midtrans` with an HTTP notification whose `signature_key`

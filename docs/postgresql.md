@@ -44,12 +44,10 @@ Switch to PostgreSQL when the app outgrows that:
 Your code stays the same on both. Models, the query builder, `renox::db::sql()`, auth, the
 queue, the cache, the scheduler, `db:shell` and `migrate:*` all work on both databases.
 
-Two examples show this:
-
-- [`examples/postgres`](../examples/postgres) is one app that runs on both. Only `DATABASE_URL`
-  and one migration file differ.
-- [`examples/fields`](../examples/fields) shows, for every field type, which column type it
-  uses on each database.
+[examples/bikeshop](../examples/bikeshop) shows this: one app on both, where only `DATABASE_URL` and the
+migrations' `.postgres.up.sql` twins differ ([migrations/](../examples/bikeshop/migrations)). CI runs its
+tests on PostgreSQL too. Its `/about/fields` page shows, for every field type, which column
+type it uses on each database ([src/app/about/fields.rs](../examples/bikeshop/src/app/about/fields.rs)).
 
 ## Starting a new app on PostgreSQL
 
@@ -264,8 +262,9 @@ the transaction rolls back. SQLite carries on.
 
 So when a step may fail on purpose (for example, an insert that may hit a unique index), run it
 inside `tx.savepoint(|tx| …)`. If it returns `Err`, only the savepoint rolls back and the
-transaction goes on. This works the same on both databases. examples/crud's import does this
-for each line of the file.
+transaction goes on. This works the same on both databases. `renox::import` does this for
+each row of a file (the bike shop's price lists:
+[src/app/stock/import.rs](../examples/bikeshop/src/app/stock/import.rs)).
 
 ## Tests
 

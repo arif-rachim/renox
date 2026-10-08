@@ -1,4 +1,4 @@
-// /about/fields in a browser under CSP=strict (#351; examples/fields' round
+// /about/fields in a browser under CSP=strict (#351; the fields example's round
 // trip in examples-flows.test.mjs and crud's live validation in
 // examples.test.mjs until then): a field checked live as it is left, every
 // kind of field sent, saved and back in the edit form as it was, and the

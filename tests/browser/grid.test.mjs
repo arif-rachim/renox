@@ -1,4 +1,4 @@
-// #267: renox-grid.js on the fixture's /grid pages (480 seeded orders; examples/grid's until #351): sorting and
+// #267: renox-grid.js on the fixture's /grid pages (480 seeded orders; the grid example's until #351): sorting and
 // paging through the URL, search as you type, the column menu remembered,
 // resizing and moving columns, row details, and the phone layout.
 

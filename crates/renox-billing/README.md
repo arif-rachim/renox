@@ -37,4 +37,4 @@ What it adds:
 - Stripe and Xendit; another provider is one impl of the `Gateway` trait.
 
 The guide is [docs/billing.md](https://github.com/arif-rachim/renox/blob/main/docs/billing.md);
-examples/billing uses it. Versioned with `renox`: use the same version for both.
+examples/bikeshop uses it for its service plans (Stripe, Xendit and a demo gateway). Versioned with `renox`: use the same version for both.

@@ -109,6 +109,9 @@ Paths are relative to this folder.
 | Social login (renox-oauth) and two-factor login (renox-2fa) | `/login`, `/two-factor/setup` | [src/lib.rs](src/lib.rs), [src/app/staff/two_factor.rs](src/app/staff/two_factor.rs) |
 | A walk-in customer claiming their record (signed URL) | `/claim/{customer}/{email}` | [src/app/accounts/claim.rs](src/app/accounts/claim.rs) |
 | Personal API tokens with abilities | `/account/api-tokens` | [src/app/api/tokens.rs](src/app/api/tokens.rs) |
+| Each store's own page on its own host: `Routes::domain`, `DomainParams`, a domain `fallback` | `north.localhost:3000/` | [src/app/home/stores.rs](src/app/home/stores.rs), [resources/views/home/store.html](resources/views/home/store.html), [layouts/store.html](resources/views/layouts/store.html) |
+| Every form input ↔ Rust ↔ SQLite ↔ PostgreSQL, a form that tries them all (files public and private, `Uuid` keys, the editors, live validation), read back on an infolist | `/about/fields` | [src/app/about/fields.rs](src/app/about/fields.rs), [resources/views/about/_fields_form.html](resources/views/about/_fields_form.html), [tests/fields.rs](tests/fields.rs) |
+| htmx recipes, live: a modal form, out-of-band swaps (`.also`), `HxRetarget`/`HxReswap`, inline edit, Alpine tabs, `HxRefresh`/`HxRedirect`, toasts, infinite scroll | `/about/htmx` | [src/app/about/htmx.rs](src/app/about/htmx.rs), [resources/views/about/htmx.html](resources/views/about/htmx.html), [tests/htmx.rs](tests/htmx.rs) |
 
 ### The staff side
 
@@ -322,6 +325,7 @@ Renox's settings are in [.env.example](.env.example), with a comment for each. T
 | `BIKESHOP_EXPLAIN=false` | Hides the "About this page" panels for a clean demo (`/about/pages` stays) |
 | `BIKESHOP_STAFF_2FA=optional` | Staff may use the staff side without two-factor login (demos, browser tests) |
 | `BIKESHOP_DEMO_LOGINS=false` | Hides the demo accounts on the login page (shown only while the seeded users exist) |
+| `BIKESHOP_STORE_DOMAIN` | The domain each store's own page lives under, `{slug}.<domain>` (`localhost` by default: `north.localhost:3000`) |
 | `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_<PLAN>`, `XENDIT_SECRET_KEY`, `XENDIT_CALLBACK_TOKEN` | Service plans through Stripe or Xendit; without them a demo gateway of the shop's own stands in (never in production). Webhooks come to `/billing/webhooks/stripe` and `/billing/webhooks/xendit`. Card plans are charged in USD; Xendit only charges rupiah, so its plans carry their own IDR price (`RUPIAH_PER_DOLLAR` in src/app/plans/billing.rs) |
 | `MIDTRANS_SERVER_KEY` | Online orders paid through Midtrans; without it a demo payment page stands in. Midtrans only charges rupiah, so a real key needs `APP_CURRENCY=IDR`; the demo works in dollars |
 | `GOOGLE_CLIENT_ID`/`_SECRET`, `GITHUB_CLIENT_ID`/`_SECRET` | "Continue with Google / GitHub" (hidden when unset) |
@@ -382,6 +386,7 @@ $ cargo run -- schedule:list
 | Every area's acceptance tests, the walker (every GET route has an explanation whose guide anchors and files exist), the seeds, access rules, operations | `cargo test -p bikeshop` |
 | No N+1: the main pages cost the same queries on the small and the large seed ([tests/queries.rs](tests/queries.rs)) | `cargo test -p bikeshop --test queries -- --nocapture` |
 | The same on PostgreSQL (CI's PostgreSQL job) | `TEST_DATABASE_URL=postgres://postgres:postgres@localhost:55432/renox_test cargo test -p bikeshop --features renox/postgres` |
+| `/about/fields`' files on S3 (CI's s3 job, SeaweedFS; the commands are in [tests/fields.rs](tests/fields.rs)) | `TEST_S3_ENDPOINT=… cargo test -p bikeshop --features s3 --test fields` |
 | In headless Chrome: each area's flows at 1280 and 390 px, light and dark, both CSPs; the main pages under `CSP=strict` | `tests/browser/run.sh 'bikeshop-*'` (or one: `tests/browser/run.sh bikeshop-rentals`) |
 | The binary served, every page asked as a guest and as the owner | `python3 tests/process/examples.py bikeshop` (after `cargo build -p bikeshop`) |
 

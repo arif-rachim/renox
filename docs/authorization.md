@@ -22,17 +22,19 @@ In this guide:
 Want the short version of every API? See the [cheat-sheet](../CHEATSHEET.md) (the parts "Auth,
 policies, gates" and "Tenants, roles and permissions").
 
-Complete apps that use these tools:
+[examples/bikeshop](../examples/bikeshop) uses these tools in a whole business:
 
-- [examples/shop](../examples/shop): an admin role and an audit trail;
-- [examples/api](../examples/api): token abilities;
-- [examples/crud](../examples/crud): a policy;
-- [examples/teams](../examples/teams): tenants;
-- [examples/backoffice](../examples/backoffice): roles made of permissions,
-  `require_permission` per section, and an activity log;
-- [examples/bikeshop](../examples/bikeshop): permissions only (never role names), roles per store with dates
-  (`assign_role_in`, `Scope`, `permissions::set_scope`, `scopes_with`) and records checked
-  against their owner, location or operating store.
+- roles made of permissions, and code that checks permissions only, never role names
+  ([src/app/access/catalogue.rs](../examples/bikeshop/src/app/access/catalogue.rs));
+- roles per store with dates (`assign_role_in`, `Scope`, `permissions::set_scope`) and the
+  active store kept in the session and the context
+  ([src/app/access/active_store.rs](../examples/bikeshop/src/app/access/active_store.rs));
+- records checked against their owner, location or operating store (`scopes_with`,
+  [src/app/access/policy.rs](../examples/bikeshop/src/app/access/policy.rs));
+- a `Policy` for the admin panel's models
+  ([src/app/staff/admin.rs](../examples/bikeshop/src/app/staff/admin.rs));
+- API tokens with abilities ([src/app/api/mod.rs](../examples/bikeshop/src/app/api/mod.rs));
+- an activity log ([src/app/staff/audit.rs](../examples/bikeshop/src/app/staff/audit.rs)).
 
 ### Words you'll meet
 
@@ -201,8 +203,7 @@ What's going on:
 
 A policy can check roles too. `has_role` on the `User` it gets reads the roles the request
 already loaded (with the [`Permissions` module](#roles-and-permissions)). So a rule like
-"accountants see every invoice" fits in `allows`
-([examples/shop](../examples/shop/src/app/orders/model.rs) does this for its admins):
+"accountants see every invoice" fits in `allows`:
 
 ```rust
 use renox::prelude::*;
@@ -300,8 +301,9 @@ What's going on:
 > [!TIP]
 > Check **permissions** in your code (`require_permission("posts.publish")`) and use roles as
 > bundles of them. Then a new role needs no code change: you just give it permissions.
-> A role with no permissions (`&[]`) is fine when the app only checks the role itself, as
-> examples/shop does with `admin`.
+> A role with no permissions (`&[]`) is fine when the app only checks the role itself.
+> The bike shop goes the other way: its code never names a role, and a test fails if it does
+> ([tests/access.rs](../examples/bikeshop/tests/access.rs)).
 
 More you can do:
 
@@ -567,8 +569,8 @@ More to know:
 - The ability `"*"` allows everything: `create_token_with(&db, "admin", &["*"], None)`.
 - A password reset deletes all of the user's API tokens, since whoever reset it may be taking
   back a stolen account. Programs then need new tokens.
-- `rnx tokens:prune` deletes tokens that expired more than a day ago. Schedule it daily, as
-  examples/api does.
+- `rnx tokens:prune` deletes tokens that expired more than a day ago. Schedule it daily
+  (`renox::auth::prune_expired_tokens` in a `daily_at` task).
 
 ## Tenants: rows that belong to a team
 
@@ -640,8 +642,8 @@ Things to know:
 - `query()`, `find`, `all`, `where_eq` and the relation loaders apply the scope. `unscoped()`
   skips it. Saving and deleting a model you already loaded work by its id.
 - Check the team the user asks for before you put it in the context: is the user really a member?
-  [examples/teams](../examples/teams) keeps the current team in the session and checks the
-  membership in the middleware.
+  The bike shop keeps the active store in the session and checks the person's roles there in
+  its middleware ([src/app/access/active_store.rs](../examples/bikeshop/src/app/access/active_store.rs)).
 - Uniqueness is per team too: `.unique("projects", "name").ignore(id).where_eq("team_id", team)`.
 
 > [!WARNING]

@@ -1,5 +1,5 @@
 // #268: editors.js (renox-editors) on the bike shop's /about/fields form
-// (examples/fields' product form until #351): Trix keeps its hidden input in
+// (the fields example's product form until #351): Trix keeps its hidden input in
 // step, the Markdown toolbar and preview, CodeJar keeps its textarea in step,
 // and each library loads only when needed. The form needs a login: the
 // seeded customer's.

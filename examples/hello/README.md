@@ -4,8 +4,8 @@ A guestbook that touches many Renox features in one file: named routes, a layout
 and flash messages, CSRF, htmx fragments, validation with old input, a model, migrations, a
 seeder, pagination, login and registration, the account page, an event whose listener queues a job, a scheduled
 task, an app command, uploads and two languages. It is also the app used for live and browser
-testing. Read it for a quick tour; read [examples/crud](../crud) or
-[examples/shop](../shop) for how to structure a real app.
+testing. Read it for a quick tour; read [examples/bikeshop](../bikeshop) for how a real app is
+structured.
 
 ```bash
 cd examples/hello

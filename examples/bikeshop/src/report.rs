@@ -10,7 +10,7 @@
 //! `/_renox/debug`.
 //!
 //! In production a shop would send them to an error tracker instead
-//! (Sentry, a chat channel): `examples/jobs` posts them to a webhook with
+//! (Sentry, a chat channel), for example by posting them to a webhook with
 //! `state.http`.
 
 use renox::prelude::*;

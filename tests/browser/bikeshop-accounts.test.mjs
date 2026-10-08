@@ -3,7 +3,7 @@
 // the notification bell, the preferences' segmented controls, the language
 // switch remembered on the account, "About this page", and deleting the
 // account from its sheet, and two-factor login turned on with a code, then
-// asked for after the password (renox-2fa; examples/teams' until #351).
+// asked for after the password (renox-2fa; the teams example's until #351).
 // Screenshots go to BIKESHOP_SCREENS when it's set.
 
 import { after, before, describe, test } from 'node:test';

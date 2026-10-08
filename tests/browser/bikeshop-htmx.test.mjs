@@ -1,4 +1,4 @@
-// /about/htmx in a browser (#351; these were examples/htmx-recipes' tests in
+// /about/htmx in a browser (#351; these were the htmx-recipes example's tests in
 // examples.test.mjs and examples-flows.test.mjs): the modal adds a row and
 // the count follows out of band, a repeat is retargeted onto its row with a
 // toast, a row is ticked, renamed inline (Escape cancels) and deleted from

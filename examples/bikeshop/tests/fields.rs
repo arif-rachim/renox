@@ -1,6 +1,6 @@
 //! `/about/fields` (#351): every kind of form field from the browser to the
 //! database and back into the edit form, files included. These tests were
-//! examples/fields' and examples/uploads'; they run on SQLite, or on
+//! the fields and uploads examples' until #351; they run on SQLite, or on
 //! PostgreSQL with TEST_DATABASE_URL set (the CI's PostgreSQL job), and the
 //! last one on S3 with the TEST_S3_* variables and `--features s3`.
 

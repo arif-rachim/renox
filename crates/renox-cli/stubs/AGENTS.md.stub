@@ -11,13 +11,13 @@ one Renox version (the `renox` line in `Cargo.toml`); the links below are for th
   jobs, schedules, cache and locks, mail, notifications, uploads, config, tests):
   {{renox_docs}}/CHEATSHEET.md
 - **llms.txt**, a map from every topic to a guide or an example file: {{renox_docs}}/llms.txt
-- **Whole apps:** `examples/shop` shows how everything fits (catalog, cart, checkout in a
-  transaction, queued mail, admin); `examples/htmx-recipes` for interactive pages;
-  `examples/relations` for related tables (and a public blog with Markdown, SEO, RSS and a
-  sitemap); `examples/grid` for a data grid (filters, search, editing in place, bulk actions,
-  totals, exports); `examples/backoffice` for a back office (sidebar, grids, invoices, payment
-  webhooks, CSV import, roles, activity log); `examples/teams` for a multi-tenant SaaS.
-  Every example has a README.
+- **Whole apps:** `examples/bikeshop` shows how everything fits in a real business: a shop
+  (catalogue, cart, checkout in a transaction, payment webhooks), rentals, a workshop,
+  service plans billed as subscriptions, staff with roles per store, data grids, reports,
+  jobs, mail, an admin panel and a JSON API. Every page explains the Renox features it uses:
+  its README maps each feature to a page and a file, `/about/pages` lists them, and
+  `/about/fields` and `/about/htmx` are references for form fields and htmx recipes.
+  `examples/hello` is the smallest app.
 - **Guides:** `docs/routing.md` (routes, groups, middleware, sessions, cookies, signed URLs),
   `docs/validation.md` (forms, rules, `#[derive(Validate)]`, hooks), `docs/mail.md` (mail and
   notifications), `docs/scheduling.md` (schedules, events, cache and locks, commands),

@@ -3,7 +3,7 @@
 //! future to be `Send`; an API whose future holds a closure over `&T` across
 //! an `.await` fails that check (rustc issue #100013) only where it's
 //! routed, so doctests and plain `async fn` tests don't catch it. The
-//! relation loaders did, until examples/shop routed them.
+//! relation loaders did, until an example app (the shop) routed them.
 
 use std::time::Duration;
 

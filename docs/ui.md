@@ -244,8 +244,10 @@ suggests three cities. Below, a "Delivery" group asks for a speed (one choice) a
 ### Rows of fields
 
 Some forms have a list inside them: the people to invite to a team, the lines of an order.
-examples/teams' "New team" wizard does this. Each row's input is named `invites[0][email]`,
-`invites[1][email]`, and so on. `Valid` reads them into a `Vec`.
+The bike shop's store hours do this ([staff/stores/edit.html](../examples/bikeshop/resources/views/staff/stores/edit.html),
+a repeater row per day, named `hours[0][day]`, `hours[0][opens]`…). In the example below
+each row's input is named `invites[0][email]`, `invites[1][email]`, and so on. `Valid` reads
+them into a `Vec`.
 
 ```html
 {% from "renox/ui.html" import wizard, wizard_step, repeater, input %}
@@ -327,8 +329,8 @@ Here is what the kit sends to that URL, and what the handler answers:
 If adding or renaming fails, a 422 answer from `Valid` (say, "that name is already taken")
 shows its first message under the field. Escape gives up a rename.
 
-Who may add or rename is up to the route. examples/shop puts the three handlers inside its
-admin group, so only admins can.
+Who may add or rename is up to the route: put the three handlers inside a group that only
+the people allowed can reach (an admin group, a `require_permission`).
 
 Here is the handler that answers the `GET`s:
 
@@ -365,8 +367,9 @@ Without JavaScript, the browser's own select shows only the options in the page.
 
 ### A field that depends on another
 
-Sometimes a field matters only when another field has a certain value. examples/shop's
-checkout asks for an address only for delivery by courier, and requires it only then:
+Sometimes a field matters only when another field has a certain value. The bike shop's
+checkout ([sales/checkout/show.html](../examples/bikeshop/resources/views/sales/checkout/show.html)) asks
+for an address only for delivery, and requires it only then:
 
 ```html
 {% from "renox/ui.html" import toggle_buttons, show_when, textarea, date_picker %}
@@ -502,9 +505,9 @@ copied from lucide-static's `icons/<name>.svg`.
 The frame of a page comes from the kit too. So an app writes no CSS for its navigation bar,
 its sidebar or its page headings.
 
-Every example is built this way. examples/backoffice has a sidebar. examples/shop has a
-navigation bar with links, a cart count and menus. [examples/bikeshop](../examples/bikeshop) has both (a public navbar, a
-staff sidebar) and shows how to add what the kit lacks as "blocks" of the app's own.
+Both examples are built this way. [examples/bikeshop](../examples/bikeshop) has a public
+navigation bar with links, a cart count and menus, and a staff sidebar; its pages use
+renox-blocks for what the kit lacks. [examples/hello](../examples/hello) has a navigation bar.
 
 A navigation bar on top looks like this:
 
@@ -743,8 +746,8 @@ tell a story. Every theme defines them:
 Every text colour keeps 4.5:1 on every background (WCAG AA), in light and dark.
 
 An app's own `:root` tokens, in a stylesheet loaded after `renox_ui()`, win over either
-theme. So a brand colour stays when the theme changes. examples/shop keeps its brown this
-way, and examples/backoffice a colour from its settings.
+theme. So a brand colour stays when the theme changes. The bike shop keeps its teal and
+terracotta this way ([public/theme.css](../examples/bikeshop/public/theme.css)).
 
 ### The type scale
 
@@ -854,7 +857,8 @@ Code shown coloured, read-only and copyable (`code_entry`), and editors for rich
 and code, come from the `renox-editors` crate: see [editors.md](editors.md).
 
 For sections and tabs, use the kit's own `card`, `fieldset` and `tabs`, and put an infolist
-in each. examples/shop's order page and examples/fields' product page are built this way.
+in each. The bike shop's order page and the sample page of its `/about/fields`
+([about/fields_show.html](../examples/bikeshop/resources/views/about/fields_show.html)) are built this way.
 
 ### Formatting values
 
@@ -1038,8 +1042,7 @@ The details:
 - From the page's own JavaScript: `Renox.request("POST", "/orders/7/retry")`.
 - A toast pushed from the server to open pages (`state.broadcast_to(user_id, "renox:toast",
   json!({ "toasts": [toast] }))`, see [mail.md](mail.md#your-own-live-events)) can carry one
-  too: [examples/jobs](../examples/jobs) tells the staff about a failed charge with a
-  "Reopen" button.
+  too, say a "Reopen" button on a failed charge.
 
 Toasts go away. For notifications that stay (a bell in the navigation bar, with new ones
 arriving live), see [mail.md](mail.md#the-bell).
@@ -1216,7 +1219,8 @@ holds all the versions in one line, using Laravel's plural ranges:
 
 For example: `"{0} Sold out|{1} Only one left|[2,5] Only :count
 left|[6,*] :count in stock"`. Print it with
-`{{ t('products.in_stock', count=product.stock) }}` (examples/shop).
+`{{ t('products.in_stock', count=product.stock) }}`. The bike shop counts its search results
+this way (`catalog.found` in [resources/lang/en.json](../examples/bikeshop/resources/lang/en.json)).
 
 ## Actions
 
@@ -1326,14 +1330,14 @@ An `icon_button`'s `label` is read out by screen readers. It's also shown as a t
 a short hover, or at once when the button gets keyboard focus. Any element can have a tooltip
 with `data-rx-tip="…"`.
 
-examples/shop's admin product list has all of these:
+The bike shop has all of these:
 
-- an "Adjust stock" action on each row;
-- an edit `icon_button`;
-- a "view in the shop" button, disabled with a reason for hidden products;
-- the "New product" button on the `n` key.
-
-Its product form also saves on ⌘S / Ctrl+S.
+- a "Write off" `action_sheet` on a stock level's page
+  ([stock/ledger.html](../examples/bikeshop/resources/views/stock/ledger.html));
+- the counter's buttons on keys, and "Pay" disabled with a reason while the sale is empty
+  ([sales/counter/show.html](../examples/bikeshop/resources/views/sales/counter/show.html));
+- "New item" on the `n` key on `/about/htmx`
+  ([about/htmx.html](../examples/bikeshop/resources/views/about/htmx.html)).
 
 ### Action groups
 
@@ -1515,9 +1519,10 @@ format. The grid only says which columns: those shown by default, in their order
 {{ menu_link(route('products.ledger', product.id), "Export ledger (CSV)", icon="download", download=true) }}
 ```
 
-examples/backoffice uses all of these: "New product" is a `wizard_action`, "More" on the
-product list is an `action_group` with the `import_action` and its template, and a product's
-page has an action group with "Duplicate" and "Export ledger".
+The bike shop's stock page has an `action_group`
+([stock/index.html](../examples/bikeshop/resources/views/stock/index.html)), and a supplier's page
+the `import_action` with its template
+([stock/suppliers/show.html](../examples/bikeshop/resources/views/stock/suppliers/show.html)).
 
 ## Dashboards
 
@@ -1688,9 +1693,10 @@ The parts, one by one:
   - `query_fields("period", "from", "to")` writes the current query as hidden inputs, without
     `page` and the keys named, for any GET form that should keep the page's other filters.
 
-examples/shop's admin dashboard uses all of it: the period (with 12 weeks and a custom
-range), four figures, revenue against the period before, orders per day, orders by status
-(loaded on their own every minute), products sold as bubbles and orders as a scatter chart.
+The bike shop's reports dashboard ([reports/dashboard.html](../examples/bikeshop/resources/views/reports/dashboard.html))
+uses most of it: the period (with a custom range), figures against the period before with
+their trend, revenue as stacked bars, the mix of income as a doughnut and rental hours as
+bubbles.
 
 ## Data grids
 
@@ -1704,7 +1710,8 @@ server. It fills its container and has:
 - summaries, groups and exports.
 
 You define it in Rust and draw it with the `grid` macro of `renox/grid.html`.
-[docs/grid.md](grid.md) is its guide, and examples/grid is a dashboard built on it.
+[docs/grid.md](grid.md) is its guide, and the bike shop's report grids
+([src/app/reports/grids.rs](../examples/bikeshop/src/app/reports/grids.rs)) are built on it.
 
 `{{ sparkline(values) }}` (a small line or bar chart as inline SVG) works in any template,
 not only in a grid.
