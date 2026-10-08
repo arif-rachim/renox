@@ -219,7 +219,8 @@ every kit component follows in light and dark mode, plus four tokens of the shop
 (`--bs-clay`, `--bs-sand`, `--bs-hero`, `--bs-section`) and the public pages' parts: the hero
 ([layouts/_hero.html](resources/views/layouts/_hero.html), on the home, rent and plans pages),
 category chips and photo tiles, service tiles, the stores strip, product cards as photos with
-their text under them, the sign-in pages' photo, the phone's floating tab bar. This relaxes
+their text under them, the sign-in pages' photo. The phone's floating tab bar is the kit's
+(`navbar(…, tabs=…)`, #346). This relaxes
 rule 3 for those brand tokens only (recorded in #231); spacing stays the kit's.
 
 **Photos.** 68 free [Unsplash](https://unsplash.com/license) photos in WebP (3.6 MB):

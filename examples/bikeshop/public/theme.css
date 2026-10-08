@@ -137,20 +137,9 @@
 
 .bs-footer { padding-block: var(--rx-space-8); }
 
-/* ---------- phones: the tab bar floats as a dark pill ---------- */
+/* ---------- phones ---------- */
 
 @media (max-width: 40rem) {
-  .bs-public { padding-bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
-  .bs-public .bs-tabbar {
-    inset: auto var(--rx-space-3) calc(var(--rx-space-3) + env(safe-area-inset-bottom)) var(--rx-space-3);
-    padding: var(--rx-space-2) var(--rx-space-1); border: 0; border-radius: calc(var(--rx-radius-l) - 2px);
-    background: var(--rx-ink); box-shadow: 0 12px 30px rgba(20, 15, 10, 0.28);
-  }
-  .bs-public .bs-tabbar__tab { color: rgba(255, 255, 255, 0.72); gap: 3px; }
-  .bs-public .bs-tabbar__tab svg { width: 2.75rem; height: 1.75rem; padding: 0.25rem 0.75rem; border-radius: 999px; box-sizing: border-box; }
-  .bs-public .bs-tabbar__tab[aria-current="page"] { color: #fff; }
-  .bs-public .bs-tabbar__tab[aria-current="page"] svg { background: var(--rx-accent); }
-  .bs-public .bs-tabbar__tab:focus-visible { outline-color: #fff; }
   .bs-services { grid-template-columns: minmax(0, 1fr); }
   .bs-service { min-height: 13rem; padding: var(--rx-space-6); }
   .bs-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--rx-space-3); }

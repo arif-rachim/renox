@@ -241,6 +241,7 @@ fn builtin(locale: &str) -> Option<&'static HashMap<&'static str, &'static str>>
             ("ui.more", "More"),
             ("ui.skip", "Skip to content"),
             ("ui.main_navigation", "Main"),
+            ("ui.sections", "Sections"),
             ("ui.errors_title", "Please check the highlighted fields."),
             ("ui.show_password", "Show password"),
             ("ui.hide_password", "Hide password"),

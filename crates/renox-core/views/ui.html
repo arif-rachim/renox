@@ -549,15 +549,53 @@ rx-choices{% if inline %} rx-choices--inline{% elif columns %} rx-cols-{{ column
     `width`: "narrow" (as `rx-container`), "wide" (as `rx-container--wide`) or
     "full". It starts with a "Skip to content" link to `#main` (`skip=false`
     when a `sidebar` already has one). On phones the links move to a row of
-    their own that scrolls sideways. -#}
-{% macro navbar(brand, href="/", logo=none, mark=false, width="narrow", label=none, skip=true) -%}
+    their own that scrolls sideways.
+
+    `tabs`: on phones (under 36rem), a tab bar at the bottom of the screen
+    instead of the links' row, within reach of a thumb; the bar on top keeps
+    one row. Each tab is `{"href": …, "label": …, "icon": "house", "active":
+    route_is('home')}` (the current one gets `aria-current`), or `{"open":
+    "menu-sheet", "label": "Menu", "icon": "menu"}`: a button opening the
+    `sheet` of that id with the rest of the navigation. Four or five fit;
+    `badge` adds a count. `tabs_label` names the bar for screen readers.
+    What else shouldn't crowd the phone's bar (a language menu) goes in an
+    element with `rx-hide-narrow`; a search form goes in `nav_search`. -#}
+{% macro navbar(brand, href="/", logo=none, mark=false, width="narrow", label=none, skip=true, tabs=none, tabs_label=none) -%}
 {%- if skip %}<a class="rx-skip" href="#main">{{ t('ui.skip') }}</a>{% endif %}
-<header class="rx-navbar">
+<header class="rx-navbar{% if tabs %} rx-navbar--tabs{% endif %}">
   <nav class="rx-navbar__inner rx-navbar__inner--{{ width }}" aria-label="{{ label or t('ui.main_navigation') }}">
     {%- if brand %}<a class="rx-navbar__brand" href="{{ href }}">{{ _brand_mark(brand, logo, mark) }}<span>{{ brand }}</span></a>{% endif %}
     {%- if caller is defined %}{{ caller() }}{% endif %}
   </nav>
 </header>
+{%- if tabs %}
+<nav class="rx-tabbar" aria-label="{{ tabs_label or t('ui.sections') }}">
+  {%- for tab in tabs %}
+  {%- if tab.open %}
+  <button class="rx-tabbar__tab" type="button" data-rx-open="{{ tab.open }}" aria-haspopup="dialog">{{ _tab_inner(tab) }}</button>
+  {%- else %}
+  <a class="rx-tabbar__tab" href="{{ tab.href }}"{% if tab.active %} aria-current="page"{% endif %}>{{ _tab_inner(tab) }}</a>
+  {%- endif %}
+  {%- endfor %}
+</nav>
+{%- endif %}
+{%- endmacro %}
+
+{%- macro _tab_inner(tab) -%}
+<span class="rx-tabbar__icon">{{ renox_icon(tab.icon or "", size=22) }}</span><span class="rx-tabbar__label">{{ tab.label }}</span>
+{%- if tab.badge is defined and tab.badge is not none and tab.badge != "" %}<span class="rx-tabbar__badge">{{ tab.badge }}</span>{% endif %}
+{%- endmacro -%}
+
+{#- A navbar's search form: shown in the bar on wide screens; on phones
+    behind a search button, opening on a row under the bar (focused, and
+    closed again with Escape or the button).
+
+    {% call nav_search() %}<form role="search" action="/search">…</form>{% endcall %}
+
+    `label`: the button's name ("Search"); `id`: when a page has two. -#}
+{% macro nav_search(label=none, id="rx-nav-search") -%}
+<button class="rx-icon-button rx-icon-button--plain rx-navbar__search-toggle" type="button" aria-label="{{ label or t('ui.search') }}" aria-controls="{{ id }}" aria-expanded="false" data-rx-search-toggle>{{ renox_icon("search", size=20) }}</button>
+<div class="rx-navbar__search" id="{{ id }}">{{ caller() }}</div>
 {%- endmacro %}
 
 {#- The navigation bar's links, kept together (on phones, a row that scrolls). -#}

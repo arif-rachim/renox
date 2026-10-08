@@ -531,6 +531,52 @@ The bar shows the app's name (a link home), two links (Products, and Cart with a
 on the right a menu with the user's name. `active=route_is('products.*')` highlights
 "Products" on every products page.
 
+#### Tabs at the bottom on phones
+
+On a phone, a shop's main sections are easier to reach at the bottom of the screen, under
+the thumb. Give `navbar` its `tabs`, and under 36rem (the kit's phone width) the bar on top
+keeps one row while the sections become a tab bar floating at the bottom. examples/bikeshop's
+public pages work this way:
+
+```html
+{% from "renox/ui.html" import navbar, nav_links, nav_link, nav_search, sheet, sidebar_link %}
+{%- set tabs = [
+  {"href": route('home'), "label": "Home", "icon": "house", "active": route_is('home')},
+  {"href": route('catalog.index'), "label": "Shop", "icon": "shopping-bag", "active": route_is('catalog.*')},
+  {"href": route('orders.index'), "label": "Orders", "icon": "receipt", "active": route_is('orders.*'), "badge": open_orders},
+  {"open": "site-menu", "label": "Menu", "icon": "menu"},
+] %}
+{% call navbar(app.name, href=route('home'), width="wide", tabs=tabs) %}
+  {% call nav_links() %}…the same sections, for wider screens…{% endcall %}
+  <span class="rx-spacer"></span>
+  {% call nav_search(label="Search") %}
+    <form role="search" method="get" action="{{ route('catalog.search') }}">…</form>
+  {% endcall %}
+  <span class="rx-hide-narrow">{{ link_button(route('login'), "Log in", variant="plain", size="small") }}</span>
+{% endcall %}
+{% call sheet("site-menu", "Menu", slide_over=true, width="sm") %}
+  {{ sidebar_link(route('login'), "Log in") }}
+{% endcall %}
+```
+
+- Each tab is a link (`href`, `label`, an [icon](#icons), `active`), or, with `open`, a button
+  that opens the `sheet` of that id: the place for everything the tabs leave out. Four or
+  five tabs fit a phone; a long label is cut short. `badge` shows a count.
+- `active` marks the current tab with `aria-current="page"`, as `nav_link` does; the current
+  tab's icon sits on the accent colour, and its label is bold (not colour alone).
+- `nav_search` holds a search form: in the bar on wide screens; on phones behind a search
+  button, opening on a row under the bar with its field focused. Escape, or the button again,
+  closes it and puts the focus back on the button.
+- `nav_links` leave the phone's bar (the tabs replace them), and so does anything in an
+  element with `rx-hide-narrow` (a language menu, the account menu: put them in the sheet).
+- The tab bar keeps above the home indicator (`env(safe-area-inset-bottom)`; add
+  `viewport-fit=cover` to the viewport meta tag to use the whole screen), the page gets room
+  at its end so nothing hides behind the bar, and nothing is wider than the screen.
+- The tabs are links and buttons in the page's order, after the bar on top: Tab reaches each
+  one, with the focus ring on the dark bar. `tabs_label` names the tab bar for screen readers
+  ("Sections", the kit text `ui.sections`).
+- Without `tabs`, `navbar` is as before.
+
 A back office puts its sections down the side instead:
 
 ```html
@@ -555,8 +601,9 @@ top holds the notification bell, and the page's content goes under it.
 
 | Component | What it is |
 |---|---|
-| `navbar(brand, href="/", logo=…, mark=…, width="narrow", label=…, skip=true)` | The bar on top: see-through, it stays at the top while you scroll ("sticky"), with a hairline under it. `brand` links to `href` (`none` for no brand). `logo` is an image URL; `mark=true` shows the name's first letter in the accent colour. `width` matches the page: `narrow` (`rx-container`), `wide` (`rx-container--wide`) or `full`. It starts with a "Skip to content" link to `#main`, for keyboard users. |
-| `nav_links()` + `nav_link(href, label, active=…, badge=…)` | The bar's sections. `active` (usually `route_is('….*')`) marks the current one, with `aria-current` for screen readers. `badge` shows a count. On phones the links get a row of their own that scrolls sideways. |
+| `navbar(brand, href="/", logo=…, mark=…, width="narrow", label=…, skip=true, tabs=[…], tabs_label=…)` | The bar on top: see-through, it stays at the top while you scroll ("sticky"), with a hairline under it. `brand` links to `href` (`none` for no brand). `logo` is an image URL; `mark=true` shows the name's first letter in the accent colour. `width` matches the page: `narrow` (`rx-container`), `wide` (`rx-container--wide`) or `full`. It starts with a "Skip to content" link to `#main`, for keyboard users. `tabs`: a tab bar at the bottom on phones ([above](#tabs-at-the-bottom-on-phones)). |
+| `nav_search(label=…, id=…)` | A search form in the bar; on phones behind a search button that opens it on a row under the bar. |
+| `nav_links()` + `nav_link(href, label, active=…, badge=…)` | The bar's sections. `active` (usually `route_is('….*')`) marks the current one, with `aria-current` for screen readers. `badge` shows a count. On phones the links get a row of their own that scrolls sideways (with `tabs`, the tab bar replaces them). |
 | `sidebar(brand, href="/", logo=…, mark=true, label=…, skip=true)` + `sidebar_link(href, label, active=…, badge=…)`, `sidebar_section(title)` | Sections down the side, for back offices. The page is built like this: `rx-shell` on `<body>`, the sidebar, then `rx-shell__main` holding a full-width `navbar` and `<main class="rx-shell__content">`. On phones the sidebar becomes a bar of links on top. |
 | `page_header(title, subtitle=…, back=…, back_label=…, badge=…, badge_kind=…)` | A page's heading: the title (with a badge), a line under it, a link back (`back`), and the call block's buttons at the end of the row (under the title on phones). |
 | `toolbar()` | Filter fields side by side. They wrap onto more lines on narrow screens, and line up with their buttons. There are no "(optional)" marks, since filters are all optional. Put it inside the `<form>`. |
@@ -610,7 +657,7 @@ The kit's own texts ("optional", "Cancel", the error summary's title) are in Eng
 can change or translate them in `lang/<locale>.json` (for example `es.json` for Spanish):
 
 - the kit: `ui.optional`, `ui.cancel`, `ui.close`, `ui.dismiss`, `ui.more`, `ui.skip`
-  ("Skip to content"), `ui.main_navigation`, `ui.errors_title`, `ui.loading`, `ui.back` (the
+  ("Skip to content"), `ui.main_navigation`, `ui.sections` (the tab bar), `ui.errors_title`, `ui.loading`, `ui.back` (the
   wizard and `page_header`'s back link) and `ui.next` (the wizard);
 - the fields: `ui.show_password`, `ui.hide_password`, `ui.copy`, `ui.copied`,
   `ui.choose_file`, `ui.choose_files`, `ui.current_file`, `ui.choose_date`, `ui.date_unavailable`,

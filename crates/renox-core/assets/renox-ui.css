@@ -355,6 +355,57 @@
   .rx-navbar__inner > .rx-button--small, .rx-navbar__inner > .rx-menu > .rx-button--small { padding-inline: 10px; }
 }
 
+/* `nav_search`: in the bar on wide screens; on phones behind its button,
+   opening on a row of its own under the bar (renox-ui.js). */
+.rx-navbar__search { display: contents; }
+.rx-navbar .rx-navbar__search-toggle { display: none; }
+@media (max-width: 36rem) {
+  .rx-navbar .rx-navbar__search-toggle { display: inline-grid; }
+  .rx-navbar__search { display: none; order: 11; flex-basis: 100%; min-width: 0; padding-bottom: var(--rx-space-2); }
+  .rx-navbar--searching .rx-navbar__search { display: block; }
+}
+
+/* `navbar(…, tabs=[…])` on phones: the bar on top keeps one row and the
+   links become a tab bar floating at the bottom, above the home indicator
+   (the safe area), as a dark pill; the current tab's icon sits on the accent.
+   The page gets room under its content so nothing hides behind the bar. */
+.rx-tabbar { display: none; }
+@media (max-width: 36rem) {
+  .rx-navbar--tabs .rx-navbar__links { display: none; }
+  .rx-tabbar {
+    --rx-tabbar-gap: var(--rx-space-3);
+    --rx-tabbar-label: rgba(255, 255, 255, 0.74);
+    position: fixed; z-index: 30;
+    inset: auto var(--rx-tabbar-gap) calc(var(--rx-tabbar-gap) + env(safe-area-inset-bottom)) var(--rx-tabbar-gap);
+    display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
+    padding: var(--rx-space-2) var(--rx-space-1);
+    border-radius: var(--rx-radius-l);
+    background: var(--rx-ink); color: #fff;
+    box-shadow: var(--rx-shadow-raised), inset 0 0 0 0.5px var(--rx-separator);
+  }
+  body:has(.rx-tabbar) {
+    padding-bottom: calc(var(--rx-target) + var(--rx-space-1) + 2 * var(--rx-space-2) + 2 * var(--rx-space-3) + env(safe-area-inset-bottom));
+  }
+}
+.rx-tabbar__tab {
+  position: relative; display: grid; justify-items: center; align-content: center; gap: 2px;
+  min-width: 0; min-height: var(--rx-target); padding: 0 2px; margin: 0;
+  border: 0; border-radius: var(--rx-radius-s); background: none; color: var(--rx-tabbar-label);
+  font: var(--rx-type-caption); text-decoration: none; cursor: pointer;
+}
+.rx-tabbar__icon { display: grid; place-items: center; width: 2.75rem; height: 1.75rem; border-radius: 999px; transition: background-color 0.15s ease, color 0.15s ease; }
+.rx-tabbar__label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rx-tabbar__tab:hover { color: #fff; }
+.rx-tabbar__tab[aria-current="page"] { color: #fff; font-weight: 600; }
+.rx-tabbar__tab[aria-current="page"] .rx-tabbar__icon { background: var(--rx-accent); color: var(--rx-on-accent); }
+.rx-tabbar__tab:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
+.rx-tabbar__badge {
+  position: absolute; top: 0; left: calc(50% + 0.5rem); min-width: 18px; padding: 0 5px; border-radius: 9px;
+  background: var(--rx-accent-2); color: #fff; font: 600 0.6875rem/18px var(--rx-font); text-align: center;
+}
+@media (prefers-reduced-motion: reduce) { .rx-tabbar__icon { transition: none; } }
+@media print { .rx-tabbar { display: none !important; } body:has(.rx-tabbar) { padding-bottom: 0; } }
+
 /* A back office: the sidebar, then the main column. */
 /* In the default theme, an app shell (a sidebar and dense pages) has
    rounded-rectangle buttons. */

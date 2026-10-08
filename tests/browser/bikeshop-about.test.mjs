@@ -178,9 +178,9 @@ describe('bikeshop in Spanish', () => {
   /** Chooses Español in the navbar's language menu, or on a phone in the
    *  menu panel the tab bar opens (#323). */
   async function spanish(page) {
-    const phone = await page.eval(() => getComputedStyle(document.querySelector('.bs-tabbar')).display !== 'none');
+    const phone = await page.eval(() => getComputedStyle(document.querySelector('.rx-tabbar')).display !== 'none');
     if (phone) {
-      await page.click('.bs-tabbar [data-rx-open="site-menu"]');
+      await page.click('.rx-tabbar [data-rx-open="site-menu"]');
       await page.waitFor(
         () => {
           const menu = document.querySelector('#site-menu');

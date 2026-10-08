@@ -1035,6 +1035,37 @@
     });
   });
 
+  // ---------- The navbar's search on phones (nav_search) ----------
+
+  // Its button opens the search on a row under the bar and focuses its
+  // field; a second press, or Escape inside it, closes it and the focus goes
+  // back to the button.
+  function closeNavSearch(bar, toggle) {
+    bar.classList.remove("rx-navbar--searching");
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.focus();
+  }
+  document.addEventListener("click", function (event) {
+    var toggle = event.target.closest && event.target.closest("[data-rx-search-toggle]");
+    var bar = toggle && toggle.closest(".rx-navbar");
+    if (!bar) return;
+    if (bar.classList.contains("rx-navbar--searching")) { closeNavSearch(bar, toggle); return; }
+    bar.classList.add("rx-navbar--searching");
+    toggle.setAttribute("aria-expanded", "true");
+    var region = document.getElementById(toggle.getAttribute("aria-controls"));
+    var field = region && region.querySelector("input:not([type=hidden]), select, textarea");
+    if (field) field.focus();
+  });
+  // On `window`, after the page's own handlers: a suggestion list that
+  // closes on Escape (and says so with preventDefault) keeps the search open.
+  window.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape" || event.defaultPrevented || !event.target.closest) return;
+    var region = event.target.closest(".rx-navbar--searching .rx-navbar__search");
+    var bar = region && region.closest(".rx-navbar");
+    var toggle = bar && bar.querySelector('[data-rx-search-toggle][aria-controls="' + CSS.escape(region.id) + '"]');
+    if (toggle) closeNavSearch(bar, toggle);
+  });
+
   // ---------- Date picker ----------
 
   var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;

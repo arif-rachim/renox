@@ -256,7 +256,12 @@ fn views() -> tempfile::TempDir {
 <p id="named">{{ icon("lock", label="Private & \"locked\"") }}</p>
 <p id="old">{{ icon("trash") }}</p>
 <p id="unknown">{{ icon("no-such-icon") }}</p>
-{{ button("Ship", icon="truck") }}"#,
+{{ button("Ship", icon="truck") }}
+{% from "renox/ui.html" import navbar, nav_search %}
+{% call navbar("Shop", tabs=[{"href": "/", "label": "Home", "icon": "house", "active": true}, {"href": "/orders", "label": "Orders", "icon": "receipt", "badge": 2}, {"open": "more", "label": "More", "icon": "menu"}]) %}
+{% call nav_search(label="Find") %}<form role="search"><input name="q"></form>{% endcall %}
+{% endcall %}
+{{ navbar("Plain") }}"#,
     );
     dir
 }
@@ -495,6 +500,19 @@ async fn the_icon_macro_draws_lucide_icons_hidden_unless_labelled() {
         .assert_see(r#"<p id="unknown"></p>"#)
         // A button's icon comes from the same set.
         .assert_see(r#"<span class="rx-button__icon" aria-hidden="true"><svg class="rx-icon""#);
+    // A navbar with tabs: a tab bar after the header, the current tab marked,
+    // a button for a sheet; the search behind its button on phones.
+    page.assert_see(r#"<header class="rx-navbar rx-navbar--tabs">"#)
+        .assert_see(r#"<nav class="rx-tabbar" aria-label="Sections">"#)
+        .assert_see(r#"<a class="rx-tabbar__tab" href="/" aria-current="page"><span class="rx-tabbar__icon"><svg class="rx-icon""#)
+        .assert_see(r#"<a class="rx-tabbar__tab" href="/orders"><span class="rx-tabbar__icon">"#)
+        .assert_see(r#"<span class="rx-tabbar__label">Orders</span><span class="rx-tabbar__badge">2</span>"#)
+        .assert_see(r#"<button class="rx-tabbar__tab" type="button" data-rx-open="more" aria-haspopup="dialog">"#)
+        .assert_see(r#"aria-label="Find" aria-controls="rx-nav-search" aria-expanded="false" data-rx-search-toggle>"#)
+        .assert_see(r#"<div class="rx-navbar__search" id="rx-nav-search"><form role="search">"#);
+    // Without tabs the navbar is as before.
+    assert_eq!(html.matches("rx-tabbar\"").count(), 1, "{html}");
+    assert!(html.contains("<header class=\"rx-navbar\">"), "{html}");
     let named = html.split(r#"<p id="named">"#).nth(1).unwrap();
     assert!(
         !named[..named.find("</svg>").unwrap()].contains("aria-hidden"),
